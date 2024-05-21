@@ -51,6 +51,11 @@ html_context = {
     "github_version": "develop",
     "conf_py_path": "/docs/",
 }
+html_logo = "images/logo.svg"
+html_theme_options = {
+    'logo_only': True,
+    'display_version': False,
+}
 html_style = 'css/style.css'
 
 html_static_path = ['_static']
