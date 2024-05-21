@@ -1,5 +1,7 @@
-<img alt="Hephaestus the agile god" height="200px" src="https://github.com/ls1intum/Hephaestus/assets/5898705/656357d1-dfc0-4641-bc7c-671f629a351d">
+<img alt="Hephaestus Logo" height="200px" src="./docs/images/agile_hephaestus.png">
 
 # Hephaestus
 Hephaestus - A Generative AI Mentor for Agile Software Development
 
+## Documentation
+The documentation can be found [here](https://ls1intum.github.io/Hephaestus/).

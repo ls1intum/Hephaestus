@@ -1,0 +1,8 @@
+@startuml Hephaestus
+  !theme plain
+  skinparam style strictuml
+  skinparam SequenceMessageAlignment center
+  
+  "Novice Developer" -> Hephaestus: Mentor me
+  "Novice Developer" <- Hephaestus: Yes
+@enduml
