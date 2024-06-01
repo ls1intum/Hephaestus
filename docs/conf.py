@@ -55,6 +55,7 @@ html_logo = "images/logo.svg"
 html_theme_options = {
     'logo_only': True,
     'display_version': False,
+    'style_nav_header_background': '#3b82f6',
 }
 html_style = 'css/style.css'
 

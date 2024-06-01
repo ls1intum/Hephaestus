@@ -1,10 +1,6 @@
 /* This import resolves when built */
 @import url("theme.css");
 
-.wy-side-nav-search {
-    background-color: #3b82f6;
-}
-
 .wy-body-for-nav .wy-nav-content {
     max-width: none; /* use full width */
 }
