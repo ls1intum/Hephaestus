@@ -37,8 +37,8 @@ autodoc_mock_imports = [
 plantuml_output_format='svg'
 
 # java = 'JAVA_HOME' in os.environ and f"{os.environ['JAVA_HOME']}/bin/java" or 'java'
-# local_plantuml_path = os.path.join(os.path.dirname(__file__), )
-plantuml = f"java -jar ./bin/plantuml.jar"
+local_plantuml_path = os.path.join(os.path.dirname(__file__), 'bin/plantuml.jar')
+plantuml = f'java -jar {local_plantuml_path}'
 
 # -- Options for HTML output -------------------------------------------------
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#options-for-html-output

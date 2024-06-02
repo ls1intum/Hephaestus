@@ -1,0 +1,44 @@
+@startuml
+left to right direction
+skinparam backgroundColor transparent
+skinparam packageStyle rectangle
+
+actor Developer
+actor "Project Manager" as PM
+actor "QA Engineer" as QA
+actor "Security Analyst" as SA
+
+rectangle "Hephaestus System - Maintenance" {
+  usecase "Track and Resolve Bugs" as TRB
+  usecase "Monitor System Performance" as MSP
+  usecase "Perform System Upgrades" as PSU
+  usecase "Apply Security Patches" as ASP
+  usecase "Generate Maintenance Reports" as GMR
+  usecase "Database Maintenance" as DM
+  usecase "Backup and Recovery" as BR
+  usecase "Provide User Support" as PUS
+  usecase "Manage Software Configuration" as MSC
+}
+
+Developer --> TRB
+Developer --> MSP
+Developer --> PSU
+Developer --> ASP
+Developer --> DM
+Developer --> BR
+Developer --> PUS
+Developer --> MSC
+
+PM -up-> TRB
+PM -up-> MSP
+PM -up-> PSU
+PM -up-> GMR
+PM -up-> BR
+PM -up-> MSC
+
+QA -up-> TRB
+QA -up-> MSP
+
+SA -up-> ASP
+SA -up-> MSC
+@enduml

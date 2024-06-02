@@ -1,0 +1,46 @@
+@startuml
+left to right direction
+skinparam backgroundColor transparent
+skinparam packageStyle rectangle
+
+actor Developer
+actor "QA Engineer" as QA
+actor "Scrum Master" as SM
+actor "Project Manager" as PM
+
+rectangle "Hephaestus System - Testing & Integration" {
+  usecase "Generate Automated Tests" as GAT
+  usecase "Manage Test Cases" as MTC
+  usecase "Execute Tests" as ET
+  usecase "Support Manual Testing" as SMT
+  usecase "Track Bugs" as TB
+  usecase "Integrate with CI/CD" as ICC
+  usecase "Generate Test Reports" as GTR
+  usecase "Conduct Regression Testing" as CRT
+  usecase "Conduct Performance Testing" as CPT
+  usecase "Conduct Security Testing" as CST
+}
+
+Developer --> GAT
+Developer --> ET
+Developer --> ICC
+Developer --> CRT
+
+QA -up-> GAT
+QA -up-> MTC
+QA -up-> ET
+QA -up-> SMT
+QA -up-> TB
+QA -up-> GTR
+QA -up-> CRT
+QA -up-> CPT
+QA -up-> CST
+
+SM --> ICC
+
+PM --> MTC
+PM --> TB
+PM --> GTR
+PM --> CPT
+PM --> CST
+@enduml

@@ -1,0 +1,42 @@
+@startuml
+left to right direction
+skinparam backgroundColor transparent
+skinparam packageStyle rectangle
+
+actor "Product Owner" as PO
+actor "Project Manager" as PM
+actor "Scrum Master" as SM
+actor Developer
+
+rectangle "Hephaestus System - Planning" {
+  usecase "Prioritize Backlog Items" as PBI
+  usecase "Assist Sprint Planning" as ASP
+  usecase "Create Project Timeline" as CPT
+  usecase "Generate Planning Reports" as GPR
+  usecase "Identify and Mitigate Risks" as IMR
+  usecase "Plan Resource Allocation" as PRA
+  usecase "Estimate Effort and Costs" as EEC
+  usecase "Define Project Goals and Scope" as DPGS
+}
+
+PM --> DPGS
+PM --> EEC
+PM --> PRA
+PM --> IMR
+PM --> GPR
+PM --> CPT
+
+Developer --> EEC
+Developer --> PRA
+Developer --> ASP
+Developer --> PBI
+
+PO -up-> DPGS
+PO -up-> IMR
+PO -up-> ASP
+PO -up-> PBI
+
+SM --up-> CPT
+SM --up-> GPR
+SM --up-> ASP
+@enduml

@@ -1,0 +1,54 @@
+@startuml
+left to right direction
+skinparam backgroundColor transparent
+skinparam packageStyle rectangle
+
+actor Developer
+actor "Project Manager" as PM
+actor "Scrum Master" as SM
+actor "QA Engineer" as QA
+
+rectangle "Hephaestus System - Implementation" {
+  usecase "Assist Pair Programming" as APP
+  usecase "Automate Code Review" as ACR
+  usecase "Assess Code Quality" as ACQ
+  usecase "Define and Maintain Best Practices" as DMBP
+  usecase "Monitor Guideline Adherence" as MGA
+  usecase "Provide Code Examples" as PCE
+  usecase "Suggest Refactoring" as SR
+  usecase "Generate Implementation Docs" as GID
+  usecase "Support Continuous Integration" as SCI
+  usecase "Analyze Performance" as AP
+  usecase "Conduct Security Checks" as CSC
+  usecase "Facilitate Code Reviews" as FCR
+}
+
+Developer --> APP
+Developer --> ACR
+Developer --> ACQ
+Developer --> DMBP
+Developer --> MGA
+Developer --> PCE
+Developer --> SR
+Developer --> GID
+Developer --> SCI
+Developer --> AP
+Developer --> CSC
+Developer --> FCR
+
+PM -up--> DMBP
+PM -up--> MGA
+PM -up--> GID
+PM -up--> SCI
+
+SM -up-> APP
+SM -up-> DMBP
+SM -up-> MGA
+SM -up-> SCI
+
+QA -up-> ACR
+QA -up-> ACQ
+QA -up-> AP
+QA -up-> CSC
+QA -up-> FCR
+@enduml

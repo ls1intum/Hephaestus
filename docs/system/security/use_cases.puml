@@ -1,0 +1,43 @@
+@startuml
+left to right direction
+skinparam backgroundColor transparent
+skinparam packageStyle rectangle
+
+actor Developer
+actor "Security Analyst" as SA
+actor "QA Engineer" as QA
+
+rectangle "Hephaestus System - Security" {
+  usecase "Identify Security Vulnerabilities" as ISV
+  usecase "Conduct Security Audits" as CSA
+  usecase "Apply Security Patches" as ASP
+  usecase "Monitor Security Compliance" as MSC
+  usecase "Generate Security Reports" as GSR
+  usecase "Conduct Penetration Testing" as CPT
+  usecase "Implement Best Security Practices" as IBSP
+  usecase "Incident Response" as IR
+  usecase "Continuous Security Monitoring" as CSM
+  usecase "Provide Security Training" as PST
+}
+
+Developer --> ISV
+Developer --> ASP
+Developer --> IBSP
+Developer --> IR
+
+SA -up-> ISV
+SA -up-> CSA
+SA -up-> ASP
+SA -up-> MSC
+SA -up-> GSR
+SA -up-> CPT
+SA -up-> IBSP
+SA -up-> IR
+SA -up-> CSM
+SA -up-> PST
+
+QA --> ISV
+QA --> CPT
+QA --> CSM
+
+@enduml

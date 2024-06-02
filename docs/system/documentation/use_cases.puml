@@ -1,0 +1,58 @@
+@startuml
+left to right direction
+skinparam backgroundColor transparent
+skinparam packageStyle rectangle
+
+actor Developer
+actor "Project Manager" as PM
+actor "Scrum Master" as SM
+actor "Product Owner" as PO
+actor "QA Engineer" as QA
+
+rectangle "Hephaestus System - Documentation" {
+  usecase "Generate API Documentation" as GAD
+  usecase "Update Project Documentation" as UPD
+  usecase "Maintain User Manuals" as MUM
+  usecase "Create Technical Specifications" as CTS
+  usecase "Generate Release Notes" as GRN
+  usecase "Automate Documentation Updates" as ADU
+  usecase "Document Best Practices" as DBP
+  usecase "Create Training Materials" as CTM
+  usecase "Compile Knowledge Base" as CKB
+}
+
+Developer --> GAD
+Developer --> UPD
+Developer --> MUM
+Developer --> CTS
+Developer --> ADU
+Developer --> DBP
+Developer --> CTM
+Developer --> CKB
+
+PM ---> UPD
+PM ---> GRN
+PM ---> ADU
+PM ---> DBP
+PM ---> CKB
+
+SM -up---> UPD
+SM -up---> ADU
+SM -up---> DBP
+SM -up---> CTM
+
+PO -up--> UPD
+PO -up--> MUM
+PO -up--> CTS
+PO -up--> GRN
+PO -up--> DBP
+PO -up--> CKB
+
+QA -up-> GAD
+QA -up-> UPD
+QA -up-> MUM
+QA -up-> GRN
+QA -up-> ADU
+QA -up-> DBP
+QA -up-> CKB
+@enduml

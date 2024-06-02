@@ -1,0 +1,29 @@
+@startuml
+left to right direction
+skinparam backgroundColor transparent
+skinparam packageStyle rectangle
+
+actor "Project Manager" as PM
+actor Developer
+actor "Product Owner" as PO
+
+rectangle "Hephaestus System - Analysis" {
+  usecase "Collect and Document Requirements" as CDR
+  usecase "Analyze and Validate Requirements" as AVR
+  usecase "Model System Behavior" as MSB
+  usecase "Define Acceptance Criteria" as DAC
+  usecase "Generate Analysis Reports" as GAR
+}
+
+PM --> CDR
+PM --> AVR
+PM --> GAR
+
+Developer --> AVR
+Developer --> MSB
+Developer --> DAC
+
+PO -up-> CDR
+PO -up-> AVR
+PO -up-> DAC
+@enduml

@@ -1,8 +1,10 @@
 .. _hephaestus:
 
-==================================================================
-Hephaestus - A Generative AI Mentor for Agile Software Development
-==================================================================
+=====================================================================================================
+Hephaestus: Leveraging Generative AI to Enhance Software Development Processes and Developer Training
+=====================================================================================================
+
+Hephaestus leverages generative AI, specifically large language models (LLMs), to enhance the software development lifecycle (SDLC) and developer training. This research project explores how AI can improve each phase of the SDLC — planning, analysis, design, implementation, testing & integration, and maintenance — while also providing comprehensive support for developer onboarding and continuous education. By integrating AI-driven insights and adaptive guidance into these processes, Hephaestus aims to boost efficiency, adherence to best practices, and overall software quality. The project also emphasizes support for agile methodologies, ensuring dynamic and iterative improvements to development workflows.
 
 .. figure:: ./images/agile_hephaestus.png
   :height: 250px
@@ -10,31 +12,20 @@ Hephaestus - A Generative AI Mentor for Agile Software Development
 
   Hephaestus /hɪˈfɛstəs/ is the Greek god of blacksmiths, craftsmen, and artisans, symbolizing the fusion of creativity and technical skill.
 
-Introduction
-============
+.. uml:: ./use_cases.puml
 
-Hephaestus is designed to mentor novice developers in agile software development practices. The aim is to integrate Hephaestus into software engineering practical courses, extended university projects, and agile teams in the industry to help learn and apply agile methodologies. Unlike traditional educational tools that offer static content, Hephaestus provides dynamic, real-time guidance, adapting to individual and team needs.
-
-This approach is expected to foster a better understanding and application of agile principles among novice developers, preparing them more effectively for professional software development environments. Hephaestus fills a critical gap in educational technology by actively supporting and enhancing learning in complex, team-based settings.
-
-**Please note:** Hephaestus is currently in the concept and planning phase. The project aims to provide proactive guidance to novice developers, from planning a feature to delivering it to production and beyond.
-
-.. getting_started/index
-.. user_guide/index
-.. api_reference/index
-.. faq/index
-.. contribute/index
-.. uml_diagrams/index
 .. toctree::
-  :maxdepth: 2
-  :caption: Contents
+  :maxdepth: 3
+  :caption: System Documentation
 
-  requirements_analysis/index
-  system_design/index
-  object_design/index
+  system/planning/index
+  system/analysis/index
+  system/design/index
+  system/implementation/index
+  system/testing_and_integration/index
+  system/maintenance/index
+  system/training/index
+  system/collaboration/index
+  system/documentation/index
+  system/security/index
 
-
-Rough UML Activity Diagram for Hephaestus
-=========================================
-
-.. uml:: hephaestus.uml

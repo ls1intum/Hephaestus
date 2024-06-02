@@ -1,0 +1,48 @@
+@startuml
+left to right direction
+skinparam backgroundColor transparent
+skinparam packageStyle rectangle
+
+actor Developer
+actor "Project Manager" as PM
+actor "Scrum Master" as SM
+actor "Product Owner" as PO
+
+rectangle "Hephaestus System - Training" {
+  usecase "Developer Training" as UC1
+  usecase "Onboard New Developers" as UC2
+  usecase "Provide Learning Resources" as UC3
+  usecase "Track Training Progress" as UC4
+  usecase "Generate Training Reports" as UC5
+  usecase "Conduct Training Sessions" as UC6
+  usecase "Offer Mentorship Programs" as UC7
+  usecase "Manage Certification Programs" as UC8
+  usecase "Evaluate Skill Levels" as UC9
+}
+
+Developer --> UC1
+Developer --> UC2
+Developer --> UC3
+Developer --> UC4
+Developer --> UC5
+Developer --> UC6
+Developer --> UC7
+Developer --> UC8
+Developer --> UC9
+
+PM -up-> UC1
+PM -up-> UC4
+PM -up-> UC5
+PM -up-> UC6
+
+SM -up-> UC2
+SM -up-> UC3
+SM -up-> UC6
+SM -up-> UC7
+
+PO -up-> UC3
+PO -up--> UC4
+PO -up-> UC7
+PO -up-> UC8
+
+@enduml
