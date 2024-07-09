@@ -35,19 +35,3 @@ Architecture
     :alt: Hephaestus Top Level Design
 
     Hephaestus Top Level Design
-
-.. toctree::
-  :maxdepth: 3
-  :caption: System Documentation
-
-  system/planning/index
-  system/analysis/index
-  system/design/index
-  system/implementation/index
-  system/testing_and_integration/index
-  system/maintenance/index
-  system/training/index
-  system/collaboration/index
-  system/documentation/index
-  system/security/index
-
