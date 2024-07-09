@@ -5,12 +5,10 @@ left to right direction
 skinparam backgroundColor transparent
 
 class Developer {
-  username
-  email
+  name
   picture
   points
   level
-  submitReview()
 }
 
 class Team {
@@ -18,6 +16,8 @@ class Team {
   identifier
   addMember()
   removeMember()
+  addRepository()
+  removeRepository()
 }
 
 class Repository {
@@ -25,6 +25,7 @@ class Repository {
   description
   source
   isPublic
+  createPullRequest()
   monitorActivity()
 }
 
@@ -32,18 +33,25 @@ class PullRequest {
   title
   description
   submissionDate
-  status
+  commits
+  tags
   submit()
+  edit()
   merge()
   close()
+  requestReview()
 }
 
 class Review {
   comment
   didManualTest
   didCodeReview
+  commit
   submit()
   edit()
+  approve()
+  requestChanges()
+  addComments()
 }
 
 class CodeComment {
@@ -61,6 +69,8 @@ enum ReviewState {
 
 class Leaderboard {
   title
+  timeframe
+  selectTimeframe()
   updateRankings()
   displayRankings()
 }
@@ -68,12 +78,15 @@ class Leaderboard {
 class LeaderboardEntry {
   score
   placement
+  date
 }
 
 class Level {
   number
   minimumPoints
   maximumPoints
+  currentPoints
+  lastUpdated
   gainPoints()
   levelUp()
   viewLevelProgress()
@@ -85,7 +98,8 @@ abstract class Reward {
   criteria
   pointsReward
   displayReward()
-  notifyUser()
+  notifyDeveloper()
+  notifyTeam()
 }
 
 class Badge {
@@ -96,17 +110,20 @@ class Badge {
 }
 
 class Achievement {
+  achievementDate
   unlock()
 }
 
 class Challenge {
   timeLimit
+  timeRemaining
   start()
   complete()
 }
 
 class Quest {
   tasks
+  progress
   start()
   complete()
 }
@@ -118,8 +135,8 @@ class NotificationSystem {
   markAsRead()
 }
 
-
 class GamificationDashboard { 
+  displayPreferences
   displayDashboard()
   showWeekly()
   showMonthly()
@@ -127,29 +144,31 @@ class GamificationDashboard {
 }
 
 
-Repository o- PullRequest: pullRequests
-Team o--- "*" Repository: manages
-Developer "*" --- "*" Team: members
+Team o- "1..*" Developer: members
+Team "*" - "1" Developer: teamLead
+
+Repository o-- PullRequest: pullRequests
+Team o-- "*" Repository: repositories
 PullRequest o-- "1..*" Developer: author
 Review --> Developer: author
-Review *-- "*" CodeComment: comments
+Review o-- "*" CodeComment: comments
 PullRequest o-- "*" Review: reviews
-Review -- ReviewState: state
+Review --- ReviewState: state
 
-Leaderboard -- Team
-Leaderboard *-- LeaderboardEntry
-LeaderboardEntry o-- Developer
+Leaderboard - Team
+Leaderboard *- "*" LeaderboardEntry
+Developer o-- "*" LeaderboardEntry
 
 Reward <|-- Badge
 Reward <|-- Achievement
 Reward <|-- Challenge
 Reward <|-- Quest
 
-GamificationDashboard -- Developer
-GamificationDashboard o-- "*" Leaderboard: leaderboards
-GamificationDashboard o-- "*" Reward: rewards
-GamificationDashboard o-- "*" Level: achivedLevels
-GamificationDashboard - NotificationSystem
-NotificationSystem o-- Developer: recipients
+GamificationDashboard ---- Developer
+GamificationDashboard o--- "*" Leaderboard: leaderboards
+GamificationDashboard o--- "*" Reward: rewards
+GamificationDashboard o--- "*" Level: achivedLevels
+GamificationDashboard "*" --- NotificationSystem
+NotificationSystem o- "*" Developer: recipients
 
 @enduml
