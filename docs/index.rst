@@ -32,6 +32,13 @@ Architecture
 ------------
 
 .. figure:: ./system/top_level_architecture.svg
-    :alt: Hephaestus Top Level Design
+  :alt: Hephaestus Top Level Design
 
-    Hephaestus Top Level Design
+  Hephaestus Top Level Design (UML Component Diagram)
+
+
+.. toctree::
+  :caption: Table of Content
+  :maxdepth: 3
+
+  system/gamification/index

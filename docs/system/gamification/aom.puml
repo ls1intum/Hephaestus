@@ -1,0 +1,155 @@
+@startuml
+!theme plain
+hide circle
+left to right direction
+skinparam backgroundColor transparent
+
+class Developer {
+  username
+  email
+  picture
+  points
+  level
+  submitReview()
+}
+
+class Team {
+  name
+  identifier
+  addMember()
+  removeMember()
+}
+
+class Repository {
+  name
+  description
+  source
+  isPublic
+  monitorActivity()
+}
+
+class PullRequest {
+  title
+  description
+  submissionDate
+  status
+  submit()
+  merge()
+  close()
+}
+
+class Review {
+  comment
+  didManualTest
+  didCodeReview
+  submit()
+  edit()
+}
+
+class CodeComment {
+  comment
+  reference
+  reply()
+  resolve()
+}
+
+enum ReviewState {
+  APPROVE
+  COMMENT
+  REQUESTED_CHANGES
+}
+
+class Leaderboard {
+  title
+  updateRankings()
+  displayRankings()
+}
+
+class LeaderboardEntry {
+  score
+  placement
+}
+
+class Level {
+  number
+  minimumPoints
+  maximumPoints
+  gainPoints()
+  levelUp()
+  viewLevelProgress()
+}
+
+abstract class Reward {
+  title
+  description
+  criteria
+  pointsReward
+  displayReward()
+  notifyUser()
+}
+
+class Badge {
+  progress
+  unlockDate
+  awardBadge()
+  trackProgress()
+}
+
+class Achievement {
+  unlock()
+}
+
+class Challenge {
+  timeLimit
+  start()
+  complete()
+}
+
+class Quest {
+  tasks
+  start()
+  complete()
+}
+
+class NotificationSystem {
+  notifications
+  sendNotification()
+  viewNotification()
+  markAsRead()
+}
+
+
+class GamificationDashboard { 
+  displayDashboard()
+  showWeekly()
+  showMonthly()
+  showAll()
+}
+
+
+Repository o- PullRequest: pullRequests
+Team o--- "*" Repository: manages
+Developer "*" --- "*" Team: members
+PullRequest o-- "1..*" Developer: author
+Review --> Developer: author
+Review *-- "*" CodeComment: comments
+PullRequest o-- "*" Review: reviews
+Review -- ReviewState: state
+
+Leaderboard -- Team
+Leaderboard *-- LeaderboardEntry
+LeaderboardEntry o-- Developer
+
+Reward <|-- Badge
+Reward <|-- Achievement
+Reward <|-- Challenge
+Reward <|-- Quest
+
+GamificationDashboard -- Developer
+GamificationDashboard o-- "*" Leaderboard: leaderboards
+GamificationDashboard o-- "*" Reward: rewards
+GamificationDashboard o-- "*" Level: achivedLevels
+GamificationDashboard - NotificationSystem
+NotificationSystem o-- Developer: recipients
+
+@enduml
