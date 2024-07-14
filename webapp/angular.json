@@ -10,8 +10,7 @@
           "inlineStyle": true,
           "style": "sass",
           "skipTests": true,
-          "standalone": true,
-          "changeDetection": "OnPush"
+          "standalone": true
         },
         "@schematics/angular:class": {
           "skipTests": true
@@ -45,9 +44,7 @@
             "outputPath": "dist/webapp",
             "index": "src/index.html",
             "browser": "src/main.ts",
-            "polyfills": [
-              "zone.js"
-            ],
+            "polyfills": [],
             "tsConfig": "tsconfig.app.json",
             "inlineStyleLanguage": "sass",
             "assets": [
