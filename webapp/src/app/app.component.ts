@@ -10,5 +10,5 @@ import { HelloWorldComponent } from './hello-world/hello-world.component';
   styles: [],
 })
 export class AppComponent {
-  title = 'webapp';
+  title = 'Hephaestus';
 }
