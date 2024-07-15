@@ -1,12 +1,13 @@
 {
-  "name": "webapp",
+  "name": "hephaestus",
   "version": "0.0.0",
   "scripts": {
     "ng": "ng",
     "start": "ng serve",
     "build": "ng build",
     "watch": "ng build --watch --configuration development",
-    "test": "ng test"
+    "test": "ng test",
+    "generate:api": "npx openapi-generator-cli generate -i ../server/openapi.yaml -g typescript-angular -o ./src/app/core/modules/openapi --additional-properties fileNaming=kebab-case,withInterfaces=true --generate-alias-as-model"
   },
   "private": true,
   "dependencies": {
