@@ -1,0 +1,28 @@
+
+<div class="flex gap-2 items-start m-2">
+  <button class="p-2 bg-blue-500 hover:bg-blue-600 disabled:bg-gray-300 disabled:hover:bg-gray-300 rounded-md" [disabled]="this.pokemonId() <= 0" (click)="decrementId()">
+    Prev
+  </button>
+  <button class="p-2 bg-blue-500 hover:bg-blue-600 rounded-md" (click)="incrementId()">
+    Next
+  </button>
+</div>
+
+
+@if (query.isPending()) {
+  Loading...
+} @else if (query.error()) {
+  An error has occurred: {{ query.error()?.message }}
+}
+
+@if (query.data(); as pokemon) {
+  <div class="p-2 m-2 border border-1 border-gray-400">
+    <p>ID: {{pokemon.id }}</p>
+    <p>Name: {{pokemon.name }}</p>
+    @if (query.isFetching()) {
+      <p>Updating...</p>
+    }
+  </div>
+}
+
+<angular-query-devtools initialIsOpen />

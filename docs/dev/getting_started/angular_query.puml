@@ -1,0 +1,37 @@
+@startuml
+!theme plain
+skinparam backgroundColor transparent
+
+[*] -> Idle
+
+Idle : Query has data
+Idle : fetchStatus = 'idle'
+Idle -> Fetching : User initiates refetch
+
+Fetching : Query is fetching data
+Fetching : fetchStatus = 'fetching'
+Fetching --> Success : Data fetched successfully
+Fetching --> Error : Data fetching failed
+Fetching --> Paused : Network connection lost
+
+Success : Data is available
+Success : status = 'success'
+Success --> Fetching : Background refetch
+
+Error : Query encountered an error
+Error : status = 'error'
+Error --> Fetching : Retry fetch
+
+Paused : Fetching paused
+Paused : fetchStatus = 'paused'
+Paused --> Fetching : Network connection restored
+
+Fetching --> Pending : No data yet
+
+Pending : Query has no data
+Pending : status = 'pending'
+Pending : fetchStatus = 'fetching'
+Pending ---> Error : Data fetching failed
+Pending ---> Success : Data fetched successfully
+Paused --> Pending : Network connection lost
+@enduml

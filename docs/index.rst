@@ -36,9 +36,16 @@ Architecture
 
   Hephaestus Top Level Design (UML Component Diagram)
 
+.. toctree::
+  :caption: Contributor Guide
+  :includehidden:
+  :maxdepth: 3
+
+  dev/getting_started/getting_started
 
 .. toctree::
-  :caption: Table of Content
+  :caption: System
+  :includehidden:
   :maxdepth: 3
 
   system/gamification/index
