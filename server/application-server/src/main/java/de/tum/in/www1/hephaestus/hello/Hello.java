@@ -1,4 +1,4 @@
-package de.tum.in.www1.hephaestus;
+package de.tum.in.www1.hephaestus.hello;
 
 import java.time.Instant;
 
@@ -16,7 +16,7 @@ import lombok.Setter;
 @Getter
 @Setter
 public class Hello {
-  
+
   @Id
   @GeneratedValue(strategy = GenerationType.IDENTITY)
   private Long id;

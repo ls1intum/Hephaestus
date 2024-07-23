@@ -1,11 +1,10 @@
-package de.tum.in.www1.hephaestus;
+package de.tum.in.www1.hephaestus.hello;
 
 import java.time.Instant;
 import java.util.List;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 @Service
@@ -13,8 +12,11 @@ public class HelloService {
 
   private static final Logger logger = LoggerFactory.getLogger(HelloService.class);
 
-  @Autowired
-  private HelloRepository helloRepository;
+  private final HelloRepository helloRepository;
+
+  public HelloService(HelloRepository helloRepository) {
+    this.helloRepository = helloRepository;
+  }
 
   public List<Hello> getAllHellos() {
     return helloRepository.findAll();

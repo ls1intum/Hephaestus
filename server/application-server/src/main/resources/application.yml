@@ -4,17 +4,15 @@ spring:
 
   datasource:
     url: jdbc:postgresql://localhost:5432/hephaestus
-    username:
-    password:
+    username: root
+    password: root
   
   jpa:
-    show_sql: true
     hibernate:
       ddl-auto: create-drop
     properties:
       hibernate:
         dialect: org.hibernate.dialect.PostgreSQLDialect
-        format_sql: true
 
   liquibase:
     change-log: classpath:db/master.xml
@@ -23,7 +21,3 @@ spring:
     user:
       name: admin
       password: admin
-
-logging:
-  level:
-    root: INFO
