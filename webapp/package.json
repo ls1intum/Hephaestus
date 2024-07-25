@@ -10,6 +10,9 @@
     "generate:api": "rimraf ./src/app/core/modules/openapi  && npx openapi-generator-cli generate -i ../server/openapi.yaml -g typescript-angular -o ./src/app/core/modules/openapi --additional-properties fileNaming=kebab-case,withInterfaces=true --generate-alias-as-model"
   },
   "private": true,
+  "engines": {
+    "node": "22"
+  },
   "dependencies": {
     "@angular/animations": "18.1.2",
     "@angular/common": "18.1.2",
