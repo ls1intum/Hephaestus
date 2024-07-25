@@ -1,0 +1,23 @@
+spring:
+  application:
+    name: Hephaestus
+
+  datasource:
+    url: jdbc:postgresql://localhost:5432/hephaestus
+    username: root
+    password: root
+  
+  jpa:
+    hibernate:
+      ddl-auto: create-drop
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.PostgreSQLDialect
+
+  liquibase:
+    change-log: classpath:db/master.xml
+
+  security:
+    user:
+      name: admin
+      password: admin
