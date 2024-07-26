@@ -7,7 +7,9 @@
     "build": "ng build",
     "watch": "ng build --watch --configuration development",
     "test": "ng test",
-    "generate:api": "rimraf ./src/app/core/modules/openapi  && npx openapi-generator-cli generate -i ../server/openapi.yaml -g typescript-angular -o ./src/app/core/modules/openapi --additional-properties fileNaming=kebab-case,withInterfaces=true --generate-alias-as-model"
+    "generate:api": "rimraf ./src/app/core/modules/openapi  && npx openapi-generator-cli generate -i ../server/openapi.yaml -g typescript-angular -o ./src/app/core/modules/openapi --additional-properties fileNaming=kebab-case,withInterfaces=true --generate-alias-as-model",
+    "storybook": "ng run webapp:storybook",
+    "build-storybook": "ng run webapp:build-storybook"
   },
   "private": true,
   "engines": {
@@ -34,6 +36,14 @@
     "@angular-devkit/build-angular": "18.1.2",
     "@angular/cli": "18.1.2",
     "@angular/compiler-cli": "18.1.2",
+    "@chromatic-com/storybook": "^1.6.1",
+    "@storybook/addon-essentials": "^8.2.6",
+    "@storybook/addon-interactions": "^8.2.6",
+    "@storybook/addon-links": "^8.2.6",
+    "@storybook/addon-onboarding": "^8.2.6",
+    "@storybook/angular": "^8.2.6",
+    "@storybook/blocks": "^8.2.6",
+    "@storybook/test": "^8.2.6",
     "@types/jasmine": "5.1.4",
     "jasmine-core": "5.2.0",
     "karma": "6.4.3",
@@ -42,6 +52,7 @@
     "karma-jasmine": "5.1.0",
     "karma-jasmine-html-reporter": "2.1.0",
     "rimraf": "^6.0.1",
+    "storybook": "^8.2.6",
     "typescript": "5.5.4"
   }
 }
