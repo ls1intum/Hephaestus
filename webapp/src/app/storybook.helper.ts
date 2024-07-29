@@ -69,7 +69,7 @@ function createCVADefaultArgs<T>(config?: Config<T>) {
   }
 }
 
-export function cva<T>(base?: ClassValue, config?: Config<T>) {
+export function cva<T extends ConfigSchema>(base?: ClassValue, config?: Config<T>) {
   const cvaFunction = CVA(base, config);
   const argTypes = createCVAArgTypes(config);
   const defaultArgs = createCVADefaultArgs(config);

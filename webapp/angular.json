@@ -123,6 +123,7 @@
           "options": {
             "configDir": ".storybook",
             "browserTarget": "webapp:build",
+            "styles": ["src/styles.css"],
             "compodoc": false,
             "port": 6006
           }
