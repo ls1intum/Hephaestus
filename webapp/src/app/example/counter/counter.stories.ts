@@ -1,5 +1,5 @@
 import type { Meta, StoryObj } from '@storybook/angular';
-import { toArgs } from '@app/storybook.helper';
+import { toArgs } from 'app/storybook.helper';
 import { CounterComponent } from './counter.component';
 
 // More on how to set up stories at: https://storybook.js.org/docs/writing-stories

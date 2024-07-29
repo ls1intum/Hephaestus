@@ -45,23 +45,28 @@ type Config<T> = T extends ConfigSchema ? {
     compoundVariants?: (T extends ConfigSchema ? (ConfigVariants<T> | ConfigVariantsMulti<T>) & ClassProp : ClassProp)[];
 } : never;
 
-function createCVAArgTypes<T>(config?: Config<T>): ArgTypes {
-  const argTypes: ArgTypes = {};
-  if (config?.variants) {
-    const variants = config.variants;
-    for (const variant in variants) {
-      argTypes[variant] = {
-        control: { type: 'select' },
-        options: Object.keys(variants[variant]),
-        description: `Variant for ${variant}`,
-      };
-    }
+function createCVAArgTypes<T extends ConfigSchema>(config?: Config<T>) {
+  if (!config?.variants) {
+    return {};
   }
-  return argTypes;
+
+  const variants = config?.variants;
+  return Object.fromEntries(
+    Object.entries(variants).map(([variant, options]) => {
+      const variantKey = variant as keyof T;
+      const optionsArray = Object.keys(options) as (keyof T[typeof variantKey])[];
+      return [variant, {
+        control: { type: 'select' },
+        options: optionsArray
+      }];
+    })
+  );
 }
 
 function createCVADefaultArgs<T>(config?: Config<T>) {
-  return config?.defaultVariants as Args;
+  return (config?.defaultVariants || {}) as {
+    [Variant in keyof T]: keyof T[Variant];
+  }
 }
 
 export function cva<T>(base?: ClassValue, config?: Config<T>) {
