@@ -1,8 +1,10 @@
-import { Component, HostBinding, input } from '@angular/core';
+import { computed, Directive, HostBinding, input } from '@angular/core';
+import type { ClassValue } from 'clsx';
+import { VariantProps } from 'class-variance-authority';
 import { cn } from '@app/utils';
-import { cva, VariantProps } from 'class-variance-authority';
+import { cva } from 'app/storybook.helper';
 
-const buttonVariants = cva(
+const [buttonVariants, args, argTypes] = cva(
   'inline-flex items-center justify-center whitespace-nowrap rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50',
   {
     variants: {
@@ -28,20 +30,23 @@ const buttonVariants = cva(
   }
 );
 
+export { args, argTypes };
+
 interface ButtonVariants extends VariantProps<typeof buttonVariants> {}
 
-@Component({
-  selector: 'button',
+@Directive({
+  selector: 'appBtn',
   standalone: true,
-  templateUrl: './button.component.html',
 })
-export class ButtonComponent {
+export class AppButtonDirective {
+	class = input<ClassValue>('');
   variant = input<ButtonVariants['variant']>('default');
   size = input<ButtonVariants['size']>('default');
-  asChild = input<boolean>(false);
+
+  private computedClass = computed(() => cn(buttonVariants({ variant: this.variant(), size: this.size() }), this.class()));
 
   @HostBinding('class')
-  get classes(): string {
-    return cn(buttonVariants({ variant: this.variant(), size: this.size() }));
+  get test() {
+    return this.computedClass();
   }
 }

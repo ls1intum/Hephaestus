@@ -1,26 +1,26 @@
-import type { Meta, StoryObj } from '@storybook/angular';
+import { argsToTemplate, type Meta, type StoryObj } from '@storybook/angular';
 import { toArgs } from '@app/storybook.helper';
-import { ButtonComponent } from './button.component';
-import { InputSignal } from '@angular/core';
+import { AppButtonDirective, args, argTypes } from './button.directive';
 
 // More on how to set up stories at: https://storybook.js.org/docs/writing-stories
-const meta: Meta<ButtonComponent> = {
+const meta: Meta<AppButtonDirective> = {
   title: 'Example/Button2',
-  component: ButtonComponent,
+  component: AppButtonDirective,
   tags: ['autodocs'],
-  argTypes: {
-    variant: 'default' as unknown as InputSignal<'default' | 'primary' | 'secondary'>,
-    size: 'lg' as unknown as InputSignal<'sm' | 'md' | 'lg'>,
-  },
+  args: toArgs(args),
+  argTypes: argTypes,
 };
 
 export default meta;
-type Story = StoryObj<ButtonComponent>;
+type Story = StoryObj<AppButtonDirective>;
+
+console.log('args', args);
+console.log('argTypes', argTypes);
 
 // More on writing stories with args: https://storybook.js.org/docs/writing-stories/args
 export const Primary: Story = {
-  args: {
-    variant: 'default',
-    size: 'lg',
-  },
+  render: (args) => ({
+    props: args,
+    template: `<button appBtn ${argsToTemplate(args)}>Click me</button>`,
+  }),
 };
