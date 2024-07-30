@@ -9,7 +9,8 @@
     "test": "ng test",
     "generate:api": "rimraf ./src/app/core/modules/openapi  && npx openapi-generator-cli generate -i ../server/openapi.yaml -g typescript-angular -o ./src/app/core/modules/openapi --additional-properties fileNaming=kebab-case,withInterfaces=true --generate-alias-as-model",
     "storybook": "ng run webapp:storybook",
-    "build-storybook": "ng run webapp:build-storybook"
+    "build-storybook": "ng run webapp:build-storybook",
+    "chromatic": "npx chromatic --exit-zero-on-changes"
   },
   "private": true,
   "engines": {
@@ -51,6 +52,7 @@
     "@storybook/blocks": "8.2.6",
     "@storybook/test": "8.2.6",
     "@types/jasmine": "5.1.4",
+    "chromatic": "11.5.6",
     "jasmine-core": "5.2.0",
     "karma": "6.4.3",
     "karma-chrome-launcher": "3.2.0",
