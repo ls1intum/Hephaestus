@@ -11,4 +11,6 @@ Hephaestus leverages generative AI, specifically large language models (LLMs), t
 Hephaestus /hɪˈfɛstəs/ is the Greek god of blacksmiths, craftsmen, and artisans, symbolizing the fusion of creativity and technical skill.
 
 ## Documentation
-The documentation can be found [here](https://ls1intum.github.io/Hephaestus/).
+
+Technical/user docs: [Read the Docs](https://ls1intum.github.io/Hephaestus/)  
+UI component docs: [Storybook](https://develop--66a8981a27ced8fef3190d41.chromatic.com/)
