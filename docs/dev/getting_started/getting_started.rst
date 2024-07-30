@@ -124,6 +124,9 @@ Best Practices for Using Storybook
 .. important::
     Chromatic runs on every PR, make sure to add stories and check the visual diffs and get them approved if they are expected! Build results are located in the ``Chromatic: Run Chromatic`` CI check under ``Details`` at ``Summary``. 
 
+.. tip::
+    Refer to `Shadcn/ui <https://ui.shadcn.com/>`_ (React components) for theming and component examples. We are copying their styles and also use `Class Variance Authority <https://cva.style/docs>`_ for our components like them. The Shadcn/ui Angular port `Spartan/ui <https://www.spartan.ng/documentation/installation>`_ can also be used as reference, they are also using Storybook but we are not directly copying their components' code. Refer to existing components in the project for `examples <https://develop--66a8981a27ced8fef3190d41.chromatic.com/?path=/docs/ui-button--docs>`_. For more complex components, we might want to use `Angular CDK <https://material.angular.io/cdk/categories>`_ as a base while avoiding libraries that are not widely used or maintained.
+
 OpenAPI: Type-Safe API Interaction
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
