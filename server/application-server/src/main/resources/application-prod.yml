@@ -1,0 +1,14 @@
+spring:
+  datasource:
+    url: ${DATABASE_URL}
+    username: ${DATABASE_USERNAME}
+    password: ${DATABASE_PASSWORD}
+  
+  jpa:
+    hibernate:
+      ddl-auto: none
+
+  security:
+    user:
+      name: ${SECURITY_USER_NAME}
+      password: ${SECURITY_USER_PASSWORD}
