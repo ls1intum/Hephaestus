@@ -41,6 +41,9 @@ interface ButtonVariants extends VariantProps<typeof buttonVariants> {}
 })
 export class AppButtonComponent {
 	class = input<ClassValue>('');
+  /**
+   * Text label for the button
+   */
   variant = input<ButtonVariants['variant']>('default');
   size = input<ButtonVariants['size']>('default');
   disabled = input<boolean>(false);
