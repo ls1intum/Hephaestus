@@ -8,11 +8,11 @@ const meta: Meta<AppButtonComponent> = {
   title: 'UI/Button',
   component: AppButtonComponent,
   tags: ['autodocs'],
-  args: identity({
+  args: {
     ...args,
     disabled: false,
     onClick: fn(),
-  }),
+  },
   argTypes: {
     ...argTypes,
     disabled: {
