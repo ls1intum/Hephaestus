@@ -84,6 +84,48 @@ Best Practices
 4. **Avoid Premature Abstraction:** Don't use ``@apply`` just to clean up your HTML. **It is fine to repeat yourself!**
 5. **Design Tokens:** Utilize design tokens for consistent theming and easy maintenance of your design system. Define and use them in your Tailwind configuration for colors, spacing, typography, etc.
 
+Storybook: Component Driven UI
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+**Storybook.js is a frontend workshop for building UI components and pages in isolation.** Thousands of teams, including ours, use it for UI development, testing, and documentation. It's open source and free, and it transforms how we develop user interfaces by enabling us to focus on creating high-quality, reusable components without the grunt work.
+
+.. figure:: ./storybook.svg
+  :width: 250px
+  :alt: Storybook Logo
+
+
+Storybook's Core Strengths
+""""""""""""""""""""""""""
+
+1. **Isolation:** Develop components in isolation, ensuring they work independently of the app. This prevents issues arising from dependencies on other components or global application state.
+2. **Component-Driven Development (CDD):** Focus on building individual UI components first and then composing them into complete user interfaces. This methodology aligns with modern frontend best practices and enhances reusability and maintainability.
+3. **Interactive Documentation:** Each component can be documented interactively, allowing developers and designers to see the components in various states and configurations.
+4. **Automated Testing:** Storybook supports a variety of testing tools for visual regression testing, accessibility checks, and behavior testing, ensuring components meet quality standards before integration.
+
+Getting Started with Storybook
+""""""""""""""""""""""""""""""
+
+- `Storybook.js <https://storybook.js.org/>`_: Official website for Storybook.
+- `Review our Storybook <https://develop--66a8981a27ced8fef3190d41.chromatic.com/>`_: Explore our Storybook to see an overview of our components for reference (state of ``develop`` branch).
+- `Storybook Docs <https://storybook.js.org/docs>`_: Official documentation for Storybook.
+- `What's a story? <https://storybook.js.org/docs/get-started/whats-a-story>`_: Learn the basics of Storybook and how to create stories.
+- `Storybook Tutorial <https://storybook.js.org/tutorials/>`_: Step-by-step guide to creating a Storybook for your project.
+- `Chromatic <https://www.chromatic.com/>`_: Automated visual testing and review tool for Storybook that we use.
+- `Addons <https://storybook.js.org/addons>`_: Extend Storybook's functionality with a rich ecosystem of addons for actions, accessibility, backgrounds, and more.
+
+Best Practices for Using Storybook
+""""""""""""""""""""""""""""""""""
+
+1. **Organize Stories Logically:** Group stories by component type or feature to maintain a clean and navigable Storybook.
+2. **Comprehensive Stories:** Ensure each component has a story and the stories cover all meaningful states, including edge cases, to thoroughly test and document its behavior.
+3. **Automated Testing Integration:** Perform visual regression testing, accessibility checks, and behavior testing in Storybook to catch issues early and ensure components meet quality standards. 
+4. **Visual Regression Testing:** Use Chromatic for visual regression testing for Storybook stories to catch visual bugs early and ensure consistent UI across components. Ensure you have a Chromatic account that is added to the team and you are familiar with the tool.
+
+.. important::
+    Chromatic runs on every PR, make sure to add stories and check the visual diffs and get them approved if they are expected! Build results are located in the ``Chromatic: Run Chromatic`` CI check under ``Details`` at ``Summary``. 
+
+.. tip::
+    Refer to `Shadcn/ui <https://ui.shadcn.com/>`_ (React components) for theming and component examples. We are copying their styles and also use `Class Variance Authority <https://cva.style/docs>`_ for our components like them. The Shadcn/ui Angular port `Spartan/ui <https://www.spartan.ng/documentation/installation>`_ can also be used as reference, they are also using Storybook but we are not directly copying their components' code. Refer to existing components in the project for `examples <https://develop--66a8981a27ced8fef3190d41.chromatic.com/?path=/docs/ui-button--docs>`_. For more complex components, we might want to use `Angular CDK <https://material.angular.io/cdk/categories>`_ as a base while avoiding libraries that are not widely used or maintained.
 
 OpenAPI: Type-Safe API Interaction
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
