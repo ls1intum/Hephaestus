@@ -36,7 +36,7 @@
       },
       "root": "",
       "sourceRoot": "src",
-      "prefix": "",
+      "prefix": "app",
       "architect": {
         "build": {
           "builder": "@angular-devkit/build-angular:application",
@@ -116,6 +116,25 @@
               "src/styles.css"
             ],
             "scripts": []
+          }
+        },
+        "storybook": {
+          "builder": "@storybook/angular:start-storybook",
+          "options": {
+            "configDir": ".storybook",
+            "browserTarget": "webapp:build",
+            "styles": ["src/styles.css"],
+            "compodoc": false,
+            "port": 6006
+          }
+        },
+        "build-storybook": {
+          "builder": "@storybook/angular:build-storybook",
+          "options": {
+            "configDir": ".storybook",
+            "browserTarget": "webapp:build",
+            "compodoc": false,
+            "outputDir": "storybook-static"
           }
         }
       }

@@ -1,8 +1,8 @@
 import { Component, inject, signal } from '@angular/core';
-import { PokemonService } from '../../core/modules/openapi';
 import { injectQuery, injectQueryClient } from '@tanstack/angular-query-experimental';
 import { AngularQueryDevtools } from '@tanstack/angular-query-devtools-experimental'
 import { fromEvent, lastValueFrom } from 'rxjs';
+import { PokemonService } from 'app/core/modules/openapi';
 
 @Component({
   selector: 'pokemon',

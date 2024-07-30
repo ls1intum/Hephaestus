@@ -2,12 +2,12 @@
   <h3 class="text-xl font-medium">Counter Title: {{title()}}</h3>
   <p>Value: {{counter()}}<p>
   <p>HexValue: {{hexCounter()}}<p>
-  <button class="font-medium text-white bg-indigo-500 hover:bg-indigo-600 rounded-md px-4 py-1" (click)="increment()">
+  <app-button (click)="increment()">
     Increment 
     @if (byCount() > 1) {
       by {{byCount()}}
     }
-  </button>
+  </app-button>
   <h4 class="text-lg font-medium">History</h4>
   <div>
     @for (item of counterHistory(); track item.dec) {
