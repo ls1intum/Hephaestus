@@ -16,7 +16,7 @@ paths:
   /hello:
     get:
       tags:
-      - hello-controller
+      - hello
       operationId: getAllHellos
       responses:
         "200":
@@ -29,7 +29,7 @@ paths:
                   $ref: "#/components/schemas/Hello"
     post:
       tags:
-      - hello-controller
+      - hello
       operationId: addHello
       responses:
         "200":
@@ -41,7 +41,7 @@ paths:
   /admin:
     get:
       tags:
-      - admin-controller
+      - admin
       operationId: admin
       responses:
         "200":

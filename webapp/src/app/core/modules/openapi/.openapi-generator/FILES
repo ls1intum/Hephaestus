@@ -2,11 +2,11 @@
 .openapi-generator-ignore
 README.md
 api.module.ts
-api/admin-controller.service.ts
-api/admin-controller.serviceInterface.ts
+api/admin.service.ts
+api/admin.serviceInterface.ts
 api/api.ts
-api/hello-controller.service.ts
-api/hello-controller.serviceInterface.ts
+api/hello.service.ts
+api/hello.serviceInterface.ts
 configuration.ts
 encoder.ts
 git_push.sh
