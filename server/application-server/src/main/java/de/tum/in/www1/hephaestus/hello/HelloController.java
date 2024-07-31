@@ -17,11 +17,21 @@ public class HelloController {
     this.helloService = helloService;
   }
 
+  /**
+   * Handles GET requests for retrieving all Hello entities.
+   * 
+   * @return a list of all Hello entities
+   */
   @GetMapping
   public List<Hello> getAllHellos() {
     return helloService.getAllHellos();
   }
 
+  /**
+   * Handles POST requests for creating a new Hello entity.
+   * 
+   * @return the newly created Hello entity
+   */
   @PostMapping
   public Hello addHello() {
     return helloService.addHello();

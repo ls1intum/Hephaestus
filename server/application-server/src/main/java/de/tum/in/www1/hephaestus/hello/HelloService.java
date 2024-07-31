@@ -18,12 +18,22 @@ public class HelloService {
     this.helloRepository = helloRepository;
   }
 
+  /**
+   * Retrieves all Hello entities from the repository.
+   * 
+   * @return a list of all Hello entities
+   */
   public List<Hello> getAllHellos() {
     var hellos = helloRepository.findAll();
     logger.info("Getting Hellos: {}", hellos);
     return helloRepository.findAll();
   }
 
+  /**
+   * Creates and saves a new Hello entity with the current timestamp.
+   * 
+   * @return the newly created Hello entity
+   */
   public Hello addHello() {
     Hello hello = new Hello();
     hello.setTimestamp(Instant.now());

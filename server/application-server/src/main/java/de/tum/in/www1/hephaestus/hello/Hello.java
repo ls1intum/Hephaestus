@@ -17,10 +17,16 @@ import lombok.Setter;
 @Setter
 public class Hello {
 
+  /**
+   * The unique identifier for a Hello entity.
+   */
   @Id
   @GeneratedValue(strategy = GenerationType.IDENTITY)
   private Long id;
 
+  /**
+   * The timestamp indicating when the Hello entity was created.
+   */
   @Column(nullable = false)
   private Instant timestamp;
 }
