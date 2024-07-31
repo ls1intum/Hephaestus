@@ -9,7 +9,7 @@ on:
 
 jobs:
   generate-api-client:
-    name: Update API client if necessary
+    name: Update API Specs and Client
     runs-on: ubuntu-latest
 
     steps:
@@ -44,7 +44,7 @@ jobs:
 
       - name: Commit and push changes
         run: |
-          git add webapp/src/app/core/modules/openapi
+          git add .
           if git diff-index --quiet HEAD; then
             echo "No changes to commit"
             exit 0
