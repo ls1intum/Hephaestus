@@ -12,7 +12,13 @@
 
 
 export interface Hello { 
+    /**
+     * The unique identifier for a Hello entity.
+     */
     id?: number;
+    /**
+     * The timestamp of when the Hello entity was created.  This field is mandatory.
+     */
     timestamp?: string;
 }
 
