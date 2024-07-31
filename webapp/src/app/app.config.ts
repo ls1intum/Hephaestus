@@ -15,7 +15,7 @@ export const appConfig: ApplicationConfig = {
     provideExperimentalZonelessChangeDetection(),
     provideRouter(routes),
     provideAngularQuery(new QueryClient()),
-    { provide: BASE_PATH, useValue: "https://pokeapi.co" },
+    { provide: BASE_PATH, useValue: "http://localhost:8080" },
     provideHttpClient(withInterceptorsFromDi()),
     importProvidersFrom(LucideAngularModule.pick({ Home }))
   ]

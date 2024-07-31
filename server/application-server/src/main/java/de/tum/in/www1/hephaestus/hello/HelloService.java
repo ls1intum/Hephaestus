@@ -19,6 +19,8 @@ public class HelloService {
   }
 
   public List<Hello> getAllHellos() {
+    var hellos = helloRepository.findAll();
+    logger.info("Getting Hellos: {}", hellos);
     return helloRepository.findAll();
   }
 

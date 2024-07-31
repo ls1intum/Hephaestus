@@ -86,26 +86,6 @@ export class Configuration {
         else {
             this.credentials = {};
         }
-
-        // init default basicAuth credential
-        if (!this.credentials['basicAuth']) {
-            this.credentials['basicAuth'] = () => {
-                return (this.username || this.password)
-                    ? btoa(this.username + ':' + this.password)
-                    : undefined;
-            };
-        }
-
-        // init default cookieAuth credential
-        if (!this.credentials['cookieAuth']) {
-            this.credentials['cookieAuth'] = () => {
-                if (this.apiKeys === null || this.apiKeys === undefined) {
-                    return undefined;
-                } else {
-                    return this.apiKeys['cookieAuth'] || this.apiKeys['sessionid'];
-                }
-            };
-        }
     }
 
     /**
