@@ -41,8 +41,11 @@ jobs:
       - name: Commit and push changes
         run: |
           git add webapp/src/app/core/modules/openapi
-          git diff-index --quiet HEAD || git commit -m "chore: update API client"
-          git push origin HEAD:${{ github.event.pull_request.head.ref }}
-        
+          if git diff-index --quiet HEAD; then
+            echo "No changes to commit"
+          else
+            git commit -m "chore: update API client"
+            git push origin HEAD:${{ github.event.pull_request.head.ref }}
+          fi
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
