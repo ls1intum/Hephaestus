@@ -17,10 +17,12 @@ paths:
     get:
       tags:
       - hello
+      summary: "Retrieves all {@link Hello Hello} entities."
+      description: "Retrieves all {@link Hello Hello} entities."
       operationId: getAllHellos
       responses:
         "200":
-          description: OK
+          description: A list of all Hello entities
           content:
             application/json:
               schema:
@@ -30,10 +32,12 @@ paths:
     post:
       tags:
       - hello
+      summary: "Creates a new {@link Hello Hello} entity with the current timestamp."
+      description: "Creates a new {@link Hello Hello} entity with the current timestamp."
       operationId: addHello
       responses:
         "200":
-          description: OK
+          description: The created Hello entity
           content:
             application/json:
               schema:
@@ -57,7 +61,11 @@ components:
       properties:
         id:
           type: integer
+          description: The unique identifier for a Hello entity.
           format: int64
         timestamp:
           type: string
+          description: |-
+            The timestamp of when the Hello entity was created.
+             This field is mandatory.
           format: date-time
