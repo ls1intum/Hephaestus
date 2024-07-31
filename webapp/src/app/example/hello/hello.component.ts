@@ -1,7 +1,7 @@
-import { Component, inject, signal } from '@angular/core';
+import { Component, inject } from '@angular/core';
 import { injectMutation, injectQuery, injectQueryClient } from '@tanstack/angular-query-experimental';
 import { AngularQueryDevtools } from '@tanstack/angular-query-devtools-experimental'
-import { lastValueFrom, tap } from 'rxjs';
+import { lastValueFrom } from 'rxjs';
 import { HelloControllerService } from 'app/core/modules/openapi';
 import { AppButtonComponent } from 'app/ui/button/button/button.component';
 
