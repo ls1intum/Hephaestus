@@ -1,4 +1,4 @@
-name: Generate API Client
+name: OpenAPI
 
 on:
   pull_request:
@@ -29,15 +29,20 @@ jobs:
       - name: Install dependencies
         run: npm install
 
+      - name: Pull latest changes
+        run: |
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+          git pull --rebase origin ${{ github.event.pull_request.head.ref }}
+
       - name: Generate API client
         run: npm run generate:api
 
       - name: Commit and push changes
         run: |
-          git config --global user.name "github-actions[bot]"
-          git config --global user.email "github-actions[bot]@users.noreply.github.com"
-          git add .
+          git add webapp/src/app/core/modules/openapi
           git diff-index --quiet HEAD || git commit -m "chore: update API client"
           git push origin HEAD:${{ github.event.pull_request.head.ref }}
+        
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
