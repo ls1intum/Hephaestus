@@ -36,22 +36,26 @@ jobs:
       - name: Generate API client
         run: npm run generate:api
 
-      - name: Check for changes
+      - name: Check for changes in the API client
         id: check_changes
         run: |
-          if [[ -z $(git status --porcelain) ]]; then
-            echo "no_changes=true" >> $GITHUB_ENV
+          echo "Checking for changes in the API client directory..."
+          git add .
+          if git diff --cached --quiet; then
+            echo "No changes detected in the API client directory."
+            echo "NO_CHANGES_DETECTED=true" >> $GITHUB_ENV
           else
-            echo "no_changes=false" >> $GITHUB_ENV
+            echo "Changes detected in the API client directory."
+            echo "NO_CHANGES_DETECTED=false" >> $GITHUB_ENV
           fi
 
       - name: Commit and push changes
-        if: env.no_changes == 'false'
+        if: env.NO_CHANGES_DETECTED == 'false'
         run: |
+          echo "Committing and pushing changes..."
           git config --global user.name "github-actions[bot]"
           git config --global user.email "github-actions[bot]@users.noreply.github.com"
-          git add .
           git commit -m "chore: update API client"
-          git push origin HEAD:${{ github.head_ref }}
+          git push origin HEAD:${{ github.event.pull_request.head.ref }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
