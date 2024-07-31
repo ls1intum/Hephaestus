@@ -1,7 +1,7 @@
-export * from './admin-controller.service';
-import { AdminControllerService } from './admin-controller.service';
-export * from './admin-controller.serviceInterface';
-export * from './hello-controller.service';
-import { HelloControllerService } from './hello-controller.service';
-export * from './hello-controller.serviceInterface';
-export const APIS = [AdminControllerService, HelloControllerService];
+export * from './admin.service';
+import { AdminService } from './admin.service';
+export * from './admin.serviceInterface';
+export * from './hello.service';
+import { HelloService } from './hello.service';
+export * from './hello.serviceInterface';
+export const APIS = [AdminService, HelloService];

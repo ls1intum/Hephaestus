@@ -20,7 +20,7 @@ import { Configuration }                                     from '../configurat
 
 
 
-export interface HelloControllerServiceInterface {
+export interface HelloServiceInterface {
     defaultHeaders: HttpHeaders;
     configuration: Configuration;
 

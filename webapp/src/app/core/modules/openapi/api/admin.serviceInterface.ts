@@ -19,7 +19,7 @@ import { Configuration }                                     from '../configurat
 
 
 
-export interface AdminControllerServiceInterface {
+export interface AdminServiceInterface {
     defaultHeaders: HttpHeaders;
     configuration: Configuration;
 

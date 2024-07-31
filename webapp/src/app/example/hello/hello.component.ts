@@ -2,7 +2,7 @@ import { Component, inject } from '@angular/core';
 import { injectMutation, injectQuery, injectQueryClient } from '@tanstack/angular-query-experimental';
 import { AngularQueryDevtools } from '@tanstack/angular-query-devtools-experimental'
 import { lastValueFrom } from 'rxjs';
-import { HelloControllerService } from 'app/core/modules/openapi';
+import { HelloService } from 'app/core/modules/openapi';
 import { AppButtonComponent } from 'app/ui/button/button/button.component';
 
 @Component({
@@ -12,17 +12,17 @@ import { AppButtonComponent } from 'app/ui/button/button/button.component';
   templateUrl: './hello.component.html'
 })
 export class PokemonComponent {
-  helloControllerService = inject(HelloControllerService)
+  helloService = inject(HelloService)
   queryClient = injectQueryClient()
 
   query = injectQuery(() => ({
     queryKey: ['hellos'],
-    queryFn: async () => lastValueFrom(this.helloControllerService.getAllHellos()),
+    queryFn: async () => lastValueFrom(this.helloService.getAllHellos()),
     })
   );
 
   mutation = injectMutation(() => ({
-    mutationFn: () => lastValueFrom(this.helloControllerService.addHello()),
+    mutationFn: () => lastValueFrom(this.helloService.addHello()),
     onSuccess: () => 
       this.queryClient.invalidateQueries({
         queryKey: ['hellos'],
