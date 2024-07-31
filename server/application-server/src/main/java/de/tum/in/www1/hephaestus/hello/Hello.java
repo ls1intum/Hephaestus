@@ -25,7 +25,8 @@ public class Hello {
   private Long id;
 
   /**
-   * The timestamp indicating when the Hello entity was created.
+   * The timestamp of when the Hello entity was created.
+   * This field is mandatory.
    */
   @Column(nullable = false)
   private Instant timestamp;

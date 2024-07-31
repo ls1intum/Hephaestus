@@ -18,9 +18,9 @@ public class HelloController {
   }
 
   /**
-   * Handles GET requests for retrieving all Hello entities.
+   * Retrieves all {@link Hello} entities.
    * 
-   * @return a list of all Hello entities
+   * @return A list of all Hello entities
    */
   @GetMapping
   public List<Hello> getAllHellos() {
@@ -28,9 +28,9 @@ public class HelloController {
   }
 
   /**
-   * Handles POST requests for creating a new Hello entity.
+   * Creates a new {@link Hello} entity with the current timestamp.
    * 
-   * @return the newly created Hello entity
+   * @return The created Hello entity
    */
   @PostMapping
   public Hello addHello() {

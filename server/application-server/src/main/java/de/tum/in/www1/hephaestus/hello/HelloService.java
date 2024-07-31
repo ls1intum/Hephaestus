@@ -19,9 +19,9 @@ public class HelloService {
   }
 
   /**
-   * Retrieves all Hello entities from the repository.
+   * Retrieves all {@link Hello} entities from the repository.
    * 
-   * @return a list of all Hello entities
+   * @return A list of all Hello entities
    */
   public List<Hello> getAllHellos() {
     var hellos = helloRepository.findAll();
@@ -30,9 +30,9 @@ public class HelloService {
   }
 
   /**
-   * Creates and saves a new Hello entity with the current timestamp.
+   * Creates a new {@link Hello} entity with the current timestamp and saves it to the repository.
    * 
-   * @return the newly created Hello entity
+   * @return The created Hello entity
    */
   public Hello addHello() {
     Hello hello = new Hello();
