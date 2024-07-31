@@ -1,0 +1,9 @@
+services:
+  postgres:
+    image: 'postgres:latest'
+    environment:
+      POSTGRES_DB: hephaestus
+      POSTGRES_PASSWORD: root
+      POSTGRES_USER: root
+    ports:
+      - '5432'

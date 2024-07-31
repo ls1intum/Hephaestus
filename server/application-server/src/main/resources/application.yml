@@ -21,3 +21,6 @@ spring:
     user:
       name: admin
       password: admin
+
+springdoc:
+  default-produces-media-type: application/json
