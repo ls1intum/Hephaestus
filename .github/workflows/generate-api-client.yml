@@ -1,0 +1,39 @@
+name: Generate API Client
+
+on:
+  push:
+    paths:
+      - 'server/application-server/**'
+  pull_request:
+    paths:
+      - 'server/application-server/**'
+  workflow_dispatch:
+
+jobs:
+  generate-api-client:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Generate API client
+        run: npm run generate:api
+
+      - name: Commit and push changes
+        run: |
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+          git add .
+          git diff-index --quiet HEAD || git commit -m "chore: update API client"
+          git push
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
