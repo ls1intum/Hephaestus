@@ -9,11 +9,15 @@ on:
 
 jobs:
   generate-api-client:
+    name: Update API client if necessary
     runs-on: ubuntu-latest
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.ref }}
+          fetch-depth: 0
 
       - name: Set up Node.js
         uses: actions/setup-node@v4
@@ -43,6 +47,7 @@ jobs:
           git add webapp/src/app/core/modules/openapi
           if git diff-index --quiet HEAD; then
             echo "No changes to commit"
+            exit 0
           else
             git commit -m "chore: update API client"
             git push origin HEAD:${{ github.event.pull_request.head.ref }}
