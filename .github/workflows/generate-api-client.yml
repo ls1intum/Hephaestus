@@ -17,7 +17,7 @@ concurrency:
 
 jobs:
   generate-api-client:
-    name: Update API Specs and Client
+    name: Verify API Specs and Client
     runs-on: ubuntu-latest
 
     steps:
@@ -55,16 +55,5 @@ jobs:
           else
             echo "Changes detected in the API client directory."
             echo "NO_CHANGES_DETECTED=false" >> $GITHUB_ENV
+            exit 1
           fi
-
-      - name: Commit and push changes
-        if: env.NO_CHANGES_DETECTED == 'false'
-        run: |
-          echo "Committing and pushing changes..."
-          git config --global user.name "github-actions[bot]"
-          git config --global user.email "github-actions[bot]@users.noreply.github.com"
-          git commit -m "chore: update API client"
-          git push origin HEAD:${{ github.event.pull_request.head.ref }}
-          echo "Done."
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
