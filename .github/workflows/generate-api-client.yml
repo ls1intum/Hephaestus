@@ -5,7 +5,15 @@ on:
     paths:
       - 'server/application-server/**'
       - '.github/workflows/generate-api-client.yml'
+  push:
+    paths:
+      - 'server/application-server/openapi.yaml'
+      - 'webapp/src/app/core/modules/openapi/**'
   workflow_dispatch:
+
+concurrency:
+  group: generate-api-client
+  cancel-in-progress: true
 
 jobs:
   generate-api-client:

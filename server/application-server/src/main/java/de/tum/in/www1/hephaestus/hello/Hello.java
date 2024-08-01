@@ -18,14 +18,14 @@ import lombok.Setter;
 public class Hello {
 
   /**
-   * The unique identifier for a Hello entity.
+   * Unique identifier for a Hello entity.
    */
   @Id
   @GeneratedValue(strategy = GenerationType.IDENTITY)
   private Long id;
 
   /**
-   * The timestamp of when the Hello entity was created.
+   * Timestamp of when the Hello entity was created.
    * This field is mandatory.
    */
   @Column(nullable = false)
