@@ -16,4 +16,4 @@ To register a destination, send a POST request to `/register` with the following
 
 ### Send a webhook
 
-To send a webhook, send a POST request to `/webhook`. The webhook will be forwarded to all registered destinations.
+To send a webhook, send a POST request to `/`. The webhook will be forwarded to all registered destinations.

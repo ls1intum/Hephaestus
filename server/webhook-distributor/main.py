@@ -1,5 +1,5 @@
 from typing import Set
-from fastapi import FastAPI, Request
+from fastapi import FastAPI, Request, status
 from pydantic import BaseModel
 import httpx
 
@@ -21,7 +21,7 @@ def register_destination(destination: Destination):
   return { "message": "Destination registered successfully" }
 
 
-@app.post("/webhook")
+@app.post("/")
 async def send_webhook(request: Request):
   payload = await request.json()
   failed_destinations = []
@@ -41,3 +41,19 @@ async def send_webhook(request: Request):
     "failed": len(failed_destinations),
     "success_destinations": len(destinations),
   }
+
+
+class HealthCheck(BaseModel):
+    status: str = "OK"
+
+
+@app.get(
+    "/health",
+    tags=["healthcheck"],
+    summary="Perform a Health Check",
+    response_description="Return HTTP Status Code 200 (OK)",
+    status_code=status.HTTP_200_OK,
+    response_model=HealthCheck,
+)
+def get_health() -> HealthCheck:
+    return HealthCheck(status="OK")
