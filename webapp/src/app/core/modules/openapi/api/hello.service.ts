@@ -96,6 +96,8 @@ export class HelloService implements HelloServiceInterface {
     }
 
     /**
+     * Creates a new {@link Hello Hello} entity with the current timestamp.
+     * Creates a new {@link Hello Hello} entity with the current timestamp.
      * @param observe set whether or not to return the data Observable as the body, response or events. defaults to returning the body.
      * @param reportProgress flag to report request and response progress.
      */
@@ -155,6 +157,8 @@ export class HelloService implements HelloServiceInterface {
     }
 
     /**
+     * Retrieves all {@link Hello Hello} entities.
+     * Retrieves all {@link Hello Hello} entities.
      * @param observe set whether or not to return the data Observable as the body, response or events. defaults to returning the body.
      * @param reportProgress flag to report request and response progress.
      */

@@ -11,7 +11,7 @@ import { AppButtonComponent } from 'app/ui/button/button/button.component';
   imports: [AppButtonComponent, AngularQueryDevtools],
   templateUrl: './hello.component.html'
 })
-export class PokemonComponent {
+export class HelloComponent {
   helloService = inject(HelloService)
   queryClient = injectQueryClient()
 
