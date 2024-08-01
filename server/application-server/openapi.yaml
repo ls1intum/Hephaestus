@@ -61,11 +61,11 @@ components:
       properties:
         id:
           type: integer
-          description: The unique identifier for a Hello entity.
+          description: Unique identifier for a Hello entity.
           format: int64
         timestamp:
           type: string
           description: |-
-            The timestamp of when the Hello entity was created.
+            Timestamp of when the Hello entity was created.
              This field is mandatory.
           format: date-time
