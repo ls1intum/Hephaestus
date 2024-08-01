@@ -17,11 +17,21 @@ public class HelloController {
     this.helloService = helloService;
   }
 
+  /**
+   * Retrieves all {@link Hello} entities.
+   * 
+   * @return A list of all Hello entities
+   */
   @GetMapping
   public List<Hello> getAllHellos() {
     return helloService.getAllHellos();
   }
 
+  /**
+   * Creates a new {@link Hello} entity with the current timestamp.
+   * 
+   * @return The created Hello entity
+   */
   @PostMapping
   public Hello addHello() {
     return helloService.addHello();

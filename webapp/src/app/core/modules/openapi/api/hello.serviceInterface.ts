@@ -25,14 +25,14 @@ export interface HelloServiceInterface {
     configuration: Configuration;
 
     /**
-     * 
-     * 
+     * Creates a new {@link Hello Hello} entity with the current timestamp.
+     * Creates a new {@link Hello Hello} entity with the current timestamp.
      */
     addHello(extraHttpRequestParams?: any): Observable<Hello>;
 
     /**
-     * 
-     * 
+     * Retrieves all {@link Hello Hello} entities.
+     * Retrieves all {@link Hello Hello} entities.
      */
     getAllHellos(extraHttpRequestParams?: any): Observable<Array<Hello>>;
 
