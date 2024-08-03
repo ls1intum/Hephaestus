@@ -19,11 +19,12 @@ jobs:
               uses: actions/setup-node@v4
               with:
                   node-version: "22"
-            - name: Switch to webapp directory
-              run: cd webapp
             - name: Install dependencies
+              working-directory: ./webapp
               run: npm ci
             - name: Run ESLint
+              working-directory: ./webapp
               run: npm run lint
             - name: Run Prettier
+              working-directory: ./webapp
               run: npm run prettier:check
