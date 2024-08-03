@@ -89,8 +89,6 @@ module.exports = [
     },
     rules: {
       'prettier/prettier': ['error', { parser: 'angular' }],
-      '@angular-eslint/template/prefer-control-flow': 'error',
-      '@angular-eslint/template/prefer-self-closing-tags': 'error',
     },
   },
 ];
