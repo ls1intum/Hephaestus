@@ -1,4 +1,4 @@
-name: Webapp QA / Lint
+name: Webapp QA
 
 on:
     pull_request:
@@ -11,6 +11,7 @@ on:
 
 jobs:
     quality:
+         name: Code Quality Checks
         runs-on: ubuntu-latest
         steps:
             - name: Checkout repository
