@@ -42,7 +42,7 @@ module.exports = [
         'warn',
         {
           type: 'attribute',
-          prefix: 'jhi',
+          prefix: 'app',
           style: 'camelCase',
         },
       ],
@@ -50,7 +50,7 @@ module.exports = [
         'warn',
         {
           type: 'element',
-          prefix: 'jhi',
+          prefix: 'app',
           style: 'kebab-case',
         },
       ],
