@@ -7,11 +7,11 @@ const meta: Meta<AppLabelComponent> = {
   tags: ['autodocs'],
   args: {
     ...args,
-    for: 'example-input',
+    for: 'example-input'
   },
   argTypes: {
-    ...argTypes,
-  },
+    ...argTypes
+  }
 };
 
 export default meta;
@@ -20,6 +20,6 @@ type Story = StoryObj<AppLabelComponent>;
 export const Default: Story = {
   render: (args) => ({
     props: args,
-    template: `<app-label ${argsToTemplate(args)}>Label</app-label>`,
-  }),
+    template: `<app-label ${argsToTemplate(args)}>Label</app-label>`
+  })
 };

@@ -8,10 +8,10 @@ interface CounterHistoryEntry {
 }
 
 @Component({
-  selector: 'counter',
+  selector: 'app-counter',
   standalone: true,
   imports: [AppButtonComponent],
-  templateUrl: './counter.component.html',
+  templateUrl: './counter.component.html'
 })
 export class CounterComponent {
   // we put all our application data inside signals! -> most optimal change detection and re-rendering possible
@@ -26,9 +26,9 @@ export class CounterComponent {
     // Pitfall: conditional logic inside computed
     // When calling computed initially the dependency signal has to be called, otherwise it will not work
     return this.counter().toString(16);
-  })
+  });
 
-  counterHistory = signal<CounterHistoryEntry[]>([{ dec: 0, hex: "0" }])
+  counterHistory = signal<CounterHistoryEntry[]>([{ dec: 0, hex: '0' }]);
 
   constructor() {
     console.log(`counter value: ${this.counter()}`);
@@ -36,7 +36,8 @@ export class CounterComponent {
     // `effect`s goes in constructor (?)
     // `effectRef` is not necessary, only if needed
     // Runs once when the effect is declared to collect dependencies, and again when they change
-    const effectRef = effect((onCleanup) => {
+    // const effectRef =
+    effect((onCleanup) => {
       const currentCount = this.counter();
       const currentHexCount = this.hexCounter();
 
@@ -46,8 +47,8 @@ export class CounterComponent {
 
       onCleanup(() => {
         console.log('Perform cleanup action here');
-      })
-    })
+      });
+    });
 
     // effectRef.destroy() at any time! Usually not necessary
 
@@ -57,9 +58,9 @@ export class CounterComponent {
 
   increment() {
     console.log('Updating counter...');
-    this.counter.update(counter => counter + this.byCount());
+    this.counter.update((counter) => counter + this.byCount());
 
     // Update values of a signal only through Signals API, e.g.`set()` and `update()`, not directly (i.e. `push()`)
-    this.counterHistory.update(history => [...history, { dec: this.counter(), hex: this.hexCounter() }])
+    this.counterHistory.update((history) => [...history, { dec: this.counter(), hex: this.hexCounter() }]);
   }
 }

@@ -11,13 +11,13 @@ const [inputVariants, args, argTypes] = cva(
       size: {
         default: 'h-10 px-4 py-2',
         sm: 'h-9 px-2 py-1',
-        lg: 'h-11 px-4 py-3',
-      },
+        lg: 'h-11 px-4 py-3'
+      }
     },
     defaultVariants: {
-      size: 'default',
-    },
-  },
+      size: 'default'
+    }
+  }
 );
 
 export { args, argTypes };
@@ -27,7 +27,7 @@ interface InputVariants extends VariantProps<typeof inputVariants> {}
 @Component({
   selector: 'app-input',
   standalone: true,
-  templateUrl: './input.component.html',
+  templateUrl: './input.component.html'
 })
 export class AppInputComponent {
   class = input<ClassValue>('');
@@ -45,7 +45,5 @@ export class AppInputComponent {
     this.valueChange.emit(inputValue);
   }
 
-  computedClass = computed(() =>
-    cn(inputVariants({ size: this.size() }), this.class()),
-  );
+  computedClass = computed(() => cn(inputVariants({ size: this.size() }), this.class()));
 }
