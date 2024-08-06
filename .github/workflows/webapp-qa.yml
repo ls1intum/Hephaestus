@@ -11,7 +11,7 @@ on:
 
 jobs:
     quality:
-         name: Code Quality Checks
+        name: Code Quality Checks
         runs-on: ubuntu-latest
         steps:
             - name: Checkout repository
