@@ -6,4 +6,4 @@ package-lock.json
 .git
 
 # Ignore OpenAPI generated files:
-src/app/core
+src/app/core/modules/openapi

@@ -14,7 +14,7 @@ module.exports = [
       'coverage/',
       'node/',
       'node_modules/',
-      'src/app/core/',
+      'src/app/core/modules/openapi/',
     ],
   },
   {
