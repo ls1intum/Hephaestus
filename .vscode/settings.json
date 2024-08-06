@@ -1,7 +1,8 @@
 {
-  "java.compile.nullAnalysis.mode": "automatic",
-  "java.configuration.updateBuildConfiguration": "interactive",
-  "editor.codeActionsOnSave": {
-    "source.fixAll": true
-  }
+	"java.compile.nullAnalysis.mode": "automatic",
+	"java.configuration.updateBuildConfiguration": "interactive",
+	"tailwindCSS.experimental.classRegex": [["cva\\(([^)]*)\\)", "[\"'`]([^\"'`]*).*?[\"'`]"]],
+	"editor.codeActionsOnSave": {
+		"source.fixAll": true
+	}
 }
