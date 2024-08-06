@@ -1,9 +1,4 @@
-import {
-  argsToTemplate,
-  moduleMetadata,
-  type Meta,
-  type StoryObj,
-} from '@storybook/angular';
+import { argsToTemplate, moduleMetadata, type Meta, type StoryObj } from '@storybook/angular';
 import { AppInputComponent, args, argTypes } from './input.component';
 import { action } from '@storybook/addon-actions';
 import { AppButtonComponent } from '@app/ui/button/button/button.component';
@@ -17,22 +12,22 @@ const meta: Meta<AppInputComponent> = {
     ...args,
     value: '',
     disabled: false,
-    size: 'default',
+    size: 'default'
   },
   argTypes: {
     ...argTypes,
     disabled: {
-      control: 'boolean',
+      control: 'boolean'
     },
     onInput: {
-      action: 'onInput',
-    },
+      action: 'onInput'
+    }
   },
   decorators: [
     moduleMetadata({
-      imports: [AppButtonComponent, AppLabelComponent],
-    }),
-  ],
+      imports: [AppButtonComponent, AppLabelComponent]
+    })
+  ]
 };
 
 export default meta;
@@ -41,18 +36,18 @@ type Story = StoryObj<AppInputComponent>;
 export const Default: Story = {
   render: (args) => ({
     props: args,
-    template: `<app-input ${argsToTemplate(args)} placeholder="Enter text here"/>`,
-  }),
+    template: `<app-input ${argsToTemplate(args)} placeholder="Enter text here"/>`
+  })
 };
 
 export const Disabled: Story = {
   args: {
-    disabled: true,
+    disabled: true
   },
   render: (args) => ({
     props: args,
-    template: `<app-input ${argsToTemplate(args)} placeholder="Disabled input"/>`,
-  }),
+    template: `<app-input ${argsToTemplate(args)} placeholder="Disabled input"/>`
+  })
 };
 
 export const WithLabel: Story = {
@@ -63,8 +58,8 @@ export const WithLabel: Story = {
         <app-label [for]="input-field" size="sm">Label</app-label>
         <app-input ${argsToTemplate(args)} [id]="input-field" placeholder="Enter text here" class="grow"></app-input>
       </div>
-    `,
-  }),
+    `
+  })
 };
 
 export const WithButton: Story = {
@@ -74,13 +69,13 @@ export const WithButton: Story = {
       userInput: '',
       onButtonClick(value: string) {
         action('Button Clicked')(`Input Value: ${value}`);
-      },
+      }
     },
     template: `
       <div class="flex gap-2 flex-row">
         <app-input ${argsToTemplate(args)} [size]="args.size" [(value)]="userInput" placeholder="Enter text here" class="grow"/>
         <app-button (onClick)="onButtonClick(userInput)" size="${args.size ?? 'default'}" [disabled]="!userInput">Submit</app-button>
       </div>
-    `,
-  }),
+    `
+  })
 };
