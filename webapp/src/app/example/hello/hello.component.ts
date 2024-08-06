@@ -1,34 +1,32 @@
 import { Component, inject } from '@angular/core';
 import { injectMutation, injectQuery, injectQueryClient } from '@tanstack/angular-query-experimental';
-import { AngularQueryDevtools } from '@tanstack/angular-query-devtools-experimental'
+import { AngularQueryDevtools } from '@tanstack/angular-query-devtools-experimental';
 import { lastValueFrom } from 'rxjs';
 import { HelloService } from 'app/core/modules/openapi';
 import { AppButtonComponent } from 'app/ui/button/button/button.component';
 
 @Component({
-  selector: 'hello',
+  selector: 'app-hello',
   standalone: true,
   imports: [AppButtonComponent, AngularQueryDevtools],
   templateUrl: './hello.component.html'
 })
 export class HelloComponent {
-  helloService = inject(HelloService)
-  queryClient = injectQueryClient()
+  helloService = inject(HelloService);
+  queryClient = injectQueryClient();
 
   query = injectQuery(() => ({
     queryKey: ['hellos'],
-    queryFn: async () => lastValueFrom(this.helloService.getAllHellos()),
-    })
-  );
+    queryFn: async () => lastValueFrom(this.helloService.getAllHellos())
+  }));
 
   mutation = injectMutation(() => ({
     mutationFn: () => lastValueFrom(this.helloService.addHello()),
-    onSuccess: () => 
+    onSuccess: () =>
       this.queryClient.invalidateQueries({
-        queryKey: ['hellos'],
-      }),
-    })
-  );
+        queryKey: ['hellos']
+      })
+  }));
 
   addHello() {
     this.mutation.mutate();
