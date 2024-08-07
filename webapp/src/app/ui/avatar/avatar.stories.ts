@@ -6,7 +6,8 @@ const meta: Meta<AppAvatarComponent> = {
   component: AppAvatarComponent,
   tags: ['autodocs'],
   args: {
-    ...args
+    ...args,
+    size: 'default'
   },
   argTypes: {
     ...argTypes
@@ -18,7 +19,6 @@ type Story = StoryObj<AppAvatarComponent>;
 
 export const Default: Story = {
   args: {
-    variant: 'medium',
     src: 'https://i.pravatar.cc/40?img=1',
     alt: 'avatar',
     class: ''
@@ -32,7 +32,7 @@ export const Default: Story = {
 
 export const Small: Story = {
   args: {
-    variant: 'small',
+    size: 'sm',
     src: 'https://i.pravatar.cc/24?img=1'
   },
 
@@ -44,7 +44,7 @@ export const Small: Story = {
 
 export const Medium: Story = {
   args: {
-    variant: 'medium',
+    size: 'default',
     src: 'https://i.pravatar.cc/40?img=1'
   },
 
@@ -56,7 +56,7 @@ export const Medium: Story = {
 
 export const Large: Story = {
   args: {
-    variant: 'large',
+    size: 'lg',
     src: 'https://i.pravatar.cc/56?img=1',
     alt: 'avatar',
     class: ''
@@ -70,7 +70,7 @@ export const Large: Story = {
 
 export const WithRandomImage: Story = {
   args: {
-    variant: 'large',
+    size: 'lg',
     src: 'https://i.pravatar.cc/56',
     alt: 'avatar'
   },
@@ -83,7 +83,7 @@ export const WithRandomImage: Story = {
 
 export const WithFallback: Story = {
   args: {
-    variant: 'medium',
+    size: 'default',
     src: 'foobar.jpg',
     fallback: 'https://placehold.co/40',
     alt: 'fallback'

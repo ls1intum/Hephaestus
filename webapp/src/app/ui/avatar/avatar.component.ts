@@ -7,14 +7,14 @@ import { NgOptimizedImage } from '@angular/common';
 
 const [avatarVariants, args, argTypes] = cva('relative flex shrink-0 overflow-hidden rounded-full', {
   variants: {
-    variant: {
-      small: 'h-6 w-6 text-xs',
-      medium: 'h-10 w-10',
-      large: 'h-14 w-14 text-lg'
+    size: {
+      default: 'h-10 w-10',
+      sm: 'h-6 w-6 text-xs',
+      lg: 'h-14 w-14 text-lg'
     }
   },
   defaultVariants: {
-    variant: 'medium'
+    size: 'default'
   }
 });
 
@@ -31,7 +31,7 @@ interface AvatarVariants extends VariantProps<typeof avatarVariants> {}
 })
 export class AppAvatarComponent {
   class = input<ClassValue>('');
-  variant = input<AvatarVariants['variant']>('medium');
+  size = input<AvatarVariants['size']>('default');
 
   src = input<string>('');
   alt = input<string>('');
@@ -44,7 +44,7 @@ export class AppAvatarComponent {
     this.canShow.set(false);
   };
 
-  computedClass = computed(() => cn(avatarVariants({ variant: this.variant() }), this.class()));
+  computedClass = computed(() => cn(avatarVariants({ size: this.size() }), this.class()));
 
   computedSrc = computed(() => (this.canShow() ? this.src() : this.fallback()));
 
