@@ -1,4 +1,4 @@
-import { ChangeDetectionStrategy, Component, computed, input, signal } from '@angular/core';
+import { Component, computed, input, signal } from '@angular/core';
 import type { ClassValue } from 'clsx';
 import type { VariantProps } from 'class-variance-authority';
 import { cn } from 'app/utils';
@@ -26,7 +26,6 @@ interface AvatarVariants extends VariantProps<typeof avatarVariants> {}
   selector: 'app-avatar',
   standalone: true,
   imports: [NgOptimizedImage],
-  changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './avatar.component.html'
 })
 export class AppAvatarComponent {

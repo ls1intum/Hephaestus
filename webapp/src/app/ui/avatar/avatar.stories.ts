@@ -6,8 +6,7 @@ const meta: Meta<AppAvatarComponent> = {
   component: AppAvatarComponent,
   tags: ['autodocs'],
   args: {
-    ...args,
-    size: 'default'
+    ...args
   },
   argTypes: {
     ...argTypes
@@ -50,7 +49,7 @@ export const Medium: Story = {
 
   render: (args) => ({
     props: args,
-    template: `<app-avatar ${argsToTemplate(args)}>MD</app-avatar>`
+    template: `<app-avatar ${argsToTemplate(args)}></app-avatar>`
   })
 };
 
@@ -64,7 +63,7 @@ export const Large: Story = {
 
   render: (args) => ({
     props: args,
-    template: `<app-avatar ${argsToTemplate(args)}>LG</app-avatar>`
+    template: `<app-avatar ${argsToTemplate(args)}></app-avatar>`
   })
 };
 
