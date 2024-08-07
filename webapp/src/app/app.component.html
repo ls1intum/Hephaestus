@@ -3,9 +3,9 @@
     <p>Header</p>
   </header>
   <div class="flex gap-2 m-2 flex-col items-start">
-    <counter title="First Counter"/>
-    <counter title="Second Counter" [byCount]="16"/>
+    <app-counter title="First Counter" />
+    <app-counter title="Second Counter" [byCount]="16" />
   </div>
-  <hello />
+  <app-hello />
   <router-outlet />
 </main>

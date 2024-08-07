@@ -8,7 +8,7 @@ import { HelloComponent } from './example/hello/hello.component';
   standalone: true,
   imports: [RouterOutlet, CounterComponent, HelloComponent],
   templateUrl: './app.component.html',
-  styles: [],
+  styles: []
 })
 export class AppComponent {
   title = 'Hephaestus';

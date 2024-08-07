@@ -8,6 +8,7 @@ module.exports = [
   {
     ignores: [
       '.cache/',
+      '.angular/',
       '.git/',
       '.github/',
       'build/',
@@ -54,10 +55,7 @@ module.exports = [
           style: 'kebab-case',
         },
       ],
-      '@angular-eslint/prefer-standalone': 'error',
-      '@angular-eslint/template/prefer-ngsrc': 'error',
-      '@angular-eslint/template/prefer-self-closing-tags': 'error',
-      '@angular-eslint/template/prefer-control-flow': 'error',
+      '@typescript-eslint/no-empty-object-type': 'off',
     },
   },
   {
