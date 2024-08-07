@@ -6,5 +6,5 @@
   "semi": true,
   "bracketSpacing": true,
   "trailingComma": "none",
-  "endOfLine": "lf"
+  "endOfLine": "auto"
 }
