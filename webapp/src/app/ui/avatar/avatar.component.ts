@@ -32,7 +32,7 @@ export class AppAvatarComponent {
   class = input<ClassValue>('');
   size = input<AvatarVariants['size']>('default');
 
-  src = input<string>('');
+  src = input.required<string>();
   alt = input<string>('');
   imageClass = input<string>('');
   fallback = input<string>('https://placehold.co/56');
