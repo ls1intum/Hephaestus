@@ -1,13 +1,3 @@
 <div [class]="computedClass()">
-  @if (canShow()) {
-    <img
-      [src]="src()"
-      [alt]="alt()"
-      [class]="computedImageClass()"
-      placeholder
-      (error)="onError()"
-    />
-  } @else {
-    <img [class]="computedImageClass()" src="https://placehold.co/64" />
-  }
+  <img [ngSrc]="computedSrc()" [alt]="alt()" [class]="computedImageClass()" (error)="onError()" fill />
 </div>
