@@ -1,51 +1,31 @@
-import { Component, computed, input, signal } from '@angular/core';
+import { Component, computed, inject, InjectionToken, input, signal } from '@angular/core';
 import type { ClassValue } from 'clsx';
-import type { VariantProps } from 'class-variance-authority';
 import { cn } from 'app/utils';
-import { cva } from 'app/storybook.helper';
-import { NgOptimizedImage } from '@angular/common';
 
-const [avatarVariants, args, argTypes] = cva('relative flex shrink-0 overflow-hidden rounded-full', {
-  variants: {
-    size: {
-      default: 'h-10 w-10',
-      sm: 'h-6 w-6 text-xs',
-      lg: 'h-14 w-14 text-lg'
-    }
-  },
-  defaultVariants: {
-    size: 'default'
-  }
-});
+const AvatarToken = new InjectionToken<AvatarComponent>('AvatarToken');
 
-export { args, argTypes };
+export function injectAvatar(): AvatarComponent {
+  return inject(AvatarToken);
+}
 
-interface AvatarVariants extends VariantProps<typeof avatarVariants> {}
+type ImageLoadingStatus = 'idle' | 'loading' | 'loaded' | 'error';
 
 @Component({
   selector: 'app-avatar',
   standalone: true,
-  imports: [NgOptimizedImage],
-  templateUrl: './avatar.component.html'
+  template: `<ng-content />`,
+  providers: [{ provide: AvatarToken, useExisting: AvatarComponent }],
+  host: {
+    '[class]': 'computedClass()'
+  }
 })
-export class AppAvatarComponent {
-  class = input<ClassValue>('');
-  size = input<AvatarVariants['size']>('default');
+export class AvatarComponent {
+  readonly state = signal<ImageLoadingStatus>('idle');
 
-  src = input.required<string>();
-  alt = input<string>('');
-  imageClass = input<string>('');
-  fallback = input<string>('https://placehold.co/56');
+  class = input<ClassValue>();
+  computedClass = computed(() => cn('relative flex h-10 w-10 shrink-0 overflow-hidden rounded-full', this.class()));
 
-  canShow = signal(true);
-
-  onError = () => {
-    this.canShow.set(false);
-  };
-
-  computedClass = computed(() => cn(avatarVariants({ size: this.size() }), this.class()));
-
-  computedSrc = computed(() => (this.canShow() ? this.src() : this.fallback()));
-
-  computedImageClass = computed(() => cn('aspect-square object-cover h-full w-full', this.imageClass()));
+  setState(state: ImageLoadingStatus): void {
+    this.state.set(state);
+  }
 }
