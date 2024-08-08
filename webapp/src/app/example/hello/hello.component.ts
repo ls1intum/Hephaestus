@@ -3,7 +3,7 @@ import { injectMutation, injectQuery, injectQueryClient } from '@tanstack/angula
 import { AngularQueryDevtools } from '@tanstack/angular-query-devtools-experimental';
 import { lastValueFrom } from 'rxjs';
 import { HelloService } from 'app/core/modules/openapi';
-import { AppButtonComponent } from 'app/ui/button/button/button.component';
+import { AppButtonComponent } from 'app/ui/button/button.component';
 
 @Component({
   selector: 'app-hello',

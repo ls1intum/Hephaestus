@@ -1,6 +1,6 @@
 import { Component, computed, effect, input, signal } from '@angular/core';
 import { counter } from './counter';
-import { AppButtonComponent } from 'app/ui/button/button/button.component';
+import { AppButtonComponent } from 'app/ui/button/button.component';
 
 interface CounterHistoryEntry {
   dec: number;
