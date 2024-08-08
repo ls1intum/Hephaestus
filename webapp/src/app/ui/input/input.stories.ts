@@ -1,7 +1,7 @@
 import { argsToTemplate, moduleMetadata, type Meta, type StoryObj } from '@storybook/angular';
 import { AppInputComponent, args, argTypes } from './input.component';
 import { action } from '@storybook/addon-actions';
-import { AppButtonComponent } from '@app/ui/button/button/button.component';
+import { AppButtonComponent } from '@app/ui/button/button.component';
 import { AppLabelComponent } from '@app/ui/label/label.component';
 
 const meta: Meta<AppInputComponent> = {
