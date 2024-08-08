@@ -1,4 +1,4 @@
-import { argsToTemplate, moduleMetadata, type Meta, type StoryObj } from '@storybook/angular';
+import { moduleMetadata, type Meta, type StoryObj } from '@storybook/angular';
 import { AvatarComponent } from './avatar.component';
 import { AvatarImageComponent } from './avatar-image.component';
 import { AvatarFallbackComponent } from './avatar-fallback.component';
