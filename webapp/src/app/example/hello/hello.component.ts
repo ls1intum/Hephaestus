@@ -3,12 +3,12 @@ import { injectMutation, injectQuery, injectQueryClient } from '@tanstack/angula
 import { AngularQueryDevtools } from '@tanstack/angular-query-devtools-experimental';
 import { lastValueFrom } from 'rxjs';
 import { HelloService } from 'app/core/modules/openapi';
-import { AppButtonComponent } from 'app/ui/button/button.component';
+import { ButtonComponent } from 'app/ui/button/button.component';
 
 @Component({
   selector: 'app-hello',
   standalone: true,
-  imports: [AppButtonComponent, AngularQueryDevtools],
+  imports: [ButtonComponent, AngularQueryDevtools],
   templateUrl: './hello.component.html'
 })
 export class HelloComponent {

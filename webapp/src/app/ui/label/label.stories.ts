@@ -1,9 +1,9 @@
 import { argsToTemplate, type Meta, type StoryObj } from '@storybook/angular';
-import { AppLabelComponent, args, argTypes } from './label.component';
+import { LabelComponent, args, argTypes } from './label.component';
 
-const meta: Meta<AppLabelComponent> = {
+const meta: Meta<LabelComponent> = {
   title: 'UI/Label',
-  component: AppLabelComponent,
+  component: LabelComponent,
   tags: ['autodocs'],
   args: {
     ...args,
@@ -15,7 +15,7 @@ const meta: Meta<AppLabelComponent> = {
 };
 
 export default meta;
-type Story = StoryObj<AppLabelComponent>;
+type Story = StoryObj<LabelComponent>;
 
 export const Default: Story = {
   render: (args) => ({

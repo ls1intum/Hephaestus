@@ -1,12 +1,12 @@
 import { argsToTemplate, moduleMetadata, type Meta, type StoryObj } from '@storybook/angular';
-import { AppInputComponent, args, argTypes } from './input.component';
 import { action } from '@storybook/addon-actions';
-import { AppButtonComponent } from '@app/ui/button/button.component';
-import { AppLabelComponent } from '@app/ui/label/label.component';
+import { ButtonComponent } from '@app/ui/button/button.component';
+import { LabelComponent } from '@app/ui/label/label.component';
+import { InputComponent, args, argTypes } from './input.component';
 
-const meta: Meta<AppInputComponent> = {
+const meta: Meta<InputComponent> = {
   title: 'UI/Input',
-  component: AppInputComponent,
+  component: InputComponent,
   tags: ['autodocs'],
   args: {
     ...args,
@@ -25,13 +25,13 @@ const meta: Meta<AppInputComponent> = {
   },
   decorators: [
     moduleMetadata({
-      imports: [AppButtonComponent, AppLabelComponent]
+      imports: [ButtonComponent, LabelComponent]
     })
   ]
 };
 
 export default meta;
-type Story = StoryObj<AppInputComponent>;
+type Story = StoryObj<InputComponent>;
 
 export const Default: Story = {
   render: (args) => ({

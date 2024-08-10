@@ -39,7 +39,7 @@ interface ButtonVariants extends VariantProps<typeof buttonVariants> {}
   standalone: true,
   templateUrl: './button.component.html'
 })
-export class AppButtonComponent {
+export class ButtonComponent {
   class = input<ClassValue>('');
   variant = input<ButtonVariants['variant']>('default');
   size = input<ButtonVariants['size']>('default');

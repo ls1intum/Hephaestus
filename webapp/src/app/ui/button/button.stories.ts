@@ -1,12 +1,12 @@
 import { argsToTemplate, moduleMetadata, type Meta, type StoryObj } from '@storybook/angular';
-import { AppButtonComponent, args, argTypes } from './button.component';
+import { ButtonComponent, args, argTypes } from './button.component';
 import { LucideAngularModule, ChevronRight, Mail, Loader2 } from 'lucide-angular';
 import { within, userEvent, expect, fn } from '@storybook/test';
 
 // More on how to set up stories at: https://storybook.js.org/docs/writing-stories
-const meta: Meta<AppButtonComponent> = {
+const meta: Meta<ButtonComponent> = {
   title: 'UI/Button',
-  component: AppButtonComponent,
+  component: ButtonComponent,
   tags: ['autodocs'],
   args: {
     ...args,
@@ -25,7 +25,7 @@ const meta: Meta<AppButtonComponent> = {
 };
 
 export default meta;
-type Story = StoryObj<AppButtonComponent>;
+type Story = StoryObj<ButtonComponent>;
 
 // More on writing stories with args: https://storybook.js.org/docs/writing-stories/args
 export const Primary: Story = {

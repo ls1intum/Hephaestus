@@ -29,7 +29,7 @@ interface InputVariants extends VariantProps<typeof inputVariants> {}
   standalone: true,
   templateUrl: './input.component.html'
 })
-export class AppInputComponent {
+export class InputComponent {
   class = input<ClassValue>('');
   type = input<string>('text');
   placeholder = input<string>('');
