@@ -26,7 +26,8 @@ jobs:
         uses: tj-actions/changed-files@v44
         with:
           files: |
-            **/**
+            webapp/src/app/**
+            webapp/.storybook/**
       - name: List all changed files
         env:
           ALL_CHANGED_FILES: ${{ steps.changed-files.outputs.all_changed_files }}
@@ -54,7 +55,7 @@ jobs:
           node-version: 22
       - name: Install dependencies
         working-directory: ./webapp
-        run: npm install
+        run: npm ci
       - name: Run Chromatic
         id: chromatic
         uses: chromaui/action@latest
