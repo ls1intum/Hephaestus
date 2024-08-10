@@ -52,8 +52,6 @@ jobs:
           projectToken: ${{ secrets.CHROMATIC_PROJECT_TOKEN }}
           autoAcceptChanges: "develop"
           workingDir: webapp
-          exitZeroOnChanges: true
-          exitOnceUploaded: true
           onlyChanged: true
           skip: "dependabot/**"
       - name: Publish Summary
