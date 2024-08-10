@@ -1,95 +1,61 @@
-import { argsToTemplate, type Meta, type StoryObj } from '@storybook/angular';
-import { AppAvatarComponent, args, argTypes } from './avatar.component';
+import { argsToTemplate, moduleMetadata, type Meta, type StoryObj } from '@storybook/angular';
+import { AvatarComponent } from './avatar.component';
+import { AvatarImageComponent } from './avatar-image.component';
+import { AvatarFallbackComponent } from './avatar-fallback.component';
 
-const meta: Meta<AppAvatarComponent> = {
+type CustomArgs = {
+  src: string;
+  alt: string;
+  delayMs: number;
+};
+
+const meta: Meta<CustomArgs> = {
   title: 'UI/Avatar',
-  component: AppAvatarComponent,
+  component: AvatarComponent,
+  decorators: [
+    moduleMetadata({
+      imports: [AvatarImageComponent, AvatarFallbackComponent]
+    })
+  ],
   tags: ['autodocs'],
   args: {
-    ...args
+    src: 'https://github.com/shadcn.png',
+    alt: '@shadcn',
+    delayMs: 600
   },
   argTypes: {
-    ...argTypes
+    src: {
+      control: {
+        type: 'text'
+      }
+    },
+    alt: {
+      control: {
+        type: 'text'
+      }
+    },
+    delayMs: {
+      control: {
+        type: 'number'
+      }
+    }
   }
 };
 
 export default meta;
-type Story = StoryObj<AppAvatarComponent>;
+type Story = StoryObj<AvatarComponent>;
 
 export const Default: Story = {
-  args: {
-    src: 'https://i.pravatar.cc/40?img=1',
-    alt: 'avatar',
-    class: ''
-  },
-
-  render: (args) => ({
-    props: args,
-    template: `<app-avatar ${argsToTemplate(args)}></app-avatar>`
-  })
-};
-
-export const Small: Story = {
-  args: {
-    size: 'sm',
-    src: 'https://i.pravatar.cc/24?img=1'
-  },
-
-  render: (args) => ({
-    props: args,
-    template: `<app-avatar ${argsToTemplate(args)}></app-avatar>`
-  })
-};
-
-export const Medium: Story = {
-  args: {
-    size: 'default',
-    src: 'https://i.pravatar.cc/40?img=1'
-  },
-
-  render: (args) => ({
-    props: args,
-    template: `<app-avatar ${argsToTemplate(args)}></app-avatar>`
-  })
-};
-
-export const Large: Story = {
-  args: {
-    size: 'lg',
-    src: 'https://i.pravatar.cc/56?img=1',
-    alt: 'avatar',
-    class: ''
-  },
-
-  render: (args) => ({
-    props: args,
-    template: `<app-avatar ${argsToTemplate(args)}></app-avatar>`
-  })
-};
-
-export const WithRandomImage: Story = {
-  args: {
-    size: 'lg',
-    src: 'https://i.pravatar.cc/56',
-    alt: 'avatar'
-  },
-
-  render: (args) => ({
-    props: args,
-    template: `<app-avatar ${argsToTemplate(args)}></app-avatar>`
-  })
-};
-
-export const WithFallback: Story = {
-  args: {
-    size: 'default',
-    src: 'foobar.jpg',
-    fallback: 'https://placehold.co/40',
-    alt: 'fallback'
-  },
-
-  render: (args) => ({
-    props: args,
-    template: `<app-avatar ${argsToTemplate(args)}></app-avatar>`
-  })
+  render: (args) => {
+    console.log(args);
+    return {
+      props: args,
+      template: `
+      <app-avatar>
+        <app-avatar-image ${argsToTemplate(args)}/>
+        <app-avatar-fallback ${argsToTemplate(args)}>CN</app-avatar-fallback>
+      </app-avatar>
+    `
+    };
+  }
 };
