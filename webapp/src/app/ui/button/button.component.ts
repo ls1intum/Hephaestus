@@ -40,7 +40,7 @@ interface ButtonVariants extends VariantProps<typeof buttonVariants> {}
   templateUrl: './button.component.html'
 })
 export class ButtonComponent {
-  class = input<ClassValue>('bg-red-400 outline-1');
+  class = input<ClassValue>('bg-red-400');
   variant = input<ButtonVariants['variant']>('default');
   size = input<ButtonVariants['size']>('default');
   disabled = input<boolean>(false);
