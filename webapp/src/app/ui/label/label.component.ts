@@ -12,7 +12,7 @@ export { args, argTypes };
   standalone: true,
   templateUrl: './label.component.html'
 })
-export class AppLabelComponent {
+export class LabelComponent {
   class = input<ClassValue>('');
   for = input<string>('');
 

@@ -1,6 +1,6 @@
 import { Component, computed, effect, input, signal } from '@angular/core';
 import { counter } from './counter';
-import { AppButtonComponent } from 'app/ui/button/button.component';
+import { ButtonComponent } from 'app/ui/button/button.component';
 
 interface CounterHistoryEntry {
   dec: number;
@@ -10,7 +10,7 @@ interface CounterHistoryEntry {
 @Component({
   selector: 'app-counter',
   standalone: true,
-  imports: [AppButtonComponent],
+  imports: [ButtonComponent],
   templateUrl: './counter.component.html'
 })
 export class CounterComponent {
