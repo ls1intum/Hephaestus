@@ -26,8 +26,8 @@ jobs:
         uses: tj-actions/changed-files@v44
         with:
           files: |
-          webapp/src/app/**
-          webapp/.storybook/**
+            webapp/src/app/**
+            webapp/.storybook/**
       - name: List all changed files
         env:
           ALL_CHANGED_FILES: ${{ steps.changed-files.outputs.all_changed_files }}
