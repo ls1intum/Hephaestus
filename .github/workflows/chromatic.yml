@@ -41,8 +41,6 @@ jobs:
           fetch-depth: 0
       - uses: actions/setup-node@v4
         with:
-          cache: npm
-          cache-dependency-path: ./webapp/package.json
           node-version: 22
       - name: Install dependencies
         working-directory: ./webapp
