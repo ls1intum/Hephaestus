@@ -10,6 +10,11 @@ package-mode = false
 python = "^3.12"
 fastapi = "^0.112.0"
 uvicorn = "^0.30.5"
+python-dotenv = "^1.0.1"
+langchain-community = "^0.2.11"
+openai = "^1.40.3"
+langchain = "^0.2.12"
+langchain-openai = "^0.1.21"
 
 
 [tool.poetry.group.dev.dependencies]
