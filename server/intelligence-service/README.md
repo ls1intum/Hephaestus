@@ -41,8 +41,10 @@ intelligence-service/
 ├── tests/                
 │   ├── __init__.py
 │   └── test_hello.py
-├── src/                  
-│   ├── config.py        
+├── src/               
+│   ├── __init__.py   
+│   ├── config.py   
+│   ├── langchain_client.py
 │   ├── main.py          
 │   └── auth/            
 │       └── router.py    
