@@ -1,0 +1,21 @@
+documentation:
+  - changed-files:
+    - any-glob-to-any-file: docs/**
+
+client:
+  - changed-files:
+    - any-glob-to-any-file: webapp/**
+
+application-server:
+  - changed-files:
+    - any-glob-to-any-file: server/application-server/**
+
+intelligence-service:
+  - changed-files:
+    - any-glob-to-any-file: "server/intelligence-service/**"
+
+feature:
+  - head-branch: ['^feature', 'feature', '^feat', 'feat']
+
+bug:
+  - head-branch: ['^fix', 'fix', '^bug', 'bug']

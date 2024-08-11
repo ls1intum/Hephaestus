@@ -1,8 +1,9 @@
-import { Preview } from '@storybook/angular';
+import { applicationConfig, Preview } from '@storybook/angular';
 import { withThemeByClassName } from '@storybook/addon-themes';
 import { DocsContainer } from '@storybook/blocks';
 import { createElement } from 'react';
 import { themes } from '@storybook/core/theming';
+import { appConfig } from 'app/app.config';
 
 const preview: Preview = {
   parameters: {
@@ -54,8 +55,9 @@ const preview: Preview = {
         light: '',
         dark: 'dark bg-background',
       },
-      defaultTheme: 'light',
+      defaultTheme: 'dark',
     }),
+    applicationConfig(appConfig),
   ],
 };
 
