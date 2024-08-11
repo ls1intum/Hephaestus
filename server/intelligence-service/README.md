@@ -32,7 +32,22 @@ After running the application, you can access the FastAPI API documentation at `
 ## Project Structure
 
 The project is organized as follows:
-
+```
+intelligence-service/
+├── pyproject.toml     
+├── README.md            
+├── poetry.lock           
+├── .pytest_cache/        
+├── tests/                
+│   ├── __init__.py
+│   └── test_hello.py
+├── src/                  
+│   ├── config.py        
+│   ├── main.py          
+│   └── auth/            
+│       └── router.py    
+└── ...
+```
 ## Testing
 
 The project includes a set of unit tests to ensure that the core functionalities work as expected. These tests are located in the `tests/` directory.
