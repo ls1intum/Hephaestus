@@ -1,6 +1,6 @@
 from langchain_openai import OpenAI
 from langchain_community.chat_models import AzureChatOpenAI
-from .config import settings
+from ..config import settings
 
 def get_openai_client():
     if settings.OPENAI_API_KEY:

@@ -1,7 +1,7 @@
 from fastapi import FastAPI, HTTPException
 from .auth.router import router
 from .config import settings
-from .langchain_client import get_openai_client
+from .services.langchain_client import get_openai_client
 from pydantic import BaseModel
 
 app = FastAPI(title=settings.APP_NAME)
