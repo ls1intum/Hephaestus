@@ -1,6 +1,6 @@
 import { ApplicationConfig, importProvidersFrom, provideExperimentalZonelessChangeDetection } from '@angular/core';
 import { provideRouter } from '@angular/router';
-import { BrowserAnimationsModule } from '@angular/platform-browser/animations';
+import { provideAnimationsAsync } from '@angular/platform-browser/animations/async';
 import { provideHttpClient, withInterceptorsFromDi } from '@angular/common/http';
 import { provideAngularQuery, QueryClient } from '@tanstack/angular-query-experimental';
 import { LucideAngularModule, Home, Sun, Moon, Hammer } from 'lucide-angular';
@@ -14,6 +14,7 @@ export const appConfig: ApplicationConfig = {
     provideAngularQuery(new QueryClient()),
     { provide: BASE_PATH, useValue: 'http://localhost:8080' },
     provideHttpClient(withInterceptorsFromDi()),
-    importProvidersFrom([BrowserAnimationsModule, LucideAngularModule.pick({ Home, Sun, Moon, Hammer })])
+    provideAnimationsAsync(),
+    importProvidersFrom(LucideAngularModule.pick({ Home, Sun, Moon, Hammer }))
   ]
 };
