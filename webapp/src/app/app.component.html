@@ -1,6 +1,10 @@
-<main>
-  <header>
-    <p>Header</p>
+<main class="container">
+  <header class="flex items-center justify-between py-4">
+    <a class="flex gap-2 items-center hover:text-muted-foreground" href="/">
+      <lucide-angular name="hammer" class="size-6" />
+      <span class="text-xl font-semibold">Hephaestus</span>
+    </a>
+    <app-theme-switcher />
   </header>
   <div class="flex gap-2 m-2 flex-col items-start">
     <app-counter title="First Counter" />
