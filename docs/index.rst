@@ -4,6 +4,7 @@
 Hephaestus: Leveraging Generative AI to Enhance Software Development Processes and Developer Training
 =====================================================================================================
 
+
 Unlock the full potential and growth of your development team with Hephaestus. This innovative solution accelerates onboarding, boosts productivity, and enhances team collaboration through intelligent reflection, actionable insights, and continuous education, ensuring your projects thrive in agile environments.
 
 .. figure:: ./images/agile_hephaestus.png
