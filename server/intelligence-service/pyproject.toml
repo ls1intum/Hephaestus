@@ -1,0 +1,21 @@
+[tool.poetry]
+name = "intelligence-service"
+version = "0.1.0"
+description = "A FastAPI service for interfacing with large language models (LLMs) and providing intelligent text-based responses"
+authors = ["milenasrb <mi.serbinova@gmail.com>"]
+readme = "README.md"
+package-mode = false
+
+[tool.poetry.dependencies]
+python = "^3.12"
+fastapi = "^0.112.0"
+uvicorn = "^0.30.5"
+
+
+[tool.poetry.group.dev.dependencies]
+httpx = "^0.27.0"
+pytest = "^8.3.2"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
