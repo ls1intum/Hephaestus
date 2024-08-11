@@ -1,0 +1,55 @@
+name: Pull Request Labeler
+on:
+  pull_request_target:
+    types: [opened, synchronize, reopened]
+
+jobs:
+  labeler:
+    permissions:
+      contents: read
+      pull-requests: write
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Apply Labels Based on File Changes
+        uses: actions/labeler@v5
+        with:
+          repo-token: ${{ secrets.ACCESS_TOKEN }}
+          configuration-path: .github/labeler.yml
+
+      - name: Apply Labels Based on PR Size
+        uses: actions/github-script@v6
+        with:
+          script: |
+            const pr = context.payload.pull_request;
+            const files = await github.paginate(github.rest.pulls.listFiles, {
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              pull_number: pr.number,
+            });
+
+            let totalChanges = files.reduce((acc, file) => acc + file.changes, 0);
+            console.log(`Total changes: ${totalChanges}`);
+
+            let label = '';
+            if (totalChanges >= 1000) {
+              label = 'size:XXL';
+            } else if (totalChanges >= 500) {
+              label = 'size:XL';
+            } else if (totalChanges >= 100) {
+              label = 'size:L';
+            } else if (totalChanges >= 30) {
+              label = 'size:M';
+            } else if (totalChanges >= 10) {
+              label = 'size:S';
+            } else {
+              label = 'size:XS';
+            }
+
+            await github.rest.issues.addLabels({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: pr.number,
+              labels: [label],
+            });
