@@ -1,13 +1,12 @@
-### Description
+### Motivation
+<!-- Explain why this change is necessary. What problem does it solve? -->
+<!-- Link to the issue this PR addresses (e.g., `Fixes #123`, `Closes #123`, etc.) -->
 
-#### Summary
+### Description
 <!-- Provide a brief summary of the changes. -->
 
-#### Motivation
-<!-- Explain why this change is necessary. What problem does it solve? -->
-
-### Related Issue
-<!-- Link to the issue this PR addresses (e.g., `Fixes #123`). -->
+### Screenshots (if applicable)
+<!-- Attach screenshots here. -->
 
 ### Checklist
 
@@ -36,6 +35,3 @@
 - [ ] Proper error handling has been implemented
 - [ ] Added tests for new functionality
 - [ ] Changes have been tested in different environments (if applicable)
-
-### Screenshots (if applicable)
-<!-- Attach screenshots here. -->
