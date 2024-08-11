@@ -1,7 +1,7 @@
 import { Component, inject } from '@angular/core';
 import { LucideAngularModule } from 'lucide-angular';
 import { ButtonComponent } from 'app/ui/button/button.component';
-import { ThemeSwitcherService } from './theme-switcher.service';
+import { AppTheme, ThemeSwitcherService } from './theme-switcher.service';
 import { animate, state, style, transition, trigger } from '@angular/animations';
 
 @Component({
@@ -21,7 +21,7 @@ export class ThemeSwitcherComponent {
   themeSwitcherService = inject(ThemeSwitcherService);
 
   toggleTheme() {
-    if (this.themeSwitcherService.currentTheme() === 'dark') {
+    if (this.themeSwitcherService.currentTheme() === AppTheme.DARK) {
       this.themeSwitcherService.setLightTheme();
     } else {
       this.themeSwitcherService.setDarkTheme();

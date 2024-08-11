@@ -54,7 +54,7 @@ const preview: Preview = {
         light: '',
         dark: 'dark bg-background',
       },
-      defaultTheme: 'light',
+      defaultTheme: 'dark',
     }),
   ],
 };
