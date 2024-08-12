@@ -3,6 +3,7 @@ import { cn } from 'app/utils';
 import { ClassValue } from 'clsx';
 import { injectAvatarConfig } from './avatar-config';
 import { injectAvatar } from './avatar.component';
+import { Subject, takeUntil, timer } from 'rxjs';
 
 @Component({
   selector: 'app-avatar-fallback',
@@ -17,7 +18,7 @@ export class AvatarFallbackComponent implements OnInit, OnDestroy {
   private readonly avatar = injectAvatar();
   private config = injectAvatarConfig();
   private delayElapsed = signal(false);
-  private timeout: NodeJS.Timeout | null = null;
+  private destroy$ = new Subject<void>();
 
   class = input<ClassValue>();
   delayMs = input(this.config.delayMs);
@@ -25,12 +26,13 @@ export class AvatarFallbackComponent implements OnInit, OnDestroy {
   visible = computed(() => this.avatar.state() !== 'loaded' && this.delayElapsed());
 
   ngOnInit(): void {
-    this.timeout = setTimeout(() => this.delayElapsed.set(true), this.delayMs());
+    timer(this.delayMs())
+      .pipe(takeUntil(this.destroy$))
+      .subscribe(() => this.delayElapsed.set(true));
   }
 
   ngOnDestroy(): void {
-    if (this.timeout) {
-      clearTimeout(this.timeout);
-    }
+    this.destroy$.next();
+    this.destroy$.complete();
   }
 }
