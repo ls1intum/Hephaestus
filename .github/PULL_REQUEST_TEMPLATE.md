@@ -1,20 +1,17 @@
+### Motivation
+<!-- Explain why this change is necessary. What problem does it solve? -->
+<!-- Link to the issue this PR addresses (e.g., `Fixes #123`, `Closes #123`, etc.) -->
+
 ### Description
+<!-- Provide a brief summary of the changes. -->
 
-#### Summary
-*Provide a brief summary of the changes.*
-
-#### Motivation
-*Explain why this change is necessary. What problem does it solve?*
-
-#### Key Changes
-*List the primary changes made in this PR.*
-
-### Related Issue
-*Link to the issue this PR addresses (e.g., `Fixes #123`).*
+### Screenshots (if applicable)
+<!-- Attach screenshots here. -->
 
 ### Checklist
 
 #### General
+
 - [ ] PR title is clear and descriptive
 - [ ] PR description explains the purpose and changes
 - [ ] Code follows project coding standards
@@ -24,6 +21,7 @@
 - [ ] Documentation has been updated (if applicable)
 
 #### Client (if applicable)
+
 - [ ] UI changes look good on all screen sizes and browsers
 - [ ] No console errors or warnings
 - [ ] User experience and accessibility have been tested
@@ -31,11 +29,9 @@
 - [ ] Components follow design system guidelines (if applicable)
 
 #### Server (if applicable)
+
 - [ ] Code is performant and follows best practices
 - [ ] No security vulnerabilities introduced
 - [ ] Proper error handling has been implemented
 - [ ] Added tests for new functionality
 - [ ] Changes have been tested in different environments (if applicable)
-
-### Screenshots (if applicable)
-*Attach screenshots here.*
