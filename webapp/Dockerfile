@@ -11,8 +11,7 @@ RUN COOLIFY_URL_VALUE=$(grep '^COOLIFY_URL=' .env | cut -d '=' -f2) && \
 # Set serverUrl in environment.ts
 RUN APPLICATION_SERVER_URL=$(grep '^APPLICATION_SERVER_URL=' .env | cut -d '=' -f2) && \
     echo "Replacing serverUrl in environment.ts with: $APPLICATION_SERVER_URL" && \
-    sed -i "s|serverUrl: '[^']*'|serverUrl: '$APPLICATION_SERVER_URL'|g" src/environments/environment.ts && \
-    cat src/environments/environment.ts
+    sed -i "s|serverUrl: '[^']*'|serverUrl: '$APPLICATION_SERVER_URL'|g" src/environments/environment.ts
 
 RUN npm install
 RUN npm run build
