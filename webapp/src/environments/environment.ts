@@ -1,2 +1,1 @@
-console.log('environment.ts', process.env['APPLICATION_SERVER_URL']);
-export const APPLICATION_SERVER_URL = process.env['APPLICATION_SERVER_URL'];
+export const APPLICATION_SERVER_URL = import.meta.env.APPLICATION_SERVER_URL;
