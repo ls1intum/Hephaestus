@@ -30,15 +30,6 @@ export class AboutComponent {
     gcTime: Infinity
   }));
 
-  private queryArray = computed(
-    () =>
-      this.query.data()?.map((contributor) => ({
-        queryKey: ['contributor', contributor.id],
-        queryFn: async () => lastValueFrom(this.http.get(contributor.url)) as Promise<{ id: number; name: string }>,
-        gcTime: Infinity
-      })) ?? []
-  );
-
   projectManager = computed(() => {
     const data = this.query.data();
     if (!data) {
