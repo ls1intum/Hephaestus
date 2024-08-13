@@ -1,4 +1,4 @@
-import { signal } from "@angular/core";
+import { signal } from '@angular/core';
 
 export const counter = signal(0);
 
@@ -18,7 +18,7 @@ export const counter = signal(0);
 //     // inject any dependencies you need here
 //   }
 //
-//   // anyone needing to modify the signal 
+//   // anyone needing to modify the signal
 //   // needs to do so in a controlled way
 //   incrementCounter() {
 //     this.counterSignal.update((val) => val + 1);

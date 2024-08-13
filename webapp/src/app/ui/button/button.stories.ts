@@ -1,31 +1,31 @@
 import { argsToTemplate, moduleMetadata, type Meta, type StoryObj } from '@storybook/angular';
-import { AppButtonComponent, args, argTypes } from './button.component';
+import { ButtonComponent, args, argTypes } from './button.component';
 import { LucideAngularModule, ChevronRight, Mail, Loader2 } from 'lucide-angular';
 import { within, userEvent, expect, fn } from '@storybook/test';
 
 // More on how to set up stories at: https://storybook.js.org/docs/writing-stories
-const meta: Meta<AppButtonComponent> = {
+const meta: Meta<ButtonComponent> = {
   title: 'UI/Button',
-  component: AppButtonComponent,
+  component: ButtonComponent,
   tags: ['autodocs'],
   args: {
     ...args,
     disabled: false,
-    onClick: fn(),
+    onClick: fn()
   },
   argTypes: {
     ...argTypes,
     disabled: {
-      control: 'boolean',
+      control: 'boolean'
     },
     onClick: {
-      action: 'onClick',
-    },
-  },
+      action: 'onClick'
+    }
+  }
 };
 
 export default meta;
-type Story = StoryObj<AppButtonComponent>;
+type Story = StoryObj<ButtonComponent>;
 
 // More on writing stories with args: https://storybook.js.org/docs/writing-stories/args
 export const Primary: Story = {
@@ -36,17 +36,17 @@ export const Primary: Story = {
   },
   render: (args) => ({
     props: args,
-    template: `<app-button ${argsToTemplate(args)}>Primary</app-button>`,
+    template: `<app-button ${argsToTemplate(args)}>Primary</app-button>`
   })
 };
 
 export const Secondary: Story = {
   args: {
-    variant: "secondary",
-    size: "default"
+    variant: 'secondary',
+    size: 'default'
   },
 
-  render: args => ({
+  render: (args) => ({
     props: args,
     template: `<app-button ${argsToTemplate(args)}>Secondary</app-button>`
   })
@@ -54,11 +54,11 @@ export const Secondary: Story = {
 
 export const Destructive: Story = {
   args: {
-    variant: "destructive",
-    size: "default"
+    variant: 'destructive',
+    size: 'default'
   },
 
-  render: args => ({
+  render: (args) => ({
     props: args,
     template: `<app-button ${argsToTemplate(args)}>Destructive</app-button>`
   })
@@ -66,11 +66,11 @@ export const Destructive: Story = {
 
 export const Outline: Story = {
   args: {
-    variant: "outline",
-    size: "default"
+    variant: 'outline',
+    size: 'default'
   },
 
-  render: args => ({
+  render: (args) => ({
     props: args,
     template: `<app-button ${argsToTemplate(args)}>Outline</app-button>`
   })
@@ -78,11 +78,11 @@ export const Outline: Story = {
 
 export const Ghost: Story = {
   args: {
-    variant: "ghost",
-    size: "default"
+    variant: 'ghost',
+    size: 'default'
   },
 
-  render: args => ({
+  render: (args) => ({
     props: args,
     template: `<app-button ${argsToTemplate(args)}>Ghost</app-button>`
   })
@@ -90,11 +90,11 @@ export const Ghost: Story = {
 
 export const Link: Story = {
   args: {
-    variant: "link",
-    size: "default"
+    variant: 'link',
+    size: 'default'
   },
 
-  render: args => ({
+  render: (args) => ({
     props: args,
     template: `<app-button ${argsToTemplate(args)}>Link</app-button>`
   })
@@ -103,45 +103,45 @@ export const Link: Story = {
 export const Icon: Story = {
   decorators: [
     moduleMetadata({
-      imports: [LucideAngularModule.pick({ ChevronRight })],
-    }),
+      imports: [LucideAngularModule.pick({ ChevronRight })]
+    })
   ],
   render: (args) => ({
     props: {
       variant: 'outline',
-      size: 'icon',
+      size: 'icon'
     },
-    template: `<app-button ${argsToTemplate(args)}><lucide-icon name="chevron-right" class="size-4"/></app-button>`,
+    template: `<app-button ${argsToTemplate(args)}><lucide-icon name="chevron-right" class="size-4"/></app-button>`
   })
 };
 
 export const WithIcon: Story = {
   decorators: [
     moduleMetadata({
-      imports: [LucideAngularModule.pick({ Mail })],
-    }),
+      imports: [LucideAngularModule.pick({ Mail })]
+    })
   ],
   render: (args) => ({
     props: {
       variant: 'default',
-      size: 'default',
+      size: 'default'
     },
-    template: `<app-button ${argsToTemplate(args)}><lucide-icon name="mail" class="mr-2 size-4"/>Login with Email</app-button>`,
+    template: `<app-button ${argsToTemplate(args)}><lucide-icon name="mail" class="mr-2 size-4"/>Login with Email</app-button>`
   })
 };
 
 export const Loading: Story = {
   decorators: [
     moduleMetadata({
-      imports: [LucideAngularModule.pick({ Loader2 })],
-    }),
+      imports: [LucideAngularModule.pick({ Loader2 })]
+    })
   ],
   render: (args) => ({
     props: {
       variant: 'default',
       size: 'default',
-      disabled: true,
+      disabled: true
     },
-    template: `<app-button ${argsToTemplate(args)}><lucide-icon name="loader-2" class="mr-2 size-4 animate-spin"/>Please wait</app-button>`,
+    template: `<app-button ${argsToTemplate(args)}><lucide-icon name="loader-2" class="mr-2 size-4 animate-spin"/>Please wait</app-button>`
   })
 };

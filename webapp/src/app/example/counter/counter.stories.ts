@@ -8,9 +8,9 @@ const meta: Meta<CounterComponent> = {
   component: CounterComponent,
   tags: ['autodocs'],
   argTypes: toArgs<CounterComponent>({
-    title: "test",
-    byCount: 2,
-  }),
+    title: 'test',
+    byCount: 2
+  })
 };
 
 export default meta;
@@ -21,5 +21,5 @@ export const Primary: Story = {
   args: {
     title: 'Counter',
     byCount: 2
-  },
+  }
 };
