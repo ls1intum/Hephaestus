@@ -6,14 +6,7 @@ import { AvatarComponent } from 'app/ui/avatar/avatar.component';
 import { AvatarImageComponent } from 'app/ui/avatar/avatar-image.component';
 import { AvatarFallbackComponent } from 'app/ui/avatar/avatar-fallback.component';
 import { ButtonComponent } from 'app/ui/button/button.component';
-
-interface Contributor {
-  id: number;
-  login: string;
-  url: string;
-  html_url: string;
-  avatar_url: string;
-}
+import { GitHub } from 'app/@types/github';
 
 @Component({
   selector: 'app-about',
@@ -26,7 +19,7 @@ export class AboutComponent {
 
   query = injectQuery(() => ({
     queryKey: ['contributors'],
-    queryFn: async () => lastValueFrom(this.http.get('https://api.github.com/repos/ls1intum/hephaestus/contributors')) as Promise<Contributor[]>,
+    queryFn: async () => lastValueFrom(this.http.get('https://api.github.com/repos/ls1intum/hephaestus/contributors')) as Promise<GitHub.Contributor[]>,
     gcTime: Infinity
   }));
 
@@ -46,6 +39,4 @@ export class AboutComponent {
     }
     return data.filter((contributor) => contributor.id !== 5898705);
   });
-
-  JSON = JSON;
 }
