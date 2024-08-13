@@ -55,7 +55,7 @@ const preview: Preview = {
         light: '',
         dark: 'dark bg-background',
       },
-      defaultTheme: 'dark',
+      defaultTheme: 'light',
     }),
     applicationConfig(appConfig),
   ],

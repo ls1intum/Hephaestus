@@ -1,14 +1,12 @@
 import { Component } from '@angular/core';
-import { RouterOutlet } from '@angular/router';
-import { CounterComponent } from './example/counter/counter.component';
-import { HelloComponent } from './example/hello/hello.component';
+import { RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
 import { ThemeSwitcherComponent } from './components/theme-switcher/theme-switcher.component';
 import { LucideAngularModule } from 'lucide-angular';
 
 @Component({
   selector: 'app-root',
   standalone: true,
-  imports: [RouterOutlet, CounterComponent, HelloComponent, LucideAngularModule, ThemeSwitcherComponent],
+  imports: [RouterOutlet, LucideAngularModule, ThemeSwitcherComponent, RouterLink, RouterLinkActive],
   templateUrl: './app.component.html',
   styles: []
 })

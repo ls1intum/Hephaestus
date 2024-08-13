@@ -1,15 +1,26 @@
-<main class="container">
-  <header class="flex items-center justify-between py-4">
-    <a class="flex gap-2 items-center hover:text-muted-foreground" href="/">
+<div class="flex flex-col min-h-dvh">
+  <header class="container flex items-center justify-between pt-4">
+    <a class="flex gap-2 items-center hover:text-muted-foreground" routerLink="/">
       <lucide-angular name="hammer" class="size-6" />
       <span class="text-xl font-semibold">Hephaestus</span>
     </a>
     <app-theme-switcher />
   </header>
-  <div class="flex gap-2 m-2 flex-col items-start">
-    <app-counter title="First Counter" />
-    <app-counter title="Second Counter" [byCount]="16" />
-  </div>
-  <app-hello />
-  <router-outlet />
-</main>
+  <main class="container flex-grow pt-4 pb-8">
+    <router-outlet />
+  </main>
+  <footer class="py-6 md:px-8 md:py-0 border-t">
+    <div class="container flex flex-col items-center justify-between gap-4 md:h-24 md:flex-row">
+      <p class="text-balance text-center text-sm leading-loose text-muted-foreground md:text-left">
+        <a routerLink="about" class="font-medium underline underline-offset-4">About</a>
+      </p>
+      <p class="text-balance text-center text-sm leading-loose text-muted-foreground md:text-left">
+        Built by
+        <a href="https://github.com/ls1intum" target="_blank" rel="noreferrer" class="font-medium underline underline-offset-4">LS1 Team</a>
+        at
+        <a href="https://www.tum.de/en/" target="_blank" rel="noreferrer" class="font-medium underline underline-offset-4">TUM</a>. The source code is available on
+        <a href="https://github.com/ls1intum/hephaestus" target="_blank" rel="noreferrer" class="font-medium underline underline-offset-4"> GitHub</a>.
+      </p>
+    </div>
+  </footer>
+</div>

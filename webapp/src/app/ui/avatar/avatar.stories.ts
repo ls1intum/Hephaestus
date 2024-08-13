@@ -46,16 +46,13 @@ export default meta;
 type Story = StoryObj<AvatarComponent>;
 
 export const Default: Story = {
-  render: (args) => {
-    console.log(args);
-    return {
-      props: args,
-      template: `
+  render: (args) => ({
+    props: args,
+    template: `
       <app-avatar>
         <app-avatar-image ${argsToTemplate(args)}/>
         <app-avatar-fallback ${argsToTemplate(args)}>CN</app-avatar-fallback>
       </app-avatar>
     `
-    };
-  }
+  })
 };

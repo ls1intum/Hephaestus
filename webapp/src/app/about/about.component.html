@@ -1,0 +1,53 @@
+<div class="flex flex-col gap-4">
+  <h1 class="text-3xl font-bold">About</h1>
+  <p class="mb-4">
+    Hephaestus leverages generative AI to streamline software development and enhance developer training. Focused on improving every phase of the software development lifecycle
+    (SDLC) and supporting agile practices, Hephaestus helps teams work more efficiently and adhere to best practices.
+  </p>
+  <h2 class="text-2xl font-semibold">Team</h2>
+  @if (query.isPending()) {
+    <span class="text-muted-foreground">Loading...</span>
+  } @else if (query.error()) {
+    <span class="text-destructive">An error has occurred</span>
+  }
+
+  @if (projectManager(); as projectManager) {
+    <div class="flex items-center gap-3 mb-4">
+      <a
+        [href]="projectManager.html_url"
+        target="_blank"
+        rel="noopener noreferrer"
+        class="hover:scale-105 transition-all hover:shadow-secondary-foreground/15 hover:shadow-lg rounded-full"
+      >
+        <app-avatar class="size-32">
+          <app-avatar-image [src]="projectManager.avatar_url" [alt]="projectManager.login + '\'s avatar'" />
+          <app-avatar-fallback>{{ projectManager.login.slice(0, 1).toUpperCase() }}</app-avatar-fallback>
+        </app-avatar>
+      </a>
+      <div>
+        <div class="text-2xl font-semibold">Felix T.J. Dietrich</div>
+        <div class="text-lg text-muted-foreground">Project Manager</div>
+        <a href="https://ase.cit.tum.de/people/dietrich/" target="_blank" rel="noopener noreferrer" class="text-primary underline-offset-4 hover:underline">Website</a>
+      </div>
+    </div>
+  }
+
+  @if (contributors(); as contributors) {
+    <h3 class="text-lg font-bold">Contributors</h3>
+    <div class="flex flex-wrap gap-2">
+      @for (contributor of contributors; track contributor.id) {
+        <a
+          [href]="contributor.html_url"
+          target="_blank"
+          rel="noopener noreferrer"
+          class="hover:scale-105 transition-all hover:shadow-secondary-foreground/15 hover:shadow-lg rounded-full"
+        >
+          <app-avatar class="size-20">
+            <app-avatar-image [src]="contributor.avatar_url" [alt]="contributor.login + '\'s avatar'" />
+            <app-avatar-fallback>{{ contributor.login.slice(0, 1).toUpperCase() }}</app-avatar-fallback>
+          </app-avatar>
+        </a>
+      }
+    </div>
+  }
+</div>
