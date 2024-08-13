@@ -4,6 +4,7 @@ import { provideAnimationsAsync } from '@angular/platform-browser/animations/asy
 import { provideHttpClient, withInterceptorsFromDi } from '@angular/common/http';
 import { provideAngularQuery, QueryClient } from '@tanstack/angular-query-experimental';
 import { LucideAngularModule, Home, Sun, Moon, Hammer } from 'lucide-angular';
+import { environment } from 'environments/environment';
 import { BASE_PATH } from 'app/core/modules/openapi';
 import { routes } from 'app/app.routes';
 
@@ -15,6 +16,6 @@ export const appConfig: ApplicationConfig = {
     provideHttpClient(withInterceptorsFromDi()),
     provideAnimationsAsync(),
     importProvidersFrom(LucideAngularModule.pick({ Home, Sun, Moon, Hammer })),
-    { provide: BASE_PATH, useValue: import.meta.env.NG_APPLICATION_SERVER_URL }
+    { provide: BASE_PATH, useValue: environment.serverUrl }
   ]
 };

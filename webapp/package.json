@@ -48,7 +48,6 @@
     "@angular/cli": "18.1.2",
     "@angular/compiler-cli": "18.1.2",
     "@chromatic-com/storybook": "1.6.1",
-    "@ngx-env/builder": "18.0.1",
     "@storybook/addon-essentials": "8.2.6",
     "@storybook/addon-interactions": "8.2.6",
     "@storybook/addon-links": "8.2.6",
