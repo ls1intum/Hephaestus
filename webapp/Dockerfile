@@ -4,6 +4,9 @@ WORKDIR /app
 
 COPY ./ /app/
 
+RUN printenv
+RUN cat .env
+
 RUN npm install
 RUN npm run build
 
