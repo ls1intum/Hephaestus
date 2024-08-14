@@ -46,15 +46,46 @@ jobs:
           else if (changedLines > 9) label = 'size:S';
           else label = 'size:XS';
 
+          console.log("Fetching existing labels...");
+          const labels = await github.rest.issues.listLabelsOnIssue({
+            owner: context.repo.owner,
+            repo: context.repo.repo,
+            issue_number: context.issue.number,
+          });
+
+          const sizeLabels = labels.data
+            .filter(label => label.name.startsWith('size:'))
+            .map(label => label.name);
+
+          const removeLabels = sizeLabels.filter(sizeLabel => sizeLabel !== label);
+          if (removeLabels.length > 0) {
+            console.log(`Removing existing size labels: ${removeLabels.join(', ')}`);
+            for (const label of removeLabels) {
+              await github.rest.issues.removeLabel({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: context.issue.number,
+                name: label,
+              });
+            }
+            console.log("Existing size labels removed.");
+          } else {
+            console.log("No size labels to remove.");
+          }
+
           if (label) {
-            console.log(`Applying label "${label}" to the pull request...`);
-            await github.rest.issues.addLabels({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              issue_number: context.issue.number,
-              labels: [label]
-            });
-            console.log(`Label "${label}" applied successfully.`);
+            if (sizeLabels.includes(label)) {
+              console.log(`Label "${label}" already applied.`);
+            } else {
+              console.log(`Applying label "${label}" to the pull request...`);
+              await github.rest.issues.addLabels({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: context.issue.number,
+                labels: [label]
+              });
+              console.log(`Label "${label}" applied successfully.`);
+            }
           } else {
             console.log("No label to apply.");
           }
