@@ -15,12 +15,14 @@ To set up the project locally, follow these steps:
 
 1. **Install dependencies:**
     The project uses `poetry` for dependency management. Install the dependencies by running:
+
     ```bash
     poetry install
     ```
 
 2. **Run the application:**
     You can start the FastAPI application with Uvicorn:
+
     ```bash
     poetry run uvicorn src.main:app --reload
     ```
@@ -32,6 +34,7 @@ After running the application, you can access the FastAPI API documentation at `
 ## Project Structure
 
 The project is organized as follows:
+
 ```
 intelligence-service/
 ├── pyproject.toml     
@@ -50,6 +53,7 @@ intelligence-service/
 │       └── router.py    
 └── ...
 ```
+
 ## Testing
 
 The project includes a set of unit tests to ensure that the core functionalities work as expected. These tests are located in the `tests/` directory.
