@@ -1,9 +1,23 @@
 services:
+  application-server:
+    image: hephaestus-application-server
+    ports:
+      - '3000:3000'
+    environment:
+      - SPRING_PROFILES_ACTIVE=prod
+      - DATABASE_URL=jdbc:postgresql://postgres:5432/hephaestus
+      - DATABASE_USERNAME=root
+      - DATABASE_PASSWORD=root
+      - SECURITY_USER_NAME=$SECURITY_USER_NAME
+      - SECURITY_USER_PASSWORD=$SECURITY_USER_PASSWORD
+    depends_on:
+      - postgres
+
   postgres:
     image: 'postgres:latest'
     environment:
-      POSTGRES_DB: hephaestus
-      POSTGRES_PASSWORD: root
-      POSTGRES_USER: root
+      - POSTGRES_DB=hephaestus
+      - POSTGRES_PASSWORD=root
+      - POSTGRES_USER=root
     ports:
       - '5432'
