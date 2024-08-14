@@ -2,7 +2,7 @@ services:
   application-server:
     image: hephaestus-application-server
     ports:
-      - '8080'
+      - '3000:3000'
     environment:
       - SPRING_PROFILES_ACTIVE=prod
       - DATABASE_URL=jdbc:postgresql://postgres:5432/hephaestus
