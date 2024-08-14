@@ -1,6 +1,6 @@
 services:
   application-server:
-    image: hephaestus-application-server:${SOURCE_COMMIT}
+    image: hephaestus-application-server
     ports:
       - '3000:3000'
     environment:
