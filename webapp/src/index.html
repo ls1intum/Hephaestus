@@ -1,13 +1,27 @@
 <!doctype html>
 <html lang="en">
-<head>
-  <meta charset="utf-8">
-  <title>Hephaestus</title>
-  <base href="/">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <link rel="icon" type="image/x-icon" href="favicon.ico">
-</head>
-<body>
-  <app-root></app-root>
-</body>
+  <head>
+    <meta charset="utf-8" />
+    <title>Hephaestus</title>
+    <base href="/" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <link rel="icon" type="image/x-icon" href="favicon.ico" />
+  </head>
+  <script>
+    const theme = localStorage.getItem('theme');
+    const browserDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+    if (theme !== null) {
+      if (theme === 'dark') {
+        document.documentElement.classList.add('dark');
+      }
+    } else {
+      if (browserDark) {
+        document.documentElement.classList.add('dark');
+      }
+      localStorage.setItem('theme', browserDark ? 'dark' : 'light');
+    }
+  </script>
+  <body>
+    <app-root></app-root>
+  </body>
 </html>

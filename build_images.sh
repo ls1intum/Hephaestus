@@ -1,0 +1,1 @@
+nixpacks build -n hephaestus-application-server server/application-server
