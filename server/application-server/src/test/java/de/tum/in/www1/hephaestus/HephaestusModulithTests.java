@@ -18,10 +18,11 @@ public class HephaestusModulithTests {
 
     @Test
     void writeDocumentationSnippets() {
+        DiagramOptions options = DiagramOptions.defaults().withStyle(DiagramStyle.UML);
         new Documenter(modules)
                 .writeModuleCanvases()
-                .writeModulesAsPlantUml()
-                .writeIndividualModulesAsPlantUml(DiagramOptions.defaults().withStyle(DiagramStyle.UML));
+                .writeModulesAsPlantUml(options)
+                .writeIndividualModulesAsPlantUml(options);
     }
 
 }
