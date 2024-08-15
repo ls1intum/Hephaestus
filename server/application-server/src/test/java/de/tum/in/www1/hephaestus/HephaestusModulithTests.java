@@ -3,6 +3,8 @@ package de.tum.in.www1.hephaestus;
 import org.junit.jupiter.api.Test;
 import org.springframework.modulith.core.ApplicationModules;
 import org.springframework.modulith.docs.Documenter;
+import org.springframework.modulith.docs.Documenter.DiagramOptions;
+import org.springframework.modulith.docs.Documenter.DiagramOptions.DiagramStyle;
 
 public class HephaestusModulithTests {
 
@@ -19,7 +21,7 @@ public class HephaestusModulithTests {
         new Documenter(modules)
                 .writeModuleCanvases()
                 .writeModulesAsPlantUml()
-                .writeIndividualModulesAsPlantUml();
+                .writeIndividualModulesAsPlantUml(DiagramOptions.defaults().withStyle(DiagramStyle.UML));
     }
 
 }
