@@ -2,7 +2,7 @@ services:
   application-server:
     image: hephaestus-application-server
     ports:
-      - '3000:8080'
+      - '3000:3000'
     environment:
       - SERVICE_FQDN_SERVER
       - SPRING_PROFILES_ACTIVE=prod
