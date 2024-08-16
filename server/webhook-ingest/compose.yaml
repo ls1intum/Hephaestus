@@ -15,10 +15,9 @@ services:
     image: nats:latest
     ports:
       - "4222"
-    command: ["-js", "--config", "/etc/nats/nats-server.conf"]
+    command: ["--jetstream", "--store_dir", "/data/jetstream"]
     volumes:
       - nats_data:/data
-      - ./server/webhook-ingest/nats-server.conf:/etc/nats/nats-server.conf
     networks:
       - common-network
 
