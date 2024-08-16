@@ -15,7 +15,7 @@ services:
     image: nats:latest
     ports:
       - "4222"
-    command: ["--jetstream", "--store_dir", "/data/jetstream"]
+    command: ["--jetstream", "--store_dir", "/data"]
     volumes:
       - nats_data:/data
     networks:
