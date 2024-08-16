@@ -14,10 +14,11 @@ services:
   nats-server:
     image: nats:latest
     ports:
-      - "4222"
-    command: ["--jetstream", "--store_dir", "/data"]
+      - "4222:4222"
+    command: ["--config", "/etc/nats/nats-server.conf"]
     volumes:
       - nats_data:/data
+      - ./nats-server.conf:/etc/nats/nats-server.conf
     networks:
       - common-network
 
