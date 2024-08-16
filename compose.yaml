@@ -12,8 +12,6 @@ services:
       - SECURITY_USER_PASSWORD=${SECURITY_USER_NAME:-admin_password}
     depends_on:
       - postgres
-    networks:
-      - app-network
 
   postgres:
     image: 'postgres:latest'
@@ -23,9 +21,3 @@ services:
       - POSTGRES_USER=root
     ports:
       - '5432'
-    networks:
-      - app-network
-
-networks:
-  app-network:
-    driver: bridge
