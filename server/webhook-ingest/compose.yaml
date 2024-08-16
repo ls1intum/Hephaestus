@@ -18,7 +18,7 @@ services:
     command: ["--config", "/etc/nats/nats-server.conf"]
     volumes:
       - nats_data:/data
-      - ./nats-server.conf:/etc/nats/nats-server.conf
+      - ./server/webhook-ingest/nats-server.conf:/etc/nats/nats-server.conf
     networks:
       - common-network
 
