@@ -15,9 +15,10 @@ services:
     image: nats:latest
     ports:
       - "4222"
-    command: "-js"
+    command: ["-js", "-c /etc/nats/nats-server.conf"]
     volumes:
       - nats_data:/data
+      - ./nats-server.conf:/etc/nats/nats-server.conf
     networks:
       - common-network
 
