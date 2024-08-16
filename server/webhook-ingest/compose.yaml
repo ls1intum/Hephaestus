@@ -1,0 +1,28 @@
+services:
+  webhook-ingest:
+    build: .
+    ports:
+      - "4200"
+    environment:
+      - NATS_URL=nats://nats-server:4222
+      - SECRET=${SECRET}
+    depends_on:
+      - nats-server
+    networks:
+      - common-network
+
+  nats-server:
+    image: nats:latest
+    ports:
+      - "4222"
+    command: "-js"
+    volumes:
+      - nats_data:/data
+    networks:
+      - common-network
+
+networks:
+  common-network:
+
+volumes:
+  nats_data: 
