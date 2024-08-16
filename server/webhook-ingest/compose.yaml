@@ -15,7 +15,7 @@ services:
     image: nats:latest
     ports:
       - "4222"
-    command: ["-js", "-c /etc/nats/nats-server.conf"]
+    command: ["-js", "--config", "/etc/nats/nats-server.conf"]
     volumes:
       - nats_data:/data
       - ./nats-server.conf:/etc/nats/nats-server.conf
