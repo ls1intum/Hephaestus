@@ -4,7 +4,6 @@ version = "1.0.0"
 description = "A FastAPI service for ingesting GitHub webhooks and publishing events to NATS JetStream."
 authors = ["Felix T.J. Dietrich <felixtj.dietrich@tum.de>"]
 readme = "README.md"
-packages = [{include = "webhook-ingest"}]
 package-mode = false
 
 
