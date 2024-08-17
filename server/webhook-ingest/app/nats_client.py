@@ -9,7 +9,6 @@ class NATSClient:
     async def connect(self):
         await self.nc.connect(
             servers=settings.NATS_URL,
-            token=settings.NATS_AUTH_TOKEN,
             verbose=True,
             pedantic=True,
             max_reconnect_attempts=-1,
