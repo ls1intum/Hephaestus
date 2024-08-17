@@ -1,5 +1,4 @@
 from pydantic_settings import BaseSettings
-from app.logger import logger
 
 
 class Settings(BaseSettings):
@@ -11,5 +10,3 @@ class Settings(BaseSettings):
         env_file = ".env"
 
 settings = Settings()
-
-logger.info(f"Loaded settings: {settings.model_dump_json()}")
