@@ -10,7 +10,9 @@ class NATSClient:
         self.nats_auth_token = nats_auth_token
 
     async def connect(self):
-        await self.nc.connect(servers=self.nats_url, token=self.nats_auth_token)
+        protocol, host = self.nats_url.split("://")
+        server_url = f"{protocol}://{self.nats_auth_token}@{host}"
+        await self.nc.connect(server_url)
         self.js = self.nc.jetstream()
         logger.info(f"Connected to NATS at {self.nats_url}")
 

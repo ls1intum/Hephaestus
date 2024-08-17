@@ -12,4 +12,4 @@ class Settings(BaseSettings):
 
 settings = Settings()
 
-logger.info(f"Loaded settings: {settings.dict()}")
+logger.info(f"Loaded settings: {settings.model_dump_json()}")
