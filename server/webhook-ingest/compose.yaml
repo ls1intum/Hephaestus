@@ -16,7 +16,7 @@ services:
     image: nats:latest
     ports:
       - "4222:4222"
-    command: ["--config", "/etc/nats/nats-server.conf"]
+    command: ["--config", "/etc/nats/nats-server.conf", "-DV"]
     environment:
       - TLS_CERT_FILE
       - TLS_KEY_FILE
