@@ -1,5 +1,3 @@
-import ssl
-
 from nats.aio.client import Client as NATS
 from app.config import settings
 from app.logger import logger
@@ -9,14 +7,11 @@ class NATSClient:
         self.nc = NATS()
 
     async def connect(self):
-        ssl_context = ssl.create_default_context(ssl.Purpose.CLIENT_AUTH)
-        ssl_context.check_hostname = False
-        ssl_context.verify_mode = ssl.CERT_NONE
-
         await self.nc.connect(
             servers=settings.NATS_URL,
             token=settings.NATS_AUTH_TOKEN,
-            tls=ssl_context,
+            verbose=True,
+            pedantic=True,
             max_reconnect_attempts=-1,
             allow_reconnect=True,
             reconnect_time_wait=2,
