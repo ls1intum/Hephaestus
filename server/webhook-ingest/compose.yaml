@@ -4,7 +4,7 @@ services:
     ports:
       - "4200"
     environment:
-      - NATS_URL=nats://nats-server:4222
+      - NATS_URL=tls://nats-server:4222
       - SECRET=${SECRET}
     depends_on:
       - nats-server
@@ -16,9 +16,13 @@ services:
     ports:
       - "4222:4222"
     command: ["--config", "/etc/nats/nats-server.conf"]
+    environment:
+      - TLS_CERT_FILE
+      - TLS_KEY_FILE
     volumes:
       - nats_data:/data
       - ./nats-server.conf:/etc/nats/nats-server.conf
+      - /etc/letsencrypt:/etc/letsencrypt:ro
     networks:
       - common-network
 
