@@ -4,7 +4,7 @@ services:
     ports:
       - "4200"
     environment:
-      - NATS_URL=tls://nats-server:4222
+      - NATS_URL=${NATS_URL:-nats://nats-server:4222}
       - SECRET=${SECRET}
     depends_on:
       - nats-server
