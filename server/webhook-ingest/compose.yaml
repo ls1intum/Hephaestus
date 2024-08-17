@@ -4,9 +4,8 @@ services:
     ports:
       - "4200"
     environment:
+      # For production use, tls://<token>@<host>:<port>
       - NATS_URL=${NATS_URL:-nats://nats-server:4222}
-      - NATS_USER=${NATS_USER}
-      - NATS_PASSWORD=${NATS_PASSWORD}
       - WEBHOOK_SECRET=${WEBHOOK_SECRET}
     depends_on:
       - nats-server
@@ -19,10 +18,9 @@ services:
       - "4222:4222"
     command: ["--config", "/etc/nats/nats-server.conf", "-DV"]
     environment:
-      - TLS_CERT_FILE=${TLS_CERT_FILE}
-      - TLS_KEY_FILE=${TLS_KEY_FILE}
-      - NATS_USER=${NATS_USER}
-      - NATS_PASSWORD=${NATS_PASSWORD}
+      - TLS_CERT_FILE
+      - TLS_KEY_FILE
+      - NATS_AUTH_TOKEN
     volumes:
       - nats_data:/data
       - ./nats-server.conf:/etc/nats/nats-server.conf

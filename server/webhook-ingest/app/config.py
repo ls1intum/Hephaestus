@@ -4,8 +4,6 @@ from app.logger import logger
 
 class Settings(BaseSettings):
     NATS_URL: str = "localhost"
-    NATS_USER: str = ""
-    NATS_PASSWORD: str = ""
     WEBHOOK_SECRET: str = ""
     
     class Config:
