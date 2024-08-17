@@ -4,7 +4,8 @@ services:
     ports:
       - "4200"
     environment:
-      - NATS_URL=nats://nats-server:5222
+      # For production use tls://<host>
+      - NATS_URL=${NATS_URL:-nats://nats-server:4222}
       - NATS_AUTH_TOKEN
       - WEBHOOK_SECRET
     depends_on:
