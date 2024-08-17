@@ -1,6 +1,6 @@
-from fastapi import logger
 from nats.aio.client import Client as NATS
 from app.config import settings
+from app.logger import logger
 
 
 class NATSClient:
@@ -10,7 +10,15 @@ class NATSClient:
         self.nats_auth_token = nats_auth_token
 
     async def connect(self):
-        await self.nc.connect(servers=self.nats_url, token=self.nats_auth_token)
+        await self.nc.connect(
+            servers=[self.nats_url], 
+            token=self.nats_auth_token, 
+            verbose=True, 
+            pedantic=True,
+            max_reconnect_attempts=-1,
+            allow_reconnect=True,
+            reconnect_time_wait=2,
+        )
         self.js = self.nc.jetstream()
         logger.info(f"Connected to NATS at {self.nats_url}")
 
