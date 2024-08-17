@@ -1,5 +1,5 @@
+from fastapi import logger
 from nats.aio.client import Client as NATS
-from app.logger import logger
 from app.config import settings
 
 

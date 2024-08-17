@@ -1,6 +1,6 @@
+from fastapi import logger
 from pydantic_settings import BaseSettings
 
-from app.logger import logger
 
 class Settings(BaseSettings):
     NATS_URL: str = "localhost"
