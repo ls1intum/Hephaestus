@@ -41,7 +41,7 @@ async def github_webhook(
 ):    
     body = await request.body()
     
-    if not verify_github_signature(signature, settings.SECRET, body):
+    if not verify_github_signature(signature, settings.WEBHOOK_SECRET, body):
         raise HTTPException(status_code=401, detail="Invalid signature")
     
     # Ignore ping events

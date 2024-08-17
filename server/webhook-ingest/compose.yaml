@@ -5,7 +5,8 @@ services:
       - "4200"
     environment:
       - NATS_URL=${NATS_URL:-nats://nats-server:4222}
-      - SECRET=${SECRET}
+      - NATS_AUTH_TOKEN
+      - SECRET
     depends_on:
       - nats-server
     networks:
@@ -19,6 +20,7 @@ services:
     environment:
       - TLS_CERT_FILE
       - TLS_KEY_FILE
+      - NATS_AUTH_TOKEN
     volumes:
       - nats_data:/data
       - ./nats-server.conf:/etc/nats/nats-server.conf
