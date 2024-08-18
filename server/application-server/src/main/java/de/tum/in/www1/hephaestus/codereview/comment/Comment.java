@@ -3,7 +3,6 @@ package de.tum.in.www1.hephaestus.codereview.comment;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 import de.tum.in.www1.hephaestus.codereview.actor.Actor;
-import de.tum.in.www1.hephaestus.codereview.pullrequest.Pullrequest;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.FetchType;
@@ -26,6 +25,9 @@ public class Comment {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
+    @Column(name = "github_id")
+    private String githubId;
+
     /**
      * Body of the Comment entity.
      * This field is mandatory.
@@ -38,14 +40,14 @@ public class Comment {
      * This field is mandatory.
      */
     @Column(nullable = false)
-    private Long createdAt;
+    private String createdAt;
 
     /**
      * Timestamp of when the Comment entity was updated.
      * This field is mandatory.
      */
     @Column(nullable = false)
-    private Long updatedAt;
+    private String updatedAt;
 
     /**
      * The author of the Comment entity.
@@ -58,6 +60,6 @@ public class Comment {
      * The pullrequest of the Comment entity.
      */
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "pullrequest_id")
-    private Pullrequest pullrequest;
+    @JoinColumn(name = "c_connection_id")
+    private CommentConnection connection;
 }

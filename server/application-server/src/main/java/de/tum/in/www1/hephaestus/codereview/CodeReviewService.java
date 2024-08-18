@@ -10,7 +10,6 @@ import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestClient;
 import org.springframework.data.domain.Example;
-import org.springframework.graphql.client.ClientGraphQlResponse;
 import org.springframework.graphql.client.HttpSyncGraphQlClient;
 
 import de.tum.in.www1.hephaestus.EnvConfig;
@@ -64,19 +63,18 @@ public class CodeReviewService {
                 variables.put("name", "hephaestus");
                 variables.put("first", 10);
 
-                ClientGraphQlResponse response = graphQlClient.documentName("getrepositoryprs")
+                Repository repository = graphQlClient.documentName("getrepositoryprs")
                                 .variables(variables)
-                                .executeSync();
+                                .retrieveSync("repository")
+                                .toEntity(Repository.class);
 
-                logger.info("Response: " + response.getData());
-                if (response.getErrors().size() > 0) {
-                        logger.error("Error while fetching repository: " + response.getErrors().toString());
+                if (repository == null) {
+                        logger.error("Error while fetching repository!");
                         return null;
                 }
-                Repository repository = response.toEntity(Repository.class);
                 repository.setAddedAt(Instant.now());
 
-                System.out.println("Repository: " + repository.getName());
+                System.out.println("Repository: " + repository.toString());
                 codeReviewRepository.save(repository);
                 return repository;
         }

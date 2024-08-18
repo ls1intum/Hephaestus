@@ -1,18 +1,16 @@
 package de.tum.in.www1.hephaestus.codereview.repository;
 
 import java.time.Instant;
-import java.util.List;
 
-import de.tum.in.www1.hephaestus.codereview.pullrequest.Pullrequest;
+import de.tum.in.www1.hephaestus.codereview.pullrequest.PullrequestConnection;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
-import jakarta.persistence.FetchType;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
-import jakarta.persistence.OneToMany;
+import jakarta.persistence.JoinColumn;
+import jakarta.persistence.OneToOne;
 import jakarta.persistence.Table;
-import jakarta.validation.constraints.NotNull;
 import lombok.Getter;
 import lombok.Setter;
 
@@ -27,26 +25,32 @@ public class Repository {
      */
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
-    private Long uid;
+    private Long id;
 
-    @NotNull
-    private String id;
+    @Column(name = "github_id")
+    private String githubId;
 
-    @NotNull
+    @Column
     private String name;
 
-    @NotNull
+    @Column(name = "name_with_owner")
     private String nameWithOwner;
 
-    @NotNull
+    @Column
     private String description;
 
-    @NotNull
+    @Column
     private String url;
 
-    @OneToMany(mappedBy = "repository", fetch = FetchType.LAZY)
-    private List<Pullrequest> pullRequests;
+    @OneToOne(optional = false)
+    @JoinColumn(name = "connection_id")
+    private PullrequestConnection pullRequests;
 
-    @NotNull
+    @Column(name = "added_at")
     private Instant addedAt;
+
+    public String toString() {
+        return "Repository [id=" + id + ", name=" + name + ", nameWithOwner=" + nameWithOwner + ", description="
+                + description + ", url=" + url + ", pullRequests=" + pullRequests + ", addedAt=" + addedAt + "]";
+    }
 }

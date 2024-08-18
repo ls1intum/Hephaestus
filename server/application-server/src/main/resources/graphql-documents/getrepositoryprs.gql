@@ -1,13 +1,13 @@
 query GetRepositoryPRs($owner: String!, $name: String!, $first: Int!) {
 	repository(owner: $owner, name: $name) {
-		id
+		githubId: id
 		name
 		nameWithOwner
 		description
 		url
 		pullRequests(first: $first, states: [OPEN, MERGED]) {
 			nodes {
-				id
+				githubId: id
 				title
 				url
 				state
@@ -15,24 +15,26 @@ query GetRepositoryPRs($owner: String!, $name: String!, $first: Int!) {
 				updatedAt
 				mergedAt
 				author {
-					avatarUrl
-					login
-					url
+					...authorFields
 				}
 				comments(last: 100) {
 					nodes {
-						id
+						githubId: id
 						body
 						createdAt
 						updatedAt
 						author {
-							avatarUrl
-							login
-							url
+							...authorFields
 						}
 					}
 				}
 			}
 		}
 	}
+}
+
+fragment authorFields on Actor {
+	avatarUrl
+	login
+	url
 }

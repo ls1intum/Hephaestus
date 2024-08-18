@@ -1,11 +1,9 @@
 package de.tum.in.www1.hephaestus.codereview.pullrequest;
 
 import java.time.Instant;
-import java.util.List;
 
 import de.tum.in.www1.hephaestus.codereview.actor.Actor;
-import de.tum.in.www1.hephaestus.codereview.comment.Comment;
-import de.tum.in.www1.hephaestus.codereview.repository.Repository;
+import de.tum.in.www1.hephaestus.codereview.comment.CommentConnection;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 import jakarta.persistence.Column;
@@ -15,7 +13,7 @@ import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
-import jakarta.persistence.OneToMany;
+import jakarta.persistence.OneToOne;
 import lombok.Getter;
 import lombok.Setter;
 
@@ -31,6 +29,9 @@ public class Pullrequest {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
+
+    @Column(name = "github_id")
+    private String githubId;
 
     /**
      * Title of the Pullrequest.
@@ -58,20 +59,20 @@ public class Pullrequest {
      * This field is mandatory.
      */
     @Column(nullable = false)
-    private Instant createdAt;
+    private String createdAt;
 
     /**
      * Timestamp of when the Pullrequest entity was updated.
      * This field is mandatory.
      */
     @Column(nullable = false)
-    private Instant updatedAt;
+    private String updatedAt;
 
     /**
      * Timestamp of when the Pullrequest entity was merged.
      */
     @Column(nullable = true)
-    private Instant mergedAt;
+    private String mergedAt;
 
     /**
      * The author of the Pullrequest entity.
@@ -83,13 +84,14 @@ public class Pullrequest {
     /**
      * The comments of the Pullrequest entity.
      */
-    @OneToMany(mappedBy = "pullrequest", fetch = FetchType.LAZY)
-    private List<Comment> comments;
+    @OneToOne(optional = false)
+    @JoinColumn(name = "c_connection_id")
+    private CommentConnection comments;
 
     /**
      * The repository of the Pullrequest entity.
      */
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "repository_id")
-    private Repository repository;
+    @JoinColumn(name = "pr_connection_id")
+    private PullrequestConnection connection;
 }
