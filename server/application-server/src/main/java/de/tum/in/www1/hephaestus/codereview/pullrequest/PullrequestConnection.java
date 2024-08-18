@@ -25,7 +25,4 @@ public class PullrequestConnection {
 
     @OneToMany(mappedBy = "connection", fetch = FetchType.LAZY)
     private List<Pullrequest> nodes;
-
-    @OneToOne(mappedBy = "pullRequests", fetch = FetchType.LAZY)
-    private Repository repository;
 }

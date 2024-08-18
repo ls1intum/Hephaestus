@@ -43,7 +43,7 @@ public class Repository {
     private String url;
 
     @OneToOne(optional = false)
-    @JoinColumn(name = "connection_id")
+    @JoinColumn(name = "connection_id", referencedColumnName = "id")
     private PullrequestConnection pullRequests;
 
     @Column(name = "added_at")

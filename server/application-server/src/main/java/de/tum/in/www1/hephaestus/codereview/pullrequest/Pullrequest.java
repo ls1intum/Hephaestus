@@ -6,6 +6,7 @@ import de.tum.in.www1.hephaestus.codereview.actor.Actor;
 import de.tum.in.www1.hephaestus.codereview.comment.CommentConnection;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
+import jakarta.persistence.Transient;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.FetchType;
@@ -85,13 +86,10 @@ public class Pullrequest {
      * The comments of the Pullrequest entity.
      */
     @OneToOne(optional = false)
-    @JoinColumn(name = "c_connection_id")
+    @JoinColumn(name = "c_connection_id", referencedColumnName = "id")
     private CommentConnection comments;
 
-    /**
-     * The repository of the Pullrequest entity.
-     */
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "pr_connection_id")
+    @JoinColumn(name = "pr_connection_id", referencedColumnName = "id")
     private PullrequestConnection connection;
 }

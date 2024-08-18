@@ -25,7 +25,4 @@ public class CommentConnection {
 
     @OneToMany(mappedBy = "connection", fetch = FetchType.LAZY)
     private List<Comment> nodes;
-
-    @OneToOne(mappedBy = "comments", fetch = FetchType.LAZY)
-    private Pullrequest pullrequest;
 }

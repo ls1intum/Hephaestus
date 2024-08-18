@@ -60,6 +60,7 @@ public class Comment {
      * The pullrequest of the Comment entity.
      */
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "c_connection_id")
+    @JoinColumn(name = "c_connection_id", referencedColumnName = "id")
     private CommentConnection connection;
+
 }
