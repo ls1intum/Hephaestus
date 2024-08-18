@@ -1,26 +1,29 @@
 spring:
-  application:
-    name: Hephaestus
+    application:
+        name: Hephaestus
 
-  datasource:
-    url: jdbc:postgresql://localhost:5432/hephaestus
-    username: root
-    password: root
-  
-  jpa:
-    hibernate:
-      ddl-auto: create-drop
-    properties:
-      hibernate:
-        dialect: org.hibernate.dialect.PostgreSQLDialect
+    datasource:
+        url: jdbc:postgresql://localhost:5432/hephaestus
+        username: root
+        password: root
 
-  liquibase:
-    change-log: classpath:db/master.xml
+    jpa:
+        hibernate:
+            ddl-auto: create-drop
+        properties:
+            hibernate:
+                dialect: org.hibernate.dialect.PostgreSQLDialect
 
-  security:
-    user:
-      name: admin
-      password: admin
+    liquibase:
+        change-log: classpath:db/master.xml
+
+    security:
+        user:
+            name: admin
+            password: admin
 
 springdoc:
-  default-produces-media-type: application/json
+    default-produces-media-type: application/json
+
+environment:
+    githubPat: ${GITHUB_PAT}

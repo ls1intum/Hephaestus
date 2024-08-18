@@ -30,7 +30,8 @@ public class HelloService {
   }
 
   /**
-   * Creates a new {@link Hello} entity with the current timestamp and saves it to the repository.
+   * Creates a new {@link Hello} entity with the current timestamp and saves it to
+   * the repository.
    * 
    * @return The created Hello entity
    */

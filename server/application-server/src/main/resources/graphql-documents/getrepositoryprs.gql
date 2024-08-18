@@ -1,0 +1,38 @@
+query GetRepositoryPRs($owner: String!, $name: String!, $first: Int!) {
+	repository(owner: $owner, name: $name) {
+		id
+		name
+		nameWithOwner
+		description
+		url
+		pullRequests(first: $first, states: [OPEN, MERGED]) {
+			nodes {
+				id
+				title
+				url
+				state
+				createdAt
+				updatedAt
+				mergedAt
+				author {
+					avatarUrl
+					login
+					url
+				}
+				comments(last: 100) {
+					nodes {
+						id
+						body
+						createdAt
+						updatedAt
+						author {
+							avatarUrl
+							login
+							url
+						}
+					}
+				}
+			}
+		}
+	}
+}
