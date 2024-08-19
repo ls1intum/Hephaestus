@@ -9,7 +9,8 @@ services:
       - NATS_AUTH_TOKEN
       - WEBHOOK_SECRET
     depends_on:
-      - nats-server
+      nats-server:
+        condition: service_healthy
     networks:
       - common-network
     healthcheck:
@@ -17,7 +18,7 @@ services:
       interval: 30s
       timeout: 10s
       retries: 5
-      start_period: 20s
+      start_period: 10s
     logging:
       driver: "json-file"
       options:
@@ -25,7 +26,7 @@ services:
         max-file: "3"
 
   nats-server:
-    image: nats:latest
+    image: nats:alpine
     ports:
       - "4222:4222"
       - "8222:8222"
@@ -45,7 +46,7 @@ services:
       interval: 30s
       timeout: 10s
       retries: 5
-      start_period: 20s
+      start_period: 10s
     logging:
       driver: "json-file"
       options:
