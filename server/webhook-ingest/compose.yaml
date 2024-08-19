@@ -1,0 +1,36 @@
+services:
+  webhook-ingest:
+    build: .
+    ports:
+      - "4200"
+    environment:
+      # For production use tls://<host>
+      - NATS_URL=${NATS_URL:-nats://nats-server:4222}
+      - NATS_AUTH_TOKEN
+      - WEBHOOK_SECRET
+    depends_on:
+      - nats-server
+    networks:
+      - common-network
+
+  nats-server:
+    image: nats:latest
+    ports:
+      - "4222:4222"
+    command: ["--config", "/etc/nats/nats-server.conf"]
+    environment:
+      - TLS_CERT_FILE
+      - TLS_KEY_FILE
+      - NATS_AUTH_TOKEN
+    volumes:
+      - nats_data:/data
+      - ./nats-server.conf:/etc/nats/nats-server.conf
+      - /etc/letsencrypt:/etc/letsencrypt:ro
+    networks:
+      - common-network
+
+networks:
+  common-network:
+
+volumes:
+  nats_data: 
