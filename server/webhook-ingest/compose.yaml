@@ -9,7 +9,8 @@ services:
       - NATS_AUTH_TOKEN
       - WEBHOOK_SECRET
     depends_on:
-      - nats-server
+      nats-server:
+        condition: service_healthy
     networks:
       - common-network
     healthcheck:
