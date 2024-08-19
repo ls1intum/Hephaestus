@@ -9,16 +9,15 @@ services:
       - NATS_AUTH_TOKEN
       - WEBHOOK_SECRET
     depends_on:
-      nats-server:
-        condition: service_healthy
+      - service_healthy
     networks:
       - common-network
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:4200/health"]
       interval: 30s
       timeout: 10s
-      retries: 3
-      start_period: 10s
+      retries: 5
+      start_period: 20s
     logging:
       driver: "json-file"
       options:
@@ -45,8 +44,8 @@ services:
       test: ["CMD", "curl", "-f", "http://localhost:8222/healthz"]
       interval: 30s
       timeout: 10s
-      retries: 3
-      start_period: 10s
+      retries: 5
+      start_period: 20s
     logging:
       driver: "json-file"
       options:
