@@ -173,7 +173,7 @@ For more detailed instructions and options, refer to the [Certbot documentation]
 1. **Generate a Token**:
   
 ```bash
-openssl rand -base64 32
+openssl rand -hex 48
 ```
 
 2. **Set the Token** as an environment variable:
