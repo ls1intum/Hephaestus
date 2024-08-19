@@ -1,5 +1,7 @@
 import logging
 import sys
+from typing import Any
+
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.DEBUG)
@@ -15,8 +17,8 @@ class EndpointFilter(logging.Filter):
     def __init__(
         self,
         path: str,
-        *args: t.Any,
-        **kwargs: t.Any,
+        *args: Any,
+        **kwargs: Any,
     ):
         super().__init__(*args, **kwargs)
         self._path = path
