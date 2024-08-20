@@ -29,6 +29,7 @@
 	</scm>
 	<properties>
 		<java.version>21</java.version>
+		<app.profiles>local,dev</app.profiles>
 	</properties>
 	<dependencies>
 		<dependency>
@@ -124,11 +125,6 @@
 			<groupId>org.springframework.boot</groupId>
 			<artifactId>spring-boot-starter-graphql</artifactId>
 		</dependency>
-		<dependency>
-			<groupId>me.paulschwarz</groupId>
-			<artifactId>spring-dotenv</artifactId>
-			<version>4.0.0</version>
-		</dependency>
 	</dependencies>
 
 	<dependencyManagement>
@@ -167,6 +163,7 @@
 				<groupId>org.springframework.boot</groupId>
 				<artifactId>spring-boot-maven-plugin</artifactId>
 				<configuration>
+					<profiles>${app.profiles}</profiles>
 					<jvmArguments>-Dspring.application.admin.enabled=true</jvmArguments>
 					<excludes>
 						<exclude>

@@ -163,3 +163,5 @@ cython_debug/
 #.idea/
 
 node_modules/
+
+application-local.yml
