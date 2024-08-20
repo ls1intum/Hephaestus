@@ -62,6 +62,8 @@ async def github_webhook(
 
     # Publish the payload to NATS JetStream
     await nats_client.js.publish(subject, body)
+    
+    return { "status": "ok" }
 
 
 class HealthCheck(BaseModel):
