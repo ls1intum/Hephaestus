@@ -5,6 +5,7 @@ WORKDIR /app
 COPY ./ /app/
 
 RUN ls -la
+RUN cat .env*
 # Ensure .env file exists
 RUN touch .env
 RUN env
