@@ -50,27 +50,18 @@ async def github_webhook(
     if event_type == "ping":
         return { "status": "pong" }
     
-    try:
-        # Extract subject from the payload
-        payload = await request.json()
+    payload = await request.json()
+
+    # Extract subject from the payload
+    try:    
         owner = payload["repository"]["owner"]["login"]
         repo = payload["repository"]["name"]
         subject = f"github.{owner}.{repo}.{event_type}"
+    except:
+        subject = f"github.error.{event_type}"
 
-        # Publish the payload to NATS JetStream
-        await nats_client.js.publish(subject, body)
-
-        return { "status": "ok" }
-    except KeyError as e:
-        error_logger.error(f"{event_type} - Missing key in payload")
-        raise HTTPException(status_code=400, detail=f"Missing key in payload: {str(e)}")
-    except ValueError as e:
-        error_logger.error(f"{event_type} - Invalid payload")
-        raise HTTPException(status_code=400, detail=f"Invalid payload: {str(e)}")
-    except Exception as e:
-        error_logger.error(f"{event_type} - Unexpected error")
-        raise HTTPException(status_code=500, detail="Internal server error")
-
+    # Publish the payload to NATS JetStream
+    await nats_client.js.publish(subject, body)
 
 
 class HealthCheck(BaseModel):
