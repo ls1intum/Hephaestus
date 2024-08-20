@@ -10,6 +10,8 @@ class HephaestusApplicationTests {
 
 	@Test
 	void contextLoads() {
+		// ContextLoads
+		assert (true);
 	}
 
 }

@@ -37,6 +37,6 @@ export class AboutComponent {
     if (!data) {
       return undefined;
     }
-    return data.filter((contributor) => contributor.id !== 5898705);
+    return data.filter((contributor) => contributor.id !== 5898705 && !contributor.login.includes('[bot]'));
   });
 }

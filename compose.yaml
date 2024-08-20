@@ -1,9 +1,33 @@
 services:
+  application-server:
+    image: hephaestus-application-server
+    ports:
+      - '8080'
+    environment:
+      - SPRING_PROFILES_ACTIVE=prod
+      - DATABASE_URL=jdbc:postgresql://postgres:5432/hephaestus
+      - DATABASE_USERNAME=root
+      - DATABASE_PASSWORD=root
+      - SECURITY_USER_NAME=${SECURITY_USER_NAME:-admin}
+      - SECURITY_USER_PASSWORD=${SECURITY_USER_NAME:-admin_password}
+    depends_on:
+      - postgres
+    networks:
+      - app-network
+
   postgres:
     image: 'postgres:latest'
     environment:
-      POSTGRES_DB: hephaestus
-      POSTGRES_PASSWORD: root
-      POSTGRES_USER: root
+      - POSTGRES_DB=hephaestus
+      - POSTGRES_PASSWORD=root
+      - POSTGRES_USER=root
     ports:
       - '5432'
+    networks:
+      app-network:
+        aliases:
+          - postgres
+
+networks:
+  app-network:
+    driver: bridge`

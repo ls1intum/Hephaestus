@@ -1,0 +1,23 @@
+[tool.poetry]
+name = "webhook-ingest"
+version = "1.0.0"
+description = "A FastAPI service for ingesting GitHub webhooks and publishing events to NATS JetStream."
+authors = ["Felix T.J. Dietrich <felixtj.dietrich@tum.de>"]
+readme = "README.md"
+package-mode = false
+
+
+[tool.poetry.dependencies]
+python = "^3.12"
+fastapi = {extras = ["standard"], version = "0.112.1"}
+nats-py = "2.8.0"
+pydantic = "2.8.2"
+pydantic-settings = "2.4.0"
+
+[virtualenvs]
+create = true
+in-project = true
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
