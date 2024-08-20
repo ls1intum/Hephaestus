@@ -49,7 +49,7 @@ public class CodeReviewService {
                 example.setName("hephaestus");
                 example.setNameWithOwner("ls1intum/hephaestus");
                 Optional<Repository> foundRepo = codeReviewRepository.findOne(Example.of(example));
-                logger.info("All repositories: " + codeReviewRepository.findAll().toString());
+                logger.info("Repository count: " + codeReviewRepository.count());
 
                 logger.info("Saved repo: " + foundRepo.toString());
                 if (foundRepo.isPresent()) {
@@ -75,7 +75,8 @@ public class CodeReviewService {
                 repository.setAddedAt(Instant.now());
 
                 System.out.println("Repository: " + repository.toString());
-                codeReviewRepository.save(repository);
+                codeReviewRepository.saveAndFlush(repository);
+                System.out.println("New Repository count: " + codeReviewRepository.count());
                 return repository;
         }
 

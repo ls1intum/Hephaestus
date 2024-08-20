@@ -10,6 +10,7 @@ import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
+import jakarta.persistence.OneToOne;
 import lombok.Getter;
 import lombok.Setter;
 
@@ -57,9 +58,9 @@ public class Comment {
     private Actor author;
 
     /**
-     * The pullrequest of the Comment entity.
+     * The parent connection to the pullrequest of the Comment entity.
      */
-    @ManyToOne(fetch = FetchType.LAZY)
+    @OneToOne(optional = false)
     @JoinColumn(name = "c_connection_id", referencedColumnName = "id")
     private CommentConnection connection;
 

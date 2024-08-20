@@ -3,6 +3,7 @@ package de.tum.in.www1.hephaestus.codereview.repository;
 import java.time.Instant;
 
 import de.tum.in.www1.hephaestus.codereview.pullrequest.PullrequestConnection;
+import jakarta.persistence.CascadeType;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.GeneratedValue;
@@ -42,7 +43,7 @@ public class Repository {
     @Column
     private String url;
 
-    @OneToOne(optional = false)
+    @OneToOne(cascade = CascadeType.ALL, optional = false)
     @JoinColumn(name = "connection_id", referencedColumnName = "id")
     private PullrequestConnection pullRequests;
 
