@@ -6,6 +6,7 @@ COPY ./ /app/
 
 # Ensure .env file exists
 RUN touch .env
+RUN env
 RUN echo "Contents of .env file:" && cat .env
 
 # Fix buggy replacement of COOLIFY_URL in .env
