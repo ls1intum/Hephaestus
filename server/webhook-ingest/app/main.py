@@ -6,7 +6,6 @@ from pydantic import BaseModel
 from nats.js.api import StreamConfig
 from app.config import settings
 from app.nats_client import nats_client
-from app.logger import error_logger
 
 
 @asynccontextmanager
@@ -50,19 +49,19 @@ async def github_webhook(
     if event_type == "ping":
         return { "status": "pong" }
     
-    payload = await request.json()
-
     # Extract subject from the payload
-    try:    
+    payload = await request.json()
+    subject = ""
+    if "repository" in payload:
         owner = payload["repository"]["owner"]["login"]
         repo = payload["repository"]["name"]
         subject = f"github.{owner}.{repo}.{event_type}"
-    except:
+    else:
         subject = f"github.error.{event_type}"
 
     # Publish the payload to NATS JetStream
     await nats_client.js.publish(subject, body)
-    
+
     return { "status": "ok" }
 
 
