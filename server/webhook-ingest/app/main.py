@@ -51,13 +51,16 @@ async def github_webhook(
     
     # Extract subject from the payload
     payload = await request.json()
-    subject = ""
+
+    org = "?"
+    repo = "?"
     if "repository" in payload:
-        owner = payload["repository"]["owner"]["login"]
+        org = payload["repository"]["owner"]["login"]
         repo = payload["repository"]["name"]
-        subject = f"github.{owner}.{repo}.{event_type}"
-    else:
-        subject = f"github.error.{event_type}"
+    elif "organization" in payload:
+        org = payload["organization"]["login"]
+        
+    subject = f"github.{org}.{repo}.{event_type}"
 
     # Publish the payload to NATS JetStream
     await nats_client.js.publish(subject, body)
