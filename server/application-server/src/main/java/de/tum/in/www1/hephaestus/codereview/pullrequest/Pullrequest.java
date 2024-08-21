@@ -1,7 +1,10 @@
 package de.tum.in.www1.hephaestus.codereview.pullrequest;
 
+import java.util.List;
+
 import de.tum.in.www1.hephaestus.codereview.actor.Actor;
-import de.tum.in.www1.hephaestus.codereview.comment.CommentConnection;
+import de.tum.in.www1.hephaestus.codereview.comment.Comment;
+import de.tum.in.www1.hephaestus.codereview.repository.Repository;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 import jakarta.persistence.CascadeType;
@@ -12,7 +15,7 @@ import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
-import jakarta.persistence.OneToOne;
+import jakarta.persistence.OneToMany;
 import lombok.Getter;
 import lombok.Setter;
 
@@ -80,17 +83,13 @@ public class Pullrequest {
     @JoinColumn(name = "author_id")
     private Actor author;
 
-    /**
-     * The comments of the Pullrequest entity.
-     */
-    @OneToOne(cascade = CascadeType.ALL, optional = false)
-    @JoinColumn(name = "c_connection_id", referencedColumnName = "id")
-    private CommentConnection comments;
+    @OneToMany(cascade = CascadeType.ALL, mappedBy = "pullrequest")
+    private List<Comment> pullRequests;
 
     /**
      * The parent connection of the Pullrequest entity.
      */
-    @OneToOne(optional = false)
-    @JoinColumn(name = "pr_connection_id", referencedColumnName = "id")
-    private PullrequestConnection connection;
+    @ManyToOne(optional = false)
+    @JoinColumn(name = "repository_id", referencedColumnName = "id")
+    private Repository repository;
 }

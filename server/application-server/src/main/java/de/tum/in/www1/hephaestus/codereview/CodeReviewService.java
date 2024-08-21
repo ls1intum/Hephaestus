@@ -1,10 +1,14 @@
 package de.tum.in.www1.hephaestus.codereview;
 
+import java.io.IOException;
 import java.time.Instant;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Optional;
 
+import org.kohsuke.github.GHRepository;
+import org.kohsuke.github.GitHub;
+import org.kohsuke.github.GitHubBuilder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
@@ -14,6 +18,7 @@ import org.springframework.graphql.client.HttpSyncGraphQlClient;
 
 import de.tum.in.www1.hephaestus.EnvConfig;
 import de.tum.in.www1.hephaestus.codereview.repository.Repository;
+import de.tum.in.www1.hephaestus.codereview.repository.RepositoryConverter;
 
 @Service
 public class CodeReviewService {
@@ -21,6 +26,8 @@ public class CodeReviewService {
         private static final Logger logger = LoggerFactory.getLogger(CodeReviewService.class);
 
         private final HttpSyncGraphQlClient graphQlClient;
+
+        private GitHub github;
 
         private final CodeReviewRepository codeReviewRepository;
 
@@ -42,6 +49,24 @@ public class CodeReviewService {
                 graphQlClient = HttpSyncGraphQlClient.builder(restClient)
                                 .headers(headers -> headers.setBearerAuth(githubPat))
                                 .build();
+                try {
+                        github = new GitHubBuilder().withOAuthToken(envConfig.getGithubPat()).build();
+                } catch (IOException e) {
+                        logger.error("Error while creating GitHub client: " + e.getMessage());
+                        return;
+                }
+        }
+
+        public Repository fetchHephaestus() throws IOException {
+                if (github == null) {
+                        logger.error("GitHub client not initialized!");
+                        return null;
+                }
+
+                GHRepository ghRepo = github.getRepository("ls1intum/hephaestus");
+                System.out.println("Repository: " + ghRepo.toString());
+                Repository repository = new RepositoryConverter().convert(ghRepo);
+                return repository;
         }
 
         public Repository getHephaestusRepository() {
@@ -49,15 +74,11 @@ public class CodeReviewService {
                 example.setName("hephaestus");
                 example.setNameWithOwner("ls1intum/hephaestus");
                 Optional<Repository> foundRepo = codeReviewRepository.findOne(Example.of(example));
-                logger.info("Repository count: " + codeReviewRepository.count());
-
-                logger.info("Saved repo: " + foundRepo.toString());
                 if (foundRepo.isPresent()) {
                         return foundRepo.get();
                 }
 
                 logger.info("No repo found, creating new one...");
-
                 HashMap<String, Object> variables = new HashMap<>();
                 variables.put("owner", "ls1intum");
                 variables.put("name", "hephaestus");
@@ -67,16 +88,12 @@ public class CodeReviewService {
                                 .variables(variables)
                                 .retrieveSync("repository")
                                 .toEntity(Repository.class);
-
                 if (repository == null) {
                         logger.error("Error while fetching repository!");
                         return null;
                 }
                 repository.setAddedAt(Instant.now());
-
-                System.out.println("Repository: " + repository.toString());
                 codeReviewRepository.saveAndFlush(repository);
-                System.out.println("New Repository count: " + codeReviewRepository.count());
                 return repository;
         }
 
