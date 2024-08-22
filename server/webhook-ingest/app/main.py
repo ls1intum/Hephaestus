@@ -59,11 +59,14 @@ async def github_webhook(
         repo = payload["repository"]["name"]
     elif "organization" in payload:
         org = payload["organization"]["login"]
-        
-    subject = f"github.{org}.{repo}.{event_type}"
+    
+    org_sanitized = org.replace('.', '~')
+    repo_sanitized = repo.replace('.', '~')
+
+    subject = f"github.{org_sanitized}.{repo_sanitized}.{event_type}"
 
     # Publish the payload to NATS JetStream
-    await nats_client.js.publish(subject, body)
+    await nats_client.publish_with_retry(subject, body)
 
     return { "status": "ok" }
 

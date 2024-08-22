@@ -1,8 +1,12 @@
+import asyncio
 from nats.aio.client import Client as NATS
 from app.config import settings
-from app.logger import logger
+from app.logger import logger, uvicorn_error
 
 class NATSClient:
+    MAX_RETRIES = 10
+    RETRY_BACKOFF_FACTOR = 2
+
     def __init__(self):
         self.nc = NATS()
 
@@ -36,6 +40,20 @@ class NATSClient:
     async def publish(self, subject: str, message: bytes):
         ack = await self.js.publish(subject, message)
         logger.info(f"Published message to {subject}: {ack}")
+        return ack
+
+    async def publish_with_retry(self, subject: str, message: bytes):
+        for attempt in range(self.MAX_RETRIES):
+            try:
+                ack = await self.publish(subject, message)
+                return ack  # Successfully published, return the ack
+            except Exception as e:
+                uvicorn_error.error(f"NATS request failed: {e}, retrying in {wait_time} seconds... (Attempt {attempt + 1}/{self.MAX_RETRIES})")
+                wait_time = self.RETRY_BACKOFF_FACTOR ** attempt
+                await asyncio.sleep(wait_time)
+
+        uvicorn_error.error(f"Failed to publish to {subject} after {self.MAX_RETRIES} attempts")
+        raise Exception(f"Failed to publish to {subject} after {self.MAX_RETRIES} attempts")
 
     async def close(self):
         await self.nc.close()
