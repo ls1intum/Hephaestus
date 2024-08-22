@@ -10,7 +10,7 @@
     "generate:api": "npm run generate:api:clean && npm run generate:api:application-server-client && npm run generate:api:application-server-specs"
   },
   "devDependencies": {
-    "@openapitools/openapi-generator-cli": "2.13.4",
+    "@openapitools/openapi-generator-cli": "2.13.5",
     "rimraf": "6.0.1"
   }
 }
