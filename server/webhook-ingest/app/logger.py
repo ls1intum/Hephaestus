@@ -28,3 +28,5 @@ class EndpointFilter(logging.Filter):
 
 uvicorn_logger = logging.getLogger("uvicorn.access")
 uvicorn_logger.addFilter(EndpointFilter(path="/health"))
+
+uvicorn_error = logging.getLogger("uvicorn.error")
