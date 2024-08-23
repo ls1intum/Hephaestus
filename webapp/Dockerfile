@@ -5,7 +5,9 @@ WORKDIR /app
 COPY ./ /app/
 
 # Ensure .env file exists
+RUN mv .env* .env || true
 RUN touch .env
+RUN cat .env
 
 # Fix buggy replacement of COOLIFY_URL in .env
 RUN COOLIFY_URL_VALUE=$(grep '^COOLIFY_URL=' .env | cut -d '=' -f2) && \
