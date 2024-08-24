@@ -1,5 +1,7 @@
 package de.tum.in.www1.hephaestus;
 
+import java.util.List;
+
 import org.springframework.boot.CommandLineRunner;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
@@ -24,12 +26,12 @@ public class Application {
 	CommandLineRunner commandLineRunner(CodeReviewService service, RepositoryService repositoryService) {
 		return args -> {
 			Repository repo = service.fetchHephaestus();
-			System.out.println(repo);
+			System.out.println("Got repo: " + repo);
 			repositoryService.saveRepository(repo);
 			System.out.println("Saved repo: " + repositoryService.countRepositories());
 
-			Repository repo2 = repositoryService.getAllRepositories().get(0);
-			System.out.println(repo2);
+			List<Repository> repo2 = repositoryService.getAllRepositories();
+			System.out.println("Repositories: " + repo2);
 		};
 	}
 }

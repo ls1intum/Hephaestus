@@ -15,7 +15,7 @@ import lombok.Getter;
 import lombok.Setter;
 
 @Entity
-@Table
+@Table(name = "comments")
 @Getter
 @Setter
 public class Comment {
@@ -27,7 +27,7 @@ public class Comment {
     private Long id;
 
     @Column(name = "github_id")
-    private String githubId;
+    private Long githubId;
 
     /**
      * Body of the Comment entity.
@@ -64,4 +64,13 @@ public class Comment {
     @JoinColumn(name = "pullrequest_id", referencedColumnName = "id")
     private Pullrequest pullrequest;
 
+    public Comment() {
+
+    }
+
+    public Comment(String body, String createdAt, String updatedAt) {
+        this.body = body;
+        this.createdAt = createdAt;
+        this.updatedAt = updatedAt;
+    }
 }

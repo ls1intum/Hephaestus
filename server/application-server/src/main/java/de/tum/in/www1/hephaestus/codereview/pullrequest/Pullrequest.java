@@ -20,7 +20,7 @@ import lombok.Getter;
 import lombok.Setter;
 
 @Entity
-@Table
+@Table(name = "pullrequests")
 @Getter
 @Setter
 public class Pullrequest {
@@ -33,7 +33,7 @@ public class Pullrequest {
     private Long id;
 
     @Column(name = "github_id")
-    private String githubId;
+    private Long githubId;
 
     /**
      * Title of the Pullrequest.
@@ -84,12 +84,12 @@ public class Pullrequest {
     private Actor author;
 
     @OneToMany(cascade = CascadeType.ALL, mappedBy = "pullrequest")
-    private List<Comment> pullRequests;
+    private List<Comment> comments;
 
     /**
      * The parent connection of the Pullrequest entity.
      */
-    @ManyToOne(optional = false)
+    @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "repository_id", referencedColumnName = "id")
     private Repository repository;
 }

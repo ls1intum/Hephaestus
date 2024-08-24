@@ -24,7 +24,7 @@ public class RepositoryService {
      */
     public List<Repository> getAllRepositories() {
         var repositories = repositoryRepository.findAll();
-        logger.info("Getting Repositories: {}", repositories);
+        logger.info("Getting Repositories: {}", repositories.toArray());
         return repositoryRepository.findAll();
     }
 
@@ -47,6 +47,13 @@ public class RepositoryService {
     }
 
     public Repository saveRepository(Repository repository) {
+        Repository existingRepository = repositoryRepository.findByNameWithOwner(repository.getNameWithOwner());
+        logger.info("Found Repository: {}", existingRepository);
+        if (existingRepository != null) {
+            logger.info("Repository already exists: {}", existingRepository.getNameWithOwner());
+            return existingRepository;
+        }
+
         logger.info("Adding Repository: {}", repository.getNameWithOwner());
         return repositoryRepository.save(repository);
     }
