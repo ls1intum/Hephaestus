@@ -2,6 +2,10 @@ package de.tum.in.www1.hephaestus.codereview.comment;
 
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
+
+import com.fasterxml.jackson.annotation.JsonIgnore;
+import com.fasterxml.jackson.annotation.JsonInclude;
+
 import de.tum.in.www1.hephaestus.codereview.actor.Actor;
 import de.tum.in.www1.hephaestus.codereview.pullrequest.Pullrequest;
 import jakarta.persistence.Column;
@@ -18,6 +22,7 @@ import lombok.Setter;
 @Table(name = "comments")
 @Getter
 @Setter
+@JsonInclude(JsonInclude.Include.NON_EMPTY)
 public class Comment {
     /**
      * Unique identifier for a Comment entity.
@@ -62,6 +67,7 @@ public class Comment {
      */
     @ManyToOne(optional = false)
     @JoinColumn(name = "pullrequest_id", referencedColumnName = "id")
+    @JsonIgnore
     private Pullrequest pullrequest;
 
     public Comment() {
@@ -72,5 +78,12 @@ public class Comment {
         this.body = body;
         this.createdAt = createdAt;
         this.updatedAt = updatedAt;
+    }
+
+    @Override
+    public String toString() {
+        return "Comment [id=" + id + ", githubId=" + githubId + ", body=" + body + ", createdAt=" + createdAt
+                + ", updatedAt=" + updatedAt + ", author=" + author.getLogin() + ", pullrequest="
+                + pullrequest.getTitle() + "]";
     }
 }

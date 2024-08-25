@@ -3,7 +3,11 @@ package de.tum.in.www1.hephaestus.codereview.actor;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 
+import java.util.ArrayList;
 import java.util.List;
+
+import com.fasterxml.jackson.annotation.JsonIgnore;
+import com.fasterxml.jackson.annotation.JsonInclude;
 
 import de.tum.in.www1.hephaestus.codereview.comment.Comment;
 import de.tum.in.www1.hephaestus.codereview.pullrequest.Pullrequest;
@@ -19,6 +23,7 @@ import lombok.Setter;
 @Table(name = "actors")
 @Getter
 @Setter
+@JsonInclude(JsonInclude.Include.NON_EMPTY)
 public class Actor {
     /**
      * Unique identifier for a User entity.
@@ -34,6 +39,9 @@ public class Actor {
     @Column(nullable = false)
     private String login;
 
+    @Column
+    private String email;
+
     /**
      * URL of the User entity.
      * This field is mandatory.
@@ -45,11 +53,38 @@ public class Actor {
      * The Pullrequests of the User entity.
      */
     @OneToMany(mappedBy = "author")
+    @JsonIgnore
     private List<Pullrequest> pullrequests;
 
     /**
      * The Comments of the User entity.
      */
     @OneToMany(mappedBy = "author")
+    @JsonIgnore
     private List<Comment> comments;
+
+    public void addComment(Comment comment) {
+        if (comments == null) {
+            comments = new ArrayList<>();
+        }
+        if (!comments.contains(comment)) {
+            comments.add(comment);
+        }
+    }
+
+    public void addPullrequest(Pullrequest pullrequest) {
+        if (pullrequests == null) {
+            pullrequests = new ArrayList<>();
+        }
+        if (!pullrequests.contains(pullrequest)) {
+            pullrequests.add(pullrequest);
+        }
+    }
+
+    @Override
+    public String toString() {
+        return "Actor [id=" + id + ", login=" + login + ", email=" + email + ", url="
+                + url + ", #pullrequests="
+                + pullrequests.size() + ", #comments=" + comments.size() + "]";
+    }
 }

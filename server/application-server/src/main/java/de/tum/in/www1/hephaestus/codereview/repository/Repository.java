@@ -52,7 +52,7 @@ public class Repository {
 
     public String toString() {
         return "Repository [id=" + id + ", name=" + name + ", nameWithOwner=" + nameWithOwner + ", description="
-                + description + ", url=" + url + ", pullRequests=" + pullRequests + ", addedAt=" + addedAt
+                + description + ", url=" + url + ", #pullRequests=" + pullRequests.size() + ", addedAt=" + addedAt
                 + "]";
     }
 }

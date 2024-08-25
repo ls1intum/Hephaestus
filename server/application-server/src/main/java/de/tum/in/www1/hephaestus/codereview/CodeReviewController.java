@@ -1,9 +1,10 @@
 package de.tum.in.www1.hephaestus.codereview;
 
-import java.util.List;
+import java.io.IOException;
 
-import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import de.tum.in.www1.hephaestus.codereview.repository.Repository;
@@ -17,13 +18,13 @@ public class CodeReviewController {
         this.codeReviewService = codeReviewService;
     }
 
-    /**
-     * Retrieves all {@link Repository} entities.
-     * 
-     * @return A list of all Repository entities
-     */
-    @GetMapping
-    public List<Repository> getAllRepositories() {
-        return codeReviewService.getAllRepositories();
+    @PutMapping("/repository/{nameWithOwner}")
+    public Repository addRepository(@RequestParam String nameWithOwner) {
+        try {
+            return codeReviewService.fetchRepository(nameWithOwner);
+        } catch (IOException e) {
+            e.printStackTrace();
+            return null;
+        }
     }
 }

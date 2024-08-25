@@ -2,6 +2,9 @@ package de.tum.in.www1.hephaestus.codereview.pullrequest;
 
 import java.util.List;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
+import com.fasterxml.jackson.annotation.JsonInclude;
+
 import de.tum.in.www1.hephaestus.codereview.actor.Actor;
 import de.tum.in.www1.hephaestus.codereview.comment.Comment;
 import de.tum.in.www1.hephaestus.codereview.repository.Repository;
@@ -23,6 +26,7 @@ import lombok.Setter;
 @Table(name = "pullrequests")
 @Getter
 @Setter
+@JsonInclude(JsonInclude.Include.NON_EMPTY)
 public class Pullrequest {
 
     /**
@@ -91,5 +95,15 @@ public class Pullrequest {
      */
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "repository_id", referencedColumnName = "id")
+    @JsonIgnore
     private Repository repository;
+
+    @Override
+    public String toString() {
+        return "Pullrequest [id=" + id + ", githubId=" + githubId + ", title=" +
+                title + ", url=" + url + ", state="
+                + state + ", createdAt=" + createdAt + ", updatedAt=" + updatedAt + ", mergedAt=" + mergedAt
+                + ", author=" + author.getLogin() + ", #comments=" + comments.size() + ", repository=" +
+                repository.getNameWithOwner() + "]";
+    }
 }

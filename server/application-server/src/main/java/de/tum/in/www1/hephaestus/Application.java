@@ -11,7 +11,6 @@ import org.springframework.modulith.Modulithic;
 
 import de.tum.in.www1.hephaestus.codereview.CodeReviewService;
 import de.tum.in.www1.hephaestus.codereview.repository.Repository;
-import de.tum.in.www1.hephaestus.codereview.repository.RepositoryService;
 
 @SpringBootApplication
 @Modulithic(systemName = "Hephaestus")
@@ -23,15 +22,10 @@ public class Application {
 	}
 
 	@Bean
-	CommandLineRunner commandLineRunner(CodeReviewService service, RepositoryService repositoryService) {
+	CommandLineRunner commandLineRunner(CodeReviewService service) {
 		return args -> {
-			Repository repo = service.fetchHephaestus();
+			Repository repo = service.fetchRepository("ls1intum/hephaestus");
 			System.out.println("Got repo: " + repo);
-			repositoryService.saveRepository(repo);
-			System.out.println("Saved repo: " + repositoryService.countRepositories());
-
-			List<Repository> repo2 = repositoryService.getAllRepositories();
-			System.out.println("Repositories: " + repo2);
 		};
 	}
 }

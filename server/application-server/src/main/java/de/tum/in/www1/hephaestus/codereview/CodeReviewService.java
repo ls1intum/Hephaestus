@@ -8,7 +8,9 @@ import java.util.List;
 import java.util.Optional;
 import java.util.stream.Collectors;
 
+import org.kohsuke.github.GHPullRequest;
 import org.kohsuke.github.GHRepository;
+import org.kohsuke.github.GHUser;
 import org.kohsuke.github.GitHub;
 import org.kohsuke.github.GitHubBuilder;
 import org.slf4j.Logger;
@@ -20,6 +22,9 @@ import org.springframework.data.domain.Example;
 import org.springframework.graphql.client.HttpSyncGraphQlClient;
 
 import de.tum.in.www1.hephaestus.EnvConfig;
+import de.tum.in.www1.hephaestus.codereview.actor.Actor;
+import de.tum.in.www1.hephaestus.codereview.actor.ActorConverter;
+import de.tum.in.www1.hephaestus.codereview.actor.ActorRepository;
 import de.tum.in.www1.hephaestus.codereview.comment.Comment;
 import de.tum.in.www1.hephaestus.codereview.comment.CommentConverter;
 import de.tum.in.www1.hephaestus.codereview.comment.CommentRepository;
@@ -42,17 +47,20 @@ public class CodeReviewService {
         private final RepositoryRepository repositoryRepository;
         private final PullrequestRepository pullrequestRepository;
         private final CommentRepository commentRepository;
+        private final ActorRepository actorRepository;
 
         private final EnvConfig envConfig;
 
         public CodeReviewService(EnvConfig envConfig, RepositoryRepository repositoryRepository,
-                        PullrequestRepository pullrequestRepository, CommentRepository commentRepository) {
+                        PullrequestRepository pullrequestRepository, CommentRepository commentRepository,
+                        ActorRepository actorRepository) {
                 logger.info("Hello from CodeReviewService!");
 
                 this.envConfig = envConfig;
                 this.repositoryRepository = repositoryRepository;
                 this.pullrequestRepository = pullrequestRepository;
                 this.commentRepository = commentRepository;
+                this.actorRepository = actorRepository;
 
                 RestClient restClient = RestClient.builder()
                                 .baseUrl("https://api.github.com/graphql")
@@ -72,18 +80,25 @@ public class CodeReviewService {
         }
 
         /**
-         * Rest API implementation of fetching the hephaestus Github repository.
+         * Rest API implementation of fetching a Github repository.
          * 
-         * @return The hephaestus repository.
+         * @return The repository corresponding to the given nameWithOwner.
+         * @throws IOException
          */
-        public Repository fetchHephaestus() throws IOException {
+        public Repository fetchRepository(String nameWithOwner) throws IOException {
                 if (github == null) {
-                        logger.error("GitHub client not initialized!");
+                        logger.error("GitHub client not initialized correctly!");
                         return null;
                 }
 
-                GHRepository ghRepo = github.getRepository("ls1intum/hephaestus");
-                logger.info("Fetched from GitHub: " + ghRepo.toString());
+                // Avoid double fetching of the same repository
+                Repository existingRepository = repositoryRepository.findByNameWithOwner(nameWithOwner);
+                if (existingRepository != null) {
+                        logger.info("Found existing repository: " + existingRepository);
+                        return existingRepository;
+                }
+
+                GHRepository ghRepo = github.getRepository(nameWithOwner);
                 Repository repository = new RepositoryConverter().convert(ghRepo);
                 if (repository == null) {
                         logger.error("Error while fetching repository!");
@@ -93,29 +108,27 @@ public class CodeReviewService {
                 repositoryRepository.save(repository);
 
                 PullrequestConverter prConverter = new PullrequestConverter();
-                CommentConverter commentConverter = new CommentConverter();
 
-                List<Pullrequest> prs = ghRepo.queryPullRequests().list().withPageSize(1).toList().stream().map(pr -> {
+                // Retrieve PRs in pages of 10
+                List<Pullrequest> prs = ghRepo.queryPullRequests().list().withPageSize(10).toList().stream().map(pr -> {
                         Pullrequest pullrequest = prConverter.convert(pr);
-                        if (pullrequest != null) {
-                                pullrequest.setRepository(repository);
-                                pullrequestRepository.save(pullrequest);
-                                try {
-                                        List<Comment> comments = pr.queryComments().list().toList().stream()
-                                                        .map(comment -> {
-                                                                Comment c = commentConverter.convert(comment);
-                                                                if (c != null) {
-                                                                        c.setPullrequest(pullrequest);
-                                                                }
-                                                                return c;
-                                                        }).collect(Collectors.toList());
-                                        pullrequest.setComments(comments);
-                                        commentRepository.saveAll(comments);
-                                } catch (IOException e) {
-                                        logger.error("Error while fetching comments!");
-                                        pullrequest.setComments(new ArrayList<>());
-                                }
+                        pullrequest.setRepository(repository);
+                        pullrequestRepository.save(pullrequest);
+                        try {
+                                List<Comment> comments = getCommentsFromGHPullRequest(pr, pullrequest);
+                                pullrequest.setComments(comments);
+                                commentRepository.saveAll(comments);
+                        } catch (IOException e) {
+                                logger.error("Error while fetching PR comments!");
+                                pullrequest.setComments(new ArrayList<>());
                         }
+                        try {
+                                pullrequest.setAuthor(getActorFromGHUser(pr.getUser()));
+                        } catch (IOException e) {
+                                logger.error("Error while fetching PR author!");
+                                pullrequest.setAuthor(null);
+                        }
+
                         return pullrequest;
                 }).collect(Collectors.toList());
                 repository.setPullRequests(prs);
@@ -125,8 +138,48 @@ public class CodeReviewService {
         }
 
         /**
+         * Retrieves the comments of a given pull request.
+         * 
+         * @param pr          The GH pull request.
+         * @param pullrequest Stored PR to which the comments belong.
+         * @return The comments of the given pull request.
+         * @throws IOException
+         */
+        private List<Comment> getCommentsFromGHPullRequest(GHPullRequest pr, Pullrequest pullrequest)
+                        throws IOException {
+                CommentConverter commentConverter = new CommentConverter();
+                List<Comment> comments = pr.queryComments().list().toList().stream()
+                                .map(comment -> {
+                                        Comment c = commentConverter.convert(comment);
+                                        c.setPullrequest(pullrequest);
+                                        Actor author;
+                                        try {
+                                                author = getActorFromGHUser(comment.getUser());
+                                                author.addComment(c);
+                                                author.addPullrequest(pullrequest);
+                                        } catch (IOException e) {
+                                                logger.error("Error while fetching author!");
+                                                author = null;
+                                        }
+                                        c.setAuthor(author);
+                                        return c;
+                                }).collect(Collectors.toList());
+                return comments;
+        }
+
+        private Actor getActorFromGHUser(GHUser user) {
+                Actor actor = actorRepository.findByLogin(user.getLogin());
+                if (actor == null) {
+                        actor = new ActorConverter().convert(user);
+                        actorRepository.save(actor);
+                }
+                return actor;
+        }
+
+        /**
          * GraphQL implementation of fetching the hephaestus Github repository.
          * 
+         * @see #fetchRepository(String)
          * @return The hephaestus repository.
          */
         public Repository getHephaestusRepository() {
@@ -156,9 +209,4 @@ public class CodeReviewService {
                 repositoryRepository.saveAndFlush(repository);
                 return repository;
         }
-
-        public List<Repository> getAllRepositories() {
-                return repositoryRepository.findAll();
-        }
-
 }

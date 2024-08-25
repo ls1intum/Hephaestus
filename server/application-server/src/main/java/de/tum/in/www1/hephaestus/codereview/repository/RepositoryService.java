@@ -29,6 +29,7 @@ public class RepositoryService {
     }
 
     public Repository getRepository(String nameWithOwner) {
+        logger.info("Getting repository with nameWithOwner: " + nameWithOwner);
         return repositoryRepository.findByNameWithOwner(nameWithOwner);
     }
 
