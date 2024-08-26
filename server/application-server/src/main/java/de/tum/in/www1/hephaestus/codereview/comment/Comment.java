@@ -16,12 +16,14 @@ import jakarta.persistence.GenerationType;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import lombok.Getter;
+import lombok.NoArgsConstructor;
 import lombok.Setter;
 
 @Entity
 @Table(name = "comments")
 @Getter
 @Setter
+@NoArgsConstructor
 @JsonInclude(JsonInclude.Include.NON_EMPTY)
 public class Comment {
     /**
@@ -69,10 +71,6 @@ public class Comment {
     @JoinColumn(name = "pullrequest_id", referencedColumnName = "id")
     @JsonIgnore
     private Pullrequest pullrequest;
-
-    public Comment() {
-
-    }
 
     public Comment(String body, String createdAt, String updatedAt) {
         this.body = body;

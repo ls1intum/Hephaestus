@@ -14,12 +14,14 @@ import jakarta.persistence.Id;
 import jakarta.persistence.OneToMany;
 import jakarta.persistence.Table;
 import lombok.Getter;
+import lombok.NoArgsConstructor;
 import lombok.Setter;
 
 @Entity
 @Table(name = "repositories")
 @Getter
 @Setter
+@NoArgsConstructor
 public class Repository {
 
     /**
