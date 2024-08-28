@@ -80,8 +80,8 @@ public class Actor {
 
     @Override
     public String toString() {
-        return "Actor [id=" + id + ", login=" + login + ", email=" + email + ", url="
+        return "Actor{id=" + id + ", login=" + login + ", email=" + email + ", url="
                 + url + ", #pullrequests="
-                + pullrequests.size() + ", #comments=" + comments.size() + "]";
+                + pullrequests.size() + ", #comments=" + comments.size() + "}";
     }
 }

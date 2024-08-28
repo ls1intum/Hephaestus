@@ -80,8 +80,8 @@ public class Comment {
 
     @Override
     public String toString() {
-        return "Comment [id=" + id + ", githubId=" + githubId + ", body=" + body + ", createdAt=" + createdAt
+        return "Comment{id=" + id + ", githubId=" + githubId + ", body=" + body + ", createdAt=" + createdAt
                 + ", updatedAt=" + updatedAt + ", author=" + author.getLogin() + ", pullrequest="
-                + pullrequest.getTitle() + "]";
+                + pullrequest.getTitle() + "}";
     }
 }

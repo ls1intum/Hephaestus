@@ -103,10 +103,10 @@ public class Pullrequest {
 
     @Override
     public String toString() {
-        return "Pullrequest [id=" + id + ", githubId=" + githubId + ", title=" +
+        return "Pullrequest{id=" + id + ", githubId=" + githubId + ", title=" +
                 title + ", url=" + url + ", state="
                 + state + ", createdAt=" + createdAt + ", updatedAt=" + updatedAt + ", mergedAt=" + mergedAt
                 + ", author=" + author.getLogin() + ", #comments=" + comments.size() + ", repository=" +
-                repository.getNameWithOwner() + "]";
+                repository.getNameWithOwner() + "}";
     }
 }
