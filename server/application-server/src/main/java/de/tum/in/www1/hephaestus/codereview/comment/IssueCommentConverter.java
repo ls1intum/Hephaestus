@@ -6,11 +6,11 @@ import org.kohsuke.github.GHIssueComment;
 import org.springframework.core.convert.converter.Converter;
 import org.springframework.lang.NonNull;
 
-public class CommentConverter implements Converter<GHIssueComment, Comment> {
+public class IssueCommentConverter implements Converter<GHIssueComment, IssueComment> {
 
     @Override
-    public Comment convert(@NonNull GHIssueComment source) {
-        Comment comment = new Comment();
+    public IssueComment convert(@NonNull GHIssueComment source) {
+        IssueComment comment = new IssueComment();
         comment.setBody(source.getBody());
         comment.setGithubId(source.getId());
         try {

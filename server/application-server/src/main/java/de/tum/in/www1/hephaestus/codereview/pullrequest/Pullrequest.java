@@ -8,8 +8,8 @@ import org.springframework.lang.NonNull;
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonInclude;
 
-import de.tum.in.www1.hephaestus.codereview.actor.Actor;
-import de.tum.in.www1.hephaestus.codereview.comment.Comment;
+import de.tum.in.www1.hephaestus.codereview.actor.GHUser;
+import de.tum.in.www1.hephaestus.codereview.comment.IssueComment;
 import de.tum.in.www1.hephaestus.codereview.repository.Repository;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
@@ -28,13 +28,13 @@ import lombok.Setter;
 import lombok.ToString;
 
 @Entity
-@Table(name = "pullrequest")
+@Table(name = "pull_request")
 @Getter
 @Setter
 @NoArgsConstructor
 @JsonInclude(JsonInclude.Include.NON_EMPTY)
 @ToString
-public class Pullrequest {
+public class PullRequest {
 
     /**
      * Unique identifier for a Pullrequest entity.
@@ -93,11 +93,11 @@ public class Pullrequest {
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "author_id")
     @ToString.Exclude
-    private Actor author;
+    private GHUser author;
 
     @OneToMany(cascade = CascadeType.ALL, mappedBy = "pullrequest")
     @ToString.Exclude
-    private Set<Comment> comments = new HashSet<>();;
+    private Set<IssueComment> comments = new HashSet<>();;
 
     /**
      * The parent connection of the Pullrequest entity.

@@ -6,16 +6,16 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 @RestController
-@RequestMapping("/actor")
-public class ActorController {
-    private final ActorService actorService;
+@RequestMapping("/ghuser")
+public class GHUserController {
+    private final GHUserService actorService;
 
-    public ActorController(ActorService actorService) {
+    public GHUserController(GHUserService actorService) {
         this.actorService = actorService;
     }
 
     @GetMapping("/{login}")
-    public Actor getActor(@PathVariable String login) {
+    public GHUser getActor(@PathVariable String login) {
         return actorService.getActor(login);
     }
 

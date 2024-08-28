@@ -10,7 +10,6 @@ import java.util.stream.Collectors;
 
 import org.kohsuke.github.GHPullRequest;
 import org.kohsuke.github.GHRepository;
-import org.kohsuke.github.GHUser;
 import org.kohsuke.github.GitHub;
 import org.kohsuke.github.GitHubBuilder;
 import org.slf4j.Logger;
@@ -22,15 +21,15 @@ import org.springframework.data.domain.Example;
 import org.springframework.graphql.client.HttpSyncGraphQlClient;
 
 import de.tum.in.www1.hephaestus.EnvConfig;
-import de.tum.in.www1.hephaestus.codereview.actor.Actor;
-import de.tum.in.www1.hephaestus.codereview.actor.ActorConverter;
-import de.tum.in.www1.hephaestus.codereview.actor.ActorRepository;
-import de.tum.in.www1.hephaestus.codereview.comment.Comment;
-import de.tum.in.www1.hephaestus.codereview.comment.CommentConverter;
-import de.tum.in.www1.hephaestus.codereview.comment.CommentRepository;
-import de.tum.in.www1.hephaestus.codereview.pullrequest.Pullrequest;
-import de.tum.in.www1.hephaestus.codereview.pullrequest.PullrequestConverter;
-import de.tum.in.www1.hephaestus.codereview.pullrequest.PullrequestRepository;
+import de.tum.in.www1.hephaestus.codereview.actor.GHUser;
+import de.tum.in.www1.hephaestus.codereview.actor.GHUserConverter;
+import de.tum.in.www1.hephaestus.codereview.actor.GHUserRepository;
+import de.tum.in.www1.hephaestus.codereview.comment.IssueComment;
+import de.tum.in.www1.hephaestus.codereview.comment.IssueCommentConverter;
+import de.tum.in.www1.hephaestus.codereview.comment.IssueCommentRepository;
+import de.tum.in.www1.hephaestus.codereview.pullrequest.PullRequest;
+import de.tum.in.www1.hephaestus.codereview.pullrequest.PullRequestConverter;
+import de.tum.in.www1.hephaestus.codereview.pullrequest.PullRequestRepository;
 import de.tum.in.www1.hephaestus.codereview.repository.Repository;
 import de.tum.in.www1.hephaestus.codereview.repository.RepositoryConverter;
 import de.tum.in.www1.hephaestus.codereview.repository.RepositoryRepository;
@@ -45,15 +44,15 @@ public class CodeReviewService {
         private GitHub github;
 
         private final RepositoryRepository repositoryRepository;
-        private final PullrequestRepository pullrequestRepository;
-        private final CommentRepository commentRepository;
-        private final ActorRepository actorRepository;
+        private final PullRequestRepository pullrequestRepository;
+        private final IssueCommentRepository commentRepository;
+        private final GHUserRepository actorRepository;
 
         private final EnvConfig envConfig;
 
         public CodeReviewService(EnvConfig envConfig, RepositoryRepository repositoryRepository,
-                        PullrequestRepository pullrequestRepository, CommentRepository commentRepository,
-                        ActorRepository actorRepository) {
+                        PullRequestRepository pullrequestRepository, IssueCommentRepository commentRepository,
+                        GHUserRepository actorRepository) {
                 logger.info("Hello from CodeReviewService!");
 
                 this.envConfig = envConfig;
@@ -107,15 +106,15 @@ public class CodeReviewService {
                 // preliminary save to make it referenceable
                 repositoryRepository.save(repository);
 
-                PullrequestConverter prConverter = new PullrequestConverter();
+                PullRequestConverter prConverter = new PullRequestConverter();
 
                 // Retrieve PRs in pages of 10
-                Set<Pullrequest> prs = ghRepo.queryPullRequests().list().withPageSize(10).toList().stream().map(pr -> {
-                        Pullrequest pullrequest = prConverter.convert(pr);
+                Set<PullRequest> prs = ghRepo.queryPullRequests().list().withPageSize(10).toList().stream().map(pr -> {
+                        PullRequest pullrequest = prConverter.convert(pr);
                         pullrequest.setRepository(repository);
                         pullrequestRepository.save(pullrequest);
                         try {
-                                Set<Comment> comments = getCommentsFromGHPullRequest(pr, pullrequest);
+                                Set<IssueComment> comments = getCommentsFromGHPullRequest(pr, pullrequest);
                                 pullrequest.setComments(comments);
                                 commentRepository.saveAll(comments);
                         } catch (IOException e) {
@@ -145,14 +144,14 @@ public class CodeReviewService {
          * @return The comments of the given pull request.
          * @throws IOException
          */
-        private Set<Comment> getCommentsFromGHPullRequest(GHPullRequest pr, Pullrequest pullrequest)
+        private Set<IssueComment> getCommentsFromGHPullRequest(GHPullRequest pr, PullRequest pullrequest)
                         throws IOException {
-                CommentConverter commentConverter = new CommentConverter();
-                Set<Comment> comments = pr.queryComments().list().toList().stream()
+                IssueCommentConverter commentConverter = new IssueCommentConverter();
+                Set<IssueComment> comments = pr.queryComments().list().toList().stream()
                                 .map(comment -> {
-                                        Comment c = commentConverter.convert(comment);
+                                        IssueComment c = commentConverter.convert(comment);
                                         c.setPullrequest(pullrequest);
-                                        Actor author;
+                                        GHUser author;
                                         try {
                                                 author = getActorFromGHUser(comment.getUser());
                                                 author.addComment(c);
@@ -167,10 +166,10 @@ public class CodeReviewService {
                 return comments;
         }
 
-        private Actor getActorFromGHUser(GHUser user) {
-                Actor actor = actorRepository.findByLogin(user.getLogin());
+        private GHUser getActorFromGHUser(org.kohsuke.github.GHUser user) {
+                GHUser actor = actorRepository.findByLogin(user.getLogin());
                 if (actor == null) {
-                        actor = new ActorConverter().convert(user);
+                        actor = new GHUserConverter().convert(user);
                         actorRepository.save(actor);
                 }
                 return actor;

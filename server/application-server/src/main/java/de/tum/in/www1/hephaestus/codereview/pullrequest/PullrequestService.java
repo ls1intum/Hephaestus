@@ -7,21 +7,21 @@ import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 
 @Service
-public class PullrequestService {
-    private static final Logger logger = LoggerFactory.getLogger(Pullrequest.class);
+public class PullRequestService {
+    private static final Logger logger = LoggerFactory.getLogger(PullRequest.class);
 
-    private final PullrequestRepository pullrequestRepository;
+    private final PullRequestRepository pullrequestRepository;
 
-    public PullrequestService(PullrequestRepository pullrequestRepository) {
+    public PullRequestService(PullRequestRepository pullrequestRepository) {
         this.pullrequestRepository = pullrequestRepository;
     }
 
-    public Pullrequest getPullrequestById(Long id) {
+    public PullRequest getPullrequestById(Long id) {
         logger.info("Getting pullrequest with id: " + id);
         return pullrequestRepository.findById(id).orElse(null);
     }
 
-    public List<Pullrequest> getPullrequestsByAuthor(String login) {
+    public List<PullRequest> getPullrequestsByAuthor(String login) {
         logger.info("Getting pullrequest by author: " + login);
         return pullrequestRepository.findByAuthor(login);
     }

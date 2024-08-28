@@ -11,8 +11,8 @@ import org.springframework.lang.NonNull;
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonInclude;
 
-import de.tum.in.www1.hephaestus.codereview.comment.Comment;
-import de.tum.in.www1.hephaestus.codereview.pullrequest.Pullrequest;
+import de.tum.in.www1.hephaestus.codereview.comment.IssueComment;
+import de.tum.in.www1.hephaestus.codereview.pullrequest.PullRequest;
 import jakarta.persistence.CascadeType;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
@@ -25,13 +25,13 @@ import lombok.Setter;
 import lombok.ToString;
 
 @Entity
-@Table(name = "actor")
+@Table(name = "gh_user")
 @Getter
 @Setter
 @NoArgsConstructor
 @JsonInclude(JsonInclude.Include.NON_EMPTY)
 @ToString
-public class Actor {
+public class GHUser {
     /**
      * Unique identifier for a User entity.
      */
@@ -62,7 +62,7 @@ public class Actor {
     @OneToMany(cascade = CascadeType.ALL, mappedBy = "author")
     @JsonIgnore
     @ToString.Exclude
-    private Set<Pullrequest> pullrequests = new HashSet<>();;
+    private Set<PullRequest> pullRequests = new HashSet<>();;
 
     /**
      * The Comments of the User entity.
@@ -70,17 +70,17 @@ public class Actor {
     @OneToMany(cascade = CascadeType.ALL, mappedBy = "author")
     @JsonIgnore
     @ToString.Exclude
-    private Set<Comment> comments = new HashSet<>();;
+    private Set<IssueComment> comments = new HashSet<>();;
 
-    public void addComment(Comment comment) {
+    public void addComment(IssueComment comment) {
         if (!comments.contains(comment)) {
             comments.add(comment);
         }
     }
 
-    public void addPullrequest(Pullrequest pullrequest) {
-        if (!pullrequests.contains(pullrequest)) {
-            pullrequests.add(pullrequest);
+    public void addPullrequest(PullRequest pullrequest) {
+        if (!pullRequests.contains(pullrequest)) {
+            pullRequests.add(pullrequest);
         }
     }
 }

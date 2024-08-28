@@ -9,20 +9,20 @@ import org.springframework.web.bind.annotation.RestController;
 
 @RestController
 @RequestMapping("/pr")
-public class PullrequestController {
-    private final PullrequestService pullrequestService;
+public class PullRequestController {
+    private final PullRequestService pullrequestService;
 
-    public PullrequestController(PullrequestService pullrequestService) {
+    public PullRequestController(PullRequestService pullrequestService) {
         this.pullrequestService = pullrequestService;
     }
 
     @GetMapping("/{id}")
-    public Pullrequest getPullrequest(@PathVariable Long id) {
+    public PullRequest getPullrequest(@PathVariable Long id) {
         return pullrequestService.getPullrequestById(id);
     }
 
     @GetMapping("/author/{login}")
-    public List<Pullrequest> getPullrequestsByAuthor(@PathVariable String login) {
+    public List<PullRequest> getPullrequestsByAuthor(@PathVariable String login) {
         return pullrequestService.getPullrequestsByAuthor(login);
     }
 }

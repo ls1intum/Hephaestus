@@ -6,7 +6,7 @@ import java.util.Set;
 
 import org.springframework.lang.NonNull;
 
-import de.tum.in.www1.hephaestus.codereview.pullrequest.Pullrequest;
+import de.tum.in.www1.hephaestus.codereview.pullrequest.PullRequest;
 import jakarta.persistence.CascadeType;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
@@ -53,7 +53,7 @@ public class Repository {
 
     @OneToMany(cascade = CascadeType.ALL, mappedBy = "repository", fetch = FetchType.EAGER)
     @ToString.Exclude
-    private Set<Pullrequest> pullRequests = new HashSet<>();;
+    private Set<PullRequest> pullRequests = new HashSet<>();;
 
     @Column(name = "added_at")
     private Instant addedAt;

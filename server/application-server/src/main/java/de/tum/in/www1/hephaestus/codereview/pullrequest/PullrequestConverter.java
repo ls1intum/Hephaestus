@@ -10,10 +10,10 @@ import org.springframework.stereotype.Service;
 
 @Service
 @ReadingConverter
-public class PullrequestConverter implements Converter<GHPullRequest, Pullrequest> {
+public class PullRequestConverter implements Converter<GHPullRequest, PullRequest> {
     @Override
-    public Pullrequest convert(@NonNull GHPullRequest source) {
-        Pullrequest pullrequest = new Pullrequest();
+    public PullRequest convert(@NonNull GHPullRequest source) {
+        PullRequest pullrequest = new PullRequest();
         pullrequest.setGithubId(source.getId());
         pullrequest.setTitle(source.getTitle());
         pullrequest.setUrl(source.getHtmlUrl().toString());
