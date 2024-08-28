@@ -11,6 +11,7 @@ import com.fasterxml.jackson.annotation.JsonInclude;
 
 import de.tum.in.www1.hephaestus.codereview.comment.Comment;
 import de.tum.in.www1.hephaestus.codereview.pullrequest.Pullrequest;
+import jakarta.persistence.CascadeType;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.GeneratedValue;
@@ -54,14 +55,14 @@ public class Actor {
     /**
      * The Pullrequests of the User entity.
      */
-    @OneToMany(mappedBy = "author")
+    @OneToMany(cascade = CascadeType.ALL, mappedBy = "author")
     @JsonIgnore
     private Set<Pullrequest> pullrequests;
 
     /**
      * The Comments of the User entity.
      */
-    @OneToMany(mappedBy = "author")
+    @OneToMany(cascade = CascadeType.ALL, mappedBy = "author")
     @JsonIgnore
     private Set<Comment> comments;
 
