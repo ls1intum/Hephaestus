@@ -12,6 +12,11 @@ public class GHUserConverter implements Converter<org.kohsuke.github.GHUser, GHU
         GHUser user = new GHUser();
         user.setLogin(source.getLogin());
         try {
+            user.setName(source.getName());
+        } catch (IOException e) {
+            user.setName(null);
+        }
+        try {
             user.setEmail(source.getEmail());
         } catch (IOException e) {
             user.setEmail(null);

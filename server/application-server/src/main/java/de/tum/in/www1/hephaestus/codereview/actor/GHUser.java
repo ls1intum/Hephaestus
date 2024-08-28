@@ -49,12 +49,17 @@ public class GHUser {
     @Column
     private String email;
 
+    @Column
+    private String name;
+
     /**
      * URL of the User entity.
      * This field is mandatory.
      */
-    @Column(nullable = false)
+    @NonNull
     private String url;
+
+    @Column()
 
     /**
      * The Pullrequests of the User entity.
