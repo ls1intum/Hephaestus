@@ -4,6 +4,8 @@ import java.time.Instant;
 import java.util.HashSet;
 import java.util.Set;
 
+import org.springframework.lang.NonNull;
+
 import de.tum.in.www1.hephaestus.codereview.pullrequest.Pullrequest;
 import jakarta.persistence.CascadeType;
 import jakarta.persistence.Column;
@@ -37,16 +39,16 @@ public class Repository {
     @Column(name = "github_id")
     private Long githubId;
 
-    @Column
+    @NonNull
     private String name;
 
     @Column(name = "name_with_owner")
     private String nameWithOwner;
 
-    @Column
+    @NonNull
     private String description;
 
-    @Column
+    @NonNull
     private String url;
 
     @OneToMany(cascade = CascadeType.ALL, mappedBy = "repository", fetch = FetchType.EAGER)

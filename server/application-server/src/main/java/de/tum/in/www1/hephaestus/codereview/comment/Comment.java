@@ -3,6 +3,8 @@ package de.tum.in.www1.hephaestus.codereview.comment;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 
+import org.springframework.lang.NonNull;
+
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonInclude;
 
@@ -42,21 +44,21 @@ public class Comment {
      * Body of the Comment entity.
      * This field is mandatory.
      */
-    @Column(nullable = false)
+    @NonNull
     private String body;
 
     /**
      * Timestamp of when the Comment entity was created.
      * This field is mandatory.
      */
-    @Column(nullable = false)
+    @NonNull
     private String createdAt;
 
     /**
      * Timestamp of when the Comment entity was updated.
      * This field is mandatory.
      */
-    @Column(nullable = false)
+    @NonNull
     private String updatedAt;
 
     /**

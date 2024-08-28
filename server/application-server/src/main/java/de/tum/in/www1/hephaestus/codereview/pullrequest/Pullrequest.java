@@ -3,6 +3,8 @@ package de.tum.in.www1.hephaestus.codereview.pullrequest;
 import java.util.HashSet;
 import java.util.Set;
 
+import org.springframework.lang.NonNull;
+
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonInclude;
 
@@ -48,41 +50,41 @@ public class Pullrequest {
      * Title of the Pullrequest.
      * This field is mandatory.
      */
-    @Column(nullable = false)
+    @NonNull
     private String title;
 
     /**
      * URL of the Pullrequest.
      * This field is mandatory.
      */
-    @Column(nullable = false)
+    @NonNull
     private String url;
 
     /**
      * State of the Pullrequest.
      * This field is mandatory.
      */
-    @Column(nullable = false)
+    @NonNull
     private String state;
 
     /**
      * Timestamp of when the Pullrequest entity was created.
      * This field is mandatory.
      */
-    @Column(nullable = false)
+    @NonNull
     private String createdAt;
 
     /**
      * Timestamp of when the Pullrequest entity was updated.
      * This field is mandatory.
      */
-    @Column(nullable = false)
+    @NonNull
     private String updatedAt;
 
     /**
      * Timestamp of when the Pullrequest entity was merged.
      */
-    @Column(nullable = true)
+    @Column
     private String mergedAt;
 
     /**

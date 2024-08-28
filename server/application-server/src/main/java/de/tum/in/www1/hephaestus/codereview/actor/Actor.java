@@ -6,6 +6,8 @@ import jakarta.persistence.Table;
 import java.util.HashSet;
 import java.util.Set;
 
+import org.springframework.lang.NonNull;
+
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonInclude;
 
@@ -41,7 +43,7 @@ public class Actor {
      * Login of the User entity.
      * This field is mandatory.
      */
-    @Column(nullable = false)
+    @NonNull
     private String login;
 
     @Column
