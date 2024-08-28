@@ -24,7 +24,7 @@ import lombok.NoArgsConstructor;
 import lombok.Setter;
 
 @Entity
-@Table(name = "pullrequests")
+@Table(name = "pullrequest")
 @Getter
 @Setter
 @NoArgsConstructor
