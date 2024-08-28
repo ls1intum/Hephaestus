@@ -20,6 +20,7 @@ import jakarta.persistence.OneToMany;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
+import lombok.ToString;
 
 @Entity
 @Table(name = "actor")
@@ -27,6 +28,7 @@ import lombok.Setter;
 @Setter
 @NoArgsConstructor
 @JsonInclude(JsonInclude.Include.NON_EMPTY)
+@ToString
 public class Actor {
     /**
      * Unique identifier for a User entity.
@@ -57,6 +59,7 @@ public class Actor {
      */
     @OneToMany(cascade = CascadeType.ALL, mappedBy = "author")
     @JsonIgnore
+    @ToString.Exclude
     private Set<Pullrequest> pullrequests = new HashSet<>();;
 
     /**
@@ -64,6 +67,7 @@ public class Actor {
      */
     @OneToMany(cascade = CascadeType.ALL, mappedBy = "author")
     @JsonIgnore
+    @ToString.Exclude
     private Set<Comment> comments = new HashSet<>();;
 
     public void addComment(Comment comment) {
@@ -76,12 +80,5 @@ public class Actor {
         if (!pullrequests.contains(pullrequest)) {
             pullrequests.add(pullrequest);
         }
-    }
-
-    @Override
-    public String toString() {
-        return "Actor{id=" + id + ", login=" + login + ", email=" + email + ", url="
-                + url + ", #pullrequests="
-                + pullrequests.size() + ", #comments=" + comments.size() + "}";
     }
 }

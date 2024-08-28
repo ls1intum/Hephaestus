@@ -17,12 +17,14 @@ import jakarta.persistence.Table;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
+import lombok.ToString;
 
 @Entity
 @Table(name = "repository")
 @Getter
 @Setter
 @NoArgsConstructor
+@ToString
 public class Repository {
 
     /**
@@ -48,14 +50,9 @@ public class Repository {
     private String url;
 
     @OneToMany(cascade = CascadeType.ALL, mappedBy = "repository", fetch = FetchType.EAGER)
+    @ToString.Exclude
     private Set<Pullrequest> pullRequests = new HashSet<>();;
 
     @Column(name = "added_at")
     private Instant addedAt;
-
-    public String toString() {
-        return "Repository{id=" + id + ", name=" + name + ", nameWithOwner=" + nameWithOwner + ", description="
-                + description + ", url=" + url + ", #pullRequests=" + pullRequests.size() + ", addedAt=" + addedAt
-                + "}";
-    }
 }

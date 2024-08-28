@@ -18,6 +18,7 @@ import jakarta.persistence.ManyToOne;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
+import lombok.ToString;
 
 @Entity
 @Table(name = "comment")
@@ -25,6 +26,7 @@ import lombok.Setter;
 @Setter
 @NoArgsConstructor
 @JsonInclude(JsonInclude.Include.NON_EMPTY)
+@ToString
 public class Comment {
     /**
      * Unique identifier for a Comment entity.
@@ -62,6 +64,7 @@ public class Comment {
      */
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "author_id")
+    @ToString.Exclude
     private Actor author;
 
     /**
@@ -70,18 +73,12 @@ public class Comment {
     @ManyToOne(optional = false)
     @JoinColumn(name = "pullrequest_id", referencedColumnName = "id")
     @JsonIgnore
+    @ToString.Exclude
     private Pullrequest pullrequest;
 
     public Comment(String body, String createdAt, String updatedAt) {
         this.body = body;
         this.createdAt = createdAt;
         this.updatedAt = updatedAt;
-    }
-
-    @Override
-    public String toString() {
-        return "Comment{id=" + id + ", githubId=" + githubId + ", body=" + body + ", createdAt=" + createdAt
-                + ", updatedAt=" + updatedAt + ", author=" + author.getLogin() + ", pullrequest="
-                + pullrequest.getTitle() + "}";
     }
 }

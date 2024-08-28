@@ -23,6 +23,7 @@ import jakarta.persistence.OneToMany;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
+import lombok.ToString;
 
 @Entity
 @Table(name = "pullrequest")
@@ -30,6 +31,7 @@ import lombok.Setter;
 @Setter
 @NoArgsConstructor
 @JsonInclude(JsonInclude.Include.NON_EMPTY)
+@ToString
 public class Pullrequest {
 
     /**
@@ -88,9 +90,11 @@ public class Pullrequest {
      */
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "author_id")
+    @ToString.Exclude
     private Actor author;
 
     @OneToMany(cascade = CascadeType.ALL, mappedBy = "pullrequest")
+    @ToString.Exclude
     private Set<Comment> comments = new HashSet<>();;
 
     /**
@@ -99,14 +103,6 @@ public class Pullrequest {
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "repository_id", referencedColumnName = "id")
     @JsonIgnore
+    @ToString.Exclude
     private Repository repository;
-
-    @Override
-    public String toString() {
-        return "Pullrequest{id=" + id + ", githubId=" + githubId + ", title=" +
-                title + ", url=" + url + ", state="
-                + state + ", createdAt=" + createdAt + ", updatedAt=" + updatedAt + ", mergedAt=" + mergedAt
-                + ", author=" + author.getLogin() + ", #comments=" + comments.size() + ", repository=" +
-                repository.getNameWithOwner() + "}";
-    }
 }
