@@ -3,8 +3,8 @@ package de.tum.in.www1.hephaestus.codereview.actor;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 
-import java.util.ArrayList;
-import java.util.List;
+import java.util.HashSet;
+import java.util.Set;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonInclude;
@@ -56,18 +56,18 @@ public class Actor {
      */
     @OneToMany(mappedBy = "author")
     @JsonIgnore
-    private List<Pullrequest> pullrequests;
+    private Set<Pullrequest> pullrequests;
 
     /**
      * The Comments of the User entity.
      */
     @OneToMany(mappedBy = "author")
     @JsonIgnore
-    private List<Comment> comments;
+    private Set<Comment> comments;
 
     public void addComment(Comment comment) {
         if (comments == null) {
-            comments = new ArrayList<>();
+            comments = new HashSet<>();
         }
         if (!comments.contains(comment)) {
             comments.add(comment);
@@ -76,7 +76,7 @@ public class Actor {
 
     public void addPullrequest(Pullrequest pullrequest) {
         if (pullrequests == null) {
-            pullrequests = new ArrayList<>();
+            pullrequests = new HashSet<>();
         }
         if (!pullrequests.contains(pullrequest)) {
             pullrequests.add(pullrequest);

@@ -1,7 +1,7 @@
 package de.tum.in.www1.hephaestus.codereview.repository;
 
 import java.time.Instant;
-import java.util.List;
+import java.util.Set;
 
 import de.tum.in.www1.hephaestus.codereview.pullrequest.Pullrequest;
 import jakarta.persistence.CascadeType;
@@ -47,7 +47,7 @@ public class Repository {
     private String url;
 
     @OneToMany(cascade = CascadeType.ALL, mappedBy = "repository", fetch = FetchType.EAGER)
-    private List<Pullrequest> pullRequests;
+    private Set<Pullrequest> pullRequests;
 
     @Column(name = "added_at")
     private Instant addedAt;

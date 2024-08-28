@@ -2,10 +2,10 @@ package de.tum.in.www1.hephaestus.codereview;
 
 import java.io.IOException;
 import java.time.Instant;
-import java.util.ArrayList;
 import java.util.HashMap;
-import java.util.List;
+import java.util.HashSet;
 import java.util.Optional;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 import org.kohsuke.github.GHPullRequest;
@@ -110,17 +110,17 @@ public class CodeReviewService {
                 PullrequestConverter prConverter = new PullrequestConverter();
 
                 // Retrieve PRs in pages of 10
-                List<Pullrequest> prs = ghRepo.queryPullRequests().list().withPageSize(10).toList().stream().map(pr -> {
+                Set<Pullrequest> prs = ghRepo.queryPullRequests().list().withPageSize(10).toList().stream().map(pr -> {
                         Pullrequest pullrequest = prConverter.convert(pr);
                         pullrequest.setRepository(repository);
                         pullrequestRepository.save(pullrequest);
                         try {
-                                List<Comment> comments = getCommentsFromGHPullRequest(pr, pullrequest);
+                                Set<Comment> comments = getCommentsFromGHPullRequest(pr, pullrequest);
                                 pullrequest.setComments(comments);
                                 commentRepository.saveAll(comments);
                         } catch (IOException e) {
                                 logger.error("Error while fetching PR comments!");
-                                pullrequest.setComments(new ArrayList<>());
+                                pullrequest.setComments(new HashSet<>());
                         }
                         try {
                                 pullrequest.setAuthor(getActorFromGHUser(pr.getUser()));
@@ -130,7 +130,7 @@ public class CodeReviewService {
                         }
 
                         return pullrequest;
-                }).collect(Collectors.toList());
+                }).collect(Collectors.toSet());
                 repository.setPullRequests(prs);
                 pullrequestRepository.saveAll(prs);
                 repositoryRepository.save(repository);
@@ -145,10 +145,10 @@ public class CodeReviewService {
          * @return The comments of the given pull request.
          * @throws IOException
          */
-        private List<Comment> getCommentsFromGHPullRequest(GHPullRequest pr, Pullrequest pullrequest)
+        private Set<Comment> getCommentsFromGHPullRequest(GHPullRequest pr, Pullrequest pullrequest)
                         throws IOException {
                 CommentConverter commentConverter = new CommentConverter();
-                List<Comment> comments = pr.queryComments().list().toList().stream()
+                Set<Comment> comments = pr.queryComments().list().toList().stream()
                                 .map(comment -> {
                                         Comment c = commentConverter.convert(comment);
                                         c.setPullrequest(pullrequest);
@@ -163,7 +163,7 @@ public class CodeReviewService {
                                         }
                                         c.setAuthor(author);
                                         return c;
-                                }).collect(Collectors.toList());
+                                }).collect(Collectors.toSet());
                 return comments;
         }
 

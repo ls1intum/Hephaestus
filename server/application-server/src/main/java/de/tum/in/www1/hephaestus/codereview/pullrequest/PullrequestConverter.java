@@ -1,7 +1,7 @@
 package de.tum.in.www1.hephaestus.codereview.pullrequest;
 
 import java.io.IOException;
-import java.util.ArrayList;
+import java.util.HashSet;
 
 import org.kohsuke.github.GHPullRequest;
 import org.springframework.core.convert.converter.Converter;
@@ -31,7 +31,7 @@ public class PullrequestConverter implements Converter<GHPullRequest, Pullreques
         }
         pullrequest.setMergedAt(source.getMergedAt() != null ? source.getMergedAt().toString() : null);
         // set preliminary values to be filled in later
-        pullrequest.setComments(new ArrayList<>());
+        pullrequest.setComments(new HashSet<>());
         pullrequest.setAuthor(null);
         pullrequest.setRepository(null);
         return pullrequest;
