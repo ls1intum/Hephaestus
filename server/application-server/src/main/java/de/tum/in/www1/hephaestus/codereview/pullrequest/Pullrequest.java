@@ -1,5 +1,6 @@
 package de.tum.in.www1.hephaestus.codereview.pullrequest;
 
+import java.util.HashSet;
 import java.util.Set;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
@@ -90,7 +91,7 @@ public class Pullrequest {
     private Actor author;
 
     @OneToMany(cascade = CascadeType.ALL, mappedBy = "pullrequest")
-    private Set<Comment> comments;
+    private Set<Comment> comments = new HashSet<>();;
 
     /**
      * The parent connection of the Pullrequest entity.

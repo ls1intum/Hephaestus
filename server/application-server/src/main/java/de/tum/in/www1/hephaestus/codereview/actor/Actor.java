@@ -57,28 +57,22 @@ public class Actor {
      */
     @OneToMany(cascade = CascadeType.ALL, mappedBy = "author")
     @JsonIgnore
-    private Set<Pullrequest> pullrequests;
+    private Set<Pullrequest> pullrequests = new HashSet<>();;
 
     /**
      * The Comments of the User entity.
      */
     @OneToMany(cascade = CascadeType.ALL, mappedBy = "author")
     @JsonIgnore
-    private Set<Comment> comments;
+    private Set<Comment> comments = new HashSet<>();;
 
     public void addComment(Comment comment) {
-        if (comments == null) {
-            comments = new HashSet<>();
-        }
         if (!comments.contains(comment)) {
             comments.add(comment);
         }
     }
 
     public void addPullrequest(Pullrequest pullrequest) {
-        if (pullrequests == null) {
-            pullrequests = new HashSet<>();
-        }
         if (!pullrequests.contains(pullrequest)) {
             pullrequests.add(pullrequest);
         }

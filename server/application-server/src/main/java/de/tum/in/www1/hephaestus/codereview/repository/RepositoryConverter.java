@@ -1,7 +1,6 @@
 package de.tum.in.www1.hephaestus.codereview.repository;
 
 import java.time.Instant;
-import java.util.HashSet;
 
 import org.kohsuke.github.GHRepository;
 import org.springframework.core.convert.converter.Converter;
@@ -24,7 +23,6 @@ public class RepositoryConverter implements Converter<GHRepository, Repository> 
         repository.setDescription(source.getDescription());
         repository.setAddedAt(Instant.now());
         repository.setGithubId(source.getId());
-        repository.setPullRequests(new HashSet<>());
         return repository;
     }
 

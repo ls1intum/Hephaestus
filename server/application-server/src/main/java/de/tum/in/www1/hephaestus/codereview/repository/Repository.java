@@ -1,6 +1,7 @@
 package de.tum.in.www1.hephaestus.codereview.repository;
 
 import java.time.Instant;
+import java.util.HashSet;
 import java.util.Set;
 
 import de.tum.in.www1.hephaestus.codereview.pullrequest.Pullrequest;
@@ -47,7 +48,7 @@ public class Repository {
     private String url;
 
     @OneToMany(cascade = CascadeType.ALL, mappedBy = "repository", fetch = FetchType.EAGER)
-    private Set<Pullrequest> pullRequests;
+    private Set<Pullrequest> pullRequests = new HashSet<>();;
 
     @Column(name = "added_at")
     private Instant addedAt;

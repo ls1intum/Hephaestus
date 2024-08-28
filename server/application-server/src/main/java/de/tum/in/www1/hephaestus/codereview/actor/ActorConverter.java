@@ -1,7 +1,6 @@
 package de.tum.in.www1.hephaestus.codereview.actor;
 
 import java.io.IOException;
-import java.util.HashSet;
 
 import org.kohsuke.github.GHUser;
 import org.springframework.core.convert.converter.Converter;
@@ -19,8 +18,6 @@ public class ActorConverter implements Converter<GHUser, Actor> {
             actor.setEmail(null);
         }
         actor.setUrl(source.getHtmlUrl().toString());
-        actor.setPullrequests(new HashSet<>());
-        actor.setComments(new HashSet<>());
         return actor;
     }
 
