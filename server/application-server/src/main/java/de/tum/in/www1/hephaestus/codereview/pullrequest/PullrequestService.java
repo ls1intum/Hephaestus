@@ -8,7 +8,7 @@ import org.springframework.stereotype.Service;
 
 @Service
 public class PullRequestService {
-    private static final Logger logger = LoggerFactory.getLogger(PullRequest.class);
+    private static final Logger logger = LoggerFactory.getLogger(PullRequestService.class);
 
     private final PullRequestRepository pullrequestRepository;
 

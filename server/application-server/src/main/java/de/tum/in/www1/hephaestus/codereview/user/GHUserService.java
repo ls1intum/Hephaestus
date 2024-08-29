@@ -8,7 +8,7 @@ import org.springframework.stereotype.Service;
 
 @Service
 public class GHUserService {
-    private static final Logger logger = LoggerFactory.getLogger(GHUser.class);
+    private static final Logger logger = LoggerFactory.getLogger(GHUserService.class);
 
     private final GHUserRepository ghuserRepository;
 
