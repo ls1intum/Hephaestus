@@ -17,7 +17,7 @@ public class PullRequestConverter implements Converter<GHPullRequest, PullReques
         pullrequest.setGithubId(source.getId());
         pullrequest.setTitle(source.getTitle());
         pullrequest.setUrl(source.getHtmlUrl().toString());
-        pullrequest.setState(source.getState().toString());
+        pullrequest.setState(convertState(source.getState()));
         try {
             pullrequest.setCreatedAt(source.getCreatedAt().toString());
         } catch (IOException e) {
@@ -35,6 +35,19 @@ public class PullRequestConverter implements Converter<GHPullRequest, PullReques
         pullrequest.setAuthor(null);
         pullrequest.setRepository(null);
         return pullrequest;
+    }
+
+    private GHIssueState convertState(org.kohsuke.github.GHIssueState state) {
+        switch (state) {
+            case OPEN:
+                return GHIssueState.OPEN;
+            case CLOSED:
+                return GHIssueState.CLOSED;
+            case ALL:
+                return GHIssueState.ALL;
+            default:
+                return GHIssueState.ALL;
+        }
     }
 
 }

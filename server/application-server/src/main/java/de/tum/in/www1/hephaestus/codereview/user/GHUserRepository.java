@@ -11,7 +11,7 @@ public interface GHUserRepository extends JpaRepository<GHUser, Long> {
     Optional<GHUser> findByLogin(String login);
 
     @Query("""
-                SELECT new de.tum.in.www1.hephaestus.codereview.actor.GHUserDTO(u.login, u.email, u.name, u.url)
+                SELECT new de.tum.in.www1.hephaestus.codereview.user.GHUserDTO(u.login, u.email, u.name, u.url)
                 FROM GHUser u
                 WHERE u.login = :login
             """)

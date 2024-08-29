@@ -65,7 +65,7 @@ public class PullRequest {
      * This field is mandatory.
      */
     @NonNull
-    private String state;
+    private GHIssueState state;
 
     /**
      * Timestamp of when the Pullrequest entity was created.
