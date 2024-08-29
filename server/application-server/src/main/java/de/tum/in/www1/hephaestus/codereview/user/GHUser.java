@@ -30,16 +30,13 @@ import lombok.ToString;
 @NoArgsConstructor
 @ToString
 public class GHUser {
-    /**
-     * Unique identifier for a User entity.
-     */
+
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
     /**
-     * Login of the User entity.
-     * This field is mandatory.
+     * Unique login identifier for a user.
      */
     @NonNull
     private String login;
@@ -47,39 +44,40 @@ public class GHUser {
     @Column
     private String email;
 
+    /**
+     * Display name of the user.
+     */
     @Column
     private String name;
 
     /**
-     * URL of the User entity.
-     * This field is mandatory.
+     * Unique URL to the user's profile.
+     * Not the website a user can set in their profile.
      */
     @NonNull
     private String url;
 
     /**
-     * The Pullrequests of the User entity.
+     * URL to the user's avatar.
+     * If unavailable, a fallback can be generated from the login, e.g. on Github:
+     * https://github.com/{login}.png
      */
+    @NonNull
+    private String avatarUrl;
+
     @OneToMany(cascade = CascadeType.ALL, mappedBy = "author")
     @JsonIgnore
     private Set<PullRequest> pullRequests = new HashSet<>();;
 
-    /**
-     * The Comments of the User entity.
-     */
     @OneToMany(cascade = CascadeType.ALL, mappedBy = "author")
     @JsonIgnore
     private Set<IssueComment> comments = new HashSet<>();;
 
     public void addComment(IssueComment comment) {
-        if (!comments.contains(comment)) {
-            comments.add(comment);
-        }
+        comments.add(comment);
     }
 
     public void addPullrequest(PullRequest pullrequest) {
-        if (!pullRequests.contains(pullrequest)) {
-            pullRequests.add(pullrequest);
-        }
+        pullRequests.add(pullrequest);
     }
 }

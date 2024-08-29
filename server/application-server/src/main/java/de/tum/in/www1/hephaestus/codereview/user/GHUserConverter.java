@@ -22,6 +22,7 @@ public class GHUserConverter implements Converter<org.kohsuke.github.GHUser, GHU
             user.setEmail(null);
         }
         user.setUrl(source.getHtmlUrl().toString());
+        user.setAvatarUrl(source.getAvatarUrl());
         return user;
     }
 

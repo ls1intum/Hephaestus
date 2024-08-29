@@ -36,57 +36,32 @@ import lombok.ToString;
 @ToString
 public class PullRequest {
 
-    /**
-     * Unique identifier for a Pullrequest entity.
-     */
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    /**
-     * Title of the Pullrequest.
-     * This field is mandatory.
-     */
     @NonNull
     private String title;
 
-    /**
-     * URL of the Pullrequest.
-     * This field is mandatory.
-     */
     @NonNull
     private String url;
 
     /**
-     * State of the Pullrequest.
-     * This field is mandatory.
+     * State of the PullRequest.
+     * Does not include the state of the merge.
      */
     @NonNull
     private GHIssueState state;
 
-    /**
-     * Timestamp of when the Pullrequest entity was created.
-     * This field is mandatory.
-     */
     @NonNull
     private String createdAt;
 
-    /**
-     * Timestamp of when the Pullrequest entity was updated.
-     * This field is mandatory.
-     */
     @NonNull
     private String updatedAt;
 
-    /**
-     * Timestamp of when the Pullrequest entity was merged.
-     */
     @Column
     private String mergedAt;
 
-    /**
-     * The author of the Pullrequest entity.
-     */
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "author_id")
     @ToString.Exclude
@@ -96,9 +71,6 @@ public class PullRequest {
     @ToString.Exclude
     private Set<IssueComment> comments = new HashSet<>();;
 
-    /**
-     * The parent connection of the Pullrequest entity.
-     */
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "repository_id", referencedColumnName = "id")
     @JsonIgnore

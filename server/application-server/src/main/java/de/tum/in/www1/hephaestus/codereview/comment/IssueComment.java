@@ -30,45 +30,25 @@ import lombok.ToString;
 @JsonInclude(JsonInclude.Include.NON_EMPTY)
 @ToString
 public class IssueComment {
-    /**
-     * Unique identifier for a Comment entity.
-     */
+
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    /**
-     * Body of the Comment entity.
-     * This field is mandatory.
-     */
     @NonNull
     private String body;
 
-    /**
-     * Timestamp of when the Comment entity was created.
-     * This field is mandatory.
-     */
     @NonNull
     private String createdAt;
 
-    /**
-     * Timestamp of when the Comment entity was updated.
-     * This field is mandatory.
-     */
     @NonNull
     private String updatedAt;
 
-    /**
-     * The author of the Comment entity.
-     */
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "author_id")
     @ToString.Exclude
     private GHUser author;
 
-    /**
-     * The parent connection to the pullrequest of the Comment entity.
-     */
     @ManyToOne(optional = false)
     @JoinColumn(name = "pullrequest_id", referencedColumnName = "id")
     @JsonIgnore
