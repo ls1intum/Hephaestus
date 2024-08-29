@@ -12,7 +12,6 @@ public class IssueCommentConverter implements Converter<GHIssueComment, IssueCom
     public IssueComment convert(@NonNull GHIssueComment source) {
         IssueComment comment = new IssueComment();
         comment.setBody(source.getBody());
-        comment.setGithubId(source.getId());
         try {
             comment.setCreatedAt(source.getCreatedAt().toString());
         } catch (IOException e) {

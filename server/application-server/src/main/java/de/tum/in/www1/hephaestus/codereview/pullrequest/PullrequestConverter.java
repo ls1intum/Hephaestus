@@ -14,7 +14,6 @@ public class PullRequestConverter implements Converter<GHPullRequest, PullReques
     @Override
     public PullRequest convert(@NonNull GHPullRequest source) {
         PullRequest pullrequest = new PullRequest();
-        pullrequest.setGithubId(source.getId());
         pullrequest.setTitle(source.getTitle());
         pullrequest.setUrl(source.getHtmlUrl().toString());
         pullrequest.setState(convertState(source.getState()));

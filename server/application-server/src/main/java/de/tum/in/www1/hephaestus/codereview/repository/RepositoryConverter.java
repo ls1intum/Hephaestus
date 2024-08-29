@@ -22,7 +22,6 @@ public class RepositoryConverter implements Converter<GHRepository, Repository> 
         repository.setUrl(source.getHtmlUrl().toString());
         repository.setDescription(source.getDescription());
         repository.setAddedAt(Instant.now());
-        repository.setGithubId(source.getId());
         return repository;
     }
 

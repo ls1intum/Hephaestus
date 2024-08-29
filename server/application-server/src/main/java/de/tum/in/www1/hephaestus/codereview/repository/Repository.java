@@ -36,9 +36,6 @@ public class Repository {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @Column(name = "github_id")
-    private Long githubId;
-
     @NonNull
     private String name;
 

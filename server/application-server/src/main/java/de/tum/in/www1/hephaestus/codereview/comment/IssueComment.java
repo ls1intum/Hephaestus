@@ -37,9 +37,6 @@ public class IssueComment {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @Column(name = "github_id")
-    private Long githubId;
-
     /**
      * Body of the Comment entity.
      * This field is mandatory.

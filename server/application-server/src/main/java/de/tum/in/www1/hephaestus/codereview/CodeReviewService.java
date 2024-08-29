@@ -12,7 +12,6 @@ import org.kohsuke.github.GitHubBuilder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
-import org.springframework.context.annotation.Configuration;
 
 import de.tum.in.www1.hephaestus.EnvConfig;
 import de.tum.in.www1.hephaestus.codereview.comment.IssueComment;
@@ -28,7 +27,6 @@ import de.tum.in.www1.hephaestus.codereview.user.GHUser;
 import de.tum.in.www1.hephaestus.codereview.user.GHUserConverter;
 import de.tum.in.www1.hephaestus.codereview.user.GHUserRepository;
 
-@Configuration
 @Service
 public class CodeReviewService {
 

@@ -43,9 +43,6 @@ public class PullRequest {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @Column(name = "github_id")
-    private Long githubId;
-
     /**
      * Title of the Pullrequest.
      * This field is mandatory.
