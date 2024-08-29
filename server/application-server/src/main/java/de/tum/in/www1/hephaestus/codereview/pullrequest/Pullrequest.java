@@ -8,9 +8,9 @@ import org.springframework.lang.NonNull;
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonInclude;
 
-import de.tum.in.www1.hephaestus.codereview.actor.GHUser;
 import de.tum.in.www1.hephaestus.codereview.comment.IssueComment;
 import de.tum.in.www1.hephaestus.codereview.repository.Repository;
+import de.tum.in.www1.hephaestus.codereview.user.GHUser;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 import jakarta.persistence.CascadeType;

@@ -8,8 +8,8 @@ import org.springframework.lang.NonNull;
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonInclude;
 
-import de.tum.in.www1.hephaestus.codereview.actor.GHUser;
 import de.tum.in.www1.hephaestus.codereview.pullrequest.PullRequest;
+import de.tum.in.www1.hephaestus.codereview.user.GHUser;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.FetchType;

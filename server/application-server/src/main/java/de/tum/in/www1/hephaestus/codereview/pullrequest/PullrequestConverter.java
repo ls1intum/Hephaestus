@@ -21,11 +21,13 @@ public class PullRequestConverter implements Converter<GHPullRequest, PullReques
         try {
             pullrequest.setCreatedAt(source.getCreatedAt().toString());
         } catch (IOException e) {
+            // find a better way to handle this
             pullrequest.setCreatedAt(null);
         }
         try {
             pullrequest.setUpdatedAt(source.getUpdatedAt().toString());
         } catch (IOException e) {
+            // find a better way to handle this
             pullrequest.setUpdatedAt(null);
         }
         pullrequest.setMergedAt(source.getMergedAt() != null ? source.getMergedAt().toString() : null);

@@ -21,9 +21,6 @@ import org.springframework.data.domain.Example;
 import org.springframework.graphql.client.HttpSyncGraphQlClient;
 
 import de.tum.in.www1.hephaestus.EnvConfig;
-import de.tum.in.www1.hephaestus.codereview.actor.GHUser;
-import de.tum.in.www1.hephaestus.codereview.actor.GHUserConverter;
-import de.tum.in.www1.hephaestus.codereview.actor.GHUserRepository;
 import de.tum.in.www1.hephaestus.codereview.comment.IssueComment;
 import de.tum.in.www1.hephaestus.codereview.comment.IssueCommentConverter;
 import de.tum.in.www1.hephaestus.codereview.comment.IssueCommentRepository;
@@ -33,6 +30,9 @@ import de.tum.in.www1.hephaestus.codereview.pullrequest.PullRequestRepository;
 import de.tum.in.www1.hephaestus.codereview.repository.Repository;
 import de.tum.in.www1.hephaestus.codereview.repository.RepositoryConverter;
 import de.tum.in.www1.hephaestus.codereview.repository.RepositoryRepository;
+import de.tum.in.www1.hephaestus.codereview.user.GHUser;
+import de.tum.in.www1.hephaestus.codereview.user.GHUserConverter;
+import de.tum.in.www1.hephaestus.codereview.user.GHUserRepository;
 
 @Service
 public class CodeReviewService {
@@ -46,7 +46,7 @@ public class CodeReviewService {
         private final RepositoryRepository repositoryRepository;
         private final PullRequestRepository pullrequestRepository;
         private final IssueCommentRepository commentRepository;
-        private final GHUserRepository actorRepository;
+        private final GHUserRepository ghUserRepository;
 
         private final EnvConfig envConfig;
 
@@ -59,7 +59,7 @@ public class CodeReviewService {
                 this.repositoryRepository = repositoryRepository;
                 this.pullrequestRepository = pullrequestRepository;
                 this.commentRepository = commentRepository;
-                this.actorRepository = actorRepository;
+                this.ghUserRepository = actorRepository;
 
                 RestClient restClient = RestClient.builder()
                                 .baseUrl("https://api.github.com/graphql")
@@ -167,12 +167,13 @@ public class CodeReviewService {
         }
 
         private GHUser getActorFromGHUser(org.kohsuke.github.GHUser user) {
-                GHUser actor = actorRepository.findByLogin(user.getLogin());
-                if (actor == null) {
-                        actor = new GHUserConverter().convert(user);
-                        actorRepository.save(actor);
+                GHUser ghUser = ghUserRepository.findByLogin(user.getLogin()).orElse(null);
+                if (ghUser == null) {
+                        ghUser = new GHUserConverter().convert(user);
+                        ghUserRepository.save(ghUser);
                 }
-                return actor;
+                return ghUser;
+
         }
 
         /**

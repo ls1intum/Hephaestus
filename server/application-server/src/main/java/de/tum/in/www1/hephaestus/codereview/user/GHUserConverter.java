@@ -1,4 +1,4 @@
-package de.tum.in.www1.hephaestus.codereview.actor;
+package de.tum.in.www1.hephaestus.codereview.user;
 
 import java.io.IOException;
 

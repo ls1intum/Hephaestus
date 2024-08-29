@@ -1,4 +1,4 @@
-package de.tum.in.www1.hephaestus.codereview.actor;
+package de.tum.in.www1.hephaestus.codereview.user;
 
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
@@ -9,7 +9,6 @@ import java.util.Set;
 import org.springframework.lang.NonNull;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
-import com.fasterxml.jackson.annotation.JsonInclude;
 
 import de.tum.in.www1.hephaestus.codereview.comment.IssueComment;
 import de.tum.in.www1.hephaestus.codereview.pullrequest.PullRequest;
@@ -29,7 +28,6 @@ import lombok.ToString;
 @Getter
 @Setter
 @NoArgsConstructor
-@JsonInclude(JsonInclude.Include.NON_EMPTY)
 @ToString
 public class GHUser {
     /**
@@ -59,14 +57,11 @@ public class GHUser {
     @NonNull
     private String url;
 
-    @Column()
-
     /**
      * The Pullrequests of the User entity.
      */
     @OneToMany(cascade = CascadeType.ALL, mappedBy = "author")
     @JsonIgnore
-    @ToString.Exclude
     private Set<PullRequest> pullRequests = new HashSet<>();;
 
     /**
@@ -74,7 +69,6 @@ public class GHUser {
      */
     @OneToMany(cascade = CascadeType.ALL, mappedBy = "author")
     @JsonIgnore
-    @ToString.Exclude
     private Set<IssueComment> comments = new HashSet<>();;
 
     public void addComment(IssueComment comment) {
