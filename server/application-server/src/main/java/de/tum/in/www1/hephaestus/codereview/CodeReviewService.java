@@ -1,10 +1,7 @@
 package de.tum.in.www1.hephaestus.codereview;
 
 import java.io.IOException;
-import java.time.Instant;
-import java.util.HashMap;
 import java.util.HashSet;
-import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
 
@@ -15,10 +12,7 @@ import org.kohsuke.github.GitHubBuilder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
-import org.springframework.web.client.RestClient;
-
-import org.springframework.data.domain.Example;
-import org.springframework.graphql.client.HttpSyncGraphQlClient;
+import org.springframework.context.annotation.Configuration;
 
 import de.tum.in.www1.hephaestus.EnvConfig;
 import de.tum.in.www1.hephaestus.codereview.comment.IssueComment;
@@ -34,12 +28,11 @@ import de.tum.in.www1.hephaestus.codereview.user.GHUser;
 import de.tum.in.www1.hephaestus.codereview.user.GHUserConverter;
 import de.tum.in.www1.hephaestus.codereview.user.GHUserRepository;
 
+@Configuration
 @Service
 public class CodeReviewService {
 
         private static final Logger logger = LoggerFactory.getLogger(CodeReviewService.class);
-
-        private final HttpSyncGraphQlClient graphQlClient;
 
         private GitHub github;
 
@@ -48,28 +41,16 @@ public class CodeReviewService {
         private final IssueCommentRepository commentRepository;
         private final GHUserRepository ghUserRepository;
 
-        private final EnvConfig envConfig;
-
         public CodeReviewService(EnvConfig envConfig, RepositoryRepository repositoryRepository,
                         PullRequestRepository pullrequestRepository, IssueCommentRepository commentRepository,
                         GHUserRepository actorRepository) {
                 logger.info("Hello from CodeReviewService!");
 
-                this.envConfig = envConfig;
                 this.repositoryRepository = repositoryRepository;
                 this.pullrequestRepository = pullrequestRepository;
                 this.commentRepository = commentRepository;
                 this.ghUserRepository = actorRepository;
 
-                RestClient restClient = RestClient.builder()
-                                .baseUrl("https://api.github.com/graphql")
-                                .build();
-
-                String githubPat = this.envConfig.getGithubPat();
-
-                graphQlClient = HttpSyncGraphQlClient.builder(restClient)
-                                .headers(headers -> headers.setBearerAuth(githubPat))
-                                .build();
                 try {
                         github = new GitHubBuilder().withOAuthToken(envConfig.getGithubPat()).build();
                 } catch (IOException e) {
@@ -174,39 +155,5 @@ public class CodeReviewService {
                 }
                 return ghUser;
 
-        }
-
-        /**
-         * GraphQL implementation of fetching the hephaestus Github repository.
-         * 
-         * @see #fetchRepository(String)
-         * @return The hephaestus repository.
-         */
-        public Repository getHephaestusRepository() {
-                Repository example = new Repository();
-                example.setName("hephaestus");
-                example.setNameWithOwner("ls1intum/hephaestus");
-                Optional<Repository> foundRepo = repositoryRepository.findOne(Example.of(example));
-                if (foundRepo.isPresent()) {
-                        return foundRepo.get();
-                }
-
-                logger.info("No repo found, creating new one...");
-                HashMap<String, Object> variables = new HashMap<>();
-                variables.put("owner", "ls1intum");
-                variables.put("name", "hephaestus");
-                variables.put("first", 10);
-
-                Repository repository = graphQlClient.documentName("getrepositoryprs")
-                                .variables(variables)
-                                .retrieveSync("repository")
-                                .toEntity(Repository.class);
-                if (repository == null) {
-                        logger.error("Error while fetching repository!");
-                        return null;
-                }
-                repository.setAddedAt(Instant.now());
-                repositoryRepository.saveAndFlush(repository);
-                return repository;
         }
 }
