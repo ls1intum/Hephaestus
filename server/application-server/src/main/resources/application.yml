@@ -22,9 +22,5 @@ spring:
       name: admin
       password: admin
 
-  docker:
-    compose:
-      file: server/application-server/compose.yaml
-
 springdoc:
   default-produces-media-type: application/json
