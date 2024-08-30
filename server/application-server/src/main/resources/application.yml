@@ -1,37 +1,37 @@
 spring:
-    application:
-        name: Hephaestus
+  application:
+    name: Hephaestus
 
-    datasource:
-        url: jdbc:postgresql://localhost:5432/hephaestus
-        username: root
-        password: root
+  datasource:
+    url: jdbc:postgresql://localhost:5432/hephaestus
+    username: root
+    password: root
 
-    jpa:
-        hibernate:
-            # ddl-auto: update
-            ddl-auto: create-drop
-            # ddl-auto: none
-        # show-sql: "true"
-        properties:
-            hibernate:
-                dialect: org.hibernate.dialect.PostgreSQLDialect
-                format_sql: "true"
+  jpa:
+    hibernate:
+      # ddl-auto: update
+      ddl-auto: create-drop
+      # ddl-auto: none
+    # show-sql: "true"
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.PostgreSQLDialect
+        format_sql: "true"
 
-    liquibase:
-        change-log: classpath:db/master.xml
+  liquibase:
+    change-log: classpath:db/master.xml
 
-    security:
-        user:
-            name: admin
-            password: admin
+  security:
+    user:
+      name: admin
+      password: admin
 
   docker:
     compose:
       file: server/application-server/compose.yaml
 
 springdoc:
-    default-produces-media-type: application/json
+  default-produces-media-type: application/json
 
 environment:
-    githubPat: ${GITHUB_PAT}
+  githubPat: ${GITHUB_PAT}
