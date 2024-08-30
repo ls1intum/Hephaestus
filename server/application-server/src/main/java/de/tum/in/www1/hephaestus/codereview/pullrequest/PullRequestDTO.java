@@ -9,9 +9,9 @@ import de.tum.in.www1.hephaestus.codereview.repository.RepositoryDTO;
 import de.tum.in.www1.hephaestus.codereview.user.UserDTO;
 
 @JsonInclude(JsonInclude.Include.NON_EMPTY)
-public record PullRequestDTO(String title, String url, GHIssueState state, String createdAt, String updatedAt,
+public record PullRequestDTO(String title, String url, IssueState state, String createdAt, String updatedAt,
                 String mergedAt, UserDTO author, Set<IssueCommentDTO> comments, RepositoryDTO repository) {
-        public PullRequestDTO(String title, String url, GHIssueState state, String createdAt, String updatedAt,
+        public PullRequestDTO(String title, String url, IssueState state, String createdAt, String updatedAt,
                         String mergedAt) {
                 this(title, url, state, createdAt, updatedAt, mergedAt, null, null, null);
         }

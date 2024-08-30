@@ -4,9 +4,6 @@ import jakarta.persistence.Table;
 
 import org.springframework.lang.NonNull;
 
-import com.fasterxml.jackson.annotation.JsonIgnore;
-import com.fasterxml.jackson.annotation.JsonInclude;
-
 import de.tum.in.www1.hephaestus.codereview.base.BaseGitServiceEntity;
 import de.tum.in.www1.hephaestus.codereview.pullrequest.PullRequest;
 import de.tum.in.www1.hephaestus.codereview.user.User;
@@ -24,7 +21,6 @@ import lombok.ToString;
 @Getter
 @Setter
 @NoArgsConstructor
-@JsonInclude(JsonInclude.Include.NON_EMPTY)
 @ToString(callSuper = true)
 public class IssueComment extends BaseGitServiceEntity {
     @NonNull
@@ -37,9 +33,8 @@ public class IssueComment extends BaseGitServiceEntity {
 
     @ManyToOne(optional = false)
     @JoinColumn(name = "pullrequest_id", referencedColumnName = "id")
-    @JsonIgnore
     @ToString.Exclude
-    private PullRequest pullrequest;
+    private PullRequest pullRequest;
 
     public IssueComment(String body, String createdAt, String updatedAt) {
         this.body = body;

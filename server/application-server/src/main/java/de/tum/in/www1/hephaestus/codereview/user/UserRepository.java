@@ -12,18 +12,9 @@ public interface UserRepository extends JpaRepository<User, Long> {
     Optional<User> findUser(@Param("login") String login);
 
     @Query("""
-                SELECT new de.tum.in.www1.hephaestus.codereview.user.UserDTO(u.login, u.email, u.name, u.url)
+                SELECT new UserDTO(u.login, u.email, u.name, u.url)
                 FROM User u
                 WHERE u.login = :login
             """)
     Optional<UserDTO> findByLogin(@Param("login") String login);
-
-    // @Query("""
-    // SELECT new de.tum.in.www1.hephaestus.codereview.user.UserDTO(u.login,
-    // u.email, u.name, u.url, u.pullRequests, u.comments)
-    // FROM User u
-    // WHERE u.login = :login
-    // """)
-    // Optional<UserDTO> findByLoginWithPullRequestsAndComments(@Param("login")
-    // String login);
 }

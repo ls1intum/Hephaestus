@@ -1,6 +1,6 @@
 package de.tum.in.www1.hephaestus.codereview.pullrequest;
 
-import java.util.List;
+import java.util.Set;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -16,14 +16,14 @@ public class PullRequestService {
         this.pullrequestRepository = pullrequestRepository;
     }
 
-    public PullRequest getPullrequestById(Long id) {
+    public PullRequest getPullRequestById(Long id) {
         logger.info("Getting pullrequest with id: " + id);
         return pullrequestRepository.findById(id).orElse(null);
     }
 
-    public List<PullRequest> getPullrequestsByAuthor(String login) {
+    public Set<PullRequest> getPullRequestsByAuthor(String login) {
         logger.info("Getting pullrequest by author: " + login);
-        return pullrequestRepository.findByAuthor(login);
+        return pullrequestRepository.findByAuthor_Login(login);
     }
 
 }

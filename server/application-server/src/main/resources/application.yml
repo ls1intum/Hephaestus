@@ -16,6 +16,7 @@ spring:
         properties:
             hibernate:
                 dialect: org.hibernate.dialect.PostgreSQLDialect
+                integrator_provider: de.tum.in.www1.hephaestus.ClassImportIntegratorIntegratorProvider
                 format_sql: "true"
 
     liquibase:
@@ -26,9 +27,9 @@ spring:
             name: admin
             password: admin
 
-  docker:
+docker:
     compose:
-      file: server/application-server/compose.yaml
+        file: server/application-server/compose.yaml
 
 springdoc:
     default-produces-media-type: application/json

@@ -129,12 +129,12 @@ public class CodeReviewService {
                 Set<IssueComment> comments = pr.queryComments().list().toList().stream()
                                 .map(comment -> {
                                         IssueComment c = commentConverter.convert(comment);
-                                        c.setPullrequest(pullrequest);
+                                        c.setPullRequest(pullrequest);
                                         User author;
                                         try {
                                                 author = getActorFromGHUser(comment.getUser());
                                                 author.addComment(c);
-                                                author.addPullrequest(pullrequest);
+                                                author.addPullRequest(pullrequest);
                                         } catch (IOException e) {
                                                 logger.error("Error while fetching author!");
                                                 author = null;

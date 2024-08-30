@@ -23,7 +23,7 @@ public class IssueCommentConverter implements Converter<GHIssueComment, IssueCom
             comment.setUpdatedAt(null);
         }
         // set preliminary values to be filled in later
-        comment.setPullrequest(null);
+        comment.setPullRequest(null);
         comment.setAuthor(null);
         return comment;
     }

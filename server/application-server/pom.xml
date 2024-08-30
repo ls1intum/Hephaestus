@@ -126,7 +126,11 @@
 			<artifactId>github-api</artifactId>
 			<version>1.324</version>
 		</dependency>
-
+		<dependency>
+			<groupId>io.hypersistence</groupId>
+			<artifactId>hypersistence-utils-hibernate-63</artifactId>
+			<version>3.8.2</version>
+		</dependency>
 	</dependencies>
 
 	<dependencyManagement>

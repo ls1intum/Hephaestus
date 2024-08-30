@@ -53,7 +53,6 @@ public class User extends BaseGitServiceEntity {
      * If unavailable, a fallback can be generated from the login, e.g. on Github:
      * https://github.com/{login}.png
      */
-    @Column(nullable = false, name = "avatar_url")
     private String avatarUrl;
 
     @OneToMany(cascade = CascadeType.ALL, mappedBy = "author")
@@ -66,7 +65,7 @@ public class User extends BaseGitServiceEntity {
         comments.add(comment);
     }
 
-    public void addPullrequest(PullRequest pullrequest) {
+    public void addPullRequest(PullRequest pullrequest) {
         pullRequests.add(pullrequest);
     }
 }

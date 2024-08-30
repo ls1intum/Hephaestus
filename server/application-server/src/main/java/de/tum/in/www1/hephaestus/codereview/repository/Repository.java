@@ -8,7 +8,6 @@ import org.springframework.lang.NonNull;
 import de.tum.in.www1.hephaestus.codereview.base.BaseGitServiceEntity;
 import de.tum.in.www1.hephaestus.codereview.pullrequest.PullRequest;
 import jakarta.persistence.CascadeType;
-import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.FetchType;
 import jakarta.persistence.OneToMany;
@@ -28,7 +27,7 @@ public class Repository extends BaseGitServiceEntity {
     @NonNull
     private String name;
 
-    @Column(name = "name_with_owner")
+    @NonNull
     private String nameWithOwner;
 
     @NonNull

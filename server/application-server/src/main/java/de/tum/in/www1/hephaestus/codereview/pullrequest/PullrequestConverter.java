@@ -36,16 +36,14 @@ public class PullRequestConverter implements Converter<GHPullRequest, PullReques
         return pullrequest;
     }
 
-    private GHIssueState convertState(org.kohsuke.github.GHIssueState state) {
+    private IssueState convertState(org.kohsuke.github.GHIssueState state) {
         switch (state) {
             case OPEN:
-                return GHIssueState.OPEN;
+                return IssueState.OPEN;
             case CLOSED:
-                return GHIssueState.CLOSED;
-            case ALL:
-                return GHIssueState.ALL;
+                return IssueState.CLOSED;
             default:
-                return GHIssueState.ALL;
+                return IssueState.OPEN;
         }
     }
 
