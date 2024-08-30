@@ -35,16 +35,4 @@ public class IssueComment extends BaseGitServiceEntity {
     @JoinColumn(name = "pullrequest_id", referencedColumnName = "id")
     @ToString.Exclude
     private PullRequest pullRequest;
-
-    public IssueComment(Long id, String body, String createdAt, String updatedAt, User author,
-            PullRequest pullRequest) {
-        super(id, createdAt, updatedAt);
-        this.body = body;
-        this.author = author;
-        this.pullRequest = pullRequest;
-    }
-
-    public IssueComment(Long id, String body, String createdAt, String updatedAt) {
-        this(id, body, createdAt, updatedAt, null, null);
-    }
 }

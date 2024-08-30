@@ -56,21 +56,4 @@ public class PullRequest extends BaseGitServiceEntity {
     @JoinColumn(name = "repository_id", referencedColumnName = "id")
     @ToString.Exclude
     private Repository repository;
-
-    public PullRequest(Long id, String title, String url, IssueState state, String createdAt, String updatedAt,
-            String mergedAt) {
-        this(id, title, url, state, createdAt, updatedAt, mergedAt, null, new HashSet<>(), null);
-    }
-
-    public PullRequest(Long id, String title, String url, IssueState state, String createdAt, String updatedAt,
-            String mergedAt, User author, Set<IssueComment> comments, Repository repository) {
-        super(id, createdAt, updatedAt);
-        this.title = title;
-        this.url = url;
-        this.state = state;
-        this.mergedAt = mergedAt;
-        this.author = author;
-        this.comments = comments;
-        this.repository = repository;
-    }
 }

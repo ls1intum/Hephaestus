@@ -1,26 +1,17 @@
 package de.tum.in.www1.hephaestus.codereview.comment;
 
-import java.io.IOException;
-
 import org.kohsuke.github.GHIssueComment;
-import org.springframework.core.convert.converter.Converter;
 import org.springframework.lang.NonNull;
 
-public class IssueCommentConverter implements Converter<GHIssueComment, IssueComment> {
+import de.tum.in.www1.hephaestus.codereview.base.BaseGitServiceEntityConverter;
+
+public class IssueCommentConverter extends BaseGitServiceEntityConverter<GHIssueComment, IssueComment> {
 
     @Override
     public IssueComment convert(@NonNull GHIssueComment source) {
-        Long id = source.getId();
-        String body = source.getBody();
-
-        IssueComment comment;
-        try {
-            String createdAt = source.getCreatedAt().toString();
-            String updatedAt = source.getUpdatedAt().toString();
-            comment = new IssueComment(id, body, createdAt, updatedAt);
-        } catch (IOException e) {
-            comment = new IssueComment(id, body, null, null);
-        }
+        IssueComment comment = new IssueComment();
+        convertBaseFields(source, comment);
+        comment.setBody(source.getBody());
         return comment;
     }
 

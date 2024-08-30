@@ -2,26 +2,28 @@ package de.tum.in.www1.hephaestus.codereview.user;
 
 import java.io.IOException;
 
-import org.springframework.core.convert.converter.Converter;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.lang.NonNull;
 
-public class UserConverter implements Converter<org.kohsuke.github.GHUser, User> {
+import de.tum.in.www1.hephaestus.codereview.base.BaseGitServiceEntityConverter;
+
+public class UserConverter extends BaseGitServiceEntityConverter<org.kohsuke.github.GHUser, User> {
+
+    protected static final Logger logger = LoggerFactory.getLogger(UserConverter.class);
 
     @Override
     public User convert(@NonNull org.kohsuke.github.GHUser source) {
-        Long id = source.getId();
-        String login = source.getLogin();
-        String url = source.getHtmlUrl().toString();
-        String avatarlUrl = source.getAvatarUrl();
-        User user;
+        User user = new User();
+        convertBaseFields(source, user);
+        user.setLogin(source.getLogin());
+        user.setUrl(source.getHtmlUrl().toString());
+        user.setAvatarUrl(source.getAvatarUrl());
         try {
-            String name = source.getName();
-            String email = source.getEmail();
-            String createdAt = source.getCreatedAt().toString();
-            String updatedAt = source.getUpdatedAt().toString();
-            user = new User(id, login, email, name, url, avatarlUrl, createdAt, updatedAt);
+            user.setName(source.getName());
+            user.setEmail(source.getEmail());
         } catch (IOException e) {
-            user = new User(id, login, null, null, url, avatarlUrl, null, null);
+            logger.error("Failed to convert user fields for source {}: {}", source.getId(), e.getMessage());
         }
         return user;
     }

@@ -1,30 +1,25 @@
 package de.tum.in.www1.hephaestus.codereview.pullrequest;
 
-import java.io.IOException;
-
 import org.kohsuke.github.GHPullRequest;
-import org.springframework.core.convert.converter.Converter;
 import org.springframework.data.convert.ReadingConverter;
 import org.springframework.lang.NonNull;
 import org.springframework.stereotype.Service;
 
+import de.tum.in.www1.hephaestus.codereview.base.BaseGitServiceEntityConverter;
+
 @Service
 @ReadingConverter
-public class PullRequestConverter implements Converter<GHPullRequest, PullRequest> {
+public class PullRequestConverter extends BaseGitServiceEntityConverter<GHPullRequest, PullRequest> {
     @Override
     public PullRequest convert(@NonNull GHPullRequest source) {
-        Long id = source.getId();
-        String title = source.getTitle();
-        String url = source.getHtmlUrl().toString();
-        String mergedAt = source.getMergedAt() != null ? source.getMergedAt().toString() : null;
         IssueState state = convertState(source.getState());
-        PullRequest pullrequest;
-        try {
-            String createdAt = source.getCreatedAt().toString();
-            String updatedAt = source.getUpdatedAt().toString();
-            pullrequest = new PullRequest(id, title, url, state, createdAt, updatedAt, mergedAt);
-        } catch (IOException e) {
-            pullrequest = new PullRequest(id, title, url, state, mergedAt, null, null);
+        PullRequest pullrequest = new PullRequest();
+        convertBaseFields(source, pullrequest);
+        pullrequest.setTitle(source.getTitle());
+        pullrequest.setUrl(source.getHtmlUrl().toString());
+        pullrequest.setState(state);
+        if (source.getMergedAt() != null) {
+            pullrequest.setMergedAt(source.getMergedAt().toString());
         }
         return pullrequest;
     }
