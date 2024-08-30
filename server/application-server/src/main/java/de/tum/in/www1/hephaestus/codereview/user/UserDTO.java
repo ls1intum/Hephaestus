@@ -8,9 +8,9 @@ import de.tum.in.www1.hephaestus.codereview.comment.IssueCommentDTO;
 import de.tum.in.www1.hephaestus.codereview.pullrequest.PullRequestDTO;
 
 @JsonInclude(JsonInclude.Include.NON_EMPTY)
-public record UserDTO(String login, String email, String name, String url, Set<PullRequestDTO> pullRequests,
+public record UserDTO(Long id, String login, String email, String name, String url, Set<PullRequestDTO> pullRequests,
         Set<IssueCommentDTO> comments) {
-    public UserDTO(String login, String email, String name, String url) {
-        this(login, email, name, url, null, null);
+    public UserDTO(Long id, String login, String email, String name, String url) {
+        this(id, login, email, name, url, null, null);
     }
 }

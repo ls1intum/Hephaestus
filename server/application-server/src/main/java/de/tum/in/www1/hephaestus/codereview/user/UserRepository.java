@@ -12,7 +12,7 @@ public interface UserRepository extends JpaRepository<User, Long> {
     Optional<User> findUser(@Param("login") String login);
 
     @Query("""
-                SELECT new UserDTO(u.login, u.email, u.name, u.url)
+                SELECT new UserDTO(u.id, u.login, u.email, u.name, u.url)
                 FROM User u
                 WHERE u.login = :login
             """)
