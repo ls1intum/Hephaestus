@@ -1,25 +1,23 @@
 [tool.poetry]
 name = "intelligence-service"
 version = "0.1.0"
-description = "A FastAPI service for interfacing with large language models (LLMs) and providing intelligent text-based responses"
-authors = ["milenasrb <mi.serbinova@gmail.com>"]
+description = "A FastAPI service for interfacing with machine learning models."
+authors = ["Felix T.J. Dietrich <felixtj.dietrich@tum.de>", "milenasrb <mi.serbinova@gmail.com>"]
 readme = "README.md"
 package-mode = false
 
+
 [tool.poetry.dependencies]
 python = "^3.12"
-fastapi = "^0.112.0"
-uvicorn = "^0.30.5"
-python-dotenv = "^1.0.1"
-langchain-community = "^0.2.11"
-openai = "^1.40.3"
-langchain = "^0.2.12"
-langchain-openai = "^0.1.21"
+fastapi = {extras = ["standard"], version = "0.112.1"}
+pydantic-settings = "2.4.0"
+langchain = "0.2.15"
+langchain-openai = "0.1.23"
 
-
-[tool.poetry.group.dev.dependencies]
-httpx = "^0.27.0"
-pytest = "^8.3.2"
+[virtualenvs]
+create = true
+in-project = true
+path = "./.venv"
 
 [build-system]
 requires = ["poetry-core"]

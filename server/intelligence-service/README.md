@@ -1,66 +1,41 @@
 # Intelligence Service
 
-This is a FastAPI service for interfacing with LangChain and other machine learning services.
+## Overview
 
-## Table of Contents
+A FastAPI service for interfacing with machine learning models.
 
-- [Installation](#installation)
-- [Usage](#usage)
-- [Project Structure](#project-structure)
-- [Testing](#testing)
+## Setup
 
-## Installation
+### Prerequisites
 
-To set up the project locally, follow these steps:
+- **Python 3.12**
+- **Poetry** for dependency management
+- **Docker** for containerization
 
-1. **Install dependencies:**
-    The project uses `poetry` for dependency management. Install the dependencies by running:
+### Installation
 
-    ```bash
-    poetry install
-    ```
+Install dependencies using Poetry:
 
-2. **Run the application:**
-    You can start the FastAPI application with Uvicorn:
+```bash
+pip install poetry
+poetry install
+```
 
-    ```bash
-    poetry run uvicorn src.main:app --reload
-    ```
+## Running the Service
+
+### Development
+
+```bash
+fastapi dev
+```
+
+### Production
+
+```bash
+fastapi run
+```
 
 ## Usage
 
 After running the application, you can access the FastAPI API documentation at `http://127.0.0.1:8000/docs` or `http://127.0.0.1:8000/redoc`.
 
-## Project Structure
-
-The project is organized as follows:
-
-```
-intelligence-service/
-├── pyproject.toml     
-├── README.md            
-├── poetry.lock           
-├── .pytest_cache/        
-├── tests/                
-│   ├── __init__.py
-│   └── test_hello.py
-├── src/               
-│   ├── __init__.py   
-│   ├── config.py   
-│   ├── langchain_client.py
-│   ├── main.py          
-│   └── auth/            
-│       └── router.py    
-└── ...
-```
-
-## Testing
-
-The project includes a set of unit tests to ensure that the core functionalities work as expected. These tests are located in the `tests/` directory.
-
-### Running Tests
-
-To run all tests, use the following command:
-
-```bash
-poetry run pytest
