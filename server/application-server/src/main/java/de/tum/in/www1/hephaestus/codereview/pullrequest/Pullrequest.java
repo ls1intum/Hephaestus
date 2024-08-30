@@ -5,20 +5,17 @@ import java.util.Set;
 
 import org.springframework.lang.NonNull;
 
-import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonInclude;
 
+import de.tum.in.www1.hephaestus.codereview.base.BaseGitServiceEntity;
 import de.tum.in.www1.hephaestus.codereview.comment.IssueComment;
 import de.tum.in.www1.hephaestus.codereview.repository.Repository;
-import de.tum.in.www1.hephaestus.codereview.user.GHUser;
-import jakarta.persistence.Id;
+import de.tum.in.www1.hephaestus.codereview.user.User;
 import jakarta.persistence.Table;
 import jakarta.persistence.CascadeType;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.FetchType;
-import jakarta.persistence.GeneratedValue;
-import jakarta.persistence.GenerationType;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.OneToMany;
@@ -33,13 +30,8 @@ import lombok.ToString;
 @Setter
 @NoArgsConstructor
 @JsonInclude(JsonInclude.Include.NON_EMPTY)
-@ToString
-public class PullRequest {
-
-    @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
-    private Long id;
-
+@ToString(callSuper = true)
+public class PullRequest extends BaseGitServiceEntity {
     @NonNull
     private String title;
 
@@ -53,19 +45,13 @@ public class PullRequest {
     @NonNull
     private GHIssueState state;
 
-    @NonNull
-    private String createdAt;
-
-    @NonNull
-    private String updatedAt;
-
     @Column
     private String mergedAt;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "author_id")
     @ToString.Exclude
-    private GHUser author;
+    private User author;
 
     @OneToMany(cascade = CascadeType.ALL, mappedBy = "pullrequest")
     @ToString.Exclude
@@ -73,7 +59,6 @@ public class PullRequest {
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "repository_id", referencedColumnName = "id")
-    @JsonIgnore
     @ToString.Exclude
     private Repository repository;
 }

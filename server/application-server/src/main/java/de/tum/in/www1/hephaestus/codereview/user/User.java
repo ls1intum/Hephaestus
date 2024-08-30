@@ -1,6 +1,5 @@
 package de.tum.in.www1.hephaestus.codereview.user;
 
-import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 
 import java.util.HashSet;
@@ -8,15 +7,12 @@ import java.util.Set;
 
 import org.springframework.lang.NonNull;
 
-import com.fasterxml.jackson.annotation.JsonIgnore;
-
+import de.tum.in.www1.hephaestus.codereview.base.BaseGitServiceEntity;
 import de.tum.in.www1.hephaestus.codereview.comment.IssueComment;
 import de.tum.in.www1.hephaestus.codereview.pullrequest.PullRequest;
 import jakarta.persistence.CascadeType;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
-import jakarta.persistence.GeneratedValue;
-import jakarta.persistence.GenerationType;
 import jakarta.persistence.OneToMany;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
@@ -24,17 +20,12 @@ import lombok.Setter;
 import lombok.ToString;
 
 @Entity
-@Table(name = "gh_user")
+@Table(name = "user", schema = "public")
 @Getter
 @Setter
 @NoArgsConstructor
-@ToString
-public class GHUser {
-
-    @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
-    private Long id;
-
+@ToString(callSuper = true)
+public class User extends BaseGitServiceEntity {
     /**
      * Unique login identifier for a user.
      */
@@ -62,16 +53,14 @@ public class GHUser {
      * If unavailable, a fallback can be generated from the login, e.g. on Github:
      * https://github.com/{login}.png
      */
-    @NonNull
+    @Column(nullable = false, name = "avatar_url")
     private String avatarUrl;
 
     @OneToMany(cascade = CascadeType.ALL, mappedBy = "author")
-    @JsonIgnore
-    private Set<PullRequest> pullRequests = new HashSet<>();;
+    private Set<PullRequest> pullRequests = new HashSet<>();
 
     @OneToMany(cascade = CascadeType.ALL, mappedBy = "author")
-    @JsonIgnore
-    private Set<IssueComment> comments = new HashSet<>();;
+    private Set<IssueComment> comments = new HashSet<>();
 
     public void addComment(IssueComment comment) {
         comments.add(comment);

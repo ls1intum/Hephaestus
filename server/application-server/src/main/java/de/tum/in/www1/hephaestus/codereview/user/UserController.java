@@ -10,17 +10,17 @@ import org.springframework.web.bind.annotation.RestController;
 import de.tum.in.www1.hephaestus.errors.EntityNotFoundException;
 
 @RestController
-@RequestMapping("/ghuser")
-public class GHUserController {
-    private final GHUserService ghUserService;
+@RequestMapping("/user")
+public class UserController {
+    private final UserService userService;
 
-    public GHUserController(GHUserService actorService) {
-        this.ghUserService = actorService;
+    public UserController(UserService actorService) {
+        this.userService = actorService;
     }
 
     @GetMapping("/{login}")
-    public GHUserDTO getUser(@PathVariable String login) {
-        Optional<GHUserDTO> user = ghUserService.getGHUserDTO(login);
+    public UserDTO getUser(@PathVariable String login) {
+        Optional<UserDTO> user = userService.getUserDTO(login);
         if (user.isEmpty()) {
             throw new EntityNotFoundException("Actor with login " + login + " not found!");
         }

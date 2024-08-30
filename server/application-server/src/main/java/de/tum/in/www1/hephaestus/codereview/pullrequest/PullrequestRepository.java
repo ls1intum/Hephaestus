@@ -9,7 +9,7 @@ import org.springframework.stereotype.Repository;
 @Repository
 public interface PullRequestRepository extends JpaRepository<PullRequest, Long> {
 
-    @Query("SELECT p FROM PullRequest p, GHUser a WHERE p.author = a AND a.login = ?1")
+    @Query("SELECT p FROM PullRequest p, User a WHERE p.author = a AND a.login = ?1")
     List<PullRequest> findByAuthor(String authorLogin);
 
 }

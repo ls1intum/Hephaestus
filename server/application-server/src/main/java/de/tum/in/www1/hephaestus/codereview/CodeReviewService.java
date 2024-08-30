@@ -23,9 +23,9 @@ import de.tum.in.www1.hephaestus.codereview.pullrequest.PullRequestRepository;
 import de.tum.in.www1.hephaestus.codereview.repository.Repository;
 import de.tum.in.www1.hephaestus.codereview.repository.RepositoryConverter;
 import de.tum.in.www1.hephaestus.codereview.repository.RepositoryRepository;
-import de.tum.in.www1.hephaestus.codereview.user.GHUser;
-import de.tum.in.www1.hephaestus.codereview.user.GHUserConverter;
-import de.tum.in.www1.hephaestus.codereview.user.GHUserRepository;
+import de.tum.in.www1.hephaestus.codereview.user.User;
+import de.tum.in.www1.hephaestus.codereview.user.UserConverter;
+import de.tum.in.www1.hephaestus.codereview.user.UserRepository;
 
 @Service
 public class CodeReviewService {
@@ -37,17 +37,17 @@ public class CodeReviewService {
         private final RepositoryRepository repositoryRepository;
         private final PullRequestRepository pullrequestRepository;
         private final IssueCommentRepository commentRepository;
-        private final GHUserRepository ghUserRepository;
+        private final UserRepository userRepository;
 
         public CodeReviewService(EnvConfig envConfig, RepositoryRepository repositoryRepository,
                         PullRequestRepository pullrequestRepository, IssueCommentRepository commentRepository,
-                        GHUserRepository actorRepository) {
+                        UserRepository actorRepository) {
                 logger.info("Hello from CodeReviewService!");
 
                 this.repositoryRepository = repositoryRepository;
                 this.pullrequestRepository = pullrequestRepository;
                 this.commentRepository = commentRepository;
-                this.ghUserRepository = actorRepository;
+                this.userRepository = actorRepository;
 
                 try {
                         github = new GitHubBuilder().withOAuthToken(envConfig.getGithubPat()).build();
@@ -130,7 +130,7 @@ public class CodeReviewService {
                                 .map(comment -> {
                                         IssueComment c = commentConverter.convert(comment);
                                         c.setPullrequest(pullrequest);
-                                        GHUser author;
+                                        User author;
                                         try {
                                                 author = getActorFromGHUser(comment.getUser());
                                                 author.addComment(c);
@@ -145,11 +145,11 @@ public class CodeReviewService {
                 return comments;
         }
 
-        private GHUser getActorFromGHUser(org.kohsuke.github.GHUser user) {
-                GHUser ghUser = ghUserRepository.findByLogin(user.getLogin()).orElse(null);
+        private User getActorFromGHUser(org.kohsuke.github.GHUser user) {
+                User ghUser = userRepository.findUser(user.getLogin()).orElse(null);
                 if (ghUser == null) {
-                        ghUser = new GHUserConverter().convert(user);
-                        ghUserRepository.save(ghUser);
+                        ghUser = new UserConverter().convert(user);
+                        userRepository.save(ghUser);
                 }
                 return ghUser;
 
