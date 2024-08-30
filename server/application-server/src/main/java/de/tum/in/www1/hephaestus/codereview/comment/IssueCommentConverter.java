@@ -10,21 +10,17 @@ public class IssueCommentConverter implements Converter<GHIssueComment, IssueCom
 
     @Override
     public IssueComment convert(@NonNull GHIssueComment source) {
-        IssueComment comment = new IssueComment();
-        comment.setBody(source.getBody());
+        Long id = source.getId();
+        String body = source.getBody();
+
+        IssueComment comment;
         try {
-            comment.setCreatedAt(source.getCreatedAt().toString());
+            String createdAt = source.getCreatedAt().toString();
+            String updatedAt = source.getUpdatedAt().toString();
+            comment = new IssueComment(id, body, createdAt, updatedAt);
         } catch (IOException e) {
-            comment.setCreatedAt(null);
+            comment = new IssueComment(id, body, null, null);
         }
-        try {
-            comment.setUpdatedAt(source.getUpdatedAt().toString());
-        } catch (IOException e) {
-            comment.setUpdatedAt(null);
-        }
-        // set preliminary values to be filled in later
-        comment.setPullRequest(null);
-        comment.setAuthor(null);
         return comment;
     }
 

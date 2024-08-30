@@ -13,26 +13,19 @@ import org.springframework.stereotype.Service;
 public class PullRequestConverter implements Converter<GHPullRequest, PullRequest> {
     @Override
     public PullRequest convert(@NonNull GHPullRequest source) {
-        PullRequest pullrequest = new PullRequest();
-        pullrequest.setTitle(source.getTitle());
-        pullrequest.setUrl(source.getHtmlUrl().toString());
-        pullrequest.setState(convertState(source.getState()));
+        Long id = source.getId();
+        String title = source.getTitle();
+        String url = source.getHtmlUrl().toString();
+        String mergedAt = source.getMergedAt() != null ? source.getMergedAt().toString() : null;
+        IssueState state = convertState(source.getState());
+        PullRequest pullrequest;
         try {
-            pullrequest.setCreatedAt(source.getCreatedAt().toString());
+            String createdAt = source.getCreatedAt().toString();
+            String updatedAt = source.getUpdatedAt().toString();
+            pullrequest = new PullRequest(id, title, url, state, createdAt, updatedAt, mergedAt);
         } catch (IOException e) {
-            // find a better way to handle this
-            pullrequest.setCreatedAt(null);
+            pullrequest = new PullRequest(id, title, url, state, mergedAt, null, null);
         }
-        try {
-            pullrequest.setUpdatedAt(source.getUpdatedAt().toString());
-        } catch (IOException e) {
-            // find a better way to handle this
-            pullrequest.setUpdatedAt(null);
-        }
-        pullrequest.setMergedAt(source.getMergedAt() != null ? source.getMergedAt().toString() : null);
-        // set preliminary values to be filled in later
-        pullrequest.setAuthor(null);
-        pullrequest.setRepository(null);
         return pullrequest;
     }
 

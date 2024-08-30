@@ -36,9 +36,15 @@ public class IssueComment extends BaseGitServiceEntity {
     @ToString.Exclude
     private PullRequest pullRequest;
 
-    public IssueComment(String body, String createdAt, String updatedAt) {
+    public IssueComment(Long id, String body, String createdAt, String updatedAt, User author,
+            PullRequest pullRequest) {
+        super(id, createdAt, updatedAt);
         this.body = body;
-        this.createdAt = createdAt;
-        this.updatedAt = updatedAt;
+        this.author = author;
+        this.pullRequest = pullRequest;
+    }
+
+    public IssueComment(Long id, String body, String createdAt, String updatedAt) {
+        this(id, body, createdAt, updatedAt, null, null);
     }
 }

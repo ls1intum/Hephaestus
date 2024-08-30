@@ -38,5 +38,20 @@ public class Repository extends BaseGitServiceEntity {
 
     @OneToMany(cascade = CascadeType.ALL, mappedBy = "repository", fetch = FetchType.EAGER)
     @ToString.Exclude
-    private Set<PullRequest> pullRequests = new HashSet<>();;
+    private Set<PullRequest> pullRequests = new HashSet<>();
+
+    public Repository(Long id, String name, String nameWithOwner, String description, String url, String createdAt,
+            String updatedAt) {
+        this(id, name, nameWithOwner, description, url, createdAt, updatedAt, new HashSet<>());
+    }
+
+    public Repository(Long id, String name, String nameWithOwner, String description, String url, String createdAt,
+            String updatedAt, Set<PullRequest> pullRequests) {
+        super(id, createdAt, updatedAt);
+        this.name = name;
+        this.nameWithOwner = nameWithOwner;
+        this.description = description;
+        this.url = url;
+        this.pullRequests = pullRequests;
+    }
 }

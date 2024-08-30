@@ -61,6 +61,24 @@ public class User extends BaseGitServiceEntity {
     @OneToMany(cascade = CascadeType.ALL, mappedBy = "author")
     private Set<IssueComment> comments = new HashSet<>();
 
+    public User(Long id, String login, String email, String name, String url, String avatarlUrl, String createdAt,
+            String updatedAt) {
+        this(id, login, email, name, url, avatarlUrl, createdAt, updatedAt, null, null);
+    }
+
+    public User(Long id, String login, String email, String name, String url, String avatarlUrl, String createdAt,
+            String updatedAt,
+            Set<PullRequest> pullRequests, Set<IssueComment> comments) {
+        super(id, createdAt, updatedAt);
+        this.login = login;
+        this.email = email;
+        this.name = name;
+        this.url = url;
+        this.avatarUrl = avatarlUrl;
+        this.pullRequests = pullRequests;
+        this.comments = comments;
+    }
+
     public void addComment(IssueComment comment) {
         comments.add(comment);
     }
