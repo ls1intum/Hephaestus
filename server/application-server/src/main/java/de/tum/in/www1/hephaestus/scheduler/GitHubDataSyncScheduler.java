@@ -11,9 +11,9 @@ import jakarta.annotation.PostConstruct;
 import java.io.IOException;
 
 @Component
-public class DailyGitHubDataSyncScheduler {
+public class GitHubDataSyncScheduler {
 
-    private static final Logger logger = LoggerFactory.getLogger(DailyGitHubDataSyncScheduler.class);
+    private static final Logger logger = LoggerFactory.getLogger(GitHubDataSyncScheduler.class);
     private final GitHubDataSyncService dataSyncService;
 
     @Value("${monitoring.runOnStartup:true}")
@@ -22,7 +22,7 @@ public class DailyGitHubDataSyncScheduler {
     @Value("${monitoring.repositories}")
     private String[] repositoriesToMonitor;
 
-    public DailyGitHubDataSyncScheduler(GitHubDataSyncService dataSyncService) {
+    public GitHubDataSyncScheduler(GitHubDataSyncService dataSyncService) {
         this.dataSyncService = dataSyncService;
     }
 
@@ -30,26 +30,26 @@ public class DailyGitHubDataSyncScheduler {
     public void onStartup() {
         if (runOnStartup) {
             logger.info("Starting initial GitHub data sync for Hephaestus...");
-            try {
-                dataSyncService.syncData("ls1intum/hephaestus");
-                logger.info("Initial GitHub data sync completed successfully for repository: ls1intum/hephaestus");
-            } catch (IOException e) {
-                logger.error("Error during GitHub data sync: ", e);
-            }
+            syncAllRepositories();
+            logger.info("Initial GitHub data sync completed successfully.");
         }
     }
 
     @Scheduled(cron = "${monitoring.repository-sync-cron}")
-    public void syncDataDaily() {
+    public void syncDataCron() {
         logger.info("Starting daily GitHub data sync...");
+        syncAllRepositories();
+        logger.info("Daily GitHub data sync completed successfully.");
+    }
+
+    private void syncAllRepositories() {
         for (String repositoryName : repositoriesToMonitor) {
             try {
                 dataSyncService.syncData(repositoryName);
-                logger.info("Daily GitHub data sync completed successfully for repository: " + repositoryName);
+                logger.info("GitHub data sync completed successfully for repository: " + repositoryName);
             } catch (IOException e) {
                 logger.error("Error during GitHub data sync: ", e);
             }
         }
-        logger.info("Daily GitHub data sync completed.");
     }
 }

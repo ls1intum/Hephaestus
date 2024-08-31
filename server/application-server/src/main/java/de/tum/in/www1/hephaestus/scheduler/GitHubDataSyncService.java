@@ -41,14 +41,26 @@ public class GitHubDataSyncService {
     private final IssueCommentRepository commentRepository;
     private final UserRepository userRepository;
 
+    private final RepositoryConverter repositoryConverter;
+    private final PullRequestConverter pullRequestConverter;
+    private final IssueCommentConverter commentConverter;
+    private final UserConverter userConverter;
+
     public GitHubDataSyncService(RepositoryRepository repositoryRepository, PullRequestRepository pullRequestRepository,
-            IssueCommentRepository commentRepository, UserRepository userRepository) {
+            IssueCommentRepository commentRepository, UserRepository userRepository,
+            RepositoryConverter repositoryConverter, PullRequestConverter pullRequestConverter,
+            IssueCommentConverter commentConverter, UserConverter userConverter) {
         logger.info("Hello from GitHubDataSyncService!");
 
         this.repositoryRepository = repositoryRepository;
         this.pullRequestRepository = pullRequestRepository;
         this.commentRepository = commentRepository;
         this.userRepository = userRepository;
+
+        this.repositoryConverter = repositoryConverter;
+        this.pullRequestConverter = pullRequestConverter;
+        this.commentConverter = commentConverter;
+        this.userConverter = userConverter;
     }
 
     public void syncData(String repositoryName) throws IOException {
@@ -79,7 +91,7 @@ public class GitHubDataSyncService {
         }
 
         GHRepository ghRepo = github.getRepository(nameWithOwner);
-        Repository repository = new RepositoryConverter().convert(ghRepo);
+        Repository repository = repositoryConverter.convert(ghRepo);
         if (repository == null) {
             logger.error("Error while fetching repository!");
             return null;
@@ -87,11 +99,9 @@ public class GitHubDataSyncService {
         // preliminary save to make it referenceable
         repositoryRepository.save(repository);
 
-        PullRequestConverter prConverter = new PullRequestConverter();
-
         // Retrieve PRs in pages of 10
         Set<PullRequest> prs = ghRepo.queryPullRequests().list().withPageSize(10).toList().stream().map(pr -> {
-            PullRequest pullRequest = prConverter.convert(pr);
+            PullRequest pullRequest = pullRequestConverter.convert(pr);
             pullRequest.setRepository(repository);
             pullRequestRepository.save(pullRequest);
             try {
@@ -127,7 +137,6 @@ public class GitHubDataSyncService {
      */
     private Set<IssueComment> getCommentsFromGHPullRequest(GHPullRequest pr, PullRequest pullRequest)
             throws IOException {
-        IssueCommentConverter commentConverter = new IssueCommentConverter();
         Set<IssueComment> comments = pr.queryComments().list().toList().stream()
                 .map(comment -> {
                     IssueComment c = commentConverter.convert(comment);
@@ -150,7 +159,7 @@ public class GitHubDataSyncService {
     private User getActorFromGHUser(org.kohsuke.github.GHUser user) {
         User ghUser = userRepository.findUser(user.getLogin()).orElse(null);
         if (ghUser == null) {
-            ghUser = new UserConverter().convert(user);
+            ghUser = userConverter.convert(user);
             userRepository.save(ghUser);
         }
         return ghUser;
