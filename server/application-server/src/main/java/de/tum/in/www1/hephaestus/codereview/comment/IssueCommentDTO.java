@@ -7,7 +7,7 @@ import de.tum.in.www1.hephaestus.codereview.user.UserDTO;
 
 @JsonInclude(JsonInclude.Include.NON_EMPTY)
 public record IssueCommentDTO(Long id, String body, String createdAt, String updatedAt, UserDTO author,
-        PullRequestDTO pullrequest) {
+        PullRequestDTO pullRequest) {
     public IssueCommentDTO(Long id, String body, String createdAt, String updatedAt) {
         this(id, body, createdAt, updatedAt, null, null);
     }

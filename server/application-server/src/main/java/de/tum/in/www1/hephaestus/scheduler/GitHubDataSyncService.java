@@ -37,16 +37,16 @@ public class GitHubDataSyncService {
     private GitHub github;
 
     private final RepositoryRepository repositoryRepository;
-    private final PullRequestRepository pullrequestRepository;
+    private final PullRequestRepository pullRequestRepository;
     private final IssueCommentRepository commentRepository;
     private final UserRepository userRepository;
 
-    public GitHubDataSyncService(RepositoryRepository repositoryRepository, PullRequestRepository pullrequestRepository,
+    public GitHubDataSyncService(RepositoryRepository repositoryRepository, PullRequestRepository pullRequestRepository,
             IssueCommentRepository commentRepository, UserRepository userRepository) {
         logger.info("Hello from GitHubDataSyncService!");
 
         this.repositoryRepository = repositoryRepository;
-        this.pullrequestRepository = pullrequestRepository;
+        this.pullRequestRepository = pullRequestRepository;
         this.commentRepository = commentRepository;
         this.userRepository = userRepository;
     }
@@ -91,28 +91,28 @@ public class GitHubDataSyncService {
 
         // Retrieve PRs in pages of 10
         Set<PullRequest> prs = ghRepo.queryPullRequests().list().withPageSize(10).toList().stream().map(pr -> {
-            PullRequest pullrequest = prConverter.convert(pr);
-            pullrequest.setRepository(repository);
-            pullrequestRepository.save(pullrequest);
+            PullRequest pullRequest = prConverter.convert(pr);
+            pullRequest.setRepository(repository);
+            pullRequestRepository.save(pullRequest);
             try {
-                Set<IssueComment> comments = getCommentsFromGHPullRequest(pr, pullrequest);
-                pullrequest.setComments(comments);
+                Set<IssueComment> comments = getCommentsFromGHPullRequest(pr, pullRequest);
+                pullRequest.setComments(comments);
                 commentRepository.saveAll(comments);
             } catch (IOException e) {
                 logger.error("Error while fetching PR comments!");
-                pullrequest.setComments(new HashSet<>());
+                pullRequest.setComments(new HashSet<>());
             }
             try {
-                pullrequest.setAuthor(getActorFromGHUser(pr.getUser()));
+                pullRequest.setAuthor(getActorFromGHUser(pr.getUser()));
             } catch (IOException e) {
                 logger.error("Error while fetching PR author!");
-                pullrequest.setAuthor(null);
+                pullRequest.setAuthor(null);
             }
 
-            return pullrequest;
+            return pullRequest;
         }).collect(Collectors.toSet());
         repository.setPullRequests(prs);
-        pullrequestRepository.saveAll(prs);
+        pullRequestRepository.saveAll(prs);
         repositoryRepository.save(repository);
         return repository;
     }
@@ -121,22 +121,22 @@ public class GitHubDataSyncService {
      * Retrieves the comments of a given pull request.
      * 
      * @param pr          The GH pull request.
-     * @param pullrequest Stored PR to which the comments belong.
+     * @param pullRequest Stored PR to which the comments belong.
      * @return The comments of the given pull request.
      * @throws IOException
      */
-    private Set<IssueComment> getCommentsFromGHPullRequest(GHPullRequest pr, PullRequest pullrequest)
+    private Set<IssueComment> getCommentsFromGHPullRequest(GHPullRequest pr, PullRequest pullRequest)
             throws IOException {
         IssueCommentConverter commentConverter = new IssueCommentConverter();
         Set<IssueComment> comments = pr.queryComments().list().toList().stream()
                 .map(comment -> {
                     IssueComment c = commentConverter.convert(comment);
-                    c.setPullRequest(pullrequest);
+                    c.setPullRequest(pullRequest);
                     User author;
                     try {
                         author = getActorFromGHUser(comment.getUser());
                         author.addComment(c);
-                        author.addPullRequest(pullrequest);
+                        author.addPullRequest(pullRequest);
                     } catch (IOException e) {
                         logger.error("Error while fetching author!");
                         author = null;

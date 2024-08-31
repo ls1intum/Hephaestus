@@ -65,7 +65,7 @@ public class User extends BaseGitServiceEntity {
         comments.add(comment);
     }
 
-    public void addPullRequest(PullRequest pullrequest) {
-        pullRequests.add(pullrequest);
+    public void addPullRequest(PullRequest pullRequest) {
+        pullRequests.add(pullRequest);
     }
 }
