@@ -34,7 +34,15 @@ public class Repository extends BaseGitServiceEntity {
     private String description;
 
     @NonNull
+    String defaultBranch;
+
+    @NonNull
+    private RepositoryVisibility visibility;
+
+    @NonNull
     private String url;
+
+    String homepage;
 
     @OneToMany(cascade = CascadeType.ALL, mappedBy = "repository", fetch = FetchType.EAGER)
     @ToString.Exclude
