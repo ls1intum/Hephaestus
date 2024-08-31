@@ -30,5 +30,11 @@ spring:
 springdoc:
     default-produces-media-type: application/json
 
-environment:
-    githubPat: ${GITHUB_PAT}
+monitoring:
+    runOnStartup: true
+    repository-sync-cron: "0 0 3 * * ?"
+    repositories: ls1intum/hephaestus, ls1intum/pyris
+
+# Can be any OAuth token, such as the PAT
+github:
+    authToken: ${GITHUB_PAT}
