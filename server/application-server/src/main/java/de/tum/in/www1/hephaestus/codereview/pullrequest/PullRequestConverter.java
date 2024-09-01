@@ -1,14 +1,12 @@
 package de.tum.in.www1.hephaestus.codereview.pullrequest;
 
 import org.kohsuke.github.GHPullRequest;
-import org.springframework.data.convert.ReadingConverter;
 import org.springframework.lang.NonNull;
 import org.springframework.stereotype.Service;
 
 import de.tum.in.www1.hephaestus.codereview.base.BaseGitServiceEntityConverter;
 
 @Service
-@ReadingConverter
 public class PullRequestConverter extends BaseGitServiceEntityConverter<GHPullRequest, PullRequest> {
     @Override
     public PullRequest convert(@NonNull GHPullRequest source) {

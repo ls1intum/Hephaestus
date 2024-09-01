@@ -2,9 +2,11 @@ package de.tum.in.www1.hephaestus.codereview.comment;
 
 import org.kohsuke.github.GHIssueComment;
 import org.springframework.lang.NonNull;
+import org.springframework.stereotype.Service;
 
 import de.tum.in.www1.hephaestus.codereview.base.BaseGitServiceEntityConverter;
 
+@Service
 public class IssueCommentConverter extends BaseGitServiceEntityConverter<GHIssueComment, IssueComment> {
 
     @Override

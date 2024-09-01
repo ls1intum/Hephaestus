@@ -2,6 +2,7 @@ package de.tum.in.www1.hephaestus.codereview.base;
 
 import org.kohsuke.github.GHObject;
 import org.springframework.core.convert.converter.Converter;
+import org.springframework.data.convert.ReadingConverter;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import java.io.IOException;
@@ -9,6 +10,7 @@ import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 import java.util.Date;
 
+@ReadingConverter
 public abstract class BaseGitServiceEntityConverter<S extends GHObject, T extends BaseGitServiceEntity>
         implements Converter<S, T> {
 
