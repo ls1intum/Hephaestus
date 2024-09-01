@@ -4,11 +4,11 @@ import org.kohsuke.github.GHRepository;
 import org.kohsuke.github.GHRepository.Visibility;
 import org.springframework.lang.NonNull;
 import org.springframework.lang.Nullable;
-import org.springframework.stereotype.Service;
+import org.springframework.stereotype.Component;
 
 import de.tum.in.www1.hephaestus.codereview.base.BaseGitServiceEntityConverter;
 
-@Service
+@Component
 public class RepositoryConverter extends BaseGitServiceEntityConverter<GHRepository, Repository> {
 
     @Override
