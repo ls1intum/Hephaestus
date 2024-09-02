@@ -9,16 +9,17 @@
  * https://openapi-generator.tech
  * Do not edit the class manually.
  */
+import { PullRequestDTO } from './pull-request-dto';
+import { IssueCommentDTO } from './issue-comment-dto';
 
 
-export interface Hello { 
-    /**
-     * Unique identifier for a Hello entity.
-     */
+export interface UserDTO { 
     id?: number;
-    /**
-     * Timestamp of when the Hello entity was created.   This field is mandatory.
-     */
-    timestamp?: string;
+    login?: string;
+    email?: string;
+    name?: string;
+    url?: string;
+    pullRequests?: Set<PullRequestDTO>;
+    comments?: Set<IssueCommentDTO>;
 }
 
