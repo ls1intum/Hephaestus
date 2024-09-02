@@ -17,7 +17,7 @@ export interface Hello {
      */
     id?: number;
     /**
-     * Timestamp of when the Hello entity was created.   This field is mandatory.
+     * Timestamp of when the Hello entity was created.  This field is mandatory.
      */
     timestamp?: string;
 }

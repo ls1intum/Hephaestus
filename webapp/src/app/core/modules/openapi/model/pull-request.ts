@@ -21,7 +21,7 @@ export interface PullRequest {
     title: string;
     url: string;
     /**
-     * State of the PullRequest.   Does not include the state of the merge.
+     * State of the PullRequest.  Does not include the state of the merge.
      */
     state: PullRequest.StateEnum;
     mergedAt?: string;
