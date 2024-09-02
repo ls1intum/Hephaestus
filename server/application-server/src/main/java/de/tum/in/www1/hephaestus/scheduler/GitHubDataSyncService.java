@@ -31,7 +31,7 @@ import de.tum.in.www1.hephaestus.codereview.user.UserRepository;
 public class GitHubDataSyncService {
     private static final Logger logger = LoggerFactory.getLogger(GitHubDataSyncService.class);
 
-    @Value("${github.authToken:}")
+    @Value("${github.authToken:null}")
     private String ghAuthToken;
 
     private GitHub github;
@@ -64,7 +64,7 @@ public class GitHubDataSyncService {
     }
 
     public void syncData(String repositoryName) throws IOException {
-        if (ghAuthToken == null || ghAuthToken.isEmpty()) {
+        if (ghAuthToken == null || ghAuthToken.isEmpty() || ghAuthToken.equals("null")) {
             logger.error("No GitHub auth token provided!");
             return;
         }
