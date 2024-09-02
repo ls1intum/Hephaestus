@@ -3,7 +3,6 @@ spring:
     url: ${DATABASE_URL}
     username: ${DATABASE_USERNAME}
     password: ${DATABASE_PASSWORD}
-  
   jpa:
     hibernate:
       ddl-auto: none
@@ -12,3 +11,5 @@ spring:
     user:
       name: ${SECURITY_USER_NAME}
       password: ${SECURITY_USER_PASSWORD}
+github:
+  authToken: ${GITHUB_AUTH_TOKEN}
