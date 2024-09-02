@@ -62,7 +62,7 @@ jobs:
   commit-changes:
     name: Commit and Push API Client Changes
     runs-on: ubuntu-latest
-    needs: generate-api-client
+    # The job should only run when triggered manually
     if: ${{ github.event_name == 'workflow_dispatch' }}
     steps:
       - name: Checkout repository
