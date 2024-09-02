@@ -1,6 +1,7 @@
 package de.tum.in.www1.hephaestus.hello;
 
 import java.util.List;
+import java.util.Set;
 
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -20,10 +21,10 @@ public class HelloController {
   /**
    * Retrieves all {@link Hello} entities.
    * 
-   * @return A list of all Hello entities
+   * @return A set of all Hello entities
    */
   @GetMapping
-  public List<Hello> getAllHellos() {
+  public Set<Hello> getAllHellos() {
     return helloService.getAllHellos();
   }
 
