@@ -42,6 +42,64 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/Hello"
+  /user/{login}:
+    get:
+      tags:
+      - user
+      operationId: getUser
+      parameters:
+      - name: login
+        in: path
+        required: true
+        schema:
+          type: string
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UserDTO"
+  /pullrequest/{id}:
+    get:
+      tags:
+      - pull-request
+      operationId: getPullRequest
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: integer
+          format: int64
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PullRequest"
+  /pullrequest/author/{login}:
+    get:
+      tags:
+      - pull-request
+      operationId: getPullRequestsByAuthor
+      parameters:
+      - name: login
+        in: path
+        required: true
+        schema:
+          type: string
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                uniqueItems: true
+                type: array
+                items:
+                  $ref: "#/components/schemas/PullRequest"
   /admin:
     get:
       tags:
@@ -65,7 +123,227 @@ components:
           format: int64
         timestamp:
           type: string
-          description: |-
-            Timestamp of when the Hello entity was created.
-             This field is mandatory.
+          description: "Timestamp of when the Hello entity was created.\r\n This field\
+            \ is mandatory."
           format: date-time
+    IssueCommentDTO:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+        body:
+          type: string
+        createdAt:
+          type: string
+        updatedAt:
+          type: string
+        author:
+          $ref: "#/components/schemas/UserDTO"
+        pullRequest:
+          $ref: "#/components/schemas/PullRequestDTO"
+    PullRequestDTO:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+        title:
+          type: string
+        url:
+          type: string
+        state:
+          type: string
+          enum:
+          - CLOSED
+          - OPEN
+        createdAt:
+          type: string
+        updatedAt:
+          type: string
+        mergedAt:
+          type: string
+        author:
+          $ref: "#/components/schemas/UserDTO"
+        comments:
+          uniqueItems: true
+          type: array
+          items:
+            $ref: "#/components/schemas/IssueCommentDTO"
+        repository:
+          $ref: "#/components/schemas/RepositoryDTO"
+    RepositoryDTO:
+      type: object
+      properties:
+        name:
+          type: string
+        nameWithOwner:
+          type: string
+        description:
+          type: string
+        url:
+          type: string
+    UserDTO:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+        login:
+          type: string
+        email:
+          type: string
+        name:
+          type: string
+        url:
+          type: string
+        pullRequests:
+          uniqueItems: true
+          type: array
+          items:
+            $ref: "#/components/schemas/PullRequestDTO"
+        comments:
+          uniqueItems: true
+          type: array
+          items:
+            $ref: "#/components/schemas/IssueCommentDTO"
+    IssueComment:
+      required:
+      - body
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+        body:
+          type: string
+        author:
+          $ref: "#/components/schemas/User"
+        pullRequest:
+          $ref: "#/components/schemas/PullRequest"
+    PullRequest:
+      required:
+      - state
+      - title
+      - url
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+        title:
+          type: string
+        url:
+          type: string
+        state:
+          type: string
+          description: "State of the PullRequest.\r\n Does not include the state of\
+            \ the merge."
+          enum:
+          - CLOSED
+          - OPEN
+        mergedAt:
+          type: string
+        author:
+          $ref: "#/components/schemas/User"
+        comments:
+          uniqueItems: true
+          type: array
+          items:
+            $ref: "#/components/schemas/IssueComment"
+        repository:
+          $ref: "#/components/schemas/Repository"
+    Repository:
+      required:
+      - defaultBranch
+      - description
+      - name
+      - nameWithOwner
+      - url
+      - visibility
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+        name:
+          type: string
+        nameWithOwner:
+          type: string
+        description:
+          type: string
+        defaultBranch:
+          type: string
+        visibility:
+          type: string
+          enum:
+          - PUBLIC
+          - PRIVATE
+        url:
+          type: string
+        homepage:
+          type: string
+        pullRequests:
+          uniqueItems: true
+          type: array
+          items:
+            $ref: "#/components/schemas/PullRequest"
+    User:
+      required:
+      - login
+      - url
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+        login:
+          type: string
+          description: Unique login identifier for a user.
+        email:
+          type: string
+        name:
+          type: string
+          description: Display name of the user.
+        url:
+          type: string
+          description: "Unique URL to the user's profile.\r\n Not the website a user\
+            \ can set in their profile."
+        avatarUrl:
+          type: string
+          description: "URL to the user's avatar.\r\n If unavailable, a fallback can\
+            \ be generated from the login, e.g. on Github:\r\n https://github.com/{login}.png"
+        pullRequests:
+          uniqueItems: true
+          type: array
+          items:
+            $ref: "#/components/schemas/PullRequest"
+        comments:
+          uniqueItems: true
+          type: array
+          items:
+            $ref: "#/components/schemas/IssueComment"
