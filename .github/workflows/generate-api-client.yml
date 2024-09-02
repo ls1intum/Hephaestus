@@ -56,11 +56,19 @@ jobs:
             exit 1
           fi
 
+      - name: Remove autocommit-openapi label if job succeeds
+        if: ${{ success() && github.event.label.name == 'autocommit-openapi' }}
+        run: |
+          echo "Removing the autocommit-openapi label..."
+          curl -s -X DELETE -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
+          https://api.github.com/repos/${{ github.repository }}/issues/${{ github.event.pull_request.number }}/labels/autocommit-openapi
+
+
   commit-changes:
     name: Commit and Push API Client Changes
     runs-on: ubuntu-latest
     needs: generate-api-client
-    if: ${{ github.event.label.name == 'autocommit-openapi' }}
+    if: ${{ failure() && github.event.label.name == 'autocommit-openapi' }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
