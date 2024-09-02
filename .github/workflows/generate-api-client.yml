@@ -62,8 +62,8 @@ jobs:
   commit-changes:
     name: Commit and Push API Client Changes
     runs-on: ubuntu-latest
-    # The job should only run when triggered manually
-    if: ${{ github.event_name == 'workflow_dispatch' }}
+    needs: generate-api-client
+    if: ${{ failure() && github.event_name == 'workflow_dispatch' }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
