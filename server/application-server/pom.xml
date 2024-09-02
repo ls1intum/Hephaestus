@@ -29,6 +29,7 @@
 	</scm>
 	<properties>
 		<java.version>21</java.version>
+		<app.profiles>local,dev</app.profiles>
 	</properties>
 	<dependencies>
 		<dependency>
@@ -120,6 +121,16 @@
 			<artifactId>spring-modulith-starter-test</artifactId>
 			<scope>test</scope>
 		</dependency>
+		<dependency>
+			<groupId>org.kohsuke</groupId>
+			<artifactId>github-api</artifactId>
+			<version>1.324</version>
+		</dependency>
+		<dependency>
+			<groupId>io.hypersistence</groupId>
+			<artifactId>hypersistence-utils-hibernate-63</artifactId>
+			<version>3.8.2</version>
+		</dependency>
 	</dependencies>
 
 	<dependencyManagement>
@@ -158,6 +169,7 @@
 				<groupId>org.springframework.boot</groupId>
 				<artifactId>spring-boot-maven-plugin</artifactId>
 				<configuration>
+					<profiles>${app.profiles}</profiles>
 					<jvmArguments>-Dspring.application.admin.enabled=true</jvmArguments>
 					<excludes>
 						<exclude>
@@ -165,6 +177,8 @@
 							<artifactId>lombok</artifactId>
 						</exclude>
 					</excludes>
+					<wait>500</wait>
+					<maxAttempts>100</maxAttempts>
 				</configuration>
 				<executions>
 					<execution>

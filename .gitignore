@@ -1,6 +1,9 @@
 .venv
 .DS_Store
 
+# Idea files
+.idea/
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
@@ -163,3 +166,5 @@ cython_debug/
 #.idea/
 
 node_modules/
+
+application-local.yml
