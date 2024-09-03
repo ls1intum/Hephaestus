@@ -22,7 +22,7 @@ paths:
       operationId: getAllHellos
       responses:
         "200":
-          description: A set of all Hello entities
+          description: Set of all Hello entities
           content:
             application/json:
               schema:
