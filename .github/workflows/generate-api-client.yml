@@ -64,7 +64,11 @@ jobs:
           git config --global user.email "github-actions[bot]@users.noreply.github.com"
           git add .
           git commit -m "chore: update API specs and client"
-          git push https://${{ secrets.GH_PAT_USER }}:${{ secrets.GH_PAT }}@github.com/${{ github.repository }} HEAD:${{ github.event.pull_request.head.ref }}
+          echo "$GH_PAT_USER"
+          git push https://$GH_PAT_USER:$GH_PAT@github.com/${{ github.repository }} HEAD:${{ github.event.pull_request.head.ref }}
+        env:
+          GH_PAT_USER: ${{ secrets.GH_PAT_USER }}
+          GH_PAT: ${{ secrets.GH_PAT }}
 
       - name: Remove autocommit-openapi label
         if: ${{ contains(github.event.pull_request.labels.*.name, 'autocommit-openapi') }}
