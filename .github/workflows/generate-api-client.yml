@@ -57,22 +57,18 @@ jobs:
           fi
 
       - name: Commit and push changes
-        if: ${{ failure() && github.event.label.name == 'autocommit-openapi' }}
+        if: ${{ failure() && contains(github.event.pull_request.labels.*.name, 'autocommit-openapi') }}
         run: |
           echo "Committing and pushing changes..."
           git config --global user.name "github-actions[bot]"
           git config --global user.email "github-actions[bot]@users.noreply.github.com"
           git add .
           git commit -m "chore: update API client"
-          git push origin HEAD:${{ github.event.pull_request.head.ref }}
-        env:
-          # Use a personal access token (PAT) or GitHub App token instead of GITHUB_TOKEN
-          # This PAT must have repo scope permissions
-          GITHUB_TOKEN: ${{ secrets.GH_PERSONAL_ACCESS_TOKEN }}
+          git push https://x-access-token:${{ secrets.GH_PERSONAL_ACCESS_TOKEN }}@github.com/${{ github.repository }} HEAD:${{ github.event.pull_request.head.ref }}
 
       - name: Remove autocommit-openapi label
-        if: ${{ github.event.label.name == 'autocommit-openapi' }}
+        if: ${{ success() }}
         run: |
           echo "Removing the autocommit-openapi label..."
-          curl -s -X DELETE -H "Authorization: token ${{ secrets.GH_PERSONAL_ACCESS_TOKEN }}" \
+          curl --silent --fail-with-body -X DELETE -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
           https://api.github.com/repos/${{ github.repository }}/issues/${{ github.event.pull_request.number }}/labels/autocommit-openapi
