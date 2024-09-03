@@ -68,11 +68,11 @@ jobs:
         env:
           # Use a personal access token (PAT) or GitHub App token instead of GITHUB_TOKEN
           # This PAT must have repo scope permissions
-          GITHUB_TOKEN: ${{ secrets.GITHUB_PERSONAL_ACCESS_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.GH_PERSONAL_ACCESS_TOKEN }}
 
       - name: Remove autocommit-openapi label
         if: ${{ github.event.label.name == 'autocommit-openapi' }}
         run: |
           echo "Removing the autocommit-openapi label..."
-          curl -s -X DELETE -H "Authorization: token ${{ secrets.GITHUB_PERSONAL_ACCESS_TOKEN }}" \
+          curl -s -X DELETE -H "Authorization: token ${{ secrets.GH_PERSONAL_ACCESS_TOKEN }}" \
           https://api.github.com/repos/${{ github.repository }}/issues/${{ github.event.pull_request.number }}/labels/autocommit-openapi
