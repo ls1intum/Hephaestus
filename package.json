@@ -7,7 +7,7 @@
     "generate:api:clean": "rimraf webapp/src/app/core/modules/openapi",
     "generate:api:application-server-specs": "cd server/application-server && mvn verify -DskipTests=true && node ../../scripts/clean-openapi-specs.js",
     "generate:api:application-server-client": "npx openapi-generator-cli generate -i server/application-server/openapi.yaml -g typescript-angular -o webapp/src/app/core/modules/openapi --additional-properties fileNaming=kebab-case,withInterfaces=true --generate-alias-as-model",
-    "generate:api": "npm run generate:api:clean && npm run generate:api:application-server-client && npm run generate:api:application-server-specs"
+    "generate:api": "npm run generate:api:application-server-specs && npm run generate:api:clean && npm run generate:api:application-server-client"
   },
   "devDependencies": {
     "@openapitools/openapi-generator-cli": "2.13.5",

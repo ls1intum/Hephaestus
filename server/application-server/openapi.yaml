@@ -22,10 +22,11 @@ paths:
       operationId: getAllHellos
       responses:
         "200":
-          description: A list of all Hello entities
+          description: A set of all Hello entities
           content:
             application/json:
               schema:
+                uniqueItems: true
                 type: array
                 items:
                   $ref: "#/components/schemas/Hello"

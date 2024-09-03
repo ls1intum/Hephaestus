@@ -2,6 +2,8 @@ package de.tum.in.www1.hephaestus.hello;
 
 import java.time.Instant;
 import java.util.List;
+import java.util.Set;
+import java.util.stream.Collectors;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -21,12 +23,12 @@ public class HelloService {
   /**
    * Retrieves all {@link Hello} entities from the repository.
    * 
-   * @return A list of all Hello entities
+   * @return A set of all Hello entities
    */
-  public List<Hello> getAllHellos() {
+  public Set<Hello> getAllHellos() {
     var hellos = helloRepository.findAll();
     logger.info("Getting Hellos: {}", hellos);
-    return helloRepository.findAll();
+    return helloRepository.findAll().stream().collect(Collectors.toSet());
   }
 
   /**

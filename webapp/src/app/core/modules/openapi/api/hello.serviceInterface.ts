@@ -34,6 +34,6 @@ export interface HelloServiceInterface {
      * Retrieves all {@link Hello Hello} entities.
      * Retrieves all {@link Hello Hello} entities.
      */
-    getAllHellos(extraHttpRequestParams?: any): Observable<Array<Hello>>;
+    getAllHellos(extraHttpRequestParams?: any): Observable<Set<Hello>>;
 
 }
