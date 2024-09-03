@@ -57,21 +57,23 @@ jobs:
             exit 1
           fi
 
-      - name: Commit and push changes
-        if: ${{ failure() && contains(github.event.pull_request.labels.*.name, 'autocommit-openapi') }}
+      - name: Commit files
+        if: ${{ always() && contains(github.event.pull_request.labels.*.name, 'autocommit-openapi') }}
         run: |
           echo "Committing and pushing changes..."
-          git config --global user.name "github-actions[bot]"
-          git config --global user.email "github-actions[bot]@users.noreply.github.com"
-          git add .
-          git commit -m "chore: update API specs and client"
-          git push https://$GH_PAT_USER:$GH_PAT@github.com/${{ github.repository }} HEAD:${{ github.event.pull_request.head.ref }}
-        env:
-          GH_PAT_USER: ${{ secrets.GH_PAT_USER }}
-          GH_PAT: ${{ secrets.GH_PAT }}
+          git config --local user.name "github-actions[bot]"
+          git config --local user.email "github-actions[bot]@users.noreply.github.com"
+          git commit -a -m "chore: update API specs and client"
+
+      - name: Push changes
+        if: ${{ always() && contains(github.event.pull_request.labels.*.name, 'autocommit-openapi') }}
+        uses: ad-m/github-push-action@master
+        with:
+          github_token: ${{ secrets.GH_PAT }}
+          branch: ${{ github.ref }}
 
       - name: Remove autocommit-openapi label
-        if: ${{ contains(github.event.pull_request.labels.*.name, 'autocommit-openapi') }}
+        if: ${{ always() && contains(github.event.pull_request.labels.*.name, 'autocommit-openapi') }}
         run: |
           echo "Removing the autocommit-openapi label..."
           curl --silent --fail-with-body -X DELETE -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
