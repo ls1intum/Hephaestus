@@ -21,7 +21,7 @@ public class HelloController {
   /**
    * Retrieves all {@link Hello} entities.
    * 
-   * @return A set of all Hello entities
+   * @return Set of all Hello entities
    */
   @GetMapping
   public Set<Hello> getAllHellos() {
