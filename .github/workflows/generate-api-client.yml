@@ -67,7 +67,7 @@ jobs:
           git push https://x-access-token:${{ secrets.GH_PERSONAL_ACCESS_TOKEN }}@github.com/${{ github.repository }} HEAD:${{ github.event.pull_request.head.ref }}
 
       - name: Remove autocommit-openapi label
-        if: ${{ success() }}
+        if: ${{ contains(github.event.pull_request.labels.*.name, 'autocommit-openapi') }}
         run: |
           echo "Removing the autocommit-openapi label..."
           curl --silent --fail-with-body -X DELETE -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
