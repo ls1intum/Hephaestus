@@ -70,7 +70,7 @@ jobs:
         uses: ad-m/github-push-action@master
         with:
           github_token: ${{ secrets.GH_PAT }}
-          branch: ${{ github.ref }}
+          branch: ${{ github.event.pull_request.head.ref  }}
 
       - name: Remove autocommit-openapi label
         if: ${{ always() && contains(github.event.pull_request.labels.*.name, 'autocommit-openapi') }}
