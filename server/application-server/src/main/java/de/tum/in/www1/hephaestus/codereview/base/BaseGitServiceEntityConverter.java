@@ -39,7 +39,7 @@ public abstract class BaseGitServiceEntityConverter<S extends GHObject, T extend
         }
     }
 
-    private OffsetDateTime convertToOffsetDateTime(Date date) {
+    protected OffsetDateTime convertToOffsetDateTime(Date date) {
         return date != null ? date.toInstant().atOffset(ZoneOffset.UTC) : null;
     }
 }
