@@ -8,6 +8,7 @@ import de.tum.in.www1.hephaestus.codereview.base.BaseGitServiceEntityConverter;
 
 @Component
 public class PullRequestConverter extends BaseGitServiceEntityConverter<GHPullRequest, PullRequest> {
+
     @Override
     public PullRequest convert(@NonNull GHPullRequest source) {
         IssueState state = convertState(source.getState());
@@ -17,7 +18,7 @@ public class PullRequestConverter extends BaseGitServiceEntityConverter<GHPullRe
         pullRequest.setUrl(source.getHtmlUrl().toString());
         pullRequest.setState(state);
         if (source.getMergedAt() != null) {
-            pullRequest.setMergedAt(source.getMergedAt().toString());
+            pullRequest.setMergedAt(convertToOffsetDateTime(source.getMergedAt()));
         }
         return pullRequest;
     }

@@ -1,6 +1,5 @@
 package de.tum.in.www1.hephaestus.hello;
 
-import java.util.List;
 import java.util.Set;
 
 import org.springframework.web.bind.annotation.GetMapping;
