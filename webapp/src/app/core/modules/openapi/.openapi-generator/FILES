@@ -20,6 +20,7 @@ model/issue-comment-dto.ts
 model/issue-comment.ts
 model/models.ts
 model/pull-request-dto.ts
+model/pull-request-review.ts
 model/pull-request.ts
 model/repository-dto.ts
 model/repository.ts
