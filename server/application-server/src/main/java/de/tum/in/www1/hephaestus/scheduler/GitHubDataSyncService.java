@@ -128,9 +128,9 @@ public class GitHubDataSyncService {
                 pullRequest.setComments(new HashSet<>());
             }
             try {
-                User author = getUserFromGHUser(pr.getUser());
-                author.addPullRequest(pullRequest);
-                pullRequest.setAuthor(author);
+                User prAuthor = getUserFromGHUser(pr.getUser());
+                prAuthor.addPullRequest(pullRequest);
+                pullRequest.setAuthor(prAuthor);
             } catch (IOException e) {
                 logger.error("Error while fetching PR author!");
                 pullRequest.setAuthor(null);
@@ -140,9 +140,9 @@ public class GitHubDataSyncService {
                 Set<PullRequestReview> reviews = pr.listReviews().toList().stream().map(review -> {
                     PullRequestReview prReview = reviewConverter.convert(review);
                     try {
-                        User owner = getUserFromGHUser(review.getUser());
-                        owner.addReview(prReview);
-                        prReview.setOwner(owner);
+                        User reviewAuthor = getUserFromGHUser(review.getUser());
+                        reviewAuthor.addReview(prReview);
+                        prReview.setAuthor(reviewAuthor);
                     } catch (IOException e) {
                         logger.error("Error while fetching review owner!");
                     }
@@ -180,15 +180,15 @@ public class GitHubDataSyncService {
                 .map(comment -> {
                     IssueComment c = commentConverter.convert(comment);
                     c.setPullRequest(pullRequest);
-                    User author;
+                    User commentAuthor;
                     try {
-                        author = getUserFromGHUser(comment.getUser());
-                        author.addComment(c);
+                        commentAuthor = getUserFromGHUser(comment.getUser());
+                        commentAuthor.addComment(c);
                     } catch (IOException e) {
                         logger.error("Error while fetching author!");
-                        author = null;
+                        commentAuthor = null;
                     }
-                    c.setAuthor(author);
+                    c.setAuthor(commentAuthor);
                     return c;
                 }).collect(Collectors.toSet());
         return comments;
