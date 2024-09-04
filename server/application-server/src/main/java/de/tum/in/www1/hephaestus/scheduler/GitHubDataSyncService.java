@@ -112,8 +112,18 @@ public class GitHubDataSyncService {
         // preliminary save to make it referenceable
         repositoryRepository.save(repository);
 
+        Set<PullRequest> prs = getPullRequestsFromGHRepository(ghRepo, repository);
+        repository.setPullRequests(prs);
+        pullRequestRepository.saveAll(prs);
+
+        repositoryRepository.save(repository);
+        return repository;
+    }
+
+    private Set<PullRequest> getPullRequestsFromGHRepository(GHRepository ghRepo, Repository repository)
+            throws IOException {
         // Retrieve PRs in pages of 10
-        Set<PullRequest> prs = ghRepo.queryPullRequests().list().withPageSize(10).toList().stream().map(pr -> {
+        return ghRepo.queryPullRequests().list().withPageSize(10).toList().stream().map(pr -> {
             PullRequest pullRequest = pullRequestConverter.convert(pr);
             pullRequest.setRepository(repository);
             pullRequestRepository.save(pullRequest);
@@ -156,11 +166,6 @@ public class GitHubDataSyncService {
 
             return pullRequest;
         }).collect(Collectors.toSet());
-        repository.setPullRequests(prs);
-        pullRequestRepository.saveAll(prs);
-
-        repositoryRepository.save(repository);
-        return repository;
     }
 
     /**
@@ -173,7 +178,7 @@ public class GitHubDataSyncService {
      */
     private Set<IssueComment> getCommentsFromGHPullRequest(GHPullRequest pr, PullRequest pullRequest)
             throws IOException {
-        Set<IssueComment> comments = pr.queryComments().list().toList().stream()
+        return pr.queryComments().list().toList().stream()
                 .map(comment -> {
                     IssueComment c = commentConverter.convert(comment);
                     c.setPullRequest(pullRequest);
@@ -188,7 +193,6 @@ public class GitHubDataSyncService {
                     c.setAuthor(commentAuthor);
                     return c;
                 }).collect(Collectors.toSet());
-        return comments;
     }
 
     private User getUserFromGHUser(org.kohsuke.github.GHUser user) {
