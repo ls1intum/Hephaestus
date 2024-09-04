@@ -26,9 +26,9 @@ import lombok.ToString;
 public class PullRequestReview extends BaseGitServiceEntity {
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "owner_id")
+    @JoinColumn(name = "author_id")
     @ToString.Exclude
-    private User owner;
+    private User author;
 
     @NonNull
     private PullRequestReviewState state;
