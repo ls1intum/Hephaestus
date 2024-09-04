@@ -8,7 +8,7 @@ import org.springframework.stereotype.Repository;
 @Repository
 public interface PullRequestReviewRepository extends JpaRepository<PullRequestReview, Long> {
 
-    Optional<PullRequestReview> findByOwner_Login(String ownerLogin);
+    Optional<PullRequestReview> findByAuthor_Login(String authorLogin);
 
     Optional<PullRequestReview> findByPullRequest(PullRequestReview pullRequest);
 }

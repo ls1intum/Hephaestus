@@ -62,7 +62,7 @@ public class User extends BaseGitServiceEntity {
     @OneToMany(cascade = CascadeType.ALL, mappedBy = "author")
     private Set<IssueComment> comments = new HashSet<>();
 
-    @OneToMany(cascade = CascadeType.ALL, mappedBy = "owner")
+    @OneToMany(cascade = CascadeType.ALL, mappedBy = "author")
     private Set<PullRequestReview> reviews = new HashSet<>();
 
     public void addComment(IssueComment comment) {
