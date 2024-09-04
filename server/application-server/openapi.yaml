@@ -259,6 +259,7 @@ components:
           - OPEN
         mergedAt:
           type: string
+          format: date-time
         author:
           $ref: "#/components/schemas/User"
         comments:
@@ -266,8 +267,41 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/IssueComment"
+        reviews:
+          uniqueItems: true
+          type: array
+          items:
+            $ref: "#/components/schemas/PullRequestReview"
         repository:
           $ref: "#/components/schemas/Repository"
+    PullRequestReview:
+      required:
+      - state
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+        author:
+          $ref: "#/components/schemas/User"
+        state:
+          type: string
+          enum:
+          - COMMENTED
+          - APPROVED
+          - CHANGES_REQUESTED
+          - DISMISSED
+        submittedAt:
+          type: string
+          format: date-time
+        pullRequest:
+          $ref: "#/components/schemas/PullRequest"
     Repository:
       required:
       - defaultBranch
@@ -353,3 +387,8 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/IssueComment"
+        reviews:
+          uniqueItems: true
+          type: array
+          items:
+            $ref: "#/components/schemas/PullRequestReview"
