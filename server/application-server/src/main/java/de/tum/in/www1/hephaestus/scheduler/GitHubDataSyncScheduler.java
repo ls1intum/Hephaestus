@@ -3,15 +3,15 @@ package de.tum.in.www1.hephaestus.scheduler;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.boot.ApplicationArguments;
+import org.springframework.boot.ApplicationRunner;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
-
-import jakarta.annotation.PostConstruct;
 
 import java.io.IOException;
 
 @Component
-public class GitHubDataSyncScheduler {
+public class GitHubDataSyncScheduler implements ApplicationRunner {
 
     private static final Logger logger = LoggerFactory.getLogger(GitHubDataSyncScheduler.class);
     private final GitHubDataSyncService dataSyncService;
@@ -26,8 +26,8 @@ public class GitHubDataSyncScheduler {
         this.dataSyncService = dataSyncService;
     }
 
-    @PostConstruct
-    public void onStartup() {
+    @Override
+    public void run(ApplicationArguments args) throws Exception {
         if (runOnStartup) {
             logger.info("Starting initial GitHub data sync for Hephaestus...");
             syncAllRepositories();
