@@ -30,24 +30,24 @@ public class GitHubDataSyncScheduler implements ApplicationRunner {
     public void run(ApplicationArguments args) throws Exception {
         if (runOnStartup) {
             logger.info("Starting initial GitHub data sync for Hephaestus...");
-            syncAllRepositories();
+            syncData();
             logger.info("Initial GitHub data sync completed successfully.");
         }
     }
 
     @Scheduled(cron = "${monitoring.repository-sync-cron}")
     public void syncDataCron() {
-        logger.info("Starting daily GitHub data sync...");
-        syncAllRepositories();
-        logger.info("Daily GitHub data sync completed successfully.");
+        logger.info("Starting scheduled GitHub data sync...");
+        syncData();
+        logger.info("Scheduled GitHub data sync completed successfully.");
     }
 
-    private void syncAllRepositories() {
+    private void syncData() {
         for (String repositoryName : repositoriesToMonitor) {
             try {
                 dataSyncService.syncData(repositoryName);
                 logger.info("GitHub data sync completed successfully for repository: " + repositoryName);
-            } catch (IOException e) {
+            } catch (Exception e) {
                 logger.error("Error during GitHub data sync: ", e);
             }
         }
