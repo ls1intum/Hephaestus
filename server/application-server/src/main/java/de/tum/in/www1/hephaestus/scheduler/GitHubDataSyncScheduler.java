@@ -7,7 +7,6 @@ import org.springframework.boot.ApplicationArguments;
 import org.springframework.boot.ApplicationRunner;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
-import org.springframework.transaction.annotation.Transactional;
 
 @Component
 public class GitHubDataSyncScheduler implements ApplicationRunner {
@@ -41,12 +40,11 @@ public class GitHubDataSyncScheduler implements ApplicationRunner {
         logger.info("Scheduled GitHub data sync completed.");
     }
 
-    @Transactional
     private void syncData() {
         int successfullySyncedRepositories = 0;
         for (String repositoryName : repositoriesToMonitor) {
             try {
-                dataSyncService.syncData(repositoryName);
+                dataSyncService.syncRepository(repositoryName);
                 logger.info("GitHub data sync completed successfully for repository: " + repositoryName);
                 successfullySyncedRepositories++;
             } catch (Exception e) {

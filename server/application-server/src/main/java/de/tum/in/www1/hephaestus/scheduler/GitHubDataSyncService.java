@@ -13,6 +13,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import de.tum.in.www1.hephaestus.codereview.comment.IssueComment;
 import de.tum.in.www1.hephaestus.codereview.comment.IssueCommentConverter;
@@ -63,7 +64,7 @@ public class GitHubDataSyncService {
         this.userConverter = userConverter;
     }
 
-    public void syncData(String repositoryName) throws IOException {
+    public void syncRepository(String repositoryName) throws IOException {
         if (ghAuthToken == null || ghAuthToken.isEmpty() || ghAuthToken.equals("null")) {
             logger.error("No GitHub auth token provided!");
             return;
@@ -81,6 +82,7 @@ public class GitHubDataSyncService {
      * @return The repository corresponding to the given nameWithOwner.
      * @throws IOException
      */
+    @Transactional
     public Repository fetchRepository(String nameWithOwner) throws IOException {
         if (github == null) {
             logger.error("GitHub client not initialized correctly!");
@@ -139,6 +141,7 @@ public class GitHubDataSyncService {
      * @return The comments of the given pull request.
      * @throws IOException
      */
+    @Transactional
     private Set<IssueComment> getCommentsFromGHPullRequest(GHPullRequest pr, PullRequest pullRequest)
             throws IOException {
         Set<IssueComment> comments = pr.queryComments().list().toList().stream()
