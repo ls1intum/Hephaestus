@@ -1,16 +1,21 @@
 package de.tum.in.www1.hephaestus.codereview.pullrequest.review;
 
 import java.time.OffsetDateTime;
+import java.util.HashSet;
+import java.util.Set;
 
 import org.springframework.lang.NonNull;
 
 import de.tum.in.www1.hephaestus.codereview.base.BaseGitServiceEntity;
+import de.tum.in.www1.hephaestus.codereview.comment.review.ReviewComment;
 import de.tum.in.www1.hephaestus.codereview.pullrequest.PullRequest;
 import de.tum.in.www1.hephaestus.codereview.user.User;
+import jakarta.persistence.CascadeType;
 import jakarta.persistence.Entity;
 import jakarta.persistence.FetchType;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
+import jakarta.persistence.OneToMany;
 import jakarta.persistence.Table;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
@@ -39,8 +44,16 @@ public class PullRequestReview extends BaseGitServiceEntity {
 
     private OffsetDateTime updatedAt;
 
+    @OneToMany(cascade = CascadeType.ALL, mappedBy = "review")
+    @ToString.Exclude
+    private Set<ReviewComment> comments = new HashSet<>();
+
     @ManyToOne(optional = false)
     @JoinColumn(name = "pullrequest_id", referencedColumnName = "id")
     @ToString.Exclude
     private PullRequest pullRequest;
+
+    public void addComment(ReviewComment comment) {
+        comments.add(comment);
+    }
 }

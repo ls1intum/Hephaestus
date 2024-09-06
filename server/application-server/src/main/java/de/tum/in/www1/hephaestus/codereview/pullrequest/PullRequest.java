@@ -52,11 +52,11 @@ public class PullRequest extends BaseGitServiceEntity {
 
     @OneToMany(cascade = CascadeType.ALL, mappedBy = "pullRequest")
     @ToString.Exclude
-    private Set<IssueComment> comments = new HashSet<>();;
+    private Set<IssueComment> comments = new HashSet<>();
 
     @OneToMany(cascade = CascadeType.ALL, mappedBy = "pullRequest")
     @ToString.Exclude
-    private Set<PullRequestReview> reviews = new HashSet<>();;
+    private Set<PullRequestReview> reviews = new HashSet<>();
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "repository_id", referencedColumnName = "id")
