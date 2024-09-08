@@ -10,6 +10,7 @@
  * Do not edit the class manually.
  */
 import { PullRequestReview } from './pull-request-review';
+import { ReviewComment } from './review-comment';
 import { PullRequest } from './pull-request';
 import { IssueComment } from './issue-comment';
 
@@ -36,7 +37,8 @@ export interface User {
      */
     avatarUrl?: string;
     pullRequests?: Set<PullRequest>;
-    comments?: Set<IssueComment>;
+    issueComments?: Set<IssueComment>;
+    reviewComments?: Set<ReviewComment>;
     reviews?: Set<PullRequestReview>;
 }
 

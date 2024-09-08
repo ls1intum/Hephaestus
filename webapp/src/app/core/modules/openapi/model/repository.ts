@@ -18,7 +18,7 @@ export interface Repository {
     updatedAt?: string;
     name: string;
     nameWithOwner: string;
-    description: string;
+    description?: string;
     defaultBranch: string;
     visibility: Repository.VisibilityEnum;
     url: string;

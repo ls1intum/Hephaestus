@@ -10,6 +10,7 @@
  * Do not edit the class manually.
  */
 import { User } from './user';
+import { ReviewComment } from './review-comment';
 import { PullRequest } from './pull-request';
 
 
@@ -20,6 +21,7 @@ export interface PullRequestReview {
     author?: User;
     state: PullRequestReview.StateEnum;
     submittedAt?: string;
+    comments?: Set<ReviewComment>;
     pullRequest?: PullRequest;
 }
 export namespace PullRequestReview {
