@@ -7,11 +7,12 @@ import org.springframework.stereotype.Component;
 import de.tum.in.www1.hephaestus.codereview.base.BaseGitServiceEntityConverter;
 
 @Component
-public class ReviewCommentConverter extends BaseGitServiceEntityConverter<GHPullRequestReviewComment, ReviewComment> {
+public class PullRequestReviewCommentConverter
+        extends BaseGitServiceEntityConverter<GHPullRequestReviewComment, PullRequestReviewComment> {
 
     @Override
-    public ReviewComment convert(@NonNull GHPullRequestReviewComment source) {
-        ReviewComment comment = new ReviewComment();
+    public PullRequestReviewComment convert(@NonNull GHPullRequestReviewComment source) {
+        PullRequestReviewComment comment = new PullRequestReviewComment();
         convertBaseFields(source, comment);
         comment.setBody(source.getBody());
         comment.setCommit(source.getCommitId());

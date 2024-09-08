@@ -18,9 +18,9 @@ import org.springframework.transaction.annotation.Transactional;
 import de.tum.in.www1.hephaestus.codereview.comment.IssueComment;
 import de.tum.in.www1.hephaestus.codereview.comment.IssueCommentConverter;
 import de.tum.in.www1.hephaestus.codereview.comment.IssueCommentRepository;
-import de.tum.in.www1.hephaestus.codereview.comment.review.ReviewComment;
-import de.tum.in.www1.hephaestus.codereview.comment.review.ReviewCommentConverter;
-import de.tum.in.www1.hephaestus.codereview.comment.review.ReviewCommentRepository;
+import de.tum.in.www1.hephaestus.codereview.comment.review.PullRequestReviewComment;
+import de.tum.in.www1.hephaestus.codereview.comment.review.PullRequestReviewCommentConverter;
+import de.tum.in.www1.hephaestus.codereview.comment.review.PullRequestReviewCommentRepository;
 import de.tum.in.www1.hephaestus.codereview.pullrequest.PullRequest;
 import de.tum.in.www1.hephaestus.codereview.pullrequest.PullRequestConverter;
 import de.tum.in.www1.hephaestus.codereview.pullrequest.PullRequestRepository;
@@ -47,23 +47,23 @@ public class GitHubDataSyncService {
     private final PullRequestRepository pullRequestRepository;
     private final PullRequestReviewRepository prReviewRepository;
     private final IssueCommentRepository commentRepository;
-    private final ReviewCommentRepository reviewCommentRepository;
+    private final PullRequestReviewCommentRepository reviewCommentRepository;
     private final UserRepository userRepository;
 
     private final RepositoryConverter repositoryConverter;
     private final PullRequestConverter pullRequestConverter;
     private final PullRequestReviewConverter reviewConverter;
     private final IssueCommentConverter commentConverter;
-    private final ReviewCommentConverter reviewCommentConverter;
+    private final PullRequestReviewCommentConverter reviewCommentConverter;
     private final UserConverter userConverter;
 
     public GitHubDataSyncService(RepositoryRepository repositoryRepository, PullRequestRepository pullRequestRepository,
             PullRequestReviewRepository prReviewRepository,
-            IssueCommentRepository commentRepository, ReviewCommentRepository reviewCommentRepository,
+            IssueCommentRepository commentRepository, PullRequestReviewCommentRepository reviewCommentRepository,
             UserRepository userRepository,
             RepositoryConverter repositoryConverter, PullRequestConverter pullRequestConverter,
             PullRequestReviewConverter reviewConverter, IssueCommentConverter commentConverter,
-            ReviewCommentConverter reviewCommentConverter, UserConverter userConverter) {
+            PullRequestReviewCommentConverter reviewCommentConverter, UserConverter userConverter) {
         logger.info("Hello from GitHubDataSyncService!");
 
         this.repositoryRepository = repositoryRepository;
@@ -176,7 +176,7 @@ public class GitHubDataSyncService {
 
             try {
                 pr.listReviewComments().toList().stream().forEach(comment -> {
-                    ReviewComment c = reviewCommentConverter.convert(comment);
+                    PullRequestReviewComment c = reviewCommentConverter.convert(comment);
                     // First save the comment, so that it is referencable
                     reviewCommentRepository.save(c);
 

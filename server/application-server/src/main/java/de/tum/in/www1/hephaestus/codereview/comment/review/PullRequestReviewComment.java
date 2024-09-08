@@ -14,12 +14,12 @@ import lombok.Setter;
 import lombok.ToString;
 
 @Entity
-@Table(name = "review_comment")
+@Table(name = "pull_request_review_comment")
 @Getter
 @Setter
 @NoArgsConstructor
 @ToString(callSuper = true)
-public class ReviewComment extends Comment {
+public class PullRequestReviewComment extends Comment {
     @ManyToOne(optional = false)
     @JoinColumn(name = "review_id", referencedColumnName = "id")
     @ToString.Exclude
