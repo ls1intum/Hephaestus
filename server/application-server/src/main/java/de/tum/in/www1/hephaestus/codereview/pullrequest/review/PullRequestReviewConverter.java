@@ -21,19 +21,9 @@ public class PullRequestReviewConverter extends BaseGitServiceEntityConverter<GH
         convertBaseFields(source, review);
         review.setState(convertState(source.getState()));
         try {
-            review.setCreatedAt(convertToOffsetDateTime(source.getCreatedAt()));
-        } catch (IOException e) {
-            logger.error("Failed to convert createdAt field for source {}: {}", source.getId(), e.getMessage());
-        }
-        try {
             review.setSubmittedAt(convertToOffsetDateTime(source.getSubmittedAt()));
         } catch (IOException e) {
             logger.error("Failed to convert submittedAt field for source {}: {}", source.getId(), e.getMessage());
-        }
-        try {
-            review.setUpdatedAt(convertToOffsetDateTime(source.getUpdatedAt()));
-        } catch (IOException e) {
-            logger.error("Failed to convert updatedAt field for source {}: {}", source.getId(), e.getMessage());
         }
         return review;
     }

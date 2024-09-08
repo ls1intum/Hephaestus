@@ -38,11 +38,7 @@ public class PullRequestReview extends BaseGitServiceEntity {
     @NonNull
     private PullRequestReviewState state;
 
-    private OffsetDateTime createdAt;
-
     private OffsetDateTime submittedAt;
-
-    private OffsetDateTime updatedAt;
 
     @OneToMany(cascade = CascadeType.ALL, mappedBy = "review")
     @ToString.Exclude
