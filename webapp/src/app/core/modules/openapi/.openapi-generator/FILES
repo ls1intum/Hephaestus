@@ -20,11 +20,11 @@ model/issue-comment-dto.ts
 model/issue-comment.ts
 model/models.ts
 model/pull-request-dto.ts
+model/pull-request-review-comment.ts
 model/pull-request-review.ts
 model/pull-request.ts
 model/repository-dto.ts
 model/repository.ts
-model/review-comment.ts
 model/user-dto.ts
 model/user.ts
 param.ts

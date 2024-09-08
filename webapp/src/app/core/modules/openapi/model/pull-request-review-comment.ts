@@ -13,7 +13,7 @@ import { PullRequestReview } from './pull-request-review';
 import { User } from './user';
 
 
-export interface ReviewComment { 
+export interface PullRequestReviewComment { 
     id?: number;
     createdAt?: string;
     updatedAt?: string;
