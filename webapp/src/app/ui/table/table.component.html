@@ -1,0 +1,29 @@
+<tbody>
+  @for (row of table.getRowModel().rows; track row.id) {
+    <tr>
+      @for (cell of row.getVisibleCells(); track cell.id) {
+        <td>
+          <ng-container
+            *flexRender="
+              cell.column.columnDef.cell;
+              props: cell.getContext(); // Data given to the TemplateRef
+              let cell
+            "
+          >
+            <!-- if you want to render a simple string -->
+            {{ cell }}
+            <!-- if you want to render an html string -->
+            <div [innerHTML]="cell"></div>
+          </ng-container>
+        </td>
+      }
+    </tr>
+  }
+</tbody>
+
+<ng-template #customHeader let-context>
+  {{ context.getValue() }}
+</ng-template>
+<ng-template #customCell let-context>
+  {{ context.getValue() }}
+</ng-template>
