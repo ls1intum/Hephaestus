@@ -1,0 +1,15 @@
+<div class="flex flex-col gap-4">
+  <h1 class="text-3xl font-bold">Hephaestus Leaderboard</h1>
+  <h2 class="text-2xl font-semibold">Team</h2>
+  @if (query.isPending()) {
+    <span class="text-muted-foreground">Loading...</span>
+  } @else if (query.error()) {
+    <span class="text-destructive">An error has occurred</span>
+  }
+
+  @if (leaderboard(); as leaderboard) {
+    <div class="px-4">
+      <app-table [data]="leaderboard"></app-table>
+    </div>
+  }
+</div>

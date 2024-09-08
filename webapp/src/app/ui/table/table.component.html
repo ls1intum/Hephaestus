@@ -1,29 +1,45 @@
-<tbody>
-  @for (row of table.getRowModel().rows; track row.id) {
-    <tr>
-      @for (cell of row.getVisibleCells(); track cell.id) {
-        <td>
-          <ng-container
-            *flexRender="
-              cell.column.columnDef.cell;
-              props: cell.getContext(); // Data given to the TemplateRef
-              let cell
-            "
-          >
-            <!-- if you want to render a simple string -->
-            {{ cell }}
-            <!-- if you want to render an html string -->
-            <div [innerHTML]="cell"></div>
-          </ng-container>
-        </td>
+<div class="p-2">
+  <table class="bg-background min-w-[100%] w-fit border-border">
+    <thead>
+      @for (headerGroup of table.getHeaderGroups(); track headerGroup.id) {
+        <tr class="border border-input">
+          @for (header of headerGroup.headers; track header.id) {
+            @if (!header.isPlaceholder) {
+              <th class="py-2">
+                <ng-container *flexRender="header.column.columnDef.header; props: header.getContext(); let header">
+                  <div [innerHTML]="header"></div>
+                </ng-container>
+              </th>
+            }
+          }
+        </tr>
       }
-    </tr>
-  }
-</tbody>
-
-<ng-template #customHeader let-context>
-  {{ context.getValue() }}
-</ng-template>
-<ng-template #customCell let-context>
-  {{ context.getValue() }}
-</ng-template>
+    </thead>
+    <tbody>
+      @for (row of table.getRowModel().rows; track row.id) {
+        <tr class="border border-input hover:bg-accent hover:text-accent-foreground">
+          @for (cell of row.getVisibleCells(); track cell.id) {
+            <td class="py-1 text-center">
+              <ng-container *flexRender="cell.column.columnDef.cell; props: cell.getContext(); let cell">
+                <div [innerHTML]="cell"></div>
+              </ng-container>
+            </td>
+          }
+        </tr>
+      }
+    </tbody>
+    <tfoot>
+      @for (footerGroup of table.getFooterGroups(); track footerGroup.id) {
+        <tr>
+          @for (footer of footerGroup.headers; track footer.id) {
+            <th>
+              <ng-container *flexRender="footer.column.columnDef.footer; props: footer.getContext(); let footer">
+                {{ footer }}
+              </ng-container>
+            </th>
+          }
+        </tr>
+      }
+    </tfoot>
+  </table>
+</div>

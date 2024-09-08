@@ -1,15 +1,9 @@
-import { argsToTemplate, type Meta, type StoryObj } from '@storybook/angular';
-import { TableComponent } from './table.component';
+import { HttpClient } from '@angular/common/http';
+import { Component, computed, inject } from '@angular/core';
+import { injectQuery } from '@tanstack/angular-query-experimental';
 import { Leaderboard } from 'app/@types/leaderboard';
-
-const meta: Meta<TableComponent> = {
-  title: 'UI/Table',
-  component: TableComponent,
-  tags: ['autodocs']
-};
-
-export default meta;
-type Story = StoryObj<TableComponent>;
+import { TableComponent } from 'app/ui/table/table.component';
+import { lastValueFrom } from 'rxjs';
 
 const defaultData: Leaderboard.Entry[] = [
   { githubName: 'shadcn', name: 'I', score: 90, total: 100, changes_requested: 0, approvals: 0, comments: 0 },
@@ -23,13 +17,26 @@ const defaultData: Leaderboard.Entry[] = [
   { githubName: 'shadcn', name: 'H', score: 80, total: 100, changes_requested: 0, approvals: 0, comments: 0 }
 ];
 
-export const Default: Story = {
-  args: {
-    data: defaultData
-  },
+@Component({
+  selector: 'app-leaderboard',
+  standalone: true,
+  imports: [TableComponent],
+  templateUrl: './leaderboard.component.html'
+})
+export class LeaderboardComponent {
+  http = inject(HttpClient);
 
-  render: (args) => ({
-    props: args,
-    template: `<app-table ${argsToTemplate(args)}></app-table>`
-  })
-};
+  query = injectQuery(() => ({
+    queryKey: ['leaderboard'],
+    queryFn: async () => lastValueFrom(this.http.get('http://127.0.0.1:8080/leaderboard')) as Promise<Leaderboard.Entry[]>,
+    gcTime: Infinity
+  }));
+
+  leaderboard = computed(() => {
+    const data = this.query.data();
+    if (!data) {
+      return defaultData;
+    }
+    return data;
+  });
+}
