@@ -18,9 +18,15 @@ import org.springframework.transaction.annotation.Transactional;
 import de.tum.in.www1.hephaestus.codereview.comment.IssueComment;
 import de.tum.in.www1.hephaestus.codereview.comment.IssueCommentConverter;
 import de.tum.in.www1.hephaestus.codereview.comment.IssueCommentRepository;
+import de.tum.in.www1.hephaestus.codereview.comment.review.PullRequestReviewComment;
+import de.tum.in.www1.hephaestus.codereview.comment.review.PullRequestReviewCommentConverter;
+import de.tum.in.www1.hephaestus.codereview.comment.review.PullRequestReviewCommentRepository;
 import de.tum.in.www1.hephaestus.codereview.pullrequest.PullRequest;
 import de.tum.in.www1.hephaestus.codereview.pullrequest.PullRequestConverter;
 import de.tum.in.www1.hephaestus.codereview.pullrequest.PullRequestRepository;
+import de.tum.in.www1.hephaestus.codereview.pullrequest.review.PullRequestReview;
+import de.tum.in.www1.hephaestus.codereview.pullrequest.review.PullRequestReviewConverter;
+import de.tum.in.www1.hephaestus.codereview.pullrequest.review.PullRequestReviewRepository;
 import de.tum.in.www1.hephaestus.codereview.repository.Repository;
 import de.tum.in.www1.hephaestus.codereview.repository.RepositoryConverter;
 import de.tum.in.www1.hephaestus.codereview.repository.RepositoryRepository;
@@ -39,28 +45,39 @@ public class GitHubDataSyncService {
 
     private final RepositoryRepository repositoryRepository;
     private final PullRequestRepository pullRequestRepository;
+    private final PullRequestReviewRepository prReviewRepository;
     private final IssueCommentRepository commentRepository;
+    private final PullRequestReviewCommentRepository reviewCommentRepository;
     private final UserRepository userRepository;
 
     private final RepositoryConverter repositoryConverter;
     private final PullRequestConverter pullRequestConverter;
+    private final PullRequestReviewConverter reviewConverter;
     private final IssueCommentConverter commentConverter;
+    private final PullRequestReviewCommentConverter reviewCommentConverter;
     private final UserConverter userConverter;
 
     public GitHubDataSyncService(RepositoryRepository repositoryRepository, PullRequestRepository pullRequestRepository,
-            IssueCommentRepository commentRepository, UserRepository userRepository,
+            PullRequestReviewRepository prReviewRepository,
+            IssueCommentRepository commentRepository, PullRequestReviewCommentRepository reviewCommentRepository,
+            UserRepository userRepository,
             RepositoryConverter repositoryConverter, PullRequestConverter pullRequestConverter,
-            IssueCommentConverter commentConverter, UserConverter userConverter) {
+            PullRequestReviewConverter reviewConverter, IssueCommentConverter commentConverter,
+            PullRequestReviewCommentConverter reviewCommentConverter, UserConverter userConverter) {
         logger.info("Hello from GitHubDataSyncService!");
 
         this.repositoryRepository = repositoryRepository;
         this.pullRequestRepository = pullRequestRepository;
+        this.prReviewRepository = prReviewRepository;
         this.commentRepository = commentRepository;
+        this.reviewCommentRepository = reviewCommentRepository;
         this.userRepository = userRepository;
 
         this.repositoryConverter = repositoryConverter;
         this.pullRequestConverter = pullRequestConverter;
+        this.reviewConverter = reviewConverter;
         this.commentConverter = commentConverter;
+        this.reviewCommentConverter = reviewCommentConverter;
         this.userConverter = userConverter;
     }
 
@@ -105,8 +122,18 @@ public class GitHubDataSyncService {
         // preliminary save to make it referenceable
         repositoryRepository.save(repository);
 
+        Set<PullRequest> prs = getPullRequestsFromGHRepository(ghRepo, repository);
+        repository.setPullRequests(prs);
+        pullRequestRepository.saveAll(prs);
+
+        repositoryRepository.save(repository);
+        return repository;
+    }
+
+    private Set<PullRequest> getPullRequestsFromGHRepository(GHRepository ghRepo, Repository repository)
+            throws IOException {
         // Retrieve PRs in pages of 10
-        Set<PullRequest> prs = ghRepo.queryPullRequests().list().withPageSize(10).toList().stream().map(pr -> {
+        return ghRepo.queryPullRequests().list().withPageSize(10).toList().stream().map(pr -> {
             PullRequest pullRequest = pullRequestConverter.convert(pr);
             pullRequest.setRepository(repository);
             pullRequestRepository.save(pullRequest);
@@ -119,18 +146,59 @@ public class GitHubDataSyncService {
                 pullRequest.setComments(new HashSet<>());
             }
             try {
-                pullRequest.setAuthor(getActorFromGHUser(pr.getUser()));
+                User prAuthor = getUserFromGHUser(pr.getUser());
+                prAuthor.addPullRequest(pullRequest);
+                pullRequest.setAuthor(prAuthor);
             } catch (IOException e) {
                 logger.error("Error while fetching PR author!");
                 pullRequest.setAuthor(null);
             }
 
+            try {
+                Set<PullRequestReview> reviews = pr.listReviews().toList().stream().map(review -> {
+                    PullRequestReview prReview = reviewConverter.convert(review);
+                    try {
+                        User reviewAuthor = getUserFromGHUser(review.getUser());
+                        reviewAuthor.addReview(prReview);
+                        prReview.setAuthor(reviewAuthor);
+                    } catch (IOException e) {
+                        logger.error("Error while fetching review owner!");
+                    }
+                    prReview.setPullRequest(pullRequest);
+                    return prReview;
+                }).collect(Collectors.toSet());
+                prReviewRepository.saveAll(reviews);
+                pullRequest.setReviews(reviews);
+            } catch (IOException e) {
+                logger.error("Error while fetching PR reviews!");
+                pullRequest.setReviews(new HashSet<>());
+            }
+
+            try {
+                pr.listReviewComments().toList().stream().forEach(comment -> {
+                    PullRequestReviewComment c = reviewCommentConverter.convert(comment);
+                    // First save the comment, so that it is referencable
+                    reviewCommentRepository.save(c);
+
+                    PullRequestReview review = getPullRequestReviewByReviewId(comment.getPullRequestReviewId());
+                    c.setReview(review);
+                    User commentAuthor;
+                    try {
+                        commentAuthor = getUserFromGHUser(comment.getUser());
+                        commentAuthor.addReviewComment(c);
+                    } catch (IOException e) {
+                        logger.error("Error while fetching author!");
+                        commentAuthor = null;
+                    }
+                    c.setAuthor(commentAuthor);
+                    review.addComment(c);
+                });
+            } catch (IOException e) {
+                logger.error("Error while fetching PR review comments!");
+            }
+
             return pullRequest;
         }).collect(Collectors.toSet());
-        repository.setPullRequests(prs);
-        pullRequestRepository.saveAll(prs);
-        repositoryRepository.save(repository);
-        return repository;
     }
 
     /**
@@ -144,26 +212,28 @@ public class GitHubDataSyncService {
     @Transactional
     private Set<IssueComment> getCommentsFromGHPullRequest(GHPullRequest pr, PullRequest pullRequest)
             throws IOException {
-        Set<IssueComment> comments = pr.queryComments().list().toList().stream()
+        return pr.queryComments().list().toList().stream()
                 .map(comment -> {
                     IssueComment c = commentConverter.convert(comment);
                     c.setPullRequest(pullRequest);
-                    User author;
+                    User commentAuthor;
                     try {
-                        author = getActorFromGHUser(comment.getUser());
-                        author.addComment(c);
-                        author.addPullRequest(pullRequest);
+                        commentAuthor = getUserFromGHUser(comment.getUser());
+                        commentAuthor.addIssueComment(c);
                     } catch (IOException e) {
                         logger.error("Error while fetching author!");
-                        author = null;
+                        commentAuthor = null;
                     }
-                    c.setAuthor(author);
+                    c.setAuthor(commentAuthor);
                     return c;
                 }).collect(Collectors.toSet());
-        return comments;
     }
 
-    private User getActorFromGHUser(org.kohsuke.github.GHUser user) {
+    private PullRequestReview getPullRequestReviewByReviewId(Long reviewId) {
+        return prReviewRepository.findById(reviewId).orElse(null);
+    }
+
+    private User getUserFromGHUser(org.kohsuke.github.GHUser user) {
         User ghUser = userRepository.findUser(user.getLogin()).orElse(null);
         if (ghUser == null) {
             ghUser = userConverter.convert(user);

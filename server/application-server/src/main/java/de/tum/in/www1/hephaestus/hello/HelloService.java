@@ -1,7 +1,6 @@
 package de.tum.in.www1.hephaestus.hello;
 
 import java.time.Instant;
-import java.util.List;
 import java.util.Set;
 import java.util.stream.Collectors;
 

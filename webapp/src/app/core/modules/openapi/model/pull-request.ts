@@ -10,6 +10,7 @@
  * Do not edit the class manually.
  */
 import { Repository } from './repository';
+import { PullRequestReview } from './pull-request-review';
 import { User } from './user';
 import { IssueComment } from './issue-comment';
 
@@ -27,6 +28,7 @@ export interface PullRequest {
     mergedAt?: string;
     author?: User;
     comments?: Set<IssueComment>;
+    reviews?: Set<PullRequestReview>;
     repository?: Repository;
 }
 export namespace PullRequest {

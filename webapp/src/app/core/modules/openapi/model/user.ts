@@ -9,6 +9,8 @@
  * https://openapi-generator.tech
  * Do not edit the class manually.
  */
+import { PullRequestReviewComment } from './pull-request-review-comment';
+import { PullRequestReview } from './pull-request-review';
 import { PullRequest } from './pull-request';
 import { IssueComment } from './issue-comment';
 
@@ -35,6 +37,8 @@ export interface User {
      */
     avatarUrl?: string;
     pullRequests?: Set<PullRequest>;
-    comments?: Set<IssueComment>;
+    issueComments?: Set<IssueComment>;
+    reviewComments?: Set<PullRequestReviewComment>;
+    reviews?: Set<PullRequestReview>;
 }
 

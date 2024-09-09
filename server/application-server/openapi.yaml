@@ -210,8 +210,6 @@ components:
           items:
             $ref: "#/components/schemas/IssueCommentDTO"
     IssueComment:
-      required:
-      - body
       type: object
       properties:
         id:
@@ -259,6 +257,7 @@ components:
           - OPEN
         mergedAt:
           type: string
+          format: date-time
         author:
           $ref: "#/components/schemas/User"
         comments:
@@ -266,12 +265,71 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/IssueComment"
+        reviews:
+          uniqueItems: true
+          type: array
+          items:
+            $ref: "#/components/schemas/PullRequestReview"
         repository:
           $ref: "#/components/schemas/Repository"
+    PullRequestReview:
+      required:
+      - state
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+        author:
+          $ref: "#/components/schemas/User"
+        state:
+          type: string
+          enum:
+          - COMMENTED
+          - APPROVED
+          - CHANGES_REQUESTED
+          - DISMISSED
+        submittedAt:
+          type: string
+          format: date-time
+        comments:
+          uniqueItems: true
+          type: array
+          items:
+            $ref: "#/components/schemas/PullRequestReviewComment"
+        pullRequest:
+          $ref: "#/components/schemas/PullRequest"
+    PullRequestReviewComment:
+      required:
+      - commit
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+        body:
+          type: string
+        author:
+          $ref: "#/components/schemas/User"
+        review:
+          $ref: "#/components/schemas/PullRequestReview"
+        commit:
+          type: string
     Repository:
       required:
       - defaultBranch
-      - description
       - name
       - nameWithOwner
       - url
@@ -348,8 +406,18 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/PullRequest"
-        comments:
+        issueComments:
           uniqueItems: true
           type: array
           items:
             $ref: "#/components/schemas/IssueComment"
+        reviewComments:
+          uniqueItems: true
+          type: array
+          items:
+            $ref: "#/components/schemas/PullRequestReviewComment"
+        reviews:
+          uniqueItems: true
+          type: array
+          items:
+            $ref: "#/components/schemas/PullRequestReview"
