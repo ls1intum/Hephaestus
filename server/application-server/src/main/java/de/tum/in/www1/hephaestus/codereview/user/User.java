@@ -9,7 +9,9 @@ import org.springframework.lang.NonNull;
 
 import de.tum.in.www1.hephaestus.codereview.base.BaseGitServiceEntity;
 import de.tum.in.www1.hephaestus.codereview.comment.IssueComment;
+import de.tum.in.www1.hephaestus.codereview.comment.review.PullRequestReviewComment;
 import de.tum.in.www1.hephaestus.codereview.pullrequest.PullRequest;
+import de.tum.in.www1.hephaestus.codereview.pullrequest.review.PullRequestReview;
 import jakarta.persistence.CascadeType;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
@@ -59,13 +61,27 @@ public class User extends BaseGitServiceEntity {
     private Set<PullRequest> pullRequests = new HashSet<>();
 
     @OneToMany(cascade = CascadeType.ALL, mappedBy = "author")
-    private Set<IssueComment> comments = new HashSet<>();
+    private Set<IssueComment> issueComments = new HashSet<>();
 
-    public void addComment(IssueComment comment) {
-        comments.add(comment);
+    @OneToMany(cascade = CascadeType.ALL, mappedBy = "author")
+    private Set<PullRequestReviewComment> reviewComments = new HashSet<>();
+
+    @OneToMany(cascade = CascadeType.ALL, mappedBy = "author")
+    private Set<PullRequestReview> reviews = new HashSet<>();
+
+    public void addIssueComment(IssueComment comment) {
+        issueComments.add(comment);
+    }
+
+    public void addReviewComment(PullRequestReviewComment comment) {
+        reviewComments.add(comment);
     }
 
     public void addPullRequest(PullRequest pullRequest) {
         pullRequests.add(pullRequest);
+    }
+
+    public void addReview(PullRequestReview review) {
+        reviews.add(review);
     }
 }
