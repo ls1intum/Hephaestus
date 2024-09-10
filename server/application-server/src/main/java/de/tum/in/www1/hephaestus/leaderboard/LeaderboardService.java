@@ -1,6 +1,7 @@
 package de.tum.in.www1.hephaestus.leaderboard;
 
 import java.util.List;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -25,9 +26,26 @@ public class LeaderboardService {
         List<User> users = userService.getAllUsers();
         logger.info("Found " + users.size() + " users");
 
-        List<LeaderboardEntry> leaderboard = users.stream().map(user -> {
+        List<LeaderboardEntry> leaderboard = users.parallelStream().map(user -> {
             logger.info("Creating leaderboard entry for user: " + user.getLogin());
-            return new LeaderboardEntry(user.getLogin(), user.getName(), 0, 0, 0, 0, 0);
+            AtomicInteger changesRequested = new AtomicInteger(0);
+            AtomicInteger changesApproved = new AtomicInteger(0);
+            AtomicInteger comments = new AtomicInteger(0);
+            user.getReviews().parallelStream().forEach(review -> {
+                switch (review.getState()) {
+                    case CHANGES_REQUESTED:
+                        changesRequested.incrementAndGet();
+                        break;
+                    case APPROVED:
+                        changesApproved.incrementAndGet();
+                        break;
+                    default:
+                        break;
+                }
+            });
+            comments.addAndGet(user.getIssueComments().size());
+            return new LeaderboardEntry(user.getLogin(), user.getName(), 0, 0, changesRequested.get(),
+                    changesApproved.get(), comments.get());
         }).toList();
 
         return leaderboard;
