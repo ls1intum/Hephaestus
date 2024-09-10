@@ -240,6 +240,5 @@ public class GitHubDataSyncService {
             userRepository.save(ghUser);
         }
         return ghUser;
-
     }
 }

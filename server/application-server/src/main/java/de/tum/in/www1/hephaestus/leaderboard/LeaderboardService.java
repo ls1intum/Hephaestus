@@ -26,12 +26,12 @@ public class LeaderboardService {
         List<User> users = userService.getAllUsers();
         logger.info("Found " + users.size() + " users");
 
-        List<LeaderboardEntry> leaderboard = users.parallelStream().map(user -> {
+        List<LeaderboardEntry> leaderboard = users.stream().map(user -> {
             logger.info("Creating leaderboard entry for user: " + user.getLogin());
             AtomicInteger changesRequested = new AtomicInteger(0);
             AtomicInteger changesApproved = new AtomicInteger(0);
             AtomicInteger comments = new AtomicInteger(0);
-            user.getReviews().parallelStream().forEach(review -> {
+            user.getReviews().stream().forEach(review -> {
                 switch (review.getState()) {
                     case CHANGES_REQUESTED:
                         changesRequested.incrementAndGet();

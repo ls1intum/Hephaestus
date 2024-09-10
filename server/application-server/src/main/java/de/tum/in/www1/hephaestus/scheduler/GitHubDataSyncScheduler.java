@@ -27,7 +27,7 @@ public class GitHubDataSyncScheduler implements ApplicationRunner {
     @Override
     public void run(ApplicationArguments args) throws Exception {
         if (runOnStartup) {
-            logger.info("Starting initial GitHub data sync for Hephaestus...");
+            logger.info("Starting initial GitHub data sync...");
             syncData();
             logger.info("Initial GitHub data sync completed.");
         }
@@ -48,9 +48,10 @@ public class GitHubDataSyncScheduler implements ApplicationRunner {
                 logger.info("GitHub data sync completed successfully for repository: " + repositoryName);
                 successfullySyncedRepositories++;
             } catch (Exception e) {
-                logger.error("Error during GitHub data sync: ", e);
+                logger.error("Error during GitHub data sync of repository " + repositoryName + ": " + e.getMessage());
             }
         }
-        logger.info("GitHub data sync completed for " + successfullySyncedRepositories + "/" + repositoriesToMonitor.length + " repositories.");
+        logger.info("GitHub data sync completed for " + successfullySyncedRepositories + "/"
+                + repositoriesToMonitor.length + " repositories.");
     }
 }
