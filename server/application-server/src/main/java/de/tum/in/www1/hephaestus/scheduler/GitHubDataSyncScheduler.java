@@ -17,9 +17,6 @@ public class GitHubDataSyncScheduler implements ApplicationRunner {
     @Value("${monitoring.runOnStartup:true}")
     private boolean runOnStartup;
 
-    @Value("${monitoring.repositories}")
-    private String[] repositoriesToMonitor;
-
     public GitHubDataSyncScheduler(GitHubDataSyncService dataSyncService) {
         this.dataSyncService = dataSyncService;
     }
@@ -28,7 +25,7 @@ public class GitHubDataSyncScheduler implements ApplicationRunner {
     public void run(ApplicationArguments args) throws Exception {
         if (runOnStartup) {
             logger.info("Starting initial GitHub data sync...");
-            syncData();
+            dataSyncService.syncData();
             logger.info("Initial GitHub data sync completed.");
         }
     }
@@ -36,22 +33,7 @@ public class GitHubDataSyncScheduler implements ApplicationRunner {
     @Scheduled(cron = "${monitoring.repository-sync-cron}")
     public void syncDataCron() {
         logger.info("Starting scheduled GitHub data sync...");
-        syncData();
+        dataSyncService.syncData();
         logger.info("Scheduled GitHub data sync completed.");
-    }
-
-    private void syncData() {
-        int successfullySyncedRepositories = 0;
-        for (String repositoryName : repositoriesToMonitor) {
-            try {
-                dataSyncService.syncRepository(repositoryName);
-                logger.info("GitHub data sync completed successfully for repository: " + repositoryName);
-                successfullySyncedRepositories++;
-            } catch (Exception e) {
-                logger.error("Error during GitHub data sync of repository " + repositoryName + ": " + e.getMessage());
-            }
-        }
-        logger.info("GitHub data sync completed for " + successfullySyncedRepositories + "/"
-                + repositoriesToMonitor.length + " repositories.");
     }
 }
