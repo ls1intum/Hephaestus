@@ -21,12 +21,10 @@ import lombok.ToString;
 @AllArgsConstructor
 @ToString(callSuper = true)
 public abstract class Comment extends BaseGitServiceEntity {
-    @Lob
-    @Basic(fetch = FetchType.EAGER)
-    @Column(length = 512)
+    @Column(columnDefinition = "TEXT")
     protected String body;
 
-    @ManyToOne(fetch = FetchType.LAZY)
+    @ManyToOne(fetch = FetchType.EAGER)
     @JoinColumn(name = "author_id")
     @ToString.Exclude
     protected User author;
