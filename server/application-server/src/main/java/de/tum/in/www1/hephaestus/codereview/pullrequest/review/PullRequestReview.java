@@ -40,7 +40,7 @@ public class PullRequestReview extends BaseGitServiceEntity {
 
     private OffsetDateTime submittedAt;
 
-    @OneToMany(cascade = CascadeType.ALL, mappedBy = "review", fetch = FetchType.EAGER)
+    @OneToMany(cascade = CascadeType.ALL, mappedBy = "review")
     @ToString.Exclude
     private Set<PullRequestReviewComment> comments = new HashSet<>();
 

@@ -3,10 +3,12 @@ package de.tum.in.www1.hephaestus.scheduler;
 import java.io.IOException;
 import java.util.Collection;
 import java.util.HashSet;
+import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
 
 import org.kohsuke.github.GHPullRequest;
+import org.kohsuke.github.GHPullRequestReviewComment;
 import org.kohsuke.github.GHRepository;
 import org.kohsuke.github.GitHub;
 import org.kohsuke.github.GitHubBuilder;
@@ -197,28 +199,35 @@ public class GitHubDataSyncService {
             }
 
             try {
-                pr.listReviewComments().withPageSize(10).toList().stream().forEach(comment -> {
-                    PullRequestReviewComment c = reviewCommentRepository.save(reviewCommentConverter.convert(comment));
-
-                    PullRequestReview review = getPullRequestReviewByReviewId(comment.getPullRequestReviewId());
-                    c.setReview(review);
-                    User commentAuthor;
-                    try {
-                        commentAuthor = getUserFromGHUser(comment.getUser());
-                        commentAuthor.addReviewComment(c);
-                    } catch (IOException e) {
-                        logger.error("Error while fetching author!");
-                        commentAuthor = null;
-                    }
-                    c.setAuthor(commentAuthor);
-                    review.addComment(c);
-                });
+                pr.listReviewComments().withPageSize(10).toList().stream()
+                        .forEach(c -> handleSinglePullRequestReviewComment(c));
             } catch (IOException e) {
                 logger.error("Error while fetching PR review comments!");
             }
 
             return pullRequest;
         }).collect(Collectors.toSet());
+    }
+
+    private void handleSinglePullRequestReviewComment(GHPullRequestReviewComment comment) {
+        PullRequestReviewComment c = reviewCommentRepository.save(reviewCommentConverter.convert(comment));
+
+        Optional<PullRequestReview> review = prReviewRepository
+                .findByIdWithEagerComments(comment.getPullRequestReviewId());
+        if (review.isPresent()) {
+            PullRequestReview prReview = review.get();
+            c.setReview(prReview);
+            User commentAuthor;
+            try {
+                commentAuthor = getUserFromGHUser(comment.getUser());
+                commentAuthor.addReviewComment(c);
+            } catch (IOException e) {
+                logger.error("Error while fetching author!");
+                commentAuthor = null;
+            }
+            c.setAuthor(commentAuthor);
+            prReview.addComment(c);
+        }
     }
 
     /**
@@ -249,12 +258,8 @@ public class GitHubDataSyncService {
                 }).collect(Collectors.toSet());
     }
 
-    private PullRequestReview getPullRequestReviewByReviewId(Long reviewId) {
-        return prReviewRepository.findById(reviewId).orElse(null);
-    }
-
     private User getUserFromGHUser(org.kohsuke.github.GHUser user) {
-        User ghUser = userRepository.findUser(user.getLogin()).orElse(null);
+        User ghUser = userRepository.findUserEagerly(user.getLogin()).orElse(null);
         if (ghUser == null) {
             ghUser = userRepository.save(userConverter.convert(user));
         }

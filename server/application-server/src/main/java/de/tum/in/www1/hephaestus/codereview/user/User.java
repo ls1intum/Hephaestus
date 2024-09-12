@@ -15,7 +15,6 @@ import de.tum.in.www1.hephaestus.codereview.pullrequest.review.PullRequestReview
 import jakarta.persistence.CascadeType;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
-import jakarta.persistence.FetchType;
 import jakarta.persistence.OneToMany;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
@@ -58,16 +57,16 @@ public class User extends BaseGitServiceEntity {
      */
     private String avatarUrl;
 
-    @OneToMany(cascade = CascadeType.ALL, mappedBy = "author", fetch = FetchType.EAGER)
+    @OneToMany(cascade = CascadeType.ALL, mappedBy = "author")
     private Set<PullRequest> pullRequests = new HashSet<>();
 
-    @OneToMany(cascade = CascadeType.ALL, mappedBy = "author", fetch = FetchType.EAGER)
+    @OneToMany(cascade = CascadeType.ALL, mappedBy = "author")
     private Set<IssueComment> issueComments = new HashSet<>();
 
-    @OneToMany(cascade = CascadeType.ALL, mappedBy = "author", fetch = FetchType.EAGER)
+    @OneToMany(cascade = CascadeType.ALL, mappedBy = "author")
     private Set<PullRequestReviewComment> reviewComments = new HashSet<>();
 
-    @OneToMany(cascade = CascadeType.ALL, mappedBy = "author", fetch = FetchType.EAGER)
+    @OneToMany(cascade = CascadeType.ALL, mappedBy = "author")
     private Set<PullRequestReview> reviews = new HashSet<>();
 
     public void addIssueComment(IssueComment comment) {

@@ -58,7 +58,7 @@ public class PullRequest extends BaseGitServiceEntity {
     @ToString.Exclude
     private Set<PullRequestReview> reviews = new HashSet<>();
 
-    @ManyToOne(fetch = FetchType.EAGER)
+    @ManyToOne
     @JoinColumn(name = "repository_id", referencedColumnName = "id")
     @ToString.Exclude
     private Repository repository;

@@ -13,6 +13,17 @@ public interface UserRepository extends JpaRepository<User, Long> {
     Optional<User> findUser(@Param("login") String login);
 
     @Query("""
+                SELECT u
+                FROM User u
+                JOIN FETCH u.pullRequests
+                JOIN FETCH u.issueComments
+                JOIN FETCH u.reviewComments
+                JOIN FETCH u.reviews
+                WHERE u.login = :login
+            """)
+    Optional<User> findUserEagerly(@Param("login") String login);
+
+    @Query("""
                 SELECT new UserDTO(u.id, u.login, u.email, u.name, u.url)
                 FROM User u
                 WHERE u.login = :login
