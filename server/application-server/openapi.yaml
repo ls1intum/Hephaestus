@@ -61,6 +61,24 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/UserDTO"
+  /user/{login}/full:
+    get:
+      tags:
+      - user
+      operationId: getFullUser
+      parameters:
+      - name: login
+        in: path
+        required: true
+        schema:
+          type: string
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/User"
   /pullrequest/{id}:
     get:
       tags:
@@ -101,6 +119,20 @@ paths:
                 type: array
                 items:
                   $ref: "#/components/schemas/PullRequest"
+  /leaderboard:
+    get:
+      tags:
+      - leaderboard
+      operationId: getLeaderboard
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/LeaderboardEntry"
   /admin:
     get:
       tags:
@@ -421,3 +453,25 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/PullRequestReview"
+    LeaderboardEntry:
+      type: object
+      properties:
+        githubName:
+          type: string
+        name:
+          type: string
+        score:
+          type: integer
+          format: int32
+        total:
+          type: integer
+          format: int32
+        changesRequested:
+          type: integer
+          format: int32
+        approvals:
+          type: integer
+          format: int32
+        comments:
+          type: integer
+          format: int32
