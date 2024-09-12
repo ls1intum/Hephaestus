@@ -10,7 +10,6 @@ import de.tum.in.www1.hephaestus.codereview.pullrequest.PullRequest;
 import io.micrometer.common.lang.Nullable;
 import jakarta.persistence.CascadeType;
 import jakarta.persistence.Entity;
-import jakarta.persistence.FetchType;
 import jakarta.persistence.OneToMany;
 import jakarta.persistence.Table;
 import lombok.Getter;
@@ -45,7 +44,7 @@ public class Repository extends BaseGitServiceEntity {
 
     String homepage;
 
-    @OneToMany(cascade = CascadeType.ALL, mappedBy = "repository", fetch = FetchType.EAGER)
+    @OneToMany(cascade = CascadeType.ALL, mappedBy = "repository")
     @ToString.Exclude
     private Set<PullRequest> pullRequests = new HashSet<>();
 }

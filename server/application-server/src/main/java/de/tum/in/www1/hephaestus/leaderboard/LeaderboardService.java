@@ -28,9 +28,9 @@ public class LeaderboardService {
 
         List<LeaderboardEntry> leaderboard = users.stream().map(user -> {
             logger.info("Creating leaderboard entry for user: " + user.getLogin());
+            int comments = user.getIssueComments().size();
             AtomicInteger changesRequested = new AtomicInteger(0);
             AtomicInteger changesApproved = new AtomicInteger(0);
-            AtomicInteger comments = new AtomicInteger(0);
             user.getReviews().stream().forEach(review -> {
                 switch (review.getState()) {
                     case CHANGES_REQUESTED:
@@ -43,9 +43,8 @@ public class LeaderboardService {
                         break;
                 }
             });
-            comments.addAndGet(user.getIssueComments().size());
             return new LeaderboardEntry(user.getLogin(), user.getName(), 0, 0, changesRequested.get(),
-                    changesApproved.get(), comments.get());
+                    changesApproved.get(), comments);
         }).toList();
 
         return leaderboard;

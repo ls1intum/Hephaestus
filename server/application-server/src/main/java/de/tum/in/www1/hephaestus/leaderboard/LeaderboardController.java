@@ -17,7 +17,7 @@ public class LeaderboardController {
         this.leaderboardService = leaderboardService;
     }
 
-    @GetMapping("/")
+    @GetMapping
     public ResponseEntity<List<LeaderboardEntry>> getLeaderboard() {
         return ResponseEntity.ok(leaderboardService.createLeaderboard());
     }
