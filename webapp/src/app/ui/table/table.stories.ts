@@ -1,5 +1,4 @@
 import { moduleMetadata, type Meta, type StoryObj } from '@storybook/angular';
-import { TableComponent } from './table.component';
 import { TableBodyDirective } from './table-body.directive';
 import { TableCaptionDirective } from './table-caption.directive';
 import { TableCellDirective } from './table-cell.directive';
@@ -7,6 +6,7 @@ import { TableFooterDirective } from './table-footer.directive';
 import { TableHeaderDirective } from './table-header.directive';
 import { TableHeadDirective } from './table-head.directive';
 import { TableRowDirective } from './table-row.directive';
+import { TableComponent } from './table.component';
 
 type CustomArgs = {
   invoices: {

@@ -2,14 +2,14 @@ import { HttpClient } from '@angular/common/http';
 import { ChangeDetectionStrategy, Component, computed, inject } from '@angular/core';
 import { injectQuery } from '@tanstack/angular-query-experimental';
 import { Leaderboard } from 'app/@types/leaderboard';
+import { TableBodyDirective } from 'app/ui/table/table-body.directive';
+import { TableCaptionDirective } from 'app/ui/table/table-caption.directive';
+import { TableCellDirective } from 'app/ui/table/table-cell.directive';
+import { TableFooterDirective } from 'app/ui/table/table-footer.directive';
+import { TableHeadDirective } from 'app/ui/table/table-head.directive';
+import { TableHeaderDirective } from 'app/ui/table/table-header.directive';
+import { TableRowDirective } from 'app/ui/table/table-row.directive';
 import { TableComponent } from 'app/ui/table/table.component';
-import { TableBodyComponent } from 'app/ui/table/table-body.component';
-import { TableCaptionComponent } from 'app/ui/table/table-caption.component';
-import { TableCellComponent } from 'app/ui/table/table-cell.component';
-import { TableFooterComponent } from 'app/ui/table/table-footer.component';
-import { TableHeaderComponent } from 'app/ui/table/table-header.component';
-import { TableHeadComponent } from 'app/ui/table/table-head.component';
-import { TableRowComponent } from 'app/ui/table/table-row.component';
 import { lastValueFrom } from 'rxjs';
 
 const defaultData: Leaderboard.Entry[] = [
@@ -27,7 +27,7 @@ const defaultData: Leaderboard.Entry[] = [
 @Component({
   selector: 'app-leaderboard',
   standalone: true,
-  imports: [TableComponent, TableBodyComponent, TableCaptionComponent, TableCellComponent, TableFooterComponent, TableHeaderComponent, TableHeadComponent, TableRowComponent],
+  imports: [TableComponent, TableBodyDirective, TableCaptionDirective, TableCellDirective, TableFooterDirective, TableHeaderDirective, TableHeadDirective, TableRowDirective],
   templateUrl: './leaderboard.component.html',
   changeDetection: ChangeDetectionStrategy.OnPush
 })

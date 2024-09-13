@@ -9,22 +9,22 @@
   @if (leaderboard(); as leaderboard) {
     <div class="px-4">
       <app-table>
-        <app-table-header>
-          <app-table-row>
-            <app-table-head class="w-[100px]">Contributor</app-table-head>
-            <app-table-head>Score</app-table-head>
-            <app-table-head>Activity</app-table-head>
-          </app-table-row>
-        </app-table-header>
-        <app-table-body>
+        <thead appTableHeader>
+          <tr appTableRow>
+            <th appTableHead class="w-[100px]">Contributor</th>
+            <th appTableHead>Score</th>
+            <th appTableHead>Activity</th>
+          </tr>
+        </thead>
+        <tbody appTableBody>
           @for (entry of leaderboard; track entry.githubName) {
-            <app-table-row>
-              <app-table-cell class="flex items-center gap-2 font-medium">
+            <tr appTableRow>
+              <td appTableCell class="flex items-center gap-2 font-medium">
                 <img src="https://github.com/{{ entry.githubName }}.png" width="24" height="24" />
                 {{ entry.name }}
-              </app-table-cell>
-              <app-table-cell>{{ entry.score }}</app-table-cell>
-              <app-table-cell class="flex items-center gap-4">
+              </td>
+              <td appTableCell>{{ entry.score }}</td>
+              <td appTableCell class="flex items-center gap-4">
                 <div class="flex items-center gap-2">
                   <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
                     <path
@@ -52,16 +52,16 @@
                   </svg>
                   {{ entry.comments }}
                 </div>
-              </app-table-cell>
-            </app-table-row>
+              </td>
+            </tr>
           }
-        </app-table-body>
-        <app-table-footer>
-          <app-table-row>
-            <th colspan="2" class="[&:has([role=checkbox])]:pr-0 align-middle p-4 table-cell">Total</th>
-            <app-table-cell>{{ leaderboard.length }}</app-table-cell>
-          </app-table-row>
-        </app-table-footer>
+        </tbody>
+        <tfoot appTableFooter>
+          <tr appTableRow>
+            <td appTableCell colspan="2">Total</td>
+            <td appTableCell class="text-right">{{ leaderboard.length }}</td>
+          </tr>
+        </tfoot>
       </app-table>
     </div>
   }
