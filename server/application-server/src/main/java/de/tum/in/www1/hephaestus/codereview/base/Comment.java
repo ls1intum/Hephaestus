@@ -1,11 +1,9 @@
 package de.tum.in.www1.hephaestus.codereview.base;
 
 import de.tum.in.www1.hephaestus.codereview.user.User;
-import jakarta.persistence.Basic;
 import jakarta.persistence.Column;
 import jakarta.persistence.FetchType;
 import jakarta.persistence.JoinColumn;
-import jakarta.persistence.Lob;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.MappedSuperclass;
 import lombok.AllArgsConstructor;
