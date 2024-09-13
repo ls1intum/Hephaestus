@@ -1,18 +1,15 @@
-import { Component, computed, input } from '@angular/core';
+import { Directive, computed, input } from '@angular/core';
 import { ClassValue } from 'clsx';
 import { cn } from 'app/utils';
 
-@Component({
-  selector: 'app-table-cell',
+@Directive({
+  selector: 'td[appTableCell]',
   standalone: true,
-  template: `<ng-content />`,
   host: {
-    '[class]': 'computedClass()',
-    style: 'display: table-cell;'
+    '[class]': 'computedClass()'
   }
 })
-export class TableCellComponent {
+export class TableCellDirective {
   class = input<ClassValue>();
-
   computedClass = computed(() => cn('p-4 align-middle [&:has([role=checkbox])]:pr-0', this.class()));
 }

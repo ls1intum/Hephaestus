@@ -1,18 +1,15 @@
-import { Component, computed, input } from '@angular/core';
+import { Directive, computed, input } from '@angular/core';
 import { ClassValue } from 'clsx';
 import { cn } from 'app/utils';
 
-@Component({
-  selector: 'app-table-row',
+@Directive({
+  selector: 'tr[appTableRow]',
   standalone: true,
-  template: `<ng-content />`,
   host: {
-    '[class]': 'computedClass()',
-    style: 'display: table-row;'
+    '[class]': 'computedClass()'
   }
 })
-export class TableRowComponent {
+export class TableRowDirective {
   class = input<ClassValue>();
-
   computedClass = computed(() => cn('border-b transition-colors hover:bg-muted/50 data-[state=selected]:bg-muted', this.class()));
 }
