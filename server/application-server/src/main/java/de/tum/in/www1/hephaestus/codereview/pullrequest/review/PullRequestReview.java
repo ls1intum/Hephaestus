@@ -30,7 +30,7 @@ import lombok.ToString;
 @ToString(callSuper = true)
 public class PullRequestReview extends BaseGitServiceEntity {
 
-    @ManyToOne(fetch = FetchType.LAZY)
+    @ManyToOne(fetch = FetchType.EAGER)
     @JoinColumn(name = "author_id")
     @ToString.Exclude
     private User author;
@@ -44,7 +44,7 @@ public class PullRequestReview extends BaseGitServiceEntity {
     @ToString.Exclude
     private Set<PullRequestReviewComment> comments = new HashSet<>();
 
-    @ManyToOne(optional = false)
+    @ManyToOne(fetch = FetchType.EAGER)
     @JoinColumn(name = "pullrequest_id", referencedColumnName = "id")
     @ToString.Exclude
     private PullRequest pullRequest;

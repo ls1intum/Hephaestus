@@ -2,6 +2,7 @@ package de.tum.in.www1.hephaestus.codereview.base;
 
 import de.tum.in.www1.hephaestus.codereview.user.User;
 import jakarta.persistence.Basic;
+import jakarta.persistence.Column;
 import jakarta.persistence.FetchType;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.Lob;
@@ -20,11 +21,10 @@ import lombok.ToString;
 @AllArgsConstructor
 @ToString(callSuper = true)
 public abstract class Comment extends BaseGitServiceEntity {
-    @Lob
-    @Basic(fetch = FetchType.EAGER)
+    @Column(columnDefinition = "TEXT")
     protected String body;
 
-    @ManyToOne(fetch = FetchType.LAZY)
+    @ManyToOne(fetch = FetchType.EAGER)
     @JoinColumn(name = "author_id")
     @ToString.Exclude
     protected User author;

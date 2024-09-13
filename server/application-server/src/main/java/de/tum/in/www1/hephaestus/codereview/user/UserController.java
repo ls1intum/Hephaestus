@@ -23,4 +23,10 @@ public class UserController {
         return user.map(ResponseEntity::ok).orElseGet(() -> ResponseEntity.notFound().build());
     }
 
+    @GetMapping("/{login}/full")
+    public ResponseEntity<User> getFullUser(@PathVariable String login) {
+        Optional<User> user = userService.getUser(login);
+        System.out.println(user);
+        return user.map(ResponseEntity::ok).orElseGet(() -> ResponseEntity.notFound().build());
+    }
 }

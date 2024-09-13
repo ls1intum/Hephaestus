@@ -7,6 +7,8 @@ api/admin.serviceInterface.ts
 api/api.ts
 api/hello.service.ts
 api/hello.serviceInterface.ts
+api/leaderboard.service.ts
+api/leaderboard.serviceInterface.ts
 api/pull-request.service.ts
 api/pull-request.serviceInterface.ts
 api/user.service.ts
@@ -18,6 +20,7 @@ index.ts
 model/hello.ts
 model/issue-comment-dto.ts
 model/issue-comment.ts
+model/leaderboard-entry.ts
 model/models.ts
 model/pull-request-dto.ts
 model/pull-request-review-comment.ts
