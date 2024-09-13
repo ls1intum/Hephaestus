@@ -2,6 +2,9 @@ import { HttpClient } from '@angular/common/http';
 import { ChangeDetectionStrategy, Component, computed, inject } from '@angular/core';
 import { injectQuery } from '@tanstack/angular-query-experimental';
 import { Leaderboard } from 'app/@types/leaderboard';
+import { PullRequestApprovedIconComponent } from 'app/ui/icons/PullRequestApprovedIcon.component';
+import { PullRequestChangesRequestedIconComponent } from 'app/ui/icons/PullRequestChangesRequestedIcon.component';
+import { PullRequestCommentIconComponent } from 'app/ui/icons/PullRequestCommentIcon.component';
 import { TableBodyDirective } from 'app/ui/table/table-body.directive';
 import { TableCaptionDirective } from 'app/ui/table/table-caption.directive';
 import { TableCellDirective } from 'app/ui/table/table-cell.directive';
@@ -27,7 +30,19 @@ const defaultData: Leaderboard.Entry[] = [
 @Component({
   selector: 'app-leaderboard',
   standalone: true,
-  imports: [TableComponent, TableBodyDirective, TableCaptionDirective, TableCellDirective, TableFooterDirective, TableHeaderDirective, TableHeadDirective, TableRowDirective],
+  imports: [
+    TableComponent,
+    TableBodyDirective,
+    TableCaptionDirective,
+    TableCellDirective,
+    TableFooterDirective,
+    TableHeaderDirective,
+    TableHeadDirective,
+    TableRowDirective,
+    PullRequestChangesRequestedIconComponent,
+    PullRequestApprovedIconComponent,
+    PullRequestCommentIconComponent
+  ],
   templateUrl: './leaderboard.component.html',
   changeDetection: ChangeDetectionStrategy.OnPush
 })
