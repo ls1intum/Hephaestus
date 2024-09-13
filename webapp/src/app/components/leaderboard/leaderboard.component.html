@@ -11,7 +11,7 @@
       <app-table>
         <thead appTableHeader>
           <tr appTableRow>
-            <th appTableHead class="w-[100px]">Contributor</th>
+            <th appTableHead>Contributor</th>
             <th appTableHead>Score</th>
             <th appTableHead>Activity</th>
           </tr>
@@ -24,16 +24,16 @@
                 {{ entry.name }}
               </td>
               <td appTableCell>{{ entry.score }}</td>
-              <td appTableCell class="flex items-center gap-4">
+              <td appTableCell class="flex items-center gap-4" title="Changes Requested">
                 <div class="flex items-center gap-2">
                   <app-icon-pull-request-changes-requested />
-                  {{ entry.changes_requested }}
+                  {{ entry.changesRequested }}
                 </div>
-                <div class="flex items-center gap-2">
+                <div class="flex items-center gap-2" title="Approvals">
                   <app-icon-pull-request-approved />
                   {{ entry.approvals }}
                 </div>
-                <div class="flex items-center gap-2">
+                <div class="flex items-center gap-2" title="Comments">
                   <app-icon-pull-request-comment />
                   {{ entry.comments }}
                 </div>
