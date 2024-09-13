@@ -18,7 +18,7 @@ import lombok.ToString;
 @NoArgsConstructor
 @ToString(callSuper = true)
 public class IssueComment extends Comment {
-    @ManyToOne(optional = false)
+    @ManyToOne
     @JoinColumn(name = "pullrequest_id", referencedColumnName = "id")
     @ToString.Exclude
     private PullRequest pullRequest;

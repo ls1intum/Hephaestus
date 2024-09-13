@@ -1,5 +1,6 @@
 package de.tum.in.www1.hephaestus.codereview.user;
 
+import java.util.List;
 import java.util.Optional;
 
 import org.slf4j.Logger;
@@ -24,5 +25,10 @@ public class UserService {
     public Optional<UserDTO> getUserDTO(String login) {
         logger.info("Getting userDTO with login: " + login);
         return userRepository.findByLogin(login);
+    }
+
+    public List<User> getAllUsers() {
+        logger.info("Getting all users");
+        return userRepository.findAll().stream().toList();
     }
 }

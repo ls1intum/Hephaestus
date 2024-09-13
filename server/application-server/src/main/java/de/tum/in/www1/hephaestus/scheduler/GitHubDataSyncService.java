@@ -1,11 +1,16 @@
 package de.tum.in.www1.hephaestus.scheduler;
 
 import java.io.IOException;
+import java.util.Collection;
+import java.util.Date;
 import java.util.HashSet;
+import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
 
+import org.kohsuke.github.GHObject;
 import org.kohsuke.github.GHPullRequest;
+import org.kohsuke.github.GHPullRequestReviewComment;
 import org.kohsuke.github.GHRepository;
 import org.kohsuke.github.GitHub;
 import org.kohsuke.github.GitHubBuilder;
@@ -40,6 +45,12 @@ public class GitHubDataSyncService {
 
     @Value("${github.authToken:null}")
     private String ghAuthToken;
+
+    @Value("${monitoring.repositories}")
+    private String[] repositoriesToMonitor;
+
+    @Value("${monitoring.timeframe}")
+    private int timeframe;
 
     private GitHub github;
 
@@ -81,7 +92,23 @@ public class GitHubDataSyncService {
         this.userConverter = userConverter;
     }
 
-    public void syncRepository(String repositoryName) throws IOException {
+    public void syncData() {
+        int successfullySyncedRepositories = 0;
+        for (String repositoryName : repositoriesToMonitor) {
+            try {
+                syncRepository(repositoryName);
+                logger.info("GitHub data sync completed successfully for repository: " + repositoryName);
+                successfullySyncedRepositories++;
+            } catch (Exception e) {
+                logger.error("Error during GitHub data sync of repository " + repositoryName + ": " + e.getMessage());
+                e.printStackTrace();
+            }
+        }
+        logger.info("GitHub data sync completed for " + successfullySyncedRepositories + "/"
+                + repositoriesToMonitor.length + " repositories for the last " + timeframe + " day(s).");
+    }
+
+    private void syncRepository(String repositoryName) throws IOException {
         if (ghAuthToken == null || ghAuthToken.isEmpty() || ghAuthToken.equals("null")) {
             logger.error("No GitHub auth token provided!");
             return;
@@ -99,7 +126,6 @@ public class GitHubDataSyncService {
      * @return The repository corresponding to the given nameWithOwner.
      * @throws IOException
      */
-    @Transactional
     public Repository fetchRepository(String nameWithOwner) throws IOException {
         if (github == null) {
             logger.error("GitHub client not initialized correctly!");
@@ -107,7 +133,7 @@ public class GitHubDataSyncService {
         }
 
         // Avoid double fetching of the same repository
-        Repository existingRepository = repositoryRepository.findByNameWithOwner(nameWithOwner);
+        Repository existingRepository = repositoryRepository.findByNameWithOwnerWithEagerPullRequests(nameWithOwner);
         if (existingRepository != null) {
             logger.info("Found existing repository: " + existingRepository);
             return existingRepository;
@@ -120,9 +146,10 @@ public class GitHubDataSyncService {
             return null;
         }
         // preliminary save to make it referenceable
-        repositoryRepository.save(repository);
+        repository = repositoryRepository.save(repository);
 
         Set<PullRequest> prs = getPullRequestsFromGHRepository(ghRepo, repository);
+        logger.info("Found " + prs.size() + " PRs");
         repository.setPullRequests(prs);
         pullRequestRepository.saveAll(prs);
 
@@ -133,72 +160,83 @@ public class GitHubDataSyncService {
     private Set<PullRequest> getPullRequestsFromGHRepository(GHRepository ghRepo, Repository repository)
             throws IOException {
         // Retrieve PRs in pages of 10
-        return ghRepo.queryPullRequests().list().withPageSize(10).toList().stream().map(pr -> {
-            PullRequest pullRequest = pullRequestConverter.convert(pr);
-            pullRequest.setRepository(repository);
-            pullRequestRepository.save(pullRequest);
-            try {
-                Set<IssueComment> comments = getCommentsFromGHPullRequest(pr, pullRequest);
-                pullRequest.setComments(comments);
-                commentRepository.saveAll(comments);
-            } catch (IOException e) {
-                logger.error("Error while fetching PR comments!");
-                pullRequest.setComments(new HashSet<>());
-            }
-            try {
-                User prAuthor = getUserFromGHUser(pr.getUser());
-                prAuthor.addPullRequest(pullRequest);
-                pullRequest.setAuthor(prAuthor);
-            } catch (IOException e) {
-                logger.error("Error while fetching PR author!");
-                pullRequest.setAuthor(null);
-            }
-
-            try {
-                Set<PullRequestReview> reviews = pr.listReviews().toList().stream().map(review -> {
-                    PullRequestReview prReview = reviewConverter.convert(review);
+        return ghRepo.queryPullRequests().list().withPageSize(20).toList().stream()
+                .takeWhile(pr -> isResourceRecent(pr)).map(pr -> {
+                    PullRequest pullRequest = pullRequestRepository.save(pullRequestConverter.convert(pr));
+                    pullRequest.setRepository(repository);
                     try {
-                        User reviewAuthor = getUserFromGHUser(review.getUser());
-                        reviewAuthor.addReview(prReview);
-                        prReview.setAuthor(reviewAuthor);
+                        Collection<IssueComment> comments = getCommentsFromGHPullRequest(pr, pullRequest);
+                        comments = commentRepository.saveAll(comments);
+                        for (IssueComment c : comments) {
+                            pullRequest.addComment(c);
+                        }
                     } catch (IOException e) {
-                        logger.error("Error while fetching review owner!");
+                        logger.error("Error while fetching PR comments!");
+                        pullRequest.setComments(new HashSet<>());
                     }
-                    prReview.setPullRequest(pullRequest);
-                    return prReview;
+                    try {
+                        User prAuthor = getUserFromGHUser(pr.getUser());
+                        prAuthor.addPullRequest(pullRequest);
+                        pullRequest.setAuthor(prAuthor);
+                    } catch (IOException e) {
+                        logger.error("Error while fetching PR author!");
+                        pullRequest.setAuthor(null);
+                    }
+
+                    try {
+                        Collection<PullRequestReview> reviews = pr.listReviews().toList().stream()
+                                .takeWhile(prr -> isResourceRecent(prr)).map(review -> {
+                                    PullRequestReview prReview = prReviewRepository
+                                            .save(reviewConverter.convert(review));
+                                    try {
+                                        User reviewAuthor = getUserFromGHUser(review.getUser());
+                                        reviewAuthor.addReview(prReview);
+                                        prReview.setAuthor(reviewAuthor);
+                                    } catch (IOException e) {
+                                        logger.error("Error while fetching review owner!");
+                                    }
+                                    prReview.setPullRequest(pullRequest);
+                                    return prReview;
+                                }).collect(Collectors.toSet());
+                        reviews = prReviewRepository.saveAll(reviews);
+                        for (PullRequestReview prReview : reviews) {
+                            pullRequest.addReview(prReview);
+                        }
+                    } catch (IOException e) {
+                        logger.error("Error while fetching PR reviews!");
+                        pullRequest.setReviews(new HashSet<>());
+                    }
+
+                    try {
+                        pr.listReviewComments().withPageSize(20).toList().stream().takeWhile(rc -> isResourceRecent(rc))
+                                .forEach(c -> handleSinglePullRequestReviewComment(c));
+                    } catch (IOException e) {
+                        logger.error("Error while fetching PR review comments!");
+                    }
+
+                    return pullRequest;
                 }).collect(Collectors.toSet());
-                prReviewRepository.saveAll(reviews);
-                pullRequest.setReviews(reviews);
-            } catch (IOException e) {
-                logger.error("Error while fetching PR reviews!");
-                pullRequest.setReviews(new HashSet<>());
-            }
+    }
 
+    private void handleSinglePullRequestReviewComment(GHPullRequestReviewComment comment) {
+        PullRequestReviewComment c = reviewCommentRepository.save(reviewCommentConverter.convert(comment));
+
+        Optional<PullRequestReview> review = prReviewRepository
+                .findByIdWithEagerComments(comment.getPullRequestReviewId());
+        if (review.isPresent()) {
+            PullRequestReview prReview = review.get();
+            c.setReview(prReview);
+            User commentAuthor;
             try {
-                pr.listReviewComments().toList().stream().forEach(comment -> {
-                    PullRequestReviewComment c = reviewCommentConverter.convert(comment);
-                    // First save the comment, so that it is referencable
-                    reviewCommentRepository.save(c);
-
-                    PullRequestReview review = getPullRequestReviewByReviewId(comment.getPullRequestReviewId());
-                    c.setReview(review);
-                    User commentAuthor;
-                    try {
-                        commentAuthor = getUserFromGHUser(comment.getUser());
-                        commentAuthor.addReviewComment(c);
-                    } catch (IOException e) {
-                        logger.error("Error while fetching author!");
-                        commentAuthor = null;
-                    }
-                    c.setAuthor(commentAuthor);
-                    review.addComment(c);
-                });
+                commentAuthor = getUserFromGHUser(comment.getUser());
+                commentAuthor.addReviewComment(c);
             } catch (IOException e) {
-                logger.error("Error while fetching PR review comments!");
+                logger.error("Error while fetching author!");
+                commentAuthor = null;
             }
-
-            return pullRequest;
-        }).collect(Collectors.toSet());
+            c.setAuthor(commentAuthor);
+            prReview.addComment(c);
+        }
     }
 
     /**
@@ -212,9 +250,9 @@ public class GitHubDataSyncService {
     @Transactional
     private Set<IssueComment> getCommentsFromGHPullRequest(GHPullRequest pr, PullRequest pullRequest)
             throws IOException {
-        return pr.queryComments().list().toList().stream()
+        return pr.queryComments().list().withPageSize(20).toList().stream()
                 .map(comment -> {
-                    IssueComment c = commentConverter.convert(comment);
+                    IssueComment c = commentRepository.save(commentConverter.convert(comment));
                     c.setPullRequest(pullRequest);
                     User commentAuthor;
                     try {
@@ -229,17 +267,26 @@ public class GitHubDataSyncService {
                 }).collect(Collectors.toSet());
     }
 
-    private PullRequestReview getPullRequestReviewByReviewId(Long reviewId) {
-        return prReviewRepository.findById(reviewId).orElse(null);
-    }
-
     private User getUserFromGHUser(org.kohsuke.github.GHUser user) {
-        User ghUser = userRepository.findUser(user.getLogin()).orElse(null);
+        User ghUser = userRepository.findUserEagerly(user.getLogin()).orElse(null);
         if (ghUser == null) {
-            ghUser = userConverter.convert(user);
-            userRepository.save(ghUser);
+            ghUser = userRepository.save(userConverter.convert(user));
         }
         return ghUser;
+    }
 
+    /**
+     * Checks if the resource has been created within the last week.
+     * 
+     * @param obj
+     * @return
+     */
+    private boolean isResourceRecent(GHObject obj) {
+        try {
+            return obj.getCreatedAt().after(new Date(System.currentTimeMillis() - 1000 * 60 * 60 * 24 * timeframe));
+        } catch (IOException e) {
+            logger.error("Error while fetching createdAt! Resource ID: " + obj.getId());
+            return false;
+        }
     }
 }
