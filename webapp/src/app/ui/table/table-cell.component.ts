@@ -8,19 +8,11 @@ import { cn } from 'app/utils';
   template: `<ng-content />`,
   host: {
     '[class]': 'computedClass()',
-    style: 'display: table-cell;',
-    '[attr.colspan]': 'colspan()',
-    '[attr.headers]': 'headers()',
-    '[attr.rowspan]': 'rowspan()',
-    '[attr.data-cell]': 'true'
+    style: 'display: table-cell;'
   }
 })
 export class TableCellComponent {
   class = input<ClassValue>();
-
-  colspan = input<number>();
-  headers = input<string>();
-  rowspan = input<number>();
 
   computedClass = computed(() => cn('p-4 align-middle [&:has([role=checkbox])]:pr-0', this.class()));
 }
