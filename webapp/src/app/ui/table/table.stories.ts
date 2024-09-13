@@ -103,7 +103,9 @@ export const Default: Story = {
         </app-table-body>
         <app-table-footer>
           <app-table-row>
-            <app-table-cell colspan="3">Total</app-table-cell>
+            <app-table-cell>Total</app-table-cell>
+            <app-table-cell />
+            <app-table-cell />
             <app-table-cell class="text-right">$2,500.00</app-table-cell>
           </app-table-row>
         </app-table-footer>
