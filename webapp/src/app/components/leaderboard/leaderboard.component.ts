@@ -1,8 +1,15 @@
 import { HttpClient } from '@angular/common/http';
-import { Component, computed, inject } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, inject } from '@angular/core';
 import { injectQuery } from '@tanstack/angular-query-experimental';
 import { Leaderboard } from 'app/@types/leaderboard';
 import { TableComponent } from 'app/ui/table/table.component';
+import { TableBodyComponent } from 'app/ui/table/table-body.component';
+import { TableCaptionComponent } from 'app/ui/table/table-caption.component';
+import { TableCellComponent } from 'app/ui/table/table-cell.component';
+import { TableFooterComponent } from 'app/ui/table/table-footer.component';
+import { TableHeaderComponent } from 'app/ui/table/table-header.component';
+import { TableHeadComponent } from 'app/ui/table/table-head.component';
+import { TableRowComponent } from 'app/ui/table/table-row.component';
 import { lastValueFrom } from 'rxjs';
 
 const defaultData: Leaderboard.Entry[] = [
@@ -20,8 +27,9 @@ const defaultData: Leaderboard.Entry[] = [
 @Component({
   selector: 'app-leaderboard',
   standalone: true,
-  imports: [TableComponent],
-  templateUrl: './leaderboard.component.html'
+  imports: [TableComponent, TableBodyComponent, TableCaptionComponent, TableCellComponent, TableFooterComponent, TableHeaderComponent, TableHeadComponent, TableRowComponent],
+  templateUrl: './leaderboard.component.html',
+  changeDetection: ChangeDetectionStrategy.OnPush
 })
 export class LeaderboardComponent {
   http = inject(HttpClient);
@@ -31,12 +39,18 @@ export class LeaderboardComponent {
     queryFn: async () => lastValueFrom(this.http.get('http://127.0.0.1:8080/leaderboard')) as Promise<Leaderboard.Entry[]>,
     gcTime: Infinity
   }));
+  // TODO: replace with leadboard service when merged
+  // pullrequest = inject(PullRequestService);
+
+  // query = injectQuery(() => ({
+  //   queryKey: ['leaderboard'],
+  //   queryFn: async () => lastValueFrom(this.pullrequest.getPullRequest(1)),
+  //   gcTime: Infinity
+  // }));
 
   leaderboard = computed(() => {
-    const data = this.query.data();
-    if (!data) {
-      return defaultData;
-    }
+    let data = this.query.data() ?? defaultData;
+    data = data.sort((a, b) => b.score - a.score);
     return data;
   });
 }
