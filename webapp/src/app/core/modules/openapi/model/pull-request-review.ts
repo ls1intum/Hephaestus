@@ -9,6 +9,7 @@
  * https://openapi-generator.tech
  * Do not edit the class manually.
  */
+import { PullRequestReviewComment } from './pull-request-review-comment';
 import { User } from './user';
 import { PullRequest } from './pull-request';
 
@@ -20,6 +21,7 @@ export interface PullRequestReview {
     author?: User;
     state: PullRequestReview.StateEnum;
     submittedAt?: string;
+    comments?: Set<PullRequestReviewComment>;
     pullRequest?: PullRequest;
 }
 export namespace PullRequestReview {

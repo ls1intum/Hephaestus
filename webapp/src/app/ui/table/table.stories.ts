@@ -1,12 +1,12 @@
 import { moduleMetadata, type Meta, type StoryObj } from '@storybook/angular';
 import { TableComponent } from './table.component';
-import { TableBodyComponent } from './table-body.component';
-import { TableCaptionComponent } from './table-caption.component';
-import { TableCellComponent } from './table-cell.component';
-import { TableFooterComponent } from './table-footer.component';
-import { TableHeaderComponent } from './table-header.component';
-import { TableHeadComponent } from './table-head.component';
-import { TableRowComponent } from './table-row.component';
+import { TableBodyDirective } from './table-body.directive';
+import { TableCaptionDirective } from './table-caption.directive';
+import { TableCellDirective } from './table-cell.directive';
+import { TableFooterDirective } from './table-footer.directive';
+import { TableHeaderDirective } from './table-header.directive';
+import { TableHeadDirective } from './table-head.directive';
+import { TableRowDirective } from './table-row.directive';
 
 type CustomArgs = {
   invoices: {
@@ -22,7 +22,7 @@ const meta: Meta<CustomArgs> = {
   component: TableComponent,
   decorators: [
     moduleMetadata({
-      imports: [TableBodyComponent, TableCaptionComponent, TableCellComponent, TableFooterComponent, TableHeaderComponent, TableHeadComponent, TableRowComponent]
+      imports: [TableBodyDirective, TableCaptionDirective, TableCellDirective, TableFooterDirective, TableHeaderDirective, TableHeadDirective, TableRowDirective]
     })
   ],
   tags: ['autodocs'],
@@ -82,31 +82,29 @@ export const Default: Story = {
     props: args,
     template: `
       <app-table>
-        <app-table-caption>A list of your recent invoices.</app-table-caption>
-        <app-table-header>
-          <app-table-row>
-            <app-table-head class="w-[100px]">Invoice</app-table-head>
-            <app-table-head>Status</app-table-head>
-            <app-table-head>Method</app-table-head>
-            <app-table-head class="text-right">Amount</app-table-head>
-          </app-table-row>
-        </app-table-header>
-        <app-table-body>
-          @for (invoice of invoices; track invoice.invoice) {
-            <app-table-row>
-              <app-table-cell class="font-medium">{{invoice.invoice}}</app-table-cell>
-              <app-table-cell>{{invoice.paymentStatus}}</app-table-cell>
-              <app-table-cell>{{invoice.paymentMethod}}</app-table-cell>
-              <app-table-cell class="text-right">{{invoice.totalAmount}}</app-table-cell>
-            </app-table-row>
-          }
-        </app-table-body>
-        <app-table-footer>
-          <app-table-row>
-            <app-table-cell colspan="3">Total</app-table-cell>
-            <app-table-cell class="text-right">$2,500.00</app-table-cell>
-          </app-table-row>
-        </app-table-footer>
+        <caption appTableCaption>A list of your recent invoices.</caption>
+        <thead appTableHeader>
+          <tr appTableRow>
+            <th appTableHead class="w-[100px]">Invoice</th>
+            <th appTableHead>Status</th>
+            <th appTableHead>Method</th>
+            <th appTableHead class="text-right">Amount</th>
+          </tr>
+        </thead>
+        <tbody appTableBody>
+          <tr appTableRow *ngFor="let invoice of invoices; trackBy: trackByInvoice">
+            <td appTableCell class="font-medium">{{ invoice.invoice }}</td>
+            <td appTableCell>{{ invoice.paymentStatus }}</td>
+            <td appTableCell>{{ invoice.paymentMethod }}</td>
+            <td appTableCell class="text-right">{{ invoice.totalAmount }}</td>
+          </tr>
+        </tbody>
+        <tfoot appTableFooter>
+          <tr appTableRow>
+            <td appTableCell colspan="3">Total</td>
+            <td appTableCell class="text-right">$2,500.00</td>
+          </tr>
+        </tfoot>
       </app-table>
     `
   })

@@ -10,7 +10,7 @@ spring:
     jpa:
         hibernate:
             # We use update for development and none for production, as we use liquibase
-            ddl-auto: update
+            ddl-auto: create-drop
 
         # show-sql: "true"
         properties:
@@ -32,8 +32,10 @@ springdoc:
 
 monitoring:
     runOnStartup: true
+    # Fetching timeframe in days
+    timeframe: 7
     repository-sync-cron: "0 0 3 * * ?"
-    repositories: ls1intum/Artemis, ls1intum/Pyris, ls1intum/Athena, ls1intum/Athena-CoFee, ls1intum/artemis-ansible-collection, ls1intum/Ares, ls1intum/Ares2, ls1intum/Aeolus, ls1intum/hades, ls1intum/Apollon, ls1intum/Hephaestus, ls1intum/Apollon_standalone
+    repositories: ls1intum/Artemis
 
 # Can be any OAuth token, such as the PAT
 github:

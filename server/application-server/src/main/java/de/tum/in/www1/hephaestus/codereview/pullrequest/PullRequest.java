@@ -45,7 +45,7 @@ public class PullRequest extends BaseGitServiceEntity {
 
     private OffsetDateTime mergedAt;
 
-    @ManyToOne(fetch = FetchType.LAZY)
+    @ManyToOne(fetch = FetchType.EAGER)
     @JoinColumn(name = "author_id")
     @ToString.Exclude
     private User author;
@@ -58,7 +58,7 @@ public class PullRequest extends BaseGitServiceEntity {
     @ToString.Exclude
     private Set<PullRequestReview> reviews = new HashSet<>();
 
-    @ManyToOne(fetch = FetchType.LAZY)
+    @ManyToOne
     @JoinColumn(name = "repository_id", referencedColumnName = "id")
     @ToString.Exclude
     private Repository repository;

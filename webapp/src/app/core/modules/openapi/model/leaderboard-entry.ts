@@ -9,16 +9,15 @@
  * https://openapi-generator.tech
  * Do not edit the class manually.
  */
-import { User } from './user';
-import { PullRequest } from './pull-request';
 
 
-export interface IssueComment { 
-    id?: number;
-    createdAt?: string;
-    updatedAt?: string;
-    body?: string;
-    author?: User;
-    pullRequest?: PullRequest;
+export interface LeaderboardEntry { 
+    githubName?: string;
+    name?: string;
+    score?: number;
+    total?: number;
+    changesRequested?: number;
+    approvals?: number;
+    comments?: number;
 }
 

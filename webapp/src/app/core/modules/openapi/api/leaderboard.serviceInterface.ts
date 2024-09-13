@@ -13,30 +13,21 @@ import { HttpHeaders }                                       from '@angular/comm
 
 import { Observable }                                        from 'rxjs';
 
-import { User } from '../model/models';
-import { UserDTO } from '../model/models';
+import { LeaderboardEntry } from '../model/models';
 
 
 import { Configuration }                                     from '../configuration';
 
 
 
-export interface UserServiceInterface {
+export interface LeaderboardServiceInterface {
     defaultHeaders: HttpHeaders;
     configuration: Configuration;
 
     /**
      * 
      * 
-     * @param login 
      */
-    getFullUser(login: string, extraHttpRequestParams?: any): Observable<User>;
-
-    /**
-     * 
-     * 
-     * @param login 
-     */
-    getUser(login: string, extraHttpRequestParams?: any): Observable<UserDTO>;
+    getLeaderboard(extraHttpRequestParams?: any): Observable<Array<LeaderboardEntry>>;
 
 }

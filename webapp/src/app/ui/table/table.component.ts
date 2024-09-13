@@ -14,6 +14,5 @@ import { cn } from 'app/utils';
 })
 export class TableComponent {
   class = input<ClassValue>();
-
   computedClass = computed(() => cn('w-full caption-bottom text-sm', this.class()));
 }

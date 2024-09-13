@@ -7,7 +7,7 @@ import java.util.Set;
 import org.springframework.lang.NonNull;
 
 import de.tum.in.www1.hephaestus.codereview.base.BaseGitServiceEntity;
-import de.tum.in.www1.hephaestus.codereview.comment.review.ReviewComment;
+import de.tum.in.www1.hephaestus.codereview.comment.review.PullRequestReviewComment;
 import de.tum.in.www1.hephaestus.codereview.pullrequest.PullRequest;
 import de.tum.in.www1.hephaestus.codereview.user.User;
 import jakarta.persistence.CascadeType;
@@ -30,7 +30,7 @@ import lombok.ToString;
 @ToString(callSuper = true)
 public class PullRequestReview extends BaseGitServiceEntity {
 
-    @ManyToOne(fetch = FetchType.LAZY)
+    @ManyToOne(fetch = FetchType.EAGER)
     @JoinColumn(name = "author_id")
     @ToString.Exclude
     private User author;
@@ -38,22 +38,18 @@ public class PullRequestReview extends BaseGitServiceEntity {
     @NonNull
     private PullRequestReviewState state;
 
-    private OffsetDateTime createdAt;
-
     private OffsetDateTime submittedAt;
-
-    private OffsetDateTime updatedAt;
 
     @OneToMany(cascade = CascadeType.ALL, mappedBy = "review")
     @ToString.Exclude
-    private Set<ReviewComment> comments = new HashSet<>();
+    private Set<PullRequestReviewComment> comments = new HashSet<>();
 
-    @ManyToOne(optional = false)
+    @ManyToOne(fetch = FetchType.EAGER)
     @JoinColumn(name = "pullrequest_id", referencedColumnName = "id")
     @ToString.Exclude
     private PullRequest pullRequest;
 
-    public void addComment(ReviewComment comment) {
+    public void addComment(PullRequestReviewComment comment) {
         comments.add(comment);
     }
 }
