@@ -32,7 +32,7 @@ export class AnalyticsService {
       console.error('Failed to load Umami analytics script.');
     };
 
-    document.body.appendChild(script);
+    document.head.appendChild(script);
     this.scriptLoaded = true;
   }
 }
