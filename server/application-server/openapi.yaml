@@ -13,36 +13,6 @@ servers:
 - url: /
   description: Default Server URL
 paths:
-  /hello:
-    get:
-      tags:
-      - hello
-      summary: "Retrieves all {@link Hello Hello} entities."
-      description: "Retrieves all {@link Hello Hello} entities."
-      operationId: getAllHellos
-      responses:
-        "200":
-          description: A set of all Hello entities
-          content:
-            application/json:
-              schema:
-                uniqueItems: true
-                type: array
-                items:
-                  $ref: "#/components/schemas/Hello"
-    post:
-      tags:
-      - hello
-      summary: "Creates a new {@link Hello Hello} entity with the current timestamp."
-      description: "Creates a new {@link Hello Hello} entity with the current timestamp."
-      operationId: addHello
-      responses:
-        "200":
-          description: The created Hello entity
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/Hello"
   /user/{login}:
     get:
       tags:
@@ -147,19 +117,6 @@ paths:
                 type: string
 components:
   schemas:
-    Hello:
-      type: object
-      properties:
-        id:
-          type: integer
-          description: Unique identifier for a Hello entity.
-          format: int64
-        timestamp:
-          type: string
-          description: |-
-            Timestamp of when the Hello entity was created.
-             This field is mandatory.
-          format: date-time
     IssueCommentDTO:
       type: object
       properties:
