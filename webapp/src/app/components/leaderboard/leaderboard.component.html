@@ -27,18 +27,24 @@
               </td>
               <td appTableCell>{{ entry.score }}</td>
               <td appTableCell class="flex items-center gap-4" title="Changes Requested">
-                <div class="flex items-center gap-2">
-                  <app-icon-pull-request-changes-requested />
-                  {{ entry.changesRequested }}
-                </div>
-                <div class="flex items-center gap-2" title="Approvals">
-                  <app-icon-pull-request-approved />
-                  {{ entry.approvals }}
-                </div>
-                <div class="flex items-center gap-2" title="Comments">
-                  <app-icon-pull-request-comment />
-                  {{ entry.comments }}
-                </div>
+                @if (entry.changesRequested && entry.changesRequested > 0) {
+                  <div class="flex items-center gap-2">
+                    <app-icon-pull-request-changes-requested />
+                    {{ entry.changesRequested }}
+                  </div>
+                }
+                @if (entry.approvals && entry.approvals > 0) {
+                  <div class="flex items-center gap-2" title="Approvals">
+                    <app-icon-pull-request-approved />
+                    {{ entry.approvals }}
+                  </div>
+                }
+                @if (entry.comments && entry.comments > 0) {
+                  <div class="flex items-center gap-2" title="Comments">
+                    <app-icon-pull-request-comment />
+                    {{ entry.comments }}
+                  </div>
+                }
               </td>
             </tr>
           }
