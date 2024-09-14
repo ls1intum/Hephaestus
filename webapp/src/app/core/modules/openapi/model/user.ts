@@ -36,9 +36,21 @@ export interface User {
      * URL to the user\'s avatar.  If unavailable, a fallback can be generated from the login, e.g. on Github:  https://github.com/{login}.png
      */
     avatarUrl?: string;
+    /**
+     * Type of the user. Used to distinguish between users and bots.
+     */
+    type: User.TypeEnum;
     pullRequests?: Set<PullRequest>;
     issueComments?: Set<IssueComment>;
     reviewComments?: Set<PullRequestReviewComment>;
     reviews?: Set<PullRequestReview>;
 }
+export namespace User {
+    export type TypeEnum = 'USER' | 'BOT';
+    export const TypeEnum = {
+        User: 'USER' as TypeEnum,
+        Bot: 'BOT' as TypeEnum
+    };
+}
+
 

@@ -31,7 +31,23 @@ public class UserConverter extends BaseGitServiceEntityConverter<org.kohsuke.git
         } catch (IOException e) {
             logger.error("Failed to convert user email field for source {}: {}", source.getId(), e.getMessage());
         }
+        try {
+            user.setType(convertUserType(source.getType()));
+        } catch (IOException e) {
+            logger.error("Failed to convert user type field for source {}: {}", source.getId(), e.getMessage());
+        }
         return user;
+    }
+
+    private UserType convertUserType(String type) {
+        switch (type) {
+            case "User":
+                return UserType.USER;
+            case "Bot":
+                return UserType.BOT;
+            default:
+                return UserType.USER;
+        }
     }
 
 }

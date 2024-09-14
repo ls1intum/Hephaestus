@@ -20,7 +20,7 @@
           @for (entry of leaderboard; track entry.githubName) {
             <tr appTableRow>
               <td appTableCell class="flex items-center gap-2 font-medium">
-                <img src="https://github.com/{{ entry.githubName }}.png" width="24" height="24" />
+                <img src="{{ entry.avatarUrl }}" width="24" height="24" />
                 {{ entry.name }}
               </td>
               <td appTableCell>{{ entry.score }}</td>

@@ -43,7 +43,8 @@ public class LeaderboardService {
                         break;
                 }
             });
-            return new LeaderboardEntry(user.getLogin(), user.getName(), 0, 0, changesRequested.get(),
+            return new LeaderboardEntry(user.getLogin(), user.getAvatarUrl(), user.getName(), user.getType(), 0,
+                    changesRequested.get(),
                     changesApproved.get(), comments);
         }).toList();
 

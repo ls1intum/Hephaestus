@@ -57,6 +57,12 @@ public class User extends BaseGitServiceEntity {
      */
     private String avatarUrl;
 
+    /**
+     * Type of the user. Used to distinguish between users and bots.
+     */
+    @NonNull
+    private UserType type;
+
     @OneToMany(cascade = CascadeType.ALL, mappedBy = "author")
     private Set<PullRequest> pullRequests = new HashSet<>();
 

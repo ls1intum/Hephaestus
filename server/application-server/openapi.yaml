@@ -402,6 +402,7 @@ components:
     User:
       required:
       - login
+      - type
       - url
       type: object
       properties:
@@ -433,6 +434,12 @@ components:
             URL to the user's avatar.
              If unavailable, a fallback can be generated from the login, e.g. on Github:
              https://github.com/{login}.png
+        type:
+          type: string
+          description: Type of the user. Used to distinguish between users and bots.
+          enum:
+          - USER
+          - BOT
         pullRequests:
           uniqueItems: true
           type: array
@@ -458,12 +465,16 @@ components:
       properties:
         githubName:
           type: string
+        avatarUrl:
+          type: string
         name:
           type: string
+        type:
+          type: string
+          enum:
+          - USER
+          - BOT
         score:
-          type: integer
-          format: int32
-        total:
           type: integer
           format: int32
         changesRequested:
