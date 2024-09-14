@@ -13,10 +13,22 @@ RUN cat .env
 RUN COOLIFY_URL_VALUE=$(grep '^COOLIFY_URL=' .env | cut -d '=' -f2) && \
     sed -i "s|\$COOLIFY_URL|$COOLIFY_URL_VALUE|g" .env
 
-# Set serverUrl in environment.ts
-RUN APPLICATION_SERVER_URL=$(grep '^APPLICATION_SERVER_URL=' .env | cut -d '=' -f2) && \
-    echo "Replacing serverUrl in environment.ts with: $APPLICATION_SERVER_URL" && \
-    sed -i "s|serverUrl: '[^']*'|serverUrl: '$APPLICATION_SERVER_URL'|g" src/environments/environment.ts
+# Export environment variables from .env
+# This assumes that .env contains lines like VARIABLE=value
+# and does not contain spaces around the '='
+RUN export $(grep -v '^#' .env | xargs) && \
+    echo "Generating environment.prod.ts" && \
+    cat > src/environments/environment.prod.ts <<EOF
+export const environment = {
+  serverUrl: '${APPLICATION_SERVER_URL}',
+  umami: {
+    enabled: ${UMAMI_ENABLED},
+    scriptUrl: '${UMAMI_SCRIPT_URL}',
+    websiteId: '${UMAMI_WEBSITE_ID}',
+    domains: '${UMAMI_DOMAINS}'
+  }
+};
+EOF
 
 RUN npm install
 RUN npm run build
