@@ -19,9 +19,11 @@
         <tbody appTableBody>
           @for (entry of leaderboard; track entry.githubName) {
             <tr appTableRow>
-              <td appTableCell class="flex items-center gap-2 font-medium">
-                <img src="{{ entry.avatarUrl }}" width="24" height="24" />
-                {{ entry.name }}
+              <td appTableCell>
+                <a href="https://github.com/{{ entry.githubName }}" target="_blank" rel="noopener noreferrer" class="flex items-center gap-2 font-medium">
+                  <img src="{{ entry.avatarUrl }}" width="24" height="24" />
+                  <span class="text-muted-foreground">{{ entry.name }}</span>
+                </a>
               </td>
               <td appTableCell>{{ entry.score }}</td>
               <td appTableCell class="flex items-center gap-4" title="Changes Requested">
