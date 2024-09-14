@@ -11,6 +11,7 @@
       <app-table>
         <thead appTableHeader>
           <tr appTableRow>
+            <th appTableHead>Rank</th>
             <th appTableHead>Contributor</th>
             <th appTableHead>Score</th>
             <th appTableHead>Activity</th>
@@ -19,6 +20,7 @@
         <tbody appTableBody>
           @for (entry of leaderboard; track entry.githubName) {
             <tr appTableRow>
+              <td appTableCell>{{ entry.rank }}</td>
               <td appTableCell>
                 <a href="https://github.com/{{ entry.githubName }}" target="_blank" rel="noopener noreferrer" class="flex items-center gap-2 font-medium">
                   <img src="{{ entry.avatarUrl }}" width="24" height="24" />
@@ -51,7 +53,7 @@
         </tbody>
         <tfoot appTableFooter>
           <tr appTableRow>
-            <td appTableCell colspan="2">Total</td>
+            <td appTableCell colspan="3">Total</td>
             <td appTableCell class="text-right">{{ leaderboard.length }}</td>
           </tr>
         </tfoot>
