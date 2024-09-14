@@ -22,7 +22,7 @@ RUN export $(grep -v '^#' .env | xargs) && \
 export const environment = {
   serverUrl: '${APPLICATION_SERVER_URL}',
   umami: {
-    enabled: ${UMAMI_ENABLED},
+    enabled: '${UMAMI_ENABLED}',
     scriptUrl: '${UMAMI_SCRIPT_URL}',
     websiteId: '${UMAMI_WEBSITE_ID}',
     domains: '${UMAMI_DOMAINS}'
