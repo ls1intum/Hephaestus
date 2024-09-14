@@ -15,15 +15,96 @@ import { TableComponent } from 'app/ui/table/table.component';
 import { lastValueFrom } from 'rxjs';
 
 const defaultData: LeaderboardEntry[] = [
-  { githubName: 'shadcn', avatarUrl: 'https://avatars.githubusercontent.com/u/124599?v=4', name: 'I', score: 90, changesRequested: 0, approvals: 0, comments: 0 },
-  { githubName: 'shadcn', avatarUrl: 'https://avatars.githubusercontent.com/u/124599?v=4', name: 'A', score: 10, changesRequested: 1, approvals: 0, comments: 0 },
-  { githubName: 'shadcn', avatarUrl: 'https://avatars.githubusercontent.com/u/124599?v=4', name: 'B', score: 20, changesRequested: 0, approvals: 1, comments: 0 },
-  { githubName: 'shadcn', avatarUrl: 'https://avatars.githubusercontent.com/u/124599?v=4', name: 'C', score: 30, changesRequested: 0, approvals: 0, comments: 1 },
-  { githubName: 'shadcn', avatarUrl: 'https://avatars.githubusercontent.com/u/124599?v=4', name: 'D', score: 40, changesRequested: 0, approvals: 0, comments: 0 },
-  { githubName: 'shadcn', avatarUrl: 'https://avatars.githubusercontent.com/u/124599?v=4', name: 'E', score: 50, changesRequested: 0, approvals: 0, comments: 0 },
-  { githubName: 'shadcn', avatarUrl: 'https://avatars.githubusercontent.com/u/124599?v=4', name: 'F', score: 60, changesRequested: 0, approvals: 0, comments: 0 },
-  { githubName: 'shadcn', avatarUrl: 'https://avatars.githubusercontent.com/u/124599?v=4', name: 'G', score: 70, changesRequested: 0, approvals: 0, comments: 0 },
-  { githubName: 'shadcn', avatarUrl: 'https://avatars.githubusercontent.com/u/124599?v=4', name: 'H', score: 80, changesRequested: 0, approvals: 0, comments: 0 }
+  {
+    githubName: 'shadcn',
+    avatarUrl: 'https://avatars.githubusercontent.com/u/124599?v=4',
+    type: LeaderboardEntry.TypeEnum.User,
+    name: 'I',
+    score: 90,
+    changesRequested: 0,
+    approvals: 0,
+    comments: 0
+  },
+  {
+    githubName: 'shadcn',
+    avatarUrl: 'https://avatars.githubusercontent.com/u/124599?v=4',
+    type: LeaderboardEntry.TypeEnum.User,
+    name: 'A',
+    score: 10,
+    changesRequested: 1,
+    approvals: 0,
+    comments: 0
+  },
+  {
+    githubName: 'shadcn',
+    avatarUrl: 'https://avatars.githubusercontent.com/u/124599?v=4',
+    type: LeaderboardEntry.TypeEnum.User,
+    name: 'B',
+    score: 20,
+    changesRequested: 0,
+    approvals: 1,
+    comments: 0
+  },
+  {
+    githubName: 'shadcn',
+    avatarUrl: 'https://avatars.githubusercontent.com/u/124599?v=4',
+    type: LeaderboardEntry.TypeEnum.User,
+    name: 'C',
+    score: 30,
+    changesRequested: 0,
+    approvals: 0,
+    comments: 1
+  },
+  {
+    githubName: 'shadcn',
+    avatarUrl: 'https://avatars.githubusercontent.com/u/124599?v=4',
+    type: LeaderboardEntry.TypeEnum.User,
+    name: 'D',
+    score: 40,
+    changesRequested: 0,
+    approvals: 0,
+    comments: 0
+  },
+  {
+    githubName: 'shadcn',
+    avatarUrl: 'https://avatars.githubusercontent.com/u/124599?v=4',
+    type: LeaderboardEntry.TypeEnum.User,
+    name: 'E',
+    score: 50,
+    changesRequested: 0,
+    approvals: 0,
+    comments: 0
+  },
+  {
+    githubName: 'shadcn',
+    avatarUrl: 'https://avatars.githubusercontent.com/u/124599?v=4',
+    type: LeaderboardEntry.TypeEnum.User,
+    name: 'F',
+    score: 60,
+    changesRequested: 0,
+    approvals: 0,
+    comments: 0
+  },
+  {
+    githubName: 'shadcn',
+    avatarUrl: 'https://avatars.githubusercontent.com/u/124599?v=4',
+    type: LeaderboardEntry.TypeEnum.User,
+    name: 'G',
+    score: 70,
+    changesRequested: 0,
+    approvals: 0,
+    comments: 0
+  },
+  {
+    githubName: 'shadcn',
+    avatarUrl: 'https://avatars.githubusercontent.com/u/124599?v=4',
+    type: LeaderboardEntry.TypeEnum.User,
+    name: 'H',
+    score: 80,
+    changesRequested: 0,
+    approvals: 0,
+    comments: 0
+  }
 ];
 
 const sortByScore = (a: LeaderboardEntry, b: LeaderboardEntry) => {

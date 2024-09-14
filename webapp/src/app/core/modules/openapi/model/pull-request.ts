@@ -22,9 +22,13 @@ export interface PullRequest {
     title: string;
     url: string;
     /**
-     * State of the PullRequest.  Does not include the state of the merge.
+     * State of the PullRequest.   Does not include the state of the merge.
      */
     state: PullRequest.StateEnum;
+    additions?: number;
+    deletions?: number;
+    commits?: number;
+    changedFiles?: number;
     mergedAt?: string;
     author?: User;
     comments?: Set<IssueComment>;

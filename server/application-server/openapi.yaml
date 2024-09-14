@@ -281,12 +281,23 @@ components:
           type: string
         state:
           type: string
-          description: |-
-            State of the PullRequest.
-             Does not include the state of the merge.
+          description: "State of the PullRequest.\r\n Does not include the state of\
+            \ the merge."
           enum:
           - CLOSED
           - OPEN
+        additions:
+          type: integer
+          format: int32
+        deletions:
+          type: integer
+          format: int32
+        commits:
+          type: integer
+          format: int32
+        changedFiles:
+          type: integer
+          format: int32
         mergedAt:
           type: string
           format: date-time
@@ -425,15 +436,12 @@ components:
           description: Display name of the user.
         url:
           type: string
-          description: |-
-            Unique URL to the user's profile.
-             Not the website a user can set in their profile.
+          description: "Unique URL to the user's profile.\r\n Not the website a user\
+            \ can set in their profile."
         avatarUrl:
           type: string
-          description: |-
-            URL to the user's avatar.
-             If unavailable, a fallback can be generated from the login, e.g. on Github:
-             https://github.com/{login}.png
+          description: "URL to the user's avatar.\r\n If unavailable, a fallback can\
+            \ be generated from the login, e.g. on Github:\r\n https://github.com/{login}.png"
         type:
           type: string
           description: Type of the user. Used to distinguish between users and bots.
