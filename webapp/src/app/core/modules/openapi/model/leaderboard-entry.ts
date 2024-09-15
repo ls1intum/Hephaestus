@@ -17,10 +17,7 @@ export interface LeaderboardEntry {
     name?: string;
     type?: LeaderboardEntry.TypeEnum;
     score?: number;
-<<<<<<< HEAD
-=======
     rank?: number;
->>>>>>> develop
     changesRequested?: number;
     approvals?: number;
     comments?: number;
