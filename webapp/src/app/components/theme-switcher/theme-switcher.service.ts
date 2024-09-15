@@ -24,12 +24,14 @@ export class ThemeSwitcherService {
     this.currentTheme.set(AppTheme.LIGHT);
     this.setToLocalStorage(AppTheme.LIGHT);
     this.removeClassFromHtml('dark');
+    document.documentElement.setAttribute('data-color-mode', 'light');
   }
 
   setDarkTheme() {
     this.currentTheme.set(AppTheme.DARK);
     this.setToLocalStorage(AppTheme.DARK);
     this.addClassToHtml('dark');
+    document.documentElement.setAttribute('data-color-mode', 'dark');
   }
 
   setSystemTheme() {
@@ -42,6 +44,8 @@ export class ThemeSwitcherService {
     } else {
       this.removeClassFromHtml('dark');
     }
+
+    document.documentElement.setAttribute('data-color-mode', 'auto');
   }
 
   private addClassToHtml(className: string) {
