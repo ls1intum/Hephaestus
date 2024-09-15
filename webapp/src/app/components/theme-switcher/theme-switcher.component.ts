@@ -1,5 +1,5 @@
 import { Component, inject } from '@angular/core';
-import { LucideAngularModule } from 'lucide-angular';
+import { LucideAngularModule, Sun, Moon } from 'lucide-angular';
 import { ButtonComponent } from 'app/ui/button/button.component';
 import { AppTheme, ThemeSwitcherService } from './theme-switcher.service';
 import { animate, state, style, transition, trigger } from '@angular/animations';
@@ -19,6 +19,9 @@ import { animate, state, style, transition, trigger } from '@angular/animations'
 })
 export class ThemeSwitcherComponent {
   themeSwitcherService = inject(ThemeSwitcherService);
+
+  protected Sun = Sun;
+  protected Moon = Moon;
 
   toggleTheme() {
     if (this.themeSwitcherService.currentTheme() === AppTheme.DARK) {

@@ -1,5 +1,4 @@
 import { moduleMetadata, type Meta, type StoryObj } from '@storybook/angular';
-import { LucideAngularModule, Sun, Moon } from 'lucide-angular';
 import { ThemeSwitcherComponent } from './theme-switcher.component';
 import { BrowserAnimationsModule } from '@angular/platform-browser/animations';
 
@@ -10,7 +9,7 @@ const meta: Meta<ThemeSwitcherComponent> = {
   tags: ['autodocs'],
   decorators: [
     moduleMetadata({
-      imports: [LucideAngularModule.pick({ Sun, Moon }), BrowserAnimationsModule]
+      imports: [BrowserAnimationsModule]
     })
   ]
 };
