@@ -13,11 +13,21 @@
 
 export interface LeaderboardEntry { 
     githubName?: string;
+    avatarUrl?: string;
     name?: string;
+    type?: LeaderboardEntry.TypeEnum;
     score?: number;
-    total?: number;
+    rank?: number;
     changesRequested?: number;
     approvals?: number;
     comments?: number;
 }
+export namespace LeaderboardEntry {
+    export type TypeEnum = 'USER' | 'BOT';
+    export const TypeEnum = {
+        User: 'USER' as TypeEnum,
+        Bot: 'BOT' as TypeEnum
+    };
+}
+
 

@@ -43,6 +43,14 @@ public class PullRequest extends BaseGitServiceEntity {
     @NonNull
     private IssueState state;
 
+    private int additions;
+
+    private int deletions;
+
+    private int commits;
+
+    private int changedFiles;
+
     private OffsetDateTime mergedAt;
 
     @ManyToOne(fetch = FetchType.EAGER)
