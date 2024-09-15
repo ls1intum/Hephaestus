@@ -2,7 +2,7 @@ import { Component, isDevMode } from '@angular/core';
 import { AngularQueryDevtools } from '@tanstack/angular-query-devtools-experimental';
 import { RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
 import { LucideAngularModule, Hammer } from 'lucide-angular';
-import { ThemeSwitcherComponent } from './components/theme-switcher/theme-switcher.component';
+import { ThemeSwitcherComponent } from 'app/core/theme/theme-switcher.component';
 
 @Component({
   selector: 'app-root',

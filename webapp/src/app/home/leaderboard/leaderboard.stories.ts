@@ -2,7 +2,7 @@ import { type Meta, type StoryObj } from '@storybook/angular';
 import { LeaderboardComponent } from './leaderboard.component';
 
 const meta: Meta<LeaderboardComponent> = {
-  title: 'Components/Leaderboard',
+  title: 'Components/Home/Leaderboard',
   component: LeaderboardComponent,
   tags: ['autodocs']
 };
