@@ -1,7 +1,11 @@
 package de.tum.in.www1.hephaestus.leaderboard;
 
+import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.List;
+import java.util.Objects;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.stream.Collectors;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -10,6 +14,7 @@ import org.springframework.stereotype.Service;
 import de.tum.in.www1.hephaestus.codereview.pullrequest.PullRequest;
 import de.tum.in.www1.hephaestus.codereview.user.User;
 import de.tum.in.www1.hephaestus.codereview.user.UserService;
+import de.tum.in.www1.hephaestus.codereview.user.UserType;
 
 @Service
 public class LeaderboardService {
@@ -28,6 +33,9 @@ public class LeaderboardService {
         logger.info("Found " + users.size() + " users");
 
         List<LeaderboardEntry> leaderboard = users.stream().map(user -> {
+            if (user.getType() != UserType.USER) {
+                return null;
+            }
             int comments = user.getIssueComments().size();
             AtomicInteger changesRequested = new AtomicInteger(0);
             AtomicInteger changesApproved = new AtomicInteger(0);
@@ -47,9 +55,18 @@ public class LeaderboardService {
             });
             return new LeaderboardEntry(user.getLogin(), user.getAvatarUrl(), user.getName(), user.getType(),
                     score.get(),
+                    0, // preliminary rank
                     changesRequested.get(),
                     changesApproved.get(), comments);
-        }).toList();
+        }).filter(Objects::nonNull).collect(Collectors.toCollection(ArrayList::new));
+
+        // update ranks by score
+        leaderboard.sort(Comparator.comparingInt(LeaderboardEntry::getScore).reversed());
+        AtomicInteger rank = new AtomicInteger(1);
+        leaderboard.stream().forEach(entry -> {
+            entry.setRank(rank.get());
+            rank.incrementAndGet();
+        });
 
         return leaderboard;
     }

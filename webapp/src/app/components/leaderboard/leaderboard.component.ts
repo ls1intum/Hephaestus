@@ -107,16 +107,6 @@ const defaultData: LeaderboardEntry[] = [
   }
 ];
 
-const sortByScore = (a: LeaderboardEntry, b: LeaderboardEntry) => {
-  if (!b.score) {
-    return -1;
-  }
-  if (!a.score) {
-    return 1;
-  }
-  return b.score - a.score;
-};
-
 @Component({
   selector: 'app-leaderboard',
   standalone: true,
@@ -146,8 +136,6 @@ export class LeaderboardComponent {
   }));
 
   leaderboard = computed(() => {
-    let data = this.query.data() ?? defaultData;
-    data = data.filter((entry) => entry.type === LeaderboardEntry.TypeEnum.User).sort(sortByScore);
-    return data;
+    return this.query.data() ?? defaultData;
   });
 }
