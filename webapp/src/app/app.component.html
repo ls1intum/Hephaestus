@@ -1,3 +1,6 @@
+@if (isDevMode()) {
+  <angular-query-devtools />
+}
 <div class="flex flex-col min-h-dvh">
   <header class="container flex items-center justify-between pt-4">
     <a class="flex gap-2 items-center hover:text-muted-foreground" routerLink="/">
@@ -15,6 +18,9 @@
         <a routerLink="about" class="font-medium underline underline-offset-4">About</a>
       </p>
       <p class="text-balance text-center text-sm leading-loose text-muted-foreground md:text-left">
+        <a data-canny-link href="https://hephaestus.canny.io/feature-requests" class="font-medium underline underline-offset-4">Feature requests</a>
+      </p>
+      <p class="text-balance text-center text-sm leading-loose text-muted-foreground md:text-right flex-1">
         Built by
         <a href="https://github.com/ls1intum" target="_blank" rel="noreferrer" class="font-medium underline underline-offset-4">LS1 Team</a>
         at
