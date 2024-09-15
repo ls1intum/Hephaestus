@@ -1,9 +1,8 @@
 import { ChangeDetectionStrategy, Component, computed, inject } from '@angular/core';
 import { injectQuery } from '@tanstack/angular-query-experimental';
+import { NgIconComponent } from '@ng-icons/core';
+import { octFileDiff, octCheck, octComment } from '@ng-icons/octicons';
 import { LeaderboardEntry, LeaderboardService } from 'app/core/modules/openapi';
-import { PullRequestApprovedIconComponent } from 'app/ui/icons/PullRequestApprovedIcon.component';
-import { PullRequestChangesRequestedIconComponent } from 'app/ui/icons/PullRequestChangesRequestedIcon.component';
-import { PullRequestCommentIconComponent } from 'app/ui/icons/PullRequestCommentIcon.component';
 import { TableBodyDirective } from 'app/ui/table/table-body.directive';
 import { TableCaptionDirective } from 'app/ui/table/table-caption.directive';
 import { TableCellDirective } from 'app/ui/table/table-cell.directive';
@@ -119,14 +118,16 @@ const defaultData: LeaderboardEntry[] = [
     TableHeaderDirective,
     TableHeadDirective,
     TableRowDirective,
-    PullRequestChangesRequestedIconComponent,
-    PullRequestApprovedIconComponent,
-    PullRequestCommentIconComponent
+    NgIconComponent
   ],
   templateUrl: './leaderboard.component.html',
   changeDetection: ChangeDetectionStrategy.OnPush
 })
 export class LeaderboardComponent {
+  protected octFileDiff = octFileDiff;
+  protected octCheck = octCheck;
+  protected octComment = octComment;
+
   leaderboardService = inject(LeaderboardService);
 
   query = injectQuery(() => ({

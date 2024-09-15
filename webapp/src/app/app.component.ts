@@ -1,7 +1,7 @@
 import { Component, isDevMode } from '@angular/core';
 import { AngularQueryDevtools } from '@tanstack/angular-query-devtools-experimental';
 import { RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
-import { LucideAngularModule } from 'lucide-angular';
+import { LucideAngularModule, Hammer } from 'lucide-angular';
 import { ThemeSwitcherComponent } from './components/theme-switcher/theme-switcher.component';
 
 @Component({
@@ -12,6 +12,8 @@ import { ThemeSwitcherComponent } from './components/theme-switcher/theme-switch
   styles: []
 })
 export class AppComponent {
+  protected Hammer = Hammer;
+
   title = 'Hephaestus';
 
   isDevMode() {

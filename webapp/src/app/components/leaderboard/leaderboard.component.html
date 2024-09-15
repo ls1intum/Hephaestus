@@ -28,22 +28,22 @@
                 </a>
               </td>
               <td appTableCell>{{ entry.score }}</td>
-              <td appTableCell class="flex items-center gap-4" title="Changes Requested">
+              <td appTableCell class="flex items-center gap-3">
                 @if (entry.changesRequested && entry.changesRequested > 0) {
-                  <div class="flex items-center gap-2">
-                    <app-icon-pull-request-changes-requested />
+                  <div class="flex items-center gap-1 text-github-danger-foreground" title="Changes Requested">
+                    <ng-icon [svg]="octFileDiff" size="16" />
                     {{ entry.changesRequested }}
                   </div>
                 }
                 @if (entry.approvals && entry.approvals > 0) {
-                  <div class="flex items-center gap-2" title="Approvals">
-                    <app-icon-pull-request-approved />
+                  <div class="flex items-center gap-1 text-github-success-foreground" title="Approvals">
+                    <ng-icon [svg]="octCheck" size="16" />
                     {{ entry.approvals }}
                   </div>
                 }
                 @if (entry.comments && entry.comments > 0) {
-                  <div class="flex items-center gap-2" title="Comments">
-                    <app-icon-pull-request-comment />
+                  <div class="flex items-center gap-1 text-github-muted-foreground" title="Comments">
+                    <ng-icon [svg]="octComment" size="16" />
                     {{ entry.comments }}
                   </div>
                 }

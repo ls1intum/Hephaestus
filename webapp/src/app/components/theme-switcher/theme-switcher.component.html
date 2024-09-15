@@ -1,5 +1,5 @@
 <app-button (click)="toggleTheme()" variant="outline" size="icon">
   <div [@iconTrigger]="this.themeSwitcherService.currentTheme() ?? 'dark'">
-    <lucide-angular [name]="this.themeSwitcherService.currentTheme() === 'dark' ? 'sun' : 'moon'" class="size-5" />
+    <lucide-angular [img]="this.themeSwitcherService.currentTheme() === 'dark' ? Sun : Moon" class="size-5" />
   </div>
 </app-button>
