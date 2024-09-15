@@ -1,56 +1,49 @@
-<div class="flex flex-col gap-4 py-8">
-  @if (query.isPending()) {
-    <span class="text-muted-foreground">Data is loading...</span>
-  } @else if (query.error()) {
-    <span class="text-destructive">An error has occurred</span>
-  }
-
-  @if (leaderboard(); as leaderboard) {
-    <div class="px-4">
-      <app-table>
-        <thead appTableHeader>
-          <tr appTableRow>
-            <th appTableHead>Rank</th>
-            <th appTableHead>Contributor</th>
-            <th appTableHead>Score</th>
-            <th appTableHead>Activity</th>
-          </tr>
-        </thead>
-        <tbody appTableBody>
-          @for (entry of leaderboard; track entry.githubName) {
-            <tr appTableRow>
-              <td appTableCell>{{ entry.rank }}</td>
-              <td appTableCell>
-                <a href="https://github.com/{{ entry.githubName }}" target="_blank" rel="noopener noreferrer" class="flex items-center gap-2 font-medium">
-                  <img src="{{ entry.avatarUrl }}" width="24" height="24" />
-                  <span class="text-muted-foreground">{{ entry.name }}</span>
-                </a>
-              </td>
-              <td appTableCell>{{ entry.score }}</td>
-              <td appTableCell class="flex items-center gap-3">
-                @if (entry.changesRequested && entry.changesRequested > 0) {
-                  <div class="flex items-center gap-1 text-github-danger-foreground" title="Changes Requested">
-                    <ng-icon [svg]="octFileDiff" size="16" />
-                    {{ entry.changesRequested }}
-                  </div>
-                }
-                @if (entry.approvals && entry.approvals > 0) {
-                  <div class="flex items-center gap-1 text-github-success-foreground" title="Approvals">
-                    <ng-icon [svg]="octCheck" size="16" />
-                    {{ entry.approvals }}
-                  </div>
-                }
-                @if (entry.comments && entry.comments > 0) {
-                  <div class="flex items-center gap-1 text-github-muted-foreground" title="Comments">
-                    <ng-icon [svg]="octComment" size="16" />
-                    {{ entry.comments }}
-                  </div>
-                }
-              </td>
-            </tr>
+<app-table>
+  <thead appTableHeader>
+    <tr appTableRow>
+      <th appTableHead class="text-center">Rank</th>
+      <th appTableHead>Contributor</th>
+      <th appTableHead class="text-center">Score</th>
+      <th appTableHead>Activity</th>
+    </tr>
+  </thead>
+  <tbody appTableBody>
+    @for (entry of leaderboard(); track entry.githubName) {
+      <tr appTableRow>
+        <td appTableCell class="text-center">{{ entry.rank }}</td>
+        <td appTableCell>
+          <a href="https://github.com/{{ entry.githubName }}" target="_blank" rel="noopener noreferrer" class="flex items-center gap-2 font-medium">
+            <app-avatar class="-my-2">
+              <app-avatar-image [src]="entry.avatarUrl ?? ''" [alt]="'${entry.name}\'s avatar'" />
+              <app-avatar-fallback>
+                {{ entry.name?.slice(0, 1)?.toUpperCase() }}
+              </app-avatar-fallback>
+            </app-avatar>
+            <span class="text-muted-foreground">{{ entry.name }}</span>
+          </a>
+        </td>
+        <td appTableCell class="text-center">{{ entry.score }}</td>
+        <td appTableCell class="flex items-center gap-3">
+          @if (entry.changesRequested && entry.changesRequested > 0) {
+            <div class="flex items-center gap-1 text-github-danger-foreground" title="Changes Requested">
+              <ng-icon [svg]="octFileDiff" size="16" />
+              {{ entry.changesRequested }}
+            </div>
           }
-        </tbody>
-      </app-table>
-    </div>
-  }
-</div>
+          @if (entry.approvals && entry.approvals > 0) {
+            <div class="flex items-center gap-1 text-github-success-foreground" title="Approvals">
+              <ng-icon [svg]="octCheck" size="16" />
+              {{ entry.approvals }}
+            </div>
+          }
+          @if (entry.comments && entry.comments > 0) {
+            <div class="flex items-center gap-1 text-github-muted-foreground" title="Comments">
+              <ng-icon [svg]="octComment" size="16" />
+              {{ entry.comments }}
+            </div>
+          }
+        </td>
+      </tr>
+    }
+  </tbody>
+</app-table>
