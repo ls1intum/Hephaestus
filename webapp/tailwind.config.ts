@@ -50,6 +50,82 @@ const config = {
           DEFAULT: "hsl(var(--card))",
           foreground: "hsl(var(--card-foreground))",
         },
+        github: {
+          foreground: "var(--fgColor-default)",
+          background: "var(--bgColor-default)",
+          muted: {
+            DEFAULT: "var(--bgColor-muted)",
+            foreground: "var(--fgColor-muted)",
+          },
+          onEmphasis: {
+            DEFAULT: "var(--bgColor-emphasis)",
+            foreground: "var(--fgColor-onEmphasis)",
+          },
+          onInverse: {
+            DEFAULT: "var(--bgColor-inverse)",
+            foreground: "var(--fgColor-onInverse)",
+          },
+          white: {
+            DEFAULT: "var(--bgColor-white)",
+            foreground: "var(--fgColor-white)",
+          },
+          black: {
+            DEFAULT: "var(--bgColor-black)",
+            foreground: "var(--fgColor-black)",
+          },
+          disabled: {
+            DEFAULT: "var(--bgColor-disabled)",
+            foreground: "var(--fgColor-disabled)",
+          },
+          link: {
+            DEFAULT: "var(--bgColor-link)",
+            foreground: "var(--fgColor-link)",
+          },
+          neutral: {
+            DEFAULT: "var(--bgColor-neutral)",
+            foreground: "var(--fgColor-neutral)",
+          },
+          accent: {
+            DEFAULT: "var(--bgColor-accent)",
+            foreground: "var(--fgColor-accent)",
+          },
+          success: {
+            DEFAULT: "var(--bgColor-success)",
+            foreground: "var(--fgColor-success)",
+          },
+          open: {
+            DEFAULT: "var(--bgColor-open)",
+            foreground: "var(--fgColor-open)",
+          },
+          attention: {
+            DEFAULT: "var(--bgColor-attention)",
+            foreground: "var(--fgColor-attention)",
+          },
+          severe: {
+            DEFAULT: "var(--bgColor-severe)",
+            foreground: "var(--fgColor-severe)",
+          },
+          danger: {
+            DEFAULT: "var(--bgColor-danger)",
+            foreground: "var(--fgColor-danger)",
+          },
+          closed: {
+            DEFAULT: "var(--bgColor-closed)",
+            foreground: "var(--fgColor-closed)",
+          },
+          done: {
+            DEFAULT: "var(--bgColor-done)",
+            foreground: "var(--fgColor-done)",
+          },
+          upsell: {
+            DEFAULT: "var(--bgColor-upsell)",
+            foreground: "var(--fgColor-upsell)",
+          },
+          sponsors: {
+            DEFAULT: "var(--bgColor-sponsors)",
+            foreground: "var(--fgColor-sponsors)",
+          },
+        },
       },
       borderRadius: {
         lg: "var(--radius)",

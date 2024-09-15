@@ -1,3 +1,7 @@
+/* GitHub Primer CSS */
+@import '@primer/primitives/dist/css/functional/themes/light.css';
+@import '@primer/primitives/dist/css/functional/themes/dark.css';
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;

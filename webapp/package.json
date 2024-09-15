@@ -28,6 +28,7 @@
     "@angular/platform-browser": "18.2.1",
     "@angular/platform-browser-dynamic": "18.2.1",
     "@angular/router": "18.2.1",
+    "@primer/primitives": "^9.1.1",
     "@tanstack/angular-query-devtools-experimental": "5.52.0",
     "@tanstack/angular-query-experimental": "5.52.0",
     "autoprefixer": "10.4.20",

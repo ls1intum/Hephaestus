@@ -1,5 +1,5 @@
 import { applicationConfig, Preview } from '@storybook/angular';
-import { withThemeByClassName } from '@storybook/addon-themes';
+import { withThemeByClassName, withThemeByDataAttribute } from '@storybook/addon-themes';
 import { DocsContainer } from '@storybook/blocks';
 import { createElement } from 'react';
 import { themes } from '@storybook/core/theming';
@@ -45,6 +45,9 @@ const preview: Preview = {
           ...theme,
           appContentBg: `hsl(${backgroundHSL})`,
         };
+        el?.setAttribute('data-color-mode', currentTheme);
+        el?.setAttribute('data-light-theme', 'light');
+        el?.setAttribute('data-dark-theme', 'dark');
         return createElement(DocsContainer, props);
       },
     },
@@ -54,6 +57,14 @@ const preview: Preview = {
       themes: {
         light: '',
         dark: 'dark bg-background',
+      },
+      defaultTheme: 'light',
+    }),
+    withThemeByDataAttribute({
+      attributeName: 'data-color-mode',
+      themes: {
+        light: 'light',
+        dark: 'dark',
       },
       defaultTheme: 'light',
     }),
