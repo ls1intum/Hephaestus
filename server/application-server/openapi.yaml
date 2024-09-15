@@ -446,6 +446,9 @@ components:
         score:
           type: integer
           format: int32
+        rank:
+          type: integer
+          format: int32
         changesRequested:
           type: integer
           format: int32
