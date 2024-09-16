@@ -231,7 +231,7 @@ components:
           $ref: "#/components/schemas/PullRequest"
     PullRequest:
       required:
-      - prNumber
+      - number
       - state
       - title
       - url
@@ -253,7 +253,7 @@ components:
           type: string
         url:
           type: string
-        prNumber:
+        number:
           type: integer
           format: int32
         state:
