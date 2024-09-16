@@ -34,7 +34,7 @@ monitoring:
     runOnStartup: true
     # Fetching timeframe in days
     timeframe: 7
-    repository-sync-cron: "0 0 3 * * ?"
+    repository-sync-cron: "0 * * * *"
     repositories: ls1intum/Artemis
 
 # Can be any OAuth token, such as the PAT
