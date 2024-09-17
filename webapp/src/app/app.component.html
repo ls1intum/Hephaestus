@@ -2,10 +2,21 @@
   <angular-query-devtools />
 }
 <div class="flex flex-col min-h-dvh">
-  <header class="container flex items-center justify-between pt-4">
-    <a class="flex gap-2 items-center hover:text-muted-foreground" routerLink="/">
+  <header class="container flex items-center justify-between pt-4 gap-2">
+    <a class="flex gap-2 items-center hover:text-muted-foreground flex-1" routerLink="/">
       <lucide-angular [img]="Hammer" class="size-6" />
       <span class="text-xl font-semibold">Hephaestus</span>
+    </a>
+    <a
+      appButton
+      data-canny-link
+      href="https://hephaestus.canny.io/feature-requests"
+      class="border-github-upsell-foreground text-github-upsell-foreground hover:text-github-upsell-foreground hover:bg-purple-400/30 flex gap-2"
+      variant="outline"
+      size="sm"
+    >
+      <lucide-angular [img]="Sparkles" class="size-4" />
+      Request a feature
     </a>
     <app-theme-switcher />
   </header>

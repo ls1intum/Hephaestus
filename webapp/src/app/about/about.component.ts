@@ -5,13 +5,13 @@ import { lastValueFrom } from 'rxjs';
 import { AvatarComponent } from 'app/ui/avatar/avatar.component';
 import { AvatarImageComponent } from 'app/ui/avatar/avatar-image.component';
 import { AvatarFallbackComponent } from 'app/ui/avatar/avatar-fallback.component';
-import { ButtonComponent } from 'app/ui/button/button.component';
+import { ButtonDirective } from 'app/ui/button/button.component';
 import { GitHub } from 'app/@types/github';
 
 @Component({
   selector: 'app-about',
   standalone: true,
-  imports: [AvatarComponent, AvatarImageComponent, AvatarFallbackComponent, ButtonComponent],
+  imports: [AvatarComponent, AvatarImageComponent, AvatarFallbackComponent, ButtonDirective],
   templateUrl: './about.component.html'
 })
 export class AboutComponent {

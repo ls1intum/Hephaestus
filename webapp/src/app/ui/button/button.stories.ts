@@ -1,12 +1,17 @@
 import { argsToTemplate, moduleMetadata, type Meta, type StoryObj } from '@storybook/angular';
-import { ButtonComponent, args, argTypes } from './button.component';
+import { ButtonDirective, args, argTypes } from './button.component';
 import { LucideAngularModule, ChevronRight, Mail, Loader2 } from 'lucide-angular';
-import { within, userEvent, expect, fn } from '@storybook/test';
+import { fn } from '@storybook/test';
+
+type CustomArgs = {
+  disabled: boolean;
+  onClick: () => void;
+};
 
 // More on how to set up stories at: https://storybook.js.org/docs/writing-stories
-const meta: Meta<ButtonComponent> = {
+const meta: Meta<CustomArgs> = {
   title: 'UI/Button',
-  component: ButtonComponent,
+  component: ButtonDirective,
   tags: ['autodocs'],
   args: {
     ...args,
@@ -25,18 +30,13 @@ const meta: Meta<ButtonComponent> = {
 };
 
 export default meta;
-type Story = StoryObj<ButtonComponent>;
+type Story = StoryObj<ButtonDirective>;
 
 // More on writing stories with args: https://storybook.js.org/docs/writing-stories/args
 export const Primary: Story = {
-  play: async ({ args, canvasElement }) => {
-    const canvas = within(canvasElement);
-    await userEvent.click(canvas.getByText('Primary'));
-    await expect(args.onClick).toHaveBeenCalled();
-  },
   render: (args) => ({
     props: args,
-    template: `<app-button ${argsToTemplate(args)}>Primary</app-button>`
+    template: `<button appButton ${argsToTemplate(args)}>Primary</button>`
   })
 };
 
@@ -48,7 +48,7 @@ export const Secondary: Story = {
 
   render: (args) => ({
     props: args,
-    template: `<app-button ${argsToTemplate(args)}>Secondary</app-button>`
+    template: `<button appButton ${argsToTemplate(args)}>Secondary</button>`
   })
 };
 
@@ -60,7 +60,7 @@ export const Destructive: Story = {
 
   render: (args) => ({
     props: args,
-    template: `<app-button ${argsToTemplate(args)}>Destructive</app-button>`
+    template: `<button appButton ${argsToTemplate(args)}>Destructive</button>`
   })
 };
 
@@ -72,7 +72,7 @@ export const Outline: Story = {
 
   render: (args) => ({
     props: args,
-    template: `<app-button ${argsToTemplate(args)}>Outline</app-button>`
+    template: `<button appButton ${argsToTemplate(args)}>Outline</button>`
   })
 };
 
@@ -84,7 +84,7 @@ export const Ghost: Story = {
 
   render: (args) => ({
     props: args,
-    template: `<app-button ${argsToTemplate(args)}>Ghost</app-button>`
+    template: `<button appButton ${argsToTemplate(args)}>Ghost</button>`
   })
 };
 
@@ -96,7 +96,7 @@ export const Link: Story = {
 
   render: (args) => ({
     props: args,
-    template: `<app-button ${argsToTemplate(args)}>Link</app-button>`
+    template: `<button appButton ${argsToTemplate(args)}>Link</button>`
   })
 };
 
@@ -111,7 +111,7 @@ export const Icon: Story = {
       variant: 'outline',
       size: 'icon'
     },
-    template: `<app-button ${argsToTemplate(args)}><lucide-icon name="chevron-right" class="size-4"/></app-button>`
+    template: `<button appButton ${argsToTemplate(args)}><lucide-icon name="chevron-right" class="size-4"/></button>`
   })
 };
 
@@ -126,7 +126,7 @@ export const WithIcon: Story = {
       variant: 'default',
       size: 'default'
     },
-    template: `<app-button ${argsToTemplate(args)}><lucide-icon name="mail" class="mr-2 size-4"/>Login with Email</app-button>`
+    template: `<button appButton ${argsToTemplate(args)}><lucide-icon name="mail" class="mr-2 size-4"/>Login with Email</button>`
   })
 };
 
@@ -142,6 +142,6 @@ export const Loading: Story = {
       size: 'default',
       disabled: true
     },
-    template: `<app-button ${argsToTemplate(args)}><lucide-icon name="loader-2" class="mr-2 size-4 animate-spin"/>Please wait</app-button>`
+    template: `<button appButton ${argsToTemplate(args)}><lucide-icon name="loader-2" class="mr-2 size-4 animate-spin"/>Please wait</button>`
   })
 };

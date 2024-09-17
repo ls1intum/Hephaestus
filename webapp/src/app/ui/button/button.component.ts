@@ -1,4 +1,4 @@
-import { Component, computed, input, output } from '@angular/core';
+import { Directive, computed, input } from '@angular/core';
 import type { ClassValue } from 'clsx';
 import { VariantProps } from 'class-variance-authority';
 import { cn } from 'app/utils';
@@ -34,18 +34,17 @@ export { args, argTypes };
 
 interface ButtonVariants extends VariantProps<typeof buttonVariants> {}
 
-@Component({
-  selector: 'app-button',
+@Directive({
+  selector: '[appButton]',
   standalone: true,
-  templateUrl: './button.component.html'
+  host: {
+    '[class]': 'computedClass()'
+  }
 })
-export class ButtonComponent {
+export class ButtonDirective {
   class = input<ClassValue>('');
   variant = input<ButtonVariants['variant']>('default');
   size = input<ButtonVariants['size']>('default');
-  disabled = input<boolean>(false);
-
-  onClick = output<Event>();
 
   computedClass = computed(() => cn(buttonVariants({ variant: this.variant(), size: this.size() }), this.class()));
 }

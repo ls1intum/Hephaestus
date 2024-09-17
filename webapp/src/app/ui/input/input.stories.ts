@@ -1,6 +1,6 @@
 import { argsToTemplate, moduleMetadata, type Meta, type StoryObj } from '@storybook/angular';
 import { action } from '@storybook/addon-actions';
-import { ButtonComponent } from '@app/ui/button/button.component';
+import { ButtonDirective } from '@app/ui/button/button.component';
 import { LabelComponent } from '@app/ui/label/label.component';
 import { InputComponent, args, argTypes } from './input.component';
 
@@ -25,7 +25,7 @@ const meta: Meta<InputComponent> = {
   },
   decorators: [
     moduleMetadata({
-      imports: [ButtonComponent, LabelComponent]
+      imports: [ButtonDirective, LabelComponent]
     })
   ]
 };
@@ -74,7 +74,7 @@ export const WithButton: Story = {
     template: `
       <div class="flex gap-2 flex-row">
         <app-input ${argsToTemplate(args)} [size]="args.size" [(value)]="userInput" placeholder="Enter text here" class="grow"/>
-        <app-button (onClick)="onButtonClick(userInput)" size="${args.size ?? 'default'}" [disabled]="!userInput">Submit</app-button>
+        <button appButton (onClick)="onButtonClick(userInput)" size="${args.size ?? 'default'}" [disabled]="!userInput">Submit</button>
       </div>
     `
   })

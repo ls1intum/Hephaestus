@@ -1,13 +1,13 @@
 import { Component, inject } from '@angular/core';
 import { LucideAngularModule, Sun, Moon } from 'lucide-angular';
-import { ButtonComponent } from 'app/ui/button/button.component';
+import { ButtonDirective } from 'app/ui/button/button.component';
 import { AppTheme, ThemeSwitcherService } from './theme-switcher.service';
 import { animate, state, style, transition, trigger } from '@angular/animations';
 
 @Component({
   selector: 'app-theme-switcher',
   standalone: true,
-  imports: [ButtonComponent, LucideAngularModule],
+  imports: [ButtonDirective, LucideAngularModule],
   templateUrl: './theme-switcher.component.html',
   animations: [
     trigger('iconTrigger', [
