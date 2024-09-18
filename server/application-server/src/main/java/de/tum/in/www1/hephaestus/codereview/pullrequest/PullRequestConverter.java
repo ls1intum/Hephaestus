@@ -20,6 +20,7 @@ public class PullRequestConverter extends BaseGitServiceEntityConverter<GHPullRe
         IssueState state = convertState(source.getState());
         PullRequest pullRequest = new PullRequest();
         convertBaseFields(source, pullRequest);
+        pullRequest.setNumber(source.getNumber());
         pullRequest.setTitle(source.getTitle());
         pullRequest.setUrl(source.getHtmlUrl().toString());
         pullRequest.setState(state);

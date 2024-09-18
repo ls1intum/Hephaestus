@@ -46,8 +46,8 @@ public class LeaderboardService {
             if (user.getType() != UserType.USER) {
                 return null;
             }
-            AtomicInteger comments = new AtomicInteger(
-                    user.getIssueComments().size() + user.getReviewComments().size());
+            logger.info("User: " + user.getLogin());
+            AtomicInteger comments = new AtomicInteger(0);
             AtomicInteger changesRequested = new AtomicInteger(0);
             AtomicInteger changesApproved = new AtomicInteger(0);
             AtomicInteger score = new AtomicInteger(0);
@@ -55,9 +55,6 @@ public class LeaderboardService {
                     .filter(review -> (review.getCreatedAt() != null && review.getCreatedAt().isAfter(cutOffTime))
                             || (review.getUpdatedAt() != null && review.getUpdatedAt().isAfter(cutOffTime)))
                     .forEach(review -> {
-                        if (user.getLogin().equals("SimonEntholzer")) {
-                            logger.info("State: " + review.getState() + review.toString());
-                        }
                         if (review.getPullRequest().getAuthor().getLogin().equals(user.getLogin())) {
                             return;
                         }
@@ -70,13 +67,11 @@ public class LeaderboardService {
                                 break;
                             default:
                                 comments.incrementAndGet();
+                                logger.info("Commented Review: " + review.getPullRequest().getNumber());
                                 break;
                         }
                         score.addAndGet(calculateScore(review.getPullRequest()));
                     });
-            logger.info("User " + user.getLogin() + " has " + user.getReviews().size() + " reviews and " + comments
-                    + " comments" + " and " + changesRequested + " changes requested and " + changesApproved
-                    + " approved");
             return new LeaderboardEntry(user.getLogin(), user.getAvatarUrl(), user.getName(), user.getType(),
                     score.get(),
                     0, // preliminary rank

@@ -25,7 +25,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
 
 import de.tum.in.www1.hephaestus.codereview.comment.IssueComment;
 import de.tum.in.www1.hephaestus.codereview.comment.IssueCommentConverter;
@@ -162,7 +161,7 @@ public class GitHubDataSyncService {
         repository = repositoryRepository.save(repository);
 
         Set<PullRequest> prs = getPullRequestsFromGHRepository(ghRepo, repository);
-        logger.info("Found " + prs.size() + " PRs");
+        logger.info("Found total of " + prs.size() + " PRs");
         repository.setPullRequests(prs);
 
         pullRequestRepository.saveAll(prs);
@@ -196,21 +195,11 @@ public class GitHubDataSyncService {
                 PullRequest pullRequest = pullRequestRepository.save(pullRequestConverter.convert(pr));
                 pullRequest.setRepository(repository);
                 try {
-                    Collection<IssueComment> comments = getCommentsFromGHPullRequest(pr, pullRequest);
-                    comments = commentRepository.saveAll(comments);
-                    for (IssueComment c : comments) {
-                        pullRequest.addComment(c);
-                    }
-                } catch (IOException e) {
-                    logger.error("Error while fetching PR comments!");
-                    pullRequest.setComments(new HashSet<>());
-                }
-                try {
                     User prAuthor = getUserFromGHUser(pr.getUser());
                     prAuthor.addPullRequest(pullRequest);
                     pullRequest.setAuthor(prAuthor);
                 } catch (IOException e) {
-                    // logger.error("Error while fetching PR author!");
+                    // Dont mind this error as it occurs only for bots
                     pullRequest.setAuthor(null);
                 }
 
@@ -224,7 +213,6 @@ public class GitHubDataSyncService {
                             prReview.setAuthor(reviewAuthor);
                         } catch (IOException e) {
                             // Dont mind this error as it occurs only for bots
-                            // logger.error("Error while fetching review owner!");
                         }
                         prReview.setPullRequest(pullRequest);
                         return prReview;
@@ -233,10 +221,9 @@ public class GitHubDataSyncService {
                         pullRequest.addReview(prReview);
                         reviews.add(prReview);
                     }
-                    logger.info("Found " + newReviews.size() + " reviews for PR " + pullRequest.getId());
+                    logger.info("Found " + newReviews.size() + " reviews for PR #" + pullRequest.getNumber());
                 } catch (IOException e) {
                     logger.error("Error while fetching PR reviews!");
-                    pullRequest.setReviews(new HashSet<>());
                 }
 
                 try {
@@ -247,6 +234,16 @@ public class GitHubDataSyncService {
                     reviewCommentRepository.saveAll(prrComments);
                 } catch (IOException e) {
                     logger.error("Error while fetching PR review comments!");
+                }
+
+                try {
+                    Collection<IssueComment> comments = getCommentsFromGHPullRequest(pr, pullRequest);
+                    // comments = commentRepository.saveAll(comments);
+                    for (IssueComment c : comments) {
+                        pullRequest.addComment(c);
+                    }
+                } catch (IOException e) {
+                    logger.error("Error while fetching PR comments!");
                 }
 
                 return pullRequest;
@@ -266,8 +263,6 @@ public class GitHubDataSyncService {
             commentAuthor.addReviewComment(prrc);
         } catch (IOException e) {
             // Dont mind this error as it occurs only for bots
-            // logger.error("Error while fetching author!" + comment.getPullRequestUrl() + "
-            // " + comment.getCreatedAt());
             commentAuthor = null;
         }
         prrc.setAuthor(commentAuthor);
@@ -281,9 +276,8 @@ public class GitHubDataSyncService {
      * @param pr          The GH pull request.
      * @param pullRequest Stored PR to which the comments belong.
      * @return The comments of the given pull request.
-     * @throws IOException
+     * @throws IOException when fetching the comments fails
      */
-    @Transactional
     private Set<IssueComment> getCommentsFromGHPullRequest(GHPullRequest pr, PullRequest pullRequest)
             throws IOException {
         return pr.queryComments().list().withPageSize(100).toList().stream()
@@ -296,8 +290,6 @@ public class GitHubDataSyncService {
                         commentAuthor.addIssueComment(c);
                     } catch (IOException e) {
                         // Dont mind this error as it occurs only for bots
-                        // logger.error("Error while fetching author!" + comment.getHtmlUrl() + " " +
-                        // comment.getCreatedAt());
                         commentAuthor = null;
                     }
                     c.setAuthor(commentAuthor);
@@ -305,11 +297,20 @@ public class GitHubDataSyncService {
                 }).collect(Collectors.toSet());
     }
 
+    /**
+     * Gets the corresponding User entity instance: cache -> database -> create new
+     * user
+     * 
+     * @param user GHUser instance
+     * @return entity instance
+     */
     private User getUserFromGHUser(org.kohsuke.github.GHUser user) {
+        // Try to find user in cache
         Optional<User> ghUser = users.stream().filter(u -> u.getLogin().equals(user.getLogin())).findFirst();
         if (ghUser.isPresent()) {
             return ghUser.get();
         }
+        // Try to find user in database
         ghUser = userRepository.findUserEagerly(user.getLogin());
         if (ghUser.isPresent()) {
             User u = ghUser.get();
@@ -318,12 +319,19 @@ public class GitHubDataSyncService {
             }
             return u;
         }
-        logger.info("Creating user " + user.getLogin());
+        // Otherwise create new user
         User u = userRepository.save(userConverter.convert(user));
         users.add(u);
         return u;
     }
 
+    /**
+     * Gets the corresponding PullRequestReview from the cache.
+     * 
+     * @implNote Assumes that it's executed after the review has been fetched from
+     *           Github already
+     * @param reviewId
+     */
     private PullRequestReview getPRRFromReviewId(Long reviewId) {
         Optional<PullRequestReview> prReview = reviews.stream().filter(prr -> prr.getId().equals(reviewId)).findFirst();
         if (prReview.isPresent()) {
@@ -334,7 +342,7 @@ public class GitHubDataSyncService {
     }
 
     /**
-     * Checks if the resource has been created within the last week.
+     * Checks if the resource has been created within the timeframe.
      * 
      * @param obj
      * @return
