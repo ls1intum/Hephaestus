@@ -108,8 +108,8 @@ public class LeaderboardService {
      * @return score
      */
     private int calculateScore(PullRequest pullRequest) {
-        Double complexityScore = (pullRequest.getChangedFiles() * 3) + (pullRequest.getCommits() * 0.5)
-                + pullRequest.getAdditions() + pullRequest.getDeletions();
+        Double complexityScore = ((pullRequest.getChangedFiles() * 3) + (pullRequest.getCommits() * 0.5)
+                + pullRequest.getAdditions() + pullRequest.getDeletions()) / 10;
         if (complexityScore < 10) {
             return 1; // Simple
         } else if (complexityScore < 50) {
