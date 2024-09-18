@@ -1,16 +1,16 @@
 import { Meta, StoryObj } from '@storybook/angular';
-import { PullRequestWidgetComponent } from './pull-request-widget.component';
+import { AppIssueCardComponent } from './app-issue-card.component';
 import { PullRequest, PullRequestReview, Repository } from '@app/core/modules/openapi';
 
-const meta: Meta<PullRequestWidgetComponent> = {
-  title: 'Components/PullRequestCard',
-  component: PullRequestWidgetComponent,
+const meta: Meta<AppIssueCardComponent> = {
+  title: 'UI/AppIssueCard',
+  component: AppIssueCardComponent,
   tags: ['autodocs'] // Auto-generate docs if enabled
 };
 
 export default meta;
 
-type Story = StoryObj<PullRequestWidgetComponent>;
+type Story = StoryObj<AppIssueCardComponent>;
 
 const repo: Repository = {
   name: 'Artemis',
@@ -22,10 +22,12 @@ const repo: Repository = {
 
 const reviews = new Set<PullRequestReview>([
   {
-    state: 'APPROVED'
+    state: 'APPROVED',
+    updatedAt: 'Jan 2'
   },
   {
-    state: 'CHANGES_REQUESTED'
+    state: 'CHANGES_REQUESTED',
+    updatedAt: 'Jan 4'
   }
 ]);
 

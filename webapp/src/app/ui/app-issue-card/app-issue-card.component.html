@@ -1,0 +1,31 @@
+<div class="border border-gray-300 rounded-lg p-4 w-72">
+  <div class="flex justify-between items-center mb-2 text-xs text-gray-500">
+    <span class="font-bold flex justify-center items-center space-x-1">
+      <ng-icon [svg]="octGitPullRequest" size="16" class="mr-1"></ng-icon> {{ pullRequest().repository.name }} #{{ pullRequest().number }} on {{ pullRequest().createdAt }}
+    </span>
+    <span class="flex items-center space-x-2">
+      <span class="text-github-success-foreground font-bold">+{{ pullRequest().additions }}</span>
+      <span class="text-github-danger-foreground font-bold">-{{ pullRequest().deletions }}</span>
+    </span>
+  </div>
+
+  <div class="flex justify-between font-bold text-sm mb-3">
+    {{ pullRequest().title }}
+    @if (getMostRecentReview(); as review) {
+      @if(review.state === 'APPROVED') {
+        <ng-icon [svg]="octCheck" size="16"></ng-icon>
+      } @else if(review.state === 'DISMISSED') {
+        <ng-icon [svg]="octX" size="16"></ng-icon>
+      } @else if (review.state === 'COMMENTED') {
+        <ng-icon [svg]="octComment" size="16"></ng-icon>
+      } @else {
+        <ng-icon [svg]="octFileDiff" size="16"></ng-icon>
+      }
+    }
+  </div>
+  <div class="flex gap-1 flex-wrap">
+    @for (label of pullRequest().pullRequestLabels; track label.name) {
+      <span class="px-2 py-1 rounded-full text-xs text-white mr-2" [style.background-color]="label.color">{{ label.name }}</span>
+    }
+  </div>
+</div>
