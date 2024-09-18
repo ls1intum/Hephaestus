@@ -23,7 +23,7 @@ export interface PullRequest {
     number?: number;
     title: string;
     url: string;
-    number: number;
+    prNumber: number;
     /**
      * State of the PullRequest.  Does not include the state of the merge.
      */
