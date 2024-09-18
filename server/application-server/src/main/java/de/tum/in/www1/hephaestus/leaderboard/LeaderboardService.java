@@ -1,7 +1,10 @@
 package de.tum.in.www1.hephaestus.leaderboard;
 
+import java.time.OffsetDateTime;
+import java.time.ZoneOffset;
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.Date;
 import java.util.List;
 import java.util.Objects;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -9,6 +12,7 @@ import java.util.stream.Collectors;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 import de.tum.in.www1.hephaestus.codereview.pullrequest.PullRequest;
@@ -21,6 +25,9 @@ public class LeaderboardService {
     private static final Logger logger = LoggerFactory.getLogger(LeaderboardService.class);
 
     private final UserService userService;
+
+    @Value("${monitoring.timeframe}")
+    private int timeframe;
 
     public LeaderboardService(UserService userService) {
         this.userService = userService;
@@ -36,28 +43,45 @@ public class LeaderboardService {
             if (user.getType() != UserType.USER) {
                 return null;
             }
-            int comments = user.getIssueComments().size();
+            AtomicInteger comments = new AtomicInteger(
+                    user.getIssueComments().size() + user.getReviewComments().size());
             AtomicInteger changesRequested = new AtomicInteger(0);
             AtomicInteger changesApproved = new AtomicInteger(0);
             AtomicInteger score = new AtomicInteger(0);
-            user.getReviews().stream().forEach(review -> {
-                switch (review.getState()) {
-                    case CHANGES_REQUESTED:
-                        changesRequested.incrementAndGet();
-                        break;
-                    case APPROVED:
-                        changesApproved.incrementAndGet();
-                        break;
-                    default:
-                        break;
-                }
-                score.addAndGet(calculateScore(review.getPullRequest()));
-            });
+            OffsetDateTime cutOffTime = new Date(System.currentTimeMillis() - 1000 * 60 * 60 * 24 * timeframe)
+                    .toInstant().atOffset(ZoneOffset.UTC);
+            user.getReviews().stream()
+                    .filter(review -> (review.getCreatedAt() != null && review.getCreatedAt().isAfter(cutOffTime))
+                            || (review.getUpdatedAt() != null && review.getUpdatedAt().isAfter(cutOffTime)))
+                    .forEach(review -> {
+                        if (user.getLogin().equals("SimonEntholzer")) {
+                            logger.info("State: " + review.getState() + review.toString());
+                        }
+                        if (review.getPullRequest().getAuthor().getLogin().equals(user.getLogin())) {
+                            return;
+                        }
+                        switch (review.getState()) {
+                            case CHANGES_REQUESTED:
+                                changesRequested.incrementAndGet();
+                                break;
+                            case APPROVED:
+                                changesApproved.incrementAndGet();
+                                break;
+                            default:
+                                comments.incrementAndGet();
+                                break;
+                        }
+                        score.addAndGet(calculateScore(review.getPullRequest()));
+                    });
+            logger.info("User " + user.getLogin() + " has " + user.getReviews().size() + " reviews and " + comments
+                    + " comments" + " and " + changesRequested + " changes requested and " + changesApproved
+                    + " approved");
             return new LeaderboardEntry(user.getLogin(), user.getAvatarUrl(), user.getName(), user.getType(),
                     score.get(),
                     0, // preliminary rank
                     changesRequested.get(),
-                    changesApproved.get(), comments);
+                    changesApproved.get(),
+                    comments.get());
         }).filter(Objects::nonNull).collect(Collectors.toCollection(ArrayList::new));
 
         // update ranks by score
