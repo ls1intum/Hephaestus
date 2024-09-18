@@ -12,9 +12,9 @@
   <div class="flex justify-between font-bold text-sm mb-3">
     {{ pullRequest().title }}
     @if (getMostRecentReview(); as review) {
-      @if(review.state === 'APPROVED') {
+      @if (review.state === 'APPROVED') {
         <ng-icon [svg]="octCheck" size="16"></ng-icon>
-      } @else if(review.state === 'DISMISSED') {
+      } @else if (review.state === 'DISMISSED') {
         <ng-icon [svg]="octX" size="16"></ng-icon>
       } @else if (review.state === 'COMMENTED') {
         <ng-icon [svg]="octComment" size="16"></ng-icon>
