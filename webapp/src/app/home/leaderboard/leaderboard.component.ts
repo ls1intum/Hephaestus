@@ -39,9 +39,4 @@ export class LeaderboardComponent {
   protected octComment = octComment;
 
   leaderboard = input<LeaderboardEntry[]>();
-
-  // run on leaderboard changes
-  ngOnChanges() {
-    console.log('Leaderboard changes: ', this.leaderboard());
-  }
 }
