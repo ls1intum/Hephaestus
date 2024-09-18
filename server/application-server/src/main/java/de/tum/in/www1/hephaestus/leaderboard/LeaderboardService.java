@@ -40,7 +40,7 @@ public class LeaderboardService {
         logger.info("Creating leaderboard dataset");
 
         List<User> users = userService.getAllUsers();
-        logger.info("Found " + users.size() + " users");
+        logger.info("Leaderboard has " + users.size() + " users");
 
         OffsetDateTime cutOffTime = new Date(System.currentTimeMillis() - 1000 * 60 * 60 * 24 * timeframe)
                 .toInstant().atOffset(ZoneOffset.UTC);
@@ -49,7 +49,6 @@ public class LeaderboardService {
             if (user.getType() != UserType.USER) {
                 return null;
             }
-            logger.info("User: " + user.getLogin());
             AtomicInteger score = new AtomicInteger(0);
             Set<PullRequestReviewDTO> changesRequestedSet = new HashSet<>();
             Set<PullRequestReviewDTO> approvedSet = new HashSet<>();
@@ -64,6 +63,7 @@ public class LeaderboardService {
                         }
                         PullRequestReviewDTO reviewDTO = new PullRequestReviewDTO(review.getId(), review.getCreatedAt(),
                                 review.getUpdatedAt(), review.getSubmittedAt(), review.getState());
+
                         switch (review.getState()) {
                             case CHANGES_REQUESTED:
                                 changesRequestedSet.add(reviewDTO);
@@ -71,9 +71,12 @@ public class LeaderboardService {
                             case APPROVED:
                                 approvedSet.add(reviewDTO);
                                 break;
-                            default:
+                            case COMMENTED:
                                 commentSet.add(reviewDTO);
                                 break;
+                            default:
+                                // ignore other states and don't add to score
+                                return;
                         }
                         score.addAndGet(calculateScore(review.getPullRequest()));
                     });
@@ -105,8 +108,8 @@ public class LeaderboardService {
      * @return score
      */
     private int calculateScore(PullRequest pullRequest) {
-        Double complexityScore = (pullRequest.getChangedFiles() * 3) + (pullRequest.getCommits() * 0.5)
-                + pullRequest.getAdditions() + pullRequest.getDeletions();
+        Double complexityScore = ((pullRequest.getChangedFiles() * 3) + (pullRequest.getCommits() * 0.5)
+                + pullRequest.getAdditions() + pullRequest.getDeletions()) / 10;
         if (complexityScore < 10) {
             return 1; // Simple
         } else if (complexityScore < 50) {
