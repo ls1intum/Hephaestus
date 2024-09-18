@@ -5,8 +5,10 @@ import java.time.ZoneOffset;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.Date;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Objects;
+import java.util.Set;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Collectors;
 
@@ -16,6 +18,7 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 import de.tum.in.www1.hephaestus.codereview.pullrequest.PullRequest;
+import de.tum.in.www1.hephaestus.codereview.pullrequest.review.PullRequestReviewDTO;
 import de.tum.in.www1.hephaestus.codereview.user.User;
 import de.tum.in.www1.hephaestus.codereview.user.UserService;
 import de.tum.in.www1.hephaestus.codereview.user.UserType;
@@ -47,10 +50,11 @@ public class LeaderboardService {
                 return null;
             }
             logger.info("User: " + user.getLogin());
-            AtomicInteger comments = new AtomicInteger(0);
-            AtomicInteger changesRequested = new AtomicInteger(0);
-            AtomicInteger changesApproved = new AtomicInteger(0);
             AtomicInteger score = new AtomicInteger(0);
+            Set<PullRequestReviewDTO> changesRequestedSet = new HashSet<>();
+            Set<PullRequestReviewDTO> approvedSet = new HashSet<>();
+            Set<PullRequestReviewDTO> commentSet = new HashSet<>();
+
             user.getReviews().stream()
                     .filter(review -> (review.getCreatedAt() != null && review.getCreatedAt().isAfter(cutOffTime))
                             || (review.getUpdatedAt() != null && review.getUpdatedAt().isAfter(cutOffTime)))
@@ -58,16 +62,17 @@ public class LeaderboardService {
                         if (review.getPullRequest().getAuthor().getLogin().equals(user.getLogin())) {
                             return;
                         }
+                        PullRequestReviewDTO reviewDTO = new PullRequestReviewDTO(review.getId(), review.getCreatedAt(),
+                                review.getUpdatedAt(), review.getSubmittedAt(), review.getState());
                         switch (review.getState()) {
                             case CHANGES_REQUESTED:
-                                changesRequested.incrementAndGet();
+                                changesRequestedSet.add(reviewDTO);
                                 break;
                             case APPROVED:
-                                changesApproved.incrementAndGet();
+                                approvedSet.add(reviewDTO);
                                 break;
                             default:
-                                comments.incrementAndGet();
-                                logger.info("Commented Review: " + review.getPullRequest().getNumber());
+                                commentSet.add(reviewDTO);
                                 break;
                         }
                         score.addAndGet(calculateScore(review.getPullRequest()));
@@ -75,9 +80,9 @@ public class LeaderboardService {
             return new LeaderboardEntry(user.getLogin(), user.getAvatarUrl(), user.getName(), user.getType(),
                     score.get(),
                     0, // preliminary rank
-                    changesRequested.get(),
-                    changesApproved.get(),
-                    comments.get());
+                    changesRequestedSet.toArray(new PullRequestReviewDTO[changesRequestedSet.size()]),
+                    approvedSet.toArray(new PullRequestReviewDTO[approvedSet.size()]),
+                    commentSet.toArray(new PullRequestReviewDTO[commentSet.size()]));
         }).filter(Objects::nonNull).collect(Collectors.toCollection(ArrayList::new));
 
         // update ranks by score

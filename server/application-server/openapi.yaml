@@ -232,6 +232,9 @@ components:
         updatedAt:
           type: string
           format: date-time
+        number:
+          type: integer
+          format: int32
         title:
           type: string
         url:
@@ -450,11 +453,36 @@ components:
           type: integer
           format: int32
         changesRequested:
-          type: integer
-          format: int32
+          type: array
+          items:
+            $ref: "#/components/schemas/PullRequestReviewDTO"
         approvals:
-          type: integer
-          format: int32
+          type: array
+          items:
+            $ref: "#/components/schemas/PullRequestReviewDTO"
         comments:
+          type: array
+          items:
+            $ref: "#/components/schemas/PullRequestReviewDTO"
+    PullRequestReviewDTO:
+      type: object
+      properties:
+        id:
           type: integer
-          format: int32
+          format: int64
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+        submittedAt:
+          type: string
+          format: date-time
+        state:
+          type: string
+          enum:
+          - COMMENTED
+          - APPROVED
+          - CHANGES_REQUESTED
+          - DISMISSED
