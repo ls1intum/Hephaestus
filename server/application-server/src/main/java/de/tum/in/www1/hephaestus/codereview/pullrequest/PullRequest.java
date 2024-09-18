@@ -34,7 +34,7 @@ public class PullRequest extends BaseGitServiceEntity {
     private String url;
 
     @NonNull
-    private int number;
+    private int prNumber;
 
     /**
      * State of the PullRequest.
