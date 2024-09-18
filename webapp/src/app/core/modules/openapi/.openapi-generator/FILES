@@ -21,6 +21,7 @@ model/leaderboard-entry.ts
 model/models.ts
 model/pull-request-dto.ts
 model/pull-request-review-comment.ts
+model/pull-request-review-dto.ts
 model/pull-request-review.ts
 model/pull-request.ts
 model/repository-dto.ts

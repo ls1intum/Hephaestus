@@ -1,6 +1,8 @@
 package de.tum.in.www1.hephaestus.leaderboard;
 
 import com.fasterxml.jackson.annotation.JsonInclude;
+
+import de.tum.in.www1.hephaestus.codereview.pullrequest.review.PullRequestReviewDTO;
 import de.tum.in.www1.hephaestus.codereview.user.UserType;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
@@ -19,7 +21,7 @@ public class LeaderboardEntry {
         private UserType type;
         private int score;
         private int rank;
-        private int changesRequested;
-        private int approvals;
-        private int comments;
+        private PullRequestReviewDTO[] changesRequested;
+        private PullRequestReviewDTO[] approvals;
+        private PullRequestReviewDTO[] comments;
 }

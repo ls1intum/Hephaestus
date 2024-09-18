@@ -9,6 +9,7 @@
  * https://openapi-generator.tech
  * Do not edit the class manually.
  */
+import { PullRequestReviewDTO } from './pull-request-review-dto';
 
 
 export interface LeaderboardEntry { 
@@ -18,9 +19,9 @@ export interface LeaderboardEntry {
     type?: LeaderboardEntry.TypeEnum;
     score?: number;
     rank?: number;
-    changesRequested?: number;
-    approvals?: number;
-    comments?: number;
+    changesRequested?: Array<PullRequestReviewDTO>;
+    approvals?: Array<PullRequestReviewDTO>;
+    comments?: Array<PullRequestReviewDTO>;
 }
 export namespace LeaderboardEntry {
     export type TypeEnum = 'USER' | 'BOT';

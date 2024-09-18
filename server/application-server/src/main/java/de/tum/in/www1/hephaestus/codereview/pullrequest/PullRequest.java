@@ -30,6 +30,9 @@ import lombok.ToString;
 @NoArgsConstructor
 @ToString(callSuper = true)
 public class PullRequest extends BaseGitServiceEntity {
+
+    private int number;
+
     @NonNull
     private String title;
 

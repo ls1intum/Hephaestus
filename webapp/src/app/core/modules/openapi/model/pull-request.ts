@@ -19,6 +19,7 @@ export interface PullRequest {
     id?: number;
     createdAt?: string;
     updatedAt?: string;
+    number?: number;
     title: string;
     url: string;
     /**

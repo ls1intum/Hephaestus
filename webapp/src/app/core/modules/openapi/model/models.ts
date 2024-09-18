@@ -5,6 +5,7 @@ export * from './pull-request';
 export * from './pull-request-dto';
 export * from './pull-request-review';
 export * from './pull-request-review-comment';
+export * from './pull-request-review-dto';
 export * from './repository';
 export * from './repository-dto';
 export * from './user';

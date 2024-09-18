@@ -24,22 +24,22 @@
         </td>
         <td appTableCell class="text-center">{{ entry.score }}</td>
         <td appTableCell class="flex items-center gap-3">
-          @if (entry.changesRequested && entry.changesRequested > 0) {
+          @if (entry.changesRequested && entry.changesRequested.length > 0) {
             <div class="flex items-center gap-1 text-github-danger-foreground" title="Changes Requested">
               <ng-icon [svg]="octFileDiff" size="16" />
-              {{ entry.changesRequested }}
+              {{ entry.changesRequested.length }}
             </div>
           }
-          @if (entry.approvals && entry.approvals > 0) {
+          @if (entry.approvals && entry.approvals.length > 0) {
             <div class="flex items-center gap-1 text-github-success-foreground" title="Approvals">
               <ng-icon [svg]="octCheck" size="16" />
-              {{ entry.approvals }}
+              {{ entry.approvals.length }}
             </div>
           }
-          @if (entry.comments && entry.comments > 0) {
+          @if (entry.comments && entry.comments.length > 0) {
             <div class="flex items-center gap-1 text-github-muted-foreground" title="Comments">
               <ng-icon [svg]="octComment" size="16" />
-              {{ entry.comments }}
+              {{ entry.comments.length }}
             </div>
           }
         </td>

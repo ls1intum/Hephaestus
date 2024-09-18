@@ -1,6 +1,19 @@
 import { argsToTemplate, type Meta, type StoryObj } from '@storybook/angular';
 import { LeaderboardComponent } from './leaderboard.component';
 import { LeaderboardEntry } from 'app/core/modules/openapi/model/leaderboard-entry';
+import { PullRequestReviewDTO } from 'app/core/modules/openapi/model/pull-request-review-dto';
+
+let reviewIdCounter = 1;
+
+const generateReviews = (count: number, state: PullRequestReviewDTO.StateEnum): PullRequestReviewDTO[] => {
+  return Array.from({ length: count }, () => ({
+    id: reviewIdCounter++,
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+    submittedAt: new Date().toISOString(),
+    state
+  }));
+};
 
 const leaderboardEntries: LeaderboardEntry[] = [
   {
@@ -9,9 +22,9 @@ const leaderboardEntries: LeaderboardEntry[] = [
     type: LeaderboardEntry.TypeEnum.User,
     name: 'Armin Stanitzok',
     score: 100,
-    changesRequested: 3,
-    approvals: 5,
-    comments: 1,
+    changesRequested: generateReviews(3, PullRequestReviewDTO.StateEnum.ChangesRequested),
+    approvals: generateReviews(5, PullRequestReviewDTO.StateEnum.Approved),
+    comments: generateReviews(1, PullRequestReviewDTO.StateEnum.Commented),
     rank: 1
   },
   {
@@ -20,9 +33,9 @@ const leaderboardEntries: LeaderboardEntry[] = [
     type: LeaderboardEntry.TypeEnum.User,
     name: 'Felix T.J. Dietrich',
     score: 90,
-    changesRequested: 1,
-    approvals: 1,
-    comments: 14,
+    changesRequested: generateReviews(1, PullRequestReviewDTO.StateEnum.ChangesRequested),
+    approvals: generateReviews(1, PullRequestReviewDTO.StateEnum.Approved),
+    comments: generateReviews(14, PullRequestReviewDTO.StateEnum.Commented),
     rank: 2
   },
   {
@@ -31,9 +44,9 @@ const leaderboardEntries: LeaderboardEntry[] = [
     type: LeaderboardEntry.TypeEnum.User,
     name: 'Stephan Krusche',
     score: 50,
-    changesRequested: 0,
-    approvals: 3,
-    comments: 1,
+    changesRequested: [],
+    approvals: generateReviews(3, PullRequestReviewDTO.StateEnum.Approved),
+    comments: generateReviews(1, PullRequestReviewDTO.StateEnum.Commented),
     rank: 3
   },
   {
@@ -42,9 +55,9 @@ const leaderboardEntries: LeaderboardEntry[] = [
     type: LeaderboardEntry.TypeEnum.User,
     name: 'shadcn',
     score: 20,
-    changesRequested: 0,
-    approvals: 0,
-    comments: 1,
+    changesRequested: [],
+    approvals: [],
+    comments: generateReviews(1, PullRequestReviewDTO.StateEnum.Commented),
     rank: 4
   }
 ];
