@@ -8,9 +8,11 @@ import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.stream.Collectors;
 
 import org.kohsuke.github.GHDirection;
+import org.kohsuke.github.GHIssueState;
 import org.kohsuke.github.GHObject;
 import org.kohsuke.github.GHPullRequest;
 import org.kohsuke.github.GHPullRequestReviewComment;
@@ -56,6 +58,7 @@ public class GitHubDataSyncService {
 
     @Value("${monitoring.timeframe}")
     private int timeframe;
+    private Date cutOffTime;
 
     private GitHub github;
 
@@ -102,6 +105,8 @@ public class GitHubDataSyncService {
 
     public void syncData() {
         int successfullySyncedRepositories = 0;
+        this.cutOffTime = new Date(System.currentTimeMillis() - 1000 * 60 * 60 * 24 * timeframe);
+        logger.info("Cut-off time for the data sync: " + cutOffTime);
         for (String repositoryName : repositoriesToMonitor) {
             try {
                 syncRepository(repositoryName);
@@ -169,20 +174,23 @@ public class GitHubDataSyncService {
 
     private Set<PullRequest> getPullRequestsFromGHRepository(GHRepository ghRepo, Repository repository)
             throws IOException {
+        // Iterator allows us to handle pullrequests without knowing the next ones
         PagedIterator<GHPullRequest> pullRequests = ghRepo.queryPullRequests()
-                // .state(GHIssueState.ALL)
+                .state(GHIssueState.ALL)
                 .sort(Sort.UPDATED)
                 .direction(GHDirection.DESC)
                 .list().withPageSize(100).iterator();
         Set<PullRequest> prs = new HashSet<>();
-        while (pullRequests.hasNext()) {
+
+        // Only fetch next page if all PRs are still within the timeframe
+        AtomicBoolean fetchStillInTimeframe = new AtomicBoolean(true);
+
+        while (fetchStillInTimeframe.get() && pullRequests.hasNext()) {
             List<GHPullRequest> nextPage = pullRequests.nextPage();
-            if (!isResourceRecent(nextPage.get(0))) {
-                break;
-            }
-            logger.info("Fetched " + nextPage.size() + " PRs");
+            logger.info("Fetched " + nextPage.size() + " PRs from Github");
             prs.addAll(nextPage.stream().map(pr -> {
                 if (!isResourceRecent(pr)) {
+                    fetchStillInTimeframe.set(false);
                     return null;
                 }
                 PullRequest pullRequest = pullRequestRepository.save(pullRequestConverter.convert(pr));
@@ -332,18 +340,9 @@ public class GitHubDataSyncService {
      * @return
      */
     private boolean isResourceRecent(GHObject obj) {
-        if (obj.getClass().equals(GHPullRequest.class)) {
-            try {
-                logger.info("Checking if PR is recent: " + obj.getUpdatedAt() + ", "
-                        + obj.getCreatedAt());
-            } catch (IOException e) {
-                // TODO Auto-generated catch block
-                e.printStackTrace();
-            }
-        }
         try {
             return obj.getUpdatedAt() != null
-                    && obj.getUpdatedAt().after(new Date(System.currentTimeMillis() - 1000 * 60 * 60 * 24 * timeframe));
+                    && obj.getUpdatedAt().after(cutOffTime);
         } catch (IOException e) {
             logger.error("Error while fetching createdAt! Resource ID: " + obj.getId());
             return false;

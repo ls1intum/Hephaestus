@@ -39,6 +39,9 @@ public class LeaderboardService {
         List<User> users = userService.getAllUsers();
         logger.info("Found " + users.size() + " users");
 
+        OffsetDateTime cutOffTime = new Date(System.currentTimeMillis() - 1000 * 60 * 60 * 24 * timeframe)
+                .toInstant().atOffset(ZoneOffset.UTC);
+
         List<LeaderboardEntry> leaderboard = users.stream().map(user -> {
             if (user.getType() != UserType.USER) {
                 return null;
@@ -48,8 +51,6 @@ public class LeaderboardService {
             AtomicInteger changesRequested = new AtomicInteger(0);
             AtomicInteger changesApproved = new AtomicInteger(0);
             AtomicInteger score = new AtomicInteger(0);
-            OffsetDateTime cutOffTime = new Date(System.currentTimeMillis() - 1000 * 60 * 60 * 24 * timeframe)
-                    .toInstant().atOffset(ZoneOffset.UTC);
             user.getReviews().stream()
                     .filter(review -> (review.getCreatedAt() != null && review.getCreatedAt().isAfter(cutOffTime))
                             || (review.getUpdatedAt() != null && review.getUpdatedAt().isAfter(cutOffTime)))
