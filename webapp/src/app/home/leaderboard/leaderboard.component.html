@@ -14,7 +14,7 @@
         <td appTableCell>
           <a href="https://github.com/{{ entry.githubName }}" target="_blank" rel="noopener noreferrer" class="flex items-center gap-2 font-medium">
             <app-avatar class="-my-2">
-              <app-avatar-image [src]="entry.avatarUrl ?? ''" [alt]="'${entry.name}\'s avatar'" />
+              <app-avatar-image [src]="entry.avatarUrl ?? ''" [alt]="entry.name + '\'s avatar'" />
               <app-avatar-fallback>
                 {{ entry.name?.slice(0, 1)?.toUpperCase() }}
               </app-avatar-fallback>
