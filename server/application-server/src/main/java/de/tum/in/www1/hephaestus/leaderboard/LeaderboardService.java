@@ -37,7 +37,7 @@ public class LeaderboardService {
         this.userService = userService;
     }
 
-    public List<LeaderboardEntry> createLeaderboard(Optional<OffsetDateTime> before, Optional<OffsetDateTime> after) {
+    public List<LeaderboardEntry> createLeaderboard(Optional<OffsetDateTime> after, Optional<OffsetDateTime> before) {
         logger.info("Creating leaderboard dataset");
 
         List<User> users = userService.getAllUsers();

@@ -21,8 +21,8 @@ public class LeaderboardController {
     }
 
     @GetMapping
-    public ResponseEntity<List<LeaderboardEntry>> getLeaderboard(@RequestParam Optional<OffsetDateTime> before,
-            @RequestParam Optional<OffsetDateTime> after) {
-        return ResponseEntity.ok(leaderboardService.createLeaderboard(before, after));
+    public ResponseEntity<List<LeaderboardEntry>> getLeaderboard(@RequestParam Optional<OffsetDateTime> after,
+            @RequestParam Optional<OffsetDateTime> before) {
+        return ResponseEntity.ok(leaderboardService.createLeaderboard(after, before));
     }
 }
