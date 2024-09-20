@@ -23,7 +23,7 @@ export class HomeComponent {
   protected before = computed(() => this.queryParams().get('before')?.replace(' ', '+') ?? undefined);
 
   query = injectQuery(() => ({
-    queryKey: ['leaderboard', { after: this.after, before: this.before }],
+    queryKey: ['leaderboard', { after: this.after(), before: this.before() }],
     queryFn: async () => lastValueFrom(this.leaderboardService.getLeaderboard(this.after(), this.before()))
   }));
 }
