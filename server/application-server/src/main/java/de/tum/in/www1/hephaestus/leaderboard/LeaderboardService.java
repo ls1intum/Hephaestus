@@ -59,8 +59,8 @@ public class LeaderboardService {
             Set<PullRequestReviewDTO> commentSet = new HashSet<>();
 
             user.getReviews().stream()
-                    .filter(review -> isInTimeframe(review.getCreatedAt(), before, afterCutOff)
-                            || isInTimeframe(review.getUpdatedAt(), before, afterCutOff))
+                    .filter(review -> isInTimeframe(review.getCreatedAt(), afterCutOff, before)
+                            || isInTimeframe(review.getUpdatedAt(), afterCutOff, before))
                     .forEach(review -> {
                         if (review.getPullRequest().getAuthor().getLogin().equals(user.getLogin())) {
                             return;
@@ -103,7 +103,7 @@ public class LeaderboardService {
         return leaderboard;
     }
 
-    private boolean isInTimeframe(OffsetDateTime date, Optional<OffsetDateTime> before, OffsetDateTime after) {
+    private boolean isInTimeframe(OffsetDateTime date, OffsetDateTime after, Optional<OffsetDateTime> before) {
         return date != null && (before.isPresent() && date.isAfter(before.get()) || date.isBefore(after));
     }
 
