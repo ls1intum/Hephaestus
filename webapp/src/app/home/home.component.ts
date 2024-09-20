@@ -28,7 +28,7 @@ export class HomeComponent {
 
   query = injectQuery(() => ({
     queryKey: ['leaderboard'],
-    queryFn: async () => lastValueFrom(this.leaderboardService.getLeaderboard(this.before, this.after, undefined, undefined, undefined)),
+    queryFn: async () => lastValueFrom(this.leaderboardService.getLeaderboard(this.before, this.after)),
     gcTime: Infinity
   }));
 }
