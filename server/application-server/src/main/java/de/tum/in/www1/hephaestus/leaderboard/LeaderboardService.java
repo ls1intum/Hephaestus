@@ -8,6 +8,7 @@ import java.util.Date;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Collectors;
@@ -36,14 +37,17 @@ public class LeaderboardService {
         this.userService = userService;
     }
 
-    public List<LeaderboardEntry> createLeaderboard() {
+    public List<LeaderboardEntry> createLeaderboard(Optional<OffsetDateTime> before, Optional<OffsetDateTime> after) {
         logger.info("Creating leaderboard dataset");
 
         List<User> users = userService.getAllUsers();
-        logger.info("Leaderboard has " + users.size() + " users");
 
-        OffsetDateTime cutOffTime = new Date(System.currentTimeMillis() - 1000 * 60 * 60 * 24 * timeframe)
-                .toInstant().atOffset(ZoneOffset.UTC);
+        OffsetDateTime afterCutOff = after.isPresent() ? after.get()
+                : new Date(System.currentTimeMillis() - 1000 * 60 * 60 * 24 * timeframe).toInstant()
+                        .atOffset(ZoneOffset.UTC);
+
+        logger.info("Leaderboard has " + users.size() + " users with cut-off time " + afterCutOff + " and before time "
+                + before);
 
         List<LeaderboardEntry> leaderboard = users.stream().map(user -> {
             if (user.getType() != UserType.USER) {
@@ -55,8 +59,8 @@ public class LeaderboardService {
             Set<PullRequestReviewDTO> commentSet = new HashSet<>();
 
             user.getReviews().stream()
-                    .filter(review -> (review.getCreatedAt() != null && review.getCreatedAt().isAfter(cutOffTime))
-                            || (review.getUpdatedAt() != null && review.getUpdatedAt().isAfter(cutOffTime)))
+                    .filter(review -> isInTimeframe(review.getCreatedAt(), before, afterCutOff)
+                            || isInTimeframe(review.getUpdatedAt(), before, afterCutOff))
                     .forEach(review -> {
                         if (review.getPullRequest().getAuthor().getLogin().equals(user.getLogin())) {
                             return;
@@ -97,6 +101,10 @@ public class LeaderboardService {
         });
 
         return leaderboard;
+    }
+
+    private boolean isInTimeframe(OffsetDateTime date, Optional<OffsetDateTime> before, OffsetDateTime after) {
+        return date != null && (before.isPresent() && date.isAfter(before.get()) || date.isBefore(after));
     }
 
     /**
