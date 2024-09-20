@@ -33,7 +33,7 @@ springdoc:
 monitoring:
     runOnStartup: true
     # Fetching timeframe in days
-    timeframe: 1
+    timeframe: 7
     repository-sync-cron: "0 0 * * * *"
     repositories: ls1intum/Artemis
 
