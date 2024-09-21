@@ -16,11 +16,11 @@ export class HomeComponent {
   leaderboardService = inject(LeaderboardService);
 
   // timeframe for leaderboard
-  // example: 2024-09-19T10:15:30+01:00
+  // example: 2024-09-19
   private readonly route = inject(ActivatedRoute);
   private queryParams = toSignal(this.route.queryParamMap, { requireSync: true });
-  protected after = computed(() => this.queryParams().get('after')?.replace(' ', '+') ?? undefined);
-  protected before = computed(() => this.queryParams().get('before')?.replace(' ', '+') ?? undefined);
+  protected after = computed(() => this.queryParams().get('after') ?? undefined);
+  protected before = computed(() => this.queryParams().get('before') ?? undefined);
 
   query = injectQuery(() => ({
     queryKey: ['leaderboard', { after: this.after(), before: this.before() }],

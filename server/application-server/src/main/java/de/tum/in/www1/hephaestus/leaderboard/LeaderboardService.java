@@ -1,10 +1,11 @@
 package de.tum.in.www1.hephaestus.leaderboard;
 
+import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 import java.util.ArrayList;
 import java.util.Comparator;
-import java.util.Date;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Objects;
@@ -37,17 +38,17 @@ public class LeaderboardService {
         this.userService = userService;
     }
 
-    public List<LeaderboardEntry> createLeaderboard(Optional<OffsetDateTime> after, Optional<OffsetDateTime> before) {
+    public List<LeaderboardEntry> createLeaderboard(Optional<LocalDate> after, Optional<LocalDate> before) {
         logger.info("Creating leaderboard dataset");
 
         List<User> users = userService.getAllUsers();
 
-        OffsetDateTime afterCutOff = after.isPresent() ? after.get()
-                : new Date(System.currentTimeMillis() - 1000 * 60 * 60 * 24 * timeframe).toInstant()
-                        .atOffset(ZoneOffset.UTC);
+        LocalDateTime afterCutOff = after.isPresent() ? after.get().atStartOfDay()
+                : LocalDate.now().minusDays(timeframe).atStartOfDay();
+        Optional<LocalDateTime> beforeCutOff = before.map(date -> date.plusDays(1).atStartOfDay());
 
         logger.info("Leaderboard has " + users.size() + " users with cut-off time " + afterCutOff + " and before time "
-                + before);
+                + beforeCutOff);
 
         List<LeaderboardEntry> leaderboard = users.stream().map(user -> {
             if (user.getType() != UserType.USER) {
@@ -59,12 +60,12 @@ public class LeaderboardService {
             Set<PullRequestReviewDTO> commentSet = new HashSet<>();
 
             user.getReviews().stream()
-                    .filter(review -> isInTimeframe(review.getCreatedAt(), afterCutOff, before)
-                            || isInTimeframe(review.getUpdatedAt(), afterCutOff, before))
+                    .filter(review -> isInTimeframe(review.getCreatedAt(), afterCutOff, beforeCutOff))
                     .forEach(review -> {
                         if (review.getPullRequest().getAuthor().getLogin().equals(user.getLogin())) {
                             return;
                         }
+
                         PullRequestReviewDTO reviewDTO = new PullRequestReviewDTO(review.getId(), review.getCreatedAt(),
                                 review.getUpdatedAt(), review.getSubmittedAt(), review.getState());
 
@@ -103,8 +104,9 @@ public class LeaderboardService {
         return leaderboard;
     }
 
-    private boolean isInTimeframe(OffsetDateTime date, OffsetDateTime after, Optional<OffsetDateTime> before) {
-        return date != null && (before.isPresent() && date.isAfter(before.get()) || date.isBefore(after));
+    private boolean isInTimeframe(OffsetDateTime date, LocalDateTime after, Optional<LocalDateTime> before) {
+        return date != null && (before.isPresent() && date.isBefore(before.get().atOffset(ZoneOffset.UTC))
+                || date.isAfter(after.atOffset(ZoneOffset.UTC)));
     }
 
     /**
