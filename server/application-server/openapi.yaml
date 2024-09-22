@@ -100,13 +100,13 @@ paths:
         required: false
         schema:
           type: string
-          format: date-time
+          format: date
       - name: before
         in: query
         required: false
         schema:
           type: string
-          format: date-time
+          format: date
       responses:
         "200":
           description: OK
