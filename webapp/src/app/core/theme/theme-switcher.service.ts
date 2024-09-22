@@ -5,71 +5,78 @@ export enum AppTheme {
   DARK = 'dark'
 }
 
-const IS_CLIENT_RENDER = typeof localStorage !== 'undefined';
 const LOCAL_STORAGE_THEME_KEY = 'theme';
-
-let selectedTheme: AppTheme | undefined = undefined;
-
-if (IS_CLIENT_RENDER) {
-  selectedTheme = (localStorage.getItem(LOCAL_STORAGE_THEME_KEY) as AppTheme) || undefined;
-}
 
 @Injectable({
   providedIn: 'root'
 })
 export class ThemeSwitcherService {
-  currentTheme = signal<AppTheme | undefined>(selectedTheme);
+  private htmlElement = document.documentElement;
+  private metaThemeColor = document.querySelector<HTMLMetaElement>('meta[name="theme-color"]');
+
+  currentTheme = signal<AppTheme | 'auto' | undefined>(this.getInitialTheme());
+
+  constructor() {
+    if (this.currentTheme() === 'auto') {
+      this.applySystemTheme();
+      window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', this.handleSystemThemeChange);
+    }
+  }
 
   setLightTheme() {
-    this.currentTheme.set(AppTheme.LIGHT);
-    this.setToLocalStorage(AppTheme.LIGHT);
-    this.removeClassFromHtml('dark');
-    document.documentElement.setAttribute('data-color-mode', 'light');
+    this.applyTheme(AppTheme.LIGHT);
   }
 
   setDarkTheme() {
-    this.currentTheme.set(AppTheme.DARK);
-    this.setToLocalStorage(AppTheme.DARK);
-    this.addClassToHtml('dark');
-    document.documentElement.setAttribute('data-color-mode', 'dark');
+    this.applyTheme(AppTheme.DARK);
   }
 
   setSystemTheme() {
-    this.currentTheme.set(undefined);
-    this.removeFromLocalStorage();
-
-    const isSystemDark = window?.matchMedia('(prefers-color-scheme: dark)').matches ?? false;
-    if (isSystemDark) {
-      this.addClassToHtml('dark');
-    } else {
-      this.removeClassFromHtml('dark');
-    }
-
-    document.documentElement.setAttribute('data-color-mode', 'auto');
+    this.currentTheme.set('auto');
+    localStorage.removeItem(LOCAL_STORAGE_THEME_KEY);
+    this.applySystemTheme();
+    this.updateMetaThemeColor();
   }
 
-  private addClassToHtml(className: string) {
-    if (IS_CLIENT_RENDER) {
-      this.removeClassFromHtml(className);
-      document.documentElement.classList.add(className);
+  private applyTheme(theme: AppTheme) {
+    this.currentTheme.set(theme);
+    localStorage.setItem(LOCAL_STORAGE_THEME_KEY, theme);
+    this.htmlElement.classList.toggle(AppTheme.DARK, theme === AppTheme.DARK);
+    this.htmlElement.setAttribute('data-color-mode', theme);
+    this.updateMetaThemeColor();
+  }
+
+  private applySystemTheme() {
+    const isDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+    this.htmlElement.classList.toggle(AppTheme.DARK, isDark);
+    this.htmlElement.setAttribute('data-color-mode', 'auto');
+    this.updateMetaThemeColor();
+  }
+
+  private handleSystemThemeChange = (event: MediaQueryListEvent) => {
+    if (this.currentTheme() === 'auto') {
+      this.htmlElement.classList.toggle(AppTheme.DARK, event.matches);
+      this.updateMetaThemeColor();
+    }
+  };
+
+  private updateMetaThemeColor() {
+    if (this.metaThemeColor) {
+      const backgroundColor = getComputedStyle(this.htmlElement).getPropertyValue('--background').trim();
+      this.metaThemeColor.setAttribute('content', `hsl(${backgroundColor})`);
     }
   }
 
-  private removeClassFromHtml(className: string) {
-    if (IS_CLIENT_RENDER) {
-      document.documentElement.classList.remove(className);
+  private getInitialTheme(): AppTheme | 'auto' | undefined {
+    if (typeof localStorage === 'undefined') {
+      return 'auto';
     }
-  }
 
-  private setToLocalStorage(theme: AppTheme) {
-    if (IS_CLIENT_RENDER) {
-      localStorage.setItem(LOCAL_STORAGE_THEME_KEY, theme);
+    const storedTheme = localStorage.getItem(LOCAL_STORAGE_THEME_KEY) as AppTheme | null;
+    if (storedTheme === AppTheme.LIGHT || storedTheme === AppTheme.DARK) {
+      return storedTheme;
     }
-  }
 
-  private removeFromLocalStorage() {
-    if (IS_CLIENT_RENDER) {
-      localStorage.removeItem(LOCAL_STORAGE_THEME_KEY);
-    }
+    return 'auto';
   }
 }
