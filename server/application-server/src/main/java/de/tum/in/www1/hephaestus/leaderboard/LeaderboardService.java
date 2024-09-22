@@ -1,13 +1,15 @@
 package de.tum.in.www1.hephaestus.leaderboard;
 
+import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 import java.util.ArrayList;
 import java.util.Comparator;
-import java.util.Date;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Collectors;
@@ -36,16 +38,20 @@ public class LeaderboardService {
         this.userService = userService;
     }
 
-    public List<LeaderboardEntry> createLeaderboard() {
+    public List<LeaderboardEntry> createLeaderboard(Optional<LocalDate> after, Optional<LocalDate> before) {
         logger.info("Creating leaderboard dataset");
 
-        List<User> users = userService.getAllUsers();
-        logger.info("Leaderboard has " + users.size() + " users");
+        LocalDateTime afterCutOff = after.isPresent() ? after.get().atStartOfDay()
+                : LocalDate.now().minusDays(timeframe).atStartOfDay();
+        Optional<LocalDateTime> beforeCutOff = before.map(date -> date.plusDays(1).atStartOfDay());
 
-        OffsetDateTime cutOffTime = new Date(System.currentTimeMillis() - 1000 * 60 * 60 * 24 * timeframe)
-                .toInstant().atOffset(ZoneOffset.UTC);
+        List<User> users = userService.getAllUsersInTimeframe(afterCutOff.atOffset(ZoneOffset.UTC),
+                beforeCutOff.map(b -> b.atOffset(ZoneOffset.UTC)).orElse(OffsetDateTime.now()));
+
+        logger.info("Found " + users.size() + " users for the leaderboard");
 
         List<LeaderboardEntry> leaderboard = users.stream().map(user -> {
+            // ignore non-users, e.g. bots
             if (user.getType() != UserType.USER) {
                 return null;
             }
@@ -55,12 +61,11 @@ public class LeaderboardService {
             Set<PullRequestReviewDTO> commentSet = new HashSet<>();
 
             user.getReviews().stream()
-                    .filter(review -> (review.getCreatedAt() != null && review.getCreatedAt().isAfter(cutOffTime))
-                            || (review.getUpdatedAt() != null && review.getUpdatedAt().isAfter(cutOffTime)))
                     .forEach(review -> {
                         if (review.getPullRequest().getAuthor().getLogin().equals(user.getLogin())) {
                             return;
                         }
+
                         PullRequestReviewDTO reviewDTO = new PullRequestReviewDTO(review.getId(), review.getCreatedAt(),
                                 review.getUpdatedAt(), review.getSubmittedAt(), review.getState());
 

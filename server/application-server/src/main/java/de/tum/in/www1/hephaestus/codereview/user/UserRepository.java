@@ -1,5 +1,6 @@
 package de.tum.in.www1.hephaestus.codereview.user;
 
+import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.Optional;
 
@@ -39,4 +40,12 @@ public interface UserRepository extends JpaRepository<User, Long> {
                 JOIN FETCH u.reviews
             """)
     List<User> findAllWithRelations();
+
+    @Query("""
+                SELECT u
+                FROM User u
+                JOIN FETCH u.reviews re
+                WHERE re.createdAt BETWEEN :after AND :before
+            """)
+    List<User> findAllInTimeframe(@Param("after") OffsetDateTime after, @Param("before") OffsetDateTime before);
 }

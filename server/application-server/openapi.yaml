@@ -94,6 +94,19 @@ paths:
       tags:
       - leaderboard
       operationId: getLeaderboard
+      parameters:
+      - name: after
+        in: query
+        required: false
+        schema:
+          type: string
+          format: date
+      - name: before
+        in: query
+        required: false
+        schema:
+          type: string
+          format: date
       responses:
         "200":
           description: OK
