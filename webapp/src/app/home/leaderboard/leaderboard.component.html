@@ -11,9 +11,9 @@
     @for (entry of leaderboard(); track entry.githubName) {
       <tr appTableRow>
         <td appTableCell class="text-center">{{ entry.rank }}</td>
-        <td appTableCell>
+        <td appTableCell class="py-2">
           <a href="https://github.com/{{ entry.githubName }}" target="_blank" rel="noopener noreferrer" class="flex items-center gap-2 font-medium">
-            <app-avatar class="-my-2">
+            <app-avatar>
               <app-avatar-image [src]="entry.avatarUrl ?? ''" [alt]="entry.name + '\'s avatar'" />
               <app-avatar-fallback>
                 {{ entry.name?.slice(0, 1)?.toUpperCase() }}
@@ -23,25 +23,27 @@
           </a>
         </td>
         <td appTableCell class="text-center">{{ entry.score }}</td>
-        <td appTableCell class="flex items-center gap-3">
-          @if (entry.changesRequested && entry.changesRequested.length > 0) {
-            <div class="flex items-center gap-1 text-github-danger-foreground" title="Changes Requested">
-              <ng-icon [svg]="octFileDiff" size="16" />
-              {{ entry.changesRequested.length }}
-            </div>
-          }
-          @if (entry.approvals && entry.approvals.length > 0) {
-            <div class="flex items-center gap-1 text-github-success-foreground" title="Approvals">
-              <ng-icon [svg]="octCheck" size="16" />
-              {{ entry.approvals.length }}
-            </div>
-          }
-          @if (entry.comments && entry.comments.length > 0) {
-            <div class="flex items-center gap-1 text-github-muted-foreground" title="Comments">
-              <ng-icon [svg]="octComment" size="16" />
-              {{ entry.comments.length }}
-            </div>
-          }
+        <td appTableCell class="py-2">
+          <div class="flex items-center gap-3">
+            @if (entry.changesRequested && entry.changesRequested.length > 0) {
+              <div class="flex items-center gap-1 text-github-danger-foreground" title="Changes Requested">
+                <ng-icon [svg]="octFileDiff" size="16" />
+                {{ entry.changesRequested.length }}
+              </div>
+            }
+            @if (entry.approvals && entry.approvals.length > 0) {
+              <div class="flex items-center gap-1 text-github-success-foreground" title="Approvals">
+                <ng-icon [svg]="octCheck" size="16" />
+                {{ entry.approvals.length }}
+              </div>
+            }
+            @if (entry.comments && entry.comments.length > 0) {
+              <div class="flex items-center gap-1 text-github-muted-foreground" title="Comments">
+                <ng-icon [svg]="octComment" size="16" />
+                {{ entry.comments.length }}
+              </div>
+            }
+          </div>
         </td>
       </tr>
     }
