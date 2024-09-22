@@ -41,16 +41,17 @@ public class LeaderboardService {
     public List<LeaderboardEntry> createLeaderboard(Optional<LocalDate> after, Optional<LocalDate> before) {
         logger.info("Creating leaderboard dataset");
 
-        List<User> users = userService.getAllUsers();
-
         LocalDateTime afterCutOff = after.isPresent() ? after.get().atStartOfDay()
                 : LocalDate.now().minusDays(timeframe).atStartOfDay();
         Optional<LocalDateTime> beforeCutOff = before.map(date -> date.plusDays(1).atStartOfDay());
 
-        logger.info("Leaderboard has " + users.size() + " users with cut-off time " + afterCutOff + " and before time "
-                + beforeCutOff);
+        List<User> users = userService.getAllUsersInTimeframe(afterCutOff.atOffset(ZoneOffset.UTC),
+                beforeCutOff.map(b -> b.atOffset(ZoneOffset.UTC)).orElse(OffsetDateTime.now()));
+
+        logger.info("Found " + users.size() + " users for the leaderboard");
 
         List<LeaderboardEntry> leaderboard = users.stream().map(user -> {
+            // ignore non-users, e.g. bots
             if (user.getType() != UserType.USER) {
                 return null;
             }
@@ -60,7 +61,6 @@ public class LeaderboardService {
             Set<PullRequestReviewDTO> commentSet = new HashSet<>();
 
             user.getReviews().stream()
-                    .filter(review -> isInTimeframe(review.getCreatedAt(), afterCutOff, beforeCutOff))
                     .forEach(review -> {
                         if (review.getPullRequest().getAuthor().getLogin().equals(user.getLogin())) {
                             return;
@@ -102,11 +102,6 @@ public class LeaderboardService {
         });
 
         return leaderboard;
-    }
-
-    private boolean isInTimeframe(OffsetDateTime date, LocalDateTime after, Optional<LocalDateTime> before) {
-        return date != null && (before.isPresent() && date.isBefore(before.get().atOffset(ZoneOffset.UTC))
-                || date.isAfter(after.atOffset(ZoneOffset.UTC)));
     }
 
     /**

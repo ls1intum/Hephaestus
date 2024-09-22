@@ -1,5 +1,6 @@
 package de.tum.in.www1.hephaestus.codereview.user;
 
+import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.Optional;
 
@@ -30,5 +31,10 @@ public class UserService {
     public List<User> getAllUsers() {
         logger.info("Getting all users");
         return userRepository.findAll().stream().toList();
+    }
+
+    public List<User> getAllUsersInTimeframe(OffsetDateTime after, OffsetDateTime before) {
+        logger.info("Getting all users in timeframe between " + after + " and " + before);
+        return userRepository.findAllInTimeframe(after, before);
     }
 }
