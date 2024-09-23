@@ -23,6 +23,7 @@ import org.kohsuke.github.PagedIterator;
 import org.kohsuke.github.GHPullRequestQueryBuilder.Sort;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
@@ -68,12 +69,18 @@ public class GitHubDataSyncService {
     private final PullRequestReviewCommentRepository reviewCommentRepository;
     private final UserRepository userRepository;
 
-    private final RepositoryConverter repositoryConverter;
-    private final PullRequestConverter pullRequestConverter;
-    private final PullRequestReviewConverter reviewConverter;
-    private final IssueCommentConverter commentConverter;
-    private final PullRequestReviewCommentConverter reviewCommentConverter;
-    private final UserConverter userConverter;
+    @Autowired
+    private RepositoryConverter repositoryConverter;
+    @Autowired
+    private PullRequestConverter pullRequestConverter;
+    @Autowired
+    private PullRequestReviewConverter reviewConverter;
+    @Autowired
+    private IssueCommentConverter commentConverter;
+    @Autowired
+    private PullRequestReviewCommentConverter reviewCommentConverter;
+    @Autowired
+    private UserConverter userConverter;
 
     private Set<User> users = new HashSet<>();
     private Set<PullRequestReview> reviews = new HashSet<>();
@@ -81,10 +88,7 @@ public class GitHubDataSyncService {
     public GitHubDataSyncService(RepositoryRepository repositoryRepository, PullRequestRepository pullRequestRepository,
             PullRequestReviewRepository prReviewRepository,
             IssueCommentRepository commentRepository, PullRequestReviewCommentRepository reviewCommentRepository,
-            UserRepository userRepository,
-            RepositoryConverter repositoryConverter, PullRequestConverter pullRequestConverter,
-            PullRequestReviewConverter reviewConverter, IssueCommentConverter commentConverter,
-            PullRequestReviewCommentConverter reviewCommentConverter, UserConverter userConverter) {
+            UserRepository userRepository) {
         logger.info("Hello from GitHubDataSyncService!");
 
         this.repositoryRepository = repositoryRepository;
@@ -93,13 +97,6 @@ public class GitHubDataSyncService {
         this.commentRepository = commentRepository;
         this.reviewCommentRepository = reviewCommentRepository;
         this.userRepository = userRepository;
-
-        this.repositoryConverter = repositoryConverter;
-        this.pullRequestConverter = pullRequestConverter;
-        this.reviewConverter = reviewConverter;
-        this.commentConverter = commentConverter;
-        this.reviewCommentConverter = reviewCommentConverter;
-        this.userConverter = userConverter;
     }
 
     public void syncData() {
