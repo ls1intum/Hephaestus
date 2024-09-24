@@ -28,6 +28,17 @@ public class PullRequestReviewConverter extends BaseGitServiceEntityConverter<GH
         return review;
     }
 
+    @Override
+    public PullRequestReview update(@NonNull GHPullRequestReview source, @NonNull PullRequestReview review) {
+        try {
+            review.setUpdatedAt(convertToOffsetDateTime(source.getUpdatedAt()));
+        } catch (IOException e) {
+            logger.error("Failed to convert updatedAt field for source {}: {}", source.getId(), e.getMessage());
+        }
+        review.setState(convertState(source.getState()));
+        return review;
+    }
+
     private PullRequestReviewState convertState(org.kohsuke.github.GHPullRequestReviewState state) {
         switch (state) {
             case COMMENTED:

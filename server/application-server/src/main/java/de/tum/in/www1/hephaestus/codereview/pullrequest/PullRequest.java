@@ -65,7 +65,7 @@ public class PullRequest extends BaseGitServiceEntity {
     @ToString.Exclude
     private Set<IssueComment> comments = new HashSet<>();
 
-    @OneToMany(cascade = CascadeType.ALL, mappedBy = "pullRequest")
+    @OneToMany(cascade = CascadeType.REFRESH, mappedBy = "pullRequest")
     @ToString.Exclude
     private Set<PullRequestReview> reviews = new HashSet<>();
 

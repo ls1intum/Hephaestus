@@ -17,13 +17,27 @@ public class PullRequestConverter extends BaseGitServiceEntityConverter<GHPullRe
 
     @Override
     public PullRequest convert(@NonNull GHPullRequest source) {
-        IssueState state = convertState(source.getState());
         PullRequest pullRequest = new PullRequest();
         convertBaseFields(source, pullRequest);
         pullRequest.setNumber(source.getNumber());
-        pullRequest.setTitle(source.getTitle());
         pullRequest.setUrl(source.getHtmlUrl().toString());
-        pullRequest.setState(state);
+        pullRequest = setUpdatableFields(source, pullRequest);
+        return pullRequest;
+    }
+
+    @Override
+    public PullRequest update(@NonNull GHPullRequest source, @NonNull PullRequest pullRequest) {
+        return setUpdatableFields(source, pullRequest);
+    }
+
+    private PullRequest setUpdatableFields(@NonNull GHPullRequest source, @NonNull PullRequest pullRequest) {
+        pullRequest.setTitle(source.getTitle());
+        pullRequest.setState(convertState(source.getState()));
+        try {
+            pullRequest.setUpdatedAt(convertToOffsetDateTime(source.getUpdatedAt()));
+        } catch (IOException e) {
+            logger.error("Failed to convert updatedAt field for source {}: {}", source.getId(), e.getMessage());
+        }
         try {
             pullRequest.setAdditions(source.getAdditions());
         } catch (IOException e) {

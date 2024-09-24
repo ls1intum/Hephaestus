@@ -2,6 +2,7 @@ package de.tum.in.www1.hephaestus.codereview.user;
 
 import java.io.IOException;
 
+import org.kohsuke.github.GHUser;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.lang.NonNull;
@@ -15,7 +16,7 @@ public class UserConverter extends BaseGitServiceEntityConverter<org.kohsuke.git
     protected static final Logger logger = LoggerFactory.getLogger(UserConverter.class);
 
     @Override
-    public User convert(@NonNull org.kohsuke.github.GHUser source) {
+    public User convert(@NonNull GHUser source) {
         User user = new User();
         convertBaseFields(source, user);
         user.setLogin(source.getLogin());
@@ -36,6 +37,17 @@ public class UserConverter extends BaseGitServiceEntityConverter<org.kohsuke.git
         } catch (IOException e) {
             logger.error("Failed to convert user type field for source {}: {}", source.getId(), e.getMessage());
         }
+        return user;
+    }
+
+    @Override
+    public User update(@NonNull GHUser source, @NonNull User user) {
+        try {
+            user.setUpdatedAt(convertToOffsetDateTime(source.getUpdatedAt()));
+        } catch (IOException e) {
+            logger.error("Failed to convert updatedAt field for source {}: {}", source.getId(), e.getMessage());
+        }
+        user.setAvatarUrl(source.getAvatarUrl());
         return user;
     }
 

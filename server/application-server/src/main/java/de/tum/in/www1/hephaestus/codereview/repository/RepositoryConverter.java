@@ -1,9 +1,12 @@
 package de.tum.in.www1.hephaestus.codereview.repository;
 
+import java.io.IOException;
+
 import org.kohsuke.github.GHRepository;
 import org.kohsuke.github.GHRepository.Visibility;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.lang.NonNull;
-import org.springframework.lang.Nullable;
 import org.springframework.stereotype.Component;
 
 import de.tum.in.www1.hephaestus.codereview.base.BaseGitServiceEntityConverter;
@@ -11,8 +14,9 @@ import de.tum.in.www1.hephaestus.codereview.base.BaseGitServiceEntityConverter;
 @Component
 public class RepositoryConverter extends BaseGitServiceEntityConverter<GHRepository, Repository> {
 
+    protected static final Logger logger = LoggerFactory.getLogger(RepositoryConverter.class);
+
     @Override
-    @Nullable
     public Repository convert(@NonNull GHRepository source) {
         Repository repository = new Repository();
         convertBaseFields(source, repository);
@@ -23,6 +27,16 @@ public class RepositoryConverter extends BaseGitServiceEntityConverter<GHReposit
         repository.setDefaultBranch(source.getDefaultBranch());
         repository.setVisibility(convertVisibility(source.getVisibility()));
         repository.setHomepage(source.getHomepage());
+        return repository;
+    }
+
+    @Override
+    public Repository update(@NonNull GHRepository source, @NonNull Repository repository) {
+        try {
+            repository.setUpdatedAt(convertToOffsetDateTime(source.getUpdatedAt()));
+        } catch (IOException e) {
+            logger.error("Failed to convert updatedAt field for source {}: {}", source.getId(), e.getMessage());
+        }
         return repository;
     }
 
