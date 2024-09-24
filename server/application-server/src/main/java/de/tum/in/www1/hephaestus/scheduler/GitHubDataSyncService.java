@@ -131,20 +131,18 @@ public class GitHubDataSyncService {
         if (github == null) {
             github = new GitHubBuilder().withOAuthToken(ghAuthToken).build();
         }
-        Repository repo = this.fetchRepository(repositoryName);
-        logger.info("Synced repository until " + repo.getUpdatedAt());
+        this.fetchRepository(repositoryName);
     }
 
     /**
      * Rest API implementation of fetching a Github repository.
      * 
-     * @return The repository corresponding to the given nameWithOwner.
      * @throws IOException
      */
-    public Repository fetchRepository(String nameWithOwner) throws IOException {
+    public void fetchRepository(String nameWithOwner) throws IOException {
         if (github == null) {
             logger.error("GitHub client not initialized correctly!");
-            return null;
+            return;
         }
 
         GHRepository ghRepo = github.getRepository(nameWithOwner);
@@ -179,7 +177,6 @@ public class GitHubDataSyncService {
 
         users = new HashSet<>();
         reviews = new HashSet<>();
-        return repository;
     }
 
     private Set<PullRequest> fetchPullRequestsFromGHRepository(GHRepository ghRepo, Repository repository)
