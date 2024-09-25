@@ -25,7 +25,11 @@
         <td appTableCell class="text-center">{{ entry.score }}</td>
         <td appTableCell class="py-2">
           <div class="flex items-center gap-3">
-            <div class="flex items-center gap-1 text-github-foreground" title="Total reviewed PRs">
+            <div class="flex items-center gap-1 text-github-muted-foreground" title="Total number of reviews">
+              <ng-icon [svg]="octEye" size="16" />
+              {{ entry.numberOfReviews }}
+            </div>
+            <div class="flex items-center gap-1 text-github-muted-foreground" title="Total reviewed PRs">
               <ng-icon [svg]="octGitPullRequest" size="16" />
               {{ entry.numberOfReviewedPRs }}
             </div>
