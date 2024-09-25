@@ -18,36 +18,30 @@ public class UserConverter extends BaseGitServiceEntityConverter<org.kohsuke.git
     @Override
     public User convert(@NonNull GHUser source) {
         User user = new User();
-        convertBaseFields(source, user);
         user.setLogin(source.getLogin());
         user.setUrl(source.getHtmlUrl().toString());
+        return update(source, user);
+    }
+
+    @Override
+    public User update(@NonNull GHUser source, @NonNull User user) {
+        convertBaseFields(source, user);
         user.setAvatarUrl(source.getAvatarUrl());
-        try {
-            user.setName(source.getName());
-        } catch (IOException e) {
-            logger.error("Failed to convert user name field for source {}: {}", source.getId(), e.getMessage());
-        }
         try {
             user.setEmail(source.getEmail());
         } catch (IOException e) {
             logger.error("Failed to convert user email field for source {}: {}", source.getId(), e.getMessage());
         }
         try {
+            user.setName(source.getName());
+        } catch (IOException e) {
+            logger.error("Failed to convert user name field for source {}: {}", source.getId(), e.getMessage());
+        }
+        try {
             user.setType(convertUserType(source.getType()));
         } catch (IOException e) {
             logger.error("Failed to convert user type field for source {}: {}", source.getId(), e.getMessage());
         }
-        return user;
-    }
-
-    @Override
-    public User update(@NonNull GHUser source, @NonNull User user) {
-        try {
-            user.setUpdatedAt(convertToOffsetDateTime(source.getUpdatedAt()));
-        } catch (IOException e) {
-            logger.error("Failed to convert updatedAt field for source {}: {}", source.getId(), e.getMessage());
-        }
-        user.setAvatarUrl(source.getAvatarUrl());
         return user;
     }
 

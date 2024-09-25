@@ -17,7 +17,11 @@ public class PullRequestReviewConverter extends BaseGitServiceEntityConverter<GH
 
     @Override
     public PullRequestReview convert(@NonNull GHPullRequestReview source) {
-        PullRequestReview review = new PullRequestReview();
+        return update(source, new PullRequestReview());
+    }
+
+    @Override
+    public PullRequestReview update(@NonNull GHPullRequestReview source, @NonNull PullRequestReview review) {
         convertBaseFields(source, review);
         review.setState(convertState(source.getState()));
         try {
@@ -25,17 +29,6 @@ public class PullRequestReviewConverter extends BaseGitServiceEntityConverter<GH
         } catch (IOException e) {
             logger.error("Failed to convert submittedAt field for source {}: {}", source.getId(), e.getMessage());
         }
-        return review;
-    }
-
-    @Override
-    public PullRequestReview update(@NonNull GHPullRequestReview source, @NonNull PullRequestReview review) {
-        try {
-            review.setUpdatedAt(convertToOffsetDateTime(source.getUpdatedAt()));
-        } catch (IOException e) {
-            logger.error("Failed to convert updatedAt field for source {}: {}", source.getId(), e.getMessage());
-        }
-        review.setState(convertState(source.getState()));
         return review;
     }
 
