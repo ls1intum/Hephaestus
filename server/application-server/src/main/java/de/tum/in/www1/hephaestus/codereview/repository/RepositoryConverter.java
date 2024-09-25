@@ -1,7 +1,5 @@
 package de.tum.in.www1.hephaestus.codereview.repository;
 
-import java.io.IOException;
-
 import org.kohsuke.github.GHRepository;
 import org.kohsuke.github.GHRepository.Visibility;
 import org.slf4j.Logger;
@@ -19,24 +17,19 @@ public class RepositoryConverter extends BaseGitServiceEntityConverter<GHReposit
     @Override
     public Repository convert(@NonNull GHRepository source) {
         Repository repository = new Repository();
-        convertBaseFields(source, repository);
         repository.setName(source.getName());
         repository.setNameWithOwner(source.getFullName());
-        repository.setDescription(source.getDescription());
         repository.setUrl(source.getHtmlUrl().toString());
-        repository.setDefaultBranch(source.getDefaultBranch());
-        repository.setVisibility(convertVisibility(source.getVisibility()));
-        repository.setHomepage(source.getHomepage());
-        return repository;
+        return update(source, repository);
     }
 
     @Override
     public Repository update(@NonNull GHRepository source, @NonNull Repository repository) {
-        try {
-            repository.setUpdatedAt(convertToOffsetDateTime(source.getUpdatedAt()));
-        } catch (IOException e) {
-            logger.error("Failed to convert updatedAt field for source {}: {}", source.getId(), e.getMessage());
-        }
+        convertBaseFields(source, repository);
+        repository.setDescription(source.getDescription());
+        repository.setDefaultBranch(source.getDefaultBranch());
+        repository.setVisibility(convertVisibility(source.getVisibility()));
+        repository.setHomepage(source.getHomepage());
         return repository;
     }
 
