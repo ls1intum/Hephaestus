@@ -1,5 +1,5 @@
 import { Component, input } from '@angular/core';
-import { PullRequestLabel, PullRequestReview } from '@app/core/modules/openapi';
+import { PullRequest, PullRequestLabel, PullRequestReview } from '@app/core/modules/openapi';
 import { NgIcon } from '@ng-icons/core';
 import { octCheck, octComment, octFileDiff, octGitPullRequest, octGitPullRequestClosed, octX } from '@ng-icons/octicons';
 import { Dayjs } from 'dayjs';
@@ -20,7 +20,7 @@ export class IssueCardComponent {
   repositoryName = input.required<string>();
   reviews = input.required<Array<PullRequestReview>>();
   createdAt = input.required<Dayjs>();
-  state = input.required<string>();
+  state = input.required<PullRequest.StateEnum>();
   pullRequestLabels = input.required<Array<PullRequestLabel>>();
   protected readonly octCheck = octCheck;
   protected readonly octX = octX;
@@ -30,7 +30,7 @@ export class IssueCardComponent {
   protected readonly octGitPullRequestClosed = octGitPullRequestClosed;
 
   getMostRecentReview() {
-    return Array.from(this.reviews() || []).reduce((latest: PullRequestReview, review: PullRequestReview) => {
+    return this.reviews().reduce((latest, review) => {
       return new Date(review.updatedAt || 0) > new Date(latest.updatedAt || 0) ? review : latest;
     });
   }

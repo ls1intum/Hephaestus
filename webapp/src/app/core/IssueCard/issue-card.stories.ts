@@ -3,7 +3,7 @@ import { IssueCardComponent } from './issue-card.component';
 import dayjs from 'dayjs';
 
 const meta: Meta<IssueCardComponent> = {
-  title: 'Component/IssueCard',
+  title: 'Components/Core/IssueCard',
   component: IssueCardComponent,
   tags: ['autodocs'] // Auto-generate docs if enabled
 };

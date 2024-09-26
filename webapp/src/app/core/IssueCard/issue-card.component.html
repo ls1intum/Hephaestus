@@ -1,4 +1,4 @@
-<div class="border border-border bg-card rounded-lg p-4 w-72 cursor-pointer" (click)="openIssue()">
+<div class="border border-border bg-card rounded-lg p-4 w-72">
   <div class="flex justify-between items-center mb-2 text-xs text-gray-500">
     <span class="font-bold flex justify-center items-center space-x-1">
       @if (state() === 'OPEN') {
@@ -15,7 +15,7 @@
     </span>
   </div>
 
-  <div class="flex justify-between font-bold text-sm mb-3">
+  <div class="flex justify-between font-bold text-sm mb-3 hover:text-github-accent-foreground cursor-pointer" (click)="openIssue()">
     {{ title() }}
     @if (getMostRecentReview(); as review) {
       @if (review.state === 'APPROVED') {
@@ -31,7 +31,7 @@
   </div>
   <div class="flex gap-1 flex-wrap">
     @for (label of pullRequestLabels(); track label.name) {
-      <span class="px-2 py-1 rounded-full text-xs mr-2 text-white" [style.background-color]="label.color">{{ label.name }}</span>
+      <span class="px-2 py-1 rounded-full text-xs mr-2 text-neutral-100/95" [style.background-color]="label.color">{{ label.name }}</span>
     }
   </div>
 </div>
