@@ -16,16 +16,15 @@ public class RepositoryConverter extends BaseGitServiceEntityConverter<GHReposit
 
     @Override
     public Repository convert(@NonNull GHRepository source) {
-        Repository repository = new Repository();
-        repository.setName(source.getName());
-        repository.setNameWithOwner(source.getFullName());
-        repository.setUrl(source.getHtmlUrl().toString());
-        return update(source, repository);
+        return update(source, new Repository());
     }
 
     @Override
     public Repository update(@NonNull GHRepository source, @NonNull Repository repository) {
         convertBaseFields(source, repository);
+        repository.setName(source.getName());
+        repository.setNameWithOwner(source.getFullName());
+        repository.setUrl(source.getHtmlUrl().toString());
         repository.setDescription(source.getDescription());
         repository.setDefaultBranch(source.getDefaultBranch());
         repository.setVisibility(convertVisibility(source.getVisibility()));

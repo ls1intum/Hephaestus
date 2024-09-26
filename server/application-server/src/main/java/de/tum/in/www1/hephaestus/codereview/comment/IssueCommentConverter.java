@@ -15,8 +15,7 @@ public class IssueCommentConverter extends BaseGitServiceEntityConverter<GHIssue
 
     @Override
     public IssueComment convert(@NonNull GHIssueComment source) {
-        IssueComment comment = new IssueComment();
-        return update(source, comment);
+        return update(source, new IssueComment());
     }
 
     @Override
