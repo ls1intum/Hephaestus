@@ -17,15 +17,14 @@ public class UserConverter extends BaseGitServiceEntityConverter<org.kohsuke.git
 
     @Override
     public User convert(@NonNull GHUser source) {
-        User user = new User();
-        user.setLogin(source.getLogin());
-        user.setUrl(source.getHtmlUrl().toString());
-        return update(source, user);
+        return update(source, new User());
     }
 
     @Override
     public User update(@NonNull GHUser source, @NonNull User user) {
         convertBaseFields(source, user);
+        user.setLogin(source.getLogin());
+        user.setUrl(source.getHtmlUrl().toString());
         user.setAvatarUrl(source.getAvatarUrl());
         try {
             user.setEmail(source.getEmail());
