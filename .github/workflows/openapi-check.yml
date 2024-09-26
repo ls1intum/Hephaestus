@@ -1,0 +1,36 @@
+   name: OpenAPI Check
+
+   on:
+     push:
+       branches: [ main ]
+     pull_request:
+       branches: [ main ]
+
+   jobs:
+     check-openapi:
+       runs-on: ubuntu-latest
+       steps:
+       - uses: actions/checkout@v2
+       - name: Set up JDK 11
+         uses: actions/setup-java@v2
+         with:
+           java-version: '11'
+           distribution: 'adopt'
+       - name: Set up Node.js
+         uses: actions/setup-node@v2
+         with:
+           node-version: '14'
+       - name: Install dependencies
+         run: npm ci
+       - name: Start server
+         run: python -m uvicorn server.intelligence-service.app.main:app --host 0.0.0.0 --port 8000 &
+       - name: Wait for server
+         run: sleep 10
+       - name: Generate Java client
+         run: npm run generate-java-client
+       - name: Check for changes
+         run: |
+           if [[ `git status --porcelain` ]]; then
+             echo "Changes detected in the generated client. Please regenerate and commit the changes."
+             exit 1
+           fi
