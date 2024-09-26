@@ -94,8 +94,6 @@ public class GitHubDataSyncService {
             PullRequestReviewRepository prReviewRepository,
             IssueCommentRepository commentRepository, PullRequestReviewCommentRepository reviewCommentRepository,
             UserRepository userRepository) {
-        logger.info("Hello from GitHubDataSyncService!");
-
         this.repositoryRepository = repositoryRepository;
         this.pullRequestRepository = pullRequestRepository;
         this.prReviewRepository = prReviewRepository;
@@ -105,10 +103,14 @@ public class GitHubDataSyncService {
     }
 
     public void syncData() {
+        if (!initGithubClient()) {
+            logger.error("Aborted GitHub data sync due to error during initialization of GitHub client.");
+            return;
+        }
         int successfullySyncedRepositories = 0;
         for (String repositoryName : repositoriesToMonitor) {
             try {
-                syncRepository(repositoryName);
+                this.fetchRepository(repositoryName);
                 logger.info("GitHub data sync completed successfully for repository: " + repositoryName);
                 successfullySyncedRepositories++;
             } catch (Exception e) {
@@ -120,15 +122,20 @@ public class GitHubDataSyncService {
                 + repositoriesToMonitor.length + " repositories for the last " + timeframe + " day(s).");
     }
 
-    private void syncRepository(String repositoryName) throws IOException {
+    private boolean initGithubClient() {
         if (ghAuthToken == null || ghAuthToken.isEmpty() || ghAuthToken.equals("null")) {
             logger.error("No GitHub auth token provided!");
-            return;
+            return false;
         }
         if (github == null) {
-            github = new GitHubBuilder().withOAuthToken(ghAuthToken).build();
+            try {
+                github = new GitHubBuilder().withOAuthToken(ghAuthToken).build();
+            } catch (IOException e) {
+                logger.error("Error while initializing GitHub client: " + e.getMessage());
+                return false;
+            }
         }
-        this.fetchRepository(repositoryName);
+        return github.isCredentialValid();
     }
 
     /**
@@ -137,11 +144,6 @@ public class GitHubDataSyncService {
      * @throws IOException
      */
     public void fetchRepository(String nameWithOwner) throws IOException {
-        if (github == null) {
-            logger.error("GitHub client not initialized correctly!");
-            return;
-        }
-
         GHRepository ghRepo = github.getRepository(nameWithOwner);
         // Avoid double fetching of already stored repositories
         Repository repository = repositoryRepository.findByNameWithOwnerWithEagerPullRequests(nameWithOwner);
