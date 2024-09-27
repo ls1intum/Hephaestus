@@ -1,0 +1,7 @@
+<div class="flex flex-col gap-2 border rounded-md border-input bg-background px-3 py-4">
+  <h3 class="text-base font-bold leading-none uppercase text-muted-foreground text-center pb-4 tracking-wider">Filter</h3>
+  <div class="flex flex-col px-2 gap-1">
+    <app-label for="timeframe" class="text-sm font-semibold text-muted-foreground leading-relaxed">Timeframe</app-label>
+    <app-select name="timeframe" [options]="options()" (selectChange)="selectFn($event)" [defaultOption]="after() + '.' + before()"></app-select>
+  </div>
+</div>
