@@ -19,7 +19,13 @@ export class LeaderboardFilterComponent {
   constructor(private router: Router) {
     // get monday - sunday of last 4 weeks
     const options = new Array<SelectOption>();
+    const now = dayjs();
     let currentDate = dayjs().day(1);
+    options.push({
+      id: now.unix(),
+      value: `${currentDate.format('YYYY-MM-DD')}.${now.format('YYYY-MM-DD')}`,
+      label: `${currentDate.format('MMM D')} - ${now.format('MMM D')}`
+    });
     for (let i = 0; i < 4; i++) {
       const newDate = currentDate.subtract(7, 'day');
       options.push({
