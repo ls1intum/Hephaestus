@@ -4,6 +4,7 @@ import java.time.OffsetDateTime;
 import java.util.HashSet;
 import java.util.Set;
 
+import jakarta.persistence.*;
 import org.springframework.lang.NonNull;
 
 import de.tum.in.www1.hephaestus.codereview.base.BaseGitServiceEntity;
@@ -11,13 +12,6 @@ import de.tum.in.www1.hephaestus.codereview.comment.IssueComment;
 import de.tum.in.www1.hephaestus.codereview.pullrequest.review.PullRequestReview;
 import de.tum.in.www1.hephaestus.codereview.repository.Repository;
 import de.tum.in.www1.hephaestus.codereview.user.User;
-import jakarta.persistence.Table;
-import jakarta.persistence.CascadeType;
-import jakarta.persistence.Entity;
-import jakarta.persistence.FetchType;
-import jakarta.persistence.JoinColumn;
-import jakarta.persistence.ManyToOne;
-import jakarta.persistence.OneToMany;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
@@ -73,6 +67,9 @@ public class PullRequest extends BaseGitServiceEntity {
     @JoinColumn(name = "repository_id", referencedColumnName = "id")
     @ToString.Exclude
     private Repository repository;
+
+    @ElementCollection
+    private Set<PullRequestLabel> pullRequestLabels = new HashSet<>();
 
     public void addComment(IssueComment comment) {
         comments.add(comment);

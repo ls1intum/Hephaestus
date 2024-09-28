@@ -1,7 +1,11 @@
 package de.tum.in.www1.hephaestus.codereview.pullrequest;
 
 import java.io.IOException;
+import java.util.Collection;
+import java.util.HashSet;
+import java.util.Set;
 
+import org.kohsuke.github.GHLabel;
 import org.kohsuke.github.GHPullRequest;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -24,6 +28,7 @@ public class PullRequestConverter extends BaseGitServiceEntityConverter<GHPullRe
         pullRequest.setTitle(source.getTitle());
         pullRequest.setUrl(source.getHtmlUrl().toString());
         pullRequest.setState(state);
+        pullRequest.setPullRequestLabels(convertLabels(source.getLabels()));
         try {
             pullRequest.setAdditions(source.getAdditions());
         } catch (IOException e) {
@@ -65,4 +70,14 @@ public class PullRequestConverter extends BaseGitServiceEntityConverter<GHPullRe
         }
     }
 
+    private Set<PullRequestLabel> convertLabels(Collection<GHLabel> labels) {
+        Set<PullRequestLabel> pullRequestLabels = new HashSet<>();
+        for (GHLabel label : labels) {
+            PullRequestLabel pullRequestLabel = new PullRequestLabel();
+            pullRequestLabel.setName(label.getName());
+            pullRequestLabel.setColor(label.getColor());
+            pullRequestLabels.add(pullRequestLabel);
+        }
+        return pullRequestLabels;
+    }
 }
