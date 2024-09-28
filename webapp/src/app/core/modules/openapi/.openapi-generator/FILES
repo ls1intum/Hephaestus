@@ -20,6 +20,7 @@ model/issue-comment.ts
 model/leaderboard-entry.ts
 model/models.ts
 model/pull-request-dto.ts
+model/pull-request-label.ts
 model/pull-request-review-comment.ts
 model/pull-request-review-dto.ts
 model/pull-request-review.ts
