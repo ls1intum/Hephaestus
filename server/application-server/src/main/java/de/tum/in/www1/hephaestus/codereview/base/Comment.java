@@ -20,6 +20,7 @@ import lombok.ToString;
 @ToString(callSuper = true)
 public abstract class Comment extends BaseGitServiceEntity {
     @Column(columnDefinition = "TEXT")
+    @ToString.Exclude
     protected String body;
 
     @ManyToOne(fetch = FetchType.EAGER)
