@@ -6,7 +6,7 @@ from .config import settings
 model: BaseChatModel
 
 if settings.is_openai_available:
-    model = ChatOpenAI()
+    model = ChatOpenAI(api_key=settings.OPENAI_API_KEY)
 elif settings.is_azure_openai_available:
     model = AzureChatOpenAI()
 else:
