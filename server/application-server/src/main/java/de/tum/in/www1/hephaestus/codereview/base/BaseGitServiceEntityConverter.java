@@ -3,6 +3,7 @@ package de.tum.in.www1.hephaestus.codereview.base;
 import org.kohsuke.github.GHObject;
 import org.springframework.core.convert.converter.Converter;
 import org.springframework.data.convert.ReadingConverter;
+import org.springframework.lang.NonNull;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import java.io.IOException;
@@ -15,6 +16,8 @@ public abstract class BaseGitServiceEntityConverter<S extends GHObject, T extend
         implements Converter<S, T> {
 
     private static final Logger logger = LoggerFactory.getLogger(BaseGitServiceEntityConverter.class);
+
+    abstract public T update(@NonNull S source, @NonNull T target);
 
     protected void convertBaseFields(S source, T target) {
         if (source == null || target == null) {

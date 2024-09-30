@@ -1,10 +1,12 @@
 package de.tum.in.www1.hephaestus.scheduler;
 
 import java.io.IOException;
-import java.util.Collection;
+import java.time.OffsetDateTime;
+import java.time.ZoneOffset;
 import java.util.Date;
 import java.util.HashSet;
 import java.util.List;
+import java.util.NoSuchElementException;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
@@ -12,6 +14,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.stream.Collectors;
 
 import org.kohsuke.github.GHDirection;
+import org.kohsuke.github.GHIssueComment;
 import org.kohsuke.github.GHIssueState;
 import org.kohsuke.github.GHObject;
 import org.kohsuke.github.GHPullRequest;
@@ -21,6 +24,7 @@ import org.kohsuke.github.GitHub;
 import org.kohsuke.github.GitHubBuilder;
 import org.kohsuke.github.PagedIterator;
 import org.kohsuke.github.GHPullRequestQueryBuilder.Sort;
+import org.kohsuke.github.GHPullRequestReview;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -58,7 +62,7 @@ public class GitHubDataSyncService {
 
     @Value("${monitoring.timeframe}")
     private int timeframe;
-    private Date cutOffTime;
+    private OffsetDateTime cutOffTime;
 
     private GitHub github;
 
@@ -82,6 +86,7 @@ public class GitHubDataSyncService {
     @Autowired
     private UserConverter userConverter;
 
+    // Temporary caches per repository
     private Set<User> users = new HashSet<>();
     private Set<PullRequestReview> reviews = new HashSet<>();
 
@@ -89,8 +94,6 @@ public class GitHubDataSyncService {
             PullRequestReviewRepository prReviewRepository,
             IssueCommentRepository commentRepository, PullRequestReviewCommentRepository reviewCommentRepository,
             UserRepository userRepository) {
-        logger.info("Hello from GitHubDataSyncService!");
-
         this.repositoryRepository = repositoryRepository;
         this.pullRequestRepository = pullRequestRepository;
         this.prReviewRepository = prReviewRepository;
@@ -100,12 +103,14 @@ public class GitHubDataSyncService {
     }
 
     public void syncData() {
+        if (!initGithubClient()) {
+            logger.error("Aborted GitHub data sync due to error during initialization of GitHub client.");
+            return;
+        }
         int successfullySyncedRepositories = 0;
-        this.cutOffTime = new Date(System.currentTimeMillis() - 1000 * 60 * 60 * 24 * timeframe);
-        logger.info("Cut-off time for the data sync: " + cutOffTime);
         for (String repositoryName : repositoriesToMonitor) {
             try {
-                syncRepository(repositoryName);
+                this.fetchRepository(repositoryName);
                 logger.info("GitHub data sync completed successfully for repository: " + repositoryName);
                 successfullySyncedRepositories++;
             } catch (Exception e) {
@@ -117,58 +122,63 @@ public class GitHubDataSyncService {
                 + repositoriesToMonitor.length + " repositories for the last " + timeframe + " day(s).");
     }
 
-    private void syncRepository(String repositoryName) throws IOException {
+    private boolean initGithubClient() {
         if (ghAuthToken == null || ghAuthToken.isEmpty() || ghAuthToken.equals("null")) {
             logger.error("No GitHub auth token provided!");
-            return;
+            return false;
         }
         if (github == null) {
-            github = new GitHubBuilder().withOAuthToken(ghAuthToken).build();
+            try {
+                github = new GitHubBuilder().withOAuthToken(ghAuthToken).build();
+            } catch (IOException e) {
+                logger.error("Error while initializing GitHub client: " + e.getMessage());
+                return false;
+            }
         }
-        Repository repo = this.fetchRepository(repositoryName);
-        logger.info("Synced repository until " + repo.getUpdatedAt());
+        return github.isCredentialValid();
     }
 
     /**
      * Rest API implementation of fetching a Github repository.
      * 
-     * @return The repository corresponding to the given nameWithOwner.
      * @throws IOException
      */
-    public Repository fetchRepository(String nameWithOwner) throws IOException {
-        if (github == null) {
-            logger.error("GitHub client not initialized correctly!");
-            return null;
-        }
-
-        // Avoid double fetching of the same repository
-        Repository existingRepository = repositoryRepository.findByNameWithOwnerWithEagerPullRequests(nameWithOwner);
-        if (existingRepository != null) {
-            logger.info("Found existing repository: " + existingRepository);
-            return existingRepository;
-        }
-
+    public void fetchRepository(String nameWithOwner) throws IOException {
         GHRepository ghRepo = github.getRepository(nameWithOwner);
-        Repository repository = repositoryConverter.convert(ghRepo);
+        // Avoid double fetching of already stored repositories
+        Repository repository = repositoryRepository.findByNameWithOwnerWithEagerPullRequests(nameWithOwner);
         if (repository == null) {
-            logger.error("Error while fetching repository!");
-            return null;
+            logger.info("Creating new repository: " + nameWithOwner);
+            repository = repositoryRepository.save(repositoryConverter.convert(ghRepo));
+            this.cutOffTime = new Date(System.currentTimeMillis() - 1000 * 60 * 60 * 24 * timeframe).toInstant()
+                    .atOffset(ZoneOffset.UTC);
+        } else {
+            // Update cut-off time to avoid refetching stored data.
+            // The updatedAt field of the repository does not change with every PR update,
+            // so it will always be earlier
+            this.cutOffTime = repository.getPullRequests().stream().map(PullRequest::getUpdatedAt)
+                    .max(OffsetDateTime::compareTo).orElse(repository.getUpdatedAt());
         }
-        // preliminary save to make it referenceable
-        repository = repositoryRepository.save(repository);
+        logger.info("Cut-off time for the repository data sync: " + this.cutOffTime);
 
-        Set<PullRequest> prs = getPullRequestsFromGHRepository(ghRepo, repository);
+        Set<PullRequest> prs = fetchPullRequestsFromGHRepository(ghRepo, repository);
         logger.info("Found total of " + prs.size() + " PRs");
-        repository.setPullRequests(prs);
+        for (PullRequest pr : prs) {
+            if (repository.getPullRequests().stream().noneMatch(p -> p.getId().equals(pr.getId()))) {
+                repository.addPullRequest(pr);
+            }
+        }
 
         pullRequestRepository.saveAll(prs);
         userRepository.saveAll(users);
         repositoryRepository.save(repository);
         prReviewRepository.saveAll(reviews);
-        return repository;
+
+        users = new HashSet<>();
+        reviews = new HashSet<>();
     }
 
-    private Set<PullRequest> getPullRequestsFromGHRepository(GHRepository ghRepo, Repository repository)
+    private Set<PullRequest> fetchPullRequestsFromGHRepository(GHRepository ghRepo, Repository repository)
             throws IOException {
         // Iterator allows us to handle pullrequests without knowing the next ones
         PagedIterator<GHPullRequest> pullRequests = ghRepo.queryPullRequests()
@@ -180,7 +190,6 @@ public class GitHubDataSyncService {
 
         // Only fetch next page if all PRs are still within the timeframe
         AtomicBoolean fetchStillInTimeframe = new AtomicBoolean(true);
-
         while (fetchStillInTimeframe.get() && pullRequests.hasNext()) {
             List<GHPullRequest> nextPage = pullRequests.nextPage();
             logger.info("Fetched " + nextPage.size() + " PRs from Github");
@@ -189,34 +198,18 @@ public class GitHubDataSyncService {
                     fetchStillInTimeframe.set(false);
                     return null;
                 }
-                PullRequest pullRequest = pullRequestRepository.save(pullRequestConverter.convert(pr));
-                pullRequest.setRepository(repository);
-                try {
-                    User prAuthor = getUserFromGHUser(pr.getUser());
-                    prAuthor.addPullRequest(pullRequest);
-                    pullRequest.setAuthor(prAuthor);
-                } catch (IOException e) {
-                    // Dont mind this error as it occurs only for bots
-                    pullRequest.setAuthor(null);
-                }
+
+                PullRequest pullRequest = createOrUpdatePullRequest(pr, repository);
 
                 try {
-                    Set<PullRequestReview> newReviews = pr.listReviews().toList().stream().map(review -> {
-                        PullRequestReview prReview = prReviewRepository
-                                .save(reviewConverter.convert(review));
-                        try {
-                            User reviewAuthor = getUserFromGHUser(review.getUser());
-                            reviewAuthor.addReview(prReview);
-                            prReview.setAuthor(reviewAuthor);
-                        } catch (IOException e) {
-                            // Dont mind this error as it occurs only for bots
-                        }
-                        prReview.setPullRequest(pullRequest);
-                        return prReview;
-                    }).collect(Collectors.toSet());
+                    Set<PullRequestReview> newReviews = pr.listReviews().toList().stream()
+                            .map(review -> createOrUpdatePullRequestReview(review, pullRequest))
+                            .collect(Collectors.toSet());
                     for (PullRequestReview prReview : newReviews) {
-                        pullRequest.addReview(prReview);
-                        reviews.add(prReview);
+                        if (reviews.stream().noneMatch(r -> r.getId().equals(prReview.getId()))) {
+                            pullRequest.addReview(prReview);
+                            reviews.add(prReview);
+                        }
                     }
                     logger.info("Found " + newReviews.size() + " reviews for PR #" + pullRequest.getNumber());
                 } catch (IOException e) {
@@ -233,15 +226,22 @@ public class GitHubDataSyncService {
                     logger.error("Error while fetching PR review comments!");
                 }
 
-                try {
-                    Collection<IssueComment> comments = getCommentsFromGHPullRequest(pr, pullRequest);
-                    // comments = commentRepository.saveAll(comments);
-                    for (IssueComment c : comments) {
-                        pullRequest.addComment(c);
+                PagedIterator<GHIssueComment> commentIterator = pr.queryComments().list().withPageSize(100)
+                        .iterator();
+                Set<IssueComment> comments = pullRequest.getComments();
+                while (commentIterator.hasNext()) {
+                    List<GHIssueComment> nextCommentPage = commentIterator.nextPage();
+                    try {
+                        IssueComment nextComment = createOrUpdateIssueComment(nextCommentPage.getFirst(), pullRequest);
+                        if (comments.stream().noneMatch(c -> c.getId().equals(nextComment.getId()))) {
+                            comments.add(nextComment);
+                            pullRequest.addComment(nextComment);
+                        }
+                    } catch (NoSuchElementException e) {
+                        break;
                     }
-                } catch (IOException e) {
-                    logger.error("Error while fetching PR comments!");
                 }
+                commentRepository.saveAll(comments);
 
                 return pullRequest;
             }).filter(Objects::nonNull).collect(Collectors.toSet()));
@@ -268,30 +268,66 @@ public class GitHubDataSyncService {
     }
 
     /**
-     * Retrieves the comments of a given pull request.
+     * Creates new PullRequest or updates instance if it already exists.
      * 
-     * @param pr          The GH pull request.
-     * @param pullRequest Stored PR to which the comments belong.
-     * @return The comments of the given pull request.
-     * @throws IOException when fetching the comments fails
+     * @param pr         Source GitHub PullRequest
+     * @param repository Repository the PR belongs to
+     * @return PullRequest entity
      */
-    private Set<IssueComment> getCommentsFromGHPullRequest(GHPullRequest pr, PullRequest pullRequest)
-            throws IOException {
-        return pr.queryComments().list().withPageSize(100).toList().stream()
-                .map(comment -> {
-                    IssueComment c = commentRepository.save(commentConverter.convert(comment));
-                    c.setPullRequest(pullRequest);
-                    User commentAuthor;
-                    try {
-                        commentAuthor = getUserFromGHUser(comment.getUser());
-                        commentAuthor.addIssueComment(c);
-                    } catch (IOException e) {
-                        // Dont mind this error as it occurs only for bots
-                        commentAuthor = null;
-                    }
-                    c.setAuthor(commentAuthor);
-                    return c;
-                }).collect(Collectors.toSet());
+    private PullRequest createOrUpdatePullRequest(GHPullRequest pr, Repository repository) {
+        Optional<PullRequest> pullRequest = pullRequestRepository.findByIdWithEagerRelations(pr.getId());
+        if (pullRequest.isPresent()) {
+            return pullRequestConverter.update(pr, pullRequest.get());
+        }
+
+        PullRequest newPullRequest = pullRequestRepository.save(pullRequestConverter.convert(pr));
+        newPullRequest.setRepository(repository);
+        repository.addPullRequest(newPullRequest);
+        try {
+            User prAuthor = getUserFromGHUser(pr.getUser());
+            prAuthor.addPullRequest(newPullRequest);
+            newPullRequest.setAuthor(prAuthor);
+        } catch (IOException e) {
+            // Dont mind this error as it occurs only for bots
+            newPullRequest.setAuthor(null);
+        }
+        return newPullRequest;
+    }
+
+    private PullRequestReview createOrUpdatePullRequestReview(GHPullRequestReview review, PullRequest pullRequest) {
+        Optional<PullRequestReview> pullRequestReview = prReviewRepository.findByIdWithEagerComments(review.getId());
+        if (pullRequestReview.isPresent()) {
+            return reviewConverter.update(review, pullRequestReview.get());
+        }
+        PullRequestReview newPullRequestReview = prReviewRepository.save(reviewConverter.convert(review));
+        try {
+            User reviewAuthor = getUserFromGHUser(review.getUser());
+            reviewAuthor.addReview(newPullRequestReview);
+            newPullRequestReview.setAuthor(reviewAuthor);
+        } catch (IOException e) {
+            // Dont mind this error as it occurs only for bots
+        }
+        newPullRequestReview.setPullRequest(pullRequest);
+        return newPullRequestReview;
+    }
+
+    private IssueComment createOrUpdateIssueComment(GHIssueComment comment, PullRequest pullRequest) {
+        Optional<IssueComment> issueComment = commentRepository.findById(comment.getId());
+        if (issueComment.isPresent()) {
+            return commentConverter.update(comment, issueComment.get());
+        }
+        IssueComment newIssueComment = commentRepository.save(commentConverter.convert(comment));
+        newIssueComment.setPullRequest(pullRequest);
+        User commentAuthor;
+        try {
+            commentAuthor = getUserFromGHUser(comment.getUser());
+            commentAuthor.addIssueComment(newIssueComment);
+        } catch (IOException e) {
+            // Dont mind this error as it occurs only for bots
+            commentAuthor = null;
+        }
+        newIssueComment.setAuthor(commentAuthor);
+        return newIssueComment;
     }
 
     /**
@@ -347,7 +383,7 @@ public class GitHubDataSyncService {
     private boolean isResourceRecent(GHObject obj) {
         try {
             return obj.getUpdatedAt() != null
-                    && obj.getUpdatedAt().after(cutOffTime);
+                    && obj.getUpdatedAt().toInstant().atOffset(ZoneOffset.UTC).isAfter(cutOffTime);
         } catch (IOException e) {
             logger.error("Error while fetching createdAt! Resource ID: " + obj.getId());
             return false;

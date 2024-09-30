@@ -44,7 +44,11 @@ public class Repository extends BaseGitServiceEntity {
 
     String homepage;
 
-    @OneToMany(cascade = CascadeType.ALL, mappedBy = "repository")
+    @OneToMany(cascade = CascadeType.REFRESH, mappedBy = "repository")
     @ToString.Exclude
     private Set<PullRequest> pullRequests = new HashSet<>();
+
+    public void addPullRequest(PullRequest pullRequest) {
+        pullRequests.add(pullRequest);
+    }
 }

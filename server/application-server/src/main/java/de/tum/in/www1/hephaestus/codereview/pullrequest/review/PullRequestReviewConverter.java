@@ -17,7 +17,11 @@ public class PullRequestReviewConverter extends BaseGitServiceEntityConverter<GH
 
     @Override
     public PullRequestReview convert(@NonNull GHPullRequestReview source) {
-        PullRequestReview review = new PullRequestReview();
+        return update(source, new PullRequestReview());
+    }
+
+    @Override
+    public PullRequestReview update(@NonNull GHPullRequestReview source, @NonNull PullRequestReview review) {
         convertBaseFields(source, review);
         review.setState(convertState(source.getState()));
         try {
