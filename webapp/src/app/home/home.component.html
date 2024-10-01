@@ -4,7 +4,7 @@
   <div class="grid grid-cols-1 md:grid-cols-3 gap-4 place-content-center">
     <app-leaderboard-filter [after]="after()" [before]="before()" />
     <div class="md:col-span-2 flex flex-col items-center gap-4">
-      @if (query.isPending()) {
+      @if (query.isPending() && !query.data()) {
         <app-skeleton class="w-full h-96"></app-skeleton>
       } @else if (query.error()) {
         <span class="text-xl text-destructive mt-2">An error has occurred</span>
