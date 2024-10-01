@@ -30,13 +30,14 @@ export class LeaderboardFilterComponent {
       label: `${currentDate.format('MMM D')} - ${now.format('MMM D')}`
     });
     for (let i = 0; i < 4; i++) {
-      const newDate = currentDate.subtract(7, 'day');
+      const startDate = currentDate.subtract(7, 'day');
+      const endDate = currentDate.subtract(1, 'day');
       options.push({
-        id: newDate.unix(),
-        value: `${newDate.format('YYYY-MM-DD')}.${currentDate.subtract(1, 'day').format('YYYY-MM-DD')}`,
-        label: `${newDate.format('MMM D')} - ${currentDate.subtract(1, 'day').format('MMM D')}`
+        id: startDate.unix(),
+        value: `${startDate.format('YYYY-MM-DD')}.${endDate.format('YYYY-MM-DD')}`,
+        label: `${startDate.format('MMM D')} - ${endDate.format('MMM D')}`
       });
-      currentDate = newDate;
+      currentDate = startDate;
     }
     this.options.set(options);
   }
