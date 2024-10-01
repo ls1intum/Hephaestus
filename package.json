@@ -11,7 +11,7 @@
     "generate:java-client": "npx @openapitools/openapi-generator-cli generate -i server/intelligence-service/openapi.yaml -g java -o server/intelligence-service/java-client"
   },
   "devDependencies": {
-    "@openapitools/openapi-generator-cli": "^2.13.5",
+    "@openapitools/openapi-generator-cli": "2.13.5",
     "rimraf": "6.0.1"
   }
 }
