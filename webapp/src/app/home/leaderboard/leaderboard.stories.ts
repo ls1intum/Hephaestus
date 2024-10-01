@@ -25,7 +25,8 @@ const leaderboardEntries: LeaderboardEntry[] = [
     changesRequested: generateReviews(3, PullRequestReviewDTO.StateEnum.ChangesRequested),
     approvals: generateReviews(5, PullRequestReviewDTO.StateEnum.Approved),
     comments: generateReviews(1, PullRequestReviewDTO.StateEnum.Commented),
-    rank: 1
+    rank: 1,
+    numberOfReviewedPRs: 10
   },
   {
     githubName: 'FelixTJDietrich',
@@ -36,7 +37,8 @@ const leaderboardEntries: LeaderboardEntry[] = [
     changesRequested: generateReviews(1, PullRequestReviewDTO.StateEnum.ChangesRequested),
     approvals: generateReviews(1, PullRequestReviewDTO.StateEnum.Approved),
     comments: generateReviews(14, PullRequestReviewDTO.StateEnum.Commented),
-    rank: 2
+    rank: 2,
+    numberOfReviewedPRs: 16
   },
   {
     githubName: 'krusche',
@@ -47,7 +49,8 @@ const leaderboardEntries: LeaderboardEntry[] = [
     changesRequested: [],
     approvals: generateReviews(3, PullRequestReviewDTO.StateEnum.Approved),
     comments: generateReviews(1, PullRequestReviewDTO.StateEnum.Commented),
-    rank: 3
+    rank: 3,
+    numberOfReviewedPRs: 3
   },
   {
     githubName: 'shadcn',
@@ -58,7 +61,8 @@ const leaderboardEntries: LeaderboardEntry[] = [
     changesRequested: [],
     approvals: [],
     comments: generateReviews(1, PullRequestReviewDTO.StateEnum.Commented),
-    rank: 4
+    rank: 4,
+    numberOfReviewedPRs: 1
   }
 ];
 
