@@ -20,7 +20,6 @@ export interface LeaderboardEntry {
     score?: number;
     rank?: number;
     numberOfReviewedPRs?: number;
-    numberOfReviews?: number;
     changesRequested?: Array<PullRequestReviewDTO>;
     approvals?: Array<PullRequestReviewDTO>;
     comments?: Array<PullRequestReviewDTO>;
