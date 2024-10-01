@@ -3,14 +3,17 @@ import { Router, RouterLink } from '@angular/router';
 import { SelectComponent, SelectOption } from 'app/ui/select/select.component';
 import dayjs from 'dayjs';
 import { LabelComponent } from '../../../ui/label/label.component';
+import { octFilter } from '@ng-icons/octicons';
+import { NgIconComponent } from '@ng-icons/core';
 
 @Component({
   selector: 'app-leaderboard-filter',
   standalone: true,
-  imports: [SelectComponent, RouterLink, LabelComponent],
+  imports: [SelectComponent, RouterLink, LabelComponent, NgIconComponent],
   templateUrl: './filter.component.html'
 })
 export class LeaderboardFilterComponent {
+  protected octFilter = octFilter;
   after = input<string>();
   before = input<string>();
 
