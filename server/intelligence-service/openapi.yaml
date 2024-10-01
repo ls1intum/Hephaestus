@@ -1,6 +1,6 @@
 openapi: 3.0.1
 info:
-  title: Hephaestus API
+  title: Hephaestus Intelligence API
   description: API documentation for the Hephaestus intelligence service.
   contact:
     name: Felix T.J. Dietrich
