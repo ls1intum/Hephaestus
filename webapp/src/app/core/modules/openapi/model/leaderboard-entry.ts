@@ -19,6 +19,7 @@ export interface LeaderboardEntry {
     type?: LeaderboardEntry.TypeEnum;
     score?: number;
     rank?: number;
+    numberOfReviewedPRs?: number;
     changesRequested?: Array<PullRequestReviewDTO>;
     approvals?: Array<PullRequestReviewDTO>;
     comments?: Array<PullRequestReviewDTO>;
