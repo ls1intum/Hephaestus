@@ -2,6 +2,7 @@ package de.tum.in.www1.hephaestus.codereview.user;
 
 import java.io.IOException;
 
+import org.kohsuke.github.GHUser;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.lang.NonNull;
@@ -15,21 +16,25 @@ public class UserConverter extends BaseGitServiceEntityConverter<org.kohsuke.git
     protected static final Logger logger = LoggerFactory.getLogger(UserConverter.class);
 
     @Override
-    public User convert(@NonNull org.kohsuke.github.GHUser source) {
-        User user = new User();
+    public User convert(@NonNull GHUser source) {
+        return update(source, new User());
+    }
+
+    @Override
+    public User update(@NonNull GHUser source, @NonNull User user) {
         convertBaseFields(source, user);
         user.setLogin(source.getLogin());
         user.setUrl(source.getHtmlUrl().toString());
         user.setAvatarUrl(source.getAvatarUrl());
         try {
-            user.setName(source.getName());
-        } catch (IOException e) {
-            logger.error("Failed to convert user name field for source {}: {}", source.getId(), e.getMessage());
-        }
-        try {
             user.setEmail(source.getEmail());
         } catch (IOException e) {
             logger.error("Failed to convert user email field for source {}: {}", source.getId(), e.getMessage());
+        }
+        try {
+            user.setName(source.getName());
+        } catch (IOException e) {
+            logger.error("Failed to convert user name field for source {}: {}", source.getId(), e.getMessage());
         }
         try {
             user.setType(convertUserType(source.getType()));

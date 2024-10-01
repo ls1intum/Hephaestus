@@ -10,6 +10,7 @@
  * Do not edit the class manually.
  */
 import { Repository } from './repository';
+import { PullRequestLabel } from './pull-request-label';
 import { PullRequestReview } from './pull-request-review';
 import { User } from './user';
 import { IssueComment } from './issue-comment';
@@ -35,6 +36,7 @@ export interface PullRequest {
     comments?: Set<IssueComment>;
     reviews?: Set<PullRequestReview>;
     repository?: Repository;
+    pullRequestLabels?: Set<PullRequestLabel>;
 }
 export namespace PullRequest {
     export type StateEnum = 'CLOSED' | 'OPEN';

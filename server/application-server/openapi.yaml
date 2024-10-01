@@ -289,6 +289,18 @@ components:
             $ref: "#/components/schemas/PullRequestReview"
         repository:
           $ref: "#/components/schemas/Repository"
+        pullRequestLabels:
+          uniqueItems: true
+          type: array
+          items:
+            $ref: "#/components/schemas/PullRequestLabel"
+    PullRequestLabel:
+      type: object
+      properties:
+        name:
+          type: string
+        color:
+          type: string
     PullRequestReview:
       required:
       - state
