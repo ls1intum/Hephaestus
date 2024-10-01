@@ -480,9 +480,6 @@ components:
         numberOfReviewedPRs:
           type: integer
           format: int32
-        numberOfReviews:
-          type: integer
-          format: int32
         changesRequested:
           type: array
           items:

@@ -1,6 +1,6 @@
 import { Component, input } from '@angular/core';
 import { NgIconComponent } from '@ng-icons/core';
-import { octFileDiff, octCheck, octComment, octGitPullRequest, octChevronRight, octEye } from '@ng-icons/octicons';
+import { octFileDiff, octCheck, octComment, octGitPullRequest, octChevronLeft } from '@ng-icons/octicons';
 import { LeaderboardEntry } from 'app/core/modules/openapi';
 import { AvatarFallbackComponent } from 'app/ui/avatar/avatar-fallback.component';
 import { AvatarImageComponent } from 'app/ui/avatar/avatar-image.component';
@@ -38,8 +38,7 @@ export class LeaderboardComponent {
   protected octCheck = octCheck;
   protected octComment = octComment;
   protected octGitPullRequest = octGitPullRequest;
-  protected octChevronRight = octChevronRight;
-  protected octEye = octEye;
+  protected octChevronLeft = octChevronLeft;
 
   leaderboard = input<LeaderboardEntry[]>();
 }

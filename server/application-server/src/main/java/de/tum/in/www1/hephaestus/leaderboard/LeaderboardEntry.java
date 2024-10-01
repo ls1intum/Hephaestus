@@ -22,7 +22,6 @@ public class LeaderboardEntry {
         private int score;
         private int rank;
         private int numberOfReviewedPRs;
-        private int numberOfReviews;
         private PullRequestReviewDTO[] changesRequested;
         private PullRequestReviewDTO[] approvals;
         private PullRequestReviewDTO[] comments;

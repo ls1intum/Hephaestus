@@ -91,7 +91,6 @@ public class LeaderboardService {
                     score.get(),
                     0, // preliminary rank
                     reviewedPRs.size(),
-                    user.getReviews().size(),
                     changesRequestedSet.toArray(new PullRequestReviewDTO[changesRequestedSet.size()]),
                     approvedSet.toArray(new PullRequestReviewDTO[approvedSet.size()]),
                     commentSet.toArray(new PullRequestReviewDTO[commentSet.size()]));
