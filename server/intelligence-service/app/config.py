@@ -1,9 +1,8 @@
-from pydantic_settings import BaseSettings
-from dotenv import load_dotenv
-
-load_dotenv()
+from pydantic_settings import BaseSettings, SettingsConfigDict
 
 class Settings(BaseSettings):
+    model_config = SettingsConfigDict(validate_key=False)
+
     OPENAI_API_KEY: str = ""
 
     AZURE_OPENAI_API_KEY: str = ""
@@ -18,4 +17,4 @@ class Settings(BaseSettings):
     def is_azure_openai_available(self):
         return bool(self.AZURE_OPENAI_API_KEY) and bool(self.AZURE_OPENAI_ENDPOINT) and bool(self.AZURE_OPENAI_API_VERSION)
 
-settings = Settings()
+settings = Settings(_env_file=".env")
