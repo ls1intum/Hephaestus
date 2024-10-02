@@ -2,7 +2,13 @@ from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 from .model import model
 
-app = FastAPI()
+
+app = FastAPI(
+    title="Hephaestus Intelligence Service API",
+    description="API documentation for the Hephaestus Intelligence Service.",
+    version="0.0.1",
+    contact={"name": "Felix T.J. Dietrich", "email": "felixtj.dietrich@tum.de"},
+)
 
 
 class ChatRequest(BaseModel):
