@@ -477,6 +477,9 @@ components:
         rank:
           type: integer
           format: int32
+        numberOfReviewedPRs:
+          type: integer
+          format: int32
         changesRequested:
           type: array
           items:

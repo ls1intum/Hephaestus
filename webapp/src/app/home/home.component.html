@@ -1,11 +1,18 @@
 <div class="flex gap-2 flex-col items-center justify-center">
   <h1 class="text-3xl font-bold mb-4">Artemis Leaderboard</h1>
-  @if (query.isPending()) {
-    <span class="text-muted-foreground">Data is loading...</span>
-  } @else if (query.error()) {
-    <span class="text-destructive">An error has occurred</span>
-  }
-  @if (query.data()) {
-    <app-leaderboard [leaderboard]="query.data()" />
-  }
+
+  <div class="grid grid-cols-1 md:grid-cols-3 gap-4 place-content-center">
+    <app-leaderboard-filter [after]="after()" [before]="before()" />
+    <div class="md:col-span-2 flex flex-col items-center gap-4">
+      @if (query.isPending() && !query.data()) {
+        <app-skeleton class="w-full h-96"></app-skeleton>
+      } @else if (query.error()) {
+        <span class="text-xl text-destructive mt-2">An error has occurred</span>
+      } @else if (query.data()) {
+        <div class="border rounded-md border-input">
+          <app-leaderboard [leaderboard]="query.data()" />
+        </div>
+      }
+    </div>
+  </div>
 </div>

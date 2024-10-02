@@ -56,6 +56,7 @@ public class LeaderboardService {
                 return null;
             }
             AtomicInteger score = new AtomicInteger(0);
+            Set<Integer> reviewedPRs = new HashSet<>();
             Set<PullRequestReviewDTO> changesRequestedSet = new HashSet<>();
             Set<PullRequestReviewDTO> approvedSet = new HashSet<>();
             Set<PullRequestReviewDTO> commentSet = new HashSet<>();
@@ -69,6 +70,7 @@ public class LeaderboardService {
                         PullRequestReviewDTO reviewDTO = new PullRequestReviewDTO(review.getId(), review.getCreatedAt(),
                                 review.getUpdatedAt(), review.getSubmittedAt(), review.getState());
 
+                        reviewedPRs.add(review.getPullRequest().getNumber());
                         switch (review.getState()) {
                             case CHANGES_REQUESTED:
                                 changesRequestedSet.add(reviewDTO);
@@ -88,6 +90,7 @@ public class LeaderboardService {
             return new LeaderboardEntry(user.getLogin(), user.getAvatarUrl(), user.getName(), user.getType(),
                     score.get(),
                     0, // preliminary rank
+                    reviewedPRs.size(),
                     changesRequestedSet.toArray(new PullRequestReviewDTO[changesRequestedSet.size()]),
                     approvedSet.toArray(new PullRequestReviewDTO[approvedSet.size()]),
                     commentSet.toArray(new PullRequestReviewDTO[commentSet.size()]));
