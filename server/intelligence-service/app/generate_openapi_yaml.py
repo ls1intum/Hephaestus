@@ -11,7 +11,7 @@ def get_openapi_specs():
         contact=main.app.contact,
         routes=main.app.routes,
     )
-    openapi_yaml = yaml.dump(openapi_json)
+    openapi_yaml = yaml.dump(openapi_json, allow_unicode=True)
     return openapi_yaml
 
 
