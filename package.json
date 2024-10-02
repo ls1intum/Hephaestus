@@ -9,7 +9,7 @@
     "generate:api:application-server-client": "npx openapi-generator-cli generate -i server/application-server/openapi.yaml -g typescript-angular -o webapp/src/app/core/modules/openapi --additional-properties fileNaming=kebab-case,withInterfaces=true --generate-alias-as-model",
     "generate:api": "npm run generate:api:application-server-specs && npm run generate:api:clean && npm run generate:api:application-server-client",
     "generate:api:intelligence-service-specs": "python -m server.intelligence-service.app.generate_openapi_yaml",
-    "generate:api:intelligence-service-client": "npx @openapitools/openapi-generator-cli generate -i server/intelligence-service/openapi.yaml -g java -o server/intelligence-service/java-client",
+    "generate:api:intelligence-service-client": "npx @openapitools/openapi-generator-cli generate -i server/intelligence-service/openapi.yaml -g java -o server/intelligence-service/java-client"
   },
   "devDependencies": {
     "@openapitools/openapi-generator-cli": "2.13.5",
