@@ -7,6 +7,7 @@ import { combineLatest, timer, lastValueFrom, map } from 'rxjs';
 import { toSignal } from '@angular/core/rxjs-interop';
 import { LeaderboardFilterComponent } from './leaderboard/filter/filter.component';
 import { SkeletonComponent } from 'app/ui/skeleton/skeleton.component';
+import dayjs from 'dayjs';
 
 @Component({
   selector: 'app-home',
@@ -21,8 +22,8 @@ export class HomeComponent {
   // example: 2024-09-19
   private readonly route = inject(ActivatedRoute);
   private queryParams = toSignal(this.route.queryParamMap, { requireSync: true });
-  protected after = computed(() => this.queryParams().get('after') ?? undefined);
-  protected before = computed(() => this.queryParams().get('before') ?? undefined);
+  protected after = computed(() => this.queryParams().get('after') ?? dayjs().day(1).format('YYYY-MM-DD'));
+  protected before = computed(() => this.queryParams().get('before') ?? dayjs().format('YYYY-MM-DD'));
 
   query = injectQuery(() => ({
     queryKey: ['leaderboard', { after: this.after(), before: this.before() }],
