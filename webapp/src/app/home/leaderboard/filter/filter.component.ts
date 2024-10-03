@@ -1,23 +1,47 @@
 import { Component, input, signal } from '@angular/core';
 import { Router, RouterLink } from '@angular/router';
-import { SelectComponent, SelectOption } from 'app/ui/select/select.component';
 import dayjs from 'dayjs';
-import { LabelComponent } from '../../../ui/label/label.component';
-import { octFilter } from '@ng-icons/octicons';
-import { NgIconComponent } from '@ng-icons/core';
+import weekOfYear from 'dayjs/plugin/weekOfYear';
+import { BrnSelectModule } from '@spartan-ng/ui-select-brain';
+import { HlmSelectModule } from '@spartan-ng/ui-select-helm';
+import { HlmLabelModule } from '@spartan-ng/ui-label-helm';
+import { ListFilter, LucideAngularModule } from 'lucide-angular';
+
+interface SelectOption {
+  id: number;
+  value: string;
+  label: string;
+}
+
+dayjs.extend(weekOfYear);
+
+function formatLabel(startDate: dayjs.Dayjs, endDate: dayjs.Dayjs | undefined) {
+  const calendarWeek = startDate.week();
+  if (!endDate) {
+    return `CW ${calendarWeek}: ${startDate.format('MMM D')} - Today`;
+  }
+
+  const sameMonth = startDate.month() === endDate.month();
+  if (sameMonth) {
+    return `CW ${calendarWeek}: ${startDate.format('MMM D')} - ${endDate.format('D')}`;
+  } else {
+    return `CW ${calendarWeek}: ${startDate.format('MMM D')} - ${endDate.format('MMM D')}`;
+  }
+}
 
 @Component({
   selector: 'app-leaderboard-filter',
   standalone: true,
-  imports: [SelectComponent, RouterLink, LabelComponent, NgIconComponent],
+  imports: [RouterLink, LucideAngularModule, BrnSelectModule, HlmSelectModule, HlmLabelModule],
   templateUrl: './filter.component.html'
 })
 export class LeaderboardFilterComponent {
-  protected octFilter = octFilter;
+  protected ListFilter = ListFilter;
   after = input<string>();
   before = input<string>();
 
   options = signal<SelectOption[]>([]);
+  placeholder = signal<string>('Select a timeframe');
 
   constructor(private router: Router) {
     // get monday - sunday of last 4 weeks
@@ -27,22 +51,26 @@ export class LeaderboardFilterComponent {
     options.push({
       id: now.unix(),
       value: `${currentDate.format('YYYY-MM-DD')}.${now.format('YYYY-MM-DD')}`,
-      label: `${currentDate.format('MMM D')} - ${now.format('MMM D')}`
+      label: formatLabel(currentDate, undefined)
     });
+
+    this.placeholder.set(formatLabel(currentDate, undefined));
+
     for (let i = 0; i < 4; i++) {
       const startDate = currentDate.subtract(7, 'day');
       const endDate = currentDate.subtract(1, 'day');
       options.push({
         id: startDate.unix(),
         value: `${startDate.format('YYYY-MM-DD')}.${endDate.format('YYYY-MM-DD')}`,
-        label: `${startDate.format('MMM D')} - ${endDate.format('MMM D')}`
+        label: formatLabel(startDate, endDate)
       });
       currentDate = startDate;
     }
     this.options.set(options);
   }
 
-  selectFn(value: string) {
+  onSelectChange(event: Event) {
+    const value = (event.target as HTMLSelectElement).value;
     const dates = value.split('.');
     // change query params
     this.router.navigate([], {

@@ -1,10 +1,17 @@
 <div class="flex flex-col gap-2 border rounded-md border-input bg-background p-4">
   <span class="flex items-center pb-2 gap-2 text-muted-foreground">
-    <ng-icon [svg]="octFilter" size="16"></ng-icon>
+    <lucide-angular [img]="ListFilter" class="size-4" />
     <h3 class="text-base font-semibold tracking-wide">Filter</h3>
   </span>
-  <div class="flex flex-col items-start gap-1">
-    <app-label for="timeframe" class="text-sm font-normal text-muted-foreground leading-relaxed indent-1">Timeframe</app-label>
-    <app-select name="timeframe" [options]="options()" (selectChange)="selectFn($event)" [defaultOption]="after() + '.' + before()"></app-select>
-  </div>
+  <hlm-select [placeholder]="placeholder()">
+    <label hlmLabel>Select week</label>
+    <hlm-select-trigger class="w-56">
+      <hlm-select-value />
+    </hlm-select-trigger>
+    <hlm-select-content class="w-56">
+      @for (option of options(); track option.id) {
+        <hlm-option [value]="option.value" (selectChange)="onSelectChange($event)">{{ option.label }}</hlm-option>
+      }
+    </hlm-select-content>
+  </hlm-select>
 </div>
