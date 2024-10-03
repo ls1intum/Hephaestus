@@ -8,55 +8,77 @@
     </tr>
   </thead>
   <tbody appTableBody>
-    @for (entry of leaderboard(); track entry.githubName) {
-      <tr appTableRow>
-        <td appTableCell class="text-center">{{ entry.rank }}</td>
-        <td appTableCell class="py-2">
-          <a href="https://github.com/{{ entry.githubName }}" target="_blank" rel="noopener noreferrer" class="flex items-center gap-2 font-medium">
-            <hlm-avatar>
-              <img [src]="entry.avatarUrl ?? ''" [alt]="entry.name + '\'s avatar'" hlmAvatarImage />
-              <span hlmAvatarFallback>
-                {{ entry.name?.slice(0, 2)?.toUpperCase() }}
-              </span>
-            </hlm-avatar>
-            <span class="text-muted-foreground">{{ entry.name }}</span>
-          </a>
-        </td>
-        <td appTableCell class="text-center">{{ entry.score }}</td>
-        <td appTableCell class="py-2">
-          <div class="flex items-center gap-2">
-            @if (entry.numberOfReviewedPRs > 0) {
-              <div class="flex items-center gap-1 text-github-muted-foreground" title="Total reviewed PRs">
-                <ng-icon [svg]="octGitPullRequest" size="16" />
-                {{ entry.numberOfReviewedPRs }}
-              </div>
-              @if ((entry.changesRequested?.length ?? 0) + (entry.approvals?.length ?? 0) + (entry.comments?.length ?? 0)) {
-                <div class="flex items-center text-github-muted-foreground">
-                  <ng-icon [svg]="octChevronLeft" size="16" />
+    @if (isLoading()) {
+      @for (entry of Array(10); track entry; let idx = $index) {
+        <tr appTableRow id="skeleton">
+          <td appTableCell class="flex justify-center">
+            <hlm-skeleton class="h-5 w-7" [style.width.px]="20 + 1 * idx" />
+          </td>
+          <td appTableCell class="py-2">
+            <span class="flex items-center gap-2">
+              <hlm-skeleton class="w-10 h-10 rounded-full" />
+              <hlm-skeleton class="h-5" [style.width.px]="100 + Math.random() * 200" />
+            </span>
+          </td>
+          <td appTableCell class="flex justify-center">
+            <hlm-skeleton class="h-5" [style.width.px]="20 + (10 - idx) + Math.random() * 10" />
+          </td>
+          <td appTableCell class="py-2">
+            <hlm-skeleton class="h-5" [style.width.px]="30 + (Math.random() * 70) / idx" />
+          </td>
+        </tr>
+      }
+    } @else {
+      @for (entry of leaderboard(); track entry.githubName) {
+        <tr appTableRow>
+          <td appTableCell class="text-center">{{ entry.rank }}</td>
+          <td appTableCell class="py-2">
+            <a href="https://github.com/{{ entry.githubName }}" target="_blank" rel="noopener noreferrer" class="flex items-center gap-2 font-medium">
+              <hlm-avatar>
+                <img [src]="entry.avatarUrl ?? ''" [alt]="entry.name + '\'s avatar'" hlmAvatarImage />
+                <span hlmAvatarFallback>
+                  {{ entry.name?.slice(0, 2)?.toUpperCase() }}
+                </span>
+              </hlm-avatar>
+              <span class="text-muted-foreground">{{ entry.name }}</span>
+            </a>
+          </td>
+          <td appTableCell class="text-center">{{ entry.score }}</td>
+          <td appTableCell class="py-2">
+            <div class="flex items-center gap-2">
+              @if (entry.numberOfReviewedPRs > 0) {
+                <div class="flex items-center gap-1 text-github-muted-foreground" title="Total reviewed PRs">
+                  <ng-icon [svg]="octGitPullRequest" size="16" />
+                  {{ entry.numberOfReviewedPRs }}
+                </div>
+                @if ((entry.changesRequested?.length ?? 0) + (entry.approvals?.length ?? 0) + (entry.comments?.length ?? 0)) {
+                  <div class="flex items-center text-github-muted-foreground">
+                    <ng-icon [svg]="octChevronLeft" size="16" />
+                  </div>
+                }
+              }
+              @if (entry.changesRequested && entry.changesRequested.length > 0) {
+                <div class="flex items-center gap-1 text-github-danger-foreground" title="Changes Requested">
+                  <ng-icon [svg]="octFileDiff" size="16" />
+                  {{ entry.changesRequested.length }}
                 </div>
               }
-            }
-            @if (entry.changesRequested && entry.changesRequested.length > 0) {
-              <div class="flex items-center gap-1 text-github-danger-foreground" title="Changes Requested">
-                <ng-icon [svg]="octFileDiff" size="16" />
-                {{ entry.changesRequested.length }}
-              </div>
-            }
-            @if (entry.approvals && entry.approvals.length > 0) {
-              <div class="flex items-center gap-1 text-github-success-foreground" title="Approvals">
-                <ng-icon [svg]="octCheck" size="16" />
-                {{ entry.approvals.length }}
-              </div>
-            }
-            @if (entry.comments && entry.comments.length > 0) {
-              <div class="flex items-center gap-1 text-github-muted-foreground" title="Comments">
-                <ng-icon [svg]="octComment" size="16" />
-                {{ entry.comments.length }}
-              </div>
-            }
-          </div>
-        </td>
-      </tr>
+              @if (entry.approvals && entry.approvals.length > 0) {
+                <div class="flex items-center gap-1 text-github-success-foreground" title="Approvals">
+                  <ng-icon [svg]="octCheck" size="16" />
+                  {{ entry.approvals.length }}
+                </div>
+              }
+              @if (entry.comments && entry.comments.length > 0) {
+                <div class="flex items-center gap-1 text-github-muted-foreground" title="Comments">
+                  <ng-icon [svg]="octComment" size="16" />
+                  {{ entry.comments.length }}
+                </div>
+              }
+            </div>
+          </td>
+        </tr>
+      }
     }
   </tbody>
 </app-table>

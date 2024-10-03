@@ -83,7 +83,16 @@ const meta: Meta<LeaderboardComponent> = {
   component: LeaderboardComponent,
   tags: ['autodocs'],
   args: {
-    leaderboard: leaderboardEntries
+    leaderboard: leaderboardEntries,
+    isLoading: false
+  },
+  argTypes: {
+    leaderboard: {
+      control: 'object'
+    },
+    isLoading: {
+      control: 'boolean'
+    }
   }
 };
 
@@ -91,6 +100,16 @@ export default meta;
 type Story = StoryObj<LeaderboardComponent>;
 
 export const Default: Story = {
+  render: (args) => ({
+    props: args,
+    template: `<app-leaderboard ${argsToTemplate(args)}/>`
+  })
+};
+
+export const Loading: Story = {
+  args: {
+    isLoading: true
+  },
   render: (args) => ({
     props: args,
     template: `<app-leaderboard ${argsToTemplate(args)}/>`

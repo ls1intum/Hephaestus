@@ -11,12 +11,14 @@ import { TableHeaderDirective } from 'app/ui/table/table-header.directive';
 import { TableRowDirective } from 'app/ui/table/table-row.directive';
 import { TableComponent } from 'app/ui/table/table.component';
 import { HlmAvatarModule } from '@spartan-ng/ui-avatar-helm';
+import { HlmSkeletonModule } from '@spartan-ng/ui-skeleton-helm';
 
 @Component({
   selector: 'app-leaderboard',
   standalone: true,
   imports: [
     HlmAvatarModule,
+    HlmSkeletonModule,
     TableComponent,
     TableBodyDirective,
     TableCaptionDirective,
@@ -36,5 +38,9 @@ export class LeaderboardComponent {
   protected octGitPullRequest = octGitPullRequest;
   protected octChevronLeft = octChevronLeft;
 
+  protected Math = Math;
+  protected Array = Array;
+
   leaderboard = input<LeaderboardEntry[]>();
+  isLoading = input<boolean>();
 }
