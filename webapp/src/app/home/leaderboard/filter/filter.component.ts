@@ -18,14 +18,14 @@ dayjs.extend(weekOfYear);
 function formatLabel(startDate: dayjs.Dayjs, endDate: dayjs.Dayjs | undefined) {
   const calendarWeek = startDate.week();
   if (!endDate) {
-    return `CW ${calendarWeek}: ${startDate.format('MMM D')} - Today`;
+    return `CW\xa0${calendarWeek}:\xa0${startDate.format('MMM D')}\xa0-\xa0Today`;
   }
 
   const sameMonth = startDate.month() === endDate.month();
   if (sameMonth) {
-    return `CW ${calendarWeek}: ${startDate.format('MMM D')} - ${endDate.format('D')}`;
+    return `CW\xa0${calendarWeek}:\xa0${startDate.format('MMM D')}\xa0-\xa0${endDate.format('D')}`;
   } else {
-    return `CW ${calendarWeek}: ${startDate.format('MMM D')} - ${endDate.format('MMM D')}`;
+    return `CW\xa0${calendarWeek}:\xa0${startDate.format('MMM D')}\xa0-\xa0${endDate.format('MMM D')}`;
   }
 }
 
