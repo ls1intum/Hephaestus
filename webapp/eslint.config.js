@@ -43,7 +43,7 @@ module.exports = [
         'warn',
         {
           type: 'attribute',
-          prefix: 'app',
+          prefix: ['app', 'hlm'],
           style: 'camelCase',
         },
       ],
@@ -51,7 +51,7 @@ module.exports = [
         'warn',
         {
           type: 'element',
-          prefix: 'app',
+          prefix: ['app', 'hlm'],
           style: 'kebab-case',
         },
       ],
