@@ -2,16 +2,13 @@ import { HttpClient } from '@angular/common/http';
 import { Component, computed, inject } from '@angular/core';
 import { injectQuery } from '@tanstack/angular-query-experimental';
 import { lastValueFrom } from 'rxjs';
-import { AvatarComponent } from 'app/ui/avatar/avatar.component';
-import { AvatarImageComponent } from 'app/ui/avatar/avatar-image.component';
-import { AvatarFallbackComponent } from 'app/ui/avatar/avatar-fallback.component';
-import { ButtonDirective } from 'app/ui/button/button.component';
 import { GitHub } from 'app/@types/github';
+import { HlmAvatarModule } from '@spartan-ng/ui-avatar-helm';
 
 @Component({
   selector: 'app-about',
   standalone: true,
-  imports: [AvatarComponent, AvatarImageComponent, AvatarFallbackComponent, ButtonDirective],
+  imports: [HlmAvatarModule],
   templateUrl: './about.component.html'
 })
 export class AboutComponent {

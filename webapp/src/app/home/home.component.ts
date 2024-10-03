@@ -6,13 +6,12 @@ import { LeaderboardComponent } from 'app/home/leaderboard/leaderboard.component
 import { combineLatest, timer, lastValueFrom, map } from 'rxjs';
 import { toSignal } from '@angular/core/rxjs-interop';
 import { LeaderboardFilterComponent } from './leaderboard/filter/filter.component';
-import { SkeletonComponent } from 'app/ui/skeleton/skeleton.component';
 import dayjs from 'dayjs';
 
 @Component({
   selector: 'app-home',
   standalone: true,
-  imports: [LeaderboardComponent, LeaderboardFilterComponent, SkeletonComponent],
+  imports: [LeaderboardComponent, LeaderboardFilterComponent],
   templateUrl: './home.component.html'
 })
 export class HomeComponent {

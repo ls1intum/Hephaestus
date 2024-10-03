@@ -1,13 +1,13 @@
 import { Component, inject } from '@angular/core';
 import { LucideAngularModule, Sun, Moon } from 'lucide-angular';
-import { ButtonDirective } from 'app/ui/button/button.component';
 import { AppTheme, ThemeSwitcherService } from './theme-switcher.service';
 import { animate, state, style, transition, trigger } from '@angular/animations';
+import { HlmButtonModule } from '@spartan-ng/ui-button-helm';
 
 @Component({
   selector: 'app-theme-switcher',
   standalone: true,
-  imports: [ButtonDirective, LucideAngularModule],
+  imports: [HlmButtonModule, LucideAngularModule],
   templateUrl: './theme-switcher.component.html',
   animations: [
     trigger('iconTrigger', [
