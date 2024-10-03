@@ -1,8 +1,8 @@
 import { argsToTemplate, moduleMetadata, type Meta, type StoryObj } from '@storybook/angular';
 import { action } from '@storybook/addon-actions';
-import { ButtonDirective } from '@app/ui/button/button.component';
 import { LabelComponent } from '@app/ui/label/label.component';
 import { InputComponent, args, argTypes } from './input.component';
+import { HlmButtonModule } from '@spartan-ng/ui-button-helm';
 
 const meta: Meta<InputComponent> = {
   title: 'UI/Input',
@@ -25,7 +25,7 @@ const meta: Meta<InputComponent> = {
   },
   decorators: [
     moduleMetadata({
-      imports: [ButtonDirective, LabelComponent]
+      imports: [HlmButtonModule, LabelComponent]
     })
   ]
 };
@@ -74,7 +74,7 @@ export const WithButton: Story = {
     template: `
       <div class="flex gap-2 flex-row">
         <app-input ${argsToTemplate(args)} [size]="args.size" [(value)]="userInput" placeholder="Enter text here" class="grow"/>
-        <button appButton (onClick)="onButtonClick(userInput)" size="${args.size ?? 'default'}" [disabled]="!userInput">Submit</button>
+        <button hlmBtn (onClick)="onButtonClick(userInput)" size="${args.size ?? 'default'}" [disabled]="!userInput">Submit</button>
       </div>
     `
   })

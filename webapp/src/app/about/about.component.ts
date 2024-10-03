@@ -2,14 +2,13 @@ import { HttpClient } from '@angular/common/http';
 import { Component, computed, inject } from '@angular/core';
 import { injectQuery } from '@tanstack/angular-query-experimental';
 import { lastValueFrom } from 'rxjs';
-import { ButtonDirective } from 'app/ui/button/button.component';
 import { GitHub } from 'app/@types/github';
 import { HlmAvatarModule } from '@spartan-ng/ui-avatar-helm';
 
 @Component({
   selector: 'app-about',
   standalone: true,
-  imports: [HlmAvatarModule, ButtonDirective],
+  imports: [HlmAvatarModule],
   templateUrl: './about.component.html'
 })
 export class AboutComponent {

@@ -1,4 +1,4 @@
-<button appButton (click)="toggleTheme()" variant="outline" size="icon">
+<button hlmBtn (click)="toggleTheme()" variant="outline" size="icon">
   <div [@iconTrigger]="this.themeSwitcherService.currentTheme() ?? 'dark'">
     <lucide-angular [img]="this.themeSwitcherService.currentTheme() === 'dark' ? Sun : Moon" class="size-5" />
   </div>
