@@ -13,12 +13,12 @@
         <td appTableCell class="text-center">{{ entry.rank }}</td>
         <td appTableCell class="py-2">
           <a href="https://github.com/{{ entry.githubName }}" target="_blank" rel="noopener noreferrer" class="flex items-center gap-2 font-medium">
-            <app-avatar>
-              <app-avatar-image [src]="entry.avatarUrl ?? ''" [alt]="entry.name + '\'s avatar'" />
-              <app-avatar-fallback>
-                {{ entry.name?.slice(0, 1)?.toUpperCase() }}
-              </app-avatar-fallback>
-            </app-avatar>
+            <hlm-avatar>
+              <img [src]="entry.avatarUrl ?? ''" [alt]="entry.name + '\'s avatar'" hlmAvatarImage />
+              <span hlmAvatarFallback>
+                {{ entry.name?.slice(0, 2)?.toUpperCase() }}
+              </span>
+            </hlm-avatar>
             <span class="text-muted-foreground">{{ entry.name }}</span>
           </a>
         </td>

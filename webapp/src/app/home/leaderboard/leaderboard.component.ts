@@ -2,9 +2,6 @@ import { Component, input } from '@angular/core';
 import { NgIconComponent } from '@ng-icons/core';
 import { octFileDiff, octCheck, octComment, octGitPullRequest, octChevronLeft } from '@ng-icons/octicons';
 import { LeaderboardEntry } from 'app/core/modules/openapi';
-import { AvatarFallbackComponent } from 'app/ui/avatar/avatar-fallback.component';
-import { AvatarImageComponent } from 'app/ui/avatar/avatar-image.component';
-import { AvatarComponent } from 'app/ui/avatar/avatar.component';
 import { TableBodyDirective } from 'app/ui/table/table-body.directive';
 import { TableCaptionDirective } from 'app/ui/table/table-caption.directive';
 import { TableCellDirective } from 'app/ui/table/table-cell.directive';
@@ -13,14 +10,13 @@ import { TableHeadDirective } from 'app/ui/table/table-head.directive';
 import { TableHeaderDirective } from 'app/ui/table/table-header.directive';
 import { TableRowDirective } from 'app/ui/table/table-row.directive';
 import { TableComponent } from 'app/ui/table/table.component';
+import { HlmAvatarModule } from '@spartan-ng/ui-avatar-helm';
 
 @Component({
   selector: 'app-leaderboard',
   standalone: true,
   imports: [
-    AvatarComponent,
-    AvatarFallbackComponent,
-    AvatarImageComponent,
+    HlmAvatarModule,
     TableComponent,
     TableBodyDirective,
     TableCaptionDirective,

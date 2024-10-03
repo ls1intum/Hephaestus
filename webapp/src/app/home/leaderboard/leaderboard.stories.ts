@@ -63,6 +63,18 @@ const leaderboardEntries: LeaderboardEntry[] = [
     comments: generateReviews(1, PullRequestReviewDTO.StateEnum.Commented),
     rank: 4,
     numberOfReviewedPRs: 1
+  },
+  {
+    githubName: 'doesnotexistongithub',
+    avatarUrl: 'https://avatars.githubusercontentd.com/u/13132323124599?v=4',
+    type: LeaderboardEntry.TypeEnum.User,
+    name: 'NoAvatarUser',
+    score: 10,
+    changesRequested: [],
+    approvals: [],
+    comments: generateReviews(1, PullRequestReviewDTO.StateEnum.Commented),
+    rank: 5,
+    numberOfReviewedPRs: 0
   }
 ];
 
