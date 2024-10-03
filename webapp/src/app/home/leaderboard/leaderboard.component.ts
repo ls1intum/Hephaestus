@@ -13,7 +13,6 @@ import { TableHeadDirective } from 'app/ui/table/table-head.directive';
 import { TableHeaderDirective } from 'app/ui/table/table-header.directive';
 import { TableRowDirective } from 'app/ui/table/table-row.directive';
 import { TableComponent } from 'app/ui/table/table.component';
-import { HlmTableModule } from '@spartan-ng/ui-table-helm';
 
 @Component({
   selector: 'app-leaderboard',
@@ -22,7 +21,6 @@ import { HlmTableModule } from '@spartan-ng/ui-table-helm';
     AvatarComponent,
     AvatarFallbackComponent,
     AvatarImageComponent,
-    HlmTableModule,
     TableComponent,
     TableBodyDirective,
     TableCaptionDirective,
