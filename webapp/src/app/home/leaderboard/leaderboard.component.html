@@ -9,7 +9,7 @@
   </thead>
   <tbody appTableBody>
     @if (isLoading()) {
-      @for (entry of Array(10); track entry; let idx = $index) {
+      @for (entry of [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]; track entry; let idx = $index) {
         <tr appTableRow id="skeleton">
           <td appTableCell class="flex justify-center">
             <hlm-skeleton class="h-5 w-7" [style.width.px]="20 + 1 * idx" />
@@ -17,14 +17,14 @@
           <td appTableCell class="py-2">
             <span class="flex items-center gap-2">
               <hlm-skeleton class="w-10 h-10 rounded-full" />
-              <hlm-skeleton class="h-5" [style.width.px]="100 + Math.random() * 200" />
+              <hlm-skeleton class="h-5" [style.width.px]="100 + (idx % 3) * 75" />
             </span>
           </td>
           <td appTableCell class="flex justify-center">
-            <hlm-skeleton class="h-5" [style.width.px]="20 + (10 - idx) + Math.random() * 10" />
+            <hlm-skeleton class="h-5" [style.width.px]="20 + (10 - idx) + (idx % 3) * 4" />
           </td>
           <td appTableCell class="py-2">
-            <hlm-skeleton class="h-5" [style.width.px]="30 + (Math.random() * 70) / idx" />
+            <hlm-skeleton class="h-5" [style.width.px]="30 + ((idx % 4) * 20) / idx" />
           </td>
         </tr>
       }

@@ -1,4 +1,5 @@
-import { Component, input, signal } from '@angular/core';
+import { Component, computed, effect, input, signal } from '@angular/core';
+import { FormsModule } from '@angular/forms';
 import { Router, RouterLink } from '@angular/router';
 import dayjs from 'dayjs';
 import weekOfYear from 'dayjs/plugin/weekOfYear';
@@ -32,7 +33,7 @@ function formatLabel(startDate: dayjs.Dayjs, endDate: dayjs.Dayjs | undefined) {
 @Component({
   selector: 'app-leaderboard-filter',
   standalone: true,
-  imports: [RouterLink, LucideAngularModule, BrnSelectModule, HlmSelectModule, HlmLabelModule],
+  imports: [RouterLink, LucideAngularModule, BrnSelectModule, HlmSelectModule, HlmLabelModule, FormsModule],
   templateUrl: './filter.component.html'
 })
 export class LeaderboardFilterComponent {
@@ -40,21 +41,22 @@ export class LeaderboardFilterComponent {
   after = input<string>();
   before = input<string>();
 
-  options = signal<SelectOption[]>([]);
-  placeholder = signal<string>('Select a timeframe');
+  value = signal<string>(`${this.after() ?? dayjs().day(1).format('YYYY-MM-DD')}.${this.before() ?? dayjs().format('YYYY-MM-DD')}`);
 
-  constructor(private router: Router) {
-    // get monday - sunday of last 4 weeks
-    const options = new Array<SelectOption>();
+  placeholder = computed(() => {
+    return formatLabel(dayjs(this.after()) ?? dayjs().day(1), this.before() === undefined ? undefined : dayjs(this.before()));
+  });
+
+  options = computed(() => {
     const now = dayjs();
     let currentDate = dayjs().day(1);
-    options.push({
-      id: now.unix(),
-      value: `${currentDate.format('YYYY-MM-DD')}.${now.format('YYYY-MM-DD')}`,
-      label: formatLabel(currentDate, undefined)
-    });
-
-    this.placeholder.set(formatLabel(currentDate, undefined));
+    const options: SelectOption[] = [
+      {
+        id: now.unix(),
+        value: `${currentDate.format('YYYY-MM-DD')}.${now.format('YYYY-MM-DD')}`,
+        label: formatLabel(currentDate, undefined)
+      }
+    ];
 
     for (let i = 0; i < 4; i++) {
       const startDate = currentDate.subtract(7, 'day');
@@ -66,18 +68,20 @@ export class LeaderboardFilterComponent {
       });
       currentDate = startDate;
     }
-    this.options.set(options);
-  }
 
-  onSelectChange(event: Event) {
-    const value = (event.target as HTMLSelectElement).value;
-    const dates = value.split('.');
-    // change query params
-    this.router.navigate([], {
-      queryParams: {
-        after: dates[0],
-        before: dates[1]
-      }
+    return options;
+  });
+
+  constructor(private router: Router) {
+    effect(() => {
+      const dates = this.value().split('.');
+      // change query params
+      this.router.navigate([], {
+        queryParams: {
+          after: dates[0],
+          before: dates[1]
+        }
+      });
     });
   }
 }
