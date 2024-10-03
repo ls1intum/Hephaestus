@@ -60,7 +60,7 @@ const leaderboardEntries: LeaderboardEntry[] = [
     score: 20,
     changesRequested: [],
     approvals: [],
-    comments: generateReviews(1, PullRequestReviewDTO.StateEnum.Commented),
+    comments: [],
     rank: 4,
     numberOfReviewedPRs: 1
   },
@@ -72,7 +72,7 @@ const leaderboardEntries: LeaderboardEntry[] = [
     score: 10,
     changesRequested: [],
     approvals: [],
-    comments: generateReviews(1, PullRequestReviewDTO.StateEnum.Commented),
+    comments: [],
     rank: 5,
     numberOfReviewedPRs: 0
   }

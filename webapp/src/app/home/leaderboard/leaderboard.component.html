@@ -24,7 +24,18 @@
         </td>
         <td appTableCell class="text-center">{{ entry.score }}</td>
         <td appTableCell class="py-2">
-          <div class="flex items-center gap-3">
+          <div class="flex items-center gap-2">
+            @if (entry.numberOfReviewedPRs > 0) {
+              <div class="flex items-center gap-1 text-github-muted-foreground" title="Total reviewed PRs">
+                <ng-icon [svg]="octGitPullRequest" size="16" />
+                {{ entry.numberOfReviewedPRs }}
+              </div>
+              @if ((entry.changesRequested?.length ?? 0) + (entry.approvals?.length ?? 0) + (entry.comments?.length ?? 0)) {
+                <div class="flex items-center text-github-muted-foreground">
+                  <ng-icon [svg]="octChevronLeft" size="16" />
+                </div>
+              }
+            }
             @if (entry.changesRequested && entry.changesRequested.length > 0) {
               <div class="flex items-center gap-1 text-github-danger-foreground" title="Changes Requested">
                 <ng-icon [svg]="octFileDiff" size="16" />
