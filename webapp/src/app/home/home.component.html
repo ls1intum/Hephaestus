@@ -1,9 +1,8 @@
 <div class="flex gap-2 flex-col items-center justify-center">
   <h1 class="text-3xl font-bold mb-4">Artemis Leaderboard</h1>
-
-  <div class="grid grid-cols-1 md:grid-cols-3 gap-4 place-content-center">
+  <div class="grid grid-cols-1 xl:grid-cols-4 gap-4 place-content-center">
     <app-leaderboard-filter [after]="after()" [before]="before()" />
-    <div class="md:col-span-2 flex flex-col items-center gap-4">
+    <div class="xl:col-span-2 flex flex-col items-center gap-4">
       @if (query.error()) {
         <span class="text-xl text-destructive mt-2">An error has occurred</span>
       } @else {
@@ -12,5 +11,7 @@
         </div>
       }
     </div>
+    <!-- Spacer -->
+    <div class="hidden xl:block"></div>
   </div>
 </div>
