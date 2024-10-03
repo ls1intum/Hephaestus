@@ -60,7 +60,6 @@
     "@tanstack/angular-query-devtools-experimental": "5.52.0",
     "@tanstack/angular-query-experimental": "5.52.0",
     "autoprefixer": "10.4.20",
-    "class-variance-authority": "0.7.0",
     "clsx": "2.1.1",
     "dayjs": "1.11.13",
     "embla-carousel-angular": "^14.0.0",
