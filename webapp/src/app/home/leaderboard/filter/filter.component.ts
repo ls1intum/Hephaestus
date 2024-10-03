@@ -38,10 +38,10 @@ function formatLabel(startDate: dayjs.Dayjs, endDate: dayjs.Dayjs | undefined) {
 })
 export class LeaderboardFilterComponent {
   protected ListFilter = ListFilter;
-  after = input<string>();
-  before = input<string>();
+  after = input<string>('');
+  before = input<string>('');
 
-  value = signal<string>(`${this.after() ?? dayjs().day(1).format('YYYY-MM-DD')}.${this.before() ?? dayjs().format('YYYY-MM-DD')}`);
+  value = signal<string>(`${this.after()}.${this.before()}`);
 
   placeholder = computed(() => {
     return formatLabel(dayjs(this.after()) ?? dayjs().day(1), this.before() === undefined ? undefined : dayjs(this.before()));
@@ -74,6 +74,7 @@ export class LeaderboardFilterComponent {
 
   constructor(private router: Router) {
     effect(() => {
+      if (this.value().length === 1) return;
       const dates = this.value().split('.');
       // change query params
       this.router.navigate([], {
