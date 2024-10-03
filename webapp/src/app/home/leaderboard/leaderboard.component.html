@@ -46,7 +46,7 @@
           <td appTableCell class="text-center">{{ entry.score }}</td>
           <td appTableCell class="py-2">
             <div class="flex items-center gap-2">
-              @if (entry.numberOfReviewedPRs > 0) {
+              @if (entry.numberOfReviewedPRs) {
                 <div class="flex items-center gap-1 text-github-muted-foreground" title="Total reviewed PRs">
                   <ng-icon [svg]="octGitPullRequest" size="16" />
                   {{ entry.numberOfReviewedPRs }}
