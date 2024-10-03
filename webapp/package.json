@@ -21,6 +21,7 @@
   },
   "dependencies": {
     "@angular/animations": "18.2.1",
+    "@angular/cdk": "18.2.7",
     "@angular/common": "18.2.1",
     "@angular/compiler": "18.2.1",
     "@angular/core": "18.2.1",
@@ -31,6 +32,7 @@
     "@ng-icons/core": "29.5.0",
     "@ng-icons/octicons": "29.5.0",
     "@primer/primitives": "9.1.1",
+    "@spartan-ng/ui-core": "0.0.1-alpha.356",
     "@tanstack/angular-query-devtools-experimental": "5.52.0",
     "@tanstack/angular-query-experimental": "5.52.0",
     "autoprefixer": "10.4.20",
@@ -52,6 +54,7 @@
     "@angular/cli": "18.2.1",
     "@angular/compiler-cli": "18.2.1",
     "@chromatic-com/storybook": "1.7.0",
+    "@spartan-ng/cli": "0.0.1-alpha.366",
     "@storybook/addon-essentials": "8.2.9",
     "@storybook/addon-interactions": "8.2.9",
     "@storybook/addon-links": "8.2.9",
