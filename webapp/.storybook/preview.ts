@@ -10,8 +10,8 @@ const preview: Preview = {
     controls: {
       matchers: {
         color: /(background|color)$/i,
-        date: /Date$/,
-      },
+        date: /Date$/
+      }
     },
     backgrounds: { disable: true },
     docs: {
@@ -36,40 +36,40 @@ const preview: Preview = {
         };
 
         // Fixing the theme for the DocsContainer
-        const el = document.querySelector("html");
-        const currentTheme = props?.context.store.globals.globals.theme;
-        el!.dataset['theme'] = currentTheme;
-        const theme = props?.context.store.globals.globals.theme === 'dark' ? themes.dark: themes.light;
+        const el = document.querySelector('html');
+        const currentTheme = (el?.dataset['colorMode'] as 'light' | 'dark') || 'light';
+        const theme = currentTheme === 'dark' ? themes.dark : themes.light;
         const backgroundHSL = getBackgroundHSL(currentTheme);
         props.theme = {
           ...theme,
-          appContentBg: `hsl(${backgroundHSL})`,
+          appContentBg: `hsl(${backgroundHSL})`
         };
         el?.setAttribute('data-color-mode', currentTheme);
+        el?.setAttribute('data-theme', currentTheme);
         el?.setAttribute('data-light-theme', 'light');
         el?.setAttribute('data-dark-theme', 'dark');
         return createElement(DocsContainer, props);
-      },
-    },
+      }
+    }
   },
   decorators: [
     withThemeByClassName({
       themes: {
         light: '',
-        dark: 'dark bg-background',
+        dark: 'dark bg-background'
       },
-      defaultTheme: 'light',
+      defaultTheme: 'light'
     }),
     withThemeByDataAttribute({
       attributeName: 'data-color-mode',
       themes: {
         light: 'light',
-        dark: 'dark',
+        dark: 'dark'
       },
-      defaultTheme: 'light',
+      defaultTheme: 'light'
     }),
-    applicationConfig(appConfig),
-  ],
+    applicationConfig(appConfig)
+  ]
 };
 
 export default preview;
