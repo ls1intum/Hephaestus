@@ -1,4 +1,4 @@
-import { argsToTemplate, type Meta, type StoryObj } from '@storybook/angular';
+import { type Meta, type StoryObj } from '@storybook/angular';
 import { LeaderboardFilterComponent } from './filter.component';
 
 const meta: Meta<LeaderboardFilterComponent> = {
@@ -17,6 +17,12 @@ const meta: Meta<LeaderboardFilterComponent> = {
         type: 'text'
       },
       description: 'Right limit of the timeframe'
+    },
+    repository: {
+      control: {
+        type: 'text'
+      },
+      description: 'Repository to filter for'
     }
   }
 };
@@ -25,12 +31,7 @@ export default meta;
 type Story = StoryObj<LeaderboardFilterComponent>;
 
 export const Default: Story = {
-  args: {
-    after: '2024-09-09',
-    before: '2024-09-15'
-  },
-  render: (args) => ({
-    props: args,
-    template: `<app-leaderboard-filter ${argsToTemplate(args)} />`
+  render: () => ({
+    template: '<app-leaderboard-filter />'
   })
 };

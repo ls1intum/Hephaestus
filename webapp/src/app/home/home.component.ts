@@ -1,4 +1,4 @@
-import { Component, computed, effect, inject } from '@angular/core';
+import { Component, computed, inject } from '@angular/core';
 import { ActivatedRoute } from '@angular/router';
 import { injectQuery } from '@tanstack/angular-query-experimental';
 import { LeaderboardService } from 'app/core/modules/openapi/api/leaderboard.service';
