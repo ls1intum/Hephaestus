@@ -1,4 +1,4 @@
-import { Component, input } from '@angular/core';
+import { Component } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { ListFilter, LucideAngularModule } from 'lucide-angular';
 import { LeaderboardFilterTimeframeComponent } from './timeframe/timeframe.component';
