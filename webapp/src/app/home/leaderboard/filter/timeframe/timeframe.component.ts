@@ -1,4 +1,4 @@
-import { Component, computed, effect, input, signal } from '@angular/core';
+import { Component, computed, effect, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { Router, RouterLink } from '@angular/router';
 import dayjs from 'dayjs';
@@ -17,7 +17,7 @@ dayjs.extend(weekOfYear);
 
 function formatLabel(startDate: dayjs.Dayjs, endDate: dayjs.Dayjs | undefined) {
   const calendarWeek = startDate.week();
-  if (!endDate) {
+  if (!endDate || endDate.isSame(dayjs(), 'day')) {
     return `CW\xa0${calendarWeek}:\xa0${startDate.format('MMM D')}\xa0-\xa0Today`;
   }
 
@@ -36,9 +36,8 @@ function formatLabel(startDate: dayjs.Dayjs, endDate: dayjs.Dayjs | undefined) {
   templateUrl: './timeframe.component.html'
 })
 export class LeaderboardFilterTimeframeComponent {
-  after = input<string>('');
-  before = input<string>('');
-
+  after = signal<string>('');
+  before = signal<string>('');
   value = signal<string>(`${this.after()}.${this.before()}`);
 
   placeholder = computed(() => {
@@ -71,6 +70,12 @@ export class LeaderboardFilterTimeframeComponent {
   });
 
   constructor(private router: Router) {
+    // init params
+    const queryParams = this.router.parseUrl(this.router.url).queryParams;
+    this.after.set(queryParams['after'] ?? dayjs().day(1).format('YYYY-MM-DD'));
+    this.before.set(queryParams['before'] ?? dayjs().format('YYYY-MM-DD'));
+
+    // persist changes in url
     effect(() => {
       if (this.value().length === 1) return;
 

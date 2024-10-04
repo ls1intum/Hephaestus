@@ -1,11 +1,10 @@
-import { Component, computed, effect, input, signal } from '@angular/core';
+import { Component, computed, effect, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { Router, RouterLink } from '@angular/router';
 import { BrnSelectModule } from '@spartan-ng/ui-select-brain';
 import { HlmSelectModule } from '@spartan-ng/ui-select-helm';
 import { HlmLabelModule } from '@spartan-ng/ui-label-helm';
 
-// ls1intum/Artemis, ls1intum/Pyris, ls1intum/Athena, ls1intum/Athena-CoFee, ls1intum/artemis-ansible-collection, ls1intum/Ares, ls1intum/Ares2, ls1intum/Aeolus, ls1intum/hades, ls1intum/Apollon, ls1intum/Hephaestus, ls1intum/Apollon_standalone
 export const repositoryNames = [
   'ls1intum/Artemis',
   'ls1intum/Athena',
@@ -55,8 +54,8 @@ export class LeaderboardFilterRepositoryComponent {
 
   constructor(private router: Router) {
     this.value.set(this.router.parseUrl(this.router.url).queryParams['repository'] ?? 'all');
+
     effect(() => {
-      console.log('LeaderboardFilterRepositoryComponent: effect: ', this.value());
       if (!this.value() || this.value() === '') return;
       const queryParams = this.router.parseUrl(this.router.url).queryParams;
       if (this.value() === 'all') {

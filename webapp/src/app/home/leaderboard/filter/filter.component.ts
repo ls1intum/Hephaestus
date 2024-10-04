@@ -12,6 +12,4 @@ import { LeaderboardFilterRepositoryComponent } from './repository/repository.co
 })
 export class LeaderboardFilterComponent {
   protected ListFilter = ListFilter;
-  after = input<string>('');
-  before = input<string>('');
 }

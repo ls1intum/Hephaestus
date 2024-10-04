@@ -2,7 +2,7 @@
   <h1 class="text-3xl font-bold mb-4">Artemis Leaderboard</h1>
   <div class="grid grid-cols-1 xl:grid-cols-4 gap-4 place-content-center">
     <div class="w-full flex flex-col items-center">
-      <app-leaderboard-filter [after]="after()" [before]="before()" />
+      <app-leaderboard-filter />
     </div>
     <div class="xl:col-span-2 flex flex-col items-center gap-4">
       @if (query.error()) {

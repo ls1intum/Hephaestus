@@ -28,6 +28,15 @@
           </td>
         </tr>
       }
+    } @else if (!leaderboard() || leaderboard()?.length === 0) {
+      <tr appTableRow>
+        <td appTableCell colspan="4">
+          <div class="flex flex-col items-center justify-center gap-2 mt-1">
+            <ng-icon [svg]="octNoEntry" size="32" class="text-github-danger-foreground" />
+            <span class="font-semibold text-muted-foreground">No entries found</span>
+          </div>
+        </td>
+      </tr>
     } @else {
       @for (entry of leaderboard(); track entry.githubName) {
         <tr appTableRow>

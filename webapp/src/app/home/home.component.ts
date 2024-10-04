@@ -24,12 +24,6 @@ export class HomeComponent {
   protected before = computed(() => this.queryParams().get('before') ?? dayjs().format('YYYY-MM-DD'));
   protected repository = computed(() => this.queryParams().get('repository') ?? 'all');
 
-  constructor() {
-    effect(() => {
-      console.log('HomeComponent: effect: ', this.repository());
-    });
-  }
-
   query = injectQuery(() => ({
     queryKey: ['leaderboard', { after: this.after(), before: this.before(), repository: this.repository() }],
     queryFn: async () =>

@@ -14,7 +14,7 @@ spring:
       password: ${SECURITY_USER_PASSWORD}
 
 monitoring:
-  repositories: ls1intum/Artemis
+  repositories: ls1intum/Artemis, ls1intum/Athena, ls1intum/Hephaestus, ls1intum/Pyris, ls1intum/Ares2, ls1intum/Aeolus, ls1intum/hades, ls1intum/Apollon, ls1intum/Apollon_standalone
 
 github:
   authToken: ${GITHUB_AUTH_TOKEN}
