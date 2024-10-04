@@ -1,4 +1,4 @@
-import { Component, computed, inject } from '@angular/core';
+import { Component, computed, effect, inject } from '@angular/core';
 import { ActivatedRoute } from '@angular/router';
 import { injectQuery } from '@tanstack/angular-query-experimental';
 import { LeaderboardService } from 'app/core/modules/openapi/api/leaderboard.service';
@@ -17,15 +17,26 @@ import dayjs from 'dayjs';
 export class HomeComponent {
   leaderboardService = inject(LeaderboardService);
 
-  // timeframe for leaderboard
-  // example: 2024-09-19
   private readonly route = inject(ActivatedRoute);
   private queryParams = toSignal(this.route.queryParamMap, { requireSync: true });
+  // leaderboard filter
   protected after = computed(() => this.queryParams().get('after') ?? dayjs().day(1).format('YYYY-MM-DD'));
   protected before = computed(() => this.queryParams().get('before') ?? dayjs().format('YYYY-MM-DD'));
+  protected repository = computed(() => this.queryParams().get('repository') ?? 'all');
+
+  constructor() {
+    effect(() => {
+      console.log('HomeComponent: effect: ', this.repository());
+    });
+  }
 
   query = injectQuery(() => ({
-    queryKey: ['leaderboard', { after: this.after(), before: this.before() }],
-    queryFn: async () => lastValueFrom(combineLatest([this.leaderboardService.getLeaderboard(this.after(), this.before()), timer(500)]).pipe(map(([leaderboard]) => leaderboard)))
+    queryKey: ['leaderboard', { after: this.after(), before: this.before(), repository: this.repository() }],
+    queryFn: async () =>
+      lastValueFrom(
+        combineLatest([this.leaderboardService.getLeaderboard(this.after(), this.before(), this.repository() !== 'all' ? this.repository() : undefined), timer(500)]).pipe(
+          map(([leaderboard]) => leaderboard)
+        )
+      )
   }));
 }
