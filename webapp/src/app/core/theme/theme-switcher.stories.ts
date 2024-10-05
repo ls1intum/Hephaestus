@@ -4,7 +4,6 @@ import { BrowserAnimationsModule } from '@angular/platform-browser/animations';
 
 // More on how to set up stories at: https://storybook.js.org/docs/writing-stories
 const meta: Meta<ThemeSwitcherComponent> = {
-  title: 'Components/Core/ThemeSwitcher',
   component: ThemeSwitcherComponent,
   tags: ['autodocs'],
   decorators: [

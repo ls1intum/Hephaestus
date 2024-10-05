@@ -1,21 +1,30 @@
+import dayjs from 'dayjs';
+import { combineLatest, timer, lastValueFrom, map } from 'rxjs';
 import { Component, computed, inject } from '@angular/core';
 import { ActivatedRoute } from '@angular/router';
-import { injectQuery } from '@tanstack/angular-query-experimental';
-import { LeaderboardService } from 'app/core/modules/openapi/api/leaderboard.service';
-import { LeaderboardComponent } from 'app/home/leaderboard/leaderboard.component';
-import { combineLatest, timer, lastValueFrom, map } from 'rxjs';
 import { toSignal } from '@angular/core/rxjs-interop';
+import { LucideAngularModule, CircleX } from 'lucide-angular';
+import { injectQuery } from '@tanstack/angular-query-experimental';
+import { LeaderboardService } from '@app/core/modules/openapi/api/leaderboard.service';
+import { LeaderboardComponent } from '@app/home/leaderboard/leaderboard.component';
 import { LeaderboardFilterComponent } from './leaderboard/filter/filter.component';
-import dayjs from 'dayjs';
+import { SecurityStore } from '@app/core/security/security-store.service';
+import { HlmAlertModule } from '@spartan-ng/ui-alert-helm';
 
 @Component({
   selector: 'app-home',
   standalone: true,
-  imports: [LeaderboardComponent, LeaderboardFilterComponent],
+  imports: [LeaderboardComponent, LeaderboardFilterComponent, HlmAlertModule, LucideAngularModule],
   templateUrl: './home.component.html'
 })
 export class HomeComponent {
+  protected CircleX = CircleX;
+
+  securityStore = inject(SecurityStore);
   leaderboardService = inject(LeaderboardService);
+
+  signedIn = this.securityStore.signedIn;
+  user = this.securityStore.loadedUser;
 
   // timeframe for leaderboard
   // example: 2024-09-19

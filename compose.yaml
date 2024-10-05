@@ -27,7 +27,12 @@ services:
       app-network:
         aliases:
           - postgres
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
 
 networks:
   app-network:
     driver: bridge`
+
+volumes:
+  postgres-data:

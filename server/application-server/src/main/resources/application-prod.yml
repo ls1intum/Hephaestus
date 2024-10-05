@@ -9,9 +9,10 @@ spring:
       ddl-auto: update
 
   security:
-    user:
-      name: ${SECURITY_USER_NAME}
-      password: ${SECURITY_USER_PASSWORD}
+    oauth2:
+      resourceserver:
+        jwt:
+          issuer-uri: ${KEYCLOAK_URL}/realms/${KEYCLOAK_REALM}
 
 monitoring:
   repositories: ls1intum/Artemis
