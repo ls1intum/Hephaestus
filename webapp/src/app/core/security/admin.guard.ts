@@ -16,7 +16,7 @@ export class AdminGuard implements CanActivate {
     return toObservable(this.securityStore.loadedUser, { injector: this.injector }).pipe(
       filter(Boolean),
       map((user) => {
-        if (user && user.roles.includes('ADMIN')) {
+        if (user && user.roles.includes('admin')) {
           return true;
         }
         return this.router.createUrlTree(['/']);

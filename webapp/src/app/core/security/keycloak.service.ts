@@ -1,4 +1,5 @@
 import { Injectable } from '@angular/core';
+import { environment } from 'environments/environment';
 import Keycloak from 'keycloak-js';
 
 export interface UserProfile {
@@ -19,9 +20,9 @@ export class KeycloakService {
   get keycloak() {
     if (!this._keycloak) {
       this._keycloak = new Keycloak({
-        url: 'http://localhost:8081',
-        realm: 'hephaestus',
-        clientId: 'hephaestus'
+        url: environment.keycloak.url,
+        realm: environment.keycloak.realm,
+        clientId: environment.keycloak.clientId
       });
     }
     return this._keycloak;
