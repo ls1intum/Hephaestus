@@ -44,7 +44,8 @@ export class LeaderboardFilterComponent {
   value = signal<string>(`${this.after()}.${this.before()}`);
 
   placeholder = computed(() => {
-    return formatLabel(dayjs(this.after()) ?? dayjs().isoWeekday(1), this.before() === undefined ? undefined : dayjs(this.before()));
+    const beforeIsToday = this.before() === dayjs().format('YYYY-MM-DD');
+    return formatLabel(dayjs(this.after()) ?? dayjs().isoWeekday(1), beforeIsToday ? undefined : dayjs(this.before()));
   });
 
   options = computed(() => {
