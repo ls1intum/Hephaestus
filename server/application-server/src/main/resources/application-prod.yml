@@ -17,7 +17,7 @@ spring:
 monitoring:
     runOnStartup: ${MONITORING_RUN_ON_STARTUP:true}
     # Fetching timeframe in days
-    timeframe: ${MONITORING_TIMEFRAME:30}
+    timeframe: ${MONITORING_TIMEFRAME:7}
     repository-sync-cron: ${MONITORING_REPOSITORY_SYNC_CRON:0 0 * * * *}
     repositories: ${MONITORING_REPOSITORIES:ls1intum/Artemis}
 
