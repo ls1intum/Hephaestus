@@ -4,6 +4,7 @@ export interface User {
   name: string;
   anonymous: boolean;
   bearer: string;
+  roles: string[];
 }
 
 export const ANONYMOUS_USER: User = {
@@ -11,7 +12,8 @@ export const ANONYMOUS_USER: User = {
   email: 'nomail',
   name: 'no user',
   anonymous: true,
-  bearer: ''
+  bearer: '',
+  roles: []
 };
 
 export interface SecurityState {

@@ -3,10 +3,7 @@
     <div class="grid grid-cols-1 xl:grid-cols-4 gap-4 xl:gap-8">
       <div class="space-y-2 col-span-1">
         <div class="flex flex-col gap-2 mb-4">
-          <h1 class="text-3xl font-bold">
-            Artemis<br class="hidden md:visible" />
-            Leaderboard
-          </h1>
+          <h1 class="text-3xl font-bold">Artemis Leaderboard</h1>
           @if (signedIn() && user(); as userValue) {
             <h2 class="text-xl text-muted-foreground">Hi {{ userValue.name }} 👋</h2>
           }

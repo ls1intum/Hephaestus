@@ -28,13 +28,14 @@ export class SecurityStore {
 
     const isLoggedIn = await keycloakService.init();
     if (isLoggedIn && keycloakService.profile) {
-      const { sub, email, given_name, family_name, token } = keycloakService.profile;
+      const { sub, email, given_name, family_name, token, roles } = keycloakService.profile;
       const user = {
         id: sub,
         email,
         name: `${given_name} ${family_name}`,
         anonymous: false,
-        bearer: token
+        bearer: token,
+        roles
       };
       this.user.set(user);
       this.loaded.set(true);

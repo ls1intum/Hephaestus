@@ -6,7 +6,9 @@ export interface UserProfile {
   email: string;
   given_name: string;
   family_name: string;
+  realmAccess: { roles: string[] };
   token: string;
+  roles: string[];
 }
 
 @Injectable({ providedIn: 'root' })
@@ -36,6 +38,7 @@ export class KeycloakService {
     }
     this.profile = (await this.keycloak.loadUserInfo()) as unknown as UserProfile;
     this.profile.token = this.keycloak.token || '';
+    this.profile.roles = this.keycloak.realmAccess?.roles || [];
     return true;
   }
 
