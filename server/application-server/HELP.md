@@ -12,6 +12,26 @@ This will start your application in a local development environment. You can acc
 
 Setting environment variables works through profile-based `application.yml` files. For local development, create a `application-local.yml` file overwriting the original properties. See [Using the Plugin :: Spring Boot](https://docs.spring.io/spring-boot/maven-plugin/using.html#using.overriding-command-line) for more information.
 
+
+### Keycloak Development Test Users
+
+If you started server for development it will import the example config for Keycloak from `keycloak-hephaestus-realm-example-config.json`.
+
+#### Admin Account
+
+- Username: `admin`
+- Password: `admin`
+
+Has the `admin` role.
+
+#### Test User Account
+
+- Username: `testuser`
+- Password: `testuser`
+
+Does not have the `admin` role.
+
+
 ### Reference Documentation
 
 For further reference, please consider the following sections:

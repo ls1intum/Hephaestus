@@ -17,9 +17,14 @@ services:
     environment:
       KEYCLOAK_ADMIN: admin
       KEYCLOAK_ADMIN_PASSWORD: admin
-    command: start-dev
+      KEYCLOAK_IMPORT: /opt/keycloak/data/import/hephaestus-realm.json
+    command: 
+      - start-dev
+      - --import-realm
     ports:
       - '8081:8080'
+    volumes:
+      - ./keycloak-hephaestus-realm-example-config.json:/opt/keycloak/data/import/hephaestus-realm.json
     networks:
       - app-network
 
