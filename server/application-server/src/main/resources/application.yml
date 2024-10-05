@@ -31,7 +31,7 @@ springdoc:
     default-produces-media-type: application/json
 
 monitoring:
-    runOnStartup: false
+    runOnStartup: true
     # Fetching timeframe in days
     timeframe: 7
     repository-sync-cron: "0 0 * * * *"
