@@ -1,40 +1,18 @@
 <header class="container flex items-center justify-between pt-4 gap-2">
   <a class="flex gap-2 items-center hover:text-muted-foreground flex-1" routerLink="/">
     <lucide-angular [img]="Hammer" class="size-6" />
-    <span class="text-xl font-semibold">Hephaestus</span>
+    <span class="hidden sm:inline-block text-xl font-semibold">Hephaestus</span>
   </a>
-  <div>
-    @if (user(); as userValue) {
-      @if (userValue.anonymous) {
-        <button data-testid="btn-sign-in" (click)="signIn()">Sign In</button>
-      } @else {
-        <div class="flex items-center">
-          <p class="profile" data-testid="p-username">Welcome {{ userValue.name }}</p>
-          <button (click)="signOut()" data-testid="btn-sign-out">Sign Out</button>
-        </div>
-      }
+  @if (user(); as userValue) {
+    @if (userValue.anonymous) {
+      <button hlmBtn size="sm" (click)="signIn()">Sign&nbsp;In</button>
+    } @else {
+      <button hlmBtn variant="outline" size="sm" (click)="signOut()">Sign&nbsp;Out</button>
     }
-
-    @if (query.error()) {
-      <span>An error has occurred</span>
-    }
-    @if (query.isPending()) {
-      <span>Loading...</span>
-    }
-    @if (query.data()) {
-      {{ JSON.stringify(query.data()) }}
-    }
-  </div>
-  <a
-    hlmBtn
-    data-canny-link
-    href="https://hephaestus.canny.io/feature-requests"
-    class="border-github-upsell-foreground text-github-upsell-foreground hover:text-github-upsell-foreground hover:bg-purple-500/10 dark:hover:bg-purple-500/20 flex gap-2"
-    variant="outline"
-    size="sm"
-  >
-    <lucide-angular [img]="Sparkles" class="size-4" />
-    Request a feature
-  </a>
+  } @else {
+    <button hlmBtn size="sm" (click)="signIn()">Sign&nbsp;In</button>
+  }
+  <app-request-feature class="hidden sm:inline-block" />
+  <app-request-feature class="sm:hidden" iconOnly />
   <app-theme-switcher />
 </header>
