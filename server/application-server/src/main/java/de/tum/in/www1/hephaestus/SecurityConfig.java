@@ -64,7 +64,7 @@ public class SecurityConfig {
                 .cors(cors -> cors.configurationSource(corsConfigurationSource()));
 
         http.authorizeHttpRequests(requests -> {
-            requests.requestMatchers("/admin/**").authenticated();
+            requests.requestMatchers("/admin/**").hasAuthority("ADMIN");
             requests.anyRequest().permitAll();
         });
 
