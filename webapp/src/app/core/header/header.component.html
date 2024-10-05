@@ -1,0 +1,22 @@
+<div>
+  @if (user(); as userValue) {
+    @if (userValue.anonymous) {
+      <button data-testid="btn-sign-in" (click)="signIn()">Sign In</button>
+    } @else {
+      <div class="flex items-center">
+        <p class="profile" data-testid="p-username">Welcome {{ userValue.name }}</p>
+        <button (click)="signOut()" data-testid="btn-sign-out">Sign Out</button>
+      </div>
+    }
+  }
+
+  @if (query.error()) {
+    <span>An error has occurred</span>
+  }
+  @if (query.isPending()) {
+    <span>Loading...</span>
+  }
+  @if (query.data()) {
+    {{ JSON.stringify(query.data()) }}
+  }
+</div>

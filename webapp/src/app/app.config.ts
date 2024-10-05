@@ -1,12 +1,13 @@
 import { APP_INITIALIZER, ApplicationConfig, provideExperimentalZonelessChangeDetection } from '@angular/core';
 import { provideRouter } from '@angular/router';
 import { provideAnimationsAsync } from '@angular/platform-browser/animations/async';
-import { provideHttpClient, withInterceptorsFromDi } from '@angular/common/http';
+import { provideHttpClient, withInterceptors } from '@angular/common/http';
 import { provideAngularQuery, QueryClient } from '@tanstack/angular-query-experimental';
 import { environment } from 'environments/environment';
 import { BASE_PATH } from 'app/core/modules/openapi';
 import { routes } from 'app/app.routes';
 import { AnalyticsService } from './analytics.service';
+import { securityInterceptor } from './core/security/security-interceptor';
 
 function initializeAnalytics(analyticsService: AnalyticsService): () => void {
   return () => {
@@ -19,7 +20,7 @@ export const appConfig: ApplicationConfig = {
     provideExperimentalZonelessChangeDetection(),
     provideRouter(routes),
     provideAngularQuery(new QueryClient()),
-    provideHttpClient(withInterceptorsFromDi()),
+    provideHttpClient(withInterceptors([securityInterceptor])),
     provideAnimationsAsync(),
     { provide: BASE_PATH, useValue: environment.serverUrl },
     { provide: APP_INITIALIZER, useFactory: initializeAnalytics, multi: true, deps: [AnalyticsService] }

@@ -28,6 +28,7 @@ model/pull-request.ts
 model/repository-dto.ts
 model/repository.ts
 model/user-dto.ts
+model/user-info-dto.ts
 model/user.ts
 param.ts
 variables.ts
