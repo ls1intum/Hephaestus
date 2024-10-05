@@ -5,12 +5,12 @@
   </a>
   @if (user(); as userValue) {
     @if (userValue.anonymous) {
-      <button hlmBtn size="sm" (click)="signIn()">Sign&nbsp;In</button>
+      <button hlmBtn (click)="signIn()">Sign&nbsp;In</button>
     } @else {
-      <button hlmBtn variant="outline" size="sm" (click)="signOut()">Sign&nbsp;Out</button>
+      <button hlmBtn variant="outline" (click)="signOut()">Sign&nbsp;Out</button>
     }
   } @else {
-    <button hlmBtn size="sm" (click)="signIn()">Sign&nbsp;In</button>
+    <button hlmBtn (click)="signIn()">Sign&nbsp;In</button>
   }
   <app-request-feature class="hidden sm:inline-block" />
   <app-request-feature class="sm:hidden" iconOnly />
