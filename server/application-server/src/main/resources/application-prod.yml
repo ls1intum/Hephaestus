@@ -15,7 +15,11 @@ spring:
           issuer-uri: ${KEYCLOAK_URL}/realms/${KEYCLOAK_REALM}
 
 monitoring:
-  repositories: ls1intum/Artemis
+    runOnStartup: ${MONITORING_RUN_ON_STARTUP:true}
+    # Fetching timeframe in days
+    timeframe: ${MONITORING_TIMEFRAME:30}
+    repository-sync-cron: ${MONITORING_REPOSITORY_SYNC_CRON:"0 0 * * * *"}
+    repositories: ${MONITORING_REPOSITORIES:ls1intum/Artemis}
 
 github:
   authToken: ${GITHUB_AUTH_TOKEN}
