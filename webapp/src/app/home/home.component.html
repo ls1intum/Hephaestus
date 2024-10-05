@@ -1,17 +1,33 @@
-<div class="flex gap-2 flex-col items-center justify-center">
-  <h1 class="text-3xl font-bold mb-4">Artemis Leaderboard</h1>
-  <div class="grid grid-cols-1 xl:grid-cols-4 gap-4 place-content-center">
-    <app-leaderboard-filter [after]="after()" [before]="before()" />
-    <div class="xl:col-span-2 flex flex-col items-center gap-4">
-      @if (query.error()) {
-        <span class="text-xl text-destructive mt-2">An error has occurred</span>
-      } @else {
-        <div class="border rounded-md border-input">
-          <app-leaderboard [leaderboard]="query.data()" [isLoading]="query.isPending()" />
+<div class="flex flex-col items-center">
+  <div class="">
+    <div class="grid grid-cols-1 xl:grid-cols-4 gap-4 xl:gap-8">
+      <div class="space-y-2 col-span-1">
+        <div class="flex flex-col gap-2 mb-4">
+          <h1 class="text-3xl font-bold">
+            Artemis<br class="hidden md:visible" />
+            Leaderboard
+          </h1>
+          @if (signedIn() && user(); as userValue) {
+            <h2 class="text-xl text-muted-foreground">Hi {{ userValue.name }} 👋</h2>
+          }
         </div>
-      }
+        <app-leaderboard-filter [after]="after()" [before]="before()" />
+      </div>
+      <div class="col-span-2">
+        @if (query.error()) {
+          <div hlmAlert class="max-w-xl" variant="destructive">
+            <lucide-angular [img]="CircleX" hlmAlertIcon />
+            <h4 hlmAlertTitle>Something went wrong...</h4>
+            <p hlmAlertDesc>We couldn't load the leaderboard. Please try again later.</p>
+          </div>
+        } @else {
+          <div class="border rounded-md border-input overflow-auto">
+            <app-leaderboard [leaderboard]="query.data()" [isLoading]="query.isPending()" />
+          </div>
+        }
+      </div>
+      <!-- Spacer -->
+      <div class="col-span-1"></div>
     </div>
-    <!-- Spacer -->
-    <div class="hidden xl:block"></div>
   </div>
 </div>

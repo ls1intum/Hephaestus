@@ -7,15 +7,26 @@ import { combineLatest, timer, lastValueFrom, map } from 'rxjs';
 import { toSignal } from '@angular/core/rxjs-interop';
 import { LeaderboardFilterComponent } from './leaderboard/filter/filter.component';
 import dayjs from 'dayjs';
+import { AdminService } from '@app/core/modules/openapi/api/admin.service';
+import { SecurityStore } from '@app/core/security/security-store.service';
+import { HlmAlertModule } from '@spartan-ng/ui-alert-helm';
+import { LucideAngularModule, CircleX } from 'lucide-angular';
 
 @Component({
   selector: 'app-home',
   standalone: true,
-  imports: [LeaderboardComponent, LeaderboardFilterComponent],
+  imports: [LeaderboardComponent, LeaderboardFilterComponent, HlmAlertModule, LucideAngularModule],
   templateUrl: './home.component.html'
 })
 export class HomeComponent {
+  protected CircleX = CircleX;
+
+  securityStore = inject(SecurityStore);
+  adminService = inject(AdminService);
   leaderboardService = inject(LeaderboardService);
+
+  signedIn = this.securityStore.signedIn;
+  user = this.securityStore.loadedUser;
 
   // timeframe for leaderboard
   // example: 2024-09-19

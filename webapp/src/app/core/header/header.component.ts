@@ -18,15 +18,8 @@ import { RequestFeatureComponent } from './request-feature/request-feature.compo
 export class HeaderComponent {
   protected Hammer = Hammer;
 
-  readonly securityStore = inject(SecurityStore);
-  protected readonly user = this.securityStore.loadedUser;
-
-  adminService = inject(AdminService);
-
-  query = injectQuery(() => ({
-    queryKey: ['me'],
-    queryFn: async () => lastValueFrom(this.adminService.getGretting())
-  }));
+  securityStore = inject(SecurityStore);
+  signedIn = this.securityStore.signedIn;
 
   queryClient = injectQueryClient();
 
