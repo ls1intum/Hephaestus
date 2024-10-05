@@ -2,43 +2,9 @@
   <angular-query-devtools />
 }
 <div class="flex flex-col min-h-dvh">
-  <header class="container flex items-center justify-between pt-4 gap-2">
-    <a class="flex gap-2 items-center hover:text-muted-foreground flex-1" routerLink="/">
-      <lucide-angular [img]="Hammer" class="size-6" />
-      <span class="text-xl font-semibold">Hephaestus</span>
-    </a>
-    <app-header />
-    <a
-      hlmBtn
-      data-canny-link
-      href="https://hephaestus.canny.io/feature-requests"
-      class="border-github-upsell-foreground text-github-upsell-foreground hover:text-github-upsell-foreground hover:bg-purple-500/10 dark:hover:bg-purple-500/20 flex gap-2"
-      variant="outline"
-      size="sm"
-    >
-      <lucide-angular [img]="Sparkles" class="size-4" />
-      Request a feature
-    </a>
-    <app-theme-switcher />
-  </header>
+  <app-header />
   <main class="container flex-grow pt-4 pb-8">
     <router-outlet />
   </main>
-  <footer class="py-6 md:px-8 md:py-0 border-t">
-    <div class="container flex flex-col items-center justify-between gap-4 md:h-24 md:flex-row">
-      <p class="text-balance text-center text-sm leading-loose text-muted-foreground md:text-left">
-        <a routerLink="about" class="font-medium underline underline-offset-4">About</a>
-      </p>
-      <p class="text-balance text-center text-sm leading-loose text-muted-foreground md:text-left">
-        <a data-canny-link href="https://hephaestus.canny.io/feature-requests" class="font-medium underline underline-offset-4">Feature requests</a>
-      </p>
-      <p class="text-balance text-center text-sm leading-loose text-muted-foreground md:text-right flex-1">
-        Built by
-        <a href="https://github.com/ls1intum" target="_blank" rel="noreferrer" class="font-medium underline underline-offset-4">LS1 Team</a>
-        at
-        <a href="https://www.tum.de/en/" target="_blank" rel="noreferrer" class="font-medium underline underline-offset-4">TUM</a>. The source code is available on
-        <a href="https://github.com/ls1intum/hephaestus" target="_blank" rel="noreferrer" class="font-medium underline underline-offset-4"> GitHub</a>.
-      </p>
-    </div>
-  </footer>
+  <app-footer />
 </div>

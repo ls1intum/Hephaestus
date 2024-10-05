@@ -79,7 +79,6 @@ const leaderboardEntries: LeaderboardEntry[] = [
 ];
 
 const meta: Meta<LeaderboardComponent> = {
-  title: 'Components/Home/Leaderboard',
   component: LeaderboardComponent,
   tags: ['autodocs'],
   args: {
