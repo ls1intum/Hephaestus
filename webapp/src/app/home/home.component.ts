@@ -29,8 +29,6 @@ export class HomeComponent {
   signedIn = this.securityStore.signedIn;
   user = this.securityStore.loadedUser;
 
-  // timeframe for leaderboard
-  // example: 2024-09-19
   private readonly route = inject(ActivatedRoute);
   private queryParams = toSignal(this.route.queryParamMap, { requireSync: true });
   protected after = computed(() => this.queryParams().get('after') ?? dayjs().isoWeekday(1).format('YYYY-MM-DD'));
