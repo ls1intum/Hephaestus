@@ -1,3 +1,5 @@
+# Used for local development
+
 services:
   postgres:
     image: 'postgres:latest'
@@ -6,4 +8,26 @@ services:
       POSTGRES_PASSWORD: root
       POSTGRES_USER: root
     ports:
-      - '5432'
+      - '5432:5432'
+    networks:
+      - app-network
+
+  keycloak:
+    image: quay.io/keycloak/keycloak:26.0.0
+    environment:
+      KEYCLOAK_ADMIN: admin
+      KEYCLOAK_ADMIN_PASSWORD: admin
+      KEYCLOAK_IMPORT: /opt/keycloak/data/import/hephaestus-realm.json
+    command: 
+      - start-dev
+      - --import-realm
+    ports:
+      - '8081:8080'
+    volumes:
+      - ./keycloak-hephaestus-realm-example-config.json:/opt/keycloak/data/import/hephaestus-realm.json
+    networks:
+      - app-network
+
+networks:
+  app-network:
+    driver: bridge

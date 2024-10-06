@@ -20,7 +20,13 @@ RUN export $(grep -v '^#' .env | xargs) && \
     echo "Generating environment.prod.ts" && \
     cat > src/environments/environment.prod.ts <<EOF
 export const environment = {
+  clientUrl: '${APPLICATION_CLIENT_URL}',
   serverUrl: '${APPLICATION_SERVER_URL}',
+  keycloak: {
+    url: '${KEYCLOAK_URL}',
+    realm: '${KEYCLOAK_REALM}',
+    clientId: '${KEYCLOAK_CLIENT_ID}'
+  },
   umami: {
     enabled: '${UMAMI_ENABLED}',
     scriptUrl: '${UMAMI_SCRIPT_URL}',

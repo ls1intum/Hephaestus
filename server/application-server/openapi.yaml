@@ -133,6 +133,18 @@ paths:
             application/json:
               schema:
                 type: string
+  /admin/me:
+    get:
+      tags:
+      - admin
+      operationId: getGretting
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UserInfoDto"
 components:
   schemas:
     IssueCommentDTO:
@@ -519,3 +531,12 @@ components:
           - APPROVED
           - CHANGES_REQUESTED
           - DISMISSED
+    UserInfoDto:
+      type: object
+      properties:
+        name:
+          type: string
+        roles:
+          type: array
+          items:
+            type: string
