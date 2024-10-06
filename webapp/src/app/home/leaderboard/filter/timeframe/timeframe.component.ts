@@ -2,7 +2,7 @@ import { Component, computed, effect, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { Router, RouterLink } from '@angular/router';
 import dayjs from 'dayjs';
-import weekOfYear from 'dayjs/plugin/weekOfYear';
+import isoWeek from 'dayjs/plugin/isoWeek';
 import { BrnSelectModule } from '@spartan-ng/ui-select-brain';
 import { HlmSelectModule } from '@spartan-ng/ui-select-helm';
 import { HlmLabelModule } from '@spartan-ng/ui-label-helm';
@@ -13,10 +13,10 @@ interface SelectOption {
   label: string;
 }
 
-dayjs.extend(weekOfYear);
+dayjs.extend(isoWeek);
 
 function formatLabel(startDate: dayjs.Dayjs, endDate: dayjs.Dayjs | undefined) {
-  const calendarWeek = startDate.week();
+  const calendarWeek = startDate.isoWeek();
   if (!endDate || endDate.isSame(dayjs(), 'day')) {
     return `CW\xa0${calendarWeek}:\xa0${startDate.format('MMM D')}\xa0-\xa0Today`;
   }
@@ -41,12 +41,12 @@ export class LeaderboardFilterTimeframeComponent {
   value = signal<string>(`${this.after()}.${this.before()}`);
 
   placeholder = computed(() => {
-    return formatLabel(dayjs(this.after()) ?? dayjs().day(1), this.before() === undefined ? undefined : dayjs(this.before()));
+    return formatLabel(dayjs(this.after()) ?? dayjs().day(1), !this.before() ? undefined : dayjs(this.before()));
   });
 
   options = computed(() => {
     const now = dayjs();
-    let currentDate = dayjs().day(1);
+    let currentDate = dayjs().isoWeekday(1);
     const options: SelectOption[] = [
       {
         id: now.unix(),
@@ -72,7 +72,7 @@ export class LeaderboardFilterTimeframeComponent {
   constructor(private router: Router) {
     // init params
     const queryParams = this.router.parseUrl(this.router.url).queryParams;
-    this.after.set(queryParams['after'] ?? dayjs().day(1).format('YYYY-MM-DD'));
+    this.after.set(queryParams['after'] ?? dayjs().isoWeekday(1).format('YYYY-MM-DD'));
     this.before.set(queryParams['before'] ?? dayjs().format('YYYY-MM-DD'));
 
     // persist changes in url

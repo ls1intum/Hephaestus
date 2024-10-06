@@ -26,7 +26,6 @@ export class HomeComponent {
   securityStore = inject(SecurityStore);
   leaderboardService = inject(LeaderboardService);
 
-
   signedIn = this.securityStore.signedIn;
   user = this.securityStore.loadedUser;
 
