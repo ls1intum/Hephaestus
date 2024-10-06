@@ -1,4 +1,5 @@
 import dayjs from 'dayjs';
+import isoWeek from 'dayjs/plugin/isoWeek';
 import { combineLatest, timer, lastValueFrom, map } from 'rxjs';
 import { Component, computed, inject } from '@angular/core';
 import { ActivatedRoute } from '@angular/router';
@@ -10,6 +11,8 @@ import { LeaderboardComponent } from '@app/home/leaderboard/leaderboard.componen
 import { LeaderboardFilterComponent } from './leaderboard/filter/filter.component';
 import { SecurityStore } from '@app/core/security/security-store.service';
 import { HlmAlertModule } from '@spartan-ng/ui-alert-helm';
+
+dayjs.extend(isoWeek);
 
 @Component({
   selector: 'app-home',
@@ -30,7 +33,7 @@ export class HomeComponent {
   // example: 2024-09-19
   private readonly route = inject(ActivatedRoute);
   private queryParams = toSignal(this.route.queryParamMap, { requireSync: true });
-  protected after = computed(() => this.queryParams().get('after') ?? dayjs().day(1).format('YYYY-MM-DD'));
+  protected after = computed(() => this.queryParams().get('after') ?? dayjs().isoWeekday(1).format('YYYY-MM-DD'));
   protected before = computed(() => this.queryParams().get('before') ?? dayjs().format('YYYY-MM-DD'));
 
   query = injectQuery(() => ({
