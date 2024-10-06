@@ -25,7 +25,8 @@ export const environment = {
   keycloak: {
     url: '${KEYCLOAK_URL}',
     realm: '${KEYCLOAK_REALM}',
-    clientId: '${KEYCLOAK_CLIENT_ID}'
+    clientId: '${KEYCLOAK_CLIENT_ID}',
+    skipLoginPage: ${KEYCLOAK_SKIP_LOGIN}
   },
   umami: {
     enabled: '${UMAMI_ENABLED}',
