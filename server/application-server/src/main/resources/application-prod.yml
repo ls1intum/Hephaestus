@@ -14,7 +14,7 @@ spring:
         jwt:
           issuer-uri: ${KEYCLOAK_URL}/realms/${KEYCLOAK_REALM}
 
-monitoring
+monitoring:
     runOnStartup: ${MONITORING_RUN_ON_STARTUP:true}
     # Fetching timeframe in days
     timeframe: ${MONITORING_TIMEFRAME:7}
