@@ -7,7 +7,7 @@
         <ng-icon [svg]="octGitPullRequestClosed" size="16" class="mr-1 text-github-danger-foreground"></ng-icon>
       }
 
-      {{ repositoryName() }} #{{ number() }} on {{ createdAt().format('MMM D') }}
+      {{ repositoryName() }} #{{ number() }} on {{ displayCreated().format('MMM D') }}
     </span>
     <span class="flex items-center space-x-2">
       <span class="text-github-success-foreground font-bold">+{{ additions() }}</span>
@@ -17,7 +17,7 @@
 
   <div class="flex justify-between font-bold text-sm mb-3 hover:text-github-accent-foreground cursor-pointer" (click)="openIssue()">
     {{ title() }}
-    @if (getMostRecentReview(); as review) {
+    @if (reviews().length > 0 && getMostRecentReview(); as review) {
       @if (review.state === 'APPROVED') {
         <ng-icon [svg]="octCheck" size="16" class="text-github-success-foreground"></ng-icon>
       } @else if (review.state === 'DISMISSED') {

@@ -33,7 +33,7 @@
         <tr appTableRow>
           <td appTableCell class="text-center">{{ entry.rank }}</td>
           <td appTableCell class="py-2">
-            <a href="https://github.com/{{ entry.githubName }}" target="_blank" rel="noopener noreferrer" class="flex items-center gap-2 font-medium">
+            <a routerLink="/user/{{ entry.githubName }}" routerLinkActive="active" ariaCurrentWhenActive="page" class="flex items-center gap-2 font-medium">
               <hlm-avatar>
                 <img [src]="entry.avatarUrl ?? ''" [alt]="entry.name + '\'s avatar'" hlmAvatarImage />
                 <span hlmAvatarFallback>

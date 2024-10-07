@@ -3,6 +3,7 @@ import { AboutComponent } from '@app/about/about.component';
 import { HomeComponent } from '@app/home/home.component';
 import { AdminComponent } from '@app/admin/admin.component';
 import { AdminGuard } from '@app/core/security/admin.guard';
+import { ProfileComponent } from './home/profile/profile.component';
 
 export const routes: Routes = [
   { path: '', component: HomeComponent },
@@ -11,5 +12,6 @@ export const routes: Routes = [
     path: 'admin',
     component: AdminComponent,
     canActivate: [AdminGuard]
-  }
+  },
+  { path: 'user/:id', component: ProfileComponent }
 ];
