@@ -63,65 +63,6 @@ export class ProfileComponent {
   // get user id from the url
   protected userLogin: string | null = null;
 
-  userData = signal({
-    name: 'GODrums',
-    avatarUrl: 'https://github.com/godrums.png',
-    first_contribution: '2024-08-01',
-    repositories: ['ls1intum/Hephaestus', 'ls1intum/ls1intum/Artemis'],
-    activity: [
-      {
-        id: 1,
-        createdAt: '2024-10-06',
-        updatedAt: '2024-10-06',
-        state: 'CHANGES_REQUESTED',
-        submittedAt: '2024-10-06',
-        pullRequest: {
-          title: 'Add feature Y',
-          state: 'OPEN',
-          number: 100,
-          repository: {
-            name: 'Hephaestus',
-            nameWithOwner: 'ls1intum/Hephaestus',
-            defaultBranch: 'develop',
-            visibility: 'PUBLIC',
-            url: 'https://github.com/ls1intum/Hephaestus'
-          }
-        }
-      },
-      {
-        id: 2,
-        createdAt: '2024-10-07',
-        updatedAt: '2024-10-07',
-        state: 'APPROVED',
-        submittedAt: '2024-10-07',
-        pullRequest: {
-          title: 'Add feature X',
-          state: 'CLOSED',
-          number: 99,
-          repository: {
-            name: 'Hephaestus',
-            nameWithOwner: 'ls1intum/Hephaestus',
-            defaultBranch: 'develop',
-            visibility: 'PUBLIC',
-            url: 'https://github.com/ls1intum/Hephaestus'
-          }
-        }
-      }
-    ] as PullRequestReview[],
-    pullRequests: [
-      {
-        title: 'Add feature X',
-        state: 'OPEN',
-        createdAt: '2024-10-04',
-        repository: {
-          name: 'Hephaestus',
-          nameWithOwner: 'ls1intum/Hephaestus',
-          url: 'https://github.com/ls1intum/Hephaestus'
-        }
-      }
-    ] as PullRequestDTO[]
-  });
-
   displayFirstContribution = computed(() => {
     if (this.query.data()) {
       return dayjs(this.query.data()?.firstContribution).format('Do [of] MMMM YYYY');
@@ -131,7 +72,6 @@ export class ProfileComponent {
 
   constructor(private route: ActivatedRoute) {
     this.userLogin = this.route.snapshot.paramMap.get('id');
-    console.log(this.userLogin);
   }
 
   getRepositoryImage = (name: string) => {

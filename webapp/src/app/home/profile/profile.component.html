@@ -41,7 +41,15 @@
           <h2 class="text-xl font-semibold">Latest Activity</h2>
           <hlm-scroll-area class="w-[510px] h-[400px]">
             @for (activity of userData.activity; track activity.id) {
-              <app-profile-activity-card [review]="activity" />
+              <app-profile-activity-card
+                [url]="activity.url"
+                [state]="activity.state!"
+                [createdAt]="activity.createdAt!"
+                [pullRequestNumber]="activity.pullRequest?.number!"
+                [pullRequestState]="activity.pullRequest?.state!"
+                [pullRequestUrl]="activity.pullRequest?.url!"
+                [repositoryName]="activity.pullRequest?.repository?.name!"
+              />
             }
           </hlm-scroll-area>
         </div>

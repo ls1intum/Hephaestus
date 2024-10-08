@@ -1,6 +1,6 @@
 <a
   class="w-[500px] grid grid-cols-[20%_50%_30%] border border-border bg-card hover:bg-accent hover:text-accent-foreground rounded-lg p-4 my-2"
-  [href]="this.review().url ?? this.review().pullRequest?.url"
+  [href]="this.url() ?? this.pullRequestUrl()"
   target="_blank"
   rel="noopener noreferrer"
 >
@@ -14,8 +14,8 @@
     </div>
   </div>
   <div class="justify-self-end flex items-center gap-2">
-    <a class="text-muted-foreground font-normal text-sm"> {{ this.review().pullRequest?.repository?.name }} #{{ this.review().pullRequest?.number }}</a>
-    @if (this.review().pullRequest?.state === 'OPEN') {
+    <a class="text-muted-foreground font-normal text-sm"> {{ this.repositoryName() }} #{{ this.pullRequestNumber() }}</a>
+    @if (this.pullRequestState() === 'OPEN') {
       <ng-icon [svg]="octGitPullRequest" size="20" class="text-github-success-foreground"></ng-icon>
     } @else {
       <ng-icon [svg]="octGitPullRequestClosed" size="20" class="text-github-muted-foreground"></ng-icon>

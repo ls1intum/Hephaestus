@@ -20,7 +20,7 @@ export const Default: Story = {
     url: 'http://example.com',
     state: 'OPEN',
     repositoryName: 'Artemis',
-    createdAt: dayjs('Jan 1'),
+    createdAt: '2024-01-01',
     pullRequestLabels: [
       { name: 'bug', color: 'red' },
       { name: 'enhancement', color: 'green' }
