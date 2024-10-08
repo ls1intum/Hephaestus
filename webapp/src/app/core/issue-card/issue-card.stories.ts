@@ -1,6 +1,5 @@
 import { Meta, StoryObj } from '@storybook/angular';
 import { IssueCardComponent } from './issue-card.component';
-import dayjs from 'dayjs';
 
 const meta: Meta<IssueCardComponent> = {
   component: IssueCardComponent,

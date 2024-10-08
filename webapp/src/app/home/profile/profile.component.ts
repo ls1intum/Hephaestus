@@ -1,7 +1,7 @@
-import { Component, computed, inject, signal } from '@angular/core';
+import { Component, computed, inject } from '@angular/core';
 import { NgIconComponent } from '@ng-icons/core';
 import { octClockFill } from '@ng-icons/octicons';
-import { PullRequestDTO, PullRequestReview, UserService } from 'app/core/modules/openapi';
+import { UserService } from 'app/core/modules/openapi';
 import { TableBodyDirective } from 'app/ui/table/table-body.directive';
 import { TableCaptionDirective } from 'app/ui/table/table-caption.directive';
 import { TableCellDirective } from 'app/ui/table/table-cell.directive';
