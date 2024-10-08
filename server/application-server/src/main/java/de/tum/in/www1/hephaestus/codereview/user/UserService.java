@@ -71,7 +71,7 @@ public class UserService {
         Set<PullRequestReviewDTO> activity = mapToDTO(user.getReviews(), re -> {
             PullRequest pr = re.getPullRequest();
             return new PullRequestReviewDTO(re.getId(),
-                    re.getCreatedAt(), re.getUpdatedAt(), re.getSubmittedAt(), re.getState(),
+                    re.getCreatedAt(), re.getUpdatedAt(), re.getSubmittedAt(), re.getState(), re.getUrl(),
                     new PullRequestDTO(pr.getId(), null, pr.getNumber(), pr.getUrl(), pr.getState(), 0, 0, null, null,
                             null,
                             new RepositoryDTO(pr.getRepository().getName(),

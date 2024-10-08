@@ -18,6 +18,7 @@ export interface PullRequestReviewDTO {
     updatedAt?: string;
     submittedAt?: string;
     state?: PullRequestReviewDTO.StateEnum;
+    url?: string;
     pullRequest?: PullRequestDTO;
 }
 export namespace PullRequestReviewDTO {

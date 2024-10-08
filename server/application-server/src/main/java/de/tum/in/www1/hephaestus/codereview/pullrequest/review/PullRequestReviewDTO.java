@@ -8,10 +8,16 @@ import de.tum.in.www1.hephaestus.codereview.pullrequest.PullRequestDTO;
 
 @JsonInclude(JsonInclude.Include.NON_EMPTY)
 public record PullRequestReviewDTO(Long id, OffsetDateTime createdAt, OffsetDateTime updatedAt,
-                OffsetDateTime submittedAt, PullRequestReviewState state, PullRequestDTO pullRequest) {
+                OffsetDateTime submittedAt, PullRequestReviewState state, String url, PullRequestDTO pullRequest) {
         public PullRequestReviewDTO(Long id, OffsetDateTime createdAt, OffsetDateTime updatedAt,
                         OffsetDateTime submittedAt,
                         PullRequestReviewState state) {
-                this(id, createdAt, updatedAt, submittedAt, state, null);
+                this(id, createdAt, updatedAt, submittedAt, state, null, null);
+        }
+
+        public PullRequestReviewDTO(Long id, OffsetDateTime createdAt, OffsetDateTime updatedAt,
+                        OffsetDateTime submittedAt,
+                        PullRequestReviewState state, String url) {
+                this(id, createdAt, updatedAt, submittedAt, state, url, null);
         }
 }

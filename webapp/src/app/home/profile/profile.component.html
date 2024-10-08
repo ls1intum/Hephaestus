@@ -8,7 +8,7 @@
   } @else if (query.isPending()) {
   } @else {
     @if (query.data(); as userData) {
-      <div class="flex flex-wrap gap-8 items-center justify-center mb-8">
+      <div class="flex gap-8 items-center justify-center mb-8">
         <hlm-avatar variant="extralarge" class="ring-2 ring-neutral-100 dark:ring-neutral-800">
           <img [src]="userData.avatarUrl" [alt]="userData.login + '\'s avatar'" hlmAvatarImage />
           <span hlmAvatarFallback>
@@ -27,7 +27,7 @@
           <div class="flex items-center gap-2">
             @for (repository of userData.repositories; track repository) {
               <hlm-tooltip>
-                <div hlmBtn hlmTooltipTrigger class="size-10 bg-neutral-100 dark:bg-neutral-900/80 border border-input rounded-sm p-1">
+                <div hlmBtn hlmTooltipTrigger class="size-10 bg-neutral-100 dark:bg-neutral-900/80 border border-input rounded-sm p-1" [aria-describedby]="repository">
                   <img [src]="getRepositoryImage(repository)" [alt]="repository" />
                 </div>
                 <span *brnTooltipContent>{{ repository }}</span>
@@ -36,29 +36,33 @@
           </div>
         </div>
       </div>
-      <div class="flex gap-16 justify-center border-t border-border lg:mx-24 pt-8">
+      <div class="flex flex-wrap gap-16 justify-center border-t border-border mx-24 pt-8">
         <div class="flex flex-col gap-4">
           <h2 class="text-xl font-semibold">Latest Activity</h2>
-          @for (activity of userData.activity; track activity.id) {
-            <app-profile-activity-card [review]="activity" />
-          }
+          <hlm-scroll-area class="w-[510px] h-[400px]">
+            @for (activity of userData.activity; track activity.id) {
+              <app-profile-activity-card [review]="activity" />
+            }
+          </hlm-scroll-area>
         </div>
         <div class="flex flex-col gap-4">
           <h2 class="text-xl font-semibold">Open Pullrequests</h2>
-          @for (pullRequest of userData.pullRequests; track pullRequest.id) {
-            <app-issue-card
-              class="w-96"
-              [additions]="pullRequest.additions ?? 0"
-              [deletions]="pullRequest.deletions ?? 0"
-              [number]="pullRequest.id!"
-              [repositoryName]="pullRequest.repository?.name!"
-              [title]="pullRequest.title!"
-              [url]="pullRequest.url!"
-              [state]="pullRequest.state!"
-              [createdAt]="pullRequest.createdAt!"
-              [pullRequestLabels]="[]"
-            ></app-issue-card>
-          }
+          <hlm-scroll-area class="w-[394px] h-[400px]">
+            @for (pullRequest of userData.pullRequests; track pullRequest.id) {
+              <app-issue-card
+                class="w-96 my-2"
+                [additions]="pullRequest.additions ?? 0"
+                [deletions]="pullRequest.deletions ?? 0"
+                [number]="pullRequest.number!"
+                [repositoryName]="pullRequest.repository?.name!"
+                [title]="pullRequest.title!"
+                [url]="pullRequest.url!"
+                [state]="pullRequest.state!"
+                [createdAt]="pullRequest.createdAt!"
+                [pullRequestLabels]="[]"
+              ></app-issue-card>
+            }
+          </hlm-scroll-area>
         </div>
       </div>
     }

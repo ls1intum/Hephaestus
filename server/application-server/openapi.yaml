@@ -275,6 +275,8 @@ components:
           - APPROVED
           - CHANGES_REQUESTED
           - DISMISSED
+        url:
+          type: string
         pullRequest:
           $ref: "#/components/schemas/PullRequestDTO"
     UserProfileDTO:
@@ -420,6 +422,8 @@ components:
         submittedAt:
           type: string
           format: date-time
+        url:
+          type: string
         comments:
           uniqueItems: true
           type: array
