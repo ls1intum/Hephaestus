@@ -29,11 +29,11 @@ export interface User {
      */
     name?: string;
     /**
-     * Unique URL to the user\'s profile.   Not the website a user can set in their profile.
+     * Unique URL to the user\'s profile.  Not the website a user can set in their profile.
      */
     url: string;
     /**
-     * URL to the user\'s avatar.   If unavailable, a fallback can be generated from the login, e.g. on Github:   https://github.com/{login}.png
+     * URL to the user\'s avatar.  If unavailable, a fallback can be generated from the login, e.g. on Github:  https://github.com/{login}.png
      */
     avatarUrl?: string;
     /**
