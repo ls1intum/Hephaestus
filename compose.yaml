@@ -28,11 +28,8 @@ services:
         aliases:
           - postgres
     volumes:
-      - postgres-data:/var/lib/postgresql/data
+      - 'postgresql-data:/var/lib/postgresql/data'
 
 networks:
   app-network:
     driver: bridge`
-
-volumes:
-  postgres-data:
