@@ -17,8 +17,11 @@ import { RepositoryDTO } from './repository-dto';
 export interface PullRequestDTO { 
     id?: number;
     title?: string;
+    number?: number;
     url?: string;
     state?: PullRequestDTO.StateEnum;
+    additions?: number;
+    deletions?: number;
     createdAt?: string;
     updatedAt?: string;
     mergedAt?: string;

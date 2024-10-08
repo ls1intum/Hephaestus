@@ -2,8 +2,9 @@ import { Component, computed, input } from '@angular/core';
 import { PullRequest, PullRequestLabel, PullRequestReview } from '@app/core/modules/openapi';
 import { NgIcon } from '@ng-icons/core';
 import { octCheck, octComment, octFileDiff, octGitPullRequest, octGitPullRequestClosed, octX } from '@ng-icons/octicons';
-import dayjs, { Dayjs } from 'dayjs';
+import dayjs from 'dayjs';
 import { NgStyle } from '@angular/common';
+import { cn } from '@app/utils';
 
 @Component({
   selector: 'app-issue-card',
@@ -12,6 +13,7 @@ import { NgStyle } from '@angular/common';
   standalone: true
 })
 export class IssueCardComponent {
+  class = input('');
   title = input.required<string>();
   number = input.required<number>();
   additions = input.required<number>();
@@ -37,7 +39,5 @@ export class IssueCardComponent {
     });
   }
 
-  openIssue() {
-    window.open(this.url());
-  }
+  computedClass = computed(() => cn('border border-border bg-card rounded-lg p-4 w-72', this.class()));
 }

@@ -31,6 +31,24 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/UserDTO"
+  /user/{login}/profile:
+    get:
+      tags:
+      - user
+      operationId: getUserProfile
+      parameters:
+      - name: login
+        in: path
+        required: true
+        schema:
+          type: string
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UserProfileDTO"
   /user/{login}/full:
     get:
       tags:
@@ -166,6 +184,9 @@ components:
           format: int64
         title:
           type: string
+        number:
+          type: integer
+          format: int32
         url:
           type: string
         state:
@@ -173,12 +194,21 @@ components:
           enum:
           - CLOSED
           - OPEN
+        additions:
+          type: integer
+          format: int32
+        deletions:
+          type: integer
+          format: int32
         createdAt:
           type: string
+          format: date-time
         updatedAt:
           type: string
+          format: date-time
         mergedAt:
           type: string
+          format: date-time
         author:
           $ref: "#/components/schemas/UserDTO"
         comments:
@@ -223,6 +253,58 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/IssueCommentDTO"
+    PullRequestReviewDTO:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+        submittedAt:
+          type: string
+          format: date-time
+        state:
+          type: string
+          enum:
+          - COMMENTED
+          - APPROVED
+          - CHANGES_REQUESTED
+          - DISMISSED
+        pullRequest:
+          $ref: "#/components/schemas/PullRequestDTO"
+    UserProfileDTO:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+        login:
+          type: string
+        avatarUrl:
+          type: string
+        firstContribution:
+          type: string
+          format: date-time
+        repositories:
+          uniqueItems: true
+          type: array
+          items:
+            type: string
+        activity:
+          uniqueItems: true
+          type: array
+          items:
+            $ref: "#/components/schemas/PullRequestReviewDTO"
+        pullRequests:
+          uniqueItems: true
+          type: array
+          items:
+            $ref: "#/components/schemas/PullRequestDTO"
     IssueComment:
       type: object
       properties:
@@ -266,9 +348,8 @@ components:
           type: string
         state:
           type: string
-          description: |-
-            State of the PullRequest.
-             Does not include the state of the merge.
+          description: "State of the PullRequest.\r\n Does not include the state of\
+            \ the merge."
           enum:
           - CLOSED
           - OPEN
@@ -434,15 +515,12 @@ components:
           description: Display name of the user.
         url:
           type: string
-          description: |-
-            Unique URL to the user's profile.
-             Not the website a user can set in their profile.
+          description: "Unique URL to the user's profile.\r\n Not the website a user\
+            \ can set in their profile."
         avatarUrl:
           type: string
-          description: |-
-            URL to the user's avatar.
-             If unavailable, a fallback can be generated from the login, e.g. on Github:
-             https://github.com/{login}.png
+          description: "URL to the user's avatar.\r\n If unavailable, a fallback can\
+            \ be generated from the login, e.g. on Github:\r\n https://github.com/{login}.png"
         type:
           type: string
           description: Type of the user. Used to distinguish between users and bots.
@@ -504,28 +582,6 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/PullRequestReviewDTO"
-    PullRequestReviewDTO:
-      type: object
-      properties:
-        id:
-          type: integer
-          format: int64
-        createdAt:
-          type: string
-          format: date-time
-        updatedAt:
-          type: string
-          format: date-time
-        submittedAt:
-          type: string
-          format: date-time
-        state:
-          type: string
-          enum:
-          - COMMENTED
-          - APPROVED
-          - CHANGES_REQUESTED
-          - DISMISSED
     UserInfoDto:
       type: object
       properties:

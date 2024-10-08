@@ -15,6 +15,7 @@ import { Observable }                                        from 'rxjs';
 
 import { User } from '../model/models';
 import { UserDTO } from '../model/models';
+import { UserProfileDTO } from '../model/models';
 
 
 import { Configuration }                                     from '../configuration';
@@ -38,5 +39,12 @@ export interface UserServiceInterface {
      * @param login 
      */
     getUser(login: string, extraHttpRequestParams?: any): Observable<UserDTO>;
+
+    /**
+     * 
+     * 
+     * @param login 
+     */
+    getUserProfile(login: string, extraHttpRequestParams?: any): Observable<UserProfileDTO>;
 
 }

@@ -1,5 +1,5 @@
 import { Component, computed, input } from '@angular/core';
-import { PullRequestReview } from '@app/core/modules/openapi';
+import { PullRequestReview, PullRequestReviewDTO } from '@app/core/modules/openapi';
 import { NgIcon } from '@ng-icons/core';
 import { octCheck, octComment, octFileDiff, octGitPullRequest, octGitPullRequestClosed } from '@ng-icons/octicons';
 import dayjs from 'dayjs';
@@ -14,7 +14,7 @@ dayjs.extend(relativeTime);
   standalone: true
 })
 export class ProfileActivityCardComponent {
-  review = input.required<PullRequestReview>();
+  review = input.required<PullRequestReviewDTO>();
   protected readonly octCheck = octCheck;
   protected readonly octFileDiff = octFileDiff;
   protected readonly octComment = octComment;
