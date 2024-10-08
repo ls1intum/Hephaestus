@@ -16,7 +16,7 @@ services:
       - app-network
 
   postgres:
-    image: 'postgres:latest'
+    image: 'postgres:16-alpine'
     environment:
       - POSTGRES_DB=hephaestus
       - POSTGRES_PASSWORD=root

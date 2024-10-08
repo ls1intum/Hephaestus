@@ -67,7 +67,7 @@ The following guides illustrate how to use some features concretely:
 This project contains a Docker Compose file named `compose.yaml`.
 In this file, the following services have been defined:
 
--   postgres: [`postgres:latest`](https://hub.docker.com/_/postgres)
+-   postgres: [`postgres:16-alpine`](https://hub.docker.com/_/postgres)
 
 Please review the tags of the used images and set them to the same as you're running in production.
 
