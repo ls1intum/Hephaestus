@@ -9,6 +9,7 @@
  * https://openapi-generator.tech
  * Do not edit the class manually.
  */
+import { PullRequestLabel } from './pull-request-label';
 import { UserDTO } from './user-dto';
 import { IssueCommentDTO } from './issue-comment-dto';
 import { RepositoryDTO } from './repository-dto';
@@ -27,6 +28,7 @@ export interface PullRequestDTO {
     mergedAt?: string;
     author?: UserDTO;
     comments?: Set<IssueCommentDTO>;
+    labels?: Set<PullRequestLabel>;
     repository?: RepositoryDTO;
 }
 export namespace PullRequestDTO {

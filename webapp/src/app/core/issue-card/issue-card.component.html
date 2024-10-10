@@ -17,7 +17,7 @@
 
   <a class="flex justify-between font-bold text-sm mb-3 hover:text-github-accent-foreground" href="{{ url() }}" target="_blank" rel="noopener noreferrer">
     {{ title() }}
-    @if (reviews().length > 0 && getMostRecentReview(); as review) {
+    @if (reviews() && reviews()!.size > 0 && getMostRecentReview(); as review) {
       @if (review.state === 'APPROVED') {
         <ng-icon [svg]="octCheck" size="16" class="text-github-success-foreground"></ng-icon>
       } @else if (review.state === 'DISMISSED') {

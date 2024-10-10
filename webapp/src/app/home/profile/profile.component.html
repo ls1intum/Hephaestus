@@ -17,9 +17,16 @@
         </hlm-avatar>
         <div class="flex flex-col gap-2">
           <h1 class="text-3xl font-bold leading-6">{{ userData.login }}</h1>
-          <a class="text-lg font-medium text-muted-foreground mb-1" href="https://github.com/{{ userData.login }}" target="_blank" rel="noopener noreferrer">
-            github.com/{{ userData.login }}
-          </a>
+          <div>
+            <a
+              class="text-lg font-medium text-muted-foreground mb-1 hover:text-github-accent-foreground"
+              href="https://github.com/{{ userData.login }}"
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              github.com/{{ userData.login }}
+            </a>
+          </div>
           <div class="flex items-center gap-2 text-muted-foreground font-medium">
             <ng-icon [svg]="octClockFill" size="16" />
             Contributing since {{ displayFirstContribution() }}
@@ -57,18 +64,21 @@
           <h2 class="text-xl font-semibold">Open Pullrequests</h2>
           <hlm-scroll-area class="w-[394px] h-[400px]">
             @for (pullRequest of userData.pullRequests; track pullRequest.id) {
-              <app-issue-card
-                class="w-96 my-2"
-                [additions]="pullRequest.additions ?? 0"
-                [deletions]="pullRequest.deletions ?? 0"
-                [number]="pullRequest.number!"
-                [repositoryName]="pullRequest.repository?.name!"
-                [title]="pullRequest.title!"
-                [url]="pullRequest.url!"
-                [state]="pullRequest.state!"
-                [createdAt]="pullRequest.createdAt!"
-                [pullRequestLabels]="[]"
-              ></app-issue-card>
+              @if (pullRequest.number && pullRequest.title && pullRequest.state && userData.activity && pullRequest.createdAt) {
+                <app-issue-card
+                  class="w-96 my-2"
+                  [additions]="pullRequest.additions ?? 0"
+                  [deletions]="pullRequest.deletions ?? 0"
+                  [number]="pullRequest.number"
+                  [repositoryName]="pullRequest.repository?.name ?? ''"
+                  [title]="pullRequest.title"
+                  [url]="pullRequest.url ?? pullRequest.repository?.url ?? ''"
+                  [state]="pullRequest.state"
+                  [createdAt]="pullRequest.createdAt"
+                  [pullRequestLabels]="pullRequest.labels"
+                  [reviews]="userData.activity"
+                />
+              }
             }
           </hlm-scroll-area>
         </div>

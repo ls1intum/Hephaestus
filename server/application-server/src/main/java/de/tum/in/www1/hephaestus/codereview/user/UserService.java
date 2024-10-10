@@ -63,7 +63,7 @@ public class UserService {
                 (r1, r2) -> r1.compareTo(r2));
         Set<PullRequestDTO> pullRequests = mapToDTO(user.getPullRequests(), pr -> new PullRequestDTO(pr.getId(),
                 pr.getTitle(), pr.getNumber(), pr.getUrl(), pr.getState(), pr.getAdditions(), pr.getDeletions(),
-                pr.getCreatedAt(), null, null,
+                pr.getCreatedAt(), pr.getUpdatedAt(), null, pr.getPullRequestLabels(),
                 new RepositoryDTO(pr.getRepository().getName(),
                         pr.getRepository().getNameWithOwner(), null,
                         pr.getRepository().getUrl())),
@@ -73,11 +73,11 @@ public class UserService {
             return new PullRequestReviewDTO(re.getId(),
                     re.getCreatedAt(), re.getUpdatedAt(), re.getSubmittedAt(), re.getState(), re.getUrl(),
                     new PullRequestDTO(pr.getId(), null, pr.getNumber(), pr.getUrl(), pr.getState(), 0, 0, null, null,
-                            null,
+                            null, new HashSet<>(),
                             new RepositoryDTO(pr.getRepository().getName(),
                                     pr.getRepository().getNameWithOwner(), null,
                                     pr.getRepository().getUrl())));
-        }, (prr1, prr2) -> prr1.createdAt().compareTo(prr2.createdAt()));
+        }, (prr1, prr2) -> prr1.submittedAt().compareTo(prr2.submittedAt()));
         return Optional.of(new UserProfileDTO(user.getId(), user.getLogin(), user.getAvatarUrl(), firstContribution,
                 repositories, activity, pullRequests));
     }

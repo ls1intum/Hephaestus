@@ -13,20 +13,23 @@ import de.tum.in.www1.hephaestus.codereview.user.UserDTO;
 public record PullRequestDTO(Long id, String title, int number, String url, IssueState state, int additions,
                 int deletions, OffsetDateTime createdAt,
                 OffsetDateTime updatedAt,
-                OffsetDateTime mergedAt, UserDTO author, Set<IssueCommentDTO> comments, RepositoryDTO repository) {
+                OffsetDateTime mergedAt, UserDTO author, Set<IssueCommentDTO> comments, Set<PullRequestLabel> labels,
+                RepositoryDTO repository) {
         public PullRequestDTO(Long id, String title, int number, String url, IssueState state, int additions,
                         int deletions, OffsetDateTime createdAt,
                         OffsetDateTime updatedAt,
                         OffsetDateTime mergedAt) {
                 this(id, title, number, url, state, additions, deletions, createdAt, updatedAt, mergedAt, null, null,
+                                null,
                                 null);
         }
 
         public PullRequestDTO(Long id, String title, int number, String url, IssueState state, int additions,
                         int deletions, OffsetDateTime createdAt,
                         OffsetDateTime updatedAt,
-                        OffsetDateTime mergedAt, RepositoryDTO repository) {
+                        OffsetDateTime mergedAt, Set<PullRequestLabel> labels, RepositoryDTO repository) {
                 this(id, title, number, url, state, additions, deletions, createdAt, updatedAt, mergedAt, null, null,
+                                null,
                                 repository);
         }
 }
