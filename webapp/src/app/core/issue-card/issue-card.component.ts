@@ -50,13 +50,9 @@ export class IssueCardComponent {
         backgroundColor: '#09090b'
       };
     }
+
     const borderColor = this.shadeHexColor(githubColor, -0.5);
     const backgroundColor = this.shadeHexColor(githubColor, -0.75);
-    console.log('borderColor', {
-      borderColor: borderColor,
-      color: githubColor,
-      backgroundColor: backgroundColor
-    });
     return {
       borderColor: borderColor,
       color: `#${githubColor}`,

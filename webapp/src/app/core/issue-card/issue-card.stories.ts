@@ -20,11 +20,11 @@ export const Default: Story = {
     state: 'OPEN',
     repositoryName: 'Artemis',
     createdAt: '2024-01-01',
-    pullRequestLabels: [
-      { name: 'bug', color: 'red' },
-      { name: 'enhancement', color: 'green' }
-    ],
-    reviews: [
+    pullRequestLabels: new Set([
+      { name: 'bug', color: 'f00000' },
+      { name: 'enhancement', color: '008000' }
+    ]),
+    reviews: new Set([
       {
         state: 'APPROVED',
         updatedAt: 'Jan 2'
@@ -33,6 +33,6 @@ export const Default: Story = {
         state: 'CHANGES_REQUESTED',
         updatedAt: 'Jan 4'
       }
-    ]
+    ])
   }
 };
