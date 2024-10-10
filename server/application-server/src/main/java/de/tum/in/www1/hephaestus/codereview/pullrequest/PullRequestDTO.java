@@ -29,7 +29,6 @@ public record PullRequestDTO(Long id, String title, int number, String url, Issu
                         OffsetDateTime updatedAt,
                         OffsetDateTime mergedAt, Set<PullRequestLabel> labels, RepositoryDTO repository) {
                 this(id, title, number, url, state, additions, deletions, createdAt, updatedAt, mergedAt, null, null,
-                                null,
-                                repository);
+                                labels, repository);
         }
 }

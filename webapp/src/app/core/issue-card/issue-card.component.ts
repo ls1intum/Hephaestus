@@ -31,6 +31,10 @@ export class IssueCardComponent {
   protected readonly octFileDiff = octFileDiff;
   protected readonly octGitPullRequestClosed = octGitPullRequestClosed;
 
+  ngOnInit() {
+    console.log('pullRequestLabels', this.pullRequestLabels());
+  }
+
   displayCreated = computed(() => dayjs(this.createdAt()));
 
   getMostRecentReview() {
@@ -40,6 +44,38 @@ export class IssueCardComponent {
     return Array.from(this.reviews()!).reduce((latest, review) => {
       return new Date(review.updatedAt || 0) > new Date(latest.updatedAt || 0) ? review : latest;
     });
+  }
+
+  calculateLabelColors(githubColor: string | undefined) {
+    if (!githubColor) {
+      return {
+        borderColor: '#27272a',
+        color: '#000000',
+        backgroundColor: '#09090b'
+      };
+    }
+    const borderColor = this.shadeHexColor(githubColor, -0.5);
+    const backgroundColor = this.shadeHexColor(githubColor, -0.75);
+    console.log('borderColor', {
+      borderColor: borderColor,
+      color: githubColor,
+      backgroundColor: backgroundColor
+    });
+    return {
+      borderColor: borderColor,
+      color: `#${githubColor}`,
+      backgroundColor: backgroundColor
+    };
+  }
+
+  shadeHexColor(color: string, percent: number) {
+    let f = parseInt(color, 16),
+      t = percent < 0 ? 0 : 255,
+      p = percent < 0 ? percent * -1 : percent,
+      R = f >> 16,
+      G = (f >> 8) & 0x00ff,
+      B = f & 0x0000ff;
+    return '#' + (0x1000000 + (Math.round((t - R) * p) + R) * 0x10000 + (Math.round((t - G) * p) + G) * 0x100 + (Math.round((t - B) * p) + B)).toString(16).slice(1);
   }
 
   computedClass = computed(() => cn('border border-border bg-card rounded-lg p-4 w-72', this.class()));

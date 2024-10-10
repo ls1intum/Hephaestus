@@ -16,6 +16,7 @@ import org.springframework.stereotype.Service;
 import de.tum.in.www1.hephaestus.codereview.base.BaseGitServiceEntity;
 import de.tum.in.www1.hephaestus.codereview.pullrequest.PullRequest;
 import de.tum.in.www1.hephaestus.codereview.pullrequest.PullRequestDTO;
+import de.tum.in.www1.hephaestus.codereview.pullrequest.review.PullRequestReview;
 import de.tum.in.www1.hephaestus.codereview.pullrequest.review.PullRequestReviewDTO;
 import de.tum.in.www1.hephaestus.codereview.repository.RepositoryDTO;
 
@@ -61,14 +62,28 @@ public class UserService {
                 .min(OffsetDateTime::compareTo).orElse(null);
         Set<String> repositories = mapToDTO(user.getPullRequests(), pr -> pr.getRepository().getNameWithOwner(),
                 (r1, r2) -> r1.compareTo(r2));
-        Set<PullRequestDTO> pullRequests = mapToDTO(user.getPullRequests(), pr -> new PullRequestDTO(pr.getId(),
-                pr.getTitle(), pr.getNumber(), pr.getUrl(), pr.getState(), pr.getAdditions(), pr.getDeletions(),
-                pr.getCreatedAt(), pr.getUpdatedAt(), null, pr.getPullRequestLabels(),
-                new RepositoryDTO(pr.getRepository().getName(),
-                        pr.getRepository().getNameWithOwner(), null,
-                        pr.getRepository().getUrl())),
+        Set<PullRequestDTO> pullRequests = getPullRequestDTOs(user.getPullRequests());
+        Set<PullRequestReviewDTO> activity = getPullRequestReviewDTOs(user.getReviews());
+
+        return Optional.of(new UserProfileDTO(user.getId(), user.getLogin(), user.getAvatarUrl(), firstContribution,
+                repositories, activity, pullRequests));
+    }
+
+    private Set<PullRequestDTO> getPullRequestDTOs(Set<PullRequest> pullRequests) {
+        return mapToDTO(pullRequests,
+                pr -> new PullRequestDTO(
+                        pr.getId(), pr.getTitle(), pr.getNumber(), pr.getUrl(), pr.getState(), pr.getAdditions(),
+                        pr.getDeletions(),
+                        pr.getCreatedAt(), pr.getUpdatedAt(), null,
+                        pr.getPullRequestLabels(),
+                        new RepositoryDTO(pr.getRepository().getName(),
+                                pr.getRepository().getNameWithOwner(), null,
+                                pr.getRepository().getUrl())),
                 (pr1, pr2) -> pr1.createdAt().compareTo(pr2.createdAt()));
-        Set<PullRequestReviewDTO> activity = mapToDTO(user.getReviews(), re -> {
+    }
+
+    private Set<PullRequestReviewDTO> getPullRequestReviewDTOs(Set<PullRequestReview> reviews) {
+        return mapToDTO(reviews, re -> {
             PullRequest pr = re.getPullRequest();
             return new PullRequestReviewDTO(re.getId(),
                     re.getCreatedAt(), re.getUpdatedAt(), re.getSubmittedAt(), re.getState(), re.getUrl(),
@@ -78,8 +93,6 @@ public class UserService {
                                     pr.getRepository().getNameWithOwner(), null,
                                     pr.getRepository().getUrl())));
         }, (prr1, prr2) -> prr1.submittedAt().compareTo(prr2.submittedAt()));
-        return Optional.of(new UserProfileDTO(user.getId(), user.getLogin(), user.getAvatarUrl(), firstContribution,
-                repositories, activity, pullRequests));
     }
 
     private <T extends BaseGitServiceEntity, G> Set<G> mapToDTO(Set<T> entities, Function<T, G> mapper,

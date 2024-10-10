@@ -31,7 +31,16 @@
   </a>
   <div class="flex gap-1 flex-wrap">
     @for (label of pullRequestLabels(); track label.name) {
-      <span class="px-2 py-1 rounded-full text-xs mr-2 text-neutral-100/95" [style.background-color]="label.color">{{ label.name }}</span>
+      @let labelColors = calculateLabelColors(label.color);
+      <span
+        class="px-2 py-0.5 rounded-full text-xs mr-2 text-neutral-100/95"
+        [style.border-width.px]="'0.5'"
+        [style.background-color]="labelColors.backgroundColor"
+        [style.color]="labelColors.color"
+        [style.border-color]="labelColors.borderColor"
+      >
+        {{ label.name }}
+      </span>
     }
   </div>
 </div>
