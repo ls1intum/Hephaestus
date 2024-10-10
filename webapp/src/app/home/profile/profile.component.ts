@@ -81,8 +81,10 @@ export class ProfileComponent {
         return 'https://github.com/ls1intum/Hephaestus/raw/refs/heads/develop/docs/images/hammer.svg';
       case 'Artemis':
         return 'https://artemis.in.tum.de/public/images/logo.png';
+      case 'Athena':
+        return 'https://raw.githubusercontent.com/ls1intum/Athena/develop/playground/public/logo.png';
       default:
-        return '';
+        return 'https://avatars.githubusercontent.com/u/11064260?v=4';
     }
   };
 
