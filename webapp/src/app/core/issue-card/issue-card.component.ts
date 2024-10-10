@@ -1,5 +1,5 @@
 import { Component, computed, input } from '@angular/core';
-import { PullRequest, PullRequestLabel, PullRequestReview, PullRequestReviewDTO } from '@app/core/modules/openapi';
+import { PullRequest, PullRequestLabel, PullRequestReviewDTO } from '@app/core/modules/openapi';
 import { NgIcon } from '@ng-icons/core';
 import { octCheck, octComment, octFileDiff, octGitPullRequest, octGitPullRequestClosed, octX } from '@ng-icons/octicons';
 import dayjs from 'dayjs';
@@ -30,10 +30,6 @@ export class IssueCardComponent {
   protected readonly octGitPullRequest = octGitPullRequest;
   protected readonly octFileDiff = octFileDiff;
   protected readonly octGitPullRequestClosed = octGitPullRequestClosed;
-
-  ngOnInit() {
-    console.log('pullRequestLabels', this.pullRequestLabels());
-  }
 
   displayCreated = computed(() => dayjs(this.createdAt()));
 
