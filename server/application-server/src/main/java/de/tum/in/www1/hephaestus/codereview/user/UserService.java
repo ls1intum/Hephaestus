@@ -3,6 +3,7 @@ package de.tum.in.www1.hephaestus.codereview.user;
 import java.time.OffsetDateTime;
 import java.util.Comparator;
 import java.util.HashSet;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
@@ -92,11 +93,11 @@ public class UserService {
                             new RepositoryDTO(pr.getRepository().getName(),
                                     pr.getRepository().getNameWithOwner(), null,
                                     pr.getRepository().getUrl())));
-        }, (prr1, prr2) -> prr1.submittedAt().compareTo(prr2.submittedAt()));
+        }, (prr1, prr2) -> prr2.submittedAt().compareTo(prr1.submittedAt()));
     }
 
     private <T extends BaseGitServiceEntity, G> Set<G> mapToDTO(Set<T> entities, Function<T, G> mapper,
             Comparator<G> comparator) {
-        return entities.stream().map(mapper).sorted(comparator).collect(Collectors.toCollection(HashSet::new));
+        return entities.stream().map(mapper).sorted(comparator).collect(Collectors.toCollection(LinkedHashSet::new));
     }
 }

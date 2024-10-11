@@ -1,11 +1,39 @@
 <div class="pt-10">
   @if (query.error()) {
-    <div hlmAlert class="max-w-xl" variant="destructive">
-      <lucide-angular [img]="CircleX" hlmAlertIcon />
-      <h4 hlmAlertTitle>Something went wrong...</h4>
-      <p hlmAlertDesc>User couldn't be loaded. Please try again later.</p>
+    <div class="flex items-center justify-center gap-2">
+      <div hlmAlert class="max-w-xl" variant="destructive">
+        <lucide-angular [img]="CircleX" hlmAlertIcon />
+        <h4 hlmAlertTitle>Something went wrong...</h4>
+        <p hlmAlertDesc>User couldn't be loaded. Please try again later.</p>
+      </div>
     </div>
   } @else if (query.isPending()) {
+    <div class="flex gap-8 items-center justify-center mb-8">
+      <hlm-avatar variant="extralarge" class="ring-2 ring-neutral-100 dark:ring-neutral-800">
+        <hlm-skeleton hlmAvatarImage class="h-full w-full rounded-full"></hlm-skeleton>
+        <hlm-skeleton hlmAvatarFallback class="h-full w-full rounded-full"></hlm-skeleton>
+      </hlm-avatar>
+      <div class="flex flex-col gap-2">
+        <hlm-skeleton class="h-8 w-48"></hlm-skeleton>
+        <hlm-skeleton class="h-6 w-64"></hlm-skeleton>
+      </div>
+    </div>
+    <div class="flex flex-wrap gap-16 justify-center border-t border-border mx-24 pt-8">
+      <div class="flex flex-col gap-4">
+        <h2 class="text-xl font-semibold">Latest Activity</h2>
+        <hlm-scroll-area class="w-[510px] h-[400px]">
+          <hlm-skeleton class="h-14 w-full my-4"></hlm-skeleton>
+          <hlm-skeleton class="h-14 w-full my-4"></hlm-skeleton>
+        </hlm-scroll-area>
+      </div>
+      <div class="flex flex-col gap-4">
+        <h2 class="text-xl font-semibold">Open Pullrequests</h2>
+        <hlm-scroll-area class="w-[394px] h-[400px]">
+          <hlm-skeleton class="h-20 w-full my-4"></hlm-skeleton>
+          <hlm-skeleton class="h-20 w-full my-4"></hlm-skeleton>
+        </hlm-scroll-area>
+      </div>
+    </div>
   } @else {
     @if (query.data(); as userData) {
       <div class="flex gap-8 items-center justify-center mb-8">
@@ -47,38 +75,52 @@
         <div class="flex flex-col gap-4">
           <h2 class="text-xl font-semibold">Latest Activity</h2>
           <hlm-scroll-area class="w-[510px] h-[400px]">
-            @for (activity of userData.activity; track activity.id) {
-              <app-profile-activity-card
-                [url]="activity.url"
-                [state]="activity.state!"
-                [createdAt]="activity.createdAt!"
-                [pullRequestNumber]="activity.pullRequest?.number!"
-                [pullRequestState]="activity.pullRequest?.state!"
-                [pullRequestUrl]="activity.pullRequest?.url!"
-                [repositoryName]="activity.pullRequest?.repository?.name!"
-              />
+            @if (userData.activity) {
+              @for (activity of userData.activity; track activity.id) {
+                <app-profile-activity-card
+                  [url]="activity.url"
+                  [state]="activity.state!"
+                  [createdAt]="activity.createdAt!"
+                  [pullRequestNumber]="activity.pullRequest?.number!"
+                  [pullRequestState]="activity.pullRequest?.state!"
+                  [pullRequestUrl]="activity.pullRequest?.url!"
+                  [repositoryName]="activity.pullRequest?.repository?.name!"
+                />
+              }
+            } @else {
+              <div class="w-[500px] flex justify-center items-center gap-4 border border-border bg-card hover:bg-accent hover:text-accent-foreground rounded-lg p-4 my-2">
+                <lucide-angular [img]="Info" class="text-muted-foreground" />
+                <span class="text-muted-foreground font-normal text-sm">No activity found</span>
+              </div>
             }
           </hlm-scroll-area>
         </div>
         <div class="flex flex-col gap-4">
           <h2 class="text-xl font-semibold">Open Pullrequests</h2>
           <hlm-scroll-area class="w-[394px] h-[400px]">
-            @for (pullRequest of userData.pullRequests; track pullRequest.id) {
-              @if (pullRequest.number && pullRequest.title && pullRequest.state && userData.activity && pullRequest.createdAt) {
-                <app-issue-card
-                  class="w-96 my-2"
-                  [additions]="pullRequest.additions ?? 0"
-                  [deletions]="pullRequest.deletions ?? 0"
-                  [number]="pullRequest.number"
-                  [repositoryName]="pullRequest.repository?.name ?? ''"
-                  [title]="pullRequest.title"
-                  [url]="pullRequest.url ?? pullRequest.repository?.url ?? ''"
-                  [state]="pullRequest.state"
-                  [createdAt]="pullRequest.createdAt"
-                  [pullRequestLabels]="pullRequest.labels"
-                  [reviews]="userData.activity"
-                />
+            @if (userData.pullRequests) {
+              @for (pullRequest of userData.pullRequests; track pullRequest.id) {
+                @if (pullRequest.number && pullRequest.title && pullRequest.state && userData.activity && pullRequest.createdAt) {
+                  <app-issue-card
+                    class="w-96 my-2"
+                    [additions]="pullRequest.additions ?? 0"
+                    [deletions]="pullRequest.deletions ?? 0"
+                    [number]="pullRequest.number"
+                    [repositoryName]="pullRequest.repository?.name ?? ''"
+                    [title]="pullRequest.title"
+                    [url]="pullRequest.url ?? pullRequest.repository?.url ?? ''"
+                    [state]="pullRequest.state"
+                    [createdAt]="pullRequest.createdAt"
+                    [pullRequestLabels]="pullRequest.labels"
+                    [reviews]="userData.activity"
+                  />
+                }
               }
+            } @else {
+              <div class="w-[394px] flex justify-center items-center gap-4 border border-border bg-card hover:bg-accent hover:text-accent-foreground rounded-lg p-4 my-2">
+                <lucide-angular [img]="Info" class="text-muted-foreground" />
+                <span class="text-muted-foreground font-normal text-sm">No open pullrequests found</span>
+              </div>
             }
           </hlm-scroll-area>
         </div>

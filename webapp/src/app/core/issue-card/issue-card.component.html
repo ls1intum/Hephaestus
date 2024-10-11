@@ -29,11 +29,11 @@
       }
     }
   </a>
-  <div class="flex gap-1 flex-wrap">
+  <div class="flex gap-2 flex-wrap gap-y-2">
     @for (label of pullRequestLabels(); track label.name) {
       @let labelColors = calculateLabelColors(label.color);
       <span
-        class="px-2 py-0.5 rounded-full text-xs mr-2 text-neutral-100/95"
+        class="px-2 py-0.5 rounded-full text-xs text-neutral-100/95"
         [style.border-width.px]="'0.5'"
         [style.background-color]="labelColors.backgroundColor"
         [style.color]="labelColors.color"

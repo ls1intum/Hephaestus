@@ -21,8 +21,8 @@ import { HlmButtonModule } from '@spartan-ng/ui-button-helm';
 import { HlmScrollAreaComponent } from '@spartan-ng/ui-scrollarea-helm';
 import { ProfileActivityCardComponent } from '../../core/profile-activity-card/profile-activity-card.component';
 import { IssueCardComponent } from '../../core/issue-card/issue-card.component';
-import { lastValueFrom } from 'rxjs';
-import { CircleX, LucideAngularModule } from 'lucide-angular';
+import { combineLatest, lastValueFrom, map, timer } from 'rxjs';
+import { CircleX, LucideAngularModule, Info } from 'lucide-angular';
 import dayjs from 'dayjs';
 import advancedFormat from 'dayjs/plugin/advancedFormat';
 
@@ -60,6 +60,7 @@ export class ProfileComponent {
 
   protected octClockFill = octClockFill;
   protected CircleX = CircleX;
+  protected Info = Info;
   // get user id from the url
   protected userLogin: string | null = null;
 
@@ -90,6 +91,6 @@ export class ProfileComponent {
 
   query = injectQuery(() => ({
     queryKey: ['user', { id: this.userLogin }],
-    queryFn: async () => lastValueFrom(this.userService.getUserProfile(this.userLogin ?? 'testuser'))
+    queryFn: async () => lastValueFrom(combineLatest([this.userService.getUserProfile(this.userLogin ?? 'testuser'), timer(400)]).pipe(map(([user]) => user)))
   }));
 }
