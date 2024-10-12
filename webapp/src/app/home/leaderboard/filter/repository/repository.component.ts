@@ -4,7 +4,6 @@ import { Router, RouterLink } from '@angular/router';
 import { BrnSelectModule } from '@spartan-ng/ui-select-brain';
 import { HlmSelectModule } from '@spartan-ng/ui-select-helm';
 import { HlmLabelModule } from '@spartan-ng/ui-label-helm';
-import { injectQuery } from '@tanstack/angular-query-experimental';
 
 export const repositoryNames = [
   'ls1intum/Artemis',
