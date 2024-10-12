@@ -3,27 +3,7 @@ import { LeaderboardFilterComponent } from './filter.component';
 
 const meta: Meta<LeaderboardFilterComponent> = {
   component: LeaderboardFilterComponent,
-  tags: ['autodocs'],
-  argTypes: {
-    after: {
-      control: {
-        type: 'text'
-      },
-      description: 'Left limit of the timeframe'
-    },
-    before: {
-      control: {
-        type: 'text'
-      },
-      description: 'Right limit of the timeframe'
-    },
-    repository: {
-      control: {
-        type: 'text'
-      },
-      description: 'Repository to filter for'
-    }
-  }
+  tags: ['autodocs']
 };
 
 export default meta;
