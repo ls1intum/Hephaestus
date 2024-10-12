@@ -9,7 +9,7 @@
   background: rgb(var(--label-r), var(--label-g), var(--label-b));
   border-color: hsla(var(--label-h), calc(var(--label-s) * 1%), calc((var(--label-l) - 25) * 1%), var(--border-alpha));
 }
-.dark .gh-label {
+:host-context(.dark) .gh-label {
   --lightness-threshold: 0.6;
   --background-alpha: 0.18;
   --border-alpha: 0.3;

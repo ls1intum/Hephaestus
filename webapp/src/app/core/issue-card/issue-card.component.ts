@@ -11,8 +11,7 @@ import { cn } from '@app/utils';
   templateUrl: './issue-card.component.html',
   imports: [NgIcon, NgStyle],
   styleUrls: ['./issue-card.component.scss'],
-  standalone: true,
-  encapsulation: ViewEncapsulation.None
+  standalone: true
 })
 export class IssueCardComponent {
   class = input('');
