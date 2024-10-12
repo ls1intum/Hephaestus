@@ -1,4 +1,4 @@
-package de.tum.in.www1.hephaestus.gitprovider.comment;
+package de.tum.in.www1.hephaestus.gitprovider.issuecomment;
 
 import org.kohsuke.github.GHIssueComment;
 import org.slf4j.Logger;

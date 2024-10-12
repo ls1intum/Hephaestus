@@ -1,9 +1,9 @@
-package de.tum.in.www1.hephaestus.gitprovider.comment.review;
+package de.tum.in.www1.hephaestus.gitprovider.pullrequestreviewcomment;
 
 import org.springframework.lang.NonNull;
 
 import de.tum.in.www1.hephaestus.gitprovider.base.Comment;
-import de.tum.in.www1.hephaestus.gitprovider.pullrequest.review.PullRequestReview;
+import de.tum.in.www1.hephaestus.gitprovider.pullrequestreview.PullRequestReview;
 import jakarta.persistence.Entity;
 import jakarta.persistence.FetchType;
 import jakarta.persistence.JoinColumn;

@@ -1,4 +1,4 @@
-package de.tum.in.www1.hephaestus.gitprovider.comment;
+package de.tum.in.www1.hephaestus.gitprovider.issuecomment;
 
 import com.fasterxml.jackson.annotation.JsonInclude;
 

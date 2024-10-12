@@ -6,7 +6,7 @@ import java.util.List;
 import org.hibernate.integrator.spi.Integrator;
 import org.hibernate.jpa.boot.spi.IntegratorProvider;
 
-import de.tum.in.www1.hephaestus.gitprovider.comment.IssueCommentDTO;
+import de.tum.in.www1.hephaestus.gitprovider.issuecomment.IssueCommentDTO;
 import de.tum.in.www1.hephaestus.gitprovider.pullrequest.PullRequestDTO;
 import de.tum.in.www1.hephaestus.gitprovider.repository.RepositoryDTO;
 import de.tum.in.www1.hephaestus.gitprovider.user.UserDTO;

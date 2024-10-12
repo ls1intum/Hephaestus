@@ -1,4 +1,4 @@
-package de.tum.in.www1.hephaestus.gitprovider.pullrequest.review;
+package de.tum.in.www1.hephaestus.gitprovider.pullrequestreview;
 
 import java.util.Optional;
 

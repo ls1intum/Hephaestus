@@ -1,4 +1,4 @@
-package de.tum.in.www1.hephaestus.gitprovider.pullrequest.review;
+package de.tum.in.www1.hephaestus.gitprovider.pullrequestreview;
 
 import java.time.OffsetDateTime;
 import java.util.HashSet;
@@ -7,8 +7,8 @@ import java.util.Set;
 import org.springframework.lang.NonNull;
 
 import de.tum.in.www1.hephaestus.gitprovider.base.BaseGitServiceEntity;
-import de.tum.in.www1.hephaestus.gitprovider.comment.review.PullRequestReviewComment;
 import de.tum.in.www1.hephaestus.gitprovider.pullrequest.PullRequest;
+import de.tum.in.www1.hephaestus.gitprovider.pullrequestreviewcomment.PullRequestReviewComment;
 import de.tum.in.www1.hephaestus.gitprovider.user.User;
 import jakarta.persistence.CascadeType;
 import jakarta.persistence.Entity;

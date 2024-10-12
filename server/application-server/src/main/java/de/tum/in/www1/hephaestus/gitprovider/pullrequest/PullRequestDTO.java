@@ -4,7 +4,7 @@ import java.util.Set;
 
 import com.fasterxml.jackson.annotation.JsonInclude;
 
-import de.tum.in.www1.hephaestus.gitprovider.comment.IssueCommentDTO;
+import de.tum.in.www1.hephaestus.gitprovider.issuecomment.IssueCommentDTO;
 import de.tum.in.www1.hephaestus.gitprovider.repository.RepositoryDTO;
 import de.tum.in.www1.hephaestus.gitprovider.user.UserDTO;
 

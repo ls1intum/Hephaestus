@@ -1,4 +1,4 @@
-package de.tum.in.www1.hephaestus.gitprovider.comment.review;
+package de.tum.in.www1.hephaestus.gitprovider.pullrequestreviewcomment;
 
 import org.kohsuke.github.GHPullRequestReviewComment;
 import org.slf4j.Logger;

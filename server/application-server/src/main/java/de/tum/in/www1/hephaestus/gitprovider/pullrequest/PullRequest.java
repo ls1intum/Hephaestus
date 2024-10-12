@@ -8,8 +8,8 @@ import jakarta.persistence.*;
 import org.springframework.lang.NonNull;
 
 import de.tum.in.www1.hephaestus.gitprovider.base.BaseGitServiceEntity;
-import de.tum.in.www1.hephaestus.gitprovider.comment.IssueComment;
-import de.tum.in.www1.hephaestus.gitprovider.pullrequest.review.PullRequestReview;
+import de.tum.in.www1.hephaestus.gitprovider.issuecomment.IssueComment;
+import de.tum.in.www1.hephaestus.gitprovider.pullrequestreview.PullRequestReview;
 import de.tum.in.www1.hephaestus.gitprovider.repository.Repository;
 import de.tum.in.www1.hephaestus.gitprovider.user.User;
 import lombok.Getter;
