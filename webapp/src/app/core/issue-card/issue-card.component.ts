@@ -1,15 +1,14 @@
-import { Component, computed, input, ViewEncapsulation } from '@angular/core';
+import { Component, computed, input } from '@angular/core';
 import { PullRequest, PullRequestLabel, PullRequestReviewDTO } from '@app/core/modules/openapi';
 import { NgIcon } from '@ng-icons/core';
 import { octCheck, octComment, octFileDiff, octGitPullRequest, octGitPullRequestClosed, octX } from '@ng-icons/octicons';
 import dayjs from 'dayjs';
-import { NgStyle } from '@angular/common';
 import { cn } from '@app/utils';
 
 @Component({
   selector: 'app-issue-card',
   templateUrl: './issue-card.component.html',
-  imports: [NgIcon, NgStyle],
+  imports: [NgIcon],
   styleUrls: ['./issue-card.component.scss'],
   standalone: true
 })
