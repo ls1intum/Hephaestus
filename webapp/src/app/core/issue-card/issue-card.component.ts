@@ -1,4 +1,4 @@
-import { Component, computed, input } from '@angular/core';
+import { Component, computed, input, ViewEncapsulation } from '@angular/core';
 import { PullRequest, PullRequestLabel, PullRequestReviewDTO } from '@app/core/modules/openapi';
 import { NgIcon } from '@ng-icons/core';
 import { octCheck, octComment, octFileDiff, octGitPullRequest, octGitPullRequestClosed, octX } from '@ng-icons/octicons';
@@ -10,7 +10,9 @@ import { cn } from '@app/utils';
   selector: 'app-issue-card',
   templateUrl: './issue-card.component.html',
   imports: [NgIcon, NgStyle],
-  standalone: true
+  styleUrls: ['./issue-card.component.scss'],
+  standalone: true,
+  encapsulation: ViewEncapsulation.None
 })
 export class IssueCardComponent {
   class = input('');
@@ -32,6 +34,11 @@ export class IssueCardComponent {
   protected readonly octGitPullRequestClosed = octGitPullRequestClosed;
 
   displayCreated = computed(() => dayjs(this.createdAt()));
+  computedClass = computed(() => cn('border border-border bg-card rounded-lg p-4 w-72', this.class()));
+
+  dataTheme = computed(() => {
+    return document.documentElement.className.includes('dark') ? 'dark' : 'light';
+  });
 
   getMostRecentReview() {
     if (!this.reviews()) {
@@ -42,33 +49,54 @@ export class IssueCardComponent {
     });
   }
 
-  calculateLabelColors(githubColor: string | undefined) {
-    if (!githubColor) {
-      return {
-        borderColor: '#27272a',
-        color: '#000000',
-        backgroundColor: '#09090b'
-      };
-    }
+  hexToRgb(hex: string) {
+    const bigint = parseInt(hex, 16);
+    const r = (bigint >> 16) & 255;
+    const g = (bigint >> 8) & 255;
+    const b = bigint & 255;
 
-    const borderColor = this.shadeHexColor(githubColor, -0.5);
-    const backgroundColor = this.shadeHexColor(githubColor, -0.75);
+    const hsl = this.rgbToHsl(r, g, b);
+
     return {
-      borderColor: borderColor,
-      color: `#${githubColor}`,
-      backgroundColor: backgroundColor
+      r: r,
+      g: g,
+      b: b,
+      ...hsl
     };
   }
 
-  shadeHexColor(color: string, percent: number) {
-    let f = parseInt(color, 16),
-      t = percent < 0 ? 0 : 255,
-      p = percent < 0 ? percent * -1 : percent,
-      R = f >> 16,
-      G = (f >> 8) & 0x00ff,
-      B = f & 0x0000ff;
-    return '#' + (0x1000000 + (Math.round((t - R) * p) + R) * 0x10000 + (Math.round((t - G) * p) + G) * 0x100 + (Math.round((t - B) * p) + B)).toString(16).slice(1);
-  }
+  rgbToHsl(r: number, g: number, b: number) {
+    r /= 255;
+    g /= 255;
+    b /= 255;
 
-  computedClass = computed(() => cn('border border-border bg-card rounded-lg p-4 w-72', this.class()));
+    const max = Math.max(r, g, b);
+    const min = Math.min(r, g, b);
+    let h = 0,
+      s = 0,
+      l = (max + min) / 2;
+
+    if (max !== min) {
+      const d = max - min;
+      s = l > 0.5 ? d / (2 - max - min) : d / (max + min);
+      switch (max) {
+        case r:
+          h = (g - b) / d + (g < b ? 6 : 0);
+          break;
+        case g:
+          h = (b - r) / d + 2;
+          break;
+        case b:
+          h = (r - g) / d + 4;
+          break;
+      }
+      h /= 6;
+    }
+
+    h = Math.round(h * 360);
+    s = Math.round(s * 100);
+    l = Math.round(l * 100);
+
+    return { h, s, l };
+  }
 }

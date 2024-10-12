@@ -31,13 +31,16 @@
   </a>
   <div class="flex gap-2 flex-wrap gap-y-2">
     @for (label of pullRequestLabels(); track label.name) {
-      @let labelColors = calculateLabelColors(label.color);
+      @let labelColors = hexToRgb(label.color ?? 'FFFFFF');
       <span
-        class="px-2 py-0.5 rounded-full text-xs text-neutral-100/95"
-        [style.border-width.px]="'0.5'"
-        [style.background-color]="labelColors.backgroundColor"
-        [style.color]="labelColors.color"
-        [style.border-color]="labelColors.borderColor"
+        class="px-2 py-0.5 rounded-[2rem] text-xs font-medium dark:border gh-label"
+        [ariaDescription]="dataTheme()"
+        [style.--label-r]="labelColors.r"
+        [style.--label-g]="labelColors.g"
+        [style.--label-b]="labelColors.b"
+        [style.--label-h]="labelColors.h"
+        [style.--label-s]="labelColors.s"
+        [style.--label-l]="labelColors.l"
       >
         {{ label.name }}
       </span>
