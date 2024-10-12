@@ -57,9 +57,9 @@ public class NatsConsumerService {
       // consumerContext = streamContext.getConsumerContext(natsServer)
     // } catch (JetStreamApiException | IOException e) {
     //   // JetStreamApiException:
-    //   // the stream or consumer did not exist
+    //   //     the stream or consumer did not exist
     //   // IOException:
-    //   // likely a connection problem
+    //   //     likely a connection problem
     //   return;
     // }
 
@@ -95,14 +95,6 @@ public class NatsConsumerService {
           logger.error("Failed to parse pull request review payload.", e);
         }
       } 
-      // else if (subject.endsWith(".pull_request_review_thread")) {
-      //   try {
-      //     GHEventPayload.PullRequestReviewThread pullRequestReviewThreadEvent = github.parseEventPayload(reader, GHEventPayload.PullRequestReviewThread.class);
-      //     logger.info("Received pull request review thread: " + pullRequestReviewThreadEvent.getThread().getTitle());
-      //   } catch (IOException e) {
-      //     logger.error("Failed to parse pull request review thread payload.", e);
-      //   }
-      // }
     };
 
     consumerContext.consume(handler);
@@ -110,11 +102,11 @@ public class NatsConsumerService {
     // try (MessageConsumer consumer = ) {
     // } catch (JetStreamApiException | IOException e) {
     //   // JetStreamApiException:
-    //   // 1. the stream or consumer did not exist
-    //   // 2. api calls under the covers theoretically this could fail, but practically
-    //   // it won't.
+    //   //     1. the stream or consumer did not exist
+    //   //     2. api calls under the covers theoretically this could fail, but practically
+    //   //        it won't.
     //   // IOException:
-    //   // likely a connection problem
+    //   //     likely a connection problem
     // } catch (Exception e) {
     //   // this is from the FetchConsumer being AutoCloseable, but should never be
     //   // called
@@ -132,7 +124,6 @@ public class NatsConsumerService {
         "pull_request",
         "pull_request_review_comment",
         "pull_request_review",
-        // "pull_request_review_thread"
     };
 
     return Arrays.stream(repositoriesToMonitor)

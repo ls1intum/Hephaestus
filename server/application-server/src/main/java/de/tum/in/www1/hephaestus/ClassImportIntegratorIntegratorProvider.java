@@ -6,10 +6,10 @@ import java.util.List;
 import org.hibernate.integrator.spi.Integrator;
 import org.hibernate.jpa.boot.spi.IntegratorProvider;
 
-import de.tum.in.www1.hephaestus.codereview.comment.IssueCommentDTO;
-import de.tum.in.www1.hephaestus.codereview.pullrequest.PullRequestDTO;
-import de.tum.in.www1.hephaestus.codereview.repository.RepositoryDTO;
-import de.tum.in.www1.hephaestus.codereview.user.UserDTO;
+import de.tum.in.www1.hephaestus.gitprovider.comment.IssueCommentDTO;
+import de.tum.in.www1.hephaestus.gitprovider.pullrequest.PullRequestDTO;
+import de.tum.in.www1.hephaestus.gitprovider.repository.RepositoryDTO;
+import de.tum.in.www1.hephaestus.gitprovider.user.UserDTO;
 import io.hypersistence.utils.hibernate.type.util.ClassImportIntegrator;
 
 public class ClassImportIntegratorIntegratorProvider implements IntegratorProvider {

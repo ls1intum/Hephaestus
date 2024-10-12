@@ -19,11 +19,11 @@ import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
-import de.tum.in.www1.hephaestus.codereview.pullrequest.PullRequest;
-import de.tum.in.www1.hephaestus.codereview.pullrequest.review.PullRequestReviewDTO;
-import de.tum.in.www1.hephaestus.codereview.user.User;
-import de.tum.in.www1.hephaestus.codereview.user.UserService;
-import de.tum.in.www1.hephaestus.codereview.user.UserType;
+import de.tum.in.www1.hephaestus.gitprovider.pullrequest.PullRequest;
+import de.tum.in.www1.hephaestus.gitprovider.pullrequest.review.PullRequestReviewDTO;
+import de.tum.in.www1.hephaestus.gitprovider.user.User;
+import de.tum.in.www1.hephaestus.gitprovider.user.UserService;
+import de.tum.in.www1.hephaestus.gitprovider.user.UserType;
 
 @Service
 public class LeaderboardService {

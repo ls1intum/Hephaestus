@@ -2,8 +2,8 @@ package de.tum.in.www1.hephaestus.leaderboard;
 
 import com.fasterxml.jackson.annotation.JsonInclude;
 
-import de.tum.in.www1.hephaestus.codereview.pullrequest.review.PullRequestReviewDTO;
-import de.tum.in.www1.hephaestus.codereview.user.UserType;
+import de.tum.in.www1.hephaestus.gitprovider.pullrequest.review.PullRequestReviewDTO;
+import de.tum.in.www1.hephaestus.gitprovider.user.UserType;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
 import lombok.Setter;

@@ -31,24 +31,24 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
-import de.tum.in.www1.hephaestus.codereview.comment.IssueComment;
-import de.tum.in.www1.hephaestus.codereview.comment.IssueCommentConverter;
-import de.tum.in.www1.hephaestus.codereview.comment.IssueCommentRepository;
-import de.tum.in.www1.hephaestus.codereview.comment.review.PullRequestReviewComment;
-import de.tum.in.www1.hephaestus.codereview.comment.review.PullRequestReviewCommentConverter;
-import de.tum.in.www1.hephaestus.codereview.comment.review.PullRequestReviewCommentRepository;
-import de.tum.in.www1.hephaestus.codereview.pullrequest.PullRequest;
-import de.tum.in.www1.hephaestus.codereview.pullrequest.PullRequestConverter;
-import de.tum.in.www1.hephaestus.codereview.pullrequest.PullRequestRepository;
-import de.tum.in.www1.hephaestus.codereview.pullrequest.review.PullRequestReview;
-import de.tum.in.www1.hephaestus.codereview.pullrequest.review.PullRequestReviewConverter;
-import de.tum.in.www1.hephaestus.codereview.pullrequest.review.PullRequestReviewRepository;
-import de.tum.in.www1.hephaestus.codereview.repository.Repository;
-import de.tum.in.www1.hephaestus.codereview.repository.RepositoryConverter;
-import de.tum.in.www1.hephaestus.codereview.repository.RepositoryRepository;
-import de.tum.in.www1.hephaestus.codereview.user.User;
-import de.tum.in.www1.hephaestus.codereview.user.UserConverter;
-import de.tum.in.www1.hephaestus.codereview.user.UserRepository;
+import de.tum.in.www1.hephaestus.gitprovider.comment.IssueComment;
+import de.tum.in.www1.hephaestus.gitprovider.comment.IssueCommentConverter;
+import de.tum.in.www1.hephaestus.gitprovider.comment.IssueCommentRepository;
+import de.tum.in.www1.hephaestus.gitprovider.comment.review.PullRequestReviewComment;
+import de.tum.in.www1.hephaestus.gitprovider.comment.review.PullRequestReviewCommentConverter;
+import de.tum.in.www1.hephaestus.gitprovider.comment.review.PullRequestReviewCommentRepository;
+import de.tum.in.www1.hephaestus.gitprovider.pullrequest.PullRequest;
+import de.tum.in.www1.hephaestus.gitprovider.pullrequest.PullRequestConverter;
+import de.tum.in.www1.hephaestus.gitprovider.pullrequest.PullRequestRepository;
+import de.tum.in.www1.hephaestus.gitprovider.pullrequest.review.PullRequestReview;
+import de.tum.in.www1.hephaestus.gitprovider.pullrequest.review.PullRequestReviewConverter;
+import de.tum.in.www1.hephaestus.gitprovider.pullrequest.review.PullRequestReviewRepository;
+import de.tum.in.www1.hephaestus.gitprovider.repository.Repository;
+import de.tum.in.www1.hephaestus.gitprovider.repository.RepositoryConverter;
+import de.tum.in.www1.hephaestus.gitprovider.repository.RepositoryRepository;
+import de.tum.in.www1.hephaestus.gitprovider.user.User;
+import de.tum.in.www1.hephaestus.gitprovider.user.UserConverter;
+import de.tum.in.www1.hephaestus.gitprovider.user.UserRepository;
 
 @Service
 public class GitHubDataSyncService {
