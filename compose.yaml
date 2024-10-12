@@ -16,7 +16,7 @@ services:
       - app-network
 
   postgres:
-    image: 'postgres:latest'
+    image: 'postgres:16'
     environment:
       - POSTGRES_DB=hephaestus
       - POSTGRES_PASSWORD=root
@@ -28,11 +28,8 @@ services:
         aliases:
           - postgres
     volumes:
-      - postgres-data:/var/lib/postgresql/data
+      - 'postgresql-data:/var/lib/postgresql/data'
 
 networks:
   app-network:
     driver: bridge`
-
-volumes:
-  postgres-data:

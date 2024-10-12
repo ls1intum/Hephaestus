@@ -2,7 +2,7 @@
 
 services:
   postgres:
-    image: 'postgres:latest'
+    image: 'postgres:16'
     environment:
       POSTGRES_DB: hephaestus
       POSTGRES_PASSWORD: root

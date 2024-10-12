@@ -5,6 +5,7 @@ import { HlmButtonModule } from '@spartan-ng/ui-button-helm';
 import { SecurityStore } from '@app/core/security/security-store.service';
 import { ThemeSwitcherComponent } from '@app/core/theme/theme-switcher.component';
 import { RequestFeatureComponent } from './request-feature/request-feature.component';
+import { environment } from 'environments/environment';
 
 @Component({
   selector: 'app-header',
@@ -23,6 +24,19 @@ export class HeaderComponent {
   }
 
   protected signIn() {
-    this.securityStore.signIn();
+    if (environment.keycloak.skipLoginPage) {
+      const authUrl =
+        `${environment.keycloak.url}/realms/${environment.keycloak.realm}/protocol/openid-connect/auth` +
+        `?client_id=${encodeURIComponent(environment.keycloak.clientId)}` +
+        `&redirect_uri=${encodeURIComponent(environment.clientUrl)}` +
+        `&response_type=code` +
+        `&scope=openid` +
+        `&kc_idp_hint=${encodeURIComponent('github')}`;
+
+      // Redirect the user to the Keycloak GitHub login
+      window.location.href = authUrl;
+    } else {
+      this.securityStore.signIn();
+    }
   }
 }
