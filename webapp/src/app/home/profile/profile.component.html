@@ -28,7 +28,7 @@
       </div>
       <div class="flex flex-col gap-4">
         <h2 class="text-xl font-semibold">Open Pullrequests</h2>
-        <hlm-scroll-area class="w-[394px] h-[400px]">
+        <hlm-scroll-area class="w-[510px] h-[400px]">
           <hlm-skeleton class="h-20 w-full my-4"></hlm-skeleton>
           <hlm-skeleton class="h-20 w-full my-4"></hlm-skeleton>
         </hlm-scroll-area>
@@ -97,12 +97,12 @@
         </div>
         <div class="flex flex-col gap-4">
           <h2 class="text-xl font-semibold">Open Pullrequests</h2>
-          <hlm-scroll-area class="w-[394px] h-[400px]">
+          <hlm-scroll-area class="w-[510px] h-[400px]">
             @if (userData.pullRequests) {
               @for (pullRequest of userData.pullRequests; track pullRequest.id) {
                 @if (pullRequest.number && pullRequest.title && pullRequest.state && userData.activity && pullRequest.createdAt) {
                   <app-issue-card
-                    class="w-96 my-2"
+                    class="w-[500px] my-2"
                     [additions]="pullRequest.additions ?? 0"
                     [deletions]="pullRequest.deletions ?? 0"
                     [number]="pullRequest.number"
@@ -117,7 +117,7 @@
                 }
               }
             } @else {
-              <div class="w-[394px] flex justify-center items-center gap-4 border border-border bg-card hover:bg-accent hover:text-accent-foreground rounded-lg p-4 my-2">
+              <div class="w-[510px] flex justify-center items-center gap-4 border border-border bg-card hover:bg-accent hover:text-accent-foreground rounded-lg p-4 my-2">
                 <lucide-angular [img]="Info" class="text-muted-foreground" />
                 <span class="text-muted-foreground font-normal text-sm">No open pullrequests found</span>
               </div>
