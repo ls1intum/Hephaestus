@@ -5,6 +5,6 @@
   </span>
   <form ngForm class="flex xl:flex-col gap-4">
     <app-leaderboard-filter-timeframe />
-    <app-leaderboard-filter-repository />
+    <app-leaderboard-filter-repository [repositories]="metaData()?.repositoriesToMonitor" />
   </form>
 </div>

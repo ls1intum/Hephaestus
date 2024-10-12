@@ -1,9 +1,10 @@
-import { Component, computed, effect, signal } from '@angular/core';
+import { Component, computed, effect, input, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { Router, RouterLink } from '@angular/router';
 import { BrnSelectModule } from '@spartan-ng/ui-select-brain';
 import { HlmSelectModule } from '@spartan-ng/ui-select-helm';
 import { HlmLabelModule } from '@spartan-ng/ui-label-helm';
+import { injectQuery } from '@tanstack/angular-query-experimental';
 
 export const repositoryNames = [
   'ls1intum/Artemis',
@@ -30,6 +31,7 @@ interface SelectOption {
   templateUrl: './repository.component.html'
 })
 export class LeaderboardFilterRepositoryComponent {
+  repositories = input<string[]>();
   value = signal<string>('');
 
   placeholder = computed(() => {
@@ -37,13 +39,15 @@ export class LeaderboardFilterRepositoryComponent {
   });
 
   options = computed(() => {
-    const options: SelectOption[] = repositoryNames.map((name, index) => {
-      return {
-        id: index + 1,
-        value: name,
-        label: name
-      };
-    });
+    const options: SelectOption[] = !this.repositories()
+      ? []
+      : this.repositories()!.map((name, index) => {
+          return {
+            id: index + 1,
+            value: name,
+            label: name
+          };
+        });
     options.unshift({
       id: 0,
       value: 'all',

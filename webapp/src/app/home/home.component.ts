@@ -11,6 +11,7 @@ import { LeaderboardComponent } from '@app/home/leaderboard/leaderboard.componen
 import { LeaderboardFilterComponent } from './leaderboard/filter/filter.component';
 import { SecurityStore } from '@app/core/security/security-store.service';
 import { HlmAlertModule } from '@spartan-ng/ui-alert-helm';
+import { MetaService } from '@app/core/modules/openapi';
 
 dayjs.extend(isoWeek);
 
@@ -24,6 +25,7 @@ export class HomeComponent {
   protected CircleX = CircleX;
 
   securityStore = inject(SecurityStore);
+  metaService = inject(MetaService);
   leaderboardService = inject(LeaderboardService);
 
   signedIn = this.securityStore.signedIn;
@@ -43,5 +45,10 @@ export class HomeComponent {
           map(([leaderboard]) => leaderboard)
         )
       )
+  }));
+
+  metaQuery = injectQuery(() => ({
+    queryKey: ['meta'],
+    queryFn: async () => lastValueFrom(this.metaService.getMetaData())
   }));
 }
