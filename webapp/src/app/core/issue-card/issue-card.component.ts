@@ -34,10 +34,6 @@ export class IssueCardComponent {
   displayCreated = computed(() => dayjs(this.createdAt()));
   computedClass = computed(() => cn('border border-border bg-card rounded-lg p-4 w-72', this.class()));
 
-  dataTheme = computed(() => {
-    return document.documentElement.className.includes('dark') ? 'dark' : 'light';
-  });
-
   getMostRecentReview() {
     if (!this.reviews()) {
       return null;
