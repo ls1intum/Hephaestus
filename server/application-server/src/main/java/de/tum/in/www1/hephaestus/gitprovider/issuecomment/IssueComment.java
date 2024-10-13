@@ -37,7 +37,7 @@ public class IssueComment extends BaseGitServiceEntity {
     private AuthorAssociation authorAssociation;
     
     @ManyToOne
-    @JoinColumn(name = "issue_id")
+    @JoinColumn(name = "author_id")
     @ToString.Exclude
     private User author;
 

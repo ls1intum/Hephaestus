@@ -16,16 +16,16 @@ public interface UserRepository extends JpaRepository<User, Long> {
     @Query("""
                 SELECT u
                 FROM User u
-                JOIN FETCH u.pullRequests
+                JOIN FETCH u.createdIssues i
                 JOIN FETCH u.issueComments
                 JOIN FETCH u.reviewComments
                 JOIN FETCH u.reviews
-                WHERE u.login = :login
+                WHERE u.login = :login AND TYPE(i) = PullRequest
             """)
     Optional<User> findUserEagerly(@Param("login") String login);
 
     @Query("""
-                SELECT new UserDTO(u.id, u.login, u.email, u.name, u.url)
+                SELECT new UserDTO(u.id, u.login, u.email, u.name, u.htmlUrl)
                 FROM User u
                 WHERE u.login = :login
             """)
@@ -34,10 +34,11 @@ public interface UserRepository extends JpaRepository<User, Long> {
     @Query("""
                 SELECT u
                 FROM User u
-                JOIN FETCH u.pullRequests
+                JOIN FETCH u.createdIssues i
                 JOIN FETCH u.issueComments
                 JOIN FETCH u.reviewComments
                 JOIN FETCH u.reviews
+                WHERE TYPE(i) = PullRequest
             """)
     List<User> findAllWithRelations();
 
@@ -45,7 +46,7 @@ public interface UserRepository extends JpaRepository<User, Long> {
                 SELECT u
                 FROM User u
                 JOIN FETCH u.reviews re
-                WHERE re.createdAt BETWEEN :after AND :before
+                WHERE re.submittedAt BETWEEN :after AND :before
             """)
     List<User> findAllInTimeframe(@Param("after") OffsetDateTime after, @Param("before") OffsetDateTime before);
 }

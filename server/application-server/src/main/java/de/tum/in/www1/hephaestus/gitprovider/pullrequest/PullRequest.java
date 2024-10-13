@@ -11,6 +11,8 @@ import jakarta.persistence.DiscriminatorValue;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.OneToMany;
 import jakarta.persistence.JoinColumn;
+import jakarta.persistence.JoinTable;
+import jakarta.persistence.ManyToMany;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
@@ -58,8 +60,12 @@ public class PullRequest extends Issue {
     @ToString.Exclude
     private User mergedBy;
 
-    @ManyToOne
-    @JoinColumn(name = "requested_reviewer_id")
+    @ManyToMany
+    @JoinTable(
+        name = "pull_request_requested_reviewers",
+        joinColumns = @JoinColumn(name = "pull_request_id"),
+        inverseJoinColumns = @JoinColumn(name = "user_id")
+    )
     @ToString.Exclude
     private Set<User> requestedReviewers = new HashSet<>();
 

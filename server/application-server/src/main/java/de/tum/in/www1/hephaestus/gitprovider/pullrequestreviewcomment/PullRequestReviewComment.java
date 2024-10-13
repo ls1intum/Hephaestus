@@ -15,6 +15,7 @@ import lombok.ToString;
 
 import de.tum.in.www1.hephaestus.gitprovider.base.AuthorAssociation;
 import de.tum.in.www1.hephaestus.gitprovider.base.BaseGitServiceEntity;
+import de.tum.in.www1.hephaestus.gitprovider.pullrequest.PullRequest;
 import de.tum.in.www1.hephaestus.gitprovider.pullrequestreview.PullRequestReview;
 import de.tum.in.www1.hephaestus.gitprovider.user.User;
 
@@ -92,7 +93,7 @@ public class PullRequestReviewComment extends BaseGitServiceEntity {
     @ManyToOne
     @JoinColumn(name = "pull_request_id")
     @ToString.Exclude
-    private PullRequestReview pullRequest;
+    private PullRequest pullRequest;
 
     public enum Side {
         LEFT, RIGHT

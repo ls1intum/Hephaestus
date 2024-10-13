@@ -12,8 +12,8 @@ public interface RepositoryRepository
         @Query("""
                         SELECT r
                         FROM Repository r
-                        JOIN FETCH r.pullRequests
-                        WHERE r.nameWithOwner = :nameWithOwner
+                        JOIN FETCH r.issues i
+                        WHERE r.nameWithOwner = :nameWithOwner AND TYPE(i) = PullRequest
                         """)
         Repository findByNameWithOwnerWithEagerPullRequests(String nameWithOwner);
 }
