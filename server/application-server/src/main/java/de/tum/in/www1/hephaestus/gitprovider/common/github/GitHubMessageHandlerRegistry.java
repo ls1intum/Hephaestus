@@ -1,6 +1,8 @@
 package de.tum.in.www1.hephaestus.gitprovider.common.github;
 
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 import org.kohsuke.github.GHEvent;
@@ -19,5 +21,9 @@ public class GitHubMessageHandlerRegistry {
 
     public GitHubMessageHandler<?> getHandler(GHEvent eventType) {
         return handlerMap.get(eventType);
+    }
+
+    public List<GHEvent> getSupportedEvents() {
+        return new ArrayList<>(handlerMap.keySet());
     }
 }

@@ -144,11 +144,10 @@ public class NatsConsumerService {
      * @return The subjects to monitor.
      */
     private String[] getSubjects() {
-        String[] events = new String[] {
-                "pull_request",
-                "pull_request_review_comment",
-                "pull_request_review",
-        };
+        String[] events = handlerRegistry.getSupportedEvents().stream()
+                .map(GHEvent::name)
+                .map(String::toLowerCase)
+                .toArray(String[]::new);
 
         return Arrays.stream(repositoriesToMonitor)
                 .map(this::getSubjectPrefix)
