@@ -1,8 +1,6 @@
 package de.tum.in.www1.hephaestus.gitprovider.issuecomment.github;
 
 import org.kohsuke.github.GHIssueComment;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.springframework.lang.NonNull;
 import org.springframework.stereotype.Component;
 
