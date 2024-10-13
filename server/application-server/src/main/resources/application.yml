@@ -31,6 +31,10 @@ spring:
 springdoc:
     default-produces-media-type: application/json
 
+nats:
+    enabled: false
+    server: ""
+
 monitoring:
     runOnStartup: true
     # Fetching timeframe in days
