@@ -1,7 +1,7 @@
 from langchain.chat_models.base import BaseChatModel
 from langchain_openai import ChatOpenAI, AzureChatOpenAI
-from .config import settings
 
+from .config import settings
 
 model: BaseChatModel
 
