@@ -1,4 +1,4 @@
-package de.tum.in.www1.hephaestus.gitprovider.base;
+package de.tum.in.www1.hephaestus.gitprovider.common;
 
 import org.kohsuke.github.GHObject;
 import org.springframework.core.convert.converter.Converter;

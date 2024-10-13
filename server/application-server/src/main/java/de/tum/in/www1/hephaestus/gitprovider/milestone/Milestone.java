@@ -17,7 +17,7 @@ import lombok.NonNull;
 import lombok.Setter;
 import lombok.ToString;
 
-import de.tum.in.www1.hephaestus.gitprovider.base.BaseGitServiceEntity;
+import de.tum.in.www1.hephaestus.gitprovider.common.BaseGitServiceEntity;
 import de.tum.in.www1.hephaestus.gitprovider.issue.Issue;
 import de.tum.in.www1.hephaestus.gitprovider.user.User;
 

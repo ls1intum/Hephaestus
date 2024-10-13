@@ -5,7 +5,7 @@ import org.kohsuke.github.GHIssueState;
 import org.springframework.lang.NonNull;
 import org.springframework.stereotype.Component;
 
-import de.tum.in.www1.hephaestus.gitprovider.base.BaseGitServiceEntityConverter;
+import de.tum.in.www1.hephaestus.gitprovider.common.BaseGitServiceEntityConverter;
 import de.tum.in.www1.hephaestus.gitprovider.issue.Issue;
 
 @Component

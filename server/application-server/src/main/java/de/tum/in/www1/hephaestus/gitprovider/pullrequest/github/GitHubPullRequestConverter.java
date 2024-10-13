@@ -8,7 +8,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.lang.NonNull;
 import org.springframework.stereotype.Component;
 
-import de.tum.in.www1.hephaestus.gitprovider.base.BaseGitServiceEntityConverter;
+import de.tum.in.www1.hephaestus.gitprovider.common.BaseGitServiceEntityConverter;
 import de.tum.in.www1.hephaestus.gitprovider.issue.github.GitHubIssueConverter;
 import de.tum.in.www1.hephaestus.gitprovider.pullrequest.PullRequest;
 

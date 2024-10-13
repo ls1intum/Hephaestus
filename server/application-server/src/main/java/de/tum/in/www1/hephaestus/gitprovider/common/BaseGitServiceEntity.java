@@ -1,4 +1,4 @@
-package de.tum.in.www1.hephaestus.gitprovider.base;
+package de.tum.in.www1.hephaestus.gitprovider.common;
 
 import java.time.OffsetDateTime;
 

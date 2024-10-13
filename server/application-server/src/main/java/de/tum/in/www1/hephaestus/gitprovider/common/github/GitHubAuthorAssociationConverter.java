@@ -1,4 +1,4 @@
-package de.tum.in.www1.hephaestus.gitprovider.base.github;
+package de.tum.in.www1.hephaestus.gitprovider.common.github;
 
 import org.kohsuke.github.GHCommentAuthorAssociation;
 import org.slf4j.Logger;
@@ -6,7 +6,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.core.convert.converter.Converter;
 import org.springframework.stereotype.Component;
 
-import de.tum.in.www1.hephaestus.gitprovider.base.AuthorAssociation;
+import de.tum.in.www1.hephaestus.gitprovider.common.AuthorAssociation;
 import io.micrometer.common.lang.NonNull;
 
 @Component

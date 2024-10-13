@@ -1,4 +1,4 @@
-package de.tum.in.www1.hephaestus.gitprovider.base;
+package de.tum.in.www1.hephaestus.gitprovider.common;
 
 // How the author is associated with the repository.
 public enum AuthorAssociation {
