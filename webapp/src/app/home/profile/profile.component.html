@@ -1,4 +1,4 @@
-<div class="pt-10">
+<div class="pt-4 lg:mx-20">
   @if (query.error()) {
     <div class="flex items-center justify-center gap-2">
       <div hlmAlert class="max-w-xl" variant="destructive">
@@ -71,53 +71,57 @@
           </div>
         </div>
       </div>
-      <div class="flex flex-wrap gap-16 justify-center border-t border-border mx-24 pt-8">
-        <div class="flex flex-col gap-4">
+      <div class="flex flex-col lg:flex-row lg:justify-between gap-y-8 border-t border-border pt-8 px-4">
+        <div class="lg:w-[45%] flex flex-col gap-4 mx-4">
           <h2 class="text-xl font-semibold">Latest Activity</h2>
-          <hlm-scroll-area class="w-[510px] h-[400px]">
+          <hlm-scroll-area class="h-[400px]">
             @if (userData.activity) {
               @for (activity of userData.activity; track activity.id) {
-                <app-profile-activity-card
-                  [url]="activity.url"
-                  [state]="activity.state!"
-                  [createdAt]="activity.createdAt!"
-                  [pullRequestNumber]="activity.pullRequest?.number!"
-                  [pullRequestState]="activity.pullRequest?.state!"
-                  [pullRequestUrl]="activity.pullRequest?.url!"
-                  [repositoryName]="activity.pullRequest?.repository?.name!"
-                />
+                <div class="mr-2.5">
+                  <app-profile-activity-card
+                    [url]="activity.url"
+                    [state]="activity.state!"
+                    [createdAt]="activity.createdAt!"
+                    [pullRequestNumber]="activity.pullRequest?.number!"
+                    [pullRequestState]="activity.pullRequest?.state!"
+                    [pullRequestUrl]="activity.pullRequest?.url!"
+                    [repositoryName]="activity.pullRequest?.repository?.name!"
+                  />
+                </div>
               }
             } @else {
-              <div class="w-[500px] flex justify-center items-center gap-4 border border-border bg-card hover:bg-accent hover:text-accent-foreground rounded-lg p-4 my-2">
+              <div class="w-full flex justify-center items-center gap-4 border border-border bg-card hover:bg-accent hover:text-accent-foreground rounded-lg p-4 my-2">
                 <lucide-angular [img]="Info" class="text-muted-foreground" />
                 <span class="text-muted-foreground font-normal text-sm">No activity found</span>
               </div>
             }
           </hlm-scroll-area>
         </div>
-        <div class="flex flex-col gap-4">
+        <div class="w-full lg:w-[45%] flex flex-col gap-4 mx-4">
           <h2 class="text-xl font-semibold">Open Pullrequests</h2>
-          <hlm-scroll-area class="w-[510px] h-[400px]">
+          <hlm-scroll-area class="h-[400px]">
             @if (userData.pullRequests) {
               @for (pullRequest of userData.pullRequests; track pullRequest.id) {
                 @if (pullRequest.number && pullRequest.title && pullRequest.state && userData.activity && pullRequest.createdAt) {
-                  <app-issue-card
-                    class="w-[500px] my-2"
-                    [additions]="pullRequest.additions ?? 0"
-                    [deletions]="pullRequest.deletions ?? 0"
-                    [number]="pullRequest.number"
-                    [repositoryName]="pullRequest.repository?.name ?? ''"
-                    [title]="pullRequest.title"
-                    [url]="pullRequest.url ?? pullRequest.repository?.url ?? ''"
-                    [state]="pullRequest.state"
-                    [createdAt]="pullRequest.createdAt"
-                    [pullRequestLabels]="pullRequest.labels"
-                    [reviews]="userData.activity"
-                  />
+                  <div class="mr-2.5">
+                    <app-issue-card
+                      class="w-full my-2"
+                      [additions]="pullRequest.additions ?? 0"
+                      [deletions]="pullRequest.deletions ?? 0"
+                      [number]="pullRequest.number"
+                      [repositoryName]="pullRequest.repository?.name ?? ''"
+                      [title]="pullRequest.title"
+                      [url]="pullRequest.url ?? pullRequest.repository?.url ?? ''"
+                      [state]="pullRequest.state"
+                      [createdAt]="pullRequest.createdAt"
+                      [pullRequestLabels]="pullRequest.labels"
+                      [reviews]="userData.activity"
+                    />
+                  </div>
                 }
               }
             } @else {
-              <div class="w-[510px] flex justify-center items-center gap-4 border border-border bg-card hover:bg-accent hover:text-accent-foreground rounded-lg p-4 my-2">
+              <div class="w-full flex justify-center items-center gap-4 border border-border bg-card hover:bg-accent hover:text-accent-foreground rounded-lg p-4 my-2">
                 <lucide-angular [img]="Info" class="text-muted-foreground" />
                 <span class="text-muted-foreground font-normal text-sm">No open pullrequests found</span>
               </div>
