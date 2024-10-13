@@ -32,11 +32,11 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 import de.tum.in.www1.hephaestus.gitprovider.issuecomment.IssueComment;
-import de.tum.in.www1.hephaestus.gitprovider.issuecomment.IssueCommentConverter;
 import de.tum.in.www1.hephaestus.gitprovider.issuecomment.IssueCommentRepository;
+import de.tum.in.www1.hephaestus.gitprovider.issuecomment.github.GitHubIssueCommentConverter;
 import de.tum.in.www1.hephaestus.gitprovider.pullrequest.PullRequest;
-import de.tum.in.www1.hephaestus.gitprovider.pullrequest.PullRequestConverter;
 import de.tum.in.www1.hephaestus.gitprovider.pullrequest.PullRequestRepository;
+import de.tum.in.www1.hephaestus.gitprovider.pullrequest.github.GitHubPullRequestConverter;
 import de.tum.in.www1.hephaestus.gitprovider.pullrequestreview.PullRequestReview;
 import de.tum.in.www1.hephaestus.gitprovider.pullrequestreview.PullRequestReviewConverter;
 import de.tum.in.www1.hephaestus.gitprovider.pullrequestreview.PullRequestReviewRepository;
@@ -76,11 +76,11 @@ public class GitHubDataSyncService {
     @Autowired
     private RepositoryConverter repositoryConverter;
     @Autowired
-    private PullRequestConverter pullRequestConverter;
+    private GitHubPullRequestConverter pullRequestConverter;
     @Autowired
     private PullRequestReviewConverter reviewConverter;
     @Autowired
-    private IssueCommentConverter commentConverter;
+    private GitHubIssueCommentConverter commentConverter;
     @Autowired
     private PullRequestReviewCommentConverter reviewCommentConverter;
     @Autowired

@@ -4,78 +4,80 @@ import java.time.OffsetDateTime;
 import java.util.HashSet;
 import java.util.Set;
 
-import jakarta.persistence.*;
 import org.springframework.lang.NonNull;
 
-import de.tum.in.www1.hephaestus.gitprovider.base.BaseGitServiceEntity;
-import de.tum.in.www1.hephaestus.gitprovider.issuecomment.IssueComment;
-import de.tum.in.www1.hephaestus.gitprovider.pullrequestreview.PullRequestReview;
-import de.tum.in.www1.hephaestus.gitprovider.repository.Repository;
-import de.tum.in.www1.hephaestus.gitprovider.user.User;
+import jakarta.persistence.Entity;
+import jakarta.persistence.DiscriminatorValue;
+import jakarta.persistence.ManyToOne;
+import jakarta.persistence.OneToMany;
+import jakarta.persistence.JoinColumn;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 import lombok.ToString;
 
+import de.tum.in.www1.hephaestus.gitprovider.base.BaseGitServiceEntity;
+import de.tum.in.www1.hephaestus.gitprovider.pullrequestreview.PullRequestReview;
+import de.tum.in.www1.hephaestus.gitprovider.pullrequestreviewcomment.PullRequestReviewComment;
+import de.tum.in.www1.hephaestus.gitprovider.user.User;
+
 @Entity
-@Table(name = "pull_request")
+@DiscriminatorValue(value = "PULL_REQUEST")
 @Getter
 @Setter
 @NoArgsConstructor
 @ToString(callSuper = true)
 public class PullRequest extends BaseGitServiceEntity {
 
-    private int number;
+    private OffsetDateTime mergedAt;
+
+    private String mergeCommitSha;
+
+    private boolean draft;
+
+    private boolean merged;
+
+    private Boolean mergeable;
+
+    private Boolean rebaseable;
 
     @NonNull
-    private String title;
+    private String mergeable_state;
 
-    @NonNull
-    private String url;
-
-    /**
-     * State of the PullRequest.
-     * Does not include the state of the merge.
-     */
-    @NonNull
-    private IssueState state;
-
-    private int additions;
-
-    private int deletions;
-
+    // Indicates whether maintainers can modify the pull request.
+    private boolean maintainerCanModify;
+    
     private int commits;
+    
+    private int additions;
+    
+    private int deletions;
 
     private int changedFiles;
 
-    private OffsetDateTime mergedAt;
-
-    @ManyToOne(fetch = FetchType.EAGER)
-    @JoinColumn(name = "author_id")
+    @ManyToOne
+    @JoinColumn(name = "merged_by_id")
     @ToString.Exclude
-    private User author;
+    private User mergedBy;
 
-    @OneToMany(cascade = CascadeType.ALL, mappedBy = "pullRequest")
+    @ManyToOne
+    @JoinColumn(name = "requested_reviewer_id")
     @ToString.Exclude
-    private Set<IssueComment> comments = new HashSet<>();
+    private Set<User> requestedReviewers = new HashSet<>();
 
-    @OneToMany(cascade = CascadeType.REFRESH, mappedBy = "pullRequest")
+    @OneToMany(mappedBy = "pullRequest")
     @ToString.Exclude
     private Set<PullRequestReview> reviews = new HashSet<>();
 
-    @ManyToOne
-    @JoinColumn(name = "repository_id", referencedColumnName = "id")
+    @OneToMany(mappedBy = "pullRequest")
     @ToString.Exclude
-    private Repository repository;
-
-    @ElementCollection
-    private Set<PullRequestLabel> pullRequestLabels = new HashSet<>();
-
-    public void addComment(IssueComment comment) {
-        comments.add(comment);
-    }
-
-    public void addReview(PullRequestReview review) {
-        reviews.add(review);
-    }
+    private Set<PullRequestReviewComment> reviewComments = new HashSet<>();
+    
+    // Ignored GitHub properties:
+    // - head -> "label", "ref", "repo", "sha", "user"
+    // - base -> "label", "ref", "repo", "sha", "user"
+    // - auto_merge
+    // - requested_teams
+    // - comments (cached number)
+    // - review_comments (cached number)
 }

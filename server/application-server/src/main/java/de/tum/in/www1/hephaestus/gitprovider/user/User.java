@@ -7,19 +7,22 @@ import java.util.Set;
 
 import org.springframework.lang.NonNull;
 
-import de.tum.in.www1.hephaestus.gitprovider.base.BaseGitServiceEntity;
-import de.tum.in.www1.hephaestus.gitprovider.issuecomment.IssueComment;
-import de.tum.in.www1.hephaestus.gitprovider.pullrequest.PullRequest;
-import de.tum.in.www1.hephaestus.gitprovider.pullrequestreview.PullRequestReview;
-import de.tum.in.www1.hephaestus.gitprovider.pullrequestreviewcomment.PullRequestReviewComment;
-import jakarta.persistence.CascadeType;
-import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
+import jakarta.persistence.ManyToMany;
 import jakarta.persistence.OneToMany;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 import lombok.ToString;
+
+import de.tum.in.www1.hephaestus.gitprovider.base.BaseGitServiceEntity;
+import de.tum.in.www1.hephaestus.gitprovider.issue.Issue;
+import de.tum.in.www1.hephaestus.gitprovider.issuecomment.IssueComment;
+import de.tum.in.www1.hephaestus.gitprovider.pullrequest.PullRequest;
+import de.tum.in.www1.hephaestus.gitprovider.pullrequestreview.PullRequestReview;
+import de.tum.in.www1.hephaestus.gitprovider.pullrequestreviewcomment.PullRequestReviewComment;
 
 @Entity
 @Table(name = "user", schema = "public")
@@ -28,66 +31,88 @@ import lombok.ToString;
 @NoArgsConstructor
 @ToString(callSuper = true)
 public class User extends BaseGitServiceEntity {
-    /**
-     * Unique login identifier for a user.
-     */
+
     @NonNull
     private String login;
 
-    @Column
-    private String email;
-
-    /**
-     * Display name of the user.
-     */
-    @Column
-    private String name;
-
-    /**
-     * Unique URL to the user's profile.
-     * Not the website a user can set in their profile.
-     */
     @NonNull
-    private String url;
-
-    /**
-     * URL to the user's avatar.
-     * If unavailable, a fallback can be generated from the login, e.g. on Github:
-     * https://github.com/{login}.png
-     */
     private String avatarUrl;
 
-    /**
-     * Type of the user. Used to distinguish between users and bots.
-     */
+    // AKA bio
+    private String description;
+
+    private String name;
+
+    private String company;
+
+    // Url
+    private String blog;
+
+    private String location;
+
+    private String email;
+
     @NonNull
+    private String htmlUrl;
+    
+    @NonNull
+    @Enumerated(EnumType.STRING)
     private UserType type;
 
-    @OneToMany(cascade = CascadeType.ALL, mappedBy = "author")
-    private Set<PullRequest> pullRequests = new HashSet<>();
+    private int followers;
 
-    @OneToMany(cascade = CascadeType.ALL, mappedBy = "author")
+    private int following;
+
+    private int collaborators;
+
+    private int totalPrivateRepos;
+
+    private int ownedPrivateRepos;
+
+    private int publicRepos;
+
+    private int publicGists;
+
+    private int privateGists;
+
+    @OneToMany(mappedBy = "author")
+    @ToString.Exclude
+    private Set<Issue> createdIssues = new HashSet<>();
+    
+    @ManyToMany(mappedBy = "assignees")
+    @ToString.Exclude
+    private Set<Issue> assignedIssues = new HashSet<>();
+    
+    @OneToMany(mappedBy = "closedBy")
+    @ToString.Exclude
+    private Set<Issue> closedIssues = new HashSet<>();
+    
+    @OneToMany(mappedBy = "author")
+    @ToString.Exclude
     private Set<IssueComment> issueComments = new HashSet<>();
-
-    @OneToMany(cascade = CascadeType.ALL, mappedBy = "author")
-    private Set<PullRequestReviewComment> reviewComments = new HashSet<>();
-
-    @OneToMany(cascade = CascadeType.ALL, mappedBy = "author")
+    
+    @OneToMany(mappedBy = "mergedBy")
+    @ToString.Exclude
+    private Set<PullRequest> mergedPullRequests = new HashSet<>();
+    
+    @OneToMany(mappedBy = "requestedReviewers")
+    @ToString.Exclude
+    private Set<PullRequest> requestedPullRequestReviews = new HashSet<>();
+    
+    @OneToMany(mappedBy = "author")
+    @ToString.Exclude
     private Set<PullRequestReview> reviews = new HashSet<>();
-
-    public void addIssueComment(IssueComment comment) {
-        issueComments.add(comment);
-    }
-
-    public void addReviewComment(PullRequestReviewComment comment) {
-        reviewComments.add(comment);
-    }
-
-    public void addPullRequest(PullRequest pullRequest) {
-        pullRequests.add(pullRequest);
-    }
-
-    public void addReview(PullRequestReview review) {
-        reviews.add(review);
-    }
+    
+    @OneToMany(mappedBy = "author")
+    @ToString.Exclude
+    private Set<PullRequestReviewComment> reviewComments = new HashSet<>();
+    
+    // Ignored GitHub properties:
+    // - is_verified (org?)
+    // - disk_usage
+    // - suspended_at (user)
+    // - twitter_username
+    // - billing_email (org)
+    // - has_organization_projects (org)
+    // - has_repository_projects (org)
 }

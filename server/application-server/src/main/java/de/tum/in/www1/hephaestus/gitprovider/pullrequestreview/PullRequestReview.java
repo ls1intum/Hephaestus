@@ -6,13 +6,10 @@ import java.util.Set;
 
 import org.springframework.lang.NonNull;
 
-import de.tum.in.www1.hephaestus.gitprovider.base.BaseGitServiceEntity;
-import de.tum.in.www1.hephaestus.gitprovider.pullrequest.PullRequest;
-import de.tum.in.www1.hephaestus.gitprovider.pullrequestreviewcomment.PullRequestReviewComment;
-import de.tum.in.www1.hephaestus.gitprovider.user.User;
-import jakarta.persistence.CascadeType;
 import jakarta.persistence.Entity;
-import jakarta.persistence.FetchType;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
+import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.OneToMany;
@@ -22,34 +19,52 @@ import lombok.NoArgsConstructor;
 import lombok.Setter;
 import lombok.ToString;
 
+import de.tum.in.www1.hephaestus.gitprovider.base.AuthorAssociation;
+import de.tum.in.www1.hephaestus.gitprovider.pullrequest.PullRequest;
+import de.tum.in.www1.hephaestus.gitprovider.pullrequestreviewcomment.PullRequestReviewComment;
+import de.tum.in.www1.hephaestus.gitprovider.user.User;
+
 @Entity
 @Table(name = "pull_request_review")
 @Getter
 @Setter
 @NoArgsConstructor
-@ToString(callSuper = true)
-public class PullRequestReview extends BaseGitServiceEntity {
+public class PullRequestReview {
 
-    @ManyToOne(fetch = FetchType.EAGER)
+    @Id
+    protected Long id;
+   
+    // Note: This entity does not have a createdAt and updatedAt field
+
+    @NonNull
+    private String body;
+    
+    @Enumerated(EnumType.STRING)
+    private PullRequestReviewState state;
+
+    @NonNull
+    private String htmlUrl;
+
+    @NonNull
+    private OffsetDateTime submittedAt;
+
+    @NonNull
+    @Enumerated(EnumType.STRING)
+    private AuthorAssociation authorAssociation;    
+
+    private String commitId;
+
+    @ManyToOne
     @JoinColumn(name = "author_id")
     @ToString.Exclude
     private User author;
 
-    @NonNull
-    private PullRequestReviewState state;
-
-    private OffsetDateTime submittedAt;
-
-    @OneToMany(cascade = CascadeType.REFRESH, mappedBy = "review")
-    @ToString.Exclude
-    private Set<PullRequestReviewComment> comments = new HashSet<>();
-
-    @ManyToOne(fetch = FetchType.EAGER)
-    @JoinColumn(name = "pullrequest_id", referencedColumnName = "id")
+    @ManyToOne
+    @JoinColumn(name = "pull_request_id")
     @ToString.Exclude
     private PullRequest pullRequest;
-
-    public void addComment(PullRequestReviewComment comment) {
-        comments.add(comment);
-    }
+    
+    @OneToMany(mappedBy = "review")
+    @ToString.Exclude
+    private Set<PullRequestReviewComment> comments = new HashSet<>();
 }

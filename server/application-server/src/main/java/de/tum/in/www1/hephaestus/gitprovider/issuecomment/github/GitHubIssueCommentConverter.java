@@ -1,4 +1,4 @@
-package de.tum.in.www1.hephaestus.gitprovider.issuecomment;
+package de.tum.in.www1.hephaestus.gitprovider.issuecomment.github;
 
 import org.kohsuke.github.GHIssueComment;
 import org.slf4j.Logger;
@@ -7,11 +7,12 @@ import org.springframework.lang.NonNull;
 import org.springframework.stereotype.Component;
 
 import de.tum.in.www1.hephaestus.gitprovider.base.BaseGitServiceEntityConverter;
+import de.tum.in.www1.hephaestus.gitprovider.issuecomment.IssueComment;
 
 @Component
-public class IssueCommentConverter extends BaseGitServiceEntityConverter<GHIssueComment, IssueComment> {
+public class GitHubIssueCommentConverter extends BaseGitServiceEntityConverter<GHIssueComment, IssueComment> {
 
-    protected static final Logger logger = LoggerFactory.getLogger(IssueCommentConverter.class);
+    protected static final Logger logger = LoggerFactory.getLogger(GitHubIssueCommentConverter.class);
 
     @Override
     public IssueComment convert(@NonNull GHIssueComment source) {

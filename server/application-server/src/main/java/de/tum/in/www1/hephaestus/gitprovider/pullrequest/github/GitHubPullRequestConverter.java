@@ -1,4 +1,4 @@
-package de.tum.in.www1.hephaestus.gitprovider.pullrequest;
+package de.tum.in.www1.hephaestus.gitprovider.pullrequest.github;
 
 import java.io.IOException;
 import java.util.Collection;
@@ -13,11 +13,14 @@ import org.springframework.lang.NonNull;
 import org.springframework.stereotype.Component;
 
 import de.tum.in.www1.hephaestus.gitprovider.base.BaseGitServiceEntityConverter;
+import de.tum.in.www1.hephaestus.gitprovider.issue.IssueState;
+import de.tum.in.www1.hephaestus.gitprovider.label.Label;
+import de.tum.in.www1.hephaestus.gitprovider.pullrequest.PullRequest;
 
 @Component
-public class PullRequestConverter extends BaseGitServiceEntityConverter<GHPullRequest, PullRequest> {
+public class GitHubPullRequestConverter extends BaseGitServiceEntityConverter<GHPullRequest, PullRequest> {
 
-    protected static final Logger logger = LoggerFactory.getLogger(PullRequestConverter.class);
+    protected static final Logger logger = LoggerFactory.getLogger(GitHubPullRequestConverter.class);
 
     @Override
     public PullRequest convert(@NonNull GHPullRequest source) {
@@ -75,10 +78,10 @@ public class PullRequestConverter extends BaseGitServiceEntityConverter<GHPullRe
         }
     }
 
-    private Set<PullRequestLabel> convertLabels(Collection<GHLabel> labels) {
-        Set<PullRequestLabel> pullRequestLabels = new HashSet<>();
+    private Set<Label> convertLabels(Collection<GHLabel> labels) {
+        Set<Label> pullRequestLabels = new HashSet<>();
         for (GHLabel label : labels) {
-            PullRequestLabel pullRequestLabel = new PullRequestLabel();
+            Label pullRequestLabel = new Label();
             pullRequestLabel.setName(label.getName());
             pullRequestLabel.setColor(label.getColor());
             pullRequestLabels.add(pullRequestLabel);

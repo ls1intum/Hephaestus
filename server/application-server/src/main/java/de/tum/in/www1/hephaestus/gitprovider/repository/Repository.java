@@ -2,20 +2,22 @@ package de.tum.in.www1.hephaestus.gitprovider.repository;
 
 import java.util.HashSet;
 import java.util.Set;
+import java.time.OffsetDateTime;
 
 import org.springframework.lang.NonNull;
 
-import de.tum.in.www1.hephaestus.gitprovider.base.BaseGitServiceEntity;
-import de.tum.in.www1.hephaestus.gitprovider.pullrequest.PullRequest;
-import io.micrometer.common.lang.Nullable;
-import jakarta.persistence.CascadeType;
 import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
 import jakarta.persistence.OneToMany;
 import jakarta.persistence.Table;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 import lombok.ToString;
+
+import de.tum.in.www1.hephaestus.gitprovider.base.BaseGitServiceEntity;
+import de.tum.in.www1.hephaestus.gitprovider.issue.Issue;
 
 @Entity
 @Table(name = "repository")
@@ -24,31 +26,82 @@ import lombok.ToString;
 @NoArgsConstructor
 @ToString(callSuper = true)
 public class Repository extends BaseGitServiceEntity {
+
     @NonNull
     private String name;
 
     @NonNull
     private String nameWithOwner;
 
-    @Nullable
+    // Whether the repository is private or public.
+    private boolean isPrivate;
+
+    @NonNull
+    private String htmlUrl;
+
     private String description;
 
-    @NonNull
-    String defaultBranch;
+    private String homepage;
 
     @NonNull
+    private OffsetDateTime pushedAt;
+
+    private boolean archived;
+
+    // Returns whether or not this repository disabled.
+    private boolean isDisabled;
+
+    @NonNull
+    @Enumerated(EnumType.STRING)
     private RepositoryVisibility visibility;
 
+    private int stargazersCount;
+
+    private int watchersCount;
+
+    private int subscribersCount;
+
     @NonNull
-    private String url;
+    private String defaultBranch;
 
-    String homepage;
+    private boolean hasIssues;
 
-    @OneToMany(cascade = CascadeType.REFRESH, mappedBy = "repository")
+    private boolean hasProjects;
+
+    private boolean hasWiki;
+
+    private boolean hasPages;
+
+    private boolean hasDownloads;
+
+    private boolean hasDiscussions;
+
+    @OneToMany(mappedBy = "repository")
     @ToString.Exclude
-    private Set<PullRequest> pullRequests = new HashSet<>();
+    private Set<Issue> issues = new HashSet<>();
 
-    public void addPullRequest(PullRequest pullRequest) {
-        pullRequests.add(pullRequest);
-    }
+    // TODO:
+    // owner
+    // organization
+    
+    // Ignored GitHub properties:
+    // - topics
+    // - size
+    // - fork
+    // - forks_count
+    // - default_branch
+    // - open_issues_count (cached number)
+    // - is_template
+    // - permissions
+    // - allow_rebase_merge
+    // - template_repository
+    // - allow_squash_merge
+    // - allow_auto_merge
+    // - delete_branch_on_merge
+    // - allow_merge_commit
+    // - allow_forking
+    // - network_count
+    // - license
+    // - parent
+    // - source
 }
