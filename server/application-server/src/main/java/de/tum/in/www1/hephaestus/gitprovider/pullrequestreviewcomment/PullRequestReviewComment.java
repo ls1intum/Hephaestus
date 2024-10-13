@@ -6,6 +6,7 @@ import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
 import jakarta.persistence.JoinColumn;
+import jakarta.persistence.Lob;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
 import lombok.Getter;
@@ -43,6 +44,7 @@ public class PullRequestReviewComment extends BaseGitServiceEntity {
     @NonNull
     private String originalCommitId;
 
+    @Lob
     @NonNull
     private String body;
 

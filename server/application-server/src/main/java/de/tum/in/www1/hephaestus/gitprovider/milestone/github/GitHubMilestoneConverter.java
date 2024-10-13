@@ -8,6 +8,7 @@ import org.springframework.lang.NonNull;
 import org.springframework.stereotype.Component;
 
 import de.tum.in.www1.hephaestus.gitprovider.common.BaseGitServiceEntityConverter;
+import de.tum.in.www1.hephaestus.gitprovider.common.DateUtil;
 import de.tum.in.www1.hephaestus.gitprovider.milestone.Milestone;
 
 @Component
@@ -28,9 +29,9 @@ public class GitHubMilestoneConverter extends BaseGitServiceEntityConverter<GHMi
         milestone.setHtmlUrl(source.getHtmlUrl().toString());
         milestone.setTitle(source.getTitle());
         milestone.setDescription(source.getDescription());
-        milestone.setDueOn(convertToOffsetDateTime(source.getDueOn()));
+        milestone.setDueOn(DateUtil.convertToOffsetDateTime(source.getDueOn()));
         try {
-            milestone.setClosedAt(convertToOffsetDateTime(source.getClosedAt()));
+            milestone.setClosedAt(DateUtil.convertToOffsetDateTime(source.getClosedAt()));
         } catch (Exception e) {
             logger.error("Failed to convert closedAt field for source {}: {}", source.getId(), e.getMessage());
         }

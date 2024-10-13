@@ -8,6 +8,7 @@ import org.springframework.lang.NonNull;
 import org.springframework.stereotype.Component;
 
 import de.tum.in.www1.hephaestus.gitprovider.common.BaseGitServiceEntityConverter;
+import de.tum.in.www1.hephaestus.gitprovider.common.DateUtil;
 import de.tum.in.www1.hephaestus.gitprovider.repository.Repository;
 
 @Component
@@ -29,7 +30,7 @@ public class GitHubRepositoryConverter extends BaseGitServiceEntityConverter<GHR
         repository.setHtmlUrl(source.getHtmlUrl().toString());
         repository.setDescription(source.getDescription());
         repository.setHomepage(source.getHomepage());
-        repository.setPushedAt(convertToOffsetDateTime(source.getPushedAt()));
+        repository.setPushedAt(DateUtil.convertToOffsetDateTime(source.getPushedAt()));
         repository.setArchived(source.isArchived());
         repository.setDisabled(source.isDisabled());
         repository.setVisibility(convertVisibility(source.getVisibility()));

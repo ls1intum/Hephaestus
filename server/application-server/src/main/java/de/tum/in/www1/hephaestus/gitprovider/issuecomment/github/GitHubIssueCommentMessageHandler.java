@@ -19,7 +19,7 @@ public class GitHubIssueCommentMessageHandler extends GitHubMessageHandler<GHEve
 
     @Override
     protected void handleEvent(GHEventPayload.IssueComment eventPayload) {
-        logger.info("Received issue comment event: {}", eventPayload);
+        // logger.info("Received issue comment event: {}", eventPayload);
     }
 
     @Override

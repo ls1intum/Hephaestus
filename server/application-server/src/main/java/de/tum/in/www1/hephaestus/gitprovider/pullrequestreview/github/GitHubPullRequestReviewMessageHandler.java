@@ -19,7 +19,7 @@ public class GitHubPullRequestReviewMessageHandler extends GitHubMessageHandler<
 
     @Override
     protected void handleEvent(GHEventPayload.PullRequestReview eventPayload) {
-        logger.info("Received pull request review event: {}", eventPayload);
+        // logger.info("Received pull request review event: {}", eventPayload);
     }
 
     @Override

@@ -9,6 +9,7 @@ import org.springframework.lang.NonNull;
 import org.springframework.stereotype.Component;
 
 import de.tum.in.www1.hephaestus.gitprovider.common.BaseGitServiceEntityConverter;
+import de.tum.in.www1.hephaestus.gitprovider.common.DateUtil;
 import de.tum.in.www1.hephaestus.gitprovider.issue.github.GitHubIssueConverter;
 import de.tum.in.www1.hephaestus.gitprovider.pullrequest.PullRequest;
 
@@ -32,7 +33,7 @@ public class GitHubPullRequestConverter extends BaseGitServiceEntityConverter<GH
     public PullRequest update(@NonNull GHPullRequest source, @NonNull PullRequest pullRequest) {
         issueConverter.update(source, pullRequest);
 
-        pullRequest.setMergedAt(convertToOffsetDateTime(source.getMergedAt()));
+        pullRequest.setMergedAt(DateUtil.convertToOffsetDateTime(source.getMergedAt()));
         try {
             pullRequest.setMergeCommitSha(source.getMergeCommitSha());
         } catch (IOException e) {

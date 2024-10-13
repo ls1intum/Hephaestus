@@ -20,7 +20,7 @@ public class GitHubPullRequestReviewCommentMessageHandler
 
     @Override
     protected void handleEvent(GHEventPayload.PullRequestReviewComment eventPayload) {
-        logger.info("Received pull request review comment event: {}", eventPayload);
+        // logger.info("Received pull request review comment event: {}", eventPayload);
     }
 
     @Override

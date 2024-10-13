@@ -19,7 +19,7 @@ public class GitHubIssueMessageHandler extends GitHubMessageHandler<GHEventPaylo
 
     @Override
     protected void handleEvent(GHEventPayload.Issue eventPayload) {
-        logger.info("Received issue event: {}", eventPayload);
+        // logger.info("Received issue event: {}", eventPayload);
     }
 
     @Override

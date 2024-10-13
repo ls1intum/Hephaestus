@@ -13,13 +13,19 @@ public class GitHubPullRequestMessageHandler extends GitHubMessageHandler<GHEven
 
     private static final Logger logger = LoggerFactory.getLogger(GitHubPullRequestMessageHandler.class);
 
-    private GitHubPullRequestMessageHandler() {
+    private final GitHubPullRequestSyncService pullRequestSyncService;
+
+    private GitHubPullRequestMessageHandler(GitHubPullRequestSyncService pullRequestSyncService) {
         super(GHEventPayload.PullRequest.class);
+        this.pullRequestSyncService = pullRequestSyncService;
     }
 
     @Override
     protected void handleEvent(GHEventPayload.PullRequest eventPayload) {
-        logger.info("Received pull request event: {}", eventPayload);
+        logger.info("Received pull request event for number: {}, action: {}", eventPayload.getNumber(),
+                eventPayload.getAction());
+        // TODO: REPO
+        pullRequestSyncService.processPullRequest(eventPayload.getPullRequest());
     }
 
     @Override

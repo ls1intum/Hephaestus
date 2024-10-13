@@ -7,6 +7,7 @@ import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
 import jakarta.persistence.JoinColumn;
+import jakarta.persistence.Lob;
 import jakarta.persistence.ManyToOne;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
@@ -26,6 +27,7 @@ import de.tum.in.www1.hephaestus.gitprovider.user.User;
 @ToString(callSuper = true)
 public class IssueComment extends BaseGitServiceEntity {
 
+    @Lob
     @NonNull
     private String body;
 

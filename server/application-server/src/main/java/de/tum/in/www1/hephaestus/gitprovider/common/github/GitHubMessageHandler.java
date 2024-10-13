@@ -20,9 +20,6 @@ public abstract class GitHubMessageHandler<T extends GHEventPayload> implements 
 
     private static final Logger logger = LoggerFactory.getLogger(GitHubMessageHandler.class);
 
-    @Autowired
-    private GitHub gitHub;
-
     private final Class<T> payloadType;
 
     protected GitHubMessageHandler(Class<T> payloadType) {
@@ -39,10 +36,9 @@ public abstract class GitHubMessageHandler<T extends GHEventPayload> implements 
         }
 
         String payload = new String(msg.getData(), StandardCharsets.UTF_8);
-        logger.info("Received message on subject {}: {}", subject, payload);
 
         try (StringReader reader = new StringReader(payload)) {
-            T eventPayload = gitHub.parseEventPayload(reader, payloadType);
+            T eventPayload = GitHub.offline().parseEventPayload(reader, payloadType);
             handleEvent(eventPayload);
         } catch (IOException e) {
             logger.error("Failed to parse payload for subject {}: {}", subject, e.getMessage(), e);

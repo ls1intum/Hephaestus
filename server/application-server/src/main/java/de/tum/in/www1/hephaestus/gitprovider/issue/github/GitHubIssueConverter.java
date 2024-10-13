@@ -6,6 +6,7 @@ import org.springframework.lang.NonNull;
 import org.springframework.stereotype.Component;
 
 import de.tum.in.www1.hephaestus.gitprovider.common.BaseGitServiceEntityConverter;
+import de.tum.in.www1.hephaestus.gitprovider.common.DateUtil;
 import de.tum.in.www1.hephaestus.gitprovider.issue.Issue;
 
 @Component
@@ -25,7 +26,7 @@ public class GitHubIssueConverter extends BaseGitServiceEntityConverter<GHIssue,
         issue.setBody(source.getBody());
         issue.setHtmlUrl(source.getHtmlUrl().toString());
         issue.setLocked(source.isLocked());
-        issue.setClosedAt(convertToOffsetDateTime(source.getClosedAt()));
+        issue.setClosedAt(DateUtil.convertToOffsetDateTime(source.getClosedAt()));
         return issue;
     }
 

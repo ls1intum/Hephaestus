@@ -28,21 +28,17 @@ public abstract class BaseGitServiceEntityConverter<S extends GHObject, T extend
         target.setId(source.getId());
 
         try {
-            target.setCreatedAt(convertToOffsetDateTime(source.getCreatedAt()));
+            target.setCreatedAt(DateUtil.convertToOffsetDateTime(source.getCreatedAt()));
         } catch (IOException e) {
             logger.error("Failed to convert createdAt field for source {}: {}", source.getId(), e.getMessage());
             target.setCreatedAt(null);
         }
 
         try {
-            target.setUpdatedAt(convertToOffsetDateTime(source.getUpdatedAt()));
+            target.setUpdatedAt(DateUtil.convertToOffsetDateTime(source.getUpdatedAt()));
         } catch (IOException e) {
             logger.error("Failed to convert updatedAt field for source {}: {}", source.getId(), e.getMessage());
             target.setUpdatedAt(null);
         }
-    }
-
-    protected OffsetDateTime convertToOffsetDateTime(Date date) {
-        return date != null ? date.toInstant().atOffset(ZoneOffset.UTC) : null;
     }
 }
