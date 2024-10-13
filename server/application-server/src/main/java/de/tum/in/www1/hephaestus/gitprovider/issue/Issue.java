@@ -26,7 +26,6 @@ import lombok.NoArgsConstructor;
 import lombok.Setter;
 import lombok.ToString;
 
-import de.tum.in.www1.hephaestus.gitprovider.base.AuthorAssociation;
 import de.tum.in.www1.hephaestus.gitprovider.base.BaseGitServiceEntity;
 import de.tum.in.www1.hephaestus.gitprovider.issuecomment.IssueComment;
 import de.tum.in.www1.hephaestus.gitprovider.label.Label;
@@ -49,7 +48,7 @@ public class Issue extends BaseGitServiceEntity {
 
     @NonNull
     @Enumerated(EnumType.STRING)
-    private IssueState state;
+    private Issue.State state;
 
     @NonNull
     private String title;
@@ -59,13 +58,9 @@ public class Issue extends BaseGitServiceEntity {
     @NonNull    
     private String htmlUrl;
 
-    private boolean locked;
+    private boolean isLocked;
 
     private OffsetDateTime closedAt;
-
-    @NonNull
-    @Enumerated(EnumType.STRING)
-    private AuthorAssociation authorAssociation;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "author_id")
@@ -100,7 +95,12 @@ public class Issue extends BaseGitServiceEntity {
     @ToString.Exclude
     private Set<IssueComment> comments = new HashSet<>();
 
+    public enum State {
+        OPEN, CLOSED
+    }
+
     // Ignored GitHub properties:
+    // - author_association (not provided by our GitHub API client)
     // - state_reason
     // - reactions
     // - active_lock_reason

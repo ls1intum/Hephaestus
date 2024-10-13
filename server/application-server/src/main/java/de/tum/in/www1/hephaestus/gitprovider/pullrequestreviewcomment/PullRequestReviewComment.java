@@ -60,7 +60,7 @@ public class PullRequestReviewComment extends BaseGitServiceEntity {
 
     // The side of the first line of the range for a multi-line comment.
     @Enumerated(EnumType.STRING)
-    private PullRequestReviewCommentSide startSide;
+    private PullRequestReviewComment.Side startSide;
 
     // The line of the blob to which the comment applies. The last line of the range for a multi-line comment
     private int line;
@@ -71,18 +71,13 @@ public class PullRequestReviewComment extends BaseGitServiceEntity {
     // The side of the diff to which the comment applies. The side of the last line of the range for a multi-line comment
     @NonNull
     @Enumerated(EnumType.STRING)
-    private PullRequestReviewCommentSide side;
+    private PullRequestReviewComment.Side side;
 
     // The line index in the diff to which the comment applies. This field is deprecated; use `line` instead.
     private int position;
 
     // The index of the original line in the diff to which the comment applies. This field is deprecated; use `original_line` instead.
     private int originalPosition;
-
-    // The level at which the comment is targeted, can be a diff line or a file.
-    @NonNull
-    @Enumerated(EnumType.STRING)
-    private PullRequestReviewCommentSubjectType subjectType;
 
     @ManyToOne
     @JoinColumn(name = "author_id")
@@ -98,4 +93,11 @@ public class PullRequestReviewComment extends BaseGitServiceEntity {
     @JoinColumn(name = "pull_request_id")
     @ToString.Exclude
     private PullRequestReview pullRequest;
+
+    public enum Side {
+        LEFT, RIGHT
+    }
+
+    // Ignored GitHub properties:
+    // - subject_type (FILE, LINE is not supported by our API client)
 }

@@ -23,7 +23,6 @@ import de.tum.in.www1.hephaestus.gitprovider.pullrequest.PullRequest;
 import de.tum.in.www1.hephaestus.gitprovider.pullrequestreview.PullRequestReviewDTO;
 import de.tum.in.www1.hephaestus.gitprovider.user.User;
 import de.tum.in.www1.hephaestus.gitprovider.user.UserService;
-import de.tum.in.www1.hephaestus.gitprovider.user.UserType;
 
 @Service
 public class LeaderboardService {
@@ -52,7 +51,7 @@ public class LeaderboardService {
 
         List<LeaderboardEntry> leaderboard = users.stream().map(user -> {
             // ignore non-users, e.g. bots
-            if (user.getType() != UserType.USER) {
+            if (user.getType() != User.Type.USER) {
                 return null;
             }
             AtomicInteger score = new AtomicInteger(0);
@@ -67,8 +66,7 @@ public class LeaderboardService {
                             return;
                         }
 
-                        PullRequestReviewDTO reviewDTO = new PullRequestReviewDTO(review.getId(), review.getCreatedAt(),
-                                review.getUpdatedAt(), review.getSubmittedAt(), review.getState());
+                        PullRequestReviewDTO reviewDTO = new PullRequestReviewDTO(review.getId(), review.getSubmittedAt(), review.getState());
 
                         reviewedPRs.add(review.getPullRequest().getNumber());
                         switch (review.getState()) {

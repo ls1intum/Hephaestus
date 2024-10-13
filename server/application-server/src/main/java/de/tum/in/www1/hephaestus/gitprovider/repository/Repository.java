@@ -46,14 +46,14 @@ public class Repository extends BaseGitServiceEntity {
     @NonNull
     private OffsetDateTime pushedAt;
 
-    private boolean archived;
+    private boolean isArchived;
 
     // Returns whether or not this repository disabled.
     private boolean isDisabled;
 
     @NonNull
     @Enumerated(EnumType.STRING)
-    private RepositoryVisibility visibility;
+    private Repository.Visibility visibility;
 
     private int stargazersCount;
 
@@ -70,21 +70,22 @@ public class Repository extends BaseGitServiceEntity {
 
     private boolean hasWiki;
 
-    private boolean hasPages;
-
-    private boolean hasDownloads;
-
-    private boolean hasDiscussions;
-
     @OneToMany(mappedBy = "repository")
     @ToString.Exclude
     private Set<Issue> issues = new HashSet<>();
+
+    public enum Visibility {
+        PUBLIC, PRIVATE, INTERNAL, UNKNOWN
+    }
 
     // TODO:
     // owner
     // organization
     
     // Ignored GitHub properties:
+    // - hasPages
+    // - hasDownloads
+    // - hasDiscussions
     // - topics
     // - size
     // - fork

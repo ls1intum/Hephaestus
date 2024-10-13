@@ -16,7 +16,7 @@ import lombok.NoArgsConstructor;
 import lombok.Setter;
 import lombok.ToString;
 
-import de.tum.in.www1.hephaestus.gitprovider.base.BaseGitServiceEntity;
+import de.tum.in.www1.hephaestus.gitprovider.issue.Issue;
 import de.tum.in.www1.hephaestus.gitprovider.pullrequestreview.PullRequestReview;
 import de.tum.in.www1.hephaestus.gitprovider.pullrequestreviewcomment.PullRequestReviewComment;
 import de.tum.in.www1.hephaestus.gitprovider.user.User;
@@ -27,22 +27,20 @@ import de.tum.in.www1.hephaestus.gitprovider.user.User;
 @Setter
 @NoArgsConstructor
 @ToString(callSuper = true)
-public class PullRequest extends BaseGitServiceEntity {
+public class PullRequest extends Issue {
 
     private OffsetDateTime mergedAt;
 
     private String mergeCommitSha;
 
-    private boolean draft;
+    private boolean isDraft;
 
-    private boolean merged;
+    private boolean isMerged;
 
-    private Boolean mergeable;
-
-    private Boolean rebaseable;
+    private Boolean isMergeable;
 
     @NonNull
-    private String mergeable_state;
+    private String mergeableState;
 
     // Indicates whether maintainers can modify the pull request.
     private boolean maintainerCanModify;
@@ -74,6 +72,7 @@ public class PullRequest extends BaseGitServiceEntity {
     private Set<PullRequestReviewComment> reviewComments = new HashSet<>();
     
     // Ignored GitHub properties:
+    // - rebaseable (not provided by our GitHub API client)
     // - head -> "label", "ref", "repo", "sha", "user"
     // - base -> "label", "ref", "repo", "sha", "user"
     // - auto_merge

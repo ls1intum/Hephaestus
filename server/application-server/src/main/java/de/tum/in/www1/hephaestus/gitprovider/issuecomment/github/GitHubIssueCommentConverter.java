@@ -7,12 +7,17 @@ import org.springframework.lang.NonNull;
 import org.springframework.stereotype.Component;
 
 import de.tum.in.www1.hephaestus.gitprovider.base.BaseGitServiceEntityConverter;
+import de.tum.in.www1.hephaestus.gitprovider.base.github.GitHubAuthorAssociationConverter;
 import de.tum.in.www1.hephaestus.gitprovider.issuecomment.IssueComment;
 
 @Component
 public class GitHubIssueCommentConverter extends BaseGitServiceEntityConverter<GHIssueComment, IssueComment> {
 
-    protected static final Logger logger = LoggerFactory.getLogger(GitHubIssueCommentConverter.class);
+    private final GitHubAuthorAssociationConverter authorAssociationConverter;
+
+    public GitHubIssueCommentConverter(GitHubAuthorAssociationConverter authorAssociationConverter) {
+        this.authorAssociationConverter = authorAssociationConverter;
+    }
 
     @Override
     public IssueComment convert(@NonNull GHIssueComment source) {
@@ -23,6 +28,8 @@ public class GitHubIssueCommentConverter extends BaseGitServiceEntityConverter<G
     public IssueComment update(@NonNull GHIssueComment source, @NonNull IssueComment comment) {
         convertBaseFields(source, comment);
         comment.setBody(source.getBody());
+        comment.setHtmlUrl(source.getHtmlUrl().toString());
+        comment.setAuthorAssociation(authorAssociationConverter.convert(source.getAuthorAssociation()));
         return comment;
     }
 

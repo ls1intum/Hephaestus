@@ -19,7 +19,6 @@ import lombok.NoArgsConstructor;
 import lombok.Setter;
 import lombok.ToString;
 
-import de.tum.in.www1.hephaestus.gitprovider.base.AuthorAssociation;
 import de.tum.in.www1.hephaestus.gitprovider.pullrequest.PullRequest;
 import de.tum.in.www1.hephaestus.gitprovider.pullrequestreviewcomment.PullRequestReviewComment;
 import de.tum.in.www1.hephaestus.gitprovider.user.User;
@@ -40,17 +39,13 @@ public class PullRequestReview {
     private String body;
     
     @Enumerated(EnumType.STRING)
-    private PullRequestReviewState state;
+    private PullRequestReview.State state;
 
     @NonNull
     private String htmlUrl;
 
     @NonNull
     private OffsetDateTime submittedAt;
-
-    @NonNull
-    @Enumerated(EnumType.STRING)
-    private AuthorAssociation authorAssociation;    
 
     private String commitId;
 
@@ -67,4 +62,11 @@ public class PullRequestReview {
     @OneToMany(mappedBy = "review")
     @ToString.Exclude
     private Set<PullRequestReviewComment> comments = new HashSet<>();
+
+    public enum State {
+        COMMENTED, APPROVED, CHANGES_REQUESTED, DISMISSED
+    }
+
+    // Ignored GitHub properties:
+    // - author_association (not provided by our GitHub API client)
 }

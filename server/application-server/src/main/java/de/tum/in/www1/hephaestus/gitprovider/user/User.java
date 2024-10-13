@@ -57,24 +57,12 @@ public class User extends BaseGitServiceEntity {
     
     @NonNull
     @Enumerated(EnumType.STRING)
-    private UserType type;
+    private User.Type type;
 
     private int followers;
 
     private int following;
-
-    private int collaborators;
-
-    private int totalPrivateRepos;
-
-    private int ownedPrivateRepos;
-
-    private int publicRepos;
-
-    private int publicGists;
-
-    private int privateGists;
-
+    
     @OneToMany(mappedBy = "author")
     @ToString.Exclude
     private Set<Issue> createdIssues = new HashSet<>();
@@ -106,8 +94,18 @@ public class User extends BaseGitServiceEntity {
     @OneToMany(mappedBy = "author")
     @ToString.Exclude
     private Set<PullRequestReviewComment> reviewComments = new HashSet<>();
-    
+
+    public enum Type {
+        USER, ORGANIZATION, BOT
+    }
+
     // Ignored GitHub properties:
+    // - totalPrivateRepos
+    // - ownedPrivateRepos
+    // - publicRepos
+    // - publicGists
+    // - privateGists
+    // - collaborators
     // - is_verified (org?)
     // - disk_usage
     // - suspended_at (user)
