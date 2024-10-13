@@ -15,14 +15,14 @@ import lombok.ToString;
 @Setter
 @ToString
 public class LeaderboardEntry {
-        private String githubName;
-        private String avatarUrl;
-        private String name;
-        private User.Type type;
-        private int score;
-        private int rank;
-        private int numberOfReviewedPRs;
-        private PullRequestReviewDTO[] changesRequested;
-        private PullRequestReviewDTO[] approvals;
-        private PullRequestReviewDTO[] comments;
+    private String githubName;
+    private String avatarUrl;
+    private String name;
+    private User.Type type;
+    private int score;
+    private int rank;
+    private int numberOfReviewedPRs;
+    private PullRequestReviewDTO[] changesRequested;
+    private PullRequestReviewDTO[] approvals;
+    private PullRequestReviewDTO[] comments;
 }

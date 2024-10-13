@@ -9,7 +9,8 @@ import org.springframework.stereotype.Component;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubMessageHandler;
 
 @Component
-public class GitHubPullRequestReviewCommentMessageHandler extends GitHubMessageHandler<GHEventPayload.PullRequestReviewComment> {
+public class GitHubPullRequestReviewCommentMessageHandler
+        extends GitHubMessageHandler<GHEventPayload.PullRequestReviewComment> {
 
     private static final Logger logger = LoggerFactory.getLogger(GitHubPullRequestReviewCommentMessageHandler.class);
 

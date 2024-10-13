@@ -7,22 +7,22 @@ import de.tum.in.www1.hephaestus.gitprovider.user.UserRepository;
 
 @Service
 public class GitHubUserSyncService {
-  
-  private final GitHub github;
-  private final UserRepository userRepository;
 
-  public GitHubUserSyncService(GitHub github, UserRepository userRepository) {
-    this.github = github;
-    this.userRepository = userRepository;
-  }
+    private final GitHub github;
+    private final UserRepository userRepository;
 
-  // TODO: github.listUsers()
+    public GitHubUserSyncService(GitHub github, UserRepository userRepository) {
+        this.github = github;
+        this.userRepository = userRepository;
+    }
 
-  public void syncAllUsers() {
-    // ...
-  }
+    // TODO: github.listUsers()
 
-  public void syncUser(String username) {
-    
-  }
+    public void syncAllUsers() {
+        // ...
+    }
+
+    public void syncUser(String username) {
+
+    }
 }
