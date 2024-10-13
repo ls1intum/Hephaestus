@@ -28,6 +28,12 @@ import advancedFormat from 'dayjs/plugin/advancedFormat';
 
 dayjs.extend(advancedFormat);
 
+const repoImages: { [key: string]: string } = {
+  Hephaestus: 'https://github.com/ls1intum/Hephaestus/raw/refs/heads/develop/docs/images/hammer.svg',
+  Artemis: 'https://artemis.in.tum.de/public/images/logo.png',
+  Athena: 'https://raw.githubusercontent.com/ls1intum/Athena/develop/playground/public/logo.png'
+};
+
 @Component({
   selector: 'app-profile',
   standalone: true,
@@ -75,19 +81,7 @@ export class ProfileComponent {
     this.userLogin = this.route.snapshot.paramMap.get('id');
   }
 
-  getRepositoryImage = (name: string) => {
-    const shortName = name.split('/')[1];
-    switch (shortName) {
-      case 'Hephaestus':
-        return 'https://github.com/ls1intum/Hephaestus/raw/refs/heads/develop/docs/images/hammer.svg';
-      case 'Artemis':
-        return 'https://artemis.in.tum.de/public/images/logo.png';
-      case 'Athena':
-        return 'https://raw.githubusercontent.com/ls1intum/Athena/develop/playground/public/logo.png';
-      default:
-        return 'https://avatars.githubusercontent.com/u/11064260?v=4';
-    }
-  };
+  getRepositoryImage = (name: string) => repoImages[name.split('/')[1]] || 'https://avatars.githubusercontent.com/u/11064260?v=4';
 
   query = injectQuery(() => ({
     queryKey: ['user', { id: this.userLogin }],
