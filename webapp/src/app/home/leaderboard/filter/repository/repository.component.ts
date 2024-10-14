@@ -5,18 +5,6 @@ import { BrnSelectModule } from '@spartan-ng/ui-select-brain';
 import { HlmSelectModule } from '@spartan-ng/ui-select-helm';
 import { HlmLabelModule } from '@spartan-ng/ui-label-helm';
 
-export const repositoryNames = [
-  'ls1intum/Artemis',
-  'ls1intum/Athena',
-  'ls1intum/Hephaestus',
-  'ls1intum/Pyris',
-  'ls1intum/Ares2',
-  'ls1intum/Aeolus',
-  'ls1intum/hades',
-  'ls1intum/Apollon',
-  'ls1intum/Apollon_standalone'
-];
-
 interface SelectOption {
   id: number;
   value: string;
@@ -30,11 +18,11 @@ interface SelectOption {
   templateUrl: './repository.component.html'
 })
 export class LeaderboardFilterRepositoryComponent {
-  repositories = input<string[]>();
+  repositories = input.required<string[]>();
   value = signal<string>('');
 
   placeholder = computed(() => {
-    return repositoryNames.find((option) => option === this.value()) ?? 'All';
+    return this.repositories().find((option) => option === this.value()) ?? 'All';
   });
 
   options = computed(() => {

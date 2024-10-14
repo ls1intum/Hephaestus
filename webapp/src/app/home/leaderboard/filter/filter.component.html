@@ -5,6 +5,8 @@
   </span>
   <form ngForm class="flex xl:flex-col gap-4">
     <app-leaderboard-filter-timeframe />
-    <app-leaderboard-filter-repository [repositories]="metaData()?.repositoriesToMonitor" />
+    @if (repositories() && repositories()!.length > 1) {
+      <app-leaderboard-filter-repository [repositories]="repositories()!" />
+    }
   </form>
 </div>

@@ -19,7 +19,7 @@ type Story = StoryObj<LeaderboardFilterRepositoryComponent>;
 
 export const Default: Story = {
   args: {
-    repositories: ['ls1intum/Artemis']
+    repositories: ['ls1intum/Artemis', 'ls1intum/Athena', 'ls1intum/Hephaestus']
   },
   render: (args) => ({
     props: args,

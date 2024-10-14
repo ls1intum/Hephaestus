@@ -8,7 +8,7 @@
             <h2 class="text-xl text-muted-foreground">Hi {{ userValue.name }} 👋</h2>
           }
         </div>
-        <app-leaderboard-filter [metaData]="metaQuery.data()" />
+        <app-leaderboard-filter [repositories]="metaQuery.data()?.repositoriesToMonitor" />
       </div>
       <div class="col-span-2">
         @if (query.error()) {
