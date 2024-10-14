@@ -85,6 +85,7 @@ export class UserProfileComponent {
 
   query = injectQuery(() => ({
     queryKey: ['user', { id: this.userLogin }],
-    queryFn: async () => lastValueFrom(combineLatest([this.userService.getUserProfile(this.userLogin ?? 'testuser'), timer(400)]).pipe(map(([user]) => user)))
+    enabled: !!this.userLogin,
+    queryFn: async () => lastValueFrom(combineLatest([this.userService.getUserProfile(this.userLogin!), timer(400)]).pipe(map(([user]) => user)))
   }));
 }
