@@ -19,21 +19,21 @@ import { CustomHttpParameterCodec }                          from '../encoder';
 import { Observable }                                        from 'rxjs';
 
 // @ts-ignore
-import { LeaderboardEntry } from '../model/leaderboard-entry';
+import { MetaDataDTO } from '../model/meta-data-dto';
 
 // @ts-ignore
 import { BASE_PATH, COLLECTION_FORMATS }                     from '../variables';
 import { Configuration }                                     from '../configuration';
 import {
-    LeaderboardServiceInterface
-} from './leaderboard.serviceInterface';
+    MetaServiceInterface
+} from './meta.serviceInterface';
 
 
 
 @Injectable({
   providedIn: 'root'
 })
-export class LeaderboardService implements LeaderboardServiceInterface {
+export class MetaService implements MetaServiceInterface {
 
     protected basePath = 'http://localhost';
     public defaultHeaders = new HttpHeaders();
@@ -96,30 +96,13 @@ export class LeaderboardService implements LeaderboardServiceInterface {
     }
 
     /**
-     * @param after 
-     * @param before 
-     * @param repository 
      * @param observe set whether or not to return the data Observable as the body, response or events. defaults to returning the body.
      * @param reportProgress flag to report request and response progress.
      */
-    public getLeaderboard(after?: string, before?: string, repository?: string, observe?: 'body', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<Array<LeaderboardEntry>>;
-    public getLeaderboard(after?: string, before?: string, repository?: string, observe?: 'response', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<HttpResponse<Array<LeaderboardEntry>>>;
-    public getLeaderboard(after?: string, before?: string, repository?: string, observe?: 'events', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<HttpEvent<Array<LeaderboardEntry>>>;
-    public getLeaderboard(after?: string, before?: string, repository?: string, observe: any = 'body', reportProgress: boolean = false, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<any> {
-
-        let localVarQueryParameters = new HttpParams({encoder: this.encoder});
-        if (after !== undefined && after !== null) {
-          localVarQueryParameters = this.addToHttpParams(localVarQueryParameters,
-            <any>after, 'after');
-        }
-        if (before !== undefined && before !== null) {
-          localVarQueryParameters = this.addToHttpParams(localVarQueryParameters,
-            <any>before, 'before');
-        }
-        if (repository !== undefined && repository !== null) {
-          localVarQueryParameters = this.addToHttpParams(localVarQueryParameters,
-            <any>repository, 'repository');
-        }
+    public getMetaData(observe?: 'body', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<MetaDataDTO>;
+    public getMetaData(observe?: 'response', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<HttpResponse<MetaDataDTO>>;
+    public getMetaData(observe?: 'events', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<HttpEvent<MetaDataDTO>>;
+    public getMetaData(observe: any = 'body', reportProgress: boolean = false, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<any> {
 
         let localVarHeaders = this.defaultHeaders;
 
@@ -157,11 +140,10 @@ export class LeaderboardService implements LeaderboardServiceInterface {
             }
         }
 
-        let localVarPath = `/leaderboard`;
-        return this.httpClient.request<Array<LeaderboardEntry>>('get', `${this.configuration.basePath}${localVarPath}`,
+        let localVarPath = `/meta`;
+        return this.httpClient.request<MetaDataDTO>('get', `${this.configuration.basePath}${localVarPath}`,
             {
                 context: localVarHttpContext,
-                params: localVarQueryParameters,
                 responseType: <any>responseType_,
                 withCredentials: this.configuration.withCredentials,
                 headers: localVarHeaders,
