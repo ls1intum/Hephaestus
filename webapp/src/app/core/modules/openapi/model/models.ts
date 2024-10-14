@@ -1,6 +1,7 @@
 export * from './issue-comment';
 export * from './issue-comment-dto';
 export * from './leaderboard-entry';
+export * from './meta-data-dto';
 export * from './pull-request';
 export * from './pull-request-dto';
 export * from './pull-request-label';

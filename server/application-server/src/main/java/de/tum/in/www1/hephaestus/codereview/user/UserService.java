@@ -48,9 +48,10 @@ public class UserService {
         return userRepository.findAll().stream().toList();
     }
 
-    public List<User> getAllUsersInTimeframe(OffsetDateTime after, OffsetDateTime before) {
-        logger.info("Getting all users in timeframe between " + after + " and " + before);
-        return userRepository.findAllInTimeframe(after, before);
+    public List<User> getAllUsersInTimeframe(OffsetDateTime after, OffsetDateTime before, Optional<String> repository) {
+        logger.info("Getting all users in timeframe between " + after + " and " + before + " for repository: "
+                + repository.orElse("all"));
+        return userRepository.findAllInTimeframe(after, before, repository);
     }
 
     public Optional<UserProfileDTO> getUserProfileDTO(String login) {
