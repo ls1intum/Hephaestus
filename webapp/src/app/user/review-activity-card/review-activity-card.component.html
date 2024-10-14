@@ -1,0 +1,25 @@
+@if (isLoading()) {
+  <div hlmCard class="flex">
+    <div hlmCardHeader class="p-4">
+      <hlm-skeleton class="h-4 w-56 sm:w-72 md:w-80"></hlm-skeleton>
+      <div class="flex items-center gap-2 font-medium">
+        <hlm-skeleton [class]="'h-7 w-7 ' + this.reviewStateProps().skeletonColor"></hlm-skeleton>
+        <hlm-skeleton class="h-6 w-64 sm:w-80 md:w-96"></hlm-skeleton>
+      </div>
+    </div>
+  </div>
+} @else {
+  <a hlmCard class="flex hover:bg-accent/50" [href]="this.pullRequest()?.url" target="_blank" rel="noopener noreferrer">
+    <div hlmCardHeader class="p-4">
+      <div class="text-sm text-muted-foreground first-letter:uppercase">
+        {{ relativeActivityTime() }}
+        in
+        {{ this.repositoryNameWithOwner() }} #{{ this.pullRequest()?.number }}
+      </div>
+      <div class="flex items-center gap-2 font-medium">
+        <ng-icon [className]="this.reviewStateProps().color" [svg]="this.reviewStateProps().icon" size="20"></ng-icon>
+        <div [innerHTML]="displayPullRequestTitle()"></div>
+      </div>
+    </div>
+  </a>
+}

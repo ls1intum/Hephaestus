@@ -78,14 +78,10 @@
             @if (userData.activity) {
               @for (activity of userData.activity; track activity.id) {
                 <div class="mr-2.5">
-                  <app-profile-activity-card
-                    [url]="activity.url"
-                    [state]="activity.state!"
-                    [createdAt]="activity.createdAt!"
-                    [pullRequestNumber]="activity.pullRequest?.number!"
-                    [pullRequestState]="activity.pullRequest?.state!"
-                    [pullRequestUrl]="activity.pullRequest?.url!"
-                    [repositoryName]="activity.pullRequest?.repository?.name!"
+                  <app-review-activity-card
+                    [reviewActivity]="activity"
+                    [pullRequest]="activity.pullRequest"
+                    [repositoryNameWithOwner]="activity.pullRequest?.repository?.nameWithOwner!"
                   />
                 </div>
               }

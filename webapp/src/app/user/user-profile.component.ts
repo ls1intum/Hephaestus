@@ -19,7 +19,7 @@ import { BrnTooltipContentDirective } from '@spartan-ng/ui-tooltip-brain';
 import { HlmTooltipComponent, HlmTooltipTriggerDirective } from '@spartan-ng/ui-tooltip-helm';
 import { HlmButtonModule } from '@spartan-ng/ui-button-helm';
 import { HlmScrollAreaComponent } from '@spartan-ng/ui-scrollarea-helm';
-import { ProfileActivityCardComponent } from '@app/user/profile-activity-card/profile-activity-card.component';
+import { ReviewActivityCardComponent } from '@app/user/review-activity-card/review-activity-card.component';
 import { IssueCardComponent } from '@app/user/issue-card/issue-card.component';
 import { combineLatest, lastValueFrom, map, timer } from 'rxjs';
 import { CircleX, LucideAngularModule, Info } from 'lucide-angular';
@@ -40,7 +40,7 @@ const repoImages: { [key: string]: string } = {
   imports: [
     LucideAngularModule,
     NgIconComponent,
-    ProfileActivityCardComponent,
+    ReviewActivityCardComponent,
     IssueCardComponent,
     HlmAvatarModule,
     HlmSkeletonModule,
