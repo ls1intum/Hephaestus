@@ -49,6 +49,7 @@ import de.tum.in.www1.hephaestus.codereview.repository.RepositoryRepository;
 import de.tum.in.www1.hephaestus.codereview.user.User;
 import de.tum.in.www1.hephaestus.codereview.user.UserConverter;
 import de.tum.in.www1.hephaestus.codereview.user.UserRepository;
+import jakarta.transaction.Transactional;
 
 @Service
 public class GitHubDataSyncService {
@@ -143,6 +144,7 @@ public class GitHubDataSyncService {
      * 
      * @throws IOException
      */
+    @Transactional
     public void fetchRepository(String nameWithOwner) throws IOException {
         GHRepository ghRepo = github.getRepository(nameWithOwner);
         // Avoid double fetching of already stored repositories
