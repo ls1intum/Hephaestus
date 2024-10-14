@@ -14,13 +14,13 @@ import { HlmAvatarModule } from '@spartan-ng/ui-avatar-helm';
 import { HlmSkeletonModule } from '@spartan-ng/ui-skeleton-helm';
 import { ActivatedRoute } from '@angular/router';
 import { injectQuery } from '@tanstack/angular-query-experimental';
-import { HlmIconModule } from '../../../libs/ui/ui-icon-helm/src/index';
+import { HlmIconModule } from 'libs/ui/ui-icon-helm/src/index';
 import { BrnTooltipContentDirective } from '@spartan-ng/ui-tooltip-brain';
 import { HlmTooltipComponent, HlmTooltipTriggerDirective } from '@spartan-ng/ui-tooltip-helm';
 import { HlmButtonModule } from '@spartan-ng/ui-button-helm';
 import { HlmScrollAreaComponent } from '@spartan-ng/ui-scrollarea-helm';
-import { ProfileActivityCardComponent } from '../../core/profile-activity-card/profile-activity-card.component';
-import { IssueCardComponent } from '../../core/issue-card/issue-card.component';
+import { ProfileActivityCardComponent } from '@app/user/profile-activity-card/profile-activity-card.component';
+import { IssueCardComponent } from '@app/user/issue-card/issue-card.component';
 import { combineLatest, lastValueFrom, map, timer } from 'rxjs';
 import { CircleX, LucideAngularModule, Info } from 'lucide-angular';
 import dayjs from 'dayjs';
@@ -35,7 +35,7 @@ const repoImages: { [key: string]: string } = {
 };
 
 @Component({
-  selector: 'app-profile',
+  selector: 'app-user-profile',
   standalone: true,
   imports: [
     LucideAngularModule,
@@ -59,9 +59,9 @@ const repoImages: { [key: string]: string } = {
     HlmButtonModule,
     HlmScrollAreaComponent
   ],
-  templateUrl: './profile.component.html'
+  templateUrl: './user-profile.component.html'
 })
-export class ProfileComponent {
+export class UserProfileComponent {
   userService = inject(UserService);
 
   protected octClockFill = octClockFill;
