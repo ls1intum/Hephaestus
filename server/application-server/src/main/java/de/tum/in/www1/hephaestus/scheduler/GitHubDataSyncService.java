@@ -51,6 +51,7 @@ import de.tum.in.www1.hephaestus.codereview.user.UserConverter;
 import de.tum.in.www1.hephaestus.codereview.user.UserRepository;
 import jakarta.transaction.Transactional;
 
+@Transactional
 @Service
 public class GitHubDataSyncService {
     private static final Logger logger = LoggerFactory.getLogger(GitHubDataSyncService.class);
@@ -144,7 +145,6 @@ public class GitHubDataSyncService {
      * 
      * @throws IOException
      */
-    @Transactional
     public void fetchRepository(String nameWithOwner) throws IOException {
         GHRepository ghRepo = github.getRepository(nameWithOwner);
         // Avoid double fetching of already stored repositories
