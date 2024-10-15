@@ -31,8 +31,9 @@ export class KeycloakService {
   async init() {
     const authenticated = await this.keycloak.init({
       onLoad: 'check-sso',
-      silentCheckSsoRedirectUri: window.location.origin + '/silent-check-sso.html',
-      checkLoginIframe: false
+      silentCheckSsoRedirectUri: environment.clientUrl + '/silent-check-sso.html',
+      checkLoginIframe: false,
+      enableLogging: true
     });
 
     if (!authenticated) {
