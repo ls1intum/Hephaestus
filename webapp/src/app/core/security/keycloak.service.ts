@@ -29,12 +29,11 @@ export class KeycloakService {
   }
 
   async init() {
-    console.log('KeycloakService.init silentCheckSsoRedirectUri:', window.location.origin + '/silent-check-sso.html');
     const authenticated = await this.keycloak.init({
       onLoad: 'check-sso',
-      silentCheckSsoRedirectUri: window.location.origin + '/silent-check-sso.html'
+      silentCheckSsoRedirectUri: window.location.origin + '/silent-check-sso.html',
+      checkLoginIframe: false
     });
-    console.log('KeycloakService.init authenticated:', authenticated);
 
     if (!authenticated) {
       return authenticated;
