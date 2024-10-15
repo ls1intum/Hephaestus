@@ -14,11 +14,11 @@ import { PullRequestReviewDTO } from './pull-request-review-dto';
 
 
 export interface UserProfileDTO { 
-    id?: number;
-    login?: string;
-    avatarUrl?: string;
-    firstContribution?: string;
-    repositories?: Set<string>;
+    id: number;
+    login: string;
+    avatarUrl: string;
+    firstContribution: string;
+    repositories: Set<string>;
     activity?: Set<PullRequestReviewDTO>;
     pullRequests?: Set<PullRequestDTO>;
 }

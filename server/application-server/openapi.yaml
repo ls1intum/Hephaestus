@@ -177,6 +177,16 @@ components:
         pullRequest:
           $ref: "#/components/schemas/PullRequestDTO"
     PullRequestDTO:
+      required:
+      - additions
+      - createdAt
+      - deletions
+      - id
+      - number
+      - state
+      - title
+      - updatedAt
+      - url
       type: object
       properties:
         id:
@@ -231,6 +241,10 @@ components:
         color:
           type: string
     RepositoryDTO:
+      required:
+      - name
+      - nameWithOwner
+      - url
       type: object
       properties:
         name:
@@ -266,6 +280,12 @@ components:
           items:
             $ref: "#/components/schemas/IssueCommentDTO"
     PullRequestReviewDTO:
+      required:
+      - createdAt
+      - id
+      - state
+      - submittedAt
+      - updatedAt
       type: object
       properties:
         id:
@@ -292,6 +312,12 @@ components:
         pullRequest:
           $ref: "#/components/schemas/PullRequestDTO"
     UserProfileDTO:
+      required:
+      - avatarUrl
+      - firstContribution
+      - id
+      - login
+      - repositories
       type: object
       properties:
         id:

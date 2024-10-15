@@ -40,7 +40,7 @@
         <hlm-avatar variant="extralarge" class="ring-2 ring-neutral-100 dark:ring-neutral-800">
           <img [src]="userData.avatarUrl" [alt]="userData.login + '\'s avatar'" hlmAvatarImage />
           <span hlmAvatarFallback>
-            {{ userData.login?.slice(0, 2)?.toUpperCase() ?? '?' }}
+            {{ userData.login.slice(0, 2).toUpperCase() }}
           </span>
         </hlm-avatar>
         <div class="flex flex-col gap-2">
@@ -102,12 +102,12 @@
                   <div class="mr-2.5">
                     <app-issue-card
                       class="w-full my-2"
-                      [additions]="pullRequest.additions ?? 0"
-                      [deletions]="pullRequest.deletions ?? 0"
+                      [additions]="pullRequest.additions"
+                      [deletions]="pullRequest.deletions"
                       [number]="pullRequest.number"
-                      [repositoryName]="pullRequest.repository?.name ?? ''"
+                      [repositoryName]="pullRequest.repository!.name"
                       [title]="pullRequest.title"
-                      [url]="pullRequest.url ?? pullRequest.repository?.url ?? ''"
+                      [url]="pullRequest.url"
                       [state]="pullRequest.state"
                       [createdAt]="pullRequest.createdAt"
                       [pullRequestLabels]="pullRequest.labels"

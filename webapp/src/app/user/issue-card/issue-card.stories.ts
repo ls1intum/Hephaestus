@@ -1,5 +1,6 @@
 import { Meta, StoryObj } from '@storybook/angular';
 import { IssueCardComponent } from './issue-card.component';
+import { PullRequestReviewDTO } from '../modules/openapi';
 
 const meta: Meta<IssueCardComponent> = {
   component: IssueCardComponent,
@@ -24,14 +25,20 @@ export const Default: Story = {
       { name: 'bug', color: 'f00000' },
       { name: 'enhancement', color: '008000' }
     ]),
-    reviews: new Set([
+    reviews: new Set<PullRequestReviewDTO>([
       {
-        state: 'APPROVED',
-        updatedAt: 'Jan 2'
+        id: 0,
+        createdAt: 'Jan 2',
+        updatedAt: 'Jan 2',
+        submittedAt: 'Jan 2',
+        state: 'APPROVED'
       },
       {
-        state: 'CHANGES_REQUESTED',
-        updatedAt: 'Jan 4'
+        id: 1,
+        createdAt: 'Jan 4',
+        updatedAt: 'Jan 4',
+        submittedAt: 'Jan 4',
+        state: 'CHANGES_REQUESTED'
       }
     ])
   }

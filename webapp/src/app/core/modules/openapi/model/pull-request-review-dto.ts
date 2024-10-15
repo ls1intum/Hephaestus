@@ -13,11 +13,11 @@ import { PullRequestDTO } from './pull-request-dto';
 
 
 export interface PullRequestReviewDTO { 
-    id?: number;
-    createdAt?: string;
-    updatedAt?: string;
-    submittedAt?: string;
-    state?: PullRequestReviewDTO.StateEnum;
+    id: number;
+    createdAt: string;
+    updatedAt: string;
+    submittedAt: string;
+    state: PullRequestReviewDTO.StateEnum;
     url?: string;
     pullRequest?: PullRequestDTO;
 }

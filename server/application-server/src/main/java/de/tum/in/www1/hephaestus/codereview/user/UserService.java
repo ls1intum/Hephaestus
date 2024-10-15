@@ -92,8 +92,9 @@ public class UserService {
             PullRequest pr = re.getPullRequest();
             return new PullRequestReviewDTO(re.getId(),
                     re.getCreatedAt(), re.getUpdatedAt(), re.getSubmittedAt(), re.getState(), re.getUrl(),
-                    new PullRequestDTO(pr.getId(), null, pr.getNumber(), pr.getUrl(), pr.getState(), 0, 0, null, null,
-                            null, new HashSet<>(),
+                    new PullRequestDTO(pr.getId(), pr.getTitle(), pr.getNumber(), pr.getUrl(), pr.getState(),
+                            pr.getAdditions(), pr.getDeletions(), pr.getCreatedAt(), pr.getUpdatedAt(), null,
+                            new HashSet<>(),
                             new RepositoryDTO(pr.getRepository().getName(),
                                     pr.getRepository().getNameWithOwner(), null,
                                     pr.getRepository().getUrl())));
