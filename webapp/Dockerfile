@@ -37,17 +37,6 @@ export const environment = {
 };
 EOF
 
-# Fix silent-check-sso.html
-RUN cat public/silent-check-sso.html <<EOF
-<html>
-  <body>
-    <script>
-      parent.postMessage(location.href, '*');
-    </script>
-  </body>
-</html>
-EOF
-
 RUN npm install
 RUN npm run build
 
