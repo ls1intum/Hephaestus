@@ -30,8 +30,7 @@ export class KeycloakService {
 
   async init() {
     const authenticated = await this.keycloak.init({
-      onLoad: 'login-required'
-      // onLoad: 'check-sso',
+      onLoad: 'check-sso'
       // silentCheckSsoRedirectUri: window.location.origin + '/silent-check-sso.html',
       // silentCheckSsoFallback: false
     });
