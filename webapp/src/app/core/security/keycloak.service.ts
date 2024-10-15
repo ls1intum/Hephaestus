@@ -33,6 +33,7 @@ export class KeycloakService {
       onLoad: 'check-sso',
       silentCheckSsoRedirectUri: window.location.origin + '/silent-check-sso.html'
     });
+    console.log('KeycloakService.init silentCheckSsoRedirectUri:', window.location.origin + '/silent-check-sso.html');
 
     if (!authenticated) {
       return authenticated;

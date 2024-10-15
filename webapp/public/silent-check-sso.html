@@ -1,6 +1,7 @@
 <html>
   <body>
     <script>
+      console.log('silent-check-sso.html, location.href:', location.href, 'location.origin:', location.origin);
       parent.postMessage(location.href, location.origin);
     </script>
   </body>
