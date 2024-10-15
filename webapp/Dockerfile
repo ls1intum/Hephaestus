@@ -42,7 +42,7 @@ RUN cat public/silent-check-sso.html <<EOF
 <html>
   <body>
     <script>
-      parent.postMessage(location.href, '${APPLICATION_CLIENT_URL}');
+      parent.postMessage(location.href, '${KEYCLOAK_URL}');
     </script>
   </body>
 </html>
