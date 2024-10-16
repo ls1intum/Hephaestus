@@ -26,15 +26,13 @@ export class LeaderboardFilterRepositoryComponent {
   });
 
   options = computed(() => {
-    const options: SelectOption[] = !this.repositories()
-      ? []
-      : this.repositories()!.map((name, index) => {
-          return {
-            id: index + 1,
-            value: name,
-            label: name
-          };
-        });
+    const options: SelectOption[] = this.repositories().map((name, index) => {
+      return {
+        id: index + 1,
+        value: name,
+        label: name
+      };
+    });
     options.unshift({
       id: 0,
       value: 'all',
