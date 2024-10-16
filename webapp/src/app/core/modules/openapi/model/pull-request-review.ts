@@ -21,6 +21,7 @@ export interface PullRequestReview {
     author?: User;
     state: PullRequestReview.StateEnum;
     submittedAt?: string;
+    url?: string;
     comments?: Set<PullRequestReviewComment>;
     pullRequest?: PullRequest;
 }

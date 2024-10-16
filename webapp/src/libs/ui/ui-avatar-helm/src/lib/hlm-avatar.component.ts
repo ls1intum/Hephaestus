@@ -9,7 +9,8 @@ export const avatarVariants = cva('relative flex shrink-0 overflow-hidden rounde
     variant: {
       small: 'h-6 w-6 text-xs',
       medium: 'h-10 w-10',
-      large: 'h-14 w-14 text-lg'
+      large: 'h-14 w-14 text-lg',
+      extralarge: 'h-40 w-40 text-3xl'
     }
   },
   defaultVariants: {

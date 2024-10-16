@@ -29,4 +29,10 @@ public class UserController {
         System.out.println(user);
         return user.map(ResponseEntity::ok).orElseGet(() -> ResponseEntity.notFound().build());
     }
+
+    @GetMapping("/{login}/profile")
+    public ResponseEntity<UserProfileDTO> getUserProfile(@PathVariable String login) {
+        Optional<UserProfileDTO> userProfile = userService.getUserProfileDTO(login);
+        return userProfile.map(ResponseEntity::ok).orElseGet(() -> ResponseEntity.notFound().build());
+    }
 }

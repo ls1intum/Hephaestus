@@ -24,6 +24,7 @@ public class PullRequestReviewConverter extends BaseGitServiceEntityConverter<GH
     public PullRequestReview update(@NonNull GHPullRequestReview source, @NonNull PullRequestReview review) {
         convertBaseFields(source, review);
         review.setState(convertState(source.getState()));
+        review.setUrl(source.getHtmlUrl().toString());
         try {
             review.setSubmittedAt(convertToOffsetDateTime(source.getSubmittedAt()));
         } catch (IOException e) {

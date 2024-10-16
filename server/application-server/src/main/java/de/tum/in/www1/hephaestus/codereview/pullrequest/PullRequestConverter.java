@@ -78,9 +78,7 @@ public class PullRequestConverter extends BaseGitServiceEntityConverter<GHPullRe
     private Set<PullRequestLabel> convertLabels(Collection<GHLabel> labels) {
         Set<PullRequestLabel> pullRequestLabels = new HashSet<>();
         for (GHLabel label : labels) {
-            PullRequestLabel pullRequestLabel = new PullRequestLabel();
-            pullRequestLabel.setName(label.getName());
-            pullRequestLabel.setColor(label.getColor());
+            PullRequestLabel pullRequestLabel = new PullRequestLabel(label.getName(), label.getColor());
             pullRequestLabels.add(pullRequestLabel);
         }
         return pullRequestLabels;

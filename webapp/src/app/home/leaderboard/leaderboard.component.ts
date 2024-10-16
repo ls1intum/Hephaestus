@@ -12,6 +12,7 @@ import { TableRowDirective } from 'app/ui/table/table-row.directive';
 import { TableComponent } from 'app/ui/table/table.component';
 import { HlmAvatarModule } from '@spartan-ng/ui-avatar-helm';
 import { HlmSkeletonModule } from '@spartan-ng/ui-skeleton-helm';
+import { RouterLink, RouterOutlet } from '@angular/router';
 
 @Component({
   selector: 'app-leaderboard',
@@ -27,7 +28,9 @@ import { HlmSkeletonModule } from '@spartan-ng/ui-skeleton-helm';
     TableHeaderDirective,
     TableHeadDirective,
     TableRowDirective,
-    NgIconComponent
+    NgIconComponent,
+    RouterLink,
+    RouterOutlet
   ],
   templateUrl: './leaderboard.component.html'
 })

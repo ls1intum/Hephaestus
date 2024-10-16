@@ -9,14 +9,17 @@
  * https://openapi-generator.tech
  * Do not edit the class manually.
  */
+import { PullRequestDTO } from './pull-request-dto';
 
 
 export interface PullRequestReviewDTO { 
-    id?: number;
-    createdAt?: string;
-    updatedAt?: string;
-    submittedAt?: string;
-    state?: PullRequestReviewDTO.StateEnum;
+    id: number;
+    createdAt: string;
+    updatedAt: string;
+    submittedAt: string;
+    state: PullRequestReviewDTO.StateEnum;
+    url?: string;
+    pullRequest?: PullRequestDTO;
 }
 export namespace PullRequestReviewDTO {
     export type StateEnum = 'COMMENTED' | 'APPROVED' | 'CHANGES_REQUESTED' | 'DISMISSED';
