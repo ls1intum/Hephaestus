@@ -1,0 +1,25 @@
+@if (isLoading()) {
+  <div hlmCard variant="profile">
+    <div hlmCardContent variant="profile">
+      <hlm-skeleton class="h-4 w-1/2"></hlm-skeleton>
+      <div class="flex items-center gap-2 font-medium">
+        <hlm-skeleton [class]="'h-7 w-7 ' + this.skeletonColorForReviewState()"></hlm-skeleton>
+        <hlm-skeleton class="h-6 w-3/4"></hlm-skeleton>
+      </div>
+    </div>
+  </div>
+} @else {
+  <a hlmCard variant="profile" class="hover:bg-accent/50" [href]="this.pullRequest()?.url" target="_blank" rel="noopener noreferrer">
+    <div hlmCardContent variant="profile">
+      <div class="text-sm text-muted-foreground first-letter:uppercase">
+        {{ relativeActivityTime() }}
+        in
+        {{ this.repositoryName() }} #{{ this.pullRequest()?.number }}
+      </div>
+      <div class="containerSize flex items-center gap-2 font-medium">
+        <ng-icon [className]="this.reviewStateProps().color" [svg]="this.reviewStateProps().icon" size="20"></ng-icon>
+        <span [innerHTML]="displayPullRequestTitle()" class="truncate"></span>
+      </div>
+    </div>
+  </a>
+}
