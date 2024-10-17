@@ -2,13 +2,15 @@ import { Component, computed, input } from '@angular/core';
 import { PullRequest, PullRequestLabel, PullRequestReviewDTO } from '@app/core/modules/openapi';
 import { NgIcon } from '@ng-icons/core';
 import { octCheck, octComment, octFileDiff, octGitPullRequest, octGitPullRequestClosed, octX } from '@ng-icons/octicons';
+import { HlmCardModule } from '@spartan-ng/ui-card-helm';
+import { HlmSkeletonComponent } from '@spartan-ng/ui-skeleton-helm';
 import dayjs from 'dayjs';
 import { cn } from '@app/utils';
 
 @Component({
   selector: 'app-issue-card',
   templateUrl: './issue-card.component.html',
-  imports: [NgIcon],
+  imports: [NgIcon, HlmCardModule, HlmSkeletonComponent],
   styleUrls: ['./issue-card.component.scss'],
   standalone: true
 })
@@ -32,7 +34,8 @@ export class IssueCardComponent {
   protected readonly octGitPullRequestClosed = octGitPullRequestClosed;
 
   displayCreated = computed(() => dayjs(this.createdAt()));
-  computedClass = computed(() => cn('border border-border bg-card rounded-lg p-4 w-72', this.class()));
+  displayTitle = computed(() => (this.title() ?? '').replace(/`([^`]+)`/g, '<code class="textCode">$1</code>'));
+  computedClass = computed(() => cn('w-72', this.class()));
 
   getMostRecentReview() {
     if (!this.reviews()) {

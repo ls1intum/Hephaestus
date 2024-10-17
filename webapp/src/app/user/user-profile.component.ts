@@ -59,7 +59,14 @@ const repoImages: { [key: string]: string } = {
     HlmButtonModule,
     HlmScrollAreaComponent
   ],
-  templateUrl: './user-profile.component.html'
+  templateUrl: './user-profile.component.html',
+  styles: `
+    :host {
+      code {
+        display: inline-block;
+      }
+    }
+  `
 })
 export class UserProfileComponent {
   userService = inject(UserService);

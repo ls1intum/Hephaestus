@@ -16,10 +16,8 @@ type FlatArgs = {
 function flatArgsToProps(args: FlatArgs) {
   return {
     isLoading: args.isLoading,
-    reviewActivity: {
-      createdAt: dayjs(args.reviewActivityCreatedAt),
-      state: args.reviewActivityState
-    },
+    createdAt: dayjs(args.reviewActivityCreatedAt),
+    state: args.reviewActivityState,
     pullRequest: {
       number: args.pullRequestNumber,
       title: args.pullRequestTitle,
@@ -39,7 +37,7 @@ const meta: Meta<FlatArgs> = {
     pullRequestNumber: 100,
     pullRequestTitle: '`Leaderboard`: Custom Sliding Time Window',
     pullRequestUrl: 'https://github.com/ls1intum/Hephaestus/pull/100',
-    repositoryName: 'ls1intum/Hephaestus'
+    repositoryName: 'Hephaestus'
   },
   argTypes: {
     isLoading: {

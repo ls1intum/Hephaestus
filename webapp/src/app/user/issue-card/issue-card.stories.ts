@@ -1,6 +1,6 @@
 import { Meta, StoryObj } from '@storybook/angular';
 import { IssueCardComponent } from './issue-card.component';
-import { PullRequestReviewDTO } from '../modules/openapi';
+import { PullRequestReviewDTO } from '@app/core/modules/openapi';
 
 const meta: Meta<IssueCardComponent> = {
   component: IssueCardComponent,

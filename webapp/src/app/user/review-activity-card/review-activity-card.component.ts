@@ -9,15 +9,18 @@ import relativeTime from 'dayjs/plugin/relativeTime';
 
 dayjs.extend(relativeTime);
 
-type ReviewActivityProps = {
-  state?: PullRequestReviewDTO.StateEnum;
-  createdAt?: string;
+type PullRequestProps = {
+  number: number;
+  title: string;
+  url: string;
 };
 
-type PullRequestProps = {
-  number?: number;
-  title?: string;
-  url?: string;
+type ReviewStateCases = {
+  [key: string]: {
+    icon: string;
+    color: string;
+    skeletonColor: string;
+  };
 };
 
 @Component({
@@ -27,8 +30,8 @@ type PullRequestProps = {
   standalone: true,
   styles: `
     :host {
-      code {
-        @apply bg-github-muted rounded px-1 py-0.5;
+      .containerSize {
+        container-type: inline-size;
       }
     }
   `
@@ -41,33 +44,42 @@ export class ReviewActivityCardComponent {
   protected readonly octGitPullRequestClosed = octGitPullRequestClosed;
 
   isLoading = input<boolean>(false);
-  reviewActivity = input<ReviewActivityProps>();
+  state = input<PullRequestReviewDTO.StateEnum>();
+  createdAt = input<string>();
   pullRequest = input<PullRequestProps>();
-  repositoryNameWithOwner = input<string>();
+  repositoryName = input<string>();
 
-  relativeActivityTime = computed(() => dayjs(this.reviewActivity()?.createdAt).fromNow());
-  displayPullRequestTitle = computed(() => (this.pullRequest()?.title ?? '').replace(/`([^`]+)`/g, '<code>$1</code>'));
+  relativeActivityTime = computed(() => dayjs(this.createdAt()).fromNow());
+  displayPullRequestTitle = computed(() => (this.pullRequest()?.title ?? '').replace(/`([^`]+)`/g, '<code class="textCode">$1</code>'));
+
+  reviewStateCases: ReviewStateCases = {
+    [PullRequestReviewDTO.StateEnum.Approved]: {
+      icon: this.octCheck,
+      color: 'text-github-success-foreground',
+      skeletonColor: 'bg-green-500/30'
+    },
+    [PullRequestReviewDTO.StateEnum.ChangesRequested]: {
+      icon: this.octFileDiff,
+      color: 'text-github-danger-foreground',
+      skeletonColor: 'bg-destructive/20'
+    },
+    [PullRequestReviewDTO.StateEnum.Commented]: {
+      icon: this.octComment,
+      color: 'text-github-neutral-foreground',
+      skeletonColor: 'bg-neutral-500/20'
+    }
+  };
+
+  skeletonColorForReviewState = computed(() => {
+    if (this.isLoading()) {
+      const colors = Object.values(this.reviewStateCases).map((value) => value.skeletonColor);
+      return colors[Math.floor(Math.random() * colors.length)];
+    }
+    return '';
+  });
 
   reviewStateProps = computed(() => {
-    switch (this.reviewActivity()?.state) {
-      case PullRequestReviewDTO.StateEnum.Approved:
-        return {
-          icon: this.octCheck,
-          color: 'text-github-success-foreground',
-          skeletonColor: 'bg-green-500/30'
-        };
-      case PullRequestReviewDTO.StateEnum.ChangesRequested:
-        return {
-          icon: this.octFileDiff,
-          color: 'text-github-danger-foreground',
-          skeletonColor: 'bg-destructive/20'
-        };
-      default:
-        return {
-          icon: this.octComment,
-          color: 'text-github-neutral-foreground',
-          skeletonColor: 'bg-neutral-500/20'
-        };
-    }
+    const props = this.state() ? this.reviewStateCases[this.state()!] : undefined;
+    return props ?? this.reviewStateCases[PullRequestReviewDTO.StateEnum.Commented];
   });
 }

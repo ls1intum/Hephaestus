@@ -77,11 +77,12 @@
           <hlm-scroll-area class="h-[400px]">
             @if (userData.activity) {
               @for (activity of userData.activity; track activity.id) {
-                <div class="mr-2.5">
+                <div class="ml-1 mr-3.5 my-2">
                   <app-review-activity-card
-                    [reviewActivity]="activity"
+                    [state]="activity.state"
+                    [createdAt]="activity.createdAt"
                     [pullRequest]="activity.pullRequest"
-                    [repositoryNameWithOwner]="activity.pullRequest?.repository?.nameWithOwner!"
+                    [repositoryName]="activity.pullRequest?.repository?.name!"
                   />
                 </div>
               }
@@ -99,9 +100,9 @@
             @if (userData.pullRequests) {
               @for (pullRequest of userData.pullRequests; track pullRequest.id) {
                 @if (pullRequest.number && pullRequest.title && pullRequest.state && userData.activity && pullRequest.createdAt) {
-                  <div class="mr-2.5">
+                  <div class="ml-1 mr-3.5 my-2">
                     <app-issue-card
-                      class="w-full my-2"
+                      class="w-full"
                       [additions]="pullRequest.additions"
                       [deletions]="pullRequest.deletions"
                       [number]="pullRequest.number"
