@@ -1,5 +1,5 @@
 import { Component, computed, input } from '@angular/core';
-import { PullRequest, PullRequestLabel, PullRequestReviewDTO } from '@app/core/modules/openapi';
+import { PullRequest, PullRequestLabel } from '@app/core/modules/openapi';
 import { NgIcon } from '@ng-icons/core';
 import { octCheck, octComment, octFileDiff, octGitPullRequest, octGitPullRequestClosed, octX } from '@ng-icons/octicons';
 import { HlmCardModule } from '@spartan-ng/ui-card-helm';
@@ -15,17 +15,17 @@ import { cn } from '@app/utils';
   standalone: true
 })
 export class IssueCardComponent {
+  isLoading = input(false);
   class = input('');
-  title = input.required<string>();
-  number = input.required<number>();
-  additions = input.required<number>();
-  deletions = input.required<number>();
-  url = input.required<string>();
-  repositoryName = input.required<string>();
-  reviews = input<Set<PullRequestReviewDTO>>();
-  createdAt = input.required<string>();
-  state = input.required<PullRequest.StateEnum>();
-  pullRequestLabels = input.required<Set<PullRequestLabel> | undefined>();
+  title = input<string>();
+  number = input<number>();
+  additions = input<number>();
+  deletions = input<number>();
+  url = input<string>();
+  repositoryName = input<string>();
+  createdAt = input<string>();
+  state = input<PullRequest.StateEnum>();
+  pullRequestLabels = input<Set<PullRequestLabel>>();
   protected readonly octCheck = octCheck;
   protected readonly octX = octX;
   protected readonly octComment = octComment;
@@ -36,15 +36,6 @@ export class IssueCardComponent {
   displayCreated = computed(() => dayjs(this.createdAt()));
   displayTitle = computed(() => (this.title() ?? '').replace(/`([^`]+)`/g, '<code class="textCode">$1</code>'));
   computedClass = computed(() => cn('w-72', this.class()));
-
-  getMostRecentReview() {
-    if (!this.reviews()) {
-      return null;
-    }
-    return Array.from(this.reviews()!).reduce((latest, review) => {
-      return new Date(review.updatedAt || 0) > new Date(latest.updatedAt || 0) ? review : latest;
-    });
-  }
 
   hexToRgb(hex: string) {
     const bigint = parseInt(hex, 16);

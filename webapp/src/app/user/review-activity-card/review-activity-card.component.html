@@ -1,10 +1,10 @@
 @if (isLoading()) {
   <div hlmCard variant="profile">
-    <div hlmCardContent>
-      <hlm-skeleton class="h-4 w-56 sm:w-72 md:w-80"></hlm-skeleton>
+    <div hlmCardContent variant="profile">
+      <hlm-skeleton class="h-4 w-1/2"></hlm-skeleton>
       <div class="flex items-center gap-2 font-medium">
         <hlm-skeleton [class]="'h-7 w-7 ' + this.skeletonColorForReviewState()"></hlm-skeleton>
-        <hlm-skeleton class="h-6 w-64 sm:w-80 md:w-96"></hlm-skeleton>
+        <hlm-skeleton class="h-6 w-3/4"></hlm-skeleton>
       </div>
     </div>
   </div>

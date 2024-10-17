@@ -7,125 +7,62 @@
         <p hlmAlertDesc>User couldn't be loaded. Please try again later.</p>
       </div>
     </div>
-  } @else if (query.isPending()) {
-    <div class="flex gap-8 items-center justify-center mb-8">
-      <hlm-avatar variant="extralarge" class="ring-2 ring-neutral-100 dark:ring-neutral-800">
-        <hlm-skeleton hlmAvatarImage class="h-full w-full rounded-full"></hlm-skeleton>
-        <hlm-skeleton hlmAvatarFallback class="h-full w-full rounded-full"></hlm-skeleton>
-      </hlm-avatar>
-      <div class="flex flex-col gap-2">
-        <hlm-skeleton class="h-8 w-48"></hlm-skeleton>
-        <hlm-skeleton class="h-6 w-64"></hlm-skeleton>
-      </div>
-    </div>
-    <div class="flex flex-wrap gap-16 justify-center border-t border-border mx-24 pt-8">
-      <div class="flex flex-col gap-4">
-        <h2 class="text-xl font-semibold">Latest Activity</h2>
-        <hlm-scroll-area class="w-[510px] h-[400px]">
-          <hlm-skeleton class="h-14 w-full my-4"></hlm-skeleton>
-          <hlm-skeleton class="h-14 w-full my-4"></hlm-skeleton>
-        </hlm-scroll-area>
-      </div>
-      <div class="flex flex-col gap-4">
-        <h2 class="text-xl font-semibold">Open Pull Requests</h2>
-        <hlm-scroll-area class="w-[510px] h-[400px]">
-          <hlm-skeleton class="h-20 w-full my-4"></hlm-skeleton>
-          <hlm-skeleton class="h-20 w-full my-4"></hlm-skeleton>
-        </hlm-scroll-area>
-      </div>
-    </div>
   } @else {
-    @if (query.data(); as userData) {
-      <div class="flex gap-8 items-center justify-center mb-8">
-        <hlm-avatar variant="extralarge" class="ring-2 ring-neutral-100 dark:ring-neutral-800">
-          <img [src]="userData.avatarUrl" [alt]="userData.login + '\'s avatar'" hlmAvatarImage />
-          <span hlmAvatarFallback>
-            {{ userData.login.slice(0, 2).toUpperCase() }}
-          </span>
-        </hlm-avatar>
-        <div class="flex flex-col gap-2">
-          <h1 class="text-3xl font-bold leading-6">{{ userData.login }}</h1>
-          <div>
-            <a
-              class="text-lg font-medium text-muted-foreground mb-1 hover:text-github-accent-foreground"
-              href="https://github.com/{{ userData.login }}"
-              target="_blank"
-              rel="noopener noreferrer"
-            >
-              github.com/{{ userData.login }}
-            </a>
-          </div>
-          <div class="flex items-center gap-2 text-muted-foreground font-medium">
-            <ng-icon [svg]="octClockFill" size="16" />
-            Contributing since {{ displayFirstContribution() }}
-          </div>
-          <div class="flex items-center gap-2">
-            @for (repository of userData.repositories; track repository) {
-              <hlm-tooltip>
-                <div hlmBtn hlmTooltipTrigger class="size-10 bg-neutral-100 dark:bg-neutral-900/80 border border-input rounded-sm p-1" [aria-describedby]="repository">
-                  <img [src]="getRepositoryImage(repository)" [alt]="repository" />
-                </div>
-                <span *brnTooltipContent>{{ repository }}</span>
-              </hlm-tooltip>
-            }
-          </div>
-        </div>
+    @let showSkeleton = query.isPending();
+    <app-user-header [userData]="query.data()" [isLoading]="query.isPending()" />
+    <div class="flex flex-col lg:flex-row lg:justify-between gap-y-8 border-t border-border pt-8 px-4">
+      <div class="lg:w-[45%] flex flex-col gap-4 mx-4">
+        <h2 class="text-xl font-semibold">Latest Activity</h2>
+        @let userActivity = showSkeleton ? skeletonReviews : query.data()?.activity;
+        <hlm-scroll-area [autoHeightDisabled]="false" [style]="'height : ' + calcScrollHeight(userActivity)">
+          @for (activity of userActivity; track activity.id) {
+            <div class="ml-1 mr-3.5 my-2">
+              <app-review-activity-card
+                [isLoading]="showSkeleton"
+                [state]="activity?.state"
+                [createdAt]="activity?.createdAt"
+                [pullRequest]="activity?.pullRequest"
+                [repositoryName]="activity?.pullRequest?.repository?.name"
+              />
+            </div>
+          }
+          @if (!showSkeleton && (!query.data()?.activity || query.data()?.activity?.size === 0)) {
+            <div class="w-full h-20 flex justify-center items-center gap-4 border border-border bg-card hover:bg-accent hover:text-accent-foreground rounded-lg p-4 my-2">
+              <lucide-angular [img]="Info" class="text-muted-foreground" />
+              <span class="text-muted-foreground font-normal">No activity found</span>
+            </div>
+          }
+        </hlm-scroll-area>
       </div>
-      <div class="flex flex-col lg:flex-row lg:justify-between gap-y-8 border-t border-border pt-8 px-4">
-        <div class="lg:w-[45%] flex flex-col gap-4 mx-4">
-          <h2 class="text-xl font-semibold">Latest Activity</h2>
-          <hlm-scroll-area class="h-[400px]">
-            @if (userData.activity) {
-              @for (activity of userData.activity; track activity.id) {
-                <div class="ml-1 mr-3.5 my-2">
-                  <app-review-activity-card
-                    [state]="activity.state"
-                    [createdAt]="activity.createdAt"
-                    [pullRequest]="activity.pullRequest"
-                    [repositoryName]="activity.pullRequest?.repository?.name!"
-                  />
-                </div>
-              }
-            } @else {
-              <div class="w-full flex justify-center items-center gap-4 border border-border bg-card hover:bg-accent hover:text-accent-foreground rounded-lg p-4 my-2">
-                <lucide-angular [img]="Info" class="text-muted-foreground" />
-                <span class="text-muted-foreground font-normal text-sm">No activity found</span>
-              </div>
-            }
-          </hlm-scroll-area>
-        </div>
-        <div class="w-full lg:w-[45%] flex flex-col gap-4 mx-4">
-          <h2 class="text-xl font-semibold">Open Pull Requests</h2>
-          <hlm-scroll-area class="h-[400px]">
-            @if (userData.pullRequests) {
-              @for (pullRequest of userData.pullRequests; track pullRequest.id) {
-                @if (pullRequest.number && pullRequest.title && pullRequest.state && userData.activity && pullRequest.createdAt) {
-                  <div class="ml-1 mr-3.5 my-2">
-                    <app-issue-card
-                      class="w-full"
-                      [additions]="pullRequest.additions"
-                      [deletions]="pullRequest.deletions"
-                      [number]="pullRequest.number"
-                      [repositoryName]="pullRequest.repository!.name"
-                      [title]="pullRequest.title"
-                      [url]="pullRequest.url"
-                      [state]="pullRequest.state"
-                      [createdAt]="pullRequest.createdAt"
-                      [pullRequestLabels]="pullRequest.labels"
-                      [reviews]="userData.activity"
-                    />
-                  </div>
-                }
-              }
-            } @else {
-              <div class="w-full flex justify-center items-center gap-4 border border-border bg-card hover:bg-accent hover:text-accent-foreground rounded-lg p-4 my-2">
-                <lucide-angular [img]="Info" class="text-muted-foreground" />
-                <span class="text-muted-foreground font-normal text-sm">No open pull requests found</span>
-              </div>
-            }
-          </hlm-scroll-area>
-        </div>
+      <div class="lg:w-[45%] flex flex-col gap-4 mx-4">
+        <h2 class="text-xl font-semibold">Open Pull Requests</h2>
+        @let userPullRequests = showSkeleton ? skeletonPullRequests : query.data()?.pullRequests;
+        <hlm-scroll-area [autoHeightDisabled]="false" [style]="'height : ' + calcScrollHeight(userPullRequests, 130)">
+          @for (pullRequest of userPullRequests; track pullRequest.id) {
+            <div class="ml-1 mr-3.5 my-2">
+              <app-issue-card
+                class="w-full"
+                [isLoading]="showSkeleton"
+                [additions]="pullRequest.additions"
+                [deletions]="pullRequest.deletions"
+                [number]="pullRequest.number"
+                [repositoryName]="pullRequest.repository?.name"
+                [title]="pullRequest.title"
+                [url]="pullRequest.url"
+                [state]="pullRequest.state"
+                [createdAt]="pullRequest.createdAt"
+                [pullRequestLabels]="pullRequest.labels"
+              />
+            </div>
+          }
+          @if (!showSkeleton && (!query.data()?.pullRequests || query.data()?.pullRequests?.size === 0)) {
+            <div class="w-full h-20 flex justify-center items-center gap-4 border border-border bg-card hover:bg-accent hover:text-accent-foreground rounded-lg p-4 my-2">
+              <lucide-angular [img]="Info" class="text-muted-foreground" />
+              <span class="text-muted-foreground font-normal">No open pull requests found</span>
+            </div>
+          }
+        </hlm-scroll-area>
       </div>
-    }
+    </div>
   }
 </div>

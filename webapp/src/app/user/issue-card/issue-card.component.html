@@ -2,49 +2,53 @@
   <div hlmCardContent variant="profile">
     <div class="flex justify-between items-center text-sm text-github-muted-foreground">
       <span class="font-medium flex justify-center items-center space-x-1">
-        @if (state() === 'OPEN') {
-          <ng-icon [svg]="octGitPullRequest" size="18" class="mr-1 text-github-success-foreground"></ng-icon>
+        @if (isLoading()) {
+          <hlm-skeleton class="h-4 w-16 lg:w-36"></hlm-skeleton>
         } @else {
-          <ng-icon [svg]="octGitPullRequestClosed" size="18" class="mr-1 text-github-danger-foreground"></ng-icon>
-        }
+          @if (state() === 'OPEN') {
+            <ng-icon [svg]="octGitPullRequest" size="18" class="mr-1 text-github-success-foreground"></ng-icon>
+          } @else {
+            <ng-icon [svg]="octGitPullRequestClosed" size="18" class="mr-1 text-github-danger-foreground"></ng-icon>
+          }
 
-        {{ repositoryName() }} #{{ number() }} on {{ displayCreated().format('MMM D') }}
+          {{ repositoryName() }} #{{ number() }} on {{ displayCreated().format('MMM D') }}
+        }
       </span>
       <span class="flex items-center space-x-2">
-        <span class="text-github-success-foreground font-bold">+{{ additions() }}</span>
-        <span class="text-github-danger-foreground font-bold">-{{ deletions() }}</span>
+        @if (isLoading()) {
+          <hlm-skeleton class="size-4 bg-green-500/30"></hlm-skeleton>
+          <hlm-skeleton class="size-4 bg-destructive/20"></hlm-skeleton>
+        } @else {
+          <span class="text-github-success-foreground font-bold">+{{ additions() }}</span>
+          <span class="text-github-danger-foreground font-bold">-{{ deletions() }}</span>
+        }
       </span>
     </div>
 
-    <a class="flex justify-between font-medium mb-3 hover:text-github-accent-foreground" href="{{ url() }}" target="_blank" rel="noopener noreferrer">
-      <div [innerHTML]="displayTitle()" class="truncate"></div>
-      @if (reviews() && reviews()!.size > 0 && getMostRecentReview(); as review) {
-        @if (review.state === 'APPROVED') {
-          <ng-icon [svg]="octCheck" size="16" class="text-github-success-foreground"></ng-icon>
-        } @else if (review.state === 'DISMISSED') {
-          <ng-icon [svg]="octX" size="16" class="text-github-danger-foreground"></ng-icon>
-        } @else if (review.state === 'COMMENTED') {
-          <ng-icon [svg]="octComment" size="16" class="text-github-muted-foreground"></ng-icon>
-        } @else {
-          <ng-icon [svg]="octFileDiff" size="16" class="text-github-danger-foreground"></ng-icon>
-        }
+    <a class="containerSize flex justify-between font-medium mb-3 hover:text-github-accent-foreground" href="{{ url() }}" target="_blank" rel="noopener noreferrer">
+      @if (isLoading()) {
+        <hlm-skeleton class="h-6 w-3/4"></hlm-skeleton>
+      } @else {
+        <div [innerHTML]="displayTitle()" class="truncate"></div>
       }
     </a>
   </div>
-  <div hlmCardFooter class="flex gap-2 flex-wrap gap-y-2 p-0">
-    @for (label of pullRequestLabels(); track label.name) {
-      @let labelColors = hexToRgb(label.color ?? 'FFFFFF');
-      <span
-        class="px-2 py-0.5 rounded-[2rem] text-xs font-medium dark:border gh-label"
-        [style.--label-r]="labelColors.r"
-        [style.--label-g]="labelColors.g"
-        [style.--label-b]="labelColors.b"
-        [style.--label-h]="labelColors.h"
-        [style.--label-s]="labelColors.s"
-        [style.--label-l]="labelColors.l"
-      >
-        {{ label.name }}
-      </span>
-    }
-  </div>
+  @if (!isLoading()) {
+    <div hlmCardFooter class="flex flex-wrap gap-2 p-0 space-x-0">
+      @for (label of pullRequestLabels(); track label.name) {
+        @let labelColors = hexToRgb(label.color ?? 'FFFFFF');
+        <span
+          class="px-2 py-0.5 rounded-[2rem] text-xs font-medium dark:border gh-label"
+          [style.--label-r]="labelColors.r"
+          [style.--label-g]="labelColors.g"
+          [style.--label-b]="labelColors.b"
+          [style.--label-h]="labelColors.h"
+          [style.--label-s]="labelColors.s"
+          [style.--label-l]="labelColors.l"
+        >
+          {{ label.name }}
+        </span>
+      }
+    </div>
+  }
 </div>

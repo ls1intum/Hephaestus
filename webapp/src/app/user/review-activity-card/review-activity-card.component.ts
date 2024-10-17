@@ -27,14 +27,7 @@ type ReviewStateCases = {
   selector: 'app-review-activity-card',
   templateUrl: './review-activity-card.component.html',
   imports: [NgIcon, HlmCardModule, HlmSkeletonComponent],
-  standalone: true,
-  styles: `
-    :host {
-      .containerSize {
-        container-type: inline-size;
-      }
-    }
-  `
+  standalone: true
 })
 export class ReviewActivityCardComponent {
   protected readonly octCheck = octCheck;
@@ -43,7 +36,7 @@ export class ReviewActivityCardComponent {
   protected readonly octGitPullRequest = octGitPullRequest;
   protected readonly octGitPullRequestClosed = octGitPullRequestClosed;
 
-  isLoading = input<boolean>(false);
+  isLoading = input(false);
   state = input<PullRequestReviewDTO.StateEnum>();
   createdAt = input<string>();
   pullRequest = input<PullRequestProps>();

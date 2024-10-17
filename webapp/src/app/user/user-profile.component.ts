@@ -1,15 +1,6 @@
-import { Component, computed, inject } from '@angular/core';
+import { Component, inject } from '@angular/core';
 import { NgIconComponent } from '@ng-icons/core';
-import { octClockFill } from '@ng-icons/octicons';
-import { UserService } from 'app/core/modules/openapi';
-import { TableBodyDirective } from 'app/ui/table/table-body.directive';
-import { TableCaptionDirective } from 'app/ui/table/table-caption.directive';
-import { TableCellDirective } from 'app/ui/table/table-cell.directive';
-import { TableFooterDirective } from 'app/ui/table/table-footer.directive';
-import { TableHeadDirective } from 'app/ui/table/table-head.directive';
-import { TableHeaderDirective } from 'app/ui/table/table-header.directive';
-import { TableRowDirective } from 'app/ui/table/table-row.directive';
-import { TableComponent } from 'app/ui/table/table.component';
+import { PullRequestDTO, PullRequestReviewDTO, UserService } from 'app/core/modules/openapi';
 import { HlmAvatarModule } from '@spartan-ng/ui-avatar-helm';
 import { HlmSkeletonModule } from '@spartan-ng/ui-skeleton-helm';
 import { ActivatedRoute } from '@angular/router';
@@ -23,16 +14,7 @@ import { ReviewActivityCardComponent } from '@app/user/review-activity-card/revi
 import { IssueCardComponent } from '@app/user/issue-card/issue-card.component';
 import { combineLatest, lastValueFrom, map, timer } from 'rxjs';
 import { CircleX, LucideAngularModule, Info } from 'lucide-angular';
-import dayjs from 'dayjs';
-import advancedFormat from 'dayjs/plugin/advancedFormat';
-
-dayjs.extend(advancedFormat);
-
-const repoImages: { [key: string]: string } = {
-  Hephaestus: 'https://github.com/ls1intum/Hephaestus/raw/refs/heads/develop/docs/images/hammer.svg',
-  Artemis: 'https://artemis.in.tum.de/public/images/logo.png',
-  Athena: 'https://raw.githubusercontent.com/ls1intum/Athena/develop/playground/public/logo.png'
-};
+import { UserHeaderComponent } from './header/header.component';
 
 @Component({
   selector: 'app-user-profile',
@@ -44,51 +26,40 @@ const repoImages: { [key: string]: string } = {
     IssueCardComponent,
     HlmAvatarModule,
     HlmSkeletonModule,
-    TableComponent,
-    TableBodyDirective,
-    TableCaptionDirective,
-    TableCellDirective,
-    TableFooterDirective,
-    TableHeaderDirective,
-    TableHeadDirective,
-    TableRowDirective,
     HlmIconModule,
     HlmTooltipComponent,
     HlmTooltipTriggerDirective,
     BrnTooltipContentDirective,
     HlmButtonModule,
-    HlmScrollAreaComponent
+    HlmScrollAreaComponent,
+    UserHeaderComponent
   ],
-  templateUrl: './user-profile.component.html',
-  styles: `
-    :host {
-      code {
-        display: inline-block;
-      }
-    }
-  `
+  templateUrl: './user-profile.component.html'
 })
 export class UserProfileComponent {
   userService = inject(UserService);
 
-  protected octClockFill = octClockFill;
   protected CircleX = CircleX;
   protected Info = Info;
   // get user id from the url
   protected userLogin: string | null = null;
 
-  displayFirstContribution = computed(() => {
-    if (this.query.data()) {
-      return dayjs(this.query.data()?.firstContribution).format('Do [of] MMMM YYYY');
-    }
-    return '';
-  });
-
   constructor(private route: ActivatedRoute) {
     this.userLogin = this.route.snapshot.paramMap.get('id');
   }
 
-  getRepositoryImage = (name: string) => repoImages[name.split('/')[1]] || 'https://avatars.githubusercontent.com/u/11064260?v=4';
+  skeletonReviews = this.genSkeletonArray<PullRequestReviewDTO>(3);
+  skeletonPullRequests = this.genSkeletonArray<PullRequestDTO>(2);
+
+  genSkeletonArray<T>(length: number): T[] {
+    return Array.from({ length }, (_, i) => ({ id: i })) as T[];
+  }
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  calcScrollHeight = (arr: any[] | Set<any> | undefined, elHeight = 100) => {
+    if (Array.isArray(arr)) return `min(400px, calc(${arr.length * elHeight}px + ${8 * arr.length}px))`;
+    return '400px';
+  };
 
   query = injectQuery(() => ({
     queryKey: ['user', { id: this.userLogin }],
