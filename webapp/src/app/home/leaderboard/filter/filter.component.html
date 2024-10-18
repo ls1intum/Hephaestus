@@ -1,9 +1,9 @@
-<div class="inline-flex flex-col gap-2 border rounded-md border-input bg-background p-4">
+<div class="w-full xl:w-fit inline-flex flex-col gap-2 border rounded-md border-input bg-background p-4">
   <span class="flex items-center pb-2 gap-2 text-muted-foreground">
     <lucide-angular [img]="ListFilter" class="size-4" />
     <h3 class="text-base font-semibold tracking-wide">Filter</h3>
   </span>
-  <form ngForm class="flex xl:flex-col gap-4">
+  <form ngForm class="flex flex-wrap gap-4">
     <app-leaderboard-filter-timeframe />
     @if (repositories() && repositories()!.length > 1) {
       <app-leaderboard-filter-repository [repositories]="repositories()!" />
