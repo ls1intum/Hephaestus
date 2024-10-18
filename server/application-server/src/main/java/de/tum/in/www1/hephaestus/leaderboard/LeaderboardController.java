@@ -24,7 +24,8 @@ public class LeaderboardController {
     @GetMapping
     public ResponseEntity<List<LeaderboardEntry>> getLeaderboard(
             @RequestParam @DateTimeFormat(pattern = "yyyy-MM-dd") Optional<LocalDate> after,
-            @RequestParam @DateTimeFormat(pattern = "yyyy-MM-dd") Optional<LocalDate> before) {
-        return ResponseEntity.ok(leaderboardService.createLeaderboard(after, before));
+            @RequestParam @DateTimeFormat(pattern = "yyyy-MM-dd") Optional<LocalDate> before,
+            @RequestParam Optional<String> repository) {
+        return ResponseEntity.ok(leaderboardService.createLeaderboard(after, before, repository));
     }
 }

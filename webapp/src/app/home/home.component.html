@@ -1,6 +1,6 @@
 <div class="flex flex-col items-center">
   <div class="">
-    <div class="grid grid-cols-1 xl:grid-cols-4 gap-4 xl:gap-8">
+    <div class="grid grid-cols-1 xl:grid-cols-4 gap-y-4 xl:gap-8">
       <div class="space-y-2 col-span-1">
         <div class="flex flex-col gap-2 mb-4">
           <h1 class="text-3xl font-bold">Artemis Leaderboard</h1>
@@ -8,7 +8,7 @@
             <h2 class="text-xl text-muted-foreground">Hi {{ userValue.name }} 👋</h2>
           }
         </div>
-        <app-leaderboard-filter [after]="after()" [before]="before()" />
+        <app-leaderboard-filter [repositories]="metaQuery.data()?.repositoriesToMonitor" />
       </div>
       <div class="col-span-2">
         @if (query.error()) {

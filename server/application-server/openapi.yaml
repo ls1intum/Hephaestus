@@ -107,6 +107,18 @@ paths:
                 type: array
                 items:
                   $ref: "#/components/schemas/PullRequest"
+  /meta:
+    get:
+      tags:
+      - meta
+      operationId: getMetaData
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MetaDataDTO"
   /leaderboard:
     get:
       tags:
@@ -125,6 +137,11 @@ paths:
         schema:
           type: string
           format: date
+      - name: repository
+        in: query
+        required: false
+        schema:
+          type: string
       responses:
         "200":
           description: OK
@@ -586,6 +603,13 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/PullRequestReview"
+    MetaDataDTO:
+      type: object
+      properties:
+        repositoriesToMonitor:
+          type: array
+          items:
+            type: string
     LeaderboardEntry:
       type: object
       properties:
