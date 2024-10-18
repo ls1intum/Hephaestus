@@ -1,0 +1,68 @@
+<div class="pt-4 lg:mx-20">
+  @if (query.error()) {
+    <div class="flex items-center justify-center gap-2">
+      <div hlmAlert class="max-w-xl" variant="destructive">
+        <lucide-angular [img]="CircleX" hlmAlertIcon />
+        <h4 hlmAlertTitle>Something went wrong...</h4>
+        <p hlmAlertDesc>User couldn't be loaded. Please try again later.</p>
+      </div>
+    </div>
+  } @else {
+    @let showSkeleton = query.isPending();
+    <app-user-header [userData]="query.data()" [isLoading]="query.isPending()" />
+    <div class="flex flex-col lg:flex-row lg:justify-between gap-y-8 border-t border-border pt-8 px-4">
+      <div class="lg:w-[45%] flex flex-col gap-4 mx-4">
+        <h2 class="text-xl font-semibold">Latest Activity</h2>
+        @let userActivity = showSkeleton ? skeletonReviews : query.data()?.activity;
+        <hlm-scroll-area [autoHeightDisabled]="false" [style]="'height : ' + calcScrollHeight(userActivity)">
+          @for (activity of userActivity; track activity.id) {
+            <div class="ml-1 mr-3.5 my-2">
+              <app-review-activity-card
+                [isLoading]="showSkeleton"
+                [state]="activity?.state"
+                [createdAt]="activity?.createdAt"
+                [pullRequest]="activity?.pullRequest"
+                [repositoryName]="activity?.pullRequest?.repository?.name"
+              />
+            </div>
+          }
+          @if (!showSkeleton && (!query.data()?.activity || query.data()?.activity?.size === 0)) {
+            <div class="w-full h-20 flex justify-center items-center gap-4 border border-border bg-card hover:bg-accent hover:text-accent-foreground rounded-lg p-4 my-2">
+              <lucide-angular [img]="Info" class="text-muted-foreground" />
+              <span class="text-muted-foreground font-normal">No activity found</span>
+            </div>
+          }
+        </hlm-scroll-area>
+      </div>
+      <div class="lg:w-[45%] flex flex-col gap-4 mx-4">
+        <h2 class="text-xl font-semibold">Open Pull Requests</h2>
+        @let userPullRequests = showSkeleton ? skeletonPullRequests : query.data()?.pullRequests;
+        <hlm-scroll-area [autoHeightDisabled]="false" [style]="'height : ' + calcScrollHeight(userPullRequests, 130)">
+          @for (pullRequest of userPullRequests; track pullRequest.id) {
+            <div class="ml-1 mr-3.5 my-2">
+              <app-issue-card
+                class="w-full"
+                [isLoading]="showSkeleton"
+                [additions]="pullRequest.additions"
+                [deletions]="pullRequest.deletions"
+                [number]="pullRequest.number"
+                [repositoryName]="pullRequest.repository?.name"
+                [title]="pullRequest.title"
+                [url]="pullRequest.url"
+                [state]="pullRequest.state"
+                [createdAt]="pullRequest.createdAt"
+                [pullRequestLabels]="pullRequest.labels"
+              />
+            </div>
+          }
+          @if (!showSkeleton && (!query.data()?.pullRequests || query.data()?.pullRequests?.size === 0)) {
+            <div class="w-full h-20 flex justify-center items-center gap-4 border border-border bg-card hover:bg-accent hover:text-accent-foreground rounded-lg p-4 my-2">
+              <lucide-angular [img]="Info" class="text-muted-foreground" />
+              <span class="text-muted-foreground font-normal">No open pull requests found</span>
+            </div>
+          }
+        </hlm-scroll-area>
+      </div>
+    </div>
+  }
+</div>
