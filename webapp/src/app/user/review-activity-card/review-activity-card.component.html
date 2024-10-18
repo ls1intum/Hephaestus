@@ -1,5 +1,5 @@
 @if (isLoading()) {
-  <div hlmCard variant="profile">
+  <div hlmCard variant="profile" [class]="class()">
     <div hlmCardContent variant="profile">
       <hlm-skeleton class="h-4 w-1/2"></hlm-skeleton>
       <div class="flex items-center gap-2 font-medium">
@@ -9,7 +9,7 @@
     </div>
   </div>
 } @else {
-  <a hlmCard variant="profile" class="hover:bg-accent/50" [href]="this.pullRequest()?.url" target="_blank" rel="noopener noreferrer">
+  <a hlmCard variant="profile" class="hover:bg-accent/50" [href]="this.pullRequest()?.url" target="_blank" rel="noopener noreferrer" [class]="class()">
     <div hlmCardContent variant="profile">
       <div class="text-sm text-muted-foreground first-letter:uppercase">
         {{ relativeActivityTime() }}
@@ -18,7 +18,7 @@
       </div>
       <div class="containerSize flex items-center gap-2 font-medium">
         <ng-icon [className]="this.reviewStateProps().color" [svg]="this.reviewStateProps().icon" size="20"></ng-icon>
-        <span [innerHTML]="displayPullRequestTitle()" class="truncate"></span>
+        <span [innerHTML]="displayPullRequestTitle()" class="truncate w-[95%]"></span>
       </div>
     </div>
   </a>

@@ -1,8 +1,9 @@
-<div hlmCard variant="profile" [class]="computedClass()">
+<a hlmCard variant="profile" [class]="computedClass()" [href]="url()" target="_blank" rel="noopener noreferrer">
   <div hlmCardContent variant="profile">
     <div class="flex justify-between items-center text-sm text-github-muted-foreground">
       <span class="font-medium flex justify-center items-center space-x-1">
         @if (isLoading()) {
+          <hlm-skeleton class="size-5 bg-green-500/30"></hlm-skeleton>
           <hlm-skeleton class="h-4 w-16 lg:w-36"></hlm-skeleton>
         } @else {
           @if (state() === 'OPEN') {
@@ -16,8 +17,8 @@
       </span>
       <span class="flex items-center space-x-2">
         @if (isLoading()) {
-          <hlm-skeleton class="size-4 bg-green-500/30"></hlm-skeleton>
-          <hlm-skeleton class="size-4 bg-destructive/20"></hlm-skeleton>
+          <hlm-skeleton class="h-4 w-8 bg-green-500/30"></hlm-skeleton>
+          <hlm-skeleton class="h-4 w-8 bg-destructive/20"></hlm-skeleton>
         } @else {
           <span class="text-github-success-foreground font-bold">+{{ additions() }}</span>
           <span class="text-github-danger-foreground font-bold">-{{ deletions() }}</span>
@@ -25,13 +26,13 @@
       </span>
     </div>
 
-    <a class="containerSize flex justify-between font-medium mb-3 hover:text-github-accent-foreground" href="{{ url() }}" target="_blank" rel="noopener noreferrer">
+    <span class="containerSize flex justify-between font-medium mb-3">
       @if (isLoading()) {
         <hlm-skeleton class="h-6 w-3/4"></hlm-skeleton>
       } @else {
         <div [innerHTML]="displayTitle()" class="truncate"></div>
       }
-    </a>
+    </span>
   </div>
   @if (!isLoading()) {
     <div hlmCardFooter class="flex flex-wrap gap-2 p-0 space-x-0">
@@ -51,4 +52,4 @@
       }
     </div>
   }
-</div>
+</a>

@@ -15,6 +15,13 @@ import { cn } from '@app/utils';
   standalone: true
 })
 export class IssueCardComponent {
+  protected readonly octCheck = octCheck;
+  protected readonly octX = octX;
+  protected readonly octComment = octComment;
+  protected readonly octGitPullRequest = octGitPullRequest;
+  protected readonly octFileDiff = octFileDiff;
+  protected readonly octGitPullRequestClosed = octGitPullRequestClosed;
+
   isLoading = input(false);
   class = input('');
   title = input<string>();
@@ -26,16 +33,10 @@ export class IssueCardComponent {
   createdAt = input<string>();
   state = input<PullRequest.StateEnum>();
   pullRequestLabels = input<Set<PullRequestLabel>>();
-  protected readonly octCheck = octCheck;
-  protected readonly octX = octX;
-  protected readonly octComment = octComment;
-  protected readonly octGitPullRequest = octGitPullRequest;
-  protected readonly octFileDiff = octFileDiff;
-  protected readonly octGitPullRequestClosed = octGitPullRequestClosed;
 
   displayCreated = computed(() => dayjs(this.createdAt()));
   displayTitle = computed(() => (this.title() ?? '').replace(/`([^`]+)`/g, '<code class="textCode">$1</code>'));
-  computedClass = computed(() => cn('w-72', this.class()));
+  computedClass = computed(() => cn('w-72', !this.isLoading() ? 'hover:bg-accent/50 cursor-pointer' : '', this.class()));
 
   hexToRgb(hex: string) {
     const bigint = parseInt(hex, 16);

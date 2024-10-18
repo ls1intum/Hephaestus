@@ -37,6 +37,7 @@ export class ReviewActivityCardComponent {
   protected readonly octGitPullRequestClosed = octGitPullRequestClosed;
 
   isLoading = input(false);
+  class = input('');
   state = input<PullRequestReviewDTO.StateEnum>();
   createdAt = input<string>();
   pullRequest = input<PullRequestProps>();
