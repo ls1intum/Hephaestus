@@ -13,3 +13,4 @@ export * from './repository-dto';
 export * from './user';
 export * from './user-dto';
 export * from './user-info-dto';
+export * from './user-profile-dto';

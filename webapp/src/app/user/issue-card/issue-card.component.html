@@ -1,0 +1,55 @@
+<a hlmCard variant="profile" [class]="computedClass()" [href]="url()" target="_blank" rel="noopener noreferrer">
+  <div hlmCardContent variant="profile">
+    <div class="flex justify-between items-center text-sm text-github-muted-foreground">
+      <span class="font-medium flex justify-center items-center space-x-1">
+        @if (isLoading()) {
+          <hlm-skeleton class="size-5 bg-green-500/30"></hlm-skeleton>
+          <hlm-skeleton class="h-4 w-16 lg:w-36"></hlm-skeleton>
+        } @else {
+          @if (state() === 'OPEN') {
+            <ng-icon [svg]="octGitPullRequest" size="18" class="mr-1 text-github-success-foreground"></ng-icon>
+          } @else {
+            <ng-icon [svg]="octGitPullRequestClosed" size="18" class="mr-1 text-github-danger-foreground"></ng-icon>
+          }
+
+          {{ repositoryName() }} #{{ number() }} on {{ displayCreated().format('MMM D') }}
+        }
+      </span>
+      <span class="flex items-center space-x-2">
+        @if (isLoading()) {
+          <hlm-skeleton class="h-4 w-8 bg-green-500/30"></hlm-skeleton>
+          <hlm-skeleton class="h-4 w-8 bg-destructive/20"></hlm-skeleton>
+        } @else {
+          <span class="text-github-success-foreground font-bold">+{{ additions() }}</span>
+          <span class="text-github-danger-foreground font-bold">-{{ deletions() }}</span>
+        }
+      </span>
+    </div>
+
+    <span class="containerSize flex justify-between font-medium mb-3">
+      @if (isLoading()) {
+        <hlm-skeleton class="h-6 w-3/4"></hlm-skeleton>
+      } @else {
+        <div [innerHTML]="displayTitle()" class="truncate"></div>
+      }
+    </span>
+  </div>
+  @if (!isLoading()) {
+    <div hlmCardFooter class="flex flex-wrap gap-2 p-0 space-x-0">
+      @for (label of pullRequestLabels(); track label.name) {
+        @let labelColors = hexToRgb(label.color ?? 'FFFFFF');
+        <span
+          class="px-2 py-0.5 rounded-[2rem] text-xs font-medium dark:border gh-label"
+          [style.--label-r]="labelColors.r"
+          [style.--label-g]="labelColors.g"
+          [style.--label-b]="labelColors.b"
+          [style.--label-h]="labelColors.h"
+          [style.--label-s]="labelColors.s"
+          [style.--label-l]="labelColors.l"
+        >
+          {{ label.name }}
+        </span>
+      }
+    </div>
+  }
+</a>

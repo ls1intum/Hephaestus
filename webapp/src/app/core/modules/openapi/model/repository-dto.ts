@@ -12,9 +12,9 @@
 
 
 export interface RepositoryDTO { 
-    name?: string;
-    nameWithOwner?: string;
+    name: string;
+    nameWithOwner: string;
     description?: string;
-    url?: string;
+    url: string;
 }
 
