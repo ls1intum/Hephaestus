@@ -19,6 +19,7 @@ import lombok.ToString;
 import de.tum.in.www1.hephaestus.gitprovider.common.BaseGitServiceEntity;
 import de.tum.in.www1.hephaestus.gitprovider.issue.Issue;
 import de.tum.in.www1.hephaestus.gitprovider.label.Label;
+import de.tum.in.www1.hephaestus.gitprovider.milestone.Milestone;
 
 @Entity
 @Table(name = "repository")
@@ -76,6 +77,10 @@ public class Repository extends BaseGitServiceEntity {
     @OneToMany(mappedBy = "repository")
     @ToString.Exclude
     private Set<Label> labels = new HashSet<>();
+
+    @OneToMany(mappedBy = "repository")
+    @ToString.Exclude
+    private Set<Milestone> milestones = new HashSet<>();
 
     public enum Visibility {
         PUBLIC, PRIVATE, INTERNAL, UNKNOWN

@@ -8,6 +8,7 @@ import org.springframework.stereotype.Component;
 
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubMessageHandler;
 import de.tum.in.www1.hephaestus.gitprovider.issue.github.GitHubIssueSyncService;
+import de.tum.in.www1.hephaestus.gitprovider.issuecomment.IssueCommentRepository;
 import de.tum.in.www1.hephaestus.gitprovider.repository.github.GitHubRepositorySyncService;
 
 @Component
@@ -15,15 +16,18 @@ public class GitHubIssueCommentMessageHandler extends GitHubMessageHandler<GHEve
 
     private static final Logger logger = LoggerFactory.getLogger(GitHubIssueCommentMessageHandler.class);
 
+    private final IssueCommentRepository issueCommentRepository;
     private final GitHubRepositorySyncService repositorySyncService;
     private final GitHubIssueSyncService issueSyncService;
     private final GitHubIssueCommentSyncService issueCommentSyncService;
 
     private GitHubIssueCommentMessageHandler(
+            IssueCommentRepository issueCommentRepository,
             GitHubRepositorySyncService repositorySyncService,
             GitHubIssueSyncService issueSyncService,
             GitHubIssueCommentSyncService issueCommentSyncService) {
         super(GHEventPayload.IssueComment.class);
+        this.issueCommentRepository = issueCommentRepository;
         this.repositorySyncService = repositorySyncService;
         this.issueSyncService = issueSyncService;
         this.issueCommentSyncService = issueCommentSyncService;
@@ -31,17 +35,23 @@ public class GitHubIssueCommentMessageHandler extends GitHubMessageHandler<GHEve
 
     @Override
     protected void handleEvent(GHEventPayload.IssueComment eventPayload) {
+        var action = eventPayload.getAction();
         var repository = eventPayload.getRepository();
         var issue = eventPayload.getIssue();
         var comment = eventPayload.getComment();
         logger.info("Received issue comment event for repository: {}, issue: {}, action: {}, commentId: {}",
                 repository.getFullName(),
                 issue.getNumber(),
-                eventPayload.getAction(),
+                action,
                 comment.getId());
         repositorySyncService.processRepository(repository);
         issueSyncService.processIssue(issue);
-        issueCommentSyncService.processIssueComment(comment);
+
+        if (action.equals("deleted")) {
+            issueCommentRepository.deleteById(comment.getId());
+        } else {
+            issueCommentSyncService.processIssueComment(comment);
+        }
     }
 
     @Override

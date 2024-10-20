@@ -19,6 +19,7 @@ import lombok.ToString;
 
 import de.tum.in.www1.hephaestus.gitprovider.common.BaseGitServiceEntity;
 import de.tum.in.www1.hephaestus.gitprovider.issue.Issue;
+import de.tum.in.www1.hephaestus.gitprovider.repository.Repository;
 import de.tum.in.www1.hephaestus.gitprovider.user.User;
 
 @Entity
@@ -55,6 +56,11 @@ public class Milestone extends BaseGitServiceEntity {
     @OneToMany(mappedBy = "milestone")
     @ToString.Exclude
     private Set<Issue> issues = new HashSet<>();
+
+    @ManyToOne
+    @JoinColumn(name = "repository_id")
+    @ToString.Exclude
+    private Repository repository;
 
     public enum State {
         OPEN, CLOSED

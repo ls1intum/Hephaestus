@@ -32,6 +32,7 @@ public class GitHubPullRequestMessageHandler extends GitHubMessageHandler<GHEven
                 eventPayload.getPullRequest().getNumber(),
                 eventPayload.getAction());
         repositorySyncService.processRepository(eventPayload.getRepository());
+        // We don't need to handle the deleted action here, as pull requests are not deleted
         pullRequestSyncService.processPullRequest(eventPayload.getPullRequest());
     }
 

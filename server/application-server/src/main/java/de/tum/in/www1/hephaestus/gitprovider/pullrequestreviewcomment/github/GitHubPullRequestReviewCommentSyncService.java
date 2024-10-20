@@ -1,7 +1,6 @@
 package de.tum.in.www1.hephaestus.gitprovider.pullrequestreviewcomment.github;
 
 import java.io.IOException;
-import java.lang.reflect.Field;
 
 import org.kohsuke.github.GHPullRequestReviewComment;
 import org.kohsuke.github.GHUser;
@@ -99,21 +98,15 @@ public class GitHubPullRequestReviewCommentSyncService {
         }
 
         // Link author
-        // Use reflection get user field, otherwise it would try to fetch the user from the API
-        Class<?> clazz = ghPullRequestReviewComment.getClass();
         try {
-            Field userField = clazz.getDeclaredField("user");
-            userField.setAccessible(true);
-            GHUser user = (GHUser) userField.get(ghPullRequestReviewComment);
+            GHUser user = ghPullRequestReviewComment.getUser();
             var resultAuthor = userRepository.findById(user.getId())
                     .orElseGet(() -> userRepository.save(userConverter.convert(user)));
             result.setAuthor(resultAuthor);
-        } catch (NoSuchFieldException | IllegalAccessException ex) {
-            logger.error("Failed to link author for pull request review comment {}: {}",
-                    ghPullRequestReviewComment.getId(),
-                    ex.getMessage());
+        } catch (IOException e) {
+            logger.error("Failed to link author for pull request review comment {}: {}", ghPullRequestReviewComment.getId(),
+                    e.getMessage());
         }
-
         pullRequestReviewCommentRepository.save(result);
     }
 }

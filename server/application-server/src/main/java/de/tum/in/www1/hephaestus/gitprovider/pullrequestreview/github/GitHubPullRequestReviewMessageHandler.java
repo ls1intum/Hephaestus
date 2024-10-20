@@ -38,6 +38,7 @@ public class GitHubPullRequestReviewMessageHandler extends GitHubMessageHandler<
                 repository.getFullName(), pullRequest.getNumber(), eventPayload.getAction(), review.getId());
         repositorySyncService.processRepository(repository);
         pullRequestSyncService.processPullRequest(pullRequest);
+        // We don't need to handle the deleted action here, as reviews are not deleted, they are only dismissed
         pullRequestReviewSyncService.processPullRequestReview(review);
     }
 

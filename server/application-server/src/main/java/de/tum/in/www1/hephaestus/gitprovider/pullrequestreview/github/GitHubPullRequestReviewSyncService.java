@@ -1,6 +1,6 @@
 package de.tum.in.www1.hephaestus.gitprovider.pullrequestreview.github;
 
-import java.lang.reflect.Field;
+import java.io.IOException;
 
 import org.kohsuke.github.GHPullRequestReview;
 import org.kohsuke.github.GHUser;
@@ -68,18 +68,14 @@ public class GitHubPullRequestReviewSyncService {
         result.setPullRequest(resultPullRequest);
 
         // Link author
-        // Use reflection get user field, otherwise it would try to fetch the user from the API
-        Class<?> clazz = ghPullRequestReview.getClass();
         try {
-            Field userField = clazz.getDeclaredField("user");
-            userField.setAccessible(true);
-            GHUser user = (GHUser) userField.get(ghPullRequestReview);
+            GHUser user = ghPullRequestReview.getUser();
             var resultAuthor = userRepository.findById(user.getId())
                     .orElseGet(() -> userRepository.save(userConverter.convert(user)));
             result.setAuthor(resultAuthor);
-        } catch (NoSuchFieldException | IllegalAccessException ex) {
+        } catch (IOException e) {
             logger.error("Failed to link author for pull request review {}: {}", ghPullRequestReview.getId(),
-                    ex.getMessage());
+                    e.getMessage());
         }
 
         pullRequestReviewRepository.save(result);

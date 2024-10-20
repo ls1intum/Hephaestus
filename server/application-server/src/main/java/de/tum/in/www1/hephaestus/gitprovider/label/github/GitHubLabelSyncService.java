@@ -1,4 +1,5 @@
 package de.tum.in.www1.hephaestus.gitprovider.label.github;
+
 import org.kohsuke.github.GHLabel;
 import org.kohsuke.github.GitHub;
 import org.slf4j.Logger;
