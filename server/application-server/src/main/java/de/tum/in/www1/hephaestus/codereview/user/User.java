@@ -12,9 +12,12 @@ import de.tum.in.www1.hephaestus.codereview.comment.IssueComment;
 import de.tum.in.www1.hephaestus.codereview.comment.review.PullRequestReviewComment;
 import de.tum.in.www1.hephaestus.codereview.pullrequest.PullRequest;
 import de.tum.in.www1.hephaestus.codereview.pullrequest.review.PullRequestReview;
+import de.tum.in.www1.hephaestus.codereview.team.Team;
 import jakarta.persistence.CascadeType;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
+import jakarta.persistence.FetchType;
+import jakarta.persistence.ManyToMany;
 import jakarta.persistence.OneToMany;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
@@ -63,6 +66,10 @@ public class User extends BaseGitServiceEntity {
     @NonNull
     private UserType type;
 
+    @ManyToMany(fetch = FetchType.EAGER, mappedBy = "members")
+    @ToString.Exclude
+    private Set<Team> teams = new HashSet<>();
+
     @OneToMany(cascade = CascadeType.ALL, mappedBy = "author")
     private Set<PullRequest> pullRequests = new HashSet<>();
 
@@ -89,5 +96,9 @@ public class User extends BaseGitServiceEntity {
 
     public void addReview(PullRequestReview review) {
         reviews.add(review);
+    }
+
+    public void addTeam(Team team) {
+        teams.add(team);
     }
 }

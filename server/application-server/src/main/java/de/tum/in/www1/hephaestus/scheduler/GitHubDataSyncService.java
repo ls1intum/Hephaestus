@@ -31,6 +31,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
+import de.tum.in.www1.hephaestus.admin.AdminService;
 import de.tum.in.www1.hephaestus.codereview.comment.IssueComment;
 import de.tum.in.www1.hephaestus.codereview.comment.IssueCommentConverter;
 import de.tum.in.www1.hephaestus.codereview.comment.IssueCommentRepository;
@@ -59,9 +60,6 @@ public class GitHubDataSyncService {
     @Value("${github.authToken:null}")
     private String ghAuthToken;
 
-    @Value("${monitoring.repositories}")
-    private String[] repositoriesToMonitor;
-
     @Value("${monitoring.timeframe}")
     private int timeframe;
     private OffsetDateTime cutOffTime;
@@ -74,6 +72,9 @@ public class GitHubDataSyncService {
     private final IssueCommentRepository commentRepository;
     private final PullRequestReviewCommentRepository reviewCommentRepository;
     private final UserRepository userRepository;
+
+    @Autowired
+    private AdminService adminService;
 
     @Autowired
     private RepositoryConverter repositoryConverter;
@@ -109,6 +110,8 @@ public class GitHubDataSyncService {
             logger.error("Aborted GitHub data sync due to error during initialization of GitHub client.");
             return;
         }
+
+        Set<String> repositoriesToMonitor = adminService.getAdminConfig().getRepositoriesToMonitor();
         int successfullySyncedRepositories = 0;
         for (String repositoryName : repositoriesToMonitor) {
             try {
@@ -121,7 +124,7 @@ public class GitHubDataSyncService {
             }
         }
         logger.info("GitHub data sync completed for " + successfullySyncedRepositories + "/"
-                + repositoriesToMonitor.length + " repositories for the last " + timeframe + " day(s).");
+                + repositoriesToMonitor.size() + " repositories for the last " + timeframe + " day(s).");
     }
 
     private boolean initGithubClient() {
