@@ -13,6 +13,29 @@ servers:
 - url: /
   description: Default Server URL
 paths:
+  /admin/config/repositories:
+    post:
+      tags:
+      - admin
+      operationId: updateRepositories
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: array
+              items:
+                type: string
+        required: true
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                uniqueItems: true
+                type: array
+                items:
+                  type: string
   /user/{login}:
     get:
       tags:
@@ -175,6 +198,18 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/UserInfoDto"
+  /admin/config:
+    get:
+      tags:
+      - admin
+      operationId: getConfig
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AdminConfig"
 components:
   schemas:
     IssueCommentDTO:
@@ -651,6 +686,19 @@ components:
         name:
           type: string
         roles:
+          type: array
+          items:
+            type: string
+    AdminConfig:
+      required:
+      - repositoriesToMonitor
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+        repositoriesToMonitor:
+          uniqueItems: true
           type: array
           items:
             type: string

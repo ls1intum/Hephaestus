@@ -1,17 +1,35 @@
-<h1 class="text-3xl font-bold">Admin</h1>
-<div>
-  <div>User:</div>
-  {{ user() | json }}
-</div>
-
-@if (query.isPending()) {
-  <div>Loading...</div>
-} @else if (query.error()) {
-  <div>Something went wrong...</div>
-}
-@if (query.data(); as data) {
-  <div>
-    <div>Greeting:</div>
-    {{ data | json }}
+<div class="container space-y-4">
+  <h1 class="text-3xl font-bold">Admin Page</h1>
+  <div class="flex flex-col gap-4 indent-3">
+    <h3 class="text-xl font-bold">User</h3>
+    <textarea hlmInput class="block size-full" style="field-sizing: content" readonly>{{ user() | json }}</textarea>
   </div>
-}
+  <div class="flex flex-col gap-4 indent-3">
+    <h3 class="text-xl font-bold">Config</h3>
+    <!-- input for repositories with save button -->
+    <div class="flex flex-col items-start gap-4">
+      <div class="w-1/2">
+        <textarea hlmInput [formControl]="repositoriesForm" class="block size-fit" style="field-sizing: content"></textarea>
+      </div>
+      <button hlmBtn (click)="saveRepositories()">Save</button>
+    </div>
+  </div>
+
+  @if (query.isPending()) {
+    <div>Loading...</div>
+  } @else if (query.error()) {
+    <div>Something went wrong...</div>
+  }
+  @if (query.data(); as data) {
+    <div>
+      <div>Greeting:</div>
+      {{ data | json }}
+    </div>
+  }
+  @if (configQuery.data(); as data) {
+    <div>
+      <div>Config:</div>
+      {{ data | json }}
+    </div>
+  }
+</div>

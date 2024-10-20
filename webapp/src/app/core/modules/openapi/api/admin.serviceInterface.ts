@@ -13,6 +13,7 @@ import { HttpHeaders }                                       from '@angular/comm
 
 import { Observable }                                        from 'rxjs';
 
+import { AdminConfig } from '../model/models';
 import { UserInfoDto } from '../model/models';
 
 
@@ -34,6 +35,19 @@ export interface AdminServiceInterface {
      * 
      * 
      */
+    getConfig(extraHttpRequestParams?: any): Observable<AdminConfig>;
+
+    /**
+     * 
+     * 
+     */
     getGretting(extraHttpRequestParams?: any): Observable<UserInfoDto>;
+
+    /**
+     * 
+     * 
+     * @param requestBody 
+     */
+    updateRepositories(requestBody: Array<string>, extraHttpRequestParams?: any): Observable<Set<string>>;
 
 }

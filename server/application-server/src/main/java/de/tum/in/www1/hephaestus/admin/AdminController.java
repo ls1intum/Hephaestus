@@ -1,17 +1,27 @@
 package de.tum.in.www1.hephaestus.admin;
 
 import java.util.List;
+import java.util.Set;
 
+import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.oauth2.core.oidc.StandardClaimNames;
 import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 @RestController
 @RequestMapping("/admin")
 public class AdminController {
+
+    private final AdminService adminService;
+
+    public AdminController(AdminService adminService) {
+        this.adminService = adminService;
+    }
 
     @GetMapping
     public String admin() {
@@ -21,10 +31,24 @@ public class AdminController {
     @GetMapping("/me")
     public UserInfoDto getGretting(JwtAuthenticationToken auth) {
         return new UserInfoDto(
-            auth.getToken().getClaimAsString(StandardClaimNames.PREFERRED_USERNAME),
-            auth.getAuthorities().stream().map(GrantedAuthority::getAuthority).toList());
+                auth.getToken().getClaimAsString(StandardClaimNames.PREFERRED_USERNAME),
+                auth.getAuthorities().stream().map(GrantedAuthority::getAuthority).toList());
     }
 
     public static record UserInfoDto(String name, List<String> roles) {
+    }
+
+    @GetMapping("/config")
+    public ResponseEntity<AdminConfig> getConfig() {
+        try {
+            return ResponseEntity.ok(adminService.getAdminConfig());
+        } catch (NoAdminConfigFoundException e) {
+            return ResponseEntity.notFound().build();
+        }
+    }
+
+    @PostMapping("/config/repositories")
+    public ResponseEntity<Set<String>> updateRepositories(@RequestBody List<String> repositories) {
+        return ResponseEntity.ok(adminService.updateRepositories(Set.copyOf(repositories)));
     }
 }
