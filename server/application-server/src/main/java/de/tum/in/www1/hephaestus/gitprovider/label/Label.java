@@ -5,7 +5,9 @@ import java.util.Set;
 
 import jakarta.persistence.Entity;
 import jakarta.persistence.Id;
+import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToMany;
+import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
@@ -14,6 +16,7 @@ import lombok.Setter;
 import lombok.ToString;
 
 import de.tum.in.www1.hephaestus.gitprovider.issue.Issue;
+import de.tum.in.www1.hephaestus.gitprovider.repository.Repository;
 
 @Entity
 @Table(name = "label")
@@ -39,6 +42,11 @@ public class Label {
     @ManyToMany(mappedBy = "labels")
     @ToString.Exclude
     private Set<Issue> issues = new HashSet<>();
+
+    @ManyToOne
+    @JoinColumn(name = "repository_id")
+    @ToString.Exclude
+    private Repository repository;
 
     // Ignored GitHub properties:
     // - default

@@ -88,11 +88,6 @@ public class Issue extends BaseGitServiceEntity {
     @JoinColumn(name = "repository_id")
     private Repository repository;
 
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "closed_by_id")
-    @ToString.Exclude
-    private User closedBy;
-
     @OneToMany(mappedBy = "issue")
     @ToString.Exclude
     private Set<IssueComment> comments = new HashSet<>();
@@ -102,6 +97,7 @@ public class Issue extends BaseGitServiceEntity {
     }
 
     // Ignored GitHub properties:
+    // - closed_by seems not to be used by webhooks
     // - author_association (not provided by our GitHub API client)
     // - state_reason
     // - reactions

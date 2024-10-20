@@ -48,7 +48,7 @@ public class NatsConsumerService {
                 // .durable(consumerName)
                 .filterSubjects(getSubjects())
                 .deliverPolicy(DeliverPolicy.ByStartTime)
-                .startTime(ZonedDateTime.now().minusDays(1))
+                .startTime(ZonedDateTime.now().minusDays(7))
                 .build();
 
         // JetStreamManagement jsm = natsConnection.jetStreamManagement();

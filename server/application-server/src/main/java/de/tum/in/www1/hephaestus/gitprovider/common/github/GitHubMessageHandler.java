@@ -12,7 +12,6 @@ import org.slf4j.LoggerFactory;
 
 import io.nats.client.Message;
 import io.nats.client.MessageHandler;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
 @Component

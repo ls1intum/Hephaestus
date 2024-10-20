@@ -45,6 +45,7 @@ public class IssueComment extends BaseGitServiceEntity {
 
     @ManyToOne
     @JoinColumn(name = "issue_id")
+    @ToString.Exclude
     private Issue issue;
 
     // Ignored GitHub properties:

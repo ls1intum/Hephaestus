@@ -41,7 +41,6 @@ public class PullRequest extends Issue {
 
     private Boolean isMergeable;
 
-    @NonNull
     private String mergeableState;
 
     // Indicates whether maintainers can modify the pull request.

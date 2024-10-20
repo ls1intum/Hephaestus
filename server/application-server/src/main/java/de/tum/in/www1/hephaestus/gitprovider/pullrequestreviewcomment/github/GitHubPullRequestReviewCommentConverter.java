@@ -57,8 +57,7 @@ public class GitHubPullRequestReviewCommentConverter
             case RIGHT:
                 return PullRequestReviewComment.Side.RIGHT;
             default:
-                logger.error("Unknown side: {}", side);
-                return PullRequestReviewComment.Side.RIGHT;
+                return PullRequestReviewComment.Side.UNKNOWN;
         }
     }
 }

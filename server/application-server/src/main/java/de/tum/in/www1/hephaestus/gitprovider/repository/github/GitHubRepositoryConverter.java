@@ -36,7 +36,6 @@ public class GitHubRepositoryConverter extends BaseGitServiceEntityConverter<GHR
         repository.setVisibility(convertVisibility(source.getVisibility()));
         repository.setStargazersCount(source.getStargazersCount());
         repository.setWatchersCount(source.getWatchersCount());
-        repository.setSubscribersCount(source.getSubscribersCount());
         repository.setDefaultBranch(source.getDefaultBranch());
         repository.setHasIssues(source.hasIssues());
         repository.setHasProjects(source.hasProjects());

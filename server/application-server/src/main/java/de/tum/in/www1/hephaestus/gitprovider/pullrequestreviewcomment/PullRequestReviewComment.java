@@ -29,6 +29,7 @@ import de.tum.in.www1.hephaestus.gitprovider.user.User;
 public class PullRequestReviewComment extends BaseGitServiceEntity {
 
     // The diff of the line that the comment refers to.
+    @Lob
     @NonNull
     private String diffHunk;
 
@@ -98,7 +99,7 @@ public class PullRequestReviewComment extends BaseGitServiceEntity {
     private PullRequest pullRequest;
 
     public enum Side {
-        LEFT, RIGHT
+        LEFT, RIGHT, UNKNOWN
     }
 
     // Ignored GitHub properties:

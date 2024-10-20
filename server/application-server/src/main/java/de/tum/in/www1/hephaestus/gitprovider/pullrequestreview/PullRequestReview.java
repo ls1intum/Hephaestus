@@ -37,11 +37,13 @@ public class PullRequestReview {
     // Note: This entity does not have a createdAt and updatedAt field
 
     @Lob
-    @NonNull
     private String body;
     
+    // We handle dismissed in a separate field to keep the original state
     @Enumerated(EnumType.STRING)
     private PullRequestReview.State state;
+
+    private boolean isDismissed;
 
     @NonNull
     private String htmlUrl;
@@ -66,7 +68,7 @@ public class PullRequestReview {
     private Set<PullRequestReviewComment> comments = new HashSet<>();
 
     public enum State {
-        COMMENTED, APPROVED, CHANGES_REQUESTED, DISMISSED
+        COMMENTED, APPROVED, CHANGES_REQUESTED, UNKNOWN
     }
 
     // Ignored GitHub properties:

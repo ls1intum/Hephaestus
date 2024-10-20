@@ -4,6 +4,7 @@ import java.io.IOException;
 import java.time.ZoneOffset;
 
 import org.kohsuke.github.GHPullRequestReview;
+import org.kohsuke.github.GHPullRequestReviewState;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.core.convert.converter.Converter;
@@ -25,7 +26,12 @@ public class GitHubPullRequestReviewConverter implements Converter<GHPullRequest
     public PullRequestReview update(@NonNull GHPullRequestReview source, @NonNull PullRequestReview review) {
         review.setId(source.getId());
         review.setBody(source.getBody());
-        review.setState(convertState(source.getState()));
+        
+        if (review.getState() == null || source.getState() != GHPullRequestReviewState.DISMISSED) {
+            review.setState(convertState(source.getState()));
+        }
+        review.setDismissed(source.getState() == GHPullRequestReviewState.DISMISSED);
+        
         review.setHtmlUrl(source.getHtmlUrl().toString());
         try {
             if (source.getSubmittedAt() != null) {
@@ -46,10 +52,8 @@ public class GitHubPullRequestReviewConverter implements Converter<GHPullRequest
                 return PullRequestReview.State.APPROVED;
             case CHANGES_REQUESTED:
                 return PullRequestReview.State.CHANGES_REQUESTED;
-            case DISMISSED:
-                return PullRequestReview.State.DISMISSED;
             default:
-                return PullRequestReview.State.COMMENTED;
+                return PullRequestReview.State.UNKNOWN;
         }
     }
 }

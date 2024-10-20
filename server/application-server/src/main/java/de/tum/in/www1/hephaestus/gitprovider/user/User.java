@@ -70,11 +70,7 @@ public class User extends BaseGitServiceEntity {
     @ManyToMany(mappedBy = "assignees")
     @ToString.Exclude
     private Set<Issue> assignedIssues = new HashSet<>();
-    
-    @OneToMany(mappedBy = "closedBy")
-    @ToString.Exclude
-    private Set<Issue> closedIssues = new HashSet<>();
-    
+
     @OneToMany(mappedBy = "author")
     @ToString.Exclude
     private Set<IssueComment> issueComments = new HashSet<>();

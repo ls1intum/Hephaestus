@@ -18,6 +18,7 @@ import lombok.ToString;
 
 import de.tum.in.www1.hephaestus.gitprovider.common.BaseGitServiceEntity;
 import de.tum.in.www1.hephaestus.gitprovider.issue.Issue;
+import de.tum.in.www1.hephaestus.gitprovider.label.Label;
 
 @Entity
 @Table(name = "repository")
@@ -59,8 +60,6 @@ public class Repository extends BaseGitServiceEntity {
 
     private int watchersCount;
 
-    private int subscribersCount;
-
     @NonNull
     private String defaultBranch;
 
@@ -74,6 +73,10 @@ public class Repository extends BaseGitServiceEntity {
     @ToString.Exclude
     private Set<Issue> issues = new HashSet<>();
 
+    @OneToMany(mappedBy = "repository")
+    @ToString.Exclude
+    private Set<Label> labels = new HashSet<>();
+
     public enum Visibility {
         PUBLIC, PRIVATE, INTERNAL, UNKNOWN
     }
@@ -83,6 +86,7 @@ public class Repository extends BaseGitServiceEntity {
     // organization
     
     // Ignored GitHub properties:
+    // - subscribersCount
     // - hasPages
     // - hasDownloads
     // - hasDiscussions

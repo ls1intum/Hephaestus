@@ -7,19 +7,38 @@ import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
 
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubMessageHandler;
+import de.tum.in.www1.hephaestus.gitprovider.pullrequest.github.GitHubPullRequestSyncService;
+import de.tum.in.www1.hephaestus.gitprovider.repository.github.GitHubRepositorySyncService;
 
 @Component
 public class GitHubPullRequestReviewMessageHandler extends GitHubMessageHandler<GHEventPayload.PullRequestReview> {
 
     private static final Logger logger = LoggerFactory.getLogger(GitHubPullRequestReviewMessageHandler.class);
 
-    private GitHubPullRequestReviewMessageHandler() {
+    private final GitHubPullRequestReviewSyncService pullRequestReviewSyncService;
+    private final GitHubPullRequestSyncService pullRequestSyncService;
+    private final GitHubRepositorySyncService repositorySyncService;
+
+    private GitHubPullRequestReviewMessageHandler(
+            GitHubPullRequestReviewSyncService pullRequestReviewSyncService,
+            GitHubPullRequestSyncService pullRequestSyncService,
+            GitHubRepositorySyncService repositorySyncService) {
         super(GHEventPayload.PullRequestReview.class);
+        this.pullRequestReviewSyncService = pullRequestReviewSyncService;
+        this.pullRequestSyncService = pullRequestSyncService;
+        this.repositorySyncService = repositorySyncService;
     }
 
     @Override
     protected void handleEvent(GHEventPayload.PullRequestReview eventPayload) {
-        // logger.info("Received pull request review event: {}", eventPayload);
+        var pullRequest = eventPayload.getPullRequest();
+        var repository = pullRequest.getRepository();
+        var review = eventPayload.getReview();
+        logger.info("Received pull request review event for repository: {}, pull request: {}, action: {}, reviewId: {}",
+                repository.getFullName(), pullRequest.getNumber(), eventPayload.getAction(), review.getId());
+        repositorySyncService.processRepository(repository);
+        pullRequestSyncService.processPullRequest(pullRequest);
+        pullRequestReviewSyncService.processPullRequestReview(review);
     }
 
     @Override

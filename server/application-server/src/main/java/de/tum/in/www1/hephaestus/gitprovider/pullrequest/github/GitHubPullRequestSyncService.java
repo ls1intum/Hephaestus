@@ -12,13 +12,11 @@ import org.slf4j.LoggerFactory;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 
-import aj.org.objectweb.asm.Label;
 import de.tum.in.www1.hephaestus.gitprovider.common.DateUtil;
 import de.tum.in.www1.hephaestus.gitprovider.label.LabelRepository;
 import de.tum.in.www1.hephaestus.gitprovider.label.github.GitHubLabelConverter;
 import de.tum.in.www1.hephaestus.gitprovider.milestone.MilestoneRepository;
 import de.tum.in.www1.hephaestus.gitprovider.milestone.github.GitHubMilestoneConverter;
-import de.tum.in.www1.hephaestus.gitprovider.pullrequest.PullRequest;
 import de.tum.in.www1.hephaestus.gitprovider.pullrequest.PullRequestRepository;
 import de.tum.in.www1.hephaestus.gitprovider.repository.RepositoryRepository;
 import de.tum.in.www1.hephaestus.gitprovider.user.UserRepository;
@@ -71,7 +69,7 @@ public class GitHubPullRequestSyncService {
     }
 
     @Async
-    public void fetchPullRequestsAsync(String nameWithOwner, LocalDate since) {
+    public void fetchAllPullRequestsAsync(String nameWithOwner, LocalDate since) {
         var builder = github.searchPullRequests().q("repo:" + nameWithOwner).updatedAfter(since, true);
         fetchPullRequests(builder);
     }
@@ -90,7 +88,7 @@ public class GitHubPullRequestSyncService {
                 .map(pullRequest -> {
                     try {
                         if (pullRequest.getUpdatedAt()
-                                .compareTo(DateUtil.convertToOffsetDateTime(ghPullRequest.getUpdatedAt())) < 0) {
+                                .isBefore(DateUtil.convertToOffsetDateTime(ghPullRequest.getUpdatedAt()))) {
                             return pullRequestConverter.update(ghPullRequest, pullRequest);
                         }
                         return pullRequest;
@@ -160,16 +158,6 @@ public class GitHubPullRequestSyncService {
         result.getAssignees().clear();
         result.getAssignees().addAll(resultAssignees);
 
-        // Link closed by
-        var closedByUser = ghPullRequest.getClosedBy();
-        if (closedByUser != null) {
-            var resultClosedBy = userRepository.findById(ghPullRequest.getClosedBy().getId())
-                    .orElseGet(() -> userRepository.save(userConverter.convert(closedByUser)));
-            result.setClosedBy(resultClosedBy);
-        } else {
-            result.setClosedBy(null);
-        }
-
         // Link merged by
         try {
             var mergedByUser = ghPullRequest.getMergedBy();
@@ -198,7 +186,6 @@ public class GitHubPullRequestSyncService {
         } catch (IOException e) {
             logger.error("Failed to link requested reviewers for pull request {}: {}", ghPullRequest.getId(), e.getMessage());
         }
-
 
         pullRequestRepository.save(result);
     }
