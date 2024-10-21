@@ -11,6 +11,8 @@ api/meta.service.ts
 api/meta.serviceInterface.ts
 api/pull-request.service.ts
 api/pull-request.serviceInterface.ts
+api/team.service.ts
+api/team.serviceInterface.ts
 api/user.service.ts
 api/user.serviceInterface.ts
 configuration.ts
@@ -31,9 +33,12 @@ model/pull-request-review.ts
 model/pull-request.ts
 model/repository-dto.ts
 model/repository.ts
+model/team-dto.ts
+model/team.ts
 model/user-dto.ts
 model/user-info-dto.ts
 model/user-profile-dto.ts
+model/user-teams-dto.ts
 model/user.ts
 param.ts
 variables.ts

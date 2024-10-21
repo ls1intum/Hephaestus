@@ -48,6 +48,11 @@ public class UserService {
         return userRepository.findAll().stream().toList();
     }
 
+    public List<UserTeamsDTO> getAllUsersWithTeams() {
+        logger.info("Getting all users with their teams");
+        return userRepository.findAll().stream().map(UserTeamsDTO::fromUser).toList();
+    }
+
     public List<User> getAllUsersInTimeframe(OffsetDateTime after, OffsetDateTime before, Optional<String> repository) {
         logger.info("Getting all users in timeframe between " + after + " and " + before + " for repository: "
                 + repository.orElse("all"));
