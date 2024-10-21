@@ -33,6 +33,11 @@ public class TeamService {
         return teams;
     }
 
+    public Team saveTeam(Team team) {
+        logger.info("Saving team: " + team);
+        return teamRepository.save(team);
+    }
+
     public Boolean createDefaultTeams() {
         logger.info("Creating default teams");
         Team iris = teamRepository.save(new Team());

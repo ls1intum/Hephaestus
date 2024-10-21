@@ -65,11 +65,10 @@
   </brn-column-def>
   <brn-column-def name="teams" class="w-20 lg:flex-1">
     <hlm-th *brnHeaderDef>Teams</hlm-th>
-    <hlm-td class="font-medium tabular-nums" *brnCellDef="let element">
-      @if (this.isLoading()) {
-        <hlm-skeleton class="h-6 w-36" />
-      } @else {
-        {{ element.teams }}
+    <hlm-td class="font-medium tabular-nums flex gap-4" *brnCellDef="let element">
+      @for (team of element.teams; track team) {
+        @let label = { name: team.name, color: '69feff' };
+        <app-github-label [label]="label" [isLoading]="this.isLoading()" />
       }
     </hlm-td>
   </brn-column-def>

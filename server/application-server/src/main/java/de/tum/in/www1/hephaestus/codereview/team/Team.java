@@ -46,6 +46,6 @@ public class Team {
 
     public void addMember(User user) {
         members.add(user);
-        // user.addTeam(this);
+        user.addTeam(this);
     }
 }

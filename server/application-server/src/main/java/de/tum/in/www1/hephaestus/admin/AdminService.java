@@ -96,6 +96,7 @@ public class AdminService {
         Team team = optionalTeam.get();
         User user = optionalUser.get();
         team.addMember(user);
+        teamService.saveTeam(team);
         return Optional.of(new UserDTO(user.getId(), user.getLogin(), user.getEmail(), user.getName(), user.getUrl()));
     }
 }

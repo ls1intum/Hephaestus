@@ -18,6 +18,7 @@ import { HlmSkeletonModule } from '@spartan-ng/ui-skeleton-helm';
 import { debounceTime, map } from 'rxjs';
 import { AdminService, TeamDTO, UserTeamsDTO } from '@app/core/modules/openapi';
 import { RouterLink } from '@angular/router';
+import { GithubLabelComponent } from '@app/ui/github-label/github-label.component';
 
 const LOADING_DATA: UserTeamsDTO[] = [
   {
@@ -82,7 +83,9 @@ const LOADING_TEAMS: TeamDTO[] = [
     BrnSelectModule,
     HlmSelectModule,
 
-    HlmSkeletonModule
+    HlmSkeletonModule,
+
+    GithubLabelComponent
   ],
   providers: [provideIcons({ lucideChevronDown, lucideMoreHorizontal, lucideArrowUpDown })],
   templateUrl: './users-table.component.html'
@@ -190,7 +193,7 @@ export class AdminUsersTableComponent {
       this.adminService.addTeamToUser(user.login, this._selectedTeam()!.id).subscribe({
         next: () => {
           console.log('Team added to user', user);
-          this.userData()
+          this._users()
             ?.find((u) => u.login === user.login)
             ?.teams.add(this._selectedTeam()!);
         },
