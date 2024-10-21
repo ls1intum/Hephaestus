@@ -1,0 +1,8 @@
+<div class="container space-y-4">
+  <div class="flex items-center gap-8 mb-4">
+    <h1 class="text-3xl font-bold">Admin - Users</h1>
+    <a hlmBtn variant="secondary" routerLink="/admin">Back</a>
+  </div>
+
+  <app-admin-users-table [userData]="userQuery.data()" [isLoading]="userQuery.isPending()" [teams]="teamsQuery.data()" />
+</div>

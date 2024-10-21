@@ -18,6 +18,7 @@ export class HeaderComponent {
 
   securityStore = inject(SecurityStore);
   signedIn = this.securityStore.signedIn;
+  loadedUser = this.securityStore.loadedUser;
 
   protected signOut() {
     this.securityStore.signOut();

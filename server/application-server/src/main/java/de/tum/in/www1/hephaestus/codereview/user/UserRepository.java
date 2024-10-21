@@ -50,4 +50,11 @@ public interface UserRepository extends JpaRepository<User, Long> {
             """)
     List<User> findAllInTimeframe(@Param("after") OffsetDateTime after, @Param("before") OffsetDateTime before,
             @Param("repository") Optional<String> repository);
+
+    @Query("""
+                SELECT u
+                FROM User u
+                JOIN FETCH u.teams
+            """)
+    List<User> findAllWithTeams();
 }

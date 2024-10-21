@@ -13,7 +13,10 @@ import { HttpHeaders }                                       from '@angular/comm
 
 import { Observable }                                        from 'rxjs';
 
+import { AdminConfig } from '../model/models';
+import { UserDTO } from '../model/models';
 import { UserInfoDto } from '../model/models';
+import { UserTeamsDTO } from '../model/models';
 
 
 import { Configuration }                                     from '../configuration';
@@ -27,6 +30,14 @@ export interface AdminServiceInterface {
     /**
      * 
      * 
+     * @param login 
+     * @param teamId 
+     */
+    addTeamToUser(login: string, teamId: number, extraHttpRequestParams?: any): Observable<UserDTO>;
+
+    /**
+     * 
+     * 
      */
     admin(extraHttpRequestParams?: any): Observable<string>;
 
@@ -34,6 +45,25 @@ export interface AdminServiceInterface {
      * 
      * 
      */
+    getConfig(extraHttpRequestParams?: any): Observable<AdminConfig>;
+
+    /**
+     * 
+     * 
+     */
     getGretting(extraHttpRequestParams?: any): Observable<UserInfoDto>;
+
+    /**
+     * 
+     * 
+     */
+    getUsersAsAdmin(extraHttpRequestParams?: any): Observable<Array<UserTeamsDTO>>;
+
+    /**
+     * 
+     * 
+     * @param requestBody 
+     */
+    updateRepositories(requestBody: Array<string>, extraHttpRequestParams?: any): Observable<Set<string>>;
 
 }
