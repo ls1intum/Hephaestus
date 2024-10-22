@@ -3,7 +3,7 @@ import { DecimalPipe, TitleCasePipe } from '@angular/common';
 import { Component, TrackByFunction, computed, effect, inject, input, signal } from '@angular/core';
 import { toObservable, toSignal } from '@angular/core/rxjs-interop';
 import { FormsModule } from '@angular/forms';
-import { lucideArrowUpDown, lucideChevronDown, lucideMoreHorizontal } from '@ng-icons/lucide';
+import { lucideArrowUpDown, lucideChevronDown, lucideMoreHorizontal, lucideRotateCw } from '@ng-icons/lucide';
 import { HlmButtonModule } from '@spartan-ng/ui-button-helm';
 import { HlmCheckboxCheckIconComponent, HlmCheckboxComponent } from '@spartan-ng/ui-checkbox-helm';
 import { HlmIconComponent, provideIcons } from '@spartan-ng/ui-icon-helm';
@@ -19,6 +19,7 @@ import { debounceTime, map } from 'rxjs';
 import { AdminService, TeamDTO, UserTeamsDTO } from '@app/core/modules/openapi';
 import { RouterLink } from '@angular/router';
 import { GithubLabelComponent } from '@app/ui/github-label/github-label.component';
+import { injectQueryClient } from '@tanstack/angular-query-experimental';
 
 const LOADING_DATA: UserTeamsDTO[] = [
   {
@@ -87,11 +88,12 @@ const LOADING_TEAMS: TeamDTO[] = [
 
     GithubLabelComponent
   ],
-  providers: [provideIcons({ lucideChevronDown, lucideMoreHorizontal, lucideArrowUpDown })],
+  providers: [provideIcons({ lucideChevronDown, lucideMoreHorizontal, lucideArrowUpDown, lucideRotateCw })],
   templateUrl: './users-table.component.html'
 })
 export class AdminUsersTableComponent {
   protected adminService = inject(AdminService);
+  protected queryClient = injectQueryClient();
 
   isLoading = input(false);
   userData = input.required<UserTeamsDTO[] | undefined>();
@@ -200,5 +202,13 @@ export class AdminUsersTableComponent {
         error: (err) => console.error('Error adding team to user', user, err)
       });
     }
+    this.invalidateUsers();
+  }
+
+  protected invalidateUsers() {
+    for (const user of this._selected()) {
+      this._selectionModel.deselect(user);
+    }
+    this.queryClient.invalidateQueries({ queryKey: ['admin', 'users'] });
   }
 }
