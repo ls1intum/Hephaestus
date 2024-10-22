@@ -4,5 +4,5 @@
     <a hlmBtn variant="secondary" routerLink="/admin">Back</a>
   </div>
 
-  <app-admin-users-table [userData]="userQuery.data()" [isLoading]="userQuery.isPending()" [teams]="teamsQuery.data()" />
+  <app-admin-users-table [userData]="userQuery.data()" [isLoading]="userQuery.isPending() || userQuery.isRefetching()" [teams]="teamsQuery.data()" />
 </div>

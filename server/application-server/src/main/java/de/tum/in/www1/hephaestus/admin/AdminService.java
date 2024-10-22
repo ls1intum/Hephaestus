@@ -99,4 +99,21 @@ public class AdminService {
         teamService.saveTeam(team);
         return Optional.of(new UserDTO(user.getId(), user.getLogin(), user.getEmail(), user.getName(), user.getUrl()));
     }
+
+    public Optional<UserDTO> removeTeamFromUser(String login, Long teamId) {
+        logger.info("Removing team (ID: " + teamId + ") from user with login: " + login);
+        Optional<User> optionalUser = userService.getUser(login);
+        if (optionalUser.isEmpty()) {
+            return Optional.empty();
+        }
+        Optional<Team> optionalTeam = teamService.getTeam(teamId);
+        if (optionalTeam.isEmpty()) {
+            return Optional.empty();
+        }
+        Team team = optionalTeam.get();
+        User user = optionalUser.get();
+        team.removeMember(user);
+        teamService.saveTeam(team);
+        return Optional.of(new UserDTO(user.getId(), user.getLogin(), user.getEmail(), user.getName(), user.getUrl()));
+    }
 }

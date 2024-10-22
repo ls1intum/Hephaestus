@@ -7,6 +7,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.oauth2.core.oidc.StandardClaimNames;
 import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -65,6 +66,13 @@ public class AdminController {
     @PutMapping("/users/teamadd/{login}/{teamId}")
     public ResponseEntity<UserDTO> addTeamToUser(@PathVariable String login, @PathVariable Long teamId) {
         return adminService.addTeamToUser(login, teamId)
+                .map(ResponseEntity::ok)
+                .orElseGet(() -> ResponseEntity.notFound().build());
+    }
+
+    @DeleteMapping("/users/teamremove/{login}/{teamId}")
+    public ResponseEntity<UserDTO> removeTeamFromUser(@PathVariable String login, @PathVariable Long teamId) {
+        return adminService.removeTeamFromUser(login, teamId)
                 .map(ResponseEntity::ok)
                 .orElseGet(() -> ResponseEntity.notFound().build());
     }

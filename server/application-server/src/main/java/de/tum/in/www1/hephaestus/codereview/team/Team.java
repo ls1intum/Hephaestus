@@ -48,4 +48,9 @@ public class Team {
         members.add(user);
         user.addTeam(this);
     }
+
+    public void removeMember(User user) {
+        members.remove(user);
+        user.removeTeam(this);
+    }
 }

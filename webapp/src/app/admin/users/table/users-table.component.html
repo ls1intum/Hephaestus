@@ -3,7 +3,11 @@
 
   <div class="flex items-center gap-4">
     <button hlmBtn variant="outline" size="icon" (click)="invalidateUsers()">
-      <hlm-icon name="lucideRotateCw" strokeWidth="2px" size="sm" />
+      @if (this.isLoading()) {
+        <hlm-icon name="lucideRotateCw" strokeWidth="2px" size="sm" class="animate-spin" />
+      } @else {
+        <hlm-icon name="lucideRotateCw" strokeWidth="2px" size="sm" />
+      }
     </button>
     <button hlmBtn variant="outline" align="end" [brnMenuTriggerFor]="menu">
       Columns
@@ -53,7 +57,7 @@
       }
     </hlm-td>
   </brn-column-def>
-  <brn-column-def name="login" class="w-60">
+  <brn-column-def name="login" class="w-32 sm:w-40">
     <hlm-th *brnHeaderDef>
       <button hlmBtn size="sm" variant="ghost" (click)="handleLoginSortChange()">
         Login
@@ -68,7 +72,7 @@
       }
     </hlm-td>
   </brn-column-def>
-  <brn-column-def name="teams" class="w-20 lg:flex-1">
+  <brn-column-def name="teams" class="w-20 flex-1">
     <hlm-th *brnHeaderDef>Teams</hlm-th>
     <hlm-td class="font-medium tabular-nums flex gap-4" *brnCellDef="let element">
       @for (team of element.teams; track team) {
@@ -98,7 +102,12 @@
       </ng-template>
     </hlm-td>
   </brn-column-def>
-  <div class="flex items-center justify-center p-20 text-muted-foreground" brnNoDataRow>No data</div>
+  <div class="flex items-center justify-center p-20 text-muted-foreground" brnNoDataRow>
+    <div class="flex flex-col items-center justify-center gap-2 mt-1">
+      <hlm-icon name="lucideXOctagon" strokeWidth="2px" size="lg" class="text-github-danger-foreground" />
+      <span class="font-semibold text-muted-foreground">No entries found</span>
+    </div>
+  </div>
 </brn-table>
 <div
   class="flex flex-col justify-between mt-4 sm:flex-row sm:items-center"
@@ -130,13 +139,14 @@
     <hlm-select-trigger class="inline-flex">
       <hlm-select-value />
     </hlm-select-trigger>
-    <hlm-select-content>
+    <hlm-select-content class="min-w-[9.5rem]">
       @for (team of _availableTeams(); track team.id) {
-        <hlm-option [value]="team">
-          {{ team.name }}
+        <hlm-option [value]="team" class="containerSize">
+          <span class="">{{ team.name }}</span>
         </hlm-option>
       }
     </hlm-select-content>
   </brn-select>
-  <button hlmBtn variant="secondary" [disabled]="_selected().length === 0 || !_selectedTeam" (click)="addTeamToSelected()">Add team to selected users</button>
+  <button hlmBtn variant="secondary" [disabled]="_selected().length === 0 || !_selectedTeam" (click)="addTeamToSelected()">Add team</button>
+  <button hlmBtn variant="secondary" [disabled]="_selected().length === 0 || !_selectedTeam">Remove team</button>
 </div>

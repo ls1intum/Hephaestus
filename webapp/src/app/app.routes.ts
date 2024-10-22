@@ -5,19 +5,25 @@ import { AdminComponent } from '@app/admin/admin.component';
 import { AdminGuard } from '@app/core/security/admin.guard';
 import { UserProfileComponent } from '@app/user/user-profile.component';
 import { AdminUsersComponent } from './admin/users/users.component';
+import { AdminLayoutComponent } from './admin/layout.component';
 
 export const routes: Routes = [
   { path: '', component: HomeComponent },
   { path: 'about', component: AboutComponent },
   {
     path: 'admin',
-    component: AdminComponent,
-    canActivate: [AdminGuard]
-  },
-  {
-    path: 'admin/users',
-    component: AdminUsersComponent,
-    canActivate: [AdminGuard]
+    component: AdminLayoutComponent,
+    canActivate: [AdminGuard],
+    children: [
+      {
+        path: '',
+        component: AdminComponent
+      },
+      {
+        path: 'users',
+        component: AdminUsersComponent
+      }
+    ]
   },
   { path: 'user/:id', component: UserProfileComponent }
 ];

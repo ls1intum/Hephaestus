@@ -3,7 +3,7 @@ import { DecimalPipe, TitleCasePipe } from '@angular/common';
 import { Component, TrackByFunction, computed, effect, inject, input, signal } from '@angular/core';
 import { toObservable, toSignal } from '@angular/core/rxjs-interop';
 import { FormsModule } from '@angular/forms';
-import { lucideArrowUpDown, lucideChevronDown, lucideMoreHorizontal, lucideRotateCw } from '@ng-icons/lucide';
+import { lucideArrowUpDown, lucideChevronDown, lucideMoreHorizontal, lucideRotateCw, lucideXOctagon } from '@ng-icons/lucide';
 import { HlmButtonModule } from '@spartan-ng/ui-button-helm';
 import { HlmCheckboxCheckIconComponent, HlmCheckboxComponent } from '@spartan-ng/ui-checkbox-helm';
 import { HlmIconComponent, provideIcons } from '@spartan-ng/ui-icon-helm';
@@ -20,6 +20,7 @@ import { AdminService, TeamDTO, UserTeamsDTO } from '@app/core/modules/openapi';
 import { RouterLink } from '@angular/router';
 import { GithubLabelComponent } from '@app/ui/github-label/github-label.component';
 import { injectQueryClient } from '@tanstack/angular-query-experimental';
+import { octNoEntry } from '@ng-icons/octicons';
 
 const LOADING_DATA: UserTeamsDTO[] = [
   {
@@ -88,12 +89,13 @@ const LOADING_TEAMS: TeamDTO[] = [
 
     GithubLabelComponent
   ],
-  providers: [provideIcons({ lucideChevronDown, lucideMoreHorizontal, lucideArrowUpDown, lucideRotateCw })],
+  providers: [provideIcons({ lucideChevronDown, lucideMoreHorizontal, lucideArrowUpDown, lucideRotateCw, lucideXOctagon })],
   templateUrl: './users-table.component.html'
 })
 export class AdminUsersTableComponent {
   protected adminService = inject(AdminService);
   protected queryClient = injectQueryClient();
+  protected octNoEntry = octNoEntry;
 
   isLoading = input(false);
   userData = input.required<UserTeamsDTO[] | undefined>();
@@ -193,12 +195,7 @@ export class AdminUsersTableComponent {
     for (const user of this._selected()) {
       console.log('Adding team to user', user.login, this._selectedTeam());
       this.adminService.addTeamToUser(user.login, this._selectedTeam()!.id).subscribe({
-        next: () => {
-          console.log('Team added to user', user);
-          this._users()
-            ?.find((u) => u.login === user.login)
-            ?.teams.add(this._selectedTeam()!);
-        },
+        next: () => console.log('Team added to user', user),
         error: (err) => console.error('Error adding team to user', user, err)
       });
     }
@@ -206,6 +203,9 @@ export class AdminUsersTableComponent {
   }
 
   protected invalidateUsers() {
+    if (this.isLoading()) {
+      return;
+    }
     for (const user of this._selected()) {
       this._selectionModel.deselect(user);
     }

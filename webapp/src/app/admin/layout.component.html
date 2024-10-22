@@ -1,0 +1,16 @@
+<div class="container space-y-4">
+  <h1 class="text-3xl font-bold mb-4">Admin Page</h1>
+  <div class="flex justify-between gap-8">
+    <div class="flex flex-col items-stretch gap-4 rounded-md border border-input p-2 w-24">
+      <span class="text-lg font-bold">Admin</span>
+      <ul class="flex flex-col gap-2 w-24">
+        <li><a hlmBtn variant="ghost" routerLink="config" class="w-24">Config</a></li>
+        <li><a hlmBtn variant="ghost" routerLink="users" class="w-24">Users</a></li>
+        <li><a hlmBtn variant="ghost" routerLink="teams" class="w-24">Teams</a></li>
+      </ul>
+    </div>
+    <div class="block">
+      <router-outlet></router-outlet>
+    </div>
+  </div>
+</div>
