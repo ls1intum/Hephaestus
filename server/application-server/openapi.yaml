@@ -262,6 +262,30 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/AdminConfig"
+  /admin/users/teamremove/{login}/{teamId}:
+    delete:
+      tags:
+      - admin
+      operationId: removeTeamFromUser
+      parameters:
+      - name: login
+        in: path
+        required: true
+        schema:
+          type: string
+      - name: teamId
+        in: path
+        required: true
+        schema:
+          type: integer
+          format: int64
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UserDTO"
 components:
   schemas:
     IssueCommentDTO:

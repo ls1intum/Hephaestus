@@ -62,6 +62,14 @@ export interface AdminServiceInterface {
     /**
      * 
      * 
+     * @param login 
+     * @param teamId 
+     */
+    removeTeamFromUser(login: string, teamId: number, extraHttpRequestParams?: any): Observable<UserDTO>;
+
+    /**
+     * 
+     * 
      * @param requestBody 
      */
     updateRepositories(requestBody: Array<string>, extraHttpRequestParams?: any): Observable<Set<string>>;
