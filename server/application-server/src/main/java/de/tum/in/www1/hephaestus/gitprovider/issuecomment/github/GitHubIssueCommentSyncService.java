@@ -12,6 +12,7 @@ import jakarta.transaction.Transactional;
 import de.tum.in.www1.hephaestus.gitprovider.common.DateUtil;
 import de.tum.in.www1.hephaestus.gitprovider.issue.IssueRepository;
 import de.tum.in.www1.hephaestus.gitprovider.issue.github.GitHubIssueConverter;
+import de.tum.in.www1.hephaestus.gitprovider.issuecomment.IssueComment;
 import de.tum.in.www1.hephaestus.gitprovider.issuecomment.IssueCommentRepository;
 import de.tum.in.www1.hephaestus.gitprovider.user.UserRepository;
 import de.tum.in.www1.hephaestus.gitprovider.user.github.GitHubUserConverter;
@@ -47,7 +48,7 @@ public class GitHubIssueCommentSyncService {
     }
 
     @Transactional
-    public void processIssueComment(GHIssueComment ghIssueComment) {
+    public IssueComment processIssueComment(GHIssueComment ghIssueComment) {
         var result = issueCommentRepository.findById(ghIssueComment.getId())
                 .map(issueComment -> {
                     try {
@@ -71,7 +72,7 @@ public class GitHubIssueCommentSyncService {
                         });
 
         if (result == null) {
-            return;
+            return null;
         }
 
         // Link issue
@@ -90,6 +91,6 @@ public class GitHubIssueCommentSyncService {
             logger.error("Failed to link author for issue comment {}: {}", ghIssueComment.getId(), e.getMessage());
         }
 
-        issueCommentRepository.save(result);
+        return issueCommentRepository.save(result);
     }
 }

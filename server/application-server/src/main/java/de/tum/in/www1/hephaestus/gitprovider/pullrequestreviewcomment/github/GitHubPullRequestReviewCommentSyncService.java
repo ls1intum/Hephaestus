@@ -14,6 +14,7 @@ import de.tum.in.www1.hephaestus.gitprovider.common.DateUtil;
 import de.tum.in.www1.hephaestus.gitprovider.pullrequest.PullRequestRepository;
 import de.tum.in.www1.hephaestus.gitprovider.pullrequest.github.GitHubPullRequestConverter;
 import de.tum.in.www1.hephaestus.gitprovider.pullrequestreview.PullRequestReviewRepository;
+import de.tum.in.www1.hephaestus.gitprovider.pullrequestreviewcomment.PullRequestReviewComment;
 import de.tum.in.www1.hephaestus.gitprovider.pullrequestreviewcomment.PullRequestReviewCommentRepository;
 import de.tum.in.www1.hephaestus.gitprovider.user.UserRepository;
 import de.tum.in.www1.hephaestus.gitprovider.user.github.GitHubUserConverter;
@@ -52,7 +53,7 @@ public class GitHubPullRequestReviewCommentSyncService {
     }
 
     @Transactional
-    public void processPullRequestReviewComment(GHPullRequestReviewComment ghPullRequestReviewComment) {
+    public PullRequestReviewComment processPullRequestReviewComment(GHPullRequestReviewComment ghPullRequestReviewComment) {
         var result = pullRequestReviewCommentRepository.findById(ghPullRequestReviewComment.getId())
                 .map(pullRequestReviewComment -> {
                     try {
@@ -76,7 +77,7 @@ public class GitHubPullRequestReviewCommentSyncService {
                         });
 
         if (result == null) {
-            return;
+            return null;
         }
 
         // Link pull request
@@ -107,6 +108,7 @@ public class GitHubPullRequestReviewCommentSyncService {
             logger.error("Failed to link author for pull request review comment {}: {}", ghPullRequestReviewComment.getId(),
                     e.getMessage());
         }
-        pullRequestReviewCommentRepository.save(result);
+
+        return pullRequestReviewCommentRepository.save(result);
     }
 }

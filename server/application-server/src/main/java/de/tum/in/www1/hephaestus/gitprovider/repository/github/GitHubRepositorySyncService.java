@@ -13,6 +13,7 @@ import org.springframework.stereotype.Service;
 import jakarta.transaction.Transactional;
 
 import de.tum.in.www1.hephaestus.gitprovider.common.DateUtil;
+import de.tum.in.www1.hephaestus.gitprovider.repository.Repository;
 import de.tum.in.www1.hephaestus.gitprovider.repository.RepositoryRepository;
 import de.tum.in.www1.hephaestus.gitprovider.user.UserRepository;
 import de.tum.in.www1.hephaestus.gitprovider.user.github.GitHubUserConverter;
@@ -59,7 +60,7 @@ public class GitHubRepositorySyncService {
     }
 
     @Transactional
-    public void processRepository(GHRepository ghRepository) {
+    public Repository processRepository(GHRepository ghRepository) {
         var result = repositoryRepository.findById(ghRepository.getId())
                 .map(repository -> {
                     try {
@@ -79,9 +80,9 @@ public class GitHubRepositorySyncService {
                         });
 
         if (result == null) {
-            return;
+            return null;
         }
 
-        repositoryRepository.save(result);
+        return repositoryRepository.save(result);
     }
 }

@@ -11,17 +11,18 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
+import jakarta.transaction.Transactional;
 
 import de.tum.in.www1.hephaestus.gitprovider.common.DateUtil;
 import de.tum.in.www1.hephaestus.gitprovider.label.LabelRepository;
 import de.tum.in.www1.hephaestus.gitprovider.label.github.GitHubLabelConverter;
 import de.tum.in.www1.hephaestus.gitprovider.milestone.MilestoneRepository;
 import de.tum.in.www1.hephaestus.gitprovider.milestone.github.GitHubMilestoneConverter;
+import de.tum.in.www1.hephaestus.gitprovider.pullrequest.PullRequest;
 import de.tum.in.www1.hephaestus.gitprovider.pullrequest.PullRequestRepository;
 import de.tum.in.www1.hephaestus.gitprovider.repository.RepositoryRepository;
 import de.tum.in.www1.hephaestus.gitprovider.user.UserRepository;
 import de.tum.in.www1.hephaestus.gitprovider.user.github.GitHubUserConverter;
-import jakarta.transaction.Transactional;
 
 @Service
 public class GitHubPullRequestSyncService {
@@ -83,7 +84,7 @@ public class GitHubPullRequestSyncService {
     }
 
     @Transactional
-    public void processPullRequest(GHPullRequest ghPullRequest) {
+    public PullRequest processPullRequest(GHPullRequest ghPullRequest) {
         var result = pullRequestRepository.findById(ghPullRequest.getId())
                 .map(pullRequest -> {
                     try {
@@ -103,7 +104,7 @@ public class GitHubPullRequestSyncService {
                         });
 
         if (result == null) {
-            return;
+            return null;
         }
 
         // Link with existing repository if not already linked
@@ -187,6 +188,6 @@ public class GitHubPullRequestSyncService {
             logger.error("Failed to link requested reviewers for pull request {}: {}", ghPullRequest.getId(), e.getMessage());
         }
 
-        pullRequestRepository.save(result);
+        return pullRequestRepository.save(result);
     }
 }

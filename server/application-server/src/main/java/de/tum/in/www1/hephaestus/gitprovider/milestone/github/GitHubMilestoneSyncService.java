@@ -9,6 +9,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import jakarta.transaction.Transactional;
 
+import de.tum.in.www1.hephaestus.gitprovider.milestone.Milestone;
 import de.tum.in.www1.hephaestus.gitprovider.milestone.MilestoneRepository;
 import de.tum.in.www1.hephaestus.gitprovider.repository.RepositoryRepository;
 import de.tum.in.www1.hephaestus.gitprovider.user.UserRepository;
@@ -43,7 +44,7 @@ public class GitHubMilestoneSyncService {
     }
 
     @Transactional
-    public void processMilestone(GHMilestone ghMilestone) {
+    public Milestone processMilestone(GHMilestone ghMilestone) {
         var result = milestoneRepository.findById(ghMilestone.getId())
                 .map(milestone -> {
                     return milestoneConverter.update(ghMilestone, milestone);
@@ -53,7 +54,7 @@ public class GitHubMilestoneSyncService {
                 });
 
         if (result == null) {
-            return;
+            return null;
         }
 
         // Link with existing repository if not already linked
@@ -77,6 +78,6 @@ public class GitHubMilestoneSyncService {
             logger.error("Failed to link creator for milestone {}: {}", ghMilestone.getId(), e.getMessage());
         }
 
-        milestoneRepository.save(result);
+        return milestoneRepository.save(result);
     }
 }

@@ -11,6 +11,7 @@ import org.springframework.stereotype.Service;
 import jakarta.transaction.Transactional;
 
 import de.tum.in.www1.hephaestus.gitprovider.common.DateUtil;
+import de.tum.in.www1.hephaestus.gitprovider.issue.Issue;
 import de.tum.in.www1.hephaestus.gitprovider.issue.IssueRepository;
 import de.tum.in.www1.hephaestus.gitprovider.label.LabelRepository;
 import de.tum.in.www1.hephaestus.gitprovider.label.github.GitHubLabelConverter;
@@ -60,7 +61,7 @@ public class GitHubIssueSyncService {
     }
 
     @Transactional
-    public void processIssue(GHIssue ghIssue) {
+    public Issue processIssue(GHIssue ghIssue) {
         var result = issueRepository.findById(ghIssue.getId())
                 .map(issue -> {
                     try {
@@ -80,7 +81,7 @@ public class GitHubIssueSyncService {
                         });
 
         if (result == null) {
-            return;
+            return null;
         }
 
         // Link with existing repository if not already linked
@@ -136,6 +137,6 @@ public class GitHubIssueSyncService {
         result.getAssignees().clear();
         result.getAssignees().addAll(resultAssignees);
 
-        issueRepository.save(result);
+        return issueRepository.save(result);
     }
 }

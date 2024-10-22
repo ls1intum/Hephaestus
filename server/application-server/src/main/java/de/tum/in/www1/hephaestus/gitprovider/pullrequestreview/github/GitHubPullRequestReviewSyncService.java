@@ -12,6 +12,7 @@ import jakarta.transaction.Transactional;
 
 import de.tum.in.www1.hephaestus.gitprovider.pullrequest.PullRequestRepository;
 import de.tum.in.www1.hephaestus.gitprovider.pullrequest.github.GitHubPullRequestConverter;
+import de.tum.in.www1.hephaestus.gitprovider.pullrequestreview.PullRequestReview;
 import de.tum.in.www1.hephaestus.gitprovider.pullrequestreview.PullRequestReviewRepository;
 import de.tum.in.www1.hephaestus.gitprovider.user.UserRepository;
 import de.tum.in.www1.hephaestus.gitprovider.user.github.GitHubUserConverter;
@@ -47,7 +48,7 @@ public class GitHubPullRequestReviewSyncService {
     }
 
     @Transactional
-    public void processPullRequestReview(GHPullRequestReview ghPullRequestReview) {
+    public PullRequestReview processPullRequestReview(GHPullRequestReview ghPullRequestReview) {
         var result = pullRequestReviewRepository.findById(ghPullRequestReview.getId())
                 .map(pullRequestReview -> {
                     return pullRequestReviewConverter.update(ghPullRequestReview, pullRequestReview);
@@ -58,7 +59,7 @@ public class GitHubPullRequestReviewSyncService {
                         });
 
         if (result == null) {
-            return;
+            return null;
         }
 
         // Link pull request
@@ -78,6 +79,6 @@ public class GitHubPullRequestReviewSyncService {
                     e.getMessage());
         }
 
-        pullRequestReviewRepository.save(result);
+        return pullRequestReviewRepository.save(result);
     }
 }

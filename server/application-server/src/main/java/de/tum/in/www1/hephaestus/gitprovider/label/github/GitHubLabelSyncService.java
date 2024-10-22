@@ -7,6 +7,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import jakarta.transaction.Transactional;
 
+import de.tum.in.www1.hephaestus.gitprovider.label.Label;
 import de.tum.in.www1.hephaestus.gitprovider.label.LabelRepository;
 import de.tum.in.www1.hephaestus.gitprovider.repository.RepositoryRepository;
 
@@ -32,7 +33,7 @@ public class GitHubLabelSyncService {
     }
 
     @Transactional
-    public void processLabel(GHLabel ghLabel) {
+    public Label processLabel(GHLabel ghLabel) {
         var result = labelRepository.findById(ghLabel.getId())
                 .map(label -> {
                     return labelConverter.update(ghLabel, label);
@@ -42,7 +43,7 @@ public class GitHubLabelSyncService {
                 });
 
         if (result == null) {
-            return;
+            return null;
         }
 
         // Link with existing repository if not already linked
@@ -56,6 +57,6 @@ public class GitHubLabelSyncService {
             }
         }
 
-        labelRepository.save(result);
+        return labelRepository.save(result);
     }
 }
