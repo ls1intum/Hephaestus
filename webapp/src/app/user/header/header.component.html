@@ -34,8 +34,8 @@
         github.com/{{ userData()?.login }}
       </a>
       @if (displayFirstContribution()) {
-        <div class="flex items-center gap-2 text-muted-foreground font-medium text-sm md:text-base">
-          <ng-icon [svg]="octClockFill" size="16" />
+        <div class="flex items-center gap-1 md:gap-2 text-muted-foreground font-medium text-sm md:text-base">
+          <ng-icon [svg]="octClockFill" size="16" class="!overflow-visible" />
           Contributing since {{ displayFirstContribution() }}
         </div>
       }
