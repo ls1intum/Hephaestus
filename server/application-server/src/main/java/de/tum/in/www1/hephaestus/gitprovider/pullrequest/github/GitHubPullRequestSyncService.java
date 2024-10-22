@@ -3,13 +3,14 @@ package de.tum.in.www1.hephaestus.gitprovider.pullrequest.github;
 import java.io.IOException;
 import java.time.LocalDate;
 import java.util.HashSet;
+import java.util.List;
+import java.util.Optional;
 
 import org.kohsuke.github.GHPullRequest;
 import org.kohsuke.github.GHPullRequestSearchBuilder;
 import org.kohsuke.github.GitHub;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 import jakarta.transaction.Transactional;
 
@@ -63,19 +64,60 @@ public class GitHubPullRequestSyncService {
         this.userConverter = userConverter;
     }
 
-    @Async
-    public void fetchAllPullRequestsAsync(String nameWithOwner) {
-        var builder = github.searchPullRequests().q("repo:" + nameWithOwner);
-        fetchPullRequests(builder);
+    /**
+     * Fetches all pull requests owned by a specific GitHub user and processes them to synchronize with the local repository.
+     *
+     * @param owner The GitHub username (login) of the pull request owner.
+     * @param since An optional date to filter pull requests by their last update.
+     */
+    public void fetchPullRequestsOfOwner(String owner, Optional<LocalDate> since) {
+        var builder = github.searchPullRequests()
+                .q("is:pr")
+                .q("user:" + owner);
+        if (since.isPresent()) {
+            builder = builder.updatedAfter(since.get(), true);
+        }
+        fetchRepositoriesWithBuilder(builder);
     }
 
-    @Async
-    public void fetchAllPullRequestsAsync(String nameWithOwner, LocalDate since) {
-        var builder = github.searchPullRequests().q("repo:" + nameWithOwner).updatedAfter(since, true);
-        fetchPullRequests(builder);
+    /**
+     * Fetches all pull requests within a specific repository and processes them to synchronize with the local repository.
+     *
+     * @param nameWithOwner The full name of the repository in the format "owner/repo".
+     * @param since         An optional date to filter pull requests by their last update.
+     */
+    public void fetchPullRequestsOfRepository(String nameWithOwner, Optional<LocalDate> since) {
+        var builder = github.searchPullRequests()
+                .q("is:pr")
+                .q("repo:" + nameWithOwner);
+        if (since.isPresent()) {
+            builder = builder.updatedAfter(since.get(), true);
+        }
+        fetchRepositoriesWithBuilder(builder);
     }
 
-    private void fetchPullRequests(GHPullRequestSearchBuilder builder) {
+    /**
+     * Fetches pull requests across multiple repositories and processes them to synchronize with the local repository.
+     *
+     * @param nameWithOwners A list of repository full names in the format "owner/repo".
+     * @param since          An optional date to filter pull requests by their last update.
+     */
+    public void fetchPullRequestsOfRepositories(List<String> nameWithOwners, Optional<LocalDate> since) {
+        var builder = github.searchPullRequests()
+                .q("is:pr")
+                .q(String.join(" OR ", nameWithOwners.stream().map(nameWithOwner -> "repo:" + nameWithOwner).toList()));
+        if (since.isPresent()) {
+            builder = builder.updatedAfter(since.get(), true);
+        }
+        fetchRepositoriesWithBuilder(builder);
+    }
+
+    /**
+     * Fetches pull requests based on the provided search builder and processes each pull request.
+     *
+     * @param builder The GHPullRequestSearchBuilder configured with search parameters.
+     */
+    private void fetchRepositoriesWithBuilder(GHPullRequestSearchBuilder builder) {
         var iterator = builder.list().withPageSize(100).iterator();
         while (iterator.hasNext()) {
             var ghPullRequests = iterator.nextPage();
@@ -83,6 +125,14 @@ public class GitHubPullRequestSyncService {
         }
     }
 
+    /**
+     * Processes a single GitHub pull request by either updating the existing pull request in the local repository
+     * or creating a new one if it does not exist. Additionally, it manages associations with repositories,
+     * labels, milestones, authors, assignees, merged by users, and requested reviewers.
+     * 
+     * @param ghPullRequest The GitHub pull request data to process.
+     * @return The updated or newly created PullRequest entity, or {@code null} if an error occurred during update.
+     */
     @Transactional
     public PullRequest processPullRequest(GHPullRequest ghPullRequest) {
         var result = pullRequestRepository.findById(ghPullRequest.getId())

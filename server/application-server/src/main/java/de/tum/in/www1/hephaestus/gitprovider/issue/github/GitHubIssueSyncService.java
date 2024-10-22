@@ -1,9 +1,13 @@
 package de.tum.in.www1.hephaestus.gitprovider.issue.github;
 
 import java.io.IOException;
+import java.time.LocalDate;
 import java.util.HashSet;
+import java.util.List;
+import java.util.Optional;
 
 import org.kohsuke.github.GHIssue;
+import org.kohsuke.github.GHIssueSearchBuilder;
 import org.kohsuke.github.GitHub;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -60,6 +64,76 @@ public class GitHubIssueSyncService {
         this.userConverter = userConverter;
     }
 
+    /**
+     * Fetches all issues within a specific repository and processes them to synchronize with the local repository.
+     *
+     * @param nameWithOwner The full name of the repository in the format "owner/repo".
+     * @param since         An optional date to filter issues by their last update.
+     */
+    public void fetchIssuesOfOwner(String owner, Optional<LocalDate> since) {
+        var builder = github.searchIssues()
+                .q("is:issue")
+                .q("user:" + owner);
+
+        if (since.isPresent()) {
+            builder = builder.q("updated:>=" + since.get().toString());
+        }
+        fetchRepositoriesWithBuilder(builder);
+    }
+
+    /**
+     * Fetches issues across multiple repositories and processes them to synchronize with the local repository.
+     *
+     * @param nameWithOwners A list of repository full names in the format "owner/repo".
+     * @param since          An optional date to filter issues by their last update.
+     */
+    public void fetchIssuesOfRepository(String nameWithOwner, Optional<LocalDate> since) {
+        var builder = github.searchIssues()
+                .q("is:issue")
+                .q("repo:" + nameWithOwner);
+        if (since.isPresent()) {
+            builder = builder.q("updated:>=" + since.get().toString());
+        }
+        fetchRepositoriesWithBuilder(builder);
+    }
+
+    /**
+     * Fetches issues based on the provided search builder and processes each issue.
+     *
+     * @param builder The GHIssueSearchBuilder configured with search parameters.
+     * @param since   An optional date to filter issues by their last update.
+     */
+    public void fetchIssuesOfRepositories(List<String> nameWithOwners, Optional<LocalDate> since) {
+        var builder = github.searchIssues()
+                .q("is:issue")
+                .q(String.join(" OR ", nameWithOwners.stream().map(nameWithOwner -> "repo:" + nameWithOwner).toList()));
+        if (since.isPresent()) {
+            builder = builder.q("updated:>=" + since.get().toString());
+        }
+        fetchRepositoriesWithBuilder(builder);
+    }
+
+    /**
+     * Fetches issues based on the provided search builder and processes each issue.
+     *
+     * @param builder The GHIssueSearchBuilder configured with search parameters.
+     */
+    private void fetchRepositoriesWithBuilder(GHIssueSearchBuilder builder) {
+        var iterator = builder.list().withPageSize(100).iterator();
+        while (iterator.hasNext()) {
+            var ghIssues = iterator.nextPage();
+            ghIssues.forEach(this::processIssue);
+        }
+    }
+
+    /**
+     * Processes a single GitHub issue by either updating the existing issue in the local repository
+     * or creating a new one if it does not exist. Additionally, it manages associations with repositories,
+     * labels, milestones, authors, and assignees.
+     *
+     * @param ghIssue The GitHub issue data to process.
+     * @return The updated or newly created Issue entity, or {@code null} if an error occurred during update.
+     */
     @Transactional
     public Issue processIssue(GHIssue ghIssue) {
         var result = issueRepository.findById(ghIssue.getId())

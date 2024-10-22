@@ -8,7 +8,6 @@ import org.kohsuke.github.GHRepositorySearchBuilder;
 import org.kohsuke.github.GitHub;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 import jakarta.transaction.Transactional;
 
@@ -38,20 +37,33 @@ public class GitHubRepositorySyncService {
         this.repositoryConverter = repositoryConverter;
     }
 
-    @Async
-    public void fetchAllRepositoriesOfOwnerAsync(String owner) {
+    /**
+     * Fetches all repositories owned by a specific GitHub user or organization and processes them to synchronize with the local repository.
+     *
+     * @param owner The GitHub username (login) of the repository owner.
+     */
+    public void fetchAllRepositoriesOfOwner(String owner) {
         var builder = github.searchRepositories().user(owner);
-        fetchRepository(builder);
+        fetchRepositoriesWithBuilder(builder);
     }
 
-    @Async
-    public void fetchRepositoriesAsync(List<String> nameWithOwners) {
+    /**
+     * Fetches a list of repositories specified by their full names (e.g., "owner/repo") and processes them to synchronize with the local repository.
+     *
+     * @param nameWithOwners A list of repository full names in the format "owner/repo".
+     */
+    public void fetchRepositories(List<String> nameWithOwners) {
         var builder = github.searchRepositories()
                 .q(String.join(" OR ", nameWithOwners.stream().map(nameWithOwner -> "repo:" + nameWithOwner).toList()));
-        fetchRepository(builder);
+        fetchRepositoriesWithBuilder(builder);
     }
 
-    private void fetchRepository(GHRepositorySearchBuilder builder) {
+    /**
+     * Fetches repositories based on the provided search builder and processes each repository.
+     *
+     * @param builder The GHRepositorySearchBuilder configured with search parameters.
+     */
+    private void fetchRepositoriesWithBuilder(GHRepositorySearchBuilder builder) {
         var iterator = builder.list().withPageSize(100).iterator();
         while (iterator.hasNext()) {
             var ghRepositories = iterator.nextPage();
@@ -59,6 +71,13 @@ public class GitHubRepositorySyncService {
         }
     }
 
+    /**
+     * Processes a single GitHub repository by either updating the existing repository in the local repository
+     * or creating a new one if it does not exist.
+     *
+     * @param ghRepository The GitHub repository data to process.
+     * @return The updated or newly created Repository entity, or {@code null} if an error occurred during update.
+     */
     @Transactional
     public Repository processRepository(GHRepository ghRepository) {
         var result = repositoryRepository.findById(ghRepository.getId())
