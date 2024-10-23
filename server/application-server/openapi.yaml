@@ -37,6 +37,29 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/UserDTO"
+  /admin/teams:
+    put:
+      tags:
+      - admin
+      operationId: createTeam
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name:
+                  type: string
+                color:
+                  type: string
+        required: true
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TeamDTO"
   /admin/config/repositories:
     post:
       tags:
@@ -286,6 +309,25 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/UserDTO"
+  /admin/teams/{teamId}:
+    delete:
+      tags:
+      - admin
+      operationId: deleteTeam
+      parameters:
+      - name: teamId
+        in: path
+        required: true
+        schema:
+          type: integer
+          format: int64
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TeamDTO"
 components:
   schemas:
     IssueCommentDTO:
@@ -407,6 +449,20 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/IssueCommentDTO"
+    TeamDTO:
+      required:
+      - color
+      - id
+      - name
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+        name:
+          type: string
+        color:
+          type: string
     PullRequestReviewDTO:
       required:
       - createdAt
@@ -516,9 +572,8 @@ components:
           type: string
         state:
           type: string
-          description: |-
-            State of the PullRequest.
-             Does not include the state of the merge.
+          description: "State of the PullRequest.\r\n Does not include the state of\
+            \ the merge."
           enum:
           - CLOSED
           - OPEN
@@ -696,15 +751,12 @@ components:
           description: Display name of the user.
         url:
           type: string
-          description: |-
-            Unique URL to the user's profile.
-             Not the website a user can set in their profile.
+          description: "Unique URL to the user's profile.\r\n Not the website a user\
+            \ can set in their profile."
         avatarUrl:
           type: string
-          description: |-
-            URL to the user's avatar.
-             If unavailable, a fallback can be generated from the login, e.g. on Github:
-             https://github.com/{login}.png
+          description: "URL to the user's avatar.\r\n If unavailable, a fallback can\
+            \ be generated from the login, e.g. on Github:\r\n https://github.com/{login}.png"
         type:
           type: string
           description: Type of the user. Used to distinguish between users and bots.
@@ -736,20 +788,6 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/PullRequestReview"
-    TeamDTO:
-      required:
-      - color
-      - id
-      - name
-      type: object
-      properties:
-        id:
-          type: integer
-          format: int64
-        name:
-          type: string
-        color:
-          type: string
     MetaDataDTO:
       type: object
       properties:

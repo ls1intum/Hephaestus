@@ -1,8 +1,8 @@
 <div class="flex flex-col justify-between gap-4 sm:flex-row">
-  <input hlmInput class="w-full md:w-80" placeholder="Filter login..." [ngModel]="_loginFilter()" (ngModelChange)="_rawFilterInput.set($event)" />
+  <input hlmInput class="w-full md:w-80" placeholder="Filter names..." [ngModel]="_nameFilter()" (ngModelChange)="_rawFilterInput.set($event)" />
 
   <div class="flex items-center gap-4">
-    <button hlmBtn variant="outline" size="icon" (click)="invalidateUsers()">
+    <button hlmBtn variant="outline" size="icon" (click)="invalidateTeams()">
       @if (this.isLoading()) {
         <hlm-icon name="lucideRotateCw" strokeWidth="2px" size="sm" class="animate-spin" />
       } @else {
@@ -35,7 +35,7 @@
   hlm
   stickyHeader
   class="border-border mt-4 block overflow-auto rounded-md border"
-  [dataSource]="_filteredSortedPaginatedLogins()"
+  [dataSource]="_filteredSortedPaginatedTeams()"
   [displayedColumns]="_allDisplayedColumns()"
   [trackBy]="_trackBy"
 >
@@ -44,23 +44,13 @@
       <hlm-checkbox [checked]="_checkboxState()" (changed)="handleHeaderCheckboxChange()" />
     </hlm-th>
     <hlm-td *brnCellDef="let element">
-      <hlm-checkbox [checked]="_isUserSelected(element)" (changed)="toggleUser(element)" />
+      <hlm-checkbox [checked]="_isUserSelected(element)" (changed)="toggleTeam(element)" />
     </hlm-td>
   </brn-column-def>
   <brn-column-def name="name" class="w-32 sm:w-40">
-    <hlm-th truncate *brnHeaderDef>Name</hlm-th>
-    <hlm-td truncate *brnCellDef="let element">
-      @if (this.isLoading()) {
-        <hlm-skeleton class="h-6 w-28" />
-      } @else {
-        {{ element.name }}
-      }
-    </hlm-td>
-  </brn-column-def>
-  <brn-column-def name="login" class="w-32 sm:w-40">
     <hlm-th *brnHeaderDef>
-      <button hlmBtn size="sm" variant="ghost" (click)="handleLoginSortChange()">
-        Login
+      <button hlmBtn size="sm" variant="ghost" (click)="handleNameSortChange()">
+        Name
         <hlm-icon class="ml-3" size="sm" name="lucideArrowUpDown" />
       </button>
     </hlm-th>
@@ -68,17 +58,15 @@
       @if (this.isLoading()) {
         <hlm-skeleton class="h-6 w-20" />
       } @else {
-        {{ element.login }}
+        {{ element.name }}
       }
     </hlm-td>
   </brn-column-def>
-  <brn-column-def name="teams" class="w-20 flex-1">
-    <hlm-th *brnHeaderDef>Teams</hlm-th>
+  <brn-column-def name="color" class="w-20 flex-1">
+    <hlm-th *brnHeaderDef>Color</hlm-th>
     <hlm-td class="font-medium tabular-nums flex gap-4" *brnCellDef="let element">
-      @for (team of element.teams; track team) {
-        @let label = { name: team.name, color: team.color ?? '69feff' };
-        <app-github-label [label]="label" [isLoading]="this.isLoading()" />
-      }
+      <div class="w-4 h-4 rounded-full" [style.backgroundColor]="element.color"></div>
+      <span>{{ element.color }}</span>
     </hlm-td>
   </brn-column-def>
   <brn-column-def name="actions" class="w-16">
@@ -91,12 +79,11 @@
       <ng-template #menu>
         <hlm-menu>
           <hlm-menu-group>
-            <button hlmMenuItem (click)="copyLogin(element)">Copy login</button>
+            <button hlmMenuItem (click)="copyName(element)">Copy name</button>
           </hlm-menu-group>
           <hlm-menu-separator />
           <hlm-menu-group>
-            <a hlmMenuItem [href]="element.url" target="_blank">View Github</a>
-            <a hlmMenuItem [routerLink]="'/user/' + element.login">View profile page</a>
+            <button hlmMenuItem class="text-github-danger-foreground" (click)="deleteTeam(element)">Delete Team</button>
           </hlm-menu-group>
         </hlm-menu>
       </ng-template>
@@ -134,19 +121,16 @@
     </div>
   </div>
 </div>
-<div class="flex gap-4 mt-4">
-  <brn-select class="inline-block" placeholder="Select a team" [(ngModel)]="_selectedTeam">
-    <hlm-select-trigger class="inline-flex">
-      <hlm-select-value />
-    </hlm-select-trigger>
-    <hlm-select-content class="min-w-[9.5rem]">
-      @for (team of _availableTeams(); track team.id) {
-        <hlm-option [value]="team" class="containerSize">
-          <span class="">{{ team.name }}</span>
-        </hlm-option>
-      }
-    </hlm-select-content>
-  </brn-select>
-  <button hlmBtn variant="secondary" [disabled]="_selected().length === 0 || !_selectedTeam" (click)="addTeamToSelected()">Add team</button>
-  <button hlmBtn variant="secondary" [disabled]="_selected().length === 0 || !_selectedTeam" (click)="removeTeamFromSelected()">Remove team</button>
+<!-- Card to add new team -->
+<div hlmCard class="size-fit">
+  <div hlmCardHeader class="pb-0">
+    <h3 hlmCardTitle>Create new team</h3>
+  </div>
+  <div hlmCardContent class="flex gap-4">
+    <input hlmInput placeholder="Team name" [formControl]="_newTeamName" />
+    <input hlmInput placeholder="Team color" [formControl]="_newTeamColor" />
+  </div>
+  <div hlmCardFooter class="justify-end">
+    <button hlmBtn>Create</button>
+  </div>
 </div>

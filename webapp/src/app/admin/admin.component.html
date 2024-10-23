@@ -1,12 +1,11 @@
-<div class="flex flex-col gap-4 indent-3">
-  <h3 class="text-xl font-bold">User</h3>
-  <textarea hlmInput class="block size-full" style="field-sizing: content" readonly>{{ user() | json }}</textarea>
-  <h3 class="text-xl font-bold">Config</h3>
-  <!-- input for repositories with save button -->
-  <div class="flex flex-col items-start gap-4">
-    <div class="w-1/2">
-      <textarea hlmInput [formControl]="repositoriesForm" class="block size-fit" style="field-sizing: content"></textarea>
-    </div>
-    <button hlmBtn (click)="saveRepositories()">Save</button>
+<!-- input for repositories with save button -->
+<h1 class="text-3xl font-bold mb-4">Environment</h1>
+<div class="flex flex-col items-start gap-4">
+  <div class="w-1/2">
+    <h2 class="text-lg font-semibold mb-2">Repositories to monitor:</h2>
+    <textarea hlmInput [formControl]="repositoriesForm" class="block size-fit" style="field-sizing: content"></textarea>
+    <h2 class="text-lg font-semibold my-2">User:</h2>
+    <textarea hlmInput [formControl]="userForm" class="block size-fit" style="field-sizing: content"></textarea>
   </div>
+  <button hlmBtn (click)="saveRepositories()">Save</button>
 </div>

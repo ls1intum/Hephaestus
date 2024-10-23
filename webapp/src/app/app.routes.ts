@@ -6,6 +6,7 @@ import { AdminGuard } from '@app/core/security/admin.guard';
 import { UserProfileComponent } from '@app/user/user-profile.component';
 import { AdminUsersComponent } from './admin/users/users.component';
 import { AdminLayoutComponent } from './admin/layout.component';
+import { AdminTeamsComponent } from './admin/teams/teams.component';
 
 export const routes: Routes = [
   { path: '', component: HomeComponent },
@@ -22,6 +23,10 @@ export const routes: Routes = [
       {
         path: 'users',
         component: AdminUsersComponent
+      },
+      {
+        path: 'teams',
+        component: AdminTeamsComponent
       }
     ]
   },

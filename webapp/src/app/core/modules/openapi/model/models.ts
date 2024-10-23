@@ -1,4 +1,5 @@
 export * from './admin-config';
+export * from './create-team-request';
 export * from './issue-comment';
 export * from './issue-comment-dto';
 export * from './leaderboard-entry';

@@ -202,6 +202,17 @@ export class AdminUsersTableComponent {
     this.invalidateUsers();
   }
 
+  protected removeTeamFromSelected() {
+    for (const user of this._selected()) {
+      console.log('Removing team from user', user.login, this._selectedTeam());
+      this.adminService.removeTeamFromUser(user.login, this._selectedTeam()!.id).subscribe({
+        next: () => console.log('Team removed from user', user),
+        error: (err) => console.error('Error removing team from user', user, err)
+      });
+    }
+    this.invalidateUsers();
+  }
+
   protected invalidateUsers() {
     if (this.isLoading()) {
       return;

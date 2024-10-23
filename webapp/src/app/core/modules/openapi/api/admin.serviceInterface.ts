@@ -14,6 +14,8 @@ import { HttpHeaders }                                       from '@angular/comm
 import { Observable }                                        from 'rxjs';
 
 import { AdminConfig } from '../model/models';
+import { CreateTeamRequest } from '../model/models';
+import { TeamDTO } from '../model/models';
 import { UserDTO } from '../model/models';
 import { UserInfoDto } from '../model/models';
 import { UserTeamsDTO } from '../model/models';
@@ -40,6 +42,20 @@ export interface AdminServiceInterface {
      * 
      */
     admin(extraHttpRequestParams?: any): Observable<string>;
+
+    /**
+     * 
+     * 
+     * @param createTeamRequest 
+     */
+    createTeam(createTeamRequest: CreateTeamRequest, extraHttpRequestParams?: any): Observable<TeamDTO>;
+
+    /**
+     * 
+     * 
+     * @param teamId 
+     */
+    deleteTeam(teamId: number, extraHttpRequestParams?: any): Observable<TeamDTO>;
 
     /**
      * 

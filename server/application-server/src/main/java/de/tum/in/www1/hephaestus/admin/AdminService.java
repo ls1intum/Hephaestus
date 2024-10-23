@@ -116,4 +116,19 @@ public class AdminService {
         teamService.saveTeam(team);
         return Optional.of(new UserDTO(user.getId(), user.getLogin(), user.getEmail(), user.getName(), user.getUrl()));
     }
+
+    public TeamDTO createTeam(String name, String color) {
+        logger.info("Creating team with name: " + name + " and color: " + color);
+        return TeamDTO.fromTeam(teamService.createTeam(name, color));
+    }
+
+    public Optional<TeamDTO> deleteTeam(Long teamId) {
+        logger.info("Deleting team with ID: " + teamId);
+        Optional<Team> optionalTeam = teamService.getTeam(teamId);
+        if (optionalTeam.isEmpty()) {
+            return Optional.empty();
+        }
+        teamService.deleteTeam(teamId);
+        return Optional.of(TeamDTO.fromTeam(optionalTeam.get()));
+    }
 }

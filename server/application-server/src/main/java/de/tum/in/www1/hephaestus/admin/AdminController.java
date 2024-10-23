@@ -16,6 +16,7 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+import de.tum.in.www1.hephaestus.codereview.team.TeamDTO;
 import de.tum.in.www1.hephaestus.codereview.user.UserDTO;
 import de.tum.in.www1.hephaestus.codereview.user.UserTeamsDTO;
 
@@ -73,6 +74,18 @@ public class AdminController {
     @DeleteMapping("/users/teamremove/{login}/{teamId}")
     public ResponseEntity<UserDTO> removeTeamFromUser(@PathVariable String login, @PathVariable Long teamId) {
         return adminService.removeTeamFromUser(login, teamId)
+                .map(ResponseEntity::ok)
+                .orElseGet(() -> ResponseEntity.notFound().build());
+    }
+
+    @PutMapping("/teams")
+    public ResponseEntity<TeamDTO> createTeam(@RequestBody String name, @RequestBody String color) {
+        return ResponseEntity.ok(adminService.createTeam(name, color));
+    }
+
+    @DeleteMapping("/teams/{teamId}")
+    public ResponseEntity<TeamDTO> deleteTeam(@PathVariable Long teamId) {
+        return adminService.deleteTeam(teamId)
                 .map(ResponseEntity::ok)
                 .orElseGet(() -> ResponseEntity.notFound().build());
     }
