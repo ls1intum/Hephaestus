@@ -40,7 +40,7 @@ monitoring:
     # Fetching timeframe in days
     timeframe: 7
     repository-sync-cron: "0 0 * * * *"
-    repositories: ls1intum/Artemis,ls1intum/Athena,ls1intum/Hephaestus,ls1intum/Pyris,ls1intum/Ares2,ls1intum/Aeolus,ls1intum/hades,ls1intum/Apollon,ls1intum/Apollon_standalone,ls1intum/artemis-android,ls1intum/artemis-ios,ls1intum/artemis-ansible-collection
+    repositories: ls1intum/Artemis
 
 # Can be any OAuth token, such as the PAT
 github:
