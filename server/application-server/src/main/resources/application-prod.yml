@@ -16,6 +16,7 @@ spring:
 
 nats:
     enabled: ${NATS_ENABLED:false}
+    durableConsumerName: ${NATS_DURABLE_CONSUMER_NAME}
     server: ${NATS_SERVER}
 
 monitoring:

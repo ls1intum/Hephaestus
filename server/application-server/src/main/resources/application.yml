@@ -33,6 +33,7 @@ springdoc:
 
 nats:
     enabled: false
+    durableConsumerName: ""
     server: ""
 
 monitoring:

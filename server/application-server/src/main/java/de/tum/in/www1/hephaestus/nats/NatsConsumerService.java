@@ -1,13 +1,20 @@
 package de.tum.in.www1.hephaestus.nats;
 
-import io.nats.client.*;
-import io.nats.client.api.ConsumerConfiguration;
-import io.nats.client.api.DeliverPolicy;
-
 import java.io.IOException;
 import java.util.Arrays;
 import java.time.Duration;
 import java.time.ZonedDateTime;
+
+import io.nats.client.Connection;
+import io.nats.client.ConsumerContext;
+import io.nats.client.JetStreamApiException;
+import io.nats.client.Message;
+import io.nats.client.MessageHandler;
+import io.nats.client.Nats;
+import io.nats.client.Options;
+import io.nats.client.StreamContext;
+import io.nats.client.api.ConsumerConfiguration;
+import io.nats.client.api.DeliverPolicy;
 
 import org.springframework.stereotype.Service;
 import org.springframework.boot.context.event.ApplicationReadyEvent;
@@ -25,13 +32,19 @@ public class NatsConsumerService {
 
     private static final Logger logger = LoggerFactory.getLogger(NatsConsumerService.class);
 
+    private static final int INITIAL_RECONNECT_DELAY_SECONDS = 2;
+
     @Value("${nats.server}")
     private String natsServer;
+
+    @Value("${nats.durableConsumerName}")
+    private String durableConsumerName;
 
     @Value("${monitoring.repositories}")
     private String[] repositoriesToMonitor;
 
     private Connection natsConnection;
+    private ConsumerContext consumerContext;
 
     private final GitHubMessageHandlerRegistry handlerRegistry;
 
@@ -40,109 +53,86 @@ public class NatsConsumerService {
     }
 
     @EventListener(ApplicationReadyEvent.class)
-    public void init() throws IOException, InterruptedException, JetStreamApiException {
-        Options options = Options.builder().server(natsServer).connectionListener((c, t) -> {
-            logger.info("Connection: " + c.getServerInfo().getPort() + " " + t);
-        }).maxReconnects(-1).reconnectWait(Duration.ofSeconds(2)).build();
-        natsConnection = Nats.connect(options);
+    public void init() {
+        validateConfigurations();
+        Options options = buildNatsOptions();
 
-        // String consumerName = "github-consumer";
-        ConsumerConfiguration consumerConfig = ConsumerConfiguration.builder()
-                // .durable(consumerName)
-                .filterSubjects(getSubjects())
-                .deliverPolicy(DeliverPolicy.ByStartTime)
-                .startTime(ZonedDateTime.now().minusDays(30))
-                .maxBatch(0)
+        while (true) {
+            try {
+                natsConnection = Nats.connect(options);
+                setupConsumer(natsConnection);
+                return;
+            } catch (IOException | InterruptedException e) {
+                logger.error("NATS connection error: {}", e.getMessage(), e);
+            }
+        }
+    }
+
+    private void validateConfigurations() {
+        if (natsServer == null || natsServer.trim().isEmpty()) {
+            throw new IllegalArgumentException("NATS server configuration is missing.");
+        }
+        if (repositoriesToMonitor == null || repositoriesToMonitor.length == 0) {
+            throw new IllegalArgumentException("No repositories to monitor are configured.");
+        }
+    }
+
+    private Options buildNatsOptions() {
+        return Options.builder()
+                .server(natsServer)
+                .connectionListener((conn, type) -> logger.info("Connection event - Server: {}, {}",
+                        conn.getServerInfo().getPort(), type))
+                .maxReconnects(-1)
+                .reconnectWait(Duration.ofSeconds(INITIAL_RECONNECT_DELAY_SECONDS))
                 .build();
+    }
 
-        // JetStreamManagement jsm = natsConnection.jetStreamManagement();
-        // logger.info("Consumer names:" + jsm.getConsumerNames("github"));
-        // logger.info("Consumers:" + jsm.getConsumers("github"));
-        // jsm.deleteConsumer("github", "github-consumer");
+    private void setupConsumer(Connection connection) throws IOException, InterruptedException {
+        try {
+            StreamContext streamContext = connection.getStreamContext("github");
+            ConsumerConfiguration.Builder consumerConfigBuilder = ConsumerConfiguration.builder()
+                    .filterSubjects(getSubjects())
+                    .deliverPolicy(DeliverPolicy.ByStartTime)
+                    .startTime(ZonedDateTime.now().minusDays(30));
 
-        // try {
-        StreamContext streamContext = natsConnection.getStreamContext("github");
-        ConsumerContext consumerContext = streamContext.createOrUpdateConsumer(consumerConfig);
-        // consumerContext = streamContext.getConsumerContext(natsServer)
-        // } catch (JetStreamApiException | IOException e) {
-        // // JetStreamApiException:
-        // // the stream or consumer did not exist
-        // // IOException:
-        // // likely a connection problem
-        // return;
-        // }
+            if (durableConsumerName != null && !durableConsumerName.isEmpty()) {
+                consumerConfigBuilder.durable(durableConsumerName);
+            }
 
-        // GitHub github = new GitHubBuilder().build();
+            ConsumerConfiguration consumerConfig = consumerConfigBuilder.build();
+            consumerContext = streamContext.createOrUpdateConsumer(consumerConfig);
 
-        MessageHandler handler = msg -> {
-            msg.ack();
+            MessageHandler handler = this::handleMessage;
+            consumerContext.consume(handler);
+            logger.info("Successfully started consuming messages.");
+        } catch (JetStreamApiException e) {
+            logger.error("JetStream API exception: {}", e.getMessage(), e);
+            throw new IOException("Failed to set up consumer.", e);
+        }
+    }
+
+    private void handleMessage(Message msg) {
+        try {
             String subject = msg.getSubject();
             String lastPart = subject.substring(subject.lastIndexOf(".") + 1);
             GHEvent eventType = GHEvent.valueOf(lastPart.toUpperCase());
             GitHubMessageHandler<?> eventHandler = handlerRegistry.getHandler(eventType);
+
             if (eventHandler == null) {
-                logger.warn("No handler found for event type: " + eventType);
+                logger.warn("No handler found for event type: {}", eventType);
+                msg.ack();
                 return;
             }
+
             eventHandler.onMessage(msg);
-
-            // logger.info("Received message: " + msg.getSubject() + " metaData: " +
-            // msg.metaData());
-            // byte[] data = msg.getData();
-            // String payload = new String(data, StandardCharsets.UTF_8);
-            // StringReader reader = new StringReader(payload);
-
-            // String subject = msg.getSubject();
-            // if (subject.endsWith(".pull_request")) {
-            // try {
-            // GHEventPayload.PullRequest pullRequestEvent =
-            // github.parseEventPayload(reader,
-            // GHEventPayload.PullRequest.class);
-            // logger.info("Received pull request: " +
-            // pullRequestEvent.getPullRequest().getTitle());
-            // } catch (IOException e) {
-            // logger.error("Failed to parse pull request payload.", e);
-            // }
-            // } else if (subject.endsWith(".pull_request_review_comment")) {
-            // try {
-            // GHEventPayload.PullRequestReviewComment pullRequestReviewCommentEvent =
-            // github.parseEventPayload(
-            // reader,
-            // GHEventPayload.PullRequestReviewComment.class);
-            // logger.info("Received pull request review comment: " +
-            // pullRequestReviewCommentEvent.getComment().getBody());
-            // } catch (IOException e) {
-            // logger.error("Failed to parse pull request review comment payload.", e);
-            // }
-            // } else if (subject.endsWith(".pull_request_review")) {
-            // try {
-            // GHEventPayload.PullRequestReview pullRequestReviewEvent =
-            // github.parseEventPayload(reader,
-            // GHEventPayload.PullRequestReview.class);
-            // logger.info("Received pull request review: " +
-            // pullRequestReviewEvent.getReview().getBody());
-            // } catch (IOException e) {
-            // logger.error("Failed to parse pull request review payload.", e);
-            // }
-            // }
-        };
-
-        consumerContext.consume(handler);
-
-        // try (MessageConsumer consumer = ) {
-        // } catch (JetStreamApiException | IOException e) {
-        // // JetStreamApiException:
-        // // 1. the stream or consumer did not exist
-        // // 2. api calls under the covers theoretically this could fail, but
-        // practically
-        // // it won't.
-        // // IOException:
-        // // likely a connection problem
-        // } catch (Exception e) {
-        // // this is from the FetchConsumer being AutoCloseable, but should never be
-        // // called
-        // // as work inside the close is already guarded by try/catch
-        // }
+            msg.ack();
+        } catch (IllegalArgumentException e) {
+            logger.error("Invalid event type in subject '{}': {}", msg.getSubject(), e.getMessage());
+            msg.nak();
+        } catch (Exception e) {
+            logger.error("Error processing message: {}", e.getMessage(), e);
+            msg.nak();
+        }
     }
 
     /**
