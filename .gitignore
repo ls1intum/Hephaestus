@@ -168,3 +168,6 @@ cython_debug/
 node_modules/
 
 application-local.yml
+
+# Java-Client creation temporary
+tmp
