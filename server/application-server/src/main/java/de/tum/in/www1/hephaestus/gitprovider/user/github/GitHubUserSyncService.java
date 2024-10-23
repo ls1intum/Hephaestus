@@ -32,7 +32,8 @@ public class GitHubUserSyncService {
     }
 
     /**
-     * Fetches a GitHub user's data by their login and processes it to synchronize with the local repository.
+     * Fetches a GitHub user's data by their login and processes it to synchronize
+     * with the local repository.
      *
      * @param login The GitHub username (login) of the user to fetch.
      */
@@ -45,10 +46,12 @@ public class GitHubUserSyncService {
     }
 
     /**
-     * Processes a GitHub user by either updating the existing user in the repository or creating a new one.
+     * Processes a GitHub user by either updating the existing user in the
+     * repository or creating a new one.
      *
      * @param ghUser The GitHub user data to process.
-     * @return The updated or newly created User entity, or {@code null} if an error occurred during update.
+     * @return The updated or newly created User entity, or {@code null} if an error
+     *         occurred during update.
      */
     @Transactional
     public User processUser(GHUser ghUser) {
@@ -64,11 +67,7 @@ public class GitHubUserSyncService {
                         logger.error("Failed to update repository {}: {}", ghUser.getId(), e.getMessage());
                         return null;
                     }
-                }).orElseGet(
-                        () -> {
-                            var user = userConverter.convert(ghUser);
-                            return userRepository.save(user);
-                        });
+                }).orElseGet(() -> userConverter.convert(ghUser));
 
         if (result == null) {
             return null;

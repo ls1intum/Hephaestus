@@ -6,6 +6,7 @@ import java.util.Set;
 
 import org.springframework.lang.NonNull;
 
+import jakarta.persistence.CascadeType;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
@@ -63,7 +64,7 @@ public class PullRequestReview {
     @ToString.Exclude
     private PullRequest pullRequest;
     
-    @OneToMany(mappedBy = "review")
+    @OneToMany(mappedBy = "review", cascade = CascadeType.REMOVE, orphanRemoval = true)
     @ToString.Exclude
     private Set<PullRequestReviewComment> comments = new HashSet<>();
 

@@ -4,9 +4,8 @@ import java.time.OffsetDateTime;
 import java.util.HashSet;
 import java.util.Set;
 
-import org.springframework.lang.NonNull;
-
 import jakarta.persistence.Entity;
+import jakarta.persistence.CascadeType;
 import jakarta.persistence.DiscriminatorValue;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.OneToMany;
@@ -68,11 +67,11 @@ public class PullRequest extends Issue {
     @ToString.Exclude
     private Set<User> requestedReviewers = new HashSet<>();
 
-    @OneToMany(mappedBy = "pullRequest")
+    @OneToMany(mappedBy = "pullRequest", cascade = CascadeType.REMOVE, orphanRemoval = true)
     @ToString.Exclude
     private Set<PullRequestReview> reviews = new HashSet<>();
 
-    @OneToMany(mappedBy = "pullRequest")
+    @OneToMany(mappedBy = "pullRequest", cascade = CascadeType.REMOVE, orphanRemoval = true)
     @ToString.Exclude
     private Set<PullRequestReviewComment> reviewComments = new HashSet<>();
     

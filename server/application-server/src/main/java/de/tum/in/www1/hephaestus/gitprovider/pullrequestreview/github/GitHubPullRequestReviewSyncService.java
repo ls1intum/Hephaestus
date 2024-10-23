@@ -52,11 +52,7 @@ public class GitHubPullRequestReviewSyncService {
         var result = pullRequestReviewRepository.findById(ghPullRequestReview.getId())
                 .map(pullRequestReview -> {
                     return pullRequestReviewConverter.update(ghPullRequestReview, pullRequestReview);
-                }).orElseGet(
-                        () -> {
-                            var pullRequestReview = pullRequestReviewConverter.convert(ghPullRequestReview);
-                            return pullRequestReviewRepository.save(pullRequestReview);
-                        });
+                }).orElseGet(() -> pullRequestReviewConverter.convert(ghPullRequestReview));
 
         if (result == null) {
             return null;

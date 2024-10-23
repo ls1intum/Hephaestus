@@ -65,7 +65,8 @@ public class GitHubPullRequestSyncService {
     }
 
     /**
-     * Fetches all pull requests owned by a specific GitHub user and processes them to synchronize with the local repository.
+     * Fetches all pull requests owned by a specific GitHub user and processes them
+     * to synchronize with the local repository.
      *
      * @param owner The GitHub username (login) of the pull request owner.
      * @param since An optional date to filter pull requests by their last update.
@@ -81,10 +82,13 @@ public class GitHubPullRequestSyncService {
     }
 
     /**
-     * Fetches all pull requests within a specific repository and processes them to synchronize with the local repository.
+     * Fetches all pull requests within a specific repository and processes them to
+     * synchronize with the local repository.
      *
-     * @param nameWithOwner The full name of the repository in the format "owner/repo".
-     * @param since         An optional date to filter pull requests by their last update.
+     * @param nameWithOwner The full name of the repository in the format
+     *                      "owner/repo".
+     * @param since         An optional date to filter pull requests by their last
+     *                      update.
      */
     public void fetchPullRequestsOfRepository(String nameWithOwner, Optional<LocalDate> since) {
         var builder = github.searchPullRequests()
@@ -97,10 +101,13 @@ public class GitHubPullRequestSyncService {
     }
 
     /**
-     * Fetches pull requests across multiple repositories and processes them to synchronize with the local repository.
+     * Fetches pull requests across multiple repositories and processes them to
+     * synchronize with the local repository.
      *
-     * @param nameWithOwners A list of repository full names in the format "owner/repo".
-     * @param since          An optional date to filter pull requests by their last update.
+     * @param nameWithOwners A list of repository full names in the format
+     *                       "owner/repo".
+     * @param since          An optional date to filter pull requests by their last
+     *                       update.
      */
     public void fetchPullRequestsOfRepositories(List<String> nameWithOwners, Optional<LocalDate> since) {
         var builder = github.searchPullRequests()
@@ -113,9 +120,11 @@ public class GitHubPullRequestSyncService {
     }
 
     /**
-     * Fetches pull requests based on the provided search builder and processes each pull request.
+     * Fetches pull requests based on the provided search builder and processes each
+     * pull request.
      *
-     * @param builder The GHPullRequestSearchBuilder configured with search parameters.
+     * @param builder The GHPullRequestSearchBuilder configured with search
+     *                parameters.
      */
     private void fetchRepositoriesWithBuilder(GHPullRequestSearchBuilder builder) {
         var iterator = builder.list().withPageSize(100).iterator();
@@ -126,12 +135,16 @@ public class GitHubPullRequestSyncService {
     }
 
     /**
-     * Processes a single GitHub pull request by either updating the existing pull request in the local repository
-     * or creating a new one if it does not exist. Additionally, it manages associations with repositories,
-     * labels, milestones, authors, assignees, merged by users, and requested reviewers.
+     * Processes a single GitHub pull request by either updating the existing pull
+     * request in the local repository
+     * or creating a new one if it does not exist. Additionally, it manages
+     * associations with repositories,
+     * labels, milestones, authors, assignees, merged by users, and requested
+     * reviewers.
      * 
      * @param ghPullRequest The GitHub pull request data to process.
-     * @return The updated or newly created PullRequest entity, or {@code null} if an error occurred during update.
+     * @return The updated or newly created PullRequest entity, or {@code null} if
+     *         an error occurred during update.
      */
     @Transactional
     public PullRequest processPullRequest(GHPullRequest ghPullRequest) {
@@ -147,11 +160,7 @@ public class GitHubPullRequestSyncService {
                         logger.error("Failed to update pull request {}: {}", ghPullRequest.getId(), e.getMessage());
                         return null;
                     }
-                }).orElseGet(
-                        () -> {
-                            var pullRequest = pullRequestConverter.convert(ghPullRequest);
-                            return pullRequestRepository.save(pullRequest);
-                        });
+                }).orElseGet(() -> pullRequestConverter.convert(ghPullRequest));
 
         if (result == null) {
             return null;
@@ -169,11 +178,15 @@ public class GitHubPullRequestSyncService {
         }
 
         // Link new labels and remove labels that are not present anymore
-        var labels = ghPullRequest.getLabels();
+        var ghLabels = ghPullRequest.getLabels();
         var resultLabels = new HashSet<>(result.getLabels());
-        labels.forEach(label -> {
-            var resultLabel = labelRepository.findById(label.getId())
-                    .orElseGet(() -> labelRepository.save(labelConverter.convert(label)));
+        ghLabels.forEach(ghLabel -> {
+            var resultLabel = labelRepository.findById(ghLabel.getId())
+                    .orElseGet(() -> {
+                        var label = labelConverter.convert(ghLabel);
+                        label.setRepository(result.getRepository());
+                        return labelRepository.save(label);
+                    });
             resultLabels.add(resultLabel);
         });
         result.getLabels().clear();
@@ -182,7 +195,8 @@ public class GitHubPullRequestSyncService {
         // Link milestone
         if (ghPullRequest.getMilestone() != null) {
             var resultMilestone = milestoneRepository.findById(ghPullRequest.getMilestone().getId())
-                    .orElseGet(() -> milestoneRepository.save(milestoneConverter.convert(ghPullRequest.getMilestone())));
+                    .orElseGet(
+                            () -> milestoneRepository.save(milestoneConverter.convert(ghPullRequest.getMilestone())));
             result.setMilestone(resultMilestone);
         } else {
             result.setMilestone(null);
@@ -220,7 +234,8 @@ public class GitHubPullRequestSyncService {
                 result.setMergedBy(null);
             }
         } catch (IOException e) {
-            logger.error("Failed to link merged by user for pull request {}: {}", ghPullRequest.getId(), e.getMessage());
+            logger.error("Failed to link merged by user for pull request {}: {}", ghPullRequest.getId(),
+                    e.getMessage());
         }
 
         // Link requested reviewers
@@ -235,7 +250,8 @@ public class GitHubPullRequestSyncService {
             result.getRequestedReviewers().clear();
             result.getRequestedReviewers().addAll(resultRequestedReviewers);
         } catch (IOException e) {
-            logger.error("Failed to link requested reviewers for pull request {}: {}", ghPullRequest.getId(), e.getMessage());
+            logger.error("Failed to link requested reviewers for pull request {}: {}", ghPullRequest.getId(),
+                    e.getMessage());
         }
 
         return pullRequestRepository.save(result);

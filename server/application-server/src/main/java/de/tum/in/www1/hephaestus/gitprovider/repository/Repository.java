@@ -6,6 +6,7 @@ import java.time.OffsetDateTime;
 
 import org.springframework.lang.NonNull;
 
+import jakarta.persistence.CascadeType;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
@@ -70,15 +71,15 @@ public class Repository extends BaseGitServiceEntity {
 
     private boolean hasWiki;
 
-    @OneToMany(mappedBy = "repository")
+    @OneToMany(mappedBy = "repository", cascade = CascadeType.REMOVE, orphanRemoval = true)
     @ToString.Exclude
     private Set<Issue> issues = new HashSet<>();
 
-    @OneToMany(mappedBy = "repository")
+    @OneToMany(mappedBy = "repository", cascade = CascadeType.REMOVE, orphanRemoval = true)
     @ToString.Exclude
     private Set<Label> labels = new HashSet<>();
 
-    @OneToMany(mappedBy = "repository")
+    @OneToMany(mappedBy = "repository", cascade = CascadeType.REMOVE, orphanRemoval = true)
     @ToString.Exclude
     private Set<Milestone> milestones = new HashSet<>();
 

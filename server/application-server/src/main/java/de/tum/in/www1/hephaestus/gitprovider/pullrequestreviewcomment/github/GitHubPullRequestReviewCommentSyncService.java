@@ -2,6 +2,7 @@ package de.tum.in.www1.hephaestus.gitprovider.pullrequestreviewcomment.github;
 
 import java.io.IOException;
 
+import org.kohsuke.github.GHPullRequestReview;
 import org.kohsuke.github.GHPullRequestReviewComment;
 import org.kohsuke.github.GHUser;
 import org.kohsuke.github.GitHub;
@@ -52,8 +53,17 @@ public class GitHubPullRequestReviewCommentSyncService {
         this.userConverter = userConverter;
     }
 
+    public void fetchReviewCommentsOfReview(GHPullRequestReview review) {
+        try {
+            review.listReviewComments().withPageSize(100).forEach(this::processPullRequestReviewComment);
+        } catch (IOException e) {
+            logger.error("Failed to fetch review comments of review {}: {}", review.getId(), e.getMessage());
+        }
+    }
+
     @Transactional
-    public PullRequestReviewComment processPullRequestReviewComment(GHPullRequestReviewComment ghPullRequestReviewComment) {
+    public PullRequestReviewComment processPullRequestReviewComment(
+            GHPullRequestReviewComment ghPullRequestReviewComment) {
         var result = pullRequestReviewCommentRepository.findById(ghPullRequestReviewComment.getId())
                 .map(pullRequestReviewComment -> {
                     try {
@@ -69,12 +79,7 @@ public class GitHubPullRequestReviewCommentSyncService {
                                 ghPullRequestReviewComment.getId(), e.getMessage());
                         return null;
                     }
-                }).orElseGet(
-                        () -> {
-                            var pullRequestReviewComment = pullRequestReviewCommentConverter
-                                    .convert(ghPullRequestReviewComment);
-                            return pullRequestReviewCommentRepository.save(pullRequestReviewComment);
-                        });
+                }).orElseGet(() -> pullRequestReviewCommentConverter.convert(ghPullRequestReviewComment));
 
         if (result == null) {
             return null;
@@ -105,7 +110,8 @@ public class GitHubPullRequestReviewCommentSyncService {
                     .orElseGet(() -> userRepository.save(userConverter.convert(user)));
             result.setAuthor(resultAuthor);
         } catch (IOException e) {
-            logger.error("Failed to link author for pull request review comment {}: {}", ghPullRequestReviewComment.getId(),
+            logger.error("Failed to link author for pull request review comment {}: {}",
+                    ghPullRequestReviewComment.getId(),
                     e.getMessage());
         }
 

@@ -38,7 +38,8 @@ public class GitHubRepositorySyncService {
     }
 
     /**
-     * Fetches all repositories owned by a specific GitHub user or organization and processes them to synchronize with the local repository.
+     * Fetches all repositories owned by a specific GitHub user or organization and
+     * processes them to synchronize with the local repository.
      *
      * @param owner The GitHub username (login) of the repository owner.
      */
@@ -48,9 +49,11 @@ public class GitHubRepositorySyncService {
     }
 
     /**
-     * Fetches a list of repositories specified by their full names (e.g., "owner/repo") and processes them to synchronize with the local repository.
+     * Fetches a list of repositories specified by their full names (e.g.,
+     * "owner/repo") and processes them to synchronize with the local repository.
      *
-     * @param nameWithOwners A list of repository full names in the format "owner/repo".
+     * @param nameWithOwners A list of repository full names in the format
+     *                       "owner/repo".
      */
     public void fetchRepositories(List<String> nameWithOwners) {
         var builder = github.searchRepositories()
@@ -59,9 +62,11 @@ public class GitHubRepositorySyncService {
     }
 
     /**
-     * Fetches repositories based on the provided search builder and processes each repository.
+     * Fetches repositories based on the provided search builder and processes each
+     * repository.
      *
-     * @param builder The GHRepositorySearchBuilder configured with search parameters.
+     * @param builder The GHRepositorySearchBuilder configured with search
+     *                parameters.
      */
     private void fetchRepositoriesWithBuilder(GHRepositorySearchBuilder builder) {
         var iterator = builder.list().withPageSize(100).iterator();
@@ -72,11 +77,13 @@ public class GitHubRepositorySyncService {
     }
 
     /**
-     * Processes a single GitHub repository by either updating the existing repository in the local repository
+     * Processes a single GitHub repository by either updating the existing
+     * repository in the local repository
      * or creating a new one if it does not exist.
      *
      * @param ghRepository The GitHub repository data to process.
-     * @return The updated or newly created Repository entity, or {@code null} if an error occurred during update.
+     * @return The updated or newly created Repository entity, or {@code null} if an
+     *         error occurred during update.
      */
     @Transactional
     public Repository processRepository(GHRepository ghRepository) {
@@ -92,11 +99,7 @@ public class GitHubRepositorySyncService {
                         logger.error("Failed to update repository {}: {}", ghRepository.getId(), e.getMessage());
                         return null;
                     }
-                }).orElseGet(
-                        () -> {
-                            var repository = repositoryConverter.convert(ghRepository);
-                            return repositoryRepository.save(repository);
-                        });
+                }).orElseGet(() -> repositoryConverter.convert(ghRepository));
 
         if (result == null) {
             return null;

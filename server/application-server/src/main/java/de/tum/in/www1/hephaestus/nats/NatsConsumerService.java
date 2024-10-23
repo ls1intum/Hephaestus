@@ -6,6 +6,7 @@ import io.nats.client.api.DeliverPolicy;
 
 import java.io.IOException;
 import java.util.Arrays;
+import java.time.Duration;
 import java.time.ZonedDateTime;
 
 import org.springframework.stereotype.Service;
@@ -40,7 +41,9 @@ public class NatsConsumerService {
 
     @EventListener(ApplicationReadyEvent.class)
     public void init() throws IOException, InterruptedException, JetStreamApiException {
-        Options options = Options.builder().server(natsServer).build();
+        Options options = Options.builder().server(natsServer).connectionListener((c, t) -> {
+            logger.info("Connection: " + c.getServerInfo().getPort() + " " + t);
+        }).maxReconnects(-1).reconnectWait(Duration.ofSeconds(2)).build();
         natsConnection = Nats.connect(options);
 
         // String consumerName = "github-consumer";
@@ -48,7 +51,8 @@ public class NatsConsumerService {
                 // .durable(consumerName)
                 .filterSubjects(getSubjects())
                 .deliverPolicy(DeliverPolicy.ByStartTime)
-                .startTime(ZonedDateTime.now().minusDays(7))
+                .startTime(ZonedDateTime.now().minusDays(30))
+                .maxBatch(0)
                 .build();
 
         // JetStreamManagement jsm = natsConnection.jetStreamManagement();
@@ -83,40 +87,43 @@ public class NatsConsumerService {
             eventHandler.onMessage(msg);
 
             // logger.info("Received message: " + msg.getSubject() + " metaData: " +
-            //         msg.metaData());
+            // msg.metaData());
             // byte[] data = msg.getData();
             // String payload = new String(data, StandardCharsets.UTF_8);
             // StringReader reader = new StringReader(payload);
 
             // String subject = msg.getSubject();
             // if (subject.endsWith(".pull_request")) {
-            //     try {
-            //         GHEventPayload.PullRequest pullRequestEvent = github.parseEventPayload(reader,
-            //                 GHEventPayload.PullRequest.class);
-            //         logger.info("Received pull request: " +
-            //                 pullRequestEvent.getPullRequest().getTitle());
-            //     } catch (IOException e) {
-            //         logger.error("Failed to parse pull request payload.", e);
-            //     }
+            // try {
+            // GHEventPayload.PullRequest pullRequestEvent =
+            // github.parseEventPayload(reader,
+            // GHEventPayload.PullRequest.class);
+            // logger.info("Received pull request: " +
+            // pullRequestEvent.getPullRequest().getTitle());
+            // } catch (IOException e) {
+            // logger.error("Failed to parse pull request payload.", e);
+            // }
             // } else if (subject.endsWith(".pull_request_review_comment")) {
-            //     try {
-            //         GHEventPayload.PullRequestReviewComment pullRequestReviewCommentEvent = github.parseEventPayload(
-            //                 reader,
-            //                 GHEventPayload.PullRequestReviewComment.class);
-            //         logger.info("Received pull request review comment: " +
-            //                 pullRequestReviewCommentEvent.getComment().getBody());
-            //     } catch (IOException e) {
-            //         logger.error("Failed to parse pull request review comment payload.", e);
-            //     }
+            // try {
+            // GHEventPayload.PullRequestReviewComment pullRequestReviewCommentEvent =
+            // github.parseEventPayload(
+            // reader,
+            // GHEventPayload.PullRequestReviewComment.class);
+            // logger.info("Received pull request review comment: " +
+            // pullRequestReviewCommentEvent.getComment().getBody());
+            // } catch (IOException e) {
+            // logger.error("Failed to parse pull request review comment payload.", e);
+            // }
             // } else if (subject.endsWith(".pull_request_review")) {
-            //     try {
-            //         GHEventPayload.PullRequestReview pullRequestReviewEvent = github.parseEventPayload(reader,
-            //                 GHEventPayload.PullRequestReview.class);
-            //         logger.info("Received pull request review: " +
-            //                 pullRequestReviewEvent.getReview().getBody());
-            //     } catch (IOException e) {
-            //         logger.error("Failed to parse pull request review payload.", e);
-            //     }
+            // try {
+            // GHEventPayload.PullRequestReview pullRequestReviewEvent =
+            // github.parseEventPayload(reader,
+            // GHEventPayload.PullRequestReview.class);
+            // logger.info("Received pull request review: " +
+            // pullRequestReviewEvent.getReview().getBody());
+            // } catch (IOException e) {
+            // logger.error("Failed to parse pull request review payload.", e);
+            // }
             // }
         };
 

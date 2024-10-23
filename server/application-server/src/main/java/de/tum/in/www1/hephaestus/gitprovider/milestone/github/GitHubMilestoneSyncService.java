@@ -15,7 +15,6 @@ import de.tum.in.www1.hephaestus.gitprovider.repository.RepositoryRepository;
 import de.tum.in.www1.hephaestus.gitprovider.user.UserRepository;
 import de.tum.in.www1.hephaestus.gitprovider.user.github.GitHubUserConverter;
 
-
 @Service
 public class GitHubMilestoneSyncService {
 
@@ -46,12 +45,8 @@ public class GitHubMilestoneSyncService {
     @Transactional
     public Milestone processMilestone(GHMilestone ghMilestone) {
         var result = milestoneRepository.findById(ghMilestone.getId())
-                .map(milestone -> {
-                    return milestoneConverter.update(ghMilestone, milestone);
-                }).orElseGet(() -> {
-                    var milestone = milestoneConverter.convert(ghMilestone);
-                    return milestoneRepository.save(milestone);
-                });
+                .map(milestone -> milestoneConverter.update(ghMilestone, milestone))
+                .orElseGet(() -> milestoneConverter.convert(ghMilestone));
 
         if (result == null) {
             return null;

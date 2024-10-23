@@ -37,10 +37,7 @@ public class GitHubLabelSyncService {
         var result = labelRepository.findById(ghLabel.getId())
                 .map(label -> {
                     return labelConverter.update(ghLabel, label);
-                }).orElseGet(() -> {
-                    var label = labelConverter.convert(ghLabel);
-                    return labelRepository.save(label);
-                });
+                }).orElseGet(() -> labelConverter.convert(ghLabel));
 
         if (result == null) {
             return null;

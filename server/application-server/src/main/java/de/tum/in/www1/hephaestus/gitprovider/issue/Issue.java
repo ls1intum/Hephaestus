@@ -7,6 +7,7 @@ import java.time.OffsetDateTime;
 import org.springframework.lang.NonNull;
 
 import jakarta.persistence.Table;
+import jakarta.persistence.CascadeType;
 import jakarta.persistence.DiscriminatorColumn;
 import jakarta.persistence.DiscriminatorValue;
 import jakarta.persistence.DiscriminatorType;
@@ -88,7 +89,7 @@ public class Issue extends BaseGitServiceEntity {
     @JoinColumn(name = "repository_id")
     private Repository repository;
 
-    @OneToMany(mappedBy = "issue")
+    @OneToMany(mappedBy = "issue", cascade = CascadeType.REMOVE, orphanRemoval = true)
     @ToString.Exclude
     private Set<IssueComment> comments = new HashSet<>();
 

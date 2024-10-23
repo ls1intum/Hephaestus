@@ -64,12 +64,7 @@ public class GitHubIssueCommentSyncService {
                                 ghIssueComment.getId(), e.getMessage());
                         return null;
                     }
-                }).orElseGet(
-                        () -> {
-                            var issueComment = issueCommentConverter
-                                    .convert(ghIssueComment);
-                            return issueCommentRepository.save(issueComment);
-                        });
+                }).orElseGet(() -> issueCommentConverter.convert(ghIssueComment));
 
         if (result == null) {
             return null;

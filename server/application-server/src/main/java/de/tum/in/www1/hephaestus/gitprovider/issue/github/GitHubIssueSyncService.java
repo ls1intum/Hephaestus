@@ -65,9 +65,11 @@ public class GitHubIssueSyncService {
     }
 
     /**
-     * Fetches all issues within a specific repository and processes them to synchronize with the local repository.
+     * Fetches all issues within a specific repository and processes them to
+     * synchronize with the local repository.
      *
-     * @param nameWithOwner The full name of the repository in the format "owner/repo".
+     * @param nameWithOwner The full name of the repository in the format
+     *                      "owner/repo".
      * @param since         An optional date to filter issues by their last update.
      */
     public void fetchIssuesOfOwner(String owner, Optional<LocalDate> since) {
@@ -82,9 +84,11 @@ public class GitHubIssueSyncService {
     }
 
     /**
-     * Fetches issues across multiple repositories and processes them to synchronize with the local repository.
+     * Fetches issues across multiple repositories and processes them to synchronize
+     * with the local repository.
      *
-     * @param nameWithOwners A list of repository full names in the format "owner/repo".
+     * @param nameWithOwners A list of repository full names in the format
+     *                       "owner/repo".
      * @param since          An optional date to filter issues by their last update.
      */
     public void fetchIssuesOfRepository(String nameWithOwner, Optional<LocalDate> since) {
@@ -127,12 +131,15 @@ public class GitHubIssueSyncService {
     }
 
     /**
-     * Processes a single GitHub issue by either updating the existing issue in the local repository
-     * or creating a new one if it does not exist. Additionally, it manages associations with repositories,
+     * Processes a single GitHub issue by either updating the existing issue in the
+     * local repository
+     * or creating a new one if it does not exist. Additionally, it manages
+     * associations with repositories,
      * labels, milestones, authors, and assignees.
      *
      * @param ghIssue The GitHub issue data to process.
-     * @return The updated or newly created Issue entity, or {@code null} if an error occurred during update.
+     * @return The updated or newly created Issue entity, or {@code null} if an
+     *         error occurred during update.
      */
     @Transactional
     public Issue processIssue(GHIssue ghIssue) {
@@ -148,11 +155,7 @@ public class GitHubIssueSyncService {
                         logger.error("Failed to update issue {}: {}", ghIssue.getId(), e.getMessage());
                         return null;
                     }
-                }).orElseGet(
-                        () -> {
-                            var issue = issueConverter.convert(ghIssue);
-                            return issueRepository.save(issue);
-                        });
+                }).orElseGet(() -> issueConverter.convert(ghIssue));
 
         if (result == null) {
             return null;
@@ -170,11 +173,15 @@ public class GitHubIssueSyncService {
         }
 
         // Link new labels and remove labels that are not present anymore
-        var labels = ghIssue.getLabels();
+        var ghLabels = ghIssue.getLabels();
         var resultLabels = new HashSet<>(result.getLabels());
-        labels.forEach(label -> {
-            var resultLabel = labelRepository.findById(label.getId())
-                    .orElseGet(() -> labelRepository.save(labelConverter.convert(label)));
+        ghLabels.forEach(ghLabel -> {
+            var resultLabel = labelRepository.findById(ghLabel.getId())
+                    .orElseGet(() -> {
+                        var label = labelConverter.convert(ghLabel);
+                        label.setRepository(result.getRepository());
+                        return labelRepository.save(label);
+                    });
             resultLabels.add(resultLabel);
         });
         result.getLabels().clear();
@@ -183,8 +190,11 @@ public class GitHubIssueSyncService {
         // Link milestone
         if (ghIssue.getMilestone() != null) {
             var resultMilestone = milestoneRepository.findById(ghIssue.getMilestone().getId())
-                    .orElseGet(
-                            () -> milestoneRepository.save(milestoneConverter.convert(ghIssue.getMilestone())));
+                    .orElseGet(() -> {
+                        var milestone = milestoneConverter.convert(ghIssue.getMilestone());
+                        milestone.setRepository(result.getRepository());
+                        return milestoneRepository.save(milestone);
+                    });
             result.setMilestone(resultMilestone);
         } else {
             result.setMilestone(null);
