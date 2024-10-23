@@ -46,12 +46,7 @@ paths:
         content:
           application/json:
             schema:
-              type: object
-              properties:
-                name:
-                  type: string
-                color:
-                  type: string
+              $ref: "#/components/schemas/TeamDTO"
         required: true
       responses:
         "200":

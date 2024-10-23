@@ -20,7 +20,6 @@ encoder.ts
 git_push.sh
 index.ts
 model/admin-config.ts
-model/create-team-request.ts
 model/issue-comment-dto.ts
 model/issue-comment.ts
 model/leaderboard-entry.ts

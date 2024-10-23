@@ -169,6 +169,24 @@ export class AdminTeamsTableComponent {
     navigator.clipboard.writeText(element.name!);
   }
 
+  _newTeamName = new FormControl('');
+  _newTeamColor = new FormControl('');
+
+  protected createTeam() {
+    if (this.isLoading() || !this._newTeamName.value || !this._newTeamColor.value) {
+      return;
+    }
+    const newTeam = {
+      name: this._newTeamName.value,
+      color: this._newTeamColor.value
+    } as TeamDTO;
+    this.adminService.createTeam(newTeam).subscribe({
+      next: () => console.log('Team created'),
+      error: (err) => console.error('Error creating team', err)
+    });
+    this.invalidateTeams();
+  }
+
   protected invalidateTeams() {
     if (this.isLoading()) {
       return;
@@ -177,24 +195,5 @@ export class AdminTeamsTableComponent {
       this._selectionModel.deselect(team);
     }
     this.queryClient.invalidateQueries({ queryKey: ['admin', 'teams'] });
-  }
-
-  _newTeamName = new FormControl('');
-  _newTeamColor = new FormControl('');
-
-  protected createTeam() {
-    if (this.isLoading() || !this._newTeamName.value || !this._newTeamColor.value) {
-      return;
-    }
-    this.adminService
-      .createTeam({
-        name: this._newTeamName.value,
-        color: this._newTeamColor.value
-      })
-      .subscribe({
-        next: () => console.log('Team created'),
-        error: (err) => console.error('Error creating team', err)
-      });
-    this.invalidateTeams();
   }
 }

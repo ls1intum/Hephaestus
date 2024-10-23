@@ -79,8 +79,8 @@ public class AdminController {
     }
 
     @PutMapping("/teams")
-    public ResponseEntity<TeamDTO> createTeam(@RequestBody String name, @RequestBody String color) {
-        return ResponseEntity.ok(adminService.createTeam(name, color));
+    public ResponseEntity<TeamDTO> createTeam(@RequestBody TeamDTO team) {
+        return ResponseEntity.ok(adminService.createTeam(team.name(), team.color()));
     }
 
     @DeleteMapping("/teams/{teamId}")

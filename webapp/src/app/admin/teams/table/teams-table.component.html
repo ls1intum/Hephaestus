@@ -65,8 +65,13 @@
   <brn-column-def name="color" class="w-20 flex-1">
     <hlm-th *brnHeaderDef>Color</hlm-th>
     <hlm-td class="font-medium tabular-nums flex gap-4" *brnCellDef="let element">
-      <div class="w-4 h-4 rounded-full" [style.backgroundColor]="element.color"></div>
-      <span>{{ element.color }}</span>
+      @if (this.isLoading()) {
+        <hlm-skeleton class="w-4 h-4 rounded-full" [style.backgroundColor]="'#69feff'" />
+        <hlm-skeleton class="h-6 w-12" />
+      } @else {
+        <div class="w-4 h-4 rounded-full" [style.backgroundColor]="element.color"></div>
+        <span>{{ element.color }}</span>
+      }
     </hlm-td>
   </brn-column-def>
   <brn-column-def name="actions" class="w-16">
@@ -122,15 +127,13 @@
   </div>
 </div>
 <!-- Card to add new team -->
-<div hlmCard class="size-fit">
+<div hlmCard class="size-fit mt-4">
   <div hlmCardHeader class="pb-0">
     <h3 hlmCardTitle>Create new team</h3>
   </div>
-  <div hlmCardContent class="flex gap-4">
+  <div hlmCardContent class="flex items-center gap-4">
     <input hlmInput placeholder="Team name" [formControl]="_newTeamName" />
-    <input hlmInput placeholder="Team color" [formControl]="_newTeamColor" />
-  </div>
-  <div hlmCardFooter class="justify-end">
-    <button hlmBtn>Create</button>
+    <input hlmInput placeholder="Team color" type="color" [formControl]="_newTeamColor" />
+    <button hlmBtn class="ml-4" (click)="createTeam()">Create</button>
   </div>
 </div>

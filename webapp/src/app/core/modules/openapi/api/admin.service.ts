@@ -21,8 +21,6 @@ import { Observable }                                        from 'rxjs';
 // @ts-ignore
 import { AdminConfig } from '../model/admin-config';
 // @ts-ignore
-import { CreateTeamRequest } from '../model/create-team-request';
-// @ts-ignore
 import { TeamDTO } from '../model/team-dto';
 // @ts-ignore
 import { UserDTO } from '../model/user-dto';
@@ -232,16 +230,16 @@ export class AdminService implements AdminServiceInterface {
     }
 
     /**
-     * @param createTeamRequest 
+     * @param teamDTO 
      * @param observe set whether or not to return the data Observable as the body, response or events. defaults to returning the body.
      * @param reportProgress flag to report request and response progress.
      */
-    public createTeam(createTeamRequest: CreateTeamRequest, observe?: 'body', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<TeamDTO>;
-    public createTeam(createTeamRequest: CreateTeamRequest, observe?: 'response', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<HttpResponse<TeamDTO>>;
-    public createTeam(createTeamRequest: CreateTeamRequest, observe?: 'events', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<HttpEvent<TeamDTO>>;
-    public createTeam(createTeamRequest: CreateTeamRequest, observe: any = 'body', reportProgress: boolean = false, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<any> {
-        if (createTeamRequest === null || createTeamRequest === undefined) {
-            throw new Error('Required parameter createTeamRequest was null or undefined when calling createTeam.');
+    public createTeam(teamDTO: TeamDTO, observe?: 'body', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<TeamDTO>;
+    public createTeam(teamDTO: TeamDTO, observe?: 'response', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<HttpResponse<TeamDTO>>;
+    public createTeam(teamDTO: TeamDTO, observe?: 'events', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<HttpEvent<TeamDTO>>;
+    public createTeam(teamDTO: TeamDTO, observe: any = 'body', reportProgress: boolean = false, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<any> {
+        if (teamDTO === null || teamDTO === undefined) {
+            throw new Error('Required parameter teamDTO was null or undefined when calling createTeam.');
         }
 
         let localVarHeaders = this.defaultHeaders;
@@ -293,7 +291,7 @@ export class AdminService implements AdminServiceInterface {
         return this.httpClient.request<TeamDTO>('put', `${this.configuration.basePath}${localVarPath}`,
             {
                 context: localVarHttpContext,
-                body: createTeamRequest,
+                body: teamDTO,
                 responseType: <any>responseType_,
                 withCredentials: this.configuration.withCredentials,
                 headers: localVarHeaders,
