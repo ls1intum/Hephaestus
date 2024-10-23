@@ -1,4 +1,4 @@
-package de.tum.in.www1.hephaestus.nats;
+package de.tum.in.www1.hephaestus.config;
 
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;

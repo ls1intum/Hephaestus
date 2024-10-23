@@ -1,8 +1,11 @@
 package de.tum.in.www1.hephaestus.gitprovider.milestone.github;
 
 import java.io.IOException;
+import java.util.List;
 
+import org.kohsuke.github.GHIssueState;
 import org.kohsuke.github.GHMilestone;
+import org.kohsuke.github.GHRepository;
 import org.kohsuke.github.GitHub;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -40,6 +43,25 @@ public class GitHubMilestoneSyncService {
         this.userRepository = userRepository;
         this.milestoneConverter = milestoneConverter;
         this.userConverter = userConverter;
+    }
+
+
+    /*
+     * Sync all milestones of a list of GitHub repositories and processes them to
+     * synchronize with the local repository.
+     */
+    public void syncMilestonesOfAllRepositories(List<GHRepository> repositories) {
+        repositories.stream().forEach(this::syncMilestonesOfRepository);
+    }
+
+    /*
+     * Sync all milestones of a GitHub repository and processes them to synchronize with
+     * the local repository.
+     */
+    public void syncMilestonesOfRepository(GHRepository repository) {
+        repository.listMilestones(GHIssueState.ALL).withPageSize(100).forEach(ghMilestone -> {
+            processMilestone(ghMilestone);
+        });
     }
 
     @Transactional

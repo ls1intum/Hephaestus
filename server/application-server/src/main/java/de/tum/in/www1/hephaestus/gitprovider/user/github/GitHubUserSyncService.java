@@ -32,12 +32,23 @@ public class GitHubUserSyncService {
     }
 
     /**
-     * Fetches a GitHub user's data by their login and processes it to synchronize
+     * Sync all existing users in the local repository with their GitHub
+     * data.
+     */
+    public void syncAllExistingUsers() {
+        userRepository.findAll()
+                .stream()
+                .map(User::getLogin)
+                .forEach(this::syncUser);
+    }
+
+    /**
+     * Sync a GitHub user's data by their login and processes it to synchronize
      * with the local repository.
      *
      * @param login The GitHub username (login) of the user to fetch.
      */
-    public void fetchUser(String login) {
+    public void syncUser(String login) {
         try {
             processUser(github.getUser(login));
         } catch (IOException e) {

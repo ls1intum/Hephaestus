@@ -1,4 +1,4 @@
-package de.tum.in.www1.hephaestus.nats;
+package de.tum.in.www1.hephaestus.syncing;
 
 import java.io.IOException;
 import java.util.Arrays;
@@ -34,6 +34,9 @@ public class NatsConsumerService {
 
     private static final int INITIAL_RECONNECT_DELAY_SECONDS = 2;
 
+    @Value("${nats.enabled}")
+    private boolean isNatsEnabled;
+
     @Value("${nats.server}")
     private String natsServer;
 
@@ -54,6 +57,11 @@ public class NatsConsumerService {
 
     @EventListener(ApplicationReadyEvent.class)
     public void init() {
+        if (!isNatsEnabled) {
+            logger.info("NATS is disabled. Skipping initialization.");
+            return;
+        }
+
         validateConfigurations();
         Options options = buildNatsOptions();
 

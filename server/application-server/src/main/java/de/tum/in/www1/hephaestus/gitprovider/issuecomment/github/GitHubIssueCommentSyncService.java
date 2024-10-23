@@ -1,7 +1,11 @@
 package de.tum.in.www1.hephaestus.gitprovider.issuecomment.github;
 
 import java.io.IOException;
+import java.util.Optional;
+import java.util.Date;
+import java.util.List;
 
+import org.kohsuke.github.GHIssue;
 import org.kohsuke.github.GHIssueComment;
 import org.kohsuke.github.GitHub;
 import org.slf4j.Logger;
@@ -45,6 +49,30 @@ public class GitHubIssueCommentSyncService {
         this.issueCommentConverter = issueCommentConverter;
         this.issueConverter = issueConverter;
         this.userConverter = userConverter;
+    }
+
+    /**
+     * Sync all issue comments of a list of GitHub issues and processes them to
+     * synchronize with the local repository.
+     *
+     * @param ghIssues The GitHub issues to sync the comments of.
+     * @param since    Optional date to only fetch comments since this date.
+     */
+    public void syncIssueCommentsOfAllIssues(List<GHIssue> ghIssues, Optional<Date> since) {
+        ghIssues.stream().forEach(ghIssue -> syncIssueCommentsOfIssue(ghIssue, since));
+    }
+
+    /**
+     * Sync all issue comments of a GitHub issue and processes them to synchronize
+     * with the local repository.
+     *
+     * @param ghIssue The GitHub issue to sync the comments of.
+     * @param since   Optional date to only fetch comments since this date.
+     */
+    public void syncIssueCommentsOfIssue(GHIssue ghIssue, Optional<Date> since) {
+        var builder = ghIssue.queryComments();
+        since.ifPresent(date -> builder.since(date));
+        builder.list().withPageSize(100).forEach(this::processIssueComment);
     }
 
     @Transactional

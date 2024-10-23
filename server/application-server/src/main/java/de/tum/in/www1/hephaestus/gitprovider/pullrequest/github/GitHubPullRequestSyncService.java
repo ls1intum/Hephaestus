@@ -1,13 +1,17 @@
 package de.tum.in.www1.hephaestus.gitprovider.pullrequest.github;
 
 import java.io.IOException;
-import java.time.LocalDate;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Optional;
+import java.util.ArrayList;
+import java.util.Date;
 
+import org.kohsuke.github.GHDirection;
+import org.kohsuke.github.GHIssueState;
 import org.kohsuke.github.GHPullRequest;
-import org.kohsuke.github.GHPullRequestSearchBuilder;
+import org.kohsuke.github.GHPullRequestQueryBuilder.Sort;
+import org.kohsuke.github.GHRepository;
 import org.kohsuke.github.GitHub;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -65,73 +69,62 @@ public class GitHubPullRequestSyncService {
     }
 
     /**
-     * Fetches all pull requests owned by a specific GitHub user and processes them
-     * to synchronize with the local repository.
-     *
-     * @param owner The GitHub username (login) of the pull request owner.
-     * @param since An optional date to filter pull requests by their last update.
-     */
-    public void fetchPullRequestsOfOwner(String owner, Optional<LocalDate> since) {
-        var builder = github.searchPullRequests()
-                .q("is:pr")
-                .q("user:" + owner);
-        if (since.isPresent()) {
-            builder = builder.updatedAfter(since.get(), true);
-        }
-        fetchRepositoriesWithBuilder(builder);
-    }
-
-    /**
-     * Fetches all pull requests within a specific repository and processes them to
+     * Sync all pull requests of a list of GitHub repositories and processes them to
      * synchronize with the local repository.
-     *
-     * @param nameWithOwner The full name of the repository in the format
-     *                      "owner/repo".
-     * @param since         An optional date to filter pull requests by their last
-     *                      update.
+     * 
+     * @param repositories The list of repositories to fetch pull requests from.
+     * @param since        An optional date to filter pull requests by their last
+     *                     update.
+     * @return A list of successfully fetched GitHub pull requests.
      */
-    public void fetchPullRequestsOfRepository(String nameWithOwner, Optional<LocalDate> since) {
-        var builder = github.searchPullRequests()
-                .q("is:pr")
-                .q("repo:" + nameWithOwner);
-        if (since.isPresent()) {
-            builder = builder.updatedAfter(since.get(), true);
-        }
-        fetchRepositoriesWithBuilder(builder);
+    public List<GHPullRequest> syncPullRequestsOfAllRepositories(List<GHRepository> repositories,
+            Optional<Date> since) {
+        return repositories.stream()
+                .map(repository -> syncPullRequestsOfRepository(repository, since))
+                .flatMap(List::stream)
+                .toList();
     }
 
     /**
-     * Fetches pull requests across multiple repositories and processes them to
+     * Sync all pull requests of a list of GitHub repositories and processes them to
      * synchronize with the local repository.
-     *
-     * @param nameWithOwners A list of repository full names in the format
-     *                       "owner/repo".
-     * @param since          An optional date to filter pull requests by their last
-     *                       update.
+     * 
+     * @param repositories The list of repositories to fetch pull requests from.
+     * @param since        An optional date to filter pull requests by their last
+     *                     update.
+     * @return A list of successfully fetched GitHub pull requests.
      */
-    public void fetchPullRequestsOfRepositories(List<String> nameWithOwners, Optional<LocalDate> since) {
-        var builder = github.searchPullRequests()
-                .q("is:pr")
-                .q(String.join(" OR ", nameWithOwners.stream().map(nameWithOwner -> "repo:" + nameWithOwner).toList()));
-        if (since.isPresent()) {
-            builder = builder.updatedAfter(since.get(), true);
-        }
-        fetchRepositoriesWithBuilder(builder);
-    }
+    public List<GHPullRequest> syncPullRequestsOfRepository(GHRepository repository, Optional<Date> since) {
+        var iterator = repository.queryPullRequests()
+                .state(GHIssueState.ALL)
+                .sort(Sort.UPDATED)
+                .direction(GHDirection.DESC)
+                .list()
+                .withPageSize(100)
+                .iterator();
 
-    /**
-     * Fetches pull requests based on the provided search builder and processes each
-     * pull request.
-     *
-     * @param builder The GHPullRequestSearchBuilder configured with search
-     *                parameters.
-     */
-    private void fetchRepositoriesWithBuilder(GHPullRequestSearchBuilder builder) {
-        var iterator = builder.list().withPageSize(100).iterator();
+        var pullRequests = new ArrayList<GHPullRequest>();
         while (iterator.hasNext()) {
             var ghPullRequests = iterator.nextPage();
-            ghPullRequests.forEach(this::processPullRequest);
+            var keepPullRequests = ghPullRequests.stream()
+                    .filter(pullRequest -> {
+                        try {
+                            return since.isEmpty() || pullRequest.getUpdatedAt().after(since.get());
+                        } catch (IOException e) {
+                            logger.error("Failed to filter pull request {}: {}", pullRequest.getId(), e.getMessage());
+                            return false;
+                        }
+                    })
+                    .toList();
+
+            pullRequests.addAll(keepPullRequests);
+            if (keepPullRequests.size() != ghPullRequests.size()) {
+                break;
+            }
         }
+
+        pullRequests.forEach(this::processPullRequest);
+        return pullRequests;
     }
 
     /**

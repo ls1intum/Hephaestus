@@ -2,12 +2,13 @@ package de.tum.in.www1.hephaestus.gitprovider.repository.github;
 
 import java.io.IOException;
 import java.util.List;
+import java.util.Optional;
 
 import org.kohsuke.github.GHRepository;
-import org.kohsuke.github.GHRepositorySearchBuilder;
 import org.kohsuke.github.GitHub;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import jakarta.transaction.Transactional;
 
@@ -21,6 +22,9 @@ import de.tum.in.www1.hephaestus.gitprovider.user.github.GitHubUserConverter;
 public class GitHubRepositorySyncService {
 
     private static final Logger logger = LoggerFactory.getLogger(GitHubRepositorySyncService.class);
+
+    @Value("${monitoring.repositories}")
+    private String[] repositoriesToMonitor;
 
     private final GitHub github;
     private final RepositoryRepository repositoryRepository;
@@ -38,41 +42,63 @@ public class GitHubRepositorySyncService {
     }
 
     /**
-     * Fetches all repositories owned by a specific GitHub user or organization and
+     * Sync all monitored repositories and processes them to synchronize with the
+     * local repository.
+     *
+     * @return A list of successfully fetched GitHub repositories.
+     */
+    public List<GHRepository> syncAllMonitoredRepositories() {
+        return syncAllRepositories(List.of(repositoriesToMonitor));
+    }
+
+    /**
+     * Sync all repositories owned by a specific GitHub user or organization and
      * processes them to synchronize with the local repository.
      *
      * @param owner The GitHub username (login) of the repository owner.
      */
-    public void fetchAllRepositoriesOfOwner(String owner) {
+    public void syncAllRepositoriesOfOwner(String owner) {
         var builder = github.searchRepositories().user(owner);
-        fetchRepositoriesWithBuilder(builder);
-    }
-
-    /**
-     * Fetches a list of repositories specified by their full names (e.g.,
-     * "owner/repo") and processes them to synchronize with the local repository.
-     *
-     * @param nameWithOwners A list of repository full names in the format
-     *                       "owner/repo".
-     */
-    public void fetchRepositories(List<String> nameWithOwners) {
-        var builder = github.searchRepositories()
-                .q(String.join(" OR ", nameWithOwners.stream().map(nameWithOwner -> "repo:" + nameWithOwner).toList()));
-        fetchRepositoriesWithBuilder(builder);
-    }
-
-    /**
-     * Fetches repositories based on the provided search builder and processes each
-     * repository.
-     *
-     * @param builder The GHRepositorySearchBuilder configured with search
-     *                parameters.
-     */
-    private void fetchRepositoriesWithBuilder(GHRepositorySearchBuilder builder) {
         var iterator = builder.list().withPageSize(100).iterator();
         while (iterator.hasNext()) {
             var ghRepositories = iterator.nextPage();
             ghRepositories.forEach(this::processRepository);
+        }
+    }
+
+    /**
+     * Sync a list of repositories specified by their full names (e.g.,
+     * "owner/repo") and processes them to synchronize with the local repository.
+     *
+     * @param nameWithOwners A list of repository full names in the format
+     *                       "owner/repo".
+     * @return A list of successfully fetched GitHub repositories.
+     */
+    public List<GHRepository> syncAllRepositories(List<String> nameWithOwners) {
+        return nameWithOwners.stream()
+                .map(this::syncRepository)
+                .filter(Optional::isPresent)
+                .map(Optional::get)
+                .toList();
+    }
+
+    /**
+     * Sync a single GitHub repository by its full name (e.g., "owner/repo") and
+     * processes it to synchronize with the local repository.
+     *
+     * @param nameWithOwner The full name of the repository in the format
+     *                      "owner/repo".
+     * @return An optional containing the fetched GitHub repository, or an empty
+     *         optional if the repository could not be fetched.
+     */
+    public Optional<GHRepository> syncRepository(String nameWithOwner) {
+        try {
+            var repository = github.getRepository(nameWithOwner);
+            processRepository(repository);
+            return Optional.of(repository);
+        } catch (IOException e) {
+            logger.error("Failed to fetch repository {}: {}", nameWithOwner, e.getMessage());
+            return Optional.empty();
         }
     }
 

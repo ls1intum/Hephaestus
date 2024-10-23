@@ -1,6 +1,10 @@
 package de.tum.in.www1.hephaestus.gitprovider.label.github;
 
+import java.io.IOException;
+import java.util.List;
+
 import org.kohsuke.github.GHLabel;
+import org.kohsuke.github.GHRepository;
 import org.kohsuke.github.GitHub;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -30,6 +34,28 @@ public class GitHubLabelSyncService {
         this.labelRepository = labelRepository;
         this.repositoryRepository = repositoryRepository;
         this.labelConverter = labelConverter;
+    }
+
+    /*
+     * Sync all labels of a list of GitHub repositories and processes them to
+     * synchronize with the local repository.
+     */
+    public void syncLabelsOfAllRepositories(List<GHRepository> repositories) {
+        repositories.stream().forEach(this::syncLabelsOfRepository);
+    }
+
+    /*
+     * Sync all labels of a GitHub repository and processes them to synchronize with
+     * the local repository.
+     */
+    public void syncLabelsOfRepository(GHRepository repository) {
+        try {
+            repository.listLabels().withPageSize(100).forEach(ghLabel -> {
+                processLabel(ghLabel);
+            });
+        } catch (IOException e) {
+            logger.error("Failed to fetch labels for repository {}: {}", repository.getFullName(), e.getMessage());
+        }
     }
 
     @Transactional

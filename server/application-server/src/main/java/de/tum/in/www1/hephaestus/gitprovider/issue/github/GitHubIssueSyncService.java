@@ -1,13 +1,16 @@
 package de.tum.in.www1.hephaestus.gitprovider.issue.github;
 
 import java.io.IOException;
-import java.time.LocalDate;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Optional;
+import java.util.Date;
+import java.util.ArrayList;
 
 import org.kohsuke.github.GHIssue;
-import org.kohsuke.github.GHIssueSearchBuilder;
+import org.kohsuke.github.GHIssueQueryBuilder;
+import org.kohsuke.github.GHIssueState;
+import org.kohsuke.github.GHRepository;
 import org.kohsuke.github.GitHub;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -65,68 +68,39 @@ public class GitHubIssueSyncService {
     }
 
     /**
-     * Fetches all issues within a specific repository and processes them to
+     * Sync all issues of a list of GitHub repositories and processes them to
      * synchronize with the local repository.
      *
-     * @param nameWithOwner The full name of the repository in the format
-     *                      "owner/repo".
-     * @param since         An optional date to filter issues by their last update.
+     * @param repositories The list of repositories to fetch issues from.
+     * @param since        An optional date to filter issues by their last update.
+     * @return             A list of successfully fetched GitHub issues.
      */
-    public void fetchIssuesOfOwner(String owner, Optional<LocalDate> since) {
-        var builder = github.searchIssues()
-                .q("is:issue")
-                .q("user:" + owner);
-
-        if (since.isPresent()) {
-            builder = builder.q("updated:>=" + since.get().toString());
-        }
-        fetchRepositoriesWithBuilder(builder);
+    public List<GHIssue> syncIssuesOfAllRepositories(List<GHRepository> repositories, Optional<Date> since) {
+        return repositories.stream()
+                .map(repository -> syncIssuesOfRepository(repository, since))
+                .flatMap(List::stream)
+                .toList();
     }
 
     /**
-     * Fetches issues across multiple repositories and processes them to synchronize
+     * Sync issues across a repository and processes them to synchronize
      * with the local repository.
      *
-     * @param nameWithOwners A list of repository full names in the format
-     *                       "owner/repo".
-     * @param since          An optional date to filter issues by their last update.
+     * @param repository The repository to fetch issues from.
+     * @param since      An optional date to filter issues by their last update.
+     * @return           A list of successfully fetched GitHub issues.
      */
-    public void fetchIssuesOfRepository(String nameWithOwner, Optional<LocalDate> since) {
-        var builder = github.searchIssues()
-                .q("is:issue")
-                .q("repo:" + nameWithOwner);
-        if (since.isPresent()) {
-            builder = builder.q("updated:>=" + since.get().toString());
-        }
-        fetchRepositoriesWithBuilder(builder);
-    }
-
-    /**
-     * Fetches issues based on the provided search builder and processes each issue.
-     *
-     * @param builder The GHIssueSearchBuilder configured with search parameters.
-     * @param since   An optional date to filter issues by their last update.
-     */
-    public void fetchIssuesOfRepositories(List<String> nameWithOwners, Optional<LocalDate> since) {
-        var builder = github.searchIssues()
-                .q("is:issue")
-                .q(String.join(" OR ", nameWithOwners.stream().map(nameWithOwner -> "repo:" + nameWithOwner).toList()));
-        if (since.isPresent()) {
-            builder = builder.q("updated:>=" + since.get().toString());
-        }
-        fetchRepositoriesWithBuilder(builder);
-    }
-
-    /**
-     * Fetches issues based on the provided search builder and processes each issue.
-     *
-     * @param builder The GHIssueSearchBuilder configured with search parameters.
-     */
-    private void fetchRepositoriesWithBuilder(GHIssueSearchBuilder builder) {
-        var iterator = builder.list().withPageSize(100).iterator();
-        while (iterator.hasNext()) {
-            var ghIssues = iterator.nextPage();
-            ghIssues.forEach(this::processIssue);
+    public List<GHIssue> syncIssuesOfRepository(GHRepository repository, Optional<Date> since) {
+        GHIssueQueryBuilder builder = repository.queryIssues().pageSize(100).state(GHIssueState.ALL);
+        since.ifPresent(sinceDate -> builder.since(sinceDate));
+        
+        try {
+            var issues = builder.list().toList();
+            issues.forEach(this::processIssue);
+            return issues;
+        } catch (IOException e) {
+            logger.error("Failed to fetch issues for repository {}: {}", repository.getFullName(), e.getMessage());
+            return new ArrayList<>();
         }
     }
 
