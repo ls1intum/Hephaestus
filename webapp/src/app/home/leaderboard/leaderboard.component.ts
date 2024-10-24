@@ -52,7 +52,7 @@ export class LeaderboardComponent {
   user = this.securityStore.loadedUser;
 
   trClass = (entry: LeaderboardEntry) => {
-    return cn('cursor-pointer', this.signedIn() && this.user()?.name === entry.name ? 'bg-emerald-950' : '');
+    return cn('cursor-pointer', this.signedIn() && this.user()?.username === entry.githubName ? 'bg-emerald-950' : '');
   };
 
   leaderboard = input<LeaderboardEntry[]>();
