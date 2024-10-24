@@ -3,13 +3,16 @@ import { environment } from 'environments/environment';
 import Keycloak from 'keycloak-js';
 
 export interface UserProfile {
-  sub: string;
   email: string;
+  email_verified: boolean;
   given_name: string;
   family_name: string;
+  name: string;
+  preferred_username: string;
   realmAccess: { roles: string[] };
-  token: string;
   roles: string[];
+  sub: string;
+  token: string;
 }
 
 @Injectable({ providedIn: 'root' })
