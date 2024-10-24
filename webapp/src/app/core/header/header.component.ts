@@ -1,23 +1,47 @@
 import { Component, inject } from '@angular/core';
-import { RouterLink } from '@angular/router';
+import { RouterLink, RouterModule } from '@angular/router';
 import { LucideAngularModule, Hammer } from 'lucide-angular';
 import { HlmButtonModule } from '@spartan-ng/ui-button-helm';
+import { HlmAvatarModule } from '@spartan-ng/ui-avatar-helm';
+import { HlmMenuModule } from '@spartan-ng/ui-menu-helm';
+import { HlmIconComponent } from '@spartan-ng/ui-icon-helm';
+import { BrnMenuTriggerDirective } from '@spartan-ng/ui-menu-brain';
 import { SecurityStore } from '@app/core/security/security-store.service';
 import { ThemeSwitcherComponent } from '@app/core/theme/theme-switcher.component';
 import { RequestFeatureComponent } from './request-feature/request-feature.component';
 import { environment } from 'environments/environment';
+import { lucideUser, lucideLogOut } from '@ng-icons/lucide';
+import { provideIcons } from '@ng-icons/core';
 
 @Component({
   selector: 'app-header',
   templateUrl: './header.component.html',
   standalone: true,
-  imports: [RouterLink, LucideAngularModule, ThemeSwitcherComponent, HlmButtonModule, RequestFeatureComponent]
+  imports: [
+    RouterLink,
+    RouterModule,
+    LucideAngularModule,
+    ThemeSwitcherComponent,
+    HlmButtonModule,
+    RequestFeatureComponent,
+    HlmAvatarModule,
+    HlmMenuModule,
+    BrnMenuTriggerDirective,
+    HlmIconComponent
+  ],
+  providers: [
+    provideIcons({
+      lucideUser,
+      lucideLogOut
+    })
+  ]
 })
 export class HeaderComponent {
   protected Hammer = Hammer;
 
   securityStore = inject(SecurityStore);
   signedIn = this.securityStore.signedIn;
+  user = this.securityStore.loadedUser;
 
   protected signOut() {
     this.securityStore.signOut();
