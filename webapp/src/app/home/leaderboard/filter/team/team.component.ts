@@ -12,21 +12,21 @@ interface SelectOption {
 }
 
 @Component({
-  selector: 'app-leaderboard-filter-repository',
+  selector: 'app-leaderboard-filter-team',
   standalone: true,
   imports: [RouterLink, BrnSelectModule, HlmSelectModule, HlmLabelModule, FormsModule],
-  templateUrl: './repository.component.html'
+  templateUrl: './team.component.html'
 })
-export class LeaderboardFilterRepositoryComponent {
-  repositories = input.required<string[]>();
+export class LeaderboardFilterTeamComponent {
+  teams = input.required<string[]>();
   value = signal<string>('');
 
   placeholder = computed(() => {
-    return this.repositories().find((option) => option === this.value()) ?? 'All';
+    return this.teams().find((option) => option === this.value()) ?? 'All';
   });
 
   options = computed(() => {
-    const options: SelectOption[] = this.repositories().map((name, index) => {
+    const options: SelectOption[] = this.teams().map((name, index) => {
       return {
         id: index + 1,
         value: name,
@@ -42,15 +42,15 @@ export class LeaderboardFilterRepositoryComponent {
   });
 
   constructor(private router: Router) {
-    this.value.set(this.router.parseUrl(this.router.url).queryParams['repository'] ?? 'all');
+    this.value.set(this.router.parseUrl(this.router.url).queryParams['team'] ?? 'all');
 
     effect(() => {
       if (!this.value() || this.value() === '') return;
       const queryParams = this.router.parseUrl(this.router.url).queryParams;
       if (this.value() === 'all') {
-        delete queryParams['repository'];
+        delete queryParams['team'];
       } else {
-        queryParams['repository'] = this.value();
+        queryParams['team'] = this.value();
       }
       this.router.navigate([], {
         queryParams

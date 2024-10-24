@@ -1,11 +1,11 @@
 import { argsToTemplate, type Meta, type StoryObj } from '@storybook/angular';
-import { LeaderboardFilterRepositoryComponent } from './repository.component';
+import { LeaderboardFilterTeamComponent } from './team.component';
 
-const meta: Meta<LeaderboardFilterRepositoryComponent> = {
-  component: LeaderboardFilterRepositoryComponent,
+const meta: Meta<LeaderboardFilterTeamComponent> = {
+  component: LeaderboardFilterTeamComponent,
   tags: ['autodocs'],
   argTypes: {
-    repositories: {
+    teams: {
       control: {
         type: 'object'
       },
@@ -15,11 +15,11 @@ const meta: Meta<LeaderboardFilterRepositoryComponent> = {
 };
 
 export default meta;
-type Story = StoryObj<LeaderboardFilterRepositoryComponent>;
+type Story = StoryObj<LeaderboardFilterTeamComponent>;
 
 export const Default: Story = {
   args: {
-    repositories: ['ls1intum/Artemis', 'ls1intum/Athena', 'ls1intum/Hephaestus']
+    teams: ['Artemis', 'Athena', 'Hephaestus']
   },
   render: (args) => ({
     props: args,

@@ -13,6 +13,7 @@ import { PullRequestReviewComment } from './pull-request-review-comment';
 import { PullRequestReview } from './pull-request-review';
 import { PullRequest } from './pull-request';
 import { IssueComment } from './issue-comment';
+import { Team } from './team';
 
 
 export interface User { 
@@ -40,6 +41,7 @@ export interface User {
      * Type of the user. Used to distinguish between users and bots.
      */
     type: User.TypeEnum;
+    teams?: Set<Team>;
     pullRequests?: Set<PullRequest>;
     issueComments?: Set<IssueComment>;
     reviewComments?: Set<PullRequestReviewComment>;

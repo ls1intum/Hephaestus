@@ -13,7 +13,11 @@ import { HttpHeaders }                                       from '@angular/comm
 
 import { Observable }                                        from 'rxjs';
 
+import { AdminConfig } from '../model/models';
+import { TeamDTO } from '../model/models';
+import { UserDTO } from '../model/models';
 import { UserInfoDto } from '../model/models';
+import { UserTeamsDTO } from '../model/models';
 
 
 import { Configuration }                                     from '../configuration';
@@ -27,13 +31,62 @@ export interface AdminServiceInterface {
     /**
      * 
      * 
+     * @param login 
+     * @param teamId 
+     */
+    addTeamToUser(login: string, teamId: number, extraHttpRequestParams?: any): Observable<UserDTO>;
+
+    /**
+     * 
+     * 
      */
     admin(extraHttpRequestParams?: any): Observable<string>;
 
     /**
      * 
      * 
+     * @param teamDTO 
+     */
+    createTeam(teamDTO: TeamDTO, extraHttpRequestParams?: any): Observable<TeamDTO>;
+
+    /**
+     * 
+     * 
+     * @param teamId 
+     */
+    deleteTeam(teamId: number, extraHttpRequestParams?: any): Observable<TeamDTO>;
+
+    /**
+     * 
+     * 
+     */
+    getConfig(extraHttpRequestParams?: any): Observable<AdminConfig>;
+
+    /**
+     * 
+     * 
      */
     getGretting(extraHttpRequestParams?: any): Observable<UserInfoDto>;
+
+    /**
+     * 
+     * 
+     */
+    getUsersAsAdmin(extraHttpRequestParams?: any): Observable<Array<UserTeamsDTO>>;
+
+    /**
+     * 
+     * 
+     * @param login 
+     * @param teamId 
+     */
+    removeTeamFromUser(login: string, teamId: number, extraHttpRequestParams?: any): Observable<UserDTO>;
+
+    /**
+     * 
+     * 
+     * @param requestBody 
+     */
+    updateRepositories(requestBody: Array<string>, extraHttpRequestParams?: any): Observable<Set<string>>;
 
 }
