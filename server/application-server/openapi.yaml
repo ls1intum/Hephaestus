@@ -216,7 +216,7 @@ paths:
         schema:
           type: string
           format: date
-      - name: repository
+      - name: team
         in: query
         required: false
         schema:

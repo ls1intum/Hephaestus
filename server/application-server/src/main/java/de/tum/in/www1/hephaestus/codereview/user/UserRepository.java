@@ -8,6 +8,8 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
+import de.tum.in.www1.hephaestus.codereview.team.Team;
+
 public interface UserRepository extends JpaRepository<User, Long> {
 
     @Query("SELECT u FROM User u WHERE u.login = :login")
@@ -46,10 +48,10 @@ public interface UserRepository extends JpaRepository<User, Long> {
                 FROM User u
                 JOIN FETCH u.reviews re
                 WHERE re.createdAt BETWEEN :after AND :before
-                AND (:repository IS NULL OR re.pullRequest.repository.nameWithOwner = :repository)
+                AND (:team IS NULL OR :team MEMBER OF u.teams)
             """)
     List<User> findAllInTimeframe(@Param("after") OffsetDateTime after, @Param("before") OffsetDateTime before,
-            @Param("repository") Optional<String> repository);
+            @Param("team") Optional<Team> team);
 
     @Query("""
                 SELECT u

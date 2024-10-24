@@ -16,11 +16,14 @@ import java.util.stream.Collectors;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 import de.tum.in.www1.hephaestus.codereview.pullrequest.PullRequest;
 import de.tum.in.www1.hephaestus.codereview.pullrequest.review.PullRequestReviewDTO;
+import de.tum.in.www1.hephaestus.codereview.team.Team;
+import de.tum.in.www1.hephaestus.codereview.team.TeamService;
 import de.tum.in.www1.hephaestus.codereview.user.User;
 import de.tum.in.www1.hephaestus.codereview.user.UserService;
 import de.tum.in.www1.hephaestus.codereview.user.UserType;
@@ -29,25 +32,25 @@ import de.tum.in.www1.hephaestus.codereview.user.UserType;
 public class LeaderboardService {
     private static final Logger logger = LoggerFactory.getLogger(LeaderboardService.class);
 
-    private final UserService userService;
+    @Autowired
+    private UserService userService;
+    @Autowired
+    private TeamService teamService;
 
     @Value("${monitoring.timeframe}")
     private int timeframe;
 
-    public LeaderboardService(UserService userService) {
-        this.userService = userService;
-    }
-
     public List<LeaderboardEntry> createLeaderboard(Optional<LocalDate> after, Optional<LocalDate> before,
-            Optional<String> repository) {
+            Optional<String> team) {
         logger.info("Creating leaderboard dataset");
 
         LocalDateTime afterCutOff = after.isPresent() ? after.get().atStartOfDay()
                 : LocalDate.now().minusDays(timeframe).atStartOfDay();
         Optional<LocalDateTime> beforeCutOff = before.map(date -> date.plusDays(1).atStartOfDay());
+        Optional<Team> teamEntity = team.map((t) -> teamService.getTeam(t)).orElse(Optional.empty());
 
         List<User> users = userService.getAllUsersInTimeframe(afterCutOff.atOffset(ZoneOffset.UTC),
-                beforeCutOff.map(b -> b.atOffset(ZoneOffset.UTC)).orElse(OffsetDateTime.now()), repository);
+                beforeCutOff.map(b -> b.atOffset(ZoneOffset.UTC)).orElse(OffsetDateTime.now()), teamEntity);
 
         logger.info("Found " + users.size() + " users for the leaderboard");
 

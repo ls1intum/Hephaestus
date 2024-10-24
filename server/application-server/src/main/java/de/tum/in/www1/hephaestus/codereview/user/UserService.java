@@ -22,6 +22,7 @@ import de.tum.in.www1.hephaestus.codereview.pullrequest.PullRequestDTO;
 import de.tum.in.www1.hephaestus.codereview.pullrequest.review.PullRequestReview;
 import de.tum.in.www1.hephaestus.codereview.pullrequest.review.PullRequestReviewDTO;
 import de.tum.in.www1.hephaestus.codereview.repository.RepositoryDTO;
+import de.tum.in.www1.hephaestus.codereview.team.Team;
 
 @Service
 public class UserService {
@@ -53,10 +54,10 @@ public class UserService {
         return userRepository.findAll().stream().map(UserTeamsDTO::fromUser).toList();
     }
 
-    public List<User> getAllUsersInTimeframe(OffsetDateTime after, OffsetDateTime before, Optional<String> repository) {
-        logger.info("Getting all users in timeframe between " + after + " and " + before + " for repository: "
-                + repository.orElse("all"));
-        return userRepository.findAllInTimeframe(after, before, repository);
+    public List<User> getAllUsersInTimeframe(OffsetDateTime after, OffsetDateTime before, Optional<Team> team) {
+        logger.info("Getting all users in timeframe between " + after + " and " + before + " for team: "
+                + team.map(Team::getName).orElse("all"));
+        return userRepository.findAllInTimeframe(after, before, team);
     }
 
     public Optional<UserProfileDTO> getUserProfileDTO(String login) {
