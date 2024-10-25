@@ -80,7 +80,8 @@ public class AdminService {
 
     public List<UserTeamsDTO> getUsersAsAdmin() {
         logger.info("Getting all users with their teams");
-        return userService.getAllUsersWithTeams();
+        return userService.getAllUsersWithTeams().stream().filter(user -> !user.login().contains("[bot]"))
+                .toList();
     }
 
     public Optional<UserDTO> addTeamToUser(String login, Long teamId) {

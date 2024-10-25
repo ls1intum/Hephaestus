@@ -47,10 +47,13 @@ import de.tum.in.www1.hephaestus.codereview.pullrequest.review.PullRequestReview
 import de.tum.in.www1.hephaestus.codereview.repository.Repository;
 import de.tum.in.www1.hephaestus.codereview.repository.RepositoryConverter;
 import de.tum.in.www1.hephaestus.codereview.repository.RepositoryRepository;
+import de.tum.in.www1.hephaestus.codereview.team.Team;
+import de.tum.in.www1.hephaestus.codereview.team.TeamRepository;
 import de.tum.in.www1.hephaestus.codereview.user.User;
 import de.tum.in.www1.hephaestus.codereview.user.UserConverter;
 import de.tum.in.www1.hephaestus.codereview.user.UserRepository;
 import jakarta.transaction.Transactional;
+import static org.springframework.util.StringUtils.capitalize;
 
 @Transactional
 @Service
@@ -66,12 +69,20 @@ public class GitHubDataSyncService {
 
     private GitHub github;
 
-    private final RepositoryRepository repositoryRepository;
-    private final PullRequestRepository pullRequestRepository;
-    private final PullRequestReviewRepository prReviewRepository;
-    private final IssueCommentRepository commentRepository;
-    private final PullRequestReviewCommentRepository reviewCommentRepository;
-    private final UserRepository userRepository;
+    @Autowired
+    private RepositoryRepository repositoryRepository;
+    @Autowired
+    private PullRequestRepository pullRequestRepository;
+    @Autowired
+    private PullRequestReviewRepository prReviewRepository;
+    @Autowired
+    private IssueCommentRepository commentRepository;
+    @Autowired
+    private PullRequestReviewCommentRepository reviewCommentRepository;
+    @Autowired
+    private UserRepository userRepository;
+    @Autowired
+    private TeamRepository teamRepository;
 
     @Autowired
     private AdminService adminService;
@@ -92,18 +103,7 @@ public class GitHubDataSyncService {
     // Temporary caches per repository
     private Set<User> users = new HashSet<>();
     private Set<PullRequestReview> reviews = new HashSet<>();
-
-    public GitHubDataSyncService(RepositoryRepository repositoryRepository, PullRequestRepository pullRequestRepository,
-            PullRequestReviewRepository prReviewRepository,
-            IssueCommentRepository commentRepository, PullRequestReviewCommentRepository reviewCommentRepository,
-            UserRepository userRepository) {
-        this.repositoryRepository = repositoryRepository;
-        this.pullRequestRepository = pullRequestRepository;
-        this.prReviewRepository = prReviewRepository;
-        this.commentRepository = commentRepository;
-        this.reviewCommentRepository = reviewCommentRepository;
-        this.userRepository = userRepository;
-    }
+    private Set<Team> teams = new HashSet<>();
 
     public void syncData() {
         if (!initGithubClient()) {
@@ -112,6 +112,9 @@ public class GitHubDataSyncService {
         }
 
         Set<String> repositoriesToMonitor = adminService.getAdminConfig().getRepositoriesToMonitor();
+        if (teams.size() == 0) {
+            teams.addAll(teamRepository.findAll());
+        }
         int successfullySyncedRepositories = 0;
         for (String repositoryName : repositoriesToMonitor) {
             try {
@@ -123,6 +126,7 @@ public class GitHubDataSyncService {
                 e.printStackTrace();
             }
         }
+        teams.clear();
         logger.info("GitHub data sync completed for " + successfullySyncedRepositories + "/"
                 + repositoriesToMonitor.size() + " repositories for the last " + timeframe + " day(s).");
     }
@@ -178,6 +182,7 @@ public class GitHubDataSyncService {
         userRepository.saveAll(users);
         repositoryRepository.save(repository);
         prReviewRepository.saveAll(reviews);
+        teamRepository.saveAll(teams);
 
         users = new HashSet<>();
         reviews = new HashSet<>();
@@ -248,10 +253,43 @@ public class GitHubDataSyncService {
                 }
                 commentRepository.saveAll(comments);
 
+                automaticTeamAssignment(pullRequest);
+
                 return pullRequest;
             }).filter(Objects::nonNull).collect(Collectors.toSet()));
         }
         return prs;
+    }
+
+    /**
+     * Assigns the PR author to the corresponding team based on the PR labels and
+     * the repository
+     * 
+     * @param pr
+     */
+    private void automaticTeamAssignment(PullRequest pr) {
+        // Match team via PR label
+        pr.getPullRequestLabels().forEach(label -> {
+            // All team labels got this description
+            if ("Pull requests that affect the corresponding module".equals(label.getDescription())) {
+                Optional<Team> team = teams.stream().filter(t -> t.getName().equals(capitalize(label.getName())))
+                        .findFirst();
+                if (team.isPresent()) {
+                    team.get().addMember(pr.getAuthor());
+                }
+            }
+        });
+
+        // Match team via repository name
+        List<String> teamNames = teams.stream().map(Team::getName).collect(Collectors.toList());
+        Optional<String> matchedRepo = teamNames.stream().filter(r -> pr.getRepository().getName().contains(r))
+                .findFirst();
+        if (matchedRepo.isPresent()) {
+            Optional<Team> team = teams.stream().filter(t -> t.getName().equals(matchedRepo.get())).findFirst();
+            if (team.isPresent()) {
+                team.get().addMember(pr.getAuthor());
+            }
+        }
     }
 
     private PullRequestReviewComment handleSinglePullRequestReviewComment(GHPullRequestReviewComment comment) {

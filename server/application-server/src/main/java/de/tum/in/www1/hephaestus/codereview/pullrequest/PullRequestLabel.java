@@ -18,4 +18,6 @@ public class PullRequestLabel {
 
     @NonNull
     private String color;
+
+    private String description;
 }
