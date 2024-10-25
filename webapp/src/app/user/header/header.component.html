@@ -1,0 +1,54 @@
+<div class="flex gap-4 items-center justify-center">
+  @if (isLoading()) {
+    <hlm-avatar variant="extralarge" class="ring-2 ring-neutral-100 dark:ring-neutral-800">
+      <hlm-skeleton hlmAvatarImage class="h-full w-full rounded-full"></hlm-skeleton>
+      <hlm-skeleton hlmAvatarFallback class="h-full w-full rounded-full"></hlm-skeleton>
+    </hlm-avatar>
+  } @else {
+    <hlm-avatar variant="extralarge" class="ring-2 ring-neutral-100 dark:ring-neutral-800">
+      <img [src]="userData()?.avatarUrl" [alt]="userData()?.login + '\'s avatar'" hlmAvatarImage />
+      <span hlmAvatarFallback>
+        {{ userData()?.login?.slice(0, 2)?.toUpperCase() }}
+      </span>
+    </hlm-avatar>
+  }
+  @if (isLoading()) {
+    <div class="flex flex-col gap-2">
+      <hlm-skeleton class="h-8 w-48" />
+      <hlm-skeleton class="h-5 w-64" />
+      <hlm-skeleton class="h-5 w-80" />
+      <div class="flex items-center gap-2">
+        <hlm-skeleton class="size-10" />
+        <hlm-skeleton class="size-10" />
+      </div>
+    </div>
+  } @else {
+    <div class="flex flex-col gap-1">
+      <h1 class="text-2xl md:text-3xl font-bold leading-6">{{ userData()?.login }}</h1>
+      <a
+        class="md:text-lg font-medium text-muted-foreground mb-1 hover:text-github-accent-foreground"
+        href="https://github.com/{{ userData()?.login }}"
+        target="_blank"
+        rel="noopener noreferrer"
+      >
+        github.com/{{ userData()?.login }}
+      </a>
+      @if (displayFirstContribution()) {
+        <div class="flex items-center gap-2 text-muted-foreground font-medium text-sm md:text-base">
+          <ng-icon [svg]="octClockFill" size="16" />
+          Contributing since {{ displayFirstContribution() }}
+        </div>
+      }
+      <div class="flex items-center gap-2">
+        @for (repository of userData()?.repositories; track repository) {
+          <hlm-tooltip>
+            <a hlmBtn hlmTooltipTrigger class="size-10 bg-neutral-100 dark:bg-neutral-900/80 border border-input rounded-sm p-1" [aria-describedby]="repository">
+              <img [src]="getRepositoryImage(repository)" [alt]="repository" />
+            </a>
+            <span *brnTooltipContent>{{ repository }}</span>
+          </hlm-tooltip>
+        }
+      </div>
+    </div>
+  }
+</div>

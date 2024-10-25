@@ -18,7 +18,6 @@ type CustomArgs = {
 };
 
 const meta: Meta<CustomArgs> = {
-  title: 'UI/Table',
   component: TableComponent,
   decorators: [
     moduleMetadata({

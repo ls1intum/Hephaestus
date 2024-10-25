@@ -6,6 +6,8 @@ api/admin.serviceInterface.ts
 api/api.ts
 api/leaderboard.service.ts
 api/leaderboard.serviceInterface.ts
+api/meta.service.ts
+api/meta.serviceInterface.ts
 api/pull-request.service.ts
 api/pull-request.serviceInterface.ts
 api/user.service.ts
@@ -17,6 +19,7 @@ index.ts
 model/issue-comment-dto.ts
 model/issue-comment.ts
 model/leaderboard-entry.ts
+model/meta-data-dto.ts
 model/models.ts
 model/pull-request-dto.ts
 model/pull-request-label.ts
@@ -27,6 +30,8 @@ model/pull-request.ts
 model/repository-dto.ts
 model/repository.ts
 model/user-dto.ts
+model/user-info-dto.ts
+model/user-profile-dto.ts
 model/user.ts
 param.ts
 variables.ts

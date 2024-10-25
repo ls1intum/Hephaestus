@@ -23,9 +23,10 @@ spring:
         change-log: classpath:db/master.xml
 
     security:
-        user:
-            name: admin
-            password: admin
+        oauth2:
+            resourceserver:
+                jwt:
+                    issuer-uri: http://localhost:8081/realms/hephaestus
 
 springdoc:
     default-produces-media-type: application/json

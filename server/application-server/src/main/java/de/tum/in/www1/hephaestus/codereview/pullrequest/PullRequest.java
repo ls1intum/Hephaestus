@@ -78,4 +78,12 @@ public class PullRequest extends BaseGitServiceEntity {
     public void addReview(PullRequestReview review) {
         reviews.add(review);
     }
+
+    public Integer getAdditions() {
+        return additions;
+    }
+
+    public Integer getDeletions() {
+        return deletions;
+    }
 }

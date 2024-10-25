@@ -60,18 +60,38 @@ const leaderboardEntries: LeaderboardEntry[] = [
     score: 20,
     changesRequested: [],
     approvals: [],
-    comments: generateReviews(1, PullRequestReviewDTO.StateEnum.Commented),
+    comments: [],
     rank: 4,
     numberOfReviewedPRs: 1
+  },
+  {
+    githubName: 'doesnotexistongithub',
+    avatarUrl: 'https://avatars.githubusercontentd.com/u/13132323124599?v=4',
+    type: LeaderboardEntry.TypeEnum.User,
+    name: 'NoAvatarUser',
+    score: 10,
+    changesRequested: [],
+    approvals: [],
+    comments: [],
+    rank: 5,
+    numberOfReviewedPRs: 0
   }
 ];
 
 const meta: Meta<LeaderboardComponent> = {
-  title: 'Components/Home/Leaderboard',
   component: LeaderboardComponent,
   tags: ['autodocs'],
   args: {
-    leaderboard: leaderboardEntries
+    leaderboard: leaderboardEntries,
+    isLoading: false
+  },
+  argTypes: {
+    leaderboard: {
+      control: 'object'
+    },
+    isLoading: {
+      control: 'boolean'
+    }
   }
 };
 
@@ -79,6 +99,16 @@ export default meta;
 type Story = StoryObj<LeaderboardComponent>;
 
 export const Default: Story = {
+  render: (args) => ({
+    props: args,
+    template: `<app-leaderboard ${argsToTemplate(args)}/>`
+  })
+};
+
+export const Loading: Story = {
+  args: {
+    isLoading: true
+  },
   render: (args) => ({
     props: args,
     template: `<app-leaderboard ${argsToTemplate(args)}/>`

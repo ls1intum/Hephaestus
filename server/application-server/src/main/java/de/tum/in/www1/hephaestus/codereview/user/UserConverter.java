@@ -32,7 +32,7 @@ public class UserConverter extends BaseGitServiceEntityConverter<org.kohsuke.git
             logger.error("Failed to convert user email field for source {}: {}", source.getId(), e.getMessage());
         }
         try {
-            user.setName(source.getName());
+            user.setName(source.getName() != null ? source.getName() : source.getLogin());
         } catch (IOException e) {
             logger.error("Failed to convert user name field for source {}: {}", source.getId(), e.getMessage());
         }

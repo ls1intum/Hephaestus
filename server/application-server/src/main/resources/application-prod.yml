@@ -9,12 +9,17 @@ spring:
       ddl-auto: update
 
   security:
-    user:
-      name: ${SECURITY_USER_NAME}
-      password: ${SECURITY_USER_PASSWORD}
+    oauth2:
+      resourceserver:
+        jwt:
+          issuer-uri: ${KEYCLOAK_URL}/realms/${KEYCLOAK_REALM}
 
 monitoring:
-  repositories: ls1intum/Artemis
+    runOnStartup: ${MONITORING_RUN_ON_STARTUP:true}
+    # Fetching timeframe in days
+    timeframe: ${MONITORING_TIMEFRAME:7}
+    repository-sync-cron: ${MONITORING_REPOSITORY_SYNC_CRON:0 0 * * * *}
+    repositories: ${MONITORING_REPOSITORIES:ls1intum/Artemis}
 
 github:
   authToken: ${GITHUB_AUTH_TOKEN}

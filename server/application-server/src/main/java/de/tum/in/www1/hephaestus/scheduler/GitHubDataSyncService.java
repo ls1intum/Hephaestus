@@ -49,7 +49,9 @@ import de.tum.in.www1.hephaestus.codereview.repository.RepositoryRepository;
 import de.tum.in.www1.hephaestus.codereview.user.User;
 import de.tum.in.www1.hephaestus.codereview.user.UserConverter;
 import de.tum.in.www1.hephaestus.codereview.user.UserRepository;
+import jakarta.transaction.Transactional;
 
+@Transactional
 @Service
 public class GitHubDataSyncService {
     private static final Logger logger = LoggerFactory.getLogger(GitHubDataSyncService.class);

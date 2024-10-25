@@ -1,0 +1,21 @@
+<hlm-tooltip>
+  <a
+    hlmBtn
+    hlmTooltipTrigger
+    hlmTooltipContentClass="bg-purple-100 dark:bg-purple-800 dark:border-purple-500 border-purple-300 text-github-upsell-foreground dark:text-popover-foreground"
+    aria-describedby="Request a feature"
+    data-canny-link
+    href="https://hephaestus.canny.io/feature-requests"
+    class="border-github-upsell-foreground text-github-upsell-foreground hover:text-github-upsell-foreground hover:bg-purple-500/10 dark:hover:bg-purple-500/20 flex gap-2"
+    variant="outline"
+    [size]="iconOnly() ? 'icon' : 'default'"
+  >
+    <lucide-angular [img]="Sparkles" class="size-4" />
+    @if (!iconOnly()) {
+      Request&nbsp;a&nbsp;feature
+    }
+  </a>
+  @if (iconOnly()) {
+    <span *brnTooltipContent class="flex items-center">Request&nbsp;a&nbsp;feature</span>
+  }
+</hlm-tooltip>
