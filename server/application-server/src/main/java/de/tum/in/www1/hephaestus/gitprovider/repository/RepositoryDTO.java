@@ -8,10 +8,18 @@ import com.fasterxml.jackson.annotation.JsonInclude;
 import de.tum.in.www1.hephaestus.gitprovider.pullrequest.PullRequestDTO;
 
 @JsonInclude(JsonInclude.Include.NON_EMPTY)
-public record RepositoryDTO(@NonNull String name, @NonNull String nameWithOwner, String description,
-        @NonNull String url,
+public record RepositoryDTO(
+        @NonNull String name,
+        @NonNull String nameWithOwner,
+        @NonNull String htmlUrl,
+        String description,
         Set<PullRequestDTO> pullRequests) {
-    public RepositoryDTO(@NonNull String name, @NonNull String nameWithOwner, String description, @NonNull String url) {
-        this(name, nameWithOwner, description, url, null);
+
+    public RepositoryDTO(
+            @NonNull String name,
+            @NonNull String nameWithOwner,
+            @NonNull String htmlUrl,
+            String description) {
+        this(name, nameWithOwner, description, htmlUrl, null);
     }
 }
