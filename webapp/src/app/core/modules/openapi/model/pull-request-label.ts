@@ -14,5 +14,6 @@
 export interface PullRequestLabel { 
     name?: string;
     color?: string;
+    description?: string;
 }
 
