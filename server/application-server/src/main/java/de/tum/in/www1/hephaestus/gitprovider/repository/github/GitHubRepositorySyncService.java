@@ -42,8 +42,7 @@ public class GitHubRepositorySyncService {
     }
 
     /**
-     * Sync all monitored repositories and processes them to synchronize with the
-     * local repository.
+     * Syncs all monitored GitHub repositories.
      *
      * @return A list of successfully fetched GitHub repositories.
      */
@@ -52,8 +51,7 @@ public class GitHubRepositorySyncService {
     }
 
     /**
-     * Sync all repositories owned by a specific GitHub user or organization and
-     * processes them to synchronize with the local repository.
+     * Syncs all repositories owned by a specific GitHub user or organization.
      *
      * @param owner The GitHub username (login) of the repository owner.
      */
@@ -67,8 +65,8 @@ public class GitHubRepositorySyncService {
     }
 
     /**
-     * Sync a list of repositories specified by their full names (e.g.,
-     * "owner/repo") and processes them to synchronize with the local repository.
+     * Syncs a list of repositories specified by their full names (e.g.,
+     * "owner/repo").
      *
      * @param nameWithOwners A list of repository full names in the format
      *                       "owner/repo".
@@ -83,8 +81,7 @@ public class GitHubRepositorySyncService {
     }
 
     /**
-     * Sync a single GitHub repository by its full name (e.g., "owner/repo") and
-     * processes it to synchronize with the local repository.
+     * Syncs a single GitHub repository by its full name (e.g., "owner/repo").
      *
      * @param nameWithOwner The full name of the repository in the format
      *                      "owner/repo".
@@ -103,9 +100,8 @@ public class GitHubRepositorySyncService {
     }
 
     /**
-     * Processes a single GitHub repository by either updating the existing
-     * repository in the local repository
-     * or creating a new one if it does not exist.
+     * Processes a single GitHub repository by updating or creating it in the local
+     * repository.
      *
      * @param ghRepository The GitHub repository data to process.
      * @return The updated or newly created Repository entity, or {@code null} if an

@@ -1,10 +1,11 @@
 package de.tum.in.www1.hephaestus.gitprovider.pullrequestreview.github;
 
 import java.io.IOException;
+import java.util.List;
 
+import org.kohsuke.github.GHPullRequest;
 import org.kohsuke.github.GHPullRequestReview;
 import org.kohsuke.github.GHUser;
-import org.kohsuke.github.GitHub;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
@@ -22,7 +23,6 @@ public class GitHubPullRequestReviewSyncService {
 
     private static final Logger logger = LoggerFactory.getLogger(GitHubPullRequestReviewSyncService.class);
 
-    private final GitHub github;
     private final PullRequestReviewRepository pullRequestReviewRepository;
     private final PullRequestRepository pullRequestRepository;
     private final UserRepository userRepository;
@@ -31,14 +31,12 @@ public class GitHubPullRequestReviewSyncService {
     private final GitHubUserConverter userConverter;
 
     public GitHubPullRequestReviewSyncService(
-            GitHub github,
             PullRequestReviewRepository pullRequestReviewRepository,
             PullRequestRepository pullRequestRepository,
             UserRepository userRepository,
             GitHubPullRequestReviewConverter pullRequestReviewConverter,
             GitHubPullRequestConverter pullRequestConverter,
             GitHubUserConverter userConverter) {
-        this.github = github;
         this.pullRequestReviewRepository = pullRequestReviewRepository;
         this.pullRequestRepository = pullRequestRepository;
         this.userRepository = userRepository;
@@ -47,6 +45,33 @@ public class GitHubPullRequestReviewSyncService {
         this.userConverter = userConverter;
     }
 
+    /**
+     * Synchronizes all reviews for the given list of GitHub pull requests.
+     *
+     * @param pullRequests the list of GitHub pull requests to sync reviews for
+     */
+    public void syncReviewsOfAllPullRequests(List<GHPullRequest> pullRequests) {
+        pullRequests.stream().forEach(this::syncReviewsOfPullRequest);
+    }
+
+    /**
+     * Synchronizes all reviews for a specific GitHub pull request.
+     *
+     * @param pullRequest the GitHub pull request to sync reviews for
+     */
+    public void syncReviewsOfPullRequest(GHPullRequest pullRequest) {
+        pullRequest.listReviews().withPageSize(100).forEach(this::processPullRequestReview);
+    }
+
+    /**
+     * Processes a single GitHub pull request review by updating or creating it in
+     * the local repository.
+     * Links the review to its parent pull request and author.
+     *
+     * @param ghPullRequestReview the GitHub pull request review to process
+     * @return the updated or newly created PullRequestReview entity, or
+     *         {@code null} if an error occurred
+     */
     @Transactional
     public PullRequestReview processPullRequestReview(GHPullRequestReview ghPullRequestReview) {
         var result = pullRequestReviewRepository.findById(ghPullRequestReview.getId())

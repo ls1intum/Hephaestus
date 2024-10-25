@@ -46,3 +46,8 @@ monitoring:
 # Can be any OAuth token, such as the PAT
 github:
     authToken: null
+
+# Turn on logging for the GitHub client
+logging:
+  level:
+    org.kohsuke.github.GitHubClient: DEBUG

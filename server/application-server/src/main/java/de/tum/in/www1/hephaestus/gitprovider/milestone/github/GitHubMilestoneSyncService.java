@@ -6,7 +6,6 @@ import java.util.List;
 import org.kohsuke.github.GHIssueState;
 import org.kohsuke.github.GHMilestone;
 import org.kohsuke.github.GHRepository;
-import org.kohsuke.github.GitHub;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
@@ -23,7 +22,6 @@ public class GitHubMilestoneSyncService {
 
     private static final Logger logger = LoggerFactory.getLogger(GitHubMilestoneSyncService.class);
 
-    private final GitHub github;
     private final MilestoneRepository milestoneRepository;
     private final RepositoryRepository repositoryRepository;
     private final UserRepository userRepository;
@@ -31,13 +29,11 @@ public class GitHubMilestoneSyncService {
     private final GitHubUserConverter userConverter;
 
     public GitHubMilestoneSyncService(
-            GitHub github,
             MilestoneRepository milestoneRepository,
             RepositoryRepository repositoryRepository,
             UserRepository userRepository,
             GitHubMilestoneConverter milestoneConverter,
             GitHubUserConverter userConverter) {
-        this.github = github;
         this.milestoneRepository = milestoneRepository;
         this.repositoryRepository = repositoryRepository;
         this.userRepository = userRepository;
@@ -45,25 +41,36 @@ public class GitHubMilestoneSyncService {
         this.userConverter = userConverter;
     }
 
-
-    /*
-     * Sync all milestones of a list of GitHub repositories and processes them to
-     * synchronize with the local repository.
+    /**
+     * Synchronizes all milestones of a list of GitHub repositories with the local
+     * repository.
+     *
+     * @param repositories the list of GitHub repositories whose milestones are to
+     *                     be synchronized
      */
     public void syncMilestonesOfAllRepositories(List<GHRepository> repositories) {
         repositories.stream().forEach(this::syncMilestonesOfRepository);
     }
 
-    /*
-     * Sync all milestones of a GitHub repository and processes them to synchronize with
-     * the local repository.
+    /**
+     * Synchronizes milestones for a specific GitHub repository with the local
+     * repository.
+     *
+     * @param repository the GitHub repository whose milestones are to be
+     *                   synchronized
      */
     public void syncMilestonesOfRepository(GHRepository repository) {
-        repository.listMilestones(GHIssueState.ALL).withPageSize(100).forEach(ghMilestone -> {
-            processMilestone(ghMilestone);
-        });
+        repository.listMilestones(GHIssueState.ALL).withPageSize(100).forEach(this::processMilestone);
     }
 
+    /**
+     * Processes a GitHub milestone and ensures it is synchronized with the local
+     * repository.
+     *
+     * @param ghMilestone the GitHub milestone to process
+     * @return the synchronized local Milestone entity, or null if synchronization
+     *         fails
+     */
     @Transactional
     public Milestone processMilestone(GHMilestone ghMilestone) {
         var result = milestoneRepository.findById(ghMilestone.getId())

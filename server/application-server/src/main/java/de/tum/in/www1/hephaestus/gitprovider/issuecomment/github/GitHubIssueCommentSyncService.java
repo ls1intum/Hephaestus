@@ -7,7 +7,6 @@ import java.util.List;
 
 import org.kohsuke.github.GHIssue;
 import org.kohsuke.github.GHIssueComment;
-import org.kohsuke.github.GitHub;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
@@ -26,7 +25,6 @@ public class GitHubIssueCommentSyncService {
 
     private static final Logger logger = LoggerFactory.getLogger(GitHubIssueCommentSyncService.class);
 
-    private final GitHub github;
     private final IssueCommentRepository issueCommentRepository;
     private final IssueRepository issueRepository;
     private final UserRepository userRepository;
@@ -35,14 +33,12 @@ public class GitHubIssueCommentSyncService {
     private final GitHubUserConverter userConverter;
 
     public GitHubIssueCommentSyncService(
-            GitHub github,
             IssueCommentRepository issueCommentRepository,
             IssueRepository issueRepository,
             UserRepository userRepository,
             GitHubIssueCommentConverter issueCommentConverter,
             GitHubIssueConverter issueConverter,
             GitHubUserConverter userConverter) {
-        this.github = github;
         this.issueCommentRepository = issueCommentRepository;
         this.issueRepository = issueRepository;
         this.userRepository = userRepository;
@@ -52,8 +48,7 @@ public class GitHubIssueCommentSyncService {
     }
 
     /**
-     * Sync all issue comments of a list of GitHub issues and processes them to
-     * synchronize with the local repository.
+     * Syncs all issue comments from the specified list of GitHub issues.
      *
      * @param ghIssues The GitHub issues to sync the comments of.
      * @param since    Optional date to only fetch comments since this date.
@@ -63,8 +58,7 @@ public class GitHubIssueCommentSyncService {
     }
 
     /**
-     * Sync all issue comments of a GitHub issue and processes them to synchronize
-     * with the local repository.
+     * Syncs issue comments from a specific GitHub issue.
      *
      * @param ghIssue The GitHub issue to sync the comments of.
      * @param since   Optional date to only fetch comments since this date.
@@ -75,6 +69,15 @@ public class GitHubIssueCommentSyncService {
         builder.list().withPageSize(100).forEach(this::processIssueComment);
     }
 
+    /**
+     * Processes a single GitHub issue comment by updating or creating it in the
+     * local repository.
+     * Manages associations with issues and authors.
+     *
+     * @param ghIssueComment The GitHub issue comment to process.
+     * @return The updated or newly created IssueComment entity, or {@code null} if
+     *         an error occurred during update.
+     */
     @Transactional
     public IssueComment processIssueComment(GHIssueComment ghIssueComment) {
         var result = issueCommentRepository.findById(ghIssueComment.getId())

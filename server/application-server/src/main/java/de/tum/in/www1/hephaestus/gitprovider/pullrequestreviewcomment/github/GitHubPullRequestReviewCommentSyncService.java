@@ -1,11 +1,11 @@
 package de.tum.in.www1.hephaestus.gitprovider.pullrequestreviewcomment.github;
 
 import java.io.IOException;
+import java.util.List;
 
-import org.kohsuke.github.GHPullRequestReview;
+import org.kohsuke.github.GHPullRequest;
 import org.kohsuke.github.GHPullRequestReviewComment;
 import org.kohsuke.github.GHUser;
-import org.kohsuke.github.GitHub;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
@@ -25,7 +25,6 @@ public class GitHubPullRequestReviewCommentSyncService {
 
     private static final Logger logger = LoggerFactory.getLogger(GitHubPullRequestReviewCommentSyncService.class);
 
-    private final GitHub github;
     private final PullRequestReviewCommentRepository pullRequestReviewCommentRepository;
     private final PullRequestReviewRepository pullRequestReviewRepository;
     private final PullRequestRepository pullRequestRepository;
@@ -35,7 +34,6 @@ public class GitHubPullRequestReviewCommentSyncService {
     private final GitHubUserConverter userConverter;
 
     public GitHubPullRequestReviewCommentSyncService(
-            GitHub github,
             PullRequestReviewCommentRepository pullRequestReviewCommentRepository,
             PullRequestReviewRepository pullRequestReviewRepository,
             PullRequestRepository pullRequestRepository,
@@ -43,7 +41,6 @@ public class GitHubPullRequestReviewCommentSyncService {
             GitHubPullRequestReviewCommentConverter pullRequestReviewCommentConverter,
             GitHubPullRequestConverter pullRequestConverter,
             GitHubUserConverter userConverter) {
-        this.github = github;
         this.pullRequestReviewCommentRepository = pullRequestReviewCommentRepository;
         this.pullRequestReviewRepository = pullRequestReviewRepository;
         this.pullRequestRepository = pullRequestRepository;
@@ -53,14 +50,41 @@ public class GitHubPullRequestReviewCommentSyncService {
         this.userConverter = userConverter;
     }
 
-    public void fetchReviewCommentsOfReview(GHPullRequestReview review) {
+    /**
+     * Synchronizes all review comments for the given list of GitHub pull requests.
+     *
+     * @param pullRequests the list of GitHub pull requests to sync review comments
+     *                     for
+     */
+    public void syncReviewCommentsOfAllPullRequests(List<GHPullRequest> pullRequests) {
+        pullRequests.stream().forEach(this::syncReviewCommentsOfPullRequest);
+    }
+
+    /**
+     * Synchronizes all review comments for a specific GitHub pull request.
+     *
+     * @param pullRequest the GitHub pull request to sync review comments for
+     */
+    public void syncReviewCommentsOfPullRequest(GHPullRequest pullRequest) {
         try {
-            review.listReviewComments().withPageSize(100).forEach(this::processPullRequestReviewComment);
+            pullRequest.listReviewComments().forEach(this::processPullRequestReviewComment);
         } catch (IOException e) {
-            logger.error("Failed to fetch review comments of review {}: {}", review.getId(), e.getMessage());
+            logger.error("Failed to fetch review comments for pull request {}: {}", pullRequest.getId(),
+                    e.getMessage());
         }
     }
 
+    /**
+     * Processes a single GitHub pull request review comment by updating or creating
+     * it in the local repository.
+     * Links the comment to its parent pull request and review, as well as the
+     * author.
+     *
+     * @param ghPullRequestReviewComment the GitHub pull request review comment to
+     *                                   process
+     * @return the updated or newly created PullRequestReviewComment entity, or
+     *         {@code null} if an error occurred
+     */
     @Transactional
     public PullRequestReviewComment processPullRequestReviewComment(
             GHPullRequestReviewComment ghPullRequestReviewComment) {

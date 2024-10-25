@@ -11,7 +11,6 @@ import org.kohsuke.github.GHIssue;
 import org.kohsuke.github.GHIssueQueryBuilder;
 import org.kohsuke.github.GHIssueState;
 import org.kohsuke.github.GHRepository;
-import org.kohsuke.github.GitHub;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
@@ -33,7 +32,6 @@ public class GitHubIssueSyncService {
 
     private static final Logger logger = LoggerFactory.getLogger(GitHubIssueSyncService.class);
 
-    private final GitHub github;
     private final IssueRepository issueRepository;
     private final RepositoryRepository repositoryRepository;
     private final LabelRepository labelRepository;
@@ -45,7 +43,6 @@ public class GitHubIssueSyncService {
     private final GitHubUserConverter userConverter;
 
     public GitHubIssueSyncService(
-            GitHub github,
             IssueRepository issueRepository,
             RepositoryRepository repositoryRepository,
             LabelRepository labelRepository,
@@ -55,7 +52,6 @@ public class GitHubIssueSyncService {
             GitHubLabelConverter labelConverter,
             GitHubMilestoneConverter milestoneConverter,
             GitHubUserConverter userConverter) {
-        this.github = github;
         this.issueRepository = issueRepository;
         this.repositoryRepository = repositoryRepository;
         this.labelRepository = labelRepository;
@@ -68,12 +64,11 @@ public class GitHubIssueSyncService {
     }
 
     /**
-     * Sync all issues of a list of GitHub repositories and processes them to
-     * synchronize with the local repository.
+     * Syncs all issues from the specified list of GitHub repositories.
      *
      * @param repositories The list of repositories to fetch issues from.
      * @param since        An optional date to filter issues by their last update.
-     * @return             A list of successfully fetched GitHub issues.
+     * @return A list of successfully fetched GitHub issues.
      */
     public List<GHIssue> syncIssuesOfAllRepositories(List<GHRepository> repositories, Optional<Date> since) {
         return repositories.stream()
@@ -83,17 +78,16 @@ public class GitHubIssueSyncService {
     }
 
     /**
-     * Sync issues across a repository and processes them to synchronize
-     * with the local repository.
+     * Syncs issues from a specific GitHub repository.
      *
      * @param repository The repository to fetch issues from.
      * @param since      An optional date to filter issues by their last update.
-     * @return           A list of successfully fetched GitHub issues.
+     * @return A list of successfully fetched GitHub issues.
      */
     public List<GHIssue> syncIssuesOfRepository(GHRepository repository, Optional<Date> since) {
         GHIssueQueryBuilder builder = repository.queryIssues().pageSize(100).state(GHIssueState.ALL);
         since.ifPresent(sinceDate -> builder.since(sinceDate));
-        
+
         try {
             var issues = builder.list().toList();
             issues.forEach(this::processIssue);
@@ -105,11 +99,10 @@ public class GitHubIssueSyncService {
     }
 
     /**
-     * Processes a single GitHub issue by either updating the existing issue in the
-     * local repository
-     * or creating a new one if it does not exist. Additionally, it manages
-     * associations with repositories,
-     * labels, milestones, authors, and assignees.
+     * Processes a single GitHub issue by updating or creating it in the local
+     * repository.
+     * Manages associations with repositories, labels, milestones, authors, and
+     * assignees.
      *
      * @param ghIssue The GitHub issue data to process.
      * @return The updated or newly created Issue entity, or {@code null} if an

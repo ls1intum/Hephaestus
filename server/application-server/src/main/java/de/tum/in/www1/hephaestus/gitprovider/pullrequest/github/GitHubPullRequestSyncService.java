@@ -12,7 +12,6 @@ import org.kohsuke.github.GHIssueState;
 import org.kohsuke.github.GHPullRequest;
 import org.kohsuke.github.GHPullRequestQueryBuilder.Sort;
 import org.kohsuke.github.GHRepository;
-import org.kohsuke.github.GitHub;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
@@ -34,7 +33,6 @@ public class GitHubPullRequestSyncService {
 
     private static final Logger logger = LoggerFactory.getLogger(GitHubPullRequestSyncService.class);
 
-    private final GitHub github;
     private final PullRequestRepository pullRequestRepository;
     private final RepositoryRepository repositoryRepository;
     private final LabelRepository labelRepository;
@@ -46,7 +44,6 @@ public class GitHubPullRequestSyncService {
     private final GitHubUserConverter userConverter;
 
     public GitHubPullRequestSyncService(
-            GitHub github,
             PullRequestRepository pullRequestRepository,
             RepositoryRepository repositoryRepository,
             LabelRepository labelRepository,
@@ -56,7 +53,6 @@ public class GitHubPullRequestSyncService {
             GitHubLabelConverter labelConverter,
             GitHubMilestoneConverter milestoneConverter,
             GitHubUserConverter userConverter) {
-        this.github = github;
         this.pullRequestRepository = pullRequestRepository;
         this.repositoryRepository = repositoryRepository;
         this.labelRepository = labelRepository;
@@ -69,13 +65,14 @@ public class GitHubPullRequestSyncService {
     }
 
     /**
-     * Sync all pull requests of a list of GitHub repositories and processes them to
-     * synchronize with the local repository.
-     * 
-     * @param repositories The list of repositories to fetch pull requests from.
-     * @param since        An optional date to filter pull requests by their last
-     *                     update.
-     * @return A list of successfully fetched GitHub pull requests.
+     * Synchronizes all pull requests from the specified GitHub repositories.
+     *
+     * @param repositories the list of GitHub repositories to sync pull requests
+     *                     from
+     * @param since        an optional date to filter pull requests by their last
+     *                     update
+     * @return a list of GitHub pull requests that were successfully fetched and
+     *         processed
      */
     public List<GHPullRequest> syncPullRequestsOfAllRepositories(List<GHRepository> repositories,
             Optional<Date> since) {
@@ -86,13 +83,13 @@ public class GitHubPullRequestSyncService {
     }
 
     /**
-     * Sync all pull requests of a list of GitHub repositories and processes them to
-     * synchronize with the local repository.
-     * 
-     * @param repositories The list of repositories to fetch pull requests from.
-     * @param since        An optional date to filter pull requests by their last
-     *                     update.
-     * @return A list of successfully fetched GitHub pull requests.
+     * Synchronizes all pull requests from a specific GitHub repository.
+     *
+     * @param repository the GitHub repository to sync pull requests from
+     * @param since      an optional date to filter pull requests by their last
+     *                   update
+     * @return a list of GitHub pull requests that were successfully fetched and
+     *         processed
      */
     public List<GHPullRequest> syncPullRequestsOfRepository(GHRepository repository, Optional<Date> since) {
         var iterator = repository.queryPullRequests()
@@ -128,16 +125,15 @@ public class GitHubPullRequestSyncService {
     }
 
     /**
-     * Processes a single GitHub pull request by either updating the existing pull
-     * request in the local repository
-     * or creating a new one if it does not exist. Additionally, it manages
-     * associations with repositories,
-     * labels, milestones, authors, assignees, merged by users, and requested
-     * reviewers.
-     * 
-     * @param ghPullRequest The GitHub pull request data to process.
-     * @return The updated or newly created PullRequest entity, or {@code null} if
-     *         an error occurred during update.
+     * Processes a single GitHub pull request by updating or creating it in the
+     * local repository.
+     * Manages associations with repositories, labels, milestones, authors,
+     * assignees, merged by users,
+     * and requested reviewers.
+     *
+     * @param ghPullRequest the GitHub pull request to process
+     * @return the updated or newly created PullRequest entity, or {@code null} if
+     *         an error occurred
      */
     @Transactional
     public PullRequest processPullRequest(GHPullRequest ghPullRequest) {
