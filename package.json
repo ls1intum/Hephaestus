@@ -12,8 +12,8 @@
     "generate:api:specs": "npm run generate:api:application-server-specs && npm run generate:api:intelligence-service-specs",
     "generate:api:application-server-client": "npx openapi-generator-cli generate -i server/application-server/openapi.yaml -g typescript-angular -o webapp/src/app/core/modules/openapi --additional-properties fileNaming=kebab-case,withInterfaces=true --generate-alias-as-model",
     "generate:api:intelligence-service-client": "openapi-generator-cli generate -i server/intelligence-service/openapi.yaml -g java --library resttemplate --api-package de.tum.in.www1.hephaestus.intelligenceapi.api --model-package de.tum.in.www1.hephaestus.intelligenceapi.model --invoker-package de.tum.in.www1.hephaestus.intelligenceapi --additional-properties useJakartaEe=true,performBeanValidation=true,generateClientAsBean=true --package-name de.tum.in.www1.hephaestus.intelligenceapi -o tmp/java-client && shx cp -r tmp/java-client/src/main/java/de/tum/in/www1/hephaestus/intelligenceapi server/application-server/src/main/java/de/tum/in/www1/hephaestus && rimraf tmp",
-    "generate:api:clients": "npm run generate:api:application-server-client && npm run generate:api:intelligence-service-client",
-    "generate:api": "npm run generate:api:clean && npm run generate:api:specs && npm run generate:api:clients"
+    "generate:api:clients": "npm run generate:api:intelligence-service-client && npm run generate:api:application-server-client",
+    "generate:api": "npm run generate:api:clean && npm run generate:api:intelligence-service-specs && npm run generate:api:intelligence-service-client && npm run generate:api:application-server-specs && npm run generate:api:application-server-client"
   },
   "devDependencies": {
     "@openapitools/openapi-generator-cli": "2.13.5",
