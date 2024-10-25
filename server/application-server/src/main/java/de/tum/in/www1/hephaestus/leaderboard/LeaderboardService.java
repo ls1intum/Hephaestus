@@ -37,7 +37,8 @@ public class LeaderboardService {
         this.userService = userService;
     }
 
-    public List<LeaderboardEntry> createLeaderboard(Optional<LocalDate> after, Optional<LocalDate> before) {
+    public List<LeaderboardEntry> createLeaderboard(Optional<LocalDate> after, Optional<LocalDate> before,
+            Optional<String> repository) {
         logger.info("Creating leaderboard dataset");
 
         LocalDateTime afterCutOff = after.isPresent() ? after.get().atStartOfDay()
@@ -45,7 +46,7 @@ public class LeaderboardService {
         Optional<LocalDateTime> beforeCutOff = before.map(date -> date.plusDays(1).atStartOfDay());
 
         List<User> users = userService.getAllUsersInTimeframe(afterCutOff.atOffset(ZoneOffset.UTC),
-                beforeCutOff.map(b -> b.atOffset(ZoneOffset.UTC)).orElse(OffsetDateTime.now()));
+                beforeCutOff.map(b -> b.atOffset(ZoneOffset.UTC)).orElse(OffsetDateTime.now()), repository);
 
         logger.info("Found " + users.size() + " users for the leaderboard");
 

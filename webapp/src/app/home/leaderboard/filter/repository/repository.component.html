@@ -1,0 +1,11 @@
+<hlm-select [placeholder]="placeholder()" [(ngModel)]="value" name="value">
+  <label hlmLabel>Select repository</label>
+  <hlm-select-trigger class="w-56">
+    <hlm-select-value />
+  </hlm-select-trigger>
+  <hlm-select-content class="w-56">
+    @for (option of options(); track option.id) {
+      <hlm-option [value]="option.value">{{ option.label }}</hlm-option>
+    }
+  </hlm-select-content>
+</hlm-select>

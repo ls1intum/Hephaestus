@@ -11,6 +11,7 @@ import { LeaderboardComponent } from '@app/home/leaderboard/leaderboard.componen
 import { LeaderboardFilterComponent } from './leaderboard/filter/filter.component';
 import { SecurityStore } from '@app/core/security/security-store.service';
 import { HlmAlertModule } from '@spartan-ng/ui-alert-helm';
+import { MetaService } from '@app/core/modules/openapi';
 
 dayjs.extend(isoWeek);
 
@@ -24,20 +25,30 @@ export class HomeComponent {
   protected CircleX = CircleX;
 
   securityStore = inject(SecurityStore);
+  metaService = inject(MetaService);
   leaderboardService = inject(LeaderboardService);
 
   signedIn = this.securityStore.signedIn;
   user = this.securityStore.loadedUser;
 
-  // timeframe for leaderboard
-  // example: 2024-09-19
   private readonly route = inject(ActivatedRoute);
   private queryParams = toSignal(this.route.queryParamMap, { requireSync: true });
   protected after = computed(() => this.queryParams().get('after') ?? dayjs().isoWeekday(1).format('YYYY-MM-DD'));
   protected before = computed(() => this.queryParams().get('before') ?? dayjs().format('YYYY-MM-DD'));
+  protected repository = computed(() => this.queryParams().get('repository') ?? 'all');
 
   query = injectQuery(() => ({
-    queryKey: ['leaderboard', { after: this.after(), before: this.before() }],
-    queryFn: async () => lastValueFrom(combineLatest([this.leaderboardService.getLeaderboard(this.after(), this.before()), timer(500)]).pipe(map(([leaderboard]) => leaderboard)))
+    queryKey: ['leaderboard', { after: this.after(), before: this.before(), repository: this.repository() }],
+    queryFn: async () =>
+      lastValueFrom(
+        combineLatest([this.leaderboardService.getLeaderboard(this.after(), this.before(), this.repository() !== 'all' ? this.repository() : undefined), timer(500)]).pipe(
+          map(([leaderboard]) => leaderboard)
+        )
+      )
+  }));
+
+  metaQuery = injectQuery(() => ({
+    queryKey: ['meta'],
+    queryFn: async () => lastValueFrom(this.metaService.getMetaData())
   }));
 }

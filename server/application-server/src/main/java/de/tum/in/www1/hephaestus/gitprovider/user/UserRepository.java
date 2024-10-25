@@ -46,7 +46,9 @@ public interface UserRepository extends JpaRepository<User, Long> {
                 SELECT u
                 FROM User u
                 JOIN FETCH u.reviews re
-                WHERE re.submittedAt BETWEEN :after AND :before
+                WHERE re.createdAt BETWEEN :after AND :before
+                AND (:repository IS NULL OR re.pullRequest.repository.nameWithOwner = :repository)
             """)
-    List<User> findAllInTimeframe(@Param("after") OffsetDateTime after, @Param("before") OffsetDateTime before);
+    List<User> findAllInTimeframe(@Param("after") OffsetDateTime after, @Param("before") OffsetDateTime before,
+            @Param("repository") Optional<String> repository);
 }

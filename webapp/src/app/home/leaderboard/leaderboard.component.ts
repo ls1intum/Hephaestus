@@ -1,6 +1,6 @@
 import { Component, input } from '@angular/core';
 import { NgIconComponent } from '@ng-icons/core';
-import { octFileDiff, octCheck, octComment, octGitPullRequest, octChevronLeft } from '@ng-icons/octicons';
+import { octFileDiff, octCheck, octComment, octGitPullRequest, octChevronLeft, octNoEntry } from '@ng-icons/octicons';
 import { LeaderboardEntry } from 'app/core/modules/openapi';
 import { TableBodyDirective } from 'app/ui/table/table-body.directive';
 import { TableCaptionDirective } from 'app/ui/table/table-caption.directive';
@@ -12,6 +12,7 @@ import { TableRowDirective } from 'app/ui/table/table-row.directive';
 import { TableComponent } from 'app/ui/table/table.component';
 import { HlmAvatarModule } from '@spartan-ng/ui-avatar-helm';
 import { HlmSkeletonModule } from '@spartan-ng/ui-skeleton-helm';
+import { RouterLink, RouterOutlet } from '@angular/router';
 
 @Component({
   selector: 'app-leaderboard',
@@ -27,7 +28,9 @@ import { HlmSkeletonModule } from '@spartan-ng/ui-skeleton-helm';
     TableHeaderDirective,
     TableHeadDirective,
     TableRowDirective,
-    NgIconComponent
+    NgIconComponent,
+    RouterLink,
+    RouterOutlet
   ],
   templateUrl: './leaderboard.component.html'
 })
@@ -37,6 +40,7 @@ export class LeaderboardComponent {
   protected octComment = octComment;
   protected octGitPullRequest = octGitPullRequest;
   protected octChevronLeft = octChevronLeft;
+  protected octNoEntry = octNoEntry;
 
   protected Math = Math;
   protected Array = Array;

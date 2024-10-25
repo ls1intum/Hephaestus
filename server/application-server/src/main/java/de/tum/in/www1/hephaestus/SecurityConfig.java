@@ -28,6 +28,7 @@ public class SecurityConfig {
     interface AuthoritiesConverter extends Converter<Map<String, Object>, Collection<GrantedAuthority>> {
     }
 
+    @SuppressWarnings("unchecked")
     @Bean
     AuthoritiesConverter realmRolesAuthoritiesConverter() {
         return claims -> {

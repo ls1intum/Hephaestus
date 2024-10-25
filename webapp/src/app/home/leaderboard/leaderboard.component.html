@@ -28,12 +28,21 @@
           </td>
         </tr>
       }
+    } @else if (!leaderboard() || leaderboard()?.length === 0) {
+      <tr appTableRow>
+        <td appTableCell colspan="4">
+          <div class="flex flex-col items-center justify-center gap-2 mt-1">
+            <ng-icon [svg]="octNoEntry" size="32" class="text-github-danger-foreground" />
+            <span class="font-semibold text-muted-foreground">No entries found</span>
+          </div>
+        </td>
+      </tr>
     } @else {
       @for (entry of leaderboard(); track entry.githubName) {
-        <tr appTableRow>
+        <tr appTableRow routerLink="/user/{{ entry.githubName }}" routerLinkActive="active" ariaCurrentWhenActive="page" class="cursor-pointer">
           <td appTableCell class="text-center">{{ entry.rank }}</td>
           <td appTableCell class="py-2">
-            <a href="https://github.com/{{ entry.githubName }}" target="_blank" rel="noopener noreferrer" class="flex items-center gap-2 font-medium">
+            <span class="flex items-center gap-2 font-medium">
               <hlm-avatar>
                 <img [src]="entry.avatarUrl ?? ''" [alt]="entry.name + '\'s avatar'" hlmAvatarImage />
                 <span hlmAvatarFallback>
@@ -41,7 +50,7 @@
                 </span>
               </hlm-avatar>
               <span class="text-muted-foreground">{{ entry.name }}</span>
-            </a>
+            </span>
           </td>
           <td appTableCell class="text-center">{{ entry.score }}</td>
           <td appTableCell class="py-2">
