@@ -8,6 +8,8 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+import de.tum.in.www1.hephaestus.gitprovider.user.dto.UserProfileDTO;
+
 @RestController
 @RequestMapping("/user")
 public class UserController {
@@ -17,15 +19,9 @@ public class UserController {
         this.userService = actorService;
     }
 
-    @GetMapping("/{login}")
-    public ResponseEntity<UserDTO> getUser(@PathVariable String login) {
-        Optional<UserDTO> user = userService.getUserDTO(login);
-        return user.map(ResponseEntity::ok).orElseGet(() -> ResponseEntity.notFound().build());
-    }
-
     @GetMapping("/{login}/profile")
     public ResponseEntity<UserProfileDTO> getUserProfile(@PathVariable String login) {
-        Optional<UserProfileDTO> userProfile = userService.getUserProfileDTO(login);
+        Optional<UserProfileDTO> userProfile = userService.getUserProfile(login);
         return userProfile.map(ResponseEntity::ok).orElseGet(() -> ResponseEntity.notFound().build());
     }
 }

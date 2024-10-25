@@ -74,7 +74,12 @@ public class PullRequest extends Issue {
     @OneToMany(mappedBy = "pullRequest", cascade = CascadeType.REMOVE, orphanRemoval = true)
     @ToString.Exclude
     private Set<PullRequestReviewComment> reviewComments = new HashSet<>();
-    
+
+    @Override
+    public boolean isPullRequest() {
+        return true;
+    }
+
     // Ignored GitHub properties:
     // - rebaseable (not provided by our GitHub API client)
     // - head -> "label", "ref", "repo", "sha", "user"
