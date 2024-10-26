@@ -1,5 +1,6 @@
 package de.tum.in.www1.hephaestus.gitprovider.issue.dto;
 
+import java.time.OffsetDateTime;
 import java.util.List;
 
 import org.springframework.lang.NonNull;
@@ -17,9 +18,9 @@ public record IssueInfoDTO(
     UserInfoDTO author,
     List<LabelInfoDTO> labels,
     List<UserInfoDTO> assignees,
-    @NonNull String repositoryNameWithOwner,
+    String repositoryNameWithOwner,
     @NonNull String htmlUrl,
-    @NonNull String createdAt,
-    @NonNull String updatedAt
+    OffsetDateTime createdAt,
+    OffsetDateTime updatedAt
 ) {
 }

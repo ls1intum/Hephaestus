@@ -1,5 +1,7 @@
 package de.tum.in.www1.hephaestus.gitprovider.issuecomment.dto;
 
+import java.time.OffsetDateTime;
+
 import org.springframework.lang.NonNull;
 import com.fasterxml.jackson.annotation.JsonInclude;
 
@@ -14,7 +16,6 @@ public record IssueCommentInfoDTO(
     UserInfoDTO author,
     IssueInfoDTO issue,
     @NonNull String htmlUrl,
-    @NonNull String createdAt, 
-    @NonNull String updatedAt) {
-
+    OffsetDateTime createdAt, 
+    OffsetDateTime updatedAt) {
 }

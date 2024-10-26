@@ -10,7 +10,6 @@ import org.springframework.context.annotation.Configuration;
 
 import org.kohsuke.github.GitHub;
 import org.kohsuke.github.GitHubBuilder;
-import org.kohsuke.github.connector.GitHubConnector;
 
 @Configuration
 public class GitHubConfig {

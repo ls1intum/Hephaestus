@@ -41,6 +41,8 @@ public class User extends BaseGitServiceEntity {
     // AKA bio
     private String description;
 
+    @NonNull
+    // Equals login if not fetched / existing
     private String name;
 
     private String company;

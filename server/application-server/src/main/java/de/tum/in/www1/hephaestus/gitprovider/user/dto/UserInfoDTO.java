@@ -9,7 +9,5 @@ public record UserInfoDTO(
         @NonNull String login,
         @NonNull String avatarUrl,
         @NonNull String name,
-        @NonNull String htmlUrl,
-        @NonNull String createdAt,
-        @NonNull String updatedAt) {
+        @NonNull String htmlUrl) {
 }

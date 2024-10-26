@@ -1,7 +1,10 @@
 package de.tum.in.www1.hephaestus.gitprovider.repository;
 
+import java.util.List;
+
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 
 @org.springframework.stereotype.Repository
 public interface RepositoryRepository
@@ -12,8 +15,9 @@ public interface RepositoryRepository
     @Query("""
             SELECT r
             FROM Repository r
-            JOIN FETCH r.issues i
-            WHERE r.nameWithOwner = :nameWithOwner AND TYPE(i) = PullRequest
+            JOIN PullRequest pr ON r.id = pr.repository.id
+            WHERE pr.author.login = :contributorLogin
+            ORDER BY r.name ASC
             """)
-    Repository findByNameWithOwnerWithEagerPullRequests(String nameWithOwner);
+    List<Repository> findContributedByLogin(@Param("contributorLogin") String contributorLogin);
 }

@@ -41,6 +41,7 @@ public class PullRequestReview {
     private String body;
     
     // We handle dismissed in a separate field to keep the original state
+    @NonNull
     @Enumerated(EnumType.STRING)
     private PullRequestReview.State state;
 

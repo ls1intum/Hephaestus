@@ -5,10 +5,9 @@ import com.fasterxml.jackson.annotation.JsonInclude;
 
 @JsonInclude(JsonInclude.Include.NON_EMPTY)
 public record RepositoryInfoDTO(
+        @NonNull Long id,
         @NonNull String name,
         @NonNull String nameWithOwner,
         String description,
-        @NonNull String htmlUrl,
-        @NonNull String createdAt,
-        @NonNull String updatedAt) {
+        @NonNull String htmlUrl) {
 }

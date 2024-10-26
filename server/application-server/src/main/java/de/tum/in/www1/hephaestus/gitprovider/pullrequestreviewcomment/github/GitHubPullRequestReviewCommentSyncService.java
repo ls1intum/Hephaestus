@@ -67,7 +67,7 @@ public class GitHubPullRequestReviewCommentSyncService {
      */
     public void syncReviewCommentsOfPullRequest(GHPullRequest pullRequest) {
         try {
-            pullRequest.listReviewComments().forEach(this::processPullRequestReviewComment);
+            pullRequest.listReviewComments().withPageSize(100).forEach(this::processPullRequestReviewComment);
         } catch (IOException e) {
             logger.error("Failed to fetch review comments for pull request {}: {}", pullRequest.getId(),
                     e.getMessage());

@@ -1,116 +1,94 @@
 package de.tum.in.www1.hephaestus.gitprovider.user;
 
-import java.time.OffsetDateTime;
 import java.util.Comparator;
-import java.util.HashSet;
-import java.util.LinkedHashSet;
+import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
-import java.util.function.Function;
-import java.util.function.Predicate;
-import java.util.stream.Collectors;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 
-import de.tum.in.www1.hephaestus.codereview.base.BaseGitServiceEntity;
-import de.tum.in.www1.hephaestus.codereview.pullrequest.IssueState;
-import de.tum.in.www1.hephaestus.codereview.pullrequest.PullRequest;
-import de.tum.in.www1.hephaestus.codereview.pullrequest.PullRequestDTO;
-import de.tum.in.www1.hephaestus.codereview.pullrequest.review.PullRequestReview;
-import de.tum.in.www1.hephaestus.codereview.pullrequest.review.PullRequestReviewDTO;
-import de.tum.in.www1.hephaestus.codereview.repository.RepositoryDTO;
+import de.tum.in.www1.hephaestus.gitprovider.issue.Issue;
+import de.tum.in.www1.hephaestus.gitprovider.pullrequest.PullRequestRepository;
+import de.tum.in.www1.hephaestus.gitprovider.pullrequest.dto.PullRequestDTOConverter;
+import de.tum.in.www1.hephaestus.gitprovider.pullrequest.dto.PullRequestInfoDTO;
+import de.tum.in.www1.hephaestus.gitprovider.pullrequestreview.PullRequestReviewRepository;
+import de.tum.in.www1.hephaestus.gitprovider.pullrequestreview.dto.PullRequestReviewDTOConverter;
+import de.tum.in.www1.hephaestus.gitprovider.pullrequestreview.dto.PullRequestReviewInfoDTO;
+import de.tum.in.www1.hephaestus.gitprovider.repository.RepositoryRepository;
+import de.tum.in.www1.hephaestus.gitprovider.repository.dto.RepositoryDTOConverter;
+import de.tum.in.www1.hephaestus.gitprovider.repository.dto.RepositoryInfoDTO;
+import de.tum.in.www1.hephaestus.gitprovider.user.dto.UserDTOConverter;
+import de.tum.in.www1.hephaestus.gitprovider.user.dto.UserInfoDTO;
+import de.tum.in.www1.hephaestus.gitprovider.user.dto.UserProfileDTO;
+import jakarta.transaction.Transactional;
 
 @Service
 public class UserService {
     private static final Logger logger = LoggerFactory.getLogger(UserService.class);
 
     private final UserRepository userRepository;
+    private final RepositoryRepository repositoryRepository;
+    private final PullRequestRepository pullRequestRepository;
+    private final PullRequestReviewRepository pullRequestReviewRepository;
+    private final UserDTOConverter userDTOConverter;
+    private final RepositoryDTOConverter repositoryDTOConverter;
+    private final PullRequestDTOConverter pullRequestDTOConverter;
+    private final PullRequestReviewDTOConverter pullRequestReviewDTOConverter;
 
-    public UserService(UserRepository actorRepository) {
-        this.userRepository = actorRepository;
+    public UserService(
+            UserRepository userRepository,
+            RepositoryRepository repositoryRepository,
+            PullRequestRepository pullRequestRepository,
+            PullRequestReviewRepository pullRequestReviewRepository,
+            UserDTOConverter userDTOConverter,
+            RepositoryDTOConverter repositoryDTOConverter,
+            PullRequestDTOConverter pullRequestDTOConverter,
+            PullRequestReviewDTOConverter pullRequestReviewDTOConverter) {
+        this.userRepository = userRepository;
+        this.repositoryRepository = repositoryRepository;
+        this.pullRequestRepository = pullRequestRepository;
+        this.pullRequestReviewRepository = pullRequestReviewRepository;
+        this.userDTOConverter = userDTOConverter;
+        this.repositoryDTOConverter = repositoryDTOConverter;
+        this.pullRequestDTOConverter = pullRequestDTOConverter;
+        this.pullRequestReviewDTOConverter = pullRequestReviewDTOConverter;
     }
 
-    public Optional<User> getUser(String login) {
-        logger.info("Getting user with login: " + login);
-        return userRepository.findUser(login);
-    }
+    @Transactional
+    public Optional<UserProfileDTO> getUserProfile(String login) {
+        logger.info("Getting user profile with login: " + login);
 
-    public Optional<UserDTO> getUserDTO(String login) {
-        logger.info("Getting userDTO with login: " + login);
-        return userRepository.findByLogin(login);
-    }
-
-    public List<User> getAllUsers() {
-        logger.info("Getting all users");
-        return userRepository.findAll().stream().toList();
-    }
-
-    public List<User> getAllUsersInTimeframe(OffsetDateTime after, OffsetDateTime before, Optional<String> repository) {
-        logger.info("Getting all users in timeframe between " + after + " and " + before + " for repository: "
-                + repository.orElse("all"));
-        return userRepository.findAllInTimeframe(after, before, repository);
-    }
-
-    public Optional<UserProfileDTO> getUserProfileDTO(String login) {
-        logger.info("Getting userProfileDTO with login: " + login);
-        Optional<User> optionalUser = userRepository.findUser(login);
+        Optional<UserInfoDTO> optionalUser = userRepository.findByLogin(login).map(userDTOConverter::convertToDTO);
         if (optionalUser.isEmpty()) {
             return Optional.empty();
         }
-        User user = optionalUser.get();
 
-        OffsetDateTime firstContribution = user.getPullRequests().stream().map(pr -> pr.getCreatedAt())
-                .min(OffsetDateTime::compareTo).orElse(null);
-        Set<String> repositories = mapToDTO(user.getPullRequests(), pr -> true,
-                pr -> pr.getRepository().getNameWithOwner(),
-                (r1, r2) -> r1.compareTo(r2));
-        Set<PullRequestDTO> pullRequests = getPullRequestDTOs(user.getPullRequests());
-        Set<PullRequestReviewDTO> activity = getPullRequestReviewDTOs(user.getReviews());
+        UserInfoDTO user = optionalUser.get();
+        OffsetDateTime firstContribution = pullRequestRepository.firstContributionByAuthorLogin(login).orElse(null);
+        List<PullRequestInfoDTO> openPullRequests = pullRequestRepository.findAssignedByLoginAndStates(login, Set.of(Issue.State.OPEN))
+                .stream()
+                .map(pullRequestDTOConverter::convertToDTO)
+                .toList();
+        List<RepositoryInfoDTO> contributedRepositories = repositoryRepository.findContributedByLogin(login)
+                .stream()
+                .map(repositoryDTOConverter::convertToDTO)
+                .sorted(Comparator.comparing(RepositoryInfoDTO::name))
+                .toList();
+        List<PullRequestReviewInfoDTO> reviewActivity = pullRequestReviewRepository.findAllByAuthorLoginSince(login, OffsetDateTime.now().minusDays(7))
+                .stream()
+                .map(pullRequestReviewDTOConverter::convertToDTO)
+                .sorted(Comparator.comparing(PullRequestReviewInfoDTO::submittedAt))
+                .toList();
 
-        return Optional.of(new UserProfileDTO(user.getId(), user.getLogin(), user.getAvatarUrl(), firstContribution,
-                repositories, activity, pullRequests));
-    }
-
-    private Set<PullRequestDTO> getPullRequestDTOs(Set<PullRequest> pullRequests) {
-        return mapToDTO(pullRequests,
-                isRecentlyPredicate().and(pr -> ((PullRequest) pr).getState().equals(IssueState.OPEN)),
-                pr -> new PullRequestDTO(
-                        pr.getId(), pr.getTitle(), pr.getNumber(), pr.getUrl(), pr.getState(), pr.getAdditions(),
-                        pr.getDeletions(),
-                        pr.getCreatedAt(), pr.getUpdatedAt(), null,
-                        pr.getPullRequestLabels(),
-                        new RepositoryDTO(pr.getRepository().getName(),
-                                pr.getRepository().getNameWithOwner(), null,
-                                pr.getRepository().getUrl())),
-                (pr1, pr2) -> pr1.createdAt().compareTo(pr2.createdAt()));
-    }
-
-    private Set<PullRequestReviewDTO> getPullRequestReviewDTOs(Set<PullRequestReview> reviews) {
-        return mapToDTO(reviews, isRecentlyPredicate(), re -> {
-            PullRequest pr = re.getPullRequest();
-            return new PullRequestReviewDTO(re.getId(),
-                    re.getCreatedAt(), re.getUpdatedAt(), re.getSubmittedAt(), re.getState(), re.getUrl(),
-                    new PullRequestDTO(pr.getId(), pr.getTitle(), pr.getNumber(), pr.getUrl(), pr.getState(),
-                            pr.getAdditions(), pr.getDeletions(), pr.getCreatedAt(), pr.getUpdatedAt(), null,
-                            new HashSet<>(),
-                            new RepositoryDTO(pr.getRepository().getName(),
-                                    pr.getRepository().getNameWithOwner(), null,
-                                    pr.getRepository().getUrl())));
-        }, (prr1, prr2) -> prr2.submittedAt().compareTo(prr1.submittedAt()));
-    }
-
-    private <T extends BaseGitServiceEntity, G> Set<G> mapToDTO(Set<T> entities, Predicate<? super T> predicate,
-            Function<T, G> mapper,
-            Comparator<G> comparator) {
-        return entities.stream().filter(predicate).map(mapper).sorted(comparator)
-                .collect(Collectors.toCollection(LinkedHashSet::new));
-    }
-
-    // Predicate filtering createdAt for within past 7 days
-    private Predicate<? super BaseGitServiceEntity> isRecentlyPredicate() {
-        return entity -> entity.getCreatedAt().isAfter(OffsetDateTime.now().minusDays(7));
+        return Optional.of(new UserProfileDTO(
+                user,
+                firstContribution,
+                contributedRepositories,
+                reviewActivity,
+                openPullRequests
+        ));
     }
 }

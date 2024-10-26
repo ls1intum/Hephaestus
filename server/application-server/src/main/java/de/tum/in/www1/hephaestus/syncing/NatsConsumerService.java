@@ -37,6 +37,9 @@ public class NatsConsumerService {
     @Value("${nats.enabled}")
     private boolean isNatsEnabled;
 
+    @Value("${nats.timeframe}")
+    private int timeframe;
+
     @Value("${nats.server}")
     private String natsServer;
 
@@ -101,7 +104,7 @@ public class NatsConsumerService {
             ConsumerConfiguration.Builder consumerConfigBuilder = ConsumerConfiguration.builder()
                     .filterSubjects(getSubjects())
                     .deliverPolicy(DeliverPolicy.ByStartTime)
-                    .startTime(ZonedDateTime.now().minusDays(30));
+                    .startTime(ZonedDateTime.now().minusDays(timeframe));
 
             if (durableConsumerName != null && !durableConsumerName.isEmpty()) {
                 consumerConfigBuilder.durable(durableConsumerName);

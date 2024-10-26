@@ -33,6 +33,7 @@ springdoc:
 
 nats:
     enabled: false
+    timeframe: 7
     durableConsumerName: ""
     server: ""
 
