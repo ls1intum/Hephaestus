@@ -18,6 +18,8 @@ export const Default: Story = {
     deletions: 5,
     htmlUrl: 'http://example.com',
     state: 'OPEN',
+    isDraft: false,
+    isMerged: false,
     repositoryName: 'Artemis',
     createdAt: '2024-01-01',
     pullRequestLabels: [
@@ -35,6 +37,8 @@ export const isLoading: Story = {
     deletions: 5,
     htmlUrl: 'http://example.com',
     state: 'OPEN',
+    isDraft: false,
+    isMerged: false,
     repositoryName: 'Artemis',
     createdAt: '2024-01-01',
     pullRequestLabels: [
