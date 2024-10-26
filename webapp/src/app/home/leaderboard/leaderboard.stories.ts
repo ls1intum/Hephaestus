@@ -1,7 +1,6 @@
 import { argsToTemplate, type Meta, type StoryObj } from '@storybook/angular';
 import { LeaderboardComponent } from './leaderboard.component';
 import { LeaderboardEntry } from 'app/core/modules/openapi/model/leaderboard-entry';
-import { PullRequestReviewInfo } from 'app/core/modules/openapi/model/pull-request-review-info';
 
 const leaderboardEntries: LeaderboardEntry[] = [
   {
