@@ -19,6 +19,8 @@ export interface PullRequestInfo {
     number: number;
     title: string;
     state: PullRequestInfo.StateEnum;
+    isDraft: boolean;
+    isMerged: boolean;
     commentsCount: number;
     author?: UserInfo;
     labels?: Array<LabelInfo>;

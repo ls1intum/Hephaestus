@@ -12,6 +12,8 @@ public record PullRequestBaseInfoDTO(
         @NonNull Integer number,
         @NonNull String title,
         @NonNull State state,
+        @NonNull Boolean isDraft,
+        @NonNull Boolean isMerged,
         RepositoryInfoDTO repository,
         @NonNull String htmlUrl) {
 

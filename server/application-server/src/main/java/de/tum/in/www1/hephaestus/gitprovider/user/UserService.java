@@ -80,7 +80,7 @@ public class UserService {
         List<PullRequestReviewInfoDTO> reviewActivity = pullRequestReviewRepository.findAllByAuthorLoginSince(login, OffsetDateTime.now().minusDays(7))
                 .stream()
                 .map(pullRequestReviewDTOConverter::convertToDTO)
-                .sorted(Comparator.comparing(PullRequestReviewInfoDTO::submittedAt))
+                .sorted(Comparator.comparing(PullRequestReviewInfoDTO::submittedAt).reversed())
                 .toList();
 
         return Optional.of(new UserProfileDTO(

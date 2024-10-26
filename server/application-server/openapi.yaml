@@ -108,6 +108,8 @@ components:
       - deletions
       - htmlUrl
       - id
+      - isDraft
+      - isMerged
       - number
       - state
       - title
@@ -126,6 +128,10 @@ components:
           enum:
           - OPEN
           - CLOSED
+        isDraft:
+          type: boolean
+        isMerged:
+          type: boolean
         commentsCount:
           type: integer
           format: int32
@@ -262,6 +268,8 @@ components:
       required:
       - htmlUrl
       - id
+      - isDraft
+      - isMerged
       - number
       - state
       - title
@@ -280,6 +288,10 @@ components:
           enum:
           - OPEN
           - CLOSED
+        isDraft:
+          type: boolean
+        isMerged:
+          type: boolean
         repository:
           $ref: "#/components/schemas/RepositoryInfo"
         htmlUrl:

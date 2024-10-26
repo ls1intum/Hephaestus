@@ -17,6 +17,8 @@ export interface PullRequestBaseInfo {
     number: number;
     title: string;
     state: PullRequestBaseInfo.StateEnum;
+    isDraft: boolean;
+    isMerged: boolean;
     repository?: RepositoryInfo;
     htmlUrl: string;
 }

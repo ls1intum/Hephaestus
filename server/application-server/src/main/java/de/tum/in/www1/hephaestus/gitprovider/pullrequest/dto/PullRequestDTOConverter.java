@@ -33,6 +33,8 @@ public class PullRequestDTOConverter {
                 pullRequest.getNumber(),
                 pullRequest.getTitle(),
                 pullRequest.getState(),
+                pullRequest.isDraft(),
+                pullRequest.isMerged(),
                 pullRequest.getCommentsCount(),
                 userDTOConverter.convertToDTO(pullRequest.getAuthor()),
                 pullRequest.getLabels()
@@ -61,6 +63,8 @@ public class PullRequestDTOConverter {
                 pullRequest.getNumber(),
                 pullRequest.getTitle(),
                 pullRequest.getState(),
+                pullRequest.isDraft(),
+                pullRequest.isMerged(),
                 repositoryDTOConverter.convertToDTO(pullRequest.getRepository()),
                 pullRequest.getHtmlUrl());
     }

@@ -17,6 +17,8 @@ public record PullRequestInfoDTO(
         @NonNull Integer number,
         @NonNull String title,
         @NonNull State state,
+        @NonNull Boolean isDraft,
+        @NonNull Boolean isMerged,
         @NonNull Integer commentsCount,
         UserInfoDTO author,
         List<LabelInfoDTO> labels,

@@ -53,18 +53,21 @@ public class LeaderboardService {
 
         var afterOffset = afterCutOff.atOffset(ZoneOffset.UTC);
         var beforeOffset = beforeCutOff.map(b -> b.atOffset(ZoneOffset.UTC)).orElse(OffsetDateTime.now());
-        List<PullRequestReview> reviews = pullRequestReviewRepository.findAllInTimeframe(afterOffset, beforeOffset, repository);
+        List<PullRequestReview> reviews = pullRequestReviewRepository.findAllInTimeframe(afterOffset, beforeOffset,
+                repository);
 
-        Map<Long, User> usersById = reviews.stream().map(PullRequestReview::getAuthor).collect(Collectors.toMap(User::getId, user -> user, (u1, u2) -> u1));
-        Map<Long, List<PullRequestReview>> reviewsByUserId = reviews.stream().collect(Collectors.groupingBy(review -> review.getAuthor().getId()));
-        Map<Long, Integer> scoresByUserId = reviewsByUserId.entrySet().stream().collect(Collectors.toMap(Map.Entry::getKey, entry -> calculateTotalScore(entry.getValue())));
+        Map<Long, User> usersById = reviews.stream().map(PullRequestReview::getAuthor)
+                .collect(Collectors.toMap(User::getId, user -> user, (u1, u2) -> u1));
+        Map<Long, List<PullRequestReview>> reviewsByUserId = reviews.stream()
+                .collect(Collectors.groupingBy(review -> review.getAuthor().getId()));
+        Map<Long, Integer> scoresByUserId = reviewsByUserId.entrySet().stream()
+                .collect(Collectors.toMap(Map.Entry::getKey, entry -> calculateTotalScore(entry.getValue())));
 
         // Ranking (sorted by score descending)
         List<Long> rankingByUserId = scoresByUserId.entrySet().stream()
                 .sorted(Map.Entry.comparingByValue(Comparator.reverseOrder()))
                 .map(Map.Entry::getKey)
                 .collect(Collectors.toList());
-        
 
         List<LeaderboardEntryDTO> leaderboard = IntStream.range(0, rankingByUserId.size())
                 .mapToObj(index -> {
@@ -73,14 +76,23 @@ public class LeaderboardService {
                     int score = scoresByUserId.get(userId);
                     UserInfoDTO user = userDTOConverter.convertToDTO(usersById.get(userId));
                     List<PullRequestReview> userReviews = reviewsByUserId.get(userId);
-                    int numberOfReviewedPRs = userReviews.stream().map(review -> review.getPullRequest().getId()).collect(Collectors.toSet()).size();
-                    int numberOfApprovals = (int) userReviews.stream().filter(review -> review.getState() == PullRequestReview.State.APPROVED).count();
-                    int numberOfChangeRequests = (int) userReviews.stream().filter(review -> review.getState() == PullRequestReview.State.CHANGES_REQUESTED).count();
-                    int numberOfComments = (int) userReviews.stream().filter(review -> review.getState() == PullRequestReview.State.COMMENTED).count();
-                    int numberOfUnknowns = userReviews.size() - numberOfApprovals - numberOfChangeRequests - numberOfComments;
-                    int numberOfCodeComments = userReviews.stream().map(review -> review.getComments().size()).reduce(0, Integer::sum);
+                    int numberOfReviewedPRs = userReviews.stream().map(review -> review.getPullRequest().getId())
+                            .collect(Collectors.toSet()).size();
+                    int numberOfApprovals = (int) userReviews.stream()
+                            .filter(review -> review.getState() == PullRequestReview.State.APPROVED).count();
+                    int numberOfChangeRequests = (int) userReviews.stream()
+                            .filter(review -> review.getState() == PullRequestReview.State.CHANGES_REQUESTED).count();
+                    int numberOfComments = (int) userReviews.stream()
+                            .filter(review -> review.getState() == PullRequestReview.State.COMMENTED)
+                            .filter(review -> review.getBody() != null).count();
+                    int numberOfUnknowns = (int) userReviews.stream()
+                            .filter(review -> review.getState() == PullRequestReview.State.UNKNOWN)
+                            .filter(review -> review.getBody() != null).count();
+                    int numberOfCodeComments = userReviews.stream().map(review -> review.getComments().size()).reduce(0,
+                            Integer::sum);
 
-                    return new LeaderboardEntryDTO(rank, score, user, numberOfReviewedPRs, numberOfApprovals, numberOfChangeRequests, numberOfComments, numberOfUnknowns, numberOfCodeComments);
+                    return new LeaderboardEntryDTO(rank, score, user, numberOfReviewedPRs, numberOfApprovals,
+                            numberOfChangeRequests, numberOfComments, numberOfUnknowns, numberOfCodeComments);
                 })
                 .toList();
 
@@ -107,9 +119,12 @@ public class LeaderboardService {
                             .count();
                     int commentReviews = (int) pullRequestReviews.stream()
                             .filter(review -> review.getState() == PullRequestReview.State.COMMENTED)
+                            .filter(review -> review.getBody() != null) // Only count if there is a comment
                             .count();
-                    int unknownReviews = pullRequestReviews.size() - approvalReviews - changesRequestedReviews
-                            - commentReviews;
+                    int unknownReviews = (int) pullRequestReviews.stream()
+                            .filter(review -> review.getState() == PullRequestReview.State.UNKNOWN)
+                            .filter(review -> review.getBody() != null) // Only count if there is a comment
+                            .count();
 
                     int codeComments = pullRequestReviews.stream()
                             .map(review -> review.getComments().size())
@@ -121,7 +136,7 @@ public class LeaderboardService {
                             codeComments * 0.5);
 
                     double complexityBonus = 1 + (complexityScore - 1) / 32.0;
-                
+
                     return 5 * interactionScore * complexityBonus;
                 })
                 .reduce(0.0, Double::sum);
