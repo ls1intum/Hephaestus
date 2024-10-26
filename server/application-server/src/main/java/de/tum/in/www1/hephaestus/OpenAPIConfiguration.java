@@ -41,7 +41,7 @@ public class OpenAPIConfiguration {
 
     @Bean
     public OpenApiCustomizer schemaCustomizer() {
-        return openApi -> {
+        return openApi -> {            
             var components = openApi.getComponents();
 
             // Only include schemas with DTO suffix and remove the suffix
@@ -69,11 +69,11 @@ public class OpenAPIConfiguration {
 
             components.setSchemas(schemas);
 
-            // Remove DTO suffix from reponse schemas
             var paths = openApi.getPaths();
             paths.forEach((path, pathItem) -> {
                 logger.info(path);
                 pathItem.readOperations().forEach(operation -> {
+                    // Remove DTO suffix from reponse schemas
                     var responses = operation.getResponses();
                     responses.forEach((responseCode, response) -> {
                         var content = response.getContent();
@@ -82,8 +82,15 @@ public class OpenAPIConfiguration {
 
                         });
                     });
+
+                    // Remove -controller suffix from tags
+                    operation.setTags(operation.getTags()
+                            .stream()
+                            .map(tag -> tag.substring(0, tag.length() - 11)).toList());
                 });
             });
+
+            
         };
     }
 
