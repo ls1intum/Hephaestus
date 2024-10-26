@@ -16,14 +16,14 @@ export const Default: Story = {
     number: 12,
     additions: 10,
     deletions: 5,
-    url: 'http://example.com',
+    htmlUrl: 'http://example.com',
     state: 'OPEN',
     repositoryName: 'Artemis',
     createdAt: '2024-01-01',
-    pullRequestLabels: new Set([
-      { name: 'bug', color: 'f00000' },
-      { name: 'enhancement', color: '008000' }
-    ])
+    pullRequestLabels: [
+      { id: 1, name: 'bug', color: 'f00000' },
+      { id: 2, name: 'enhancement', color: '008000' }
+    ]
   }
 };
 
@@ -33,14 +33,14 @@ export const isLoading: Story = {
     number: 12,
     additions: 10,
     deletions: 5,
-    url: 'http://example.com',
+    htmlUrl: 'http://example.com',
     state: 'OPEN',
     repositoryName: 'Artemis',
     createdAt: '2024-01-01',
-    pullRequestLabels: new Set([
-      { name: 'bug', color: 'f00000' },
-      { name: 'enhancement', color: '008000' }
-    ]),
+    pullRequestLabels: [
+      { id: 1, name: 'bug', color: 'f00000' },
+      { id: 2, name: 'enhancement', color: '008000' }
+    ],
     isLoading: true
   }
 };

@@ -1,5 +1,5 @@
 import { Component, computed, input } from '@angular/core';
-import { PullRequest, PullRequestLabel } from '@app/core/modules/openapi';
+import { PullRequestInfo, LabelInfo } from '@app/core/modules/openapi';
 import { NgIcon } from '@ng-icons/core';
 import { octCheck, octComment, octFileDiff, octGitPullRequest, octGitPullRequestClosed, octX } from '@ng-icons/octicons';
 import { HlmCardModule } from '@spartan-ng/ui-card-helm';
@@ -28,11 +28,11 @@ export class IssueCardComponent {
   number = input<number>();
   additions = input<number>();
   deletions = input<number>();
-  url = input<string>();
+  htmlUrl = input<string>();
   repositoryName = input<string>();
   createdAt = input<string>();
-  state = input<PullRequest.StateEnum>();
-  pullRequestLabels = input<Set<PullRequestLabel>>();
+  state = input<PullRequestInfo.StateEnum>();
+  pullRequestLabels = input<Array<LabelInfo>>();
 
   displayCreated = computed(() => dayjs(this.createdAt()));
   displayTitle = computed(() => (this.title() ?? '').replace(/`([^`]+)`/g, '<code class="textCode">$1</code>'));

@@ -10,15 +10,9 @@ import { HlmButtonModule } from '@spartan-ng/ui-button-helm';
 import { LucideAngularModule } from 'lucide-angular';
 import dayjs from 'dayjs';
 import advancedFormat from 'dayjs/plugin/advancedFormat';
+import { RepositoryInfo, UserInfo } from '@app/core/modules/openapi';
 
 dayjs.extend(advancedFormat);
-
-type UserHeaderProps = {
-  avatarUrl: string;
-  login: string;
-  firstContribution: string;
-  repositories: Set<string>;
-};
 
 const repoImages: { [key: string]: string } = {
   Hephaestus: 'https://github.com/ls1intum/Hephaestus/raw/refs/heads/develop/docs/images/hammer.svg',
@@ -46,11 +40,13 @@ export class UserHeaderComponent {
   protected octClockFill = octClockFill;
 
   isLoading = input(false);
-  userData = input<UserHeaderProps>();
+  user = input<UserInfo>();
+  firstContribution = input<string>();
+  contributedRepositories = input<RepositoryInfo[]>();
 
   displayFirstContribution = computed(() => {
-    if (this.userData()?.firstContribution) {
-      return dayjs(this.userData()?.firstContribution).format('Do [of] MMMM YYYY');
+    if (this.firstContribution()) {
+      return dayjs(this.firstContribution()).format('Do [of] MMMM YYYY');
     }
     return null;
   });

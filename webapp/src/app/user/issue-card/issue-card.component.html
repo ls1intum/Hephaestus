@@ -1,4 +1,4 @@
-<a hlmCard variant="profile" [class]="computedClass()" [href]="url()" target="_blank" rel="noopener noreferrer">
+<a hlmCard variant="profile" [class]="computedClass()" [href]="htmlUrl()" target="_blank" rel="noopener noreferrer">
   <div hlmCardContent variant="profile">
     <div class="flex justify-between items-center text-sm text-github-muted-foreground">
       <span class="font-medium flex justify-center items-center space-x-1">
@@ -37,7 +37,7 @@
   @if (!isLoading()) {
     <div hlmCardFooter class="flex flex-wrap gap-2 p-0 space-x-0">
       @for (label of pullRequestLabels(); track label.name) {
-        @let labelColors = hexToRgb(label.color ?? 'FFFFFF');
+        @let labelColors = hexToRgb(label.color);
         <span
           class="px-2 py-0.5 rounded-[2rem] text-xs font-medium dark:border gh-label"
           [style.--label-r]="labelColors.r"
