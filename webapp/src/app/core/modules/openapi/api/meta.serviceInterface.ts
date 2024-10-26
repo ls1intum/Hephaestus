@@ -13,7 +13,7 @@ import { HttpHeaders }                                       from '@angular/comm
 
 import { Observable }                                        from 'rxjs';
 
-import { MetaDataDTO } from '../model/models';
+import { MetaData } from '../model/models';
 
 
 import { Configuration }                                     from '../configuration';
@@ -28,6 +28,6 @@ export interface MetaServiceInterface {
      * 
      * 
      */
-    getMetaData(extraHttpRequestParams?: any): Observable<MetaDataDTO>;
+    getMetaData(extraHttpRequestParams?: any): Observable<MetaData>;
 
 }

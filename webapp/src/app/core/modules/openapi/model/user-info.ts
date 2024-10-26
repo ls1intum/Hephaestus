@@ -11,8 +11,11 @@
  */
 
 
-export interface PullRequestLabel { 
-    name?: string;
-    color?: string;
+export interface UserInfo { 
+    id: number;
+    login: string;
+    avatarUrl: string;
+    name: string;
+    htmlUrl: string;
 }
 

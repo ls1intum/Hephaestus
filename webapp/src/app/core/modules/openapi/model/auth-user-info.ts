@@ -11,10 +11,8 @@
  */
 
 
-export interface RepositoryDTO { 
-    name: string;
-    nameWithOwner: string;
-    description?: string;
-    url: string;
+export interface AuthUserInfo { 
+    name?: string;
+    roles?: Array<string>;
 }
 

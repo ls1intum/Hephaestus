@@ -9,27 +9,18 @@
  * https://openapi-generator.tech
  * Do not edit the class manually.
  */
-import { PullRequestReviewDTO } from './pull-request-review-dto';
+import { UserInfo } from './user-info';
 
 
 export interface LeaderboardEntry { 
-    githubName?: string;
-    avatarUrl?: string;
-    name?: string;
-    type?: LeaderboardEntry.TypeEnum;
-    score?: number;
-    rank?: number;
-    numberOfReviewedPRs?: number;
-    changesRequested?: Array<PullRequestReviewDTO>;
-    approvals?: Array<PullRequestReviewDTO>;
-    comments?: Array<PullRequestReviewDTO>;
+    rank: number;
+    score: number;
+    user: UserInfo;
+    numberOfReviewedPRs: number;
+    numberOfApprovals: number;
+    numberOfChangeRequests: number;
+    numberOfComments: number;
+    numberOfUnknowns: number;
+    numberOfCodeComments: number;
 }
-export namespace LeaderboardEntry {
-    export type TypeEnum = 'USER' | 'BOT';
-    export const TypeEnum = {
-        User: 'USER' as TypeEnum,
-        Bot: 'BOT' as TypeEnum
-    };
-}
-
 

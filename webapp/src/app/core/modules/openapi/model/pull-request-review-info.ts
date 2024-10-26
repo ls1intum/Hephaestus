@@ -9,25 +9,27 @@
  * https://openapi-generator.tech
  * Do not edit the class manually.
  */
-import { PullRequestDTO } from './pull-request-dto';
+import { PullRequestBaseInfo } from './pull-request-base-info';
+import { UserInfo } from './user-info';
 
 
-export interface PullRequestReviewDTO { 
+export interface PullRequestReviewInfo { 
     id: number;
-    createdAt: string;
-    updatedAt: string;
-    submittedAt: string;
-    state: PullRequestReviewDTO.StateEnum;
-    url?: string;
-    pullRequest?: PullRequestDTO;
+    isDismissed: boolean;
+    state: PullRequestReviewInfo.StateEnum;
+    codeComments: number;
+    author?: UserInfo;
+    pullRequest?: PullRequestBaseInfo;
+    htmlUrl: string;
+    submittedAt?: string;
 }
-export namespace PullRequestReviewDTO {
-    export type StateEnum = 'COMMENTED' | 'APPROVED' | 'CHANGES_REQUESTED' | 'DISMISSED';
+export namespace PullRequestReviewInfo {
+    export type StateEnum = 'COMMENTED' | 'APPROVED' | 'CHANGES_REQUESTED' | 'UNKNOWN';
     export const StateEnum = {
         Commented: 'COMMENTED' as StateEnum,
         Approved: 'APPROVED' as StateEnum,
         ChangesRequested: 'CHANGES_REQUESTED' as StateEnum,
-        Dismissed: 'DISMISSED' as StateEnum
+        Unknown: 'UNKNOWN' as StateEnum
     };
 }
 

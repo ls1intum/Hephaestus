@@ -11,7 +11,9 @@
  */
 
 
-export interface MetaDataDTO { 
-    repositoriesToMonitor?: Array<string>;
+export interface LabelInfo { 
+    id: number;
+    name: string;
+    color: string;
 }
 

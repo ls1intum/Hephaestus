@@ -9,17 +9,13 @@
  * https://openapi-generator.tech
  * Do not edit the class manually.
  */
-import { PullRequestReview } from './pull-request-review';
-import { User } from './user';
 
 
-export interface PullRequestReviewComment { 
-    id?: number;
-    createdAt?: string;
-    updatedAt?: string;
-    body?: string;
-    author?: User;
-    review?: PullRequestReview;
-    commit: string;
+export interface RepositoryInfo { 
+    id: number;
+    name: string;
+    nameWithOwner: string;
+    description?: string;
+    htmlUrl: string;
 }
 

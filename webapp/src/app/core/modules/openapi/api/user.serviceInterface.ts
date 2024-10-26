@@ -13,9 +13,7 @@ import { HttpHeaders }                                       from '@angular/comm
 
 import { Observable }                                        from 'rxjs';
 
-import { User } from '../model/models';
-import { UserDTO } from '../model/models';
-import { UserProfileDTO } from '../model/models';
+import { UserProfile } from '../model/models';
 
 
 import { Configuration }                                     from '../configuration';
@@ -31,20 +29,6 @@ export interface UserServiceInterface {
      * 
      * @param login 
      */
-    getFullUser(login: string, extraHttpRequestParams?: any): Observable<User>;
-
-    /**
-     * 
-     * 
-     * @param login 
-     */
-    getUser(login: string, extraHttpRequestParams?: any): Observable<UserDTO>;
-
-    /**
-     * 
-     * 
-     * @param login 
-     */
-    getUserProfile(login: string, extraHttpRequestParams?: any): Observable<UserProfileDTO>;
+    getUserProfile(login: string, extraHttpRequestParams?: any): Observable<UserProfile>;
 
 }
