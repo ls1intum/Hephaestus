@@ -13,8 +13,6 @@ import org.springframework.stereotype.Repository;
 @Repository
 public interface PullRequestRepository extends JpaRepository<PullRequest, Long> {
 
-    Set<PullRequest> findByAuthor_Login(String authorLogin);
-
     @Query("""
             SELECT MIN(p.createdAt)
             FROM PullRequest p

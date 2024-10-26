@@ -12,8 +12,6 @@ import org.springframework.stereotype.Repository;
 @Repository
 public interface PullRequestReviewRepository extends JpaRepository<PullRequestReview, Long> {
 
-    Optional<PullRequestReview> findByAuthor_Login(String authorLogin);
-
     @Query("""
             SELECT prr
             FROM PullRequestReview prr
