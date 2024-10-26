@@ -1,11 +1,13 @@
 package de.tum.in.www1.hephaestus.syncing;
 
 import java.time.OffsetDateTime;
-import java.util.Date;
 import java.util.Optional;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
+import jakarta.transaction.Transactional;
 
 import de.tum.in.www1.hephaestus.gitprovider.issue.github.GitHubIssueSyncService;
 import de.tum.in.www1.hephaestus.gitprovider.issuecomment.github.GitHubIssueCommentSyncService;
@@ -20,6 +22,8 @@ import de.tum.in.www1.hephaestus.gitprovider.user.github.GitHubUserSyncService;
 @Service
 public class GitHubDataSyncService {
 
+    private static final Logger logger = LoggerFactory.getLogger(GitHubDataSyncService.class);
+
     @Value("${github.authToken:null}")
     private String ghAuthToken;
 
@@ -28,6 +32,9 @@ public class GitHubDataSyncService {
 
     @Value("${monitoring.timeframe}")
     private int timeframe;
+
+    @Value("${monitoring.runOnStartupCooldownInMinutes}")
+    private int runOnStartupCooldownInMinutes;
 
     private final DataSyncStatusRepository dataSyncStatusRepository;
     private final GitHubUserSyncService userSyncService;
@@ -63,15 +70,22 @@ public class GitHubDataSyncService {
         this.pullRequestReviewCommentSyncService = pullRequestReviewCommentSyncService;
     }
 
+    @Transactional
     public void syncData() {
         var cutoffDate = OffsetDateTime.now().minusDays(timeframe);
         
         // Get last sync time
-        var lastSync = dataSyncStatusRepository.findLastByOrderByStartTimeDesc();
+        var lastSync = dataSyncStatusRepository.findTopByOrderByStartTimeDesc();
         if (lastSync.isPresent()) {
             var lastSyncTime = lastSync.get().getStartTime();
             cutoffDate = lastSyncTime.isAfter(cutoffDate) ? lastSyncTime : cutoffDate;
         } 
+
+        var cooldownTime = OffsetDateTime.now().minusMinutes(runOnStartupCooldownInMinutes);
+        if (lastSync.isPresent() && lastSync.get().getStartTime().isAfter(cooldownTime)) {
+            logger.info("Skipping sync, last sync was less than {} minutes ago", runOnStartupCooldownInMinutes);
+            return;
+        }
 
         // Start new sync
         var startTime = OffsetDateTime.now();
