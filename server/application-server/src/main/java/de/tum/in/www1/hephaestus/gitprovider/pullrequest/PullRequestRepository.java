@@ -23,10 +23,10 @@ public interface PullRequestRepository extends JpaRepository<PullRequest, Long> 
     @Query("""
             SELECT p
             FROM PullRequest p
-            JOIN FETCH p.labels
+            LEFT JOIN FETCH p.labels
             JOIN FETCH p.author
-            JOIN FETCH p.assignees
-            JOIN FETCH p.repository
+            LEFT JOIN FETCH p.assignees
+            LEFT JOIN FETCH p.repository
             WHERE (p.author.login = :assigneeLogin OR :assigneeLogin IN (SELECT u.login FROM p.assignees u)) AND p.state IN :states
             ORDER BY p.createdAt DESC
             """)

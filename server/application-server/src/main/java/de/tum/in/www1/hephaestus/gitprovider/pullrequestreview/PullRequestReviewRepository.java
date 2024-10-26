@@ -16,9 +16,9 @@ public interface PullRequestReviewRepository extends JpaRepository<PullRequestRe
             SELECT prr
             FROM PullRequestReview prr
             JOIN FETCH prr.author
-            JOIN FETCH prr.pullRequest
-            JOIN FETCH prr.pullRequest.repository
-            JOIN FETCH prr.comments
+            LEFT JOIN FETCH prr.pullRequest
+            LEFT JOIN FETCH prr.pullRequest.repository
+            LEFT JOIN FETCH prr.comments
             WHERE prr.author.login = :authorLogin AND prr.submittedAt >= :activitySince
             ORDER BY prr.submittedAt DESC
             """)
@@ -30,9 +30,9 @@ public interface PullRequestReviewRepository extends JpaRepository<PullRequestRe
             SELECT prr
             FROM PullRequestReview prr
             JOIN FETCH prr.author
-            JOIN FETCH prr.pullRequest
-            JOIN FETCH prr.pullRequest.repository
-            JOIN FETCH prr.comments
+            LEFT JOIN FETCH prr.pullRequest
+            LEFT JOIN FETCH prr.pullRequest.repository
+            LEFT JOIN FETCH prr.comments
             WHERE 
                 prr.submittedAt BETWEEN :after AND :before
                 AND (:repository IS NULL OR prr.pullRequest.repository.nameWithOwner = :repository)
