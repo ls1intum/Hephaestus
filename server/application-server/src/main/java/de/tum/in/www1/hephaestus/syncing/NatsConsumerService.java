@@ -19,6 +19,7 @@ import io.nats.client.api.DeliverPolicy;
 import org.springframework.stereotype.Service;
 import org.springframework.boot.context.event.ApplicationReadyEvent;
 import org.springframework.context.event.EventListener;
+import org.springframework.core.annotation.Order;
 import org.kohsuke.github.GHEvent;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -27,6 +28,7 @@ import org.springframework.beans.factory.annotation.Value;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubMessageHandler;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubMessageHandlerRegistry;
 
+@Order(value = 1)
 @Service
 public class NatsConsumerService {
 

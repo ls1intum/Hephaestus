@@ -66,6 +66,10 @@ public class GitHubIssueCommentSyncService {
      */
     public void syncIssueCommentsOfIssue(GHIssue ghIssue, Optional<OffsetDateTime> since) {
         var builder = ghIssue.queryComments();
+        if (ghIssue.isPullRequest()) {
+            return;
+        }
+
         since.ifPresent(date -> builder.since(Date.from(date.toInstant())));
         builder.list().withPageSize(100).forEach(this::processIssueComment);
     }
