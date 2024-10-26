@@ -4,8 +4,9 @@ import java.io.IOException;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Optional;
-import java.util.Date;
 import java.util.ArrayList;
+import java.util.Date;
+import java.time.OffsetDateTime;
 
 import org.kohsuke.github.GHIssue;
 import org.kohsuke.github.GHIssueQueryBuilder;
@@ -70,7 +71,7 @@ public class GitHubIssueSyncService {
      * @param since        An optional date to filter issues by their last update.
      * @return A list of successfully fetched GitHub issues.
      */
-    public List<GHIssue> syncIssuesOfAllRepositories(List<GHRepository> repositories, Optional<Date> since) {
+    public List<GHIssue> syncIssuesOfAllRepositories(List<GHRepository> repositories, Optional<OffsetDateTime> since) {
         return repositories.stream()
                 .map(repository -> syncIssuesOfRepository(repository, since))
                 .flatMap(List::stream)
@@ -84,9 +85,9 @@ public class GitHubIssueSyncService {
      * @param since      An optional date to filter issues by their last update.
      * @return A list of successfully fetched GitHub issues.
      */
-    public List<GHIssue> syncIssuesOfRepository(GHRepository repository, Optional<Date> since) {
+    public List<GHIssue> syncIssuesOfRepository(GHRepository repository, Optional<OffsetDateTime> since) {
         GHIssueQueryBuilder builder = repository.queryIssues().pageSize(100).state(GHIssueState.ALL);
-        since.ifPresent(sinceDate -> builder.since(sinceDate));
+        since.ifPresent(sinceDate -> builder.since(Date.from(sinceDate.toInstant())));
 
         try {
             var issues = builder.list().toList();

@@ -34,11 +34,8 @@
 	</properties>
 	<repositories>
 		<repository>
-			<id>github</id>
-			<url>https://maven.pkg.github.com/FelixTJDietrich/github-api</url>
-			<snapshots>
-				<enabled>true</enabled>
-			</snapshots>
+		    <id>jitpack.io</id>
+		    <url>https://jitpack.io</url>
 		</repository>
 	</repositories>
 	<dependencies>
@@ -119,9 +116,9 @@
 			<version>0.15.0</version>
 		</dependency>
 		<dependency>
-			<groupId>org.kohsuke</groupId>
+			<groupId>com.github.FelixTJDietrich</groupId>
 			<artifactId>github-api</artifactId>
-			<version>2.0-alpha-6-SNAPSHOT</version>
+			<version>2.0.5</version>
 		</dependency>
 		<dependency>
 			<groupId>io.hypersistence</groupId>

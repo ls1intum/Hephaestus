@@ -6,6 +6,7 @@ import java.util.List;
 import java.util.Optional;
 import java.util.ArrayList;
 import java.util.Date;
+import java.time.OffsetDateTime;
 
 import org.kohsuke.github.GHDirection;
 import org.kohsuke.github.GHIssueState;
@@ -75,7 +76,7 @@ public class GitHubPullRequestSyncService {
      *         processed
      */
     public List<GHPullRequest> syncPullRequestsOfAllRepositories(List<GHRepository> repositories,
-            Optional<Date> since) {
+            Optional<OffsetDateTime> since) {
         return repositories.stream()
                 .map(repository -> syncPullRequestsOfRepository(repository, since))
                 .flatMap(List::stream)
@@ -91,7 +92,7 @@ public class GitHubPullRequestSyncService {
      * @return a list of GitHub pull requests that were successfully fetched and
      *         processed
      */
-    public List<GHPullRequest> syncPullRequestsOfRepository(GHRepository repository, Optional<Date> since) {
+    public List<GHPullRequest> syncPullRequestsOfRepository(GHRepository repository, Optional<OffsetDateTime> since) {
         var iterator = repository.queryPullRequests()
                 .state(GHIssueState.ALL)
                 .sort(Sort.UPDATED)
@@ -100,13 +101,15 @@ public class GitHubPullRequestSyncService {
                 .withPageSize(100)
                 .iterator();
 
+        var sinceDate = since.map(date -> Date.from(date.toInstant()));
+        
         var pullRequests = new ArrayList<GHPullRequest>();
         while (iterator.hasNext()) {
             var ghPullRequests = iterator.nextPage();
             var keepPullRequests = ghPullRequests.stream()
                     .filter(pullRequest -> {
                         try {
-                            return since.isEmpty() || pullRequest.getUpdatedAt().after(since.get());
+                            return sinceDate.isEmpty() || pullRequest.getUpdatedAt().after(sinceDate.get());
                         } catch (IOException e) {
                             logger.error("Failed to filter pull request {}: {}", pullRequest.getId(), e.getMessage());
                             return false;

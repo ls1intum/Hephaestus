@@ -4,6 +4,7 @@ import java.io.IOException;
 import java.util.Optional;
 import java.util.Date;
 import java.util.List;
+import java.time.OffsetDateTime;
 
 import org.kohsuke.github.GHIssue;
 import org.kohsuke.github.GHIssueComment;
@@ -53,7 +54,7 @@ public class GitHubIssueCommentSyncService {
      * @param ghIssues The GitHub issues to sync the comments of.
      * @param since    Optional date to only fetch comments since this date.
      */
-    public void syncIssueCommentsOfAllIssues(List<GHIssue> ghIssues, Optional<Date> since) {
+    public void syncIssueCommentsOfAllIssues(List<GHIssue> ghIssues, Optional<OffsetDateTime> since) {
         ghIssues.stream().forEach(ghIssue -> syncIssueCommentsOfIssue(ghIssue, since));
     }
 
@@ -63,9 +64,9 @@ public class GitHubIssueCommentSyncService {
      * @param ghIssue The GitHub issue to sync the comments of.
      * @param since   Optional date to only fetch comments since this date.
      */
-    public void syncIssueCommentsOfIssue(GHIssue ghIssue, Optional<Date> since) {
+    public void syncIssueCommentsOfIssue(GHIssue ghIssue, Optional<OffsetDateTime> since) {
         var builder = ghIssue.queryComments();
-        since.ifPresent(date -> builder.since(date));
+        since.ifPresent(date -> builder.since(Date.from(date.toInstant())));
         builder.list().withPageSize(100).forEach(this::processIssueComment);
     }
 

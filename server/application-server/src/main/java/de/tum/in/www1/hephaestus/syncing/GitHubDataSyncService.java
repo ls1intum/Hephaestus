@@ -1,7 +1,9 @@
 package de.tum.in.www1.hephaestus.syncing;
 
+import java.time.OffsetDateTime;
 import java.util.Date;
 import java.util.Optional;
+
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
@@ -27,6 +29,7 @@ public class GitHubDataSyncService {
     @Value("${monitoring.timeframe}")
     private int timeframe;
 
+    private final DataSyncStatusRepository dataSyncStatusRepository;
     private final GitHubUserSyncService userSyncService;
     private final GitHubRepositorySyncService repositorySyncService;
     private final GitHubLabelSyncService labelSyncService;
@@ -38,6 +41,7 @@ public class GitHubDataSyncService {
     private final GitHubPullRequestReviewCommentSyncService pullRequestReviewCommentSyncService;
 
     public GitHubDataSyncService(
+            DataSyncStatusRepository dataSyncStatusRepository,
             GitHubUserSyncService userSyncService,
             GitHubRepositorySyncService repositorySyncService,
             GitHubLabelSyncService labelSyncService,
@@ -47,6 +51,7 @@ public class GitHubDataSyncService {
             GitHubPullRequestSyncService pullRequestSyncService,
             GitHubPullRequestReviewSyncService pullRequestReviewSyncService,
             GitHubPullRequestReviewCommentSyncService pullRequestReviewCommentSyncService) {
+        this.dataSyncStatusRepository = dataSyncStatusRepository;
         this.userSyncService = userSyncService;
         this.repositorySyncService = repositorySyncService;
         this.labelSyncService = labelSyncService;
@@ -59,16 +64,34 @@ public class GitHubDataSyncService {
     }
 
     public void syncData() {
-        var cutoffDate = Optional.of(new Date(System.currentTimeMillis() - 1000 * 60 * 60 * 24 * timeframe));
+        var cutoffDate = OffsetDateTime.now().minusDays(timeframe);
+        
+        // Get last sync time
+        var lastSync = dataSyncStatusRepository.findLastByOrderByStartTimeDesc();
+        if (lastSync.isPresent()) {
+            var lastSyncTime = lastSync.get().getStartTime();
+            cutoffDate = lastSyncTime.isAfter(cutoffDate) ? lastSyncTime : cutoffDate;
+        } 
+
+        // Start new sync
+        var startTime = OffsetDateTime.now();
 
         var repositories = repositorySyncService.syncAllMonitoredRepositories();
         labelSyncService.syncLabelsOfAllRepositories(repositories);
         milestoneSyncService.syncMilestonesOfAllRepositories(repositories);
-        var issues = issueSyncService.syncIssuesOfAllRepositories(repositories, cutoffDate); // also contains PRs as issues
-        issueCommentSyncService.syncIssueCommentsOfAllIssues(issues, cutoffDate);
-        var pullRequests = pullRequestSyncService.syncPullRequestsOfAllRepositories(repositories, cutoffDate);
+        var issues = issueSyncService.syncIssuesOfAllRepositories(repositories, Optional.of(cutoffDate)); // also contains PRs as issues
+        issueCommentSyncService.syncIssueCommentsOfAllIssues(issues, Optional.of(cutoffDate));
+        var pullRequests = pullRequestSyncService.syncPullRequestsOfAllRepositories(repositories, Optional.of(cutoffDate));
         pullRequestReviewSyncService.syncReviewsOfAllPullRequests(pullRequests);
         pullRequestReviewCommentSyncService.syncReviewCommentsOfAllPullRequests(pullRequests);
         userSyncService.syncAllExistingUsers();
+
+        var endTime = OffsetDateTime.now();
+
+        // Store successful sync status
+        var syncStatus = new DataSyncStatus();
+        syncStatus.setStartTime(startTime);
+        syncStatus.setEndTime(endTime);
+        dataSyncStatusRepository.save(syncStatus);
     }
 }
