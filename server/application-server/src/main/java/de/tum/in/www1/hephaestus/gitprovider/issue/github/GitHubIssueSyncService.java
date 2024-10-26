@@ -114,7 +114,7 @@ public class GitHubIssueSyncService {
         var result = issueRepository.findById(ghIssue.getId())
                 .map(issue -> {
                     try {
-                        if (issue.getUpdatedAt()
+                        if (issue.getUpdatedAt() == null || issue.getUpdatedAt()
                                 .isBefore(DateUtil.convertToOffsetDateTime(ghIssue.getUpdatedAt()))) {
                             return issueConverter.update(ghIssue, issue);
                         }

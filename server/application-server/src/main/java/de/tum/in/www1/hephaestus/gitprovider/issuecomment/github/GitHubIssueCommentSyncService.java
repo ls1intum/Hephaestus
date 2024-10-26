@@ -88,7 +88,7 @@ public class GitHubIssueCommentSyncService {
         var result = issueCommentRepository.findById(ghIssueComment.getId())
                 .map(issueComment -> {
                     try {
-                        if (issueComment.getUpdatedAt()
+                        if (issueComment.getUpdatedAt() == null || issueComment.getUpdatedAt()
                                 .isBefore(
                                         DateUtil.convertToOffsetDateTime(ghIssueComment.getUpdatedAt()))) {
                             return issueCommentConverter.update(ghIssueComment,

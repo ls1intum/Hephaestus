@@ -91,7 +91,7 @@ public class GitHubPullRequestReviewCommentSyncService {
         var result = pullRequestReviewCommentRepository.findById(ghPullRequestReviewComment.getId())
                 .map(pullRequestReviewComment -> {
                     try {
-                        if (pullRequestReviewComment.getUpdatedAt()
+                        if (pullRequestReviewComment.getUpdatedAt() == null || pullRequestReviewComment.getUpdatedAt()
                                 .isBefore(
                                         DateUtil.convertToOffsetDateTime(ghPullRequestReviewComment.getUpdatedAt()))) {
                             return pullRequestReviewCommentConverter.update(ghPullRequestReviewComment,

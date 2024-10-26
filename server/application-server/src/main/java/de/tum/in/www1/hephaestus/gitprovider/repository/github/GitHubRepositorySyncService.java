@@ -112,7 +112,7 @@ public class GitHubRepositorySyncService {
         var result = repositoryRepository.findById(ghRepository.getId())
                 .map(repository -> {
                     try {
-                        if (repository.getUpdatedAt()
+                        if (repository.getUpdatedAt() == null || repository.getUpdatedAt()
                                 .isBefore(DateUtil.convertToOffsetDateTime(ghRepository.getUpdatedAt()))) {
                             return repositoryConverter.update(ghRepository, repository);
                         }

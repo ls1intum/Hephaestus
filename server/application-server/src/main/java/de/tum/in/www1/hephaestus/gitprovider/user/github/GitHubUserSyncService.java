@@ -69,7 +69,7 @@ public class GitHubUserSyncService {
         var result = userRepository.findById(ghUser.getId())
                 .map(user -> {
                     try {
-                        if (user.getUpdatedAt()
+                        if (user.getUpdatedAt() == null || user.getUpdatedAt()
                                 .isBefore(DateUtil.convertToOffsetDateTime(ghUser.getUpdatedAt()))) {
                             return userConverter.update(ghUser, user);
                         }

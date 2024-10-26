@@ -143,7 +143,7 @@ public class GitHubPullRequestSyncService {
         var result = pullRequestRepository.findById(ghPullRequest.getId())
                 .map(pullRequest -> {
                     try {
-                        if (pullRequest.getUpdatedAt()
+                        if (pullRequest.getUpdatedAt() == null || pullRequest.getUpdatedAt()
                                 .isBefore(DateUtil.convertToOffsetDateTime(ghPullRequest.getUpdatedAt()))) {
                             return pullRequestConverter.update(ghPullRequest, pullRequest);
                         }
