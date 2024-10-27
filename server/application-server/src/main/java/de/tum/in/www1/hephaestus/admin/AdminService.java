@@ -15,7 +15,7 @@ import org.springframework.context.event.EventListener;
 import org.springframework.stereotype.Service;
 
 import de.tum.in.www1.hephaestus.gitprovider.team.Team;
-import de.tum.in.www1.hephaestus.gitprovider.team.TeamDTO;
+import de.tum.in.www1.hephaestus.gitprovider.team.TeamInfoDTO;
 import de.tum.in.www1.hephaestus.gitprovider.team.TeamService;
 import de.tum.in.www1.hephaestus.gitprovider.user.User;
 import de.tum.in.www1.hephaestus.gitprovider.user.UserInfoDTO;
@@ -56,7 +56,7 @@ public class AdminService {
             }
         }
         // make sure teams are initialized
-        List<TeamDTO> teams = teamService.getAllTeams();
+        List<TeamInfoDTO> teams = teamService.getAllTeams();
         if (teams.isEmpty()) {
             logger.info("No teams found, creating default teams");
             teamService.createDefaultTeams();
@@ -117,18 +117,18 @@ public class AdminService {
         return Optional.of(UserInfoDTO.fromUser(user));
     }
 
-    public TeamDTO createTeam(String name, String color) {
+    public TeamInfoDTO createTeam(String name, String color) {
         logger.info("Creating team with name: " + name + " and color: " + color);
-        return TeamDTO.fromTeam(teamService.createTeam(name, color));
+        return TeamInfoDTO.fromTeam(teamService.createTeam(name, color));
     }
 
-    public Optional<TeamDTO> deleteTeam(Long teamId) {
+    public Optional<TeamInfoDTO> deleteTeam(Long teamId) {
         logger.info("Deleting team with ID: " + teamId);
         Optional<Team> optionalTeam = teamService.getTeam(teamId);
         if (optionalTeam.isEmpty()) {
             return Optional.empty();
         }
         teamService.deleteTeam(teamId);
-        return Optional.of(TeamDTO.fromTeam(optionalTeam.get()));
+        return Optional.of(TeamInfoDTO.fromTeam(optionalTeam.get()));
     }
 }

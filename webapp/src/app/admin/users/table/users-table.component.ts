@@ -16,13 +16,13 @@ import { BrnSelectModule } from '@spartan-ng/ui-select-brain';
 import { HlmSelectModule } from '@spartan-ng/ui-select-helm';
 import { HlmSkeletonModule } from '@spartan-ng/ui-skeleton-helm';
 import { debounceTime, map } from 'rxjs';
-import { AdminService, TeamDTO, UserTeamsDTO } from '@app/core/modules/openapi';
+import { AdminService, TeamInfo, UserTeams } from '@app/core/modules/openapi';
 import { RouterLink } from '@angular/router';
 import { GithubLabelComponent } from '@app/ui/github-label/github-label.component';
 import { injectQueryClient } from '@tanstack/angular-query-experimental';
 import { octNoEntry } from '@ng-icons/octicons';
 
-const LOADING_DATA: UserTeamsDTO[] = [
+const LOADING_DATA: UserTeams[] = [
   {
     id: 1,
     login: 'test1',
@@ -51,7 +51,7 @@ const LOADING_DATA: UserTeamsDTO[] = [
   }
 ];
 
-const LOADING_TEAMS: TeamDTO[] = [
+const LOADING_TEAMS: TeamInfo[] = [
   {
     id: 1,
     name: 'Team A',
@@ -98,7 +98,7 @@ export class AdminUsersTableComponent {
   protected octNoEntry = octNoEntry;
 
   isLoading = input(false);
-  userData = input.required<UserTeamsDTO[] | undefined>();
+  userData = input.required<UserTeams[] | undefined>();
 
   _users = computed(() => this.userData() ?? LOADING_DATA);
   protected readonly _rawFilterInput = signal('');
@@ -109,8 +109,8 @@ export class AdminUsersTableComponent {
   protected readonly _availablePageSizes = [5, 10, 20, 10000];
   protected readonly _pageSize = signal(this._availablePageSizes[0]);
 
-  private readonly _selectionModel = new SelectionModel<UserTeamsDTO>(true);
-  protected readonly _isUserSelected = (user: UserTeamsDTO) => this._selectionModel.isSelected(user);
+  private readonly _selectionModel = new SelectionModel<UserTeams>(true);
+  protected readonly _isUserSelected = (user: UserTeams) => this._selectionModel.isSelected(user);
   protected readonly _selected = toSignal(this._selectionModel.changed.pipe(map((change) => change.source.selected)), {
     initialValue: []
   });
@@ -147,7 +147,7 @@ export class AdminUsersTableComponent {
     return noneSelected ? false : allSelectedOrIndeterminate;
   });
 
-  protected readonly _trackBy: TrackByFunction<UserTeamsDTO> = (_: number, u: UserTeamsDTO) => u.id;
+  protected readonly _trackBy: TrackByFunction<UserTeams> = (_: number, u: UserTeams) => u.id;
   protected readonly _totalElements = computed(() => this._filteredLogins().length);
   protected readonly _onStateChange = ({ startIndex, endIndex }: PaginatorState) => this._displayedIndices.set({ start: startIndex, end: endIndex });
 
@@ -157,7 +157,7 @@ export class AdminUsersTableComponent {
     effect(() => this._loginFilter.set(this._debouncedFilter() ?? ''), { allowSignalWrites: true });
   }
 
-  protected toggleUser(user: UserTeamsDTO) {
+  protected toggleUser(user: UserTeams) {
     this._selectionModel.toggle(user);
   }
 
@@ -181,15 +181,15 @@ export class AdminUsersTableComponent {
     }
   }
 
-  protected copyLogin(element: UserTeamsDTO) {
+  protected copyLogin(element: UserTeams) {
     console.log('Copying login', element);
     navigator.clipboard.writeText(element.login!);
   }
 
   // handle team add / remove
-  teams = input<TeamDTO[] | undefined>();
+  teams = input<TeamInfo[] | undefined>();
   protected readonly _availableTeams = computed(() => this.teams() ?? LOADING_TEAMS);
-  protected readonly _selectedTeam = signal<TeamDTO | undefined>(undefined);
+  protected readonly _selectedTeam = signal<TeamInfo | undefined>(undefined);
 
   protected addTeamToSelected() {
     for (const user of this._selected()) {

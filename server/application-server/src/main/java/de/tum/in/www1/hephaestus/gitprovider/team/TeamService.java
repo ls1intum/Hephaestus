@@ -27,8 +27,8 @@ public class TeamService {
         return teamRepository.findByName(name);
     }
 
-    public List<TeamDTO> getAllTeams() {
-        List<TeamDTO> teams = teamRepository.findAll().stream().map(TeamDTO::fromTeam).toList();
+    public List<TeamInfoDTO> getAllTeams() {
+        List<TeamInfoDTO> teams = teamRepository.findAll().stream().map(TeamInfoDTO::fromTeam).toList();
         logger.info("Getting all (" + teams.size() + ") teams");
         return teams;
     }

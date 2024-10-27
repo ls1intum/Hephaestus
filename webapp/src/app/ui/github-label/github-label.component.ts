@@ -1,5 +1,5 @@
 import { Component, computed, input } from '@angular/core';
-import type { PullRequestLabel } from '@app/core/modules/openapi';
+import type { LabelInfo } from '@app/core/modules/openapi';
 import { HlmSkeletonModule } from '@spartan-ng/ui-skeleton-helm';
 
 @Component({
@@ -27,11 +27,14 @@ import { HlmSkeletonModule } from '@spartan-ng/ui-skeleton-helm';
 })
 export class GithubLabelComponent {
   isLoading = input(false);
-  label = input.required<PullRequestLabel>();
+  label = input.required<LabelInfo>();
 
   protected colors = computed(() => this.hexToRgb(this.label().color ?? 'FFFFFF'));
 
   hexToRgb(hex: string) {
+    if (hex.charAt(0) === '#') {
+      hex = hex.slice(1);
+    }
     const bigint = parseInt(hex, 16);
     const r = (bigint >> 16) & 255;
     const g = (bigint >> 8) & 255;

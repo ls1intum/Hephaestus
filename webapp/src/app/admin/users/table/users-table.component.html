@@ -76,7 +76,7 @@
     <hlm-th *brnHeaderDef>Teams</hlm-th>
     <hlm-td class="font-medium tabular-nums flex gap-4" *brnCellDef="let element">
       @for (team of element.teams; track team) {
-        @let label = { name: team.name, color: team.color ?? '69feff' };
+        @let label = { id: team.id, name: team.name, color: team.color ?? '69feff' };
         <app-github-label [label]="label" [isLoading]="this.isLoading()" />
       }
     </hlm-td>

@@ -3,6 +3,7 @@ package de.tum.in.www1.hephaestus.admin;
 import java.util.List;
 import java.util.Set;
 
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.oauth2.core.oidc.StandardClaimNames;
@@ -16,7 +17,7 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
-import de.tum.in.www1.hephaestus.gitprovider.team.TeamDTO;
+import de.tum.in.www1.hephaestus.gitprovider.team.TeamInfoDTO;
 import de.tum.in.www1.hephaestus.gitprovider.user.UserInfoDTO;
 import de.tum.in.www1.hephaestus.gitprovider.user.UserTeamsDTO;
 
@@ -24,11 +25,8 @@ import de.tum.in.www1.hephaestus.gitprovider.user.UserTeamsDTO;
 @RequestMapping("/admin")
 public class AdminController {
 
-    private final AdminService adminService;
-
-    public AdminController(AdminService adminService) {
-        this.adminService = adminService;
-    }
+    @Autowired
+    private AdminService adminService;
 
     @GetMapping
     public String admin() {
@@ -46,9 +44,9 @@ public class AdminController {
     }
 
     @GetMapping("/config")
-    public ResponseEntity<AdminConfig> getConfig() {
+    public ResponseEntity<AdminConfigDTO> getConfig() {
         try {
-            return ResponseEntity.ok(adminService.getAdminConfig());
+            return ResponseEntity.ok(AdminConfigDTO.fromAdminConfig(adminService.getAdminConfig()));
         } catch (NoAdminConfigFoundException e) {
             return ResponseEntity.notFound().build();
         }
@@ -79,12 +77,12 @@ public class AdminController {
     }
 
     @PutMapping("/teams")
-    public ResponseEntity<TeamDTO> createTeam(@RequestBody TeamDTO team) {
+    public ResponseEntity<TeamInfoDTO> createTeam(@RequestBody TeamInfoDTO team) {
         return ResponseEntity.ok(adminService.createTeam(team.name(), team.color()));
     }
 
     @DeleteMapping("/teams/{teamId}")
-    public ResponseEntity<TeamDTO> deleteTeam(@PathVariable Long teamId) {
+    public ResponseEntity<TeamInfoDTO> deleteTeam(@PathVariable Long teamId) {
         return adminService.deleteTeam(teamId)
                 .map(ResponseEntity::ok)
                 .orElseGet(() -> ResponseEntity.notFound().build());

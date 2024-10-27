@@ -13,7 +13,7 @@ import de.tum.in.www1.hephaestus.gitprovider.milestone.MilestoneInfoDTO;
 import de.tum.in.www1.hephaestus.gitprovider.pullrequest.PullRequestInfoDTO;
 import de.tum.in.www1.hephaestus.gitprovider.pullrequestreview.PullRequestReviewInfoDTO;
 import de.tum.in.www1.hephaestus.gitprovider.repository.RepositoryInfoDTO;
-import de.tum.in.www1.hephaestus.gitprovider.team.TeamDTO;
+import de.tum.in.www1.hephaestus.gitprovider.team.TeamInfoDTO;
 import de.tum.in.www1.hephaestus.gitprovider.user.UserInfoDTO;
 import io.hypersistence.utils.hibernate.type.util.ClassImportIntegrator;
 
@@ -25,7 +25,7 @@ public class ClassImportIntegratorIntegratorProvider implements IntegratorProvid
                 @SuppressWarnings("rawtypes")
                 List<Class> classes = new ArrayList<>();
                 classes.add(UserInfoDTO.class);
-                classes.add(TeamDTO.class);
+                classes.add(TeamInfoDTO.class);
                 classes.add(IssueInfoDTO.class);
                 classes.add(LabelInfoDTO.class);
                 classes.add(MilestoneInfoDTO.class);

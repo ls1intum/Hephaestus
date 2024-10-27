@@ -1,0 +1,16 @@
+export * from './admin.service';
+import { AdminService } from './admin.service';
+export * from './admin.serviceInterface';
+export * from './leaderboard.service';
+import { LeaderboardService } from './leaderboard.service';
+export * from './leaderboard.serviceInterface';
+export * from './meta.service';
+import { MetaService } from './meta.service';
+export * from './meta.serviceInterface';
+export * from './team.service';
+import { TeamService } from './team.service';
+export * from './team.serviceInterface';
+export * from './user.service';
+import { UserService } from './user.service';
+export * from './user.serviceInterface';
+export const APIS = [AdminService, LeaderboardService, MetaService, TeamService, UserService];

@@ -17,12 +17,12 @@ import { HlmSelectModule } from '@spartan-ng/ui-select-helm';
 import { HlmSkeletonModule } from '@spartan-ng/ui-skeleton-helm';
 import { HlmCardModule } from '@spartan-ng/ui-card-helm';
 import { debounceTime, map } from 'rxjs';
-import { AdminService, TeamDTO } from '@app/core/modules/openapi';
+import { AdminService, TeamInfo } from '@app/core/modules/openapi';
 import { RouterLink } from '@angular/router';
 import { injectQueryClient } from '@tanstack/angular-query-experimental';
 import { octNoEntry } from '@ng-icons/octicons';
 
-const LOADING_TEAMS: TeamDTO[] = [
+const LOADING_TEAMS: TeamInfo[] = [
   {
     id: 1,
     name: 'Team A',
@@ -74,7 +74,7 @@ export class AdminTeamsTableComponent {
   protected octNoEntry = octNoEntry;
 
   isLoading = input(false);
-  teamData = input.required<TeamDTO[] | undefined>();
+  teamData = input.required<TeamInfo[] | undefined>();
 
   _teams = computed(() => this.teamData() ?? LOADING_TEAMS);
   protected readonly _rawFilterInput = signal('');
@@ -85,8 +85,8 @@ export class AdminTeamsTableComponent {
   protected readonly _availablePageSizes = [5, 10, 20, 10000];
   protected readonly _pageSize = signal(this._availablePageSizes[0]);
 
-  private readonly _selectionModel = new SelectionModel<TeamDTO>(true);
-  protected readonly _isUserSelected = (user: TeamDTO) => this._selectionModel.isSelected(user);
+  private readonly _selectionModel = new SelectionModel<TeamInfo>(true);
+  protected readonly _isUserSelected = (user: TeamInfo) => this._selectionModel.isSelected(user);
   protected readonly _selected = toSignal(this._selectionModel.changed.pipe(map((change) => change.source.selected)), {
     initialValue: []
   });
@@ -122,7 +122,7 @@ export class AdminTeamsTableComponent {
     return noneSelected ? false : allSelectedOrIndeterminate;
   });
 
-  protected readonly _trackBy: TrackByFunction<TeamDTO> = (_: number, u: TeamDTO) => u.id;
+  protected readonly _trackBy: TrackByFunction<TeamInfo> = (_: number, u: TeamInfo) => u.id;
   protected readonly _totalElements = computed(() => this._filteredNames().length);
   protected readonly _onStateChange = ({ startIndex, endIndex }: PaginatorState) => this._displayedIndices.set({ start: startIndex, end: endIndex });
 
@@ -132,7 +132,7 @@ export class AdminTeamsTableComponent {
     effect(() => this._nameFilter.set(this._debouncedFilter() ?? ''), { allowSignalWrites: true });
   }
 
-  protected toggleTeam(team: TeamDTO) {
+  protected toggleTeam(team: TeamInfo) {
     this._selectionModel.toggle(team);
   }
 
@@ -156,7 +156,7 @@ export class AdminTeamsTableComponent {
     }
   }
 
-  protected deleteTeam(team: TeamDTO) {
+  protected deleteTeam(team: TeamInfo) {
     if (this.isLoading()) {
       return;
     }
@@ -164,7 +164,7 @@ export class AdminTeamsTableComponent {
     this.invalidateTeams();
   }
 
-  protected copyName(element: TeamDTO) {
+  protected copyName(element: TeamInfo) {
     console.log('Copying name', element);
     navigator.clipboard.writeText(element.name!);
   }
@@ -179,7 +179,7 @@ export class AdminTeamsTableComponent {
     const newTeam = {
       name: this._newTeamName.value,
       color: this._newTeamColor.value
-    } as TeamDTO;
+    } as TeamInfo;
     this.adminService.createTeam(newTeam).subscribe({
       next: () => console.log('Team created'),
       error: (err) => console.error('Error creating team', err)
