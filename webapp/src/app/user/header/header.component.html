@@ -6,9 +6,9 @@
     </hlm-avatar>
   } @else {
     <hlm-avatar variant="extralarge" class="ring-2 ring-neutral-100 dark:ring-neutral-800">
-      <img [src]="userData()?.avatarUrl" [alt]="userData()?.login + '\'s avatar'" hlmAvatarImage />
+      <img [src]="user()?.avatarUrl" [alt]="user()?.login + '\'s avatar'" hlmAvatarImage />
       <span hlmAvatarFallback>
-        {{ userData()?.login?.slice(0, 2)?.toUpperCase() }}
+        {{ user()?.login?.slice(0, 2)?.toUpperCase() }}
       </span>
     </hlm-avatar>
   }
@@ -22,16 +22,12 @@
         <hlm-skeleton class="size-10" />
       </div>
     </div>
-  } @else {
+  }
+  @if (!isLoading() && user(); as user) {
     <div class="flex flex-col gap-1">
-      <h1 class="text-2xl md:text-3xl font-bold leading-6">{{ userData()?.login }}</h1>
-      <a
-        class="md:text-lg font-medium text-muted-foreground mb-1 hover:text-github-accent-foreground"
-        href="https://github.com/{{ userData()?.login }}"
-        target="_blank"
-        rel="noopener noreferrer"
-      >
-        github.com/{{ userData()?.login }}
+      <h1 class="text-2xl md:text-3xl font-bold leading-6">{{ user.name }}</h1>
+      <a class="md:text-lg font-medium text-muted-foreground mb-1 hover:text-github-accent-foreground" [href]="user.htmlUrl" target="_blank" rel="noopener noreferrer">
+        github.com/{{ user.login }}
       </a>
       @if (displayFirstContribution()) {
         <div class="flex items-center gap-2 text-muted-foreground font-medium text-sm md:text-base">
@@ -39,16 +35,18 @@
           Contributing since {{ displayFirstContribution() }}
         </div>
       }
-      <div class="flex items-center gap-2">
-        @for (repository of userData()?.repositories; track repository) {
-          <hlm-tooltip>
-            <a hlmBtn hlmTooltipTrigger class="size-10 bg-neutral-100 dark:bg-neutral-900/80 border border-input rounded-sm p-1" [aria-describedby]="repository">
-              <img [src]="getRepositoryImage(repository)" [alt]="repository" />
-            </a>
-            <span *brnTooltipContent>{{ repository }}</span>
-          </hlm-tooltip>
-        }
-      </div>
+      @if (contributedRepositories(); as contributedRepositories) {
+        <div class="flex items-center gap-2">
+          @for (repository of contributedRepositories; track repository) {
+            <hlm-tooltip>
+              <a hlmBtn hlmTooltipTrigger variant="outline" class="size-10 p-1" [aria-describedby]="repository.nameWithOwner" [href]="repository.htmlUrl">
+                <img [src]="getRepositoryImage(repository.nameWithOwner)" [alt]="repository" />
+              </a>
+              <span *brnTooltipContent>{{ repository.nameWithOwner }}</span>
+            </hlm-tooltip>
+          }
+        </div>
+      }
     </div>
   }
 </div>

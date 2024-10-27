@@ -1,6 +1,6 @@
 import { Component, inject } from '@angular/core';
 import { NgIconComponent } from '@ng-icons/core';
-import { PullRequestDTO, PullRequestReviewDTO, UserService } from 'app/core/modules/openapi';
+import { PullRequestInfo, PullRequestReviewInfo, UserService } from 'app/core/modules/openapi';
 import { HlmAvatarModule } from '@spartan-ng/ui-avatar-helm';
 import { HlmSkeletonModule } from '@spartan-ng/ui-skeleton-helm';
 import { ActivatedRoute } from '@angular/router';
@@ -48,8 +48,8 @@ export class UserProfileComponent {
     this.userLogin = this.route.snapshot.paramMap.get('id');
   }
 
-  skeletonReviews = this.genSkeletonArray<PullRequestReviewDTO>(3);
-  skeletonPullRequests = this.genSkeletonArray<PullRequestDTO>(2);
+  skeletonReviews = this.genSkeletonArray<PullRequestReviewInfo>(3);
+  skeletonPullRequests = this.genSkeletonArray<PullRequestInfo>(2);
 
   genSkeletonArray<T>(length: number): T[] {
     return Array.from({ length }, (_, i) => ({ id: i })) as T[];

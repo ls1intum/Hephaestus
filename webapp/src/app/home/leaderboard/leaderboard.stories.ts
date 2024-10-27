@@ -1,80 +1,92 @@
 import { argsToTemplate, type Meta, type StoryObj } from '@storybook/angular';
 import { LeaderboardComponent } from './leaderboard.component';
 import { LeaderboardEntry } from 'app/core/modules/openapi/model/leaderboard-entry';
-import { PullRequestReviewDTO } from 'app/core/modules/openapi/model/pull-request-review-dto';
-
-let reviewIdCounter = 1;
-
-const generateReviews = (count: number, state: PullRequestReviewDTO.StateEnum): PullRequestReviewDTO[] => {
-  return Array.from({ length: count }, () => ({
-    id: reviewIdCounter++,
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
-    submittedAt: new Date().toISOString(),
-    state
-  }));
-};
 
 const leaderboardEntries: LeaderboardEntry[] = [
   {
-    githubName: 'GODrums',
-    avatarUrl: 'https://avatars.githubusercontent.com/u/21990230?v=4',
-    type: LeaderboardEntry.TypeEnum.User,
-    name: 'Armin Stanitzok',
-    score: 100,
-    changesRequested: generateReviews(3, PullRequestReviewDTO.StateEnum.ChangesRequested),
-    approvals: generateReviews(5, PullRequestReviewDTO.StateEnum.Approved),
-    comments: generateReviews(1, PullRequestReviewDTO.StateEnum.Commented),
     rank: 1,
-    numberOfReviewedPRs: 10
+    score: 100,
+    user: {
+      id: 0,
+      login: 'GODrums',
+      avatarUrl: 'https://avatars.githubusercontent.com/u/21990230?v=4',
+      name: 'Armin Stanitzok',
+      htmlUrl: 'https://github.com/GODrums'
+    },
+    numberOfReviewedPRs: 18,
+    numberOfApprovals: 8,
+    numberOfChangeRequests: 7,
+    numberOfComments: 2,
+    numberOfUnknowns: 1,
+    numberOfCodeComments: 5
   },
   {
-    githubName: 'FelixTJDietrich',
-    avatarUrl: 'https://avatars.githubusercontent.com/u/5898705?v=4',
-    type: LeaderboardEntry.TypeEnum.User,
-    name: 'Felix T.J. Dietrich',
-    score: 90,
-    changesRequested: generateReviews(1, PullRequestReviewDTO.StateEnum.ChangesRequested),
-    approvals: generateReviews(1, PullRequestReviewDTO.StateEnum.Approved),
-    comments: generateReviews(14, PullRequestReviewDTO.StateEnum.Commented),
     rank: 2,
-    numberOfReviewedPRs: 16
+    score: 90,
+    user: {
+      id: 1,
+      login: 'FelixTJDietrich',
+      avatarUrl: 'https://avatars.githubusercontent.com/u/5898705?v=4',
+      name: 'Felix T.J. Dietrich',
+      htmlUrl: 'https://github.com/FelixTJDietrich'
+    },
+    numberOfReviewedPRs: 8,
+    numberOfApprovals: 1,
+    numberOfChangeRequests: 5,
+    numberOfComments: 2,
+    numberOfUnknowns: 0,
+    numberOfCodeComments: 21
   },
   {
-    githubName: 'krusche',
-    avatarUrl: 'https://avatars.githubusercontent.com/u/744067?v=4',
-    type: LeaderboardEntry.TypeEnum.User,
-    name: 'Stephan Krusche',
-    score: 50,
-    changesRequested: [],
-    approvals: generateReviews(3, PullRequestReviewDTO.StateEnum.Approved),
-    comments: generateReviews(1, PullRequestReviewDTO.StateEnum.Commented),
     rank: 3,
-    numberOfReviewedPRs: 3
+    score: 50,
+    user: {
+      id: 2,
+      login: 'krusche',
+      avatarUrl: 'https://avatars.githubusercontent.com/u/744067?v=4',
+      name: 'Stephan Krusche',
+      htmlUrl: 'https://github.com/krusche'
+    },
+    numberOfReviewedPRs: 5,
+    numberOfApprovals: 3,
+    numberOfChangeRequests: 1,
+    numberOfComments: 0,
+    numberOfUnknowns: 0,
+    numberOfCodeComments: 2
   },
   {
-    githubName: 'shadcn',
-    avatarUrl: 'https://avatars.githubusercontent.com/u/124599?v=4',
-    type: LeaderboardEntry.TypeEnum.User,
-    name: 'shadcn',
-    score: 20,
-    changesRequested: [],
-    approvals: [],
-    comments: [],
     rank: 4,
-    numberOfReviewedPRs: 1
+    score: 20,
+    user: {
+      id: 3,
+      login: 'shadcn',
+      avatarUrl: 'https://avatars.githubusercontent.com/u/124599?v=4',
+      name: 'shadcn',
+      htmlUrl: 'https://github.com/shadcn'
+    },
+    numberOfReviewedPRs: 3,
+    numberOfApprovals: 0,
+    numberOfChangeRequests: 1,
+    numberOfComments: 1,
+    numberOfUnknowns: 1,
+    numberOfCodeComments: 5
   },
   {
-    githubName: 'doesnotexistongithub',
-    avatarUrl: 'https://avatars.githubusercontentd.com/u/13132323124599?v=4',
-    type: LeaderboardEntry.TypeEnum.User,
-    name: 'NoAvatarUser',
-    score: 10,
-    changesRequested: [],
-    approvals: [],
-    comments: [],
     rank: 5,
-    numberOfReviewedPRs: 0
+    score: 0,
+    user: {
+      id: 3,
+      login: 'doesnotexistongithub',
+      avatarUrl: 'https://avatars.githubusercontentd.com/u/13132323124599?v=4',
+      name: 'NoAvatarUser',
+      htmlUrl: 'https://github.com/NoAvatarUser'
+    },
+    numberOfReviewedPRs: 0,
+    numberOfApprovals: 0,
+    numberOfChangeRequests: 0,
+    numberOfComments: 0,
+    numberOfUnknowns: 0,
+    numberOfCodeComments: 0
   }
 ];
 
