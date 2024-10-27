@@ -19,6 +19,7 @@ import org.springframework.stereotype.Service;
 import jakarta.transaction.Transactional;
 
 import de.tum.in.www1.hephaestus.gitprovider.common.DateUtil;
+import de.tum.in.www1.hephaestus.gitprovider.label.Label;
 import de.tum.in.www1.hephaestus.gitprovider.label.LabelRepository;
 import de.tum.in.www1.hephaestus.gitprovider.label.github.GitHubLabelConverter;
 import de.tum.in.www1.hephaestus.gitprovider.milestone.MilestoneRepository;
@@ -26,6 +27,7 @@ import de.tum.in.www1.hephaestus.gitprovider.milestone.github.GitHubMilestoneCon
 import de.tum.in.www1.hephaestus.gitprovider.pullrequest.PullRequest;
 import de.tum.in.www1.hephaestus.gitprovider.pullrequest.PullRequestRepository;
 import de.tum.in.www1.hephaestus.gitprovider.repository.RepositoryRepository;
+import de.tum.in.www1.hephaestus.gitprovider.user.User;
 import de.tum.in.www1.hephaestus.gitprovider.user.UserRepository;
 import de.tum.in.www1.hephaestus.gitprovider.user.github.GitHubUserConverter;
 
@@ -171,7 +173,7 @@ public class GitHubPullRequestSyncService {
 
         // Link new labels and remove labels that are not present anymore
         var ghLabels = ghPullRequest.getLabels();
-        var resultLabels = new HashSet<>(result.getLabels());
+        var resultLabels = new HashSet<Label>();
         ghLabels.forEach(ghLabel -> {
             var resultLabel = labelRepository.findById(ghLabel.getId())
                     .orElseGet(() -> {
@@ -206,7 +208,7 @@ public class GitHubPullRequestSyncService {
 
         // Link assignees
         var assignees = ghPullRequest.getAssignees();
-        var resultAssignees = new HashSet<>(result.getAssignees());
+        var resultAssignees = new HashSet<User>();
         assignees.forEach(assignee -> {
             var resultAssignee = userRepository.findById(assignee.getId())
                     .orElseGet(() -> userRepository.save(userConverter.convert(assignee)));
@@ -233,7 +235,7 @@ public class GitHubPullRequestSyncService {
         // Link requested reviewers
         try {
             var requestedReviewers = ghPullRequest.getRequestedReviewers();
-            var resultRequestedReviewers = new HashSet<>(result.getRequestedReviewers());
+            var resultRequestedReviewers = new HashSet<User>();
             requestedReviewers.forEach(requestedReviewer -> {
                 var resultRequestedReviewer = userRepository.findById(requestedReviewer.getId())
                         .orElseGet(() -> userRepository.save(userConverter.convert(requestedReviewer)));

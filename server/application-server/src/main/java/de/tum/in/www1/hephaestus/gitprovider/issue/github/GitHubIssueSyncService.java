@@ -20,11 +20,13 @@ import jakarta.transaction.Transactional;
 import de.tum.in.www1.hephaestus.gitprovider.common.DateUtil;
 import de.tum.in.www1.hephaestus.gitprovider.issue.Issue;
 import de.tum.in.www1.hephaestus.gitprovider.issue.IssueRepository;
+import de.tum.in.www1.hephaestus.gitprovider.label.Label;
 import de.tum.in.www1.hephaestus.gitprovider.label.LabelRepository;
 import de.tum.in.www1.hephaestus.gitprovider.label.github.GitHubLabelConverter;
 import de.tum.in.www1.hephaestus.gitprovider.milestone.MilestoneRepository;
 import de.tum.in.www1.hephaestus.gitprovider.milestone.github.GitHubMilestoneConverter;
 import de.tum.in.www1.hephaestus.gitprovider.repository.RepositoryRepository;
+import de.tum.in.www1.hephaestus.gitprovider.user.User;
 import de.tum.in.www1.hephaestus.gitprovider.user.UserRepository;
 import de.tum.in.www1.hephaestus.gitprovider.user.github.GitHubUserConverter;
 
@@ -142,7 +144,7 @@ public class GitHubIssueSyncService {
 
         // Link new labels and remove labels that are not present anymore
         var ghLabels = ghIssue.getLabels();
-        var resultLabels = new HashSet<>(result.getLabels());
+        var resultLabels = new HashSet<Label>();
         ghLabels.forEach(ghLabel -> {
             var resultLabel = labelRepository.findById(ghLabel.getId())
                     .orElseGet(() -> {
@@ -180,7 +182,7 @@ public class GitHubIssueSyncService {
 
         // Link assignees
         var assignees = ghIssue.getAssignees();
-        var resultAssignees = new HashSet<>(result.getAssignees());
+        var resultAssignees = new HashSet<User>();
         assignees.forEach(assignee -> {
             var resultAssignee = userRepository.findById(assignee.getId())
                     .orElseGet(() -> userRepository.save(userConverter.convert(assignee)));
