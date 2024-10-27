@@ -34,6 +34,7 @@ export class ReviewActivityCardComponent {
   class = input('');
   state = input<PullRequestReviewInfo.StateEnum>();
   submittedAt = input<string>();
+  htmlUrl = input<string>();
   pullRequest = input<PullRequestBaseInfo>();
   repositoryName = input<string>();
 

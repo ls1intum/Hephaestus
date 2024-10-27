@@ -9,7 +9,7 @@
     </div>
   </div>
 } @else {
-  <a hlmCard variant="profile" class="hover:bg-accent/50" [href]="this.pullRequest()?.htmlUrl" target="_blank" rel="noopener noreferrer" [class]="class()">
+  <a hlmCard variant="profile" class="hover:bg-accent/50" [href]="htmlUrl() ?? this.pullRequest()?.htmlUrl" target="_blank" rel="noopener noreferrer" [class]="class()">
     <div hlmCardContent variant="profile">
       <div class="text-sm text-muted-foreground first-letter:uppercase">
         {{ relativeActivityTime() }}
