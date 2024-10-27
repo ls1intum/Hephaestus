@@ -15,7 +15,7 @@ public interface PullRequestReviewRepository extends JpaRepository<PullRequestRe
     @Query("""
             SELECT prr
             FROM PullRequestReview prr
-            JOIN FETCH prr.author
+            LEFT JOIN FETCH prr.author
             LEFT JOIN FETCH prr.pullRequest
             LEFT JOIN FETCH prr.pullRequest.repository
             LEFT JOIN FETCH prr.comments
@@ -29,7 +29,7 @@ public interface PullRequestReviewRepository extends JpaRepository<PullRequestRe
     @Query("""
             SELECT prr
             FROM PullRequestReview prr
-            JOIN FETCH prr.author
+            LEFT JOIN FETCH prr.author
             LEFT JOIN FETCH prr.pullRequest
             LEFT JOIN FETCH prr.pullRequest.repository
             LEFT JOIN FETCH prr.comments

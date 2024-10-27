@@ -1,4 +1,4 @@
-package de.tum.in.www1.hephaestus.gitprovider.user.dto;
+package de.tum.in.www1.hephaestus.gitprovider.user;
 
 import org.springframework.lang.NonNull;
 import com.fasterxml.jackson.annotation.JsonInclude;
@@ -10,4 +10,13 @@ public record UserInfoDTO(
         @NonNull String avatarUrl,
         @NonNull String name,
         @NonNull String htmlUrl) {
+
+    public static UserInfoDTO fromUser(User user) {
+        return new UserInfoDTO(
+                user.getId(),
+                user.getLogin(),
+                user.getAvatarUrl(),
+                user.getName(),
+                user.getHtmlUrl());
+    }
 }

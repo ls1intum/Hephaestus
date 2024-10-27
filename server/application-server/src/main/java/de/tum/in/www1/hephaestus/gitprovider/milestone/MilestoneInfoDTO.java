@@ -1,4 +1,4 @@
-package de.tum.in.www1.hephaestus.gitprovider.milestone.dto;
+package de.tum.in.www1.hephaestus.gitprovider.milestone;
 
 import java.time.OffsetDateTime;
 

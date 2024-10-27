@@ -1,4 +1,4 @@
-package de.tum.in.www1.hephaestus.gitprovider.issue.dto;
+package de.tum.in.www1.hephaestus.gitprovider.issue;
 
 import java.time.OffsetDateTime;
 import java.util.List;
@@ -6,8 +6,8 @@ import java.util.List;
 import org.springframework.lang.NonNull;
 
 import de.tum.in.www1.hephaestus.gitprovider.issue.Issue.State;
-import de.tum.in.www1.hephaestus.gitprovider.label.dto.LabelInfoDTO;
-import de.tum.in.www1.hephaestus.gitprovider.user.dto.UserInfoDTO;
+import de.tum.in.www1.hephaestus.gitprovider.label.LabelInfoDTO;
+import de.tum.in.www1.hephaestus.gitprovider.user.UserInfoDTO;
 
 public record IssueInfoDTO(
     @NonNull Long id,

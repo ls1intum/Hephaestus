@@ -1,6 +1,6 @@
-package de.tum.in.www1.hephaestus.leaderboard.dto;
+package de.tum.in.www1.hephaestus.leaderboard;
 
-import de.tum.in.www1.hephaestus.gitprovider.user.dto.UserInfoDTO;
+import de.tum.in.www1.hephaestus.gitprovider.user.UserInfoDTO;
 import io.micrometer.common.lang.NonNull;
 
 public record LeaderboardEntryDTO(

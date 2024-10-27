@@ -1,4 +1,4 @@
-package de.tum.in.www1.hephaestus.gitprovider.issuecomment.dto;
+package de.tum.in.www1.hephaestus.gitprovider.issuecomment;
 
 import java.time.OffsetDateTime;
 
@@ -6,8 +6,8 @@ import org.springframework.lang.NonNull;
 import com.fasterxml.jackson.annotation.JsonInclude;
 
 import de.tum.in.www1.hephaestus.gitprovider.common.AuthorAssociation;
-import de.tum.in.www1.hephaestus.gitprovider.issue.dto.IssueInfoDTO;
-import de.tum.in.www1.hephaestus.gitprovider.user.dto.UserInfoDTO;
+import de.tum.in.www1.hephaestus.gitprovider.issue.IssueInfoDTO;
+import de.tum.in.www1.hephaestus.gitprovider.user.UserInfoDTO;
 
 @JsonInclude(JsonInclude.Include.NON_EMPTY)
 public record IssueCommentInfoDTO(
