@@ -107,7 +107,11 @@ public class NatsConsumerService {
             
             // Check if consumer already exists
             if (durableConsumerName != null && !durableConsumerName.isEmpty()) {
-                consumerContext = streamContext.getConsumerContext(durableConsumerName);
+                try {
+                    consumerContext = streamContext.getConsumerContext(durableConsumerName);
+                } catch (JetStreamApiException e) {
+                    consumerContext = null;
+                }
             }
 
             if (consumerContext == null) {
