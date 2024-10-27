@@ -10,6 +10,7 @@ import { BrnTooltipContentDirective } from '@spartan-ng/ui-tooltip-brain';
 import { HlmTooltipComponent, HlmTooltipTriggerDirective } from '@spartan-ng/ui-tooltip-helm';
 import { HlmButtonModule } from '@spartan-ng/ui-button-helm';
 import { HlmScrollAreaComponent } from '@spartan-ng/ui-scrollarea-helm';
+import { HlmAlertModule } from '@spartan-ng/ui-alert-helm';
 import { ReviewActivityCardComponent } from '@app/user/review-activity-card/review-activity-card.component';
 import { IssueCardComponent } from '@app/user/issue-card/issue-card.component';
 import { combineLatest, lastValueFrom, map, timer } from 'rxjs';
@@ -32,7 +33,8 @@ import { UserHeaderComponent } from './header/header.component';
     BrnTooltipContentDirective,
     HlmButtonModule,
     HlmScrollAreaComponent,
-    UserHeaderComponent
+    UserHeaderComponent,
+    HlmAlertModule
   ],
   templateUrl: './user-profile.component.html'
 })

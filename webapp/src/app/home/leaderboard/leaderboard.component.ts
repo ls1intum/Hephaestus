@@ -1,4 +1,4 @@
-import { Component, input } from '@angular/core';
+import { Component, inject, input } from '@angular/core';
 import { NgIconComponent } from '@ng-icons/core';
 import { octFileDiff, octCheck, octComment, octCommentDiscussion, octGitPullRequest, octChevronLeft, octNoEntry } from '@ng-icons/octicons';
 import { LeaderboardEntry } from 'app/core/modules/openapi';
@@ -13,6 +13,8 @@ import { TableComponent } from 'app/ui/table/table.component';
 import { HlmAvatarModule } from '@spartan-ng/ui-avatar-helm';
 import { HlmSkeletonModule } from '@spartan-ng/ui-skeleton-helm';
 import { RouterLink, RouterOutlet } from '@angular/router';
+import { SecurityStore } from '@app/core/security/security-store.service';
+import { cn } from '@app/utils';
 
 @Component({
   selector: 'app-leaderboard',
@@ -35,6 +37,7 @@ import { RouterLink, RouterOutlet } from '@angular/router';
   templateUrl: './leaderboard.component.html'
 })
 export class LeaderboardComponent {
+  securityStore = inject(SecurityStore);
   protected octFileDiff = octFileDiff;
   protected octCheck = octCheck;
   protected octComment = octComment;
@@ -45,6 +48,13 @@ export class LeaderboardComponent {
 
   protected Math = Math;
   protected Array = Array;
+
+  signedIn = this.securityStore.signedIn;
+  user = this.securityStore.loadedUser;
+
+  trClass = (entry: LeaderboardEntry) => {
+    return cn('cursor-pointer', this.signedIn() && this.user()?.username.toLowerCase() === entry.user.login.toLowerCase() ? 'bg-accent' : '');
+  };
 
   leaderboard = input<LeaderboardEntry[]>();
   isLoading = input<boolean>();

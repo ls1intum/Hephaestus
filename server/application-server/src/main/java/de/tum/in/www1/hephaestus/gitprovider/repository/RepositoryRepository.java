@@ -16,7 +16,7 @@ public interface RepositoryRepository
             SELECT r
             FROM Repository r
             JOIN PullRequest pr ON r.id = pr.repository.id
-            WHERE pr.author.login = :contributorLogin
+            WHERE pr.author.login ILIKE :contributorLogin
             ORDER BY r.name ASC
             """)
     List<Repository> findContributedByLogin(@Param("contributorLogin") String contributorLogin);

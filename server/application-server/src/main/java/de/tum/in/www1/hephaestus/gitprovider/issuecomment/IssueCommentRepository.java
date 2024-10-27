@@ -17,7 +17,7 @@ public interface IssueCommentRepository extends JpaRepository<IssueComment, Long
             LEFT JOIN FETCH ic.issue
             LEFT JOIN FETCH ic.issue.repository
             WHERE 
-                ic.author.login = :authorLogin AND ic.createdAt >= :activitySince
+                ic.author.login ILIKE :authorLogin AND ic.createdAt >= :activitySince
                 AND (:onlyFromPullRequests = false OR ic.issue.htmlUrl LIKE '%/pull/%')
             ORDER BY ic.createdAt DESC
             """)
