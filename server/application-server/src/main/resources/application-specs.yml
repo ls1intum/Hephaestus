@@ -1,0 +1,8 @@
+nats:
+    enabled: false
+
+monitoring:
+    runOnStartup: false
+
+github:
+    authToken: ""

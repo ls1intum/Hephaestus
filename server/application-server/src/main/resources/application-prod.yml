@@ -14,6 +14,12 @@ spring:
         jwt:
           issuer-uri: ${KEYCLOAK_URL}/realms/${KEYCLOAK_REALM}
 
+nats:
+    enabled: ${NATS_ENABLED:false}
+    timeframe: ${MONITORING_TIMEFRAME:7}
+    durableConsumerName: ${NATS_DURABLE_CONSUMER_NAME}
+    server: ${NATS_SERVER}
+
 monitoring:
     runOnStartup: ${MONITORING_RUN_ON_STARTUP:true}
     # Fetching timeframe in days
