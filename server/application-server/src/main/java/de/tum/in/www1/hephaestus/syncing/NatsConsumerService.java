@@ -14,6 +14,7 @@ import io.nats.client.Nats;
 import io.nats.client.Options;
 import io.nats.client.StreamContext;
 import io.nats.client.api.ConsumerConfiguration;
+import io.nats.client.api.ConsumerInfo;
 import io.nats.client.api.DeliverPolicy;
 
 import org.springframework.stereotype.Service;
@@ -103,17 +104,28 @@ public class NatsConsumerService {
     private void setupConsumer(Connection connection) throws IOException, InterruptedException {
         try {
             StreamContext streamContext = connection.getStreamContext("github");
-            ConsumerConfiguration.Builder consumerConfigBuilder = ConsumerConfiguration.builder()
+            
+            // Check if consumer already exists
+            if (durableConsumerName != null && !durableConsumerName.isEmpty()) {
+                consumerContext = streamContext.getConsumerContext(durableConsumerName);
+            }
+
+            if (consumerContext == null) {
+                logger.info("Setting up consumer for subjects: {}", Arrays.toString(getSubjects()));
+                ConsumerConfiguration.Builder consumerConfigBuilder = ConsumerConfiguration.builder()
                     .filterSubjects(getSubjects())
                     .deliverPolicy(DeliverPolicy.ByStartTime)
                     .startTime(ZonedDateTime.now().minusDays(timeframe));
+            
+                if (durableConsumerName != null && !durableConsumerName.isEmpty()) {
+                    consumerConfigBuilder.durable(durableConsumerName);
+                } 
 
-            if (durableConsumerName != null && !durableConsumerName.isEmpty()) {
-                consumerConfigBuilder.durable(durableConsumerName);
+                ConsumerConfiguration consumerConfig = consumerConfigBuilder.build();
+                consumerContext = streamContext.createOrUpdateConsumer(consumerConfig);
+            } else {
+                logger.info("Consumer already exists. Skipping consumer setup.");
             }
-
-            ConsumerConfiguration consumerConfig = consumerConfigBuilder.build();
-            consumerContext = streamContext.createOrUpdateConsumer(consumerConfig);
 
             MessageHandler handler = this::handleMessage;
             consumerContext.consume(handler);
