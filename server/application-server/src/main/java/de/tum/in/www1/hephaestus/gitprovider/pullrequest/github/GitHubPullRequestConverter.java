@@ -72,12 +72,16 @@ public class GitHubPullRequestConverter extends BaseGitServiceEntityConverter<GH
             logger.error("Failed to convert commits field for source {}: {}", source.getId(), e.getMessage());
         }
         try {
-            pullRequest.setAdditions(source.getAdditions());
+            if (pullRequest.getAdditions() == 0 || source.getAdditions() != 0) {
+                pullRequest.setAdditions(source.getAdditions());
+            }
         } catch (IOException e) {
             logger.error("Failed to convert additions field for source {}: {}", source.getId(), e.getMessage());
         }
         try {
-            pullRequest.setDeletions(source.getDeletions());
+            if (pullRequest.getDeletions() == 0 || source.getDeletions() != 0) {
+                pullRequest.setDeletions(source.getDeletions());
+            }
         } catch (IOException e) {
             logger.error("Failed to convert deletions field for source {}: {}", source.getId(), e.getMessage());
         }
