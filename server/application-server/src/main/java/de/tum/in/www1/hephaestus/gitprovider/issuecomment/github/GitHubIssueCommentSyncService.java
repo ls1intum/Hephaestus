@@ -116,7 +116,7 @@ public class GitHubIssueCommentSyncService {
 
         // Link author
         try {
-            var author = ghIssue.getUser();
+            var author = ghIssueComment.getUser();
             var resultAuthor = userRepository.findById(author.getId())
                     .orElseGet(() -> userRepository.save(userConverter.convert(author)));
             result.setAuthor(resultAuthor);
