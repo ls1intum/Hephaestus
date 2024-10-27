@@ -7,7 +7,7 @@
   <app-request-feature class="sm:hidden" iconOnly />
   <app-theme-switcher />
   @if (signedIn()) {
-    <button [brnMenuTriggerFor]="usermenu" class="ml-4">
+    <button [brnMenuTriggerFor]="usermenu" class="ml-2">
       <hlm-avatar>
         <img [src]="'https://github.com/' + user()!.username + '.png'" [alt]="user()?.name + '\'s avatar'" hlmAvatarImage />
         <span hlmAvatarFallback>
@@ -25,9 +25,7 @@
             <hlm-icon name="lucideUser" hlmMenuIcon />
             <span>My Profile</span>
           </a>
-
           <hlm-menu-separator />
-
           <button hlmMenuItem (click)="signOut()" class="cursor-pointer">
             <hlm-icon name="lucideLogOut" hlmMenuIcon />
             <span>Sign&nbsp;Out</span>

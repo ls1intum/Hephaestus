@@ -16,7 +16,7 @@ public interface PullRequestRepository extends JpaRepository<PullRequest, Long> 
     @Query("""
             SELECT MIN(p.createdAt)
             FROM PullRequest p
-            WHERE p.author.login = :authorLogin
+            WHERE p.author.login ILIKE :authorLogin
             """)
     Optional<OffsetDateTime> firstContributionByAuthorLogin(@Param("authorLogin") String authorLogin);
     
@@ -27,7 +27,7 @@ public interface PullRequestRepository extends JpaRepository<PullRequest, Long> 
             JOIN FETCH p.author
             LEFT JOIN FETCH p.assignees
             LEFT JOIN FETCH p.repository
-            WHERE (p.author.login = :assigneeLogin OR :assigneeLogin IN (SELECT u.login FROM p.assignees u)) AND p.state IN :states
+            WHERE (p.author.login ILIKE :assigneeLogin OR LOWER(:assigneeLogin) IN (SELECT LOWER(u.login) FROM p.assignees u)) AND p.state IN :states
             ORDER BY p.createdAt DESC
             """)
     List<PullRequest> findAssignedByLoginAndStates(
