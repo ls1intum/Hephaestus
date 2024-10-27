@@ -14,13 +14,13 @@ import org.springframework.cache.annotation.Cacheable;
 import org.springframework.context.event.EventListener;
 import org.springframework.stereotype.Service;
 
-import de.tum.in.www1.hephaestus.codereview.team.Team;
-import de.tum.in.www1.hephaestus.codereview.team.TeamDTO;
-import de.tum.in.www1.hephaestus.codereview.team.TeamService;
-import de.tum.in.www1.hephaestus.codereview.user.User;
-import de.tum.in.www1.hephaestus.codereview.user.UserDTO;
-import de.tum.in.www1.hephaestus.codereview.user.UserService;
-import de.tum.in.www1.hephaestus.codereview.user.UserTeamsDTO;
+import de.tum.in.www1.hephaestus.gitprovider.team.Team;
+import de.tum.in.www1.hephaestus.gitprovider.team.TeamDTO;
+import de.tum.in.www1.hephaestus.gitprovider.team.TeamService;
+import de.tum.in.www1.hephaestus.gitprovider.user.User;
+import de.tum.in.www1.hephaestus.gitprovider.user.UserInfoDTO;
+import de.tum.in.www1.hephaestus.gitprovider.user.UserRepository;
+import de.tum.in.www1.hephaestus.gitprovider.user.UserTeamsDTO;
 
 @Service
 public class AdminService {
@@ -29,7 +29,7 @@ public class AdminService {
     @Autowired
     private AdminRepository adminRepository;
     @Autowired
-    private UserService userService;
+    private UserRepository userRepository;
     @Autowired
     private TeamService teamService;
 
@@ -80,13 +80,12 @@ public class AdminService {
 
     public List<UserTeamsDTO> getUsersAsAdmin() {
         logger.info("Getting all users with their teams");
-        return userService.getAllUsersWithTeams().stream().filter(user -> !user.login().contains("[bot]"))
-                .toList();
+        return userRepository.findAllWithEagerTeams().stream().map(UserTeamsDTO::fromUser).toList();
     }
 
-    public Optional<UserDTO> addTeamToUser(String login, Long teamId) {
+    public Optional<UserInfoDTO> addTeamToUser(String login, Long teamId) {
         logger.info("Adding team (ID: " + teamId + ") to user with login: " + login);
-        Optional<User> optionalUser = userService.getUser(login);
+        Optional<User> optionalUser = userRepository.findByLogin(login);
         if (optionalUser.isEmpty()) {
             return Optional.empty();
         }
@@ -98,12 +97,12 @@ public class AdminService {
         User user = optionalUser.get();
         team.addMember(user);
         teamService.saveTeam(team);
-        return Optional.of(new UserDTO(user.getId(), user.getLogin(), user.getEmail(), user.getName(), user.getUrl()));
+        return Optional.of(UserInfoDTO.fromUser(user));
     }
 
-    public Optional<UserDTO> removeTeamFromUser(String login, Long teamId) {
+    public Optional<UserInfoDTO> removeTeamFromUser(String login, Long teamId) {
         logger.info("Removing team (ID: " + teamId + ") from user with login: " + login);
-        Optional<User> optionalUser = userService.getUser(login);
+        Optional<User> optionalUser = userRepository.findByLogin(login);
         if (optionalUser.isEmpty()) {
             return Optional.empty();
         }
@@ -115,7 +114,7 @@ public class AdminService {
         User user = optionalUser.get();
         team.removeMember(user);
         teamService.saveTeam(team);
-        return Optional.of(new UserDTO(user.getId(), user.getLogin(), user.getEmail(), user.getName(), user.getUrl()));
+        return Optional.of(UserInfoDTO.fromUser(user));
     }
 
     public TeamDTO createTeam(String name, String color) {

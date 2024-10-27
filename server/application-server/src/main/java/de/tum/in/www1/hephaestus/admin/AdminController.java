@@ -16,9 +16,9 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
-import de.tum.in.www1.hephaestus.codereview.team.TeamDTO;
-import de.tum.in.www1.hephaestus.codereview.user.UserDTO;
-import de.tum.in.www1.hephaestus.codereview.user.UserTeamsDTO;
+import de.tum.in.www1.hephaestus.gitprovider.team.TeamDTO;
+import de.tum.in.www1.hephaestus.gitprovider.user.UserInfoDTO;
+import de.tum.in.www1.hephaestus.gitprovider.user.UserTeamsDTO;
 
 @RestController
 @RequestMapping("/admin")
@@ -36,13 +36,13 @@ public class AdminController {
     }
 
     @GetMapping("/me")
-    public UserInfoDto getGretting(JwtAuthenticationToken auth) {
-        return new UserInfoDto(
+    public AuthUserInfoDTO getGretting(JwtAuthenticationToken auth) {
+        return new AuthUserInfoDTO(
                 auth.getToken().getClaimAsString(StandardClaimNames.PREFERRED_USERNAME),
                 auth.getAuthorities().stream().map(GrantedAuthority::getAuthority).toList());
     }
 
-    public static record UserInfoDto(String name, List<String> roles) {
+    public static record AuthUserInfoDTO(String name, List<String> roles) {
     }
 
     @GetMapping("/config")
@@ -65,14 +65,14 @@ public class AdminController {
     }
 
     @PutMapping("/users/teamadd/{login}/{teamId}")
-    public ResponseEntity<UserDTO> addTeamToUser(@PathVariable String login, @PathVariable Long teamId) {
+    public ResponseEntity<UserInfoDTO> addTeamToUser(@PathVariable String login, @PathVariable Long teamId) {
         return adminService.addTeamToUser(login, teamId)
                 .map(ResponseEntity::ok)
                 .orElseGet(() -> ResponseEntity.notFound().build());
     }
 
     @DeleteMapping("/users/teamremove/{login}/{teamId}")
-    public ResponseEntity<UserDTO> removeTeamFromUser(@PathVariable String login, @PathVariable Long teamId) {
+    public ResponseEntity<UserInfoDTO> removeTeamFromUser(@PathVariable String login, @PathVariable Long teamId) {
         return adminService.removeTeamFromUser(login, teamId)
                 .map(ResponseEntity::ok)
                 .orElseGet(() -> ResponseEntity.notFound().build());

@@ -10,7 +10,7 @@ spring:
     jpa:
         hibernate:
             # We use update for development and none for production, as we use liquibase
-            ddl-auto: create-drop
+            ddl-auto: update
 
         # show-sql: "true"
         properties:
@@ -31,10 +31,18 @@ spring:
 springdoc:
     default-produces-media-type: application/json
 
+nats:
+    enabled: false
+    timeframe: 7
+    durableConsumerName: ""
+    server: ""
+
 monitoring:
     runOnStartup: true
     # Fetching timeframe in days
     timeframe: 7
+    # Cooldown in minutes before running the monitoring again
+    runOnStartupCooldownInMinutes: 15
     repository-sync-cron: "0 0 * * * *"
     repositories: ls1intum/Artemis
 

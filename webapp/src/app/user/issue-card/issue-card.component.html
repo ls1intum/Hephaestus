@@ -1,4 +1,4 @@
-<a hlmCard variant="profile" [class]="computedClass()" [href]="url()" target="_blank" rel="noopener noreferrer">
+<a hlmCard variant="profile" [class]="computedClass()" [href]="htmlUrl()" target="_blank" rel="noopener noreferrer">
   <div hlmCardContent variant="profile">
     <div class="flex justify-between items-center text-sm text-github-muted-foreground">
       <span class="font-medium flex justify-center items-center space-x-1">
@@ -6,12 +6,7 @@
           <hlm-skeleton class="size-5 bg-green-500/30"></hlm-skeleton>
           <hlm-skeleton class="h-4 w-16 lg:w-36"></hlm-skeleton>
         } @else {
-          @if (state() === 'OPEN') {
-            <ng-icon [svg]="octGitPullRequest" size="18" class="mr-1 text-github-success-foreground"></ng-icon>
-          } @else {
-            <ng-icon [svg]="octGitPullRequestClosed" size="18" class="mr-1 text-github-danger-foreground"></ng-icon>
-          }
-
+          <ng-icon [svg]="issueIconAndColor().icon" size="18" [class]="'mr-1 ' + issueIconAndColor().color"></ng-icon>
           {{ repositoryName() }} #{{ number() }} on {{ displayCreated().format('MMM D') }}
         }
       </span>

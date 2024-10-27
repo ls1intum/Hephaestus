@@ -4,16 +4,41 @@
       <lucide-angular [img]="Hammer" class="size-8 sm:size-6" />
       <span class="hidden sm:inline-block text-xl font-semibold">Hephaestus</span>
     </a>
-    @if (loadedUser()?.roles?.includes('admin')) {
+    @if (user()?.roles?.includes('admin')) {
       <a hlmBtn variant="link" routerLink="/admin">Admin</a>
     }
   </div>
-  @if (signedIn()) {
-    <button hlmBtn variant="outline" (click)="signOut()">Sign&nbsp;Out</button>
-  } @else {
-    <button hlmBtn (click)="signIn()">Sign&nbsp;In</button>
-  }
   <app-request-feature class="hidden sm:inline-block" />
   <app-request-feature class="sm:hidden" iconOnly />
   <app-theme-switcher />
+  @if (signedIn()) {
+    <button [brnMenuTriggerFor]="usermenu" class="ml-2">
+      <hlm-avatar>
+        <img [src]="'https://github.com/' + user()!.username + '.png'" [alt]="user()?.name + '\'s avatar'" hlmAvatarImage />
+        <span hlmAvatarFallback>
+          {{ user()?.name?.slice(0, 2)?.toUpperCase() ?? '?' }}
+        </span>
+      </hlm-avatar>
+    </button>
+
+    <ng-template #usermenu>
+      <hlm-menu>
+        <hlm-menu-label>{{ user()!.name }}</hlm-menu-label>
+        <hlm-menu-separator />
+        <hlm-menu-group>
+          <a hlmMenuItem [routerLink]="'/user/' + user()!.username" class="cursor-pointer">
+            <hlm-icon name="lucideUser" hlmMenuIcon />
+            <span>My Profile</span>
+          </a>
+          <hlm-menu-separator />
+          <button hlmMenuItem (click)="signOut()" class="cursor-pointer">
+            <hlm-icon name="lucideLogOut" hlmMenuIcon />
+            <span>Sign&nbsp;Out</span>
+          </button>
+        </hlm-menu-group>
+      </hlm-menu>
+    </ng-template>
+  } @else {
+    <button hlmBtn (click)="signIn()">Sign&nbsp;In</button>
+  }
 </header>
