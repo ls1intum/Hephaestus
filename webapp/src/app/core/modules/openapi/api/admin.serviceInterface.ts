@@ -29,63 +29,63 @@ export interface AdminServiceInterface {
     configuration: Configuration;
 
     /**
-     *
-     *
-     * @param login
-     * @param teamId
+     * 
+     * 
+     * @param login 
+     * @param teamId 
      */
     addTeamToUser(login: string, teamId: number, extraHttpRequestParams?: any): Observable<UserInfo>;
 
     /**
-     *
-     *
+     * 
+     * 
      */
     admin(extraHttpRequestParams?: any): Observable<string>;
 
     /**
-     *
-     *
-     * @param body
+     * 
+     * 
+     * @param teamInfo 
      */
-    createTeam(body: TeamInfo, extraHttpRequestParams?: any): Observable<TeamInfo>;
+    createTeam(teamInfo: TeamInfo, extraHttpRequestParams?: any): Observable<TeamInfo>;
 
     /**
-     *
-     *
-     * @param teamId
+     * 
+     * 
+     * @param teamId 
      */
     deleteTeam(teamId: number, extraHttpRequestParams?: any): Observable<TeamInfo>;
 
     /**
-     *
-     *
+     * 
+     * 
      */
     getConfig(extraHttpRequestParams?: any): Observable<AdminConfig>;
 
     /**
-     *
-     *
+     * 
+     * 
      */
     getGretting(extraHttpRequestParams?: any): Observable<AuthUserInfo>;
 
     /**
-     *
-     *
+     * 
+     * 
      */
     getUsersAsAdmin(extraHttpRequestParams?: any): Observable<Array<UserTeams>>;
 
     /**
-     *
-     *
-     * @param login
-     * @param teamId
+     * 
+     * 
+     * @param login 
+     * @param teamId 
      */
     removeTeamFromUser(login: string, teamId: number, extraHttpRequestParams?: any): Observable<UserInfo>;
 
     /**
-     *
-     *
-     * @param requestBody
+     * 
+     * 
+     * @param requestBody 
      */
     updateRepositories(requestBody: Array<string>, extraHttpRequestParams?: any): Observable<Set<string>>;
 

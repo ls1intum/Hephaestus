@@ -25,8 +25,6 @@ import { AuthUserInfo } from '../model/auth-user-info';
 // @ts-ignore
 import { TeamInfo } from '../model/team-info';
 // @ts-ignore
-import { TeamInfoDTO } from '../model/team-info-dto';
-// @ts-ignore
 import { UserInfo } from '../model/user-info';
 // @ts-ignore
 import { UserTeams } from '../model/user-teams';
@@ -232,16 +230,16 @@ export class AdminService implements AdminServiceInterface {
     }
 
     /**
-     * @param body 
+     * @param teamInfo 
      * @param observe set whether or not to return the data Observable as the body, response or events. defaults to returning the body.
      * @param reportProgress flag to report request and response progress.
      */
-    public createTeam(body: TeamInfoDTO, observe?: 'body', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<TeamInfo>;
-    public createTeam(body: TeamInfoDTO, observe?: 'response', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<HttpResponse<TeamInfo>>;
-    public createTeam(body: TeamInfoDTO, observe?: 'events', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<HttpEvent<TeamInfo>>;
-    public createTeam(body: TeamInfoDTO, observe: any = 'body', reportProgress: boolean = false, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<any> {
-        if (body === null || body === undefined) {
-            throw new Error('Required parameter body was null or undefined when calling createTeam.');
+    public createTeam(teamInfo: TeamInfo, observe?: 'body', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<TeamInfo>;
+    public createTeam(teamInfo: TeamInfo, observe?: 'response', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<HttpResponse<TeamInfo>>;
+    public createTeam(teamInfo: TeamInfo, observe?: 'events', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<HttpEvent<TeamInfo>>;
+    public createTeam(teamInfo: TeamInfo, observe: any = 'body', reportProgress: boolean = false, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<any> {
+        if (teamInfo === null || teamInfo === undefined) {
+            throw new Error('Required parameter teamInfo was null or undefined when calling createTeam.');
         }
 
         let localVarHeaders = this.defaultHeaders;
@@ -293,7 +291,7 @@ export class AdminService implements AdminServiceInterface {
         return this.httpClient.request<TeamInfo>('put', `${this.configuration.basePath}${localVarPath}`,
             {
                 context: localVarHttpContext,
-                body: body,
+                body: teamInfo,
                 responseType: <any>responseType_,
                 withCredentials: this.configuration.withCredentials,
                 headers: localVarHeaders,
