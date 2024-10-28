@@ -11,7 +11,7 @@ import { LeaderboardComponent } from '@app/home/leaderboard/leaderboard.componen
 import { LeaderboardFilterComponent } from './leaderboard/filter/filter.component';
 import { SecurityStore } from '@app/core/security/security-store.service';
 import { HlmAlertModule } from '@spartan-ng/ui-alert-helm';
-import { MetaService, TeamService } from '@app/core/modules/openapi';
+import { TeamService } from '@app/core/modules/openapi';
 
 dayjs.extend(isoWeek);
 
@@ -25,7 +25,6 @@ export class HomeComponent {
   protected CircleX = CircleX;
 
   securityStore = inject(SecurityStore);
-  metaService = inject(MetaService);
   leaderboardService = inject(LeaderboardService);
   teamService = inject(TeamService);
 

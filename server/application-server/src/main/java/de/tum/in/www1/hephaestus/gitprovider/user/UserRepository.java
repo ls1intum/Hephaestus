@@ -19,7 +19,7 @@ public interface UserRepository extends JpaRepository<User, Long> {
     @Query("""
                 SELECT u
                 FROM User u
-                JOIN FETCH u.teams
+                LEFT JOIN FETCH u.teams
                 WHERE u.type = 'USER'
             """)
     List<User> findAllWithEagerTeams();

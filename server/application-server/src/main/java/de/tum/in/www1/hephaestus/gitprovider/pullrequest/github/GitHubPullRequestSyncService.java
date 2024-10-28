@@ -6,7 +6,6 @@ import java.io.IOException;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Optional;
-import java.util.stream.Collectors;
 import java.util.ArrayList;
 import java.util.Date;
 import java.time.OffsetDateTime;
@@ -270,16 +269,12 @@ public class GitHubPullRequestSyncService {
         });
 
         // Match team via repository name
-        List<String> teamNames = teamRepository.findAll().stream().map(Team::getName).collect(Collectors.toList());
-        Optional<String> matchedRepo = teamNames.stream().filter(r -> pr.getRepository().getName().contains(r))
-                .findFirst();
-        if (matchedRepo.isPresent()) {
-            Optional<Team> team = teamRepository.findByName(matchedRepo.get());
-            if (team.isPresent()) {
-                Team teamEntity = team.get();
-                teamEntity.addMember(pr.getAuthor());
-                teamRepository.save(teamEntity);
-            }
+        String repoName = capitalize(pr.getRepository().getName().replaceAll("[0-9]", ""));
+        Optional<Team> repoTeam = teamRepository.findByName(repoName);
+        if (repoTeam.isPresent()) {
+            Team teamEntity = repoTeam.get();
+            teamEntity.addMember(pr.getAuthor());
+            teamRepository.save(teamEntity);
         }
     }
 }

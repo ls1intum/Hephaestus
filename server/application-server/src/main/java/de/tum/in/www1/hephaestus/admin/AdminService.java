@@ -38,21 +38,21 @@ public class AdminService {
 
     @EventListener(ApplicationReadyEvent.class)
     public void run() {
+        logger.info("Updating AdminConfig...");
         // make sure the admin config is present
         Optional<AdminConfig> optionalAdminConfig = adminRepository.findById(1L);
         if (optionalAdminConfig.isEmpty()) {
             logger.info("No admin config found, creating new one");
             AdminConfig newAdminConfig = new AdminConfig();
             newAdminConfig.setRepositoriesToMonitor(Set.of(repositoriesToMonitor));
-            adminRepository.save(newAdminConfig);
+            adminRepository.saveAndFlush(newAdminConfig);
         } else {
             // repositories should match the environment variable
             AdminConfig adminConfig = optionalAdminConfig.get();
-            if (adminConfig.getRepositoriesToMonitor().stream()
-                    .anyMatch(repository -> !Set.of(repositoriesToMonitor).contains(repository))) {
-                logger.info("Adding missing repositories to monitor");
+            if (!adminConfig.getRepositoriesToMonitor().equals(Set.of(repositoriesToMonitor))) {
+                logger.info("Adding new repositories to monitor");
                 adminConfig.setRepositoriesToMonitor(Set.of(repositoriesToMonitor));
-                adminRepository.save(adminConfig);
+                adminRepository.saveAndFlush(adminConfig);
             }
         }
         // make sure teams are initialized
@@ -80,7 +80,7 @@ public class AdminService {
 
     public List<UserTeamsDTO> getUsersAsAdmin() {
         logger.info("Getting all users with their teams");
-        return userRepository.findAllWithEagerTeams().stream().map(UserTeamsDTO::fromUser).toList();
+        return userRepository.findAll().stream().map(UserTeamsDTO::fromUser).toList();
     }
 
     public Optional<UserInfoDTO> addTeamToUser(String login, Long teamId) {

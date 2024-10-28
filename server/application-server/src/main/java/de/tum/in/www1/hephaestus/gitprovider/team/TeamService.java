@@ -5,31 +5,23 @@ import java.util.Optional;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 @Service
 public class TeamService {
     private static final Logger logger = LoggerFactory.getLogger(TeamService.class);
 
-    private final TeamRepository teamRepository;
-
-    public TeamService(TeamRepository teamRepository) {
-        this.teamRepository = teamRepository;
-    }
+    @Autowired
+    private TeamRepository teamRepository;
 
     public Optional<Team> getTeam(Long id) {
         logger.info("Getting team with id: " + id);
         return teamRepository.findById(id);
     }
 
-    public Optional<Team> getTeam(String name) {
-        logger.info("Getting team with name: " + name);
-        return teamRepository.findByName(name);
-    }
-
     public List<TeamInfoDTO> getAllTeams() {
         List<TeamInfoDTO> teams = teamRepository.findAll().stream().map(TeamInfoDTO::fromTeam).toList();
-        logger.info("Getting all (" + teams.size() + ") teams");
         return teams;
     }
 
@@ -43,12 +35,13 @@ public class TeamService {
         Team team = new Team();
         team.setName(name);
         team.setColor(color);
-        return teamRepository.save(team);
+        return teamRepository.saveAndFlush(team);
     }
 
     public void deleteTeam(Long id) {
         logger.info("Deleting team with id: " + id);
         teamRepository.deleteById(id);
+        teamRepository.flush();
     }
 
     public Boolean createDefaultTeams() {
@@ -80,7 +73,7 @@ public class TeamService {
         Team ares = teamRepository.save(new Team());
         ares.setName("Ares");
         ares.setColor("#69feff");
-        teamRepository.saveAll(
+        teamRepository.saveAllAndFlush(
                 List.of(iris, athena, atlas, programming, hephaestus, communication, lectures, usability, ares));
         return true;
     }

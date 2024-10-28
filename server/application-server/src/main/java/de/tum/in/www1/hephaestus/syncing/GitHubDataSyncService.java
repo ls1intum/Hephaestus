@@ -77,10 +77,8 @@ public class GitHubDataSyncService {
         var repositories = repositorySyncService.syncAllMonitoredRepositories();
         labelSyncService.syncLabelsOfAllRepositories(repositories);
         milestoneSyncService.syncMilestonesOfAllRepositories(repositories);
-        var issues = issueSyncService.syncIssuesOfAllRepositories(repositories, Optional.of(cutoffDate)); // also
-                                                                                                          // contains
-                                                                                                          // PRs as
-                                                                                                          // issues
+        // also contains PRs as issues
+        var issues = issueSyncService.syncIssuesOfAllRepositories(repositories, Optional.of(cutoffDate));
         issueCommentSyncService.syncIssueCommentsOfAllIssues(issues, Optional.of(cutoffDate));
         var pullRequests = pullRequestSyncService.syncPullRequestsOfAllRepositories(repositories,
                 Optional.of(cutoffDate));

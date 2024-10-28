@@ -44,7 +44,6 @@ export class KeycloakService {
     this.profile = (await this.keycloak.loadUserInfo()) as unknown as UserProfile;
     this.profile.token = this.keycloak.token || '';
     this.profile.roles = this.keycloak.realmAccess?.roles || [];
-    console.log('KeycloakService.init', this.profile);
     return true;
   }
 
