@@ -11,8 +11,8 @@ if os.getenv("GITHUB_ACTIONS") == "true":
     class MockChatModel(BaseChatModel):
         def invoke(self, message: str):
             return "Mock response"
-
-if settings.is_openai_available:
+    model = MockChatModel()
+elif settings.is_openai_available:
     model = ChatOpenAI()
 elif settings.is_azure_openai_available:
     model = AzureChatOpenAI()
