@@ -40,12 +40,21 @@ jobs:
           distribution: 'temurin'
           java-version: '21'
       
-      - name: Install and configure Poetry
-        run: pipx install poetry
+       - name: Install Poetry
+         uses: snok/install-poetry@v1
+         with:
+          virtualenvs-create: true
+          virtualenvs-in-project: true
+          virtualenvs-path: .venv
+          installer-parallel: true
 
       - name: Install Python dependencies
         working-directory: server/intelligence-service
-        run: poetry install
+        run: poetry install --no-interaction --no-root
+      
+      - name: Install project
+        working-directory: server/intelligence-service
+        run: poetry install --no-interaction
 
       - name: Generate API client for the intelligence service
         run: npm run generate:api:intelligence-service
