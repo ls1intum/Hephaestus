@@ -14,7 +14,7 @@ on:
   workflow_dispatch:
 
 jobs:
-  generate-api-client:
+  generate-application-server-client:
     name: Verify API Specs and Client of the application server (add autocommit-openapi label to PR to auto-commit changes)
     runs-on: ubuntu-latest
 
