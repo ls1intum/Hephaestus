@@ -34,7 +34,7 @@ import org.hibernate.validator.constraints.*;
 @JsonPropertyOrder({
   HTTPValidationError.JSON_PROPERTY_DETAIL
 })
-@jakarta.annotation.Generated(value = "org.openapitools.codegen.languages.JavaClientCodegen", date = "2024-10-29T19:30:44.172496+01:00[Europe/Berlin]", comments = "Generator version: 7.7.0")
+@jakarta.annotation.Generated(value = "org.openapitools.codegen.languages.JavaClientCodegen", date = "2024-10-29T19:53:57.523401+01:00[Europe/Berlin]", comments = "Generator version: 7.7.0")
 public class HTTPValidationError {
   public static final String JSON_PROPERTY_DETAIL = "detail";
   private List<ValidationError> detail = new ArrayList<>();

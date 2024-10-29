@@ -36,7 +36,7 @@ import org.hibernate.validator.constraints.*;
   ValidationError.JSON_PROPERTY_MSG,
   ValidationError.JSON_PROPERTY_TYPE
 })
-@jakarta.annotation.Generated(value = "org.openapitools.codegen.languages.JavaClientCodegen", date = "2024-10-29T19:30:44.172496+01:00[Europe/Berlin]", comments = "Generator version: 7.7.0")
+@jakarta.annotation.Generated(value = "org.openapitools.codegen.languages.JavaClientCodegen", date = "2024-10-29T19:53:57.523401+01:00[Europe/Berlin]", comments = "Generator version: 7.7.0")
 public class ValidationError {
   public static final String JSON_PROPERTY_LOC = "loc";
   private List<ValidationErrorLocInner> loc = new ArrayList<>();

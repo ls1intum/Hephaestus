@@ -64,8 +64,8 @@ jobs:
         run: poetry install --no-interaction
 
       - name: Generate API client for the intelligence service
-        run: npm run generate:api:intelligence-service
-        
+        run: poetry run npm run generate:api:intelligence-service
+
       - name: Check for changes in the API
         id: check_changes
         run: |

@@ -58,7 +58,7 @@ import java.time.OffsetDateTime;
 
 import de.tum.in.www1.hephaestus.intelligenceapi.auth.Authentication;
 
-@jakarta.annotation.Generated(value = "org.openapitools.codegen.languages.JavaClientCodegen", date = "2024-10-29T19:30:44.172496+01:00[Europe/Berlin]", comments = "Generator version: 7.7.0")
+@jakarta.annotation.Generated(value = "org.openapitools.codegen.languages.JavaClientCodegen", date = "2024-10-29T19:53:57.523401+01:00[Europe/Berlin]", comments = "Generator version: 7.7.0")
 @Component("de.tum.in.www1.hephaestus.intelligenceapi.ApiClient")
 public class ApiClient extends JavaTimeFormatter {
     public enum CollectionFormat {
