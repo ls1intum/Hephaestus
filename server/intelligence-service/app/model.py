@@ -7,11 +7,11 @@ from .config import settings
 model: BaseChatModel
 
 if os.getenv("GITHUB_ACTIONS") == "true":
-    # mock model for testing environment
-    class MockChatModel(BaseChatModel):
+    class MockChatModel():
         def invoke(self, message: str):
             return "Mock response"
     model = MockChatModel()
+
 elif settings.is_openai_available:
     model = ChatOpenAI()
 elif settings.is_azure_openai_available:
