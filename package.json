@@ -8,7 +8,7 @@
     "generate:api:intelligence-service:clean": "rimraf server/application-server/src/main/java/de/tum/in/www1/hephaestus/intelligenceapi",
     "generate:api:clean": "npm run generate:api:intelligence-service:clean && npm run generate:api:application-server:clean",
     
-    "generate:api:application-server-specs": "cd server/application-server && mvn verify -DskipTests=true && node ../../scripts/clean-openapi-specs.js",
+    "generate:api:application-server-specs": "cd server/application-server && mvn verify -DskipTests=true -Dapp.profiles=specs",
     "generate:api:intelligence-service-specs": "python -m server.intelligence-service.app.generate_openapi_yaml",
     "generate:api:specs": "npm run generate:api:application-server-specs && npm run generate:api:intelligence-service-specs",
     
@@ -18,7 +18,6 @@
     
     "generate:api:application-server": "npm run generate:api:application-server-specs && npm run generate:api:application-server:clean && npm run generate:api:application-server-client",
     "generate:api:intelligence-service": "npm run generate:api:intelligence-service:clean && npm run generate:api:intelligence-service-specs && npm run generate:api:intelligence-service-client",
-    
     "generate:api": "npm run generate:api:intelligence-service && npm run generate:api:application-server"
   },
   "devDependencies": {

@@ -19,12 +19,12 @@ public class AdminController {
     }
 
     @GetMapping("/me")
-    public UserInfoDto getGretting(JwtAuthenticationToken auth) {
-        return new UserInfoDto(
+    public AuthUserInfoDTO getGretting(JwtAuthenticationToken auth) {
+        return new AuthUserInfoDTO(
             auth.getToken().getClaimAsString(StandardClaimNames.PREFERRED_USERNAME),
             auth.getAuthorities().stream().map(GrantedAuthority::getAuthority).toList());
     }
 
-    public static record UserInfoDto(String name, List<String> roles) {
+    public static record AuthUserInfoDTO(String name, List<String> roles) {
     }
 }

@@ -13,7 +13,7 @@ import { HttpHeaders }                                       from '@angular/comm
 
 import { Observable }                                        from 'rxjs';
 
-import { UserInfoDto } from '../model/models';
+import { AuthUserInfo } from '../model/models';
 
 
 import { Configuration }                                     from '../configuration';
@@ -34,6 +34,6 @@ export interface AdminServiceInterface {
      * 
      * 
      */
-    getGretting(extraHttpRequestParams?: any): Observable<UserInfoDto>;
+    getGretting(extraHttpRequestParams?: any): Observable<AuthUserInfo>;
 
 }

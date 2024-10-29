@@ -1,17 +1,14 @@
 package de.tum.in.www1.hephaestus.leaderboard;
 
+import java.util.stream.IntStream;
+import java.util.Map;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
-import java.util.ArrayList;
 import java.util.Comparator;
-import java.util.HashSet;
 import java.util.List;
-import java.util.Objects;
 import java.util.Optional;
-import java.util.Set;
-import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Collectors;
 
 import org.slf4j.Logger;
@@ -19,26 +16,34 @@ import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
-import de.tum.in.www1.hephaestus.codereview.pullrequest.PullRequest;
-import de.tum.in.www1.hephaestus.codereview.pullrequest.review.PullRequestReviewDTO;
-import de.tum.in.www1.hephaestus.codereview.user.User;
-import de.tum.in.www1.hephaestus.codereview.user.UserService;
-import de.tum.in.www1.hephaestus.codereview.user.UserType;
+import de.tum.in.www1.hephaestus.gitprovider.issuecomment.IssueComment;
+import de.tum.in.www1.hephaestus.gitprovider.issuecomment.IssueCommentRepository;
+import de.tum.in.www1.hephaestus.gitprovider.pullrequest.PullRequest;
+import de.tum.in.www1.hephaestus.gitprovider.pullrequestreview.PullRequestReview;
+import de.tum.in.www1.hephaestus.gitprovider.pullrequestreview.PullRequestReviewRepository;
+import de.tum.in.www1.hephaestus.gitprovider.user.User;
+import de.tum.in.www1.hephaestus.gitprovider.user.UserInfoDTO;
+import jakarta.transaction.Transactional;
 
 @Service
 public class LeaderboardService {
     private static final Logger logger = LoggerFactory.getLogger(LeaderboardService.class);
 
-    private final UserService userService;
+    private final PullRequestReviewRepository pullRequestReviewRepository;
+    private final IssueCommentRepository issueCommentRepository;
 
     @Value("${monitoring.timeframe}")
     private int timeframe;
 
-    public LeaderboardService(UserService userService) {
-        this.userService = userService;
+    public LeaderboardService(
+            PullRequestReviewRepository pullRequestReviewRepository,
+            IssueCommentRepository issueCommentRepository) {
+        this.pullRequestReviewRepository = pullRequestReviewRepository;
+        this.issueCommentRepository = issueCommentRepository;
     }
 
-    public List<LeaderboardEntry> createLeaderboard(Optional<LocalDate> after, Optional<LocalDate> before,
+    @Transactional
+    public List<LeaderboardEntryDTO> createLeaderboard(Optional<LocalDate> after, Optional<LocalDate> before,
             Optional<String> repository) {
         logger.info("Creating leaderboard dataset");
 
@@ -46,77 +51,119 @@ public class LeaderboardService {
                 : LocalDate.now().minusDays(timeframe).atStartOfDay();
         Optional<LocalDateTime> beforeCutOff = before.map(date -> date.plusDays(1).atStartOfDay());
 
-        List<User> users = userService.getAllUsersInTimeframe(afterCutOff.atOffset(ZoneOffset.UTC),
-                beforeCutOff.map(b -> b.atOffset(ZoneOffset.UTC)).orElse(OffsetDateTime.now()), repository);
+        var afterOffset = afterCutOff.atOffset(ZoneOffset.UTC);
+        var beforeOffset = beforeCutOff.map(b -> b.atOffset(ZoneOffset.UTC)).orElse(OffsetDateTime.now());
+        List<PullRequestReview> reviews = pullRequestReviewRepository.findAllInTimeframe(afterOffset, beforeOffset,
+                repository);
+        List<IssueComment> issueComments = issueCommentRepository.findAllInTimeframe(afterOffset, beforeOffset,
+                repository, true);
 
-        logger.info("Found " + users.size() + " users for the leaderboard");
+        Map<Long, User> usersById = reviews.stream().map(PullRequestReview::getAuthor)
+                .collect(Collectors.toMap(User::getId, user -> user, (u1, u2) -> u1));
+        
+        // Review activity
+        Map<Long, List<PullRequestReview>> reviewsByUserId = reviews.stream()
+                .collect(Collectors.groupingBy(review -> review.getAuthor().getId()));
+        Map<Long, List<IssueComment>> issueCommentsByUserId = issueComments.stream()
+                .collect(Collectors.groupingBy(comment -> comment.getAuthor().getId()));
+        
+        Map<Long, Integer> scoresByUserId = reviewsByUserId.entrySet().stream()
+                .collect(Collectors.toMap(Map.Entry::getKey, entry -> calculateTotalScore(entry.getValue(), 
+                        issueCommentsByUserId.getOrDefault(entry.getKey(), List.of()).size())));
 
-        List<LeaderboardEntry> leaderboard = users.stream().map(user -> {
-            // ignore non-users, e.g. bots
-            if (user.getType() != UserType.USER) {
-                return null;
-            }
-            AtomicInteger score = new AtomicInteger(0);
-            Set<Integer> reviewedPRs = new HashSet<>();
-            Set<PullRequestReviewDTO> changesRequestedSet = new HashSet<>();
-            Set<PullRequestReviewDTO> approvedSet = new HashSet<>();
-            Set<PullRequestReviewDTO> commentSet = new HashSet<>();
+        // Ranking (sorted by score descending)
+        List<Long> rankingByUserId = scoresByUserId.entrySet().stream()
+                .sorted(Map.Entry.comparingByValue(Comparator.reverseOrder()))
+                .map(Map.Entry::getKey)
+                .collect(Collectors.toList());
 
-            user.getReviews().stream()
-                    .forEach(review -> {
-                        if (review.getPullRequest().getAuthor().getLogin().equals(user.getLogin())) {
-                            return;
-                        }
+        List<LeaderboardEntryDTO> leaderboard = IntStream.range(0, rankingByUserId.size())
+                .mapToObj(index -> {
+                    int rank = index + 1;
+                    Long userId = rankingByUserId.get(index);
+                    int score = scoresByUserId.get(userId);
+                    UserInfoDTO user = UserInfoDTO.fromUser(usersById.get(userId));
+                    List<PullRequestReview> userReviews = reviewsByUserId.getOrDefault(userId, List.of());
+                    List<IssueComment> userIssueComments = issueCommentsByUserId.getOrDefault(userId, List.of());
 
-                        PullRequestReviewDTO reviewDTO = new PullRequestReviewDTO(review.getId(), review.getCreatedAt(),
-                                review.getUpdatedAt(), review.getSubmittedAt(), review.getState());
+                    int numberOfReviewedPRs = userReviews.stream().map(review -> review.getPullRequest().getId())
+                            .collect(Collectors.toSet()).size();
+                    int numberOfApprovals = (int) userReviews.stream()
+                            .filter(review -> review.getState() == PullRequestReview.State.APPROVED).count();
+                    int numberOfChangeRequests = (int) userReviews.stream()
+                            .filter(review -> review.getState() == PullRequestReview.State.CHANGES_REQUESTED).count();
+                    int numberOfComments = (int) userReviews.stream()
+                            .filter(review -> review.getState() == PullRequestReview.State.COMMENTED)
+                            .filter(review -> review.getBody() != null).count();
+                    numberOfComments += userIssueComments.size();
+                    
+                    int numberOfUnknowns = (int) userReviews.stream()
+                            .filter(review -> review.getState() == PullRequestReview.State.UNKNOWN)
+                            .filter(review -> review.getBody() != null).count();
+                    int numberOfCodeComments = userReviews.stream().map(review -> review.getComments().size()).reduce(0,
+                            Integer::sum);
 
-                        reviewedPRs.add(review.getPullRequest().getNumber());
-                        switch (review.getState()) {
-                            case CHANGES_REQUESTED:
-                                changesRequestedSet.add(reviewDTO);
-                                break;
-                            case APPROVED:
-                                approvedSet.add(reviewDTO);
-                                break;
-                            case COMMENTED:
-                                commentSet.add(reviewDTO);
-                                break;
-                            default:
-                                // ignore other states and don't add to score
-                                return;
-                        }
-                        score.addAndGet(calculateScore(review.getPullRequest()));
-                    });
-            return new LeaderboardEntry(user.getLogin(), user.getAvatarUrl(), user.getName(), user.getType(),
-                    score.get(),
-                    0, // preliminary rank
-                    reviewedPRs.size(),
-                    changesRequestedSet.toArray(new PullRequestReviewDTO[changesRequestedSet.size()]),
-                    approvedSet.toArray(new PullRequestReviewDTO[approvedSet.size()]),
-                    commentSet.toArray(new PullRequestReviewDTO[commentSet.size()]));
-        }).filter(Objects::nonNull).collect(Collectors.toCollection(ArrayList::new));
-
-        // update ranks by score
-        leaderboard.sort(Comparator.comparingInt(LeaderboardEntry::getScore).reversed());
-        AtomicInteger rank = new AtomicInteger(1);
-        leaderboard.stream().forEach(entry -> {
-            entry.setRank(rank.get());
-            rank.incrementAndGet();
-        });
+                    return new LeaderboardEntryDTO(rank, score, user, numberOfReviewedPRs, numberOfApprovals,
+                            numberOfChangeRequests, numberOfComments, numberOfUnknowns, numberOfCodeComments);
+                })
+                .toList();
 
         return leaderboard;
     }
 
+    private int calculateTotalScore(List<PullRequestReview> reviews, int numberOfIssueComments) {
+        // Could contain multiple reviews for the same pull request
+        Map<Long, List<PullRequestReview>> reviewsByPullRequestId = reviews.stream()
+                .collect(Collectors.groupingBy(review -> review.getPullRequest().getId()));
+
+        double totalScore = reviewsByPullRequestId
+                .values()
+                .stream()
+                .map(pullRequestReviews -> {
+                    // All reviews are for the same pull request
+                    int complexityScore = calculateComplexityScore(pullRequestReviews.get(0).getPullRequest());
+
+                    int approvalReviews = (int) pullRequestReviews.stream()
+                            .filter(review -> review.getState() == PullRequestReview.State.APPROVED)
+                            .count();
+                    int changesRequestedReviews = (int) pullRequestReviews.stream()
+                            .filter(review -> review.getState() == PullRequestReview.State.CHANGES_REQUESTED)
+                            .count();
+                    int commentReviews = (int) pullRequestReviews.stream()
+                            .filter(review -> review.getState() == PullRequestReview.State.COMMENTED)
+                            .filter(review -> review.getBody() != null) // Only count if there is a comment
+                            .count();
+                    int unknownReviews = (int) pullRequestReviews.stream()
+                            .filter(review -> review.getState() == PullRequestReview.State.UNKNOWN)
+                            .filter(review -> review.getBody() != null) // Only count if there is a comment
+                            .count();
+
+                    int codeComments = pullRequestReviews.stream()
+                            .map(review -> review.getComments().size())
+                            .reduce(0, Integer::sum);
+
+                    double interactionScore = (approvalReviews * 1.5 +
+                            changesRequestedReviews * 2.0 +
+                            (commentReviews + unknownReviews + numberOfIssueComments) +
+                            codeComments * 0.5);
+
+                    double complexityBonus = 1 + (complexityScore - 1) / 32.0;
+
+                    return 5 * interactionScore * complexityBonus;
+                })
+                .reduce(0.0, Double::sum);
+        return (int) Math.ceil(totalScore);
+    }
+
     /**
-     * Calculates the score for a given pull request.
+     * Calculates the complexity score for a given pull request.
      * Possible values: 1, 3, 7, 17, 33.
      * Taken from the original leaderboard implementation script.
      * 
      * @param pullRequest
      * @return score
      */
-    private int calculateScore(PullRequest pullRequest) {
+    private int calculateComplexityScore(PullRequest pullRequest) {
         Double complexityScore = ((pullRequest.getChangedFiles() * 3) + (pullRequest.getCommits() * 0.5)
                 + pullRequest.getAdditions() + pullRequest.getDeletions()) / 10;
         if (complexityScore < 10) {

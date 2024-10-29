@@ -6,10 +6,14 @@ import java.util.List;
 import org.hibernate.integrator.spi.Integrator;
 import org.hibernate.jpa.boot.spi.IntegratorProvider;
 
-import de.tum.in.www1.hephaestus.codereview.comment.IssueCommentDTO;
-import de.tum.in.www1.hephaestus.codereview.pullrequest.PullRequestDTO;
-import de.tum.in.www1.hephaestus.codereview.repository.RepositoryDTO;
-import de.tum.in.www1.hephaestus.codereview.user.UserDTO;
+import de.tum.in.www1.hephaestus.gitprovider.issue.IssueInfoDTO;
+import de.tum.in.www1.hephaestus.gitprovider.issuecomment.IssueCommentInfoDTO;
+import de.tum.in.www1.hephaestus.gitprovider.label.LabelInfoDTO;
+import de.tum.in.www1.hephaestus.gitprovider.milestone.MilestoneInfoDTO;
+import de.tum.in.www1.hephaestus.gitprovider.pullrequest.PullRequestInfoDTO;
+import de.tum.in.www1.hephaestus.gitprovider.pullrequestreview.PullRequestReviewInfoDTO;
+import de.tum.in.www1.hephaestus.gitprovider.repository.RepositoryInfoDTO;
+import de.tum.in.www1.hephaestus.gitprovider.user.UserInfoDTO;
 import io.hypersistence.utils.hibernate.type.util.ClassImportIntegrator;
 
 public class ClassImportIntegratorIntegratorProvider implements IntegratorProvider {
@@ -19,10 +23,14 @@ public class ClassImportIntegratorIntegratorProvider implements IntegratorProvid
         // Accessible DTOs
         @SuppressWarnings("rawtypes")
         List<Class> classes = new ArrayList<>();
-        classes.add(UserDTO.class);
-        classes.add(PullRequestDTO.class);
-        classes.add(IssueCommentDTO.class);
-        classes.add(RepositoryDTO.class);
+        classes.add(UserInfoDTO.class);
+        classes.add(IssueInfoDTO.class);
+        classes.add(LabelInfoDTO.class);
+        classes.add(MilestoneInfoDTO.class);
+        classes.add(PullRequestInfoDTO.class);
+        classes.add(IssueCommentInfoDTO.class);
+        classes.add(PullRequestReviewInfoDTO.class);
+        classes.add(RepositoryInfoDTO.class);
 
         return List.of(new ClassImportIntegrator(classes));
     }

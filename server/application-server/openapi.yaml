@@ -13,24 +13,6 @@ servers:
 - url: /
   description: Default Server URL
 paths:
-  /user/{login}:
-    get:
-      tags:
-      - user
-      operationId: getUser
-      parameters:
-      - name: login
-        in: path
-        required: true
-        schema:
-          type: string
-      responses:
-        "200":
-          description: OK
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/UserDTO"
   /user/{login}/profile:
     get:
       tags:
@@ -48,65 +30,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/UserProfileDTO"
-  /user/{login}/full:
-    get:
-      tags:
-      - user
-      operationId: getFullUser
-      parameters:
-      - name: login
-        in: path
-        required: true
-        schema:
-          type: string
-      responses:
-        "200":
-          description: OK
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/User"
-  /pullrequest/{id}:
-    get:
-      tags:
-      - pull-request
-      operationId: getPullRequest
-      parameters:
-      - name: id
-        in: path
-        required: true
-        schema:
-          type: integer
-          format: int64
-      responses:
-        "200":
-          description: OK
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/PullRequest"
-  /pullrequest/author/{login}:
-    get:
-      tags:
-      - pull-request
-      operationId: getPullRequestsByAuthor
-      parameters:
-      - name: login
-        in: path
-        required: true
-        schema:
-          type: string
-      responses:
-        "200":
-          description: OK
-          content:
-            application/json:
-              schema:
-                uniqueItems: true
-                type: array
-                items:
-                  $ref: "#/components/schemas/PullRequest"
+                $ref: "#/components/schemas/UserProfile"
   /meta:
     get:
       tags:
@@ -118,7 +42,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/MetaDataDTO"
+                $ref: "#/components/schemas/MetaData"
   /leaderboard:
     get:
       tags:
@@ -174,478 +98,205 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/UserInfoDto"
+                $ref: "#/components/schemas/AuthUserInfo"
 components:
   schemas:
-    IssueCommentDTO:
-      type: object
-      properties:
-        id:
-          type: integer
-          format: int64
-        body:
-          type: string
-        createdAt:
-          type: string
-        updatedAt:
-          type: string
-        author:
-          $ref: "#/components/schemas/UserDTO"
-        pullRequest:
-          $ref: "#/components/schemas/PullRequestDTO"
-    PullRequestDTO:
+    PullRequestInfo:
       required:
       - additions
-      - createdAt
+      - commentsCount
       - deletions
+      - htmlUrl
       - id
+      - isDraft
+      - isMerged
       - number
       - state
       - title
-      - updatedAt
-      - url
       type: object
       properties:
         id:
           type: integer
           format: int64
-        title:
-          type: string
         number:
           type: integer
           format: int32
-        url:
+        title:
           type: string
         state:
           type: string
           enum:
-          - CLOSED
           - OPEN
+          - CLOSED
+        isDraft:
+          type: boolean
+        isMerged:
+          type: boolean
+        commentsCount:
+          type: integer
+          format: int32
+        author:
+          $ref: "#/components/schemas/UserInfo"
+        labels:
+          type: array
+          items:
+            $ref: "#/components/schemas/LabelInfo"
+        assignees:
+          type: array
+          items:
+            $ref: "#/components/schemas/UserInfo"
+        repository:
+          $ref: "#/components/schemas/RepositoryInfo"
         additions:
           type: integer
           format: int32
         deletions:
           type: integer
           format: int32
+        mergedAt:
+          type: string
+          format: date-time
+        closedAt:
+          type: string
+          format: date-time
+        htmlUrl:
+          type: string
         createdAt:
           type: string
           format: date-time
         updatedAt:
           type: string
           format: date-time
-        mergedAt:
-          type: string
-          format: date-time
-        author:
-          $ref: "#/components/schemas/UserDTO"
-        comments:
-          uniqueItems: true
-          type: array
-          items:
-            $ref: "#/components/schemas/IssueCommentDTO"
-        labels:
-          uniqueItems: true
-          type: array
-          items:
-            $ref: "#/components/schemas/PullRequestLabel"
-        repository:
-          $ref: "#/components/schemas/RepositoryDTO"
-    PullRequestLabel:
+    LabelInfo:
+      required:
+      - color
+      - id
+      - name
       type: object
       properties:
+        id:
+          type: integer
+          format: int64
         name:
           type: string
         color:
           type: string
-    RepositoryDTO:
+    UserProfile:
       required:
-      - name
-      - nameWithOwner
-      - url
-      type: object
-      properties:
-        name:
-          type: string
-        nameWithOwner:
-          type: string
-        description:
-          type: string
-        url:
-          type: string
-    UserDTO:
-      type: object
-      properties:
-        id:
-          type: integer
-          format: int64
-        login:
-          type: string
-        email:
-          type: string
-        name:
-          type: string
-        url:
-          type: string
-        pullRequests:
-          uniqueItems: true
-          type: array
-          items:
-            $ref: "#/components/schemas/PullRequestDTO"
-        comments:
-          uniqueItems: true
-          type: array
-          items:
-            $ref: "#/components/schemas/IssueCommentDTO"
-    PullRequestReviewDTO:
-      required:
-      - createdAt
-      - id
-      - state
-      - submittedAt
-      - updatedAt
-      type: object
-      properties:
-        id:
-          type: integer
-          format: int64
-        createdAt:
-          type: string
-          format: date-time
-        updatedAt:
-          type: string
-          format: date-time
-        submittedAt:
-          type: string
-          format: date-time
-        state:
-          type: string
-          enum:
-          - COMMENTED
-          - APPROVED
-          - CHANGES_REQUESTED
-          - DISMISSED
-        url:
-          type: string
-        pullRequest:
-          $ref: "#/components/schemas/PullRequestDTO"
-    UserProfileDTO:
-      required:
-      - avatarUrl
+      - contributedRepositories
       - firstContribution
-      - id
-      - login
-      - repositories
+      - userInfo
       type: object
       properties:
-        id:
-          type: integer
-          format: int64
-        login:
-          type: string
-        avatarUrl:
-          type: string
+        userInfo:
+          $ref: "#/components/schemas/UserInfo"
         firstContribution:
           type: string
           format: date-time
-        repositories:
-          uniqueItems: true
+        contributedRepositories:
           type: array
           items:
-            type: string
-        activity:
-          uniqueItems: true
+            $ref: "#/components/schemas/RepositoryInfo"
+        reviewActivity:
           type: array
           items:
-            $ref: "#/components/schemas/PullRequestReviewDTO"
-        pullRequests:
-          uniqueItems: true
+            $ref: "#/components/schemas/PullRequestReviewInfo"
+        openPullRequests:
           type: array
           items:
-            $ref: "#/components/schemas/PullRequestDTO"
-    IssueComment:
-      type: object
-      properties:
-        id:
-          type: integer
-          format: int64
-        createdAt:
-          type: string
-          format: date-time
-        updatedAt:
-          type: string
-          format: date-time
-        body:
-          type: string
-        author:
-          $ref: "#/components/schemas/User"
-        pullRequest:
-          $ref: "#/components/schemas/PullRequest"
-    PullRequest:
+            $ref: "#/components/schemas/PullRequestInfo"
+    PullRequestReviewInfo:
       required:
-      - state
-      - title
-      - url
-      type: object
-      properties:
-        id:
-          type: integer
-          format: int64
-        createdAt:
-          type: string
-          format: date-time
-        updatedAt:
-          type: string
-          format: date-time
-        number:
-          type: integer
-          format: int32
-        title:
-          type: string
-        url:
-          type: string
-        state:
-          type: string
-          description: |-
-            State of the PullRequest.
-             Does not include the state of the merge.
-          enum:
-          - CLOSED
-          - OPEN
-        additions:
-          type: integer
-          format: int32
-        deletions:
-          type: integer
-          format: int32
-        commits:
-          type: integer
-          format: int32
-        changedFiles:
-          type: integer
-          format: int32
-        mergedAt:
-          type: string
-          format: date-time
-        author:
-          $ref: "#/components/schemas/User"
-        comments:
-          uniqueItems: true
-          type: array
-          items:
-            $ref: "#/components/schemas/IssueComment"
-        reviews:
-          uniqueItems: true
-          type: array
-          items:
-            $ref: "#/components/schemas/PullRequestReview"
-        repository:
-          $ref: "#/components/schemas/Repository"
-        pullRequestLabels:
-          uniqueItems: true
-          type: array
-          items:
-            $ref: "#/components/schemas/PullRequestLabel"
-    PullRequestReview:
-      required:
+      - codeComments
+      - htmlUrl
+      - id
+      - isDismissed
       - state
       type: object
       properties:
         id:
           type: integer
           format: int64
-        createdAt:
-          type: string
-          format: date-time
-        updatedAt:
-          type: string
-          format: date-time
-        author:
-          $ref: "#/components/schemas/User"
+        isDismissed:
+          type: boolean
         state:
           type: string
           enum:
           - COMMENTED
           - APPROVED
           - CHANGES_REQUESTED
-          - DISMISSED
+          - UNKNOWN
+        codeComments:
+          type: integer
+          format: int32
+        author:
+          $ref: "#/components/schemas/UserInfo"
+        pullRequest:
+          $ref: "#/components/schemas/PullRequestBaseInfo"
+        htmlUrl:
+          type: string
         submittedAt:
           type: string
           format: date-time
-        url:
-          type: string
-        comments:
-          uniqueItems: true
-          type: array
-          items:
-            $ref: "#/components/schemas/PullRequestReviewComment"
-        pullRequest:
-          $ref: "#/components/schemas/PullRequest"
-    PullRequestReviewComment:
+    RepositoryInfo:
       required:
-      - commit
-      type: object
-      properties:
-        id:
-          type: integer
-          format: int64
-        createdAt:
-          type: string
-          format: date-time
-        updatedAt:
-          type: string
-          format: date-time
-        body:
-          type: string
-        author:
-          $ref: "#/components/schemas/User"
-        review:
-          $ref: "#/components/schemas/PullRequestReview"
-        commit:
-          type: string
-    Repository:
-      required:
-      - defaultBranch
+      - htmlUrl
+      - id
       - name
       - nameWithOwner
-      - url
-      - visibility
       type: object
       properties:
         id:
           type: integer
           format: int64
-        createdAt:
-          type: string
-          format: date-time
-        updatedAt:
-          type: string
-          format: date-time
         name:
           type: string
         nameWithOwner:
           type: string
         description:
           type: string
-        defaultBranch:
+        htmlUrl:
           type: string
-        visibility:
-          type: string
-          enum:
-          - PUBLIC
-          - PRIVATE
-        url:
-          type: string
-        homepage:
-          type: string
-        pullRequests:
-          uniqueItems: true
-          type: array
-          items:
-            $ref: "#/components/schemas/PullRequest"
-    User:
-      required:
-      - login
-      - type
-      - url
-      type: object
-      properties:
-        id:
-          type: integer
-          format: int64
-        createdAt:
-          type: string
-          format: date-time
-        updatedAt:
-          type: string
-          format: date-time
-        login:
-          type: string
-          description: Unique login identifier for a user.
-        email:
-          type: string
-        name:
-          type: string
-          description: Display name of the user.
-        url:
-          type: string
-          description: |-
-            Unique URL to the user's profile.
-             Not the website a user can set in their profile.
-        avatarUrl:
-          type: string
-          description: |-
-            URL to the user's avatar.
-             If unavailable, a fallback can be generated from the login, e.g. on Github:
-             https://github.com/{login}.png
-        type:
-          type: string
-          description: Type of the user. Used to distinguish between users and bots.
-          enum:
-          - USER
-          - BOT
-        pullRequests:
-          uniqueItems: true
-          type: array
-          items:
-            $ref: "#/components/schemas/PullRequest"
-        issueComments:
-          uniqueItems: true
-          type: array
-          items:
-            $ref: "#/components/schemas/IssueComment"
-        reviewComments:
-          uniqueItems: true
-          type: array
-          items:
-            $ref: "#/components/schemas/PullRequestReviewComment"
-        reviews:
-          uniqueItems: true
-          type: array
-          items:
-            $ref: "#/components/schemas/PullRequestReview"
-    MetaDataDTO:
+    MetaData:
       type: object
       properties:
         repositoriesToMonitor:
           type: array
           items:
             type: string
-    LeaderboardEntry:
+    PullRequestBaseInfo:
+      required:
+      - htmlUrl
+      - id
+      - isDraft
+      - isMerged
+      - number
+      - state
+      - title
       type: object
       properties:
-        githubName:
+        id:
+          type: integer
+          format: int64
+        number:
+          type: integer
+          format: int32
+        title:
           type: string
-        avatarUrl:
-          type: string
-        name:
-          type: string
-        type:
+        state:
           type: string
           enum:
-          - USER
-          - BOT
-        score:
-          type: integer
-          format: int32
-        rank:
-          type: integer
-          format: int32
-        numberOfReviewedPRs:
-          type: integer
-          format: int32
-        changesRequested:
-          type: array
-          items:
-            $ref: "#/components/schemas/PullRequestReviewDTO"
-        approvals:
-          type: array
-          items:
-            $ref: "#/components/schemas/PullRequestReviewDTO"
-        comments:
-          type: array
-          items:
-            $ref: "#/components/schemas/PullRequestReviewDTO"
-    UserInfoDto:
+          - OPEN
+          - CLOSED
+        isDraft:
+          type: boolean
+        isMerged:
+          type: boolean
+        repository:
+          $ref: "#/components/schemas/RepositoryInfo"
+        htmlUrl:
+          type: string
+    AuthUserInfo:
       type: object
       properties:
         name:
@@ -654,3 +305,62 @@ components:
           type: array
           items:
             type: string
+    UserInfo:
+      required:
+      - avatarUrl
+      - htmlUrl
+      - id
+      - login
+      - name
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+        login:
+          type: string
+        avatarUrl:
+          type: string
+        name:
+          type: string
+        htmlUrl:
+          type: string
+    LeaderboardEntry:
+      required:
+      - numberOfApprovals
+      - numberOfChangeRequests
+      - numberOfCodeComments
+      - numberOfComments
+      - numberOfReviewedPRs
+      - numberOfUnknowns
+      - rank
+      - score
+      - user
+      type: object
+      properties:
+        rank:
+          type: integer
+          format: int32
+        score:
+          type: integer
+          format: int32
+        user:
+          $ref: "#/components/schemas/UserInfo"
+        numberOfReviewedPRs:
+          type: integer
+          format: int32
+        numberOfApprovals:
+          type: integer
+          format: int32
+        numberOfChangeRequests:
+          type: integer
+          format: int32
+        numberOfComments:
+          type: integer
+          format: int32
+        numberOfUnknowns:
+          type: integer
+          format: int32
+        numberOfCodeComments:
+          type: integer
+          format: int32

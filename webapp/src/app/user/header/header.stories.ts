@@ -5,20 +5,29 @@ import { UserHeaderComponent } from './header.component';
 type FlatArgs = {
   isLoading: boolean;
   avatarUrl: string;
+  name: string;
   login: string;
   firstContribution: string;
-  repositories: string;
+  contributedRepositories: string;
 };
 
 function flatArgsToProps(args: FlatArgs) {
   return {
     isLoading: args.isLoading,
-    userData: {
+    user: {
+      id: 1,
       avatarUrl: args.avatarUrl,
+      name: args.name,
       login: args.login,
-      firstContribution: dayjs(args.firstContribution),
-      repositories: new Set(args.repositories.split(',').map((repo) => repo.trim()))
-    }
+      htmlUrl: 'https://www.github.com/' + args.login
+    },
+    firstContribution: dayjs(args.firstContribution),
+    contributedRepositories: args.contributedRepositories.split(',').map((repo) => ({
+      id: 1,
+      name: repo.split('/')[1],
+      nameWithOwner: repo,
+      htmlUrl: 'https://www.github.com/' + repo
+    }))
   };
 }
 
@@ -29,8 +38,9 @@ const meta: Meta<FlatArgs> = {
     isLoading: false,
     avatarUrl: 'https://avatars.githubusercontent.com/u/11064260?v=4',
     login: 'octocat',
+    name: 'Octocat',
     firstContribution: dayjs().subtract(4, 'days').toISOString(),
-    repositories: 'ls1intum/Hephaestus, ls1intum/Artemis, ls1intum/Athena'
+    contributedRepositories: 'ls1intum/Hephaestus,ls1intum/Artemis,ls1intum/Athena'
   },
   argTypes: {
     isLoading: {
@@ -53,7 +63,7 @@ const meta: Meta<FlatArgs> = {
         type: 'text'
       }
     },
-    repositories: {
+    contributedRepositories: {
       control: {
         type: 'text'
       }

@@ -22,7 +22,7 @@ public class LeaderboardController {
     }
 
     @GetMapping
-    public ResponseEntity<List<LeaderboardEntry>> getLeaderboard(
+    public ResponseEntity<List<LeaderboardEntryDTO>> getLeaderboard(
             @RequestParam @DateTimeFormat(pattern = "yyyy-MM-dd") Optional<LocalDate> after,
             @RequestParam @DateTimeFormat(pattern = "yyyy-MM-dd") Optional<LocalDate> before,
             @RequestParam Optional<String> repository) {
