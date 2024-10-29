@@ -14,7 +14,7 @@ on:
   workflow_dispatch:
 
 jobs:
-  generate-intelligence-service-client:
+  generate-api-client:
     name: Verify API Specs and Client of the intelligence service (add autocommit-openapi label to PR to auto-commit changes)
     runs-on: ubuntu-latest
 
@@ -52,7 +52,7 @@ jobs:
          id: cached-poetry-dependencies
          uses: actions/cache@v4
          with:
-          path: .venv
+           path: .venv
           key: venv-${{ runner.os }}-${{ steps.setup-python.outputs.python-version }}-${{ hashFiles('**/poetry.lock') }}
 
       - name: Install Python dependencies
