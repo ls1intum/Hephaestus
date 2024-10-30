@@ -24,7 +24,7 @@ export const appConfig: ApplicationConfig = {
     provideHttpClient(withInterceptors([securityInterceptor])),
     provideAnimationsAsync(),
     { provide: BASE_PATH, useValue: environment.serverUrl },
-    { provide: APP_INITIALIZER, useFactory: initializeAnalytics, multi: true, deps: [AnalyticsService] },
-    { provide: TitleStrategy, useClass: TemplatePageTitleStrategy }
+    { provide: APP_INITIALIZER, useFactory: initializeAnalytics, multi: true, deps: [AnalyticsService] }
+    // { provide: TitleStrategy, useClass: TemplatePageTitleStrategy }
   ]
 };
