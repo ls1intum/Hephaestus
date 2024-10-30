@@ -18,7 +18,7 @@ export class TemplatePageTitleStrategy extends TitleStrategy {
     this.title.setTitle(title);
 
     // Update meta tags
-    const metaTags = routerState.root.data['meta'];
+    const metaTags = routerState.root.firstChild?.data['meta'];
     if (metaTags) {
       const iconURL = 'https://github.com/ls1intum/Hephaestus/raw/refs/heads/develop/docs/images/hammer.svg';
       this.metaService.updateTag({ name: 'description', content: metaTags.description });
@@ -28,7 +28,7 @@ export class TemplatePageTitleStrategy extends TitleStrategy {
       this.metaService.updateTag({ property: 'og:image', content: iconURL });
       this.metaService.updateTag({ property: 'og:image:width', content: '67' });
       this.metaService.updateTag({ property: 'og:image:height', content: '60' });
-      this.metaService.updateTag({ property: 'og:url', content: routerState.url });
+      this.metaService.updateTag({ property: 'og:url', content: 'https://hephaestus.ase.cit.tum.de' + routerState.url });
 
       // this.metaService.updateTag({ name: 'twitter:card', content: 'summary_large_image' });
       this.metaService.updateTag({ name: 'twitter:title', content: title });
