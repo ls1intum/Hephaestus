@@ -6,12 +6,13 @@ import { AdminGuard } from '@app/core/security/admin.guard';
 import { UserProfileComponent } from '@app/user/user-profile.component';
 
 export const routes: Routes = [
-  { path: '', component: HomeComponent },
-  { path: 'about', component: AboutComponent },
+  { path: '', component: HomeComponent, title: 'Home', data: { meta: { description: 'Artemis Leaderboard - Hephaestus' } } },
+  { path: 'about', component: AboutComponent, title: 'About', data: { meta: { description: 'About Hephaestus' } } },
   {
     path: 'admin',
     component: AdminComponent,
-    canActivate: [AdminGuard]
+    canActivate: [AdminGuard],
+    title: 'Admin'
   },
-  { path: 'user/:id', component: UserProfileComponent }
+  { path: 'user/:id', component: UserProfileComponent, data: { meta: { description: 'User Profile - Hephaestus' } } }
 ];
