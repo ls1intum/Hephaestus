@@ -9,6 +9,7 @@ import { routes } from 'app/app.routes';
 import { AnalyticsService } from './analytics.service';
 import { securityInterceptor } from './core/security/security-interceptor';
 import { TemplatePageTitleStrategy } from './core/TemplatePageTitleStrategy';
+import { provideClientHydration, withHttpTransferCacheOptions } from '@angular/platform-browser';
 
 function initializeAnalytics(analyticsService: AnalyticsService): () => void {
   return () => {
@@ -23,8 +24,9 @@ export const appConfig: ApplicationConfig = {
     provideAngularQuery(new QueryClient()),
     provideHttpClient(withInterceptors([securityInterceptor])),
     provideAnimationsAsync(),
+    provideClientHydration(),
     { provide: BASE_PATH, useValue: environment.serverUrl },
-    { provide: APP_INITIALIZER, useFactory: initializeAnalytics, multi: true, deps: [AnalyticsService] }
-    // { provide: TitleStrategy, useClass: TemplatePageTitleStrategy }
+    { provide: APP_INITIALIZER, useFactory: initializeAnalytics, multi: true, deps: [AnalyticsService] },
+    { provide: TitleStrategy, useClass: TemplatePageTitleStrategy }
   ]
 };
