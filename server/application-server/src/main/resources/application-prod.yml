@@ -29,3 +29,6 @@ monitoring:
 
 github:
   authToken: ${GITHUB_AUTH_TOKEN}
+slack:
+    token: ${SLACK_BOT_TOKEN}
+    signingSecret: ${SLACK_SIGNING_SECRET}
