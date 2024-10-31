@@ -50,5 +50,8 @@ monitoring:
 github:
     authToken: null
 slack:
+    runScheduledMessage: false
+    cronSchedule: "0 0 9 ? * TUE"
     token: ""
     signingSecret: ""
+    channelId: ""
