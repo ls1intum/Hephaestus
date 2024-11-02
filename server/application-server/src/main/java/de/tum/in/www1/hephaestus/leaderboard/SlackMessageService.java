@@ -1,7 +1,10 @@
 package de.tum.in.www1.hephaestus.leaderboard;
 
 import java.io.IOException;
+import java.time.LocalDate;
 import java.util.List;
+import java.util.Optional;
+import java.util.stream.IntStream;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -42,6 +45,9 @@ public class SlackMessageService {
     @Autowired
     private App slackApp;
 
+    @Autowired
+    private LeaderboardService leaderboardService;
+
     public void sendMessage(String channelId, List<LayoutBlock> blocks, String fallback)
             throws IOException, SlackApiException {
         ChatPostMessageRequest request = ChatPostMessageRequest.builder()
@@ -57,26 +63,47 @@ public class SlackMessageService {
         }
     }
 
+    private List<LeaderboardEntryDTO> getTop3SlackReviewers() {
+        LocalDate after = LocalDate.now().minusDays(8);
+        LocalDate before = LocalDate.now().minusDays(1);
+        var leaderboard = leaderboardService.createLeaderboard(Optional.of(after), Optional.of(before),
+                Optional.empty());
+        return leaderboard.subList(0, Math.min(3, leaderboard.size()));
+    }
+
     @Scheduled(cron = "${slack.cronSchedule}")
     public void sendScheduledLeaderboard() {
         if (!runScheduledMessage) {
             return;
         }
+
+        var top3reviewers = getTop3SlackReviewers();
+        logger.info("Top 3 Accounts of the last week: " + top3reviewers);
+
         logger.info("Sending scheduled message to Slack channel...");
-        var blocks = asBlocks(
+        List<LayoutBlock> blocks = asBlocks(
                 header(header -> header.text(
-                        plainText(pt -> pt.text(":newspaper:  Developer Reviews of the last week  :newspaper:")))),
+                        plainText(pt -> pt.text(":newspaper: Developer Reviews of the last week :newspaper:")))),
                 divider(),
                 context(context -> context
-                        .elements(List.of(markdownText("*October 31, 2024*  |  Hephaestus Announcement")))),
+                        .elements(List.of(markdownText("*October 31, 2024* | Hephaestus Announcement")))),
                 section(section -> section.text(markdownText(
-                        "Here is the *review table* summary for the last week. The table is taken directly from <https://hephaestus.ase.cit.tum.de/|Hephaestus> and now also includes non-review comments & code comments in addition to all variants of reviews for each developer. The score is a weighted heuristic based on the complexities of the reviewed PRs (similar to the old algorithm)."))),
+                        "Another *review leaderboard* has concluded. You can check out your placement at <https://hephaestus.ase.cit.tum.de/|hephaestus.ase.cit.tum.de>. The score is a weighted heuristic based on the complexities of the reviewed PRs (similar to the old algorithm)."))),
                 section(section -> section.text(markdownText(
-                        "If you would like to check out more leaderboards or statistics, head over to last week's leaderboard or this month's leaderboard."))));
+                        "If you would like to check out more leaderboards or statistics, head over to last week's leaderboard or this month's leaderboard."))),
+                section(section -> section.text(markdownText(
+                        "The top 3 reviewers of the last week are:"))),
+                section(section -> section.text(markdownText(
+                        IntStream.range(0, top3reviewers.size())
+                                .mapToObj(i -> ("• *" + (i + 1) + ". @" + top3reviewers.get(i).user().name() + " *"))
+                                .reduce((a, b) -> a + "\n" + b).orElse(""))))
+
+        );
         try {
             sendMessage(channelId, blocks, "Developer Reviews of the last week");
         } catch (IOException | SlackApiException e) {
-            logger.error("Failed to send scheduled message to Slack channel: " + e.getMessage());
+            logger.error("Failed to send scheduled message to Slack channel: " +
+                    e.getMessage());
         }
     }
 
