@@ -100,24 +100,23 @@ public class SlackMessageService {
         logger.info("Sending scheduled message to Slack channel...");
         List<LayoutBlock> blocks = asBlocks(
                 header(header -> header.text(
-                        plainText(pt -> pt.text(":newspaper: Developer Reviews of the last week :newspaper:")))),
+                        plainText(pt -> pt.text(":newspaper: Reviews of the last week :newspaper:")))),
                 divider(),
                 context(context -> context
-                        .elements(List.of(markdownText("*" + currentDate + "* | Hephaestus Announcement")))),
+                        .elements(List.of(markdownText("*" + currentDate + "*")))),
                 section(section -> section.text(markdownText(
                         "Another *review leaderboard* has concluded. You can check out your placement at <https://hephaestus.ase.cit.tum.de/|hephaestus.ase.cit.tum.de>."))),
                 section(section -> section.text(markdownText(
-                        "If you would like to check out more leaderboards or statistics, head over to last week's leaderboard or this month's leaderboard."))),
-                section(section -> section.text(markdownText(
-                        "The top 3 reviewers of the last week are:"))),
+                        "Special thanks to our top 3 reviewers of last week:"))),
                 section(section -> section.text(markdownText(
                         IntStream.range(0, top3reviewers.size())
                                 .mapToObj(i -> ("• *" + (i + 1) + ". @" + top3reviewers.get(i).getTeamId() + " *"))
-                                .reduce((a, b) -> a + "\n" + b).orElse(""))))
+                                .reduce((a, b) -> a + "\n" + b).orElse("")))),
+                section(section -> section.text(markdownText("Happy coding and reviewing! :rocket:")))
 
         );
         try {
-            sendMessage(channelId, blocks, "Developer Reviews of the last week");
+            sendMessage(channelId, blocks, "Reviews of the last week");
         } catch (IOException | SlackApiException e) {
             logger.error("Failed to send scheduled message to Slack channel: " + e.getMessage());
         }
