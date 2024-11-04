@@ -13,6 +13,7 @@ fastapi = {extras = ["standard"], version = "0.112.1"}
 pydantic-settings = "2.4.0"
 langchain = "0.2.15"
 langchain-openai = "0.1.23"
+langgraph = "^0.2.44"
 
 [virtualenvs]
 create = true
