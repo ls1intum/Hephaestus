@@ -2,6 +2,7 @@ package de.tum.in.www1.hephaestus.leaderboard;
 
 import java.io.IOException;
 import java.time.LocalDate;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 import java.util.stream.IntStream;
@@ -23,6 +24,7 @@ import com.slack.api.methods.SlackApiException;
 import com.slack.api.methods.request.chat.ChatPostMessageRequest;
 import com.slack.api.methods.response.auth.AuthTestResponse;
 import com.slack.api.methods.response.chat.ChatPostMessageResponse;
+import com.slack.api.model.User;
 import com.slack.api.model.block.LayoutBlock;
 
 import static com.slack.api.model.block.Blocks.*;
@@ -63,12 +65,24 @@ public class SlackMessageService {
         }
     }
 
-    private List<LeaderboardEntryDTO> getTop3SlackReviewers() {
+    private List<User> getTop3SlackReviewers() {
         LocalDate after = LocalDate.now().minusDays(8);
         LocalDate before = LocalDate.now().minusDays(1);
         var leaderboard = leaderboardService.createLeaderboard(Optional.of(after), Optional.of(before),
                 Optional.empty());
-        return leaderboard.subList(0, Math.min(3, leaderboard.size()));
+        var top3 = leaderboard.subList(0, Math.min(3, leaderboard.size()));
+
+        List<User> allSlackUsers;
+        try {
+            allSlackUsers = slackApp.client().usersList(r -> r).getMembers();
+        } catch (SlackApiException | IOException e) {
+            logger.error("Failed to get Slack users: " + e.getMessage());
+            return new ArrayList<>();
+        }
+
+        return top3.stream().map(entry -> allSlackUsers.stream()
+                .filter(user -> user.getName().equals(entry.user().name())).findFirst().orElse(null))
+                .filter(user -> user != null).toList();
     }
 
     @Scheduled(cron = "${slack.cronSchedule}")
@@ -77,8 +91,11 @@ public class SlackMessageService {
             return;
         }
 
+        // get date in format October 31, 2024
+        var currentDate = LocalDate.now().format(java.time.format.DateTimeFormatter.ofPattern("MMMM d, yyyy"));
+
         var top3reviewers = getTop3SlackReviewers();
-        logger.info("Top 3 Accounts of the last week: " + top3reviewers);
+        // logger.info("Top 3 Accounts of the last week: " + top3reviewers);
 
         logger.info("Sending scheduled message to Slack channel...");
         List<LayoutBlock> blocks = asBlocks(
@@ -86,24 +103,23 @@ public class SlackMessageService {
                         plainText(pt -> pt.text(":newspaper: Developer Reviews of the last week :newspaper:")))),
                 divider(),
                 context(context -> context
-                        .elements(List.of(markdownText("*October 31, 2024* | Hephaestus Announcement")))),
+                        .elements(List.of(markdownText("*" + currentDate + "* | Hephaestus Announcement")))),
                 section(section -> section.text(markdownText(
-                        "Another *review leaderboard* has concluded. You can check out your placement at <https://hephaestus.ase.cit.tum.de/|hephaestus.ase.cit.tum.de>. The score is a weighted heuristic based on the complexities of the reviewed PRs (similar to the old algorithm)."))),
+                        "Another *review leaderboard* has concluded. You can check out your placement at <https://hephaestus.ase.cit.tum.de/|hephaestus.ase.cit.tum.de>."))),
                 section(section -> section.text(markdownText(
                         "If you would like to check out more leaderboards or statistics, head over to last week's leaderboard or this month's leaderboard."))),
                 section(section -> section.text(markdownText(
                         "The top 3 reviewers of the last week are:"))),
                 section(section -> section.text(markdownText(
                         IntStream.range(0, top3reviewers.size())
-                                .mapToObj(i -> ("• *" + (i + 1) + ". @" + top3reviewers.get(i).user().name() + " *"))
+                                .mapToObj(i -> ("• *" + (i + 1) + ". @" + top3reviewers.get(i).getTeamId() + " *"))
                                 .reduce((a, b) -> a + "\n" + b).orElse(""))))
 
         );
         try {
             sendMessage(channelId, blocks, "Developer Reviews of the last week");
         } catch (IOException | SlackApiException e) {
-            logger.error("Failed to send scheduled message to Slack channel: " +
-                    e.getMessage());
+            logger.error("Failed to send scheduled message to Slack channel: " + e.getMessage());
         }
     }
 
