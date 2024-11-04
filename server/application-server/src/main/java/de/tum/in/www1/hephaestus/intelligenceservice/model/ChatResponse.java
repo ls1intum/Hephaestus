@@ -20,6 +20,10 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonTypeName;
 import com.fasterxml.jackson.annotation.JsonValue;
+import org.openapitools.jackson.nullable.JsonNullable;
+import com.fasterxml.jackson.annotation.JsonIgnore;
+import org.openapitools.jackson.nullable.JsonNullable;
+import java.util.NoSuchElementException;
 import com.fasterxml.jackson.annotation.JsonPropertyOrder;
 import com.fasterxml.jackson.annotation.JsonTypeName;
 import org.hibernate.validator.constraints.*;
@@ -28,12 +32,16 @@ import org.hibernate.validator.constraints.*;
  * ChatResponse
  */
 @JsonPropertyOrder({
-  ChatResponse.JSON_PROPERTY_RESPONSE
+  ChatResponse.JSON_PROPERTY_RESPONSE,
+  ChatResponse.JSON_PROPERTY_THREAD_ID
 })
 @jakarta.annotation.Generated(value = "org.openapitools.codegen.languages.JavaClientCodegen", comments = "Generator version: 7.7.0")
 public class ChatResponse {
   public static final String JSON_PROPERTY_RESPONSE = "response";
   private String response;
+
+  public static final String JSON_PROPERTY_THREAD_ID = "thread_id";
+  private JsonNullable<String> threadId = JsonNullable.<String>undefined();
 
   public ChatResponse() {
   }
@@ -63,6 +71,39 @@ public class ChatResponse {
     this.response = response;
   }
 
+  public ChatResponse threadId(String threadId) {
+    this.threadId = JsonNullable.<String>of(threadId);
+    
+    return this;
+  }
+
+  /**
+   * Get threadId
+   * @return threadId
+   */
+  @jakarta.annotation.Nullable
+  @JsonIgnore
+
+  public String getThreadId() {
+        return threadId.orElse(null);
+  }
+
+  @JsonProperty(JSON_PROPERTY_THREAD_ID)
+  @JsonInclude(value = JsonInclude.Include.USE_DEFAULTS)
+
+  public JsonNullable<String> getThreadId_JsonNullable() {
+    return threadId;
+  }
+  
+  @JsonProperty(JSON_PROPERTY_THREAD_ID)
+  public void setThreadId_JsonNullable(JsonNullable<String> threadId) {
+    this.threadId = threadId;
+  }
+
+  public void setThreadId(String threadId) {
+    this.threadId = JsonNullable.<String>of(threadId);
+  }
+
   @Override
   public boolean equals(Object o) {
     if (this == o) {
@@ -72,12 +113,24 @@ public class ChatResponse {
       return false;
     }
     ChatResponse chatResponse = (ChatResponse) o;
-    return Objects.equals(this.response, chatResponse.response);
+    return Objects.equals(this.response, chatResponse.response) &&
+        equalsNullable(this.threadId, chatResponse.threadId);
+  }
+
+  private static <T> boolean equalsNullable(JsonNullable<T> a, JsonNullable<T> b) {
+    return a == b || (a != null && b != null && a.isPresent() && b.isPresent() && Objects.deepEquals(a.get(), b.get()));
   }
 
   @Override
   public int hashCode() {
-    return Objects.hash(response);
+    return Objects.hash(response, hashCodeNullable(threadId));
+  }
+
+  private static <T> int hashCodeNullable(JsonNullable<T> a) {
+    if (a == null) {
+      return 1;
+    }
+    return a.isPresent() ? Arrays.deepHashCode(new Object[]{a.get()}) : 31;
   }
 
   @Override
@@ -85,6 +138,7 @@ public class ChatResponse {
     StringBuilder sb = new StringBuilder();
     sb.append("class ChatResponse {\n");
     sb.append("    response: ").append(toIndentedString(response)).append("\n");
+    sb.append("    threadId: ").append(toIndentedString(threadId)).append("\n");
     sb.append("}");
     return sb.toString();
   }

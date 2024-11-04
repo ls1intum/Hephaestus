@@ -24,7 +24,7 @@ class ChatResponse(BaseModel):
     thread_id: Optional[str] = None
 
 
-@app.post("/chat", response_model=ChatResponse, summary="Chat with LLM")
+@app.post("/chat", response_model=ChatResponse, summary="Start and continue a chat session with an LLM.")
 async def chat(request: ChatRequest):
     if request.thread_id is None:
         # Start a new chat session
