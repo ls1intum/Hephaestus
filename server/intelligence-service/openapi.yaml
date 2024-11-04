@@ -89,4 +89,4 @@ paths:
               schema:
                 $ref: '#/components/schemas/HTTPValidationError'
           description: Validation Error
-      summary: Chat with LLM
+      summary: Start and continue a chat session with an LLM.

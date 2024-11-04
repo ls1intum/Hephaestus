@@ -42,7 +42,7 @@ public class DefaultApi extends BaseApi {
     }
 
     /**
-     * Chat with LLM
+     * Start and continue a chat session with an LLM.
      * 
      * <p><b>200</b> - Successful Response
      * <p><b>422</b> - Validation Error
@@ -55,7 +55,7 @@ public class DefaultApi extends BaseApi {
     }
 
     /**
-     * Chat with LLM
+     * Start and continue a chat session with an LLM.
      * 
      * <p><b>200</b> - Successful Response
      * <p><b>422</b> - Validation Error
