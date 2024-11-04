@@ -1,4 +1,4 @@
-package de.tum.in.www1.hephaestus.intelligenceapi;
+package de.tum.in.www1.hephaestus.intelligenceservice;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
@@ -56,10 +56,10 @@ import java.util.TimeZone;
 import java.util.function.Supplier;
 import java.time.OffsetDateTime;
 
-import de.tum.in.www1.hephaestus.intelligenceapi.auth.Authentication;
+import de.tum.in.www1.hephaestus.intelligenceservice.auth.Authentication;
 
-@jakarta.annotation.Generated(value = "org.openapitools.codegen.languages.JavaClientCodegen", date = "2024-10-29T19:53:57.523401+01:00[Europe/Berlin]", comments = "Generator version: 7.7.0")
-@Component("de.tum.in.www1.hephaestus.intelligenceapi.ApiClient")
+@jakarta.annotation.Generated(value = "org.openapitools.codegen.languages.JavaClientCodegen", comments = "Generator version: 7.7.0")
+@Component("de.tum.in.www1.hephaestus.intelligenceservice.ApiClient")
 public class ApiClient extends JavaTimeFormatter {
     public enum CollectionFormat {
         CSV(","), TSV("\t"), SSV(" "), PIPES("|"), MULTI(null);

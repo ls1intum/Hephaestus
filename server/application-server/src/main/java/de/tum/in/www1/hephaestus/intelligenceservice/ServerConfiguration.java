@@ -1,11 +1,11 @@
-package de.tum.in.www1.hephaestus.intelligenceapi;
+package de.tum.in.www1.hephaestus.intelligenceservice;
 
 import java.util.Map;
 
 /**
  * Representing a Server configuration.
  */
-@jakarta.annotation.Generated(value = "org.openapitools.codegen.languages.JavaClientCodegen", date = "2024-10-29T19:53:57.523401+01:00[Europe/Berlin]", comments = "Generator version: 7.7.0")
+@jakarta.annotation.Generated(value = "org.openapitools.codegen.languages.JavaClientCodegen", comments = "Generator version: 7.7.0")
 public class ServerConfiguration {
     public String URL;
     public String description;

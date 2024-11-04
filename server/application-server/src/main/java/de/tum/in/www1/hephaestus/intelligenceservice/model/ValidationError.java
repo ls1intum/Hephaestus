@@ -11,7 +11,7 @@
  */
 
 
-package de.tum.in.www1.hephaestus.intelligenceapi.model;
+package de.tum.in.www1.hephaestus.intelligenceservice.model;
 
 import java.util.Objects;
 import java.util.Arrays;
@@ -20,7 +20,7 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonTypeName;
 import com.fasterxml.jackson.annotation.JsonValue;
-import de.tum.in.www1.hephaestus.intelligenceapi.model.ValidationErrorLocInner;
+import de.tum.in.www1.hephaestus.intelligenceservice.model.ValidationErrorLocInner;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
@@ -36,7 +36,7 @@ import org.hibernate.validator.constraints.*;
   ValidationError.JSON_PROPERTY_MSG,
   ValidationError.JSON_PROPERTY_TYPE
 })
-@jakarta.annotation.Generated(value = "org.openapitools.codegen.languages.JavaClientCodegen", date = "2024-10-29T19:53:57.523401+01:00[Europe/Berlin]", comments = "Generator version: 7.7.0")
+@jakarta.annotation.Generated(value = "org.openapitools.codegen.languages.JavaClientCodegen", comments = "Generator version: 7.7.0")
 public class ValidationError {
   public static final String JSON_PROPERTY_LOC = "loc";
   private List<ValidationErrorLocInner> loc = new ArrayList<>();

@@ -1,4 +1,4 @@
-package de.tum.in.www1.hephaestus.intelligenceapi.auth;
+package de.tum.in.www1.hephaestus.intelligenceservice.auth;
 
 import org.springframework.http.HttpHeaders;
 import org.springframework.util.MultiValueMap;

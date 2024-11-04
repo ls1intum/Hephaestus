@@ -1,4 +1,4 @@
-package de.tum.in.www1.hephaestus.intelligenceapi;
+package de.tum.in.www1.hephaestus.intelligenceservice;
 
 import java.util.Set;
 

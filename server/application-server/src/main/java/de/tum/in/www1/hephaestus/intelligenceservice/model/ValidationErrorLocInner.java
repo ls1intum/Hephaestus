@@ -11,7 +11,7 @@
  */
 
 
-package de.tum.in.www1.hephaestus.intelligenceapi.model;
+package de.tum.in.www1.hephaestus.intelligenceservice.model;
 
 import java.util.Objects;
 import java.util.Arrays;
@@ -26,7 +26,7 @@ import org.hibernate.validator.constraints.*;
 @JsonPropertyOrder({
 })
 @JsonTypeName("ValidationError_loc_inner")
-@jakarta.annotation.Generated(value = "org.openapitools.codegen.languages.JavaClientCodegen", date = "2024-10-29T19:53:57.523401+01:00[Europe/Berlin]", comments = "Generator version: 7.7.0")
+@jakarta.annotation.Generated(value = "org.openapitools.codegen.languages.JavaClientCodegen", comments = "Generator version: 7.7.0")
 public class ValidationErrorLocInner {
   public ValidationErrorLocInner() {
   }

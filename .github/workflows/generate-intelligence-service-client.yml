@@ -9,7 +9,7 @@ on:
   push:
     paths:
       - 'server/intelligence-service/openapi.yaml'
-      - 'server/application-server/src/main/java/de/tum/in/www1/hephaestus/intelligenceapi/**'
+      - 'server/application-server/src/main/java/de/tum/in/www1/hephaestus/intelligenceservice/**'
     branches: [develop]
   workflow_dispatch:
 

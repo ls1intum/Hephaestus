@@ -1,11 +1,11 @@
-package de.tum.in.www1.hephaestus.intelligenceapi.api;
+package de.tum.in.www1.hephaestus.intelligenceservice.api;
 
-import de.tum.in.www1.hephaestus.intelligenceapi.ApiClient;
-import de.tum.in.www1.hephaestus.intelligenceapi.BaseApi;
+import de.tum.in.www1.hephaestus.intelligenceservice.ApiClient;
+import de.tum.in.www1.hephaestus.intelligenceservice.BaseApi;
 
-import de.tum.in.www1.hephaestus.intelligenceapi.model.ChatRequest;
-import de.tum.in.www1.hephaestus.intelligenceapi.model.ChatResponse;
-import de.tum.in.www1.hephaestus.intelligenceapi.model.HTTPValidationError;
+import de.tum.in.www1.hephaestus.intelligenceservice.model.ChatRequest;
+import de.tum.in.www1.hephaestus.intelligenceservice.model.ChatResponse;
+import de.tum.in.www1.hephaestus.intelligenceservice.model.HTTPValidationError;
 
 import java.util.Collections;
 import java.util.HashMap;
@@ -28,8 +28,8 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 
-@jakarta.annotation.Generated(value = "org.openapitools.codegen.languages.JavaClientCodegen", date = "2024-10-29T19:53:57.523401+01:00[Europe/Berlin]", comments = "Generator version: 7.7.0")
-@Component("de.tum.in.www1.hephaestus.intelligenceapi.api.DefaultApi")
+@jakarta.annotation.Generated(value = "org.openapitools.codegen.languages.JavaClientCodegen", comments = "Generator version: 7.7.0")
+@Component("de.tum.in.www1.hephaestus.intelligenceservice.api.DefaultApi")
 public class DefaultApi extends BaseApi {
 
     public DefaultApi() {
