@@ -69,6 +69,11 @@
 			<artifactId>liquibase-core</artifactId>
 		</dependency>
 		<dependency>
+			<groupId>org.liquibase.ext</groupId>
+			<artifactId>liquibase-hibernate6</artifactId>
+			<version>4.28.0</version>
+		</dependency>
+		<dependency>
 			<groupId>org.springframework.boot</groupId>
 			<artifactId>spring-boot-starter-logging</artifactId>
 		</dependency>
@@ -194,6 +199,34 @@
 					<outputDir>.</outputDir>
 				</configuration>
 			</plugin>
+			<plugin>
+				<groupId>org.liquibase</groupId>
+				<artifactId>liquibase-maven-plugin</artifactId>
+				<version>4.27.0</version>
+				<configuration>
+					<!-- Main changelog file that Liquibase applies to the database -->
+					<changeLogFile>src/main/resources/db/master.yaml</changeLogFile>
+
+					<!-- Generated diff changelog file with a timestamp in the filename -->
+					<diffChangeLogFile>src/main/resources/db/${maven.build.timestamp}_changelog.yaml</diffChangeLogFile>
+
+					<!-- Database connection properties -->
+					<driver>org.postgresql.Driver</driver>
+					<url>jdbc:postgresql://localhost:5432/hephaestus</url>
+					<username>root</username>
+					<password>root</password>
+
+					<!-- Hibernate URL for reference schema using the Hibernate 6 dialect -->
+					<referenceUrl>hibernate:spring:de.tum.in.www1.hephaestus.entity?dialect=org.hibernate.dialect.PostgreSQLDialect
+						&amp;hibernate.physical_naming_strategy=org.hibernate.boot.model.naming.CamelCaseToUnderscoresNamingStrategy
+						&amp;hibernate.implicit_naming_strategy=org.springframework.boot.orm.jpa.hibernate.SpringImplicitNamingStrategy
+					</referenceUrl>
+
+					<!-- Enable detailed logging output -->
+					<verbose>true</verbose>
+				</configuration>
+			</plugin>
+
 		</plugins>
 	</build>
 
