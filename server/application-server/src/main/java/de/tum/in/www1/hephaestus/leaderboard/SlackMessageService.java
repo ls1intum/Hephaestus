@@ -44,6 +44,9 @@ public class SlackMessageService {
     @Value("${slack.runScheduledMessage}")
     private boolean runScheduledMessage;
 
+    @Value("${spring.url:localhost:8080}")
+    private String hephaestusUrl;
+
     @Autowired
     private App slackApp;
 
@@ -105,7 +108,9 @@ public class SlackMessageService {
                 context(context -> context
                         .elements(List.of(markdownText("*" + currentDate + "*")))),
                 section(section -> section.text(markdownText(
-                        "Another *review leaderboard* has concluded. You can check out your placement at <https://hephaestus.ase.cit.tum.de/|hephaestus.ase.cit.tum.de>."))),
+                        "Another *review leaderboard* has concluded. You can check out your placement at "
+                                + hephaestusUrl
+                                + "."))),
                 section(section -> section.text(markdownText(
                         "Special thanks to our top 3 reviewers of last week:"))),
                 section(section -> section.text(markdownText(
@@ -131,6 +136,7 @@ public class SlackMessageService {
             logger.info("Slack scheduled messages are disabled, skipping Slack app init test.");
             return;
         }
+        logger.info("Testing Slack app initialization...");
         AuthTestResponse response;
         try {
             response = slackApp.client().authTest(r -> r);
