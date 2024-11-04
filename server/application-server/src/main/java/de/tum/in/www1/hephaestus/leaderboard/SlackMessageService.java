@@ -67,7 +67,7 @@ public class SlackMessageService {
 
     private List<User> getTop3SlackReviewers() {
         LocalDate after = LocalDate.now().minusDays(8);
-        LocalDate before = LocalDate.now().minusDays(1);
+        LocalDate before = LocalDate.now().minusDays(2);
         var leaderboard = leaderboardService.createLeaderboard(Optional.of(after), Optional.of(before),
                 Optional.empty());
         var top3 = leaderboard.subList(0, Math.min(3, leaderboard.size()));
