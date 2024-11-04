@@ -1,4 +1,4 @@
-name: OpenAPI Intelligence Service
+name: OpenAPI
 
 on:
   pull_request:
@@ -15,7 +15,7 @@ on:
 
 jobs:
   generate-api-client:
-    name: Verify API Specs and Client of the intelligence service (add autocommit-openapi label to PR to auto-commit changes)
+    name: Verify API Specs and Client of the Intelligence Service (add autocommit-openapi label to PR to auto-commit changes)
     runs-on: ubuntu-latest
 
     steps:
@@ -60,7 +60,8 @@ jobs:
         run: poetry install --no-interaction --no-root
 
       - name: Generate API client for the application server
-        run: npm run generate:api:intelligence-service
+        working-directory: server/intelligence-service
+        run: poetry run npm run generate:api:intelligence-service
 
       - name: Check for changes in the API
         id: check_changes
