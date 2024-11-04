@@ -1,4 +1,4 @@
-name: OpenAPI application server
+name: OpenAPI Application Server
 
 on:
   pull_request:
