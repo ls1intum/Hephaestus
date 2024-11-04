@@ -19,7 +19,7 @@ class ChatResponse(BaseModel):
     response: str
 
 
-@app.post("/chat", response_model=ChatResponse, summary="Chat with LLM")
+@app.post("/chat", response_model=ChatResponse, summary="Get a response from an LLM to a chat message.")
 async def chat(request: ChatRequest):
     try:
         response = model.invoke(request.message)
