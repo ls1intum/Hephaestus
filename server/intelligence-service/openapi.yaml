@@ -5,11 +5,6 @@ components:
         message:
           title: Message
           type: string
-        thread_id:
-          anyOf:
-          - type: string
-          - type: 'null'
-          title: Thread Id
       required:
       - message
       title: ChatRequest
@@ -19,11 +14,6 @@ components:
         response:
           title: Response
           type: string
-        thread_id:
-          anyOf:
-          - type: string
-          - type: 'null'
-          title: Thread Id
       required:
       - response
       title: ChatResponse
@@ -89,4 +79,4 @@ paths:
               schema:
                 $ref: '#/components/schemas/HTTPValidationError'
           description: Validation Error
-      summary: Chat with LLM
+      summary: Get a response from an LLM to a chat message.

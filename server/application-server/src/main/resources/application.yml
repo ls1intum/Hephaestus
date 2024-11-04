@@ -49,3 +49,7 @@ monitoring:
 # Can be any OAuth token, such as the PAT
 github:
     authToken: null
+
+logging:
+    level:
+        org.kohsuke.github.GitHubClient: DEBUG

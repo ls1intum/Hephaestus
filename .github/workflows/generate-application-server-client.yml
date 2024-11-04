@@ -1,4 +1,4 @@
-name: OpenAPI application server
+name: OpenAPI
 
 on:
   pull_request:
@@ -15,7 +15,7 @@ on:
 
 jobs:
   generate-api-client:
-    name: Verify API Specs and Client of the application server (add autocommit-openapi label to PR to auto-commit changes)
+    name: Verify API Specs and Client of the Application Server (add autocommit-openapi label to PR to auto-commit changes)
     runs-on: ubuntu-latest
 
     steps:
