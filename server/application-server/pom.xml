@@ -71,7 +71,7 @@
 		<dependency>
 			<groupId>org.liquibase.ext</groupId>
 			<artifactId>liquibase-hibernate6</artifactId>
-			<version>4.28.0</version>
+			<version>4.27.0</version>
 		</dependency>
 		<dependency>
 			<groupId>org.springframework.boot</groupId>
@@ -230,7 +230,13 @@
 					<dependency>
 						<groupId>org.liquibase.ext</groupId>
 						<artifactId>liquibase-hibernate6</artifactId>
-						<version>4.28.0</version>
+						<version>4.27.0</version>
+					</dependency>
+
+					<dependency>
+						<groupId>org.springframework.boot</groupId>
+						<artifactId>spring-boot-starter-data-jpa</artifactId>
+						<version>3.3.3</version>
 					</dependency>
 				</dependencies>
 			</plugin>
