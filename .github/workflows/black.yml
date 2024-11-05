@@ -33,5 +33,5 @@ jobs:
         run: poetry install --no-interaction --no-root
 
       - name: Check formatting with Black
-        uses: psf/black@stable
         working-directory: ./server/intelligence-service
+        run: poetry run black --check .
