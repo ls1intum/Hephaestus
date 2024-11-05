@@ -15,6 +15,9 @@ langchain = "0.2.15"
 langchain-openai = "0.1.23"
 langgraph = "^0.2.44"
 
+[tool.poetry.group.dev.dependencies]
+black = "24.10.0"
+
 [virtualenvs]
 create = true
 in-project = true
