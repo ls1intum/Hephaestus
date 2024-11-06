@@ -240,7 +240,7 @@
 							<artifactId>lombok</artifactId>
 						</exclude>
 					</excludes>
-					<wait>10000</wait>
+					<wait>1000</wait>
 					<maxAttempts>100</maxAttempts>
 				</configuration>
 				<executions>
