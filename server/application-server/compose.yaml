@@ -26,6 +26,7 @@ services:
     ports:
       - '8081:8080'
     volumes:
+      - ./keycloak-data:/opt/keycloak/data/
       - ./keycloak-hephaestus-realm-example-config.json:/opt/keycloak/data/import/hephaestus-realm.json
     networks:
       - app-network
