@@ -5,7 +5,7 @@ on:
     types: [opened, synchronize, labeled, reopened]
     paths:
       - 'server/application-server/**'
-      - '.github/workflows/generate-api-client.yml'
+      - '.github/workflows/generate-application-server-client.yml'
   push:
     paths:
       - 'server/application-server/openapi.yaml'
@@ -15,7 +15,7 @@ on:
 
 jobs:
   generate-api-client:
-    name: Verify API Specs and Client (add autocommit-openapi label to PR to auto-commit changes)
+    name: Verify API Specs and Client of the Application Server (add autocommit-openapi label to PR to auto-commit changes)
     runs-on: ubuntu-latest
 
     steps:
@@ -37,11 +37,17 @@ jobs:
           distribution: 'temurin'
           java-version: '21'
 
+      - name: Set up directories
+        working-directory: server/application-server
+        run: |
+          mkdir -p ./keycloak-data
+          chmod -R 755 ./keycloak-data
+
       - name: Install dependencies
         run: npm install
 
-      - name: Generate API client
-        run: npm run generate:api
+      - name: Generate API client for the application server
+        run: npm run generate:api:application-server
 
       - name: Check for changes in the API
         id: check_changes

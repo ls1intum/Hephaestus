@@ -6,7 +6,7 @@ spring:
   jpa:
     hibernate:
       # TODO: Change to none and use liquibase
-      ddl-auto: update
+      ddl-auto: none
   url: ${APPLICATION_SERVER_URL}
 
   security:

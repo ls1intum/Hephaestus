@@ -169,3 +169,6 @@ node_modules/
 application-local.yml
 
 server/application-server/postgres-data/
+
+# Java-Client creation temporary
+tmp

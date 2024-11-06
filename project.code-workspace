@@ -1,30 +1,32 @@
 {
-  "folders": [
-    {
-      "name": "Hephaestus",
-      "path": "./"
-    },
-    {
-      "name": "webapp",
-      "path": "./webapp"
-    },
-    {
-      "name": "server/application-server",
-      "path": "./server/application-server"
-    },
-    {
-      "name": "server/intelligence-service",
-      "path": "./server/intelligence-service"
-    },
-    {
-      "name": "server/webhook-ingest",
-      "path": "./server/webhook-ingest"
-    },
-  ],
-  "settings": {
-    "java.compile.nullAnalysis.mode": "automatic",
-    "python.terminal.activateEnvironment": true,
-    "python.terminal.activateEnvInCurrentTerminal": true,
-    "python.defaultInterpreterPath": "${workspaceFolder}/.venv/bin/python"
-  }
+	"folders": [
+		{
+			"name": "Hephaestus",
+			"path": "./",
+		},
+		{
+			"name": "webapp",
+			"path": "./webapp",
+		},
+		{
+			"name": "server/application-server",
+			"path": "./server/application-server",
+		},
+		{
+			"name": "server/intelligence-service",
+			"path": "./server/intelligence-service",
+		},
+		{
+			"name": "server/webhook-ingest",
+			"path": "./server/webhook-ingest",
+		},
+	],
+	"settings": {
+		"java.compile.nullAnalysis.mode": "automatic",
+		"python.terminal.activateEnvironment": true,
+		"python.terminal.activateEnvInCurrentTerminal": true,
+		"python.defaultInterpreterPath": "${workspaceFolder}/.venv/bin/python",
+		"java.configuration.updateBuildConfiguration": "interactive",
+		"java.completion.importOrder": ["#"],
+	},
 }
