@@ -7,7 +7,7 @@
     "generate:api:application-server:clean": "rimraf webapp/src/app/core/modules/openapi",
     "generate:api:intelligence-service:clean": "rimraf server/application-server/src/main/java/de/tum/in/www1/hephaestus/intelligenceservice",
     "generate:api:clean": "npm run generate:api:intelligence-service:clean && npm run generate:api:application-server:clean",
-    "generate:api:application-server-specs": "cd server/application-server && mvn verify -DskipTests=true -Dapp.profiles=specs",
+    "generate:api:application-server-specs": "cd server/application-server && mvn verify -DskipTests=true -Dapp.profiles=specs -Dspring-boot.start.wait=1000",
     "generate:api:intelligence-service-specs": "python -m server.intelligence-service.app.generate_openapi_yaml",
     "generate:api:specs": "npm run generate:api:application-server-specs && npm run generate:api:intelligence-service-specs",
     "generate:api:application-server-client": "npx openapi-generator-cli generate -i server/application-server/openapi.yaml -g typescript-angular -o webapp/src/app/core/modules/openapi --additional-properties fileNaming=kebab-case,withInterfaces=true --generate-alias-as-model",
