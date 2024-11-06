@@ -35,6 +35,8 @@ services:
           - postgres
     volumes:
       - 'postgresql-data:/var/lib/postgresql/data'
+    # Exclude from Coolify health check
+    exclude_from_hc: true
 
 networks:
   app-network:
