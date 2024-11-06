@@ -17,7 +17,8 @@
     "generate:api:intelligence-service": "npm run generate:api:intelligence-service:clean && npm run generate:api:intelligence-service-specs && npm run generate:api:intelligence-service-client",
     "generate:api": "npm run generate:api:intelligence-service && npm run generate:api:application-server",
     "prettier:java:check": "prettier --check server/application-server/src/**/*.java",
-    "prettier:java:write": "prettier --write server/application-server/src/**/*.java"
+    "prettier:java:write": "prettier --write server/application-server/src/**/*.java",
+    "db:changelog:diff": "cd server/application-server && docker compose up -d postgres && mvn liquibase:diff && docker compose down postgres"
   },
   "devDependencies": {
     "@openapitools/openapi-generator-cli": "2.13.5",
