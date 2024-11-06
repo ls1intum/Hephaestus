@@ -242,6 +242,9 @@
 					</excludes>
 					<wait>1000</wait>
 					<maxAttempts>100</maxAttempts>
+					<start>
+						<timeout>300000</timeout>
+					</start>
 				</configuration>
 				<executions>
 					<execution>
