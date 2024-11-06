@@ -1,6 +1,6 @@
 <?xml version="1.1" encoding="UTF-8" standalone="no"?>
 <databaseChangeLog xmlns="http://www.liquibase.org/xml/ns/dbchangelog" xmlns:ext="http://www.liquibase.org/xml/ns/dbchangelog-ext" xmlns:pro="http://www.liquibase.org/xml/ns/pro" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog-ext http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-ext.xsd http://www.liquibase.org/xml/ns/pro http://www.liquibase.org/xml/ns/pro/liquibase-pro-latest.xsd http://www.liquibase.org/xml/ns/dbchangelog http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
-    <changeSet author="flo (generated)" id="1730730860388-1">
+    <changeSet author="FelixTJDietrich" id="1730730860388-1">
         <createTable tableName="issue_comment">
             <column name="id" type="BIGINT">
                 <constraints nullable="false" primaryKey="true" primaryKeyName="issue_comment_pkey"/>
@@ -14,7 +14,7 @@
             <column name="issue_id" type="BIGINT"/>
         </createTable>
     </changeSet>
-    <changeSet author="flo (generated)" id="1730730860388-2">
+    <changeSet author="FelixTJDietrich" id="1730730860388-2">
         <createTable tableName="issue">
             <column name="issue_type" type="VARCHAR(31)">
                 <constraints nullable="false"/>
@@ -55,7 +55,7 @@
             <column name="merged_by_id" type="BIGINT"/>
         </createTable>
     </changeSet>
-    <changeSet author="flo (generated)" id="1730730860388-3">
+    <changeSet author="FelixTJDietrich" id="1730730860388-3">
         <createTable tableName="milestone">
             <column name="id" type="BIGINT">
                 <constraints nullable="false" primaryKey="true" primaryKeyName="milestone_pkey"/>
@@ -75,7 +75,7 @@
             <column name="repository_id" type="BIGINT"/>
         </createTable>
     </changeSet>
-    <changeSet author="flo (generated)" id="1730730860388-4">
+    <changeSet author="FelixTJDietrich" id="1730730860388-4">
         <createTable tableName="pull_request_review_comment">
             <column name="id" type="BIGINT">
                 <constraints nullable="false" primaryKey="true" primaryKeyName="pull_request_review_comment_pkey"/>
@@ -110,7 +110,7 @@
             <column name="review_id" type="BIGINT"/>
         </createTable>
     </changeSet>
-    <changeSet author="flo (generated)" id="1730730860388-5">
+    <changeSet author="FelixTJDietrich" id="1730730860388-5">
         <createTable tableName="pull_request_review">
             <column name="id" type="BIGINT">
                 <constraints nullable="false" primaryKey="true" primaryKeyName="pull_request_review_pkey"/>
@@ -127,7 +127,7 @@
             <column name="pull_request_id" type="BIGINT"/>
         </createTable>
     </changeSet>
-    <changeSet author="flo (generated)" id="1730730860388-6">
+    <changeSet author="FelixTJDietrich" id="1730730860388-6">
         <createTable tableName="repository">
             <column name="id" type="BIGINT">
                 <constraints nullable="false" primaryKey="true" primaryKeyName="repository_pkey"/>
@@ -168,7 +168,7 @@
             </column>
         </createTable>
     </changeSet>
-    <changeSet author="flo (generated)" id="1730730860388-7">
+    <changeSet author="FelixTJDietrich" id="1730730860388-7">
         <createTable tableName="user">
             <column name="id" type="BIGINT">
                 <constraints nullable="false" primaryKey="true" primaryKeyName="user_pkey"/>
@@ -193,7 +193,7 @@
             <column name="type" type="VARCHAR(255)"/>
         </createTable>
     </changeSet>
-    <changeSet author="flo (generated)" id="1730730860388-8">
+    <changeSet author="FelixTJDietrich" id="1730730860388-8">
         <createTable tableName="data_sync_status">
             <column autoIncrement="true" name="id" type="BIGINT">
                 <constraints nullable="false" primaryKey="true" primaryKeyName="data_sync_status_pkey"/>
@@ -202,17 +202,7 @@
             <column name="start_time" type="TIMESTAMP WITH TIME ZONE"/>
         </createTable>
     </changeSet>
-    <changeSet author="flo (generated)" id="1730730860388-9">
-        <createTable tableName="hello">
-            <column autoIncrement="true" name="id" type="BIGINT">
-                <constraints nullable="false" primaryKey="true" primaryKeyName="hello_pkey"/>
-            </column>
-            <column name="timestamp" type="TIMESTAMP WITHOUT TIME ZONE">
-                <constraints nullable="false"/>
-            </column>
-        </createTable>
-    </changeSet>
-    <changeSet author="flo (generated)" id="1730730860388-10">
+    <changeSet author="FelixTJDietrich" id="1730730860388-10">
         <createTable tableName="issue_assignee">
             <column name="issue_id" type="BIGINT">
                 <constraints nullable="false" primaryKey="true" primaryKeyName="issue_assignee_pkey"/>
@@ -222,7 +212,7 @@
             </column>
         </createTable>
     </changeSet>
-    <changeSet author="flo (generated)" id="1730730860388-11">
+    <changeSet author="FelixTJDietrich" id="1730730860388-11">
         <createTable tableName="issue_label">
             <column name="issue_id" type="BIGINT">
                 <constraints nullable="false" primaryKey="true" primaryKeyName="issue_label_pkey"/>
@@ -232,7 +222,7 @@
             </column>
         </createTable>
     </changeSet>
-    <changeSet author="flo (generated)" id="1730730860388-12">
+    <changeSet author="FelixTJDietrich" id="1730730860388-12">
         <createTable tableName="label">
             <column name="id" type="BIGINT">
                 <constraints nullable="false" primaryKey="true" primaryKeyName="label_pkey"/>
@@ -243,7 +233,7 @@
             <column name="repository_id" type="BIGINT"/>
         </createTable>
     </changeSet>
-    <changeSet author="flo (generated)" id="1730730860388-13">
+    <changeSet author="FelixTJDietrich" id="1730730860388-13">
         <createTable tableName="pull_request_requested_reviewers">
             <column name="pull_request_id" type="BIGINT">
                 <constraints nullable="false" primaryKey="true" primaryKeyName="pull_request_requested_reviewers_pkey"/>
@@ -253,64 +243,64 @@
             </column>
         </createTable>
     </changeSet>
-    <changeSet author="flo (generated)" id="1730730860388-14">
+    <changeSet author="FelixTJDietrich" id="1730730860388-14">
         <addForeignKeyConstraint baseColumnNames="repository_id" baseTableName="label" constraintName="fk2951edbl9g9y8ee1q97e2ff75" deferrable="false" initiallyDeferred="false" onDelete="NO ACTION" onUpdate="NO ACTION" referencedColumnNames="id" referencedTableName="repository" validate="true"/>
     </changeSet>
-    <changeSet author="flo (generated)" id="1730730860388-15">
+    <changeSet author="FelixTJDietrich" id="1730730860388-15">
         <addForeignKeyConstraint baseColumnNames="user_id" baseTableName="issue_assignee" constraintName="fk2cfu8w8wjb9vosy4hbrme0rqe" deferrable="false" initiallyDeferred="false" onDelete="NO ACTION" onUpdate="NO ACTION" referencedColumnNames="id" referencedTableName="user" validate="true"/>
     </changeSet>
-    <changeSet author="flo (generated)" id="1730730860388-16">
+    <changeSet author="FelixTJDietrich" id="1730730860388-16">
         <addForeignKeyConstraint baseColumnNames="pull_request_id" baseTableName="pull_request_requested_reviewers" constraintName="fk6dld06xx8rh9xhqfnca070a0i" deferrable="false" initiallyDeferred="false" onDelete="NO ACTION" onUpdate="NO ACTION" referencedColumnNames="id" referencedTableName="issue" validate="true"/>
     </changeSet>
-    <changeSet author="flo (generated)" id="1730730860388-17">
+    <changeSet author="FelixTJDietrich" id="1730730860388-17">
         <addForeignKeyConstraint baseColumnNames="repository_id" baseTableName="issue" constraintName="fk76s4b6ncspm9bk35y49xh4s9t" deferrable="false" initiallyDeferred="false" onDelete="NO ACTION" onUpdate="NO ACTION" referencedColumnNames="id" referencedTableName="repository" validate="true"/>
     </changeSet>
-    <changeSet author="flo (generated)" id="1730730860388-18">
+    <changeSet author="FelixTJDietrich" id="1730730860388-18">
         <addForeignKeyConstraint baseColumnNames="milestone_id" baseTableName="issue" constraintName="fk7t1o4tuel06m9bn4dppqmiod6" deferrable="false" initiallyDeferred="false" onDelete="NO ACTION" onUpdate="NO ACTION" referencedColumnNames="id" referencedTableName="milestone" validate="true"/>
     </changeSet>
-    <changeSet author="flo (generated)" id="1730730860388-19">
+    <changeSet author="FelixTJDietrich" id="1730730860388-19">
         <addForeignKeyConstraint baseColumnNames="issue_id" baseTableName="issue_comment" constraintName="fk8wy5rxggrte2ntcq80g7o7210" deferrable="false" initiallyDeferred="false" onDelete="NO ACTION" onUpdate="NO ACTION" referencedColumnNames="id" referencedTableName="issue" validate="true"/>
     </changeSet>
-    <changeSet author="flo (generated)" id="1730730860388-20">
+    <changeSet author="FelixTJDietrich" id="1730730860388-20">
         <addForeignKeyConstraint baseColumnNames="repository_id" baseTableName="milestone" constraintName="fkbjhs37s6qmqtd330gu9mit6w0" deferrable="false" initiallyDeferred="false" onDelete="NO ACTION" onUpdate="NO ACTION" referencedColumnNames="id" referencedTableName="repository" validate="true"/>
     </changeSet>
-    <changeSet author="flo (generated)" id="1730730860388-21">
+    <changeSet author="FelixTJDietrich" id="1730730860388-21">
         <addForeignKeyConstraint baseColumnNames="review_id" baseTableName="pull_request_review_comment" constraintName="fkbx1g5jpdegymhyv9pbk2jdgfw" deferrable="false" initiallyDeferred="false" onDelete="NO ACTION" onUpdate="NO ACTION" referencedColumnNames="id" referencedTableName="pull_request_review" validate="true"/>
     </changeSet>
-    <changeSet author="flo (generated)" id="1730730860388-22">
+    <changeSet author="FelixTJDietrich" id="1730730860388-22">
         <addForeignKeyConstraint baseColumnNames="author_id" baseTableName="issue_comment" constraintName="fkdy6oeojymud1wna20olqgyt31" deferrable="false" initiallyDeferred="false" onDelete="NO ACTION" onUpdate="NO ACTION" referencedColumnNames="id" referencedTableName="user" validate="true"/>
     </changeSet>
-    <changeSet author="flo (generated)" id="1730730860388-23">
+    <changeSet author="FelixTJDietrich" id="1730730860388-23">
         <addForeignKeyConstraint baseColumnNames="author_id" baseTableName="pull_request_review" constraintName="fkeehfcwrodfu61gremlcvhgir5" deferrable="false" initiallyDeferred="false" onDelete="NO ACTION" onUpdate="NO ACTION" referencedColumnNames="id" referencedTableName="user" validate="true"/>
     </changeSet>
-    <changeSet author="flo (generated)" id="1730730860388-24">
+    <changeSet author="FelixTJDietrich" id="1730730860388-24">
         <addForeignKeyConstraint baseColumnNames="creator_id" baseTableName="milestone" constraintName="fkg6ieho7gomiumy85puy6l13f1" deferrable="false" initiallyDeferred="false" onDelete="NO ACTION" onUpdate="NO ACTION" referencedColumnNames="id" referencedTableName="user" validate="true"/>
     </changeSet>
-    <changeSet author="flo (generated)" id="1730730860388-25">
+    <changeSet author="FelixTJDietrich" id="1730730860388-25">
         <addForeignKeyConstraint baseColumnNames="pull_request_id" baseTableName="pull_request_review" constraintName="fkio96gq2jetvy6a4in9nl8vkvd" deferrable="false" initiallyDeferred="false" onDelete="NO ACTION" onUpdate="NO ACTION" referencedColumnNames="id" referencedTableName="issue" validate="true"/>
     </changeSet>
-    <changeSet author="flo (generated)" id="1730730860388-26">
+    <changeSet author="FelixTJDietrich" id="1730730860388-26">
         <addForeignKeyConstraint baseColumnNames="user_id" baseTableName="pull_request_requested_reviewers" constraintName="fkioq4g5aksr97l6qyl4g5l63tn" deferrable="false" initiallyDeferred="false" onDelete="NO ACTION" onUpdate="NO ACTION" referencedColumnNames="id" referencedTableName="user" validate="true"/>
     </changeSet>
-    <changeSet author="flo (generated)" id="1730730860388-27">
+    <changeSet author="FelixTJDietrich" id="1730730860388-27">
         <addForeignKeyConstraint baseColumnNames="issue_id" baseTableName="issue_label" constraintName="fkit5n9c0frugu5m8xqsxtps63r" deferrable="false" initiallyDeferred="false" onDelete="NO ACTION" onUpdate="NO ACTION" referencedColumnNames="id" referencedTableName="issue" validate="true"/>
     </changeSet>
-    <changeSet author="flo (generated)" id="1730730860388-28">
+    <changeSet author="FelixTJDietrich" id="1730730860388-28">
         <addForeignKeyConstraint baseColumnNames="issue_id" baseTableName="issue_assignee" constraintName="fkocgmsva4p5e8ic9k5dbjqa15u" deferrable="false" initiallyDeferred="false" onDelete="NO ACTION" onUpdate="NO ACTION" referencedColumnNames="id" referencedTableName="issue" validate="true"/>
     </changeSet>
-    <changeSet author="flo (generated)" id="1730730860388-29">
+    <changeSet author="FelixTJDietrich" id="1730730860388-29">
         <addForeignKeyConstraint baseColumnNames="pull_request_id" baseTableName="pull_request_review_comment" constraintName="fkohqvdiswptbm0h8cniq7r1tgq" deferrable="false" initiallyDeferred="false" onDelete="NO ACTION" onUpdate="NO ACTION" referencedColumnNames="id" referencedTableName="issue" validate="true"/>
     </changeSet>
-    <changeSet author="flo (generated)" id="1730730860388-30">
+    <changeSet author="FelixTJDietrich" id="1730730860388-30">
         <addForeignKeyConstraint baseColumnNames="merged_by_id" baseTableName="issue" constraintName="fkqvnu6vslj5txt8xencru8m6x4" deferrable="false" initiallyDeferred="false" onDelete="NO ACTION" onUpdate="NO ACTION" referencedColumnNames="id" referencedTableName="user" validate="true"/>
     </changeSet>
-    <changeSet author="flo (generated)" id="1730730860388-31">
+    <changeSet author="FelixTJDietrich" id="1730730860388-31">
         <addForeignKeyConstraint baseColumnNames="author_id" baseTableName="issue" constraintName="fkrwr6v8fiqetuiuvfjcvie8s85" deferrable="false" initiallyDeferred="false" onDelete="NO ACTION" onUpdate="NO ACTION" referencedColumnNames="id" referencedTableName="user" validate="true"/>
     </changeSet>
-    <changeSet author="flo (generated)" id="1730730860388-32">
+    <changeSet author="FelixTJDietrich" id="1730730860388-32">
         <addForeignKeyConstraint baseColumnNames="author_id" baseTableName="pull_request_review_comment" constraintName="fktl08ieowbl171xem2bciho7kw" deferrable="false" initiallyDeferred="false" onDelete="NO ACTION" onUpdate="NO ACTION" referencedColumnNames="id" referencedTableName="user" validate="true"/>
     </changeSet>
-    <changeSet author="flo (generated)" id="1730730860388-33">
+    <changeSet author="FelixTJDietrich" id="1730730860388-33">
         <addForeignKeyConstraint baseColumnNames="label_id" baseTableName="issue_label" constraintName="fkxbk5rr30kkb6k4ech7x4vh9h" deferrable="false" initiallyDeferred="false" onDelete="NO ACTION" onUpdate="NO ACTION" referencedColumnNames="id" referencedTableName="label" validate="true"/>
     </changeSet>
 </databaseChangeLog>
