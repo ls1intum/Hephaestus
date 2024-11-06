@@ -1,12 +1,8 @@
 [variables]
 NIXPACKS_JDK_VERSION = '21'
 
-[packages]
-curl = "curl"
+[phases.setup]
+aptPkgs = ["...", "wget"]
 
 [phases.build]
-cmds = [
-  "chmod +x ./mvnw",
-  "./mvnw -DskipTests clean package",
-  "nix-env -iA nixpkgs.curl"
-]
+cmds = ["chmod +x ./mvnw", "./mvnw -DskipTests clean package"]
