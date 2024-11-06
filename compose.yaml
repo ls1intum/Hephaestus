@@ -35,8 +35,11 @@ services:
           - postgres
     volumes:
       - 'postgresql-data:/var/lib/postgresql/data'
-    # Exclude from Coolify health check
-    exclude_from_hc: true
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
 networks:
   app-network:
