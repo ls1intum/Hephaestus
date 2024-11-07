@@ -36,25 +36,17 @@ export class AdminComponent {
     queryKey: ['admin', 'config'],
     queryFn: async () => {
       const adminConfig = await lastValueFrom(this.adminService.getConfig());
-      this.repositoriesForm.setValue(JSON.stringify(adminConfig.repositoriesToMonitor, null, 4));
+      this.repositoriesForm.setValue(this.convertJSON(adminConfig.repositoriesToMonitor));
       return adminConfig;
-    }
+    },
+    select: data => data.repositoriesToMonitor
   }));
 
-  userForm = new FormControl(
-    JSON.stringify(
-      {
-        id: this.user()?.id,
-        email: this.user()?.email,
-        name: this.user()?.name,
-        anonymous: this.user()?.anonymous,
-        roles: this.user()?.roles
-      },
-      null,
-      4
-    )
-  );
-  repositoriesForm = new FormControl('');
+  repositoriesForm = new FormControl(this.configQuery.data() ? this.convertJSON(this.configQuery.data()!) : '[]');
+
+  convertJSON(value: Set<string>) {
+    return JSON.stringify(value, null, 4);
+  }
 
   saveRepositories() {
     const repositories = JSON.parse(this.repositoriesForm.value ?? '[]') as string[];

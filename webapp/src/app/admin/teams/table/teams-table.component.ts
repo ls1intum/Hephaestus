@@ -10,7 +10,7 @@ import { HlmIconComponent, provideIcons } from '@spartan-ng/ui-icon-helm';
 import { HlmInputDirective } from '@spartan-ng/ui-input-helm';
 import { BrnMenuTriggerDirective } from '@spartan-ng/ui-menu-brain';
 import { HlmMenuModule } from '@spartan-ng/ui-menu-helm';
-import { BrnTableModule, PaginatorState, useBrnColumnManager } from '@spartan-ng/ui-table-brain';
+import { BrnTableModule, PaginatorState } from '@spartan-ng/ui-table-brain';
 import { HlmTableModule } from '@spartan-ng/ui-table-helm';
 import { BrnSelectModule } from '@spartan-ng/ui-select-brain';
 import { HlmSelectModule } from '@spartan-ng/ui-select-helm';
@@ -83,7 +83,7 @@ export class AdminTeamsTableComponent {
 
   private readonly _displayedIndices = signal({ start: 0, end: 0 });
   protected readonly _availablePageSizes = [5, 10, 20, 10000];
-  protected readonly _pageSize = signal(this._availablePageSizes[0]);
+  protected readonly _pageSize = signal(this._availablePageSizes[2]);
 
   private readonly _selectionModel = new SelectionModel<TeamInfo>(true);
   protected readonly _isUserSelected = (user: TeamInfo) => this._selectionModel.isSelected(user);
@@ -91,11 +91,7 @@ export class AdminTeamsTableComponent {
     initialValue: []
   });
 
-  protected readonly _brnColumnManager = useBrnColumnManager({
-    name: { visible: true, label: 'Name' },
-    color: { visible: true, label: 'Color' }
-  });
-  protected readonly _allDisplayedColumns = computed(() => ['select', ...this._brnColumnManager.displayedColumns(), 'actions']);
+  protected readonly _allDisplayedColumns = ['name', 'color', 'actions'];
 
   private readonly _filteredNames = computed(() => {
     const nameFilter = this._nameFilter()?.trim()?.toLowerCase();
