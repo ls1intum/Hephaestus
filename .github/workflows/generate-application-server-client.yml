@@ -37,6 +37,12 @@ jobs:
           distribution: 'temurin'
           java-version: '21'
 
+      - name: Set up directories
+        working-directory: server/application-server
+        run: |
+          mkdir -p ./keycloak-data
+          chmod -R 755 ./keycloak-data
+
       - name: Install dependencies
         run: npm install
 

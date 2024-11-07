@@ -14,6 +14,9 @@ pydantic-settings = "2.4.0"
 langchain = "0.2.15"
 langchain-openai = "0.1.23"
 
+[tool.poetry.group.dev.dependencies]
+black = "24.10.0"
+
 [virtualenvs]
 create = true
 in-project = true
