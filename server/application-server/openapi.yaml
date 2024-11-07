@@ -319,6 +319,8 @@ components:
           format: int64
         login:
           type: string
+        email:
+          type: string
         avatarUrl:
           type: string
         name:
