@@ -7,6 +7,7 @@ import com.fasterxml.jackson.annotation.JsonInclude;
 public record UserInfoDTO(
         @NonNull Long id,
         @NonNull String login,
+        String email,
         @NonNull String avatarUrl,
         @NonNull String name,
         @NonNull String htmlUrl) {
@@ -15,6 +16,7 @@ public record UserInfoDTO(
         return new UserInfoDTO(
                 user.getId(),
                 user.getLogin(),
+                user.getEmail(),
                 user.getAvatarUrl(),
                 user.getName(),
                 user.getHtmlUrl());

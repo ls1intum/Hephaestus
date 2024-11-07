@@ -2,6 +2,8 @@ spring:
     application:
         name: Hephaestus
 
+    url: https://hephaestus.ase.cit.tum.de/
+
     datasource:
         url: jdbc:postgresql://localhost:5432/hephaestus
         username: root

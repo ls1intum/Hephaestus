@@ -2,6 +2,7 @@ package de.tum.in.www1.hephaestus.leaderboard;
 
 import java.io.IOException;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
@@ -26,10 +27,10 @@ import com.slack.api.methods.response.auth.AuthTestResponse;
 import com.slack.api.methods.response.chat.ChatPostMessageResponse;
 import com.slack.api.model.User;
 import com.slack.api.model.block.LayoutBlock;
+import org.apache.commons.text.similarity.LevenshteinDistance;
 
 import static com.slack.api.model.block.Blocks.*;
 import static com.slack.api.model.block.composition.BlockCompositions.*;
-import static com.slack.api.model.block.element.BlockElements.*;
 
 @Order(value = Ordered.LOWEST_PRECEDENCE)
 @EnableScheduling
@@ -69,11 +70,12 @@ public class SlackMessageService {
     }
 
     private List<User> getTop3SlackReviewers() {
-        LocalDate after = LocalDate.now().minusDays(8);
-        LocalDate before = LocalDate.now().minusDays(2);
+        LocalDate after = LocalDate.now().minusDays(9);
+        LocalDate before = LocalDate.now().minusDays(3);
         var leaderboard = leaderboardService.createLeaderboard(Optional.of(after), Optional.of(before),
                 Optional.empty());
         var top3 = leaderboard.subList(0, Math.min(3, leaderboard.size()));
+        logger.debug("Top 3 Users of the last week: " + top3.stream().map(e -> e.user().name()).toList());
 
         List<User> allSlackUsers;
         try {
@@ -83,9 +85,21 @@ public class SlackMessageService {
             return new ArrayList<>();
         }
 
-        return top3.stream().map(entry -> allSlackUsers.stream()
-                .filter(user -> user.getName().equals(entry.user().name())).findFirst().orElse(null))
-                .filter(user -> user != null).toList();
+        return top3.stream().map(entry -> {
+            var exactUser = allSlackUsers.stream()
+                .filter(user -> user.getName().equals(entry.user().name()) || (user.getProfile().getEmail() != null && user.getProfile().getEmail().equals(entry.user().email()))).findFirst();
+            if (exactUser.isPresent()) {
+                return exactUser.get();
+            }
+
+            // find through String edit distance
+            return allSlackUsers.stream()
+                .min((a, b) -> Integer.compare(
+                    LevenshteinDistance.getDefaultInstance().apply(
+                        entry.user().name(), a.getName()),
+                    LevenshteinDistance.getDefaultInstance().apply(
+                        entry.user().name(), b.getName()))).orElse(null);
+        }).filter(user -> user != null).toList();
     }
 
     @Scheduled(cron = "${slack.cronSchedule}")
@@ -94,31 +108,27 @@ public class SlackMessageService {
             return;
         }
 
-        // get date in format October 31, 2024
-        var currentDate = LocalDate.now().format(java.time.format.DateTimeFormatter.ofPattern("MMMM d, yyyy"));
+        // get date in unix format
+        var currentDate = LocalDateTime.now().toEpochSecond(java.time.ZoneOffset.UTC);
 
         var top3reviewers = getTop3SlackReviewers();
-        // logger.info("Top 3 Accounts of the last week: " + top3reviewers);
 
         logger.info("Sending scheduled message to Slack channel...");
         List<LayoutBlock> blocks = asBlocks(
                 header(header -> header.text(
                         plainText(pt -> pt.text(":newspaper: Reviews of the last week :newspaper:")))),
-                divider(),
                 context(context -> context
-                        .elements(List.of(markdownText("*" + currentDate + "*")))),
+                        .elements(List.of(markdownText("<!date^" + currentDate + "^{date} at {time}| Today at 9:00AM CEST> | " + hephaestusUrl)))),
+                divider(),
                 section(section -> section.text(markdownText(
-                        "Another *review leaderboard* has concluded. You can check out your placement at "
-                                + hephaestusUrl
-                                + "."))),
+                        "Another *review leaderboard* has concluded. You can check out your placement <" + hephaestusUrl + "|here>."))),
                 section(section -> section.text(markdownText(
                         "Special thanks to our top 3 reviewers of last week:"))),
                 section(section -> section.text(markdownText(
                         IntStream.range(0, top3reviewers.size())
-                                .mapToObj(i -> ("• *" + (i + 1) + ". @" + top3reviewers.get(i).getTeamId() + " *"))
+                                .mapToObj(i -> ((i + 1) + ". <@" + top3reviewers.get(i).getId() + ">"))
                                 .reduce((a, b) -> a + "\n" + b).orElse("")))),
                 section(section -> section.text(markdownText("Happy coding and reviewing! :rocket:")))
-
         );
         try {
             sendMessage(channelId, blocks, "Reviews of the last week");
