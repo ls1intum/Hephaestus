@@ -33,8 +33,8 @@ export class HomeComponent {
 
   private readonly route = inject(ActivatedRoute);
   private queryParams = toSignal(this.route.queryParamMap, { requireSync: true });
-  protected after = computed(() => this.queryParams().get('after') ?? dayjs().isoWeekday(1).format('YYYY-MM-DD'));
-  protected before = computed(() => this.queryParams().get('before') ?? dayjs().format('YYYY-MM-DD'));
+  protected after = computed(() => this.queryParams().get('after') ?? dayjs().isoWeekday(1).startOf('hour').hour(9).format());
+  protected before = computed(() => this.queryParams().get('before') ?? dayjs().format());
   protected repository = computed(() => this.queryParams().get('repository') ?? 'all');
 
   query = injectQuery(() => ({

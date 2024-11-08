@@ -3,7 +3,6 @@ package de.tum.in.www1.hephaestus.leaderboard;
 import java.util.stream.IntStream;
 import java.util.Map;
 import java.time.LocalDate;
-import java.time.LocalDateTime;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 import java.util.Comparator;
@@ -43,16 +42,12 @@ public class LeaderboardService {
     }
 
     @Transactional
-    public List<LeaderboardEntryDTO> createLeaderboard(Optional<LocalDate> after, Optional<LocalDate> before,
+    public List<LeaderboardEntryDTO> createLeaderboard(Optional<OffsetDateTime> after, Optional<OffsetDateTime> before,
             Optional<String> repository) {
         logger.info("Creating leaderboard dataset");
-
-        LocalDateTime afterCutOff = after.isPresent() ? after.get().atStartOfDay()
-                : LocalDate.now().minusDays(timeframe).atStartOfDay();
-        Optional<LocalDateTime> beforeCutOff = before.map(date -> date.plusDays(1).atStartOfDay());
-
-        var afterOffset = afterCutOff.atOffset(ZoneOffset.UTC);
-        var beforeOffset = beforeCutOff.map(b -> b.atOffset(ZoneOffset.UTC)).orElse(OffsetDateTime.now());
+        var afterOffset = after.orElse(LocalDate.now().minusDays(timeframe).atStartOfDay().atOffset(ZoneOffset.UTC));
+        var beforeOffset = before.orElse(OffsetDateTime.now());
+        logger.info("Timeframe: {} - {}", afterOffset, beforeOffset);
         List<PullRequestReview> reviews = pullRequestReviewRepository.findAllInTimeframe(afterOffset, beforeOffset,
                 repository);
         List<IssueComment> issueComments = issueCommentRepository.findAllInTimeframe(afterOffset, beforeOffset,

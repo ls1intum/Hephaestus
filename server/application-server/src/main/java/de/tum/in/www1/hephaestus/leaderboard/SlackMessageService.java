@@ -2,7 +2,7 @@ package de.tum.in.www1.hephaestus.leaderboard;
 
 import java.io.IOException;
 import java.time.LocalDate;
-import java.time.LocalDateTime;
+import java.time.OffsetDateTime;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
@@ -70,9 +70,10 @@ public class SlackMessageService {
     }
 
     private List<User> getTop3SlackReviewers() {
-        LocalDate after = LocalDate.now().minusDays(9);
-        LocalDate before = LocalDate.now().minusDays(3);
-        var leaderboard = leaderboardService.createLeaderboard(Optional.of(after), Optional.of(before),
+        // exactly 7 days ago
+        OffsetDateTime after = OffsetDateTime.of(LocalDate.now().minusDays(7), OffsetDateTime.now().toLocalTime(),
+                OffsetDateTime.now().getOffset());
+        var leaderboard = leaderboardService.createLeaderboard(Optional.of(after), Optional.empty(),
                 Optional.empty());
         var top3 = leaderboard.subList(0, Math.min(3, leaderboard.size()));
         logger.debug("Top 3 Users of the last week: " + top3.stream().map(e -> e.user().name()).toList());
@@ -109,7 +110,7 @@ public class SlackMessageService {
         }
 
         // get date in unix format
-        var currentDate = LocalDateTime.now().toEpochSecond(java.time.ZoneOffset.UTC);
+        var currentDate = OffsetDateTime.now().toEpochSecond();
 
         var top3reviewers = getTop3SlackReviewers();
 

@@ -1,6 +1,6 @@
 import { Component, computed, effect, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-import { Router, RouterLink } from '@angular/router';
+import { Router } from '@angular/router';
 import dayjs from 'dayjs';
 import isoWeek from 'dayjs/plugin/isoWeek';
 import { BrnSelectModule } from '@spartan-ng/ui-select-brain';
@@ -18,21 +18,21 @@ dayjs.extend(isoWeek);
 function formatLabel(startDate: dayjs.Dayjs, endDate: dayjs.Dayjs | undefined) {
   const calendarWeek = startDate.isoWeek();
   if (!endDate || endDate.isSame(dayjs(), 'day')) {
-    return `CW\xa0${calendarWeek}:\xa0${startDate.format('MMM D')}\xa0-\xa0Today`;
+    return `CW\xa0${calendarWeek}:\xa0${startDate.format('MMM D, h[am]')}\xa0-\xa0Today`;
   }
 
   const sameMonth = startDate.month() === endDate.month();
   if (sameMonth) {
-    return `CW\xa0${calendarWeek}:\xa0${startDate.format('MMM D')}\xa0-\xa0${endDate.format('D')}`;
+    return `CW\xa0${calendarWeek}:\xa0${startDate.format('MMM D, h[am]')}\xa0-\xa0${endDate.format('D, h[am]')}`;
   } else {
-    return `CW\xa0${calendarWeek}:\xa0${startDate.format('MMM D')}\xa0-\xa0${endDate.format('MMM D')}`;
+    return `CW\xa0${calendarWeek}:\xa0${startDate.format('MMM D, h[am]')}\xa0-\xa0${endDate.format('MMM D, h[am]')}`;
   }
 }
 
 @Component({
   selector: 'app-leaderboard-filter-timeframe',
   standalone: true,
-  imports: [RouterLink, BrnSelectModule, HlmSelectModule, HlmLabelModule, FormsModule],
+  imports: [BrnSelectModule, HlmSelectModule, HlmLabelModule, FormsModule],
   templateUrl: './timeframe.component.html'
 })
 export class LeaderboardFilterTimeframeComponent {
@@ -41,16 +41,16 @@ export class LeaderboardFilterTimeframeComponent {
   value = signal<string>(`${this.after()}.${this.before()}`);
 
   placeholder = computed(() => {
-    return formatLabel(dayjs(this.after()) ?? dayjs().day(1), !this.before() ? undefined : dayjs(this.before()));
+    return formatLabel(dayjs(this.after()) ?? dayjs().day(2).startOf('hour').hour(9), !this.before() ? undefined : dayjs(this.before()));
   });
 
   options = computed(() => {
     const now = dayjs();
-    let currentDate = dayjs().isoWeekday(1);
+    let currentDate = dayjs().isoWeekday(2).startOf('hour').hour(9);
     const options: SelectOption[] = [
       {
         id: now.unix(),
-        value: `${currentDate.format('YYYY-MM-DD')}.${now.format('YYYY-MM-DD')}`,
+        value: `${currentDate.format()}.${now.format()}`,
         label: formatLabel(currentDate, undefined)
       }
     ];
@@ -60,7 +60,7 @@ export class LeaderboardFilterTimeframeComponent {
       const endDate = currentDate.subtract(1, 'day');
       options.push({
         id: startDate.unix(),
-        value: `${startDate.format('YYYY-MM-DD')}.${endDate.format('YYYY-MM-DD')}`,
+        value: `${startDate.format()}.${endDate.format()}`,
         label: formatLabel(startDate, endDate)
       });
       currentDate = startDate;
@@ -72,8 +72,8 @@ export class LeaderboardFilterTimeframeComponent {
   constructor(private router: Router) {
     // init params
     const queryParams = this.router.parseUrl(this.router.url).queryParams;
-    this.after.set(queryParams['after'] ?? dayjs().isoWeekday(1).format('YYYY-MM-DD'));
-    this.before.set(queryParams['before'] ?? dayjs().format('YYYY-MM-DD'));
+    this.after.set(queryParams['after'] ?? dayjs().isoWeekday(2).hour(9).format());
+    this.before.set(queryParams['before'] ?? dayjs().format());
 
     // persist changes in url
     effect(() => {
