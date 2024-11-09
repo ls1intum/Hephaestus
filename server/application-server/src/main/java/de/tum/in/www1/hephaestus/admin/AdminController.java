@@ -81,6 +81,20 @@ public class AdminController {
         return ResponseEntity.ok(adminService.createTeam(team.name(), team.color()));
     }
 
+    @PostMapping("/teams/{teamId}/repository/{repositoryOwner}/{repositoryName}")
+    public ResponseEntity<TeamInfoDTO> addRepositoryToTeam(@PathVariable Long teamId, @PathVariable String repositoryOwner, @PathVariable String repositoryName) {
+        return adminService.addRepositoryToTeam(teamId, repositoryOwner + '/' + repositoryName)
+                .map(ResponseEntity::ok)
+                .orElseGet(() -> ResponseEntity.notFound().build());
+    }
+
+    @PostMapping("/teams/{teamId}/label/{label}")
+    public ResponseEntity<TeamInfoDTO> addLabelToTeam(@PathVariable Long teamId, @PathVariable String label) {
+        return adminService.addLabelToTeam(teamId, label)
+                .map(ResponseEntity::ok)
+                .orElseGet(() -> ResponseEntity.notFound().build());
+    }
+
     @DeleteMapping("/teams/{teamId}")
     public ResponseEntity<TeamInfoDTO> deleteTeam(@PathVariable Long teamId) {
         return adminService.deleteTeam(teamId)

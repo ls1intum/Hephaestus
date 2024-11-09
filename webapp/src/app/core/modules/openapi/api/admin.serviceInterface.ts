@@ -31,6 +31,23 @@ export interface AdminServiceInterface {
     /**
      * 
      * 
+     * @param teamId 
+     * @param label 
+     */
+    addLabelToTeam(teamId: number, label: string, extraHttpRequestParams?: any): Observable<TeamInfo>;
+
+    /**
+     * 
+     * 
+     * @param teamId 
+     * @param repositoryOwner 
+     * @param repositoryName 
+     */
+    addRepositoryToTeam(teamId: number, repositoryOwner: string, repositoryName: string, extraHttpRequestParams?: any): Observable<TeamInfo>;
+
+    /**
+     * 
+     * 
      * @param login 
      * @param teamId 
      */

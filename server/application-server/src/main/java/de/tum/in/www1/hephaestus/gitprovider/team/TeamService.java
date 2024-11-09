@@ -1,5 +1,6 @@
 package de.tum.in.www1.hephaestus.gitprovider.team;
 
+import jakarta.transaction.Transactional;
 import java.util.List;
 import java.util.Optional;
 
@@ -20,6 +21,7 @@ public class TeamService {
         return teamRepository.findById(id);
     }
 
+    @Transactional
     public List<TeamInfoDTO> getAllTeams() {
         List<TeamInfoDTO> teams = teamRepository.findAll().stream().map(TeamInfoDTO::fromTeam).toList();
         return teams;

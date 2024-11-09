@@ -1,9 +1,19 @@
 package de.tum.in.www1.hephaestus.admin;
 
+import de.tum.in.www1.hephaestus.gitprovider.label.Label;
+import de.tum.in.www1.hephaestus.gitprovider.label.LabelRepository;
+import de.tum.in.www1.hephaestus.gitprovider.repository.Repository;
+import de.tum.in.www1.hephaestus.gitprovider.repository.RepositoryRepository;
+import de.tum.in.www1.hephaestus.gitprovider.team.Team;
+import de.tum.in.www1.hephaestus.gitprovider.team.TeamInfoDTO;
+import de.tum.in.www1.hephaestus.gitprovider.team.TeamService;
+import de.tum.in.www1.hephaestus.gitprovider.user.User;
+import de.tum.in.www1.hephaestus.gitprovider.user.UserInfoDTO;
+import de.tum.in.www1.hephaestus.gitprovider.user.UserRepository;
+import de.tum.in.www1.hephaestus.gitprovider.user.UserTeamsDTO;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
-
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -14,24 +24,25 @@ import org.springframework.cache.annotation.Cacheable;
 import org.springframework.context.event.EventListener;
 import org.springframework.stereotype.Service;
 
-import de.tum.in.www1.hephaestus.gitprovider.team.Team;
-import de.tum.in.www1.hephaestus.gitprovider.team.TeamInfoDTO;
-import de.tum.in.www1.hephaestus.gitprovider.team.TeamService;
-import de.tum.in.www1.hephaestus.gitprovider.user.User;
-import de.tum.in.www1.hephaestus.gitprovider.user.UserInfoDTO;
-import de.tum.in.www1.hephaestus.gitprovider.user.UserRepository;
-import de.tum.in.www1.hephaestus.gitprovider.user.UserTeamsDTO;
-
 @Service
 public class AdminService {
+
     private static final Logger logger = LoggerFactory.getLogger(AdminService.class);
 
     @Autowired
     private AdminRepository adminRepository;
+
     @Autowired
     private UserRepository userRepository;
+
     @Autowired
     private TeamService teamService;
+
+    @Autowired
+    private RepositoryRepository repositoryRepository;
+
+    @Autowired
+    private LabelRepository labelRepository;
 
     @Value("${monitoring.repositories}")
     private String[] repositoriesToMonitor;
@@ -120,6 +131,38 @@ public class AdminService {
     public TeamInfoDTO createTeam(String name, String color) {
         logger.info("Creating team with name: " + name + " and color: " + color);
         return TeamInfoDTO.fromTeam(teamService.createTeam(name, color));
+    }
+
+    public Optional<TeamInfoDTO> addRepositoryToTeam(Long teamId, String repositoryName) {
+        logger.info("Adding repository with name: " + repositoryName + " to team with ID: " + teamId);
+        Optional<Team> optionalTeam = teamService.getTeam(teamId);
+        if (optionalTeam.isEmpty()) {
+            return Optional.empty();
+        }
+        Team team = optionalTeam.get();
+        Repository repository = repositoryRepository.findByNameWithOwner(repositoryName);
+        if (repository == null) {
+            return Optional.empty();
+        }
+        team.addRepository(repository);
+        teamService.saveTeam(team);
+        return Optional.of(TeamInfoDTO.fromTeam(team));
+    }
+
+    public Optional<TeamInfoDTO> addLabelToTeam(Long teamId, String label) {
+        logger.info("Adding label '" + label + "' to team with ID: " + teamId);
+        Optional<Team> optionalTeam = teamService.getTeam(teamId);
+        if (optionalTeam.isEmpty()) {
+            return Optional.empty();
+        }
+        Team team = optionalTeam.get();
+        Optional<Label> labelEntity = labelRepository.findByName(label);
+        if (labelEntity.isEmpty()) {
+            return Optional.empty();
+        }
+        team.addLabel(labelEntity.get());
+        teamService.saveTeam(team);
+        return Optional.of(TeamInfoDTO.fromTeam(team));
     }
 
     public Optional<TeamInfoDTO> deleteTeam(Long teamId) {

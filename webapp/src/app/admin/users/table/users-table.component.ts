@@ -1,11 +1,10 @@
 import { SelectionModel } from '@angular/cdk/collections';
-import { DecimalPipe, TitleCasePipe } from '@angular/common';
 import { Component, TrackByFunction, computed, effect, inject, input, signal } from '@angular/core';
 import { toObservable, toSignal } from '@angular/core/rxjs-interop';
 import { FormsModule } from '@angular/forms';
 import { lucideArrowUpDown, lucideChevronDown, lucideMoreHorizontal, lucideRotateCw, lucideXOctagon } from '@ng-icons/lucide';
 import { HlmButtonModule } from '@spartan-ng/ui-button-helm';
-import { HlmCheckboxCheckIconComponent, HlmCheckboxComponent } from '@spartan-ng/ui-checkbox-helm';
+import { HlmCheckboxComponent } from '@spartan-ng/ui-checkbox-helm';
 import { HlmIconComponent, provideIcons } from '@spartan-ng/ui-icon-helm';
 import { HlmInputDirective } from '@spartan-ng/ui-input-helm';
 import { BrnMenuTriggerDirective } from '@spartan-ng/ui-menu-brain';
@@ -32,7 +31,9 @@ const LOADING_DATA: UserTeams[] = [
       {
         id: 1,
         name: 'Team A',
-        color: '#FF0000'
+        color: '#FF0000',
+        repositories: [],
+        labels: []
       }
     ])
   },
@@ -45,7 +46,9 @@ const LOADING_DATA: UserTeams[] = [
       {
         id: 2,
         name: 'Team B',
-        color: '#00FF00'
+        color: '#00FF00',
+        repositories: [],
+        labels: []
       }
     ])
   }
@@ -55,7 +58,9 @@ const LOADING_TEAMS: TeamInfo[] = [
   {
     id: 1,
     name: 'Team A',
-    color: '#FF0000'
+    color: '#FF0000',
+    repositories: [],
+    labels: []
   }
 ];
 
@@ -74,12 +79,9 @@ const LOADING_TEAMS: TeamInfo[] = [
 
     HlmButtonModule,
 
-    DecimalPipe,
-    TitleCasePipe,
     HlmIconComponent,
     HlmInputDirective,
 
-    HlmCheckboxCheckIconComponent,
     HlmCheckboxComponent,
 
     BrnSelectModule,

@@ -55,6 +55,59 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/TeamInfo"
+  /admin/teams/{teamId}/repository/{repositoryOwner}/{repositoryName}:
+    post:
+      tags:
+      - admin
+      operationId: addRepositoryToTeam
+      parameters:
+      - name: teamId
+        in: path
+        required: true
+        schema:
+          type: integer
+          format: int64
+      - name: repositoryOwner
+        in: path
+        required: true
+        schema:
+          type: string
+      - name: repositoryName
+        in: path
+        required: true
+        schema:
+          type: string
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TeamInfo"
+  /admin/teams/{teamId}/label/{label}:
+    post:
+      tags:
+      - admin
+      operationId: addLabelToTeam
+      parameters:
+      - name: teamId
+        in: path
+        required: true
+        schema:
+          type: integer
+          format: int64
+      - name: label
+        in: path
+        required: true
+        schema:
+          type: string
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TeamInfo"
   /admin/config/repositories:
     post:
       tags:
@@ -351,6 +404,25 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/PullRequestInfo"
+    RepositoryInfo:
+      required:
+      - htmlUrl
+      - id
+      - name
+      - nameWithOwner
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+        name:
+          type: string
+        nameWithOwner:
+          type: string
+        description:
+          type: string
+        htmlUrl:
+          type: string
     PullRequestReviewInfo:
       required:
       - codeComments
@@ -384,25 +456,6 @@ components:
         submittedAt:
           type: string
           format: date-time
-    RepositoryInfo:
-      required:
-      - htmlUrl
-      - id
-      - name
-      - nameWithOwner
-      type: object
-      properties:
-        id:
-          type: integer
-          format: int64
-        name:
-          type: string
-        nameWithOwner:
-          type: string
-        description:
-          type: string
-        htmlUrl:
-          type: string
     UserTeams:
       required:
       - id
@@ -491,7 +544,9 @@ components:
       required:
       - color
       - id
+      - labels
       - name
+      - repositories
       type: object
       properties:
         id:
@@ -501,6 +556,14 @@ components:
           type: string
         color:
           type: string
+        repositories:
+          type: array
+          items:
+            $ref: "#/components/schemas/RepositoryInfo"
+        labels:
+          type: array
+          items:
+            $ref: "#/components/schemas/LabelInfo"
     LeaderboardEntry:
       required:
       - numberOfApprovals

@@ -1,11 +1,9 @@
 import { SelectionModel } from '@angular/cdk/collections';
-import { DecimalPipe, TitleCasePipe } from '@angular/common';
 import { Component, TrackByFunction, computed, effect, inject, input, signal } from '@angular/core';
 import { toObservable, toSignal } from '@angular/core/rxjs-interop';
 import { FormControl, FormsModule, ReactiveFormsModule } from '@angular/forms';
-import { lucideArrowUpDown, lucideChevronDown, lucideMoreHorizontal, lucideRotateCw, lucideXOctagon } from '@ng-icons/lucide';
+import { lucideArrowUpDown, lucideChevronDown, lucideMoreHorizontal, lucideRotateCw, lucideXOctagon, lucidePlus } from '@ng-icons/lucide';
 import { HlmButtonModule } from '@spartan-ng/ui-button-helm';
-import { HlmCheckboxCheckIconComponent, HlmCheckboxComponent } from '@spartan-ng/ui-checkbox-helm';
 import { HlmIconComponent, provideIcons } from '@spartan-ng/ui-icon-helm';
 import { HlmInputDirective } from '@spartan-ng/ui-input-helm';
 import { BrnMenuTriggerDirective } from '@spartan-ng/ui-menu-brain';
@@ -18,20 +16,30 @@ import { HlmSkeletonModule } from '@spartan-ng/ui-skeleton-helm';
 import { HlmCardModule } from '@spartan-ng/ui-card-helm';
 import { debounceTime, map } from 'rxjs';
 import { AdminService, TeamInfo } from '@app/core/modules/openapi';
-import { RouterLink } from '@angular/router';
 import { injectQueryClient } from '@tanstack/angular-query-experimental';
 import { octNoEntry } from '@ng-icons/octicons';
+import { HlmPopoverModule } from '@spartan-ng/ui-popover-helm';
+import {
+  BrnPopoverComponent,
+  BrnPopoverContentDirective,
+  BrnPopoverTriggerDirective,
+} from '@spartan-ng/ui-popover-brain';
+import { GithubLabelComponent } from '@app/ui/github-label/github-label.component';
 
 const LOADING_TEAMS: TeamInfo[] = [
   {
     id: 1,
     name: 'Team A',
-    color: '#FF0000'
+    color: '#FF0000',
+    repositories: [],
+    labels: []
   },
   {
     id: 2,
     name: 'Team B',
-    color: '#00FF00'
+    color: '#00FF00',
+    repositories: [],
+    labels: []
   }
 ];
 
@@ -41,7 +49,6 @@ const LOADING_TEAMS: TeamInfo[] = [
   imports: [
     FormsModule,
     ReactiveFormsModule,
-    RouterLink,
 
     BrnMenuTriggerDirective,
     HlmMenuModule,
@@ -51,21 +58,23 @@ const LOADING_TEAMS: TeamInfo[] = [
 
     HlmButtonModule,
 
-    DecimalPipe,
-    TitleCasePipe,
     HlmIconComponent,
     HlmInputDirective,
-
-    HlmCheckboxCheckIconComponent,
-    HlmCheckboxComponent,
 
     BrnSelectModule,
     HlmSelectModule,
 
     HlmSkeletonModule,
-    HlmCardModule
+    HlmCardModule,
+
+    HlmPopoverModule,
+    BrnPopoverComponent,
+    BrnPopoverContentDirective,
+    BrnPopoverTriggerDirective,
+
+    GithubLabelComponent
   ],
-  providers: [provideIcons({ lucideChevronDown, lucideMoreHorizontal, lucideArrowUpDown, lucideRotateCw, lucideXOctagon })],
+  providers: [provideIcons({ lucideChevronDown, lucideMoreHorizontal, lucideArrowUpDown, lucideRotateCw, lucideXOctagon, lucidePlus })],
   templateUrl: './teams-table.component.html'
 })
 export class AdminTeamsTableComponent {
@@ -91,7 +100,7 @@ export class AdminTeamsTableComponent {
     initialValue: []
   });
 
-  protected readonly _allDisplayedColumns = ['name', 'color', 'actions'];
+  protected readonly _allDisplayedColumns = ['name', 'color', 'repositories', 'labels', 'actions'];
 
   private readonly _filteredNames = computed(() => {
     const nameFilter = this._nameFilter()?.trim()?.toLowerCase();
@@ -165,30 +174,56 @@ export class AdminTeamsTableComponent {
     navigator.clipboard.writeText(element.name!);
   }
 
+  _newRepositoryOwner = new FormControl('');
+  _newRepositoryName = new FormControl('');
+  _newLabelName = new FormControl('');
   _newTeamName = new FormControl('');
   _newTeamColor = new FormControl('');
 
+  protected addLabel(team: TeamInfo) {
+    if (this.isLoading() || !this._newLabelName.value) {
+      return;
+    }
+    this.adminService.addLabelToTeam(team.id, this._newLabelName.value).subscribe({
+      next: () => {
+        this._newLabelName.reset();
+        this.invalidateTeams();
+      },
+      error: (err) => console.error('Error adding label', err),
+    });
+  }
+
+  protected addRepository(team: TeamInfo) {
+    if (this.isLoading() || !this._newRepositoryName.value) {
+      return;
+    }
+    this.adminService.addRepositoryToTeam(team.id, this._newRepositoryOwner.value!, this._newRepositoryName.value).subscribe({
+      next: () => {
+        this._newRepositoryOwner.reset();
+        this._newRepositoryName.reset();
+        this.invalidateTeams();
+      },
+      error: (err) => console.error('Error adding repository', err),
+    });
+  }
+
   protected createTeam() {
-    if (this.isLoading() || !this._newTeamName.value || !this._newTeamColor.value) {
+    if (this.isLoading() || !this._newTeamName.value) {
       return;
     }
     const newTeam = {
       name: this._newTeamName.value,
-      color: this._newTeamColor.value
+      color: this._newTeamColor.value ?? '#000000',
     } as TeamInfo;
     this.adminService.createTeam(newTeam).subscribe({
-      next: () => console.log('Team created'),
+      next: () => this.invalidateTeams(),
       error: (err) => console.error('Error creating team', err)
     });
-    this.invalidateTeams();
   }
 
   protected invalidateTeams() {
     if (this.isLoading()) {
       return;
-    }
-    for (const team of this._selected()) {
-      this._selectionModel.deselect(team);
     }
     this.queryClient.invalidateQueries({ queryKey: ['admin', 'teams'] });
   }

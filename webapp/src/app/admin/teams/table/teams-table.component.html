@@ -35,7 +35,7 @@
       }
     </hlm-td>
   </brn-column-def>
-  <brn-column-def name="color" class="w-20 flex-1">
+  <brn-column-def name="color" class="w-28">
     <hlm-th *brnHeaderDef>Color</hlm-th>
     <hlm-td class="font-medium tabular-nums flex gap-4" *brnCellDef="let element">
       @if (this.isLoading()) {
@@ -44,6 +44,58 @@
       } @else {
         <div class="w-4 h-4 rounded-full" [style.backgroundColor]="element.color"></div>
         <span>{{ element.color }}</span>
+      }
+    </hlm-td>
+  </brn-column-def>
+  <brn-column-def name="repositories" class="w-48 flex-1">
+    <hlm-th *brnHeaderDef>Repositories</hlm-th>
+    <hlm-td class="font-medium tabular-nums flex flex-wrap gap-1" *brnCellDef="let element">
+      @if (this.isLoading()) {
+        <hlm-skeleton class="h-6 w-20" />
+      } @else {
+        @for(repo of element.repositories; track repo.id) {
+          <span>{{ repo.nameWithOwner }},</span>
+        }
+        <brn-popover sideOffset="5" closeDelay="100">
+          <button id="add-repository" size="icon" variant="outline" class="h-6 w-6 p-0.5" brnPopoverTrigger hlmBtn>
+            <hlm-icon class="w-4 h-4" name="lucidePlus" />
+          </button>
+          <div hlmPopoverContent class="w-96 p-4 gap-4 flex flex-col items-center" *brnPopoverContent="let ctx">
+            <div class="flex gap-2 items-center">
+              <input hlmInput placeholder="Owner" [formControl]="_newRepositoryOwner" class="w-32" />
+              <span class="text-muted-foreground">/</span>
+              <input hlmInput placeholder="Repository" [formControl]="_newRepositoryName" class="w-32" />
+            </div>
+            <button hlmBtn variant="default" class="space-x-2" (click)="addRepository(element)">
+              <span>Add</span>
+              <hlm-icon class="w-4 h-4" name="lucidePlus" />
+            </button>
+          </div>
+        </brn-popover>
+      }
+    </hlm-td>
+  </brn-column-def>
+  <brn-column-def name="labels" class="w-48 flex-1">
+    <hlm-th *brnHeaderDef>Labels</hlm-th>
+    <hlm-td class="font-medium tabular-nums flex gap-4" *brnCellDef="let element">
+      @if (this.isLoading()) {
+        <hlm-skeleton class="h-6 w-20" />
+      } @else {
+        @for(label of element.labels; track label.id) {
+          @let ghLabel = { id: label.id, name: label.name, color: label.color ?? '69feff' };
+          <app-github-label [label]="ghLabel" />
+        }
+        <brn-popover sideOffset="5" closeDelay="100">
+          <button id="add-label" size="icon" variant="outline" class="h-6 w-6 p-0.5" brnPopoverTrigger hlmBtn>
+            <hlm-icon class="w-4 h-4" name="lucidePlus" />
+          </button>
+          <div hlmPopoverContent class="w-80 p-4 gap-4 flex flex-wrap items-center justify-center" *brnPopoverContent="let ctx">
+            <input hlmInput placeholder="Label name" [formControl]="_newLabelName" />
+            <button hlmBtn size="icon" variant="default" class="ml-2" (click)="addLabel(element)">
+              <hlm-icon class="w-4 h-4" name="lucidePlus" />
+            </button>
+          </div>
+        </brn-popover>
       }
     </hlm-td>
   </brn-column-def>
@@ -57,7 +109,7 @@
       <ng-template #menu>
         <hlm-menu>
           <hlm-menu-group>
-            <button hlmMenuItem (click)="copyName(element)">Copy name</button>
+            <button hlmMenuItem (click)="copyName(element)">Copy Name</button>
           </hlm-menu-group>
           <hlm-menu-separator />
           <hlm-menu-group>
