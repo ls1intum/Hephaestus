@@ -62,7 +62,7 @@ export class LeaderboardFilterTimeframeComponent {
       options.push({
         id: startDate.unix(),
         value: `${startDate.format()}.${currentDate.format()}`,
-        label: formatLabel(i+1)
+        label: formatLabel(i + 1)
       });
       currentDate = startDate;
     }
