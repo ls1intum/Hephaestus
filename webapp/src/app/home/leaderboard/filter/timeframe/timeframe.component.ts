@@ -6,6 +6,11 @@ import isoWeek from 'dayjs/plugin/isoWeek';
 import { BrnSelectModule } from '@spartan-ng/ui-select-brain';
 import { HlmSelectModule } from '@spartan-ng/ui-select-helm';
 import { HlmLabelModule } from '@spartan-ng/ui-label-helm';
+import { BrnTooltipContentDirective } from '@spartan-ng/ui-tooltip-brain';
+import { HlmTooltipComponent, HlmTooltipTriggerDirective } from '@spartan-ng/ui-tooltip-helm';
+import { HlmIconComponent } from '@spartan-ng/ui-icon-helm';
+import { provideIcons } from '@spartan-ng/ui-icon-helm';
+import { lucideHelpCircle } from '@ng-icons/lucide';
 
 interface SelectOption {
   id: number;
@@ -15,24 +20,21 @@ interface SelectOption {
 
 dayjs.extend(isoWeek);
 
-function formatLabel(startDate: dayjs.Dayjs, endDate: dayjs.Dayjs | undefined) {
-  const calendarWeek = startDate.isoWeek();
-  if (!endDate || endDate.isSame(dayjs(), 'day')) {
-    return `CW\xa0${calendarWeek}:\xa0${startDate.format('MMM D, h[am]')}\xa0-\xa0Today`;
+function formatLabel(weekIndex: number) {
+  if (weekIndex === 0) {
+    return 'Current week';
   }
-
-  const sameMonth = startDate.month() === endDate.month();
-  if (sameMonth) {
-    return `CW\xa0${calendarWeek}:\xa0${startDate.format('MMM D, h[am]')}\xa0-\xa0${endDate.format('D, h[am]')}`;
-  } else {
-    return `CW\xa0${calendarWeek}:\xa0${startDate.format('MMM D, h[am]')}\xa0-\xa0${endDate.format('MMM D, h[am]')}`;
+  if (weekIndex === 1) {
+    return 'Last week';
   }
+  return `${weekIndex} weeks ago`;
 }
 
 @Component({
   selector: 'app-leaderboard-filter-timeframe',
   standalone: true,
-  imports: [BrnSelectModule, HlmSelectModule, HlmLabelModule, FormsModule],
+  imports: [BrnSelectModule, HlmSelectModule, HlmLabelModule, FormsModule, HlmTooltipComponent, HlmTooltipTriggerDirective, BrnTooltipContentDirective, HlmIconComponent],
+  providers: [provideIcons({ lucideHelpCircle })],
   templateUrl: './timeframe.component.html'
 })
 export class LeaderboardFilterTimeframeComponent {
@@ -41,7 +43,7 @@ export class LeaderboardFilterTimeframeComponent {
   value = signal<string>(`${this.after()}.${this.before()}`);
 
   placeholder = computed(() => {
-    return formatLabel(dayjs(this.after()) ?? dayjs().day(2).startOf('hour').hour(9), !this.before() ? undefined : dayjs(this.before()));
+    return formatLabel(dayjs(dayjs()).diff(this.after(), 'week'));
   });
 
   options = computed(() => {
@@ -51,17 +53,16 @@ export class LeaderboardFilterTimeframeComponent {
       {
         id: now.unix(),
         value: `${currentDate.format()}.${now.format()}`,
-        label: formatLabel(currentDate, undefined)
+        label: formatLabel(0)
       }
     ];
 
     for (let i = 0; i < 4; i++) {
       const startDate = currentDate.subtract(7, 'day');
-      const endDate = currentDate.subtract(1, 'day');
       options.push({
         id: startDate.unix(),
-        value: `${startDate.format()}.${endDate.format()}`,
-        label: formatLabel(startDate, endDate)
+        value: `${startDate.format()}.${currentDate.format()}`,
+        label: formatLabel(i+1)
       });
       currentDate = startDate;
     }
