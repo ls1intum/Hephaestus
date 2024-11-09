@@ -54,13 +54,13 @@ paths:
         required: false
         schema:
           type: string
-          format: date
+          format: date-time
       - name: before
         in: query
         required: false
         schema:
           type: string
-          format: date
+          format: date-time
       - name: repository
         in: query
         required: false
