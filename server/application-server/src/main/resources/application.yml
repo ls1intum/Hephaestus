@@ -33,6 +33,12 @@ springdoc:
 
 hephaestus:
     host_url: https://hephaestus.ase.cit.tum.de/
+    notification:
+        leaderboard:
+            enabled: false
+            cron: "0 0 9 ? * TUE"
+            channelId: ""
+
 
 nats:
     enabled: false
@@ -53,8 +59,5 @@ monitoring:
 github:
     authToken: null
 slack:
-    runScheduledMessage: false
-    cronSchedule: "0 0 9 ? * TUE"
     token: ""
     signingSecret: ""
-    channelId: ""

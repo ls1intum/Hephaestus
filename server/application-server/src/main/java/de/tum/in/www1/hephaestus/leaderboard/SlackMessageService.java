@@ -39,10 +39,10 @@ public class SlackMessageService {
 
     private static final Logger logger = LoggerFactory.getLogger(SlackMessageService.class);
 
-    @Value("${slack.channelId}")
+    @Value("${hephaestus.notification.leaderboard.channelId}")
     private String channelId;
 
-    @Value("${slack.runScheduledMessage}")
+    @Value("${hephaestus.notification.leaderboard.enabled}")
     private boolean runScheduledMessage;
 
     @Value("${hephaestus.host_url:localhost:8080}")
@@ -102,7 +102,7 @@ public class SlackMessageService {
         }).filter(user -> user != null).toList();
     }
 
-    @Scheduled(cron = "${slack.cronSchedule}")
+    @Scheduled(cron = "${hephaestus.notification.leaderboard.cron}")
     public void sendScheduledLeaderboard() {
         if (!runScheduledMessage) {
             return;

@@ -16,6 +16,11 @@ spring:
 
 hephaestus:
     host_url: ${APPLICATION_HOST_URL}
+    notification:
+      leaderboard:
+        enabled: ${NOTIFICATION_LEADERBOARD_ENABLED:true}
+        cron: ${NOTIFICATION_LEADERBOARD_CRON:0 0 9 ? * TUE}
+        channelId: ${NOTIFICATION_LEADERBOARD_CHANNEL_ID:G6TCVL6HL}
 
 nats:
     enabled: ${NATS_ENABLED:false}
@@ -33,8 +38,5 @@ monitoring:
 github:
   authToken: ${GITHUB_AUTH_TOKEN}
 slack:
-    runScheduledMessage: ${SLACK_RUN_SCHEDULED_MESSAGE:true}
-    cronSchedule: ${SLACK_CRON_SCHEDULE:0 0 9 ? * TUE}
     token: ${SLACK_BOT_TOKEN}
     signingSecret: ${SLACK_SIGNING_SECRET}
-    channelId: ${SLACK_CHANNEL_ID:G6TCVL6HL}
