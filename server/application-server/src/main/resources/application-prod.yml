@@ -7,13 +7,15 @@ spring:
     hibernate:
       # TODO: Change to none and use liquibase
       ddl-auto: none
-  url: ${APPLICATION_SERVER_URL}
 
   security:
     oauth2:
       resourceserver:
         jwt:
           issuer-uri: ${KEYCLOAK_URL}/realms/${KEYCLOAK_REALM}
+
+hephaestus:
+    host_url: ${APPLICATION_HOST_URL}
 
 nats:
     enabled: ${NATS_ENABLED:false}

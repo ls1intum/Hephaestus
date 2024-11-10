@@ -2,8 +2,6 @@ spring:
     application:
         name: Hephaestus
 
-    url: https://hephaestus.ase.cit.tum.de/
-
     datasource:
         url: jdbc:postgresql://localhost:5432/hephaestus
         username: root
@@ -32,6 +30,9 @@ spring:
 
 springdoc:
     default-produces-media-type: application/json
+
+hephaestus:
+    host_url: https://hephaestus.ase.cit.tum.de/
 
 nats:
     enabled: false

@@ -45,7 +45,7 @@ public class SlackMessageService {
     @Value("${slack.runScheduledMessage}")
     private boolean runScheduledMessage;
 
-    @Value("${spring.url:localhost:8080}")
+    @Value("${hephaestus.host_url:localhost:8080}")
     private String hephaestusUrl;
 
     @Autowired
