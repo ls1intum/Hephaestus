@@ -8,8 +8,8 @@ import { hlm } from '@spartan-ng/ui-core';
   standalone: true,
   imports: [HlmAvatarModule, LucideAngularModule],
   template: `
-    <button [class]="computedClass()" (click)="handleClick($event)">
-      <hlm-avatar shape="square">
+    <button [class]="computedClass()" (click)="handleClick($event)" class="block">
+      <hlm-avatar variant="base" shape="square">
         <img [src]="iconUrl()" hlmAvatarImage />
         <span class="inset-2 rounded-md" hlmAvatarFallback>
           <lucide-angular [img]="Hammer" class="size-8 sm:size-6" />

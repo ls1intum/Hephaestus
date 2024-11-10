@@ -1,14 +1,26 @@
-import { Component } from '@angular/core';
+import { Component, input } from '@angular/core';
+import { WorkspaceThumbComponent } from '../workspace-thumb/workspace-thumb.component';
 
 @Component({
   selector: 'app-workspace-badge',
   standalone: true,
-  imports: [],
-  template: `<p>workspace-badge works!</p>`
+  imports: [WorkspaceThumbComponent],
+  template: `
+    <div class="flex items-center gap-2">
+      <div class="block md:hidden">
+        <app-workspace-thumb [iconUrl]="iconUrl()" [ringEnabled]="false"></app-workspace-thumb>
+      </div>
+      <span class="text-xl font-semibold">
+        {{ title() }}
+      </span>
+    </div>
+  `
 })
 export class WorkspaceBadgeComponent {
-  // Workspace thumb + text
-  // Opens sidebar on mobile
-  // Hides thumb on desktop
+  // Open sidebar on mobile, smaller than md
+  // Hide icon on desktop, show on mobile
   // Contains dropdown with workspace actions on desktop (in sidebar on mobile)
+
+  title = input.required<string>();
+  iconUrl = input<string>();
 }
