@@ -15,11 +15,13 @@ spring:
 
 hephaestus:
     host_url: ${APPLICATION_HOST_URL}
-    notification:
-      leaderboard:
-        enabled: ${NOTIFICATION_LEADERBOARD_ENABLED:true}
-        cron: ${NOTIFICATION_LEADERBOARD_CRON:0 0 9 ? * TUE}
-        channelId: ${NOTIFICATION_LEADERBOARD_CHANNEL_ID:G6TCVL6HL}
+    leaderboard:
+      schedule:
+        day: ${LEADERBOARD_SCHEDULE_DAY:2}
+        time: ${LEADERBOARD_SCHEDULE_TIME:9}
+      notification:
+        enabled: ${LEADERBOARD_NOTIFICATION_ENABLED:true}
+        channelId: ${LEADERBOARD_NOTIFICATION_CHANNEL_ID:G6TCVL6HL}
 
 nats:
     enabled: ${NATS_ENABLED:false}

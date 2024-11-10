@@ -33,10 +33,12 @@ springdoc:
 
 hephaestus:
     host_url: https://hephaestus.ase.cit.tum.de/
-    notification:
-        leaderboard:
+    leaderboard:
+        schedule:
+            day: 2
+            time: "9:00"
+        notification:
             enabled: false
-            cron: "0 0 9 ? * TUE"
             channelId: ""
 
 
