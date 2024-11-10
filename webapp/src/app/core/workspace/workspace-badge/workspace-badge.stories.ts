@@ -22,18 +22,18 @@ export default meta;
 
 type Story = StoryObj<WorkspaceBadgeComponent>;
 
-export const Default: Story = {};
-
-Default.parameters = {
-  viewport: {
-    defaultViewport: 'responsive'
+export const Default: Story = {
+  parameters: {
+    viewport: {
+      defaultViewport: 'responsive'
+    }
   }
 };
 
-export const Mobile: Story = {};
-
-Mobile.parameters = {
-  viewport: {
-    defaultViewport: 'mobile1'
+export const Mobile: Story = {
+  parameters: {
+    viewport: {
+      defaultViewport: 'mobile1'
+    }
   }
 };

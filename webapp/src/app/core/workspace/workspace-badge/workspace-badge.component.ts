@@ -8,7 +8,7 @@ import { WorkspaceThumbComponent } from '../workspace-thumb/workspace-thumb.comp
   template: `
     <div class="flex items-center gap-2">
       <div class="block md:hidden">
-        <app-workspace-thumb [iconUrl]="iconUrl()" [ringEnabled]="false"></app-workspace-thumb>
+        <app-workspace-thumb [iconUrl]="iconUrl()" [hoverRingEnabled]="false"></app-workspace-thumb>
       </div>
       <span class="text-xl font-semibold">
         {{ title() }}

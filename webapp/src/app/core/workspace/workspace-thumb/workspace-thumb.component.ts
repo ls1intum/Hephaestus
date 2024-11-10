@@ -8,8 +8,8 @@ import { hlm } from '@spartan-ng/ui-core';
   standalone: true,
   imports: [HlmAvatarModule, LucideAngularModule],
   template: `
-    <button [class]="computedClass()" (click)="handleClick($event)" class="block">
-      <hlm-avatar variant="base" shape="square">
+    <button [class]="computedClass()" (click)="handleClick($event)">
+      <hlm-avatar [variant]="variant()" shape="square">
         <img [src]="iconUrl()" hlmAvatarImage />
         <span class="inset-2 rounded-md" hlmAvatarFallback>
           <lucide-angular [img]="Hammer" class="size-8 sm:size-6" />
@@ -21,15 +21,16 @@ import { hlm } from '@spartan-ng/ui-core';
 export class WorkspaceThumbComponent {
   protected Hammer = Hammer;
 
+  variant = input<'base' | 'medium'>('base');
   isSelected = input<boolean>();
-  ringEnabled = input<boolean>(true);
+  hoverRingEnabled = input<boolean>(true);
   iconUrl = input<string>();
   onClick = output<MouseEvent>();
 
   computedClass = computed(() => {
     return hlm(
-      'rounded-md ring-offset-background ring-offset-2 duration-200 transition-all',
-      this.ringEnabled() && (this.isSelected() ? 'ring-2 ring-primary' : 'hover:ring-2 hover:ring-muted-foreground/50')
+      'block rounded-md ring-offset-background ring-offset-2 duration-200 transition-all',
+      this.isSelected() ? 'ring-2 ring-primary' : this.hoverRingEnabled() && 'hover:ring-2 hover:ring-muted-foreground/50'
     );
   });
 

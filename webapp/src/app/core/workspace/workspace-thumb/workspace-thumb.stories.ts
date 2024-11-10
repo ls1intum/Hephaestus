@@ -7,7 +7,7 @@ const meta: Meta<WorkspaceThumbComponent> = {
   tags: ['autodocs'],
   args: {
     isSelected: false,
-    ringEnabled: true,
+    hoverRingEnabled: true,
     iconUrl: 'https://avatars.githubusercontent.com/u/11064260?s=48&v=4',
     onClick: fn()
   },
@@ -15,7 +15,7 @@ const meta: Meta<WorkspaceThumbComponent> = {
     isSelected: {
       control: { type: 'boolean' }
     },
-    ringEnabled: {
+    hoverRingEnabled: {
       control: { type: 'boolean' }
     },
     iconUrl: {
@@ -38,7 +38,7 @@ export const Selected: Story = {
 
 export const RingDisabled: Story = {
   args: {
-    ringEnabled: false
+    hoverRingEnabled: false
   }
 };
 
