@@ -33,15 +33,33 @@ export class HomeComponent {
 
   private readonly route = inject(ActivatedRoute);
   private queryParams = toSignal(this.route.queryParamMap, { requireSync: true });
-  protected after = computed(() => this.queryParams().get('after') ?? dayjs().isoWeekday(1).startOf('hour').hour(9).format());
+  protected leaderboardSchedule = computed(() => {
+    const timeParts = this.metaQuery.data()?.scheduledTime?.split(':') ?? ['09', '00'];
+    return {
+      day: Number.parseInt(this.metaQuery.data()?.scheduledDay ?? '2'),
+      hour: Number.parseInt(timeParts[0]),
+      minute: Number.parseInt(timeParts[1] ?? '0')
+    }
+  });
+  protected after = computed(() => {
+    const afterParam = this.queryParams().get('after');
+    if (afterParam) return afterParam;
+
+    let defaultDate = dayjs().isoWeekday(this.leaderboardSchedule().day).startOf('hour').hour(this.leaderboardSchedule().hour).minute(this.leaderboardSchedule().minute);
+    if (defaultDate.isAfter(dayjs())) {
+      defaultDate = defaultDate.subtract(1, 'week');
+    }
+    return defaultDate.format();
+  });
   protected before = computed(() => this.queryParams().get('before') ?? dayjs().format());
   protected repository = computed(() => this.queryParams().get('repository') ?? 'all');
 
   query = injectQuery(() => ({
+    enabled: this.metaQuery.data !== undefined,
     queryKey: ['leaderboard', { after: this.after(), before: this.before(), repository: this.repository() }],
     queryFn: async () =>
       lastValueFrom(
-        combineLatest([this.leaderboardService.getLeaderboard(this.after(), this.before(), this.repository() !== 'all' ? this.repository() : undefined), timer(500)]).pipe(
+        combineLatest([this.leaderboardService.getLeaderboard(this.after(), this.before(), this.repository() !== 'all' ? this.repository() : undefined), timer(0)]).pipe(
           map(([leaderboard]) => leaderboard)
         )
       )

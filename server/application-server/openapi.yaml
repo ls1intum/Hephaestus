@@ -258,12 +258,20 @@ components:
         htmlUrl:
           type: string
     MetaData:
+      required:
+      - repositoriesToMonitor
+      - scheduledDay
+      - scheduledTime
       type: object
       properties:
         repositoriesToMonitor:
           type: array
           items:
             type: string
+        scheduledDay:
+          type: string
+        scheduledTime:
+          type: string
     PullRequestBaseInfo:
       required:
       - htmlUrl

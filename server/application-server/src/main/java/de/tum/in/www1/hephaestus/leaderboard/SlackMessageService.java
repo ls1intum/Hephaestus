@@ -11,8 +11,9 @@ import com.slack.api.methods.response.chat.ChatPostMessageResponse;
 import com.slack.api.model.User;
 import com.slack.api.model.block.LayoutBlock;
 import java.io.IOException;
-import java.time.LocalDate;
+import java.time.DayOfWeek;
 import java.time.OffsetDateTime;
+import java.time.temporal.TemporalAdjusters;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
@@ -94,8 +95,13 @@ public class SlackMessageService {
 
         var timeParts = scheduledTime.split(":");
 
-        String cron = String.format("0 %s %s ? * %s", timeParts.length > 1 ? timeParts[1] : 0, timeParts[0], scheduledDay);
-        
+        String cron = String.format(
+            "0 %s %s ? * %s",
+            timeParts.length > 1 ? timeParts[1] : 0,
+            timeParts[0],
+            scheduledDay
+        );
+
         if (!CronExpression.isValidExpression(cron)) {
             logger.error("Invalid cron expression: " + cron);
             return;
@@ -141,13 +147,17 @@ public class SlackMessageService {
          * @return
          */
         private List<User> getTop3SlackReviewers() {
-            // exactly 7 days ago
-            OffsetDateTime after = OffsetDateTime.of(
-                LocalDate.now().minusDays(7),
-                OffsetDateTime.now().toLocalTime(),
-                OffsetDateTime.now().getOffset()
-            );
-            var leaderboard = leaderboardService.createLeaderboard(after, OffsetDateTime.now(), Optional.empty());
+            // Calculate the the last leaderboard schedule
+            var timeParts = scheduledTime.split(":");
+            OffsetDateTime before = OffsetDateTime.now()
+                .with(TemporalAdjusters.previousOrSame(DayOfWeek.of(Integer.parseInt(scheduledDay))))
+                .withHour(Integer.parseInt(timeParts[0]))
+                .withMinute(timeParts.length > 0 ? Integer.parseInt(timeParts[1]) : 0)
+                .withSecond(0)
+                .withNano(0);
+            OffsetDateTime after = before.minusWeeks(1);
+
+            var leaderboard = leaderboardService.createLeaderboard(after, before, Optional.empty());
             var top3 = leaderboard.subList(0, Math.min(3, leaderboard.size()));
             logger.debug("Top 3 Users of the last week: " + top3.stream().map(e -> e.user().name()).toList());
 

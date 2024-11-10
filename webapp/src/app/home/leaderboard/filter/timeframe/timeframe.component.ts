@@ -1,4 +1,4 @@
-import { Component, computed, effect, signal } from '@angular/core';
+import { Component, computed, effect, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
 import dayjs from 'dayjs';
@@ -11,6 +11,9 @@ import { HlmTooltipComponent, HlmTooltipTriggerDirective } from '@spartan-ng/ui-
 import { HlmIconComponent } from '@spartan-ng/ui-icon-helm';
 import { provideIcons } from '@spartan-ng/ui-icon-helm';
 import { lucideHelpCircle } from '@ng-icons/lucide';
+import { injectQuery } from '@tanstack/angular-query-experimental';
+import { lastValueFrom } from 'rxjs';
+import { MetaService } from '@app/core/modules/openapi';
 
 interface SelectOption {
   id: number;
@@ -42,13 +45,35 @@ export class LeaderboardFilterTimeframeComponent {
   before = signal<string>('');
   value = signal<string>(`${this.after()}.${this.before()}`);
 
+  metaService = inject(MetaService);
+  dateQuery = injectQuery(() => ({
+    queryKey: ['meta'],
+    queryFn: async () => lastValueFrom(this.metaService.getMetaData())
+  }));
+
+  leaderboardSchedule = computed(() => {
+    const day = Number.parseInt(this.dateQuery.data()?.scheduledDay ?? '2');
+    const timeParts = this.dateQuery.data()?.scheduledTime.split(':') ?? ['09', '00'];
+    const hour = Number.parseInt(timeParts[0]);
+    const minute = Number.parseInt(timeParts[1] ?? '0');
+    return {
+      day,
+      hour,
+      minute,
+      formatted: dayjs().isoWeekday(day).startOf('hour').hour(hour).minute(minute).format("dddd, h:mm A")
+    };
+  });
+
   placeholder = computed(() => {
     return formatLabel(dayjs(dayjs()).diff(this.after(), 'week'));
   });
 
   options = computed(() => {
     const now = dayjs();
-    let currentDate = dayjs().isoWeekday(2).startOf('hour').hour(9);
+    let currentDate = dayjs().isoWeekday(this.leaderboardSchedule().day).startOf('hour').hour(this.leaderboardSchedule().hour).minute(this.leaderboardSchedule().minute);
+    if (currentDate.isAfter(now)) {
+      currentDate = currentDate.subtract(1, 'week');
+    }
     const options: SelectOption[] = [
       {
         id: now.unix(),
@@ -58,7 +83,7 @@ export class LeaderboardFilterTimeframeComponent {
     ];
 
     for (let i = 0; i < 4; i++) {
-      const startDate = currentDate.subtract(7, 'day');
+      const startDate = currentDate.subtract(1, 'week');
       options.push({
         id: startDate.unix(),
         value: `${startDate.format()}.${currentDate.format()}`,
@@ -73,7 +98,7 @@ export class LeaderboardFilterTimeframeComponent {
   constructor(private router: Router) {
     // init params
     const queryParams = this.router.parseUrl(this.router.url).queryParams;
-    this.after.set(queryParams['after'] ?? dayjs().isoWeekday(2).hour(9).format());
+    this.after.set(queryParams['after'] ?? dayjs().isoWeekday(this.leaderboardSchedule().day).startOf('hour').hour(this.leaderboardSchedule().hour).minute(this.leaderboardSchedule().minute));
     this.before.set(queryParams['before'] ?? dayjs().format());
 
     // persist changes in url
