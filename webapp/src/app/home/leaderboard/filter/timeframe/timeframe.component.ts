@@ -64,6 +64,18 @@ export class LeaderboardFilterTimeframeComponent {
     };
   });
 
+  formattedDates = computed(() => {
+    const dates = this.value().split('.');
+    const startDate = dayjs(dates[0].length > 0 ? dates[0] : this.after());
+    const endDate = dayjs(dates[1].length > 0 ? dates[1] : this.before());
+    const sameMonth = startDate.month() === endDate.month();
+    if (sameMonth) {
+      return `${startDate.format('MMM D')} - ${endDate.format('D')}`;
+    } else {
+      return `${startDate.format('MMM D')} - ${endDate.format('MMM D')}`;
+    }
+  });
+
   placeholder = computed(() => {
     return formatLabel(dayjs(dayjs()).diff(this.after(), 'week'));
   });
