@@ -11,6 +11,7 @@ on:
 
 jobs:
   lint:
+    name: Code Quality Checks
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
