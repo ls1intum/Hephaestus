@@ -73,6 +73,11 @@
 			<artifactId>liquibase-core</artifactId>
 		</dependency>
 		<dependency>
+			<groupId>org.liquibase.ext</groupId>
+			<artifactId>liquibase-hibernate6</artifactId>
+			<version>4.27.0</version>
+		</dependency>
+		<dependency>
 			<groupId>org.springframework.boot</groupId>
 			<artifactId>spring-boot-starter-logging</artifactId>
 		</dependency>
@@ -264,6 +269,49 @@
 					<outputFileName>openapi.yaml</outputFileName>
 					<outputDir>.</outputDir>
 				</configuration>
+			</plugin>
+			<plugin>
+				<groupId>org.liquibase</groupId>
+				<artifactId>liquibase-maven-plugin</artifactId>
+				<version>4.27.0</version>
+				<configuration>
+					<changeLogFile>db/master.xml</changeLogFile>
+					<diffChangeLogFile>src/main/resources/db/changelog_new.xml</diffChangeLogFile>
+					<driver>org.postgresql.Driver</driver>
+					<url>jdbc:postgresql://localhost:5432/hephaestus</url>
+					<username>root</username>
+					<password>root</password>
+					<!-- Hibernate URL for reference schema using the Hibernate 6 dialect -->
+					<referenceUrl>hibernate:spring:de.tum.in.www1.hephaestus?dialect=org.hibernate.dialect.PostgreSQLDialect
+						&amp;hibernate.physical_naming_strategy=org.hibernate.boot.model.naming.CamelCaseToUnderscoresNamingStrategy
+						&amp;hibernate.implicit_naming_strategy=org.springframework.boot.orm.jpa.hibernate.SpringImplicitNamingStrategy
+					</referenceUrl>
+					<!-- Enable detailed logging output -->
+					<verbose>true</verbose>
+				</configuration>
+				<dependencies>
+					<!-- Plugin-specific dependency for liquibase-hibernate6 -->
+					<dependency>
+						<groupId>org.liquibase.ext</groupId>
+						<artifactId>liquibase-hibernate6</artifactId>
+						<version>4.27.0</version>
+					</dependency>
+					<dependency>
+						<groupId>org.springframework.boot</groupId>
+						<artifactId>spring-boot-starter-data-jpa</artifactId>
+						<version>3.3.3</version>
+					</dependency>
+					<dependency>
+						<groupId>jakarta.validation</groupId>
+						<artifactId>jakarta.validation-api</artifactId>
+						<version>3.0.2</version>
+					</dependency>
+					<dependency>
+						<groupId>org.postgresql</groupId>
+						<artifactId>postgresql</artifactId>
+						<version>42.7.3</version>
+					</dependency>
+				</dependencies>
 			</plugin>
 		</plugins>
 	</build>
