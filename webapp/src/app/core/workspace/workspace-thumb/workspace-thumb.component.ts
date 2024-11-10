@@ -1,9 +1,39 @@
-import { Component } from '@angular/core';
+import { Component, computed, input, output } from '@angular/core';
+import { LucideAngularModule, Hammer } from 'lucide-angular';
+import { HlmAvatarModule } from '@spartan-ng/ui-avatar-helm';
+import { hlm } from '@spartan-ng/ui-core';
 
 @Component({
   selector: 'app-workspace-thumb',
   standalone: true,
-  imports: [],
-  template: `<p>workspace-thumb works!</p>`
+  imports: [HlmAvatarModule, LucideAngularModule],
+  template: `
+    <button [class]="computedClass()" (click)="handleClick($event)">
+      <hlm-avatar shape="square">
+        <img [src]="iconUrl()" hlmAvatarImage />
+        <span class="inset-2 rounded-md" hlmAvatarFallback>
+          <lucide-angular [img]="Hammer" class="size-8 sm:size-6" />
+        </span>
+      </hlm-avatar>
+    </button>
+  `
 })
-export class WorkspaceThumbComponent {}
+export class WorkspaceThumbComponent {
+  protected Hammer = Hammer;
+
+  isSelected = input<boolean>();
+  ringEnabled = input<boolean>(true);
+  iconUrl = input<string>();
+  onClick = output<MouseEvent>();
+
+  computedClass = computed(() => {
+    return hlm(
+      'rounded-md ring-offset-background ring-offset-2 duration-200 transition-all',
+      this.ringEnabled() && (this.isSelected() ? 'ring-2 ring-primary' : 'hover:ring-2 hover:ring-muted-foreground/50')
+    );
+  });
+
+  handleClick(event: MouseEvent) {
+    this.onClick.emit(event);
+  }
+}
