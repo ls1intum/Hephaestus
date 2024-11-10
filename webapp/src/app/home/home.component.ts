@@ -39,7 +39,7 @@ export class HomeComponent {
       day: Number.parseInt(this.metaQuery.data()?.scheduledDay ?? '2'),
       hour: Number.parseInt(timeParts[0]),
       minute: Number.parseInt(timeParts[1] ?? '0')
-    }
+    };
   });
   protected after = computed(() => {
     const afterParam = this.queryParams().get('after');

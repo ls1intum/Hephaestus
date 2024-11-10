@@ -60,7 +60,7 @@ export class LeaderboardFilterTimeframeComponent {
       day,
       hour,
       minute,
-      formatted: dayjs().isoWeekday(day).startOf('hour').hour(hour).minute(minute).format("dddd, h:mm A")
+      formatted: dayjs().isoWeekday(day).startOf('hour').hour(hour).minute(minute).format('dddd, h:mm A')
     };
   });
 
@@ -98,7 +98,9 @@ export class LeaderboardFilterTimeframeComponent {
   constructor(private router: Router) {
     // init params
     const queryParams = this.router.parseUrl(this.router.url).queryParams;
-    this.after.set(queryParams['after'] ?? dayjs().isoWeekday(this.leaderboardSchedule().day).startOf('hour').hour(this.leaderboardSchedule().hour).minute(this.leaderboardSchedule().minute));
+    this.after.set(
+      queryParams['after'] ?? dayjs().isoWeekday(this.leaderboardSchedule().day).startOf('hour').hour(this.leaderboardSchedule().hour).minute(this.leaderboardSchedule().minute)
+    );
     this.before.set(queryParams['before'] ?? dayjs().format());
 
     // persist changes in url
