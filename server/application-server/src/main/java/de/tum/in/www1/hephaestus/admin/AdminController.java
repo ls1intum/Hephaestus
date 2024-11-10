@@ -88,9 +88,23 @@ public class AdminController {
                 .orElseGet(() -> ResponseEntity.notFound().build());
     }
 
+    @DeleteMapping("/teams/{teamId}/repository/{repositoryOwner}/{repositoryName}")
+    public ResponseEntity<TeamInfoDTO> removeRepositoryFromTeam(@PathVariable Long teamId, @PathVariable String repositoryOwner, @PathVariable String repositoryName) {
+        return adminService.removeRepositoryFromTeam(teamId, repositoryOwner + '/' + repositoryName)
+                .map(ResponseEntity::ok)
+                .orElseGet(() -> ResponseEntity.notFound().build());
+    }
+
     @PostMapping("/teams/{teamId}/label/{label}")
     public ResponseEntity<TeamInfoDTO> addLabelToTeam(@PathVariable Long teamId, @PathVariable String label) {
         return adminService.addLabelToTeam(teamId, label)
+                .map(ResponseEntity::ok)
+                .orElseGet(() -> ResponseEntity.notFound().build());
+    }
+
+    @DeleteMapping("/teams/{teamId}/label/{label}")
+    public ResponseEntity<TeamInfoDTO> removeLabelFromTeam(@PathVariable Long teamId, @PathVariable String label) {
+        return adminService.removeLabelFromTeam(teamId, label)
                 .map(ResponseEntity::ok)
                 .orElseGet(() -> ResponseEntity.notFound().build());
     }

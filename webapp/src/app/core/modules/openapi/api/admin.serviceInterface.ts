@@ -94,6 +94,23 @@ export interface AdminServiceInterface {
     /**
      * 
      * 
+     * @param teamId 
+     * @param label 
+     */
+    removeLabelFromTeam(teamId: number, label: string, extraHttpRequestParams?: any): Observable<TeamInfo>;
+
+    /**
+     * 
+     * 
+     * @param teamId 
+     * @param repositoryOwner 
+     * @param repositoryName 
+     */
+    removeRepositoryFromTeam(teamId: number, repositoryOwner: string, repositoryName: string, extraHttpRequestParams?: any): Observable<TeamInfo>;
+
+    /**
+     * 
+     * 
      * @param login 
      * @param teamId 
      */

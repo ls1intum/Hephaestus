@@ -84,11 +84,62 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/TeamInfo"
+    delete:
+      tags:
+      - admin
+      operationId: removeRepositoryFromTeam
+      parameters:
+      - name: teamId
+        in: path
+        required: true
+        schema:
+          type: integer
+          format: int64
+      - name: repositoryOwner
+        in: path
+        required: true
+        schema:
+          type: string
+      - name: repositoryName
+        in: path
+        required: true
+        schema:
+          type: string
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TeamInfo"
   /admin/teams/{teamId}/label/{label}:
     post:
       tags:
       - admin
       operationId: addLabelToTeam
+      parameters:
+      - name: teamId
+        in: path
+        required: true
+        schema:
+          type: integer
+          format: int64
+      - name: label
+        in: path
+        required: true
+        schema:
+          type: string
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TeamInfo"
+    delete:
+      tags:
+      - admin
+      operationId: removeLabelFromTeam
       parameters:
       - name: teamId
         in: path

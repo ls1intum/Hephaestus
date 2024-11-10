@@ -149,6 +149,22 @@ public class AdminService {
         return Optional.of(TeamInfoDTO.fromTeam(team));
     }
 
+    public Optional<TeamInfoDTO> removeRepositoryFromTeam(Long teamId, String repositoryName) {
+        logger.info("Removing repository with name: " + repositoryName + " from team with ID: " + teamId);
+        Optional<Team> optionalTeam = teamService.getTeam(teamId);
+        if (optionalTeam.isEmpty()) {
+            return Optional.empty();
+        }
+        Team team = optionalTeam.get();
+        Repository repository = repositoryRepository.findByNameWithOwner(repositoryName);
+        if (repository == null) {
+            return Optional.empty();
+        }
+        team.removeRepository(repository);
+        teamService.saveTeam(team);
+        return Optional.of(TeamInfoDTO.fromTeam(team));
+    }
+
     public Optional<TeamInfoDTO> addLabelToTeam(Long teamId, String label) {
         logger.info("Adding label '" + label + "' to team with ID: " + teamId);
         Optional<Team> optionalTeam = teamService.getTeam(teamId);
@@ -161,6 +177,22 @@ public class AdminService {
             return Optional.empty();
         }
         team.addLabel(labelEntity.get());
+        teamService.saveTeam(team);
+        return Optional.of(TeamInfoDTO.fromTeam(team));
+    }
+
+    public Optional<TeamInfoDTO> removeLabelFromTeam(Long teamId, String label) {
+        logger.info("Removing label '" + label + "' from team with ID: " + teamId);
+        Optional<Team> optionalTeam = teamService.getTeam(teamId);
+        if (optionalTeam.isEmpty()) {
+            return Optional.empty();
+        }
+        Team team = optionalTeam.get();
+        Optional<Label> labelEntity = labelRepository.findByName(label);
+        if (labelEntity.isEmpty()) {
+            return Optional.empty();
+        }
+        team.removeLabel(labelEntity.get());
         teamService.saveTeam(team);
         return Optional.of(TeamInfoDTO.fromTeam(team));
     }

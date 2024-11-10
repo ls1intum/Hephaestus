@@ -37,7 +37,7 @@
   </brn-column-def>
   <brn-column-def name="color" class="w-28">
     <hlm-th *brnHeaderDef>Color</hlm-th>
-    <hlm-td class="font-medium tabular-nums flex gap-4" *brnCellDef="let element">
+    <hlm-td class="font-medium tabular-nums flex gap-2" *brnCellDef="let element">
       @if (this.isLoading()) {
         <hlm-skeleton class="w-4 h-4 rounded-full" [style.backgroundColor]="'#69feff'" />
         <hlm-skeleton class="h-6 w-12" />
@@ -53,23 +53,36 @@
       @if (this.isLoading()) {
         <hlm-skeleton class="h-6 w-20" />
       } @else {
-        @for(repo of element.repositories; track repo.id) {
-          <span>{{ repo.nameWithOwner }},</span>
-        }
+        <div class="flex flex-wrap items-center gap-2">
+          @for(repo of element.repositories; track repo.id) {
+            <span class="text-muted-foreground border px-2 py-0.5 rounded-lg text-sm">{{ repo.nameWithOwner }}</span>
+          }
+        </div>
         <brn-popover sideOffset="5" closeDelay="100">
           <button id="add-repository" size="icon" variant="outline" class="h-6 w-6 p-0.5" brnPopoverTrigger hlmBtn>
             <hlm-icon class="w-4 h-4" name="lucidePlus" />
           </button>
-          <div hlmPopoverContent class="w-96 p-4 gap-4 flex flex-col items-center" *brnPopoverContent="let ctx">
-            <div class="flex gap-2 items-center">
-              <input hlmInput placeholder="Owner" [formControl]="_newRepositoryOwner" class="w-32" />
-              <span class="text-muted-foreground">/</span>
-              <input hlmInput placeholder="Repository" [formControl]="_newRepositoryName" class="w-32" />
+          <div hlmPopoverContent class="w-80 h-96 space-y-4" *brnPopoverContent="let ctx">
+            <div class="space-y-2">
+              <h4 class="font-medium leading-none">Repositories</h4>
+              <p class="text-sm text-muted-foreground">Select repositories the team actively uses.</p>
             </div>
-            <button hlmBtn variant="default" class="space-x-2" (click)="addRepository(element)">
-              <span>Add</span>
-              <hlm-icon class="w-4 h-4" name="lucidePlus" />
-            </button>
+            <hlm-scroll-area class="border h-72 rounded-md border-border">
+              @for(repo of allRepositories(); track repo) {
+                @let isSelected = isRepositoryInTeam(element, repo);
+                <button
+                  hlmBtn
+                  variant="outline"
+                  class="flex items-center justify-between w-full"
+                  (click)="toggleRepository(element, repo, isSelected)"
+                >
+                  <span>{{ repo }}</span>
+                  @if(isSelected) {
+                    <hlm-icon class="w-4 h-4" name="lucideCheck" />
+                  }
+                </button>
+              }
+            </hlm-scroll-area>
           </div>
         </brn-popover>
       }
@@ -90,10 +103,13 @@
             <hlm-icon class="w-4 h-4" name="lucidePlus" />
           </button>
           <div hlmPopoverContent class="w-80 p-4 gap-4 flex flex-wrap items-center justify-center" *brnPopoverContent="let ctx">
-            <input hlmInput placeholder="Label name" [formControl]="_newLabelName" />
+            <input hlmInput placeholder="Label name" [formControl]="_newLabelName" [class]="displayLabelAlert() ? 'border-destructive' : ''" />
             <button hlmBtn size="icon" variant="default" class="ml-2" (click)="addLabel(element)">
               <hlm-icon class="w-4 h-4" name="lucidePlus" />
             </button>
+            @if (displayLabelAlert()) {
+              <div class="text-sm text-github-danger-foreground">Invalid label name</div>
+            }
           </div>
         </brn-popover>
       }

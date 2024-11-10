@@ -2,7 +2,7 @@ import { SelectionModel } from '@angular/cdk/collections';
 import { Component, TrackByFunction, computed, effect, inject, input, signal } from '@angular/core';
 import { toObservable, toSignal } from '@angular/core/rxjs-interop';
 import { FormControl, FormsModule, ReactiveFormsModule } from '@angular/forms';
-import { lucideArrowUpDown, lucideChevronDown, lucideMoreHorizontal, lucideRotateCw, lucideXOctagon, lucidePlus } from '@ng-icons/lucide';
+import { lucideArrowUpDown, lucideChevronDown, lucideMoreHorizontal, lucideRotateCw, lucideXOctagon, lucidePlus, lucideCheck } from '@ng-icons/lucide';
 import { HlmButtonModule } from '@spartan-ng/ui-button-helm';
 import { HlmIconComponent, provideIcons } from '@spartan-ng/ui-icon-helm';
 import { HlmInputDirective } from '@spartan-ng/ui-input-helm';
@@ -19,12 +19,9 @@ import { AdminService, TeamInfo } from '@app/core/modules/openapi';
 import { injectQueryClient } from '@tanstack/angular-query-experimental';
 import { octNoEntry } from '@ng-icons/octicons';
 import { HlmPopoverModule } from '@spartan-ng/ui-popover-helm';
-import {
-  BrnPopoverComponent,
-  BrnPopoverContentDirective,
-  BrnPopoverTriggerDirective,
-} from '@spartan-ng/ui-popover-brain';
+import { BrnPopoverComponent, BrnPopoverContentDirective, BrnPopoverTriggerDirective } from '@spartan-ng/ui-popover-brain';
 import { GithubLabelComponent } from '@app/ui/github-label/github-label.component';
+import { HlmScrollAreaComponent } from '@spartan-ng/ui-scrollarea-helm';
 
 const LOADING_TEAMS: TeamInfo[] = [
   {
@@ -60,6 +57,7 @@ const LOADING_TEAMS: TeamInfo[] = [
 
     HlmIconComponent,
     HlmInputDirective,
+    HlmScrollAreaComponent,
 
     BrnSelectModule,
     HlmSelectModule,
@@ -74,7 +72,7 @@ const LOADING_TEAMS: TeamInfo[] = [
 
     GithubLabelComponent
   ],
-  providers: [provideIcons({ lucideChevronDown, lucideMoreHorizontal, lucideArrowUpDown, lucideRotateCw, lucideXOctagon, lucidePlus })],
+  providers: [provideIcons({ lucideChevronDown, lucideMoreHorizontal, lucideArrowUpDown, lucideRotateCw, lucideXOctagon, lucidePlus, lucideCheck })],
   templateUrl: './teams-table.component.html'
 })
 export class AdminTeamsTableComponent {
@@ -84,6 +82,7 @@ export class AdminTeamsTableComponent {
 
   isLoading = input(false);
   teamData = input.required<TeamInfo[] | undefined>();
+  allRepositories = input.required<Set<string> | undefined>();
 
   _teams = computed(() => this.teamData() ?? LOADING_TEAMS);
   protected readonly _rawFilterInput = signal('');
@@ -174,11 +173,10 @@ export class AdminTeamsTableComponent {
     navigator.clipboard.writeText(element.name!);
   }
 
-  _newRepositoryOwner = new FormControl('');
-  _newRepositoryName = new FormControl('');
   _newLabelName = new FormControl('');
   _newTeamName = new FormControl('');
   _newTeamColor = new FormControl('');
+  displayLabelAlert = signal(false);
 
   protected addLabel(team: TeamInfo) {
     if (this.isLoading() || !this._newLabelName.value) {
@@ -186,24 +184,14 @@ export class AdminTeamsTableComponent {
     }
     this.adminService.addLabelToTeam(team.id, this._newLabelName.value).subscribe({
       next: () => {
+        this.displayLabelAlert.set(false);
         this._newLabelName.reset();
         this.invalidateTeams();
       },
-      error: (err) => console.error('Error adding label', err),
-    });
-  }
-
-  protected addRepository(team: TeamInfo) {
-    if (this.isLoading() || !this._newRepositoryName.value) {
-      return;
-    }
-    this.adminService.addRepositoryToTeam(team.id, this._newRepositoryOwner.value!, this._newRepositoryName.value).subscribe({
-      next: () => {
-        this._newRepositoryOwner.reset();
-        this._newRepositoryName.reset();
-        this.invalidateTeams();
-      },
-      error: (err) => console.error('Error adding repository', err),
+      error: (err) => {
+        console.error('Error adding label', err);
+        this.displayLabelAlert.set(true);
+      }
     });
   }
 
@@ -213,7 +201,7 @@ export class AdminTeamsTableComponent {
     }
     const newTeam = {
       name: this._newTeamName.value,
-      color: this._newTeamColor.value ?? '#000000',
+      color: this._newTeamColor.value ?? '#000000'
     } as TeamInfo;
     this.adminService.createTeam(newTeam).subscribe({
       next: () => this.invalidateTeams(),
@@ -226,5 +214,26 @@ export class AdminTeamsTableComponent {
       return;
     }
     this.queryClient.invalidateQueries({ queryKey: ['admin', 'teams'] });
+  }
+
+  protected isRepositoryInTeam(team: TeamInfo, repository: string) {
+    return team.repositories.some((r) => r.nameWithOwner === repository);
+  }
+
+  protected toggleRepository(team: TeamInfo, repository: string, checked: boolean) {
+    const separatedName = repository.split('/');
+    if (checked) {
+      this.adminService.removeRepositoryFromTeam(team.id, separatedName[0], separatedName[1]).subscribe({
+        next: () => {
+          team.repositories = team.repositories.filter((r) => r.nameWithOwner !== repository);
+        },
+        error: (err) => console.error('Error removing repository', err)
+      });
+    } else {
+      this.adminService.addRepositoryToTeam(team.id, separatedName[0], separatedName[1]).subscribe({
+        next: (newTeam) => team.repositories.push(newTeam.repositories[newTeam.repositories.length - 1]),
+        error: (err) => console.error('Error adding repository', err)
+      });
+    }
   }
 }
