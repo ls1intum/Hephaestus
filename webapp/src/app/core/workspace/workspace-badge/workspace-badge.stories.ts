@@ -1,19 +1,40 @@
 import { Meta, StoryObj } from '@storybook/angular';
 import { WorkspaceBadgeComponent } from './workspace-badge.component';
+import { fn } from '@storybook/test';
+
+const workspaces = [
+  {
+    id: '1',
+    title: 'AET TUM',
+    iconUrl: 'https://avatars.githubusercontent.com/u/11064260?s=48&v=4'
+  },
+  {
+    id: '2',
+    title: 'Hephaestus',
+    iconUrl: ''
+  },
+  {
+    id: '3',
+    title: 'Intro Course',
+    iconUrl: 'https://avatars.githubusercontent.com/u/11064260?s=48&v=4'
+  }
+];
 
 const meta: Meta<WorkspaceBadgeComponent> = {
   component: WorkspaceBadgeComponent,
   tags: ['autodocs'],
   args: {
-    iconUrl: 'https://avatars.githubusercontent.com/u/11064260?s=48&v=4',
-    title: 'AET TUM'
+    selectedWorkspace: workspaces[0],
+    workspaces,
+    onSelect: fn(),
+    onSignOut: fn()
   },
   argTypes: {
-    iconUrl: {
-      control: { type: 'text' }
+    selectedWorkspace: {
+      control: { type: 'object' }
     },
-    title: {
-      control: { type: 'text' }
+    workspaces: {
+      control: { type: 'object' }
     }
   }
 };

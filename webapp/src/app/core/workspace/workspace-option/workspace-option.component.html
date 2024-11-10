@@ -13,13 +13,13 @@
   </hlm-tooltip>
 } @else {
   <div [class]="computedClass()">
-    <app-workspace-thumb [iconUrl]="iconUrl()" [isSelected]="isSelected()" [hoverRingEnabled]="false" variant="medium" />
-    <span class="text-xl font-semibold flex-1">
+    <app-workspace-thumb [iconUrl]="iconUrl()" [isSelected]="isSelected()" [hoverRingEnabled]="false" variant="base" />
+    <span class="text-base font-semibold flex-1">
       {{ title() }}
     </span>
     @if (isSelected()) {
       <button [brnMenuTriggerFor]="menu">
-        <lucide-angular [img]="Ellipsis" class="size-6 mr-2 text-muted-foreground block" />
+        <lucide-angular [img]="Ellipsis" class="size-5 text-muted-foreground block" />
       </button>
     }
   </div>

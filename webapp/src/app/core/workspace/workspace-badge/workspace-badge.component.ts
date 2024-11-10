@@ -1,26 +1,40 @@
-import { Component, input } from '@angular/core';
+import { Component, input, output } from '@angular/core';
+import { BrnSheetContentDirective } from '@spartan-ng/ui-sheet-brain';
+import { HlmSheetComponent, HlmSheetContentComponent, HlmSheetFooterComponent, HlmSheetHeaderComponent, HlmSheetTitleDirective } from '@spartan-ng/ui-sheet-helm';
+import { HlmMenuSeparatorComponent } from '@spartan-ng/ui-menu-helm';
+import { HlmScrollAreaComponent } from '@spartan-ng/ui-scrollarea-helm';
 import { WorkspaceThumbComponent } from '../workspace-thumb/workspace-thumb.component';
+import { WorkspaceOptionSelectorComponent } from '../workspace-option-selector/workspace-option-selector.component';
+import { WorkspaceAddButtonComponent } from '../workspace-add-button/workspace-add-button.component';
+
+type Workspace = {
+  id: string;
+  title: string;
+  iconUrl: string;
+};
 
 @Component({
   selector: 'app-workspace-badge',
   standalone: true,
-  imports: [WorkspaceThumbComponent],
-  template: `
-    <div class="flex items-center gap-2">
-      <div class="block md:hidden">
-        <app-workspace-thumb [iconUrl]="iconUrl()" [hoverRingEnabled]="false"></app-workspace-thumb>
-      </div>
-      <span class="text-xl font-semibold">
-        {{ title() }}
-      </span>
-    </div>
-  `
+  imports: [
+    BrnSheetContentDirective,
+    HlmSheetComponent,
+    HlmSheetContentComponent,
+    HlmSheetHeaderComponent,
+    HlmSheetFooterComponent,
+    HlmSheetTitleDirective,
+    HlmScrollAreaComponent,
+    HlmMenuSeparatorComponent,
+    WorkspaceThumbComponent,
+    WorkspaceOptionSelectorComponent,
+    WorkspaceAddButtonComponent
+  ],
+  templateUrl: './workspace-badge.component.html'
 })
 export class WorkspaceBadgeComponent {
-  // Open sidebar on mobile, smaller than md
-  // Hide icon on desktop, show on mobile
-  // Contains dropdown with workspace actions on desktop (in sidebar on mobile)
+  selectedWorkspace = input.required<Workspace>();
+  workspaces = input.required<Workspace[]>();
 
-  title = input.required<string>();
-  iconUrl = input<string>();
+  onSelect = output<Workspace>();
+  onSignOut = output<Workspace>();
 }
