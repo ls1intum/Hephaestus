@@ -29,10 +29,6 @@ export class WorkspaceOptionComponent {
   protected Ellipsis = Ellipsis;
   protected LogOut = LogOut;
 
-  // Two variants:
-  // - Compact for desktop with tooltip
-  // - Full for mobile for sidebar with thumb and text
-
   isCompact = input.required<boolean>();
   isSelected = input<boolean>();
   iconUrl = input<string>();
@@ -41,5 +37,5 @@ export class WorkspaceOptionComponent {
   onSelect = output<void>();
   onSignOut = output<void>();
 
-  computedClass = computed(() => hlm('flex items-center gap-2 hover:bg-accent p-3 rounded-xl cursor-pointer duration-300 transition-all', this.isSelected() && 'bg-accent'));
+  computedClass = computed(() => hlm('flex items-center gap-2 hover:bg-accent/50 p-3 rounded-xl cursor-pointer duration-300 transition-all', this.isSelected() && 'bg-accent'));
 }
