@@ -1,9 +1,17 @@
-name: Lint
+name: Intelligence Service QA
 
-on: [pull_request]
+on:
+    pull_request:
+        paths:
+            - "server/intelligence-service/**"
+    push:
+        paths:
+            - "server/intelligence-service/**"
+        branches: [develop]
 
 jobs:
   lint:
+    name: Code Quality Checks
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4

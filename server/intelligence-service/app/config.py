@@ -19,8 +19,11 @@ class Settings(BaseSettings):
 
     @property
     def is_azure_openai_available(self):
-        return bool(self.AZURE_OPENAI_API_KEY) and bool(self.AZURE_OPENAI_ENDPOINT) and bool(
-            self.AZURE_OPENAI_API_VERSION)
+        return (
+            bool(self.AZURE_OPENAI_API_KEY)
+            and bool(self.AZURE_OPENAI_ENDPOINT)
+            and bool(self.AZURE_OPENAI_API_VERSION)
+        )
 
 
 settings = Settings()
