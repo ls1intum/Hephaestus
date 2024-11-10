@@ -54,6 +54,14 @@ public class SlackMessageService {
     @Autowired
     private LeaderboardService leaderboardService;
 
+    /**
+     * Sends a message to the specified Slack channel.
+     * @param channelId Slack channel ID
+     * @param blocks message blocks
+     * @param fallback used for example in notifications
+     * @throws IOException
+     * @throws SlackApiException
+     */
     public void sendMessage(String channelId, List<LayoutBlock> blocks, String fallback)
             throws IOException, SlackApiException {
         ChatPostMessageRequest request = ChatPostMessageRequest.builder()
@@ -69,6 +77,10 @@ public class SlackMessageService {
         }
     }
 
+    /**
+     * Gets the Slack handles of the top 3 reviewers of the last week.
+     * @return
+     */
     private List<User> getTop3SlackReviewers() {
         // exactly 7 days ago
         OffsetDateTime after = OffsetDateTime.of(LocalDate.now().minusDays(7), OffsetDateTime.now().toLocalTime(),

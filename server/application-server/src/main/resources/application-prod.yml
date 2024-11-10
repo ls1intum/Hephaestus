@@ -5,7 +5,6 @@ spring:
     password: ${DATABASE_PASSWORD}
   jpa:
     hibernate:
-      # TODO: Change to none and use liquibase
       ddl-auto: none
 
   security:
