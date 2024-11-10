@@ -51,13 +51,13 @@ paths:
       parameters:
       - name: after
         in: query
-        required: false
+        required: true
         schema:
           type: string
           format: date-time
       - name: before
         in: query
-        required: false
+        required: true
         schema:
           type: string
           format: date-time

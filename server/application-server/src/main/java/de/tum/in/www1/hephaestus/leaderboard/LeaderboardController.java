@@ -24,8 +24,8 @@ public class LeaderboardController {
 
     @GetMapping
     public ResponseEntity<List<LeaderboardEntryDTO>> getLeaderboard(
-            @RequestParam @DateTimeFormat(iso = ISO.DATE_TIME) Optional<OffsetDateTime> after,
-            @RequestParam @DateTimeFormat(iso = ISO.DATE_TIME) Optional<OffsetDateTime> before,
+            @RequestParam @DateTimeFormat(iso = ISO.DATE_TIME) OffsetDateTime after,
+            @RequestParam @DateTimeFormat(iso = ISO.DATE_TIME) OffsetDateTime before,
             @RequestParam Optional<String> repository) {
         return ResponseEntity.ok(leaderboardService.createLeaderboard(after, before, repository));
     }

@@ -73,8 +73,7 @@ public class SlackMessageService {
         // exactly 7 days ago
         OffsetDateTime after = OffsetDateTime.of(LocalDate.now().minusDays(7), OffsetDateTime.now().toLocalTime(),
                 OffsetDateTime.now().getOffset());
-        var leaderboard = leaderboardService.createLeaderboard(Optional.of(after), Optional.empty(),
-                Optional.empty());
+        var leaderboard = leaderboardService.createLeaderboard(after, OffsetDateTime.now(), Optional.empty());
         var top3 = leaderboard.subList(0, Math.min(3, leaderboard.size()));
         logger.debug("Top 3 Users of the last week: " + top3.stream().map(e -> e.user().name()).toList());
 

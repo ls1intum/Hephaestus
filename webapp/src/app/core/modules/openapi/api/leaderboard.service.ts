@@ -102,10 +102,16 @@ export class LeaderboardService implements LeaderboardServiceInterface {
      * @param observe set whether or not to return the data Observable as the body, response or events. defaults to returning the body.
      * @param reportProgress flag to report request and response progress.
      */
-    public getLeaderboard(after?: string, before?: string, repository?: string, observe?: 'body', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<Array<LeaderboardEntry>>;
-    public getLeaderboard(after?: string, before?: string, repository?: string, observe?: 'response', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<HttpResponse<Array<LeaderboardEntry>>>;
-    public getLeaderboard(after?: string, before?: string, repository?: string, observe?: 'events', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<HttpEvent<Array<LeaderboardEntry>>>;
-    public getLeaderboard(after?: string, before?: string, repository?: string, observe: any = 'body', reportProgress: boolean = false, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<any> {
+    public getLeaderboard(after: string, before: string, repository?: string, observe?: 'body', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<Array<LeaderboardEntry>>;
+    public getLeaderboard(after: string, before: string, repository?: string, observe?: 'response', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<HttpResponse<Array<LeaderboardEntry>>>;
+    public getLeaderboard(after: string, before: string, repository?: string, observe?: 'events', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<HttpEvent<Array<LeaderboardEntry>>>;
+    public getLeaderboard(after: string, before: string, repository?: string, observe: any = 'body', reportProgress: boolean = false, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<any> {
+        if (after === null || after === undefined) {
+            throw new Error('Required parameter after was null or undefined when calling getLeaderboard.');
+        }
+        if (before === null || before === undefined) {
+            throw new Error('Required parameter before was null or undefined when calling getLeaderboard.');
+        }
 
         let localVarQueryParameters = new HttpParams({encoder: this.encoder});
         if (after !== undefined && after !== null) {

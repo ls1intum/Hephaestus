@@ -2,9 +2,7 @@ package de.tum.in.www1.hephaestus.leaderboard;
 
 import java.util.stream.IntStream;
 import java.util.Map;
-import java.time.LocalDate;
 import java.time.OffsetDateTime;
-import java.time.ZoneOffset;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Optional;
@@ -42,15 +40,13 @@ public class LeaderboardService {
     }
 
     @Transactional
-    public List<LeaderboardEntryDTO> createLeaderboard(Optional<OffsetDateTime> after, Optional<OffsetDateTime> before,
+    public List<LeaderboardEntryDTO> createLeaderboard(OffsetDateTime after, OffsetDateTime before,
             Optional<String> repository) {
         logger.info("Creating leaderboard dataset");
-        var afterOffset = after.orElse(LocalDate.now().minusDays(timeframe).atStartOfDay().atOffset(ZoneOffset.UTC));
-        var beforeOffset = before.orElse(OffsetDateTime.now());
-        logger.info("Timeframe: {} - {}", afterOffset, beforeOffset);
-        List<PullRequestReview> reviews = pullRequestReviewRepository.findAllInTimeframe(afterOffset, beforeOffset,
+        logger.info("Timeframe: {} - {}", after, before);
+        List<PullRequestReview> reviews = pullRequestReviewRepository.findAllInTimeframe(after, before,
                 repository);
-        List<IssueComment> issueComments = issueCommentRepository.findAllInTimeframe(afterOffset, beforeOffset,
+        List<IssueComment> issueComments = issueCommentRepository.findAllInTimeframe(after, before,
                 repository, true);
 
         Map<Long, User> usersById = reviews.stream().map(PullRequestReview::getAuthor)
