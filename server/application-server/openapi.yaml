@@ -13,11 +13,34 @@ servers:
 - url: /
   description: Default Server URL
 paths:
-  /admin/users/teamadd/{login}/{teamId}:
+  /admin/user/{login}/team/{teamId}:
     put:
       tags:
       - admin
       operationId: addTeamToUser
+      parameters:
+      - name: login
+        in: path
+        required: true
+        schema:
+          type: string
+      - name: teamId
+        in: path
+        required: true
+        schema:
+          type: integer
+          format: int64
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UserInfo"
+    delete:
+      tags:
+      - admin
+      operationId: removeTeamFromUser
       parameters:
       - name: login
         in: path
@@ -55,7 +78,7 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/TeamInfo"
-  /admin/teams/{teamId}/repository/{repositoryOwner}/{repositoryName}:
+  /admin/team/{teamId}/repository/{repositoryOwner}/{repositoryName}:
     post:
       tags:
       - admin
@@ -112,7 +135,7 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/TeamInfo"
-  /admin/teams/{teamId}/label/{label}:
+  /admin/team/{teamId}/label/{label}:
     post:
       tags:
       - admin
@@ -296,31 +319,7 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/AdminConfig"
-  /admin/users/teamremove/{login}/{teamId}:
-    delete:
-      tags:
-      - admin
-      operationId: removeTeamFromUser
-      parameters:
-      - name: login
-        in: path
-        required: true
-        schema:
-          type: string
-      - name: teamId
-        in: path
-        required: true
-        schema:
-          type: integer
-          format: int64
-      responses:
-        "200":
-          description: OK
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/UserInfo"
-  /admin/teams/{teamId}:
+  /admin/team/{teamId}:
     delete:
       tags:
       - admin

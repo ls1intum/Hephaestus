@@ -156,7 +156,7 @@ export class AdminService implements AdminServiceInterface {
             }
         }
 
-        let localVarPath = `/admin/teams/${this.configuration.encodeParam({name: "teamId", value: teamId, in: "path", style: "simple", explode: false, dataType: "number", dataFormat: "int64"})}/label/${this.configuration.encodeParam({name: "label", value: label, in: "path", style: "simple", explode: false, dataType: "string", dataFormat: undefined})}`;
+        let localVarPath = `/admin/team/${this.configuration.encodeParam({name: "teamId", value: teamId, in: "path", style: "simple", explode: false, dataType: "number", dataFormat: "int64"})}/label/${this.configuration.encodeParam({name: "label", value: label, in: "path", style: "simple", explode: false, dataType: "string", dataFormat: undefined})}`;
         return this.httpClient.request<TeamInfo>('post', `${this.configuration.basePath}${localVarPath}`,
             {
                 context: localVarHttpContext,
@@ -227,7 +227,7 @@ export class AdminService implements AdminServiceInterface {
             }
         }
 
-        let localVarPath = `/admin/teams/${this.configuration.encodeParam({name: "teamId", value: teamId, in: "path", style: "simple", explode: false, dataType: "number", dataFormat: "int64"})}/repository/${this.configuration.encodeParam({name: "repositoryOwner", value: repositoryOwner, in: "path", style: "simple", explode: false, dataType: "string", dataFormat: undefined})}/${this.configuration.encodeParam({name: "repositoryName", value: repositoryName, in: "path", style: "simple", explode: false, dataType: "string", dataFormat: undefined})}`;
+        let localVarPath = `/admin/team/${this.configuration.encodeParam({name: "teamId", value: teamId, in: "path", style: "simple", explode: false, dataType: "number", dataFormat: "int64"})}/repository/${this.configuration.encodeParam({name: "repositoryOwner", value: repositoryOwner, in: "path", style: "simple", explode: false, dataType: "string", dataFormat: undefined})}/${this.configuration.encodeParam({name: "repositoryName", value: repositoryName, in: "path", style: "simple", explode: false, dataType: "string", dataFormat: undefined})}`;
         return this.httpClient.request<TeamInfo>('post', `${this.configuration.basePath}${localVarPath}`,
             {
                 context: localVarHttpContext,
@@ -294,7 +294,7 @@ export class AdminService implements AdminServiceInterface {
             }
         }
 
-        let localVarPath = `/admin/users/teamadd/${this.configuration.encodeParam({name: "login", value: login, in: "path", style: "simple", explode: false, dataType: "string", dataFormat: undefined})}/${this.configuration.encodeParam({name: "teamId", value: teamId, in: "path", style: "simple", explode: false, dataType: "number", dataFormat: "int64"})}`;
+        let localVarPath = `/admin/user/${this.configuration.encodeParam({name: "login", value: login, in: "path", style: "simple", explode: false, dataType: "string", dataFormat: undefined})}/team/${this.configuration.encodeParam({name: "teamId", value: teamId, in: "path", style: "simple", explode: false, dataType: "number", dataFormat: "int64"})}`;
         return this.httpClient.request<UserInfo>('put', `${this.configuration.basePath}${localVarPath}`,
             {
                 context: localVarHttpContext,
@@ -489,7 +489,7 @@ export class AdminService implements AdminServiceInterface {
             }
         }
 
-        let localVarPath = `/admin/teams/${this.configuration.encodeParam({name: "teamId", value: teamId, in: "path", style: "simple", explode: false, dataType: "number", dataFormat: "int64"})}`;
+        let localVarPath = `/admin/team/${this.configuration.encodeParam({name: "teamId", value: teamId, in: "path", style: "simple", explode: false, dataType: "number", dataFormat: "int64"})}`;
         return this.httpClient.request<TeamInfo>('delete', `${this.configuration.basePath}${localVarPath}`,
             {
                 context: localVarHttpContext,
@@ -733,7 +733,7 @@ export class AdminService implements AdminServiceInterface {
             }
         }
 
-        let localVarPath = `/admin/teams/${this.configuration.encodeParam({name: "teamId", value: teamId, in: "path", style: "simple", explode: false, dataType: "number", dataFormat: "int64"})}/label/${this.configuration.encodeParam({name: "label", value: label, in: "path", style: "simple", explode: false, dataType: "string", dataFormat: undefined})}`;
+        let localVarPath = `/admin/team/${this.configuration.encodeParam({name: "teamId", value: teamId, in: "path", style: "simple", explode: false, dataType: "number", dataFormat: "int64"})}/label/${this.configuration.encodeParam({name: "label", value: label, in: "path", style: "simple", explode: false, dataType: "string", dataFormat: undefined})}`;
         return this.httpClient.request<TeamInfo>('delete', `${this.configuration.basePath}${localVarPath}`,
             {
                 context: localVarHttpContext,
@@ -804,7 +804,7 @@ export class AdminService implements AdminServiceInterface {
             }
         }
 
-        let localVarPath = `/admin/teams/${this.configuration.encodeParam({name: "teamId", value: teamId, in: "path", style: "simple", explode: false, dataType: "number", dataFormat: "int64"})}/repository/${this.configuration.encodeParam({name: "repositoryOwner", value: repositoryOwner, in: "path", style: "simple", explode: false, dataType: "string", dataFormat: undefined})}/${this.configuration.encodeParam({name: "repositoryName", value: repositoryName, in: "path", style: "simple", explode: false, dataType: "string", dataFormat: undefined})}`;
+        let localVarPath = `/admin/team/${this.configuration.encodeParam({name: "teamId", value: teamId, in: "path", style: "simple", explode: false, dataType: "number", dataFormat: "int64"})}/repository/${this.configuration.encodeParam({name: "repositoryOwner", value: repositoryOwner, in: "path", style: "simple", explode: false, dataType: "string", dataFormat: undefined})}/${this.configuration.encodeParam({name: "repositoryName", value: repositoryName, in: "path", style: "simple", explode: false, dataType: "string", dataFormat: undefined})}`;
         return this.httpClient.request<TeamInfo>('delete', `${this.configuration.basePath}${localVarPath}`,
             {
                 context: localVarHttpContext,
@@ -871,7 +871,7 @@ export class AdminService implements AdminServiceInterface {
             }
         }
 
-        let localVarPath = `/admin/users/teamremove/${this.configuration.encodeParam({name: "login", value: login, in: "path", style: "simple", explode: false, dataType: "string", dataFormat: undefined})}/${this.configuration.encodeParam({name: "teamId", value: teamId, in: "path", style: "simple", explode: false, dataType: "number", dataFormat: "int64"})}`;
+        let localVarPath = `/admin/user/${this.configuration.encodeParam({name: "login", value: login, in: "path", style: "simple", explode: false, dataType: "string", dataFormat: undefined})}/team/${this.configuration.encodeParam({name: "teamId", value: teamId, in: "path", style: "simple", explode: false, dataType: "number", dataFormat: "int64"})}`;
         return this.httpClient.request<UserInfo>('delete', `${this.configuration.basePath}${localVarPath}`,
             {
                 context: localVarHttpContext,

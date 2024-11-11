@@ -62,14 +62,14 @@ public class AdminController {
         return ResponseEntity.ok(adminService.getUsersAsAdmin());
     }
 
-    @PutMapping("/users/teamadd/{login}/{teamId}")
+    @PutMapping("/user/{login}/team/{teamId}")
     public ResponseEntity<UserInfoDTO> addTeamToUser(@PathVariable String login, @PathVariable Long teamId) {
         return adminService.addTeamToUser(login, teamId)
                 .map(ResponseEntity::ok)
                 .orElseGet(() -> ResponseEntity.notFound().build());
     }
 
-    @DeleteMapping("/users/teamremove/{login}/{teamId}")
+    @DeleteMapping("/user/{login}/team/{teamId}")
     public ResponseEntity<UserInfoDTO> removeTeamFromUser(@PathVariable String login, @PathVariable Long teamId) {
         return adminService.removeTeamFromUser(login, teamId)
                 .map(ResponseEntity::ok)
@@ -81,35 +81,35 @@ public class AdminController {
         return ResponseEntity.ok(adminService.createTeam(team.name(), team.color()));
     }
 
-    @PostMapping("/teams/{teamId}/repository/{repositoryOwner}/{repositoryName}")
+    @PostMapping("/team/{teamId}/repository/{repositoryOwner}/{repositoryName}")
     public ResponseEntity<TeamInfoDTO> addRepositoryToTeam(@PathVariable Long teamId, @PathVariable String repositoryOwner, @PathVariable String repositoryName) {
         return adminService.addRepositoryToTeam(teamId, repositoryOwner + '/' + repositoryName)
                 .map(ResponseEntity::ok)
                 .orElseGet(() -> ResponseEntity.notFound().build());
     }
 
-    @DeleteMapping("/teams/{teamId}/repository/{repositoryOwner}/{repositoryName}")
+    @DeleteMapping("/team/{teamId}/repository/{repositoryOwner}/{repositoryName}")
     public ResponseEntity<TeamInfoDTO> removeRepositoryFromTeam(@PathVariable Long teamId, @PathVariable String repositoryOwner, @PathVariable String repositoryName) {
         return adminService.removeRepositoryFromTeam(teamId, repositoryOwner + '/' + repositoryName)
                 .map(ResponseEntity::ok)
                 .orElseGet(() -> ResponseEntity.notFound().build());
     }
 
-    @PostMapping("/teams/{teamId}/label/{label}")
+    @PostMapping("/team/{teamId}/label/{label}")
     public ResponseEntity<TeamInfoDTO> addLabelToTeam(@PathVariable Long teamId, @PathVariable String label) {
         return adminService.addLabelToTeam(teamId, label)
                 .map(ResponseEntity::ok)
                 .orElseGet(() -> ResponseEntity.notFound().build());
     }
 
-    @DeleteMapping("/teams/{teamId}/label/{label}")
+    @DeleteMapping("/team/{teamId}/label/{label}")
     public ResponseEntity<TeamInfoDTO> removeLabelFromTeam(@PathVariable Long teamId, @PathVariable String label) {
         return adminService.removeLabelFromTeam(teamId, label)
                 .map(ResponseEntity::ok)
                 .orElseGet(() -> ResponseEntity.notFound().build());
     }
 
-    @DeleteMapping("/teams/{teamId}")
+    @DeleteMapping("/team/{teamId}")
     public ResponseEntity<TeamInfoDTO> deleteTeam(@PathVariable Long teamId) {
         return adminService.deleteTeam(teamId)
                 .map(ResponseEntity::ok)
