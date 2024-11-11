@@ -164,8 +164,10 @@ export class AdminTeamsTableComponent {
     if (this.isLoading()) {
       return;
     }
-    this.adminService.deleteTeam(team.id!);
-    this.invalidateTeams();
+    this.adminService.deleteTeam(team.id!).subscribe({
+      next: () => this.invalidateTeams(),
+      error: (err) => console.error('Error deleting team', err)
+    });
   }
 
   protected copyName(element: TeamInfo) {
