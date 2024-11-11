@@ -21,7 +21,7 @@ hephaestus:
         time: ${LEADERBOARD_SCHEDULE_TIME:9}
       notification:
         enabled: ${LEADERBOARD_NOTIFICATION_ENABLED:true}
-        channelId: ${LEADERBOARD_NOTIFICATION_CHANNEL_ID:G6TCVL6HL}
+        channel-id: ${LEADERBOARD_NOTIFICATION_CHANNEL_ID:G6TCVL6HL}
 
 nats:
     enabled: ${NATS_ENABLED:false}

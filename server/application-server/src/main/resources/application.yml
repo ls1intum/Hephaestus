@@ -39,7 +39,7 @@ hephaestus:
             time: "9:00"
         notification:
             enabled: false
-            channelId: ""
+            channel-id: ""
 
 
 nats:

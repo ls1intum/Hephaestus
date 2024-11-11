@@ -41,7 +41,7 @@ public class SlackMessageService {
 
     private static final Logger logger = LoggerFactory.getLogger(SlackMessageService.class);
 
-    @Value("${hephaestus.leaderboard.notification.channelId}")
+    @Value("${hephaestus.leaderboard.notification.channel-id}")
     private String channelId;
 
     @Value("${hephaestus.leaderboard.notification.enabled}")
