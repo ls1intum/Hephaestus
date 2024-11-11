@@ -54,7 +54,7 @@
         <hlm-skeleton class="h-6 w-20" />
       } @else {
         <div class="flex flex-wrap items-center gap-2">
-          @for(repo of element.repositories; track repo.id) {
+          @for (repo of element.repositories; track repo.id) {
             <span class="text-muted-foreground border px-2 py-0.5 rounded-lg text-sm">{{ repo.nameWithOwner }}</span>
           }
         </div>
@@ -68,16 +68,11 @@
               <p class="text-sm text-muted-foreground">Select repositories the team actively uses.</p>
             </div>
             <hlm-scroll-area class="border h-72 rounded-md border-border">
-              @for(repo of allRepositories(); track repo) {
+              @for (repo of allRepositories(); track repo) {
                 @let isSelected = isRepositoryInTeam(element, repo);
-                <button
-                  hlmBtn
-                  variant="outline"
-                  class="flex items-center justify-between w-full"
-                  (click)="toggleRepository(element, repo, isSelected)"
-                >
+                <button hlmBtn variant="outline" class="flex items-center justify-between w-full" (click)="toggleRepository(element, repo, isSelected)">
                   <span>{{ repo }}</span>
-                  @if(isSelected) {
+                  @if (isSelected) {
                     <hlm-icon class="w-4 h-4" name="lucideCheck" />
                   }
                 </button>
@@ -94,7 +89,7 @@
       @if (this.isLoading()) {
         <hlm-skeleton class="h-6 w-20" />
       } @else {
-        @for(label of element.labels; track label.id) {
+        @for (label of element.labels; track label.id) {
           @let ghLabel = { id: label.id, name: label.name, color: label.color ?? '69feff' };
           <app-github-label [label]="ghLabel" />
         }

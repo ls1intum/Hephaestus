@@ -39,7 +39,7 @@ export class AdminComponent {
       this.repositoriesForm.setValue(this.convertJSON(adminConfig.repositoriesToMonitor));
       return adminConfig;
     },
-    select: data => data.repositoriesToMonitor
+    select: (data) => data.repositoriesToMonitor
   }));
 
   repositoriesForm = new FormControl(this.configQuery.data() ? this.convertJSON(this.configQuery.data()!) : '[]');

@@ -24,7 +24,7 @@ export class AdminTeamsComponent {
 
   allReposQuery = injectQuery(() => ({
     queryKey: ['admin', 'config'],
-    queryFn: async () =>  lastValueFrom(this.adminService.getConfig()),
-    select: data => data.repositoriesToMonitor
+    queryFn: async () => lastValueFrom(this.adminService.getConfig()),
+    select: (data) => data.repositoriesToMonitor
   }));
 }
