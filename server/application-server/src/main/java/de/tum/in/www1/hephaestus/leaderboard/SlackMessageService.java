@@ -17,6 +17,7 @@ import java.time.temporal.TemporalAdjusters;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
+import java.util.function.Function;
 import java.util.stream.IntStream;
 import org.apache.commons.text.similarity.LevenshteinDistance;
 import org.slf4j.Logger;
@@ -171,33 +172,37 @@ public class SlackMessageService {
 
             return top3
                 .stream()
-                .map(entry -> {
-                    var exactUser = allSlackUsers
-                        .stream()
-                        .filter(
-                            user ->
-                                user.getName().equals(entry.user().name()) ||
-                                (user.getProfile().getEmail() != null &&
-                                    user.getProfile().getEmail().equals(entry.user().email()))
-                        )
-                        .findFirst();
-                    if (exactUser.isPresent()) {
-                        return exactUser.get();
-                    }
-
-                    // find through String edit distance
-                    return allSlackUsers
-                        .stream()
-                        .min((a, b) ->
-                            Integer.compare(
-                                LevenshteinDistance.getDefaultInstance().apply(entry.user().name(), a.getName()),
-                                LevenshteinDistance.getDefaultInstance().apply(entry.user().name(), b.getName())
-                            )
-                        )
-                        .orElse(null);
-                })
+                .map(mapToSlackUser(allSlackUsers))
                 .filter(user -> user != null)
                 .toList();
+        }
+
+        private Function<LeaderboardEntryDTO, User> mapToSlackUser(List<User> allSlackUsers) {
+            return entry -> {
+                var exactUser = allSlackUsers
+                    .stream()
+                    .filter(
+                        user ->
+                            user.getName().equals(entry.user().name()) ||
+                            (user.getProfile().getEmail() != null &&
+                                user.getProfile().getEmail().equals(entry.user().email()))
+                    )
+                    .findFirst();
+                if (exactUser.isPresent()) {
+                    return exactUser.get();
+                }
+
+                // find through String edit distance
+                return allSlackUsers
+                    .stream()
+                    .min((a, b) ->
+                        Integer.compare(
+                            LevenshteinDistance.getDefaultInstance().apply(entry.user().name(), a.getName()),
+                            LevenshteinDistance.getDefaultInstance().apply(entry.user().name(), b.getName())
+                        )
+                    )
+                    .orElse(null);
+            };
         }
 
         @Override

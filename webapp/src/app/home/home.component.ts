@@ -33,6 +33,7 @@ export class HomeComponent {
 
   private readonly route = inject(ActivatedRoute);
   private queryParams = toSignal(this.route.queryParamMap, { requireSync: true });
+
   protected leaderboardSchedule = computed(() => {
     const timeParts = this.metaQuery.data()?.scheduledTime?.split(':') ?? ['09', '00'];
     return {
@@ -41,6 +42,7 @@ export class HomeComponent {
       minute: Number.parseInt(timeParts[1] ?? '0')
     };
   });
+
   protected after = computed(() => {
     const afterParam = this.queryParams().get('after');
     if (afterParam) return afterParam;
