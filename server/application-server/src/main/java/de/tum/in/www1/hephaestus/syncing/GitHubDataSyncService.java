@@ -24,7 +24,7 @@ public class GitHubDataSyncService {
 
     private static final Logger logger = LoggerFactory.getLogger(GitHubDataSyncService.class);
 
-    @Value("${github.authToken:null}")
+    @Value("${github.auth-token:null}")
     private String ghAuthToken;
 
     @Value("${monitoring.repositories}")
@@ -33,7 +33,7 @@ public class GitHubDataSyncService {
     @Value("${monitoring.timeframe}")
     private int timeframe;
 
-    @Value("${monitoring.runOnStartupCooldownInMinutes}")
+    @Value("${monitoring.run-on-startup-cooldown-in-minutes}")
     private int runOnStartupCooldownInMinutes;
 
     private final DataSyncStatusRepository dataSyncStatusRepository;

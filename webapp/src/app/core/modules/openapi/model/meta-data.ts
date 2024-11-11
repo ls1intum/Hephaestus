@@ -12,6 +12,8 @@
 
 
 export interface MetaData { 
-    repositoriesToMonitor?: Array<string>;
+    repositoriesToMonitor: Array<string>;
+    scheduledDay: string;
+    scheduledTime: string;
 }
 

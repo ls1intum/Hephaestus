@@ -46,9 +46,6 @@ export class LeaderboardComponent {
   protected octChevronLeft = octChevronLeft;
   protected octNoEntry = octNoEntry;
 
-  protected Math = Math;
-  protected Array = Array;
-
   signedIn = this.securityStore.signedIn;
   user = this.securityStore.loadedUser;
 

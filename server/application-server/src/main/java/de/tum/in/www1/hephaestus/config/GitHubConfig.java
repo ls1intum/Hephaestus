@@ -17,7 +17,7 @@ public class GitHubConfig {
 
     private static final Logger logger = LoggerFactory.getLogger(GitHubConfig.class);
 
-    @Value("${github.authToken}")
+    @Value("${github.auth-token}")
     private String ghAuthToken;
 
     @Autowired

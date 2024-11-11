@@ -12,8 +12,14 @@ public class MetaService {
     @Value("${monitoring.repositories}")
     private String[] repositoriesToMonitor;
 
+    @Value("${hephaestus.leaderboard.schedule.day}")
+    private String scheduledDay;
+
+    @Value("${hephaestus.leaderboard.schedule.time}")
+    private String scheduledTime;
+
     public MetaDataDTO getMetaData() {
         logger.info("Getting meta data...");
-        return new MetaDataDTO(repositoriesToMonitor);
+        return new MetaDataDTO(repositoriesToMonitor, scheduledDay, scheduledTime);
     }
 }
