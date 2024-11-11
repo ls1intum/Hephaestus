@@ -14,7 +14,7 @@ spring:
           issuer-uri: ${KEYCLOAK_URL}/realms/${KEYCLOAK_REALM}
 
 hephaestus:
-    host_url: ${APPLICATION_HOST_URL}
+    host-url: ${APPLICATION_HOST_URL}
     leaderboard:
       schedule:
         day: ${LEADERBOARD_SCHEDULE_DAY:2}
@@ -26,18 +26,18 @@ hephaestus:
 nats:
     enabled: ${NATS_ENABLED:false}
     timeframe: ${MONITORING_TIMEFRAME:7}
-    durableConsumerName: ${NATS_DURABLE_CONSUMER_NAME}
+    durable-consumer-name: ${NATS_DURABLE_CONSUMER_NAME}
     server: ${NATS_SERVER}
 
 monitoring:
-    runOnStartup: ${MONITORING_RUN_ON_STARTUP:true}
+    run-on-startup: ${MONITORING_RUN_ON_STARTUP:true}
     # Fetching timeframe in days
     timeframe: ${MONITORING_TIMEFRAME:7}
     repository-sync-cron: ${MONITORING_REPOSITORY_SYNC_CRON:0 0 * * * *}
     repositories: ${MONITORING_REPOSITORIES:ls1intum/Artemis}
 
 github:
-  authToken: ${GITHUB_AUTH_TOKEN}
+  auth-token: ${GITHUB_AUTH_TOKEN}
 slack:
     token: ${SLACK_BOT_TOKEN}
-    signingSecret: ${SLACK_SIGNING_SECRET}
+    signing-secret: ${SLACK_SIGNING_SECRET}

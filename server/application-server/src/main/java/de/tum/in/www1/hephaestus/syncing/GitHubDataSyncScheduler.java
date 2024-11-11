@@ -16,7 +16,7 @@ public class GitHubDataSyncScheduler {
     private static final Logger logger = LoggerFactory.getLogger(GitHubDataSyncScheduler.class);
     private final GitHubDataSyncService dataSyncService;
 
-    @Value("${monitoring.runOnStartup:true}")
+    @Value("${monitoring.run-on-startup:true}")
     private boolean runOnStartup;
 
     public GitHubDataSyncScheduler(GitHubDataSyncService dataSyncService) {

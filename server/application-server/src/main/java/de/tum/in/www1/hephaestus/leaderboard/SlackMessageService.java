@@ -47,7 +47,7 @@ public class SlackMessageService {
     @Value("${hephaestus.leaderboard.notification.enabled}")
     private boolean runScheduledMessage;
 
-    @Value("${hephaestus.host_url:localhost:8080}")
+    @Value("${hephaestus.host-url:localhost:8080}")
     private String hephaestusUrl;
 
     @Value("${hephaestus.leaderboard.schedule.day}")

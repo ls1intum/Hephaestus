@@ -12,7 +12,7 @@ public class SlackAppConfig {
     @Value("${slack.token}")
     private String botToken;
 
-    @Value("${slack.signingSecret}")
+    @Value("${slack.signing-secret}")
     private String signingSecret;
 
     @Bean
