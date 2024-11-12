@@ -254,8 +254,8 @@ paths:
         required: true
         schema:
           type: string
-          format: date
-      - name: team
+          format: date-time
+      - name: repository
         in: query
         required: false
         schema:
@@ -524,11 +524,25 @@ components:
           type: string
         url:
           type: string
-        teams:
-          uniqueItems: true
+        description:
+          type: string
+        htmlUrl:
+          type: string
+    MetaData:
+      required:
+      - repositoriesToMonitor
+      - scheduledDay
+      - scheduledTime
+      type: object
+      properties:
+        repositoriesToMonitor:
           type: array
           items:
-            $ref: "#/components/schemas/TeamInfo"
+            type: string
+        scheduledDay:
+          type: string
+        scheduledTime:
+          type: string
     PullRequestBaseInfo:
       required:
       - htmlUrl
