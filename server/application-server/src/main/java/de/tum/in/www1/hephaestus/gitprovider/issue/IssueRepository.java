@@ -6,6 +6,8 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
+import java.util.List;
+
 public interface IssueRepository extends JpaRepository<Issue, Long> {
     @Query(
         """
@@ -37,4 +39,18 @@ public interface IssueRepository extends JpaRepository<Issue, Long> {
         """
     )
     Optional<Integer> findLastIssueNumber(long repositoryId);
+
+    @Query("""
+            SELECT i
+            FROM Issue i
+            LEFT JOIN FETCH i.labels
+            JOIN FETCH i.author
+            LEFT JOIN FETCH i.assignees
+            LEFT JOIN FETCH i.repository
+            WHERE (i.author.login ILIKE :assigneeLogin OR LOWER(:assigneeLogin) IN (SELECT LOWER(u.login) FROM i.assignees u)) AND i.state IN :states
+            ORDER BY i.createdAt DESC
+            """)
+    List<Issue> findAssignedByLoginAndStates(
+            @Param("assigneeLogin") String assigneeLogin,
+            @Param("states") Set<Issue.State> states);
 }

@@ -23,4 +23,27 @@ public record IssueInfoDTO(
     OffsetDateTime createdAt,
     OffsetDateTime updatedAt
 ) {
+
+    public static IssueInfoDTO fromIssue(Issue issue) {
+        return new IssueInfoDTO(
+            issue.getId(),
+            issue.getNumber(),
+            issue.getTitle(),
+            issue.getState(),
+            issue.getCommentsCount(),
+            UserInfoDTO.fromUser(issue.getAuthor()),
+            issue.getLabels()
+                .stream()
+                .map(LabelInfoDTO::fromLabel)
+                .toList(),
+            issue.getAssignees()
+                .stream()
+                .map(UserInfoDTO::fromUser)
+                .toList(),
+            issue.getRepository().getNameWithOwner(),
+            issue.getHtmlUrl(),
+            issue.getCreatedAt(),
+            issue.getUpdatedAt()
+        );
+    }
 }
