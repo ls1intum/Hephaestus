@@ -5,14 +5,11 @@ import de.tum.in.www1.hephaestus.intelligenceservice.BaseApi;
 
 import de.tum.in.www1.hephaestus.intelligenceservice.model.ChatRequest;
 import de.tum.in.www1.hephaestus.intelligenceservice.model.ChatResponse;
-import de.tum.in.www1.hephaestus.intelligenceservice.model.HTTPValidationError;
 
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
-import java.util.Locale;
 import java.util.Map;
-import java.util.stream.Collectors;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
@@ -21,7 +18,6 @@ import org.springframework.util.MultiValueMap;
 import org.springframework.web.client.RestClientException;
 import org.springframework.web.client.HttpClientErrorException;
 import org.springframework.core.ParameterizedTypeReference;
-import org.springframework.core.io.FileSystemResource;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
@@ -42,7 +38,7 @@ public class DefaultApi extends BaseApi {
     }
 
     /**
-     * Get a response from an LLM to a chat message.
+     * Start and continue a chat session with an LLM.
      * 
      * <p><b>200</b> - Successful Response
      * <p><b>422</b> - Validation Error
@@ -55,7 +51,7 @@ public class DefaultApi extends BaseApi {
     }
 
     /**
-     * Get a response from an LLM to a chat message.
+     * Start and continue a chat session with an LLM.
      * 
      * <p><b>200</b> - Successful Response
      * <p><b>422</b> - Validation Error

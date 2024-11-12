@@ -12,6 +12,7 @@ import { LeaderboardFilterComponent } from './leaderboard/filter/filter.componen
 import { SecurityStore } from '@app/core/security/security-store.service';
 import { HlmAlertModule } from '@spartan-ng/ui-alert-helm';
 import { TeamService } from '@app/core/modules/openapi';
+import { MetaService } from '@app/core/modules/openapi';
 
 dayjs.extend(isoWeek);
 
@@ -25,6 +26,7 @@ export class HomeComponent {
   protected CircleX = CircleX;
 
   securityStore = inject(SecurityStore);
+  metaService = inject(MetaService);
   leaderboardService = inject(LeaderboardService);
   teamService = inject(TeamService);
 
@@ -33,11 +35,31 @@ export class HomeComponent {
 
   private readonly route = inject(ActivatedRoute);
   private queryParams = toSignal(this.route.queryParamMap, { requireSync: true });
-  protected after = computed(() => this.queryParams().get('after') ?? dayjs().isoWeekday(1).format('YYYY-MM-DD'));
-  protected before = computed(() => this.queryParams().get('before') ?? dayjs().format('YYYY-MM-DD'));
+
+  protected leaderboardSchedule = computed(() => {
+    const timeParts = this.metaQuery.data()?.scheduledTime?.split(':') ?? ['09', '00'];
+    return {
+      day: Number.parseInt(this.metaQuery.data()?.scheduledDay ?? '2'),
+      hour: Number.parseInt(timeParts[0]),
+      minute: Number.parseInt(timeParts[1] ?? '0')
+    };
+  });
+
+  protected after = computed(() => {
+    const afterParam = this.queryParams().get('after');
+    if (afterParam) return afterParam;
+
+    let defaultDate = dayjs().isoWeekday(this.leaderboardSchedule().day).startOf('hour').hour(this.leaderboardSchedule().hour).minute(this.leaderboardSchedule().minute);
+    if (defaultDate.isAfter(dayjs()) || defaultDate.isSame(dayjs(), 'day')) {
+      defaultDate = defaultDate.subtract(1, 'week');
+    }
+    return defaultDate.format();
+  });
+  protected before = computed(() => this.queryParams().get('before') ?? dayjs().format());
   protected teams = computed(() => this.queryParams().get('team') ?? 'all');
 
   query = injectQuery(() => ({
+    enabled: this.metaQuery.data !== undefined,
     queryKey: ['leaderboard', { after: this.after(), before: this.before(), repository: this.teams() }],
     queryFn: async () =>
       lastValueFrom(
@@ -51,5 +73,9 @@ export class HomeComponent {
   teamsQuery = injectQuery(() => ({
     queryKey: ['teams'],
     queryFn: async () => lastValueFrom(this.teamService.getTeams())
+  }));
+  metaQuery = injectQuery(() => ({
+    queryKey: ['meta'],
+    queryFn: async () => lastValueFrom(this.metaService.getMetaData())
   }));
 }

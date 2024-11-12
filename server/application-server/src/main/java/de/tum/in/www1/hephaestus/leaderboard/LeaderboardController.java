@@ -1,10 +1,11 @@
 package de.tum.in.www1.hephaestus.leaderboard;
 
-import java.time.LocalDate;
+import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.Optional;
 
 import org.springframework.format.annotation.DateTimeFormat;
+import org.springframework.format.annotation.DateTimeFormat.ISO;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -23,8 +24,8 @@ public class LeaderboardController {
 
     @GetMapping
     public ResponseEntity<List<LeaderboardEntryDTO>> getLeaderboard(
-            @RequestParam @DateTimeFormat(pattern = "yyyy-MM-dd") Optional<LocalDate> after,
-            @RequestParam @DateTimeFormat(pattern = "yyyy-MM-dd") Optional<LocalDate> before,
+            @RequestParam @DateTimeFormat(iso = ISO.DATE_TIME) OffsetDateTime after,
+            @RequestParam @DateTimeFormat(iso = ISO.DATE_TIME) OffsetDateTime before,
             @RequestParam Optional<String> team) {
         return ResponseEntity.ok(leaderboardService.createLeaderboard(after, before, team));
     }

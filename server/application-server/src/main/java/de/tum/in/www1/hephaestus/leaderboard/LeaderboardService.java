@@ -2,10 +2,7 @@ package de.tum.in.www1.hephaestus.leaderboard;
 
 import java.util.stream.IntStream;
 import java.util.Map;
-import java.time.LocalDate;
-import java.time.LocalDateTime;
 import java.time.OffsetDateTime;
-import java.time.ZoneOffset;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Optional;
@@ -39,26 +36,16 @@ public class LeaderboardService {
         @Autowired
         private TeamRepository teamRepository;
 
-        @Value("${monitoring.timeframe}")
-        private int timeframe;
+    @Value("${monitoring.timeframe}")
+    private int timeframe;
 
-        @Transactional
-        public List<LeaderboardEntryDTO> createLeaderboard(Optional<LocalDate> after, Optional<LocalDate> before,
-                        Optional<String> team) {
-                logger.info("Creating leaderboard dataset");
-
-                LocalDateTime afterCutOff = after.isPresent() ? after.get().atStartOfDay()
-                                : LocalDate.now().minusDays(timeframe).atStartOfDay();
-                Optional<LocalDateTime> beforeCutOff = before.map(date -> date.plusDays(1).atStartOfDay());
-                Optional<Team> teamEntity = team.map((t) -> teamRepository.findByName(t)).orElse(Optional.empty());
-
-                var afterOffset = afterCutOff.atOffset(ZoneOffset.UTC);
-                var beforeOffset = beforeCutOff.map(b -> b.atOffset(ZoneOffset.UTC)).orElse(OffsetDateTime.now());
-                List<PullRequestReview> reviews = pullRequestReviewRepository.findAllInTimeframe(afterOffset,
-                                beforeOffset,
-                                teamEntity);
-                List<IssueComment> issueComments = issueCommentRepository.findAllInTimeframe(afterOffset, beforeOffset,
-                                teamEntity, true);
+    @Transactional
+    public List<LeaderboardEntryDTO> createLeaderboard(OffsetDateTime after, OffsetDateTime before, Optional<String> team) {
+        logger.info("Creating leaderboard dataset");
+        logger.info("Timeframe: {} - {}", after, before);
+        Optional<Team> teamEntity = team.map((t) -> teamRepository.findByName(t)).orElse(Optional.empty());
+        List<PullRequestReview> reviews = pullRequestReviewRepository.findAllInTimeframe(after, before, teamEntity);
+        List<IssueComment> issueComments = issueCommentRepository.findAllInTimeframe(after, before, teamEntity, true);
 
                 Map<Long, User> usersById = reviews.stream().map(PullRequestReview::getAuthor)
                                 .collect(Collectors.toMap(User::getId, user -> user, (u1, u2) -> u1));

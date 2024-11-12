@@ -25,11 +25,11 @@ export interface LeaderboardServiceInterface {
     configuration: Configuration;
 
     /**
-     * 
-     * 
-     * @param after 
-     * @param before 
-     * @param team 
+     *
+     *
+     * @param after
+     * @param before
+     * @param team
      */
     getLeaderboard(after?: string, before?: string, team?: string, extraHttpRequestParams?: any): Observable<Array<LeaderboardEntry>>;
 

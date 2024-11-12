@@ -245,13 +245,13 @@ paths:
       parameters:
       - name: after
         in: query
-        required: false
+        required: true
         schema:
           type: string
-          format: date
+          format: date-time
       - name: before
         in: query
-        required: false
+        required: true
         schema:
           type: string
           format: date
@@ -583,6 +583,8 @@ components:
           type: integer
           format: int64
         login:
+          type: string
+        email:
           type: string
         avatarUrl:
           type: string

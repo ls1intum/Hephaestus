@@ -31,25 +31,35 @@ spring:
 springdoc:
     default-produces-media-type: application/json
 
+hephaestus:
+    host-url: https://hephaestus.ase.cit.tum.de/
+    leaderboard:
+        schedule:
+            day: 2
+            time: "9:00"
+        notification:
+            enabled: false
+            channel-id: ""
+
+
 nats:
     enabled: false
     timeframe: 7
-    durableConsumerName: ""
+    durable-consumer-name: ""
     server: ""
 
 monitoring:
-    runOnStartup: true
+    run-on-startup: true
     # Fetching timeframe in days
     timeframe: 7
     # Cooldown in minutes before running the monitoring again
-    runOnStartupCooldownInMinutes: 15
+    run-on-startup-cooldown-in-minutes: 15
     repository-sync-cron: "0 0 * * * *"
     repositories: ls1intum/Artemis
 
 # Can be any OAuth token, such as the PAT
 github:
-    authToken: null
-
-logging:
-    level:
-        org.kohsuke.github.GitHubClient: DEBUG
+    auth-token: null
+slack:
+    token: ""
+    signing-secret: ""

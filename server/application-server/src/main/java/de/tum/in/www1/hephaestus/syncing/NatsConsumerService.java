@@ -48,7 +48,7 @@ public class NatsConsumerService {
     @Value("${nats.server}")
     private String natsServer;
 
-    @Value("${nats.durableConsumerName}")
+    @Value("${nats.durable-consumer-name}")
     private String durableConsumerName;
 
     @Autowired

@@ -11,7 +11,9 @@
  */
 
 
-export interface AdminConfig { 
-    repositoriesToMonitor: Set<string>;
+export interface MetaData {
+    repositoriesToMonitor: Array<string>;
+    scheduledDay: string;
+    scheduledTime: string;
 }
 
