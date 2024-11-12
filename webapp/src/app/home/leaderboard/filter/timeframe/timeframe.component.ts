@@ -65,14 +65,14 @@ export class LeaderboardFilterTimeframeComponent {
   });
 
   formattedDates = computed(() => {
-    const dates = this.value().split('.');
-    const startDate = dayjs(dates[0].length > 0 ? dates[0] : this.after());
-    const endDate = dayjs(dates[1].length > 0 ? dates[1] : this.before());
+    const currentOption = this.value() !== '.' ? this.options().find((option) => option.value === this.value()) : this.options()[0];
+    const [startDate, endDate] = currentOption!.value.split('.').map((date) => dayjs(date));
     const sameMonth = startDate.month() === endDate.month();
+    const endDateFormatted = endDate.isSame(dayjs(), 'hour') ? 'Now' : sameMonth ? endDate.format('D, h:mm A') : endDate.format('MMM D, h:mm A');
     if (sameMonth) {
-      return `${startDate.format('MMM D')} - ${endDate.format('D')}`;
+      return `${startDate.format('MMM D, h:mm A')} - ${endDateFormatted}`;
     } else {
-      return `${startDate.format('MMM D')} - ${endDate.format('MMM D')}`;
+      return `${startDate.format('MMM D, h:mm A')} - ${endDateFormatted}`;
     }
   });
 
