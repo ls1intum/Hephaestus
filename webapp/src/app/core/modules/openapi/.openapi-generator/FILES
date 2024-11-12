@@ -2,6 +2,8 @@
 .openapi-generator-ignore
 README.md
 api.module.ts
+api/activity-dashboard.service.ts
+api/activity-dashboard.serviceInterface.ts
 api/api.ts
 api/leaderboard.service.ts
 api/leaderboard.serviceInterface.ts
@@ -17,6 +19,9 @@ configuration.ts
 encoder.ts
 git_push.sh
 index.ts
+model/activities.ts
+model/auth-user-info.ts
+model/issue-info.ts
 model/label-info.ts
 model/leaderboard-entry.ts
 model/meta-data.ts

@@ -1,3 +1,5 @@
+export * from './activities';
+export * from './issue-info';
 export * from './label-info';
 export * from './leaderboard-entry';
 export * from './meta-data';
