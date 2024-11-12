@@ -2,6 +2,7 @@ export * from './admin-config';
 export * from './auth-user-info';
 export * from './label-info';
 export * from './leaderboard-entry';
+export * from './meta-data';
 export * from './pull-request-base-info';
 export * from './pull-request-info';
 export * from './pull-request-review-info';

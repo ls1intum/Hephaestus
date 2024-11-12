@@ -13,24 +13,21 @@ import { HttpHeaders }                                       from '@angular/comm
 
 import { Observable }                                        from 'rxjs';
 
-import { LeaderboardEntry } from '../model/models';
+import { MetaData } from '../model/models';
 
 
 import { Configuration }                                     from '../configuration';
 
 
 
-export interface LeaderboardServiceInterface {
+export interface MetaServiceInterface {
     defaultHeaders: HttpHeaders;
     configuration: Configuration;
 
     /**
      * 
      * 
-     * @param after 
-     * @param before 
-     * @param team 
      */
-    getLeaderboard(after: string, before: string, team?: string, extraHttpRequestParams?: any): Observable<Array<LeaderboardEntry>>;
+    getMetaData(extraHttpRequestParams?: any): Observable<MetaData>;
 
 }

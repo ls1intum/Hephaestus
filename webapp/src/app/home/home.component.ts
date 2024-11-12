@@ -11,7 +11,6 @@ import { LeaderboardComponent } from '@app/home/leaderboard/leaderboard.componen
 import { LeaderboardFilterComponent } from './leaderboard/filter/filter.component';
 import { SecurityStore } from '@app/core/security/security-store.service';
 import { HlmAlertModule } from '@spartan-ng/ui-alert-helm';
-import { TeamService } from '@app/core/modules/openapi';
 import { MetaService } from '@app/core/modules/openapi';
 
 dayjs.extend(isoWeek);
@@ -28,7 +27,6 @@ export class HomeComponent {
   securityStore = inject(SecurityStore);
   metaService = inject(MetaService);
   leaderboardService = inject(LeaderboardService);
-  teamService = inject(TeamService);
 
   signedIn = this.securityStore.signedIn;
   user = this.securityStore.loadedUser;
@@ -59,8 +57,8 @@ export class HomeComponent {
   protected teams = computed(() => this.queryParams().get('team') ?? 'all');
 
   query = injectQuery(() => ({
-    enabled: this.metaQuery.data !== undefined,
-    queryKey: ['leaderboard', { after: this.after(), before: this.before(), repository: this.teams() }],
+    enabled: !!this.metaQuery.data(),
+    queryKey: ['leaderboard', { after: this.after(), before: this.before(), team: this.teams() }],
     queryFn: async () =>
       lastValueFrom(
         combineLatest([this.leaderboardService.getLeaderboard(this.after(), this.before(), this.teams() !== 'all' ? this.teams() : undefined), timer(500)]).pipe(
@@ -69,11 +67,7 @@ export class HomeComponent {
       )
   }));
 
-  protected _teams = computed(() => this.teamsQuery.data()?.map((team) => team.name) ?? []);
-  teamsQuery = injectQuery(() => ({
-    queryKey: ['teams'],
-    queryFn: async () => lastValueFrom(this.teamService.getTeams())
-  }));
+  protected _teams = computed(() => this.metaQuery.data()?.teams.map((team) => team.name) ?? []);
   metaQuery = injectQuery(() => ({
     queryKey: ['meta'],
     queryFn: async () => lastValueFrom(this.metaService.getMetaData())

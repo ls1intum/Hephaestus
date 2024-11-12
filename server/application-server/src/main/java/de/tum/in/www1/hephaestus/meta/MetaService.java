@@ -1,13 +1,18 @@
 package de.tum.in.www1.hephaestus.meta;
 
+import de.tum.in.www1.hephaestus.gitprovider.team.TeamService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 @Service
 public class MetaService {
     private static final Logger logger = LoggerFactory.getLogger(MetaService.class);
+
+    @Autowired
+    private TeamService teamService;
 
     @Value("${monitoring.repositories}")
     private String[] repositoriesToMonitor;
@@ -20,6 +25,7 @@ public class MetaService {
 
     public MetaDataDTO getMetaData() {
         logger.info("Getting meta data...");
-        return new MetaDataDTO(repositoriesToMonitor, scheduledDay, scheduledTime);
+        var teams = teamService.getAllTeams();
+        return new MetaDataDTO(teams, scheduledDay, scheduledTime);
     }
 }
