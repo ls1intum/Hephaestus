@@ -61,9 +61,7 @@ export class HomeComponent {
     queryKey: ['leaderboard', { after: this.after(), before: this.before(), team: this.teams() }],
     queryFn: async () =>
       lastValueFrom(
-        combineLatest([this.leaderboardService.getLeaderboard(this.after(), this.before(), this.teams() !== 'all' ? this.teams() : undefined), timer(500)]).pipe(
-          map(([leaderboard]) => leaderboard)
-        )
+        this.leaderboardService.getLeaderboard(this.after(), this.before(), this.teams() !== 'all' ? this.teams() : undefined)
       )
   }));
 

@@ -136,10 +136,7 @@ public class GitHubIssueSyncService {
             // Extract name with owner from the repository URL
             // Example: https://api.github.com/repos/ls1intum/Artemis/issues/9463
             var nameWithOwner = ghIssue.getUrl().toString().split("/repos/")[1].split("/issues")[0];
-            var repository = repositoryRepository.findByNameWithOwner(nameWithOwner);
-            if (repository != null) {
-                result.setRepository(repository);
-            }
+            repositoryRepository.findByNameWithOwner(nameWithOwner).ifPresent(result::setRepository);
         }
 
         // Link new labels and remove labels that are not present anymore

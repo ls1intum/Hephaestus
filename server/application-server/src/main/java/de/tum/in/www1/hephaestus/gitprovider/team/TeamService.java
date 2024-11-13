@@ -1,6 +1,9 @@
 package de.tum.in.www1.hephaestus.gitprovider.team;
 
+import de.tum.in.www1.hephaestus.gitprovider.label.LabelRepository;
+import de.tum.in.www1.hephaestus.gitprovider.repository.RepositoryRepository;
 import jakarta.transaction.Transactional;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 
@@ -15,6 +18,10 @@ public class TeamService {
 
     @Autowired
     private TeamRepository teamRepository;
+    @Autowired
+    private RepositoryRepository repositoryRepository;
+    @Autowired
+    private LabelRepository labelRepository;
 
     public Optional<Team> getTeam(Long id) {
         logger.info("Getting team with id: " + id);
@@ -46,37 +53,36 @@ public class TeamService {
         teamRepository.flush();
     }
 
+    @Transactional
     public Boolean createDefaultTeams() {
         logger.info("Creating default teams");
-        Team iris = teamRepository.save(new Team());
-        iris.setName("Iris");
-        iris.setColor("#69feff");
-        Team athena = teamRepository.save(new Team());
-        athena.setName("Athena");
-        athena.setColor("#69feff");
-        Team atlas = teamRepository.save(new Team());
-        atlas.setName("Atlas");
-        atlas.setColor("#69feff");
-        Team programming = teamRepository.save(new Team());
-        programming.setName("Programming");
-        programming.setColor("#69feff");
-        Team hephaestus = teamRepository.save(new Team());
-        hephaestus.setName("Hephaestus");
-        hephaestus.setColor("#69feff");
-        Team communication = teamRepository.save(new Team());
-        communication.setName("Communication");
-        communication.setColor("#69feff");
-        Team lectures = teamRepository.save(new Team());
-        lectures.setName("Lectures");
-        lectures.setColor("#69feff");
-        Team usability = teamRepository.save(new Team());
-        usability.setName("Usability");
-        usability.setColor("#69feff");
-        Team ares = teamRepository.save(new Team());
-        ares.setName("Ares");
-        ares.setColor("#69feff");
-        teamRepository.saveAllAndFlush(
-                List.of(iris, athena, atlas, programming, hephaestus, communication, lectures, usability, ares));
+        List<DefaultTeamRecord> defaultTeams = new ArrayList<>();
+        defaultTeams.add(new DefaultTeamRecord("Iris", "#69feff", List.of("ls1intum/Artemis", "ls1intum/Pyris"), List.of("iris", "component:iris")));
+        defaultTeams.add(new DefaultTeamRecord("Athena", "#69feff", List.of("ls1intum/Artemis", "ls1intum/Athena"), List.of("athena")));
+        defaultTeams.add(new DefaultTeamRecord("Atlas", "#69feff", List.of("ls1intum/Artemis"), List.of("atlas")));
+        defaultTeams.add(new DefaultTeamRecord("Programming", "#69feff", List.of("ls1intum/Artemis", "ls1intum/Pyris", "ls1intum/Atlas"), List.of("programming", "component:programming")));
+        defaultTeams.add(new DefaultTeamRecord("Hephaestus", "#69feff", List.of("ls1intum/Hephaestus"), List.of()));
+        defaultTeams.add(new DefaultTeamRecord("Communication", "#69feff", List.of("ls1intum/Artemis"), List.of("communication", "component:communication")));
+        defaultTeams.add(new DefaultTeamRecord("Lectures", "#69feff", List.of("ls1intum/Artemis"), List.of("lecture", "Component:Lecture")));
+        defaultTeams.add(new DefaultTeamRecord("Usability", "#69feff", List.of("ls1intum/Artemis"), List.of()));
+        defaultTeams.add(new DefaultTeamRecord("Ares", "#69feff", List.of("ls1intum/Ares", "ls1intum/Ares2"), List.of()));
+        
+        for (DefaultTeamRecord defaultTeam : defaultTeams) {
+            Team team = teamRepository.findByName(defaultTeam.name()).orElse(new Team());
+            team.setName(defaultTeam.name());
+            team.setColor(defaultTeam.color());
+            defaultTeam.repositories().forEach(repositoryName -> repositoryRepository.findByNameWithOwner(repositoryName).ifPresent(team::addRepository));
+            defaultTeam.labels().forEach(labelName -> labelRepository.findByName(labelName).ifPresent(team::addLabel));
+            teamRepository.save(team);
+        }
+        teamRepository.flush();
         return true;
     }
+
+    private record DefaultTeamRecord (
+        String name,
+        String color,
+        List<String> repositories,
+        List<String> labels
+    ) {}
 }

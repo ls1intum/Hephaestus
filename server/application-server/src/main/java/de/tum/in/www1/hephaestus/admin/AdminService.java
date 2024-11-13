@@ -2,7 +2,6 @@ package de.tum.in.www1.hephaestus.admin;
 
 import de.tum.in.www1.hephaestus.gitprovider.label.Label;
 import de.tum.in.www1.hephaestus.gitprovider.label.LabelRepository;
-import de.tum.in.www1.hephaestus.gitprovider.repository.Repository;
 import de.tum.in.www1.hephaestus.gitprovider.repository.RepositoryRepository;
 import de.tum.in.www1.hephaestus.gitprovider.team.Team;
 import de.tum.in.www1.hephaestus.gitprovider.team.TeamInfoDTO;
@@ -140,11 +139,7 @@ public class AdminService {
             return Optional.empty();
         }
         Team team = optionalTeam.get();
-        Repository repository = repositoryRepository.findByNameWithOwner(repositoryName);
-        if (repository == null) {
-            return Optional.empty();
-        }
-        team.addRepository(repository);
+        repositoryRepository.findByNameWithOwner(repositoryName).ifPresent(team::addRepository);
         teamService.saveTeam(team);
         return Optional.of(TeamInfoDTO.fromTeam(team));
     }
@@ -156,11 +151,7 @@ public class AdminService {
             return Optional.empty();
         }
         Team team = optionalTeam.get();
-        Repository repository = repositoryRepository.findByNameWithOwner(repositoryName);
-        if (repository == null) {
-            return Optional.empty();
-        }
-        team.removeRepository(repository);
+        repositoryRepository.findByNameWithOwner(repositoryName).ifPresent(team::removeRepository);
         teamService.saveTeam(team);
         return Optional.of(TeamInfoDTO.fromTeam(team));
     }

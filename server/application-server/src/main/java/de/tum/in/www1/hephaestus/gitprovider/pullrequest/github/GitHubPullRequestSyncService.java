@@ -160,10 +160,7 @@ public class GitHubPullRequestSyncService {
             // Extract name with owner from the repository URL
             // Example: https://api.github.com/repos/ls1intum/Artemis/pulls/9463
             var nameWithOwner = ghPullRequest.getUrl().toString().split("/repos/")[1].split("/pulls")[0];
-            var repository = repositoryRepository.findByNameWithOwner(nameWithOwner);
-            if (repository != null) {
-                result.setRepository(repository);
-            }
+            repositoryRepository.findByNameWithOwner(nameWithOwner).ifPresent(result::setRepository);
         }
 
         // Link new labels and remove labels that are not present anymore
