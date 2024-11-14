@@ -5,7 +5,7 @@
             <column autoIncrement="true" name="id" type="BIGINT">
                 <constraints nullable="false" primaryKey="true" primaryKeyName="admin_configPK"/>
             </column>
-            <column name="repositories_to_monitor" type="VARCHAR(255)"/>
+            <column name="repositories_to_monitor" type="text[]"/>
         </createTable>
     </changeSet>
     <changeSet author="armin (generated)" id="1731511193057-2">

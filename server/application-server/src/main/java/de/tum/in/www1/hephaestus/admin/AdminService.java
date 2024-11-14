@@ -17,10 +17,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.boot.context.event.ApplicationReadyEvent;
 import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.cache.annotation.Cacheable;
-import org.springframework.context.event.EventListener;
 import org.springframework.stereotype.Service;
 
 @Service
@@ -46,37 +44,16 @@ public class AdminService {
     @Value("${monitoring.repositories}")
     private String[] repositoriesToMonitor;
 
-    @EventListener(ApplicationReadyEvent.class)
-    public void run() {
-        logger.info("Updating AdminConfig...");
-        // make sure the admin config is present
-        Optional<AdminConfig> optionalAdminConfig = adminRepository.findById(1L);
-        if (optionalAdminConfig.isEmpty()) {
-            logger.info("No admin config found, creating new one");
-            AdminConfig newAdminConfig = new AdminConfig();
-            newAdminConfig.setRepositoriesToMonitor(Set.of(repositoriesToMonitor));
-            adminRepository.saveAndFlush(newAdminConfig);
-        } else {
-            // repositories should match the environment variable
-            AdminConfig adminConfig = optionalAdminConfig.get();
-            if (!adminConfig.getRepositoriesToMonitor().equals(Set.of(repositoriesToMonitor))) {
-                logger.info("Adding new repositories to monitor");
-                adminConfig.setRepositoriesToMonitor(Set.of(repositoriesToMonitor));
-                adminRepository.saveAndFlush(adminConfig);
-            }
-        }
-        // make sure teams are initialized
-        List<TeamInfoDTO> teams = teamService.getAllTeams();
-        if (teams.isEmpty()) {
-            logger.info("No teams found, creating default teams");
-            teamService.createDefaultTeams();
-        }
+    private AdminConfig createInitialConfig() {
+        AdminConfig newAdminConfig = new AdminConfig();
+        newAdminConfig.setRepositoriesToMonitor(Set.of(repositoriesToMonitor));
+        return adminRepository.saveAndFlush(newAdminConfig);
     }
 
     @Cacheable("config")
     public AdminConfig getAdminConfig() {
         logger.info("Getting admin config");
-        return adminRepository.findAll().stream().findFirst().orElseThrow(NoAdminConfigFoundException::new);
+        return adminRepository.findFirstByOrderByIdAsc().orElseGet(this::createInitialConfig);
     }
 
     @CacheEvict(value = "config")

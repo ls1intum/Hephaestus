@@ -54,7 +54,7 @@ public class TeamService {
     }
 
     @Transactional
-    public Boolean createDefaultTeams() {
+    public void syncDefaultTeams() {
         logger.info("Creating default teams");
         List<DefaultTeamRecord> defaultTeams = new ArrayList<>();
         defaultTeams.add(new DefaultTeamRecord("Iris", "#69feff", List.of("ls1intum/Artemis", "ls1intum/Pyris"), List.of("iris", "component:iris")));
@@ -76,7 +76,6 @@ public class TeamService {
             teamRepository.save(team);
         }
         teamRepository.flush();
-        return true;
     }
 
     private record DefaultTeamRecord (

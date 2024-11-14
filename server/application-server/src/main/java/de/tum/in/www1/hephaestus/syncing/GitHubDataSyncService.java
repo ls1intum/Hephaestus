@@ -17,6 +17,7 @@ import de.tum.in.www1.hephaestus.gitprovider.pullrequest.github.GitHubPullReques
 import de.tum.in.www1.hephaestus.gitprovider.pullrequestreview.github.GitHubPullRequestReviewSyncService;
 import de.tum.in.www1.hephaestus.gitprovider.pullrequestreviewcomment.github.GitHubPullRequestReviewCommentSyncService;
 import de.tum.in.www1.hephaestus.gitprovider.repository.github.GitHubRepositorySyncService;
+import de.tum.in.www1.hephaestus.gitprovider.team.TeamService;
 import de.tum.in.www1.hephaestus.gitprovider.user.github.GitHubUserSyncService;
 
 @Service
@@ -53,6 +54,8 @@ public class GitHubDataSyncService {
     private GitHubPullRequestReviewSyncService pullRequestReviewSyncService;
     @Autowired
     private GitHubPullRequestReviewCommentSyncService pullRequestReviewCommentSyncService;
+    @Autowired
+    private TeamService teamService;
 
     @Transactional
     public void syncData() {
@@ -85,6 +88,7 @@ public class GitHubDataSyncService {
         pullRequestReviewSyncService.syncReviewsOfAllPullRequests(pullRequests);
         pullRequestReviewCommentSyncService.syncReviewCommentsOfAllPullRequests(pullRequests);
         userSyncService.syncAllExistingUsers();
+        teamService.syncDefaultTeams();
 
         var endTime = OffsetDateTime.now();
 
