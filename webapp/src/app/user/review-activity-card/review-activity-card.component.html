@@ -11,10 +11,16 @@
 } @else {
   <a hlmCard variant="profile" class="hover:bg-accent/50" [href]="htmlUrl() ?? this.pullRequest()?.htmlUrl" target="_blank" rel="noopener noreferrer" [class]="class()">
     <div hlmCardContent variant="profile">
-      <div class="text-sm text-muted-foreground first-letter:uppercase">
-        {{ relativeActivityTime() }}
-        in
-        {{ this.repositoryName() }} #{{ this.pullRequest()?.number }}
+      <div class="flex items-center justify-between">
+        <span class="text-sm text-muted-foreground first-letter:uppercase">
+          {{ relativeActivityTime() }}
+          in
+          {{ this.repositoryName() }} #{{ this.pullRequest()?.number }}
+        </span>
+        <div class="flex items-center text-violet-500 dark:text-violet-600">
+          <hlm-icon size='sm' name="lucideAward" />
+          <span>+{{ this.score() }}</span>
+        </div>
       </div>
       <div class="containerSize flex items-center gap-2 font-medium">
         <ng-icon [className]="this.reviewStateProps().color" [svg]="this.reviewStateProps().icon" size="20"></ng-icon>
