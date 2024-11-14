@@ -1,6 +1,6 @@
 import dayjs from 'dayjs';
 import isoWeek from 'dayjs/plugin/isoWeek';
-import { combineLatest, timer, lastValueFrom, map } from 'rxjs';
+import { lastValueFrom } from 'rxjs';
 import { Component, computed, inject } from '@angular/core';
 import { ActivatedRoute } from '@angular/router';
 import { toSignal } from '@angular/core/rxjs-interop';
@@ -59,10 +59,7 @@ export class HomeComponent {
   query = injectQuery(() => ({
     enabled: !!this.metaQuery.data(),
     queryKey: ['leaderboard', { after: this.after(), before: this.before(), team: this.teams() }],
-    queryFn: async () =>
-      lastValueFrom(
-        this.leaderboardService.getLeaderboard(this.after(), this.before(), this.teams() !== 'all' ? this.teams() : undefined)
-      )
+    queryFn: async () => lastValueFrom(this.leaderboardService.getLeaderboard(this.after(), this.before(), this.teams() !== 'all' ? this.teams() : undefined))
   }));
 
   protected _teams = computed(() => this.metaQuery.data()?.teams.map((team) => team.name) ?? []);
