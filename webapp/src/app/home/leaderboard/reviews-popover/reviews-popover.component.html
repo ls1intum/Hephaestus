@@ -29,7 +29,7 @@
       <div class="flex flex-col rounded-md text-muted-foreground text-sm pr-2.5">
         @for (pullRequest of sortedReviewedPRs(); track pullRequest.id) {
           <a hlmBtn [href]="pullRequest.htmlUrl" target="_blank" variant="ghost" class="justify-start" [title]="pullRequest.title">
-            {{ pullRequest.repository?.name ?? '' }}:{{ pullRequest.number }}
+            {{ pullRequest.repository?.name ?? '' }} #{{ pullRequest.number }}
           </a>
         }
       </div>
