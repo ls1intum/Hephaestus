@@ -5,6 +5,7 @@ import de.tum.in.www1.hephaestus.gitprovider.label.LabelRepository;
 import de.tum.in.www1.hephaestus.gitprovider.repository.RepositoryRepository;
 import de.tum.in.www1.hephaestus.gitprovider.team.Team;
 import de.tum.in.www1.hephaestus.gitprovider.team.TeamInfoDTO;
+import de.tum.in.www1.hephaestus.gitprovider.team.TeamRepository;
 import de.tum.in.www1.hephaestus.gitprovider.team.TeamService;
 import de.tum.in.www1.hephaestus.gitprovider.user.User;
 import de.tum.in.www1.hephaestus.gitprovider.user.UserInfoDTO;
@@ -36,6 +37,9 @@ public class AdminService {
     private TeamService teamService;
 
     @Autowired
+    private TeamRepository teamRepository;
+
+    @Autowired
     private RepositoryRepository repositoryRepository;
 
     @Autowired
@@ -47,7 +51,7 @@ public class AdminService {
     private AdminConfig createInitialConfig() {
         AdminConfig newAdminConfig = new AdminConfig();
         newAdminConfig.setRepositoriesToMonitor(Set.of(repositoriesToMonitor));
-        return adminRepository.saveAndFlush(newAdminConfig);
+        return adminRepository.save(newAdminConfig);
     }
 
     @Cacheable("config")
@@ -65,7 +69,7 @@ public class AdminService {
         return adminConfig.getRepositoriesToMonitor();
     }
 
-    public List<UserTeamsDTO> getUsersAsAdmin() {
+    public List<UserTeamsDTO> getUsersWithTeams() {
         logger.info("Getting all users with their teams");
         return userRepository.findAll().stream().map(UserTeamsDTO::fromUser).toList();
     }
@@ -76,31 +80,31 @@ public class AdminService {
         if (optionalUser.isEmpty()) {
             return Optional.empty();
         }
-        Optional<Team> optionalTeam = teamService.getTeam(teamId);
+        Optional<Team> optionalTeam = teamRepository.findById(teamId);
         if (optionalTeam.isEmpty()) {
             return Optional.empty();
         }
         Team team = optionalTeam.get();
         User user = optionalUser.get();
         team.addMember(user);
-        teamService.saveTeam(team);
+        teamRepository.save(team);
         return Optional.of(UserInfoDTO.fromUser(user));
     }
 
-    public Optional<UserInfoDTO> removeTeamFromUser(String login, Long teamId) {
+    public Optional<UserInfoDTO> removeUserFromTeam(String login, Long teamId) {
         logger.info("Removing team (ID: " + teamId + ") from user with login: " + login);
         Optional<User> optionalUser = userRepository.findByLogin(login);
         if (optionalUser.isEmpty()) {
             return Optional.empty();
         }
-        Optional<Team> optionalTeam = teamService.getTeam(teamId);
+        Optional<Team> optionalTeam = teamRepository.findById(teamId);
         if (optionalTeam.isEmpty()) {
             return Optional.empty();
         }
         Team team = optionalTeam.get();
         User user = optionalUser.get();
         team.removeMember(user);
-        teamService.saveTeam(team);
+        teamRepository.save(team);
         return Optional.of(UserInfoDTO.fromUser(user));
     }
 
@@ -111,31 +115,31 @@ public class AdminService {
 
     public Optional<TeamInfoDTO> addRepositoryToTeam(Long teamId, String repositoryName) {
         logger.info("Adding repository with name: " + repositoryName + " to team with ID: " + teamId);
-        Optional<Team> optionalTeam = teamService.getTeam(teamId);
+        Optional<Team> optionalTeam = teamRepository.findById(teamId);
         if (optionalTeam.isEmpty()) {
             return Optional.empty();
         }
         Team team = optionalTeam.get();
         repositoryRepository.findByNameWithOwner(repositoryName).ifPresent(team::addRepository);
-        teamService.saveTeam(team);
+        teamRepository.save(team);
         return Optional.of(TeamInfoDTO.fromTeam(team));
     }
 
     public Optional<TeamInfoDTO> removeRepositoryFromTeam(Long teamId, String repositoryName) {
         logger.info("Removing repository with name: " + repositoryName + " from team with ID: " + teamId);
-        Optional<Team> optionalTeam = teamService.getTeam(teamId);
+        Optional<Team> optionalTeam = teamRepository.findById(teamId);
         if (optionalTeam.isEmpty()) {
             return Optional.empty();
         }
         Team team = optionalTeam.get();
         repositoryRepository.findByNameWithOwner(repositoryName).ifPresent(team::removeRepository);
-        teamService.saveTeam(team);
+        teamRepository.save(team);
         return Optional.of(TeamInfoDTO.fromTeam(team));
     }
 
     public Optional<TeamInfoDTO> addLabelToTeam(Long teamId, String label) {
         logger.info("Adding label '" + label + "' to team with ID: " + teamId);
-        Optional<Team> optionalTeam = teamService.getTeam(teamId);
+        Optional<Team> optionalTeam = teamRepository.findById(teamId);
         if (optionalTeam.isEmpty()) {
             return Optional.empty();
         }
@@ -145,13 +149,13 @@ public class AdminService {
             return Optional.empty();
         }
         team.addLabel(labelEntity.get());
-        teamService.saveTeam(team);
+        teamRepository.save(team);
         return Optional.of(TeamInfoDTO.fromTeam(team));
     }
 
     public Optional<TeamInfoDTO> removeLabelFromTeam(Long teamId, String label) {
         logger.info("Removing label '" + label + "' from team with ID: " + teamId);
-        Optional<Team> optionalTeam = teamService.getTeam(teamId);
+        Optional<Team> optionalTeam = teamRepository.findById(teamId);
         if (optionalTeam.isEmpty()) {
             return Optional.empty();
         }
@@ -161,17 +165,17 @@ public class AdminService {
             return Optional.empty();
         }
         team.removeLabel(labelEntity.get());
-        teamService.saveTeam(team);
+        teamRepository.save(team);
         return Optional.of(TeamInfoDTO.fromTeam(team));
     }
 
     public Optional<TeamInfoDTO> deleteTeam(Long teamId) {
         logger.info("Deleting team with ID: " + teamId);
-        Optional<Team> optionalTeam = teamService.getTeam(teamId);
+        Optional<Team> optionalTeam = teamRepository.findById(teamId);
         if (optionalTeam.isEmpty()) {
             return Optional.empty();
         }
-        teamService.deleteTeam(teamId);
+        teamRepository.delete(optionalTeam.get());
         return Optional.of(TeamInfoDTO.fromTeam(optionalTeam.get()));
     }
 }

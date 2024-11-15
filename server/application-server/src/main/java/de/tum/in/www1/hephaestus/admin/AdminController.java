@@ -58,8 +58,8 @@ public class AdminController {
     }
 
     @GetMapping("/users")
-    public ResponseEntity<List<UserTeamsDTO>> getUsersAsAdmin() {
-        return ResponseEntity.ok(adminService.getUsersAsAdmin());
+    public ResponseEntity<List<UserTeamsDTO>> getUsersWithTeams() {
+        return ResponseEntity.ok(adminService.getUsersWithTeams());
     }
 
     @PutMapping("/user/{login}/team/{teamId}")
@@ -70,8 +70,8 @@ public class AdminController {
     }
 
     @DeleteMapping("/user/{login}/team/{teamId}")
-    public ResponseEntity<UserInfoDTO> removeTeamFromUser(@PathVariable String login, @PathVariable Long teamId) {
-        return adminService.removeTeamFromUser(login, teamId)
+    public ResponseEntity<UserInfoDTO> removeUserFromTeam(@PathVariable String login, @PathVariable Long teamId) {
+        return adminService.removeUserFromTeam(login, teamId)
                 .map(ResponseEntity::ok)
                 .orElseGet(() -> ResponseEntity.notFound().build());
     }

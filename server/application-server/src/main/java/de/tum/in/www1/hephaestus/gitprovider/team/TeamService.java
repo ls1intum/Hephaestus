@@ -5,7 +5,6 @@ import de.tum.in.www1.hephaestus.gitprovider.repository.RepositoryRepository;
 import jakarta.transaction.Transactional;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Optional;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -23,20 +22,10 @@ public class TeamService {
     @Autowired
     private LabelRepository labelRepository;
 
-    public Optional<Team> getTeam(Long id) {
-        logger.info("Getting team with id: " + id);
-        return teamRepository.findById(id);
-    }
-
     @Transactional
     public List<TeamInfoDTO> getAllTeams() {
         List<TeamInfoDTO> teams = teamRepository.findAll().stream().map(TeamInfoDTO::fromTeam).toList();
         return teams;
-    }
-
-    public Team saveTeam(Team team) {
-        logger.info("Saving team: " + team);
-        return teamRepository.saveAndFlush(team);
     }
 
     public Team createTeam(String name, String color) {
@@ -45,12 +34,6 @@ public class TeamService {
         team.setName(name);
         team.setColor(color);
         return teamRepository.saveAndFlush(team);
-    }
-
-    public void deleteTeam(Long id) {
-        logger.info("Deleting team with id: " + id);
-        teamRepository.deleteById(id);
-        teamRepository.flush();
     }
 
     @Transactional
