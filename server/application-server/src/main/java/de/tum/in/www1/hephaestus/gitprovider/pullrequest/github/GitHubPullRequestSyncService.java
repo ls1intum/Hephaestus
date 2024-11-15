@@ -1,7 +1,5 @@
 package de.tum.in.www1.hephaestus.gitprovider.pullrequest.github;
 
-import static org.springframework.util.StringUtils.capitalize;
-
 import java.io.IOException;
 import java.util.HashSet;
 import java.util.List;
@@ -30,7 +28,6 @@ import de.tum.in.www1.hephaestus.gitprovider.milestone.github.GitHubMilestoneCon
 import de.tum.in.www1.hephaestus.gitprovider.pullrequest.PullRequest;
 import de.tum.in.www1.hephaestus.gitprovider.pullrequest.PullRequestRepository;
 import de.tum.in.www1.hephaestus.gitprovider.repository.RepositoryRepository;
-import de.tum.in.www1.hephaestus.gitprovider.team.Team;
 import de.tum.in.www1.hephaestus.gitprovider.team.TeamRepository;
 import de.tum.in.www1.hephaestus.gitprovider.user.User;
 import de.tum.in.www1.hephaestus.gitprovider.user.UserRepository;
@@ -252,26 +249,16 @@ public class GitHubPullRequestSyncService {
      * @param pr
      */
     private void automaticTeamAssignment(PullRequest pr) {
-        // Match team via PR label
-        pr.getLabels().forEach(label -> {
-            // All team labels got this description
-            if ("Pull requests that affect the corresponding module".equals(label.getDescription())) {
-                Optional<Team> team = teamRepository.findByName(capitalize(label.getName()));
-                if (team.isPresent()) {
-                    Team teamEntity = team.get();
-                    teamEntity.addMember(pr.getAuthor());
-                    teamRepository.save(teamEntity);
-                }
-            }
+        // Match PR author to team via PR label
+        teamRepository.findAllByPullRequestLabels(pr.getLabels()).stream().forEach(team -> {
+            team.addMember(pr.getAuthor());
+            teamRepository.save(team);
         });
 
         // Match team via repository name
-        String repoName = capitalize(pr.getRepository().getName().replaceAll("[0-9]", ""));
-        Optional<Team> repoTeam = teamRepository.findByName(repoName);
-        if (repoTeam.isPresent()) {
-            Team teamEntity = repoTeam.get();
-            teamEntity.addMember(pr.getAuthor());
-            teamRepository.save(teamEntity);
-        }
+        teamRepository.findAllByRepositoryName(pr.getRepository().getNameWithOwner()).stream().forEach(team -> {
+            team.addMember(pr.getAuthor());
+            teamRepository.save(team);
+        });
     }
 }
