@@ -344,6 +344,7 @@ components:
       - numberOfReviewedPRs
       - numberOfUnknowns
       - rank
+      - reviewedPullRequests
       - score
       - user
       type: object
@@ -356,6 +357,10 @@ components:
           format: int32
         user:
           $ref: "#/components/schemas/UserInfo"
+        reviewedPullRequests:
+          type: array
+          items:
+            $ref: "#/components/schemas/PullRequestInfo"
         numberOfReviewedPRs:
           type: integer
           format: int32
