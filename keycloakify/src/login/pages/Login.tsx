@@ -21,7 +21,7 @@ export default function Login(props: PageProps<Extract<KcContext, { pageId: "log
 
     const [isLoginButtonDisabled, setIsLoginButtonDisabled] = useState(false);
 
-    const [isPasswordLoginShown, setIsPasswordLoginShown] = useState(false);
+    const [isPasswordLoginShown, setIsPasswordLoginShown] = useState((social?.providers?.length ?? 0) === 0);
 
     // Secret keyboard shortcut to show the password login form
     useEffect(() => {
