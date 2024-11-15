@@ -16,7 +16,6 @@ import { BrnPopoverComponent, BrnPopoverContentDirective, BrnPopoverTriggerDirec
 import { HlmScrollAreaComponent } from '@spartan-ng/ui-scrollarea-helm';
 import { HlmIconComponent, provideIcons } from '@spartan-ng/ui-icon-helm';
 
-
 import { RouterLink } from '@angular/router';
 import { SecurityStore } from '@app/core/security/security-store.service';
 import { cn } from '@app/utils';
@@ -71,7 +70,7 @@ export class LeaderboardComponent {
   calcScrollHeight = (arr: PullRequestInfo[]) => {
     return `min(200px, calc(${15 + 42 * arr.length}px))`;
   };
-  displayPullRequestTitle = (title: string) => (title).replace(/`([^`]+)`/g, '<code class="textCode">$1</code>');
+  displayPullRequestTitle = (title: string) => title.replace(/`([^`]+)`/g, '<code class="textCode">$1</code>');
 
   copyPullRequests = (entry: LeaderboardEntry) => {
     const htmlList = `<ul>

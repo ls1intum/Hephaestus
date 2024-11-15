@@ -71,13 +71,20 @@
                         @if (showCopySuccess()) {
                           <hlm-icon name="lucideCheck" class="text-green-600 h-5 w-5" />
                         } @else {
-                          <hlm-icon name="lucideClipboardCopy" class="h-5 w-5"  />
+                          <hlm-icon name="lucideClipboardCopy" class="h-5 w-5" />
                         }
                       </button>
                     </div>
                     <hlm-scroll-area class="rounded-md" [autoHeightDisabled]="false" [style]="'height: ' + calcScrollHeight(entry.reviewedPullRequests)">
                       @for (pr of entry.reviewedPullRequests; track pr.id) {
-                        <a [href]="pr.htmlUrl" target="_blank" class="flex items-center gap-2 p-2 text-sm text-muted-foreground containerSize my-1 mr-2" variant="outline" hlmBtn [title]="pr.title">
+                        <a
+                          [href]="pr.htmlUrl"
+                          target="_blank"
+                          class="flex items-center gap-2 p-2 text-sm text-muted-foreground containerSize my-1 mr-2"
+                          variant="outline"
+                          hlmBtn
+                          [title]="pr.title"
+                        >
                           <span [innerHTML]="displayPullRequestTitle(pr.title)" class="truncate w-[95%]"></span>
                         </a>
                       }
