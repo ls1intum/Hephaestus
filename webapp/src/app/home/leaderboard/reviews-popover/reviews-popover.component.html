@@ -1,0 +1,38 @@
+<brn-popover sideOffset="5" closeDelay="100">
+  <button
+    variant="ghost"
+    size="sm"
+    class="flex items-center gap-1 text-github-muted-foreground"
+    brnPopoverTrigger
+    hlmBtn
+    (click)="$event.stopPropagation()"
+    [disabled]="!reviewedPRs().length"
+  >
+    <ng-icon [svg]="octGitPullRequest" size="16" />
+    {{ reviewedPRs().length }}
+  </button>
+  <div hlmPopoverContent class="space-y-2 w-60" *brnPopoverContent="let ctx">
+    <div class="flex flex-wrap justify-between items-center gap-4">
+      <div class="flex items-center gap-2">
+        <ng-icon [svg]="octGitPullRequest" size="20" />
+        <h4 class="font-medium leading-none">Reviewed PRs</h4>
+      </div>
+      <button hlmBtn variant="outline" size="icon" (click)="copyPullRequests()">
+        @if (showCopySuccess()) {
+          <lucide-angular [img]="Check" class="text-green-600 size-5" />
+        } @else {
+          <lucide-angular [img]="ClipboardCopy" class="size-5" />
+        }
+      </button>
+    </div>
+    <hlm-scroll-area [autoHeightDisabled]="false" class="-mr-2.5" [style]="'height: min(200px, calc(' + 42 * reviewedPRs().length + 'px'">
+      <div class="flex flex-col rounded-md text-muted-foreground text-sm pr-2.5">
+        @for (pullRequest of sortedReviewedPRs(); track pullRequest.id) {
+          <a hlmBtn [href]="pullRequest.htmlUrl" target="_blank" variant="ghost" class="justify-start" [title]="pullRequest.title">
+            {{ pullRequest.repository?.name ?? '' }}:{{ pullRequest.number }}
+          </a>
+        }
+      </div>
+    </hlm-scroll-area>
+  </div>
+</brn-popover>
