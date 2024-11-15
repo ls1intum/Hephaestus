@@ -27,6 +27,7 @@ export default function KcPage(props: { kcContext: KcContext }) {
                             <Login
                                 {...{ kcContext, i18n, classes: {
                                     ...classes,
+                                    "kcFormCardClass": "",
                                     "kcInfoAreaWrapperClass": "p-0"
                                 } }}
                                 Template={Template}
