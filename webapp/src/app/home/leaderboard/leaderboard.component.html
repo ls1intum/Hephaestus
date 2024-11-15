@@ -56,41 +56,7 @@
           <td appTableCell class="py-2">
             <div class="flex items-center gap-2">
               @if (entry.numberOfReviewedPRs) {
-                <brn-popover sideOffset="5" closeDelay="100">
-                  <button variant="outline" size="sm" class="flex items-center gap-1 text-github-muted-foreground" brnPopoverTrigger hlmBtn (click)="$event.stopPropagation()">
-                    <ng-icon [svg]="octGitPullRequest" size="16" />
-                    {{ entry.numberOfReviewedPRs }}
-                  </button>
-                  <div hlmPopoverContent class="w-80 space-y-4" *brnPopoverContent="let ctx">
-                    <div class="flex flex-wrap justify-between items-center gap-4">
-                      <div class="flex items-center gap-2">
-                        <ng-icon [svg]="octGitPullRequest" size="20" />
-                        <h4 class="font-medium leading-none">Reviewed PRs</h4>
-                      </div>
-                      <button variant="outline" size="icon" (click)="copyPullRequests(entry)" hlmBtn>
-                        @if (showCopySuccess()) {
-                          <hlm-icon name="lucideCheck" class="text-green-600 h-5 w-5" />
-                        } @else {
-                          <hlm-icon name="lucideClipboardCopy" class="h-5 w-5" />
-                        }
-                      </button>
-                    </div>
-                    <hlm-scroll-area class="rounded-md" [autoHeightDisabled]="false" [style]="'height: ' + calcScrollHeight(entry.reviewedPullRequests)">
-                      @for (pr of entry.reviewedPullRequests; track pr.id) {
-                        <a
-                          [href]="pr.htmlUrl"
-                          target="_blank"
-                          class="flex items-center gap-2 p-2 text-sm text-muted-foreground containerSize my-1 mr-2"
-                          variant="outline"
-                          hlmBtn
-                          [title]="pr.title"
-                        >
-                          <span [innerHTML]="displayPullRequestTitle(pr.title)" class="truncate w-[95%]"></span>
-                        </a>
-                      }
-                    </hlm-scroll-area>
-                  </div>
-                </brn-popover>
+                <app-reviews-popover [reviewedPRs]="entry.reviewedPullRequests" />
                 <div class="flex items-center text-github-muted-foreground">
                   <ng-icon [svg]="octChevronLeft" size="16" />
                 </div>
