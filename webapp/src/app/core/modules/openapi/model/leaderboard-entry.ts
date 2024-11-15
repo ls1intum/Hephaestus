@@ -13,7 +13,7 @@ import { PullRequestInfo } from './pull-request-info';
 import { UserInfo } from './user-info';
 
 
-export interface LeaderboardEntry {
+export interface LeaderboardEntry { 
     rank: number;
     score: number;
     user: UserInfo;
