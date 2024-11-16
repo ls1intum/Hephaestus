@@ -32,7 +32,11 @@
         if (metaThemeColor) {
             metaThemeColor.setAttribute(
                 "content",
-                "hsl(" + getComputedStyle(document.documentElement).getPropertyValue("--background") + ")"
+                "hsl(" +
+                    getComputedStyle(document.documentElement).getPropertyValue(
+                        "--background"
+                    ) +
+                    ")"
             );
         }
     </script>

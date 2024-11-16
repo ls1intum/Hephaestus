@@ -8,7 +8,7 @@ import type { KcContext } from "../KcContext";
 import type { I18n } from "../i18n";
 import { Button } from "@/components/ui/button";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faGithub, faGitlab, IconDefinition } from '@fortawesome/free-brands-svg-icons';
+import { faGithub, faGitlab, IconDefinition } from "@fortawesome/free-brands-svg-icons";
 
 export default function Login(props: PageProps<Extract<KcContext, { pageId: "login.ftl" }>, I18n>) {
     const { kcContext, i18n, doUseDefaultCss, Template, classes } = props;
@@ -77,7 +77,7 @@ export default function Login(props: PageProps<Extract<KcContext, { pageId: "log
                                 </>
                             )}
                             <ul className="flex flex-col gap-2">
-                                {social.providers.map((...[p,,]) => {
+                                {social.providers.map((...[p, ,]) => {
                                     let icon: IconDefinition | undefined;
                                     if (p.loginUrl.includes("github")) {
                                         icon = faGithub;
@@ -88,14 +88,13 @@ export default function Login(props: PageProps<Extract<KcContext, { pageId: "log
                                     return (
                                         <li key={p.alias}>
                                             <Button asChild variant="outline" className="w-full">
-                                                <a
-                                                    id={`social-${p.alias}`}
-                                                    type="button"
-                                                    href={p.loginUrl}
-                                                >
+                                                <a id={`social-${p.alias}`} type="button" href={p.loginUrl}>
                                                     {icon && <FontAwesomeIcon icon={icon} />}
                                                     <span
-                                                        className={clsx(kcClsx("kcFormSocialAccountNameClass"), p.iconClasses && "kc-social-icon-text")}
+                                                        className={clsx(
+                                                            kcClsx("kcFormSocialAccountNameClass"),
+                                                            p.iconClasses && "kc-social-icon-text"
+                                                        )}
                                                         dangerouslySetInnerHTML={{ __html: kcSanitize(p.displayName) }}
                                                     ></span>
                                                 </a>

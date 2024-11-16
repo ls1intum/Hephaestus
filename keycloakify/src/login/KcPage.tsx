@@ -16,9 +16,11 @@ const Login = lazy(() => import("./pages/Login"));
 const doMakeUserConfirmPassword = true;
 
 export default function KcPage(props: { kcContext: KcContext }) {
-    return <ThemeProvider>
-        <KcPageContextualized {...props} />
-    </ThemeProvider>
+    return (
+        <ThemeProvider>
+            <KcPageContextualized {...props} />
+        </ThemeProvider>
+    );
 }
 
 function KcPageContextualized(props: { kcContext: KcContext }) {
@@ -57,6 +59,6 @@ function KcPageContextualized(props: { kcContext: KcContext }) {
 }
 
 const classes = {
-    "kcHtmlClass": "",
-    "kcBodyClass": "",
+    kcHtmlClass: "",
+    kcBodyClass: ""
 } satisfies { [key in ClassKey]?: string };

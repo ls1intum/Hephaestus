@@ -35,7 +35,12 @@ const ThemeSwitcher: React.FC = () => {
     };
 
     return (
-        <Button variant="outline" size="icon" onClick={toggleTheme} aria-label="Toggle Theme">
+        <Button
+            variant="outline"
+            size="icon"
+            onClick={toggleTheme}
+            aria-label="Toggle Theme"
+        >
             {getIcon()}
         </Button>
     );
