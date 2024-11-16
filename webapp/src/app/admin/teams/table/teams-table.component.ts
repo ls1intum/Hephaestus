@@ -84,7 +84,7 @@ export class AdminTeamsTableComponent {
   teamData = input.required<TeamInfo[] | undefined>();
   allRepositories = input.required<Set<string> | undefined>();
 
-  _teams = computed(() => this.teamData() ?? LOADING_TEAMS);
+  _teams = computed(() => this.isLoading() ? LOADING_TEAMS : this.teamData() ?? []);
   protected readonly _rawFilterInput = signal('');
   protected readonly _nameFilter = signal('');
   private readonly _debouncedFilter = toSignal(toObservable(this._rawFilterInput).pipe(debounceTime(300)));

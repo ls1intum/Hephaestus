@@ -8,7 +8,7 @@
             <h2 class="text-xl text-muted-foreground">Hi {{ userValue.name }} 👋</h2>
           }
         </div>
-        <app-leaderboard-filter [teams]="_teams()" />
+        <app-leaderboard-filter [teams]="teams()" />
       </div>
       <div class="col-span-2">
         @if (query.error()) {
