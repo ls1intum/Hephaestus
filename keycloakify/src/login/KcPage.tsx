@@ -1,10 +1,12 @@
-import "./main.css";
+import "./index.css";
+
 import { Suspense, lazy } from "react";
 import type { ClassKey } from "keycloakify/login";
 import type { KcContext } from "./KcContext";
 import { useI18n } from "./i18n";
 import DefaultPage from "keycloakify/login/DefaultPage";
 import Template from "./Template";
+import { ThemeProvider } from "@/components/theme-context";
 
 const UserProfileFormFields = lazy(
     () => import("keycloakify/login/UserProfileFormFields")
@@ -14,6 +16,12 @@ const Login = lazy(() => import("./pages/Login"));
 const doMakeUserConfirmPassword = true;
 
 export default function KcPage(props: { kcContext: KcContext }) {
+    return <ThemeProvider>
+        <KcPageContextualized {...props} />
+    </ThemeProvider>
+}
+
+function KcPageContextualized(props: { kcContext: KcContext }) {
     const { kcContext } = props;
 
     const { i18n } = useI18n({ kcContext });
@@ -25,13 +33,9 @@ export default function KcPage(props: { kcContext: KcContext }) {
                     case "login.ftl":
                         return (
                             <Login
-                                {...{ kcContext, i18n, classes: {
-                                    ...classes,
-                                    "kcFormCardClass": "",
-                                    "kcInfoAreaWrapperClass": "p-0"
-                                } }}
+                                {...{ kcContext, i18n, classes }}
                                 Template={Template}
-                                doUseDefaultCss={true}
+                                doUseDefaultCss={false}
                             />
                         );
                     default:

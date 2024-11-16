@@ -6,6 +6,9 @@ import type { PageProps } from "keycloakify/login/pages/PageProps";
 import { getKcClsx, type KcClsx } from "keycloakify/login/lib/kcClsx";
 import type { KcContext } from "../KcContext";
 import type { I18n } from "../i18n";
+import { Button } from "@/components/ui/button";
+import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
+import { faGithub, faGitlab, IconDefinition } from '@fortawesome/free-brands-svg-icons';
 
 export default function Login(props: PageProps<Extract<KcContext, { pageId: "login.ftl" }>, I18n>) {
     const { kcContext, i18n, doUseDefaultCss, Template, classes } = props;
@@ -73,30 +76,30 @@ export default function Login(props: PageProps<Extract<KcContext, { pageId: "log
                                     <h2>{msg("identity-provider-login-label")}</h2>
                                 </>
                             )}
-                            <ul className={kcClsx("kcFormSocialAccountListClass", social.providers.length > 3 && "kcFormSocialAccountListGridClass")}>
-                                {social.providers.map((...[p, , providers]) => {
-                                    if (!p.iconClasses && p.loginUrl.includes("gitlab")) {
-                                        p.iconClasses = "fa fa-gitlab";
+                            <ul className="flex flex-col gap-2">
+                                {social.providers.map((...[p,,]) => {
+                                    let icon: IconDefinition | undefined;
+                                    if (p.loginUrl.includes("github")) {
+                                        icon = faGithub;
+                                    } else if (p.loginUrl.includes("gitlab")) {
+                                        icon = faGitlab;
                                     }
+
                                     return (
                                         <li key={p.alias}>
-                                            <a
-                                                id={`social-${p.alias}`}
-                                                className={kcClsx(
-                                                    "kcFormSocialAccountListButtonClass",
-                                                    providers.length > 3 && "kcFormSocialAccountGridItem"
-                                                )}
-                                                type="button"
-                                                href={p.loginUrl}
-                                            >
-                                                {p.iconClasses && (
-                                                    <i className={clsx(kcClsx("kcCommonLogoIdP"), p.iconClasses)} aria-hidden="true"></i>
-                                                )}
-                                                <span
-                                                    className={clsx(kcClsx("kcFormSocialAccountNameClass"), p.iconClasses && "kc-social-icon-text")}
-                                                    dangerouslySetInnerHTML={{ __html: kcSanitize(p.displayName) }}
-                                                ></span>
-                                            </a>
+                                            <Button asChild variant="outline" className="w-full">
+                                                <a
+                                                    id={`social-${p.alias}`}
+                                                    type="button"
+                                                    href={p.loginUrl}
+                                                >
+                                                    {icon && <FontAwesomeIcon icon={icon} />}
+                                                    <span
+                                                        className={clsx(kcClsx("kcFormSocialAccountNameClass"), p.iconClasses && "kc-social-icon-text")}
+                                                        dangerouslySetInnerHTML={{ __html: kcSanitize(p.displayName) }}
+                                                    ></span>
+                                                </a>
+                                            </Button>
                                         </li>
                                     );
                                 })}

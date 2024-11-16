@@ -7,7 +7,8 @@ import { useSetClassName } from "keycloakify/tools/useSetClassName";
 import { useInitialize } from "keycloakify/login/Template.useInitialize";
 import type { I18n } from "./i18n";
 import type { KcContext } from "./KcContext";
-import Logo from "./Logo";
+import ThemeSwitcher from "@/components/theme-switcher";
+import { Hammer } from "lucide-react";
 
 export default function Template(props: TemplateProps<KcContext, I18n>) {
     const {
@@ -28,7 +29,7 @@ export default function Template(props: TemplateProps<KcContext, I18n>) {
 
     const { kcClsx } = getKcClsx({ doUseDefaultCss, classes });
 
-    const { msg, msgStr, currentLanguage, enabledLanguages } = i18n;
+    const { msg, msgStr } = i18n;
 
     const { auth, url, message, isAppInitiatedAction } = kcContext;
 
@@ -53,50 +54,19 @@ export default function Template(props: TemplateProps<KcContext, I18n>) {
     }
 
     return (
-        <div className={kcClsx("kcLoginClass")}>
-            <div>
-                <div id="kc-header" className={kcClsx("kcHeaderClass")}>
-                    <div id="kc-header-wrapper" className={kcClsx("kcHeaderWrapperClass")}>
-                        <Logo />
-                        Hephaestus
+        <div className="flex flex-col gap-4 min-h-dvh">
+            <header className="container flex items-center justify-end pt-4 gap-2">
+                <ThemeSwitcher />
+            </header>
+            <div className="container flex flex-col items-center justify-center gap-6 flex-1">
+                <div id="kc-header">
+                    <div id="kc-header-wrapper" className="flex flex-col items-center gap-4">
+                        <Hammer className="size-12" />
+                        <span className="text-3xl font-medium">Hephaestus</span>
                     </div>
                 </div>
-                <div className={kcClsx("kcFormCardClass")}>
-                    <header className={kcClsx("kcFormHeaderClass")}>
-                        {false && enabledLanguages.length > 1 && (
-                            <div className={kcClsx("kcLocaleMainClass")} id="kc-locale">
-                                <div id="kc-locale-wrapper" className={kcClsx("kcLocaleWrapperClass")}>
-                                    <div id="kc-locale-dropdown" className={clsx("menu-button-links", kcClsx("kcLocaleDropDownClass"))}>
-                                        <button
-                                            tabIndex={1}
-                                            id="kc-current-locale-link"
-                                            aria-label={msgStr("languages")}
-                                            aria-haspopup="true"
-                                            aria-expanded="false"
-                                            aria-controls="language-switch1"
-                                        >
-                                            {currentLanguage.label}
-                                        </button>
-                                        <ul
-                                            role="menu"
-                                            tabIndex={-1}
-                                            aria-labelledby="kc-current-locale-link"
-                                            aria-activedescendant=""
-                                            id="language-switch1"
-                                            className={kcClsx("kcLocaleListClass")}
-                                        >
-                                            {enabledLanguages.map(({ languageTag, label, href }, i) => (
-                                                <li key={languageTag} className={kcClsx("kcLocaleListItemClass")} role="none">
-                                                    <a role="menuitem" id={`language-${i + 1}`} className={kcClsx("kcLocaleItemClass")} href={href}>
-                                                        {label}
-                                                    </a>
-                                                </li>
-                                            ))}
-                                        </ul>
-                                    </div>
-                                </div>
-                            </div>
-                        )}
+                <div className="flex flex-col gap-4 mb-48">
+                    <header className="text-xl">
                         {(() => {
                             const node = !(auth !== undefined && auth.showUsername && !auth.showResetCredentials) ? (
                                 <h1 id="kc-page-title">{headerNode}</h1>

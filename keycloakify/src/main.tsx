@@ -10,8 +10,27 @@ import { getKcContextMock } from "./login/KcPageStory";
 
 if (import.meta.env.DEV) {
     window.kcContext = getKcContextMock({
-        pageId: "register.ftl",
-        overrides: {}
+        pageId: "login.ftl",
+        overrides: {
+            social: {
+                providers: [
+                    {
+                        loginUrl: "http://localhost:8080/auth/realms/hephaestus/broker/github/endpoint",
+                        alias: "github",
+                        providerId: "github",
+                        displayName: "GitHub",
+                        iconClasses: "fa fa-github",
+                    },
+                    {
+                        loginUrl: "http://localhost:8080/auth/realms/hephaestus/broker/gitlab-lrz/endpoint",
+                        alias: "gitlab",
+                        providerId: "gitlab-lrz",
+                        displayName: "GitLab LRZ",
+                        iconClasses: "", // None since it is OpenID Connect
+                    }
+                ],
+            },
+        }
     });
 }
 */
