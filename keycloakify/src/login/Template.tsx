@@ -67,10 +67,10 @@ export default function Template(props: TemplateProps<KcContext, I18n>) {
                     </div>
                 </div>
                 <div className="flex flex-col gap-4 mb-48 w-72">
-                    <header className="text-xl text-center">
+                    <header>
                         {(() => {
                             const node = !(auth !== undefined && auth.showUsername && !auth.showResetCredentials) ? (
-                                <h1 id="kc-page-title">{headerNode}</h1>
+                                <h1 id="kc-page-title" className="text-xl text-center">{headerNode}</h1>
                             ) : (
                                 <div id="kc-username" className={kcClsx("kcFormGroupClass")}>
                                     <label id="kc-attempted-username">{auth.attemptedUsername}</label>
