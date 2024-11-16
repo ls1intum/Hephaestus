@@ -12,13 +12,14 @@ import { LeaderboardFilterComponent } from './leaderboard/filter/filter.componen
 import { SecurityStore } from '@app/core/security/security-store.service';
 import { HlmAlertModule } from '@spartan-ng/ui-alert-helm';
 import { MetaService } from '@app/core/modules/openapi';
+import { LeaderboardLegendComponent } from "./leaderboard/legend/legends.component";
 
 dayjs.extend(isoWeek);
 
 @Component({
   selector: 'app-home',
   standalone: true,
-  imports: [LeaderboardComponent, LeaderboardFilterComponent, HlmAlertModule, LucideAngularModule],
+  imports: [LeaderboardComponent, LeaderboardFilterComponent, HlmAlertModule, LucideAngularModule, LeaderboardLegendComponent],
   templateUrl: './home.component.html'
 })
 export class HomeComponent {

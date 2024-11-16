@@ -1,0 +1,49 @@
+<div hlmCard>
+  <div class="flex items-center group hover:cursor-pointer" (click)="toggleOpen()">
+    <div hlmCardHeader class="flex-1">
+      <h3 hlmCardTitle class="group-hover:underline">Leaderboard Legend</h3>
+      <p hlmCardDescription class="group-hover:underline">Explanation of the most important elements</p>
+    </div>
+    <div class="flex items-center gap-2 px-6">
+      @if (open()) {
+        <hlm-icon name="lucideChevronsUp" />
+      } @else {
+        <hlm-icon name="lucideChevronsDown" />
+      }
+    </div>
+  </div>
+  <div hlmCardContent [class]="contentClass()">
+      <div class="flex flex-col gap-2 sm:min-w-[250px]">
+        <h4 class="font-medium mb-2">Icons</h4>
+        <div class="flex items-center gap-2 text-github-muted-foreground">
+          <ng-icon [svg]="octGitPullRequest" size="16" />
+          Reviewed Pullrequests
+        </div>
+        <div class="flex items-center gap-2 text-github-danger-foreground">
+          <ng-icon [svg]="octFileDiff" size="16" />
+          Changes Requested
+        </div>
+        <div class="flex items-center gap-2 text-github-success-foreground">
+          <ng-icon [svg]="octCheck" size="16" />
+          Approvals
+        </div>
+        <div class="flex items-center gap-2 text-github-muted-foreground">
+          <ng-icon [svg]="octComment" size="16" />
+          Comments
+        </div>
+        <div class="flex items-center gap-2 text-github-muted-foreground">
+          <ng-icon [svg]="octCommentDiscussion" size="16" />
+          Code comments
+        </div>
+      </div>
+      <div class="max-w-[500px]">
+        <h4 class="font-medium mb-2">Scoring System</h4>
+        <p class="text-sm text-github-muted-foreground">
+          The score represents an <span class="font-semibold">approximation of the account's contribution activity</span>.
+          Different types of review interactions are weighted according to pre-defined metrics, with constructive feedback like change requests valued highest.
+          Additional points are awarded for reviewing more complex pull requests based on their size and scope.
+          As a result, the score is <span class="font-semibold">not</span> a direct representation of the reviewer's time investment or quality of work.
+        </p>
+      </div>
+  </div>
+</div>
