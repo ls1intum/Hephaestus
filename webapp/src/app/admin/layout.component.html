@@ -3,32 +3,23 @@
     <div class="flex flex-col gap-4 rounded-md border border-input p-2">
       <span class="text-lg font-bold indent-2">Admin Area</span>
       <ul class="flex flex-col gap-2 w-40">
-        <li>
-          <a
-            hlmBtn
-            size="sm"
-            variant="navButton"
-            routerLink="."
-            routerLinkActive="text-accent-foreground bg-accent"
-            [routerLinkActiveOptions]="{ exact: true }"
-            ariaCurrentWhenActive="page"
-          >
-            <hlm-icon size="normal" name="lucideFileCog" />
-            Environment
-          </a>
-        </li>
-        <li>
-          <a hlmBtn size="sm" variant="navButton" routerLink="users" routerLinkActive="text-accent-foreground bg-accent" ariaCurrentWhenActive="page">
-            <hlm-icon size="normal" name="lucideUserCircle" />
-            Users
-          </a>
-        </li>
-        <li>
-          <a hlmBtn size="sm" variant="navButton" routerLink="teams" routerLinkActive="text-accent-foreground bg-accent" ariaCurrentWhenActive="page">
-            <hlm-icon size="normal" name="lucideUsers2" />
-            Teams
-          </a>
-        </li>
+        @for (navItem of navItems; track navItem.label) {
+          <li>
+            <a
+              hlmBtn
+              size="sm"
+              variant="ghost"
+              class="justify-start gap-2 w-full"
+              [routerLink]="navItem.route"
+              routerLinkActive="text-accent-foreground bg-accent"
+              [routerLinkActiveOptions]="{ exact: navItem.exact ?? false, }"
+              ariaCurrentWhenActive="page"
+            >
+              <hlm-icon size="normal" [name]="navItem.icon" />
+              {{ navItem.label }}
+            </a>
+          </li>
+        }
       </ul>
     </div>
     <div class="block w-full">
