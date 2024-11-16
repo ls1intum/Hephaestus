@@ -22,7 +22,6 @@ public class TeamService {
     @Autowired
     private LabelRepository labelRepository;
 
-    @Transactional
     public List<TeamInfoDTO> getAllTeams() {
         List<TeamInfoDTO> teams = teamRepository.findAll().stream().map(TeamInfoDTO::fromTeam).toList();
         return teams;
