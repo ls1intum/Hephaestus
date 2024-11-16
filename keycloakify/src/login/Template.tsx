@@ -8,7 +8,8 @@ import { useInitialize } from "keycloakify/login/Template.useInitialize";
 import type { I18n } from "./i18n";
 import type { KcContext } from "./KcContext";
 import ThemeSwitcher from "@/components/theme-switcher";
-import { Hammer } from "lucide-react";
+import { CircleAlert, CircleCheck, CircleX, Hammer, Info } from "lucide-react";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 
 export default function Template(props: TemplateProps<KcContext, I18n>) {
     const {
@@ -65,8 +66,8 @@ export default function Template(props: TemplateProps<KcContext, I18n>) {
                         <span className="text-3xl font-medium">Hephaestus</span>
                     </div>
                 </div>
-                <div className="flex flex-col gap-4 mb-48">
-                    <header className="text-xl">
+                <div className="flex flex-col gap-4 mb-48 w-72">
+                    <header className="text-xl text-center">
                         {(() => {
                             const node = !(auth !== undefined && auth.showUsername && !auth.showResetCredentials) ? (
                                 <h1 id="kc-page-title">{headerNode}</h1>
@@ -103,26 +104,20 @@ export default function Template(props: TemplateProps<KcContext, I18n>) {
                         <div id="kc-content-wrapper">
                             {/* App-initiated actions should not see warning messages about the need to complete the action during login. */}
                             {displayMessage && message !== undefined && (message.type !== "warning" || !isAppInitiatedAction) && (
-                                <div
-                                    className={clsx(
-                                        `alert-${message.type}`,
-                                        kcClsx("kcAlertClass"),
-                                        `pf-m-${message?.type === "error" ? "danger" : message.type}`
-                                    )}
-                                >
-                                    <div className="pf-c-alert__icon">
-                                        {message.type === "success" && <span className={kcClsx("kcFeedbackSuccessIcon")}></span>}
-                                        {message.type === "warning" && <span className={kcClsx("kcFeedbackWarningIcon")}></span>}
-                                        {message.type === "error" && <span className={kcClsx("kcFeedbackErrorIcon")}></span>}
-                                        {message.type === "info" && <span className={kcClsx("kcFeedbackInfoIcon")}></span>}
-                                    </div>
-                                    <span
-                                        className={kcClsx("kcAlertTitleClass")}
-                                        dangerouslySetInnerHTML={{
-                                            __html: kcSanitize(message.summary)
-                                        }}
-                                    />
-                                </div>
+                                <Alert variant={message.type} className="mb-2">
+                                    {message.type === "error" && <CircleX className="h-4 w-4 flex-shrink-0" />}
+                                    {message.type === "warning" && <CircleAlert className="h-4 w-4 flex-shrink-0" />}
+                                    {message.type === "info" && <Info className="h-4 w-4 flex-shrink-0" />}
+                                    {message.type === "success" && <CircleCheck className="h-4 w-4 flex-shrink-0" />}
+                                    <AlertDescription>
+                                        <span
+                                            className={kcClsx("kcAlertTitleClass")}
+                                            dangerouslySetInnerHTML={{
+                                                __html: kcSanitize(message.summary)
+                                            }}
+                                        />
+                                    </AlertDescription>
+                                </Alert>
                             )}
                             {children}
                             {auth !== undefined && auth.showTryAnotherWayLink && (
