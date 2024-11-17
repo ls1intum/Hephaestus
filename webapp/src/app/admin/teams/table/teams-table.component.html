@@ -99,7 +99,7 @@
           </button>
           <div hlmPopoverContent class="w-80 p-4 gap-4 flex flex-wrap items-center justify-center" *brnPopoverContent="let ctx">
             <input hlmInput placeholder="Label name" [formControl]="_newLabelName" [class]="displayLabelAlert() ? 'border-destructive' : ''" />
-            <button hlmBtn size="icon" variant="default" class="ml-2" (click)="addLabel(element)">
+            <button hlmBtn size="icon" variant="default" class="ml-2" (click)="addLabelToTeam.mutate(element)">
               <hlm-icon class="w-4 h-4" name="lucidePlus" />
             </button>
             @if (displayLabelAlert()) {
@@ -124,7 +124,7 @@
           </hlm-menu-group>
           <hlm-menu-separator />
           <hlm-menu-group>
-            <button hlmMenuItem class="text-github-danger-foreground" (click)="deleteTeam(element)">Delete Team</button>
+            <button hlmMenuItem class="text-github-danger-foreground" (click)="deleteTeam.mutate(element)">Delete Team</button>
           </hlm-menu-group>
         </hlm-menu>
       </ng-template>
@@ -169,6 +169,6 @@
   <div hlmCardContent class="flex items-center gap-4">
     <input hlmInput placeholder="Team name" [formControl]="_newTeamName" />
     <input hlmInput placeholder="Team color" type="color" [formControl]="_newTeamColor" />
-    <button hlmBtn class="ml-4" (click)="createTeam()">Create</button>
+    <button hlmBtn class="ml-4" (click)="createTeam.mutate()">Create</button>
   </div>
 </div>

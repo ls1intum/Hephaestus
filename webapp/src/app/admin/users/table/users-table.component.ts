@@ -14,11 +14,11 @@ import { HlmTableModule } from '@spartan-ng/ui-table-helm';
 import { BrnSelectModule } from '@spartan-ng/ui-select-brain';
 import { HlmSelectModule } from '@spartan-ng/ui-select-helm';
 import { HlmSkeletonModule } from '@spartan-ng/ui-skeleton-helm';
-import { debounceTime, map } from 'rxjs';
+import { debounceTime, lastValueFrom, map } from 'rxjs';
 import { AdminService, TeamInfo, UserTeams } from '@app/core/modules/openapi';
 import { RouterLink } from '@angular/router';
 import { GithubLabelComponent } from '@app/ui/github-label/github-label.component';
-import { injectQueryClient } from '@tanstack/angular-query-experimental';
+import { injectMutation, injectQueryClient } from '@tanstack/angular-query-experimental';
 import { octNoEntry } from '@ng-icons/octicons';
 
 const LOADING_DATA: UserTeams[] = [
@@ -51,16 +51,6 @@ const LOADING_DATA: UserTeams[] = [
         labels: []
       }
     ])
-  }
-];
-
-const LOADING_TEAMS: TeamInfo[] = [
-  {
-    id: 1,
-    name: 'Team A',
-    color: '#FF0000',
-    repositories: [],
-    labels: []
   }
 ];
 
@@ -102,21 +92,22 @@ export class AdminUsersTableComponent {
   isLoading = input(false);
   userData = input.required<UserTeams[] | undefined>();
 
-  _users = computed(() => this.userData() ?? LOADING_DATA);
+  _users = computed(() => this.isLoading() ? LOADING_DATA : this.userData() ?? []);
+  // Filters
   protected readonly _rawFilterInput = signal('');
   protected readonly _loginFilter = signal('');
   private readonly _debouncedFilter = toSignal(toObservable(this._rawFilterInput).pipe(debounceTime(300)));
-
+  // Pagination
   private readonly _displayedIndices = signal({ start: 0, end: 0 });
   protected readonly _availablePageSizes = [5, 10, 20, 10000];
   protected readonly _pageSize = signal(this._availablePageSizes[0]);
-
+  // Selection
   private readonly _selectionModel = new SelectionModel<UserTeams>(true);
   protected readonly _isUserSelected = (user: UserTeams) => this._selectionModel.isSelected(user);
   protected readonly _selected = toSignal(this._selectionModel.changed.pipe(map((change) => change.source.selected)), {
     initialValue: []
   });
-
+  // Manage columns
   protected readonly _brnColumnManager = useBrnColumnManager({
     name: { visible: true, label: 'Name' },
     login: { visible: true, label: 'Login' },
@@ -124,6 +115,7 @@ export class AdminUsersTableComponent {
   });
   protected readonly _allDisplayedColumns = computed(() => ['select', ...this._brnColumnManager.displayedColumns(), 'actions']);
 
+  // Table state logic properties
   private readonly _filteredLogins = computed(() => {
     const loginFilter = this._loginFilter()?.trim()?.toLowerCase();
     if (loginFilter && loginFilter.length > 0) {
@@ -190,35 +182,32 @@ export class AdminUsersTableComponent {
 
   // handle team add / remove
   teams = input<TeamInfo[] | undefined>();
-  protected readonly _availableTeams = computed(() => this.teams() ?? LOADING_TEAMS);
+  protected readonly _availableTeams = computed(() => this.teams() ?? []);
   protected readonly _selectedTeam = signal<TeamInfo | undefined>(undefined);
 
+  addTeamToUser = injectMutation(() => ({
+    mutationFn: (user: UserTeams) => lastValueFrom(this.adminService.addTeamToUser(user.login, this._selectedTeam()!.id)),
+    queryKey: ['admin', 'user', 'team', 'add'],
+    onSettled: () => this.invalidateUsers()
+  }));
   protected addTeamToSelected() {
     for (const user of this._selected()) {
-      console.log('Adding team to user', user.login, this._selectedTeam());
-      this.adminService.addTeamToUser(user.login, this._selectedTeam()!.id).subscribe({
-        next: () => console.log('Team added to user', user),
-        error: (err) => console.error('Error adding team to user', user, err)
-      });
+      this.addTeamToUser.mutate(user);
     }
-    this.invalidateUsers();
   }
 
+  removeTeamFromUser = injectMutation(() => ({
+    mutationFn: (user: UserTeams) => lastValueFrom(this.adminService.removeTeamFromUser(user.login, this._selectedTeam()!.id)),
+    queryKey: ['admin', 'user', 'team', 'remove'],
+    onSettled: () => this.invalidateUsers()
+  }));
   protected removeTeamFromSelected() {
     for (const user of this._selected()) {
-      console.log('Removing team from user', user.login, this._selectedTeam());
-      this.adminService.removeTeamFromUser(user.login, this._selectedTeam()!.id).subscribe({
-        next: () => console.log('Team removed from user', user),
-        error: (err) => console.error('Error removing team from user', user, err)
-      });
+      this.removeTeamFromUser.mutate(user);
     }
-    this.invalidateUsers();
   }
 
   protected invalidateUsers() {
-    if (this.isLoading()) {
-      return;
-    }
     for (const user of this._selected()) {
       this._selectionModel.deselect(user);
     }

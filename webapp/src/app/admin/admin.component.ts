@@ -2,7 +2,7 @@ import { CommonModule } from '@angular/common';
 import { Component, inject } from '@angular/core';
 import { AdminService } from '@app/core/modules/openapi/api/admin.service';
 import { SecurityStore } from '@app/core/security/security-store.service';
-import { injectQuery } from '@tanstack/angular-query-experimental';
+import { injectMutation, injectQuery, injectQueryClient } from '@tanstack/angular-query-experimental';
 import { lastValueFrom } from 'rxjs';
 import { HlmCardModule } from '@spartan-ng/ui-card-helm';
 import { HlmInputDirective } from '@spartan-ng/ui-input-helm';
@@ -10,26 +10,21 @@ import { HlmSkeletonModule } from '../../libs/ui/ui-skeleton-helm/src/index';
 import { HlmScrollAreaModule } from '@spartan-ng/ui-scrollarea-helm';
 import { FormControl, ReactiveFormsModule } from '@angular/forms';
 import { HlmButtonModule } from '@spartan-ng/ui-button-helm';
-import { RouterModule, RouterOutlet } from '@angular/router';
+import { RouterModule, } from '@angular/router';
 
 @Component({
   selector: 'app-admin',
   standalone: true,
-  imports: [CommonModule, RouterModule, HlmCardModule, HlmInputDirective, HlmSkeletonModule, HlmScrollAreaModule, ReactiveFormsModule, HlmButtonModule, RouterOutlet],
+  imports: [CommonModule, RouterModule, HlmCardModule, HlmInputDirective, HlmSkeletonModule, HlmScrollAreaModule, ReactiveFormsModule, HlmButtonModule],
   templateUrl: './admin.component.html'
 })
 export class AdminComponent {
   adminService = inject(AdminService);
   securityStore = inject(SecurityStore);
+  queryClient = injectQueryClient();
 
   signedIn = this.securityStore.signedIn;
   user = this.securityStore.loadedUser;
-
-  query = injectQuery(() => ({
-    enabled: this.signedIn(),
-    queryKey: ['admin', 'greeting'],
-    queryFn: async () => lastValueFrom(this.adminService.getGretting())
-  }));
 
   configQuery = injectQuery(() => ({
     enabled: this.signedIn(),
@@ -44,17 +39,14 @@ export class AdminComponent {
 
   repositoriesForm = new FormControl(this.configQuery.data() ? this.convertJSON(this.configQuery.data()!) : '[]');
 
+  updateRepositories = injectMutation(() => ({
+    mutationFn: (repos: string) => lastValueFrom(this.adminService.updateRepositories(JSON.parse(repos))),
+    queryKey: ['admin', 'repository', 'update'],
+    onSettled: () => this.queryClient.invalidateQueries({ queryKey: ['admin', 'config'] })
+  }));
+
   convertJSON(value: Set<string>) {
     return JSON.stringify(value, null, 4);
   }
-
-  saveRepositories() {
-    const repositories = JSON.parse(this.repositoriesForm.value ?? '[]') as string[];
-    console.log('Saving repositories', repositories);
-    this.adminService.updateRepositories(repositories).subscribe({
-      next: () => this.configQuery.refetch(),
-      error: () => console.error('Error saving repositories'),
-      complete: () => console.log('Repositories saved')
-    });
-  }
 }
+

@@ -14,9 +14,9 @@ import { BrnSelectModule } from '@spartan-ng/ui-select-brain';
 import { HlmSelectModule } from '@spartan-ng/ui-select-helm';
 import { HlmSkeletonModule } from '@spartan-ng/ui-skeleton-helm';
 import { HlmCardModule } from '@spartan-ng/ui-card-helm';
-import { debounceTime, map } from 'rxjs';
+import { debounceTime, lastValueFrom, map } from 'rxjs';
 import { AdminService, TeamInfo } from '@app/core/modules/openapi';
-import { injectQueryClient } from '@tanstack/angular-query-experimental';
+import { injectMutation, injectQueryClient } from '@tanstack/angular-query-experimental';
 import { octNoEntry } from '@ng-icons/octicons';
 import { HlmPopoverModule } from '@spartan-ng/ui-popover-helm';
 import { BrnPopoverComponent, BrnPopoverContentDirective, BrnPopoverTriggerDirective } from '@spartan-ng/ui-popover-brain';
@@ -84,15 +84,23 @@ export class AdminTeamsTableComponent {
   teamData = input.required<TeamInfo[] | undefined>();
   allRepositories = input.required<Set<string> | undefined>();
 
+  // Controls for mutations
+  _newLabelName = new FormControl('');
+  _newTeamName = new FormControl('');
+  _newTeamColor = new FormControl('');
+
+  displayLabelAlert = signal(false);
+
   _teams = computed(() => this.isLoading() ? LOADING_TEAMS : this.teamData() ?? []);
+  // Filters
   protected readonly _rawFilterInput = signal('');
   protected readonly _nameFilter = signal('');
   private readonly _debouncedFilter = toSignal(toObservable(this._rawFilterInput).pipe(debounceTime(300)));
-
+  // Pagination
   private readonly _displayedIndices = signal({ start: 0, end: 0 });
   protected readonly _availablePageSizes = [5, 10, 20, 10000];
   protected readonly _pageSize = signal(this._availablePageSizes[2]);
-
+  // Selection
   private readonly _selectionModel = new SelectionModel<TeamInfo>(true);
   protected readonly _isUserSelected = (user: TeamInfo) => this._selectionModel.isSelected(user);
   protected readonly _selected = toSignal(this._selectionModel.changed.pipe(map((change) => change.source.selected)), {
@@ -101,6 +109,7 @@ export class AdminTeamsTableComponent {
 
   protected readonly _allDisplayedColumns = ['name', 'color', 'repositories', 'labels', 'actions'];
 
+  // Table state logic properties
   private readonly _filteredNames = computed(() => {
     const nameFilter = this._nameFilter()?.trim()?.toLowerCase();
     if (nameFilter && nameFilter.length > 0) {
@@ -160,61 +169,40 @@ export class AdminTeamsTableComponent {
     }
   }
 
-  protected deleteTeam(team: TeamInfo) {
-    if (this.isLoading()) {
-      return;
-    }
-    this.adminService.deleteTeam(team.id!).subscribe({
-      next: () => this.invalidateTeams(),
-      error: (err) => console.error('Error deleting team', err)
-    });
-  }
+  deleteTeam = injectMutation(() => ({
+    mutationFn: (team: TeamInfo) => lastValueFrom(this.adminService.deleteTeam(team.id)),
+    queryKey: ['admin', 'team', 'delete'],
+    onSettled: () => this.invalidateTeams()
+  }));
 
   protected copyName(element: TeamInfo) {
     console.log('Copying name', element);
     navigator.clipboard.writeText(element.name!);
   }
 
-  _newLabelName = new FormControl('');
-  _newTeamName = new FormControl('');
-  _newTeamColor = new FormControl('');
-  displayLabelAlert = signal(false);
-
-  protected addLabel(team: TeamInfo) {
-    if (this.isLoading() || !this._newLabelName.value) {
-      return;
+  addLabelToTeam = injectMutation(() => ({
+    mutationFn: (team: TeamInfo) => lastValueFrom(this.adminService.addLabelToTeam(team.id, this._newLabelName.value ?? '')),
+    queryKey: ['admin', 'team', 'label', 'add'],
+    onError: () => {
+      this.displayLabelAlert.set(true);
+    },
+    onSettled: () => {
+      this.displayLabelAlert.set(false);
+      this._newLabelName.reset();
+      this.invalidateTeams()
     }
-    this.adminService.addLabelToTeam(team.id, this._newLabelName.value).subscribe({
-      next: () => {
-        this.displayLabelAlert.set(false);
-        this._newLabelName.reset();
-        this.invalidateTeams();
-      },
-      error: (err) => {
-        console.error('Error adding label', err);
-        this.displayLabelAlert.set(true);
-      }
-    });
-  }
+  }));
 
-  protected createTeam() {
-    if (this.isLoading() || !this._newTeamName.value) {
-      return;
-    }
-    const newTeam = {
+  createTeam = injectMutation(() => ({
+    mutationFn: () => lastValueFrom(this.adminService.createTeam({
       name: this._newTeamName.value,
       color: this._newTeamColor.value ?? '#000000'
-    } as TeamInfo;
-    this.adminService.createTeam(newTeam).subscribe({
-      next: () => this.invalidateTeams(),
-      error: (err) => console.error('Error creating team', err)
-    });
-  }
+    } as TeamInfo)),
+    queryKey: ['admin', 'team', 'create'],
+    onSettled: () => this.invalidateTeams()
+  }));
 
   protected invalidateTeams() {
-    if (this.isLoading()) {
-      return;
-    }
     this.queryClient.invalidateQueries({ queryKey: ['admin', 'teams'] });
   }
 
