@@ -21,6 +21,7 @@ export interface PullRequestReviewInfo {
     author?: UserInfo;
     pullRequest?: PullRequestBaseInfo;
     htmlUrl: string;
+    score: number;
     submittedAt?: string;
 }
 export namespace PullRequestReviewInfo {

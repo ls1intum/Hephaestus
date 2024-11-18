@@ -18,6 +18,7 @@ import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
@@ -26,19 +27,13 @@ public class LeaderboardService {
 
     private static final Logger logger = LoggerFactory.getLogger(LeaderboardService.class);
 
-    private final PullRequestReviewRepository pullRequestReviewRepository;
-    private final IssueCommentRepository issueCommentRepository;
+    @Autowired
+    private PullRequestReviewRepository pullRequestReviewRepository;
+    @Autowired
+    private IssueCommentRepository issueCommentRepository;
 
     @Value("${monitoring.timeframe}")
     private int timeframe;
-
-    public LeaderboardService(
-        PullRequestReviewRepository pullRequestReviewRepository,
-        IssueCommentRepository issueCommentRepository
-    ) {
-        this.pullRequestReviewRepository = pullRequestReviewRepository;
-        this.issueCommentRepository = issueCommentRepository;
-    }
 
     @Transactional
     public List<LeaderboardEntryDTO> createLeaderboard(
@@ -166,72 +161,8 @@ public class LeaderboardService {
         double totalScore = reviewsByPullRequestId
             .values()
             .stream()
-            .map(pullRequestReviews -> {
-                // All reviews are for the same pull request
-                int complexityScore = calculateComplexityScore(pullRequestReviews.get(0).getPullRequest());
-
-                int approvalReviews = (int) pullRequestReviews
-                    .stream()
-                    .filter(review -> review.getState() == PullRequestReview.State.APPROVED)
-                    .count();
-                int changesRequestedReviews = (int) pullRequestReviews
-                    .stream()
-                    .filter(review -> review.getState() == PullRequestReview.State.CHANGES_REQUESTED)
-                    .count();
-                int commentReviews = (int) pullRequestReviews
-                    .stream()
-                    .filter(review -> review.getState() == PullRequestReview.State.COMMENTED)
-                    .filter(review -> review.getBody() != null) // Only count if there is a comment
-                    .count();
-                int unknownReviews = (int) pullRequestReviews
-                    .stream()
-                    .filter(review -> review.getState() == PullRequestReview.State.UNKNOWN)
-                    .filter(review -> review.getBody() != null) // Only count if there is a comment
-                    .count();
-
-                int codeComments = pullRequestReviews
-                    .stream()
-                    .map(review -> review.getComments().size())
-                    .reduce(0, Integer::sum);
-
-                double interactionScore =
-                    (approvalReviews * 1.5 +
-                        changesRequestedReviews * 2.0 +
-                        (commentReviews + unknownReviews + numberOfIssueComments) +
-                        codeComments * 0.5);
-
-                double complexityBonus = 1 + (complexityScore - 1) / 32.0;
-
-                return 5 * interactionScore * complexityBonus;
-            })
+            .map(pullRequestReviews -> ScoringService.calculateReviewScore(pullRequestReviews, numberOfIssueComments))
             .reduce(0.0, Double::sum);
         return (int) Math.ceil(totalScore);
-    }
-
-    /**
-     * Calculates the complexity score for a given pull request.
-     * Possible values: 1, 3, 7, 17, 33.
-     * Taken from the original leaderboard implementation script.
-     *
-     * @param pullRequest
-     * @return score
-     */
-    private int calculateComplexityScore(PullRequest pullRequest) {
-        Double complexityScore =
-            ((pullRequest.getChangedFiles() * 3) +
-                (pullRequest.getCommits() * 0.5) +
-                pullRequest.getAdditions() +
-                pullRequest.getDeletions()) /
-            10;
-        if (complexityScore < 10) {
-            return 1; // Simple
-        } else if (complexityScore < 50) {
-            return 3; // Medium
-        } else if (complexityScore < 100) {
-            return 7; // Large
-        } else if (complexityScore < 500) {
-            return 17; // Huge
-        }
-        return 33; // Overly complex
     }
 }
