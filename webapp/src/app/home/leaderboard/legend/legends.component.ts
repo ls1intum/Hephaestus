@@ -6,11 +6,12 @@ import { HlmCardModule } from '@spartan-ng/ui-card-helm';
 import { provideIcons } from '@spartan-ng/ui-icon-helm';
 import { lucideChevronsDown, lucideChevronsUp } from '@ng-icons/lucide';
 import { cn } from '@app/utils';
+import { HlmButtonDirective } from '@spartan-ng/ui-button-helm';
 
 @Component({
   selector: 'app-leaderboard-legend',
   standalone: true,
-  imports: [HlmCardModule, NgIconComponent, HlmIconComponent],
+  imports: [HlmCardModule, NgIconComponent, HlmIconComponent, HlmButtonDirective],
   providers: [provideIcons({ lucideChevronsDown, lucideChevronsUp })],
   templateUrl: './legend.component.html'
 })

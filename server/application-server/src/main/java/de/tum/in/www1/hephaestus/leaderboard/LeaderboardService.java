@@ -198,7 +198,7 @@ public class LeaderboardService {
                     (approvalReviews * 1.5 +
                         changesRequestedReviews * 2.0 +
                         (commentReviews + unknownReviews + numberOfIssueComments) +
-                        codeComments * 0.5);
+                        codeComments * 0.25);
 
                 double complexityBonus = 1 + (complexityScore - 1) / 32.0;
 
