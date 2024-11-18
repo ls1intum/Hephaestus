@@ -56,10 +56,7 @@
           <td appTableCell class="py-2">
             <div class="flex items-center gap-2">
               @if (entry.numberOfReviewedPRs) {
-                <div class="flex items-center gap-1 text-github-muted-foreground" title="Total reviewed PRs">
-                  <ng-icon [svg]="octGitPullRequest" size="16" />
-                  {{ entry.numberOfReviewedPRs }}
-                </div>
+                <app-reviews-popover [reviewedPRs]="entry.reviewedPullRequests" />
                 <div class="flex items-center text-github-muted-foreground">
                   <ng-icon [svg]="octChevronLeft" size="16" />
                 </div>
