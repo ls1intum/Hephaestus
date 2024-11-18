@@ -2,30 +2,28 @@ components:
   schemas:
     ChatRequest:
       properties:
-        message:
-          title: Message
+        chat_id:
+          title: Chat Id
           type: string
-        thread_id:
-          anyOf:
-          - type: string
-          - type: 'null'
-          title: Thread Id
+        message_content:
+          title: Message Content
+          type: string
       required:
-      - message
+      - chat_id
+      - message_content
       title: ChatRequest
       type: object
     ChatResponse:
       properties:
-        response:
-          title: Response
+        chat_id:
+          title: Chat Id
           type: string
-        thread_id:
-          anyOf:
-          - type: string
-          - type: 'null'
-          title: Thread Id
+        message_content:
+          title: Message Content
+          type: string
       required:
-      - response
+      - chat_id
+      - message_content
       title: ChatResponse
       type: object
     HTTPValidationError:

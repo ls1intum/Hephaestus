@@ -20,10 +20,6 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonTypeName;
 import com.fasterxml.jackson.annotation.JsonValue;
-import org.openapitools.jackson.nullable.JsonNullable;
-import com.fasterxml.jackson.annotation.JsonIgnore;
-import org.openapitools.jackson.nullable.JsonNullable;
-import java.util.NoSuchElementException;
 import com.fasterxml.jackson.annotation.JsonPropertyOrder;
 import com.fasterxml.jackson.annotation.JsonTypeName;
 import org.hibernate.validator.constraints.*;
@@ -32,76 +28,68 @@ import org.hibernate.validator.constraints.*;
  * ChatRequest
  */
 @JsonPropertyOrder({
-  ChatRequest.JSON_PROPERTY_MESSAGE,
-  ChatRequest.JSON_PROPERTY_THREAD_ID
+  ChatRequest.JSON_PROPERTY_CHAT_ID,
+  ChatRequest.JSON_PROPERTY_MESSAGE_CONTENT
 })
 @jakarta.annotation.Generated(value = "org.openapitools.codegen.languages.JavaClientCodegen", comments = "Generator version: 7.7.0")
 public class ChatRequest {
-  public static final String JSON_PROPERTY_MESSAGE = "message";
-  private String message;
+  public static final String JSON_PROPERTY_CHAT_ID = "chat_id";
+  private String chatId;
 
-  public static final String JSON_PROPERTY_THREAD_ID = "thread_id";
-  private JsonNullable<String> threadId = JsonNullable.<String>undefined();
+  public static final String JSON_PROPERTY_MESSAGE_CONTENT = "message_content";
+  private String messageContent;
 
   public ChatRequest() {
   }
 
-  public ChatRequest message(String message) {
+  public ChatRequest chatId(String chatId) {
     
-    this.message = message;
+    this.chatId = chatId;
     return this;
   }
 
   /**
-   * Get message
-   * @return message
+   * Get chatId
+   * @return chatId
    */
   @jakarta.annotation.Nonnull
-  @JsonProperty(JSON_PROPERTY_MESSAGE)
+  @JsonProperty(JSON_PROPERTY_CHAT_ID)
   @JsonInclude(value = JsonInclude.Include.ALWAYS)
 
-  public String getMessage() {
-    return message;
+  public String getChatId() {
+    return chatId;
   }
 
 
-  @JsonProperty(JSON_PROPERTY_MESSAGE)
+  @JsonProperty(JSON_PROPERTY_CHAT_ID)
   @JsonInclude(value = JsonInclude.Include.ALWAYS)
-  public void setMessage(String message) {
-    this.message = message;
+  public void setChatId(String chatId) {
+    this.chatId = chatId;
   }
 
-  public ChatRequest threadId(String threadId) {
-    this.threadId = JsonNullable.<String>of(threadId);
+  public ChatRequest messageContent(String messageContent) {
     
+    this.messageContent = messageContent;
     return this;
   }
 
   /**
-   * Get threadId
-   * @return threadId
+   * Get messageContent
+   * @return messageContent
    */
-  @jakarta.annotation.Nullable
-  @JsonIgnore
+  @jakarta.annotation.Nonnull
+  @JsonProperty(JSON_PROPERTY_MESSAGE_CONTENT)
+  @JsonInclude(value = JsonInclude.Include.ALWAYS)
 
-  public String getThreadId() {
-        return threadId.orElse(null);
+  public String getMessageContent() {
+    return messageContent;
   }
 
-  @JsonProperty(JSON_PROPERTY_THREAD_ID)
-  @JsonInclude(value = JsonInclude.Include.USE_DEFAULTS)
 
-  public JsonNullable<String> getThreadId_JsonNullable() {
-    return threadId;
-  }
-  
-  @JsonProperty(JSON_PROPERTY_THREAD_ID)
-  public void setThreadId_JsonNullable(JsonNullable<String> threadId) {
-    this.threadId = threadId;
-  }
-
-  public void setThreadId(String threadId) {
-    this.threadId = JsonNullable.<String>of(threadId);
+  @JsonProperty(JSON_PROPERTY_MESSAGE_CONTENT)
+  @JsonInclude(value = JsonInclude.Include.ALWAYS)
+  public void setMessageContent(String messageContent) {
+    this.messageContent = messageContent;
   }
 
   @Override
@@ -113,32 +101,21 @@ public class ChatRequest {
       return false;
     }
     ChatRequest chatRequest = (ChatRequest) o;
-    return Objects.equals(this.message, chatRequest.message) &&
-        equalsNullable(this.threadId, chatRequest.threadId);
-  }
-
-  private static <T> boolean equalsNullable(JsonNullable<T> a, JsonNullable<T> b) {
-    return a == b || (a != null && b != null && a.isPresent() && b.isPresent() && Objects.deepEquals(a.get(), b.get()));
+    return Objects.equals(this.chatId, chatRequest.chatId) &&
+        Objects.equals(this.messageContent, chatRequest.messageContent);
   }
 
   @Override
   public int hashCode() {
-    return Objects.hash(message, hashCodeNullable(threadId));
-  }
-
-  private static <T> int hashCodeNullable(JsonNullable<T> a) {
-    if (a == null) {
-      return 1;
-    }
-    return a.isPresent() ? Arrays.deepHashCode(new Object[]{a.get()}) : 31;
+    return Objects.hash(chatId, messageContent);
   }
 
   @Override
   public String toString() {
     StringBuilder sb = new StringBuilder();
     sb.append("class ChatRequest {\n");
-    sb.append("    message: ").append(toIndentedString(message)).append("\n");
-    sb.append("    threadId: ").append(toIndentedString(threadId)).append("\n");
+    sb.append("    chatId: ").append(toIndentedString(chatId)).append("\n");
+    sb.append("    messageContent: ").append(toIndentedString(messageContent)).append("\n");
     sb.append("}");
     return sb.toString();
   }
