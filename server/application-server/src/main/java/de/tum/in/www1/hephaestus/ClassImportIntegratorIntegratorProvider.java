@@ -14,6 +14,8 @@ import de.tum.in.www1.hephaestus.gitprovider.pullrequest.PullRequestInfoDTO;
 import de.tum.in.www1.hephaestus.gitprovider.pullrequestreview.PullRequestReviewInfoDTO;
 import de.tum.in.www1.hephaestus.gitprovider.repository.RepositoryInfoDTO;
 import de.tum.in.www1.hephaestus.gitprovider.user.UserInfoDTO;
+import de.tum.in.www1.hephaestus.chat.ChatDTO;
+import de.tum.in.www1.hephaestus.chat.message.MessageDTO;
 import io.hypersistence.utils.hibernate.type.util.ClassImportIntegrator;
 
 public class ClassImportIntegratorIntegratorProvider implements IntegratorProvider {
@@ -31,6 +33,8 @@ public class ClassImportIntegratorIntegratorProvider implements IntegratorProvid
         classes.add(IssueCommentInfoDTO.class);
         classes.add(PullRequestReviewInfoDTO.class);
         classes.add(RepositoryInfoDTO.class);
+        classes.add(MessageDTO.class);
+        classes.add(ChatDTO.class);
 
         return List.of(new ClassImportIntegrator(classes));
     }
