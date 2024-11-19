@@ -90,6 +90,7 @@
     "@storybook/angular": "8.3.4",
     "@storybook/blocks": "8.3.4",
     "@storybook/test": "8.3.4",
+    "@tailwindcss/typography": "0.5.15",
     "@types/jasmine": "5.1.4",
     "@typescript-eslint/eslint-plugin": "8.2.0",
     "@typescript-eslint/parser": "8.2.0",
