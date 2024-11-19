@@ -2,27 +2,27 @@ components:
   schemas:
     ChatRequest:
       properties:
-        chat_id:
-          title: Chat Id
-          type: string
         message_content:
           title: Message Content
           type: string
+        session_id:
+          title: Session Id
+          type: string
       required:
-      - chat_id
+      - session_id
       - message_content
       title: ChatRequest
       type: object
     ChatResponse:
       properties:
-        chat_id:
-          title: Chat Id
-          type: string
         message_content:
           title: Message Content
           type: string
+        session_id:
+          title: Session Id
+          type: string
       required:
-      - chat_id
+      - session_id
       - message_content
       title: ChatResponse
       type: object

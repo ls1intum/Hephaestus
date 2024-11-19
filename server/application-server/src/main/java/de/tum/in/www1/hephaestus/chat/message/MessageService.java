@@ -4,14 +4,13 @@ import java.time.ZonedDateTime;
 
 import org.springframework.stereotype.Service;
 
-import de.tum.in.www1.hephaestus.chat.Chat;
+import de.tum.in.www1.hephaestus.chat.Session;
+import de.tum.in.www1.hephaestus.chat.SessionDTO;
 import de.tum.in.www1.hephaestus.chat.message.Message.MessageSender;
 import de.tum.in.www1.hephaestus.intelligenceservice.api.DefaultApi;
 import de.tum.in.www1.hephaestus.intelligenceservice.model.ChatRequest;
 import de.tum.in.www1.hephaestus.intelligenceservice.model.ChatResponse;
-import de.tum.in.www1.hephaestus.chat.ChatRepository;
-
-
+import de.tum.in.www1.hephaestus.chat.SessionRepository;
 
 /**
  * Service for managing messages.
@@ -19,44 +18,44 @@ import de.tum.in.www1.hephaestus.chat.ChatRepository;
 @Service
 public class MessageService {
 
-    private final ChatRepository chatRepository;
+    private final SessionRepository sessionRepository;
     private final MessageRepository messageRepository;
-    private final DefaultApi chatApiClient;
+    private final DefaultApi sessionApiClient;
 
-    public MessageService(ChatRepository chatRepository, MessageRepository messageRepository) {
-        this.chatRepository = chatRepository;
+    public MessageService(SessionRepository sessionRepository, MessageRepository messageRepository) {
+        this.sessionRepository = sessionRepository;
         this.messageRepository = messageRepository;
-        this.chatApiClient = new DefaultApi();
+        this.sessionApiClient = new DefaultApi();
     }
 
     /**
      * Sends a message, saves it, and generates a bot response.
      */
     public MessageDTO sendMessage(MessageDTO messageDTO) {
-        Chat chat = chatRepository.findById(messageDTO.chat().getId())
-                .orElseThrow(() -> new IllegalArgumentException("Chat not found"));
+        Session session = sessionRepository.findById(messageDTO.session().id())
+                .orElseThrow(() -> new IllegalArgumentException("Session not found"));
 
-        Message userMessage = new Message(ZonedDateTime.now(), MessageSender.USER, messageDTO.content(), chat);
+        Message userMessage = new Message(ZonedDateTime.now(), MessageSender.USER, messageDTO.content(), session);
         messageRepository.save(userMessage);
 
-        String systemResponse = generateResponse(messageDTO.chat(), messageDTO.content());
+        String systemResponse = generateResponse(messageDTO.session(), messageDTO.content());
 
-        Message systemMessage = new Message(ZonedDateTime.now(), MessageSender.SYSTEM, systemResponse, chat);
+        Message systemMessage = new Message(ZonedDateTime.now(), MessageSender.SYSTEM, systemResponse, session);
         messageRepository.save(systemMessage);
 
-        return new MessageDTO(systemMessage.getId(), systemMessage.getSentAt(), systemMessage.getSender(), systemMessage.getContent(), systemMessage.getChat()); 
+        return new MessageDTO(systemMessage.getId(), systemMessage.getSentAt(), systemMessage.getSender(), systemMessage.getContent(), new SessionDTO(systemMessage.getSession())); 
     }
 
     /**
      * Calls the Python FastAPI service to generate a bot response.
      */
-    private String generateResponse(Chat chat, String messageContent) {
+    private String generateResponse(SessionDTO session, String messageContent) {
         ChatRequest chatRequest = new ChatRequest();
-        chatRequest.setChatId(chat.getId().toString());
+        chatRequest.setSessionId(session.id().toString());
         chatRequest.setMessageContent(messageContent);
 
         try {
-            ChatResponse chatResponse = chatApiClient.chatChatPost(chatRequest);
+            ChatResponse chatResponse = sessionApiClient.chatChatPost(chatRequest);
             return chatResponse.getMessageContent();
         } catch (Exception e) {
             throw new RuntimeException("Error communicating with intelligence service: " + e.getMessage(), e);

@@ -13,6 +13,42 @@ servers:
 - url: /
   description: Default Server URL
 paths:
+  /session:
+    post:
+      tags:
+      - session
+      operationId: createSession
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/User"
+        required: true
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Session"
+  /message:
+    post:
+      tags:
+      - message
+      operationId: sendMessage
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/MessageDTO"
+        required: true
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Message"
   /user/{login}/profile:
     get:
       tags:
@@ -31,6 +67,25 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/UserProfile"
+  /session/session/{sessionId}:
+    get:
+      tags:
+      - session
+      operationId: getSession
+      parameters:
+      - name: sessionId
+        in: path
+        required: true
+        schema:
+          type: integer
+          format: int64
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Session"
   /meta:
     get:
       tags:
@@ -181,6 +236,30 @@ components:
           type: string
         color:
           type: string
+    Message:
+      required:
+      - content
+      - id
+      - sender
+      - sentAt
+      - session
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+        sentAt:
+          type: string
+          format: date-time
+        sender:
+          type: string
+          enum:
+          - SYSTEM
+          - USER
+        content:
+          type: string
+        session:
+          $ref: "#/components/schemas/Session"
     UserProfile:
       required:
       - contributedRepositories
@@ -379,3 +458,23 @@ components:
         numberOfCodeComments:
           type: integer
           format: int32
+    Session:
+      required:
+      - creationDate
+      - id
+      - messages
+      - user
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+        messages:
+          type: array
+          items:
+            $ref: "#/components/schemas/Message"
+        user:
+          $ref: "#/components/schemas/UserInfo"
+        creationDate:
+          type: string
+          format: date-time

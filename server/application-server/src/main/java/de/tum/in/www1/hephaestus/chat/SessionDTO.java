@@ -11,13 +11,13 @@ import de.tum.in.www1.hephaestus.gitprovider.user.UserInfoDTO;
 
 
 @JsonInclude(JsonInclude.Include.NON_EMPTY)
-public record ChatDTO (
+public record SessionDTO (
     @NonNull Long id,
     @NonNull List<Message> messages,
     @NonNull UserInfoDTO user,
     @NonNull ZonedDateTime creationDate){
 
-        public ChatDTO(Chat chat) {
-            this(chat.getId(), chat.getMessages(), UserInfoDTO.fromUser(chat.getUser()), chat.getCreationDate());
+        public SessionDTO(Session session) {
+            this(session.getId(), session.getMessages(), UserInfoDTO.fromUser(session.getUser()), session.getCreationDate());
         }
     }

@@ -10,12 +10,12 @@ app = FastAPI(
 )
 
 class ChatRequest(BaseModel):
-    chat_id: str
+    session_id: str
     message_content: str
 
 
 class ChatResponse(BaseModel):
-    chat_id: str
+    session_id: str
     message_content: str
 
 
@@ -28,7 +28,7 @@ async def chat(request: ChatRequest):
         # TODO: Add state management when implementing more complex chat logic
         state = 0
         user_input = request.message_content
-        result = chat(request.chat_id, user_input, state)
+        result = chat(request.session_id, user_input, state)
         state = result["state"]
         response_message = result["response"]["messages"][-1].content
-        return ChatResponse(chat_id=request.chat_id, message_content=response_message)
+        return ChatResponse(session_id=request.session_id, message_content=response_message)
