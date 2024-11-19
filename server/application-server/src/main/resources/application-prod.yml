@@ -23,6 +23,13 @@ hephaestus:
         enabled: ${LEADERBOARD_NOTIFICATION_ENABLED:true}
         channel-id: ${LEADERBOARD_NOTIFICATION_CHANNEL_ID:G6TCVL6HL}
 
+keycloak:
+    url: ${KEYCLOAK_URL}
+    realm: ${KEYCLOAK_REALM}
+    client-id: ${KEYCLOAK_CLIENT_ID}
+    client-secret: ${KEYCLOAK_CLIENT_SECRET}
+
+
 nats:
     enabled: ${NATS_ENABLED:false}
     timeframe: ${MONITORING_TIMEFRAME:7}
