@@ -6,6 +6,8 @@ import org.springframework.lang.NonNull;
 import com.fasterxml.jackson.annotation.JsonInclude;
 
 import de.tum.in.www1.hephaestus.chat.message.Message.MessageSender;
+import de.tum.in.www1.hephaestus.chat.Chat;
+
 
 @JsonInclude(JsonInclude.Include.NON_EMPTY)
 public record MessageDTO(
@@ -13,7 +15,7 @@ public record MessageDTO(
         @NonNull ZonedDateTime sentAt,
         @NonNull MessageSender sender,
         @NonNull String content,
-        @NonNull Long chatId) {
+        @NonNull Chat chat) {
 
                 public MessageDTO(Message message) {
                         this(
@@ -21,6 +23,6 @@ public record MessageDTO(
                                 message.getSentAt(),
                                 message.getSender(),
                                 message.getContent(),
-                                message.getChat().getId());
+                                message.getChat());
                 }
 }

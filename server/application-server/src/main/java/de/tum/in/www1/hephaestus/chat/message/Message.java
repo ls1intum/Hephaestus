@@ -11,7 +11,6 @@ import org.springframework.lang.NonNull;
 import de.tum.in.www1.hephaestus.gitprovider.common.BaseGitServiceEntity;
 import de.tum.in.www1.hephaestus.chat.Chat;
 
-
 @Entity
 @Table(name = "message")
 @Getter
@@ -32,7 +31,7 @@ public class Message extends BaseGitServiceEntity {
     private String content;
 
     @NonNull
-    @ManyToOne(optional = false)
+    @ManyToOne(optional = false, fetch = FetchType.LAZY)
     @JoinColumn(name = "chat_id") 
     private Chat chat; 
 

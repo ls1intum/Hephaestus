@@ -7,8 +7,9 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 
-import de.tum.in.www1.hephaestus.gitprovider.user.User;
+import java.util.Optional;  
 
+import de.tum.in.www1.hephaestus.gitprovider.user.User;
 import org.springframework.http.ResponseEntity;
 
 @RestController
@@ -23,11 +24,13 @@ public class ChatController {
 
     @PostMapping
     public ResponseEntity<ChatDTO> createChat(@RequestBody User user) {
-        return ResponseEntity.ok(chatService.createChat(user));
+        ChatDTO chat = chatService.createChat(user);
+        return ResponseEntity.ok(chat);
     }
 
-    @GetMapping
+    @GetMapping("/chat/{chatId}")
     public ResponseEntity<ChatDTO> getChat(@PathVariable Long chatId) {
-        return ResponseEntity.ok(chatService.findChatById(chatId).get());
+        Optional<ChatDTO> chat = chatService.findChatById(chatId);
+        return ResponseEntity.ok(chat.get());
     }
 }

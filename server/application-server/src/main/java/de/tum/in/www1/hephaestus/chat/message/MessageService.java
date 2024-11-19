@@ -33,26 +33,26 @@ public class MessageService {
      * Sends a message, saves it, and generates a bot response.
      */
     public MessageDTO sendMessage(MessageDTO messageDTO) {
-        Chat chat = chatRepository.findById(messageDTO.chatId())
+        Chat chat = chatRepository.findById(messageDTO.chat().getId())
                 .orElseThrow(() -> new IllegalArgumentException("Chat not found"));
 
         Message userMessage = new Message(ZonedDateTime.now(), MessageSender.USER, messageDTO.content(), chat);
         messageRepository.save(userMessage);
 
-        String systemResponse = generateResponse(messageDTO.chatId(), messageDTO.content());
+        String systemResponse = generateResponse(messageDTO.chat(), messageDTO.content());
 
         Message systemMessage = new Message(ZonedDateTime.now(), MessageSender.SYSTEM, systemResponse, chat);
         messageRepository.save(systemMessage);
 
-        return new MessageDTO(systemMessage.getId(), systemMessage.getSentAt(), systemMessage.getSender(), systemMessage.getContent(), systemMessage.getChat().getId()); 
+        return new MessageDTO(systemMessage.getId(), systemMessage.getSentAt(), systemMessage.getSender(), systemMessage.getContent(), systemMessage.getChat()); 
     }
 
     /**
      * Calls the Python FastAPI service to generate a bot response.
      */
-    private String generateResponse(Long chatId, String messageContent) {
+    private String generateResponse(Chat chat, String messageContent) {
         ChatRequest chatRequest = new ChatRequest();
-        chatRequest.setChatId(chatId.toString());
+        chatRequest.setChatId(chat.getId().toString());
         chatRequest.setMessageContent(messageContent);
 
         try {

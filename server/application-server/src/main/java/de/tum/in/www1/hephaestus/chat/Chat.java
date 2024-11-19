@@ -12,6 +12,8 @@ import de.tum.in.www1.hephaestus.chat.message.Message;
 import de.tum.in.www1.hephaestus.gitprovider.common.BaseGitServiceEntity;
 import de.tum.in.www1.hephaestus.gitprovider.user.User;
 
+import java.util.Optional;
+
 
 @Entity
 @Table(name = "chat")
