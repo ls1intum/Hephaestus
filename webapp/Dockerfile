@@ -1,4 +1,4 @@
-FROM node:latest AS build
+FROM node:latest as build
 
 WORKDIR /app
 
@@ -17,7 +17,7 @@ RUN COOLIFY_URL_VALUE=$(grep '^COOLIFY_URL=' .env | cut -d '=' -f2) && \
 # This assumes that .env contains lines like VARIABLE=value
 # and does not contain spaces around the '='
 RUN set -a && \
-    . .env && \
+    source .env && \
     set +a && \
     echo "Generating environment.prod.ts" && \
     cat > src/environments/environment.prod.ts <<EOF
