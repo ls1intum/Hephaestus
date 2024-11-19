@@ -13,19 +13,10 @@ RUN cat .env
 RUN COOLIFY_URL_VALUE=$(grep '^COOLIFY_URL=' .env | cut -d '=' -f2) && \
     sed -i "s|\$COOLIFY_URL|$COOLIFY_URL_VALUE|g" .env
 
-
-RUN ls -la /app
-
-RUN ls -la .
-
 # Export environment variables from .env
 # This assumes that .env contains lines like VARIABLE=value
 # and does not contain spaces around the '='
-RUN set -a && \
-    echo "Listing /app directory:" && \
-    ls -la /app && \
-    echo "Displaying contents of /app/.env:" && \
-    cat /app/.env && \
+RUN set -a && \\
     . /app/.env && \
     set +a && \
     echo "Generating environment.prod.ts" && \
