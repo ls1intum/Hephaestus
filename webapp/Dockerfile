@@ -33,6 +33,9 @@ export const environment = {
     scriptUrl: '${UMAMI_SCRIPT_URL}',
     websiteId: '${UMAMI_WEBSITE_ID}',
     domains: '${UMAMI_DOMAINS}'
+  },
+  legal: {
+    imprintHtml: '${LEGAL_IMPRINT_HTML}',
   }
 };
 EOF
