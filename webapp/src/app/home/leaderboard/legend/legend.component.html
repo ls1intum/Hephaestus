@@ -1,20 +1,7 @@
 <div hlmCard>
-  <div class="flex items-center group hover:cursor-pointer" (click)="toggleOpen()">
-    <div hlmCardHeader class="flex-1">
-      <h3 hlmCardTitle class="group-hover:underline">Leaderboard Legend</h3>
-      <p hlmCardDescription class="group-hover:underline">Explanation of the most important elements</p>
-    </div>
-    <div class="flex items-center gap-2 px-6">
-      @if (open()) {
-        <hlm-icon name="lucideChevronsUp" />
-      } @else {
-        <hlm-icon name="lucideChevronsDown" />
-      }
-    </div>
-  </div>
-  <div hlmCardContent [class]="contentClass()">
+  <div hlmCardContent class="flex flex-col gap-y-4">
     <div class="flex flex-col gap-2 sm:min-w-[250px]">
-      <h4 class="font-medium mb-2">Icons</h4>
+      <h4 class="mb-2 text-lg font-semibold leading-none tracking-tight">Icons</h4>
       <div class="flex items-center gap-2 text-github-muted-foreground">
         <ng-icon [svg]="octGitPullRequest" size="16" />
         Reviewed pull requests
@@ -36,7 +23,7 @@
         Code comments
       </div>
     </div>
-    <div class="max-w-[500px]">
+    <div [class]="contentClass()">
       <h4 class="font-medium mb-2">Scoring System</h4>
       <p class="text-sm text-github-muted-foreground">
         The score approximates your contribution activity by evaluating your review interactions and the complexity of the pull requests you've reviewed.
@@ -54,6 +41,17 @@
           [source]
         </a>
       </p>
+    </div>
+  </div>
+  <div class="flex items-center justify-center group hover:cursor-pointer hover:bg-muted/50" (click)="toggleOpen()">
+    <div class="flex items-center gap-2 px-6 py-1.5">
+      @if (open()) {
+        <hlm-icon name="lucideChevronUp" />
+        <p class="text-github-muted-foreground text-sm font-medium">Show less</p>
+      } @else {
+        <hlm-icon name="lucideChevronDown" />
+        <p class="text-github-muted-foreground text-sm font-medium">Show more</p>
+      }
     </div>
   </div>
 </div>
