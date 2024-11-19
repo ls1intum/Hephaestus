@@ -16,7 +16,7 @@ RUN COOLIFY_URL_VALUE=$(grep '^COOLIFY_URL=' .env | cut -d '=' -f2) && \
 # Export environment variables from .env
 # This assumes that .env contains lines like VARIABLE=value
 # and does not contain spaces around the '='
-RUN set -a && \\
+RUN set -a && \
     . /app/.env && \
     set +a && \
     echo "Generating environment.prod.ts" && \
