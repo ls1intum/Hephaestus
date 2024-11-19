@@ -2,7 +2,9 @@ package de.tum.in.www1.hephaestus.chat;
 
 import java.time.ZonedDateTime;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
@@ -12,12 +14,11 @@ import de.tum.in.www1.hephaestus.chat.message.Message;
 import de.tum.in.www1.hephaestus.gitprovider.common.BaseGitServiceEntity;
 import de.tum.in.www1.hephaestus.gitprovider.user.User;
 
-
 @Entity
 @Table(name = "session")
 @Getter
 @Setter
-@ToString(callSuper = true) 
+@ToString(callSuper = true)
 @NoArgsConstructor
 public class Session extends BaseGitServiceEntity {
 
@@ -28,6 +29,8 @@ public class Session extends BaseGitServiceEntity {
     @Column(name = "creation_date")
     private ZonedDateTime creationDate = ZonedDateTime.now();
 
-    @OneToOne
+    @ManyToOne
+    @JoinColumn(name = "user_id")
+    @ToString.Exclude
     private User user;
 }

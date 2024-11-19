@@ -30,9 +30,8 @@ public interface SessionRepository extends JpaRepository<Session, Long> {
     Session findByIdWithMessagesAndContents(@Param("sessionId") long sessionId);
 
     private Session getValueElseThrow(Optional<Session> optional, long sessionId) {
-        return optional.orElseThrow(() -> 
-            new EntityNotFoundException("Session entity with id " + sessionId + " was not found.")
-        );
+        return optional.orElseThrow(
+                () -> new EntityNotFoundException("Session entity with id " + sessionId + " was not found."));
     }
 
     @NotNull

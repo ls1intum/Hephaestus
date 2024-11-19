@@ -15,7 +15,7 @@ import de.tum.in.www1.hephaestus.chat.Session;
 @Table(name = "message")
 @Getter
 @Setter
-@ToString(callSuper = true) 
+@ToString(callSuper = true)
 @RequiredArgsConstructor
 public class Message extends BaseGitServiceEntity {
     @NonNull
@@ -32,8 +32,8 @@ public class Message extends BaseGitServiceEntity {
 
     @NonNull
     @ManyToOne(optional = false, fetch = FetchType.LAZY)
-    @JoinColumn(name = "session_id") 
-    private Session session; 
+    @JoinColumn(name = "session_id")
+    private Session session;
 
     public enum MessageSender {
         SYSTEM, USER

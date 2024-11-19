@@ -22,7 +22,7 @@ paths:
         content:
           application/json:
             schema:
-              $ref: "#/components/schemas/User"
+              type: string
         required: true
       responses:
         "200":
@@ -40,7 +40,7 @@ paths:
         content:
           application/json:
             schema:
-              $ref: "#/components/schemas/MessageDTO"
+              $ref: "#/components/schemas/Message"
         required: true
       responses:
         "200":

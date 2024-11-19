@@ -43,7 +43,8 @@ public class MessageService {
         Message systemMessage = new Message(ZonedDateTime.now(), MessageSender.SYSTEM, systemResponse, session);
         messageRepository.save(systemMessage);
 
-        return new MessageDTO(systemMessage.getId(), systemMessage.getSentAt(), systemMessage.getSender(), systemMessage.getContent(), new SessionDTO(systemMessage.getSession())); 
+        return new MessageDTO(systemMessage.getId(), systemMessage.getSentAt(), systemMessage.getSender(),
+                systemMessage.getContent(), SessionDTO.fromSession(systemMessage.getSession()));
     }
 
     /**
