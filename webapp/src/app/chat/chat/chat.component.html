@@ -1,0 +1,46 @@
+<div class="flex flex-col h-screen h-4">
+    <!-- Chat Messages Section -->
+    <div class="flex-1 overflow-y-auto p-4 space-y-4">
+      <!-- Mock Message (From Bot) -->
+      <div class="flex items-start space-x-4">
+        <div class="w-10 h-10 bg-transparent border-2 border-cyan-500 rounded-full flex items-center justify-center">
+          <lucide-icon [img]="Hammer" class="size-6 text-cyan-500"></lucide-icon>
+        </div>
+        <div class="flex flex-col space-y-2">
+          <div class="bg-gray-200 p-3 rounded-lg text-black">
+            <p>Hello! How can I help you today?</p>
+          </div>
+          <span class="text-xs text-gray-500">AI Mentor · 2 mins ago</span>
+        </div>
+      </div>
+      <!-- Mock Message (From User) -->
+      <div class="flex items-start space-x-4 justify-end">
+        <div class="flex flex-col space-y-2 text-right">
+          <div class="bg-cyan-500 text-white p-3 rounded-lg">
+            <p>What are your features?</p>
+          </div>
+          <span class="text-xs text-gray-500">You · 1 min ago</span>
+        </div>
+        <hlm-avatar>
+          <img [src]="'https://github.com/' + user()!.username + '.png'" [alt]="user()?.name + '\'s avatar'" hlmAvatarImage />
+          <span hlmAvatarFallback>
+            {{ user()?.name?.slice(0, 2)?.toUpperCase() ?? '?' }}
+          </span>
+        </hlm-avatar>
+      </div>
+    </div>
+  
+    <!-- Input Section (Sticks to Bottom) -->
+    <div class="border-t p-4">
+      <div class="flex items-center space-x-3">
+        <input
+          type="text"
+          placeholder="Type your message..."
+          class="flex-1 bg-transparent px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring focus:ring-cyan-200"
+        />
+        <button class="bg-cyan-500 text-white p-2 rounded-lg hover:bg-cyan-600">
+          <lucide-icon [img]="Send" class="size-6"></lucide-icon>
+        </button>
+      </div>
+    </div>
+  </div>

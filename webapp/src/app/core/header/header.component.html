@@ -5,6 +5,9 @@
   </a>
   <app-request-feature class="hidden sm:inline-block" />
   <app-request-feature class="sm:hidden" iconOnly />
+  @if (signedIn()) {
+    <app-ai-mentor class="hidden sm:inline-block" />
+  }
   <app-theme-switcher />
   @if (signedIn()) {
     <button [brnMenuTriggerFor]="usermenu" class="ml-2">
