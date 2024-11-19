@@ -28,43 +28,18 @@ import org.hibernate.validator.constraints.*;
  * ChatResponse
  */
 @JsonPropertyOrder({
-  ChatResponse.JSON_PROPERTY_CHAT_ID,
-  ChatResponse.JSON_PROPERTY_MESSAGE_CONTENT
+  ChatResponse.JSON_PROPERTY_MESSAGE_CONTENT,
+  ChatResponse.JSON_PROPERTY_SESSION_ID
 })
 @jakarta.annotation.Generated(value = "org.openapitools.codegen.languages.JavaClientCodegen", comments = "Generator version: 7.7.0")
 public class ChatResponse {
-  public static final String JSON_PROPERTY_CHAT_ID = "chat_id";
-  private String chatId;
-
   public static final String JSON_PROPERTY_MESSAGE_CONTENT = "message_content";
   private String messageContent;
 
+  public static final String JSON_PROPERTY_SESSION_ID = "session_id";
+  private String sessionId;
+
   public ChatResponse() {
-  }
-
-  public ChatResponse chatId(String chatId) {
-    
-    this.chatId = chatId;
-    return this;
-  }
-
-  /**
-   * Get chatId
-   * @return chatId
-   */
-  @jakarta.annotation.Nonnull
-  @JsonProperty(JSON_PROPERTY_CHAT_ID)
-  @JsonInclude(value = JsonInclude.Include.ALWAYS)
-
-  public String getChatId() {
-    return chatId;
-  }
-
-
-  @JsonProperty(JSON_PROPERTY_CHAT_ID)
-  @JsonInclude(value = JsonInclude.Include.ALWAYS)
-  public void setChatId(String chatId) {
-    this.chatId = chatId;
   }
 
   public ChatResponse messageContent(String messageContent) {
@@ -92,6 +67,31 @@ public class ChatResponse {
     this.messageContent = messageContent;
   }
 
+  public ChatResponse sessionId(String sessionId) {
+    
+    this.sessionId = sessionId;
+    return this;
+  }
+
+  /**
+   * Get sessionId
+   * @return sessionId
+   */
+  @jakarta.annotation.Nonnull
+  @JsonProperty(JSON_PROPERTY_SESSION_ID)
+  @JsonInclude(value = JsonInclude.Include.ALWAYS)
+
+  public String getSessionId() {
+    return sessionId;
+  }
+
+
+  @JsonProperty(JSON_PROPERTY_SESSION_ID)
+  @JsonInclude(value = JsonInclude.Include.ALWAYS)
+  public void setSessionId(String sessionId) {
+    this.sessionId = sessionId;
+  }
+
   @Override
   public boolean equals(Object o) {
     if (this == o) {
@@ -101,21 +101,21 @@ public class ChatResponse {
       return false;
     }
     ChatResponse chatResponse = (ChatResponse) o;
-    return Objects.equals(this.chatId, chatResponse.chatId) &&
-        Objects.equals(this.messageContent, chatResponse.messageContent);
+    return Objects.equals(this.messageContent, chatResponse.messageContent) &&
+        Objects.equals(this.sessionId, chatResponse.sessionId);
   }
 
   @Override
   public int hashCode() {
-    return Objects.hash(chatId, messageContent);
+    return Objects.hash(messageContent, sessionId);
   }
 
   @Override
   public String toString() {
     StringBuilder sb = new StringBuilder();
     sb.append("class ChatResponse {\n");
-    sb.append("    chatId: ").append(toIndentedString(chatId)).append("\n");
     sb.append("    messageContent: ").append(toIndentedString(messageContent)).append("\n");
+    sb.append("    sessionId: ").append(toIndentedString(sessionId)).append("\n");
     sb.append("}");
     return sb.toString();
   }

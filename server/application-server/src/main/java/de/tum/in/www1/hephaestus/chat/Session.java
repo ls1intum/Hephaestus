@@ -14,15 +14,15 @@ import de.tum.in.www1.hephaestus.gitprovider.user.User;
 
 
 @Entity
-@Table(name = "chat")
+@Table(name = "session")
 @Getter
 @Setter
 @ToString(callSuper = true) 
 @NoArgsConstructor
-public class Chat extends BaseGitServiceEntity {
+public class Session extends BaseGitServiceEntity {
 
     @OrderColumn(name = "message_order")
-    @OneToMany(mappedBy = "chat")
+    @OneToMany(mappedBy = "session")
     private List<Message> messages = new ArrayList<>();
 
     @Column(name = "creation_date")

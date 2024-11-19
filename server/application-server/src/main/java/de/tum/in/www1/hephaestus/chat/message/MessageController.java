@@ -15,6 +15,7 @@ public class MessageController {
         this.messageService = messageService;
     }
 
+    // TODO: Pathvariable with session_id 
     @PostMapping
     public ResponseEntity<MessageDTO> sendMessage(@RequestBody MessageDTO messageDTO) {
         MessageDTO savedMessage = messageService.sendMessage(messageDTO);
