@@ -5,7 +5,7 @@ import { environment } from 'environments/environment';
   selector: 'app-imprint',
   standalone: true,
   template: `
-    <div class="prose dark:prose-invert">
+    <div class="container prose dark:prose-invert">
       <h1>Imprint</h1>
       <div [innerHTML]="imprintHtml"></div>
     </div>
