@@ -2,14 +2,15 @@ import { Component, inject } from '@angular/core';
 import { Router } from '@angular/router';
 import { UserService } from '@app/core/modules/openapi';
 import { SecurityStore } from '@app/core/security/security-store.service';
+import { HlmButtonDirective } from '@spartan-ng/ui-button-helm';
 import { injectMutation } from '@tanstack/angular-query-experimental';
 import { lastValueFrom } from 'rxjs';
 
 @Component({
   selector: 'app-settings',
   standalone: true,
-  imports: [],
-  template: `<button (click)="deleteUser()">Delete User</button>`
+  imports: [HlmButtonDirective],
+  template: `<button hlmBtn variant="destructive" (click)="deleteUser()">Delete Account</button>`
 })
 export class SettingsComponent {
   router = inject(Router);
