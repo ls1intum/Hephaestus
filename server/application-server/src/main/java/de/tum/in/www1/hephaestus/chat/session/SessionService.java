@@ -3,7 +3,6 @@ package de.tum.in.www1.hephaestus.chat.session;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
-import de.tum.in.www1.hephaestus.gitprovider.user.User;
 import de.tum.in.www1.hephaestus.gitprovider.user.UserRepository;
 import java.time.OffsetDateTime;
 import java.util.Optional;

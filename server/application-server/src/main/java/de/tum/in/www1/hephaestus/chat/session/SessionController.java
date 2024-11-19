@@ -9,7 +9,6 @@ import org.springframework.web.bind.annotation.PathVariable;
 
 import java.util.Optional;
 
-import de.tum.in.www1.hephaestus.gitprovider.user.User;
 import org.springframework.http.ResponseEntity;
 
 @RestController
