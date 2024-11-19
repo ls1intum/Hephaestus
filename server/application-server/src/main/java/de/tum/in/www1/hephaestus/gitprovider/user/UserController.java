@@ -40,16 +40,20 @@ public class UserController {
         return userProfile.map(ResponseEntity::ok).orElseGet(() -> ResponseEntity.notFound().build());
     }
 
-    @DeleteMapping("/delete")
-    public ResponseEntity<String> deleteUser(JwtAuthenticationToken auth) {
-        logger.info("Deleting user {}", auth.getToken().getClaimAsString(StandardClaimNames.SUB));
+    @DeleteMapping
+    public ResponseEntity<Void> deleteUser(JwtAuthenticationToken auth) {
+        if (auth == null) {
+            logger.error("No authentication token found.");
+            return ResponseEntity.badRequest().body(null);
+        }
+
         String userId = auth.getToken().getClaimAsString(StandardClaimNames.SUB);
-        UsersResource usersResource = keycloak.realm(realm).users();
-        var response = usersResource.delete(userId);
+        logger.info("Deleting user {}", userId);
+        var response = keycloak.realm(realm).users().delete(userId);
         if (response.getStatus() != 204) {
             logger.error("Failed to delete user account: {}", response.getStatusInfo().getReasonPhrase());
-            return ResponseEntity.badRequest().body("Failed to delete user account.");
+            return ResponseEntity.badRequest().body(null);
         }
-        return ResponseEntity.ok("User account deleted successfully.");
+        return ResponseEntity.ok().build();
     }
 }

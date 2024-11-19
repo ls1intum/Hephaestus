@@ -28,7 +28,7 @@ export interface UserServiceInterface {
      * 
      * 
      */
-    deleteUser(extraHttpRequestParams?: any): Observable<string>;
+    deleteUser(extraHttpRequestParams?: any): Observable<{}>;
 
     /**
      * 
