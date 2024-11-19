@@ -22,7 +22,11 @@ RUN ls -la .
 # This assumes that .env contains lines like VARIABLE=value
 # and does not contain spaces around the '='
 RUN set -a && \
-    . .env && \
+    echo "Listing /app directory:" && \
+    ls -la /app && \
+    echo "Displaying contents of /app/.env:" && \
+    cat /app/.env && \
+    . /app/.env && \
     set +a && \
     echo "Generating environment.prod.ts" && \
     cat > src/environments/environment.prod.ts <<EOF
