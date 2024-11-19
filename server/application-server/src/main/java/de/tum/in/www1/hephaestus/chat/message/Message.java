@@ -7,9 +7,8 @@ import lombok.RequiredArgsConstructor;
 import lombok.Setter;
 import lombok.ToString;
 import org.springframework.lang.NonNull;
-
+import de.tum.in.www1.hephaestus.chat.session.Session;
 import de.tum.in.www1.hephaestus.gitprovider.common.BaseGitServiceEntity;
-import de.tum.in.www1.hephaestus.chat.Session;
 
 @Entity
 @Table(name = "message")

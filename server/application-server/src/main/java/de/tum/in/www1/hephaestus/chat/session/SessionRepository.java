@@ -1,4 +1,4 @@
-package de.tum.in.www1.hephaestus.chat;
+package de.tum.in.www1.hephaestus.chat.session;
 
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;

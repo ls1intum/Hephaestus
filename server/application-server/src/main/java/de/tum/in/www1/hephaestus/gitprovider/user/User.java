@@ -16,10 +16,9 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 import lombok.ToString;
-
+import de.tum.in.www1.hephaestus.chat.session.Session;
 import de.tum.in.www1.hephaestus.gitprovider.common.BaseGitServiceEntity;
 import de.tum.in.www1.hephaestus.gitprovider.issue.Issue;
-import de.tum.in.www1.hephaestus.chat.Session;
 import de.tum.in.www1.hephaestus.gitprovider.issuecomment.IssueComment;
 import de.tum.in.www1.hephaestus.gitprovider.pullrequest.PullRequest;
 import de.tum.in.www1.hephaestus.gitprovider.pullrequestreview.PullRequestReview;

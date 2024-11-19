@@ -6,7 +6,7 @@ import org.springframework.lang.NonNull;
 import com.fasterxml.jackson.annotation.JsonInclude;
 
 import de.tum.in.www1.hephaestus.chat.message.Message.MessageSender;
-import de.tum.in.www1.hephaestus.chat.SessionDTO;
+import de.tum.in.www1.hephaestus.chat.session.SessionDTO;
 
 @JsonInclude(JsonInclude.Include.NON_EMPTY)
 public record MessageDTO(

@@ -3,14 +3,13 @@ package de.tum.in.www1.hephaestus.chat.message;
 import java.time.ZonedDateTime;
 
 import org.springframework.stereotype.Service;
-
-import de.tum.in.www1.hephaestus.chat.Session;
-import de.tum.in.www1.hephaestus.chat.SessionDTO;
 import de.tum.in.www1.hephaestus.chat.message.Message.MessageSender;
+import de.tum.in.www1.hephaestus.chat.session.Session;
+import de.tum.in.www1.hephaestus.chat.session.SessionDTO;
+import de.tum.in.www1.hephaestus.chat.session.SessionRepository;
 import de.tum.in.www1.hephaestus.intelligenceservice.api.DefaultApi;
 import de.tum.in.www1.hephaestus.intelligenceservice.model.ChatRequest;
 import de.tum.in.www1.hephaestus.intelligenceservice.model.ChatResponse;
-import de.tum.in.www1.hephaestus.chat.SessionRepository;
 
 /**
  * Service for managing messages.
