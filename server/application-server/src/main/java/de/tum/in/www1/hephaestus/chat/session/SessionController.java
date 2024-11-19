@@ -1,4 +1,4 @@
-package de.tum.in.www1.hephaestus.chat;
+package de.tum.in.www1.hephaestus.chat.session;
 
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -7,9 +7,8 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 
-import java.util.Optional;  
+import java.util.Optional;
 
-import de.tum.in.www1.hephaestus.gitprovider.user.User;
 import org.springframework.http.ResponseEntity;
 
 @RestController
@@ -23,8 +22,8 @@ public class SessionController {
     }
 
     @PostMapping
-    public ResponseEntity<SessionDTO> createSession(@RequestBody User user) {
-        SessionDTO session = sessionService.createSession(user);
+    public ResponseEntity<SessionDTO> createSession(@RequestBody String login) {
+        SessionDTO session = sessionService.createSession(login);
         return ResponseEntity.ok(session);
     }
 

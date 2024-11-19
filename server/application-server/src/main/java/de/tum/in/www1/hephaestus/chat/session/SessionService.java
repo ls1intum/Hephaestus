@@ -1,8 +1,9 @@
-package de.tum.in.www1.hephaestus.chat;
+package de.tum.in.www1.hephaestus.chat.session;
 
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
-import de.tum.in.www1.hephaestus.gitprovider.user.User;
+import de.tum.in.www1.hephaestus.gitprovider.user.UserRepository;
 import java.time.OffsetDateTime;
 import java.util.Optional;
 
@@ -13,6 +14,8 @@ import java.util.Optional;
 public class SessionService {
 
     private final SessionRepository sessionRepository;
+    @Autowired
+    private UserRepository userRepository;
 
     public SessionService(SessionRepository sessionRepository) {
         this.sessionRepository = sessionRepository;
@@ -24,11 +27,14 @@ public class SessionService {
      * @param user The user the session belongs to
      * @return The created session
      */
-    public SessionDTO createSession(User user) {
+    public SessionDTO createSession(String login) {
         Session session = new Session();
-        session.setUser(user);
+        var user = userRepository.findByLogin(login);
+        if (user.isPresent()){
+            session.setUser(user.get());
+        }
         session.setCreatedAt(OffsetDateTime.now());
-        return new SessionDTO(sessionRepository.save(session));
+        return SessionDTO.fromSession(sessionRepository.save(session));
     }
 
     /**
@@ -38,7 +44,7 @@ public class SessionService {
      * @return The session entity if found, otherwise throws an exception
      */
     public Optional<SessionDTO> findSessionById(Long sessionId) {
-        return sessionRepository.findById(sessionId).map(SessionDTO::new);
+        return sessionRepository.findById(sessionId).map(SessionDTO::fromSession);
     }
 
 }

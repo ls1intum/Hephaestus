@@ -7,15 +7,14 @@ import lombok.RequiredArgsConstructor;
 import lombok.Setter;
 import lombok.ToString;
 import org.springframework.lang.NonNull;
-
+import de.tum.in.www1.hephaestus.chat.session.Session;
 import de.tum.in.www1.hephaestus.gitprovider.common.BaseGitServiceEntity;
-import de.tum.in.www1.hephaestus.chat.Session;
 
 @Entity
 @Table(name = "message")
 @Getter
 @Setter
-@ToString(callSuper = true) 
+@ToString(callSuper = true)
 @RequiredArgsConstructor
 public class Message extends BaseGitServiceEntity {
     @NonNull
@@ -32,8 +31,8 @@ public class Message extends BaseGitServiceEntity {
 
     @NonNull
     @ManyToOne(optional = false, fetch = FetchType.LAZY)
-    @JoinColumn(name = "session_id") 
-    private Session session; 
+    @JoinColumn(name = "session_id")
+    private Session session;
 
     public enum MessageSender {
         SYSTEM, USER

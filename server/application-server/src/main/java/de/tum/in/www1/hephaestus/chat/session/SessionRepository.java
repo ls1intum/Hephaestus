@@ -1,4 +1,4 @@
-package de.tum.in.www1.hephaestus.chat;
+package de.tum.in.www1.hephaestus.chat.session;
 
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
@@ -30,9 +30,8 @@ public interface SessionRepository extends JpaRepository<Session, Long> {
     Session findByIdWithMessagesAndContents(@Param("sessionId") long sessionId);
 
     private Session getValueElseThrow(Optional<Session> optional, long sessionId) {
-        return optional.orElseThrow(() -> 
-            new EntityNotFoundException("Session entity with id " + sessionId + " was not found.")
-        );
+        return optional.orElseThrow(
+                () -> new EntityNotFoundException("Session entity with id " + sessionId + " was not found."));
     }
 
     @NotNull

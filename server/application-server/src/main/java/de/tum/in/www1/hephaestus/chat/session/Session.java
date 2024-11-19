@@ -1,4 +1,4 @@
-package de.tum.in.www1.hephaestus.chat;
+package de.tum.in.www1.hephaestus.chat.session;
 
 import java.time.ZonedDateTime;
 import java.util.ArrayList;
@@ -12,12 +12,11 @@ import de.tum.in.www1.hephaestus.chat.message.Message;
 import de.tum.in.www1.hephaestus.gitprovider.common.BaseGitServiceEntity;
 import de.tum.in.www1.hephaestus.gitprovider.user.User;
 
-
 @Entity
 @Table(name = "session")
 @Getter
 @Setter
-@ToString(callSuper = true) 
+@ToString(callSuper = true)
 @NoArgsConstructor
 public class Session extends BaseGitServiceEntity {
 
@@ -28,6 +27,8 @@ public class Session extends BaseGitServiceEntity {
     @Column(name = "creation_date")
     private ZonedDateTime creationDate = ZonedDateTime.now();
 
-    @OneToOne
+    @ManyToOne
+    @JoinColumn(name = "user_id")
+    @ToString.Exclude
     private User user;
 }
