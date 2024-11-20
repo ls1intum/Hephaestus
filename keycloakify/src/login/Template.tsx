@@ -66,8 +66,8 @@ export default function Template(props: TemplateProps<KcContext, I18n>) {
                         <span className="text-3xl font-medium">Hephaestus</span>
                     </div>
                 </div>
-                <div className="flex flex-col gap-4 mb-48 w-72">
-                    <header>
+                <div className="flex flex-col gap-4 mb-16 md:mb-32 w-72">
+                    <div>
                         {(() => {
                             const node = !(auth !== undefined && auth.showUsername && !auth.showResetCredentials) ? (
                                 <h1 id="kc-page-title" className="text-xl text-center">
@@ -101,7 +101,7 @@ export default function Template(props: TemplateProps<KcContext, I18n>) {
 
                             return node;
                         })()}
-                    </header>
+                    </div>
                     <div id="kc-content">
                         <div id="kc-content-wrapper">
                             {/* App-initiated actions should not see warning messages about the need to complete the action during login. */}
@@ -151,6 +151,51 @@ export default function Template(props: TemplateProps<KcContext, I18n>) {
                     </div>
                 </div>
             </div>
+            <footer className="py-6 md:px-8 md:py-0 border-t">
+                <div className="container flex flex-col items-center justify-between gap-2 md:gap-4 md:h-24 md:flex-row">
+                    <p className="text-balance text-center text-sm leading-loose text-muted-foreground md:text-left">
+                        <a href="/about" className="font-medium underline underline-offset-4">
+                            About
+                        </a>
+                    </p>
+                    <p className="text-balance text-center text-sm leading-loose text-muted-foreground md:text-left">
+                        <a href="/privacy" className="font-medium underline underline-offset-4">
+                            Privacy
+                        </a>
+                    </p>
+                    <p className="text-balance text-center text-sm leading-loose text-muted-foreground md:text-left">
+                        <a href="/imprint" className="font-medium underline underline-offset-4">
+                            Imprint
+                        </a>
+                    </p>
+                    <p className="text-balance text-center text-sm leading-loose text-muted-foreground md:text-left">
+                        <a data-canny-link href="https://hephaestus.canny.io/feature-requests" className="font-medium underline underline-offset-4">
+                            Feature requests
+                        </a>
+                    </p>
+                    <p className="text-balance text-center text-sm leading-loose text-muted-foreground md:text-right flex-1">
+                        Built by{" "}
+                        <a href="https://github.com/ls1intum" target="_blank" rel="noreferrer" className="font-medium underline underline-offset-4">
+                            LS1 Team
+                        </a>{" "}
+                        at{" "}
+                        <a href="https://www.tum.de/en/" target="_blank" rel="noreferrer" className="font-medium underline underline-offset-4">
+                            TUM
+                        </a>
+                        . The source code is available on
+                        <a
+                            href="https://github.com/ls1intum/hephaestus"
+                            target="_blank"
+                            rel="noreferrer"
+                            className="font-medium underline underline-offset-4"
+                        >
+                            {" "}
+                            GitHub
+                        </a>
+                        .
+                    </p>
+                </div>
+            </footer>
         </div>
     );
 }
