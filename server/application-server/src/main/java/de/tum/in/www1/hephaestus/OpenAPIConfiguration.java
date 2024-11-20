@@ -44,59 +44,95 @@ public class OpenAPIConfiguration {
         return openApi -> {            
             var components = openApi.getComponents();
 
-            // Only include schemas with DTO suffix and remove the suffix
-            var schemas = components
-                    .getSchemas()
-                    .entrySet()
-                    .stream()
-                    .filter(entry -> entry.getKey().endsWith("DTO"))
-                    .collect(Collectors.toMap(entry -> entry.getKey().substring(0, entry.getKey().length() - 3),
+            if (components != null && components.getSchemas() != null) {
+                // Only include schemas with DTO suffix and remove the suffix
+                var schemas = components
+                        .getSchemas()
+                        .entrySet()
+                        .stream()
+                        .filter(entry -> entry.getKey().endsWith("DTO"))
+                        .collect(Collectors.toMap(
+                            entry -> entry.getKey().substring(0, entry.getKey().length() - 3),
                             entry -> {
                                 var schema = entry.getValue();
                                 schema.setName(entry.getKey().substring(0, entry.getKey().length() - 3));
                                 return schema;
-                            }));
+                            }
+                        ));
 
-            // Remove DTO suffix from attribute names
-            schemas.forEach((key, value) -> {
-                Map<String, Schema<?>> properties = value.getProperties();
-                if (properties != null) {
-                    properties.forEach((propertyKey, propertyValue) -> {
-                        removeDTOSuffixesFromSchemaRecursively(propertyValue);
-                    });
-                }
-            });
+                // Remove DTO suffix from attribute names
+                schemas.forEach((key, value) -> {
+                    Map<String, Schema<?>> properties = value.getProperties();
+                    if (properties != null) {
+                        properties.forEach((propertyKey, propertyValue) -> {
+                            removeDTOSuffixesFromSchemaRecursively(propertyValue);
+                        });
+                    }
+                });
 
-            components.setSchemas(schemas);
+                components.setSchemas(schemas);
+            } else {
+                logger.warn("Components or Schemas are null in OpenAPI configuration.");
+            }
 
             var paths = openApi.getPaths();
-            paths.forEach((path, pathItem) -> {
-                logger.info(path);
-                pathItem.readOperations().forEach(operation -> {
-                    // Remove DTO suffix from reponse schemas
-                    var responses = operation.getResponses();
-                    responses.forEach((responseCode, response) -> {
-                        var content = response.getContent();
-                        content.forEach((contentType, mediaType) -> {
-                            removeDTOSuffixesFromSchemaRecursively(mediaType.getSchema());
+            if (paths != null) {
+                paths.forEach((path, pathItem) -> {
+                    logger.info("Processing path: {}", path);
+                    pathItem.readOperations().forEach(operation -> {
+                        // Remove DTO suffix from response schemas
+                        var responses = operation.getResponses();
+                        if (responses != null) {
+                            responses.forEach((responseCode, response) -> {
+                                var content = response.getContent();
+                                if (content != null) {
+                                    content.forEach((contentType, mediaType) -> {
+                                        if (mediaType != null && mediaType.getSchema() != null) {
+                                            removeDTOSuffixesFromSchemaRecursively(mediaType.getSchema());
+                                        } else {
+                                            logger.warn("MediaType or Schema is null for content type: {}", contentType);
+                                        }
+                                    });
+                                } else {
+                                    logger.warn("Response with code {} has no content.", responseCode);
+                                }
+                            });
+                        }
 
-                        });
+                        // Remove -controller suffix from tags
+                        if (operation.getTags() != null) {
+                            operation.setTags(
+                                operation.getTags()
+                                    .stream()
+                                    .filter(tag -> {
+                                        if (tag.length() > 11) {
+                                            return true;
+                                        } else {
+                                            logger.warn("Tag '{}' is shorter than expected and cannot be trimmed.", tag);
+                                            return false;
+                                        }
+                                    })
+                                    .map(tag -> tag.substring(0, tag.length() - 11))
+                                    .collect(Collectors.toList())
+                            );
+                        }
                     });
-
-                    // Remove -controller suffix from tags
-                    operation.setTags(operation.getTags()
-                            .stream()
-                            .map(tag -> tag.substring(0, tag.length() - 11)).toList());
                 });
-            });
-
-            
+            } else {
+                logger.warn("Paths are null in OpenAPI configuration.");
+            }
         };
     }
 
     private void removeDTOSuffixesFromSchemaRecursively(Schema<?> schema) {
+        if (schema == null) {
+            return;
+        }
+
         if (schema.get$ref() != null && schema.get$ref().endsWith("DTO")) {
-            schema.set$ref(schema.get$ref().substring(0, schema.get$ref().length() - 3));
+            String newRef = schema.get$ref().substring(0, schema.get$ref().length() - 3);
+            schema.set$ref(newRef);
+            logger.debug("Updated $ref from {} to {}", schema.get$ref(), newRef);
         }
 
         if (schema.getItems() != null) {

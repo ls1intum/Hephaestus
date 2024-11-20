@@ -4,6 +4,7 @@ import { HomeComponent } from '@app/home/home.component';
 import { AdminComponent } from '@app/admin/admin.component';
 import { AdminGuard } from '@app/core/security/admin.guard';
 import { UserProfileComponent } from '@app/user/user-profile.component';
+import { SettingsComponent } from '@app/settings/settings.component';
 import { ImprintComponent } from '@app/legal/imprint/imprint.component';
 
 export const routes: Routes = [
@@ -15,5 +16,6 @@ export const routes: Routes = [
     canActivate: [AdminGuard]
   },
   { path: 'user/:id', component: UserProfileComponent },
+  { path: 'settings', component: SettingsComponent },
   { path: 'imprint', component: ImprintComponent }
 ];
