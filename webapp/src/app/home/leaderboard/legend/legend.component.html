@@ -1,5 +1,5 @@
 <div hlmCard>
-  <div hlmCardContent class="flex flex-col gap-y-4">
+  <div hlmCardContent class="flex flex-col gap-y-4 pb-0">
     <div class="flex flex-col gap-2 sm:min-w-[250px]">
       <h4 class="mb-2 text-lg font-semibold leading-none tracking-tight">Icons</h4>
       <div class="flex items-center gap-2 text-github-muted-foreground">
@@ -22,36 +22,32 @@
         <ng-icon [svg]="octCommentDiscussion" size="16" />
         Code comments
       </div>
-    </div>
-    <div [class]="contentClass()">
-      <h4 class="font-medium mb-2">Scoring System</h4>
-      <p class="text-sm text-github-muted-foreground">
-        The score approximates your contribution activity by evaluating your review interactions and the complexity of the pull requests you've reviewed.
-        <span class="font-semibold">Change requests are valued highest</span>, followed by approvals and comments. The score increases with the number of review interactions. Pull
-        request complexity &mdash; based on factors like changed files, commits, additions, and deletions &mdash; also enhances your score;
-        <span class="font-semibold">more complex pull requests contribute more</span>. The final score balances your interactions with the complexity of the work reviewed,
-        highlighting both your engagement and the difficulty of the tasks you've undertaken. This score reflects your impact but does not directly measure time invested or work
-        quality.
-        <a
-          hlmBtn
-          variant="link"
-          size="none"
-          href="https://github.com/ls1intum/Hephaestus/blob/961614388f7860319a076089be0095190bf20a71/server/application-server/src/main/java/de/tum/in/www1/hephaestus/leaderboard/LeaderboardService.java#L160"
-        >
-          [source]
-        </a>
-      </p>
-    </div>
-  </div>
-  <div class="flex items-center justify-center group hover:cursor-pointer hover:bg-muted/50" (click)="toggleOpen()">
-    <div class="flex items-center gap-2 px-6 py-1.5">
-      @if (open()) {
-        <hlm-icon name="lucideChevronUp" />
-        <p class="text-github-muted-foreground text-sm font-medium">Show less</p>
-      } @else {
-        <hlm-icon name="lucideChevronDown" />
-        <p class="text-github-muted-foreground text-sm font-medium">Show more</p>
-      }
+      <div hlmAccordion>
+        <div hlmAccordionItem class="border-none">
+          <button hlmAccordionTrigger>
+            Scoring system
+            <hlm-icon hlmAccIcon />
+          </button>
+          <hlm-accordion-content class="max-w-xl">
+            <p class="text-sm text-github-muted-foreground">
+              The score approximates your contribution activity by evaluating your review interactions and the complexity of the pull requests you've reviewed.
+              <span class="font-semibold">Change requests are valued highest</span>, followed by approvals and comments. The score increases with the number of review interactions.
+              Pull request complexity &mdash; based on factors like changed files, commits, additions, and deletions &mdash; also enhances your score;
+              <span class="font-semibold">more complex pull requests contribute more</span>. The final score balances your interactions with the complexity of the work reviewed,
+              highlighting both your engagement and the difficulty of the tasks you've undertaken. This score reflects your impact but does not directly measure time invested or
+              work quality.
+              <a
+                hlmBtn
+                variant="link"
+                size="none"
+                href="https://github.com/ls1intum/Hephaestus/blob/961614388f7860319a076089be0095190bf20a71/server/application-server/src/main/java/de/tum/in/www1/hephaestus/leaderboard/LeaderboardService.java#L160"
+              >
+                [source]
+              </a>
+            </p>
+          </hlm-accordion-content>
+        </div>
+      </div>
     </div>
   </div>
 </div>
