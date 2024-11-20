@@ -26,14 +26,13 @@ export const Default: Story = {
                             providerId: "github",
                             displayName: "Github",
                             iconClasses: "fa fa-github"
-                        },
+                        }
                     ]
                 }
             }}
         />
     )
 };
-
 
 export const WithAllSocialProviders: Story = {
     render: () => (
@@ -64,7 +63,7 @@ export const WithAllSocialProviders: Story = {
 };
 
 export const WithErrorMessage: Story = {
-    render: (args) => (
+    render: args => (
         <KcPageStory
             {...args}
             kcContext={{

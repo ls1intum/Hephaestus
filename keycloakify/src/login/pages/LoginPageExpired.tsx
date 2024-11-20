@@ -12,15 +12,15 @@ export default function LoginPageExpired(props: PageProps<Extract<KcContext, { p
     return (
         <Template kcContext={kcContext} i18n={i18n} doUseDefaultCss={doUseDefaultCss} classes={classes} headerNode={msg("pageExpiredTitle")}>
             <p id="instruction1" className="instruction">
-                {msg("pageExpiredMsg1")}
-                <a id="loginRestartLink" href={url.loginRestartFlowUrl}>
+                {msg("pageExpiredMsg1")}{" "}
+                <a id="loginRestartLink" href={url.loginRestartFlowUrl} className="font-medium [&>div]:underline [&>div]:underline-offset-4">
                     {msg("doClickHere")}
-                </a>{" "}
+                </a>
                 .<br />
                 {msg("pageExpiredMsg2")}{" "}
-                <a id="loginContinueLink" href={url.loginAction}>
+                <a id="loginContinueLink" href={url.loginAction} className="font-medium [&>div]:underline [&>div]:underline-offset-4">
                     {msg("doClickHere")}
-                </a>{" "}
+                </a>
                 .
             </p>
         </Template>

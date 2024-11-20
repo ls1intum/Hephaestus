@@ -5,6 +5,8 @@ import type { UserProfileFormFieldsProps } from "keycloakify/login/UserProfileFo
 import type { PageProps } from "keycloakify/login/pages/PageProps";
 import type { KcContext } from "../KcContext";
 import type { I18n } from "../i18n";
+import { Button } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
 
 type LoginUpdateProfileProps = PageProps<Extract<KcContext, { pageId: "login-update-profile.ftl" }>, I18n> & {
     UserProfileFormFields: LazyOrNot<(props: UserProfileFormFieldsProps) => JSX.Element>;
@@ -35,7 +37,7 @@ export default function LoginUpdateProfile(props: LoginUpdateProfileProps) {
             headerNode={msg("loginProfileTitle")}
             displayMessage={messagesPerField.exists("global")}
         >
-            <form id="kc-update-profile-form" className={kcClsx("kcFormClass")} action={url.loginAction} method="post">
+            <form id="kc-update-profile-form" className={cn(kcClsx("kcFormClass"), "space-y-2")} action={url.loginAction} method="post">
                 <UserProfileFormFields
                     kcContext={kcContext}
                     i18n={i18n}
@@ -48,19 +50,21 @@ export default function LoginUpdateProfile(props: LoginUpdateProfileProps) {
                         <div className={kcClsx("kcFormOptionsWrapperClass")} />
                     </div>
                     <div id="kc-form-buttons" className={kcClsx("kcFormButtonsClass")}>
-                        <input
-                            disabled={!isFormSubmittable}
-                            className={kcClsx(
-                                "kcButtonClass",
-                                "kcButtonPrimaryClass",
-                                !isAppInitiatedAction && "kcButtonBlockClass",
-                                "kcButtonLargeClass"
-                            )}
-                            type="submit"
-                            value={msgStr("doSubmit")}
-                        />
+                        <Button asChild>
+                            <input
+                                disabled={!isFormSubmittable}
+                                className={kcClsx(
+                                    "kcButtonClass",
+                                    "kcButtonPrimaryClass",
+                                    !isAppInitiatedAction && "kcButtonBlockClass",
+                                    "kcButtonLargeClass"
+                                )}
+                                type="submit"
+                                value={msgStr("doSubmit")}
+                            />
+                        </Button>
                         {isAppInitiatedAction && (
-                            <button
+                            <Button
                                 className={kcClsx("kcButtonClass", "kcButtonDefaultClass", "kcButtonLargeClass")}
                                 type="submit"
                                 name="cancel-aia"
@@ -68,7 +72,7 @@ export default function LoginUpdateProfile(props: LoginUpdateProfileProps) {
                                 formNoValidate
                             >
                                 {msg("doCancel")}
-                            </button>
+                            </Button>
                         )}
                     </div>
                 </div>

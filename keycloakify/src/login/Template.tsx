@@ -10,6 +10,7 @@ import type { KcContext } from "./KcContext";
 import ThemeSwitcher from "@/components/theme-switcher";
 import { CircleAlert, CircleCheck, CircleX, Hammer, Info } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { cn } from "@/lib/utils";
 
 export default function Template(props: TemplateProps<KcContext, I18n>) {
     const {
@@ -66,7 +67,7 @@ export default function Template(props: TemplateProps<KcContext, I18n>) {
                         <span className="text-3xl font-medium">Hephaestus</span>
                     </div>
                 </div>
-                <div className="flex flex-col gap-4 mb-16 md:mb-32 w-72">
+                <div className="flex flex-col gap-4 mb-16 md:mb-32 w-96">
                     <div>
                         {(() => {
                             const node = !(auth !== undefined && auth.showUsername && !auth.showResetCredentials) ? (
@@ -88,9 +89,9 @@ export default function Template(props: TemplateProps<KcContext, I18n>) {
                             if (displayRequiredFields) {
                                 return (
                                     <div className={kcClsx("kcContentWrapperClass")}>
-                                        <div className={clsx(kcClsx("kcLabelWrapperClass"), "subtitle")}>
-                                            <span className="subtitle">
-                                                <span className="required">*</span>
+                                        <div className={clsx(kcClsx("kcLabelWrapperClass"), "subtitle flex justify-end")}>
+                                            <span className="subtitle [&>div]:text-muted-foreground [&>div]:text-sm">
+                                                <span className="required text-destructive mr-0.5">*</span>
                                                 {msg("requiredFields")}
                                             </span>
                                         </div>

@@ -2,6 +2,7 @@ import type { PageProps } from "keycloakify/login/pages/PageProps";
 import { kcSanitize } from "keycloakify/lib/kcSanitize";
 import type { KcContext } from "../KcContext";
 import type { I18n } from "../i18n";
+import { Button } from "@/components/ui/button";
 
 export default function Info(props: PageProps<Extract<KcContext, { pageId: "info.ftl" }>, I18n>) {
     const { kcContext, i18n, doUseDefaultCss, Template, classes } = props;
@@ -53,23 +54,29 @@ export default function Info(props: PageProps<Extract<KcContext, { pageId: "info
 
                     if (pageRedirectUri) {
                         return (
-                            <p>
-                                <a href={pageRedirectUri}>{msg("backToApplication")}</a>
+                            <p className="mt-2">
+                                <Button asChild variant="ghost">
+                                    <a href={pageRedirectUri}>{msg("backToApplication")}</a>
+                                </Button>
                             </p>
                         );
                     }
                     if (actionUri) {
                         return (
-                            <p>
-                                <a href={actionUri}>{msg("proceedWithAction")}</a>
+                            <p className="mt-2">
+                                <Button asChild variant="ghost">
+                                    <a href={actionUri}>{msg("proceedWithAction")}</a>
+                                </Button>
                             </p>
                         );
                     }
 
                     if (client.baseUrl) {
                         return (
-                            <p>
-                                <a href={client.baseUrl}>{msg("backToApplication")}</a>
+                            <p className="mt-2">
+                                <Button asChild variant="ghost">
+                                    <a href={client.baseUrl}>{msg("backToApplication")}</a>
+                                </Button>
                             </p>
                         );
                     }
