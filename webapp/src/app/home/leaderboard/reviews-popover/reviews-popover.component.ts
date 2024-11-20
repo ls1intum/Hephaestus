@@ -53,13 +53,13 @@ export class ReviewsPopoverComponent {
   copyPullRequests() {
     const htmlList = `<ul>
       ${this.sortedReviewedPRs()
-        .map((pullRequest) => `<li><a href="${pullRequest.htmlUrl}">${pullRequest.repository?.name ?? ''}:${pullRequest.number}</a></li>`)
+        .map((pullRequest) => `<li><a href="${pullRequest.htmlUrl}">${pullRequest.repository?.name ?? ''} #${pullRequest.number}</a></li>`)
         .join('\n')}
     </ul>`;
 
     // As markdown text
     const plainText = this.sortedReviewedPRs()
-      .map((pullRequest) => `[${pullRequest.repository?.name ?? ''}:${pullRequest.number}](${pullRequest.htmlUrl})`)
+      .map((pullRequest) => `[${pullRequest.repository?.name ?? ''} #${pullRequest.number}](${pullRequest.htmlUrl})`)
       .join('\n');
 
     const clipboardItem = new ClipboardItem({

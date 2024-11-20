@@ -144,20 +144,10 @@ public class SlackMessageService {
     private class SlackWeeklyLeaderboardTask implements Runnable {
 
         /**
-         * Gets the Slack handles of the top 3 reviewers of the last week.
+         * Gets the Slack handles of the top 3 reviewers in the given time frame.
          * @return
          */
-        private List<User> getTop3SlackReviewers() {
-            // Calculate the the last leaderboard schedule
-            var timeParts = scheduledTime.split(":");
-            OffsetDateTime before = OffsetDateTime.now()
-                .with(TemporalAdjusters.previousOrSame(DayOfWeek.of(Integer.parseInt(scheduledDay))))
-                .withHour(Integer.parseInt(timeParts[0]))
-                .withMinute(timeParts.length > 0 ? Integer.parseInt(timeParts[1]) : 0)
-                .withSecond(0)
-                .withNano(0);
-            OffsetDateTime after = before.minusWeeks(1);
-
+        private List<User> getTop3SlackReviewers(OffsetDateTime after, OffsetDateTime before) {
             var leaderboard = leaderboardService.createLeaderboard(after, before, Optional.empty());
             var top3 = leaderboard.subList(0, Math.min(3, leaderboard.size()));
             logger.debug("Top 3 Users of the last week: " + top3.stream().map(e -> e.user().name()).toList());
@@ -170,11 +160,7 @@ public class SlackMessageService {
                 return new ArrayList<>();
             }
 
-            return top3
-                .stream()
-                .map(mapToSlackUser(allSlackUsers))
-                .filter(user -> user != null)
-                .toList();
+            return top3.stream().map(mapToSlackUser(allSlackUsers)).filter(user -> user != null).toList();
         }
 
         private Function<LeaderboardEntryDTO, User> mapToSlackUser(List<User> allSlackUsers) {
@@ -205,14 +191,28 @@ public class SlackMessageService {
             };
         }
 
+        private String formatDateForURL(OffsetDateTime date) {
+            return date.format(java.time.format.DateTimeFormatter.ISO_OFFSET_DATE_TIME).replace("+", "%2B");
+        }
+
         @Override
         public void run() {
             // get date in unix format
-            var currentDate = OffsetDateTime.now().toEpochSecond();
+            long currentDate = OffsetDateTime.now().toEpochSecond();
+            // Calculate the the last leaderboard schedule
+            String[] timeParts = scheduledTime.split(":");
+            OffsetDateTime before = OffsetDateTime.now()
+                .with(TemporalAdjusters.previousOrSame(DayOfWeek.of(Integer.parseInt(scheduledDay))))
+                .withHour(Integer.parseInt(timeParts[0]))
+                .withMinute(timeParts.length > 0 ? Integer.parseInt(timeParts[1]) : 0)
+                .withSecond(0)
+                .withNano(0);
+            OffsetDateTime after = before.minusWeeks(1);
 
-            var top3reviewers = getTop3SlackReviewers();
+            var top3reviewers = getTop3SlackReviewers(after, before);
 
             logger.info("Sending scheduled message to Slack channel...");
+
             List<LayoutBlock> blocks = asBlocks(
                 header(header ->
                     header.text(plainText(pt -> pt.text(":newspaper: Reviews of the last week :newspaper:")))
@@ -232,6 +232,10 @@ public class SlackMessageService {
                         markdownText(
                             "Another *review leaderboard* has concluded. You can check out your placement <" +
                             hephaestusUrl +
+                            "?after=" +
+                            formatDateForURL(after) +
+                            "&before=" +
+                            formatDateForURL(before) +
                             "|here>."
                         )
                     )
