@@ -11,8 +11,10 @@ export default defineConfig({
         keycloakify({
             themeName: "hephaestus",
             accountThemeImplementation: "none",
-            postBuild:  async (buildContext) => {
-                await fs.rm(path.join(buildContext.keycloakifyBuildDirPath, ".gitignore"));
+            postBuild: async buildContext => {
+                await fs.rm(
+                    path.join(buildContext.keycloakifyBuildDirPath, ".gitignore")
+                );
             }
         })
     ],

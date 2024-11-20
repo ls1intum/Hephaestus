@@ -12,7 +12,10 @@
         "build": "tsc && vite build",
         "build-keycloak-theme": "npm run build && keycloakify build",
         "storybook": "storybook dev -p 6006",
-        "format": "prettier . --write"
+        "format": "prettier . --write",
+        "start-keycloak": "npx keycloakify start-keycloak",
+        "eject-page": "npx keycloakify eject-page",
+        "add-story": "npx keycloakify add-story"
     },
     "license": "MIT",
     "keywords": [],
