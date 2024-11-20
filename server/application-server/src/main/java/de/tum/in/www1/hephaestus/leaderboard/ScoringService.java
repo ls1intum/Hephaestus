@@ -3,14 +3,25 @@ package de.tum.in.www1.hephaestus.leaderboard;
 import de.tum.in.www1.hephaestus.gitprovider.issue.Issue;
 import de.tum.in.www1.hephaestus.gitprovider.issuecomment.IssueComment;
 import de.tum.in.www1.hephaestus.gitprovider.pullrequest.PullRequest;
+import de.tum.in.www1.hephaestus.gitprovider.pullrequest.PullRequestRepository;
 import de.tum.in.www1.hephaestus.gitprovider.pullrequestreview.PullRequestReview;
 import java.util.List;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Service;
 
+@Service
 public class ScoringService {
 
-    private static final Logger logger = LoggerFactory.getLogger(ScoringService.class);
+    private final Logger logger = LoggerFactory.getLogger(ScoringService.class);
+
+    @Autowired
+    private PullRequestRepository pullRequestRepository;
+
+    public static double WEIGHT_APPROVAL = 2.0;
+    public static double WEIGHT_CHANGESREQUESTED = 2.5;
+    public static double WEIGHT_COMMENT = 1.5;
 
     public static double calculateReviewScore(List<PullRequestReview> pullRequestReviews) {
         return calculateReviewScore(pullRequestReviews, 0);
@@ -20,36 +31,51 @@ public class ScoringService {
         // All reviews are for the same pull request
         int complexityScore = calculateComplexityScore(pullRequestReviews.get(0).getPullRequest());
 
-        double approvalWeight = 2.0;
         double approvalScore = pullRequestReviews
             .stream()
             .filter(review -> review.getState() == PullRequestReview.State.APPROVED)
             .filter(review -> review.getAuthor().getId() != review.getPullRequest().getAuthor().getId())
-            .map(review -> approvalWeight * calculateCodeReviewBonus(review.getComments().size(), complexityScore))
+            .map(review -> WEIGHT_APPROVAL * calculateCodeReviewBonus(review.getComments().size(), complexityScore))
             .reduce(0.0, Double::sum);
 
-        double changesRequestedWeight = 2.5;
         double changesRequestedScore = pullRequestReviews
             .stream()
             .filter(review -> review.getState() == PullRequestReview.State.CHANGES_REQUESTED)
             .filter(review -> review.getAuthor().getId() != review.getPullRequest().getAuthor().getId())
-            .map(review -> changesRequestedWeight * calculateCodeReviewBonus(review.getComments().size(), complexityScore))
+            .map(review -> WEIGHT_CHANGESREQUESTED * calculateCodeReviewBonus(review.getComments().size(), complexityScore))
             .reduce(0.0, Double::sum);
 
-        double commentWeight = 1.5;
         double commentScore = pullRequestReviews
             .stream()
             .filter(review -> review.getState() == PullRequestReview.State.COMMENTED || review.getState() == PullRequestReview.State.UNKNOWN)
             .filter(review -> review.getAuthor().getId() != review.getPullRequest().getAuthor().getId())
-            .map(review -> commentWeight * calculateCodeReviewBonus(review.getComments().size(), complexityScore))
+            .map(review -> WEIGHT_COMMENT * calculateCodeReviewBonus(review.getComments().size(), complexityScore))
             .reduce(0.0, Double::sum);
 
-        double issueCommentScore = commentWeight * numberOfIssueComments;
+        double issueCommentScore = WEIGHT_COMMENT * numberOfIssueComments;
 
         double interactionScore = approvalScore + changesRequestedScore + commentScore + issueCommentScore;
         return 10 * interactionScore * complexityScore / (interactionScore + complexityScore);
     }
 
+    public double calculateReviewScore(IssueComment issueComment) {
+        Issue issue = issueComment.getIssue();
+        PullRequest pullRequest;
+        if (issue.isPullRequest()) {
+            pullRequest = (PullRequest) issue;
+        } else {
+            var optionalPR = pullRequestRepository.findByRepositoryAndNumber(issue.getRepository(), issue.getNumber());
+            if (optionalPR.isEmpty()) {
+                logger.error("Issue comment is not associated with a pull request.");
+                return 0;
+            }
+            pullRequest = optionalPR.get();
+        }
+        
+        int complexityScore = calculateComplexityScore(pullRequest);
+        
+        return 10 * WEIGHT_COMMENT * complexityScore / (WEIGHT_COMMENT + complexityScore);
+    }
 
     /**
      * Calculates the code review bonus for a given number of code comments and complexity score.
@@ -72,20 +98,6 @@ public class ScoringService {
             codeReviewBonus += 1;
         }
         return codeReviewBonus / 2 * maxBonus;
-    }
-
-    public static double calculateReviewScore(IssueComment issueComment) {
-        Issue issue = issueComment.getIssue();
-        // TODO: we have to find a better way to determine the complexity score for issue comments
-        if (!issue.isPullRequest()) {
-            return 1;
-        }
-        PullRequest pullRequest = (PullRequest) issue;
-        
-        int complexityScore = ScoringService.calculateComplexityScore(pullRequest);
-        double complexityBonus = 1 + (complexityScore - 1) / 32.0;
-
-        return 5 * complexityBonus;
     }
 
     /**

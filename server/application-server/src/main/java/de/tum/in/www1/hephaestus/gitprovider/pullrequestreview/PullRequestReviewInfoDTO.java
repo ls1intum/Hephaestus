@@ -36,7 +36,7 @@ public record PullRequestReviewInfoDTO(
             pullRequestReview.getSubmittedAt());
     }
 
-    public static PullRequestReviewInfoDTO fromIssueComment(IssueComment issueComment) {
+    public static PullRequestReviewInfoDTO fromIssueComment(IssueComment issueComment, int reviewScore) {
         return new PullRequestReviewInfoDTO(
                 issueComment.getId(),
                 false,
@@ -45,7 +45,7 @@ public record PullRequestReviewInfoDTO(
                 UserInfoDTO.fromUser(issueComment.getAuthor()),
                 PullRequestBaseInfoDTO.fromIssue(issueComment.getIssue()),
                 issueComment.getHtmlUrl(),
-                (int) ScoringService.calculateReviewScore(issueComment),
+                reviewScore,
                 issueComment.getCreatedAt()
         );
     }

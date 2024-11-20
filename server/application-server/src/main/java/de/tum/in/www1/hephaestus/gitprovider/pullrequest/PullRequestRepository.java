@@ -33,4 +33,15 @@ public interface PullRequestRepository extends JpaRepository<PullRequest, Long> 
     List<PullRequest> findAssignedByLoginAndStates(
             @Param("assigneeLogin") String assigneeLogin,
             @Param("states") Set<PullRequest.State> states);
+
+    @Query("""
+            SELECT p
+            FROM PullRequest p
+            LEFT JOIN FETCH p.labels
+            JOIN FETCH p.author
+            LEFT JOIN FETCH p.assignees
+            LEFT JOIN FETCH p.repository
+            WHERE p.repository = :repository AND p.number = :number
+            """)
+    Optional<PullRequest> findByRepositoryAndNumber(@Param("repository") de.tum.in.www1.hephaestus.gitprovider.repository.Repository repository, @Param("number") int number);
 }
