@@ -99,6 +99,14 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/AuthUserInfo"
+  /user:
+    delete:
+      tags:
+      - user
+      operationId: deleteUser
+      responses:
+        "200":
+          description: OK
 components:
   schemas:
     PullRequestInfo:

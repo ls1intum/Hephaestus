@@ -41,6 +41,11 @@ hephaestus:
             enabled: false
             channel-id: ""
 
+keycloak:
+    url: http://localhost:8081
+    realm: hephaestus
+    client-id: hephaestus-confidential
+    client-secret: 0g0QtFmz6GB1Jv03SszCFepPro0hiP7G
 
 nats:
     enabled: false
