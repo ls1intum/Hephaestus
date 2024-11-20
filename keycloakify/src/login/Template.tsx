@@ -10,7 +10,6 @@ import type { KcContext } from "./KcContext";
 import ThemeSwitcher from "@/components/theme-switcher";
 import { CircleAlert, CircleCheck, CircleX, Hammer, Info } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { cn } from "@/lib/utils";
 
 export default function Template(props: TemplateProps<KcContext, I18n>) {
     const {
