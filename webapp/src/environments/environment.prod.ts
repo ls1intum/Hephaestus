@@ -14,6 +14,7 @@ export const environment = {
     domains: ''
   },
   legal: {
-    imprintHtml: '<p>This is the imprint.</p>'
+    imprintHtml: '<p>This is the imprint.</p>',
+    privacyHtml: '<p>This is the privacy policy.</p>'
   }
 };

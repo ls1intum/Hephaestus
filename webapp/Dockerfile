@@ -37,7 +37,8 @@ export const environment = {
     domains: '${UMAMI_DOMAINS}'
   },
   legal: {
-    imprintHtml: '${LEGAL_IMPRINT_HTML}'
+    imprintHtml: '${LEGAL_IMPRINT_HTML}',
+    privacyHtml: '${LEGAL_PRIVACY_HTML}'
   }
 };
 EOF
