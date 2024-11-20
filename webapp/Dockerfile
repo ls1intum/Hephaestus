@@ -16,7 +16,9 @@ RUN COOLIFY_URL_VALUE=$(grep '^COOLIFY_URL=' .env | cut -d '=' -f2) && \
 # Export environment variables from .env
 # This assumes that .env contains lines like VARIABLE=value
 # and does not contain spaces around the '='
-RUN export $(grep -v '^#' .env | xargs) && \
+RUN set -a && \
+    . /app/.env && \
+    set +a && \
     echo "Generating environment.prod.ts" && \
     cat > src/environments/environment.prod.ts <<EOF
 export const environment = {
@@ -33,6 +35,9 @@ export const environment = {
     scriptUrl: '${UMAMI_SCRIPT_URL}',
     websiteId: '${UMAMI_WEBSITE_ID}',
     domains: '${UMAMI_DOMAINS}'
+  },
+  legal: {
+    imprintHtml: '${LEGAL_IMPRINT_HTML}'
   }
 };
 EOF

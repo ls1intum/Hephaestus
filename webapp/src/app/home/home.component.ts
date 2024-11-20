@@ -49,7 +49,7 @@ export class HomeComponent {
     if (afterParam) return afterParam;
 
     let defaultDate = dayjs().isoWeekday(this.leaderboardSchedule().day).startOf('hour').hour(this.leaderboardSchedule().hour).minute(this.leaderboardSchedule().minute);
-    if (defaultDate.isAfter(dayjs()) || defaultDate.isSame(dayjs(), 'day')) {
+    if (defaultDate.isAfter(dayjs())) {
       defaultDate = defaultDate.subtract(1, 'week');
     }
     return defaultDate.format();

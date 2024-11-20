@@ -12,5 +12,8 @@ export const environment = {
     scriptUrl: '',
     websiteId: '',
     domains: ''
+  },
+  legal: {
+    imprintHtml: '<p>This is the imprint.</p>'
   }
 };
