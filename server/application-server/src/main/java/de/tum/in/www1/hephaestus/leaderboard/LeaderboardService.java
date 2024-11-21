@@ -170,39 +170,34 @@ public class LeaderboardService {
                 // All reviews are for the same pull request
                 int complexityScore = calculateComplexityScore(pullRequestReviews.get(0).getPullRequest());
 
-                int approvalReviews = (int) pullRequestReviews
+                double approvalWeight = 2.0;
+                double approvalScore = pullRequestReviews
                     .stream()
                     .filter(review -> review.getState() == PullRequestReview.State.APPROVED)
-                    .count();
-                int changesRequestedReviews = (int) pullRequestReviews
+                    .filter(review -> review.getAuthor().getId() != review.getPullRequest().getAuthor().getId())
+                    .map(review -> approvalWeight * calculateCodeReviewBonus(review.getComments().size(), complexityScore))
+                    .reduce(0.0, Double::sum);
+
+                double changesRequestedWeight = 2.5;
+                double changesRequestedScore = pullRequestReviews
                     .stream()
                     .filter(review -> review.getState() == PullRequestReview.State.CHANGES_REQUESTED)
-                    .count();
-                int commentReviews = (int) pullRequestReviews
+                    .filter(review -> review.getAuthor().getId() != review.getPullRequest().getAuthor().getId())
+                    .map(review -> changesRequestedWeight * calculateCodeReviewBonus(review.getComments().size(), complexityScore))
+                    .reduce(0.0, Double::sum);
+
+                double commentWeight = 1.5;
+                double commentScore = pullRequestReviews
                     .stream()
-                    .filter(review -> review.getState() == PullRequestReview.State.COMMENTED)
-                    .filter(review -> review.getBody() != null) // Only count if there is a comment
-                    .count();
-                int unknownReviews = (int) pullRequestReviews
-                    .stream()
-                    .filter(review -> review.getState() == PullRequestReview.State.UNKNOWN)
-                    .filter(review -> review.getBody() != null) // Only count if there is a comment
-                    .count();
+                    .filter(review -> review.getState() == PullRequestReview.State.COMMENTED || review.getState() == PullRequestReview.State.UNKNOWN)
+                    .filter(review -> review.getAuthor().getId() != review.getPullRequest().getAuthor().getId())
+                    .map(review -> commentWeight * calculateCodeReviewBonus(review.getComments().size(), complexityScore))
+                    .reduce(0.0, Double::sum);
 
-                int codeComments = pullRequestReviews
-                    .stream()
-                    .map(review -> review.getComments().size())
-                    .reduce(0, Integer::sum);
+                double issueCommentScore = commentWeight * numberOfIssueComments;
 
-                double interactionScore =
-                    (approvalReviews * 1.5 +
-                        changesRequestedReviews * 2.0 +
-                        (commentReviews + unknownReviews + numberOfIssueComments) +
-                        codeComments * 0.5);
-
-                double complexityBonus = 1 + (complexityScore - 1) / 32.0;
-
-                return 5 * interactionScore * complexityBonus;
+                double interactionScore = approvalScore + changesRequestedScore + commentScore + issueCommentScore;
+                return 10 * interactionScore * complexityScore / (interactionScore + complexityScore);
             })
             .reduce(0.0, Double::sum);
         return (int) Math.ceil(totalScore);
@@ -233,5 +228,28 @@ public class LeaderboardService {
             return 17; // Huge
         }
         return 33; // Overly complex
+    }
+
+    /**
+     * Calculates the code review bonus for a given number of code comments and complexity score.
+     * The bonus is a value between 0 and 2.
+     * Taken from the original leaderboard implementation script.
+     *
+     * @param codeComments
+     * @param complexityScore
+     * @return bonus
+     */
+    private double calculateCodeReviewBonus(int codeComments, int complexityScore) {
+        double maxBonus = 2;
+
+        double codeReviewBonus = 1;
+        if (codeComments < complexityScore) {
+            // Function goes from 0 at codeComments = 0 to 1 at codeComments = complexityScore
+            codeReviewBonus +=  2 * Math.sqrt(complexityScore) * Math.sqrt(codeComments) / (codeComments + complexityScore);
+        } else {
+            // Saturate at 1
+            codeReviewBonus += 1;
+        }
+        return codeReviewBonus / 2 * maxBonus;
     }
 }
