@@ -1,11 +1,11 @@
 package de.tum.in.www1.hephaestus.chat.message;
 
 import java.time.ZonedDateTime;
+import java.util.List;
 
 import org.springframework.stereotype.Service;
 import de.tum.in.www1.hephaestus.chat.message.Message.MessageSender;
 import de.tum.in.www1.hephaestus.chat.session.Session;
-import de.tum.in.www1.hephaestus.chat.session.SessionDTO;
 import de.tum.in.www1.hephaestus.chat.session.SessionRepository;
 import de.tum.in.www1.hephaestus.intelligenceservice.api.DefaultApi;
 import de.tum.in.www1.hephaestus.intelligenceservice.model.ChatRequest;
@@ -27,31 +27,33 @@ public class MessageService {
         this.sessionApiClient = new DefaultApi();
     }
 
-    /**
-     * Sends a message, saves it, and generates a bot response.
-     */
+    public List<MessageDTO> getMessagesBySessionId(Long sessionId) {
+        return messageRepository.findBySessionId(sessionId).stream()
+                .map(message -> new MessageDTO(message.getId(), message.getSentAt(), message.getSender(),
+                        message.getContent(), message.getSession().getId()))
+                .toList();
+    }
+
     public MessageDTO sendMessage(MessageDTO messageDTO) {
-        Session session = sessionRepository.findById(messageDTO.session().id())
+        Session session = sessionRepository.findById(messageDTO.sessionId())
                 .orElseThrow(() -> new IllegalArgumentException("Session not found"));
 
-        Message userMessage = new Message(ZonedDateTime.now(), MessageSender.USER, messageDTO.content(), session);
+        Message userMessage = new Message(messageDTO.sentAt(), MessageSender.USER, messageDTO.content(), session);
         messageRepository.save(userMessage);
 
-        String systemResponse = generateResponse(messageDTO.session(), messageDTO.content());
+        String systemResponse = generateResponse(messageDTO.sessionId(), messageDTO.content());
 
         Message systemMessage = new Message(ZonedDateTime.now(), MessageSender.SYSTEM, systemResponse, session);
         messageRepository.save(systemMessage);
 
         return new MessageDTO(systemMessage.getId(), systemMessage.getSentAt(), systemMessage.getSender(),
-                systemMessage.getContent(), SessionDTO.fromSession(systemMessage.getSession()));
+                systemMessage.getContent(), systemMessage.getSession().getId());
     }
 
-    /**
-     * Calls the Python FastAPI service to generate a bot response.
-     */
-    private String generateResponse(SessionDTO session, String messageContent) {
+
+    private String generateResponse(Long session_id, String messageContent) {
         ChatRequest chatRequest = new ChatRequest();
-        chatRequest.setSessionId(session.id().toString());
+        chatRequest.setSessionId(session_id.toString());
         chatRequest.setMessageContent(messageContent);
 
         try {

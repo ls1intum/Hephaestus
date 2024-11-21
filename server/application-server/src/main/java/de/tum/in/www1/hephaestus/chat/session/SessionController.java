@@ -2,17 +2,18 @@ package de.tum.in.www1.hephaestus.chat.session;
 
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PathVariable;
 
-import java.util.Optional;
+import java.util.List;
 
 import org.springframework.http.ResponseEntity;
 
+
 @RestController
-@RequestMapping("/session")
+@RequestMapping("/sessions")
 public class SessionController {
 
     private final SessionService sessionService;
@@ -21,15 +22,24 @@ public class SessionController {
         this.sessionService = sessionService;
     }
 
+    @GetMapping
+    public ResponseEntity<List<SessionDTO>> getSessions(@RequestParam Long userId) {
+        List<SessionDTO> sessions = sessionService.findAllSessionsByUser(userId);
+        return ResponseEntity.ok(sessions);
+    }
+
     @PostMapping
-    public ResponseEntity<SessionDTO> createSession(@RequestBody String login) {
-        SessionDTO session = sessionService.createSession(login);
+    public ResponseEntity<SessionDTO> createSession(@RequestBody Long userId) {
+        SessionDTO session = sessionService.createSession(userId);
         return ResponseEntity.ok(session);
     }
 
+ /* 
     @GetMapping("/session/{sessionId}")
     public ResponseEntity<SessionDTO> getSession(@PathVariable Long sessionId) {
         Optional<SessionDTO> session = sessionService.findSessionById(sessionId);
         return ResponseEntity.ok(session.get());
     }
+*/
+    
 }
