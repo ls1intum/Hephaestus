@@ -39,7 +39,7 @@
         >
           <p>{{ message.content }}</p>
         </div>
-        <span class="text-xs text-gray-500"> {{ message.sender === 'USER' ? 'You' : 'AI Mentor' }} · {{ message.timestamp | date: 'shortTime' }} </span>
+        <span class="text-xs text-gray-500"> {{ message.sender === 'USER' ? 'You' : 'AI Mentor' }} · {{ message.sentAt| date: 'shortTime' }} </span>
       </div>
     </div>
   </div>

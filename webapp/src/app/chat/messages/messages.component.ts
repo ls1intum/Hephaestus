@@ -17,9 +17,10 @@ export class MessagesComponent implements OnInit, AfterViewChecked {
 
   securityStore = inject(SecurityStore);
   user = this.securityStore.loadedUser;
+  signedIn = this.securityStore.signedIn;
 
   @ViewChild('chatMessagesContainer') private chatMessagesContainer!: ElementRef;
-  @Input() messages: { sender: Message.SenderEnum; content: string; timestamp: string }[] = [];
+  @Input() messages: Message[] = [];
 
     ngOnInit() { 
         this.scrollToBottom();

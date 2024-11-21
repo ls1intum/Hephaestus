@@ -1,23 +1,17 @@
 <div class="flex gap-4" style="height: calc(100vh - 100px);">
-    <div hlmCard class="bg-card border border-border focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-background focus:ring-ring rounded-lg shadow-sm text-card-foreground">
-    <div hlmCardContent class="flex flex-col gap-y-4 pb-0 p-6">
-      
-      <a hlmBtn class="w-full" variant="default" class="cursor-pointer bg-cyan-500 hover:bg-cyan-600 gap-2 justify-start" >
-        <lucide-angular [img]="Plus" class="size-4" />
-        <span>New Reflective Session</span>
-      </a>
-      <div class="flex flex-col gap-2 sm:min-w-[250px]">
-        <h4 class="mb-2 text-lg font-semibold leading-none tracking-tight">Past Sessions</h4>
-      </div>
-    </div>
-  </div>
+  <!-- Sessions Card -->
+  <app-sessions-card
+    
+    (sessionCreated)="onSessionCreated()"
+    class="w-1/4"
+  ></app-sessions-card>
 
-  <!-- Chat Section -->
+  <!-- 
   <div class="flex flex-col w-3/4">
-    <!-- Messages Section -->
+    
     <app-messages [messages]="messages" class="flex-1 overflow-y-auto p-4 space-y-4"></app-messages>
 
-    <!-- Input Section -->
+ 
     <app-chat-input (messageSent)="sendMessage($event)" class="border-t p-4"></app-chat-input>
-  </div>
+  </div> -->
 </div>

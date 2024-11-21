@@ -1,53 +1,64 @@
-import { Component, inject, input } from '@angular/core';
+import { Component, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
+import { SessionsCardComponent } from '../sessions-card/sessions-card.component';
 import { MessagesComponent } from '../messages/messages.component';
 import { InputComponent } from '../input/input.component';
 import { SecurityStore } from '@app/core/security/security-store.service';
-import { Message } from '@app/core/modules/openapi';
-
+import { Message, Session } from '@app/core/modules/openapi';
+import { SessionService, MessageService } from '@app/core/modules/openapi'; // Ensure the MessageService is imported
 
 import { HlmButtonModule } from '@spartan-ng/ui-button-helm';
-import { Plus, LucideAngularModule } from 'lucide-angular';
 
 @Component({
   selector: 'app-chat',
   templateUrl: './chat.component.html',
   standalone: true,
-  imports: [CommonModule, MessagesComponent, InputComponent, HlmButtonModule, LucideAngularModule],
+  imports: [CommonModule, SessionsCardComponent, MessagesComponent, InputComponent, HlmButtonModule],
 })
 export class ChatComponent {
-  protected Plus = Plus;
   securityStore = inject(SecurityStore);
+  sessionService = inject(SessionService);
+  messageService = inject(MessageService); // Inject MessageService
   signedIn = this.securityStore.signedIn;
   user = this.securityStore.loadedUser;
 
-  session = input<Message>();
+  selectedSession?: Session; // Track the selected session
+  messages: Message[] = []; // Messages for the selected session
 
-  previousSessions = [
-    { id: 1, name: 'Session 1' },
-    { id: 2, name: 'Session 2' },
-    { id: 3, name: 'Session 3' },
-  ];
+  // Handle session selection
+  onSessionSelected(session: Session): void {
+    this.selectedSession = session;
+    console.log('Selected session:', session);
+    this.loadMessagesForSession(session.id); // Fetch messages for the selected session
+  }
 
-  messages: { sender: Message.SenderEnum; content: string; timestamp: string }[] = []; // Mock messages array
+  // Handle session creation
+  onSessionCreated(): void {
+    console.log('New session created!');
+    // Refresh the session list or take other actions if needed
+  }
 
-  // Mock message handler
+  // Fetch messages for a specific session
+  loadMessagesForSession(sessionId: number): void {
+    this.messageService.getMessages(sessionId).subscribe(
+      (data: Message[]) => {
+        this.messages = data; // Update the messages array
+        console.log('Loaded messages:', data);
+      }
+    );
+  }
+
+  // Send a message
   sendMessage(content: string): void {
-    // Add the user's message to the mocked messages array
-    this.messages.push({
-      sender: Message.SenderEnum.User,
-      content: content,
-      timestamp: new Date().toISOString(),
-    });
-  }
+    if (!this.selectedSession) {
+      console.error('No session selected!');
+      return;
+    }
 
-  startSession() {
-    console.log('Starting Reflective Session...');
-    // Logic to start a new reflective session
-  }
-
-  fetchSessions(session: { id: number; name: string }) {
-    console.log('Fetching session:', session.name);
-    // Logic to fetch the selected session
+    this.messageService.createMessage(this.selectedSession.id, content).subscribe(
+      (savedMessage: Message) => {
+        this.messages.push(savedMessage); // Append the new message to the array
+        console.log('Message sent:', savedMessage);
+      });
   }
 }
