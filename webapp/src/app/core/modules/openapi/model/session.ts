@@ -15,7 +15,7 @@ import { Message } from './message';
 export interface Session { 
     id: number;
     messages: Array<Message>;
-    userId: number;
+    userLogin: string;
     creationDate: string;
 }
 

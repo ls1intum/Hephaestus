@@ -19,12 +19,11 @@ paths:
       - session
       operationId: getSessions
       parameters:
-      - name: userId
+      - name: login
         in: query
         required: true
         schema:
-          type: integer
-          format: int64
+          type: string
       responses:
         "200":
           description: OK
@@ -42,8 +41,7 @@ paths:
         content:
           application/json:
             schema:
-              type: integer
-              format: int64
+              type: string
         required: true
       responses:
         "200":
@@ -501,7 +499,7 @@ components:
       - creationDate
       - id
       - messages
-      - userId
+      - userLogin
       type: object
       properties:
         id:
@@ -511,9 +509,8 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/Message"
-        userId:
-          type: integer
-          format: int64
+        userLogin:
+          type: string
         creationDate:
           type: string
           format: date-time
