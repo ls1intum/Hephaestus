@@ -8,9 +8,8 @@
       hlmBtn
       class="w-full cursor-pointer bg-cyan-500 hover:bg-cyan-600 gap-2 justify-start "
       [disabled]="isLoading()"
-     
+      (click)="handleCreateSession()"
     >
-     <!-- (click)="handleCreateSession()" -->
       <lucide-angular [img]="Plus" class="size-4"></lucide-angular>
       <span *ngIf="!isLoading(); else loading">New Reflective Session</span>
       <ng-template #loading>Loading...</ng-template>
@@ -25,7 +24,7 @@
           class="cursor-pointer bg-gray-100 hover:bg-gray-200 p-2 rounded-lg"
           
         >
-          {{ session || 'Unnamed Session' }}
+          {{ session.creationDate | date: 'short' }}
         </li>
       </ul>
     </div>

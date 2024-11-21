@@ -1,10 +1,9 @@
-import { Component, computed, inject, signal } from '@angular/core';
+import { Component, computed, inject, signal, Signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
+import { lastValueFrom } from 'rxjs';
 import { SecurityStore } from '@app/core/security/security-store.service';
 import { Plus, LucideAngularModule } from 'lucide-angular';
-import { ActivatedRoute } from '@angular/router';
-import { KeycloakService } from '@app/core/security/keycloak.service';
-import { SessionService, UserService, UserInfo } from '@app/core/modules/openapi';
+import { SessionService, Session } from '@app/core/modules/openapi';
 import { injectMutation, injectQuery } from '@tanstack/angular-query-experimental';
 import { HlmButtonModule } from '@spartan-ng/ui-button-helm';
 
@@ -12,7 +11,7 @@ import { HlmButtonModule } from '@spartan-ng/ui-button-helm';
   standalone: true,
   selector: 'app-sessions-card',
   templateUrl: './sessions-card.component.html',
-  imports: [CommonModule, LucideAngularModule, HlmButtonModule],
+  imports: [CommonModule, LucideAngularModule, HlmButtonModule]
 })
 export class SessionsCardComponent {
   protected Plus = Plus;
@@ -25,49 +24,45 @@ export class SessionsCardComponent {
   user = this.securityStore.loadedUser;
 
   constructor() {
-    console.log('User:', this.user(),
-      'Signed in:', this.signedIn());
+    console.log('User:', this.user(), 'Signed in:', this.signedIn());
   }
 
   query = injectQuery(() => ({
     enabled: this.signedIn(),
-    queryKey: ['sessions', { userId: (this.user()?.id) }],
-    queryFn: async () => ([this.sessionService.getSessions])
+    queryKey: ['sessions', { login: this.user()?.username }],
+    queryFn: async () => {
+      const username = this.user()?.username;
+      if (!username) {
+        console.log('User is not logged in or username is undefined.');
+        throw new Error('User is not logged in or username is undefined.');
+      }
+      return lastValueFrom(this.sessionService.getSessions(username));
+    }
   }));
 
-  sessions = computed(() => this.query.data() ?? []);
-
-
-  // // Signals
-  // isLoading = signal(false);
-  // user = signal<UserInfo | null>(null);
-
-  // // Get the current user from the SecurityStore
-  // private loadedUser = computed(() => this.securityStore.loadedUser());
-
-  // // Fetch sessions using Angular Query
-  // protected sessionsQuery = injectQuery(() => ({
-  //   queryKey: ['sessions', this.loadedUser()?.id],
-  //   queryFn: async () => this.sessionService.getSessions(Number(this.loadedUser()?.id)),
-  //   enabled: !!this.loadedUser()?.id // Only fetch if user ID is available
-  // }));
+  sessions: Signal<Session[]> = computed(() => this.query.data() ?? []);
 
   // // Computed property to get sessions
   // protected sessions = computed(() => this.sessionsQuery.data() ?? []);
 
-  // // Create a new session
-  // protected createSession = injectMutation(() => ({
-  //   mutationFn: async () => this.sessionService.createSession(Number(this.loadedUser()?.id)),
-  //   onSuccess: () => {
-  //     this.sessionsQuery.refetch(); // Refetch sessions after creating a new one
-  //   }
-  // }));
+  handleCreateSession(): void {
+    this.createSession.mutate();
+  }
 
-  // // Handle new session creation
-  // handleCreateSession(): void {
-  //   this.createSession.mutate();
-  // }
+  protected createSession = injectMutation(() => ({
+    mutationFn: async () => {
+      const username = this.user()?.username;
+      if (!username) {
+        console.log('User is not logged in or username is undefined.');
+        throw new Error('User is not logged in or username is undefined.');
+      }
+      await lastValueFrom(this.sessionService.createSession(username));
+    },
+    onSuccess: () => {
+      console.log('New session created');
+      this.query.refetch(); // Refetch sessions after creating a new one
+    }
+  }));
 
-  
 
 }
