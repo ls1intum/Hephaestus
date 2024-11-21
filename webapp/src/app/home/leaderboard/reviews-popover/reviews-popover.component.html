@@ -1,8 +1,8 @@
 <brn-popover sideOffset="5" closeDelay="100">
   <button
-    [variant]="highlight() ? 'default' : 'outline'"
+    [variant]="highlight() ? 'outline' : 'outline'"
     size="sm"
-    [class]="'flex items-center gap-1 ' + (!highlight() ? 'text-github-muted-foreground' : '')"
+    [class]="'flex items-center gap-1 ' + (!highlight() ? 'text-github-muted-foreground' : 'border-primary bg-accent hover:bg-primary hover:text-background')"
     brnPopoverTrigger
     hlmBtn
     (click)="$event.stopPropagation()"
