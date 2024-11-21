@@ -54,6 +54,9 @@ export class LeaderboardComponent {
   isLoading = input<boolean>();
 
   trClass = (entry: LeaderboardEntry) => {
-    return cn('cursor-pointer', this.signedIn() && this.user()?.username.toLowerCase() === entry.user.login.toLowerCase() ? 'bg-accent' : '');
+    return cn(
+      'cursor-pointer',
+      this.signedIn() && this.user()?.username.toLowerCase() === entry.user.login.toLowerCase() ? 'bg-accent dark:bg-accent/30 dark:hover:bg-accent/50' : ''
+    );
   };
 }
