@@ -20,6 +20,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.cache.annotation.Cacheable;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 
 @Service
@@ -28,26 +29,25 @@ public class AdminService {
     private static final Logger logger = LoggerFactory.getLogger(AdminService.class);
 
     @Autowired
-    private AdminRepository adminRepository;
+    private ApplicationEventPublisher eventPublisher;
 
+    @Autowired
+    private AdminRepository adminRepository;
     @Autowired
     private UserRepository userRepository;
-
     @Autowired
     private TeamService teamService;
-
     @Autowired
     private TeamRepository teamRepository;
-
     @Autowired
     private RepositoryRepository repositoryRepository;
-
     @Autowired
     private LabelRepository labelRepository;
 
     @Value("${monitoring.repositories}")
     private String[] repositoriesToMonitor;
 
+    @CacheEvict(value = "config")
     private AdminConfig createInitialConfig() {
         AdminConfig newAdminConfig = new AdminConfig();
         newAdminConfig.setRepositoriesToMonitor(Set.of(repositoriesToMonitor));
@@ -66,6 +66,9 @@ public class AdminService {
         AdminConfig adminConfig = getAdminConfig();
         adminConfig.setRepositoriesToMonitor(repositories);
         adminRepository.save(adminConfig);
+
+        eventPublisher.publishEvent(new AdminConfigChangedEvent(this, adminConfig));
+
         return adminConfig.getRepositoriesToMonitor();
     }
 

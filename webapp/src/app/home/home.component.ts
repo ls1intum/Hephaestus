@@ -64,7 +64,7 @@ export class HomeComponent {
     queryFn: async () => lastValueFrom(this.leaderboardService.getLeaderboard(this.afterParam(), this.beforeParam(), this.teamParam() !== 'all' ? this.teamParam() : undefined))
   }));
 
-  protected teams = computed(() => this.metaQuery.data()?.teams.map((team) => team.name) ?? []);
+  protected teams = computed(() => this.metaQuery.data()?.teams?.map((team) => team.name) ?? []);
   metaQuery = injectQuery(() => ({
     queryKey: ['meta'],
     queryFn: async () => lastValueFrom(this.metaService.getMetaData())

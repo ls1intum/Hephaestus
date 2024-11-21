@@ -1,11 +1,9 @@
 package de.tum.in.www1.hephaestus.syncing;
 
-import java.io.IOException;
-import java.util.Arrays;
-import java.util.Set;
-import java.time.Duration;
-import java.time.ZonedDateTime;
-
+import de.tum.in.www1.hephaestus.admin.AdminConfigChangedEvent;
+import de.tum.in.www1.hephaestus.admin.AdminService;
+import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubMessageHandler;
+import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubMessageHandlerRegistry;
 import io.nats.client.Connection;
 import io.nats.client.ConsumerContext;
 import io.nats.client.JetStreamApiException;
@@ -16,20 +14,20 @@ import io.nats.client.Options;
 import io.nats.client.StreamContext;
 import io.nats.client.api.ConsumerConfiguration;
 import io.nats.client.api.DeliverPolicy;
-
-import org.springframework.stereotype.Service;
-import org.springframework.boot.context.event.ApplicationReadyEvent;
-import org.springframework.context.event.EventListener;
-import org.springframework.core.annotation.Order;
+import java.io.IOException;
+import java.time.Duration;
+import java.time.ZonedDateTime;
+import java.util.Arrays;
+import java.util.Set;
 import org.kohsuke.github.GHEvent;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
-
-import de.tum.in.www1.hephaestus.admin.AdminService;
-import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubMessageHandler;
-import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubMessageHandlerRegistry;
+import org.springframework.boot.context.event.ApplicationReadyEvent;
+import org.springframework.context.event.EventListener;
+import org.springframework.core.annotation.Order;
+import org.springframework.stereotype.Service;
 
 @Order(value = 1)
 @Service
@@ -96,12 +94,13 @@ public class NatsConsumerService {
 
     private Options buildNatsOptions() {
         return Options.builder()
-                .server(natsServer)
-                .connectionListener((conn, type) -> logger.info("Connection event - Server: {}, {}",
-                        conn.getServerInfo().getPort(), type))
-                .maxReconnects(-1)
-                .reconnectWait(Duration.ofSeconds(INITIAL_RECONNECT_DELAY_SECONDS))
-                .build();
+            .server(natsServer)
+            .connectionListener((conn, type) ->
+                logger.info("Connection event - Server: {}, {}", conn.getServerInfo().getPort(), type)
+            )
+            .maxReconnects(-1)
+            .reconnectWait(Duration.ofSeconds(INITIAL_RECONNECT_DELAY_SECONDS))
+            .build();
     }
 
     private void setupConsumer(Connection connection) throws IOException, InterruptedException {
@@ -120,9 +119,9 @@ public class NatsConsumerService {
             if (consumerContext == null) {
                 logger.info("Setting up consumer for subjects: {}", Arrays.toString(getSubjects()));
                 ConsumerConfiguration.Builder consumerConfigBuilder = ConsumerConfiguration.builder()
-                        .filterSubjects(getSubjects())
-                        .deliverPolicy(DeliverPolicy.ByStartTime)
-                        .startTime(ZonedDateTime.now().minusDays(timeframe));
+                    .filterSubjects(getSubjects())
+                    .deliverPolicy(DeliverPolicy.ByStartTime)
+                    .startTime(ZonedDateTime.now().minusDays(timeframe));
 
                 if (durableConsumerName != null && !durableConsumerName.isEmpty()) {
                     consumerConfigBuilder.durable(durableConsumerName);
@@ -140,6 +139,35 @@ public class NatsConsumerService {
         } catch (JetStreamApiException e) {
             logger.error("JetStream API exception: {}", e.getMessage(), e);
             throw new IOException("Failed to set up consumer.", e);
+        }
+    }
+
+    @EventListener(classes = AdminConfigChangedEvent.class)
+    public void handleAdminConfigChangedEvent(AdminConfigChangedEvent event) {
+        logger.info("Received admin config changed event. Updating consumer.");
+        updateConsumer(event.getAdminConfig().getRepositoriesToMonitor());
+    }
+
+    public void updateConsumer(Set<String> repositoriesToMonitor) {
+        if (natsConnection == null || natsConnection.getStatus() != Connection.Status.CONNECTED) {
+            logger.info("NATS connection is not initialized. No need to update the consumer.");
+            return;
+        }
+
+        StreamContext streamContext;
+        try {
+            streamContext = natsConnection.getStreamContext("github");
+            ConsumerConfiguration oldConfig = consumerContext.getConsumerInfo().getConsumerConfiguration();
+            // Update the consumer config with the latest subjects
+            ConsumerConfiguration newConfig = ConsumerConfiguration.builder()
+                .filterSubjects(getSubjects(repositoriesToMonitor))
+                .deliverPolicy(oldConfig.getDeliverPolicy())
+                .durable(oldConfig.getDurable())
+                .startTime(oldConfig.getStartTime())
+                .build();
+            streamContext.createOrUpdateConsumer(newConfig);
+        } catch (IOException | JetStreamApiException e) {
+            logger.error("Failed to update consumer: {}", e.getMessage(), e);
         }
     }
 
@@ -167,26 +195,33 @@ public class NatsConsumerService {
         }
     }
 
+    private String[] getSubjects() {
+        return getSubjects(adminService.getAdminConfig().getRepositoriesToMonitor());
+    }
+
     /**
      * Subjects to monitor.
-     * 
+     *
      * @return The subjects to monitor.
      */
-    private String[] getSubjects() {
-        String[] events = handlerRegistry.getSupportedEvents().stream()
-                .map(GHEvent::name)
-                .map(String::toLowerCase)
-                .toArray(String[]::new);
+    private String[] getSubjects(Set<String> repositoriesToMonitor) {
+        String[] events = handlerRegistry
+            .getSupportedEvents()
+            .stream()
+            .map(GHEvent::name)
+            .map(String::toLowerCase)
+            .toArray(String[]::new);
 
-        return adminService.getAdminConfig().getRepositoriesToMonitor().stream()
-                .map(this::getSubjectPrefix)
-                .flatMap(prefix -> Arrays.stream(events).map(event -> prefix + "." + event))
-                .toArray(String[]::new);
+        return repositoriesToMonitor
+            .stream()
+            .map(this::getSubjectPrefix)
+            .flatMap(prefix -> Arrays.stream(events).map(event -> prefix + "." + event))
+            .toArray(String[]::new);
     }
 
     /**
      * Get subject prefix from ownerWithName for the given repository.
-     * 
+     *
      * @param ownerWithName The owner and name of the repository.
      * @return The subject prefix, i.e. "github.owner.name" sanitized.
      * @throws IllegalArgumentException if the repository string is improperly
@@ -202,8 +237,8 @@ public class NatsConsumerService {
 
         if (parts.length != 2) {
             throw new IllegalArgumentException(
-                    String.format("Invalid repository format: '%s'. Expected format 'owner/repository'.",
-                            ownerWithName));
+                String.format("Invalid repository format: '%s'. Expected format 'owner/repository'.", ownerWithName)
+            );
         }
 
         return "github." + parts[0] + "." + parts[1];
