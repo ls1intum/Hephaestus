@@ -27,9 +27,10 @@ export interface MessageServiceInterface {
     /**
      * 
      * 
-     * @param message 
+     * @param sessionId 
+     * @param body 
      */
-    createMessage(message: Message, extraHttpRequestParams?: any): Observable<Message>;
+    createMessage(sessionId: number, body: string, extraHttpRequestParams?: any): Observable<Message>;
 
     /**
      * 

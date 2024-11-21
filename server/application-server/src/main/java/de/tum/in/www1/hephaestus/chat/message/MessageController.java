@@ -25,9 +25,9 @@ public class MessageController {
         return ResponseEntity.ok(messages);
     }
 
-    @PostMapping
-    public ResponseEntity<MessageDTO> createMessage(@RequestBody MessageDTO message) {
-        MessageDTO createdMessage = messageService.sendMessage(message);
+    @PostMapping("/{sessionId}")
+    public ResponseEntity<MessageDTO> createMessage(@RequestBody String message, @PathVariable Long sessionId) {
+        MessageDTO createdMessage = messageService.sendMessage(message, sessionId);
         return ResponseEntity.ok(createdMessage);
     }
 }

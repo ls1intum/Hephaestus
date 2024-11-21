@@ -11,9 +11,6 @@ import de.tum.in.www1.hephaestus.intelligenceservice.api.DefaultApi;
 import de.tum.in.www1.hephaestus.intelligenceservice.model.ChatRequest;
 import de.tum.in.www1.hephaestus.intelligenceservice.model.ChatResponse;
 
-/**
- * Service for managing messages.
- */
 @Service
 public class MessageService {
 
@@ -34,14 +31,14 @@ public class MessageService {
                 .toList();
     }
 
-    public MessageDTO sendMessage(MessageDTO messageDTO) {
-        Session session = sessionRepository.findById(messageDTO.sessionId())
+    public MessageDTO sendMessage(String content, Long sessionId) {
+        Session session = sessionRepository.findById(sessionId)
                 .orElseThrow(() -> new IllegalArgumentException("Session not found"));
 
-        Message userMessage = new Message(messageDTO.sentAt(), MessageSender.USER, messageDTO.content(), session);
+        Message userMessage = new Message(ZonedDateTime.now(), MessageSender.USER, content, session);
         messageRepository.save(userMessage);
 
-        String systemResponse = generateResponse(messageDTO.sessionId(), messageDTO.content());
+        String systemResponse = generateResponse(sessionId, content);
 
         Message systemMessage = new Message(ZonedDateTime.now(), MessageSender.SYSTEM, systemResponse, session);
         messageRepository.save(systemMessage);
@@ -49,7 +46,6 @@ public class MessageService {
         return new MessageDTO(systemMessage.getId(), systemMessage.getSentAt(), systemMessage.getSender(),
                 systemMessage.getContent(), systemMessage.getSession().getId());
     }
-
 
     private String generateResponse(Long session_id, String messageContent) {
         ChatRequest chatRequest = new ChatRequest();
