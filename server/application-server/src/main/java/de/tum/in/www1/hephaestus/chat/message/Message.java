@@ -17,6 +17,10 @@ import de.tum.in.www1.hephaestus.gitprovider.common.BaseGitServiceEntity;
 @ToString(callSuper = true)
 @RequiredArgsConstructor
 public class Message extends BaseGitServiceEntity {
+    @Id
+    @GeneratedValue(strategy=GenerationType.IDENTITY)
+    protected Long id;
+    
     @NonNull
     @Column(name = "sent_at")
     private final ZonedDateTime sentAt;
