@@ -1,4 +1,4 @@
-<div class="messages space-y-4">
+<div #chatMessagesContainer class="messages space-y-4 overflow-y-auto" style="max-height: 100%">
   <div *ngFor="let message of messages" class="flex w-full" [ngClass]="{ 'justify-end': message.sender === 'USER', 'justify-start': message.sender === 'SYSTEM' }">
     <!-- Wrapper for Avatar and Bubble -->
     <div class="flex space-x-2" [ngClass]="{ 'flex-row-reverse': message.sender === 'USER' }" style="max-width: 60%">
@@ -43,4 +43,4 @@
       </div>
     </div>
   </div>
-</div>
+</div> 
