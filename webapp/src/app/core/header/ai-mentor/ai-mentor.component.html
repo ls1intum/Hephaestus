@@ -1,21 +1,17 @@
-<hlm-tooltip>
-    <a
-      hlmBtn
-      hlmTooltipTrigger
-      hlmTooltipContentClass="bg-purple-100 dark:bg-purple-800 dark:border-purple-500 border-purple-300 text-github-upsell-foreground dark:text-popover-foreground"
-      aria-describedby="AI Mentor"
-      class="cursor-pointer gap-2"
-      variant="ghost"
-      [size]="iconOnly() ? 'icon' : 'default'"
-      [routerLink]="[ '/', 'chat' ]" 
-      routerLinkActive="active"
-    >
-      <lucide-angular [img]="BotMessageSquare" class="size-4" />
-      @if (!iconOnly()) {
-        AI&nbsp;Mentor
-      }
-    </a>
-    @if (iconOnly()) {
-      <span *brnTooltipContent class="flex items-center">AI&nbsp;Mentor</span>
+<a
+    hlmBtn
+    aria-describedby="AI Mentor"
+    class="border-cyan-500 cursor-pointer text-cyan-500 hover:text-cyan-500 hover:bg-cyan-500/10 dark:hover:bg-cyan-500/20 gap-2"
+    variant="outline"
+    [size]="iconOnly() ? 'icon' : 'default'"
+    [routerLink]="['/', 'chat']"
+    routerLinkActive="active"
+  >
+    <lucide-angular [img]="BotMessageSquare" class="size-4" />
+    @if (!iconOnly()) {
+      AI&nbsp;Mentor
     }
-  </hlm-tooltip>
+  </a>
+  @if (iconOnly()) {
+    <span *brnTooltipContent class="flex items-center">AI&nbsp;Mentor</span>
+  }
