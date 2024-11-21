@@ -1,5 +1,5 @@
 <div align="center">
-  <img alt="Hephaestus Logo" height="100px" src="./webapp/public/apple-touch-icon.png" style="border-radius: 16%">
+  <img alt="Hephaestus Logo" height="100px" src="./docs/images/hammer_bg.svg">
 </div>
 
 # Hephaestus - A Framework to Support Novice Software Engineers in Collaborative Environments
