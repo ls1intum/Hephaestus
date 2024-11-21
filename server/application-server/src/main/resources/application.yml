@@ -40,6 +40,9 @@ hephaestus:
         notification:
             enabled: false
             channel-id: ""
+    team:
+        assignment:
+            auto: false
 
 keycloak:
     url: http://localhost:8081

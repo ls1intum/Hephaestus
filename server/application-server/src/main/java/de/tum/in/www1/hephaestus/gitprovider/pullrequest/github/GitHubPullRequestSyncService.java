@@ -16,6 +16,7 @@ import org.kohsuke.github.GHRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import jakarta.transaction.Transactional;
 
@@ -58,6 +59,9 @@ public class GitHubPullRequestSyncService {
     private GitHubMilestoneConverter milestoneConverter;
     @Autowired
     private GitHubUserConverter userConverter;
+
+    @Value("${hephaestus.team.assignment.auto}")
+    private boolean autoTeamAssignment;
 
     /**
      * Synchronizes all pull requests from the specified GitHub repositories.
@@ -237,7 +241,9 @@ public class GitHubPullRequestSyncService {
                     e.getMessage());
         }
 
-        automaticTeamAssignment(result);
+        if (autoTeamAssignment) {
+            automaticTeamAssignment(result);
+        }
 
         return pullRequestRepository.save(result);
     }

@@ -34,6 +34,9 @@ public class GitHubDataSyncService {
     @Value("${monitoring.run-on-startup-cooldown-in-minutes}")
     private int runOnStartupCooldownInMinutes;
 
+    @Value("${hephaestus.team.assignment.auto}")
+    private boolean autoTeamAssignment;
+
     @Autowired
     private DataSyncStatusRepository dataSyncStatusRepository;
     @Autowired
@@ -88,7 +91,9 @@ public class GitHubDataSyncService {
         pullRequestReviewSyncService.syncReviewsOfAllPullRequests(pullRequests);
         pullRequestReviewCommentSyncService.syncReviewCommentsOfAllPullRequests(pullRequests);
         userSyncService.syncAllExistingUsers();
-        teamService.syncDefaultTeams();
+        if (autoTeamAssignment) {
+            teamService.syncDefaultTeams();
+        }
 
         var endTime = OffsetDateTime.now();
 
