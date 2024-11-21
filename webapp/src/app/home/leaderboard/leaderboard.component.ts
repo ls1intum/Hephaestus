@@ -14,6 +14,8 @@ import { TableHeaderDirective } from 'app/ui/table/table-header.directive';
 import { TableRowDirective } from 'app/ui/table/table-row.directive';
 import { TableComponent } from 'app/ui/table/table.component';
 import { ReviewsPopoverComponent } from './reviews-popover/reviews-popover.component';
+import { HlmIconComponent, provideIcons } from '@spartan-ng/ui-icon-helm';
+import { lucideAward } from '@ng-icons/lucide';
 
 @Component({
   selector: 'app-leaderboard',
@@ -29,8 +31,10 @@ import { ReviewsPopoverComponent } from './reviews-popover/reviews-popover.compo
     TableRowDirective,
     ReviewsPopoverComponent,
     NgIconComponent,
+    HlmIconComponent,
     RouterLink
   ],
+  providers: [provideIcons({ lucideAward })],
   templateUrl: './leaderboard.component.html'
 })
 export class LeaderboardComponent {
