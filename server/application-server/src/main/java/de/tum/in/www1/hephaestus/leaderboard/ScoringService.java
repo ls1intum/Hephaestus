@@ -19,15 +19,15 @@ public class ScoringService {
     @Autowired
     private PullRequestRepository pullRequestRepository;
 
-    public static double WEIGHT_APPROVAL = 2.0;
-    public static double WEIGHT_CHANGESREQUESTED = 2.5;
-    public static double WEIGHT_COMMENT = 1.5;
+    public double WEIGHT_APPROVAL = 2.0;
+    public double WEIGHT_CHANGESREQUESTED = 2.5;
+    public double WEIGHT_COMMENT = 1.5;
 
-    public static double calculateReviewScore(List<PullRequestReview> pullRequestReviews) {
+    public double calculateReviewScore(List<PullRequestReview> pullRequestReviews) {
         return calculateReviewScore(pullRequestReviews, 0);
     }
 
-    public static double calculateReviewScore(List<PullRequestReview> pullRequestReviews, int numberOfIssueComments) {
+    public double calculateReviewScore(List<PullRequestReview> pullRequestReviews, int numberOfIssueComments) {
         // All reviews are for the same pull request
         int complexityScore = calculateComplexityScore(pullRequestReviews.get(0).getPullRequest());
 
@@ -86,7 +86,7 @@ public class ScoringService {
      * @param complexityScore
      * @return bonus
      */
-    public static double calculateCodeReviewBonus(int codeComments, int complexityScore) {
+    private double calculateCodeReviewBonus(int codeComments, int complexityScore) {
         double maxBonus = 2;
 
         double codeReviewBonus = 1;
@@ -108,7 +108,7 @@ public class ScoringService {
      * @param pullRequest
      * @return score
      */
-    public static int calculateComplexityScore(PullRequest pullRequest) {
+    private int calculateComplexityScore(PullRequest pullRequest) {
         Double complexityScore =
             ((pullRequest.getChangedFiles() * 3) +
                 (pullRequest.getCommits() * 0.5) +

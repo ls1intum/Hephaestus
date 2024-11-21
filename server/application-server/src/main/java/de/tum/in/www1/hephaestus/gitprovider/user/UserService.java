@@ -18,10 +18,10 @@ import de.tum.in.www1.hephaestus.gitprovider.issuecomment.IssueCommentRepository
 import de.tum.in.www1.hephaestus.gitprovider.pullrequest.PullRequestInfoDTO;
 import de.tum.in.www1.hephaestus.gitprovider.pullrequest.PullRequestRepository;
 import de.tum.in.www1.hephaestus.gitprovider.pullrequestreview.PullRequestReviewInfoDTO;
+import de.tum.in.www1.hephaestus.gitprovider.pullrequestreview.PullRequestReviewInfoDTOConverter;
 import de.tum.in.www1.hephaestus.gitprovider.pullrequestreview.PullRequestReviewRepository;
 import de.tum.in.www1.hephaestus.gitprovider.repository.RepositoryInfoDTO;
 import de.tum.in.www1.hephaestus.gitprovider.repository.RepositoryRepository;
-import de.tum.in.www1.hephaestus.leaderboard.ScoringService;
 import jakarta.transaction.Transactional;
 
 @Service
@@ -39,7 +39,7 @@ public class UserService {
     @Autowired
     private IssueCommentRepository issueCommentRepository;
     @Autowired
-    private ScoringService scoringService;
+    private PullRequestReviewInfoDTOConverter pullRequestReviewInfoDTOConverter;
 
     @Transactional
     public Optional<UserProfileDTO> getUserProfile(String login) {
@@ -67,13 +67,13 @@ public class UserService {
         List<PullRequestReviewInfoDTO> reviewActivity = pullRequestReviewRepository
                 .findAllByAuthorLoginSince(login, OffsetDateTime.now().minusDays(7))
                 .stream()
-                .map(PullRequestReviewInfoDTO::fromPullRequestReview)
+                .map(pullRequestReviewInfoDTOConverter::convert)
                 .collect(Collectors.toCollection(ArrayList::new));
         reviewActivity.addAll(
             issueCommentRepository
                 .findAllByAuthorLoginSince(login, OffsetDateTime.now().minusDays(7), true)
                 .stream()
-                .map(comment -> PullRequestReviewInfoDTO.fromIssueComment(comment, (int) scoringService.calculateReviewScore(comment)))
+                .map(pullRequestReviewInfoDTOConverter::convert)
                 .toList()
         );
         reviewActivity.sort(Comparator.comparing(PullRequestReviewInfoDTO::submittedAt).reversed());

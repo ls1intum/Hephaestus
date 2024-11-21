@@ -31,6 +31,8 @@ public class LeaderboardService {
     private PullRequestReviewRepository pullRequestReviewRepository;
     @Autowired
     private IssueCommentRepository issueCommentRepository;
+    @Autowired
+    private ScoringService scoringService;
 
     @Value("${monitoring.timeframe}")
     private int timeframe;
@@ -161,7 +163,7 @@ public class LeaderboardService {
         double totalScore = reviewsByPullRequestId
             .values()
             .stream()
-            .map(pullRequestReviews -> ScoringService.calculateReviewScore(pullRequestReviews, numberOfIssueComments))
+            .map(pullRequestReviews -> scoringService.calculateReviewScore(pullRequestReviews, numberOfIssueComments))
             .reduce(0.0, Double::sum);
         return (int) Math.ceil(totalScore);
     }
