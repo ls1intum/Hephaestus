@@ -10,14 +10,15 @@ import java.util.stream.Collectors;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import de.tum.in.www1.hephaestus.gitprovider.issue.Issue;
-import de.tum.in.www1.hephaestus.gitprovider.issuecomment.IssueComment;
 import de.tum.in.www1.hephaestus.gitprovider.issuecomment.IssueCommentRepository;
 import de.tum.in.www1.hephaestus.gitprovider.pullrequest.PullRequestInfoDTO;
 import de.tum.in.www1.hephaestus.gitprovider.pullrequest.PullRequestRepository;
 import de.tum.in.www1.hephaestus.gitprovider.pullrequestreview.PullRequestReviewInfoDTO;
+import de.tum.in.www1.hephaestus.gitprovider.pullrequestreview.PullRequestReviewInfoDTOConverter;
 import de.tum.in.www1.hephaestus.gitprovider.pullrequestreview.PullRequestReviewRepository;
 import de.tum.in.www1.hephaestus.gitprovider.repository.RepositoryInfoDTO;
 import de.tum.in.www1.hephaestus.gitprovider.repository.RepositoryRepository;
@@ -27,24 +28,18 @@ import jakarta.transaction.Transactional;
 public class UserService {
     private static final Logger logger = LoggerFactory.getLogger(UserService.class);
 
-    private final UserRepository userRepository;
-    private final RepositoryRepository repositoryRepository;
-    private final PullRequestRepository pullRequestRepository;
-    private final PullRequestReviewRepository pullRequestReviewRepository;
-    private final IssueCommentRepository issueCommentRepository;
-
-    public UserService(
-            UserRepository userRepository,
-            RepositoryRepository repositoryRepository,
-            PullRequestRepository pullRequestRepository,
-            PullRequestReviewRepository pullRequestReviewRepository,
-            IssueCommentRepository issueCommentRepository) {
-        this.userRepository = userRepository;
-        this.repositoryRepository = repositoryRepository;
-        this.pullRequestRepository = pullRequestRepository;
-        this.pullRequestReviewRepository = pullRequestReviewRepository;
-        this.issueCommentRepository = issueCommentRepository;
-    }
+    @Autowired
+    private UserRepository userRepository;
+    @Autowired
+    private RepositoryRepository repositoryRepository;
+    @Autowired
+    private PullRequestRepository pullRequestRepository;
+    @Autowired
+    private PullRequestReviewRepository pullRequestReviewRepository;
+    @Autowired
+    private IssueCommentRepository issueCommentRepository;
+    @Autowired
+    private PullRequestReviewInfoDTOConverter pullRequestReviewInfoDTOConverter;
 
     @Transactional
     public Optional<UserProfileDTO> getUserProfile(String login) {
@@ -72,13 +67,13 @@ public class UserService {
         List<PullRequestReviewInfoDTO> reviewActivity = pullRequestReviewRepository
                 .findAllByAuthorLoginSince(login, OffsetDateTime.now().minusDays(7))
                 .stream()
-                .map(PullRequestReviewInfoDTO::fromPullRequestReview)
+                .map(pullRequestReviewInfoDTOConverter::convert)
                 .collect(Collectors.toCollection(ArrayList::new));
         reviewActivity.addAll(
             issueCommentRepository
                 .findAllByAuthorLoginSince(login, OffsetDateTime.now().minusDays(7), true)
                 .stream()
-                .map(PullRequestReviewInfoDTO::fromIssueComment)
+                .map(pullRequestReviewInfoDTOConverter::convert)
                 .toList()
         );
         reviewActivity.sort(Comparator.comparing(PullRequestReviewInfoDTO::submittedAt).reversed());

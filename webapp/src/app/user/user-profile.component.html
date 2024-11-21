@@ -29,6 +29,7 @@
                 [htmlUrl]="activity?.htmlUrl"
                 [pullRequest]="activity?.pullRequest"
                 [repositoryName]="activity?.pullRequest?.repository?.name"
+                [score]="activity?.score"
               />
             }
             @if (!showSkeleton && (!query.data()?.reviewActivity || query.data()?.reviewActivity?.length === 0)) {
