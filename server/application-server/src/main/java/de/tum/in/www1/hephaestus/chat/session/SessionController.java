@@ -23,14 +23,14 @@ public class SessionController {
     }
 
     @GetMapping
-    public ResponseEntity<List<SessionDTO>> getSessions(@RequestParam Long userId) {
-        List<SessionDTO> sessions = sessionService.findAllSessionsByUser(userId);
+    public ResponseEntity<List<SessionDTO>> getSessions(@RequestParam String login) {
+        List<SessionDTO> sessions = sessionService.findAllSessionsByUser(login);
         return ResponseEntity.ok(sessions);
     }
 
     @PostMapping
-    public ResponseEntity<SessionDTO> createSession(@RequestBody Long userId) {
-        SessionDTO session = sessionService.createSession(userId);
+    public ResponseEntity<SessionDTO> createSession(@RequestBody String login) {
+        SessionDTO session = sessionService.createSession(login);
         return ResponseEntity.ok(session);
     }
 
