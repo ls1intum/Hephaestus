@@ -5,6 +5,8 @@ import { octCheck, octComment, octFileDiff, octGitPullRequest, octGitPullRequest
 import { HlmCardModule } from '@spartan-ng/ui-card-helm';
 import { HlmSkeletonComponent } from '@spartan-ng/ui-skeleton-helm';
 import { HlmIconComponent } from '@spartan-ng/ui-icon-helm';
+import { HlmTooltipTriggerDirective } from '@spartan-ng/ui-tooltip-helm';
+import { HlmButtonModule } from '@spartan-ng/ui-button-helm';
 import dayjs from 'dayjs';
 import relativeTime from 'dayjs/plugin/relativeTime';
 import { lucideAward } from '@ng-icons/lucide';
@@ -22,7 +24,7 @@ type ReviewStateCases = {
 @Component({
   selector: 'app-review-activity-card',
   templateUrl: './review-activity-card.component.html',
-  imports: [NgIcon, HlmCardModule, HlmSkeletonComponent, HlmIconComponent],
+  imports: [NgIcon, HlmCardModule, HlmSkeletonComponent, HlmIconComponent, HlmTooltipTriggerDirective, HlmButtonModule],
   providers: [provideIcons({ lucideAward })],
   standalone: true
 })

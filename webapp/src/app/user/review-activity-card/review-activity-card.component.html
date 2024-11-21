@@ -17,10 +17,17 @@
           in
           {{ this.repositoryName() }} #{{ this.pullRequest()?.number }}
         </span>
-        <div class="flex items-center text-github-done-foreground">
+        <button
+          hlmBtn
+          [hlmTooltipTrigger]="'Points awarded for this activity'"
+          variant="ghost"
+          size="sm"
+          aria-describedby="Points Activity"
+          class="flex items-center text-github-done-foreground h-8"
+        >
           <hlm-icon size="sm" name="lucideAward" />
           <span>+{{ this.score() }}</span>
-        </div>
+        </button>
       </div>
       <div class="containerSize flex items-center gap-2 font-medium">
         <ng-icon [className]="this.reviewStateProps().color" [svg]="this.reviewStateProps().icon" size="20"></ng-icon>
