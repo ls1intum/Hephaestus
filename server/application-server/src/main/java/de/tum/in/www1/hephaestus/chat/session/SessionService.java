@@ -19,8 +19,8 @@ public class SessionService {
         this.sessionRepository = sessionRepository;
     }
 
-    public List<SessionDTO> findAllSessionsByUser(Long userId) {
-        Optional<List<Session>> sessions = sessionRepository.findByUserId(userId);
+    public List<SessionDTO> findAllSessionsByUser(String login) {
+        Optional<List<Session>> sessions = sessionRepository.findByUserLogin(login);
         if (sessions.isEmpty()) {
             return List.of();
         }
@@ -31,9 +31,9 @@ public class SessionService {
         return sessionRepository.findById(sessionId).map(SessionDTO::fromSession);
     }
 
-    public SessionDTO createSession(Long userId) {
+    public SessionDTO createSession(String login) {
         Session session = new Session();
-        var user = userRepository.findById(userId);
+        var user = userRepository.findByLogin(login);
         if (user.isPresent()){
             session.setUser(user.get());
         }

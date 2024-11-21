@@ -12,14 +12,14 @@ import de.tum.in.www1.hephaestus.chat.message.MessageDTO;
 public record SessionDTO(
         @NonNull Long id,
         @NonNull List<MessageDTO> messages,
-        @NonNull Long userId,
+        @NonNull String userLogin,
         @NonNull ZonedDateTime creationDate) {
 
     public static SessionDTO fromSession(Session session) {
         return new SessionDTO(
                 session.getId(),
                 session.getMessages().stream().map(MessageDTO::fromMessage).toList(),
-                session.getUser().getId(),
+                session.getUser().getLogin(),
                 session.getCreationDate());
     }
 }

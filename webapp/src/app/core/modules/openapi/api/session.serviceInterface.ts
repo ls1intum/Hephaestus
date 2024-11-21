@@ -29,13 +29,13 @@ export interface SessionServiceInterface {
      * 
      * @param body 
      */
-    createSession(body: number, extraHttpRequestParams?: any): Observable<Session>;
+    createSession(body: string, extraHttpRequestParams?: any): Observable<Session>;
 
     /**
      * 
      * 
-     * @param userId 
+     * @param login 
      */
-    getSessions(userId: number, extraHttpRequestParams?: any): Observable<Array<Session>>;
+    getSessions(login: string, extraHttpRequestParams?: any): Observable<Array<Session>>;
 
 }
