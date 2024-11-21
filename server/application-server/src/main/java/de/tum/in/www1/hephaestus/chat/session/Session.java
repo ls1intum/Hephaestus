@@ -19,6 +19,9 @@ import de.tum.in.www1.hephaestus.gitprovider.user.User;
 @ToString(callSuper = true)
 @NoArgsConstructor
 public class Session extends BaseGitServiceEntity {
+    @Id
+    @GeneratedValue(strategy=GenerationType.IDENTITY)
+    protected Long id;
 
     @OrderColumn(name = "message_order")
     @OneToMany(mappedBy = "session")
