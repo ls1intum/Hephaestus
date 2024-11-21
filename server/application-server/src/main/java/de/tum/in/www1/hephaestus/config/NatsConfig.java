@@ -13,6 +13,9 @@ import io.nats.client.Options;
 @Configuration
 public class NatsConfig {
 
+    @Value("${nats.enabled}")
+    private boolean isNatsEnabled;
+    
     @Value("${nats.server}")
     private String natsServer;
 
@@ -21,7 +24,7 @@ public class NatsConfig {
 
     @Bean
     public Connection natsConnection() throws Exception {
-        if (environment.matchesProfiles("specs")) {
+        if (environment.matchesProfiles("specs") || !isNatsEnabled) {
             return null;
         }
 
