@@ -92,7 +92,7 @@ export class AdminUsersTableComponent {
   isLoading = input(false);
   userData = input.required<UserTeams[] | undefined>();
 
-  _users = computed(() => this.isLoading() ? LOADING_DATA : this.userData() ?? []);
+  _users = computed(() => (this.isLoading() ? LOADING_DATA : (this.userData() ?? [])));
   // Filters
   protected readonly _rawFilterInput = signal('');
   protected readonly _loginFilter = signal('');

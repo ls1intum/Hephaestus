@@ -91,7 +91,7 @@ export class AdminTeamsTableComponent {
 
   displayLabelAlert = signal(false);
 
-  _teams = computed(() => this.isLoading() ? LOADING_TEAMS : this.teamData() ?? []);
+  _teams = computed(() => (this.isLoading() ? LOADING_TEAMS : (this.teamData() ?? [])));
   // Filters
   protected readonly _rawFilterInput = signal('');
   protected readonly _nameFilter = signal('');
@@ -189,15 +189,18 @@ export class AdminTeamsTableComponent {
     onSettled: () => {
       this.displayLabelAlert.set(false);
       this._newLabelName.reset();
-      this.invalidateTeams()
+      this.invalidateTeams();
     }
   }));
 
   createTeam = injectMutation(() => ({
-    mutationFn: () => lastValueFrom(this.adminService.createTeam({
-      name: this._newTeamName.value,
-      color: this._newTeamColor.value ?? '#000000'
-    } as TeamInfo)),
+    mutationFn: () =>
+      lastValueFrom(
+        this.adminService.createTeam({
+          name: this._newTeamName.value,
+          color: this._newTeamColor.value ?? '#000000'
+        } as TeamInfo)
+      ),
     queryKey: ['admin', 'team', 'create'],
     onSettled: () => this.invalidateTeams()
   }));

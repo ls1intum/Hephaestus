@@ -44,13 +44,17 @@ export class HomeComponent {
     };
   });
 
-  protected afterParam = computed(() => this.queryParams().get('after') ?? (() => {
-    let defaultDate = dayjs().isoWeekday(this.leaderboardSchedule().day).startOf('hour').hour(this.leaderboardSchedule().hour).minute(this.leaderboardSchedule().minute);
-    if (defaultDate.isAfter(dayjs())) {
-      defaultDate = defaultDate.subtract(1, 'week');
-    }
-    return defaultDate.format();
-  })());
+  protected afterParam = computed(
+    () =>
+      this.queryParams().get('after') ??
+      (() => {
+        let defaultDate = dayjs().isoWeekday(this.leaderboardSchedule().day).startOf('hour').hour(this.leaderboardSchedule().hour).minute(this.leaderboardSchedule().minute);
+        if (defaultDate.isAfter(dayjs())) {
+          defaultDate = defaultDate.subtract(1, 'week');
+        }
+        return defaultDate.format();
+      })()
+  );
   protected beforeParam = computed(() => this.queryParams().get('before') ?? dayjs().format());
   protected teamParam = computed(() => this.queryParams().get('team') ?? 'all');
 

@@ -10,7 +10,7 @@ import { HlmSkeletonModule } from '../../libs/ui/ui-skeleton-helm/src/index';
 import { HlmScrollAreaModule } from '@spartan-ng/ui-scrollarea-helm';
 import { FormControl, ReactiveFormsModule } from '@angular/forms';
 import { HlmButtonModule } from '@spartan-ng/ui-button-helm';
-import { RouterModule, } from '@angular/router';
+import { RouterModule } from '@angular/router';
 
 @Component({
   selector: 'app-admin',
@@ -49,4 +49,3 @@ export class AdminComponent {
     return JSON.stringify(value, null, 4);
   }
 }
-

@@ -19,5 +19,5 @@ export class AdminLayoutComponent {
     { icon: 'lucideFileCog', label: 'Environment', route: '.', exact: true },
     { icon: 'lucideUserCircle', label: 'Users', route: 'users' },
     { icon: 'lucideUsers2', label: 'Teams', route: 'teams' }
-  ]
+  ];
 }
