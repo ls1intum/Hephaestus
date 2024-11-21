@@ -10,7 +10,7 @@ import { SecurityStore } from '@app/core/security/security-store.service';
 import { ThemeSwitcherComponent } from '@app/core/theme/theme-switcher.component';
 import { RequestFeatureComponent } from './request-feature/request-feature.component';
 import { environment } from 'environments/environment';
-import { lucideUser, lucideLogOut } from '@ng-icons/lucide';
+import { lucideUser, lucideLogOut, lucideSettings } from '@ng-icons/lucide';
 import { provideIcons } from '@ng-icons/core';
 import { AiMentorComponent } from './ai-mentor/ai-mentor.component';
 
@@ -34,7 +34,8 @@ import { AiMentorComponent } from './ai-mentor/ai-mentor.component';
   providers: [
     provideIcons({
       lucideUser,
-      lucideLogOut
+      lucideLogOut,
+      lucideSettings
     })
   ]
 })

@@ -10,13 +10,12 @@
  * Do not edit the class manually.
  */
 import { Message } from './message';
-import { UserInfo } from './user-info';
 
 
 export interface Session { 
     id: number;
     messages: Array<Message>;
-    user: UserInfo;
+    userId: number;
     creationDate: string;
 }
 

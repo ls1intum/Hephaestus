@@ -9,7 +9,6 @@
  * https://openapi-generator.tech
  * Do not edit the class manually.
  */
-import { Session } from './session';
 
 
 export interface Message { 
@@ -17,7 +16,7 @@ export interface Message {
     sentAt: string;
     sender: Message.SenderEnum;
     content: string;
-    session: Session;
+    sessionId: number;
 }
 export namespace Message {
     export type SenderEnum = 'SYSTEM' | 'USER';

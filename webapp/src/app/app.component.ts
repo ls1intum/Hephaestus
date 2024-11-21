@@ -8,8 +8,7 @@ import { FooterComponent } from './core/footer/footer.component';
   selector: 'app-root',
   standalone: true,
   imports: [RouterOutlet, RouterLink, RouterLinkActive, AngularQueryDevtools, HeaderComponent, FooterComponent],
-  templateUrl: './app.component.html',
-  styles: []
+  templateUrl: './app.component.html'
 })
 export class AppComponent {
   title = 'Hephaestus';
