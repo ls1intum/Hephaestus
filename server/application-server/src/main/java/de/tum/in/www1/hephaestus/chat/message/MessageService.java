@@ -36,12 +36,12 @@ public class MessageService {
                 .orElseThrow(() -> new IllegalArgumentException("Session not found"));
 
         Message userMessage = new Message(OffsetDateTime.now(), MessageSender.USER, content, session);
-        messageRepository.save(userMessage);
+        messageRepository.saveAndFlush(userMessage);
 
         String systemResponse = generateResponse(sessionId, content);
 
         Message systemMessage = new Message(OffsetDateTime.now(), MessageSender.SYSTEM, systemResponse, session);
-        messageRepository.save(systemMessage);
+        messageRepository.saveAndFlush(systemMessage);
 
         return new MessageDTO(systemMessage.getId(), systemMessage.getSentAt(), systemMessage.getSender(),
                 systemMessage.getContent(), systemMessage.getSession().getId());

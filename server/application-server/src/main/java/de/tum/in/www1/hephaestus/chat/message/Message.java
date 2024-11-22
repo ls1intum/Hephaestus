@@ -19,10 +19,6 @@ public class Message {
     @Id
     @GeneratedValue(strategy=GenerationType.IDENTITY)
     protected Long id;
-
-    @NonNull
-    @Column(name = "created_at")
-    protected OffsetDateTime createdAt = OffsetDateTime.now();
     
     @NonNull
     @Column(name = "sent_at")

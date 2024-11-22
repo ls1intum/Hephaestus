@@ -37,7 +37,7 @@ public class SessionService {
         if (user.isPresent()){
             session.setUser(user.get());
         }
-        session.setCreatedAt(OffsetDateTime.now());
-        return SessionDTO.fromSession(sessionRepository.save(session));
+
+        return SessionDTO.fromSession(sessionRepository.saveAndFlush(session));
     }
 }
