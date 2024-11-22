@@ -52,6 +52,7 @@ public class OpenAPIConfiguration {
 
                 // Remove DTO suffix from attribute names
                 schemas.forEach((key, value) -> {
+                    @SuppressWarnings("unchecked")
                     Map<String, Schema<?>> properties = value.getProperties();
                     if (properties != null) {
                         properties.forEach((propertyKey, propertyValue) -> {
@@ -86,6 +87,12 @@ public class OpenAPIConfiguration {
                                 } else {
                                     logger.warn("Response with code {} has no content.", responseCode);
                                 }
+                            });
+                        }
+                        if (operation.getRequestBody() != null) {
+                            var requestBodyContent = operation.getRequestBody().getContent();
+                            requestBodyContent.forEach((contentType, mediaType) -> {
+                                removeDTOSuffixesFromSchemaRecursively(mediaType.getSchema());
                             });
                         }
 

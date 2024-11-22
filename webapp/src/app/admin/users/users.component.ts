@@ -20,7 +20,7 @@ export class AdminUsersComponent {
 
   userQuery = injectQuery(() => ({
     queryKey: ['admin', 'users'],
-    queryFn: async () => lastValueFrom(combineLatest([this.adminService.getUsersAsAdmin(), timer(400)]).pipe(map(([user]) => user)))
+    queryFn: async () => lastValueFrom(combineLatest([this.adminService.getUsersWithTeams(), timer(400)]).pipe(map(([user]) => user)))
   }));
 
   teamsQuery = injectQuery(() => ({

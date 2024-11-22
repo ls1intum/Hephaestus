@@ -107,7 +107,7 @@ export class AdminTeamsTableComponent {
     initialValue: []
   });
 
-  protected readonly _allDisplayedColumns = ['name', 'color', 'repositories', 'labels', 'actions'];
+  protected readonly _allDisplayedColumns = ['name', 'color', 'repositories', 'actions'];
 
   // Table state logic properties
   private readonly _filteredNames = computed(() => {
@@ -143,6 +143,19 @@ export class AdminTeamsTableComponent {
     // needed to sync the debounced filter to the name filter, but being able to override the
     // filter when loading new users without debounce
     effect(() => this._nameFilter.set(this._debouncedFilter() ?? ''), { allowSignalWrites: true });
+  }
+
+  groupBy = <T, K extends keyof any>(arr: T[], key: (i: T) => K) =>
+    arr.reduce((groups, item) => {
+      (groups[key(item)] ||= []).push(item);
+      return groups;
+    }, {} as Record<K, T[]>);
+
+  groupLabelsByRepository = (team: TeamInfo) => {
+    const group = Object.entries(this.groupBy(team.labels, (l) => l.repository!.nameWithOwner)).map(([repository, labels]) => ({ repository, labels }));
+    // add repos without labels
+    const filteredRepos = team.repositories.map((r) => r.nameWithOwner).filter((r) => !group.map((g) => g.repository).includes(r));
+    return group.concat(filteredRepos.map((r) => ({ repository: r, labels: [] })));
   }
 
   protected toggleTeam(team: TeamInfo) {

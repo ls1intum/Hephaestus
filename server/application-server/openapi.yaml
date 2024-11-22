@@ -40,7 +40,7 @@ paths:
     delete:
       tags:
       - admin
-      operationId: removeTeamFromUser
+      operationId: removeUserFromTeam
       parameters:
       - name: login
         in: path
@@ -297,7 +297,7 @@ paths:
     get:
       tags:
       - admin
-      operationId: getUsersAsAdmin
+      operationId: getUsersWithTeams
       responses:
         "200":
           description: OK
@@ -331,6 +331,14 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/AdminConfig"
+  /user:
+    delete:
+      tags:
+      - user
+      operationId: deleteUser
+      responses:
+        "200":
+          description: OK
   /admin/team/{teamId}:
     delete:
       tags:
@@ -350,14 +358,6 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/TeamInfo"
-  /user:
-    delete:
-      tags:
-      - user
-      operationId: deleteUser
-      responses:
-        "200":
-          description: OK
 components:
   schemas:
     PullRequestInfo:
@@ -603,6 +603,8 @@ components:
           type: string
         color:
           type: string
+        repository:
+          $ref: "#/components/schemas/RepositoryInfo"
     PullRequestReviewInfo:
       required:
       - codeComments

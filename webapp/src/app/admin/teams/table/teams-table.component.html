@@ -54,11 +54,36 @@
         <hlm-skeleton class="h-6 w-20" />
       } @else {
         <div class="flex flex-wrap items-center gap-2">
-          @for (repo of element.repositories; track repo.id) {
-            <span class="text-muted-foreground border px-2 py-0.5 rounded-lg text-sm">{{ repo.nameWithOwner }}</span>
+          @let labelGroup = groupLabelsByRepository(element);
+          @for (group of labelGroup; track group.repository) {
+            <div hlmCard>
+              <div hlmCardHeader class="p-2 px-4">
+                <h3 hlmCardTitle class="text-sm text-center">{{ group.repository }}</h3>
+              </div>
+              <div hlmCardContent class="pt-0 pb-2 px-4 flex flex-wrap items-center gap-1">
+                @for (label of group.labels; track label.id) {
+                  @let ghLabel = { id: label.id, name: label.name, color: label.color };
+                  <app-github-label [label]="ghLabel" />
+                }
+                <brn-popover sideOffset="5" closeDelay="100">
+                  <button id="add-label" size="icon" variant="outline" class="h-6 w-6 p-0.5" brnPopoverTrigger hlmBtn>
+                    <hlm-icon class="w-4 h-4" name="lucidePlus" />
+                  </button>
+                  <div hlmPopoverContent class="w-80 p-4 gap-4 flex flex-wrap items-center justify-center" *brnPopoverContent="let ctx">
+                    <input hlmInput placeholder="Label name" [formControl]="_newLabelName" [class]="displayLabelAlert() ? 'border-destructive' : ''" />
+                    <button hlmBtn size="icon" variant="default" class="ml-2" (click)="addLabelToTeam.mutate(element)">
+                      <hlm-icon class="w-4 h-4" name="lucidePlus" />
+                    </button>
+                    @if (displayLabelAlert()) {
+                      <div class="text-sm text-github-danger-foreground">Invalid label name</div>
+                    }
+                  </div>
+                </brn-popover>
+              </div>
+            </div>
           }
         </div>
-        <brn-popover sideOffset="5" closeDelay="100">
+        <brn-popover sideOffset="5" closeDelay="100" class="pl-2">
           <button id="add-repository" size="icon" variant="outline" class="h-6 w-6 p-0.5" brnPopoverTrigger hlmBtn>
             <hlm-icon class="w-4 h-4" name="lucidePlus" />
           </button>
@@ -78,33 +103,6 @@
                 </button>
               }
             </hlm-scroll-area>
-          </div>
-        </brn-popover>
-      }
-    </hlm-td>
-  </brn-column-def>
-  <brn-column-def name="labels" class="w-48 flex-1">
-    <hlm-th *brnHeaderDef>Labels</hlm-th>
-    <hlm-td class="font-medium tabular-nums flex gap-4" *brnCellDef="let element">
-      @if (this.isLoading()) {
-        <hlm-skeleton class="h-6 w-20" />
-      } @else {
-        @for (label of element.labels; track label.id) {
-          @let ghLabel = { id: label.id, name: label.name, color: label.color ?? '69feff' };
-          <app-github-label [label]="ghLabel" />
-        }
-        <brn-popover sideOffset="5" closeDelay="100">
-          <button id="add-label" size="icon" variant="outline" class="h-6 w-6 p-0.5" brnPopoverTrigger hlmBtn>
-            <hlm-icon class="w-4 h-4" name="lucidePlus" />
-          </button>
-          <div hlmPopoverContent class="w-80 p-4 gap-4 flex flex-wrap items-center justify-center" *brnPopoverContent="let ctx">
-            <input hlmInput placeholder="Label name" [formControl]="_newLabelName" [class]="displayLabelAlert() ? 'border-destructive' : ''" />
-            <button hlmBtn size="icon" variant="default" class="ml-2" (click)="addLabelToTeam.mutate(element)">
-              <hlm-icon class="w-4 h-4" name="lucidePlus" />
-            </button>
-            @if (displayLabelAlert()) {
-              <div class="text-sm text-github-danger-foreground">Invalid label name</div>
-            }
           </div>
         </brn-popover>
       }

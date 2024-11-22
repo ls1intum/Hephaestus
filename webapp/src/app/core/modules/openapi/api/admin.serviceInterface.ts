@@ -89,7 +89,7 @@ export interface AdminServiceInterface {
      * 
      * 
      */
-    getUsersAsAdmin(extraHttpRequestParams?: any): Observable<Array<UserTeams>>;
+    getUsersWithTeams(extraHttpRequestParams?: any): Observable<Array<UserTeams>>;
 
     /**
      * 
@@ -114,7 +114,7 @@ export interface AdminServiceInterface {
      * @param login 
      * @param teamId 
      */
-    removeTeamFromUser(login: string, teamId: number, extraHttpRequestParams?: any): Observable<UserInfo>;
+    removeUserFromTeam(login: string, teamId: number, extraHttpRequestParams?: any): Observable<UserInfo>;
 
     /**
      * 

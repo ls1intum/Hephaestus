@@ -197,7 +197,7 @@ export class AdminUsersTableComponent {
   }
 
   removeTeamFromUser = injectMutation(() => ({
-    mutationFn: (user: UserTeams) => lastValueFrom(this.adminService.removeTeamFromUser(user.login, this._selectedTeam()!.id)),
+    mutationFn: (user: UserTeams) => lastValueFrom(this.adminService.removeUserFromTeam(user.login, this._selectedTeam()!.id)),
     queryKey: ['admin', 'user', 'team', 'remove'],
     onSettled: () => this.invalidateUsers()
   }));
