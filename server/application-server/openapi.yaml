@@ -500,7 +500,7 @@ components:
           format: int32
     Session:
       required:
-      - creationDate
+      - createdAt
       - id
       - messages
       - userLogin
@@ -515,6 +515,6 @@ components:
             $ref: "#/components/schemas/Message"
         userLogin:
           type: string
-        creationDate:
+        createdAt:
           type: string
           format: date-time
