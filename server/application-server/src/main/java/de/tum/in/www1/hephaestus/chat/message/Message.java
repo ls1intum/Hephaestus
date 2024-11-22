@@ -1,14 +1,13 @@
 package de.tum.in.www1.hephaestus.chat.message;
 
 import jakarta.persistence.*;
-import java.time.ZonedDateTime;
+import java.time.OffsetDateTime;
 import lombok.Getter;
 import lombok.RequiredArgsConstructor;
 import lombok.Setter;
 import lombok.ToString;
 import org.springframework.lang.NonNull;
 import de.tum.in.www1.hephaestus.chat.session.Session;
-import de.tum.in.www1.hephaestus.gitprovider.common.BaseGitServiceEntity;
 
 @Entity
 @Table(name = "message")
@@ -16,14 +15,18 @@ import de.tum.in.www1.hephaestus.gitprovider.common.BaseGitServiceEntity;
 @Setter
 @ToString(callSuper = true)
 @RequiredArgsConstructor
-public class Message extends BaseGitServiceEntity {
+public class Message {
     @Id
     @GeneratedValue(strategy=GenerationType.IDENTITY)
     protected Long id;
+
+    @NonNull
+    @Column(name = "created_at")
+    protected OffsetDateTime createdAt = OffsetDateTime.now();
     
     @NonNull
     @Column(name = "sent_at")
-    private final ZonedDateTime sentAt;
+    private OffsetDateTime sentAt;
 
     @NonNull
     @Enumerated(EnumType.STRING)
