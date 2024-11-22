@@ -21,7 +21,6 @@ import java.util.stream.IntStream;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 @Service
@@ -35,8 +34,6 @@ public class LeaderboardService {
     private IssueCommentRepository issueCommentRepository;
     @Autowired
     private ScoringService scoringService;
-    @Autowired
-    private IssueCommentRepository issueCommentRepository;
     @Autowired
     private TeamRepository teamRepository;
 
