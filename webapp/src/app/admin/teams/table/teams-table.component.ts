@@ -22,6 +22,7 @@ import { HlmPopoverModule } from '@spartan-ng/ui-popover-helm';
 import { BrnPopoverComponent, BrnPopoverContentDirective, BrnPopoverTriggerDirective } from '@spartan-ng/ui-popover-brain';
 import { GithubLabelComponent } from '@app/ui/github-label/github-label.component';
 import { HlmScrollAreaComponent } from '@spartan-ng/ui-scrollarea-helm';
+import { groupBy } from '@app/utils';
 
 const LOADING_TEAMS: TeamInfo[] = [
   {
@@ -145,18 +146,12 @@ export class AdminTeamsTableComponent {
     effect(() => this._nameFilter.set(this._debouncedFilter() ?? ''), { allowSignalWrites: true });
   }
 
-  groupBy = <T, K extends keyof any>(arr: T[], key: (i: T) => K) =>
-    arr.reduce((groups, item) => {
-      (groups[key(item)] ||= []).push(item);
-      return groups;
-    }, {} as Record<K, T[]>);
-
   groupLabelsByRepository = (team: TeamInfo) => {
-    const group = Object.entries(this.groupBy(team.labels, (l) => l.repository!.nameWithOwner)).map(([repository, labels]) => ({ repository, labels }));
+    const group = Object.entries(groupBy(team.labels, (l) => l.repository!.nameWithOwner)).map(([repository, labels]) => ({ repository, labels }));
     // add repos without labels
     const filteredRepos = team.repositories.map((r) => r.nameWithOwner).filter((r) => !group.map((g) => g.repository).includes(r));
     return group.concat(filteredRepos.map((r) => ({ repository: r, labels: [] })));
-  }
+  };
 
   protected toggleTeam(team: TeamInfo) {
     this._selectionModel.toggle(team);
@@ -214,15 +209,13 @@ export class AdminTeamsTableComponent {
   }));
 
   removeRepositoryFromTeam = injectMutation(() => ({
-    mutationFn: ({ teamId, owner, repo }: { teamId: number; owner: string; repo: string }) =>
-      lastValueFrom(this.adminService.removeRepositoryFromTeam(teamId, owner, repo)),
+    mutationFn: ({ teamId, owner, repo }: { teamId: number; owner: string; repo: string }) => lastValueFrom(this.adminService.removeRepositoryFromTeam(teamId, owner, repo)),
     queryKey: ['admin', 'team', 'repository', 'remove'],
     onSettled: () => this.invalidateTeams()
   }));
 
   addRepositoryToTeam = injectMutation(() => ({
-    mutationFn: ({ teamId, owner, repo }: { teamId: number; owner: string; repo: string }) =>
-      lastValueFrom(this.adminService.addRepositoryToTeam(teamId, owner, repo)),
+    mutationFn: ({ teamId, owner, repo }: { teamId: number; owner: string; repo: string }) => lastValueFrom(this.adminService.addRepositoryToTeam(teamId, owner, repo)),
     queryKey: ['admin', 'team', 'repository', 'add'],
     onSettled: () => this.invalidateTeams()
   }));
