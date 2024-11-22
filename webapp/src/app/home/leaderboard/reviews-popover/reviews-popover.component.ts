@@ -37,7 +37,9 @@ export class ReviewsPopoverComponent {
   protected Check = Check;
   protected octGitPullRequest = octGitPullRequest;
 
+  highlight = input.required<boolean>();
   reviewedPRs = input.required<PullRequestInfo[]>();
+
   sortedReviewedPRs = computed(() =>
     this.reviewedPRs().sort((a, b) => {
       if (a.repository?.name === b.repository?.name) {

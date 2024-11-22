@@ -7,7 +7,7 @@ export const cardContentVariants = cva('pt-0', {
   variants: {
     variant: {
       default: 'p-6',
-      profile: 'flex flex-col gap-2'
+      profile: 'flex flex-col gap-1'
     }
   },
   defaultVariants: {}

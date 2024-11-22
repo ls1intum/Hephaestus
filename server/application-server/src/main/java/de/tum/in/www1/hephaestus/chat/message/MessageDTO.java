@@ -1,6 +1,6 @@
 package de.tum.in.www1.hephaestus.chat.message;
 
-import java.time.ZonedDateTime;
+import java.time.OffsetDateTime;
 
 import org.springframework.lang.NonNull;
 import com.fasterxml.jackson.annotation.JsonInclude;
@@ -10,7 +10,7 @@ import de.tum.in.www1.hephaestus.chat.message.Message.MessageSender;
 @JsonInclude(JsonInclude.Include.NON_EMPTY)
 public record MessageDTO(
                 @NonNull Long id,
-                @NonNull ZonedDateTime sentAt,
+                @NonNull OffsetDateTime sentAt,
                 @NonNull MessageSender sender,
                 @NonNull String content,
                 @NonNull Long sessionId) {

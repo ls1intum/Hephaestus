@@ -1,13 +1,10 @@
 import { Component, inject } from '@angular/core';
-import { NgIconComponent } from '@ng-icons/core';
 import { PullRequestInfo, PullRequestReviewInfo, UserService } from 'app/core/modules/openapi';
 import { HlmAvatarModule } from '@spartan-ng/ui-avatar-helm';
 import { HlmSkeletonModule } from '@spartan-ng/ui-skeleton-helm';
 import { ActivatedRoute } from '@angular/router';
 import { injectQuery } from '@tanstack/angular-query-experimental';
 import { HlmIconModule } from 'libs/ui/ui-icon-helm/src/index';
-import { BrnTooltipContentDirective } from '@spartan-ng/ui-tooltip-brain';
-import { HlmTooltipComponent, HlmTooltipTriggerDirective } from '@spartan-ng/ui-tooltip-helm';
 import { HlmButtonModule } from '@spartan-ng/ui-button-helm';
 import { HlmScrollAreaComponent } from '@spartan-ng/ui-scrollarea-helm';
 import { HlmAlertModule } from '@spartan-ng/ui-alert-helm';
@@ -22,15 +19,11 @@ import { UserHeaderComponent } from './header/header.component';
   standalone: true,
   imports: [
     LucideAngularModule,
-    NgIconComponent,
     ReviewActivityCardComponent,
     IssueCardComponent,
     HlmAvatarModule,
     HlmSkeletonModule,
     HlmIconModule,
-    HlmTooltipComponent,
-    HlmTooltipTriggerDirective,
-    BrnTooltipContentDirective,
     HlmButtonModule,
     HlmScrollAreaComponent,
     UserHeaderComponent,

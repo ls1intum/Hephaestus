@@ -5,6 +5,7 @@ const meta: Meta<ReviewsPopoverComponent> = {
   component: ReviewsPopoverComponent,
   tags: ['autodocs'],
   args: {
+    highlight: false,
     reviewedPRs: [
       {
         id: 1,

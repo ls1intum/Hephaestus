@@ -1,6 +1,6 @@
 package de.tum.in.www1.hephaestus.chat.message;
 
-import java.time.ZonedDateTime;
+import java.time.OffsetDateTime;
 import java.util.List;
 
 import org.springframework.stereotype.Service;
@@ -35,12 +35,12 @@ public class MessageService {
         Session session = sessionRepository.findById(sessionId)
                 .orElseThrow(() -> new IllegalArgumentException("Session not found"));
 
-        Message userMessage = new Message(ZonedDateTime.now(), MessageSender.USER, content, session);
+        Message userMessage = new Message(OffsetDateTime.now(), MessageSender.USER, content, session);
         messageRepository.save(userMessage);
 
         String systemResponse = generateResponse(sessionId, content);
 
-        Message systemMessage = new Message(ZonedDateTime.now(), MessageSender.SYSTEM, systemResponse, session);
+        Message systemMessage = new Message(OffsetDateTime.now(), MessageSender.SYSTEM, systemResponse, session);
         messageRepository.save(systemMessage);
 
         return new MessageDTO(systemMessage.getId(), systemMessage.getSentAt(), systemMessage.getSender(),

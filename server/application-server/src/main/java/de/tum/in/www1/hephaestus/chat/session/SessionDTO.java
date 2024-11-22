@@ -1,10 +1,10 @@
 package de.tum.in.www1.hephaestus.chat.session;
 
-import java.time.ZonedDateTime;
-
 import org.springframework.lang.NonNull;
 import com.fasterxml.jackson.annotation.JsonInclude;
+
 import java.util.List;
+import java.time.OffsetDateTime;
 
 import de.tum.in.www1.hephaestus.chat.message.MessageDTO;
 
@@ -13,13 +13,13 @@ public record SessionDTO(
         @NonNull Long id,
         @NonNull List<MessageDTO> messages,
         @NonNull String userLogin,
-        @NonNull ZonedDateTime creationDate) {
+        @NonNull OffsetDateTime createdAt) {
 
     public static SessionDTO fromSession(Session session) {
         return new SessionDTO(
                 session.getId(),
                 session.getMessages().stream().map(MessageDTO::fromMessage).toList(),
                 session.getUser().getLogin(),
-                session.getCreationDate());
+                session.getCreatedAt());
     }
 }

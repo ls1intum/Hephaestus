@@ -16,6 +16,6 @@ export interface Session {
     id: number;
     messages: Array<Message>;
     userLogin: string;
-    creationDate: string;
+    createdAt: string;
 }
 
