@@ -188,11 +188,6 @@ export class AdminTeamsTableComponent {
     onSettled: () => this.invalidateTeams()
   }));
 
-  protected copyName(element: TeamInfo) {
-    console.log('Copying name', element);
-    navigator.clipboard.writeText(element.name!);
-  }
-
   addLabelToTeam = injectMutation(() => ({
     mutationFn: (team: TeamInfo) => lastValueFrom(this.adminService.addLabelToTeam(team.id, this._newLabelName.value ?? '')),
     queryKey: ['admin', 'team', 'label', 'add'],
@@ -218,6 +213,25 @@ export class AdminTeamsTableComponent {
     onSettled: () => this.invalidateTeams()
   }));
 
+  removeRepositoryFromTeam = injectMutation(() => ({
+    mutationFn: ({ teamId, owner, repo }: { teamId: number; owner: string; repo: string }) =>
+      lastValueFrom(this.adminService.removeRepositoryFromTeam(teamId, owner, repo)),
+    queryKey: ['admin', 'team', 'repository', 'remove'],
+    onSettled: () => this.invalidateTeams()
+  }));
+
+  addRepositoryToTeam = injectMutation(() => ({
+    mutationFn: ({ teamId, owner, repo }: { teamId: number; owner: string; repo: string }) =>
+      lastValueFrom(this.adminService.addRepositoryToTeam(teamId, owner, repo)),
+    queryKey: ['admin', 'team', 'repository', 'add'],
+    onSettled: () => this.invalidateTeams()
+  }));
+
+  protected copyName(element: TeamInfo) {
+    console.log('Copying name', element);
+    navigator.clipboard.writeText(element.name!);
+  }
+
   protected invalidateTeams() {
     this.queryClient.invalidateQueries({ queryKey: ['admin', 'teams'] });
   }
@@ -227,19 +241,11 @@ export class AdminTeamsTableComponent {
   }
 
   protected toggleRepository(team: TeamInfo, repository: string, checked: boolean) {
-    const separatedName = repository.split('/');
+    const [owner, repo] = repository.split('/');
     if (checked) {
-      this.adminService.removeRepositoryFromTeam(team.id, separatedName[0], separatedName[1]).subscribe({
-        next: () => {
-          team.repositories = team.repositories.filter((r) => r.nameWithOwner !== repository);
-        },
-        error: (err) => console.error('Error removing repository', err)
-      });
+      this.removeRepositoryFromTeam.mutate({ teamId: team.id, owner, repo });
     } else {
-      this.adminService.addRepositoryToTeam(team.id, separatedName[0], separatedName[1]).subscribe({
-        next: (newTeam) => team.repositories.push(newTeam.repositories[newTeam.repositories.length - 1]),
-        error: (err) => console.error('Error adding repository', err)
-      });
+      this.addRepositoryToTeam.mutate({ teamId: team.id, owner, repo });
     }
   }
 }
