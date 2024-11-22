@@ -1,11 +1,15 @@
 import { Component, computed, input } from '@angular/core';
 import { PullRequestBaseInfo, PullRequestReviewInfo } from '@app/core/modules/openapi';
-import { NgIcon } from '@ng-icons/core';
+import { NgIcon, provideIcons } from '@ng-icons/core';
 import { octCheck, octComment, octFileDiff, octGitPullRequest, octGitPullRequestClosed } from '@ng-icons/octicons';
 import { HlmCardModule } from '@spartan-ng/ui-card-helm';
 import { HlmSkeletonComponent } from '@spartan-ng/ui-skeleton-helm';
+import { HlmIconComponent } from '@spartan-ng/ui-icon-helm';
+import { HlmTooltipTriggerDirective } from '@spartan-ng/ui-tooltip-helm';
+import { HlmButtonModule } from '@spartan-ng/ui-button-helm';
 import dayjs from 'dayjs';
 import relativeTime from 'dayjs/plugin/relativeTime';
+import { lucideAward } from '@ng-icons/lucide';
 
 dayjs.extend(relativeTime);
 
@@ -20,7 +24,8 @@ type ReviewStateCases = {
 @Component({
   selector: 'app-review-activity-card',
   templateUrl: './review-activity-card.component.html',
-  imports: [NgIcon, HlmCardModule, HlmSkeletonComponent],
+  imports: [NgIcon, HlmCardModule, HlmSkeletonComponent, HlmIconComponent, HlmTooltipTriggerDirective, HlmButtonModule],
+  providers: [provideIcons({ lucideAward })],
   standalone: true
 })
 export class ReviewActivityCardComponent {
@@ -37,6 +42,7 @@ export class ReviewActivityCardComponent {
   htmlUrl = input<string>();
   pullRequest = input<PullRequestBaseInfo>();
   repositoryName = input<string>();
+  score = input<number>();
 
   relativeActivityTime = computed(() => dayjs(this.submittedAt()).fromNow());
   displayPullRequestTitle = computed(() => (this.pullRequest()?.title ?? '').replace(/`([^`]+)`/g, '<code class="textCode">$1</code>'));

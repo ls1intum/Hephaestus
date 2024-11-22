@@ -21,6 +21,7 @@ import java.util.stream.IntStream;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 @Service
@@ -30,10 +31,12 @@ public class LeaderboardService {
 
     @Autowired
     private PullRequestReviewRepository pullRequestReviewRepository;
-
     @Autowired
     private IssueCommentRepository issueCommentRepository;
-
+    @Autowired
+    private ScoringService scoringService;
+    @Autowired
+    private IssueCommentRepository issueCommentRepository;
     @Autowired
     private TeamRepository teamRepository;
 
@@ -163,90 +166,8 @@ public class LeaderboardService {
         double totalScore = reviewsByPullRequestId
             .values()
             .stream()
-            .map(pullRequestReviews -> {
-                // All reviews are for the same pull request
-                int complexityScore = calculateComplexityScore(pullRequestReviews.get(0).getPullRequest());
-
-                double approvalWeight = 2.0;
-                double approvalScore = pullRequestReviews
-                    .stream()
-                    .filter(review -> review.getState() == PullRequestReview.State.APPROVED)
-                    .filter(review -> review.getAuthor().getId() != review.getPullRequest().getAuthor().getId())
-                    .map(review -> approvalWeight * calculateCodeReviewBonus(review.getComments().size(), complexityScore))
-                    .reduce(0.0, Double::sum);
-
-                double changesRequestedWeight = 2.5;
-                double changesRequestedScore = pullRequestReviews
-                    .stream()
-                    .filter(review -> review.getState() == PullRequestReview.State.CHANGES_REQUESTED)
-                    .filter(review -> review.getAuthor().getId() != review.getPullRequest().getAuthor().getId())
-                    .map(review -> changesRequestedWeight * calculateCodeReviewBonus(review.getComments().size(), complexityScore))
-                    .reduce(0.0, Double::sum);
-
-                double commentWeight = 1.5;
-                double commentScore = pullRequestReviews
-                    .stream()
-                    .filter(review -> review.getState() == PullRequestReview.State.COMMENTED || review.getState() == PullRequestReview.State.UNKNOWN)
-                    .filter(review -> review.getAuthor().getId() != review.getPullRequest().getAuthor().getId())
-                    .map(review -> commentWeight * calculateCodeReviewBonus(review.getComments().size(), complexityScore))
-                    .reduce(0.0, Double::sum);
-
-                double issueCommentScore = commentWeight * numberOfIssueComments;
-
-                double interactionScore = approvalScore + changesRequestedScore + commentScore + issueCommentScore;
-                return 10 * interactionScore * complexityScore / (interactionScore + complexityScore);
-            })
+            .map(pullRequestReviews -> scoringService.calculateReviewScore(pullRequestReviews, numberOfIssueComments))
             .reduce(0.0, Double::sum);
         return (int) Math.ceil(totalScore);
-    }
-
-    /**
-     * Calculates the complexity score for a given pull request.
-     * Possible values: 1, 3, 7, 17, 33.
-     * Taken from the original leaderboard implementation script.
-     *
-     * @param pullRequest
-     * @return score
-     */
-    private int calculateComplexityScore(PullRequest pullRequest) {
-        Double complexityScore =
-            ((pullRequest.getChangedFiles() * 3) +
-                (pullRequest.getCommits() * 0.5) +
-                pullRequest.getAdditions() +
-                pullRequest.getDeletions()) /
-            10;
-        if (complexityScore < 10) {
-            return 1; // Simple
-        } else if (complexityScore < 50) {
-            return 3; // Medium
-        } else if (complexityScore < 100) {
-            return 7; // Large
-        } else if (complexityScore < 500) {
-            return 17; // Huge
-        }
-        return 33; // Overly complex
-    }
-
-    /**
-     * Calculates the code review bonus for a given number of code comments and complexity score.
-     * The bonus is a value between 0 and 2.
-     * Taken from the original leaderboard implementation script.
-     *
-     * @param codeComments
-     * @param complexityScore
-     * @return bonus
-     */
-    private double calculateCodeReviewBonus(int codeComments, int complexityScore) {
-        double maxBonus = 2;
-
-        double codeReviewBonus = 1;
-        if (codeComments < complexityScore) {
-            // Function goes from 0 at codeComments = 0 to 1 at codeComments = complexityScore
-            codeReviewBonus +=  2 * Math.sqrt(complexityScore) * Math.sqrt(codeComments) / (codeComments + complexityScore);
-        } else {
-            // Saturate at 1
-            codeReviewBonus += 1;
-        }
-        return codeReviewBonus / 2 * maxBonus;
     }
 }
