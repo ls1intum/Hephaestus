@@ -50,6 +50,7 @@ export class SessionsCardComponent {
   }
 
   protected createSession = injectMutation(() => ({
+    mutationKey: ['sessions', { login: this.user()?.username }],
     mutationFn: async () => {
       const username = this.user()?.username;
       if (!username) {
