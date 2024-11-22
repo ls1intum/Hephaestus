@@ -3,7 +3,10 @@
     <tr appTableRow>
       <th appTableHead class="text-center">Rank</th>
       <th appTableHead>Contributor</th>
-      <th appTableHead class="text-center">Score</th>
+      <th appTableHead class="flex items-center gap-1 text-github-done-foreground">
+        <hlm-icon size="sm" name="lucideAward" />
+        Score
+      </th>
       <th appTableHead>Activity</th>
     </tr>
   </thead>
@@ -56,7 +59,7 @@
           <td appTableCell class="py-2">
             <div class="flex items-center gap-2">
               @if (entry.numberOfReviewedPRs) {
-                <app-reviews-popover [reviewedPRs]="entry.reviewedPullRequests" />
+                <app-reviews-popover [reviewedPRs]="entry.reviewedPullRequests" [highlight]="this.user()?.username?.toLowerCase() === entry.user.login.toLowerCase()" />
                 <div class="flex items-center text-github-muted-foreground">
                   <ng-icon [svg]="octChevronLeft" size="16" />
                 </div>

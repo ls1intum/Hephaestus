@@ -27,6 +27,7 @@ services:
       - '8081:8080'
     volumes:
       - keycloak-data:/opt/keycloak/data/
+      - ../../keycloakify/dist_keycloak:/opt/keycloak/providers/
       - ./keycloak-hephaestus-realm-example-config.json:/opt/keycloak/data/import/hephaestus-realm.json
     networks:
       - app-network

@@ -326,6 +326,7 @@ components:
       - htmlUrl
       - id
       - isDismissed
+      - score
       - state
       type: object
       properties:
@@ -350,6 +351,9 @@ components:
           $ref: "#/components/schemas/PullRequestBaseInfo"
         htmlUrl:
           type: string
+        score:
+          type: integer
+          format: int32
         submittedAt:
           type: string
           format: date-time
