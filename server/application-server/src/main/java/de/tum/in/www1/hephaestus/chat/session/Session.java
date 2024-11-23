@@ -28,8 +28,8 @@ public class Session {
     private List<Message> messages = new ArrayList<>();
 
     @NonNull
-    @Column(name = "created_at")
-    protected OffsetDateTime createdAt = OffsetDateTime.now();
+    @Column(name = "created_at", nullable = false, updatable = false)
+    protected OffsetDateTime createdAt;
 
     @ManyToOne
     @JoinColumn(name = "user_id")

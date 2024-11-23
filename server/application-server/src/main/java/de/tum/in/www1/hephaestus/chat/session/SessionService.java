@@ -4,20 +4,17 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import de.tum.in.www1.hephaestus.gitprovider.user.UserRepository;
-import java.time.OffsetDateTime;
 import java.util.Optional;
+import java.time.OffsetDateTime;
 import java.util.List;
 
 @Service
 public class SessionService {
-
-    private final SessionRepository sessionRepository;
+    @Autowired
+    private SessionRepository sessionRepository;
     @Autowired
     private UserRepository userRepository;
 
-    public SessionService(SessionRepository sessionRepository) {
-        this.sessionRepository = sessionRepository;
-    }
 
     public List<SessionDTO> findAllSessionsByUser(String login) {
         Optional<List<Session>> sessions = sessionRepository.findByUserLogin(login);
@@ -32,11 +29,11 @@ public class SessionService {
     }
 
     public SessionDTO createSession(String login) {
-        Session session = new Session();
-        var user = userRepository.findByLogin(login);
-        if (user.isPresent()){
-            session.setUser(user.get());
-        }
+        var user = userRepository.findByLogin(login)
+                .orElseThrow(() -> new IllegalArgumentException("User not found: " + login));
+
+        Session session = new Session(OffsetDateTime.now());
+        session.setUser(user);
 
         return SessionDTO.fromSession(sessionRepository.saveAndFlush(session));
     }
