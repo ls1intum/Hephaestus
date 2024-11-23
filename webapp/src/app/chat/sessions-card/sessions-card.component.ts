@@ -1,4 +1,4 @@
-import { Component, computed, inject, signal, Signal } from '@angular/core';
+import { Component, computed, inject, signal, booleanAttribute, Signal, input } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { lastValueFrom } from 'rxjs';
 import { SecurityStore } from '@app/core/security/security-store.service';
@@ -17,6 +17,7 @@ export class SessionsCardComponent {
   protected Plus = Plus;
 
   isLoading = signal(false);
+  iconOnly = input(false, { transform: booleanAttribute });
 
   securityStore = inject(SecurityStore);
   sessionService = inject(SessionService);

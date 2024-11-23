@@ -1,19 +1,26 @@
 <div
   hlmCard
-  class="bg-card border border-border focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-background focus:ring-ring rounded-lg shadow-sm text-card-foreground"
+  class="bg-card border border-border focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-background focus:ring-ring rounded-lg shadow-sm text-card-foreground min-w-[280px]"
 >
   <div hlmCardContent class="flex flex-col gap-y-4 pb-0 p-6">
     <!-- New Session Button -->
-    <button
-      hlmBtn
-      class="w-full cursor-pointer bg-cyan-500 hover:bg-cyan-600 gap-2 justify-start "
-      [disabled]="isLoading()"
-      (click)="handleCreateSession()"
-    >
-      <lucide-angular [img]="Plus" class="size-4"></lucide-angular>
-      <span *ngIf="!isLoading(); else loading">New Reflective Session</span>
-      <ng-template #loading>Loading...</ng-template>
-    </button>
+    <a
+    hlmBtn
+    aria-describedby="New Reflective Session"
+    class="w-full cursor-pointer bg-cyan-500 hover:bg-cyan-600 gap-2 justify-start text-white hover:text-white p-2 rounded-lg"
+    variant="outline"
+    (click)="handleCreateSession()"
+    [size]="iconOnly() ? 'icon' : 'default'"
+
+  >
+    <lucide-angular [img]="Plus" class="size-4" />
+    @if (!iconOnly()) {
+      New&nbsp;Reflective&nbsp;Session
+    }
+  </a>
+  @if (iconOnly()) {
+    <span *brnTooltipContent class="flex items-center">New&nbsp;Reflective&nbsp;Session</span>
+  }
 
     <!-- List of Past Sessions -->
     <div class="flex flex-col gap-2 sm:min-w-[250px]">
