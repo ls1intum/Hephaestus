@@ -1,5 +1,7 @@
 import { Component, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
+import { lastValueFrom } from 'rxjs';
+import { injectMutation, injectQuery } from '@tanstack/angular-query-experimental';
 import { SessionsCardComponent } from '../sessions-card/sessions-card.component';
 import { MessagesComponent } from '../messages/messages.component';
 import { InputComponent } from '../input/input.component';
@@ -16,49 +18,66 @@ import { HlmButtonModule } from '@spartan-ng/ui-button-helm';
   imports: [CommonModule, SessionsCardComponent, MessagesComponent, InputComponent, HlmButtonModule],
 })
 export class ChatComponent {
+
+  // mock data
+  messages: Message[] = [];
+
   securityStore = inject(SecurityStore);
-  sessionService = inject(SessionService);
-  messageService = inject(MessageService); // Inject MessageService
+  messageService = inject(MessageService);
+
   signedIn = this.securityStore.signedIn;
   user = this.securityStore.loadedUser;
 
-  selectedSession?: Session; // Track the selected session
-  messages: Message[] = []; // Messages for the selected session
+  selectedSession: Session | null = null;
 
-  // Handle session selection
-  onSessionSelected(session: Session): void {
+  handleSessionSelect(session: Session): void {
     this.selectedSession = session;
-    console.log('Selected session:', session);
-    this.loadMessagesForSession(session.id); // Fetch messages for the selected session
+    this.query.refetch();
   }
 
-  // Handle session creation
-  onSessionCreated(): void {
-    console.log('New session created!');
-    // Refresh the session list or take other actions if needed
-  }
-
-  // Fetch messages for a specific session
-  loadMessagesForSession(sessionId: number): void {
-    this.messageService.getMessages(sessionId).subscribe(
-      (data: Message[]) => {
-        this.messages = data; // Update the messages array
-        console.log('Loaded messages:', data);
+  protected query = injectQuery(() => ({
+    enabled: this.signedIn(),
+    queryKey: ['messages', { sessionId: this.selectedSession?.id }],
+    queryFn: async () => {
+      if (!this.selectedSession) {
+        throw new Error('No session selected!');
       }
-    );
-  }
+      const messageHistory = await lastValueFrom(this.messageService.getMessages(this.selectedSession?.id));
+      this.messages = messageHistory;
+      return messageHistory;
+    },
+  }));
 
-  // Send a message
-  sendMessage(content: string): void {
+
+  protected sendMessage = injectMutation(() => ({
+    mutationKey: ['messages', { sessionId: this.selectedSession?.id }],
+    mutationFn: async (content: string) => {
+      if (!this.selectedSession) {
+        throw new Error('No session selected!');
+      }
+      await lastValueFrom(this.messageService.createMessage(this.selectedSession.id, content));
+    },
+    onSuccess: () => {
+      this.query.refetch();
+    }
+  }));
+
+  handleSendMessage(content: string): void {
     if (!this.selectedSession) {
       console.error('No session selected!');
       return;
     }
+    this.sendMessage.mutate(content);
+    
 
-    this.messageService.createMessage(this.selectedSession.id, content).subscribe(
-      (savedMessage: Message) => {
-        this.messages.push(savedMessage); // Append the new message to the array
-        console.log('Message sent:', savedMessage);
-      });
+    // this.messageService.createMessage(this.selectedSession.id, content).subscribe(
+    //   (savedMessage: Message) => {
+    //     this.messages.push(savedMessage); // Append the new message to the array
+    //     console.log('Message sent:', savedMessage);
+    //   });
+
+
+    this.query.refetch();
   }
+
 }

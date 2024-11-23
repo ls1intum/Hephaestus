@@ -1,4 +1,4 @@
-import { Component, computed, inject, signal, booleanAttribute, Signal, input } from '@angular/core';
+import { Component, computed, inject, signal, Output, Signal, EventEmitter } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { lastValueFrom } from 'rxjs';
 import { SecurityStore } from '@app/core/security/security-store.service';
@@ -16,7 +16,8 @@ import { HlmButtonModule } from '@spartan-ng/ui-button-helm';
 export class SessionsCardComponent {
   protected Plus = Plus;
 
-  isLoading = signal(false);
+  @Output() sessionSelected = new EventEmitter<Session>(); // Event to notify parent of selected session
+
 
   securityStore = inject(SecurityStore);
   sessionService = inject(SessionService);
@@ -47,6 +48,10 @@ export class SessionsCardComponent {
 
   handleSessionSelect(sessionId: number): void {
     this.activeSessionId.set(sessionId);
+    const selectedSession = this.sessions().find(session => session.id === sessionId);
+    if (selectedSession) {
+      this.sessionSelected.emit(selectedSession);
+    }
   }
 
   protected createSession = injectMutation(() => ({
