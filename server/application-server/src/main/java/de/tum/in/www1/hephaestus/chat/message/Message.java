@@ -18,11 +18,11 @@ import de.tum.in.www1.hephaestus.chat.session.Session;
 public class Message {
     @Id
     @GeneratedValue(strategy=GenerationType.IDENTITY)
-    protected Long id;
+    private Long id;
     
     @NonNull
     @Column(name = "sent_at")
-    private OffsetDateTime sentAt;
+    private OffsetDateTime sentAt = OffsetDateTime.now();
 
     @NonNull
     @Enumerated(EnumType.STRING)
