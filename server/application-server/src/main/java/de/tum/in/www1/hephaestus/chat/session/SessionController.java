@@ -33,13 +33,5 @@ public class SessionController {
         SessionDTO session = sessionService.createSession(login);
         return ResponseEntity.ok(session);
     }
-
- /* 
-    @GetMapping("/session/{sessionId}")
-    public ResponseEntity<SessionDTO> getSession(@PathVariable Long sessionId) {
-        Optional<SessionDTO> session = sessionService.findSessionById(sessionId);
-        return ResponseEntity.ok(session.get());
-    }
-*/
     
 }

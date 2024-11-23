@@ -33,7 +33,7 @@ public class MessageService {
 
     public MessageDTO sendMessage(String content, Long sessionId) {
         Optional<Session> session = sessionRepository.findById(sessionId);
-        if (session.isEmpty()) {
+        if (session.isEmpty() || content == null) {
             return null;
         }
 
@@ -41,6 +41,10 @@ public class MessageService {
         userMessage.setSender(MessageSender.USER);
         userMessage.setContent(content);
         userMessage.setSession(session.get());
+
+        Message savedMessage = messageRepository.save(userMessage);
+        session.get().getMessages().add(savedMessage);
+        sessionRepository.save(session.get());
 
         // String systemResponse = generateResponse(sessionId, content);
 
@@ -51,7 +55,7 @@ public class MessageService {
         // return new MessageDTO(systemMessage.getId(), systemMessage.getSentAt(),
         // systemMessage.getSender(),
         // systemMessage.getContent(), systemMessage.getSession().getId());
-        return MessageDTO.fromMessage(messageRepository.save(userMessage));
+        return MessageDTO.fromMessage(savedMessage);
     }
 
     private String generateResponse(Long session_id, String messageContent) {

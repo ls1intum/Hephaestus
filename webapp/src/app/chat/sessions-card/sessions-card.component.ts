@@ -18,12 +18,14 @@ export class SessionsCardComponent {
 
   @Output() sessionSelected = new EventEmitter<Session>(); // Event to notify parent of selected session
 
-
   securityStore = inject(SecurityStore);
   sessionService = inject(SessionService);
 
   signedIn = this.securityStore.signedIn;
   user = this.securityStore.loadedUser;
+
+  sessions: Signal<Session[]> = computed(() => (this.query.data() ?? []).slice().reverse());
+  activeSessionId = signal<number | null>(null);
 
   query = injectQuery(() => ({
     enabled: this.signedIn(),
@@ -34,25 +36,14 @@ export class SessionsCardComponent {
         throw new Error('User is not logged in or username is undefined.');
       }
       const sessions = await lastValueFrom(this.sessionService.getSessions(username));
-      this.activeSessionId.set(sessions.slice(-1)[0]?.id);
+      if (sessions.length > 0 && !this.activeSessionId()) {
+        const latestSession = sessions.slice(-1)[0];
+        this.activeSessionId.set(latestSession.id);
+        this.sessionSelected.emit(latestSession);
+      }
       return sessions;
-    },
-  }));
-
-  sessions: Signal<Session[]> = computed(() => (this.query.data() ?? []).slice().reverse());
-  activeSessionId = signal<number | null>(null);
-
-  handleCreateSession(): void {
-    this.createSession.mutate();
-  }
-
-  handleSessionSelect(sessionId: number): void {
-    this.activeSessionId.set(sessionId);
-    const selectedSession = this.sessions().find(session => session.id === sessionId);
-    if (selectedSession) {
-      this.sessionSelected.emit(selectedSession);
     }
-  }
+  }));
 
   protected createSession = injectMutation(() => ({
     mutationKey: ['sessions', { login: this.user()?.username }],
@@ -71,4 +62,16 @@ export class SessionsCardComponent {
       }
     }
   }));
+
+  handleCreateSession(): void {
+    this.createSession.mutate();
+  }
+
+  handleSelectSession(sessionId: number): void {
+    this.activeSessionId.set(sessionId);
+    const selectedSession = this.sessions().find((session) => session.id === sessionId);
+    if (selectedSession) {
+      this.sessionSelected.emit(selectedSession);
+    }
+  }
 }

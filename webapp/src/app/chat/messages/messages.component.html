@@ -1,25 +1,22 @@
 <div #chatMessagesContainer class="messages space-y-4 overflow-y-auto" style="max-height: 100%">
-  <div *ngFor="let message of messages" class="flex w-full" [ngClass]="{ 'justify-end': message.sender === 'USER', 'justify-start': message.sender === 'SYSTEM' }">
-    <!-- Wrapper for Avatar and Bubble -->
+  <div *ngFor="let message of messageHistory" class="flex w-full" [ngClass]="{ 'justify-end': message.sender === 'USER', 'justify-start': message.sender === 'SYSTEM' }">
+
     <div class="flex space-x-2" [ngClass]="{ 'flex-row-reverse': message.sender === 'USER' }" style="max-width: 60%">
-      <!-- Avatar -->
-        <div *ngIf="message.sender === 'USER'" class="ml-2 flex flex-col" >
-          <hlm-avatar>
-            <img [src]="'https://github.com/' + user()!.username + '.png'" [alt]="user()?.name + '\'s avatar'" hlmAvatarImage />
-            <span hlmAvatarFallback>
-              {{ user()?.name?.slice(0, 2)?.toUpperCase() ?? '?' }}
-            </span>
-          </hlm-avatar>
+      <div *ngIf="message.sender === 'USER'" class="ml-2 flex flex-col">
+        <hlm-avatar>
+          <img [src]="'https://github.com/' + user()!.username + '.png'" [alt]="user()?.name + '\'s avatar'" hlmAvatarImage />
+          <span hlmAvatarFallback>
+            {{ user()?.name?.slice(0, 2)?.toUpperCase() ?? '?' }}
+          </span>
+        </hlm-avatar>
+      </div>
+
+      <div *ngIf="message.sender === 'SYSTEM'" class="mr-2 flex flex-col">
+        <div class="w-10 h-10 bg-transparent border-2 border-cyan-500 rounded-full flex items-center justify-center">
+          <lucide-angular [img]="Hammer" class="size-6 text-cyan-500"></lucide-angular>
         </div>
+      </div>
 
-        <div *ngIf="message.sender === 'SYSTEM'" class="mr-2 flex flex-col">
-          <div class="w-10 h-10 bg-transparent border-2 border-cyan-500 rounded-full flex items-center justify-center">
-            <lucide-angular [img]="Hammer" class="size-6 text-cyan-500"></lucide-angular>
-          </div>
-        </div>
-
-
-      <!-- Message Bubble -->
       <div
         class="flex flex-col space-y-2"
         [ngClass]="{
@@ -39,8 +36,8 @@
         >
           <p>{{ message.content }}</p>
         </div>
-        <span class="text-xs text-gray-500"> {{ message.sender === 'USER' ? 'You' : 'AI Mentor' }} · {{ message.sentAt| date: 'shortTime' }} </span>
+        <span class="text-xs text-gray-500"> {{ message.sender === 'USER' ? 'You' : 'AI Mentor' }} · {{ message.sentAt | date: 'shortTime' }} </span>
       </div>
     </div>
   </div>
-</div> 
+</div>
