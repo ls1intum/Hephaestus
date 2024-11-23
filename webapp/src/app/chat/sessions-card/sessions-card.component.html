@@ -1,37 +1,29 @@
 <div
   hlmCard
-  class="bg-card border border-border focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-background focus:ring-ring rounded-lg shadow-sm text-card-foreground min-w-[280px]"
+  class="bg-card pb-4 border focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-background focus:ring-ring rounded-lg shadow-sm text-card-foreground"
 >
   <div hlmCardContent class="flex flex-col gap-y-4 pb-0 p-6">
-    <!-- New Session Button -->
     <a
-    hlmBtn
-    aria-describedby="New Reflective Session"
-    class="w-full cursor-pointer bg-cyan-500 hover:bg-cyan-600 gap-2 justify-start text-white hover:text-white p-2 rounded-lg"
-    variant="outline"
-    (click)="handleCreateSession()"
-    [size]="iconOnly() ? 'icon' : 'default'"
-
-  >
-    <lucide-angular [img]="Plus" class="size-4" />
-    @if (!iconOnly()) {
-      New&nbsp;Reflective&nbsp;Session
-    }
-  </a>
-  @if (iconOnly()) {
-    <span *brnTooltipContent class="flex items-center">New&nbsp;Reflective&nbsp;Session</span>
-  }
-
-    <!-- List of Past Sessions -->
+      hlmBtn
+      aria-describedby="New Reflective Session"
+      class="w-full cursor-pointer bg-cyan-500 hover:bg-cyan-600 gap-2 justify-start text-white hover:text-white p-2 rounded-lg"
+      variant="outline"
+      (click)="handleCreateSession()"
+    >
+      <lucide-angular [img]="Plus" class="size-4" />
+      <span>New Reflective Session</span>
+    </a>
     <div class="flex flex-col gap-2 sm:min-w-[250px]">
       <h4 class="mb-2 text-lg font-semibold leading-none tracking-tight">Past Sessions</h4>
       <ul class="space-y-2">
-        <li
-          *ngFor="let session of sessions()"
-          class="cursor-pointer bg-gray-100 hover:bg-gray-200 p-2 rounded-lg"
-          
-        >
-          {{ session.createdAt| date: 'short' }}
+        <li hlmBtn variant="ghost" *ngFor="let session of sessions()" 
+        (click)="handleSessionSelect(session.id)"
+        class="rounded-lg w-full justify-start border"
+        [ngClass]="{
+          'border-cyan-500 text-cyan-500 hover:bg-card hover:text-cyan-500': activeSessionId() === session.id,
+          'cursor-pointer': activeSessionId() !== session.id
+        }">
+          {{ session.createdAt | date: 'short' }}
         </li>
       </ul>
     </div>

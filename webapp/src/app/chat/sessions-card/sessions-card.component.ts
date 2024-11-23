@@ -17,16 +17,12 @@ export class SessionsCardComponent {
   protected Plus = Plus;
 
   isLoading = signal(false);
-  iconOnly = input(false, { transform: booleanAttribute });
 
   securityStore = inject(SecurityStore);
   sessionService = inject(SessionService);
+
   signedIn = this.securityStore.signedIn;
   user = this.securityStore.loadedUser;
-
-  constructor() {
-    console.log('User:', this.user(), 'Signed in:', this.signedIn());
-  }
 
   query = injectQuery(() => ({
     enabled: this.signedIn(),
@@ -34,20 +30,23 @@ export class SessionsCardComponent {
     queryFn: async () => {
       const username = this.user()?.username;
       if (!username) {
-        console.log('User is not logged in or username is undefined.');
         throw new Error('User is not logged in or username is undefined.');
       }
-      return lastValueFrom(this.sessionService.getSessions(username));
-    }
+      const sessions = await lastValueFrom(this.sessionService.getSessions(username));
+      this.activeSessionId.set(sessions.slice(-1)[0]?.id);
+      return sessions;
+    },
   }));
 
-  sessions: Signal<Session[]> = computed(() => this.query.data() ?? []);
-
-  // // Computed property to get sessions
-  // protected sessions = computed(() => this.sessionsQuery.data() ?? []);
+  sessions: Signal<Session[]> = computed(() => (this.query.data() ?? []).slice().reverse());
+  activeSessionId = signal<number | null>(null);
 
   handleCreateSession(): void {
     this.createSession.mutate();
+  }
+
+  handleSessionSelect(sessionId: number): void {
+    this.activeSessionId.set(sessionId);
   }
 
   protected createSession = injectMutation(() => ({
@@ -55,16 +54,16 @@ export class SessionsCardComponent {
     mutationFn: async () => {
       const username = this.user()?.username;
       if (!username) {
-        console.log('User is not logged in or username is undefined.');
         throw new Error('User is not logged in or username is undefined.');
       }
       await lastValueFrom(this.sessionService.createSession(username));
     },
     onSuccess: () => {
-      console.log('New session created');
-      this.query.refetch(); // Refetch sessions after creating a new one
+      this.query.refetch();
+      const latestSession = this.sessions()?.slice(-1)[0];
+      if (latestSession) {
+        this.activeSessionId.set(latestSession.id);
+      }
     }
   }));
-
-
 }
