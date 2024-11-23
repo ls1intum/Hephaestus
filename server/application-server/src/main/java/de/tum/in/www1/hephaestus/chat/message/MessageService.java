@@ -33,7 +33,7 @@ public class MessageService {
 
     public MessageDTO sendMessage(String content, Long sessionId) {
         Optional<Session> session = sessionRepository.findById(sessionId);
-        if (session.isEmpty()) {
+        if (session.isEmpty() || content == null) {
             return null;
         }
 
@@ -41,17 +41,21 @@ public class MessageService {
         userMessage.setSender(MessageSender.USER);
         userMessage.setContent(content);
         userMessage.setSession(session.get());
+        Message savedUserMessage = messageRepository.save(userMessage);
 
-        // String systemResponse = generateResponse(sessionId, content);
+        String systemResponse = generateResponse(sessionId, content);
 
-        // Message systemMessage = new Message(OffsetDateTime.now(),
-        // MessageSender.SYSTEM, systemResponse, session);
-        // messageRepository.saveAndFlush(systemMessage);
+        Message systemMessage = new Message();
+        systemMessage.setSender(MessageSender.SYSTEM);
+        systemMessage.setContent(systemResponse);
+        systemMessage.setSession(session.get());
+        Message savedSystemMessage = messageRepository.save(systemMessage);
 
-        // return new MessageDTO(systemMessage.getId(), systemMessage.getSentAt(),
-        // systemMessage.getSender(),
-        // systemMessage.getContent(), systemMessage.getSession().getId());
-        return MessageDTO.fromMessage(messageRepository.save(userMessage));
+        session.get().getMessages().add(savedUserMessage);
+        session.get().getMessages().add(savedSystemMessage);
+        sessionRepository.save(session.get());
+
+        return MessageDTO.fromMessage(savedSystemMessage);
     }
 
     private String generateResponse(Long session_id, String messageContent) {

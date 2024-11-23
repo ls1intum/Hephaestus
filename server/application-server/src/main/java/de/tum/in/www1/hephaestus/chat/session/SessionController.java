@@ -11,7 +11,6 @@ import java.util.List;
 
 import org.springframework.http.ResponseEntity;
 
-
 @RestController
 @RequestMapping("/sessions")
 public class SessionController {
@@ -33,13 +32,4 @@ public class SessionController {
         SessionDTO session = sessionService.createSession(login);
         return ResponseEntity.ok(session);
     }
-
- /* 
-    @GetMapping("/session/{sessionId}")
-    public ResponseEntity<SessionDTO> getSession(@PathVariable Long sessionId) {
-        Optional<SessionDTO> session = sessionService.findSessionById(sessionId);
-        return ResponseEntity.ok(session.get());
-    }
-*/
-    
 }
