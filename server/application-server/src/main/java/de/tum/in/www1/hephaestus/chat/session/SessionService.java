@@ -5,7 +5,6 @@ import org.springframework.stereotype.Service;
 
 import de.tum.in.www1.hephaestus.gitprovider.user.UserRepository;
 import java.util.Optional;
-import java.time.OffsetDateTime;
 import java.util.List;
 
 @Service
@@ -29,12 +28,14 @@ public class SessionService {
     }
 
     public SessionDTO createSession(String login) {
-        var user = userRepository.findByLogin(login)
-                .orElseThrow(() -> new IllegalArgumentException("User not found: " + login));
+        var user = userRepository.findByLogin(login);
+        if (user.isEmpty()) {
+            return null;
+        }
 
-        Session session = new Session(OffsetDateTime.now());
-        session.setUser(user);
+        Session session = new Session();
+        session.setUser(user.get());
 
-        return SessionDTO.fromSession(sessionRepository.saveAndFlush(session));
+        return SessionDTO.fromSession(sessionRepository.save(session));
     }
 }

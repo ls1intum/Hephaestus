@@ -1,8 +1,8 @@
 package de.tum.in.www1.hephaestus.chat.message;
 
-import java.time.OffsetDateTime;
 import java.util.List;
-
+import java.util.Optional;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import de.tum.in.www1.hephaestus.chat.message.Message.MessageSender;
 import de.tum.in.www1.hephaestus.chat.session.Session;
@@ -14,13 +14,13 @@ import de.tum.in.www1.hephaestus.intelligenceservice.model.ChatResponse;
 @Service
 public class MessageService {
 
-    private final SessionRepository sessionRepository;
-    private final MessageRepository messageRepository;
-    private final DefaultApi sessionApiClient;
+    private DefaultApi sessionApiClient;
+    @Autowired
+    private SessionRepository sessionRepository;
+    @Autowired
+    private MessageRepository messageRepository;
 
-    public MessageService(SessionRepository sessionRepository, MessageRepository messageRepository) {
-        this.sessionRepository = sessionRepository;
-        this.messageRepository = messageRepository;
+    public MessageService() {
         this.sessionApiClient = new DefaultApi();
     }
 
@@ -32,12 +32,13 @@ public class MessageService {
     }
 
     public MessageDTO sendMessage(String content, Long sessionId) {
-        Session session = sessionRepository.findById(sessionId)
-                .orElseThrow(() -> new IllegalArgumentException("Session not found"));
+        Optional<Session>  session = sessionRepository.findById(sessionId);
+        if (session.isEmpty()) {
+            return null;
+        }
 
-        Message userMessage = new Message(OffsetDateTime.now(), MessageSender.USER, content, session);
-        messageRepository.saveAndFlush(userMessage);
-
+        Message userMessage = new Message(MessageSender.USER, content, session.get());
+        
         // String systemResponse = generateResponse(sessionId, content);
 
         // Message systemMessage = new Message(OffsetDateTime.now(), MessageSender.SYSTEM, systemResponse, session);
@@ -45,8 +46,7 @@ public class MessageService {
 
         // return new MessageDTO(systemMessage.getId(), systemMessage.getSentAt(), systemMessage.getSender(),
         //         systemMessage.getContent(), systemMessage.getSession().getId());
-        return new MessageDTO(userMessage.getId(), userMessage.getSentAt(), userMessage.getSender(),
-                userMessage.getContent(), userMessage.getSession().getId());
+        return MessageDTO.fromMessage(messageRepository.save(userMessage));
     }
 
     private String generateResponse(Long session_id, String messageContent) {

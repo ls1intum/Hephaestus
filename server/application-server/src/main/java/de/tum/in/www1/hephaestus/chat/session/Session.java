@@ -4,7 +4,7 @@ import java.time.OffsetDateTime;
 import java.util.ArrayList;
 import java.util.List;
 import lombok.Getter;
-import lombok.RequiredArgsConstructor;
+import lombok.NoArgsConstructor;
 import lombok.Setter;
 import lombok.ToString;
 import org.springframework.lang.NonNull;
@@ -17,19 +17,19 @@ import de.tum.in.www1.hephaestus.gitprovider.user.User;
 @Getter
 @Setter
 @ToString(callSuper = true)
-@RequiredArgsConstructor
+@NoArgsConstructor
 public class Session {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
-    protected Long id;
+    private Long id;
 
     @OrderColumn(name = "message_order")
     @OneToMany(mappedBy = "session")
     private List<Message> messages = new ArrayList<>();
 
     @NonNull
-    @Column(name = "created_at", nullable = false, updatable = false)
-    protected OffsetDateTime createdAt;
+    @Column(name = "created_at")
+    private OffsetDateTime createdAt = OffsetDateTime.now();
 
     @ManyToOne
     @JoinColumn(name = "user_id")
