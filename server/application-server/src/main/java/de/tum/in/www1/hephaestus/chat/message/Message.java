@@ -3,7 +3,7 @@ package de.tum.in.www1.hephaestus.chat.message;
 import jakarta.persistence.*;
 import java.time.OffsetDateTime;
 import lombok.Getter;
-import lombok.RequiredArgsConstructor;
+import lombok.NoArgsConstructor;
 import lombok.Setter;
 import lombok.ToString;
 import org.springframework.lang.NonNull;
@@ -14,12 +14,12 @@ import de.tum.in.www1.hephaestus.chat.session.Session;
 @Getter
 @Setter
 @ToString(callSuper = true)
-@RequiredArgsConstructor
+@NoArgsConstructor
 public class Message {
     @Id
-    @GeneratedValue(strategy=GenerationType.IDENTITY)
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
-    
+
     @NonNull
     @Column(name = "sent_at")
     private OffsetDateTime sentAt = OffsetDateTime.now();
