@@ -38,13 +38,15 @@ public class MessageService {
         Message userMessage = new Message(OffsetDateTime.now(), MessageSender.USER, content, session);
         messageRepository.saveAndFlush(userMessage);
 
-        String systemResponse = generateResponse(sessionId, content);
+        // String systemResponse = generateResponse(sessionId, content);
 
-        Message systemMessage = new Message(OffsetDateTime.now(), MessageSender.SYSTEM, systemResponse, session);
-        messageRepository.saveAndFlush(systemMessage);
+        // Message systemMessage = new Message(OffsetDateTime.now(), MessageSender.SYSTEM, systemResponse, session);
+        // messageRepository.saveAndFlush(systemMessage);
 
-        return new MessageDTO(systemMessage.getId(), systemMessage.getSentAt(), systemMessage.getSender(),
-                systemMessage.getContent(), systemMessage.getSession().getId());
+        // return new MessageDTO(systemMessage.getId(), systemMessage.getSentAt(), systemMessage.getSender(),
+        //         systemMessage.getContent(), systemMessage.getSession().getId());
+        return new MessageDTO(userMessage.getId(), userMessage.getSentAt(), userMessage.getSender(),
+                userMessage.getContent(), userMessage.getSession().getId());
     }
 
     private String generateResponse(Long session_id, String messageContent) {
