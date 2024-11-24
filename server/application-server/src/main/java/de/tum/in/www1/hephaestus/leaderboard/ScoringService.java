@@ -64,7 +64,7 @@ public class ScoringService {
         if (issue.isPullRequest()) {
             pullRequest = (PullRequest) issue;
         } else {
-            var optionalPR = pullRequestRepository.findByRepositoryAndNumber(issue.getRepository(), issue.getNumber());
+            var optionalPR = pullRequestRepository.findByRepositoryIdAndNumber(issue.getRepository().getId(), issue.getNumber());
             if (optionalPR.isEmpty()) {
                 logger.error("Issue comment is not associated with a pull request.");
                 return 0;

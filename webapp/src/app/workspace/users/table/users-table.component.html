@@ -149,4 +149,5 @@
   </brn-select>
   <button hlmBtn variant="secondary" [disabled]="_selected().length === 0 || !_selectedTeam" (click)="addTeamToSelected()">Add team</button>
   <button hlmBtn variant="secondary" [disabled]="_selected().length === 0 || !_selectedTeam" (click)="removeTeamFromSelected()">Remove team</button>
+  <button hlmBtn variant="secondary" [disabled]="_availableTeams().length === 0" (click)="automaticallyAssignUsers.mutate()">Autoassign</button>
 </div>

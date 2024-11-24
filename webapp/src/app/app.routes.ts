@@ -1,11 +1,11 @@
 import { Routes } from '@angular/router';
 import { AboutComponent } from '@app/about/about.component';
 import { HomeComponent } from '@app/home/home.component';
-import { AdminComponent } from '@app/admin/admin.component';
+import { WorkspaceComponent } from '@app/workspace/workspace.component';
 import { UserProfileComponent } from '@app/user/user-profile.component';
-import { AdminUsersComponent } from './admin/users/users.component';
-import { AdminLayoutComponent } from './admin/layout.component';
-import { AdminTeamsComponent } from './admin/teams/teams.component';
+import { WorkspaceUsersComponent } from './workspace/users/users.component';
+import { WorkspaceLayoutComponent } from './workspace/layout.component';
+import { WorkspaceTeamsComponent } from './workspace/teams/teams.component';
 import { SettingsComponent } from '@app/settings/settings.component';
 import { ImprintComponent } from '@app/legal/imprint.component';
 import { PrivacyComponent } from '@app/legal/privacy.component';
@@ -16,21 +16,21 @@ export const routes: Routes = [
   // Public routes
   { path: 'about', component: AboutComponent },
   {
-    path: 'admin',
-    component: AdminLayoutComponent,
+    path: 'workspace',
+    component: WorkspaceLayoutComponent,
     canActivate: [AdminGuard],
     children: [
       {
         path: '',
-        component: AdminComponent
+        component: WorkspaceComponent
       },
       {
         path: 'users',
-        component: AdminUsersComponent
+        component: WorkspaceUsersComponent
       },
       {
         path: 'teams',
-        component: AdminTeamsComponent
+        component: WorkspaceTeamsComponent
       }
     ]
   },
@@ -47,7 +47,7 @@ export const routes: Routes = [
       { path: '', component: HomeComponent },
       { path: 'user/:id', component: UserProfileComponent },
       { path: 'settings', component: SettingsComponent },
-      { path: 'admin', component: AdminComponent, canActivate: [AdminGuard] }
+      { path: 'workspace', component: WorkspaceComponent, canActivate: [AdminGuard] }
     ]
   }
 ];

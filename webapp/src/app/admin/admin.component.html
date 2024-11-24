@@ -1,9 +1,0 @@
-<!-- input for repositories with save button -->
-<h1 class="text-3xl font-bold mb-4">Environment</h1>
-<div class="flex flex-col items-start gap-4">
-  <div class="w-1/2">
-    <h2 class="text-lg font-semibold mb-2">Repositories to monitor:</h2>
-    <textarea hlmInput [formControl]="repositoriesForm" class="block size-fit" style="field-sizing: content"></textarea>
-  </div>
-  <button hlmBtn (click)="updateRepositories.mutate(repositoriesForm.value ?? '[]')">Save</button>
-</div>

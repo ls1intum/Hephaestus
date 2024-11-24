@@ -1,5 +1,3 @@
-export * from './admin-config';
-export * from './auth-user-info';
 export * from './label-info';
 export * from './leaderboard-entry';
 export * from './meta-data';

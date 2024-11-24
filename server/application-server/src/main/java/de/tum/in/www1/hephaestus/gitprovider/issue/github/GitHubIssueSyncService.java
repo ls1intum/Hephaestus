@@ -7,11 +7,13 @@ import java.util.Optional;
 import java.util.ArrayList;
 import java.util.Date;
 import java.time.OffsetDateTime;
-
+import org.kohsuke.github.GHDirection;
 import org.kohsuke.github.GHIssue;
 import org.kohsuke.github.GHIssueQueryBuilder;
 import org.kohsuke.github.GHIssueState;
 import org.kohsuke.github.GHRepository;
+import org.kohsuke.github.PagedIterator;
+import org.kohsuke.github.GHIssueQueryBuilder.Sort;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
@@ -98,6 +100,41 @@ public class GitHubIssueSyncService {
         } catch (IOException e) {
             logger.error("Failed to fetch issues for repository {}: {}", repository.getFullName(), e.getMessage());
             return new ArrayList<>();
+        }
+    }
+
+    /**
+     * Returns a paged iterator for fetching issues from a specific GitHub repository.
+     *
+     * @param repository The repository to fetch issues from.
+     * @param since      An date to filter issues by their last update.
+     * @return A paged iterator for fetching issues.
+     */
+    public PagedIterator<GHIssue> getIssuesIterator(GHRepository repository, OffsetDateTime since) {
+        var builder = repository.queryIssues()
+            .pageSize(100)
+            .state(GHIssueState.ALL)
+            .since(Date.from(since.toInstant()))
+            .sort(Sort.UPDATED)
+            .direction(GHDirection.ASC);
+        return builder.list().iterator();
+    }
+
+    /**
+     * Syncs a single GitHub issue by its number from a specific repository.
+     *
+     * @param repository  The repository to fetch the issue from.
+     * @param issueNumber The number of the issue to fetch.
+     * @return An optional containing the fetched GitHub issue, or an empty optional if the issue could not be fetched.
+     */
+    public Optional<GHIssue> syncIssue(GHRepository repository, int issueNumber) {
+        try {
+            var ghIssue = repository.getIssue(issueNumber);
+            processIssue(ghIssue);
+            return Optional.of(ghIssue);
+        } catch (IOException e) {
+            logger.error("Failed to fetch issue {} from repository {}: {}", issueNumber, repository.getFullName(), e.getMessage());
+            return Optional.empty();
         }
     }
 

@@ -13,8 +13,6 @@ import { HttpHeaders }                                       from '@angular/comm
 
 import { Observable }                                        from 'rxjs';
 
-import { AdminConfig } from '../model/models';
-import { AuthUserInfo } from '../model/models';
 import { TeamInfo } from '../model/models';
 import { UserInfo } from '../model/models';
 import { UserTeams } from '../model/models';
@@ -24,7 +22,7 @@ import { Configuration }                                     from '../configurat
 
 
 
-export interface AdminServiceInterface {
+export interface WorkspaceServiceInterface {
     defaultHeaders: HttpHeaders;
     configuration: Configuration;
 
@@ -32,9 +30,18 @@ export interface AdminServiceInterface {
      * 
      * 
      * @param teamId 
+     * @param repositoryId 
      * @param label 
      */
-    addLabelToTeam(teamId: number, label: string, extraHttpRequestParams?: any): Observable<TeamInfo>;
+    addLabelToTeam(teamId: number, repositoryId: number, label: string, extraHttpRequestParams?: any): Observable<TeamInfo>;
+
+    /**
+     * 
+     * 
+     * @param owner 
+     * @param name 
+     */
+    addRepositoryToMonitor(owner: string, name: string, extraHttpRequestParams?: any): Observable<{}>;
 
     /**
      * 
@@ -57,7 +64,7 @@ export interface AdminServiceInterface {
      * 
      * 
      */
-    admin(extraHttpRequestParams?: any): Observable<string>;
+    automaticallyAssignTeams(extraHttpRequestParams?: any): Observable<{}>;
 
     /**
      * 
@@ -77,13 +84,7 @@ export interface AdminServiceInterface {
      * 
      * 
      */
-    getConfig(extraHttpRequestParams?: any): Observable<AdminConfig>;
-
-    /**
-     * 
-     * 
-     */
-    getGretting(extraHttpRequestParams?: any): Observable<AuthUserInfo>;
+    getRepositoriesToMonitor(extraHttpRequestParams?: any): Observable<Array<string>>;
 
     /**
      * 
@@ -95,9 +96,9 @@ export interface AdminServiceInterface {
      * 
      * 
      * @param teamId 
-     * @param label 
+     * @param labelId 
      */
-    removeLabelFromTeam(teamId: number, label: string, extraHttpRequestParams?: any): Observable<TeamInfo>;
+    removeLabelFromTeam(teamId: number, labelId: number, extraHttpRequestParams?: any): Observable<TeamInfo>;
 
     /**
      * 
@@ -111,16 +112,17 @@ export interface AdminServiceInterface {
     /**
      * 
      * 
-     * @param login 
-     * @param teamId 
+     * @param owner 
+     * @param name 
      */
-    removeUserFromTeam(login: string, teamId: number, extraHttpRequestParams?: any): Observable<UserInfo>;
+    removeRepositoryToMonitor(owner: string, name: string, extraHttpRequestParams?: any): Observable<{}>;
 
     /**
      * 
      * 
-     * @param requestBody 
+     * @param login 
+     * @param teamId 
      */
-    updateRepositories(requestBody: Array<string>, extraHttpRequestParams?: any): Observable<Set<string>>;
+    removeUserFromTeam(login: string, teamId: number, extraHttpRequestParams?: any): Observable<UserInfo>;
 
 }

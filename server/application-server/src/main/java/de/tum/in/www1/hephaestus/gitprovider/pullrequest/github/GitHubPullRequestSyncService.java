@@ -16,7 +16,6 @@ import org.kohsuke.github.GHRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import jakarta.transaction.Transactional;
 
@@ -29,7 +28,6 @@ import de.tum.in.www1.hephaestus.gitprovider.milestone.github.GitHubMilestoneCon
 import de.tum.in.www1.hephaestus.gitprovider.pullrequest.PullRequest;
 import de.tum.in.www1.hephaestus.gitprovider.pullrequest.PullRequestRepository;
 import de.tum.in.www1.hephaestus.gitprovider.repository.RepositoryRepository;
-import de.tum.in.www1.hephaestus.gitprovider.team.TeamRepository;
 import de.tum.in.www1.hephaestus.gitprovider.user.User;
 import de.tum.in.www1.hephaestus.gitprovider.user.UserRepository;
 import de.tum.in.www1.hephaestus.gitprovider.user.github.GitHubUserConverter;
@@ -50,8 +48,6 @@ public class GitHubPullRequestSyncService {
     @Autowired
     private UserRepository userRepository;
     @Autowired
-    private TeamRepository teamRepository;
-    @Autowired
     private GitHubPullRequestConverter pullRequestConverter;
     @Autowired
     private GitHubLabelConverter labelConverter;
@@ -59,9 +55,6 @@ public class GitHubPullRequestSyncService {
     private GitHubMilestoneConverter milestoneConverter;
     @Autowired
     private GitHubUserConverter userConverter;
-
-    @Value("${hephaestus.team.assignment.auto}")
-    private boolean autoTeamAssignment;
 
     /**
      * Synchronizes all pull requests from the specified GitHub repositories.
@@ -123,6 +116,47 @@ public class GitHubPullRequestSyncService {
 
         pullRequests.forEach(this::processPullRequest);
         return pullRequests;
+    }
+
+    /**
+     * Synchronizes all pull requests from the specified list of GitHub pull request
+     * numbers.
+     *
+     * @param repository         the GitHub repository to fetch the pull requests
+     *                           from
+     * @param pullRequestNumbers the list of pull request numbers to fetch
+     * @param process            whether to process the fetched pull requests
+     * @return a list of GitHub pull requests that were successfully fetched and
+     *         processed
+     */
+    public List<GHPullRequest> syncPullRequests(GHRepository repository, List<Integer> pullRequestNumbers, boolean process) {
+        return pullRequestNumbers.stream()
+                .map(pullRequestNumber -> syncPullRequest(repository, pullRequestNumber, process))
+                .filter(Optional::isPresent)
+                .map(Optional::get)
+                .toList();
+    }
+
+    /**
+     * Synchronizes a single GitHub pull request by its number.
+     *
+     * @param repository        the GitHub repository to fetch the pull request from
+     * @param pullRequestNumber the number of the pull request to fetch
+     * @param process           whether to process the fetched pull request
+     * @return an optional containing the fetched GitHub pull request, or an empty
+     *         optional if the pull request could not be fetched
+     */
+    public Optional<GHPullRequest> syncPullRequest(GHRepository repository, int pullRequestNumber, boolean process) {
+        try {
+            var pullRequest = repository.getPullRequest(pullRequestNumber);
+            if (process) {
+                processPullRequest(pullRequest);
+            }
+            return Optional.of(pullRequest);
+        } catch (IOException e) {
+            logger.error("Failed to fetch pull request {}: {}", pullRequestNumber, e.getMessage());
+            return Optional.empty();
+        }
     }
 
     /**
@@ -241,30 +275,6 @@ public class GitHubPullRequestSyncService {
                     e.getMessage());
         }
 
-        if (autoTeamAssignment) {
-            automaticTeamAssignment(result);
-        }
-
         return pullRequestRepository.save(result);
-    }
-
-    /**
-     * Assigns the PR author to the corresponding team based on the PR labels and
-     * the repository
-     * 
-     * @param pr
-     */
-    private void automaticTeamAssignment(PullRequest pr) {
-        // Match PR author to team via PR label
-        teamRepository.findAllByPullRequestLabels(pr.getLabels()).stream().forEach(team -> {
-            team.addMember(pr.getAuthor());
-            teamRepository.save(team);
-        });
-
-        // Match team via repository name
-        teamRepository.findAllByRepositoryName(pr.getRepository().getNameWithOwner()).stream().forEach(team -> {
-            team.addMember(pr.getAuthor());
-            teamRepository.save(team);
-        });
     }
 }

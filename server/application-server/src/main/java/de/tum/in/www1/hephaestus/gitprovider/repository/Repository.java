@@ -93,6 +93,11 @@ public class Repository extends BaseGitServiceEntity {
         PUBLIC, PRIVATE, INTERNAL, UNKNOWN
     }
 
+    public void removeAllTeams() {
+        this.teams.forEach(team -> team.getRepositories().remove(this));
+        this.teams.clear();
+    }
+
     // TODO:
     // owner
     // organization

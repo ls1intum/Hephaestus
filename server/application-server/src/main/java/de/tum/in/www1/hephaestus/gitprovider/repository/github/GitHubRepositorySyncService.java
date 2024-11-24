@@ -12,7 +12,6 @@ import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import jakarta.transaction.Transactional;
-import de.tum.in.www1.hephaestus.admin.AdminService;
 import de.tum.in.www1.hephaestus.gitprovider.common.DateUtil;
 import de.tum.in.www1.hephaestus.gitprovider.repository.Repository;
 import de.tum.in.www1.hephaestus.gitprovider.repository.RepositoryRepository;
@@ -23,23 +22,11 @@ public class GitHubRepositorySyncService {
     private static final Logger logger = LoggerFactory.getLogger(GitHubRepositorySyncService.class);
 
     @Autowired
-    private AdminService adminService;
-
-    @Autowired
     private GitHub github;
     @Autowired
     private RepositoryRepository repositoryRepository;
     @Autowired
     private GitHubRepositoryConverter repositoryConverter;
-
-    /**
-     * Syncs all monitored GitHub repositories.
-     *
-     * @return A list of successfully fetched GitHub repositories.
-     */
-    public List<GHRepository> syncAllMonitoredRepositories() {
-        return syncAllRepositories(adminService.getAdminConfig().getRepositoriesToMonitor());
-    }
 
     /**
      * Syncs all repositories owned by a specific GitHub user or organization.

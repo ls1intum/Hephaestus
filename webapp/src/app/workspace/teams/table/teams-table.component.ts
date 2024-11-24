@@ -2,7 +2,7 @@ import { SelectionModel } from '@angular/cdk/collections';
 import { Component, TrackByFunction, computed, effect, inject, input, signal } from '@angular/core';
 import { toObservable, toSignal } from '@angular/core/rxjs-interop';
 import { FormControl, FormsModule, ReactiveFormsModule } from '@angular/forms';
-import { lucideArrowUpDown, lucideChevronDown, lucideMoreHorizontal, lucideRotateCw, lucideXOctagon, lucidePlus, lucideCheck } from '@ng-icons/lucide';
+import { lucideArrowUpDown, lucideChevronDown, lucideMoreHorizontal, lucideRotateCw, lucideXOctagon, lucidePlus, lucideCheck, lucideTrash2 } from '@ng-icons/lucide';
 import { HlmButtonModule } from '@spartan-ng/ui-button-helm';
 import { HlmIconComponent, provideIcons } from '@spartan-ng/ui-icon-helm';
 import { HlmInputDirective } from '@spartan-ng/ui-input-helm';
@@ -15,7 +15,7 @@ import { HlmSelectModule } from '@spartan-ng/ui-select-helm';
 import { HlmSkeletonModule } from '@spartan-ng/ui-skeleton-helm';
 import { HlmCardModule } from '@spartan-ng/ui-card-helm';
 import { debounceTime, lastValueFrom, map } from 'rxjs';
-import { AdminService, TeamInfo } from '@app/core/modules/openapi';
+import { WorkspaceService, TeamInfo } from '@app/core/modules/openapi';
 import { injectMutation, injectQueryClient } from '@tanstack/angular-query-experimental';
 import { octNoEntry } from '@ng-icons/octicons';
 import { HlmPopoverModule } from '@spartan-ng/ui-popover-helm';
@@ -42,48 +42,40 @@ const LOADING_TEAMS: TeamInfo[] = [
 ];
 
 @Component({
-  selector: 'app-admin-teams-table',
+  selector: 'app-workspace-teams-table',
   standalone: true,
   imports: [
     FormsModule,
     ReactiveFormsModule,
-
     BrnMenuTriggerDirective,
     HlmMenuModule,
-
     BrnTableModule,
     HlmTableModule,
-
     HlmButtonModule,
-
     HlmIconComponent,
     HlmInputDirective,
     HlmScrollAreaComponent,
-
     BrnSelectModule,
     HlmSelectModule,
-
     HlmSkeletonModule,
     HlmCardModule,
-
     HlmPopoverModule,
     BrnPopoverComponent,
     BrnPopoverContentDirective,
     BrnPopoverTriggerDirective,
-
     GithubLabelComponent
   ],
-  providers: [provideIcons({ lucideChevronDown, lucideMoreHorizontal, lucideArrowUpDown, lucideRotateCw, lucideXOctagon, lucidePlus, lucideCheck })],
+  providers: [provideIcons({ lucideChevronDown, lucideMoreHorizontal, lucideArrowUpDown, lucideRotateCw, lucideXOctagon, lucidePlus, lucideCheck, lucideTrash2 })],
   templateUrl: './teams-table.component.html'
 })
-export class AdminTeamsTableComponent {
-  protected adminService = inject(AdminService);
+export class WorkspaceTeamsTableComponent {
+  protected workspaceService = inject(WorkspaceService);
   protected queryClient = injectQueryClient();
   protected octNoEntry = octNoEntry;
 
   isLoading = input(false);
   teamData = input.required<TeamInfo[] | undefined>();
-  allRepositories = input.required<Set<string> | undefined>();
+  allRepositories = input.required<Array<string> | undefined>();
 
   // Controls for mutations
   _newLabelName = new FormControl('');
@@ -147,10 +139,17 @@ export class AdminTeamsTableComponent {
   }
 
   groupLabelsByRepository = (team: TeamInfo) => {
-    const group = Object.entries(groupBy(team.labels, (l) => l.repository!.nameWithOwner)).map(([repository, labels]) => ({ repository, labels }));
+    const group = Object.entries(groupBy(team.labels, (l) => l.repository!.nameWithOwner)).map(([repository, labels]) => ({
+      repository,
+      labels,
+      repositoryId: labels[0].repository!.id
+    }));
     // add repos without labels
-    const filteredRepos = team.repositories.map((r) => r.nameWithOwner).filter((r) => !group.map((g) => g.repository).includes(r));
-    return group.concat(filteredRepos.map((r) => ({ repository: r, labels: [] })));
+    const filteredRepos = team.repositories.filter((r) => !group.map((g) => g.repository).includes(r.nameWithOwner));
+    let result = group.concat(filteredRepos.map((r) => ({ repository: r.nameWithOwner, labels: [], repositoryId: r.id }))).sort((a, b) => a.repository.localeCompare(b.repository));
+    // Sort labels
+    result = result.map((r) => ({ ...r, labels: r.labels.sort((a, b) => a.name.localeCompare(b.name)) }));
+    return result;
   };
 
   protected toggleTeam(team: TeamInfo) {
@@ -178,14 +177,26 @@ export class AdminTeamsTableComponent {
   }
 
   deleteTeam = injectMutation(() => ({
-    mutationFn: (team: TeamInfo) => lastValueFrom(this.adminService.deleteTeam(team.id)),
-    queryKey: ['admin', 'team', 'delete'],
+    mutationFn: (team: TeamInfo) => lastValueFrom(this.workspaceService.deleteTeam(team.id)),
+    queryKey: ['workspace', 'team', 'delete'],
     onSettled: () => this.invalidateTeams()
   }));
 
   addLabelToTeam = injectMutation(() => ({
-    mutationFn: (team: TeamInfo) => lastValueFrom(this.adminService.addLabelToTeam(team.id, this._newLabelName.value ?? '')),
-    queryKey: ['admin', 'team', 'label', 'add'],
+    mutationFn: ({ teamId, repositoryId, label }: { teamId: number; repositoryId: number; label: string }) =>
+      lastValueFrom(this.workspaceService.addLabelToTeam(teamId, repositoryId, label)),
+    onError: () => {
+      this.displayLabelAlert.set(true);
+    },
+    onSettled: () => {
+      this.displayLabelAlert.set(false);
+      this._newLabelName.reset();
+      this.invalidateTeams();
+    }
+  }));
+
+  removeLabelFromTeam = injectMutation(() => ({
+    mutationFn: ({ teamId, labelId }: { teamId: number; labelId: number }) => lastValueFrom(this.workspaceService.removeLabelFromTeam(teamId, labelId)),
     onError: () => {
       this.displayLabelAlert.set(true);
     },
@@ -199,24 +210,24 @@ export class AdminTeamsTableComponent {
   createTeam = injectMutation(() => ({
     mutationFn: () =>
       lastValueFrom(
-        this.adminService.createTeam({
+        this.workspaceService.createTeam({
           name: this._newTeamName.value,
           color: this._newTeamColor.value ?? '#000000'
         } as TeamInfo)
       ),
-    queryKey: ['admin', 'team', 'create'],
+    queryKey: ['workspace', 'team', 'create'],
     onSettled: () => this.invalidateTeams()
   }));
 
   removeRepositoryFromTeam = injectMutation(() => ({
-    mutationFn: ({ teamId, owner, repo }: { teamId: number; owner: string; repo: string }) => lastValueFrom(this.adminService.removeRepositoryFromTeam(teamId, owner, repo)),
-    queryKey: ['admin', 'team', 'repository', 'remove'],
+    mutationFn: ({ teamId, owner, repo }: { teamId: number; owner: string; repo: string }) => lastValueFrom(this.workspaceService.removeRepositoryFromTeam(teamId, owner, repo)),
+    queryKey: ['workspace', 'team', 'repository', 'remove'],
     onSettled: () => this.invalidateTeams()
   }));
 
   addRepositoryToTeam = injectMutation(() => ({
-    mutationFn: ({ teamId, owner, repo }: { teamId: number; owner: string; repo: string }) => lastValueFrom(this.adminService.addRepositoryToTeam(teamId, owner, repo)),
-    queryKey: ['admin', 'team', 'repository', 'add'],
+    mutationFn: ({ teamId, owner, repo }: { teamId: number; owner: string; repo: string }) => lastValueFrom(this.workspaceService.addRepositoryToTeam(teamId, owner, repo)),
+    queryKey: ['workspace', 'team', 'repository', 'add'],
     onSettled: () => this.invalidateTeams()
   }));
 
@@ -226,7 +237,7 @@ export class AdminTeamsTableComponent {
   }
 
   protected invalidateTeams() {
-    this.queryClient.invalidateQueries({ queryKey: ['admin', 'teams'] });
+    this.queryClient.invalidateQueries({ queryKey: ['workspace', 'teams'] });
   }
 
   protected isRepositoryInTeam(team: TeamInfo, repository: string) {
