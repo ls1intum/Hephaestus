@@ -26,6 +26,22 @@ public interface UserRepository extends JpaRepository<User, Long> {
     List<User> findAllWithEagerTeams();
 
     @Query("""
+                SELECT u
+                FROM User u
+                WHERE u.type = 'USER'
+            """)
+    List<User> findAllHuman()
+
+    @Query("""
+                SELECT u
+                FROM User u
+                JOIN u.teams t
+                WHERE t.id = :teamId
+                AND u.type = 'USER'
+            """)
+    List<User> findAllByTeamId(@Param("teamId") Long teamId);
+
+    @Query("""
                 SELECT DISTINCT pr.author
                 FROM PullRequest pr
                 JOIN Team t ON pr.repository MEMBER OF t.repositories

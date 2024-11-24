@@ -202,7 +202,7 @@ public class WorkspaceService {
 
     public List<UserTeamsDTO> getUsersWithTeams() {
         logger.info("Getting all users with their teams");
-        return userRepository.findAll().stream().map(UserTeamsDTO::fromUser).toList();
+        return userRepository.findAllHuman().stream().map(UserTeamsDTO::fromUser).toList();
     }
 
     public Optional<UserInfoDTO> addTeamToUser(String login, Long teamId) {

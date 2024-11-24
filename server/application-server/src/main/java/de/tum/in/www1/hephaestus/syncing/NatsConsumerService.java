@@ -10,9 +10,9 @@ import org.kohsuke.github.GHEvent;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import io.nats.client.Connection;
-import io.nats.client.ConsumeOptions;
 import io.nats.client.ConsumerContext;
 import io.nats.client.JetStreamApiException;
+import io.nats.client.JetStreamManagement;
 import io.nats.client.Message;
 import io.nats.client.MessageHandler;
 import io.nats.client.Nats;
@@ -20,7 +20,6 @@ import io.nats.client.Options;
 import io.nats.client.StreamContext;
 import io.nats.client.api.ConsumerConfiguration;
 import io.nats.client.api.DeliverPolicy;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.context.event.ApplicationReadyEvent;
 import org.springframework.context.event.EventListener;
@@ -217,9 +216,8 @@ public class NatsConsumerService {
                 return;
             }
 
-            StreamContext streamContext = connection.getStreamContext("github");
-            streamContext.deleteConsumer(consumerContext.getConsumerName());
-
+            JetStreamManagement jsm = natsConnection.jetStreamManagement();
+            jsm.deleteConsumer("github", consumerContext.getConsumerName());
             repositoryToMonitorIdToConsumerContext.remove(repositoryToMonitor.getId());
         } catch (JetStreamApiException e) {
             logger.error("JetStream API exception: {}", e.getMessage(), e);

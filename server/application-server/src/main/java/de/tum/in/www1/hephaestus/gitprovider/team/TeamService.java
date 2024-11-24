@@ -41,7 +41,8 @@ public class TeamService {
     public void setupDefaultTeams() {
         logger.info("Creating default teams");
         List<DefaultTeamRecord> defaultTeams = new ArrayList<>();
-        defaultTeams.add(new DefaultTeamRecord("Artemis", "#69feff", List.of(new RepositoryWithLabels("ls1intum/Artemis", List.of("iris", "component:iris")), new RepositoryWithLabels("ls1intum/Pyris", List.of()))));
+        defaultTeams.add(new DefaultTeamRecord("Artemis", "#69feff", List.of(new RepositoryWithLabels("ls1intum/Artemis", List.of()))));
+        defaultTeams.add(new DefaultTeamRecord("Iris", "#69feff", List.of(new RepositoryWithLabels("ls1intum/Artemis", List.of("iris", "component:iris")), new RepositoryWithLabels("ls1intum/Pyris", List.of()))));
         defaultTeams.add(new DefaultTeamRecord("Athena", "#69feff", List.of(new RepositoryWithLabels("ls1intum/Artemis", List.of("athena")), new RepositoryWithLabels("ls1intum/Athena", List.of()))));
         defaultTeams.add(new DefaultTeamRecord("Atlas", "#69feff", List.of(new RepositoryWithLabels("ls1intum/Artemis", List.of("atlas")))));
         defaultTeams.add(new DefaultTeamRecord("Programming", "#69feff", List.of(new RepositoryWithLabels("ls1intum/Artemis", List.of("programming", "component:programming")), new RepositoryWithLabels("ls1intum/Pyris", List.of()), new RepositoryWithLabels("ls1intum/Atlas", List.of()))));
