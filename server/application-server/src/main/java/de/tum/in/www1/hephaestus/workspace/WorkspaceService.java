@@ -143,6 +143,9 @@ public class WorkspaceService {
         repositoryToMonitorRepository.save(repositoryToMonitor);
         workspace.getRepositoriesToMonitor().add(repositoryToMonitor);
         workspaceRepository.save(workspace);
+
+        // Start syncing the repository
+        gitHubDataSyncService.syncRepositoryToMonitorAsync(repositoryToMonitor);
     }
 
     public void removeRepositoryToMonitor(String nameWithOwner) throws RepositoryNotFoundException {

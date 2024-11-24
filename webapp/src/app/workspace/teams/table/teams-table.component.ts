@@ -142,7 +142,10 @@ export class WorkspaceTeamsTableComponent {
     const group = Object.entries(groupBy(team.labels, (l) => l.repository!.nameWithOwner)).map(([repository, labels]) => ({ repository, labels }));
     // add repos without labels
     const filteredRepos = team.repositories.map((r) => r.nameWithOwner).filter((r) => !group.map((g) => g.repository).includes(r));
-    return group.concat(filteredRepos.map((r) => ({ repository: r, labels: [] })));
+    let result = group.concat(filteredRepos.map((r) => ({ repository: r, labels: [] }))).sort((a, b) => a.repository.localeCompare(b.repository));
+    // Sort labels
+    result = result.map((r) => ({ ...r, labels: r.labels.sort((a, b) => a.name.localeCompare(b.name)) }));
+    return result;
   };
 
   protected toggleTeam(team: TeamInfo) {

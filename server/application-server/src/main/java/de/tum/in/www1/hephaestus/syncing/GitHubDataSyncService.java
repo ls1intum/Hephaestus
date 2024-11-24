@@ -12,8 +12,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
-import jakarta.transaction.Transactional;
 
 import de.tum.in.www1.hephaestus.gitprovider.issue.Issue;
 import de.tum.in.www1.hephaestus.gitprovider.issue.IssueRepository;
@@ -110,6 +110,11 @@ public class GitHubDataSyncService {
         workspace.setUsersSyncedAt(currentTime);
         workspaceRepository.save(workspace);
         logger.info("User sync completed.");
+    }
+
+    @Async
+    public void syncRepositoryToMonitorAsync(RepositoryToMonitor repositoryToMonitor) {
+        syncRepositoryToMonitor(repositoryToMonitor);
     }
 
     /**
