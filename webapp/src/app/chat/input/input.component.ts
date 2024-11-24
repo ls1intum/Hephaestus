@@ -18,7 +18,7 @@ export class InputComponent {
   @Output() messageSent = new EventEmitter<string>();
 
   messageText: string = '';
-  
+
   onSend(): void {
     if (this.messageText.trim() !== '') {
       this.messageSent.emit(this.messageText);

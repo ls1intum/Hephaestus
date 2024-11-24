@@ -15,7 +15,7 @@ import { HlmButtonModule } from '@spartan-ng/ui-button-helm';
   selector: 'app-chat',
   templateUrl: './chat.component.html',
   standalone: true,
-  imports: [CommonModule, SessionsCardComponent, MessagesComponent, InputComponent, HlmButtonModule],
+  imports: [CommonModule, SessionsCardComponent, MessagesComponent, InputComponent, HlmButtonModule]
 })
 export class ChatComponent {
   securityStore = inject(SecurityStore);
@@ -44,22 +44,21 @@ export class ChatComponent {
       const loadedMessages = await lastValueFrom(this.messageService.getMessages(this.selectedSession.id));
       this.messageHistory.set(loadedMessages);
       return loadedMessages;
-    },
+    }
   }));
 
   protected sendMessage = injectMutation(() => ({
     queryKey: ['messages', 'create'],
-    mutationFn: ({sessionId} : { sessionId: number}) => {
+    mutationFn: ({ sessionId }: { sessionId: number }) => {
       if (!this.selectedSession) {
         throw new Error('No session selected!');
       }
-      return lastValueFrom(this.messageService.createMessage(sessionId, this.content)); 
+      return lastValueFrom(this.messageService.createMessage(sessionId, this.content));
     },
     onSuccess: () => {
       this.query.refetch();
     }
   }));
-  
 
   handleSendMessage(content: string): void {
     if (!this.selectedSession) {
@@ -67,7 +66,6 @@ export class ChatComponent {
       return;
     }
     this.content = content;
-    this.sendMessage.mutate({sessionId: this.selectedSession.id});
+    this.sendMessage.mutate({ sessionId: this.selectedSession.id });
   }
-
 }

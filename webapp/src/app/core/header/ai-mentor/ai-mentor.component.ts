@@ -5,7 +5,6 @@ import { BrnTooltipContentDirective } from '@spartan-ng/ui-tooltip-brain';
 import { HlmTooltipComponent, HlmTooltipTriggerDirective } from '@spartan-ng/ui-tooltip-helm';
 import { LucideAngularModule, BotMessageSquare } from 'lucide-angular';
 
-
 @Component({
   selector: 'app-ai-mentor',
   standalone: true,
