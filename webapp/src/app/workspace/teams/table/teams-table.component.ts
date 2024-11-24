@@ -80,7 +80,7 @@ export class WorkspaceTeamsTableComponent {
   // Controls for mutations
   _newLabelName = new FormControl('');
   _newTeamName = new FormControl('');
-  _newTeamColor = new FormControl('');
+  _newTeamColor = new FormControl('#000000');
 
   displayLabelAlert = signal(false);
 
