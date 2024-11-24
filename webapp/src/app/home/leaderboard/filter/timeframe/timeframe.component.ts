@@ -66,7 +66,15 @@ export class LeaderboardFilterTimeframeComponent {
     };
   });
 
-  after = computed(() => this.queryParams().get('after') ?? (this.leaderboardSchedule() ? this.leaderboardSchedule().full.format() : ''));
+  getDefaultDate() {
+    let defaultDate = dayjs().isoWeekday(this.leaderboardSchedule().day).startOf('hour').hour(this.leaderboardSchedule().hour).minute(this.leaderboardSchedule().minute);
+    if (defaultDate.isAfter(dayjs())) {
+      defaultDate = defaultDate.subtract(1, 'week');
+    }
+    return defaultDate;
+  }
+
+  after = computed(() => this.queryParams().get('after') ?? (this.leaderboardSchedule() ? this.getDefaultDate().format() : ''));
   before = computed(() => this.queryParams().get('before') ?? dayjs().format());
   selectValue = signal<string>(`${this.after()}.${this.before()}`);
 
