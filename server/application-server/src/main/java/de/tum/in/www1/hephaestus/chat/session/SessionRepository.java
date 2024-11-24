@@ -9,6 +9,6 @@ import java.util.List;
 
 @Repository
 public interface SessionRepository extends JpaRepository<Session, Long> {
-    
+
     Optional<List<Session>> findByUserLogin(@Param("login") String login);
 }
