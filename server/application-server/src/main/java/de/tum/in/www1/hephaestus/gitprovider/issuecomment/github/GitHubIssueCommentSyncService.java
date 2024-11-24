@@ -1,10 +1,7 @@
 package de.tum.in.www1.hephaestus.gitprovider.issuecomment.github;
 
 import java.io.IOException;
-import java.util.Optional;
-import java.util.Date;
 import java.util.List;
-import java.time.OffsetDateTime;
 
 import org.kohsuke.github.GHIssue;
 import org.kohsuke.github.GHIssueComment;

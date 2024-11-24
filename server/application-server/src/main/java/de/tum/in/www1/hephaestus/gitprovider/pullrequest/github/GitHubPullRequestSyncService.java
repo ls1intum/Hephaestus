@@ -28,7 +28,6 @@ import de.tum.in.www1.hephaestus.gitprovider.milestone.github.GitHubMilestoneCon
 import de.tum.in.www1.hephaestus.gitprovider.pullrequest.PullRequest;
 import de.tum.in.www1.hephaestus.gitprovider.pullrequest.PullRequestRepository;
 import de.tum.in.www1.hephaestus.gitprovider.repository.RepositoryRepository;
-import de.tum.in.www1.hephaestus.gitprovider.team.TeamRepository;
 import de.tum.in.www1.hephaestus.gitprovider.user.User;
 import de.tum.in.www1.hephaestus.gitprovider.user.UserRepository;
 import de.tum.in.www1.hephaestus.gitprovider.user.github.GitHubUserConverter;
@@ -48,8 +47,6 @@ public class GitHubPullRequestSyncService {
     private MilestoneRepository milestoneRepository;
     @Autowired
     private UserRepository userRepository;
-    @Autowired
-    private TeamRepository teamRepository;
     @Autowired
     private GitHubPullRequestConverter pullRequestConverter;
     @Autowired

@@ -7,7 +7,6 @@ import java.time.OffsetDateTime;
 import org.springframework.lang.NonNull;
 
 import jakarta.persistence.Table;
-import jakarta.persistence.Basic;
 import jakarta.persistence.CascadeType;
 import jakarta.persistence.DiscriminatorColumn;
 import jakarta.persistence.DiscriminatorValue;

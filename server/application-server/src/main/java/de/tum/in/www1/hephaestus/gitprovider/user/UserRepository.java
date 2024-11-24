@@ -30,7 +30,7 @@ public interface UserRepository extends JpaRepository<User, Long> {
                 FROM User u
                 WHERE u.type = 'USER'
             """)
-    List<User> findAllHuman()
+    List<User> findAllHuman();
 
     @Query("""
                 SELECT u

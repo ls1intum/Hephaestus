@@ -1,7 +1,6 @@
 package de.tum.in.www1.hephaestus.gitprovider.team;
 
 import jakarta.transaction.Transactional;
-import java.util.Optional;
 import java.util.ArrayList;
 import java.util.List;
 
