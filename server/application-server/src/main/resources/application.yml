@@ -43,7 +43,7 @@ hephaestus:
     workspace:
         init-default: true
         default:
-            repositories-to-monitor: ls1intum/Artemis
+            repositories-to-monitor: ls1intum/Artemis,ls1intum/Hephaestus
 
 keycloak:
     url: http://localhost:8081
@@ -61,7 +61,7 @@ monitoring:
     run-on-startup: true
     # Fetching timeframe in days
     timeframe: 7
-    sync-cron: "0 0 * * * *"
+    sync-cron: "0 0 3 * * *"
     # Cooldown in minutes before running the monitoring again
     sync-cooldown-in-minutes: 15
     # Whether to sync all issues and pull requests that are missing in the database

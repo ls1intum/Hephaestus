@@ -121,6 +121,24 @@ public class GitHubIssueSyncService {
     }
 
     /**
+     * Syncs a single GitHub issue by its number from a specific repository.
+     *
+     * @param repository  The repository to fetch the issue from.
+     * @param issueNumber The number of the issue to fetch.
+     * @return An optional containing the fetched GitHub issue, or an empty optional if the issue could not be fetched.
+     */
+    public Optional<GHIssue> syncIssue(GHRepository repository, int issueNumber) {
+        try {
+            var ghIssue = repository.getIssue(issueNumber);
+            processIssue(ghIssue);
+            return Optional.of(ghIssue);
+        } catch (IOException e) {
+            logger.error("Failed to fetch issue {} from repository {}: {}", issueNumber, repository.getFullName(), e.getMessage());
+            return Optional.empty();
+        }
+    }
+
+    /**
      * Processes a single GitHub issue by updating or creating it in the local
      * repository.
      * Manages associations with repositories, labels, milestones, authors, and

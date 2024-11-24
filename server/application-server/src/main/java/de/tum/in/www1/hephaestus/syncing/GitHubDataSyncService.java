@@ -95,7 +95,6 @@ public class GitHubDataSyncService {
     /**
      * Syncs all existing users in the database with their GitHub data
      */
-    @Transactional
     public void syncUsers(Workspace workspace) {
         boolean shouldSyncUsers = workspace.getUsersSyncedAt() == null
                 || workspace.getUsersSyncedAt().isBefore(OffsetDateTime.now().minusMinutes(syncCooldownInMinutes));
@@ -138,7 +137,7 @@ public class GitHubDataSyncService {
         }
 
         // Check if there are any unsynced issues or pull requests in the past
-        if (!shouldSyncRepository && syncAllIssuesAndPullRequests) {
+        if (!shouldSyncRepository) {
             shouldSyncRepository = shouldSyncAllPastIssuesAndPullRequests(repositoryToMonitor);
         }
 
@@ -166,14 +165,16 @@ public class GitHubDataSyncService {
             logger.info(repositoryToMonitor.getNameWithOwner() + " - Syncing recent issues and pull requests...");
             syncRepositoryRecentIssuesAndPullRequests(ghRepository, repositoryToMonitor);
         }
-        if (syncAllIssuesAndPullRequests) {
-            logger.info(repositoryToMonitor.getNameWithOwner() + " - Syncing all past issues and pull requests...");
-            syncAllPastIssuesAndPullRequests(ghRepository, repositoryToMonitor);
-        }
+        
+        // TODO: Re-enable once it works without exceptions
+        //
+        // if (shouldSyncAllPastIssuesAndPullRequests(repositoryToMonitor)) {
+        //     logger.info(repositoryToMonitor.getNameWithOwner() + " - Syncing all past issues and pull requests...");
+        //     syncAllPastIssuesAndPullRequests(ghRepository, repositoryToMonitor);
+        // }
         logger.info(repositoryToMonitor.getNameWithOwner() + " - Data sync completed.");
     }
 
-    @Transactional
     private Optional<GHRepository> syncRepository(RepositoryToMonitor repositoryToMonitor) {
         String nameWithOwner = repositoryToMonitor.getNameWithOwner();
         var currentTime = OffsetDateTime.now();
@@ -183,7 +184,6 @@ public class GitHubDataSyncService {
         return repository;
     }
 
-    @Transactional
     private void syncRepositoryLabels(GHRepository repository, RepositoryToMonitor repositoryToMonitor) {
         var currentTime = OffsetDateTime.now();
         labelSyncService.syncLabelsOfRepository(repository);
@@ -191,7 +191,6 @@ public class GitHubDataSyncService {
         repositoryToMonitorRepository.save(repositoryToMonitor);
     }
 
-    @Transactional
     private void syncRepositoryMilestones(GHRepository repository, RepositoryToMonitor repositoryToMonitor) {
         var currentTime = OffsetDateTime.now();
         milestoneSyncService.syncMilestonesOfRepository(repository);
@@ -232,7 +231,6 @@ public class GitHubDataSyncService {
      * @param issuesIterator iterator for fetching issues
      * @return the last updated time of the last issue or the current time if no issues were fetched
      */
-    @Transactional
     private OffsetDateTime syncRepositoryRecentIssuesAndPullRequestsNextPage(GHRepository repository, PagedIterator<GHIssue> issuesIterator) {
         var currentTime = OffsetDateTime.now();
         var ghIssues = issuesIterator.nextPage();
@@ -312,30 +310,51 @@ public class GitHubDataSyncService {
 
         var syncedIssues = issueRepository.findAllSyncedIssueNumbers(repository.getId());
         var unsyncedIssues = IntStream.iterate(lastIssueNumber, i -> i > 0, i -> i - 1)
-            .filter(i -> !syncedIssues.contains(i))
+            .filter(issueNumber -> !syncedIssues.contains(issueNumber))
             .boxed()
-            .collect(Collectors.toSet());
+            .toList();
 
-        // TODO sync issues
+        logger.info("Syncing {} past issues and associated pull requests if necessary...", unsyncedIssues.size());
+        unsyncedIssues.forEach(issueNumber -> {
+            var isPullRequest = syncPastIssue(repository, issueNumber);
+            if (!isPullRequest) {
+                return;
+            }
+            var pullRequest = pullRequestRepository.findByRepositoryIdAndNumber(repository.getId(), issueNumber);
+            if (pullRequest.isEmpty() || pullRequest.get().getLastSyncAt() == null) {
+                syncPastPullRequest(repository, issueNumber);
+            }
+        });
+        logger.info("Past issues sync completed.");
 
+        // Sync remaining pull requests in case they were not synced with the issues
         var pullRequestNumbers = issueRepository.findAllIssueNumbersWithPullRequest(repository.getId());
         var syncedPullRequests = pullRequestRepository.findAllSyncedPullRequestNumbers(repository.getId());
         var unsyncedPullRequests = pullRequestNumbers.stream()
-            .filter(i -> !syncedPullRequests.contains(i))
-            .collect(Collectors.toSet());
+            .filter(pullRequestNumber -> !syncedPullRequests.contains(pullRequestNumber))
+            .sorted((a, b) -> b - a)
+            .toList();
 
-        // TODO sync pull requests
+        logger.info("Syncing {} past pull requests...", unsyncedPullRequests.size());
+        unsyncedPullRequests.forEach(pullRequestNumber -> syncPastPullRequest(repository, pullRequestNumber));
+        logger.info("Past pull requests sync completed.");
     }
 
-    // @Transactional
-    // private void syncPastIssue(GHRepository repository, Integer issueNumber) {
-    //     repository.getIssue(syncCooldownInMinutes)
-        
-    //     var issue = issueSyncService.syncIssue(repository, issueNumber).orElse(null);
-    //     if (issue == null) {
-    //         return;
-    //     }
+    private boolean syncPastIssue(GHRepository repository, Integer issueNumber) {
+        var issue = issueSyncService.syncIssue(repository, issueNumber);
+        if (issue.isEmpty()) {
+            return false;
+        }
+        issueCommentSyncService.syncIssueCommentsOfIssue(issue.get());
+        return issue.get().isPullRequest();
+    }
 
-    //     issueCommentSyncService.syncIssueCommentsOfIssue(issue);
-    // }
+    private void syncPastPullRequest(GHRepository repository, Integer pullRequestNumber) {
+        var pullRequest = pullRequestSyncService.syncPullRequest(repository, pullRequestNumber, true);
+        if (pullRequest.isEmpty()) {
+            return;
+        }
+        pullRequestReviewSyncService.syncReviewsOfPullRequest(pullRequest.get());
+        pullRequestReviewCommentSyncService.syncReviewCommentsOfPullRequest(pullRequest.get());
+    }
 }

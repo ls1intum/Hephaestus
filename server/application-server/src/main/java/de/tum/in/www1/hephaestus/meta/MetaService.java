@@ -1,11 +1,12 @@
 package de.tum.in.www1.hephaestus.meta;
 
-import de.tum.in.www1.hephaestus.gitprovider.team.TeamService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
+
+import de.tum.in.www1.hephaestus.gitprovider.team.TeamService;
 
 @Service
 public class MetaService {
@@ -13,9 +14,6 @@ public class MetaService {
 
     @Autowired
     private TeamService teamService;
-
-    @Value("${monitoring.repositories}")
-    private String[] repositoriesToMonitor;
 
     @Value("${hephaestus.leaderboard.schedule.day}")
     private String scheduledDay;

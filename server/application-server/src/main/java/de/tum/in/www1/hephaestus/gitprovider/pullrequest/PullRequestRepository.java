@@ -41,9 +41,9 @@ public interface PullRequestRepository extends JpaRepository<PullRequest, Long> 
             JOIN FETCH p.author
             LEFT JOIN FETCH p.assignees
             LEFT JOIN FETCH p.repository
-            WHERE p.repository = :repository AND p.number = :number
+            WHERE p.repository.id = :repositoryId AND p.number = :number
             """)
-    Optional<PullRequest> findByRepositoryAndNumber(@Param("repository") de.tum.in.www1.hephaestus.gitprovider.repository.Repository repository, @Param("number") int number);
+    Optional<PullRequest> findByRepositoryIdAndNumber(@Param("repositoryId") long repositoryId, @Param("number") int number);
 
     @Query(
         """

@@ -72,23 +72,21 @@ public class WorkspaceService {
     @Value("${monitoring.run-on-startup}")
     private boolean runMonitoringOnStartup;
 
-    @Value("${monitoring.run-on-startup-cooldown-in-minutes}")
-    private int runOnStartupCooldownInMinutes;
-
     @EventListener(ApplicationReadyEvent.class)
     public void onApplicationReady() {
         Workspace workspace = getWorkspace();
         Set<RepositoryToMonitor> repositoriesToMonitor = workspace.getRepositoriesToMonitor();
 
         if (runMonitoringOnStartup) {
+            logger.info("Running monitoring on startup");
             repositoriesToMonitor.forEach(repositoryToMonitor -> {
                 gitHubDataSyncService.syncRepositoryToMonitor(repositoryToMonitor);
             });
             gitHubDataSyncService.syncUsers(workspace);
+            logger.info("Finished running monitoring on startup");
         }
     }
 
-    @Transactional
     private Workspace createInitialWorkspace() {
         Workspace workspace = new Workspace();
         
