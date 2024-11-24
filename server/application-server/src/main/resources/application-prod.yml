@@ -22,16 +22,14 @@ hephaestus:
       notification:
         enabled: ${LEADERBOARD_NOTIFICATION_ENABLED:true}
         channel-id: ${LEADERBOARD_NOTIFICATION_CHANNEL_ID:G6TCVL6HL}
-    team:
-        assignment:
-            auto: false
+    workspace:
+        init-default: false
 
 keycloak:
     url: ${KEYCLOAK_URL}
     realm: ${KEYCLOAK_REALM}
     client-id: ${KEYCLOAK_CLIENT_ID}
     client-secret: ${KEYCLOAK_CLIENT_SECRET}
-
 
 nats:
     enabled: ${NATS_ENABLED:false}
@@ -43,11 +41,13 @@ monitoring:
     run-on-startup: ${MONITORING_RUN_ON_STARTUP:true}
     # Fetching timeframe in days
     timeframe: ${MONITORING_TIMEFRAME:7}
-    repository-sync-cron: ${MONITORING_REPOSITORY_SYNC_CRON:0 0 * * * *}
-    repositories: ${MONITORING_REPOSITORIES:ls1intum/Artemis}
+    sync-cron: ${MONITORING_SYNC_CRON:0 0 * * * *}
+    sync-cooldown-in-minutes: {MONITORING_SYNC_COOLDOWN_IN_MINUTES:0}
+    sync-all-issues-and-pull-requests: {MONITORING_SYNC_ALL_ISSUES_AND_PULL_REQUESTS:true}
 
 github:
   auth-token: ${GITHUB_AUTH_TOKEN}
+
 slack:
     token: ${SLACK_BOT_TOKEN}
     signing-secret: ${SLACK_SIGNING_SECRET}

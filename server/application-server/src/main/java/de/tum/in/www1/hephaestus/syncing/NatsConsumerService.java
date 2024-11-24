@@ -1,9 +1,14 @@
 package de.tum.in.www1.hephaestus.syncing;
 
-import de.tum.in.www1.hephaestus.admin.AdminConfigChangedEvent;
-import de.tum.in.www1.hephaestus.admin.AdminService;
-import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubMessageHandler;
-import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubMessageHandlerRegistry;
+import java.io.IOException;
+import java.time.Duration;
+import java.time.ZonedDateTime;
+import java.util.Arrays;
+import java.util.Set;
+
+import org.kohsuke.github.GHEvent;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import io.nats.client.Connection;
 import io.nats.client.ConsumerContext;
 import io.nats.client.JetStreamApiException;
@@ -14,20 +19,17 @@ import io.nats.client.Options;
 import io.nats.client.StreamContext;
 import io.nats.client.api.ConsumerConfiguration;
 import io.nats.client.api.DeliverPolicy;
-import java.io.IOException;
-import java.time.Duration;
-import java.time.ZonedDateTime;
-import java.util.Arrays;
-import java.util.Set;
-import org.kohsuke.github.GHEvent;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.context.event.ApplicationReadyEvent;
 import org.springframework.context.event.EventListener;
 import org.springframework.core.annotation.Order;
 import org.springframework.stereotype.Service;
+
+import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubMessageHandler;
+import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubMessageHandlerRegistry;
+import de.tum.in.www1.hephaestus.workspace.WorkspaceChangedEvent;
+import de.tum.in.www1.hephaestus.workspace.WorkspaceService;
 
 @Order(value = 1)
 @Service
@@ -50,7 +52,7 @@ public class NatsConsumerService {
     private String durableConsumerName;
 
     @Autowired
-    private AdminService adminService;
+    private WorkspaceService workspaceService;
 
     private Connection natsConnection;
     private ConsumerContext consumerContext;
@@ -86,7 +88,7 @@ public class NatsConsumerService {
         if (natsServer == null || natsServer.trim().isEmpty()) {
             throw new IllegalArgumentException("NATS server configuration is missing.");
         }
-        Set<String> repositoriesToMonitor = adminService.getAdminConfig().getRepositoriesToMonitor();
+        Set<String> repositoriesToMonitor = workspaceService.getRepositoriesToMonitor();
         if (repositoriesToMonitor == null || repositoriesToMonitor.size() == 0) {
             throw new IllegalArgumentException("No repositories to monitor are configured.");
         }
@@ -142,10 +144,10 @@ public class NatsConsumerService {
         }
     }
 
-    @EventListener(classes = AdminConfigChangedEvent.class)
-    public void handleAdminConfigChangedEvent(AdminConfigChangedEvent event) {
-        logger.info("Received admin config changed event. Updating consumer.");
-        updateConsumer(event.getAdminConfig().getRepositoriesToMonitor());
+    @EventListener(classes = WorkspaceChangedEvent.class)
+    public void handleWorkspaceChangedEvent(WorkspaceChangedEvent event) {
+        logger.info("Received workspace changed event. Updating consumer.");
+        updateConsumer(workspaceService.getRepositoriesToMonitor());
     }
 
     public void updateConsumer(Set<String> repositoriesToMonitor) {
@@ -196,7 +198,7 @@ public class NatsConsumerService {
     }
 
     private String[] getSubjects() {
-        return getSubjects(adminService.getAdminConfig().getRepositoriesToMonitor());
+        return getSubjects(workspaceService.getRepositoriesToMonitor());
     }
 
     /**

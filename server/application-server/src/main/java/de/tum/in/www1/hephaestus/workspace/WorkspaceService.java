@@ -1,8 +1,23 @@
-package de.tum.in.www1.hephaestus.admin;
+package de.tum.in.www1.hephaestus.workspace;
+
+import jakarta.transaction.Transactional;
+import java.util.List;
+import java.util.Optional;
+import java.util.Set;
+import java.util.stream.Collectors;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.boot.context.event.ApplicationReadyEvent;
+import org.springframework.context.ApplicationEventPublisher;
+import org.springframework.context.event.EventListener;
+import org.springframework.stereotype.Service;
 
 import de.tum.in.www1.hephaestus.gitprovider.label.Label;
 import de.tum.in.www1.hephaestus.gitprovider.label.LabelRepository;
 import de.tum.in.www1.hephaestus.gitprovider.repository.RepositoryRepository;
+import de.tum.in.www1.hephaestus.gitprovider.repository.github.GitHubRepositorySyncService;
 import de.tum.in.www1.hephaestus.gitprovider.team.Team;
 import de.tum.in.www1.hephaestus.gitprovider.team.TeamInfoDTO;
 import de.tum.in.www1.hephaestus.gitprovider.team.TeamRepository;
@@ -11,65 +26,144 @@ import de.tum.in.www1.hephaestus.gitprovider.user.User;
 import de.tum.in.www1.hephaestus.gitprovider.user.UserInfoDTO;
 import de.tum.in.www1.hephaestus.gitprovider.user.UserRepository;
 import de.tum.in.www1.hephaestus.gitprovider.user.UserTeamsDTO;
-import java.util.List;
-import java.util.Optional;
-import java.util.Set;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.beans.factory.annotation.Value;
-import org.springframework.cache.annotation.CacheEvict;
-import org.springframework.cache.annotation.Cacheable;
-import org.springframework.context.ApplicationEventPublisher;
-import org.springframework.stereotype.Service;
+import de.tum.in.www1.hephaestus.syncing.GitHubDataSyncService;
 
 @Service
-public class AdminService {
+public class WorkspaceService {
 
-    private static final Logger logger = LoggerFactory.getLogger(AdminService.class);
+    private static final Logger logger = LoggerFactory.getLogger(WorkspaceService.class);
 
     @Autowired
     private ApplicationEventPublisher eventPublisher;
 
     @Autowired
-    private AdminRepository adminRepository;
+    private GitHubDataSyncService gitHubDataSyncService;
+
+    @Autowired
+    private GitHubRepositorySyncService repositorySyncService;
+
+    @Autowired
+    private WorkspaceRepository workspaceRepository;
+
+    @Autowired
+    private RepositoryToMonitorRepository repositoryToMonitorRepository;
+
     @Autowired
     private UserRepository userRepository;
+
     @Autowired
     private TeamService teamService;
+
     @Autowired
     private TeamRepository teamRepository;
+
     @Autowired
     private RepositoryRepository repositoryRepository;
+
     @Autowired
     private LabelRepository labelRepository;
+    
+    @Value("${hephaestus.workspace.init-default}")
+    private boolean initDefaultWorkspace;
 
-    @Value("${monitoring.repositories}")
-    private String[] repositoriesToMonitor;
+    @Value("${hephaestus.workspace.default.repositories-to-monitor}")
+    private String[] defaultRepositoriesToMonitor;
 
-    @CacheEvict(value = "config")
-    private AdminConfig createInitialConfig() {
-        AdminConfig newAdminConfig = new AdminConfig();
-        newAdminConfig.setRepositoriesToMonitor(Set.of(repositoriesToMonitor));
-        return adminRepository.save(newAdminConfig);
+    @Value("${monitoring.run-on-startup}")
+    private boolean runMonitoringOnStartup;
+
+    @Value("${monitoring.run-on-startup-cooldown-in-minutes}")
+    private int runOnStartupCooldownInMinutes;
+
+    @EventListener(ApplicationReadyEvent.class)
+    public void onApplicationReady() {
+        Workspace workspace = getWorkspace();
+        Set<RepositoryToMonitor> repositoriesToMonitor = workspace.getRepositoriesToMonitor();
+
+        if (runMonitoringOnStartup) {
+            repositoriesToMonitor.forEach(repositoryToMonitor -> {
+                gitHubDataSyncService.syncRepositoryToMonitor(repositoryToMonitor);
+            });
+            gitHubDataSyncService.syncUsers(workspace);
+        }
     }
 
-    @Cacheable("config")
-    public AdminConfig getAdminConfig() {
-        logger.info("Getting admin config");
-        return adminRepository.findFirstByOrderByIdAsc().orElseGet(this::createInitialConfig);
+    @Transactional
+    private Workspace createInitialWorkspace() {
+        Workspace workspace = new Workspace();
+        
+        // If the default workspace should be initialized, add the default repositories to monitor
+        if (initDefaultWorkspace) {
+            logger.info("Initializing default workspace");
+            Set<RepositoryToMonitor> workspaceRepositoriesToMonitor = Set.of(defaultRepositoriesToMonitor)
+                .stream()
+                .map(nameWithOwner -> {
+                    var repositoryToMonitor = new RepositoryToMonitor();
+                    repositoryToMonitor.setNameWithOwner(nameWithOwner);
+                    repositoryToMonitor.setWorkspace(workspace);
+                    return repositoryToMonitor;
+                })
+                .collect(Collectors.toSet());
+            workspace.setRepositoriesToMonitor(workspaceRepositoriesToMonitor);
+        }
+
+        return workspaceRepository.save(workspace);
     }
 
-    @CacheEvict(value = "config")
-    public Set<String> updateRepositories(Set<String> repositories) {
-        logger.info("Updating repositories to monitor");
-        AdminConfig adminConfig = getAdminConfig();
-        adminConfig.setRepositoriesToMonitor(repositories);
-        adminRepository.save(adminConfig);
+    public Workspace getWorkspace() {
+        return workspaceRepository.findFirstByOrderByIdAsc().orElseGet(this::createInitialWorkspace);
+    }
 
-        eventPublisher.publishEvent(new AdminConfigChangedEvent(this, adminConfig));
+    public Set<String> getRepositoriesToMonitor() {
+        logger.info("Getting repositories to monitor");
+        return getWorkspace()
+            .getRepositoriesToMonitor()
+            .stream()
+            .map(RepositoryToMonitor::getNameWithOwner)
+            .collect(Collectors.toSet());
+    }
 
-        return adminConfig.getRepositoriesToMonitor();
+    public void addRepositoryToMonitor(String nameWithOwner) throws RepositoryAlreadyMonitoredException, RepositoryNotFoundException {
+        logger.info("Adding repository to monitor: " + nameWithOwner);
+        Workspace workspace = getWorkspace();
+        
+        if (workspace.getRepositoriesToMonitor().stream().anyMatch(r -> r.getNameWithOwner().equals(nameWithOwner))) {
+            logger.info("Repository is already being monitored");
+            throw new RepositoryAlreadyMonitoredException(nameWithOwner);
+        }
+
+        // Validate that repository exists
+        var repository = repositorySyncService.syncRepository(nameWithOwner);
+        if (repository.isEmpty()) {
+            logger.info("Repository does not exist");
+            throw new RepositoryNotFoundException(nameWithOwner);
+        }
+
+        RepositoryToMonitor repositoryToMonitor = new RepositoryToMonitor();
+        repositoryToMonitor.setNameWithOwner(nameWithOwner);
+        repositoryToMonitor.setWorkspace(workspace);
+        repositoryToMonitorRepository.save(repositoryToMonitor);
+        workspace.getRepositoriesToMonitor().add(repositoryToMonitor);
+        workspaceRepository.save(workspace);
+    }
+
+    public void removeRepositoryToMonitor(String repository) {
+        logger.info("Removing repository from monitor: " + repository);
+        Workspace workspace = getWorkspace();
+        
+        RepositoryToMonitor repositoryToMonitor = workspace.getRepositoriesToMonitor().stream()
+            .filter(r -> r.getNameWithOwner().equals(repository))
+            .findFirst()
+            .orElse(null);
+
+        if (repositoryToMonitor == null) {
+            logger.info("Repository is not being monitored");
+            return;
+        }
+
+        repositoryToMonitorRepository.delete(repositoryToMonitor);
+        workspace.getRepositoriesToMonitor().remove(repositoryToMonitor);
+        workspaceRepository.save(workspace);
     }
 
     public List<UserTeamsDTO> getUsersWithTeams() {

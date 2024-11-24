@@ -1,13 +1,10 @@
-package de.tum.in.www1.hephaestus.admin;
+package de.tum.in.www1.hephaestus.workspace;
 
 import java.util.List;
 import java.util.Set;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
-import org.springframework.security.core.GrantedAuthority;
-import org.springframework.security.oauth2.core.oidc.StandardClaimNames;
-import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -22,96 +19,90 @@ import de.tum.in.www1.hephaestus.gitprovider.user.UserInfoDTO;
 import de.tum.in.www1.hephaestus.gitprovider.user.UserTeamsDTO;
 
 @RestController
-@RequestMapping("/admin")
-public class AdminController {
+@RequestMapping("/workspace")
+public class WorkspaceController {
 
     @Autowired
-    private AdminService adminService;
+    private WorkspaceService workspaceService;
 
-    @GetMapping
-    public String admin() {
-        return "Welcome to the admin page!";
+    @GetMapping("/repositories")
+    public ResponseEntity<Set<String>> getRepositoriesToMonitor() {
+        return ResponseEntity.ok(workspaceService.getRepositoriesToMonitor());
     }
 
-    @GetMapping("/me")
-    public AuthUserInfoDTO getGretting(JwtAuthenticationToken auth) {
-        return new AuthUserInfoDTO(
-                auth.getToken().getClaimAsString(StandardClaimNames.PREFERRED_USERNAME),
-                auth.getAuthorities().stream().map(GrantedAuthority::getAuthority).toList());
-    }
-
-    public static record AuthUserInfoDTO(String name, List<String> roles) {
-    }
-
-    @GetMapping("/config")
-    public ResponseEntity<AdminConfigDTO> getConfig() {
+    @PostMapping("/repositories/{repository}")
+    public ResponseEntity<Void> addRepositoryToMonitor(@PathVariable String nameWithOwner) {
         try {
-            return ResponseEntity.ok(AdminConfigDTO.fromAdminConfig(adminService.getAdminConfig()));
-        } catch (NoAdminConfigFoundException e) {
+            workspaceService.addRepositoryToMonitor(nameWithOwner);
+            return ResponseEntity.ok().build();
+        } catch (RepositoryNotFoundException e) {
             return ResponseEntity.notFound().build();
+        } catch (RepositoryAlreadyMonitoredException e) {
+            return ResponseEntity.badRequest().build();
         }
     }
 
-    @PostMapping("/config/repositories")
-    public ResponseEntity<Set<String>> updateRepositories(@RequestBody List<String> repositories) {
-        return ResponseEntity.ok(adminService.updateRepositories(Set.copyOf(repositories)));
+    @DeleteMapping("/repositories/{repository}")
+    public ResponseEntity<Void> removeRepositoryToMonitor(@PathVariable String repository) {
+        workspaceService.removeRepositoryToMonitor(repository);
+        return ResponseEntity.ok().build();
     }
 
     @GetMapping("/users")
     public ResponseEntity<List<UserTeamsDTO>> getUsersWithTeams() {
-        return ResponseEntity.ok(adminService.getUsersWithTeams());
+        return ResponseEntity.ok(workspaceService.getUsersWithTeams());
     }
 
     @PutMapping("/user/{login}/team/{teamId}")
     public ResponseEntity<UserInfoDTO> addTeamToUser(@PathVariable String login, @PathVariable Long teamId) {
-        return adminService.addTeamToUser(login, teamId)
+        return workspaceService.addTeamToUser(login, teamId)
                 .map(ResponseEntity::ok)
                 .orElseGet(() -> ResponseEntity.notFound().build());
     }
 
     @DeleteMapping("/user/{login}/team/{teamId}")
     public ResponseEntity<UserInfoDTO> removeUserFromTeam(@PathVariable String login, @PathVariable Long teamId) {
-        return adminService.removeUserFromTeam(login, teamId)
+        return workspaceService.removeUserFromTeam(login, teamId)
                 .map(ResponseEntity::ok)
                 .orElseGet(() -> ResponseEntity.notFound().build());
     }
 
     @PutMapping("/teams")
     public ResponseEntity<TeamInfoDTO> createTeam(@RequestBody TeamInfoDTO team) {
-        return ResponseEntity.ok(adminService.createTeam(team.name(), team.color()));
+        return ResponseEntity.ok(workspaceService.createTeam(team.name(), team.color()));
     }
 
     @PostMapping("/team/{teamId}/repository/{repositoryOwner}/{repositoryName}")
     public ResponseEntity<TeamInfoDTO> addRepositoryToTeam(@PathVariable Long teamId, @PathVariable String repositoryOwner, @PathVariable String repositoryName) {
-        return adminService.addRepositoryToTeam(teamId, repositoryOwner + '/' + repositoryName)
+        return workspaceService.addRepositoryToTeam(teamId, repositoryOwner + '/' + repositoryName)
                 .map(ResponseEntity::ok)
                 .orElseGet(() -> ResponseEntity.notFound().build());
     }
 
     @DeleteMapping("/team/{teamId}/repository/{repositoryOwner}/{repositoryName}")
     public ResponseEntity<TeamInfoDTO> removeRepositoryFromTeam(@PathVariable Long teamId, @PathVariable String repositoryOwner, @PathVariable String repositoryName) {
-        return adminService.removeRepositoryFromTeam(teamId, repositoryOwner + '/' + repositoryName)
+        return workspaceService.removeRepositoryFromTeam(teamId, repositoryOwner + '/' + repositoryName)
                 .map(ResponseEntity::ok)
                 .orElseGet(() -> ResponseEntity.notFound().build());
     }
 
     @PostMapping("/team/{teamId}/label/{label}")
     public ResponseEntity<TeamInfoDTO> addLabelToTeam(@PathVariable Long teamId, @PathVariable String label) {
-        return adminService.addLabelToTeam(teamId, label)
+        return workspaceService.addLabelToTeam(teamId, label)
                 .map(ResponseEntity::ok)
                 .orElseGet(() -> ResponseEntity.notFound().build());
     }
 
     @DeleteMapping("/team/{teamId}/label/{label}")
     public ResponseEntity<TeamInfoDTO> removeLabelFromTeam(@PathVariable Long teamId, @PathVariable String label) {
-        return adminService.removeLabelFromTeam(teamId, label)
+        return workspaceService.removeLabelFromTeam(teamId, label)
                 .map(ResponseEntity::ok)
                 .orElseGet(() -> ResponseEntity.notFound().build());
     }
 
     @DeleteMapping("/team/{teamId}")
     public ResponseEntity<TeamInfoDTO> deleteTeam(@PathVariable Long teamId) {
-        return adminService.deleteTeam(teamId)
+        return workspaceService.deleteTeam(teamId)
                 .map(ResponseEntity::ok)
                 .orElseGet(() -> ResponseEntity.notFound().build());
     }

@@ -1,24 +1,37 @@
 package de.tum.in.www1.hephaestus.syncing;
 
 import java.time.OffsetDateTime;
+import java.util.NoSuchElementException;
 import java.util.Optional;
-
+import java.util.stream.Collectors;
+import java.util.stream.IntStream;
+import org.kohsuke.github.GHIssue;
+import org.kohsuke.github.GHRepository;
+import org.kohsuke.github.PagedIterator;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import jakarta.transaction.Transactional;
+
+import de.tum.in.www1.hephaestus.gitprovider.issue.Issue;
+import de.tum.in.www1.hephaestus.gitprovider.issue.IssueRepository;
 import de.tum.in.www1.hephaestus.gitprovider.issue.github.GitHubIssueSyncService;
 import de.tum.in.www1.hephaestus.gitprovider.issuecomment.github.GitHubIssueCommentSyncService;
 import de.tum.in.www1.hephaestus.gitprovider.label.github.GitHubLabelSyncService;
 import de.tum.in.www1.hephaestus.gitprovider.milestone.github.GitHubMilestoneSyncService;
+import de.tum.in.www1.hephaestus.gitprovider.pullrequest.PullRequestRepository;
 import de.tum.in.www1.hephaestus.gitprovider.pullrequest.github.GitHubPullRequestSyncService;
 import de.tum.in.www1.hephaestus.gitprovider.pullrequestreview.github.GitHubPullRequestReviewSyncService;
 import de.tum.in.www1.hephaestus.gitprovider.pullrequestreviewcomment.github.GitHubPullRequestReviewCommentSyncService;
+import de.tum.in.www1.hephaestus.gitprovider.repository.RepositoryRepository;
 import de.tum.in.www1.hephaestus.gitprovider.repository.github.GitHubRepositorySyncService;
-import de.tum.in.www1.hephaestus.gitprovider.team.TeamService;
 import de.tum.in.www1.hephaestus.gitprovider.user.github.GitHubUserSyncService;
+import de.tum.in.www1.hephaestus.workspace.RepositoryToMonitor;
+import de.tum.in.www1.hephaestus.workspace.RepositoryToMonitorRepository;
+import de.tum.in.www1.hephaestus.workspace.Workspace;
+import de.tum.in.www1.hephaestus.workspace.WorkspaceRepository;
 
 @Service
 public class GitHubDataSyncService {
@@ -31,76 +44,298 @@ public class GitHubDataSyncService {
     @Value("${monitoring.timeframe}")
     private int timeframe;
 
-    @Value("${monitoring.run-on-startup-cooldown-in-minutes}")
-    private int runOnStartupCooldownInMinutes;
+    @Value("${monitoring.sync-cooldown-in-minutes}")
+    private int syncCooldownInMinutes;
 
-    @Value("${hephaestus.team.assignment.auto}")
-    private boolean autoTeamAssignment;
+    @Value("${monitoring.sync-all-issues-and-pull-requests}")
+    private boolean syncAllIssuesAndPullRequests;
 
     @Autowired
-    private DataSyncStatusRepository dataSyncStatusRepository;
+    private WorkspaceRepository workspaceRepository;
+
+    @Autowired
+    private RepositoryToMonitorRepository repositoryToMonitorRepository;
+
     @Autowired
     private GitHubUserSyncService userSyncService;
+    
     @Autowired
     private GitHubRepositorySyncService repositorySyncService;
+    
     @Autowired
     private GitHubLabelSyncService labelSyncService;
+    
     @Autowired
     private GitHubMilestoneSyncService milestoneSyncService;
+    
     @Autowired
     private GitHubIssueSyncService issueSyncService;
+    
     @Autowired
     private GitHubIssueCommentSyncService issueCommentSyncService;
+    
     @Autowired
     private GitHubPullRequestSyncService pullRequestSyncService;
+    
     @Autowired
     private GitHubPullRequestReviewSyncService pullRequestReviewSyncService;
+    
     @Autowired
     private GitHubPullRequestReviewCommentSyncService pullRequestReviewCommentSyncService;
+
     @Autowired
-    private TeamService teamService;
+    private RepositoryRepository repositoryRepository;
 
+    @Autowired
+    private IssueRepository issueRepository;
+
+    @Autowired
+    private PullRequestRepository pullRequestRepository;
+
+    /**
+     * Syncs all existing users in the database with their GitHub data
+     */
     @Transactional
-    public void syncData() {
-        var cutoffDate = OffsetDateTime.now().minusDays(timeframe);
+    public void syncUsers(Workspace workspace) {
+        boolean shouldSyncUsers = workspace.getUsersSyncedAt() == null
+                || workspace.getUsersSyncedAt().isBefore(OffsetDateTime.now().minusMinutes(syncCooldownInMinutes));
 
-        // Get last sync time
-        var lastSync = dataSyncStatusRepository.findTopByOrderByStartTimeDesc();
-        if (lastSync.isPresent()) {
-            var lastSyncTime = lastSync.get().getStartTime();
-            cutoffDate = lastSyncTime.isAfter(cutoffDate) ? lastSyncTime : cutoffDate;
-        }
-
-        var cooldownTime = OffsetDateTime.now().minusMinutes(runOnStartupCooldownInMinutes);
-        if (lastSync.isPresent() && lastSync.get().getStartTime().isAfter(cooldownTime)) {
-            logger.info("Skipping sync, last sync was less than {} minutes ago", runOnStartupCooldownInMinutes);
+        if (!shouldSyncUsers) {
+            logger.info("No users to sync.");
             return;
         }
 
-        // Start new sync
-        var startTime = OffsetDateTime.now();
-
-        var repositories = repositorySyncService.syncAllMonitoredRepositories();
-        labelSyncService.syncLabelsOfAllRepositories(repositories);
-        milestoneSyncService.syncMilestonesOfAllRepositories(repositories);
-        // also contains PRs as issues
-        var issues = issueSyncService.syncIssuesOfAllRepositories(repositories, Optional.of(cutoffDate));
-        issueCommentSyncService.syncIssueCommentsOfAllIssues(issues, Optional.of(cutoffDate));
-        var pullRequests = pullRequestSyncService.syncPullRequestsOfAllRepositories(repositories,
-                Optional.of(cutoffDate));
-        pullRequestReviewSyncService.syncReviewsOfAllPullRequests(pullRequests);
-        pullRequestReviewCommentSyncService.syncReviewCommentsOfAllPullRequests(pullRequests);
+        logger.info("Syncing all existing users...");
+        var currentTime = OffsetDateTime.now();
         userSyncService.syncAllExistingUsers();
-        if (autoTeamAssignment) {
-            teamService.syncDefaultTeams();
+        workspace.setUsersSyncedAt(currentTime);
+        workspaceRepository.save(workspace);
+        logger.info("User sync completed.");
+    }
+
+    /**
+     * Syncs the data of the specified repository to the database and keeps track of the sync times
+     * 
+     * @param repositoryToMonitor the repository to sync and syncing status
+     */
+    public void syncRepositoryToMonitor(RepositoryToMonitor repositoryToMonitor) {
+        logger.info(repositoryToMonitor.getNameWithOwner() + " - Syncing data...");
+
+        var cooldownTime = OffsetDateTime.now().minusMinutes(syncCooldownInMinutes);
+
+        boolean shouldSyncRepository = repositoryToMonitor.getRepositorySyncedAt() == null
+                || repositoryToMonitor.getRepositorySyncedAt().isBefore(cooldownTime);
+        boolean shouldSyncLabels = repositoryToMonitor.getLabelsSyncedAt() == null
+                || repositoryToMonitor.getLabelsSyncedAt().isBefore(cooldownTime);
+        boolean shouldSyncMilestones = repositoryToMonitor.getMilestonesSyncedAt() == null
+                || repositoryToMonitor.getMilestonesSyncedAt().isBefore(cooldownTime);
+        boolean shouldSyncIssuesAndPullRequests = repositoryToMonitor.getIssuesAndPullRequestsSyncedAt() == null
+                || repositoryToMonitor.getIssuesAndPullRequestsSyncedAt().isBefore(cooldownTime);
+        
+        // Sync repository is required if any of the following is true
+        if (shouldSyncLabels || shouldSyncMilestones || shouldSyncIssuesAndPullRequests) {
+            shouldSyncRepository = true;
         }
 
-        var endTime = OffsetDateTime.now();
+        // Check if there are any unsynced issues or pull requests in the past
+        if (!shouldSyncRepository && syncAllIssuesAndPullRequests) {
+            shouldSyncRepository = shouldSyncAllPastIssuesAndPullRequests(repositoryToMonitor);
+        }
 
-        // Store successful sync status
-        var syncStatus = new DataSyncStatus();
-        syncStatus.setStartTime(startTime);
-        syncStatus.setEndTime(endTime);
-        dataSyncStatusRepository.save(syncStatus);
+        // Nothing to sync
+        if (!shouldSyncRepository) {
+            logger.info(repositoryToMonitor.getNameWithOwner() + " - No data to sync.");
+            return;
+        }
+
+        logger.info(repositoryToMonitor.getNameWithOwner() + " - Syncing repository data...");
+        var ghRepository = syncRepository(repositoryToMonitor).orElse(null);
+        if (ghRepository == null) {
+            return;
+        }
+
+        if (shouldSyncLabels) {
+            logger.info(repositoryToMonitor.getNameWithOwner() + " - Syncing labels...");
+            syncRepositoryLabels(ghRepository, repositoryToMonitor);
+        }
+        if (shouldSyncMilestones) {
+            logger.info(repositoryToMonitor.getNameWithOwner() + " - Syncing milestones...");
+            syncRepositoryMilestones(ghRepository, repositoryToMonitor);
+        }
+        if (shouldSyncIssuesAndPullRequests) {
+            logger.info(repositoryToMonitor.getNameWithOwner() + " - Syncing recent issues and pull requests...");
+            syncRepositoryRecentIssuesAndPullRequests(ghRepository, repositoryToMonitor);
+        }
+        if (syncAllIssuesAndPullRequests) {
+            logger.info(repositoryToMonitor.getNameWithOwner() + " - Syncing all past issues and pull requests...");
+            syncAllPastIssuesAndPullRequests(ghRepository, repositoryToMonitor);
+        }
+        logger.info(repositoryToMonitor.getNameWithOwner() + " - Data sync completed.");
     }
+
+    @Transactional
+    private Optional<GHRepository> syncRepository(RepositoryToMonitor repositoryToMonitor) {
+        String nameWithOwner = repositoryToMonitor.getNameWithOwner();
+        var currentTime = OffsetDateTime.now();
+        var repository = repositorySyncService.syncRepository(nameWithOwner);
+        repositoryToMonitor.setRepositorySyncedAt(currentTime);
+        repositoryToMonitorRepository.save(repositoryToMonitor);
+        return repository;
+    }
+
+    @Transactional
+    private void syncRepositoryLabels(GHRepository repository, RepositoryToMonitor repositoryToMonitor) {
+        var currentTime = OffsetDateTime.now();
+        labelSyncService.syncLabelsOfRepository(repository);
+        repositoryToMonitor.setLabelsSyncedAt(currentTime);
+        repositoryToMonitorRepository.save(repositoryToMonitor);
+    }
+
+    @Transactional
+    private void syncRepositoryMilestones(GHRepository repository, RepositoryToMonitor repositoryToMonitor) {
+        var currentTime = OffsetDateTime.now();
+        milestoneSyncService.syncMilestonesOfRepository(repository);
+        repositoryToMonitor.setMilestonesSyncedAt(currentTime);
+        repositoryToMonitorRepository.save(repositoryToMonitor);
+    }
+
+    /**
+     * Syncs the recent issues and pull requests of the repository in ascending order of their last update time.
+     * 
+     * Issues and pull requests are separate entites but are synced together in the same method.
+     * Issues are synced first with their associated issue comments.
+     * If an issue has a pull request, the pull request is synced next with its associated reviews and review comments.
+     * 
+     * @param repository GitHub repository to sync
+     * @param repositoryToMonitor syncing status
+     */
+    private void syncRepositoryRecentIssuesAndPullRequests(GHRepository repository, RepositoryToMonitor repositoryToMonitor) {
+        var cutoffDate = OffsetDateTime.now().minusDays(timeframe);
+        
+        var issuesAndPullRequestsSyncedAt = repositoryToMonitor.getIssuesAndPullRequestsSyncedAt();
+        if (issuesAndPullRequestsSyncedAt != null) {
+            cutoffDate = issuesAndPullRequestsSyncedAt.isAfter(cutoffDate) ? issuesAndPullRequestsSyncedAt : cutoffDate;
+        }
+        
+        PagedIterator<GHIssue> issuesIterator = issueSyncService.getIssuesIterator(repository, cutoffDate);
+        while (issuesIterator.hasNext()) {
+            var syncedUpToTime = syncRepositoryRecentIssuesAndPullRequestsNextPage(repository, issuesIterator);
+            repositoryToMonitor.setIssuesAndPullRequestsSyncedAt(syncedUpToTime);
+            repositoryToMonitorRepository.save(repositoryToMonitor);
+        }
+    }
+
+    /**
+     * Syncs the next page of issues and pull requests of the repository.
+     * 
+     * @param repository     GitHub repository to sync
+     * @param issuesIterator iterator for fetching issues
+     * @return the last updated time of the last issue or the current time if no issues were fetched
+     */
+    @Transactional
+    private OffsetDateTime syncRepositoryRecentIssuesAndPullRequestsNextPage(GHRepository repository, PagedIterator<GHIssue> issuesIterator) {
+        var currentTime = OffsetDateTime.now();
+        var ghIssues = issuesIterator.nextPage();
+        var issues = ghIssues.stream().map(issueSyncService::processIssue).toList();
+        issueCommentSyncService.syncIssueCommentsOfAllIssues(ghIssues);
+        issues.forEach(issue -> issue.setLastSyncAt(currentTime));
+
+        var pullRequestNumbers = issues.stream()
+            .filter(Issue::isHasPullRequest)
+            .map(Issue::getNumber)
+            .toList();
+
+        var ghPullRequests = pullRequestSyncService.syncPullRequests(repository, pullRequestNumbers, false);
+        var pullRequests = ghPullRequests.stream().map(pullRequestSyncService::processPullRequest).toList();
+        pullRequestReviewSyncService.syncReviewsOfAllPullRequests(ghPullRequests);
+        pullRequestReviewCommentSyncService.syncReviewCommentsOfAllPullRequests(ghPullRequests);
+        pullRequests.forEach(pullRequest -> pullRequest.setLastSyncAt(currentTime));
+
+        try {
+            return issues.getLast().getUpdatedAt();
+        } catch (NoSuchElementException e) {
+            return currentTime;
+        }
+    }
+
+    /**
+     * Checks if there are any issues or pull requests that have not been synced
+     * 
+     * @param repositoryToMonitor
+     * @return true if there are any issues or pull requests that have not been synced
+     */
+    private boolean shouldSyncAllPastIssuesAndPullRequests(RepositoryToMonitor repositoryToMonitor) {
+        var repository = repositoryRepository.findByNameWithOwner(repositoryToMonitor.getNameWithOwner());
+        if (repository.isEmpty()) {
+            return false;
+        }
+        
+        var repositoryId = repository.get().getId();
+        var lastIssueNumber = issueRepository.findLastIssueNumber(repositoryId).orElse(0);
+        if (lastIssueNumber == 0) {
+            return false;
+        }
+
+        var syncedIssues = issueRepository.findAllSyncedIssueNumbers(repositoryId);
+        var unsyncedIssues = IntStream.iterate(lastIssueNumber, i -> i > 0, i -> i - 1)
+            .filter(i -> !syncedIssues.contains(i))
+            .boxed()
+            .collect(Collectors.toSet());
+
+        if (unsyncedIssues.isEmpty()) {
+            var pullRequestNumbers = issueRepository.findAllIssueNumbersWithPullRequest(repositoryId);
+            var syncedPullRequests = pullRequestRepository.findAllSyncedPullRequestNumbers(repositoryId);
+            var unsyncedPullRequests = pullRequestNumbers.stream()
+                .filter(i -> !syncedPullRequests.contains(i))
+                .collect(Collectors.toSet());
+            
+            return !unsyncedPullRequests.isEmpty();
+        }
+
+        return true;
+    }
+
+    /**
+     * Syncs all past issues and pull requests of the repository that have not been synced yet.
+     * 
+     * This method will process all issues and pull requests that have not yet been synced and
+     * ensures they are synchronized with the repository.
+     * 
+     * @param repository the GitHub repository to sync
+     * @param repositoryToMonitor the repository to sync
+     */
+    private void syncAllPastIssuesAndPullRequests(GHRepository repository, RepositoryToMonitor repositoryToMonitor) {
+        var lastIssueNumber = issueRepository.findLastIssueNumber(repository.getId()).orElse(0);
+        if (lastIssueNumber == 0) {
+            return;
+        }
+
+        var syncedIssues = issueRepository.findAllSyncedIssueNumbers(repository.getId());
+        var unsyncedIssues = IntStream.iterate(lastIssueNumber, i -> i > 0, i -> i - 1)
+            .filter(i -> !syncedIssues.contains(i))
+            .boxed()
+            .collect(Collectors.toSet());
+
+        // TODO sync issues
+
+        var pullRequestNumbers = issueRepository.findAllIssueNumbersWithPullRequest(repository.getId());
+        var syncedPullRequests = pullRequestRepository.findAllSyncedPullRequestNumbers(repository.getId());
+        var unsyncedPullRequests = pullRequestNumbers.stream()
+            .filter(i -> !syncedPullRequests.contains(i))
+            .collect(Collectors.toSet());
+
+        // TODO sync pull requests
+    }
+
+    // @Transactional
+    // private void syncPastIssue(GHRepository repository, Integer issueNumber) {
+    //     repository.getIssue(syncCooldownInMinutes)
+        
+    //     var issue = issueSyncService.syncIssue(repository, issueNumber).orElse(null);
+    //     if (issue == null) {
+    //         return;
+    //     }
+
+    //     issueCommentSyncService.syncIssueCommentsOfIssue(issue);
+    // }
 }

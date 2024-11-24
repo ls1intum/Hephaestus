@@ -44,4 +44,15 @@ public interface PullRequestRepository extends JpaRepository<PullRequest, Long> 
             WHERE p.repository = :repository AND p.number = :number
             """)
     Optional<PullRequest> findByRepositoryAndNumber(@Param("repository") de.tum.in.www1.hephaestus.gitprovider.repository.Repository repository, @Param("number") int number);
+
+    @Query(
+        """
+        SELECT p.number
+        FROM PullRequest p
+        WHERE Type(p) = PullRequest
+        AND p.repository.id = :repositoryId
+        AND p.lastSyncAt IS NOT NULL
+        """
+    )
+    Set<Integer> findAllSyncedPullRequestNumbers(@Param("repositoryId") long repositoryId);
 }

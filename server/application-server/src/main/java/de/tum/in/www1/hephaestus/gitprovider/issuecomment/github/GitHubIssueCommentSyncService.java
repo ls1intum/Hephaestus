@@ -52,27 +52,18 @@ public class GitHubIssueCommentSyncService {
      * Syncs all issue comments from the specified list of GitHub issues.
      *
      * @param ghIssues The GitHub issues to sync the comments of.
-     * @param since    Optional date to only fetch comments since this date.
      */
-    public void syncIssueCommentsOfAllIssues(List<GHIssue> ghIssues, Optional<OffsetDateTime> since) {
-        ghIssues.stream().forEach(ghIssue -> syncIssueCommentsOfIssue(ghIssue, since));
+    public void syncIssueCommentsOfAllIssues(List<GHIssue> ghIssues) {
+        ghIssues.stream().forEach(ghIssue -> syncIssueCommentsOfIssue(ghIssue));
     }
 
     /**
      * Syncs issue comments from a specific GitHub issue.
      *
      * @param ghIssue The GitHub issue to sync the comments of.
-     * @param since   Optional date to only fetch comments since this date.
      */
-    public void syncIssueCommentsOfIssue(GHIssue ghIssue, Optional<OffsetDateTime> since) {
+    public void syncIssueCommentsOfIssue(GHIssue ghIssue) {
         var builder = ghIssue.queryComments();
-        if (ghIssue.isPullRequest()) {
-            since.ifPresent(date -> builder.since(Date.from(date.toInstant())));
-            builder.list().withPageSize(100).forEach(this::processIssueComment);
-            return;
-        }
-
-        since.ifPresent(date -> builder.since(Date.from(date.toInstant())));
         builder.list().withPageSize(100).forEach(this::processIssueComment);
     }
 

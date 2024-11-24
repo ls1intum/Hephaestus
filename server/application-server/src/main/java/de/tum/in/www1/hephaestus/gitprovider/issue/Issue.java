@@ -27,7 +27,7 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 import lombok.ToString;
-
+import lombok.experimental.Accessors;
 import de.tum.in.www1.hephaestus.gitprovider.common.BaseGitServiceEntity;
 import de.tum.in.www1.hephaestus.gitprovider.issuecomment.IssueComment;
 import de.tum.in.www1.hephaestus.gitprovider.label.Label;
@@ -66,6 +66,12 @@ public class Issue extends BaseGitServiceEntity {
     private OffsetDateTime closedAt;
     
     private int commentsCount;
+
+    @Accessors(prefix = "")
+    private boolean hasPullRequest;
+
+    // The last time the issue and its associated comments were updated (is also used for pull requests with reviews and review comments)
+    private OffsetDateTime lastSyncAt;
     
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "author_id")
