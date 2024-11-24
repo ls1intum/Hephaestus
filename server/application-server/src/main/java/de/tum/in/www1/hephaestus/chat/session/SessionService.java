@@ -14,7 +14,6 @@ public class SessionService {
     @Autowired
     private UserRepository userRepository;
 
-
     public List<SessionDTO> findAllSessionsByUser(String login) {
         Optional<List<Session>> sessions = sessionRepository.findByUserLogin(login);
         if (sessions.isEmpty()) {

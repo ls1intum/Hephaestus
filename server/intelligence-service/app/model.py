@@ -61,7 +61,7 @@ trimmer = trim_messages(
     token_counter=model,
     include_system=True,
     allow_partial=False,
-    start_on="human", # TODO: change to "system"
+    start_on="human",  # TODO: change to "system"
 )
 
 
