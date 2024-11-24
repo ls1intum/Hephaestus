@@ -79,6 +79,16 @@ public class WorkspaceController {
         return ResponseEntity.ok(workspaceService.createTeam(team.name(), team.color()));
     }
 
+    @PutMapping("/teams/autoassign")
+    public ResponseEntity<Void> automaticallyAssignTeams() {
+        try {
+            workspaceService.automaticallyAssignTeams();
+            return ResponseEntity.ok().build();
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().build();
+        }
+    }
+
     @PostMapping("/team/{teamId}/repository/{repositoryOwner}/{repositoryName}")
     public ResponseEntity<TeamInfoDTO> addRepositoryToTeam(@PathVariable Long teamId, @PathVariable String repositoryOwner, @PathVariable String repositoryName) {
         return workspaceService.addRepositoryToTeam(teamId, repositoryOwner + '/' + repositoryName)

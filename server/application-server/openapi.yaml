@@ -78,6 +78,14 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/TeamInfo"
+  /workspace/teams/autoassign:
+    put:
+      tags:
+      - workspace
+      operationId: automaticallyAssignTeams
+      responses:
+        "200":
+          description: OK
   /workspace/team/{teamId}/repository/{repositoryOwner}/{repositoryName}:
     post:
       tags:

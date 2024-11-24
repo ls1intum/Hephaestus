@@ -63,6 +63,12 @@ export interface WorkspaceServiceInterface {
     /**
      * 
      * 
+     */
+    automaticallyAssignTeams(extraHttpRequestParams?: any): Observable<{}>;
+
+    /**
+     * 
+     * 
      * @param teamInfo 
      */
     createTeam(teamInfo: TeamInfo, extraHttpRequestParams?: any): Observable<TeamInfo>;

@@ -2,6 +2,7 @@ package de.tum.in.www1.hephaestus.gitprovider.user;
 
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
@@ -23,4 +24,25 @@ public interface UserRepository extends JpaRepository<User, Long> {
                 WHERE u.type = 'USER'
             """)
     List<User> findAllWithEagerTeams();
+
+    @Query("""
+                SELECT DISTINCT pr.author
+                FROM PullRequest pr
+                JOIN Team t ON pr.repository MEMBER OF t.repositories
+                WHERE t.id = :teamId
+                AND (
+                    NOT EXISTS (SELECT l
+                        FROM t.labels l
+                        WHERE l.repository = pr.repository
+                    )
+                    OR
+                    EXISTS (
+                        SELECT l
+                        FROM t.labels l
+                        WHERE l.repository = pr.repository
+                        AND l MEMBER OF pr.labels
+                    )
+                )
+            """)
+    Set<User> findAllContributingToTeam(@Param("teamId") Long teamId);
 }

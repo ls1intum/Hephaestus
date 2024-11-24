@@ -13,7 +13,7 @@ import { WorkspaceTeamsTableComponent } from './table/teams-table.component';
     <app-workspace-teams-table [teamData]="teamsQuery.data()" [isLoading]="teamsQuery.isPending() || teamsQuery.isRefetching()" [allRepositories]="allReposQuery.data()" />
   `
 })
-export class AdminTeamsComponent {
+export class WorkspaceTeamsComponent {
   protected teamService = inject(TeamService);
   protected workspaceService = inject(WorkspaceService);
 

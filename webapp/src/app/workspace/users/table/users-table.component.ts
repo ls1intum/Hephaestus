@@ -199,6 +199,11 @@ export class WorkspaceUsersTableComponent {
     }
   }
 
+  automaticallyAssignUsers = injectMutation(() => ({
+    mutationFn: () => lastValueFrom(this.workspaceService.automaticallyAssignTeams()),
+    onSettled: () => this.invalidateUsers()
+  }));
+
   protected invalidateUsers() {
     for (const user of this._selected()) {
       this._selectionModel.deselect(user);

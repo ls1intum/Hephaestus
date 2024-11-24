@@ -84,6 +84,12 @@ public class WorkspaceService {
             });
             gitHubDataSyncService.syncUsers(workspace);
             logger.info("Finished running monitoring on startup");
+
+            if (initDefaultWorkspace) {
+                // Setup default teams
+                logger.info("Setting up default teams");
+                teamService.setupDefaultTeams();
+            }
         }
     }
 
@@ -285,5 +291,21 @@ public class WorkspaceService {
         }
         teamRepository.delete(optionalTeam.get());
         return Optional.of(TeamInfoDTO.fromTeam(optionalTeam.get()));
+    }
+
+    @Transactional
+    public void automaticallyAssignTeams() {
+        logger.info("Automatically assigning teams");
+
+        var teams = teamRepository.findAll();
+        teams.forEach(team -> {
+            var contributors = userRepository.findAllContributingToTeam(team.getId());
+            contributors.forEach(contributor -> {
+                contributor.addTeam(team);
+                userRepository.save(contributor);
+                team.addMember(contributor);
+                teamRepository.save(team);
+            });
+        });
     }
 }

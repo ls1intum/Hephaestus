@@ -5,7 +5,7 @@ import { WorkspaceComponent } from '@app/workspace/workspace.component';
 import { UserProfileComponent } from '@app/user/user-profile.component';
 import { WorkspaceUsersComponent } from './workspace/users/users.component';
 import { WorkspaceLayoutComponent } from './workspace/layout.component';
-import { AdminTeamsComponent } from './workspace/teams/teams.component';
+import { WorkspaceTeamsComponent } from './workspace/teams/teams.component';
 import { SettingsComponent } from '@app/settings/settings.component';
 import { ImprintComponent } from '@app/legal/imprint.component';
 import { PrivacyComponent } from '@app/legal/privacy.component';
@@ -30,7 +30,7 @@ export const routes: Routes = [
       },
       {
         path: 'teams',
-        component: AdminTeamsComponent
+        component: WorkspaceTeamsComponent
       }
     ]
   },

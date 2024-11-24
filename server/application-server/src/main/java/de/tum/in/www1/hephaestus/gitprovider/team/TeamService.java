@@ -38,7 +38,7 @@ public class TeamService {
     }
 
     @Transactional
-    public void syncDefaultTeams() {
+    public void setupDefaultTeams() {
         logger.info("Creating default teams");
         List<DefaultTeamRecord> defaultTeams = new ArrayList<>();
         defaultTeams.add(new DefaultTeamRecord("Artemis", "#69feff", List.of(new RepositoryWithLabels("ls1intum/Artemis", List.of("iris", "component:iris")), new RepositoryWithLabels("ls1intum/Pyris", List.of()))));
