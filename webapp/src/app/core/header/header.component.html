@@ -3,8 +3,10 @@
     <lucide-angular [img]="Hammer" class="size-8 sm:size-6" />
     <span class="hidden sm:inline-block text-xl font-semibold">Hephaestus</span>
   </a>
-  <app-ai-mentor class="hidden sm:inline-block" />
-  <app-ai-mentor class="sm:hidden" iconOnly />
+  @if (user()?.roles?.includes('ai-maintainer')) {
+    <app-ai-mentor class="hidden sm:inline-block" />
+    <app-ai-mentor class="sm:hidden" iconOnly />
+  }
   <app-request-feature class="hidden sm:inline-block" />
   <app-request-feature class="sm:hidden" iconOnly />
   <app-theme-switcher />
