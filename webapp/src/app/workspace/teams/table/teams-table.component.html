@@ -63,7 +63,18 @@
               <div hlmCardContent class="pt-0 pb-2 px-4 flex flex-wrap items-center gap-1">
                 @for (label of group.labels; track label.id) {
                   @let ghLabel = { id: label.id, name: label.name, color: label.color };
-                  <app-github-label [label]="ghLabel" />
+                  <button [brnMenuTriggerFor]="labelMenu">
+                    <app-github-label [label]="ghLabel" />
+                  </button>
+
+                  <ng-template #labelMenu>
+                    <hlm-menu>
+                      <button hlmMenuItem (click)="removeLabelFromTeam.mutate({ teamId: element.id, labelId: label.id })">
+                        <hlm-icon name="lucideTrash2" hlmMenuIcon />
+                        <span>Delete</span>
+                      </button>
+                    </hlm-menu>
+                  </ng-template>
                 }
                 <brn-popover sideOffset="5" closeDelay="100">
                   <button id="add-label" size="icon" variant="outline" class="h-6 w-6 p-0.5" brnPopoverTrigger hlmBtn>
@@ -71,7 +82,13 @@
                   </button>
                   <div hlmPopoverContent class="w-80 p-4 gap-4 flex flex-wrap items-center justify-center" *brnPopoverContent="let ctx">
                     <input hlmInput placeholder="Label name" [formControl]="_newLabelName" [class]="displayLabelAlert() ? 'border-destructive' : ''" />
-                    <button hlmBtn size="icon" variant="default" class="ml-2" (click)="addLabelToTeam.mutate(element)">
+                    <button
+                      hlmBtn
+                      size="icon"
+                      variant="default"
+                      class="ml-2"
+                      (click)="addLabelToTeam.mutate({ teamId: element.id, repositoryId: group.repositoryId, label: _newLabelName.value ?? '' })"
+                    >
                       <hlm-icon class="w-4 h-4" name="lucidePlus" />
                     </button>
                     @if (displayLabelAlert()) {

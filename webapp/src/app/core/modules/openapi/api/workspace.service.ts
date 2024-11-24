@@ -101,16 +101,20 @@ export class WorkspaceService implements WorkspaceServiceInterface {
 
     /**
      * @param teamId 
+     * @param repositoryId 
      * @param label 
      * @param observe set whether or not to return the data Observable as the body, response or events. defaults to returning the body.
      * @param reportProgress flag to report request and response progress.
      */
-    public addLabelToTeam(teamId: number, label: string, observe?: 'body', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<TeamInfo>;
-    public addLabelToTeam(teamId: number, label: string, observe?: 'response', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<HttpResponse<TeamInfo>>;
-    public addLabelToTeam(teamId: number, label: string, observe?: 'events', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<HttpEvent<TeamInfo>>;
-    public addLabelToTeam(teamId: number, label: string, observe: any = 'body', reportProgress: boolean = false, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<any> {
+    public addLabelToTeam(teamId: number, repositoryId: number, label: string, observe?: 'body', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<TeamInfo>;
+    public addLabelToTeam(teamId: number, repositoryId: number, label: string, observe?: 'response', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<HttpResponse<TeamInfo>>;
+    public addLabelToTeam(teamId: number, repositoryId: number, label: string, observe?: 'events', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<HttpEvent<TeamInfo>>;
+    public addLabelToTeam(teamId: number, repositoryId: number, label: string, observe: any = 'body', reportProgress: boolean = false, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<any> {
         if (teamId === null || teamId === undefined) {
             throw new Error('Required parameter teamId was null or undefined when calling addLabelToTeam.');
+        }
+        if (repositoryId === null || repositoryId === undefined) {
+            throw new Error('Required parameter repositoryId was null or undefined when calling addLabelToTeam.');
         }
         if (label === null || label === undefined) {
             throw new Error('Required parameter label was null or undefined when calling addLabelToTeam.');
@@ -152,7 +156,7 @@ export class WorkspaceService implements WorkspaceServiceInterface {
             }
         }
 
-        let localVarPath = `/workspace/team/${this.configuration.encodeParam({name: "teamId", value: teamId, in: "path", style: "simple", explode: false, dataType: "number", dataFormat: "int64"})}/label/${this.configuration.encodeParam({name: "label", value: label, in: "path", style: "simple", explode: false, dataType: "string", dataFormat: undefined})}`;
+        let localVarPath = `/workspace/team/${this.configuration.encodeParam({name: "teamId", value: teamId, in: "path", style: "simple", explode: false, dataType: "number", dataFormat: "int64"})}/label/${this.configuration.encodeParam({name: "repositoryId", value: repositoryId, in: "path", style: "simple", explode: false, dataType: "number", dataFormat: "int64"})}/${this.configuration.encodeParam({name: "label", value: label, in: "path", style: "simple", explode: false, dataType: "string", dataFormat: undefined})}`;
         return this.httpClient.request<TeamInfo>('post', `${this.configuration.basePath}${localVarPath}`,
             {
                 context: localVarHttpContext,
@@ -626,19 +630,19 @@ export class WorkspaceService implements WorkspaceServiceInterface {
 
     /**
      * @param teamId 
-     * @param label 
+     * @param labelId 
      * @param observe set whether or not to return the data Observable as the body, response or events. defaults to returning the body.
      * @param reportProgress flag to report request and response progress.
      */
-    public removeLabelFromTeam(teamId: number, label: string, observe?: 'body', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<TeamInfo>;
-    public removeLabelFromTeam(teamId: number, label: string, observe?: 'response', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<HttpResponse<TeamInfo>>;
-    public removeLabelFromTeam(teamId: number, label: string, observe?: 'events', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<HttpEvent<TeamInfo>>;
-    public removeLabelFromTeam(teamId: number, label: string, observe: any = 'body', reportProgress: boolean = false, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<any> {
+    public removeLabelFromTeam(teamId: number, labelId: number, observe?: 'body', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<TeamInfo>;
+    public removeLabelFromTeam(teamId: number, labelId: number, observe?: 'response', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<HttpResponse<TeamInfo>>;
+    public removeLabelFromTeam(teamId: number, labelId: number, observe?: 'events', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<HttpEvent<TeamInfo>>;
+    public removeLabelFromTeam(teamId: number, labelId: number, observe: any = 'body', reportProgress: boolean = false, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<any> {
         if (teamId === null || teamId === undefined) {
             throw new Error('Required parameter teamId was null or undefined when calling removeLabelFromTeam.');
         }
-        if (label === null || label === undefined) {
-            throw new Error('Required parameter label was null or undefined when calling removeLabelFromTeam.');
+        if (labelId === null || labelId === undefined) {
+            throw new Error('Required parameter labelId was null or undefined when calling removeLabelFromTeam.');
         }
 
         let localVarHeaders = this.defaultHeaders;
@@ -677,7 +681,7 @@ export class WorkspaceService implements WorkspaceServiceInterface {
             }
         }
 
-        let localVarPath = `/workspace/team/${this.configuration.encodeParam({name: "teamId", value: teamId, in: "path", style: "simple", explode: false, dataType: "number", dataFormat: "int64"})}/label/${this.configuration.encodeParam({name: "label", value: label, in: "path", style: "simple", explode: false, dataType: "string", dataFormat: undefined})}`;
+        let localVarPath = `/workspace/team/${this.configuration.encodeParam({name: "teamId", value: teamId, in: "path", style: "simple", explode: false, dataType: "number", dataFormat: "int64"})}/label/${this.configuration.encodeParam({name: "labelId", value: labelId, in: "path", style: "simple", explode: false, dataType: "number", dataFormat: "int64"})}`;
         return this.httpClient.request<TeamInfo>('delete', `${this.configuration.basePath}${localVarPath}`,
             {
                 context: localVarHttpContext,

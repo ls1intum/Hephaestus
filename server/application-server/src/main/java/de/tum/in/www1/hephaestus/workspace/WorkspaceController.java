@@ -93,16 +93,16 @@ public class WorkspaceController {
                 .orElseGet(() -> ResponseEntity.notFound().build());
     }
 
-    @PostMapping("/team/{teamId}/label/{label}")
-    public ResponseEntity<TeamInfoDTO> addLabelToTeam(@PathVariable Long teamId, @PathVariable String label) {
-        return workspaceService.addLabelToTeam(teamId, label)
+    @PostMapping("/team/{teamId}/label/{repositoryId}/{label}")
+    public ResponseEntity<TeamInfoDTO> addLabelToTeam(@PathVariable Long teamId, @PathVariable Long repositoryId, @PathVariable String label) {
+        return workspaceService.addLabelToTeam(teamId, repositoryId, label)
                 .map(ResponseEntity::ok)
                 .orElseGet(() -> ResponseEntity.notFound().build());
     }
 
-    @DeleteMapping("/team/{teamId}/label/{label}")
-    public ResponseEntity<TeamInfoDTO> removeLabelFromTeam(@PathVariable Long teamId, @PathVariable String label) {
-        return workspaceService.removeLabelFromTeam(teamId, label)
+    @DeleteMapping("/team/{teamId}/label/{labelId}")
+    public ResponseEntity<TeamInfoDTO> removeLabelFromTeam(@PathVariable Long teamId, @PathVariable Long labelId) {
+        return workspaceService.removeLabelFromTeam(teamId, labelId)
                 .map(ResponseEntity::ok)
                 .orElseGet(() -> ResponseEntity.notFound().build());
     }

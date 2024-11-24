@@ -2,7 +2,7 @@ import { SelectionModel } from '@angular/cdk/collections';
 import { Component, TrackByFunction, computed, effect, inject, input, signal } from '@angular/core';
 import { toObservable, toSignal } from '@angular/core/rxjs-interop';
 import { FormControl, FormsModule, ReactiveFormsModule } from '@angular/forms';
-import { lucideArrowUpDown, lucideChevronDown, lucideMoreHorizontal, lucideRotateCw, lucideXOctagon, lucidePlus, lucideCheck } from '@ng-icons/lucide';
+import { lucideArrowUpDown, lucideChevronDown, lucideMoreHorizontal, lucideRotateCw, lucideXOctagon, lucidePlus, lucideCheck, lucideTrash2 } from '@ng-icons/lucide';
 import { HlmButtonModule } from '@spartan-ng/ui-button-helm';
 import { HlmIconComponent, provideIcons } from '@spartan-ng/ui-icon-helm';
 import { HlmInputDirective } from '@spartan-ng/ui-input-helm';
@@ -65,7 +65,7 @@ const LOADING_TEAMS: TeamInfo[] = [
     BrnPopoverTriggerDirective,
     GithubLabelComponent
   ],
-  providers: [provideIcons({ lucideChevronDown, lucideMoreHorizontal, lucideArrowUpDown, lucideRotateCw, lucideXOctagon, lucidePlus, lucideCheck })],
+  providers: [provideIcons({ lucideChevronDown, lucideMoreHorizontal, lucideArrowUpDown, lucideRotateCw, lucideXOctagon, lucidePlus, lucideCheck, lucideTrash2 })],
   templateUrl: './teams-table.component.html'
 })
 export class WorkspaceTeamsTableComponent {
@@ -139,10 +139,14 @@ export class WorkspaceTeamsTableComponent {
   }
 
   groupLabelsByRepository = (team: TeamInfo) => {
-    const group = Object.entries(groupBy(team.labels, (l) => l.repository!.nameWithOwner)).map(([repository, labels]) => ({ repository, labels }));
+    const group = Object.entries(groupBy(team.labels, (l) => l.repository!.nameWithOwner)).map(([repository, labels]) => ({
+      repository,
+      labels,
+      repositoryId: labels[0].repository!.id
+    }));
     // add repos without labels
-    const filteredRepos = team.repositories.map((r) => r.nameWithOwner).filter((r) => !group.map((g) => g.repository).includes(r));
-    let result = group.concat(filteredRepos.map((r) => ({ repository: r, labels: [] }))).sort((a, b) => a.repository.localeCompare(b.repository));
+    const filteredRepos = team.repositories.filter((r) => !group.map((g) => g.repository).includes(r.nameWithOwner));
+    let result = group.concat(filteredRepos.map((r) => ({ repository: r.nameWithOwner, labels: [], repositoryId: r.id }))).sort((a, b) => a.repository.localeCompare(b.repository));
     // Sort labels
     result = result.map((r) => ({ ...r, labels: r.labels.sort((a, b) => a.name.localeCompare(b.name)) }));
     return result;
@@ -179,8 +183,20 @@ export class WorkspaceTeamsTableComponent {
   }));
 
   addLabelToTeam = injectMutation(() => ({
-    mutationFn: (team: TeamInfo) => lastValueFrom(this.workspaceService.addLabelToTeam(team.id, this._newLabelName.value ?? '')),
-    queryKey: ['workspace', 'team', 'label', 'add'],
+    mutationFn: ({ teamId, repositoryId, label }: { teamId: number; repositoryId: number; label: string }) =>
+      lastValueFrom(this.workspaceService.addLabelToTeam(teamId, repositoryId, label)),
+    onError: () => {
+      this.displayLabelAlert.set(true);
+    },
+    onSettled: () => {
+      this.displayLabelAlert.set(false);
+      this._newLabelName.reset();
+      this.invalidateTeams();
+    }
+  }));
+
+  removeLabelFromTeam = injectMutation(() => ({
+    mutationFn: ({ teamId, labelId }: { teamId: number; labelId: number }) => lastValueFrom(this.workspaceService.removeLabelFromTeam(teamId, labelId)),
     onError: () => {
       this.displayLabelAlert.set(true);
     },

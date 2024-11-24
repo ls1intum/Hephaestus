@@ -135,7 +135,7 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/TeamInfo"
-  /workspace/team/{teamId}/label/{label}:
+  /workspace/team/{teamId}/label/{repositoryId}/{label}:
     post:
       tags:
       - workspace
@@ -147,24 +147,7 @@ paths:
         schema:
           type: integer
           format: int64
-      - name: label
-        in: path
-        required: true
-        schema:
-          type: string
-      responses:
-        "200":
-          description: OK
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/TeamInfo"
-    delete:
-      tags:
-      - workspace
-      operationId: removeLabelFromTeam
-      parameters:
-      - name: teamId
+      - name: repositoryId
         in: path
         required: true
         schema:
@@ -330,6 +313,31 @@ paths:
       operationId: deleteTeam
       parameters:
       - name: teamId
+        in: path
+        required: true
+        schema:
+          type: integer
+          format: int64
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TeamInfo"
+  /workspace/team/{teamId}/label/{labelId}:
+    delete:
+      tags:
+      - workspace
+      operationId: removeLabelFromTeam
+      parameters:
+      - name: teamId
+        in: path
+        required: true
+        schema:
+          type: integer
+          format: int64
+      - name: labelId
         in: path
         required: true
         schema:

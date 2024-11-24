@@ -245,14 +245,14 @@ public class WorkspaceService {
         return Optional.of(TeamInfoDTO.fromTeam(team));
     }
 
-    public Optional<TeamInfoDTO> addLabelToTeam(Long teamId, String label) {
-        logger.info("Adding label '" + label + "' to team with ID: " + teamId);
+    public Optional<TeamInfoDTO> addLabelToTeam(Long teamId, Long repositoryId, String label) {
+        logger.info("Adding label '" + label + "' of repository with ID: " + repositoryId + " to team with ID: " + teamId);
         Optional<Team> optionalTeam = teamRepository.findById(teamId);
         if (optionalTeam.isEmpty()) {
             return Optional.empty();
         }
         Team team = optionalTeam.get();
-        Optional<Label> labelEntity = labelRepository.findByName(label);
+        Optional<Label> labelEntity = labelRepository.findByRepositoryIdAndName(repositoryId, label);
         if (labelEntity.isEmpty()) {
             return Optional.empty();
         }
@@ -261,14 +261,14 @@ public class WorkspaceService {
         return Optional.of(TeamInfoDTO.fromTeam(team));
     }
 
-    public Optional<TeamInfoDTO> removeLabelFromTeam(Long teamId, String label) {
-        logger.info("Removing label '" + label + "' from team with ID: " + teamId);
+    public Optional<TeamInfoDTO> removeLabelFromTeam(Long teamId, Long labelId) {
+        logger.info("Removing label with ID: " + labelId + " from team with ID: " + teamId);
         Optional<Team> optionalTeam = teamRepository.findById(teamId);
         if (optionalTeam.isEmpty()) {
             return Optional.empty();
         }
         Team team = optionalTeam.get();
-        Optional<Label> labelEntity = labelRepository.findByName(label);
+        Optional<Label> labelEntity = labelRepository.findById(labelId);
         if (labelEntity.isEmpty()) {
             return Optional.empty();
         }

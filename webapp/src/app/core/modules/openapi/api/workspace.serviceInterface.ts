@@ -30,9 +30,10 @@ export interface WorkspaceServiceInterface {
      * 
      * 
      * @param teamId 
+     * @param repositoryId 
      * @param label 
      */
-    addLabelToTeam(teamId: number, label: string, extraHttpRequestParams?: any): Observable<TeamInfo>;
+    addLabelToTeam(teamId: number, repositoryId: number, label: string, extraHttpRequestParams?: any): Observable<TeamInfo>;
 
     /**
      * 
@@ -89,9 +90,9 @@ export interface WorkspaceServiceInterface {
      * 
      * 
      * @param teamId 
-     * @param label 
+     * @param labelId 
      */
-    removeLabelFromTeam(teamId: number, label: string, extraHttpRequestParams?: any): Observable<TeamInfo>;
+    removeLabelFromTeam(teamId: number, labelId: number, extraHttpRequestParams?: any): Observable<TeamInfo>;
 
     /**
      * 
