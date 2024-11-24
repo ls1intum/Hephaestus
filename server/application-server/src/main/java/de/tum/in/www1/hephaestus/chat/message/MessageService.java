@@ -7,6 +7,7 @@ import org.springframework.stereotype.Service;
 import de.tum.in.www1.hephaestus.chat.message.Message.MessageSender;
 import de.tum.in.www1.hephaestus.chat.session.Session;
 import de.tum.in.www1.hephaestus.chat.session.SessionRepository;
+import de.tum.in.www1.hephaestus.intelligenceservice.ApiClient;
 import de.tum.in.www1.hephaestus.intelligenceservice.api.DefaultApi;
 import de.tum.in.www1.hephaestus.intelligenceservice.model.ChatRequest;
 import de.tum.in.www1.hephaestus.intelligenceservice.model.ChatResponse;
@@ -21,7 +22,9 @@ public class MessageService {
     private MessageRepository messageRepository;
 
     public MessageService() {
-        this.sessionApiClient = new DefaultApi();
+        ApiClient apiClient = new ApiClient();
+        apiClient.setBasePath("http://127.0.0.1:8000");
+        this.sessionApiClient = new DefaultApi(apiClient);
     }
 
     public List<MessageDTO> getMessagesBySessionId(Long sessionId) {
@@ -41,21 +44,29 @@ public class MessageService {
         userMessage.setSender(MessageSender.USER);
         userMessage.setContent(content);
         userMessage.setSession(session.get());
+
         Message savedUserMessage = messageRepository.save(userMessage);
+        session.get().getMessages().add(savedUserMessage);
+        sessionRepository.save(session.get());
 
         String systemResponse = generateResponse(sessionId, content);
+
+        // prevent saving empty system messages
+        if (systemResponse == null) {
+            return MessageDTO.fromMessage(savedUserMessage);
+        }
 
         Message systemMessage = new Message();
         systemMessage.setSender(MessageSender.SYSTEM);
         systemMessage.setContent(systemResponse);
         systemMessage.setSession(session.get());
-        Message savedSystemMessage = messageRepository.save(systemMessage);
 
-        session.get().getMessages().add(savedUserMessage);
+        Message savedSystemMessage = messageRepository.save(systemMessage);
         session.get().getMessages().add(savedSystemMessage);
         sessionRepository.save(session.get());
 
         return MessageDTO.fromMessage(savedSystemMessage);
+
     }
 
     private String generateResponse(Long session_id, String messageContent) {

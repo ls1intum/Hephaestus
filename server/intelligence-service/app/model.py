@@ -79,7 +79,7 @@ memory = MemorySaver()
 app = workflow.compile(checkpointer=memory)
 
 
-def chat(thread_id: str, input_message: str, state: State):
+def send_message(thread_id: str, input_message: str, state: State):
     config = {"configurable": {"thread_id": thread_id}}
     # append the new human message to the conversation
     state["messages"] += [HumanMessage(input_message)]
