@@ -94,6 +94,9 @@ public class LeaderboardService {
                     )
                 )
             );
+        
+        // Add missing users with score 0
+        usersById.keySet().forEach(userId -> scoresByUserId.putIfAbsent(userId, 0));
 
         // Ranking (sorted by score descending)
         List<Long> rankingByUserId = scoresByUserId
