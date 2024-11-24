@@ -27,6 +27,7 @@ import de.tum.in.www1.hephaestus.gitprovider.user.UserInfoDTO;
 import de.tum.in.www1.hephaestus.gitprovider.user.UserRepository;
 import de.tum.in.www1.hephaestus.gitprovider.user.UserTeamsDTO;
 import de.tum.in.www1.hephaestus.syncing.GitHubDataSyncService;
+import de.tum.in.www1.hephaestus.syncing.NatsConsumerService;
 
 @Service
 public class WorkspaceService {
@@ -34,7 +35,7 @@ public class WorkspaceService {
     private static final Logger logger = LoggerFactory.getLogger(WorkspaceService.class);
 
     @Autowired
-    private ApplicationEventPublisher eventPublisher;
+    private NatsConsumerService natsConsumerService;
 
     @Autowired
     private GitHubDataSyncService gitHubDataSyncService;
@@ -63,6 +64,9 @@ public class WorkspaceService {
     @Autowired
     private LabelRepository labelRepository;
     
+    @Value("${nats.enabled}")
+    private boolean isNatsEnabled;
+
     @Value("${hephaestus.workspace.init-default}")
     private boolean initDefaultWorkspace;
 
@@ -76,6 +80,12 @@ public class WorkspaceService {
     public void onApplicationReady() {
         Workspace workspace = getWorkspace();
         Set<RepositoryToMonitor> repositoriesToMonitor = workspace.getRepositoriesToMonitor();
+
+        if (isNatsEnabled) {
+            repositoriesToMonitor.forEach(repositoryToMonitor -> {
+                natsConsumerService.startConsumingRepositoryToMonitorAsync(repositoryToMonitor);
+            });
+        }
 
         if (runMonitoringOnStartup) {
             logger.info("Running monitoring on startup");
@@ -151,6 +161,9 @@ public class WorkspaceService {
         workspaceRepository.save(workspace);
 
         // Start syncing the repository
+        if (isNatsEnabled) {
+            natsConsumerService.startConsumingRepositoryToMonitorAsync(repositoryToMonitor);
+        }
         gitHubDataSyncService.syncRepositoryToMonitorAsync(repositoryToMonitor);
     }
 
@@ -181,6 +194,10 @@ public class WorkspaceService {
         repository.get().getLabels().forEach(label -> label.removeAllTeams());
         repository.get().removeAllTeams();
         repositoryRepository.delete(repository.get());
+
+        if (isNatsEnabled) {
+            natsConsumerService.stopConsumingRepositoryToMonitorAsync(repositoryToMonitor);
+        }
     }
 
     public List<UserTeamsDTO> getUsersWithTeams() {
