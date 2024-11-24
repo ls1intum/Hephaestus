@@ -26,14 +26,18 @@ public class WorkspaceController {
     private WorkspaceService workspaceService;
 
     @GetMapping("/repositories")
-    public ResponseEntity<Set<String>> getRepositoriesToMonitor() {
-        return ResponseEntity.ok(workspaceService.getRepositoriesToMonitor());
+    public ResponseEntity<List<String>> getRepositoriesToMonitor() {
+        var repositories = workspaceService.getRepositoriesToMonitor()
+            .stream()
+            .sorted()
+            .toList();
+        return ResponseEntity.ok(repositories);
     }
 
-    @PostMapping("/repositories/{repository}")
-    public ResponseEntity<Void> addRepositoryToMonitor(@PathVariable String nameWithOwner) {
+    @PostMapping("/repositories/{owner}/{name}")
+    public ResponseEntity<Void> addRepositoryToMonitor(@PathVariable String owner, @PathVariable String name) {
         try {
-            workspaceService.addRepositoryToMonitor(nameWithOwner);
+            workspaceService.addRepositoryToMonitor(owner + '/' + name);
             return ResponseEntity.ok().build();
         } catch (RepositoryNotFoundException e) {
             return ResponseEntity.notFound().build();
@@ -42,10 +46,14 @@ public class WorkspaceController {
         }
     }
 
-    @DeleteMapping("/repositories/{repository}")
-    public ResponseEntity<Void> removeRepositoryToMonitor(@PathVariable String repository) {
-        workspaceService.removeRepositoryToMonitor(repository);
-        return ResponseEntity.ok().build();
+    @DeleteMapping("/repositories/{owner}/{name}")
+    public ResponseEntity<Void> removeRepositoryToMonitor(@PathVariable String owner, @PathVariable String name) {
+        try {
+            workspaceService.removeRepositoryToMonitor(owner + '/' + name);
+            return ResponseEntity.ok().build();
+        } catch (RepositoryNotFoundException e) {
+            return ResponseEntity.notFound().build();
+        }
     }
 
     @GetMapping("/users")

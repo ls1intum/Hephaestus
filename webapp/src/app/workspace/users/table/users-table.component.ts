@@ -15,7 +15,7 @@ import { BrnSelectModule } from '@spartan-ng/ui-select-brain';
 import { HlmSelectModule } from '@spartan-ng/ui-select-helm';
 import { HlmSkeletonModule } from '@spartan-ng/ui-skeleton-helm';
 import { debounceTime, lastValueFrom, map } from 'rxjs';
-import { AdminService, TeamInfo, UserTeams } from '@app/core/modules/openapi';
+import { WorkspaceService, TeamInfo, UserTeams } from '@app/core/modules/openapi';
 import { RouterLink } from '@angular/router';
 import { GithubLabelComponent } from '@app/ui/github-label/github-label.component';
 import { injectMutation, injectQueryClient } from '@tanstack/angular-query-experimental';
@@ -55,37 +55,29 @@ const LOADING_DATA: UserTeams[] = [
 ];
 
 @Component({
-  selector: 'app-admin-users-table',
+  selector: 'app-workspace-users-table',
   standalone: true,
   imports: [
     FormsModule,
     RouterLink,
-
     BrnMenuTriggerDirective,
     HlmMenuModule,
-
     BrnTableModule,
     HlmTableModule,
-
     HlmButtonModule,
-
     HlmIconComponent,
     HlmInputDirective,
-
     HlmCheckboxComponent,
-
     BrnSelectModule,
     HlmSelectModule,
-
     HlmSkeletonModule,
-
     GithubLabelComponent
   ],
   providers: [provideIcons({ lucideChevronDown, lucideMoreHorizontal, lucideArrowUpDown, lucideRotateCw, lucideXOctagon })],
   templateUrl: './users-table.component.html'
 })
-export class AdminUsersTableComponent {
-  protected adminService = inject(AdminService);
+export class WorkspaceUsersTableComponent {
+  protected workspaceService = inject(WorkspaceService);
   protected queryClient = injectQueryClient();
   protected octNoEntry = octNoEntry;
 
@@ -186,8 +178,8 @@ export class AdminUsersTableComponent {
   protected readonly _selectedTeam = signal<TeamInfo | undefined>(undefined);
 
   addTeamToUser = injectMutation(() => ({
-    mutationFn: (user: UserTeams) => lastValueFrom(this.adminService.addTeamToUser(user.login, this._selectedTeam()!.id)),
-    queryKey: ['admin', 'user', 'team', 'add'],
+    mutationFn: (user: UserTeams) => lastValueFrom(this.workspaceService.addTeamToUser(user.login, this._selectedTeam()!.id)),
+    queryKey: ['workspace', 'user', 'team', 'add'],
     onSettled: () => this.invalidateUsers()
   }));
   protected addTeamToSelected() {
@@ -197,8 +189,8 @@ export class AdminUsersTableComponent {
   }
 
   removeTeamFromUser = injectMutation(() => ({
-    mutationFn: (user: UserTeams) => lastValueFrom(this.adminService.removeUserFromTeam(user.login, this._selectedTeam()!.id)),
-    queryKey: ['admin', 'user', 'team', 'remove'],
+    mutationFn: (user: UserTeams) => lastValueFrom(this.workspaceService.removeUserFromTeam(user.login, this._selectedTeam()!.id)),
+    queryKey: ['workspace', 'user', 'team', 'remove'],
     onSettled: () => this.invalidateUsers()
   }));
   protected removeTeamFromSelected() {
@@ -211,6 +203,6 @@ export class AdminUsersTableComponent {
     for (const user of this._selected()) {
       this._selectionModel.deselect(user);
     }
-    this.queryClient.invalidateQueries({ queryKey: ['admin', 'users'] });
+    this.queryClient.invalidateQueries({ queryKey: ['workspace', 'users'] });
   }
 }

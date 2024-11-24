@@ -112,13 +112,13 @@ public class WorkspaceService {
         return workspaceRepository.findFirstByOrderByIdAsc().orElseGet(this::createInitialWorkspace);
     }
 
-    public Set<String> getRepositoriesToMonitor() {
+    public List<String> getRepositoriesToMonitor() {
         logger.info("Getting repositories to monitor");
         return getWorkspace()
             .getRepositoriesToMonitor()
             .stream()
             .map(RepositoryToMonitor::getNameWithOwner)
-            .collect(Collectors.toSet());
+            .toList();
     }
 
     public void addRepositoryToMonitor(String nameWithOwner) throws RepositoryAlreadyMonitoredException, RepositoryNotFoundException {
@@ -145,23 +145,33 @@ public class WorkspaceService {
         workspaceRepository.save(workspace);
     }
 
-    public void removeRepositoryToMonitor(String repository) {
-        logger.info("Removing repository from monitor: " + repository);
+    public void removeRepositoryToMonitor(String nameWithOwner) throws RepositoryNotFoundException {
+        logger.info("Removing repository from monitor: " + nameWithOwner);
         Workspace workspace = getWorkspace();
         
         RepositoryToMonitor repositoryToMonitor = workspace.getRepositoriesToMonitor().stream()
-            .filter(r -> r.getNameWithOwner().equals(repository))
+            .filter(r -> r.getNameWithOwner().equals(nameWithOwner))
             .findFirst()
             .orElse(null);
 
         if (repositoryToMonitor == null) {
             logger.info("Repository is not being monitored");
-            return;
+            throw new RepositoryNotFoundException(nameWithOwner);
         }
 
         repositoryToMonitorRepository.delete(repositoryToMonitor);
         workspace.getRepositoriesToMonitor().remove(repositoryToMonitor);
         workspaceRepository.save(workspace);
+
+        // Delete repository if present
+        var repository = repositoryRepository.findByNameWithOwner(nameWithOwner);
+        if (repository.isEmpty()) {
+            return;
+        }
+
+        repository.get().getLabels().forEach(label -> label.removeAllTeams());
+        repository.get().removeAllTeams();
+        repositoryRepository.delete(repository.get());
     }
 
     public List<UserTeamsDTO> getUsersWithTeams() {

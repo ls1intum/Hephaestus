@@ -4,6 +4,7 @@ import java.io.IOException;
 import java.time.Duration;
 import java.time.ZonedDateTime;
 import java.util.Arrays;
+import java.util.List;
 import java.util.Set;
 
 import org.kohsuke.github.GHEvent;
@@ -88,7 +89,7 @@ public class NatsConsumerService {
         if (natsServer == null || natsServer.trim().isEmpty()) {
             throw new IllegalArgumentException("NATS server configuration is missing.");
         }
-        Set<String> repositoriesToMonitor = workspaceService.getRepositoriesToMonitor();
+        var repositoriesToMonitor = workspaceService.getRepositoriesToMonitor();
         if (repositoriesToMonitor == null || repositoriesToMonitor.size() == 0) {
             throw new IllegalArgumentException("No repositories to monitor are configured.");
         }
@@ -150,7 +151,7 @@ public class NatsConsumerService {
         updateConsumer(workspaceService.getRepositoriesToMonitor());
     }
 
-    public void updateConsumer(Set<String> repositoriesToMonitor) {
+    public void updateConsumer(List<String> repositoriesToMonitor) {
         if (natsConnection == null || natsConnection.getStatus() != Connection.Status.CONNECTED) {
             logger.info("NATS connection is not initialized. No need to update the consumer.");
             return;
@@ -206,7 +207,7 @@ public class NatsConsumerService {
      *
      * @return The subjects to monitor.
      */
-    private String[] getSubjects(Set<String> repositoriesToMonitor) {
+    private String[] getSubjects(List<String> repositoriesToMonitor) {
         String[] events = handlerRegistry
             .getSupportedEvents()
             .stream()
