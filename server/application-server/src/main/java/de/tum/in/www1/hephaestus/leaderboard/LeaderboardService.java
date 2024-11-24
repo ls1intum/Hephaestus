@@ -6,8 +6,11 @@ import de.tum.in.www1.hephaestus.gitprovider.pullrequest.PullRequest;
 import de.tum.in.www1.hephaestus.gitprovider.pullrequest.PullRequestInfoDTO;
 import de.tum.in.www1.hephaestus.gitprovider.pullrequestreview.PullRequestReview;
 import de.tum.in.www1.hephaestus.gitprovider.pullrequestreview.PullRequestReviewRepository;
+import de.tum.in.www1.hephaestus.gitprovider.team.Team;
+import de.tum.in.www1.hephaestus.gitprovider.team.TeamRepository;
 import de.tum.in.www1.hephaestus.gitprovider.user.User;
 import de.tum.in.www1.hephaestus.gitprovider.user.UserInfoDTO;
+import de.tum.in.www1.hephaestus.gitprovider.user.UserRepository;
 import jakarta.transaction.Transactional;
 import java.time.OffsetDateTime;
 import java.util.Comparator;
@@ -19,7 +22,6 @@ import java.util.stream.IntStream;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 @Service
@@ -28,31 +30,51 @@ public class LeaderboardService {
     private static final Logger logger = LoggerFactory.getLogger(LeaderboardService.class);
 
     @Autowired
+    private UserRepository userRepository;
+    @Autowired
     private PullRequestReviewRepository pullRequestReviewRepository;
     @Autowired
     private IssueCommentRepository issueCommentRepository;
     @Autowired
     private ScoringService scoringService;
-
-    @Value("${monitoring.timeframe}")
-    private int timeframe;
+    @Autowired
+    private TeamRepository teamRepository;
 
     @Transactional
     public List<LeaderboardEntryDTO> createLeaderboard(
         OffsetDateTime after,
         OffsetDateTime before,
-        Optional<String> repository
+        Optional<String> team
     ) {
-        logger.info("Creating leaderboard dataset");
-        logger.info("Timeframe: {} - {}", after, before);
-        List<PullRequestReview> reviews = pullRequestReviewRepository.findAllInTimeframe(after, before, repository);
-        List<IssueComment> issueComments = issueCommentRepository.findAllInTimeframe(after, before, repository, true);
+        Optional<Team> teamEntity = team.map(t -> teamRepository.findByName(t)).orElse(Optional.empty());
+        logger.info("Creating leaderboard dataset with timeframe: {} - {} and team: {}", after, before, teamEntity.map(Team::getName).orElse("all"));
+        
+        List<PullRequestReview> reviews;
+        List<IssueComment> issueComments;
+        if (teamEntity.isPresent()) {
+            reviews = pullRequestReviewRepository.findAllInTimeframeOfTeam(after, before, teamEntity.get().getId());
+            issueComments = issueCommentRepository.findAllInTimeframeOfTeam(after, before, teamEntity.get().getId(), true);
+        } else {
+            reviews = pullRequestReviewRepository.findAllInTimeframe(after, before);
+            issueComments = issueCommentRepository.findAllInTimeframe(after, before, true);
+        }
 
+        
         Map<Long, User> usersById = reviews
             .stream()
             .map(PullRequestReview::getAuthor)
             .collect(Collectors.toMap(User::getId, user -> user, (u1, u2) -> u1));
-
+        
+        issueComments
+            .stream()
+            .map(IssueComment::getAuthor)
+            .forEach(user -> usersById.putIfAbsent(user.getId(), user));
+        
+        if (teamEntity.isPresent()) {
+            userRepository.findAllByTeamId(teamEntity.get().getId())
+                .forEach(user -> usersById.putIfAbsent(user.getId(), user));
+        }
+        
         // Review activity
         Map<Long, List<PullRequestReview>> reviewsByUserId = reviews
             .stream()

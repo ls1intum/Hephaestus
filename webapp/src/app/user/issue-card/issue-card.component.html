@@ -32,18 +32,7 @@
   @if (!isLoading()) {
     <div hlmCardFooter class="flex flex-wrap gap-2 p-0 space-x-0">
       @for (label of pullRequestLabels(); track label.name) {
-        @let labelColors = hexToRgb(label.color);
-        <span
-          class="px-2 py-0.5 rounded-[2rem] text-xs font-medium dark:border gh-label"
-          [style.--label-r]="labelColors.r"
-          [style.--label-g]="labelColors.g"
-          [style.--label-b]="labelColors.b"
-          [style.--label-h]="labelColors.h"
-          [style.--label-s]="labelColors.s"
-          [style.--label-l]="labelColors.l"
-        >
-          {{ label.name }}
-        </span>
+        <app-github-label [label]="label"></app-github-label>
       }
     </div>
   }

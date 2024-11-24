@@ -28,6 +28,7 @@ public class GitHubIssueConverter extends BaseGitServiceEntityConverter<GHIssue,
         issue.setLocked(source.isLocked());
         issue.setClosedAt(DateUtil.convertToOffsetDateTime(source.getClosedAt()));
         issue.setCommentsCount(issue.getCommentsCount());
+        issue.setHasPullRequest(source.getPullRequest() != null);
         return issue;
     }
 

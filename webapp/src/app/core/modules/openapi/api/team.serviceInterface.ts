@@ -13,14 +13,14 @@ import { HttpHeaders }                                       from '@angular/comm
 
 import { Observable }                                        from 'rxjs';
 
-import { AuthUserInfo } from '../model/models';
+import { TeamInfo } from '../model/models';
 
 
 import { Configuration }                                     from '../configuration';
 
 
 
-export interface AdminServiceInterface {
+export interface TeamServiceInterface {
     defaultHeaders: HttpHeaders;
     configuration: Configuration;
 
@@ -28,12 +28,6 @@ export interface AdminServiceInterface {
      * 
      * 
      */
-    admin(extraHttpRequestParams?: any): Observable<string>;
-
-    /**
-     * 
-     * 
-     */
-    getGretting(extraHttpRequestParams?: any): Observable<AuthUserInfo>;
+    getTeams(extraHttpRequestParams?: any): Observable<Array<TeamInfo>>;
 
 }

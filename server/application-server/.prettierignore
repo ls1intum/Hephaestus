@@ -1,0 +1,7 @@
+# Ignore artifacts:
+.mvn
+target
+postgres-data
+
+# Ignore OpenAPI generated files:
+src\main\java\de\tum\in\www1\hephaestus\intelligenceservice

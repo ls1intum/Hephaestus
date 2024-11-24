@@ -1,6 +1,6 @@
 import dayjs from 'dayjs';
 import isoWeek from 'dayjs/plugin/isoWeek';
-import { combineLatest, timer, lastValueFrom, map } from 'rxjs';
+import { lastValueFrom } from 'rxjs';
 import { Component, computed, inject } from '@angular/core';
 import { ActivatedRoute } from '@angular/router';
 import { toSignal } from '@angular/core/rxjs-interop';
@@ -44,30 +44,27 @@ export class HomeComponent {
     };
   });
 
-  protected after = computed(() => {
-    const afterParam = this.queryParams().get('after');
-    if (afterParam) return afterParam;
-
-    let defaultDate = dayjs().isoWeekday(this.leaderboardSchedule().day).startOf('hour').hour(this.leaderboardSchedule().hour).minute(this.leaderboardSchedule().minute);
-    if (defaultDate.isAfter(dayjs())) {
-      defaultDate = defaultDate.subtract(1, 'week');
-    }
-    return defaultDate.format();
-  });
-  protected before = computed(() => this.queryParams().get('before') ?? dayjs().format());
-  protected repository = computed(() => this.queryParams().get('repository') ?? 'all');
+  protected afterParam = computed(
+    () =>
+      this.queryParams().get('after') ??
+      (() => {
+        let defaultDate = dayjs().isoWeekday(this.leaderboardSchedule().day).startOf('hour').hour(this.leaderboardSchedule().hour).minute(this.leaderboardSchedule().minute);
+        if (defaultDate.isAfter(dayjs())) {
+          defaultDate = defaultDate.subtract(1, 'week');
+        }
+        return defaultDate.format();
+      })()
+  );
+  protected beforeParam = computed(() => this.queryParams().get('before') ?? dayjs().format());
+  protected teamParam = computed(() => this.queryParams().get('team') ?? 'all');
 
   query = injectQuery(() => ({
-    enabled: this.metaQuery.data !== undefined,
-    queryKey: ['leaderboard', { after: this.after(), before: this.before(), repository: this.repository() }],
-    queryFn: async () =>
-      lastValueFrom(
-        combineLatest([this.leaderboardService.getLeaderboard(this.after(), this.before(), this.repository() !== 'all' ? this.repository() : undefined), timer(0)]).pipe(
-          map(([leaderboard]) => leaderboard)
-        )
-      )
+    enabled: !!this.metaQuery.data(),
+    queryKey: ['leaderboard', { after: this.afterParam(), before: this.beforeParam(), team: this.teamParam() }],
+    queryFn: async () => lastValueFrom(this.leaderboardService.getLeaderboard(this.afterParam(), this.beforeParam(), this.teamParam() !== 'all' ? this.teamParam() : undefined))
   }));
 
+  protected teams = computed(() => this.metaQuery.data()?.teams?.map((team) => team.name) ?? []);
   metaQuery = injectQuery(() => ({
     queryKey: ['meta'],
     queryFn: async () => lastValueFrom(this.metaService.getMetaData())

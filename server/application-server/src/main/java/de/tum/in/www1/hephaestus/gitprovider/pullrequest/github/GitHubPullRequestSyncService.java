@@ -15,6 +15,7 @@ import org.kohsuke.github.GHPullRequestQueryBuilder.Sort;
 import org.kohsuke.github.GHRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import jakarta.transaction.Transactional;
 
@@ -36,36 +37,24 @@ public class GitHubPullRequestSyncService {
 
     private static final Logger logger = LoggerFactory.getLogger(GitHubPullRequestSyncService.class);
 
-    private final PullRequestRepository pullRequestRepository;
-    private final RepositoryRepository repositoryRepository;
-    private final LabelRepository labelRepository;
-    private final MilestoneRepository milestoneRepository;
-    private final UserRepository userRepository;
-    private final GitHubPullRequestConverter pullRequestConverter;
-    private final GitHubLabelConverter labelConverter;
-    private final GitHubMilestoneConverter milestoneConverter;
-    private final GitHubUserConverter userConverter;
-
-    public GitHubPullRequestSyncService(
-            PullRequestRepository pullRequestRepository,
-            RepositoryRepository repositoryRepository,
-            LabelRepository labelRepository,
-            MilestoneRepository milestoneRepository,
-            UserRepository userRepository,
-            GitHubPullRequestConverter pullRequestConverter,
-            GitHubLabelConverter labelConverter,
-            GitHubMilestoneConverter milestoneConverter,
-            GitHubUserConverter userConverter) {
-        this.pullRequestRepository = pullRequestRepository;
-        this.repositoryRepository = repositoryRepository;
-        this.labelRepository = labelRepository;
-        this.milestoneRepository = milestoneRepository;
-        this.userRepository = userRepository;
-        this.pullRequestConverter = pullRequestConverter;
-        this.labelConverter = labelConverter;
-        this.milestoneConverter = milestoneConverter;
-        this.userConverter = userConverter;
-    }
+    @Autowired
+    private PullRequestRepository pullRequestRepository;
+    @Autowired
+    private RepositoryRepository repositoryRepository;
+    @Autowired
+    private LabelRepository labelRepository;
+    @Autowired
+    private MilestoneRepository milestoneRepository;
+    @Autowired
+    private UserRepository userRepository;
+    @Autowired
+    private GitHubPullRequestConverter pullRequestConverter;
+    @Autowired
+    private GitHubLabelConverter labelConverter;
+    @Autowired
+    private GitHubMilestoneConverter milestoneConverter;
+    @Autowired
+    private GitHubUserConverter userConverter;
 
     /**
      * Synchronizes all pull requests from the specified GitHub repositories.
@@ -104,7 +93,7 @@ public class GitHubPullRequestSyncService {
                 .iterator();
 
         var sinceDate = since.map(date -> Date.from(date.toInstant()));
-        
+
         var pullRequests = new ArrayList<GHPullRequest>();
         while (iterator.hasNext()) {
             var ghPullRequests = iterator.nextPage();
@@ -127,6 +116,47 @@ public class GitHubPullRequestSyncService {
 
         pullRequests.forEach(this::processPullRequest);
         return pullRequests;
+    }
+
+    /**
+     * Synchronizes all pull requests from the specified list of GitHub pull request
+     * numbers.
+     *
+     * @param repository         the GitHub repository to fetch the pull requests
+     *                           from
+     * @param pullRequestNumbers the list of pull request numbers to fetch
+     * @param process            whether to process the fetched pull requests
+     * @return a list of GitHub pull requests that were successfully fetched and
+     *         processed
+     */
+    public List<GHPullRequest> syncPullRequests(GHRepository repository, List<Integer> pullRequestNumbers, boolean process) {
+        return pullRequestNumbers.stream()
+                .map(pullRequestNumber -> syncPullRequest(repository, pullRequestNumber, process))
+                .filter(Optional::isPresent)
+                .map(Optional::get)
+                .toList();
+    }
+
+    /**
+     * Synchronizes a single GitHub pull request by its number.
+     *
+     * @param repository        the GitHub repository to fetch the pull request from
+     * @param pullRequestNumber the number of the pull request to fetch
+     * @param process           whether to process the fetched pull request
+     * @return an optional containing the fetched GitHub pull request, or an empty
+     *         optional if the pull request could not be fetched
+     */
+    public Optional<GHPullRequest> syncPullRequest(GHRepository repository, int pullRequestNumber, boolean process) {
+        try {
+            var pullRequest = repository.getPullRequest(pullRequestNumber);
+            if (process) {
+                processPullRequest(pullRequest);
+            }
+            return Optional.of(pullRequest);
+        } catch (IOException e) {
+            logger.error("Failed to fetch pull request {}: {}", pullRequestNumber, e.getMessage());
+            return Optional.empty();
+        }
     }
 
     /**
@@ -165,10 +195,7 @@ public class GitHubPullRequestSyncService {
             // Extract name with owner from the repository URL
             // Example: https://api.github.com/repos/ls1intum/Artemis/pulls/9463
             var nameWithOwner = ghPullRequest.getUrl().toString().split("/repos/")[1].split("/pulls")[0];
-            var repository = repositoryRepository.findByNameWithOwner(nameWithOwner);
-            if (repository != null) {
-                result.setRepository(repository);
-            }
+            repositoryRepository.findByNameWithOwner(nameWithOwner).ifPresent(result::setRepository);
         }
 
         // Link new labels and remove labels that are not present anymore
