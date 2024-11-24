@@ -1,7 +1,7 @@
 <div #chatMessagesContainer class="messages space-y-4 overflow-y-auto" style="max-height: 100%">
   <div *ngFor="let message of messageHistory" class="flex w-full" [ngClass]="{ 'justify-end': message.sender === 'USER', 'justify-start': message.sender === 'SYSTEM' }">
 
-    <div class="flex space-x-2" [ngClass]="{ 'flex-row-reverse': message.sender === 'USER' }" style="max-width: 60%">
+    <div class="flex space-x-2 md:w-3/5" [ngClass]="{ 'flex-row-reverse': message.sender === 'USER' }">
       <div *ngIf="message.sender === 'USER'" class="ml-2 flex flex-col">
         <hlm-avatar>
           <img [src]="'https://github.com/' + user()!.username + '.png'" [alt]="user()?.name + '\'s avatar'" hlmAvatarImage />

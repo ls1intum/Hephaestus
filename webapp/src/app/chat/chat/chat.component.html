@@ -1,8 +1,8 @@
-<div class="grid grid-cols-1 md:grid-cols-4 gap-x-5" style="height: calc(100vh - 100px)">
+<div class="grid grid-cols-1 gap-x-5 md:grid-cols-4 md:h-[calc(100vh-100px)]">
   <app-sessions-card (sessionSelected)="handleSessionSelect($event)"></app-sessions-card>
 
-  <div class="col-span-3 flex flex-col" *ngIf="selectedSession" style="height: calc(100vh - 100px)">
+  <div class="flex flex-col h-[calc(100vh-100px)] md:col-span-3" *ngIf="selectedSession">
     <app-messages [messageHistory]="messageHistory()" class="flex-1 overflow-y-auto p-4 space-y-4"></app-messages>
-    <app-chat-input (messageSent)="handleSendMessage($event)" class="border-t p-4"></app-chat-input>
+    <app-chat-input (messageSent)="handleSendMessage($event)" class="border-t pt-4 px-4"></app-chat-input>
   </div>
 </div>
