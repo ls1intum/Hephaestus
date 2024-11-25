@@ -9,11 +9,13 @@
  * https://openapi-generator.tech
  * Do not edit the class manually.
  */
+import { RepositoryInfo } from './repository-info';
 
 
 export interface LabelInfo { 
     id: number;
     name: string;
     color: string;
+    repository?: RepositoryInfo;
 }
 

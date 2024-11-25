@@ -17,6 +17,7 @@ import lombok.ToString;
 
 import de.tum.in.www1.hephaestus.gitprovider.issue.Issue;
 import de.tum.in.www1.hephaestus.gitprovider.repository.Repository;
+import de.tum.in.www1.hephaestus.gitprovider.team.Team;
 
 @Entity
 @Table(name = "label")
@@ -47,6 +48,15 @@ public class Label {
     @JoinColumn(name = "repository_id")
     @ToString.Exclude
     private Repository repository;
+    
+    @ManyToMany(mappedBy = "labels")
+    @ToString.Exclude
+    private Set<Team> teams = new HashSet<>();
+
+    public void removeAllTeams() {
+        this.teams.forEach(team -> team.getLabels().remove(this));
+        this.teams.clear();
+    }
 
     // Ignored GitHub properties:
     // - default

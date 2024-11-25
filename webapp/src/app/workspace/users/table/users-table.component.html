@@ -1,0 +1,153 @@
+<div class="flex flex-col justify-between gap-4 sm:flex-row">
+  <input hlmInput class="w-full md:w-80" placeholder="Filter login..." [ngModel]="_loginFilter()" (ngModelChange)="_rawFilterInput.set($event)" />
+
+  <div class="flex items-center gap-4">
+    <button hlmBtn variant="outline" size="icon" (click)="invalidateUsers()">
+      @if (this.isLoading()) {
+        <hlm-icon name="lucideRotateCw" strokeWidth="2px" size="sm" class="animate-spin" />
+      } @else {
+        <hlm-icon name="lucideRotateCw" strokeWidth="2px" size="sm" />
+      }
+    </button>
+    <button hlmBtn variant="outline" align="end" [brnMenuTriggerFor]="menu">
+      Columns
+      <hlm-icon name="lucideChevronDown" class="ml-2" size="sm" />
+    </button>
+    <ng-template #menu>
+      <hlm-menu class="w-32">
+        @for (column of _brnColumnManager.allColumns; track column.name) {
+          <button
+            hlmMenuItemCheckbox
+            [disabled]="_brnColumnManager.isColumnDisabled(column.name)"
+            [checked]="_brnColumnManager.isColumnVisible(column.name)"
+            (triggered)="_brnColumnManager.toggleVisibility(column.name)"
+          >
+            <hlm-menu-item-check />
+            <span>{{ column.label }}</span>
+          </button>
+        }
+      </hlm-menu>
+    </ng-template>
+  </div>
+</div>
+
+<brn-table
+  hlm
+  stickyHeader
+  class="border-border mt-4 block overflow-auto rounded-md border"
+  [dataSource]="_filteredSortedPaginatedLogins()"
+  [displayedColumns]="_allDisplayedColumns()"
+  [trackBy]="_trackBy"
+>
+  <brn-column-def name="select" class="w-12">
+    <hlm-th *brnHeaderDef>
+      <hlm-checkbox [checked]="_checkboxState()" (changed)="handleHeaderCheckboxChange()" />
+    </hlm-th>
+    <hlm-td *brnCellDef="let element">
+      <hlm-checkbox [checked]="_isUserSelected(element)" (changed)="toggleUser(element)" />
+    </hlm-td>
+  </brn-column-def>
+  <brn-column-def name="name" class="w-32 sm:w-40">
+    <hlm-th truncate *brnHeaderDef>Name</hlm-th>
+    <hlm-td truncate *brnCellDef="let element">
+      @if (this.isLoading()) {
+        <hlm-skeleton class="h-6 w-28" />
+      } @else {
+        {{ element.name }}
+      }
+    </hlm-td>
+  </brn-column-def>
+  <brn-column-def name="login" class="w-32 sm:w-40">
+    <hlm-th *brnHeaderDef>
+      <button hlmBtn size="sm" variant="ghost" (click)="handleLoginSortChange()">
+        Login
+        <hlm-icon class="ml-3" size="sm" name="lucideArrowUpDown" />
+      </button>
+    </hlm-th>
+    <hlm-td truncate *brnCellDef="let element">
+      @if (this.isLoading()) {
+        <hlm-skeleton class="h-6 w-20" />
+      } @else {
+        {{ element.login }}
+      }
+    </hlm-td>
+  </brn-column-def>
+  <brn-column-def name="teams" class="w-20 flex-1">
+    <hlm-th *brnHeaderDef>Teams</hlm-th>
+    <hlm-td class="font-medium tabular-nums flex gap-4" *brnCellDef="let element">
+      @for (team of element.teams; track team) {
+        @let label = { id: team.id, name: team.name, color: team.color ?? '69feff' };
+        <app-github-label [label]="label" [isLoading]="this.isLoading()" />
+      }
+    </hlm-td>
+  </brn-column-def>
+  <brn-column-def name="actions" class="w-16">
+    <hlm-th *brnHeaderDef></hlm-th>
+    <hlm-td *brnCellDef="let element">
+      <button hlmBtn variant="ghost" class="h-6 w-6 p-0.5" align="end" [brnMenuTriggerFor]="menu">
+        <hlm-icon class="w-4 h-4" name="lucideMoreHorizontal" />
+      </button>
+
+      <ng-template #menu>
+        <hlm-menu>
+          <hlm-menu-group>
+            <button hlmMenuItem (click)="copyLogin(element)">Copy login</button>
+          </hlm-menu-group>
+          <hlm-menu-separator />
+          <hlm-menu-group>
+            <a hlmMenuItem [href]="element.url" target="_blank">View Github</a>
+            <a hlmMenuItem [routerLink]="'/user/' + element.login">View profile page</a>
+          </hlm-menu-group>
+        </hlm-menu>
+      </ng-template>
+    </hlm-td>
+  </brn-column-def>
+  <div class="flex items-center justify-center p-20 text-muted-foreground" brnNoDataRow>
+    <div class="flex flex-col items-center justify-center gap-2 mt-1">
+      <hlm-icon name="lucideXOctagon" strokeWidth="2px" size="lg" class="text-github-danger-foreground" />
+      <span class="font-semibold text-muted-foreground">No entries found</span>
+    </div>
+  </div>
+</brn-table>
+<div
+  class="flex flex-col justify-between mt-4 sm:flex-row sm:items-center"
+  *brnPaginator="let ctx; totalElements: _totalElements(); pageSize: _pageSize(); onStateChange: _onStateChange"
+>
+  <span class="text-sm text-muted-foreground">{{ _selected().length }} of {{ _totalElements() }} row(s) selected</span>
+  <div class="flex mt-2 sm:mt-0">
+    <brn-select class="inline-block" placeholder="{{ _availablePageSizes[0] }}" [(ngModel)]="_pageSize">
+      <hlm-select-trigger class="inline-flex mr-1 h-9">
+        <hlm-select-value />
+      </hlm-select-trigger>
+      <hlm-select-content>
+        @for (size of _availablePageSizes; track size) {
+          <hlm-option [value]="size">
+            {{ size === 10000 ? 'All' : size }}
+          </hlm-option>
+        }
+      </hlm-select-content>
+    </brn-select>
+
+    <div class="flex space-x-1">
+      <button size="sm" variant="outline" hlmBtn [disabled]="!ctx.decrementable()" (click)="ctx.decrement()">Previous</button>
+      <button size="sm" variant="outline" hlmBtn [disabled]="!ctx.incrementable()" (click)="ctx.increment()">Next</button>
+    </div>
+  </div>
+</div>
+<div class="flex gap-4 mt-4">
+  <brn-select class="inline-block" placeholder="Select a team" [(ngModel)]="_selectedTeam">
+    <hlm-select-trigger class="inline-flex">
+      <hlm-select-value />
+    </hlm-select-trigger>
+    <hlm-select-content class="min-w-[9.5rem]">
+      @for (team of _availableTeams(); track team.id) {
+        <hlm-option [value]="team" class="containerSize">
+          <span class="">{{ team.name }}</span>
+        </hlm-option>
+      }
+    </hlm-select-content>
+  </brn-select>
+  <button hlmBtn variant="secondary" [disabled]="_selected().length === 0 || !_selectedTeam" (click)="addTeamToSelected()">Add team</button>
+  <button hlmBtn variant="secondary" [disabled]="_selected().length === 0 || !_selectedTeam" (click)="removeTeamFromSelected()">Remove team</button>
+  <button hlmBtn variant="secondary" [disabled]="_availableTeams().length === 0" (click)="automaticallyAssignUsers.mutate()">Autoassign</button>
+</div>

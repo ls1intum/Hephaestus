@@ -13,6 +13,231 @@ servers:
 - url: /
   description: Default Server URL
 paths:
+  /workspace/user/{login}/team/{teamId}:
+    put:
+      tags:
+      - workspace
+      operationId: addTeamToUser
+      parameters:
+      - name: login
+        in: path
+        required: true
+        schema:
+          type: string
+      - name: teamId
+        in: path
+        required: true
+        schema:
+          type: integer
+          format: int64
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UserInfo"
+    delete:
+      tags:
+      - workspace
+      operationId: removeUserFromTeam
+      parameters:
+      - name: login
+        in: path
+        required: true
+        schema:
+          type: string
+      - name: teamId
+        in: path
+        required: true
+        schema:
+          type: integer
+          format: int64
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UserInfo"
+  /workspace/teams:
+    put:
+      tags:
+      - workspace
+      operationId: createTeam
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/TeamInfo"
+        required: true
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TeamInfo"
+  /workspace/teams/autoassign:
+    put:
+      tags:
+      - workspace
+      operationId: automaticallyAssignTeams
+      responses:
+        "200":
+          description: OK
+  /workspace/team/{teamId}/repository/{repositoryOwner}/{repositoryName}:
+    post:
+      tags:
+      - workspace
+      operationId: addRepositoryToTeam
+      parameters:
+      - name: teamId
+        in: path
+        required: true
+        schema:
+          type: integer
+          format: int64
+      - name: repositoryOwner
+        in: path
+        required: true
+        schema:
+          type: string
+      - name: repositoryName
+        in: path
+        required: true
+        schema:
+          type: string
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TeamInfo"
+    delete:
+      tags:
+      - workspace
+      operationId: removeRepositoryFromTeam
+      parameters:
+      - name: teamId
+        in: path
+        required: true
+        schema:
+          type: integer
+          format: int64
+      - name: repositoryOwner
+        in: path
+        required: true
+        schema:
+          type: string
+      - name: repositoryName
+        in: path
+        required: true
+        schema:
+          type: string
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TeamInfo"
+  /workspace/team/{teamId}/label/{repositoryId}/{label}:
+    post:
+      tags:
+      - workspace
+      operationId: addLabelToTeam
+      parameters:
+      - name: teamId
+        in: path
+        required: true
+        schema:
+          type: integer
+          format: int64
+      - name: repositoryId
+        in: path
+        required: true
+        schema:
+          type: integer
+          format: int64
+      - name: label
+        in: path
+        required: true
+        schema:
+          type: string
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TeamInfo"
+  /workspace/repositories/{owner}/{name}:
+    post:
+      tags:
+      - workspace
+      operationId: addRepositoryToMonitor
+      parameters:
+      - name: owner
+        in: path
+        required: true
+        schema:
+          type: string
+      - name: name
+        in: path
+        required: true
+        schema:
+          type: string
+      responses:
+        "200":
+          description: OK
+    delete:
+      tags:
+      - workspace
+      operationId: removeRepositoryToMonitor
+      parameters:
+      - name: owner
+        in: path
+        required: true
+        schema:
+          type: string
+      - name: name
+        in: path
+        required: true
+        schema:
+          type: string
+      responses:
+        "200":
+          description: OK
+  /workspace/users:
+    get:
+      tags:
+      - workspace
+      operationId: getUsersWithTeams
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/UserTeams"
+  /workspace/repositories:
+    get:
+      tags:
+      - workspace
+      operationId: getRepositoriesToMonitor
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: string
   /sessions:
     get:
       tags:
@@ -113,6 +338,20 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/UserProfile"
+  /team/all:
+    get:
+      tags:
+      - team
+      operationId: getTeams
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/TeamInfo"
   /meta:
     get:
       tags:
@@ -143,7 +382,7 @@ paths:
         schema:
           type: string
           format: date-time
-      - name: repository
+      - name: team
         in: query
         required: false
         schema:
@@ -157,30 +396,50 @@ paths:
                 type: array
                 items:
                   $ref: "#/components/schemas/LeaderboardEntry"
-  /admin:
-    get:
+  /workspace/team/{teamId}:
+    delete:
       tags:
-      - admin
-      operationId: admin
+      - workspace
+      operationId: deleteTeam
+      parameters:
+      - name: teamId
+        in: path
+        required: true
+        schema:
+          type: integer
+          format: int64
       responses:
         "200":
           description: OK
           content:
             application/json:
               schema:
-                type: string
-  /admin/me:
-    get:
+                $ref: "#/components/schemas/TeamInfo"
+  /workspace/team/{teamId}/label/{labelId}:
+    delete:
       tags:
-      - admin
-      operationId: getGretting
+      - workspace
+      operationId: removeLabelFromTeam
+      parameters:
+      - name: teamId
+        in: path
+        required: true
+        schema:
+          type: integer
+          format: int64
+      - name: labelId
+        in: path
+        required: true
+        schema:
+          type: integer
+          format: int64
       responses:
         "200":
           description: OK
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/AuthUserInfo"
+                $ref: "#/components/schemas/TeamInfo"
   /user:
     delete:
       tags:
@@ -271,6 +530,8 @@ components:
           type: string
         color:
           type: string
+        repository:
+          $ref: "#/components/schemas/RepositoryInfo"
     Message:
       required:
       - content
@@ -320,6 +581,25 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/PullRequestInfo"
+    RepositoryInfo:
+      required:
+      - htmlUrl
+      - id
+      - name
+      - nameWithOwner
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+        name:
+          type: string
+        nameWithOwner:
+          type: string
+        description:
+          type: string
+        htmlUrl:
+          type: string
     PullRequestReviewInfo:
       required:
       - codeComments
@@ -357,40 +637,44 @@ components:
         submittedAt:
           type: string
           format: date-time
-    RepositoryInfo:
+    MetaData:
       required:
-      - htmlUrl
+      - scheduledDay
+      - scheduledTime
+      - teams
+      type: object
+      properties:
+        teams:
+          type: array
+          items:
+            $ref: "#/components/schemas/TeamInfo"
+        scheduledDay:
+          type: string
+        scheduledTime:
+          type: string
+    UserTeams:
+      required:
       - id
+      - login
       - name
-      - nameWithOwner
+      - teams
+      - url
       type: object
       properties:
         id:
           type: integer
           format: int64
+        login:
+          type: string
         name:
           type: string
-        nameWithOwner:
+        url:
           type: string
-        description:
-          type: string
-        htmlUrl:
-          type: string
-    MetaData:
-      required:
-      - repositoriesToMonitor
-      - scheduledDay
-      - scheduledTime
-      type: object
-      properties:
-        repositoriesToMonitor:
+        teams:
+          uniqueItems: true
           type: array
           items:
-            type: string
-        scheduledDay:
-          type: string
-        scheduledTime:
-          type: string
+            $ref: "#/components/schemas/TeamInfo"
     PullRequestBaseInfo:
       required:
       - htmlUrl
@@ -423,15 +707,6 @@ components:
           $ref: "#/components/schemas/RepositoryInfo"
         htmlUrl:
           type: string
-    AuthUserInfo:
-      type: object
-      properties:
-        name:
-          type: string
-        roles:
-          type: array
-          items:
-            type: string
     UserInfo:
       required:
       - avatarUrl
@@ -454,6 +729,30 @@ components:
           type: string
         htmlUrl:
           type: string
+    TeamInfo:
+      required:
+      - color
+      - id
+      - labels
+      - name
+      - repositories
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+        name:
+          type: string
+        color:
+          type: string
+        repositories:
+          type: array
+          items:
+            $ref: "#/components/schemas/RepositoryInfo"
+        labels:
+          type: array
+          items:
+            $ref: "#/components/schemas/LabelInfo"
     LeaderboardEntry:
       required:
       - numberOfApprovals

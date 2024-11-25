@@ -62,7 +62,7 @@ public class UserService {
                 .map(RepositoryInfoDTO::fromRepository)
                 .sorted(Comparator.comparing(RepositoryInfoDTO::name))
                 .toList();
-        
+
         // Review activity includes both pull request reviews and issue comments
         List<PullRequestReviewInfoDTO> reviewActivity = pullRequestReviewRepository
                 .findAllByAuthorLoginSince(login, OffsetDateTime.now().minusDays(7))
@@ -77,7 +77,7 @@ public class UserService {
                 .toList()
         );
         reviewActivity.sort(Comparator.comparing(PullRequestReviewInfoDTO::submittedAt).reversed());
-    
+
         return Optional.of(new UserProfileDTO(
                 user,
                 firstContribution,

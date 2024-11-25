@@ -7,7 +7,6 @@ import { HlmIconModule } from 'libs/ui/ui-icon-helm/src/index';
 import { BrnTooltipContentDirective } from '@spartan-ng/ui-tooltip-brain';
 import { HlmTooltipComponent, HlmTooltipTriggerDirective } from '@spartan-ng/ui-tooltip-helm';
 import { HlmButtonModule } from '@spartan-ng/ui-button-helm';
-import { LucideAngularModule } from 'lucide-angular';
 import dayjs from 'dayjs';
 import advancedFormat from 'dayjs/plugin/advancedFormat';
 import { RepositoryInfo, UserInfo } from '@app/core/modules/openapi';
@@ -23,17 +22,7 @@ const repoImages: { [key: string]: string } = {
 @Component({
   selector: 'app-user-header',
   standalone: true,
-  imports: [
-    LucideAngularModule,
-    NgIconComponent,
-    HlmAvatarModule,
-    HlmSkeletonModule,
-    HlmIconModule,
-    HlmTooltipComponent,
-    HlmTooltipTriggerDirective,
-    BrnTooltipContentDirective,
-    HlmButtonModule
-  ],
+  imports: [NgIconComponent, HlmAvatarModule, HlmSkeletonModule, HlmIconModule, HlmTooltipComponent, HlmTooltipTriggerDirective, BrnTooltipContentDirective, HlmButtonModule],
   templateUrl: './header.component.html'
 })
 export class UserHeaderComponent {

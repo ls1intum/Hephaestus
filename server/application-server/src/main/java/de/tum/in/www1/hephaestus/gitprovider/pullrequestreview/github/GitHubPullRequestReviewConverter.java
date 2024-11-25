@@ -30,7 +30,10 @@ public class GitHubPullRequestReviewConverter implements Converter<GHPullRequest
         if (review.getState() == null || source.getState() != GHPullRequestReviewState.DISMISSED) {
             review.setState(convertState(source.getState()));
         }
-        review.setDismissed(source.getState() == GHPullRequestReviewState.DISMISSED);
+        // Only update dismissed state if it was not already dismissed
+        if (!review.isDismissed()) {
+            review.setDismissed(source.getState() == GHPullRequestReviewState.DISMISSED);
+        }
         
         review.setHtmlUrl(source.getHtmlUrl().toString());
         try {
