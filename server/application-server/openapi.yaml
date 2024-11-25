@@ -314,6 +314,24 @@ paths:
                 type: array
                 items:
                   $ref: "#/components/schemas/LeaderboardEntry"
+  /activity/{login}:
+    get:
+      tags:
+      - activity
+      operationId: getActivityByUser
+      parameters:
+      - name: login
+        in: path
+        required: true
+        schema:
+          type: string
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Activity"
   /workspace/team/{teamId}:
     delete:
       tags:
@@ -358,24 +376,14 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/TeamInfo"
-  /activity/{login}:
-    get:
+  /user:
+    delete:
       tags:
-      - activity-dashboard
-      operationId: getActivitiesByUser
-      parameters:
-      - name: login
-        in: path
-        required: true
-        schema:
-          type: string
+      - user
+      operationId: deleteUser
       responses:
         "200":
           description: OK
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/Activities"
 components:
   schemas:
     PullRequestInfo:
@@ -444,41 +452,6 @@ components:
         updatedAt:
           type: string
           format: date-time
-    Activities:
-      required:
-      - issues
-      - pullRequests
-      - reviews
-      type: object
-      properties:
-        pullRequests:
-          type: array
-          items:
-            $ref: "#/components/schemas/PullRequestInfo"
-        issues:
-          type: array
-          items:
-            $ref: "#/components/schemas/IssueInfo"
-        reviews:
-          type: array
-          items:
-            $ref: "#/components/schemas/PullRequestReviewInfo"
-    LabelInfo:
-      required:
-      - color
-      - id
-      - name
-      type: object
-      properties:
-        id:
-          type: integer
-          format: int64
-        name:
-          type: string
-        color:
-          type: string
-        repository:
-          $ref: "#/components/schemas/RepositoryInfo"
     UserProfile:
       required:
       - contributedRepositories
@@ -522,6 +495,142 @@ components:
           type: string
         htmlUrl:
           type: string
+    UserTeams:
+      required:
+      - id
+      - login
+      - name
+      - teams
+      - url
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+        login:
+          type: string
+        name:
+          type: string
+        url:
+          type: string
+        teams:
+          uniqueItems: true
+          type: array
+          items:
+            $ref: "#/components/schemas/TeamInfo"
+    PullRequestBaseInfo:
+      required:
+      - htmlUrl
+      - id
+      - isDraft
+      - isMerged
+      - number
+      - state
+      - title
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+        number:
+          type: integer
+          format: int32
+        title:
+          type: string
+        state:
+          type: string
+          enum:
+          - OPEN
+          - CLOSED
+        isDraft:
+          type: boolean
+        isMerged:
+          type: boolean
+        repository:
+          $ref: "#/components/schemas/RepositoryInfo"
+        htmlUrl:
+          type: string
+    Activity:
+      required:
+      - issues
+      - pullRequests
+      - reviews
+      type: object
+      properties:
+        pullRequests:
+          type: array
+          items:
+            $ref: "#/components/schemas/PullRequestInfo"
+        issues:
+          type: array
+          items:
+            $ref: "#/components/schemas/IssueInfo"
+        reviews:
+          type: array
+          items:
+            $ref: "#/components/schemas/ReviewActivityDto"
+    UserInfo:
+      required:
+      - avatarUrl
+      - htmlUrl
+      - id
+      - login
+      - name
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+        login:
+          type: string
+        email:
+          type: string
+        avatarUrl:
+          type: string
+        name:
+          type: string
+        htmlUrl:
+          type: string
+    TeamInfo:
+      required:
+      - color
+      - id
+      - labels
+      - name
+      - repositories
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+        name:
+          type: string
+        color:
+          type: string
+        repositories:
+          type: array
+          items:
+            $ref: "#/components/schemas/RepositoryInfo"
+        labels:
+          type: array
+          items:
+            $ref: "#/components/schemas/LabelInfo"
+    LabelInfo:
+      required:
+      - color
+      - id
+      - name
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+        name:
+          type: string
+        color:
+          type: string
+        repository:
+          $ref: "#/components/schemas/RepositoryInfo"
     PullRequestReviewInfo:
       required:
       - codeComments
@@ -574,29 +683,6 @@ components:
           type: string
         scheduledTime:
           type: string
-    UserTeams:
-      required:
-      - id
-      - login
-      - name
-      - teams
-      - url
-      type: object
-      properties:
-        id:
-          type: integer
-          format: int64
-        login:
-          type: string
-        name:
-          type: string
-        url:
-          type: string
-        teams:
-          uniqueItems: true
-          type: array
-          items:
-            $ref: "#/components/schemas/TeamInfo"
     IssueInfo:
       required:
       - commentsCount
@@ -643,84 +729,6 @@ components:
         updatedAt:
           type: string
           format: date-time
-    PullRequestBaseInfo:
-      required:
-      - htmlUrl
-      - id
-      - isDraft
-      - isMerged
-      - number
-      - state
-      - title
-      type: object
-      properties:
-        id:
-          type: integer
-          format: int64
-        number:
-          type: integer
-          format: int32
-        title:
-          type: string
-        state:
-          type: string
-          enum:
-          - OPEN
-          - CLOSED
-        isDraft:
-          type: boolean
-        isMerged:
-          type: boolean
-        repository:
-          $ref: "#/components/schemas/RepositoryInfo"
-        htmlUrl:
-          type: string
-    UserInfo:
-      required:
-      - avatarUrl
-      - htmlUrl
-      - id
-      - login
-      - name
-      type: object
-      properties:
-        id:
-          type: integer
-          format: int64
-        login:
-          type: string
-        email:
-          type: string
-        avatarUrl:
-          type: string
-        name:
-          type: string
-        htmlUrl:
-          type: string
-    TeamInfo:
-      required:
-      - color
-      - id
-      - labels
-      - name
-      - repositories
-      type: object
-      properties:
-        id:
-          type: integer
-          format: int64
-        name:
-          type: string
-        color:
-          type: string
-        repositories:
-          type: array
-          items:
-            $ref: "#/components/schemas/RepositoryInfo"
-        labels:
-          type: array
-          items:
-            $ref: "#/components/schemas/LabelInfo"
     LeaderboardEntry:
       required:
       - numberOfApprovals
