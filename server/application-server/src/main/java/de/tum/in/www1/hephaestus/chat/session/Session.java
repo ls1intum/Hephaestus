@@ -23,7 +23,7 @@ public class Session {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @OrderColumn(name = "sent_at")
+    @OrderColumn(name = "sentAt")
     @OneToMany(mappedBy = "session")
     private List<Message> messages = new ArrayList<>();
 

@@ -157,7 +157,7 @@ export class MessageService implements MessageServiceInterface {
             }
         }
 
-        let localVarPath = `/messages/${this.configuration.encodeParam({name: "sessionId", value: sessionId, in: "path", style: "simple", explode: false, dataType: "number", dataFormat: "int64"})}`;
+        let localVarPath = `/message/${this.configuration.encodeParam({name: "sessionId", value: sessionId, in: "path", style: "simple", explode: false, dataType: "number", dataFormat: "int64"})}`;
         return this.httpClient.request<Message>('post', `${this.configuration.basePath}${localVarPath}`,
             {
                 context: localVarHttpContext,
@@ -221,7 +221,7 @@ export class MessageService implements MessageServiceInterface {
             }
         }
 
-        let localVarPath = `/messages/${this.configuration.encodeParam({name: "sessionId", value: sessionId, in: "path", style: "simple", explode: false, dataType: "number", dataFormat: "int64"})}`;
+        let localVarPath = `/message/${this.configuration.encodeParam({name: "sessionId", value: sessionId, in: "path", style: "simple", explode: false, dataType: "number", dataFormat: "int64"})}`;
         return this.httpClient.request<Array<Message>>('get', `${this.configuration.basePath}${localVarPath}`,
             {
                 context: localVarHttpContext,

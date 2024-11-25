@@ -210,7 +210,7 @@ paths:
       responses:
         "200":
           description: OK
-  /sessions:
+  /session:
     get:
       tags:
       - session
@@ -247,7 +247,7 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/Session"
-  /messages/{sessionId}:
+  /message/{sessionId}:
     get:
       tags:
       - message
