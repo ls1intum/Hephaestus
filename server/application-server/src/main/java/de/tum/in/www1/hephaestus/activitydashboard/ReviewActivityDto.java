@@ -12,7 +12,7 @@ import de.tum.in.www1.hephaestus.gitprovider.user.UserInfoDTO;
 public record ReviewActivityDto(
         @NonNull Long id,
         @NonNull Boolean isDismissed,
-        @NonNull ReviewActivityState state,
+        @NonNull ReviewActivityStateDto state,
         @NonNull Integer codeComments,
         UserInfoDTO author,
         PullRequestInfoDTO pullRequest) {
@@ -32,14 +32,14 @@ public record ReviewActivityDto(
         return new ReviewActivityDto(
                 pullRequest.getId(),
                 false,
-                ReviewActivityState.REVIEW_REQUESTED,
+                ReviewActivityStateDto.REVIEW_REQUESTED,
                 0,
                 UserInfoDTO.fromUser(pullRequest.getAuthor()),
                 PullRequestInfoDTO.fromPullRequest(pullRequest)
         );
     }
 
-    public enum ReviewActivityState {
+    public enum ReviewActivityStateDto {
         COMMENTED,
         APPROVED,
         CHANGES_REQUESTED,
@@ -47,12 +47,12 @@ public record ReviewActivityDto(
         UNKNOWN;
     }
 
-    public static ReviewActivityState fromPullRequestReviewState(PullRequestReview.State state) {
+    public static ReviewActivityStateDto fromPullRequestReviewState(PullRequestReview.State state) {
         return switch (state) {
-            case COMMENTED -> ReviewActivityState.COMMENTED;
-            case APPROVED -> ReviewActivityState.APPROVED;
-            case CHANGES_REQUESTED -> ReviewActivityState.CHANGES_REQUESTED;
-            default -> ReviewActivityState.UNKNOWN;
+            case COMMENTED -> ReviewActivityStateDto.COMMENTED;
+            case APPROVED -> ReviewActivityStateDto.APPROVED;
+            case CHANGES_REQUESTED -> ReviewActivityStateDto.CHANGES_REQUESTED;
+            default -> ReviewActivityStateDto.UNKNOWN;
         };
     }
 }

@@ -11,9 +11,7 @@ import { ImprintComponent } from '@app/legal/imprint.component';
 import { PrivacyComponent } from '@app/legal/privacy.component';
 import { AdminGuard } from '@app/core/security/admin.guard';
 import { AuthGuard } from '@app/core/security/auth.guard';
-import {
-  ActivityDashboardComponent
-} from '@app/home/activity-dashboard/activity-dashboard/activity-dashboard.component';
+import { ActivityDashboardComponent } from '@app/home/activity-dashboard/activity-dashboard/activity-dashboard.component';
 
 export const routes: Routes = [
   // Public routes
@@ -52,7 +50,7 @@ export const routes: Routes = [
       { path: 'settings', component: SettingsComponent },
       { path: 'workspace', component: WorkspaceComponent, canActivate: [AdminGuard] }
     ]
-  }
+  },
   { path: 'user/:id', component: UserProfileComponent },
   { path: 'activity/:id', component: ActivityDashboardComponent }
 ];
