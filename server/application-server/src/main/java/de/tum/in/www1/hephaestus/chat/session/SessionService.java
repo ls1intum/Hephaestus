@@ -15,11 +15,8 @@ public class SessionService {
     private UserRepository userRepository;
 
     public List<SessionDTO> findAllSessionsByUser(String login) {
-        Optional<List<Session>> sessions = sessionRepository.findByUserLogin(login);
-        if (sessions.isEmpty()) {
-            return List.of();
-        }
-        return sessions.get().stream().map(SessionDTO::fromSession).toList();
+        List<Session> sessions = sessionRepository.findByUserLogin(login);
+        return sessions.stream().map(SessionDTO::fromSession).toList();
     }
 
     public Optional<SessionDTO> findSessionById(Long sessionId) {

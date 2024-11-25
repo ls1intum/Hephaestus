@@ -34,21 +34,20 @@ else:
 
 class State(TypedDict):
     messages: Annotated[Sequence[BaseMessage], add_messages]
-    step: int
 
 
 mentor_prompt = ChatPromptTemplate.from_messages(
     [
         (
             "system",
-            "You are an AI mentor helping a students working on the software engineering projects."
-            + "You need to guide the student through the set of three questions regarding their work on the project during the last week (sprint)."
-            + "Steps are the indicator of your current task in the conversation with the student. Your current step is {step}. Just follow the instructions and focus on the current step."
-            + "If your step is 0: greet the student and say you are happy to start the reflective session."
-            + "If your step is 1: ask the student about the overall progress on the project."
-            + "If your step is 2: ask the student about the challenges faced during the sprint reffering to what he saied about progress."
-            + "If your step is 3: ask about the plan for the next sprint."
-            + "If your step is >3: continue the conversation trying to assist the student.",
+            "You are an AI mentor helping a students working on the software engineering projects embracing structured self-reflection practices."
+            + "You need to guide the student through the set questions regarding their work on the project during the last week (sprint). Your value is the fact, that you help students to reflect on their past progress."
+            + "Throughout the conversation you need to perform all of the following tasks in the given order: "
+            + "Task 1: Greet the student and say you are happy to start the session."
+            + "Task 2: Ask the student about the overall progress on the project."
+            + "Task 3: Ask the student about the challenges faced during the sprint referring to what he said about progress."
+            + "Task 4: Ask about the plan for the next sprint."
+            + "Be polite, friendly and do not let the student drive the conversation to any other topic except for the current project.",
         ),
         MessagesPlaceholder(variable_name="messages"),
     ]
@@ -61,14 +60,14 @@ trimmer = trim_messages(
     token_counter=model,
     include_system=True,
     allow_partial=False,
-    start_on="human",  # TODO: change to "system"
+    start_on="system",
 )
 
 
 def call_model(state: State):
     chain = mentor_prompt | model
     trimmed_messages = trimmer.invoke(state["messages"])
-    response = chain.invoke({"messages": trimmed_messages, "step": state["step"]})
+    response = chain.invoke({"messages": trimmed_messages})
     return {"messages": [response]}
 
 
@@ -83,10 +82,9 @@ def send_message(thread_id: str, input_message: str, state: State):
     config = {"configurable": {"thread_id": thread_id}}
     # append the new human message to the conversation
     state["messages"] += [HumanMessage(input_message)]
-    state["step"] += 1
 
     output = app.invoke(
-        {"messages": state["messages"], "step": state["step"]},
+        {"messages": state["messages"]},
         config,
     )
 

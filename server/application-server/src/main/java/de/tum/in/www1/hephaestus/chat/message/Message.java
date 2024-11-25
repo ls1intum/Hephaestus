@@ -6,6 +6,7 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 import lombok.ToString;
+import org.hibernate.Length;
 import org.springframework.lang.NonNull;
 import de.tum.in.www1.hephaestus.chat.session.Session;
 
@@ -13,7 +14,7 @@ import de.tum.in.www1.hephaestus.chat.session.Session;
 @Table(name = "message")
 @Getter
 @Setter
-@ToString(callSuper = true)
+@ToString
 @NoArgsConstructor
 public class Message {
     @Id
@@ -21,7 +22,6 @@ public class Message {
     private Long id;
 
     @NonNull
-    @Column(name = "sent_at")
     private OffsetDateTime sentAt = OffsetDateTime.now();
 
     @NonNull
@@ -29,7 +29,7 @@ public class Message {
     private MessageSender sender;
 
     @NonNull
-    @Column(name = "content")
+    @Column(length=Length.LONG16)
     private String content;
 
     @NonNull

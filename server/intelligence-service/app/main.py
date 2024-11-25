@@ -26,8 +26,7 @@ class ChatResponse(BaseModel):
     summary="Start and continue a chat session with an LLM.",
 )
 async def chat(request: ChatRequest):
-    # TODO: Add step management when implementing more complex chat logic
-    state = {"messages": [], "step": 0}
+    state = {"messages": []}
 
     result = send_message(
         thread_id=request.session_id, input_message=request.message_content, state=state

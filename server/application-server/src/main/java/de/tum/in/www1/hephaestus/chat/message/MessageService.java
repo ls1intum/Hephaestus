@@ -2,6 +2,8 @@ package de.tum.in.www1.hephaestus.chat.message;
 
 import java.util.List;
 import java.util.Optional;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import de.tum.in.www1.hephaestus.chat.message.Message.MessageSender;
@@ -21,6 +23,8 @@ public class MessageService {
     @Autowired
     private MessageRepository messageRepository;
 
+    private static final Logger logger = LoggerFactory.getLogger(MessageService.class);
+
     public MessageService() {
         ApiClient apiClient = new ApiClient();
         apiClient.setBasePath("http://127.0.0.1:8000");
@@ -29,8 +33,7 @@ public class MessageService {
 
     public List<MessageDTO> getMessagesBySessionId(Long sessionId) {
         return messageRepository.findBySessionId(sessionId).stream()
-                .map(message -> new MessageDTO(message.getId(), message.getSentAt(), message.getSender(),
-                        message.getContent(), message.getSession().getId()))
+                .map(message -> MessageDTO.fromMessage(message))
                 .toList();
     }
 
@@ -39,19 +42,20 @@ public class MessageService {
         if (session.isEmpty() || content == null) {
             return null;
         }
+        Session currentSession = session.get();
 
         Message userMessage = new Message();
         userMessage.setSender(MessageSender.USER);
         userMessage.setContent(content);
-        userMessage.setSession(session.get());
+        userMessage.setSession(currentSession);
 
         Message savedUserMessage = messageRepository.save(userMessage);
-        session.get().getMessages().add(savedUserMessage);
-        sessionRepository.save(session.get());
+        currentSession.getMessages().add(savedUserMessage);
+        sessionRepository.save(currentSession);
 
         String systemResponse = generateResponse(sessionId, content);
 
-        // prevent saving empty system messages
+        // prevent saving empty system messages if the intelligence service is down
         if (systemResponse == null) {
             return MessageDTO.fromMessage(savedUserMessage);
         }
@@ -59,11 +63,11 @@ public class MessageService {
         Message systemMessage = new Message();
         systemMessage.setSender(MessageSender.SYSTEM);
         systemMessage.setContent(systemResponse);
-        systemMessage.setSession(session.get());
+        systemMessage.setSession(currentSession);
 
         Message savedSystemMessage = messageRepository.save(systemMessage);
-        session.get().getMessages().add(savedSystemMessage);
-        sessionRepository.save(session.get());
+        currentSession.getMessages().add(savedSystemMessage);
+        sessionRepository.save(currentSession);
 
         return MessageDTO.fromMessage(savedSystemMessage);
 
@@ -78,7 +82,8 @@ public class MessageService {
             ChatResponse chatResponse = sessionApiClient.chatChatPost(chatRequest);
             return chatResponse.getMessageContent();
         } catch (Exception e) {
-            throw new RuntimeException("Error communicating with intelligence service: " + e.getMessage(), e);
+            logger.error("Failed to generate response for message: {}", e.getMessage());
+            return null;
         }
     }
 }

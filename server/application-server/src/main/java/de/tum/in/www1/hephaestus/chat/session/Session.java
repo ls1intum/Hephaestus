@@ -16,19 +16,18 @@ import de.tum.in.www1.hephaestus.gitprovider.user.User;
 @Table(name = "session")
 @Getter
 @Setter
-@ToString(callSuper = true)
+@ToString
 @NoArgsConstructor
 public class Session {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @OrderColumn(name = "message_order")
+    @OrderColumn(name = "sentAt")
     @OneToMany(mappedBy = "session")
     private List<Message> messages = new ArrayList<>();
 
     @NonNull
-    @Column(name = "created_at")
     private OffsetDateTime createdAt = OffsetDateTime.now();
 
     @ManyToOne
