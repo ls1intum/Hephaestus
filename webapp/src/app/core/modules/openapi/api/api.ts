@@ -19,4 +19,4 @@ export * from './user.serviceInterface';
 export * from './workspace.service';
 import { WorkspaceService } from './workspace.service';
 export * from './workspace.serviceInterface';
-export const APIS = [LeaderboardService, MetaService, TeamService, UserService, WorkspaceService, MessageService, SessionService];
+export const APIS = [LeaderboardService, MessageService, MetaService, SessionService, TeamService, UserService, WorkspaceService];

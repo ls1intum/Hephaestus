@@ -1,8 +1,28 @@
-<div class="grid grid-cols-1 gap-x-5 md:grid-cols-4 md:h-[calc(100vh-100px)]">
-  <app-sessions-card (sessionSelected)="handleSessionSelect($event)"></app-sessions-card>
-
-  <div class="flex flex-col h-[calc(100vh-100px)] md:col-span-3" *ngIf="selectedSession">
-    <app-messages [messageHistory]="messageHistory()" class="flex-1 overflow-y-auto p-4 space-y-4"></app-messages>
-    <app-chat-input (messageSent)="handleSendMessage($event)" class="border-t pt-4 px-4"></app-chat-input>
+@if (isLoading()) {
+  <div class="h-[calc(100vh-100px)] self-auto p-4 flex-1 flex items-center justify-center">
+    <hlm-spinner></hlm-spinner>
   </div>
-</div>
+} @else {
+  <div class="grid grid-cols-1 gap-x-5 md:grid-cols-4 md:h-[calc(100vh-100px)]">
+    @if (sessions().length === 0) {
+      <div class="col-span-4 h-[calc(100vh-100px)]">
+        <app-first-session-card (createSession)="handleCreateSession()"></app-first-session-card>
+      </div>
+    } @else {
+      <app-sessions-card
+        [sessions]="sessions()"
+        [activeSessionId]="selectedSession()?.id ?? null"
+        (sessionSelected)="handleSessionSelect($event)"
+        (createSession)="handleCreateSession()"
+        class="h-full overflow-auto"
+      ></app-sessions-card>
+
+      @if (selectedSession()) {
+        <div class="flex flex-col h-[calc(100vh-100px)] md:col-span-3">
+          <app-messages [messageHistory]="messageHistory()" class="flex-1 overflow-y-auto p-4 space-y-4"></app-messages>
+          <app-chat-input (messageSent)="handleSendMessage($event)" class="border-t pt-4 px-4"></app-chat-input>
+        </div>
+      }
+    }
+  </div>
+}
