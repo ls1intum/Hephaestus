@@ -5,24 +5,14 @@ const meta: Meta<LeaderboardFilterComponent> = {
   component: LeaderboardFilterComponent,
   tags: ['autodocs'],
   args: {
-    repositories: [
-      'ls1intum/Artemis',
-      'ls1intum/Athena',
-      'ls1intum/Hephaestus',
-      'ls1intum/Pyris',
-      'ls1intum/Ares2',
-      'ls1intum/Aeolus',
-      'ls1intum/hades',
-      'ls1intum/Apollon',
-      'ls1intum/Apollon_standalone'
-    ]
+    teams: ['Artemis', 'Athena', 'Hephaestus', 'Iris', 'Lectures']
   },
   argTypes: {
-    repositories: {
+    teams: {
       control: {
         type: 'object'
       },
-      description: 'List of repositories'
+      description: 'List of teams'
     }
   }
 };
@@ -37,9 +27,9 @@ export const Default: Story = {
   })
 };
 
-export const SingleRepository: Story = {
+export const SingleTeam: Story = {
   args: {
-    repositories: ['ls1intum/Artemis']
+    teams: ['ls1intum/Artemis']
   },
   render: (args) => ({
     props: args,

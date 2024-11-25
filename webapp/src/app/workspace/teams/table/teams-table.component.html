@@ -1,0 +1,189 @@
+<div class="flex flex-col justify-between gap-4 sm:flex-row">
+  <input hlmInput class="w-full md:w-80" placeholder="Filter names..." [ngModel]="_nameFilter()" (ngModelChange)="_rawFilterInput.set($event)" />
+
+  <div class="flex items-center gap-4">
+    <button hlmBtn variant="outline" size="icon" (click)="invalidateTeams()">
+      @if (this.isLoading()) {
+        <hlm-icon name="lucideRotateCw" strokeWidth="2px" size="sm" class="animate-spin" />
+      } @else {
+        <hlm-icon name="lucideRotateCw" strokeWidth="2px" size="sm" />
+      }
+    </button>
+  </div>
+</div>
+
+<brn-table
+  hlm
+  stickyHeader
+  class="border-border mt-4 block overflow-auto rounded-md border"
+  [dataSource]="_filteredSortedPaginatedTeams()"
+  [displayedColumns]="_allDisplayedColumns"
+  [trackBy]="_trackBy"
+>
+  <brn-column-def name="name" class="w-32 sm:w-40 sm:ml-2">
+    <hlm-th *brnHeaderDef>
+      <button hlmBtn size="sm" variant="ghost" (click)="handleNameSortChange()">
+        Name
+        <hlm-icon class="ml-3" size="sm" name="lucideArrowUpDown" />
+      </button>
+    </hlm-th>
+    <hlm-td truncate *brnCellDef="let element">
+      @if (this.isLoading()) {
+        <hlm-skeleton class="h-6 w-20" />
+      } @else {
+        {{ element.name }}
+      }
+    </hlm-td>
+  </brn-column-def>
+  <brn-column-def name="color" class="w-28">
+    <hlm-th *brnHeaderDef>Color</hlm-th>
+    <hlm-td class="font-medium tabular-nums flex gap-2" *brnCellDef="let element">
+      @if (this.isLoading()) {
+        <hlm-skeleton class="w-4 h-4 rounded-full" [style.backgroundColor]="'#69feff'" />
+        <hlm-skeleton class="h-6 w-12" />
+      } @else {
+        <div class="w-4 h-4 rounded-full" [style.backgroundColor]="element.color"></div>
+        <span>{{ element.color }}</span>
+      }
+    </hlm-td>
+  </brn-column-def>
+  <brn-column-def name="repositories" class="w-48 flex-1">
+    <hlm-th *brnHeaderDef>Repositories</hlm-th>
+    <hlm-td class="font-medium tabular-nums flex flex-wrap gap-1" *brnCellDef="let element">
+      @if (this.isLoading()) {
+        <hlm-skeleton class="h-6 w-20" />
+      } @else {
+        <div class="flex flex-wrap items-center gap-2">
+          @let labelGroup = groupLabelsByRepository(element);
+          @for (group of labelGroup; track group.repository) {
+            <div hlmCard>
+              <div hlmCardHeader class="p-2 px-4">
+                <h3 hlmCardTitle class="text-sm text-center">{{ group.repository }}</h3>
+              </div>
+              <div hlmCardContent class="pt-0 pb-2 px-4 flex flex-wrap items-center gap-1">
+                @for (label of group.labels; track label.id) {
+                  @let ghLabel = { id: label.id, name: label.name, color: label.color };
+                  <button [brnMenuTriggerFor]="labelMenu">
+                    <app-github-label [label]="ghLabel" />
+                  </button>
+
+                  <ng-template #labelMenu>
+                    <hlm-menu>
+                      <button hlmMenuItem (click)="removeLabelFromTeam.mutate({ teamId: element.id, labelId: label.id })">
+                        <hlm-icon name="lucideTrash2" hlmMenuIcon />
+                        <span>Delete</span>
+                      </button>
+                    </hlm-menu>
+                  </ng-template>
+                }
+                <brn-popover sideOffset="5" closeDelay="100">
+                  <button id="add-label" size="icon" variant="outline" class="h-6 w-6 p-0.5" brnPopoverTrigger hlmBtn>
+                    <hlm-icon class="w-4 h-4" name="lucidePlus" />
+                  </button>
+                  <div hlmPopoverContent class="w-80 p-4 gap-4 flex flex-wrap items-center justify-center" *brnPopoverContent="let ctx">
+                    <input hlmInput placeholder="Label name" [formControl]="_newLabelName" [class]="displayLabelAlert() ? 'border-destructive' : ''" />
+                    <button
+                      hlmBtn
+                      size="icon"
+                      variant="default"
+                      class="ml-2"
+                      (click)="addLabelToTeam.mutate({ teamId: element.id, repositoryId: group.repositoryId, label: _newLabelName.value ?? '' })"
+                    >
+                      <hlm-icon class="w-4 h-4" name="lucidePlus" />
+                    </button>
+                    @if (displayLabelAlert()) {
+                      <div class="text-sm text-github-danger-foreground">Invalid label name</div>
+                    }
+                  </div>
+                </brn-popover>
+              </div>
+            </div>
+          }
+        </div>
+        <brn-popover sideOffset="5" closeDelay="100" class="pl-2">
+          <button id="add-repository" size="icon" variant="outline" class="h-6 w-6 p-0.5" brnPopoverTrigger hlmBtn>
+            <hlm-icon class="w-4 h-4" name="lucidePlus" />
+          </button>
+          <div hlmPopoverContent class="w-80 h-96 space-y-4" *brnPopoverContent="let ctx">
+            <div class="space-y-2">
+              <h4 class="font-medium leading-none">Repositories</h4>
+              <p class="text-sm text-muted-foreground">Select repositories the team actively uses.</p>
+            </div>
+            <hlm-scroll-area class="border h-72 rounded-md border-border">
+              @for (repo of allRepositories(); track repo) {
+                @let isSelected = isRepositoryInTeam(element, repo);
+                <button hlmBtn variant="outline" class="flex items-center justify-between w-full" (click)="toggleRepository(element, repo, isSelected)">
+                  <span>{{ repo }}</span>
+                  @if (isSelected) {
+                    <hlm-icon class="w-4 h-4" name="lucideCheck" />
+                  }
+                </button>
+              }
+            </hlm-scroll-area>
+          </div>
+        </brn-popover>
+      }
+    </hlm-td>
+  </brn-column-def>
+  <brn-column-def name="actions" class="w-16">
+    <hlm-th *brnHeaderDef></hlm-th>
+    <hlm-td *brnCellDef="let element">
+      <button hlmBtn variant="ghost" class="h-6 w-6 p-0.5" align="end" [brnMenuTriggerFor]="menu">
+        <hlm-icon class="w-4 h-4" name="lucideMoreHorizontal" />
+      </button>
+
+      <ng-template #menu>
+        <hlm-menu>
+          <hlm-menu-group>
+            <button hlmMenuItem (click)="copyName(element)">Copy Name</button>
+          </hlm-menu-group>
+          <hlm-menu-separator />
+          <hlm-menu-group>
+            <button hlmMenuItem class="text-github-danger-foreground" (click)="deleteTeam.mutate(element)">Delete Team</button>
+          </hlm-menu-group>
+        </hlm-menu>
+      </ng-template>
+    </hlm-td>
+  </brn-column-def>
+  <div class="flex items-center justify-center p-20 text-muted-foreground" brnNoDataRow>
+    <div class="flex flex-col items-center justify-center gap-2 mt-1">
+      <hlm-icon name="lucideXOctagon" strokeWidth="2px" size="lg" class="text-github-danger-foreground" />
+      <span class="font-semibold text-muted-foreground">No entries found</span>
+    </div>
+  </div>
+</brn-table>
+<div
+  class="flex flex-col justify-end mt-4 sm:flex-row sm:items-center"
+  *brnPaginator="let ctx; totalElements: _totalElements(); pageSize: _pageSize(); onStateChange: _onStateChange"
+>
+  <div class="flex mt-2 sm:mt-0">
+    <brn-select class="inline-block" placeholder="{{ _availablePageSizes[2] }}" [(ngModel)]="_pageSize">
+      <hlm-select-trigger class="inline-flex mr-1 h-9">
+        <hlm-select-value />
+      </hlm-select-trigger>
+      <hlm-select-content>
+        @for (size of _availablePageSizes; track size) {
+          <hlm-option [value]="size">
+            {{ size === 10000 ? 'All' : size }}
+          </hlm-option>
+        }
+      </hlm-select-content>
+    </brn-select>
+
+    <div class="flex space-x-1">
+      <button size="sm" variant="outline" hlmBtn [disabled]="!ctx.decrementable()" (click)="ctx.decrement()">Previous</button>
+      <button size="sm" variant="outline" hlmBtn [disabled]="!ctx.incrementable()" (click)="ctx.increment()">Next</button>
+    </div>
+  </div>
+</div>
+<!-- Card to add new team -->
+<div hlmCard class="size-fit mt-4">
+  <div hlmCardHeader class="pb-0">
+    <h3 hlmCardTitle>Create new team</h3>
+  </div>
+  <div hlmCardContent class="flex items-center gap-4">
+    <input hlmInput placeholder="Team name" [formControl]="_newTeamName" />
+    <input hlmInput placeholder="Team color" type="color" [formControl]="_newTeamColor" />
+    <button hlmBtn class="ml-4" (click)="createTeam.mutate()">Create</button>
+  </div>
+</div>

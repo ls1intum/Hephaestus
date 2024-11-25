@@ -86,10 +86,7 @@ public class GitHubMilestoneSyncService {
             // Extract name with owner from the repository URL
             // Example: https://api.github.com/repos/ls1intum/Artemis/milestones/257
             var nameWithOwner = ghMilestone.getUrl().toString().split("/repos/")[1].split("/milestones")[0];
-            var repository = repositoryRepository.findByNameWithOwner(nameWithOwner);
-            if (repository != null) {
-                result.setRepository(repository);
-            }
+            repositoryRepository.findByNameWithOwner(nameWithOwner).ifPresent(result::setRepository);
         }
 
         // Link creator

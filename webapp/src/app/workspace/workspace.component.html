@@ -1,0 +1,46 @@
+<!-- input for repositories with save button -->
+<h1 class="text-3xl font-bold mb-4">Settings</h1>
+<div class="flex flex-col items-start gap-4">
+  <h2 class="text-lg font-semibold">Monitored Repositories</h2>
+  <div class="space-y-4">
+    <div class="space-y-2">
+      @for (nameWithOwner of repositoriesToMonitor.data(); track nameWithOwner) {
+        <div class="flex items-center gap-2">
+          <hlm-alert-dialog>
+            <button id="edit-profile" variant="outline" brnAlertDialogTrigger hlmBtn size="icon">
+              <lucide-angular [img]="Trash2" class="size-5" />
+            </button>
+            <hlm-alert-dialog-content *brnAlertDialogContent="let ctx">
+              <hlm-alert-dialog-header>
+                <h3 hlmAlertDialogTitle>Stop monitoring {{ nameWithOwner }}?</h3>
+                <p hlmAlertDialogDescription>
+                  Are you sure you want to stop monitoring this repository? This action cannot be undone and will remove all data associated with this repository.
+                </p>
+              </hlm-alert-dialog-header>
+              <hlm-alert-dialog-footer>
+                <button hlmAlertDialogCancel (click)="ctx.close()">Cancel</button>
+                <button hlmAlertDialogAction (click)="removeRepositoriesToMonitor.mutate(nameWithOwner)">Stop Monitoring</button>
+              </hlm-alert-dialog-footer>
+            </hlm-alert-dialog-content>
+          </hlm-alert-dialog>
+          <div class="bg-accent/50 p-2 px-4 rounded-md">{{ nameWithOwner }}</div>
+        </div>
+      }
+    </div>
+    <div class="space-y-2">
+      <div class="flex items-center gap-2">
+        <input hlmInput placeholder="Add a repository" [(ngModel)]="repositoriesToMonitorInput" />
+        <button
+          hlmBtn
+          (click)="addRepositoriesToMonitor.mutate(repositoriesToMonitorInput())"
+          [disabled]="!repositoriesToMonitorInput() || !repositoriesToMonitorInput().includes('/') || addRepositoriesToMonitor.isPending()"
+        >
+          Add
+        </button>
+      </div>
+      @if (addRepositoriesToMonitor.error()) {
+        <div class="text-destructive text-sm">An error occurred while adding the repository.</div>
+      }
+    </div>
+  </div>
+</div>

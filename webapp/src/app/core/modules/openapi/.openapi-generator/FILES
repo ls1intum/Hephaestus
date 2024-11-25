@@ -2,8 +2,6 @@
 .openapi-generator-ignore
 README.md
 api.module.ts
-api/admin.service.ts
-api/admin.serviceInterface.ts
 api/api.ts
 api/leaderboard.service.ts
 api/leaderboard.serviceInterface.ts
@@ -13,13 +11,16 @@ api/meta.service.ts
 api/meta.serviceInterface.ts
 api/session.service.ts
 api/session.serviceInterface.ts
+api/team.service.ts
+api/team.serviceInterface.ts
 api/user.service.ts
 api/user.serviceInterface.ts
+api/workspace.service.ts
+api/workspace.serviceInterface.ts
 configuration.ts
 encoder.ts
 git_push.sh
 index.ts
-model/auth-user-info.ts
 model/label-info.ts
 model/leaderboard-entry.ts
 model/message.ts
@@ -30,7 +31,9 @@ model/pull-request-info.ts
 model/pull-request-review-info.ts
 model/repository-info.ts
 model/session.ts
+model/team-info.ts
 model/user-info.ts
 model/user-profile.ts
+model/user-teams.ts
 param.ts
 variables.ts

@@ -80,10 +80,7 @@ public class GitHubLabelSyncService {
             // Extract name with owner from the repository URL
             // Example: https://api.github.com/repos/ls1intum/Artemis/labels/core
             var nameWithOwner = ghLabel.getUrl().toString().split("/repos/")[1].split("/label")[0];
-            var repository = repositoryRepository.findByNameWithOwner(nameWithOwner);
-            if (repository != null) {
-                result.setRepository(repository);
-            }
+            repositoryRepository.findByNameWithOwner(nameWithOwner).ifPresent(result::setRepository);
         }
 
         return labelRepository.save(result);

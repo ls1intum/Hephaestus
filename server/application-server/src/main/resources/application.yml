@@ -40,6 +40,10 @@ hephaestus:
         notification:
             enabled: false
             channel-id: ""
+    workspace:
+        init-default: true
+        default:
+            repositories-to-monitor: ls1intum/Artemis,ls1intum/Hephaestus
 
 keycloak:
     url: http://localhost:8081
@@ -57,14 +61,16 @@ monitoring:
     run-on-startup: true
     # Fetching timeframe in days
     timeframe: 7
+    sync-cron: "0 0 3 * * *"
     # Cooldown in minutes before running the monitoring again
-    run-on-startup-cooldown-in-minutes: 15
-    repository-sync-cron: "0 0 * * * *"
-    repositories: ls1intum/Artemis
+    sync-cooldown-in-minutes: 15
+    # Whether to sync all issues and pull requests that are missing in the database
+    sync-all-issues-and-pull-requests: false
 
 # Can be any OAuth token, such as the PAT
 github:
     auth-token: null
+
 slack:
     token: ""
     signing-secret: ""

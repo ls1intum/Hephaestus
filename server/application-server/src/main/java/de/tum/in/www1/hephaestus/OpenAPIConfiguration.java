@@ -1,39 +1,29 @@
 package de.tum.in.www1.hephaestus;
 
-import java.util.Map;
-import java.util.stream.Collectors;
-
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-import org.springdoc.core.customizers.OpenApiCustomizer;
-import org.springframework.context.annotation.Bean;
-import org.springframework.context.annotation.Configuration;
-
 import io.swagger.v3.oas.annotations.OpenAPIDefinition;
 import io.swagger.v3.oas.annotations.info.Contact;
 import io.swagger.v3.oas.annotations.info.Info;
 import io.swagger.v3.oas.annotations.info.License;
 import io.swagger.v3.oas.annotations.servers.Server;
 import io.swagger.v3.oas.models.media.Schema;
+import java.util.Map;
+import java.util.stream.Collectors;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springdoc.core.customizers.OpenApiCustomizer;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
 
 @Configuration
 @OpenAPIDefinition(
     info = @Info(
-        title = "Hephaestus API", 
-        description = "API documentation for the Hephaestus application server.", 
+        title = "Hephaestus API",
+        description = "API documentation for the Hephaestus application server.",
         version = "0.0.1",
-        contact = @Contact(
-            name = "Felix T.J. Dietrich",
-            email = "felixtj.dietrich@tum.de"
-        ), 
-        license = @License(
-            name = "MIT License",
-            url = "https://github.com/ls1intum/Hephaestus/blob/develop/LICENSE"
-        )
-    ), 
-    servers = {
-        @Server(url = "/", description = "Default Server URL"),
-    }
+        contact = @Contact(name = "Felix T.J. Dietrich", email = "felixtj.dietrich@tum.de"),
+        license = @License(name = "MIT License", url = "https://github.com/ls1intum/Hephaestus/blob/develop/LICENSE")
+    ),
+    servers = { @Server(url = "/", description = "Default Server URL") }
 )
 public class OpenAPIConfiguration {
 
@@ -41,7 +31,7 @@ public class OpenAPIConfiguration {
 
     @Bean
     public OpenApiCustomizer schemaCustomizer() {
-        return openApi -> {            
+        return openApi -> {
             var components = openApi.getComponents();
 
             if (components != null && components.getSchemas() != null) {
@@ -62,6 +52,7 @@ public class OpenAPIConfiguration {
 
                 // Remove DTO suffix from attribute names
                 schemas.forEach((key, value) -> {
+                    @SuppressWarnings("unchecked")
                     Map<String, Schema<?>> properties = value.getProperties();
                     if (properties != null) {
                         properties.forEach((propertyKey, propertyValue) -> {
@@ -96,6 +87,12 @@ public class OpenAPIConfiguration {
                                 } else {
                                     logger.warn("Response with code {} has no content.", responseCode);
                                 }
+                            });
+                        }
+                        if (operation.getRequestBody() != null) {
+                            var requestBodyContent = operation.getRequestBody().getContent();
+                            requestBodyContent.forEach((contentType, mediaType) -> {
+                                removeDTOSuffixesFromSchemaRecursively(mediaType.getSchema());
                             });
                         }
 
