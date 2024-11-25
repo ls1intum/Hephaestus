@@ -9,13 +9,14 @@ import org.springframework.web.bind.annotation.RestController;
 
 @RestController
 @RequestMapping("/activity")
-public class ActivityDashboardController {
+public class ActivityController {
 
     @Autowired
-    private ActivityDashboardService activityDashboardService;
+    private ActivityService activityService;
 
     @GetMapping("/{login}")
-    public ResponseEntity<ActivitiesDTO> getActivitiesByUser(@PathVariable String login) {
-        return ResponseEntity.ok(activityDashboardService.getActivities(login));
+    public ResponseEntity<ActivityDTO> getActivityByUser(@PathVariable String login) {
+        ActivityDTO activity = activityService.getActivity(login);
+        return ResponseEntity.ok(activity);
     }
 }

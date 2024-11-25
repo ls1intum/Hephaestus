@@ -82,4 +82,22 @@ public interface PullRequestReviewRepository extends JpaRepository<PullRequestRe
         @Param("before") OffsetDateTime before,
         @Param("teamId") Long teamId
     );
+
+@Query("""
+SELECT prr
+FROM PullRequestReview prr
+LEFT JOIN FETCH prr.author
+LEFT JOIN FETCH prr.pullRequest
+LEFT JOIN FETCH prr.pullRequest.repository
+LEFT JOIN FETCH prr.comments
+WHERE prr.author.login ILIKE :authorLogin AND prr.pullRequest.state = 'OPEN'
+AND prr.submittedAt = (
+    SELECT MAX(subPrr.submittedAt)
+    FROM PullRequestReview subPrr
+    WHERE subPrr.pullRequest.id = prr.pullRequest.id
+)
+ORDER BY prr.submittedAt DESC
+""")
+    List<PullRequestReview> findAllOpenReviewsByAuthorLogin(@Param("authorLogin") String authorLogin);
+
 }

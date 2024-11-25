@@ -55,4 +55,17 @@ public interface PullRequestRepository extends JpaRepository<PullRequest, Long> 
         """
     )
     Set<Integer> findAllSyncedPullRequestNumbers(@Param("repositoryId") long repositoryId);
+
+    @Query("""
+        SELECT p
+        FROM PullRequest p
+        LEFT JOIN FETCH p.labels
+        LEFT JOIN FETCH p.requestedReviewers
+        JOIN FETCH p.author
+        LEFT JOIN FETCH p.assignees
+        LEFT JOIN FETCH p.repository
+        WHERE LOWER(:reviewerLogin) IN (SELECT LOWER(u.login) FROM p.requestedReviewers u)
+        ORDER BY p.createdAt DESC
+       """)
+    List<PullRequest> findReviewRequestedByLogin(@Param("reviewerLogin") String reviewerLogin);
 }
