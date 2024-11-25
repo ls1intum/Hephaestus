@@ -568,7 +568,7 @@ components:
         reviews:
           type: array
           items:
-            $ref: "#/components/schemas/ReviewActivityDto"
+            $ref: "#/components/schemas/ReviewActivity"
     UserInfo:
       required:
       - avatarUrl
@@ -729,6 +729,34 @@ components:
         updatedAt:
           type: string
           format: date-time
+    ReviewActivity:
+      required:
+      - codeComments
+      - id
+      - isDismissed
+      - state
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+        isDismissed:
+          type: boolean
+        state:
+          type: string
+          enum:
+          - COMMENTED
+          - APPROVED
+          - CHANGES_REQUESTED
+          - REVIEW_REQUESTED
+          - UNKNOWN
+        codeComments:
+          type: integer
+          format: int32
+        author:
+          $ref: "#/components/schemas/UserInfo"
+        pullRequest:
+          $ref: "#/components/schemas/PullRequestInfo"
     LeaderboardEntry:
       required:
       - numberOfApprovals
