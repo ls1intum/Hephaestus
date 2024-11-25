@@ -4,7 +4,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 import de.tum.in.www1.hephaestus.activitydashboard.ActivityDTO;
-import de.tum.in.www1.hephaestus.activitydashboard.ReviewActivityDto;
+import de.tum.in.www1.hephaestus.activitydashboard.ReviewActivityDTO;
 import org.hibernate.integrator.spi.Integrator;
 import org.hibernate.jpa.boot.spi.IntegratorProvider;
 
@@ -36,7 +36,7 @@ public class ClassImportIntegratorIntegratorProvider implements IntegratorProvid
                 classes.add(PullRequestReviewInfoDTO.class);
                 classes.add(RepositoryInfoDTO.class);
                 classes.add(ActivityDTO.class);
-                classes.add(ReviewActivityDto.class);
+                classes.add(ReviewActivityDTO.class);
 
                 return List.of(new ClassImportIntegrator(classes));
         }

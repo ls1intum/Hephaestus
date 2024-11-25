@@ -3,11 +3,8 @@ package de.tum.in.www1.hephaestus.activitydashboard;
 import de.tum.in.www1.hephaestus.gitprovider.issue.Issue;
 import de.tum.in.www1.hephaestus.gitprovider.issue.IssueInfoDTO;
 import de.tum.in.www1.hephaestus.gitprovider.issue.IssueRepository;
-import de.tum.in.www1.hephaestus.gitprovider.pullrequest.PullRequest;
 import de.tum.in.www1.hephaestus.gitprovider.pullrequest.PullRequestInfoDTO;
 import de.tum.in.www1.hephaestus.gitprovider.pullrequest.PullRequestRepository;
-import de.tum.in.www1.hephaestus.gitprovider.pullrequestreview.PullRequestReview;
-import de.tum.in.www1.hephaestus.gitprovider.pullrequestreview.PullRequestReviewInfoDTO;
 import de.tum.in.www1.hephaestus.gitprovider.pullrequestreview.PullRequestReviewRepository;
 import jakarta.transaction.Transactional;
 import org.springframework.stereotype.Service;
@@ -44,7 +41,7 @@ public class ActivityService {
                 .map(IssueInfoDTO::fromIssue)
                 .toList();
 
-        List<ReviewActivityDto> reviews = getReviewedOrRequestedPullRequests(login);
+        List<ReviewActivityDTO> reviews = getReviewedOrRequestedPullRequests(login);
 
         return new ActivityDTO(
                 openPullRequests,
@@ -53,15 +50,15 @@ public class ActivityService {
         );
     }
 
-    private List<ReviewActivityDto> getReviewedOrRequestedPullRequests(String login) {
-        List<ReviewActivityDto> reviews = pullRequestReviewRepository.findAllOpenReviewsByAuthorLogin(login)
+    private List<ReviewActivityDTO> getReviewedOrRequestedPullRequests(String login) {
+        List<ReviewActivityDTO> reviews = pullRequestReviewRepository.findAllOpenReviewsByAuthorLogin(login)
                 .stream()
-                .map(ReviewActivityDto::fromPullRequestReview)
+                .map(ReviewActivityDTO::fromPullRequestReview)
                 .toList();
 
-        List<ReviewActivityDto> requestedReviews = pullRequestRepository.findReviewRequestedByLogin(login)
+        List<ReviewActivityDTO> requestedReviews = pullRequestRepository.findReviewRequestedByLogin(login)
                 .stream()
-                .map(ReviewActivityDto::fromPullRequest)
+                .map(ReviewActivityDTO::fromPullRequest)
                 .toList();
 
         requestedReviews.addAll(reviews);

@@ -9,5 +9,5 @@ import java.util.List;
 public record ActivityDTO(
         @NonNull List<PullRequestInfoDTO> pullRequests,
         @NonNull List<IssueInfoDTO> issues,
-        @NonNull List<ReviewActivityDto> reviews) {
+        @NonNull List<ReviewActivityDTO> reviews) {
 }
