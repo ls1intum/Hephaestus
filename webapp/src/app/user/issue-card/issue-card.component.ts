@@ -1,7 +1,18 @@
 import { Component, computed, input } from '@angular/core';
 import { PullRequestInfo, LabelInfo } from '@app/core/modules/openapi';
 import { NgIcon } from '@ng-icons/core';
-import { octCheck, octComment, octFileDiff, octGitPullRequest, octGitPullRequestClosed, octGitPullRequestDraft, octGitMerge, octX } from '@ng-icons/octicons';
+import {
+  octCheck,
+  octComment,
+  octFileDiff,
+  octGitPullRequest,
+  octGitPullRequestClosed,
+  octGitPullRequestDraft,
+  octGitMerge,
+  octX,
+  octIssueDraft,
+  octIssueOpened
+} from '@ng-icons/octicons';
 import { HlmCardModule } from '@spartan-ng/ui-card-helm';
 import { HlmSkeletonComponent } from '@spartan-ng/ui-skeleton-helm';
 import { GithubLabelComponent } from '@app/ui/github-label/github-label.component';
@@ -33,6 +44,7 @@ export class IssueCardComponent {
   isDraft = input<boolean>();
   isMerged = input<boolean>();
   pullRequestLabels = input<Array<LabelInfo>>();
+  isIssue = input<boolean>();
 
   displayCreated = computed(() => dayjs(this.createdAt()));
   displayTitle = computed(() => (this.title() ?? '').replace(/`([^`]+)`/g, '<code class="textCode">$1</code>'));
@@ -42,21 +54,31 @@ export class IssueCardComponent {
     var icon: string;
     var color: string;
 
-    if (this.state() === PullRequestInfo.StateEnum.Open) {
+    if (this.isIssue()) {
       if (this.isDraft()) {
-        icon = octGitPullRequestDraft;
+        icon = octIssueDraft;
         color = 'text-github-muted-foreground';
       } else {
-        icon = octGitPullRequest;
+        icon = octIssueOpened;
         color = 'text-github-open-foreground';
       }
     } else {
-      if (this.isMerged()) {
-        icon = octGitMerge;
-        color = 'text-github-done-foreground';
+      if (this.state() === PullRequestInfo.StateEnum.Open) {
+        if (this.isDraft()) {
+          icon = octGitPullRequestDraft;
+          color = 'text-github-muted-foreground';
+        } else {
+          icon = octGitPullRequest;
+          color = 'text-github-open-foreground';
+        }
       } else {
-        icon = octGitPullRequestClosed;
-        color = 'text-github-closed-foreground';
+        if (this.isMerged()) {
+          icon = octGitMerge;
+          color = 'text-github-done-foreground';
+        } else {
+          icon = octGitPullRequestClosed;
+          color = 'text-github-closed-foreground';
+        }
       }
     }
 

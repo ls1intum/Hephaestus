@@ -3,6 +3,8 @@ package de.tum.in.www1.hephaestus;
 import java.util.ArrayList;
 import java.util.List;
 
+import de.tum.in.www1.hephaestus.activitydashboard.ActivityDTO;
+import de.tum.in.www1.hephaestus.activitydashboard.ReviewActivityDto;
 import org.hibernate.integrator.spi.Integrator;
 import org.hibernate.jpa.boot.spi.IntegratorProvider;
 
@@ -33,6 +35,8 @@ public class ClassImportIntegratorIntegratorProvider implements IntegratorProvid
                 classes.add(IssueCommentInfoDTO.class);
                 classes.add(PullRequestReviewInfoDTO.class);
                 classes.add(RepositoryInfoDTO.class);
+                classes.add(ActivityDTO.class);
+                classes.add(ReviewActivityDto.class);
 
                 return List.of(new ClassImportIntegrator(classes));
         }

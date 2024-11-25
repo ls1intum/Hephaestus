@@ -10,15 +10,17 @@
           {{ repositoryName() }} #{{ number() }} on {{ displayCreated().format('MMM D') }}
         }
       </span>
-      <span class="flex items-center space-x-2">
-        @if (isLoading()) {
-          <hlm-skeleton class="h-4 w-8 bg-green-500/30"></hlm-skeleton>
-          <hlm-skeleton class="h-4 w-8 bg-destructive/20"></hlm-skeleton>
-        } @else {
-          <span class="text-github-success-foreground font-bold">+{{ additions() }}</span>
-          <span class="text-github-danger-foreground font-bold">-{{ deletions() }}</span>
-        }
-      </span>
+      @if (!isIssue()) {
+        <span class="flex items-center space-x-2">
+          @if (isLoading()) {
+            <hlm-skeleton class="h-4 w-8 bg-green-500/30"></hlm-skeleton>
+            <hlm-skeleton class="h-4 w-8 bg-destructive/20"></hlm-skeleton>
+          } @else {
+            <span class="text-github-success-foreground font-bold">+{{ additions() }}</span>
+            <span class="text-github-danger-foreground font-bold">-{{ deletions() }}</span>
+          }
+        </span>
+      }
     </div>
 
     <span class="containerSize flex justify-between font-medium mb-3">

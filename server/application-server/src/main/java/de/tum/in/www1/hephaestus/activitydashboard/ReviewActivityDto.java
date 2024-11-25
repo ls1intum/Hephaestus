@@ -1,6 +1,5 @@
 package de.tum.in.www1.hephaestus.activitydashboard;
 
-import java.time.OffsetDateTime;
 import org.springframework.lang.NonNull;
 import com.fasterxml.jackson.annotation.JsonInclude;
 
