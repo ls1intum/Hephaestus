@@ -1,4 +1,4 @@
-import { Component, Output, EventEmitter } from '@angular/core';
+import { Component, output } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { HlmCardModule } from '@spartan-ng/ui-card-helm';
@@ -15,11 +15,10 @@ import { LucideAngularModule, Send } from 'lucide-angular';
 export class InputComponent {
   protected Send = Send;
 
-  @Output() messageSent = new EventEmitter<string>();
+  messageSent = output<string>();
+  messageText = '';
 
-  messageText: string = '';
-
-  onSend(): void {
+  onSend() {
     if (this.messageText.trim() !== '') {
       this.messageSent.emit(this.messageText);
       this.messageText = '';

@@ -14,5 +14,5 @@ import { LucideAngularModule, BotMessageSquare } from 'lucide-angular';
 export class AiMentorComponent {
   protected BotMessageSquare = BotMessageSquare;
 
-  iconOnly = input(false, { transform: booleanAttribute });
+  iconOnly = input(false);
 }

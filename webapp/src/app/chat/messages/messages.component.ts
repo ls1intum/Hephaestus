@@ -1,4 +1,4 @@
-import { Component, inject, Input, OnInit, AfterViewChecked, ElementRef, ViewChild } from '@angular/core';
+import { Component, inject, input, OnInit, AfterViewChecked, ElementRef, ViewChild } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { LucideAngularModule, Hammer } from 'lucide-angular';
 import { HlmAvatarModule } from '@spartan-ng/ui-avatar-helm';
@@ -18,8 +18,9 @@ export class MessagesComponent implements OnInit, AfterViewChecked {
   user = this.securityStore.loadedUser;
   signedIn = this.securityStore.signedIn;
 
+  messageHistory = input<Message[]>([]);
+
   @ViewChild('chatMessagesContainer') private chatMessagesContainer!: ElementRef;
-  @Input() messageHistory = [] as Message[];
 
   ngOnInit() {
     this.scrollToBottom();
@@ -35,7 +36,7 @@ export class MessagesComponent implements OnInit, AfterViewChecked {
         this.chatMessagesContainer.nativeElement.scrollTop = this.chatMessagesContainer.nativeElement.scrollHeight;
       }
     } catch (err) {
-      console.error('Error scrolling to bottom', err);
+      return;
     }
   }
 }

@@ -1,4 +1,4 @@
-import { Component, Output, EventEmitter } from '@angular/core';
+import { Component, output } from '@angular/core';
 import { LucideAngularModule, Plus, BotMessageSquare } from 'lucide-angular';
 import { HlmButtonModule } from '@spartan-ng/ui-button-helm';
 
@@ -12,7 +12,7 @@ export class FirstSessionCardComponent {
   protected Plus = Plus;
   protected BotMessageSquare = BotMessageSquare;
 
-  @Output() createSession = new EventEmitter<void>();
+  createSession = output<void>();
 
   handleCreateSession(): void {
     this.createSession.emit();

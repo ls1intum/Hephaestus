@@ -1,4 +1,4 @@
-import { Component, input, Output, EventEmitter } from '@angular/core';
+import { Component, input, output } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { LucideAngularModule, Plus } from 'lucide-angular';
 import { HlmButtonModule } from '@spartan-ng/ui-button-helm';
@@ -16,8 +16,8 @@ export class SessionsCardComponent {
   sessions = input<Session[]>();
   activeSessionId = input<number|null>();
 
-  @Output() sessionSelected = new EventEmitter<number>();
-  @Output() createSession = new EventEmitter<void>();
+  sessionSelected = output<number>();
+  createSession = output();
 
   handleSelectSession(sessionId: number): void {
     if (this.activeSessionId() && this.activeSessionId() !== sessionId) {
