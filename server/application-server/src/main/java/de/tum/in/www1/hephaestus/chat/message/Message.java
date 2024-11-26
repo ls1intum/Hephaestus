@@ -28,8 +28,8 @@ public class Message {
     @Enumerated(EnumType.STRING)
     private MessageSender sender;
 
+    @Lob   
     @NonNull
-    @Column(length=Length.LONG16)
     private String content;
 
     @NonNull
