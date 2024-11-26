@@ -25,10 +25,6 @@ export class SessionsCardComponent {
     }
   }
 
-  constructor() {
-    console.log("sessions " + this.sessions + " activeSessionId " + this.activeSessionId);
-  }
-
   handleCreateSession(): void {
     this.createSession.emit();
   }
