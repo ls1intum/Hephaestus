@@ -21,7 +21,9 @@ export class InputComponent {
   onSend() {
     if (this.messageText.trim() !== '') {
       this.messageSent.emit(this.messageText);
-      this.messageText = '';
+      setTimeout(() => {
+        this.messageText = '';
+      }, 0);
     }
   }
 }
