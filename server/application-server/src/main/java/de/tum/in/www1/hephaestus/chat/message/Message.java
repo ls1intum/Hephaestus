@@ -28,7 +28,7 @@ public class Message {
     @Enumerated(EnumType.STRING)
     private MessageSender sender;
 
-    @Column(length = Length.LONG16)   
+    @Column(length = Length.LONG16)
     @NonNull
     private String content;
 
