@@ -53,8 +53,7 @@ jobs:
             image: ghcr.io/ls1intum/Hephaestus/hephaestus-webhook-ingest
             context: ./server/webhook-ingest
             path: server/webhook-ingest
-          - build_method: nixpacks
-            dockerfile: ./server/application-server/.nixpacks/Dockerfile
+          - dockerfile: ./server/application-server/.nixpacks/Dockerfile
             image: ghcr.io/ls1intum/Hephaestus/hephaestus-application-server
             context: ./server/application-server
             path: server/application-server
@@ -91,7 +90,6 @@ jobs:
             type=ref,event=pr
 
       - name: Build and push Docker Image
-        if: matrix.build_method == 'dockerfile'
         uses: docker/build-push-action@v6
         with:
           context: ${{ inputs.docker-context }}
