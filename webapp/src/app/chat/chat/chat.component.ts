@@ -45,7 +45,7 @@ export class ChatComponent {
       if (sessions.length > 0 && this.selectedSession() == null) {
         this.selectedSession.set(sessions.slice(-1)[0]);
       }
-      this.sessions.set(sessions);
+      this.sessions.set(sessions.reverse());
       this.isLoading.set(false);
       return sessions;
     }
@@ -71,8 +71,13 @@ export class ChatComponent {
       }
       await lastValueFrom(this.sessionService.createSession(username));
     },
-    onSuccess: () => {
-      this.query_sessions.refetch();
+    onSuccess: async () => {
+      await this.query_sessions.refetch();
+      const sessions = this.sessions();
+      if (sessions.length > 0) {
+        const newSession = sessions[0];
+        this.selectedSession.set(newSession);
+      }
     }
   }));
 
