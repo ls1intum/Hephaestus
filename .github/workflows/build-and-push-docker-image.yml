@@ -3,22 +3,6 @@ name: Build and Push Docker Image
 on:
   workflow_call:
     inputs:
-      image-name:
-        type: string
-        default: ${{ github.repository }}
-        description: "The name for the docker image (Default: Repository name)"
-      docker-file:
-        type: string
-        default: Dockerfile
-        description: "The path to the Dockerfile (Default: ./Dockerfile)"
-      docker-context:
-        type: string
-        default: .
-        description: "The context for the Docker build (Default: .)"
-      build-args:
-        type: string
-        description: "List of additional build contexts (e.g., name=path)"
-        required: false
       platforms:
         type: string
         description: "List of platforms for which to build the image"
@@ -83,7 +67,7 @@ jobs:
         id: meta
         uses: docker/metadata-action@v5
         with:
-          images: ${{ inputs.registry }}/${{ inputs.image-name }}
+          images: ${{ inputs.registry }}/${{ matrix.image }}
           tags: |
             type=raw,value=latest,enable={{is_default_branch}}
             type=ref,event=branch
@@ -92,10 +76,9 @@ jobs:
       - name: Build and push Docker Image
         uses: docker/build-push-action@v6
         with:
-          context: ${{ inputs.docker-context }}
-          file: ${{ inputs.docker-file }}
+          context: ${{ matrix.context }}
+          file: ${{ matrix.dockerfile }}
           platforms: ${{ inputs.platforms }}
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
-          build-args: ${{ inputs.build-args }}
           push: true
