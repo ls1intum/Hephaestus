@@ -1,0 +1,10 @@
+name: Build and Deploy to Dev
+
+on:
+  pull_request:
+    branches: [main]
+
+jobs:
+  build-dev-container:
+    uses: ./.github/workflows/build-and-push-docker-image.yml
+    secrets: inherit
