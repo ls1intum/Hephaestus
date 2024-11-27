@@ -1,6 +1,5 @@
 import os
 from .config import settings
-from random import randint
 from typing import Sequence
 from typing_extensions import Annotated, TypedDict
 
@@ -25,7 +24,7 @@ if os.getenv("GITHUB_ACTIONS") == "true":
     model = MockChatModel()
 
 elif settings.is_openai_available:
-    model = ChatOpenAI()
+    model = ChatOpenAI(temperature=1.0)
 elif settings.is_azure_openai_available:
     model = AzureChatOpenAI()
 else:
@@ -47,7 +46,9 @@ mentor_prompt = ChatPromptTemplate.from_messages(
             + "Task 2: Ask the student about the overall progress on the project."
             + "Task 3: Ask the student about the challenges faced during the sprint referring to what he said about progress."
             + "Task 4: Ask about the plan for the next sprint."
-            + "Be polite, friendly and do not let the student drive the conversation to any other topic except for the current project.",
+            + "Be polite, friendly and do not let the student drive the conversation to any other topic except for the current project."
+            + "Always perform only one task in one message. Listen to what the student says and refer to it in your next message."
+            + "Analyse the conversation before and asses which task is to be performed. Give the student a feeling of a real conversation, not just questionaire.",
         ),
         MessagesPlaceholder(variable_name="messages"),
     ]
@@ -55,12 +56,12 @@ mentor_prompt = ChatPromptTemplate.from_messages(
 
 workflow = StateGraph(state_schema=State)
 trimmer = trim_messages(
-    max_tokens=400,
+    max_tokens=4000,
     strategy="last",
     token_counter=model,
     include_system=True,
     allow_partial=False,
-    start_on="system",
+    start_on="human",
 )
 
 
@@ -80,7 +81,6 @@ app = workflow.compile(checkpointer=memory)
 
 def send_message(thread_id: str, input_message: str, state: State):
     config = {"configurable": {"thread_id": thread_id}}
-    # append the new human message to the conversation
     state["messages"] += [HumanMessage(input_message)]
 
     output = app.invoke(
