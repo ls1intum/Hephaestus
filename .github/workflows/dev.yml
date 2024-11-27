@@ -2,7 +2,17 @@ name: Build and Deploy to Dev
 
 on:
   pull_request:
-    branches: [main]
+    paths-ignore:
+    - 'README.md'
+    - 'CODE_OF_CONDUCT.md'
+    - 'CONTRIBUTING.md'
+    - 'LICENSE'
+    - 'SECURITY.md'
+    - 'docs/**'
+    - 'keycloakify/**'
+    - '.github/**'
+    - '!.github/workflows/build-and-push-docker-image.yml'
+    - '!.github/workflows/dev.yml'
 
 jobs:
   build-dev-container:
