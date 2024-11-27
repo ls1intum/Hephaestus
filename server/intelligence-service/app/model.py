@@ -79,8 +79,8 @@ memory = MemorySaver()
 app = workflow.compile(checkpointer=memory)
 
 
-def send_message(thread_id: str, input_message: str, state: State):
-    config = {"configurable": {"thread_id": thread_id}}
+def send_message(session_id: str, input_message: str, state: State):
+    config = {"configurable": {"thread_id": session_id}}
     state["messages"] += [HumanMessage(input_message)]
 
     output = app.invoke(
