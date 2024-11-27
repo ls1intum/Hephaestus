@@ -1,6 +1,6 @@
 import { Component, computed, effect, input, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-import { Router, RouterLink } from '@angular/router';
+import { Router } from '@angular/router';
 import { BrnSelectModule } from '@spartan-ng/ui-select-brain';
 import { HlmSelectModule } from '@spartan-ng/ui-select-helm';
 import { HlmLabelModule } from '@spartan-ng/ui-label-helm';
@@ -14,7 +14,7 @@ interface SelectOption {
 @Component({
   selector: 'app-leaderboard-filter-team',
   standalone: true,
-  imports: [RouterLink, BrnSelectModule, HlmSelectModule, HlmLabelModule, FormsModule],
+  imports: [BrnSelectModule, HlmSelectModule, HlmLabelModule, FormsModule],
   templateUrl: './team.component.html'
 })
 export class LeaderboardFilterTeamComponent {
