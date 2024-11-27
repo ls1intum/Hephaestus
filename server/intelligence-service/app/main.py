@@ -29,7 +29,7 @@ async def chat(request: ChatRequest):
     state = {"messages": []}
 
     result = send_message(
-        thread_id=request.session_id, input_message=request.message_content, state=state
+        session_id=request.session_id, input_message=request.message_content, state=state
     )
 
     response_message = result["response"]["messages"][-1].content
