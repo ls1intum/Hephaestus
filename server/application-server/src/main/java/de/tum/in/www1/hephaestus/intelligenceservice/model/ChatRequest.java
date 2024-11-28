@@ -20,6 +20,10 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonTypeName;
 import com.fasterxml.jackson.annotation.JsonValue;
+import de.tum.in.www1.hephaestus.intelligenceservice.model.ChatMessage;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
 import com.fasterxml.jackson.annotation.JsonPropertyOrder;
 import com.fasterxml.jackson.annotation.JsonTypeName;
 import org.hibernate.validator.constraints.*;
@@ -28,68 +32,47 @@ import org.hibernate.validator.constraints.*;
  * ChatRequest
  */
 @JsonPropertyOrder({
-  ChatRequest.JSON_PROPERTY_MESSAGE_CONTENT,
-  ChatRequest.JSON_PROPERTY_SESSION_ID
+  ChatRequest.JSON_PROPERTY_MESSAGE_HISTORY
 })
 @jakarta.annotation.Generated(value = "org.openapitools.codegen.languages.JavaClientCodegen", comments = "Generator version: 7.7.0")
 public class ChatRequest {
-  public static final String JSON_PROPERTY_MESSAGE_CONTENT = "message_content";
-  private String messageContent;
-
-  public static final String JSON_PROPERTY_SESSION_ID = "session_id";
-  private String sessionId;
+  public static final String JSON_PROPERTY_MESSAGE_HISTORY = "message_history";
+  private List<ChatMessage> messageHistory = new ArrayList<>();
 
   public ChatRequest() {
   }
 
-  public ChatRequest messageContent(String messageContent) {
+  public ChatRequest messageHistory(List<ChatMessage> messageHistory) {
     
-    this.messageContent = messageContent;
+    this.messageHistory = messageHistory;
+    return this;
+  }
+
+  public ChatRequest addMessageHistoryItem(ChatMessage messageHistoryItem) {
+    if (this.messageHistory == null) {
+      this.messageHistory = new ArrayList<>();
+    }
+    this.messageHistory.add(messageHistoryItem);
     return this;
   }
 
   /**
-   * Get messageContent
-   * @return messageContent
+   * Get messageHistory
+   * @return messageHistory
    */
   @jakarta.annotation.Nonnull
-  @JsonProperty(JSON_PROPERTY_MESSAGE_CONTENT)
+  @JsonProperty(JSON_PROPERTY_MESSAGE_HISTORY)
   @JsonInclude(value = JsonInclude.Include.ALWAYS)
 
-  public String getMessageContent() {
-    return messageContent;
+  public List<ChatMessage> getMessageHistory() {
+    return messageHistory;
   }
 
 
-  @JsonProperty(JSON_PROPERTY_MESSAGE_CONTENT)
+  @JsonProperty(JSON_PROPERTY_MESSAGE_HISTORY)
   @JsonInclude(value = JsonInclude.Include.ALWAYS)
-  public void setMessageContent(String messageContent) {
-    this.messageContent = messageContent;
-  }
-
-  public ChatRequest sessionId(String sessionId) {
-    
-    this.sessionId = sessionId;
-    return this;
-  }
-
-  /**
-   * Get sessionId
-   * @return sessionId
-   */
-  @jakarta.annotation.Nonnull
-  @JsonProperty(JSON_PROPERTY_SESSION_ID)
-  @JsonInclude(value = JsonInclude.Include.ALWAYS)
-
-  public String getSessionId() {
-    return sessionId;
-  }
-
-
-  @JsonProperty(JSON_PROPERTY_SESSION_ID)
-  @JsonInclude(value = JsonInclude.Include.ALWAYS)
-  public void setSessionId(String sessionId) {
-    this.sessionId = sessionId;
+  public void setMessageHistory(List<ChatMessage> messageHistory) {
+    this.messageHistory = messageHistory;
   }
 
   @Override
@@ -101,21 +84,19 @@ public class ChatRequest {
       return false;
     }
     ChatRequest chatRequest = (ChatRequest) o;
-    return Objects.equals(this.messageContent, chatRequest.messageContent) &&
-        Objects.equals(this.sessionId, chatRequest.sessionId);
+    return Objects.equals(this.messageHistory, chatRequest.messageHistory);
   }
 
   @Override
   public int hashCode() {
-    return Objects.hash(messageContent, sessionId);
+    return Objects.hash(messageHistory);
   }
 
   @Override
   public String toString() {
     StringBuilder sb = new StringBuilder();
     sb.append("class ChatRequest {\n");
-    sb.append("    messageContent: ").append(toIndentedString(messageContent)).append("\n");
-    sb.append("    sessionId: ").append(toIndentedString(sessionId)).append("\n");
+    sb.append("    messageHistory: ").append(toIndentedString(messageHistory)).append("\n");
     sb.append("}");
     return sb.toString();
   }

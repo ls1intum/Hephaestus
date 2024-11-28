@@ -1,29 +1,36 @@
 components:
   schemas:
-    ChatRequest:
+    ChatMessage:
       properties:
-        message_content:
-          title: Message Content
+        content:
+          title: Content
           type: string
-        session_id:
-          title: Session Id
+        sender:
+          title: Sender
           type: string
       required:
-      - session_id
-      - message_content
+      - sender
+      - content
+      title: ChatMessage
+      type: object
+    ChatRequest:
+      properties:
+        message_history:
+          items:
+            $ref: '#/components/schemas/ChatMessage'
+          title: Message History
+          type: array
+      required:
+      - message_history
       title: ChatRequest
       type: object
     ChatResponse:
       properties:
-        message_content:
-          title: Message Content
-          type: string
-        session_id:
-          title: Session Id
+        responce:
+          title: Responce
           type: string
       required:
-      - session_id
-      - message_content
+      - responce
       title: ChatResponse
       type: object
     HTTPValidationError:

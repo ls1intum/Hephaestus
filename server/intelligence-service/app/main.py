@@ -1,6 +1,15 @@
 from fastapi import FastAPI
 from pydantic import BaseModel
-from .model import send_message
+import os
+from enum import Enum
+from typing import List
+from .config import settings
+from typing_extensions import Annotated, TypedDict
+from langchain.chat_models.base import BaseChatModel
+from langchain_openai import ChatOpenAI, AzureChatOpenAI
+from langgraph.graph import START, StateGraph, END
+from langgraph.graph.message import add_messages
+from langchain_core.messages import SystemMessage, HumanMessage, AIMessage
 
 app = FastAPI(
     title="Hephaestus Intelligence Service API",
@@ -10,14 +19,55 @@ app = FastAPI(
 )
 
 
+class ChatMessage(BaseModel):
+    sender: str
+    content: str
+
+
 class ChatRequest(BaseModel):
-    session_id: str
-    message_content: str
+    message_history: List[ChatMessage]
 
 
 class ChatResponse(BaseModel):
-    session_id: str
-    message_content: str
+    responce: str
+
+
+model: BaseChatModel
+
+if os.getenv("GITHUB_ACTIONS") == "true":
+
+    class MockChatModel:
+        def invoke(self, message: str):
+            return "Mock response"
+
+    model = MockChatModel()
+
+elif settings.is_openai_available:
+    model = ChatOpenAI(temperature=2)
+elif settings.is_azure_openai_available:
+    model = AzureChatOpenAI()
+else:
+    raise EnvironmentError("No LLM available")
+
+
+class State(TypedDict):
+    messages: Annotated[list, add_messages]
+
+
+propmt = "You are an AI mentor helping a students working on the software engineering projects embracing structured self-reflection practices. You need to guide the student through the set questions regarding their work on the project during the last week (sprint). Your value is the fact, that you help students to reflect on their past progress. Throughout the conversation you need to perform all of the following tasks in the given order: Task 1: Greet the student and say you are happy to start the session. Task 2: Ask the student about the overall progress on the project. Task 3: Ask the student about the challenges faced during the sprint referring to what he said about progress. Task 4: Ask about the plan for the next sprint. You need to understand at which stage in the conversation you are and what is the next task. Be polite, friendly and do not let the student drive the conversation to any other topic except for the current project. Do not make a questionaire out of the conversation, but rather make it a natural conversation."
+
+
+def ai_mentor(state: State):
+    return {
+        "messages": [model.invoke([SystemMessage(content=propmt)] + state["messages"])]
+    }
+
+
+graph_builder = StateGraph(State)
+graph_builder.add_node("ai_mentor", ai_mentor)
+graph_builder.add_edge(START, "ai_mentor")
+graph_builder.add_edge("ai_mentor", END)
+graph = graph_builder.compile()
 
 
 @app.post(
@@ -26,11 +76,14 @@ class ChatResponse(BaseModel):
     summary="Start and continue a chat session with an LLM.",
 )
 async def chat(request: ChatRequest):
-    state = {"messages": []}
+    messages = []
+    for message in request.message_history:
+        if message.author == "USER":
+            messages.append(HumanMessage(content=message.content))
+        else:
+            messages.append(AIMessage(content=message.content))
 
-    result = send_message(
-        session_id=request.session_id, input_message=request.message_content, state=state
-    )
+    for event in graph.stream({"messages": messages}, stream_mode="values"):
+        responce_message = event["messages"][-1].content
 
-    response_message = result["response"]["messages"][-1].content
-    return ChatResponse(session_id=request.session_id, message_content=response_message)
+    return ChatResponse(responce=responce_message)

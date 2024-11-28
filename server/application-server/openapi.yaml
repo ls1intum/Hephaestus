@@ -534,7 +534,7 @@ components:
         sender:
           type: string
           enum:
-          - SYSTEM
+          - LLM
           - USER
         content:
           type: string
