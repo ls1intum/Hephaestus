@@ -11,7 +11,9 @@ import de.tum.in.www1.hephaestus.chat.session.Session;
 import de.tum.in.www1.hephaestus.chat.session.SessionRepository;
 import de.tum.in.www1.hephaestus.intelligenceservice.ApiClient;
 import de.tum.in.www1.hephaestus.intelligenceservice.api.DefaultApi;
+import de.tum.in.www1.hephaestus.intelligenceservice.model.ChatMessage;
 import de.tum.in.www1.hephaestus.intelligenceservice.model.ChatRequest;
+
 import de.tum.in.www1.hephaestus.intelligenceservice.model.ChatResponse;
 
 @Service
@@ -61,7 +63,7 @@ public class MessageService {
         }
 
         Message systemMessage = new Message();
-        systemMessage.setSender(MessageSender.SYSTEM);
+        systemMessage.setSender(MessageSender.LLM);
         systemMessage.setContent(systemResponse);
         systemMessage.setSession(currentSession);
 
@@ -74,13 +76,16 @@ public class MessageService {
     }
 
     private String generateResponse(Long session_id, String messageContent) {
-        ChatRequest chatRequest = new ChatRequest();
-        chatRequest.setSessionId(session_id.toString());
-        chatRequest.setMessageContent(messageContent);
+        List<Message> messages = messageRepository.findBySessionId(session_id);
 
+        ChatRequest chatRequest = new ChatRequest();
+        chatRequest.setMessageHistory(messages.stream()
+                .<ChatMessage>map(message -> new ChatMessage().content(message.getContent()).sender(message.getSender().toString()))
+                .toList());
         try {
             ChatResponse chatResponse = sessionApiClient.chatChatPost(chatRequest);
-            return chatResponse.getMessageContent();
+            return chatResponse.getResponce();
+            
         } catch (Exception e) {
             logger.error("Failed to generate response for message: {}", e.getMessage());
             return null;

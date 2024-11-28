@@ -38,6 +38,6 @@ public class Message {
     private Session session;
 
     public enum MessageSender {
-        SYSTEM, USER
+        LLM, USER
     }
 }
