@@ -1,1 +1,0 @@
-docker build server/application-server -f server/application-server/.nixpacks/Dockerfile -t hephaestus-application-server --build-arg NIXPACKS_JDK_VERSION=21 --build-arg NIXPACKS_METADATA=java
