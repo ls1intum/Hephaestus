@@ -37,7 +37,7 @@ jobs:
             image: ghcr.io/ls1intum/Hephaestus/hephaestus-webhook-ingest
             context: ./server/webhook-ingest
             path: server/webhook-ingest
-          - dockerfile: ./server/application-server/.nixpacks/Dockerfile
+          - dockerfile: ./server/application-server/Dockerfile
             image: ghcr.io/ls1intum/Hephaestus/hephaestus-application-server
             context: ./server/application-server
             path: server/application-server
