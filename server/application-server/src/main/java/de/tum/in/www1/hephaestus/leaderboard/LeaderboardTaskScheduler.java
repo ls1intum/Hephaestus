@@ -15,6 +15,10 @@ import org.springframework.scheduling.support.CronExpression;
 import org.springframework.scheduling.support.CronTrigger;
 import org.springframework.stereotype.Service;
 
+/**
+ * Schedules tasks to run at the end of every leaderboard cycle.
+ * @see SlackWeeklyLeaderboardTask
+ */
 @Order(value = Ordered.LOWEST_PRECEDENCE)
 @EnableScheduling
 @Service

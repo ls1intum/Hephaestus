@@ -26,7 +26,7 @@ import org.springframework.stereotype.Component;
 
 /**
  * Task to send a weekly leaderboard message to the Slack channel.
- * @see SlackMessageService#activateTaskScheduler()
+ * @see SlackMessageService
  */
 @Component
 public class SlackWeeklyLeaderboardTask implements Runnable {
@@ -55,7 +55,7 @@ public class SlackWeeklyLeaderboardTask implements Runnable {
 
     /**
      * Test the Slack connection.
-     * @return
+     * @return {@code true} if the connection is valid, {@code false} otherwise.
      */
     public boolean testSlackConnection() {
         return runScheduledMessage && slackMessageService.initTest();

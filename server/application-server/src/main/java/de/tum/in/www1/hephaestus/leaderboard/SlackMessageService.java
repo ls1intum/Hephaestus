@@ -15,6 +15,10 @@ import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
+/**
+ * Light wrapper around the Slack App to send messages to the Slack workspace.
+ * @implNote Use the exposed method to test the Slack connection beforehand.
+ */
 @Service
 public class SlackMessageService {
 
@@ -60,7 +64,8 @@ public class SlackMessageService {
     }
 
     /**
-     * Test if the Slack app is correctly initialized.
+     * Tests if the Slack app is correctly initialized and has access to the workspace.
+     * Does not guarantee that the app has the necessary permissions to send messages.
      */
     public boolean initTest() {
         logger.info("Testing Slack app initialization...");
