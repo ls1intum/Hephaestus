@@ -36,7 +36,7 @@ export class MessagesComponent implements OnInit, AfterViewChecked {
         this.chatMessagesContainer.nativeElement.scrollTop = this.chatMessagesContainer.nativeElement.scrollHeight;
       }
     } catch (err) {
-      return;
+      console.error(err);
     }
   }
 }

@@ -14,7 +14,7 @@ export class SessionsCardComponent {
   protected Plus = Plus;
 
   sessions = input<Session[]>();
-  activeSessionId = input<number|null>();
+  activeSessionId = input<number | null>();
 
   sessionSelected = output<number>();
   createSession = output();
