@@ -19,6 +19,7 @@ on:
 
 jobs:
   build:
+    name: ${{ matrix.path }}
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
@@ -31,15 +32,15 @@ jobs:
           - dockerfile: ./server/intelligence-service/Dockerfile
             image: ls1intum/Hephaestus/hephaestus-intelligence-service
             context: ./server/intelligence-service
-            path: server/intelligence-service
+            path: intelligence-service
           - dockerfile: ./server/webhook-ingest/Dockerfile
             image: ls1intum/Hephaestus/hephaestus-webhook-ingest
             context: ./server/webhook-ingest
-            path: server/webhook-ingest
+            path: webhook-ingest
           - dockerfile: ./server/application-server/Dockerfile
             image: ls1intum/Hephaestus/hephaestus-application-server
             context: ./server/application-server
-            path: server/application-server
+            path: application-server
 
     steps:
       - name: Checkout
