@@ -4,6 +4,7 @@ import de.tum.in.www1.hephaestus.gitprovider.user.UserRepository;
 import de.tum.in.www1.hephaestus.leaderboard.LeaderboardEntryDTO;
 import de.tum.in.www1.hephaestus.leaderboard.LeaderboardService;
 import de.tum.in.www1.hephaestus.leaderboard.LeaguePointsCalculationService;
+import jakarta.transaction.Transactional;
 import java.time.DayOfWeek;
 import java.time.OffsetDateTime;
 import java.time.temporal.TemporalAdjusters;
@@ -31,6 +32,7 @@ public class LeaguePointsUpdateTask implements Runnable {
     private LeaguePointsCalculationService leaguePointsCalculationService;
 
     @Override
+    @Transactional
     public void run() {
         List<LeaderboardEntryDTO> leaderboard = getLatestLeaderboard();
         leaderboard.forEach(updateLeaderboardEntry());
@@ -42,8 +44,8 @@ public class LeaguePointsUpdateTask implements Runnable {
      */
     private Consumer<? super LeaderboardEntryDTO> updateLeaderboardEntry() {
         return entry -> {
-            var user = userRepository.findByLogin(entry.user().login()).orElseThrow();
-            int newPoints = leaguePointsCalculationService.calculateNewPoints(user.getLeaguePoints(), entry);
+            var user = userRepository.findByLoginWithEagerMergedPullRequests(entry.user().login()).orElseThrow();
+            int newPoints = leaguePointsCalculationService.calculateNewPoints(user, entry);
             user.setLeaguePoints(newPoints);
             userRepository.save(user);
         };

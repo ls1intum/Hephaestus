@@ -20,6 +20,14 @@ public interface UserRepository extends JpaRepository<User, Long> {
     @Query("""
                 SELECT u
                 FROM User u
+                LEFT JOIN FETCH u.mergedPullRequests
+                WHERE u.login = :login
+            """)
+    Optional<User> findByLoginWithEagerMergedPullRequests(@Param("login") String login);
+
+    @Query("""
+                SELECT u
+                FROM User u
                 LEFT JOIN FETCH u.teams
                 WHERE u.type = 'USER'
             """)
