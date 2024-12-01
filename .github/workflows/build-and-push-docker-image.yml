@@ -82,5 +82,5 @@ jobs:
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
           push: true
-          cache-from: type=gha,scope=${{ matrix.path }}
-          cache-to: type=gha,scope=${{ matrix.path }},mode=max
+          cache-from: type=gha,ref=${{ matrix.image }}:buildcache
+          cache-to: type=gha,ref=${{ matrix.image }}:buildcache,mode=max
