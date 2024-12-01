@@ -81,7 +81,7 @@ public class LeaderboardTaskScheduler {
         logger.info("Scheduling Slack message to run with {}", cron);
         taskScheduler.schedule(slackWeeklyLeaderboardTask, new CronTrigger(cron));
     }
-
+  
     private void scheduleLeaguePointsUpdate(String cron) {
         // if (!runScheduledMessage) return;
 
