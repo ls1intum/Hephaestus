@@ -26,19 +26,19 @@ jobs:
       matrix:
         include:
           - dockerfile: ./webapp/Dockerfile
-            image: ls1intum/Hephaestus/hephaestus-webapp
+            image: ls1intum/Hephaestus/webapp
             context: ./webapp
             path: webapp
           - dockerfile: ./server/intelligence-service/Dockerfile
-            image: ls1intum/Hephaestus/hephaestus-intelligence-service
+            image: ls1intum/Hephaestus/intelligence-service
             context: ./server/intelligence-service
             path: intelligence-service
           - dockerfile: ./server/webhook-ingest/Dockerfile
-            image: ls1intum/Hephaestus/hephaestus-webhook-ingest
+            image: ls1intum/Hephaestus/webhook-ingest
             context: ./server/webhook-ingest
             path: webhook-ingest
           - dockerfile: ./server/application-server/Dockerfile
-            image: ls1intum/Hephaestus/hephaestus-application-server
+            image: ls1intum/Hephaestus/application-server
             context: ./server/application-server
             path: application-server
 
@@ -72,6 +72,7 @@ jobs:
             type=raw,value=latest,enable={{is_default_branch}}
             type=ref,event=branch
             type=ref,event=pr
+            type=semver,pattern={{version}}
 
       - name: Build and push Docker Image
         uses: docker/build-push-action@v6
@@ -84,3 +85,6 @@ jobs:
           push: true
           cache-from: type=gha,scope=${{ matrix.image }}
           cache-to: type=gha,scope=${{ matrix.image }},mode=max
+
+      - name: Debug Tags
+        run: echo "${{ steps.meta.outputs.tags }}"
