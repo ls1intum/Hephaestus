@@ -1,22 +1,21 @@
-name: Build and Push Docker Image
+name: Build and Push Docker Images
 
 on:
-  workflow_call:
-    inputs:
-      platforms:
-        type: string
-        description: "List of platforms for which to build the image"
-        default: linux/amd64,linux/arm64
-      registry:
-        type: string
-        default: ghcr.io
-        description: "The registry to push the image to (Default: ghcr.io)"
-      
-    secrets:
-      registry-user:
-        required: false
-      registry-password:
-        required: false
+  pull_request:
+    paths-ignore:
+    - 'README.md'
+    - 'CODE_OF_CONDUCT.md'
+    - 'CONTRIBUTING.md'
+    - 'LICENSE'
+    - 'SECURITY.md'
+    - 'docs/**'
+    - 'keycloakify/**'
+    - '.github/**'
+    - '!.github/workflows/build-and-push-docker-image.yml'
+    - '!.github/workflows/dev.yml'
+  push:
+    branches:
+      - develop
 
 jobs:
   build:
@@ -26,19 +25,19 @@ jobs:
       matrix:
         include:
           - dockerfile: ./webapp/Dockerfile
-            image: ghcr.io/ls1intum/Hephaestus/hephaestus-webapp
+            image: ls1intum/Hephaestus/hephaestus-webapp
             context: ./webapp
             path: webapp
           - dockerfile: ./server/intelligence-service/Dockerfile
-            image: ghcr.io/ls1intum/Hephaestus/hephaestus-intelligence-service
+            image: ls1intum/Hephaestus/hephaestus-intelligence-service
             context: ./server/intelligence-service
             path: server/intelligence-service
           - dockerfile: ./server/webhook-ingest/Dockerfile
-            image: ghcr.io/ls1intum/Hephaestus/hephaestus-webhook-ingest
+            image: ls1intum/Hephaestus/hephaestus-webhook-ingest
             context: ./server/webhook-ingest
             path: server/webhook-ingest
           - dockerfile: ./server/application-server/Dockerfile
-            image: ghcr.io/ls1intum/Hephaestus/hephaestus-application-server
+            image: ls1intum/Hephaestus/hephaestus-application-server
             context: ./server/application-server
             path: server/application-server
 
@@ -59,15 +58,15 @@ jobs:
       - name: Log in to the Container registry
         uses: docker/login-action@v3
         with:
-          registry: ${{ inputs.registry }}
-          username: ${{ secrets.registry-user || github.actor }}
-          password: ${{ secrets.registry-password || secrets.GITHUB_TOKEN }}
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Extract metadata (tags, labels) for Docker
         id: meta
         uses: docker/metadata-action@v5
         with:
-          images: ${{ inputs.registry }}/${{ matrix.image }}
+          images: ghcr.io/${{ matrix.image }}
           tags: |
             type=raw,value=latest,enable={{is_default_branch}}
             type=ref,event=branch
@@ -78,7 +77,7 @@ jobs:
         with:
           context: ${{ matrix.context }}
           file: ${{ matrix.dockerfile }}
-          platforms: ${{ inputs.platforms }}
+          platforms: linux/amd64,linux/arm64
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
           push: true
