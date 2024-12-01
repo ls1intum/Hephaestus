@@ -27,7 +27,7 @@ public class LeaguePointsCalculationService {
         // Additional bonus for placements
         int placementBonus = calculatePlacementBonus(entry.rank());
         // Calculate final point change
-        int pointChange = (int) (kFactor * (performanceBonus - decay));
+        int pointChange = (int) (kFactor * (performanceBonus + placementBonus - decay));
         // Apply minimum change to prevent extreme swings
         int newPoints = Math.max(0, oldPoints + pointChange);
         
