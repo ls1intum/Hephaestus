@@ -2,7 +2,7 @@ from fastapi import FastAPI
 from pydantic import BaseModel
 import os
 from typing import List
-from config import settings
+from .config import settings
 from typing_extensions import Annotated, TypedDict
 from langchain.chat_models.base import BaseChatModel
 from langchain_openai import ChatOpenAI, AzureChatOpenAI
@@ -57,7 +57,6 @@ prompt = "You are an AI mentor helping a students working on the software engine
 
 
 def ai_mentor(state: State):
-    print(SystemMessage(content=prompt) + state["messages"])
     return {
         "messages": [model.invoke(state["messages"] + [SystemMessage(content=prompt)])]
     }
@@ -65,7 +64,6 @@ def ai_mentor(state: State):
 
 graph_builder = StateGraph(State)
 graph_builder.add_node("ai_mentor", ai_mentor)
-
 graph_builder.add_edge(START, "ai_mentor")
 graph_builder.add_edge("ai_mentor", END)
 graph = graph_builder.compile()
