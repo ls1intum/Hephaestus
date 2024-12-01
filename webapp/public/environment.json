@@ -1,0 +1,20 @@
+{
+  "clientUrl": "http://localhost:4200",
+  "serverUrl": "http://localhost:8080",
+  "keycloak": {
+    "url": "http://localhost:8081",
+    "realm": "hephaestus",
+    "clientId": "hephaestus",
+    "skipLoginPage": false
+  },
+  "umami": {
+    "enabled": false,
+    "scriptUrl": "",
+    "websiteId": "",
+    "domains": ""
+  },
+  "legal": {
+    "imprintHtml": "<p>This is the imprint.</p>",
+    "privacyHtml": "<p>This is the privacy policy.</p>"
+  }
+}

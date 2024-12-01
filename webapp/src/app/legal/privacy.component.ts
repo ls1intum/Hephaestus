@@ -1,5 +1,5 @@
-import { Component } from '@angular/core';
-import { environment } from 'environments/environment';
+import { Component, inject } from '@angular/core';
+import { EnvironmentService } from '@app/environment.service';
 
 @Component({
   selector: 'app-privacy',
@@ -12,5 +12,6 @@ import { environment } from 'environments/environment';
   `
 })
 export class PrivacyComponent {
-  imprintHtml = environment.legal.privacyHtml;
+  private environmentService = inject(EnvironmentService);
+  imprintHtml = this.environmentService.env.legal.privacyHtml;
 }

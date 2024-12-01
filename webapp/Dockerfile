@@ -8,53 +8,34 @@ RUN npm install
 
 COPY . ./
 
-# Ensure .env file exists
-RUN mv .env* .env || true
-RUN touch .env
-RUN cat .env
-
-# Fix buggy replacement of COOLIFY_URL in .env
-RUN COOLIFY_URL_VALUE=$(grep '^COOLIFY_URL=' .env | cut -d '=' -f2) && \
-    sed -i "s|\$COOLIFY_URL|$COOLIFY_URL_VALUE|g" .env
-
-# Export environment variables from .env
-# This assumes that .env contains lines like VARIABLE=value
-# and does not contain spaces around the '='
-RUN set -a && \
-    . /app/.env && \
-    set +a && \
-    echo "Generating environment.prod.ts" && \
-    cat > src/environments/environment.prod.ts <<EOF
-export const environment = {
-  clientUrl: '${APPLICATION_CLIENT_URL}',
-  serverUrl: '${APPLICATION_SERVER_URL}',
-  keycloak: {
-    url: '${KEYCLOAK_URL}',
-    realm: '${KEYCLOAK_REALM}',
-    clientId: '${KEYCLOAK_CLIENT_ID}',
-    skipLoginPage: ${KEYCLOAK_SKIP_LOGIN}
-  },
-  umami: {
-    enabled: '${UMAMI_ENABLED}',
-    scriptUrl: '${UMAMI_SCRIPT_URL}',
-    websiteId: '${UMAMI_WEBSITE_ID}',
-    domains: '${UMAMI_DOMAINS}'
-  },
-  legal: {
-    imprintHtml: '${LEGAL_IMPRINT_HTML}',
-    privacyHtml: '${LEGAL_PRIVACY_HTML}'
-  }
-};
-EOF
-
 RUN npm run build
 
 FROM nginx:stable-alpine
 
+ENV APPLICATION_CLIENT_URL=https://default-client.url
+ENV APPLICATION_SERVER_URL=https://default-server.url
+
+ENV KEYCLOAK_URL=https://default-keycloak.url
+ENV KEYCLOAK_REALM=default-realm
+ENV KEYCLOAK_CLIENT_ID=default-client-id
+ENV KEYCLOAK_SKIP_LOGIN=false
+
+ENV LEGAL_IMPRINT_HTML="<p>Default Imprint</p>"
+ENV LEGAL_PRIVACY_HTML="<p>Default Privacy</p>"
+
+ENV UMAMI_ENABLED=false
+ENV UMAMI_SCRIPT_URL=""
+ENV UMAMI_WEBSITE_ID=""
+ENV UMAMI_DOMAINS=""
+
 COPY --from=build /app/dist/webapp/browser /usr/share/nginx/html
+
+COPY generate_config.sh /usr/local/bin/generate_config.sh
+RUN chmod +x /usr/local/bin/generate_config.sh
 
 COPY nginx.conf /etc/nginx/conf.d/default.conf
 
 EXPOSE 80
 
+ENTRYPOINT ["/usr/local/bin/generate_config.sh"]
 CMD ["nginx", "-g", "daemon off;"]

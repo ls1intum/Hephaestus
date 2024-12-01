@@ -9,9 +9,9 @@ import { BrnMenuTriggerDirective } from '@spartan-ng/ui-menu-brain';
 import { SecurityStore } from '@app/core/security/security-store.service';
 import { ThemeSwitcherComponent } from '@app/core/theme/theme-switcher.component';
 import { RequestFeatureComponent } from './request-feature/request-feature.component';
-import { environment } from 'environments/environment';
 import { lucideUser, lucideLogOut, lucideSettings } from '@ng-icons/lucide';
 import { provideIcons } from '@ng-icons/core';
+import { EnvironmentService } from '@app/environment.service';
 
 @Component({
   selector: 'app-header',
@@ -38,6 +38,8 @@ import { provideIcons } from '@ng-icons/core';
   ]
 })
 export class HeaderComponent {
+  private environmentService = inject(EnvironmentService);
+
   protected Hammer = Hammer;
 
   securityStore = inject(SecurityStore);
@@ -49,11 +51,11 @@ export class HeaderComponent {
   }
 
   protected signIn() {
-    if (environment.keycloak.skipLoginPage) {
+    if (this.environmentService.env.keycloak.skipLoginPage) {
       const authUrl =
-        `${environment.keycloak.url}/realms/${environment.keycloak.realm}/protocol/openid-connect/auth` +
-        `?client_id=${encodeURIComponent(environment.keycloak.clientId)}` +
-        `&redirect_uri=${encodeURIComponent(environment.clientUrl)}` +
+        `${this.environmentService.env.keycloak.url}/realms/${this.environmentService.env.keycloak.realm}/protocol/openid-connect/auth` +
+        `?client_id=${encodeURIComponent(this.environmentService.env.keycloak.clientId)}` +
+        `&redirect_uri=${encodeURIComponent(this.environmentService.env.clientUrl)}` +
         `&response_type=code` +
         `&scope=openid` +
         `&kc_idp_hint=${encodeURIComponent('github')}`;

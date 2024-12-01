@@ -1,5 +1,5 @@
-import { Injectable } from '@angular/core';
-import { environment } from 'environments/environment';
+import { inject, Injectable } from '@angular/core';
+import { EnvironmentService } from '@app/environment.service';
 import Keycloak from 'keycloak-js';
 
 export interface UserProfile {
@@ -17,6 +17,8 @@ export interface UserProfile {
 
 @Injectable({ providedIn: 'root' })
 export class KeycloakService {
+  private environmentService = inject(EnvironmentService);
+
   _keycloak: Keycloak | undefined;
   profile: UserProfile | undefined;
   tokenRefreshInterval = 60; // in seconds
@@ -24,9 +26,9 @@ export class KeycloakService {
   get keycloak() {
     if (!this._keycloak) {
       this._keycloak = new Keycloak({
-        url: environment.keycloak.url,
-        realm: environment.keycloak.realm,
-        clientId: environment.keycloak.clientId
+        url: this.environmentService.env.keycloak.url,
+        realm: this.environmentService.env.keycloak.realm,
+        clientId: this.environmentService.env.keycloak.clientId
       });
     }
     return this._keycloak;
@@ -73,6 +75,6 @@ export class KeycloakService {
   }
 
   logout() {
-    return this.keycloak.logout({ redirectUri: environment.clientUrl });
+    return this.keycloak.logout({ redirectUri: this.environmentService.env.clientUrl });
   }
 }
