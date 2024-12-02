@@ -1,0 +1,88 @@
+<div class="flex flex-col gap-8">
+  <div>
+    <p class="text-xl font-semibold">Open pull requests</p>
+    <div class="flex flex-row justify-between pt-2 w-full">
+      <div class="flex flex-col w-1/2 gap-2 m-1 mr-3">
+        @if (query.data()?.pullRequests) {
+          @for (activity of query.data()?.pullRequests; track activity.id) {
+            <app-issue-card
+              class="w-full"
+              [title]="activity.title"
+              [number]="activity.number"
+              [additions]="activity.additions"
+              [deletions]="activity.deletions"
+              [htmlUrl]="activity.htmlUrl"
+              [repositoryName]="activity.repository?.name"
+              [createdAt]="activity.createdAt"
+              [state]="activity.state"
+              [isDraft]="activity.isDraft"
+              [isMerged]="activity.isMerged"
+              [pullRequestLabels]="activity.labels"
+            >
+            </app-issue-card>
+          }
+        }
+      </div>
+      <div class="border-l mx-4 border-border"></div>
+      <div class="w-1/2">
+        <p>Pull request metrics coming</p>
+      </div>
+    </div>
+  </div>
+
+  <div>
+    <p class="text-xl font-semibold">Open issues</p>
+    <div class="flex flex-row justify-between pt-2 w-full">
+      <div class="flex flex-col w-1/2 gap-2 m-1 mr-3">
+        @if (query.data()?.issues) {
+          @for (issue of query.data()?.issues; track issue.id) {
+            <app-issue-card
+              class="w-full"
+              [title]="issue.title"
+              [number]="issue.number"
+              [htmlUrl]="issue.htmlUrl"
+              [repositoryName]="issue.repositoryNameWithOwner"
+              [createdAt]="issue.createdAt"
+              [state]="issue.state"
+              [isIssue]="true"
+            >
+            </app-issue-card>
+          }
+        }
+      </div>
+      <div class="border-l mx-4 border-border"></div>
+      <div class="w-1/2">
+        <p>Issue metrics coming</p>
+      </div>
+    </div>
+
+    <div>
+      <p class="text-xl font-semibold">Open reviews</p>
+      <div class="flex flex-row justify-between pt-2 w-full">
+        <div class="flex flex-col w-1/2 gap-2 m-1 mr-3">
+          @if (query.data()?.reviews) {
+            @for (review of query.data()?.reviews; track review.id) {
+              <app-issue-card
+                class="w-full"
+                [title]="review.pullRequest?.title"
+                [number]="review.pullRequest?.number"
+                [htmlUrl]="review.pullRequest?.htmlUrl"
+                [repositoryName]="review.pullRequest?.repository?.name"
+                [state]="review.pullRequest?.state"
+                [isDraft]="review.pullRequest?.isDraft"
+                [isMerged]="review.pullRequest?.isMerged"
+                [additions]="review.pullRequest?.additions"
+                [deletions]="review.pullRequest?.deletions"
+              >
+              </app-issue-card>
+            }
+          }
+        </div>
+        <div class="border-l mx-4 border-border"></div>
+        <div class="w-1/2">
+          <p>Review metrics coming</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>

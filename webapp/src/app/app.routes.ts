@@ -39,6 +39,7 @@ export const routes: Routes = [
   { path: 'settings', component: SettingsComponent },
   { path: 'imprint', component: ImprintComponent },
   { path: 'privacy', component: PrivacyComponent },
+  { path: 'activity/:id', component: ActivityDashboardComponent },
 
   // Protected routes
   {
@@ -50,7 +51,5 @@ export const routes: Routes = [
       { path: 'settings', component: SettingsComponent },
       { path: 'workspace', component: WorkspaceComponent, canActivate: [AdminGuard] }
     ]
-  },
-  { path: 'user/:id', component: UserProfileComponent },
-  { path: 'activity/:id', component: ActivityDashboardComponent }
+  }
 ];

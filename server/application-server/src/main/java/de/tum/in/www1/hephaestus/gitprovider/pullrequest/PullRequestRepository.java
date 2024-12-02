@@ -64,8 +64,8 @@ public interface PullRequestRepository extends JpaRepository<PullRequest, Long> 
         JOIN FETCH p.author
         LEFT JOIN FETCH p.assignees
         LEFT JOIN FETCH p.repository
-        WHERE LOWER(:reviewerLogin) IN (SELECT LOWER(u.login) FROM p.requestedReviewers u)
+        WHERE LOWER(:reviewerLogin) IN (SELECT LOWER(u.login) FROM p.requestedReviewers u) and p.state = 'OPEN'
         ORDER BY p.createdAt DESC
        """)
-    List<PullRequest> findReviewRequestedByLogin(@Param("reviewerLogin") String reviewerLogin);
+    List<PullRequest> findOpenReviewRequestedByLogin(@Param("reviewerLogin") String reviewerLogin);
 }

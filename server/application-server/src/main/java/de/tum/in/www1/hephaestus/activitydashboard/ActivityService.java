@@ -11,6 +11,7 @@ import org.springframework.stereotype.Service;
 
 import java.util.List;
 import java.util.Set;
+import java.util.stream.Stream;
 
 @Service
 public class ActivityService {
@@ -51,17 +52,14 @@ public class ActivityService {
     }
 
     private List<ReviewActivityDTO> getReviewedOrRequestedPullRequests(String login) {
-        List<ReviewActivityDTO> reviews = pullRequestReviewRepository.findAllOpenReviewsByAuthorLogin(login)
+        Stream<ReviewActivityDTO> reviews = pullRequestReviewRepository.findAllOpenReviewsByAuthorLogin(login)
                 .stream()
-                .map(ReviewActivityDTO::fromPullRequestReview)
-                .toList();
+                .map(ReviewActivityDTO::fromPullRequestReview);
 
-        List<ReviewActivityDTO> requestedReviews = pullRequestRepository.findReviewRequestedByLogin(login)
+        Stream<ReviewActivityDTO> requestedReviews = pullRequestRepository.findOpenReviewRequestedByLogin(login)
                 .stream()
-                .map(ReviewActivityDTO::fromPullRequest)
-                .toList();
+                .map(ReviewActivityDTO::fromPullRequest);
 
-        requestedReviews.addAll(reviews);
-        return requestedReviews;
+        return Stream.concat(reviews, requestedReviews).toList();
     }
 }
