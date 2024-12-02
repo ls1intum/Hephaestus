@@ -31,7 +31,7 @@ public class LeaguePointsCalculationService {
         // Apply minimum change to prevent extreme swings
         int newPoints = Math.max(0, oldPoints + pointChange);
         
-        logger.info("Points calculation: old={}, k={} decay={}, performanceBonus={}, placement={}, pointchange={}, new={}", 
+        logger.info("Points calculation: old={}, k={}, decay={}, performanceBonus={}, placement={}, pointchange={}, new={}", 
             oldPoints, kFactor, decay, performanceBonus, placementBonus, pointChange, newPoints);
         
         return newPoints;
@@ -40,7 +40,7 @@ public class LeaguePointsCalculationService {
     /**
      * Calculate the K factor for the user based on their current points and if they are a new player.
      * @param user
-     * @return
+     * @return K factor
      * @see <a href="https://en.wikipedia.org/wiki/Elo_rating_system#Most_accurate_K-factor">Wikipedia: Most accurate K-factor</a>
      */
     private double getKFactor(User user) {
@@ -58,7 +58,7 @@ public class LeaguePointsCalculationService {
     /**
      * Check if the user's earliest merged pull request is within the last 30 days.
      * @param user
-     * @return
+     * @return true if the pull request is within the last 30 days
      */
     private boolean isNewPlayer(User user) {
         return user.getMergedPullRequests().stream()
@@ -70,7 +70,7 @@ public class LeaguePointsCalculationService {
     /**
      * Calculate the base decay in points based on the current points.
      * @param currentPoints
-     * @return
+     * @return Amount of decay points
      */
     private int calculateDecay(int currentPoints) {
         // 5% decay of current points, minimum 10 points if they have any points
