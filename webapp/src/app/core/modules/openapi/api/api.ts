@@ -1,3 +1,6 @@
+export * from './activity.service';
+import { ActivityService } from './activity.service';
+export * from './activity.serviceInterface';
 export * from './leaderboard.service';
 import { LeaderboardService } from './leaderboard.service';
 export * from './leaderboard.serviceInterface';
@@ -19,4 +22,4 @@ export * from './user.serviceInterface';
 export * from './workspace.service';
 import { WorkspaceService } from './workspace.service';
 export * from './workspace.serviceInterface';
-export const APIS = [LeaderboardService, MessageService, MetaService, SessionService, TeamService, UserService, WorkspaceService];
+export const APIS = [ActivityService, LeaderboardService, MessageService, MetaService, SessionService, TeamService, UserService, WorkspaceService];
