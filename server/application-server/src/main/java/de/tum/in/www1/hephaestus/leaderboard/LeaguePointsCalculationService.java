@@ -73,7 +73,7 @@ public class LeaguePointsCalculationService {
      * @return
      */
     private int calculateDecay(int currentPoints) {
-        // 10% decay of current points, minimum 10 points if they have any points
+        // 5% decay of current points, minimum 10 points if they have any points
         return currentPoints > 0 ? Math.max(10, (int)(currentPoints * 0.05)) : 0;
     }
     

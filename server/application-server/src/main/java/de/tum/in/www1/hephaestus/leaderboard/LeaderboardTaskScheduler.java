@@ -41,6 +41,7 @@ public class LeaderboardTaskScheduler {
 
     @Autowired
     private SlackWeeklyLeaderboardTask slackWeeklyLeaderboardTask;
+
     @Autowired
     private LeaguePointsUpdateTask leaguePointsUpdateTask;
 
@@ -83,8 +84,6 @@ public class LeaderboardTaskScheduler {
     }
   
     private void scheduleLeaguePointsUpdate(String cron) {
-        // if (!runScheduledMessage) return;
-
         logger.info("Scheduling league points update to run with {}", cron);
         taskScheduler.schedule(leaguePointsUpdateTask, new CronTrigger(cron));
     }

@@ -39,8 +39,8 @@ public class LeaguePointsUpdateTask implements Runnable {
     }
 
     /**
-     * Returns a consumer that updates the ranking points of a user based on its leaderboard entry.
-     * @return
+     * Update ranking points of a user based on its leaderboard entry.
+     * @return {@code Consumer} that updates {@code leaguePoints} based on its leaderboard entry.
      */
     private Consumer<? super LeaderboardEntryDTO> updateLeaderboardEntry() {
         return entry -> {
@@ -52,8 +52,8 @@ public class LeaguePointsUpdateTask implements Runnable {
     }
 
     /**
-     * Returns the most recently completed leaderboard
-     * @return
+     * Retrieves the latest leaderboard based on the scheduled time of the environment.
+     * @return List of {@code LeaderboardEntryDTO} representing the latest leaderboard
      */
     private List<LeaderboardEntryDTO> getLatestLeaderboard() {
         String[] timeParts = scheduledTime.split(":");
