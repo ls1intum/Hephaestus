@@ -64,7 +64,7 @@ public class LeaguePointsCalculationService {
         return user.getMergedPullRequests().stream()
             .filter(PullRequest::isMerged)
             .map(PullRequest::getMergedAt)
-            .anyMatch(date -> date.isAfter(OffsetDateTime.now().minusDays(30)));
+            .noneMatch(date -> date.isAfter(OffsetDateTime.now().minusDays(30)));
     }
     
     /**
