@@ -11,10 +11,28 @@ import org.springframework.stereotype.Service;
 public class LeaguePointsCalculationService {
     private final Logger logger = LoggerFactory.getLogger(LeaguePointsCalculationService.class);
 
+    // Starting points for new players
+    public static int POINTS_DEFAULT = 1000;
+    // Upper bound for first reducting in the k-factor
+    public static int POINTS_THRESHOLD_HIGH = 1750;
+    // Lower bound for first reducting in the k-factor
+    public static int POINTS_THRESHOLD_LOW = 1250;
+    // Minimum amount of points to decay each cycle
+    public static int DECAY_MINIMUM = 10;
+    // Factor to determine how much of the current points are decayed each cycle
+    public static double DECAY_FACTOR = 0.05;
+    // K-factors depending on the player's league points
+    public static double K_FACTOR_NEW_PLAYER = 2.0;
+    public static double K_FACTOR_LOW_POINTS = 1.5;
+    public static double K_FACTOR_MEDIUM_POINTS = 1.2;
+    public static double K_FACTOR_HIGH_POINTS = 1.1;
+
+
+
     public int calculateNewPoints(User user, LeaderboardEntryDTO entry) {
-        // Initialize new players with 1000 points
+        // Initialize points for new players
         if (user.getLeaguePoints() == 0) {
-            user.setLeaguePoints(1000);
+            user.setLeaguePoints(POINTS_DEFAULT);
         }
 
         int oldPoints = user.getLeaguePoints();
@@ -39,19 +57,21 @@ public class LeaguePointsCalculationService {
 
     /**
      * Calculate the K factor for the user based on their current points and if they are a new player.
+     * The K-factor is used to control the sensitivity of the rating system to changes in the leaderboard.
+     * New players have a higher K-factor to allow them to quickly reach their true skill level.
      * @param user
      * @return K factor
      * @see <a href="https://en.wikipedia.org/wiki/Elo_rating_system#Most_accurate_K-factor">Wikipedia: Most accurate K-factor</a>
      */
     private double getKFactor(User user) {
         if (isNewPlayer(user)) {
-            return 2.0;
-        } else if (user.getLeaguePoints() < 1400) {
-            return 1.5;
-        } else if (user.getLeaguePoints() < 1800) {
-            return 1.2;
+            return K_FACTOR_NEW_PLAYER;
+        } else if (user.getLeaguePoints() < POINTS_THRESHOLD_LOW) {
+            return K_FACTOR_LOW_POINTS;
+        } else if (user.getLeaguePoints() < POINTS_THRESHOLD_HIGH) {
+            return K_FACTOR_MEDIUM_POINTS;
         } else {
-            return 1.1;
+            return K_FACTOR_HIGH_POINTS;
         }
     }
 
@@ -69,19 +89,29 @@ public class LeaguePointsCalculationService {
     
     /**
      * Calculate the base decay in points based on the current points.
-     * @param currentPoints
+     * @param currentPoints Current amount of league points
      * @return Amount of decay points
      */
     private int calculateDecay(int currentPoints) {
-        // 5% decay of current points, minimum 10 points if they have any points
-        return currentPoints > 0 ? Math.max(10, (int)(currentPoints * 0.05)) : 0;
+        // decay a part of the current points, at least DECAY_MINIMUM points
+        return currentPoints > 0 ? Math.max(DECAY_MINIMUM, (int)(currentPoints * DECAY_FACTOR)) : 0;
     }
     
+    /**
+     * Calculate the bonus points based on the leaderboard score.
+     * @param score Leaderboard score
+     * @return Bonus points
+     */
     private int calculatePerformanceBonus(int score) {
         // Convert leaderboard score directly to points with diminishing returns
         return (int)(Math.sqrt(score) * 10);
     }
 
+    /**
+     * Calculate the bonus points based on the placement in the leaderboard.
+     * @param placement Placement in the leaderboard
+     * @return Bonus points
+     */
     private int calculatePlacementBonus(int placement) {
         // Bonus for top 3 placements
         return placement <= 3 ? 20 * (4 - placement) : 0;
