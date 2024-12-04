@@ -1,6 +1,11 @@
 export const environment = {
   clientUrl: 'http://localhost:4200',
   serverUrl: 'http://localhost:8080',
+  version: '0.0.1',
+  sentry: {
+    dsn: '',
+    environment: 'prod'
+  },
   keycloak: {
     url: 'http://localhost:8081',
     realm: 'hephaestus',
