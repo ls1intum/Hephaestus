@@ -33,7 +33,7 @@ public class SentryConfiguration {
             logger.info("Sentry is disabled in specs profile");
             return;
         }
-        
+
         if (sentryDsn.isEmpty() || sentryDsn.get().isEmpty()) {
             logger.info("Sentry is disabled: Provide a DSN to enable Sentry.");
             return;
@@ -41,7 +41,6 @@ public class SentryConfiguration {
 
         try {
             final String dsn = sentryDsn.get() + "?stacktrace.app.packages=de.tum.in.www1.hephaestus";
-            logger.info("Sentry DSN: {}", dsn);
 
             Sentry.init(options -> {
                 options.setDsn(dsn);
@@ -50,6 +49,8 @@ public class SentryConfiguration {
                 options.setRelease(hephaestusVersion);
                 options.setTracesSampleRate(getTracesSampleRate());
             });
+            
+            logger.info("Sentry configuration was successful");
         } catch (Exception ex) {
             logger.error("Sentry configuration was not successful due to exception!", ex);
         }
