@@ -3,8 +3,8 @@ export const environment = {
   serverUrl: 'http://localhost:8080',
   version: '0.0.1',
   sentry: {
-    dsn: '',
-    environment: 'local'
+    dsn: 'https://289f1f62feeb4f70a8878dc0101825cd@sentry.ase.in.tum.de/3',
+    environment: 'prod'
   },
   keycloak: {
     url: 'http://localhost:8081',

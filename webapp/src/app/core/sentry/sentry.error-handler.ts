@@ -26,6 +26,8 @@ export class SentryErrorHandler extends ErrorHandler {
       integrations: [Sentry.browserTracingIntegration()],
       tracesSampleRate: env.sentry.environment !== 'prod' ? 1.0 : 0.2
     });
+
+    console.log('Sentry initialized');
   }
 
   /**
@@ -37,9 +39,9 @@ export class SentryErrorHandler extends ErrorHandler {
           super.handleError(error);
           return;
       }
-      if (this.environment.sentry.environment !== 'prod') {
-          const exception = error.error || error.message || error.originalError || error;
-          Sentry.captureException(exception);
+      if (this.environment.sentry.environment !== 'local') {
+        const exception = error.error || error.message || error.originalError || error;
+        Sentry.captureException(exception);
       }
       super.handleError(error);
   }
