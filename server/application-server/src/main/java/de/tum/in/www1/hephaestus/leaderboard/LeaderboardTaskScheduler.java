@@ -1,5 +1,6 @@
 package de.tum.in.www1.hephaestus.leaderboard;
 
+import de.tum.in.www1.hephaestus.leaderboard.tasks.LeaguePointsUpdateTask;
 import de.tum.in.www1.hephaestus.leaderboard.tasks.SlackWeeklyLeaderboardTask;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -41,6 +42,9 @@ public class LeaderboardTaskScheduler {
     @Autowired
     private SlackWeeklyLeaderboardTask slackWeeklyLeaderboardTask;
 
+    @Autowired
+    private LeaguePointsUpdateTask leaguePointsUpdateTask;
+
 
     @EventListener(ApplicationReadyEvent.class)
     public void activateTaskScheduler() {
@@ -61,7 +65,7 @@ public class LeaderboardTaskScheduler {
         }
 
         scheduleSlackMessage(cron);
-        
+        scheduleLeaguePointsUpdate(cron);
     }
 
     /**
@@ -77,5 +81,10 @@ public class LeaderboardTaskScheduler {
 
         logger.info("Scheduling Slack message to run with {}", cron);
         taskScheduler.schedule(slackWeeklyLeaderboardTask, new CronTrigger(cron));
+    }
+  
+    private void scheduleLeaguePointsUpdate(String cron) {
+        logger.info("Scheduling league points update to run with {}", cron);
+        taskScheduler.schedule(leaguePointsUpdateTask, new CronTrigger(cron));
     }
 }

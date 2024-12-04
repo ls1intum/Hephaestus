@@ -98,6 +98,9 @@ public class User extends BaseGitServiceEntity {
     @ToString.Exclude
     private Set<PullRequestReviewComment> reviewComments = new HashSet<>();
 
+    // Current ranking points for the leaderboard leagues
+    private int leaguePoints;
+
     public enum Type {
         USER, ORGANIZATION, BOT
     }
