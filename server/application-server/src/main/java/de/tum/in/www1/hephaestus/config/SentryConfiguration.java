@@ -37,7 +37,6 @@ public class SentryConfiguration {
         try {
             final String dsn = sentryDsn.get() + "?stacktrace.app.packages=de.tum.in.www1.hephaestus";
             logger.info("Sentry DSN: {}", dsn);
-            logger.info("Current environment: {}", getEnvironment());
 
             Sentry.init(options -> {
                 options.setDsn(dsn);
