@@ -41,10 +41,36 @@ export class KeycloakService {
     if (!authenticated) {
       return authenticated;
     }
+    // Load user profile
     this.profile = (await this.keycloak.loadUserInfo()) as unknown as UserProfile;
     this.profile.token = this.keycloak.token || '';
     this.profile.roles = this.keycloak.realmAccess?.roles || [];
+
     return true;
+  }
+
+  /**
+   * Update access token if it is about to expire or has expired
+   * This is independent from the silent check sso or refresh token validity.
+   * @returns
+   */
+  async updateToken() {
+    if (!this.keycloak.isTokenExpired(60)) {
+      return false;
+    }
+    try {
+      // Try to refresh token
+      const refreshed = await this.keycloak.updateToken(60);
+      if (refreshed) {
+        this.profile!.token = this.keycloak.token || '';
+      }
+      return refreshed;
+    } catch (error) {
+      console.error('Failed to refresh token:', error);
+      // Redirect to login if refresh fails
+      await this.keycloak.login();
+      return false;
+    }
   }
 
   login() {

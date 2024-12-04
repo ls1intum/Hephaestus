@@ -53,4 +53,14 @@ export class SecurityStore {
   async signOut() {
     await this.keycloakService.logout();
   }
+
+  async updateToken() {
+    await this.keycloakService.updateToken();
+    // update bearer in user with new token
+    const user = this.user();
+    if (user && this.keycloakService.profile) {
+      user.bearer = this.keycloakService.profile.token;
+      this.user.set(user);
+    }
+  }
 }
