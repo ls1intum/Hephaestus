@@ -622,6 +622,9 @@ components:
           type: string
         htmlUrl:
           type: string
+        leaguePoints:
+          type: integer
+          format: int32
     TeamInfo:
       required:
       - color

@@ -126,6 +126,23 @@ const config = {
             foreground: "var(--fgColor-sponsors)",
           },
         },
+        league: {
+          bronze: {
+            DEFAULT: "hsl(var(--league-bronze))",
+          },
+          silver: {
+            DEFAULT: "hsl(var(--league-silver))",
+          },
+          gold: {
+            DEFAULT: "hsl(var(--league-gold))",
+          },
+          diamond: {
+            DEFAULT: "hsl(var(--league-diamond))",
+          },
+          master: {
+            DEFAULT: "hsl(var(--league-master))",
+          },
+        }
       },
       borderRadius: {
         lg: "var(--radius)",

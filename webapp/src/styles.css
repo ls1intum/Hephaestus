@@ -32,6 +32,12 @@
     --input: 240 5.9% 90%;
     --ring: 240 5.9% 10%;
     --radius: 0.5rem;
+
+    --league-bronze: 30 58% 54%;
+    --league-silver: 0 0% 77%;
+    --league-gold: 48 97% 48%;
+    --league-diamond: 225 73% 53%;
+    --league-master: 330 100% 71;
   }
 
   .dark {

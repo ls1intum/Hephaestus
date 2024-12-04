@@ -2,8 +2,9 @@
   <thead appTableHeader>
     <tr appTableRow>
       <th appTableHead class="text-center">Rank</th>
+      <th appTableHead class="text-center px-0.5">League</th>
       <th appTableHead>Contributor</th>
-      <th appTableHead class="flex items-center gap-1 text-github-done-foreground">
+      <th appTableHead class="flex justify-center items-center gap-1 text-github-done-foreground">
         <hlm-icon size="sm" name="lucideAward" />
         Score
       </th>
@@ -14,6 +15,9 @@
     @if (isLoading()) {
       @for (entry of [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]; track entry; let idx = $index) {
         <tr appTableRow id="skeleton">
+          <td appTableCell class="flex justify-center">
+            <hlm-skeleton class="h-5 w-7" [style.width.px]="20 + 1 * idx" />
+          </td>
           <td appTableCell class="flex justify-center">
             <hlm-skeleton class="h-5 w-7" [style.width.px]="20 + 1 * idx" />
           </td>
@@ -44,6 +48,9 @@
       @for (entry of leaderboard(); track entry.user.login) {
         <tr appTableRow routerLink="/user/{{ entry.user.login }}" routerLinkActive="active" ariaCurrentWhenActive="page" [class]="trClass(entry)">
           <td appTableCell class="text-center">{{ entry.rank }}</td>
+          <td appTableCell class="flex justify-center items-center px-0.5">
+            <app-icon-league [leaguePoints]="entry.user.leaguePoints" />
+          </td>
           <td appTableCell class="py-2">
             <span class="flex items-center gap-2 font-medium">
               <hlm-avatar>

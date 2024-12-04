@@ -15,3 +15,17 @@ export function groupBy<T, K extends keyof any>(arr: T[], key: (i: T) => K) {
     {} as Record<K, T[]>
   );
 }
+
+export function getLeagueFromPoints(points: number) {
+  if (points < 1250) {
+    return 'bronze';
+  } else if (points < 1500) {
+    return 'silver';
+  } else if (points < 1750) {
+    return 'gold';
+  } else if (points < 2000) {
+    return 'diamond';
+  } else {
+    return 'master';
+  }
+}
