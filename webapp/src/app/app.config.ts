@@ -8,7 +8,8 @@ import { BASE_PATH } from 'app/core/modules/openapi';
 import { routes } from 'app/app.routes';
 import { AnalyticsService } from './analytics.service';
 import { securityInterceptor } from './core/security/security-interceptor';
-import { createErrorHandler, TraceService } from '@sentry/angular';
+import { TraceService } from '@sentry/angular';
+import { SentryErrorHandler } from './core/sentry/sentry.error-handler';
 
 function initializeAnalytics(analyticsService: AnalyticsService): () => void {
   return () => {
@@ -25,7 +26,7 @@ export const appConfig: ApplicationConfig = {
     provideAnimationsAsync(),
     { provide: BASE_PATH, useValue: environment.serverUrl },
     { provide: APP_INITIALIZER, useFactory: initializeAnalytics, multi: true, deps: [AnalyticsService] },
-    { provide: ErrorHandler, useValue: createErrorHandler() },
+    { provide: ErrorHandler, useClass: SentryErrorHandler },
     { provide: TraceService, deps: [Router] },
     {
         provide: APP_INITIALIZER,

@@ -3,7 +3,7 @@ import { AngularQueryDevtools } from '@tanstack/angular-query-devtools-experimen
 import { RouterOutlet } from '@angular/router';
 import { HeaderComponent } from '@app/core/header/header.component';
 import { FooterComponent } from './core/footer/footer.component';
-import { SentryService } from './core/sentry/sentry.service';
+import { SentryErrorHandler } from './core/sentry/sentry.error-handler';
 
 @Component({
   selector: 'app-root',
@@ -13,9 +13,13 @@ import { SentryService } from './core/sentry/sentry.service';
 })
 export class AppComponent {
   title = 'Hephaestus';
-  sentry = inject(SentryService);
+  sentry = inject(SentryErrorHandler);
 
   isDevMode() {
     return isDevMode();
+  }
+
+  constructor() {
+    this.sentry.init();
   }
 }
