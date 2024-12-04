@@ -73,6 +73,15 @@
                 "attributes": {}
             },
             {
+              "id": "a3e26e5c-415d-4033-b6af-d074de536cf5",
+              "name": "mentor_access",
+              "description": "",
+              "composite": false,
+              "clientRole": false,
+              "containerId": "69732d45-1431-4909-9335-9f39e304f823",
+              "attributes": {}
+            },
+            {
                 "id": "a0bcdf44-1bd1-4b3d-8667-021f2bc8802b",
                 "name": "uma_authorization",
                 "description": "${role_uma_authorization}",
@@ -82,13 +91,18 @@
                 "attributes": {}
             },
             {
-                "id": "4343b5c5-a9c1-4f09-a288-985a1e9600b7",
-                "name": "admin",
-                "description": "",
-                "composite": false,
-                "clientRole": false,
-                "containerId": "69732d45-1431-4909-9335-9f39e304f823",
-                "attributes": {}
+              "id": "4343b5c5-a9c1-4f09-a288-985a1e9600b7",
+              "name": "admin",
+              "description": "",
+              "composite": true,
+              "composites": {
+                "realm": [
+                  "mentor_access"
+                ]
+              },
+              "clientRole": false,
+              "containerId": "69732d45-1431-4909-9335-9f39e304f823",
+              "attributes": {}
             }
         ],
         "client": {
