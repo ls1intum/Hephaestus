@@ -1,0 +1,40 @@
+<div #chatMessagesContainer class="messages space-y-4 overflow-y-auto" style="max-height: 100%">
+  @for (message of messageHistory(); track message.id) {
+    <div class="flex w-full" [ngClass]="{ 'justify-end': message.sender === 'USER', 'justify-start': message.sender === 'LLM' }">
+      <div class="flex space-x-2 md:w-3/5" [ngClass]="{ 'flex-row-reverse': message.sender === 'USER' }">
+        @if (message.sender === 'USER') {
+          <div class="ml-2 flex flex-col">
+            <hlm-avatar>
+              <img [src]="'https://github.com/' + user()!.username + '.png'" [alt]="user()?.name + '\'s avatar'" hlmAvatarImage />
+              <span hlmAvatarFallback>
+                {{ user()?.name?.slice(0, 2)?.toUpperCase() ?? '?' }}
+              </span>
+            </hlm-avatar>
+          </div>
+        }
+
+        @if (message.sender === 'LLM') {
+          <div class="mr-2 flex flex-col">
+            <div class="w-10 h-10 bg-transparent border-2 border-cyan-500 rounded-full flex items-center justify-center">
+              <lucide-angular [img]="BotMessageSquare" class="size-6 text-cyan-500"></lucide-angular>
+            </div>
+          </div>
+        }
+
+        <div class="flex flex-col space-y-2" [ngClass]="{ 'items-end': message.sender === 'USER', 'items-start': message.sender === 'LLM' }">
+          <div
+            [ngClass]="{
+              'bg-cyan-500 text-white': message.sender === 'USER',
+              'bg-gray-200 text-black': message.sender === 'LLM'
+            }"
+            class="p-3 rounded-lg inline-block"
+            style="width: fit-content"
+          >
+            <p>{{ message.content }}</p>
+          </div>
+          <span class="text-xs text-gray-500"> {{ message.sender === 'USER' ? 'You' : 'AI Mentor' }} · {{ message.sentAt | date: 'shortTime' }} </span>
+        </div>
+      </div>
+    </div>
+  }
+</div>

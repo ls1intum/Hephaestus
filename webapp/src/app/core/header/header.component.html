@@ -8,6 +8,10 @@
       <a hlmBtn variant="link" routerLink="/workspace">Workspace</a>
     }
   </div>
+  @if (user()?.roles?.includes('ai-maintainer')) {
+    <app-ai-mentor class="hidden sm:inline-block" />
+    <app-ai-mentor class="sm:hidden" iconOnly />
+  }
   <app-request-feature class="hidden sm:inline-block" />
   <app-request-feature class="sm:hidden" iconOnly />
   <app-theme-switcher />
@@ -20,7 +24,6 @@
         </span>
       </hlm-avatar>
     </button>
-
     <ng-template #usermenu>
       <hlm-menu>
         <hlm-menu-label>{{ user()!.name }}</hlm-menu-label>

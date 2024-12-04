@@ -1,6 +1,7 @@
 import { Routes } from '@angular/router';
 import { AboutComponent } from '@app/about/about.component';
 import { HomeComponent } from '@app/home/home.component';
+import { ChatComponent } from '@app/chat/chat/chat.component';
 import { WorkspaceComponent } from '@app/workspace/workspace.component';
 import { UserProfileComponent } from '@app/user/user-profile.component';
 import { WorkspaceUsersComponent } from './workspace/users/users.component';
@@ -38,7 +39,7 @@ export const routes: Routes = [
   { path: 'settings', component: SettingsComponent },
   { path: 'imprint', component: ImprintComponent },
   { path: 'privacy', component: PrivacyComponent },
-
+  { path: 'chat', component: ChatComponent },
   // Protected routes
   {
     path: '',
