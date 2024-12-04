@@ -153,7 +153,7 @@ export class SessionService implements SessionServiceInterface {
             }
         }
 
-        let localVarPath = `/session`;
+        let localVarPath = `/mentor/session`;
         return this.httpClient.request<Session>('post', `${this.configuration.basePath}${localVarPath}`,
             {
                 context: localVarHttpContext,
@@ -223,7 +223,7 @@ export class SessionService implements SessionServiceInterface {
             }
         }
 
-        let localVarPath = `/session`;
+        let localVarPath = `/mentor/session`;
         return this.httpClient.request<Array<Session>>('get', `${this.configuration.basePath}${localVarPath}`,
             {
                 context: localVarHttpContext,

@@ -11,7 +11,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 
 @RestController
-@RequestMapping("/session")
+@RequestMapping("/mentor/session")
 public class SessionController {
 
     @Autowired

@@ -8,7 +8,7 @@
       <a hlmBtn variant="link" routerLink="/workspace">Workspace</a>
     }
   </div>
-  @if (user()?.roles?.includes('ai-maintainer')) {
+  @if (user()?.roles?.includes('mentor_access')) {
     <app-ai-mentor class="hidden sm:inline-block" />
     <app-ai-mentor class="sm:hidden" iconOnly />
   }
