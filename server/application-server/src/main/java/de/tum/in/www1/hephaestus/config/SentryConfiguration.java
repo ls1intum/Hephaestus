@@ -29,6 +29,11 @@ public class SentryConfiguration {
      */
     @PostConstruct
     public void init() {
+        if (environment.matchesProfiles("specs")) {
+            logger.info("Sentry is disabled in specs profile");
+            return;
+        }
+        
         if (sentryDsn.isEmpty() || sentryDsn.get().isEmpty()) {
             logger.info("Sentry is disabled: Provide a DSN to enable Sentry.");
             return;
