@@ -1,4 +1,4 @@
-package de.tum.in.www1.hephaestus.chat.session;
+package de.tum.in.www1.hephaestus.mentor.session;
 
 import java.time.OffsetDateTime;
 import java.util.ArrayList;
@@ -9,8 +9,8 @@ import lombok.Setter;
 import lombok.ToString;
 import org.springframework.lang.NonNull;
 import jakarta.persistence.*;
-import de.tum.in.www1.hephaestus.chat.message.Message;
 import de.tum.in.www1.hephaestus.gitprovider.user.User;
+import de.tum.in.www1.hephaestus.mentor.message.Message;
 
 @Entity
 @Table(name = "session")

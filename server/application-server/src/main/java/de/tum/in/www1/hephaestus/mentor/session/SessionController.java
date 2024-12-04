@@ -1,4 +1,4 @@
-package de.tum.in.www1.hephaestus.chat.session;
+package de.tum.in.www1.hephaestus.mentor.session;
 
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.bind.annotation.RequestMapping;

@@ -1,11 +1,10 @@
-package de.tum.in.www1.hephaestus.chat.message;
+package de.tum.in.www1.hephaestus.mentor.message;
 
 import java.time.OffsetDateTime;
 
 import org.springframework.lang.NonNull;
 import com.fasterxml.jackson.annotation.JsonInclude;
-
-import de.tum.in.www1.hephaestus.chat.message.Message.MessageSender;
+import de.tum.in.www1.hephaestus.mentor.message.Message.MessageSender;
 
 @JsonInclude(JsonInclude.Include.NON_EMPTY)
 public record MessageDTO(

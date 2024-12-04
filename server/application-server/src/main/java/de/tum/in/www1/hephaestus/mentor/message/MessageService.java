@@ -1,4 +1,4 @@
-package de.tum.in.www1.hephaestus.chat.message;
+package de.tum.in.www1.hephaestus.mentor.message;
 
 import java.util.List;
 import java.util.Optional;
@@ -6,15 +6,15 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
-import de.tum.in.www1.hephaestus.chat.message.Message.MessageSender;
-import de.tum.in.www1.hephaestus.chat.session.Session;
-import de.tum.in.www1.hephaestus.chat.session.SessionRepository;
 import de.tum.in.www1.hephaestus.intelligenceservice.ApiClient;
 import de.tum.in.www1.hephaestus.intelligenceservice.api.DefaultApi;
 import de.tum.in.www1.hephaestus.intelligenceservice.model.ChatMessage;
 import de.tum.in.www1.hephaestus.intelligenceservice.model.ChatRequest;
 
 import de.tum.in.www1.hephaestus.intelligenceservice.model.ChatResponse;
+import de.tum.in.www1.hephaestus.mentor.message.Message.MessageSender;
+import de.tum.in.www1.hephaestus.mentor.session.Session;
+import de.tum.in.www1.hephaestus.mentor.session.SessionRepository;
 
 @Service
 public class MessageService {

@@ -1,5 +1,6 @@
-package de.tum.in.www1.hephaestus.chat.message;
+package de.tum.in.www1.hephaestus.mentor.message;
 
+import de.tum.in.www1.hephaestus.mentor.session.Session;
 import jakarta.persistence.*;
 import java.time.OffsetDateTime;
 import lombok.Getter;
@@ -8,7 +9,6 @@ import lombok.Setter;
 import lombok.ToString;
 import org.hibernate.Length;
 import org.springframework.lang.NonNull;
-import de.tum.in.www1.hephaestus.chat.session.Session;
 
 @Entity
 @Table(name = "message")

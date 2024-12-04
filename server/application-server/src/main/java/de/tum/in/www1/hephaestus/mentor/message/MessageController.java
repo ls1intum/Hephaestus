@@ -1,4 +1,4 @@
-package de.tum.in.www1.hephaestus.chat.message;
+package de.tum.in.www1.hephaestus.mentor.message;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;

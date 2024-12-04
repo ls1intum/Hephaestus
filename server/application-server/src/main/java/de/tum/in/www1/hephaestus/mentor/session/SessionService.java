@@ -1,4 +1,4 @@
-package de.tum.in.www1.hephaestus.chat.session;
+package de.tum.in.www1.hephaestus.mentor.session;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
