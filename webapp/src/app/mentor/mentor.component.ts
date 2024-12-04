@@ -2,23 +2,23 @@ import { Component, inject, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { lastValueFrom } from 'rxjs';
 import { injectMutation, injectQuery } from '@tanstack/angular-query-experimental';
-import { SessionsCardComponent } from '../sessions-card/sessions-card.component';
-import { MessagesComponent } from '../messages/messages.component';
-import { InputComponent } from '../input/input.component';
+import { SessionsCardComponent } from './sessions-card/sessions-card.component';
+import { MessagesComponent } from './messages/messages.component';
+import { InputComponent } from './input/input.component';
 import { SecurityStore } from '@app/core/security/security-store.service';
 import { Message, Session } from '@app/core/modules/openapi';
 import { MessageService, SessionService } from '@app/core/modules/openapi';
 import { HlmButtonModule } from '@spartan-ng/ui-button-helm';
 import { HlmSpinnerComponent } from '@spartan-ng/ui-spinner-helm';
-import { FirstSessionCardComponent } from '../first-session-card/first-session-card.component';
+import { FirstSessionCardComponent } from './first-session-card/first-session-card.component';
 
 @Component({
-  selector: 'app-chat',
-  templateUrl: './chat.component.html',
+  selector: 'app-mentor',
+  templateUrl: './mentor.component.html',
   standalone: true,
   imports: [CommonModule, FirstSessionCardComponent, HlmSpinnerComponent, SessionsCardComponent, MessagesComponent, InputComponent, HlmButtonModule]
 })
-export class ChatComponent {
+export class MentorComponent {
   securityStore = inject(SecurityStore);
   messageService = inject(MessageService);
   sessionService = inject(SessionService);
