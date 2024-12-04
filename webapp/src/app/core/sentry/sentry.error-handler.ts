@@ -14,7 +14,6 @@ export class SentryErrorHandler extends ErrorHandler {
    * Initialize Sentry with environment.
    */
   async init() {
-    console.log('Initializing Sentry');
     const env = this.environment;
     if (!env || !env.version || !env.sentry?.dsn) {
       return;
