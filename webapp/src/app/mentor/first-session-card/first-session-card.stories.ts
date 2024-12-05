@@ -1,0 +1,13 @@
+import { type Meta, type StoryObj } from '@storybook/angular';
+import { FirstSessionCardComponent } from './first-session-card.component';
+
+const meta: Meta<FirstSessionCardComponent> = {
+  component: FirstSessionCardComponent,
+  tags: ['autodocs'],
+  args: {}
+};
+
+export default meta;
+type Story = StoryObj<FirstSessionCardComponent>;
+
+export const Default: Story = {};

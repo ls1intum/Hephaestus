@@ -19,9 +19,9 @@ export interface Message {
     sessionId: number;
 }
 export namespace Message {
-    export type SenderEnum = 'LLM' | 'USER';
+    export type SenderEnum = 'MENTOR' | 'USER';
     export const SenderEnum = {
-        Llm: 'LLM' as SenderEnum,
+        Mentor: 'MENTOR' as SenderEnum,
         User: 'USER' as SenderEnum
     };
 }

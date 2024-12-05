@@ -1,31 +1,22 @@
-import { Component, input, output } from '@angular/core';
+import { Component, input, model, output } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { LucideAngularModule, Plus } from 'lucide-angular';
 import { HlmButtonModule } from '@spartan-ng/ui-button-helm';
+import { BrnToggleDirective } from '@spartan-ng/ui-toggle-brain';
 import { Session } from '@app/core/modules/openapi';
+import { HlmToggleDirective } from '@spartan-ng/ui-toggle-helm';
+import { HlmCardDirective } from '@spartan-ng/ui-card-helm';
 
 @Component({
   standalone: true,
   selector: 'app-sessions-card',
   templateUrl: './sessions-card.component.html',
-  imports: [CommonModule, LucideAngularModule, HlmButtonModule]
+  imports: [CommonModule, LucideAngularModule, BrnToggleDirective, HlmToggleDirective, HlmButtonModule, HlmCardDirective]
 })
 export class SessionsCardComponent {
   protected Plus = Plus;
 
   sessions = input<Session[]>();
-  activeSessionId = input<number | null>();
-
-  sessionSelected = output<number>();
-  createSession = output();
-
-  handleSelectSession(sessionId: number): void {
-    if (this.activeSessionId() && this.activeSessionId() !== sessionId) {
-      this.sessionSelected.emit(sessionId);
-    }
-  }
-
-  handleCreateSession(): void {
-    this.createSession.emit();
-  }
+  selectedSessionId = model<number | null>();
+  createNewSession = output<void>();
 }

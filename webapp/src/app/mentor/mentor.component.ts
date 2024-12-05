@@ -1,137 +1,66 @@
 import { Component, inject, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { lastValueFrom } from 'rxjs';
-import { injectMutation, injectQuery } from '@tanstack/angular-query-experimental';
+import { injectMutation, injectQuery, injectQueryClient } from '@tanstack/angular-query-experimental';
 import { SessionsCardComponent } from './sessions-card/sessions-card.component';
 import { MessagesComponent } from './messages/messages.component';
-import { InputComponent } from './input/input.component';
-import { SecurityStore } from '@app/core/security/security-store.service';
-import { Message, Session } from '@app/core/modules/openapi';
+import { ChatInputComponent } from './chat-input/chat-input.component';
+import { LucideAngularModule, CircleX } from 'lucide-angular';
 import { MessageService, SessionService } from '@app/core/modules/openapi';
 import { HlmButtonModule } from '@spartan-ng/ui-button-helm';
 import { HlmSpinnerComponent } from '@spartan-ng/ui-spinner-helm';
 import { FirstSessionCardComponent } from './first-session-card/first-session-card.component';
+import { HlmAlertModule } from '@spartan-ng/ui-alert-helm';
 
 @Component({
   selector: 'app-mentor',
   templateUrl: './mentor.component.html',
   standalone: true,
-  imports: [CommonModule, FirstSessionCardComponent, HlmSpinnerComponent, SessionsCardComponent, MessagesComponent, InputComponent, HlmButtonModule]
+  imports: [
+    CommonModule,
+    FirstSessionCardComponent,
+    HlmSpinnerComponent,
+    SessionsCardComponent,
+    MessagesComponent,
+    ChatInputComponent,
+    HlmButtonModule,
+    HlmAlertModule,
+    LucideAngularModule
+  ]
 })
 export class MentorComponent {
-  securityStore = inject(SecurityStore);
+  protected CircleX = CircleX;
+
   messageService = inject(MessageService);
   sessionService = inject(SessionService);
 
-  signedIn = this.securityStore.signedIn;
-  user = this.securityStore.loadedUser;
+  selectedSessionId = signal<number | undefined>(undefined);
 
-  messageHistory = signal<Message[]>([]);
-  selectedSession = signal<Session | null>(null);
-  sessions = signal<Session[]>([]);
-  isLoading = signal(true);
+  queryClient = injectQueryClient();
 
-  latestMessageContent = '';
+  sessions = injectQuery(() => ({
+    queryKey: ['sessions'],
+    queryFn: async () => lastValueFrom(this.sessionService.getAllSessions())
+  }));
 
-  protected query_sessions = injectQuery(() => ({
-    enabled: this.signedIn(),
-    queryKey: ['sessions', { login: this.user()?.username }],
-    queryFn: async () => {
-      const username = this.user()?.username;
-      if (!username) {
-        throw new Error('User is not logged in or username is undefined.');
-      }
-      const sessions = await lastValueFrom(this.sessionService.getSessions(username));
-      if (sessions.length > 0 && this.selectedSession() == null) {
-        this.selectedSession.set(sessions.slice(-1)[0]);
-      }
-      this.sessions.set(sessions.reverse());
-      this.isLoading.set(false);
-      return sessions;
+  selectedSessionMessages = injectQuery(() => ({
+    enabled: !!this.selectedSessionId(),
+    queryKey: ['sessions', this.selectedSessionId()],
+    queryFn: async () => lastValueFrom(this.messageService.getMessages(this.selectedSessionId()!))
+  }));
+
+  createNewSession = injectMutation(() => ({
+    mutationFn: async () => lastValueFrom(this.sessionService.createNewSession()),
+    onSuccess: (session) => {
+      this.queryClient.invalidateQueries({ queryKey: ['sessions'] });
+      this.selectedSessionId.set(session.id);
     }
   }));
 
-  handleSessionSelect(sessionId: number): void {
-    const session = this.sessions().find((s) => s.id === sessionId);
-    if (session) {
-      this.selectedSession.set(session);
-      this.query_sessions.refetch();
-    }
-  }
-
-  handleCreateSession(): void {
-    this.createSession.mutate();
-  }
-
-  protected createSession = injectMutation(() => ({
-    mutationFn: async () => {
-      const username = this.user()?.username;
-      if (!username) {
-        throw new Error('User is not logged in or username is undefined.');
-      }
-      await lastValueFrom(this.sessionService.createSession(username));
-    },
-    onSuccess: async () => {
-      await this.query_sessions.refetch();
-      const sessions = this.sessions();
-      if (sessions.length > 0) {
-        const newSession = sessions[0];
-        this.selectedSession.set(newSession);
-      }
-    }
-  }));
-
-  protected query_messages = injectQuery(() => ({
-    enabled: !!this.selectedSession,
-    queryKey: ['messages', { sessionId: this.selectedSession()?.id }],
-    queryFn: async () => {
-      const selectedSessionId = this.selectedSession()?.id;
-      if (selectedSessionId == null) {
-        throw new Error('No session selected!');
-      }
-      const loadedMessages = await lastValueFrom(this.messageService.getMessages(selectedSessionId));
-      this.messageHistory.set(loadedMessages);
-      return loadedMessages;
-    }
-  }));
-
-  protected sendMessage = injectMutation(() => ({
-    queryKey: ['messages', 'create'],
-    mutationFn: async ({ sessionId }: { sessionId: number }) => {
-      if (!this.selectedSession) {
-        throw new Error('No session selected!');
-      }
-      await lastValueFrom(this.messageService.createMessage(sessionId, this.latestMessageContent));
-    },
+  sendMessage = injectMutation(() => ({
+    mutationFn: async ({ sessionId, message }: { sessionId: number; message: string }) => lastValueFrom(this.messageService.createMessage(sessionId, message)),
     onSuccess: () => {
-      this.query_messages.refetch();
+      this.queryClient.invalidateQueries({ queryKey: ['sessions', this.selectedSessionId()] });
     }
   }));
-
-  handleSendMessage(content: string): void {
-    if (!this.selectedSession) {
-      console.error('No session selected!');
-      return;
-    }
-
-    const selectedSessionId = this.selectedSession()?.id;
-    if (selectedSessionId == null) {
-      console.error('No session selected!');
-      return;
-    } else {
-      // show the user message directly after sending
-      const userMessage: Message = {
-        id: Math.random(), // temporary id until the message is sent
-        sessionId: selectedSessionId,
-        sender: 'USER',
-        content: content,
-        sentAt: new Date().toISOString()
-      };
-
-      this.messageHistory.set([...this.messageHistory(), userMessage]);
-
-      this.latestMessageContent = content;
-      this.sendMessage.mutate({ sessionId: selectedSessionId });
-    }
-  }
 }

@@ -1,28 +1,39 @@
-@if (isLoading()) {
-  <div class="h-[calc(100vh-100px)] self-auto p-4 flex-1 flex items-center justify-center">
-    <hlm-spinner></hlm-spinner>
-  </div>
-} @else {
-  <div class="grid grid-cols-1 gap-x-5 md:grid-cols-4 md:h-[calc(100vh-100px)]">
-    @if (sessions().length === 0) {
-      <div class="col-span-4 h-[calc(100vh-100px)]">
-        <app-first-session-card (createSession)="handleCreateSession()"></app-first-session-card>
+<div class="flex items-center justify-center space-y-4">
+  <div class="md:max-h-dvh">
+    @if (sessions.isLoading()) {
+      <hlm-spinner />
+    } @else if (sessions.isError()) {
+      <div hlmAlert class="max-w-xl" variant="destructive">
+        <lucide-angular [img]="CircleX" hlmAlertIcon />
+        <h4 hlmAlertTitle>Something went wrong...</h4>
+        <p hlmAlertDesc>Failed to load sessions. Please try again later.</p>
       </div>
-    } @else {
-      <app-sessions-card
-        [sessions]="sessions()"
-        [activeSessionId]="selectedSession()?.id ?? null"
-        (sessionSelected)="handleSessionSelect($event)"
-        (createSession)="handleCreateSession()"
-        class="h-full overflow-auto"
-      ></app-sessions-card>
-
-      @if (selectedSession()) {
-        <div class="flex flex-col h-[calc(100vh-100px)] md:col-span-3">
-          <app-messages [messageHistory]="messageHistory()" class="flex-1 overflow-y-auto p-4 space-y-4"></app-messages>
-          <app-chat-input (messageSent)="handleSendMessage($event)" class="border-t pt-4 px-4"></app-chat-input>
-        </div>
-      }
+    }
+    @if (sessions.isSuccess()) {
+      <div class="grid grid-cols-1 gap-x-5 md:grid-cols-4">
+        @if (!sessions.data()) {
+          <div class="col-span-4">
+            <app-first-session-card (createSession)="this.createNewSession.mutate()"></app-first-session-card>
+          </div>
+        } @else {
+          <app-sessions-card
+            [sessions]="sessions.data()"
+            [(selectedSessionId)]="selectedSessionId"
+            (createNewSession)="this.createNewSession.mutate()"
+            class="order-last md:order-none"
+          ></app-sessions-card>
+          <div class="flex flex-col md:col-span-3">
+            @if (selectedSessionId() !== undefined) {
+              <app-messages [messages]="selectedSessionMessages.data() ?? []" class="max-h-[calc(100dvh-200px)] overflow-y-scroll p-4 space-y-4" />
+              <app-chat-input
+                [isSending]="sendMessage.isPending()"
+                (sendMessage)="sendMessage.mutate({ sessionId: selectedSessionId()!, message: $event })"
+                class="border-t pt-4 px-4 sticky bottom-0 bg-white"
+              ></app-chat-input>
+            }
+          </div>
+        }
+      </div>
     }
   </div>
-}
+</div>

@@ -27,15 +27,13 @@ export interface SessionServiceInterface {
     /**
      * 
      * 
-     * @param body 
      */
-    createSession(body: string, extraHttpRequestParams?: any): Observable<Session>;
+    createNewSession(extraHttpRequestParams?: any): Observable<Session>;
 
     /**
      * 
      * 
-     * @param login 
      */
-    getSessions(login: string, extraHttpRequestParams?: any): Observable<Array<Session>>;
+    getAllSessions(extraHttpRequestParams?: any): Observable<Array<Session>>;
 
 }

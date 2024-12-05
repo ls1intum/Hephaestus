@@ -63,7 +63,7 @@ public class MessageService {
         }
 
         Message systemMessage = new Message();
-        systemMessage.setSender(MessageSender.LLM);
+        systemMessage.setSender(MessageSender.MENTOR);
         systemMessage.setContent(systemResponse);
         systemMessage.setSession(currentSession);
 

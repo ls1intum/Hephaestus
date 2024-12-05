@@ -1,21 +1,26 @@
 package de.tum.in.www1.hephaestus.mentor.session;
 
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.stereotype.Service;
-
-import de.tum.in.www1.hephaestus.gitprovider.user.UserRepository;
 import java.util.Optional;
 import java.util.List;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Service;
+import de.tum.in.www1.hephaestus.core.exception.AccessForbiddenException;
+import de.tum.in.www1.hephaestus.gitprovider.user.User;
 
 @Service
 public class SessionService {
+    
     @Autowired
     private SessionRepository sessionRepository;
-    @Autowired
-    private UserRepository userRepository;
 
-    public List<SessionDTO> findAllSessionsByUser(String login) {
-        List<Session> sessions = sessionRepository.findByUserLogin(login);
+    public void checkAccessElseThrow(User user, Session session) {
+        if (!session.getUser().getId().equals(user.getId())) {
+            throw new AccessForbiddenException("Session", session.getId());
+        }
+    }
+
+    public List<SessionDTO> findAllSessionsByUser(User user) {
+        List<Session> sessions = sessionRepository.findByUser(user);
         return sessions.stream().map(SessionDTO::fromSession).toList();
     }
 
@@ -23,14 +28,9 @@ public class SessionService {
         return sessionRepository.findById(sessionId).map(SessionDTO::fromSession);
     }
 
-    public SessionDTO createSession(String login) {
-        var user = userRepository.findByLogin(login);
-        if (user.isEmpty()) {
-            return null;
-        }
-
+    public SessionDTO createSession(User user) {
         Session session = new Session();
-        session.setUser(user.get());
+        session.setUser(user);
 
         return SessionDTO.fromSession(sessionRepository.save(session));
     }

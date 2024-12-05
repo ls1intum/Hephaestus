@@ -9,13 +9,10 @@
  * https://openapi-generator.tech
  * Do not edit the class manually.
  */
-import { Message } from './message';
 
 
 export interface Session { 
     id: number;
-    messages: Array<Message>;
-    userLogin: string;
     createdAt: string;
 }
 

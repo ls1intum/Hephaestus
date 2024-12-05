@@ -12,9 +12,5 @@ export class FirstSessionCardComponent {
   protected Plus = Plus;
   protected BotMessageSquare = BotMessageSquare;
 
-  createSession = output<void>();
-
-  handleCreateSession(): void {
-    this.createSession.emit();
-  }
+  createNewSession = output<void>();
 }
