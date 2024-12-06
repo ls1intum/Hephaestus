@@ -16,6 +16,6 @@ export class LeaderboardFilterComponent {
   teams = input<string[]>();
 
   throwTestError() {
-    throw new Error("Sentry Test Error2");
+    throw new Error('Sentry Test Error2');
   }
 }

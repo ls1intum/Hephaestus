@@ -1,6 +1,6 @@
 import { ErrorHandler, Injectable } from '@angular/core';
 import { environment } from 'environments/environment';
-import * as Sentry from "@sentry/angular";
+import * as Sentry from '@sentry/angular';
 
 @Injectable({ providedIn: 'root' })
 export class SentryErrorHandler extends ErrorHandler {
@@ -35,14 +35,14 @@ export class SentryErrorHandler extends ErrorHandler {
    * @param error
    */
   override handleError(error: any): void {
-      if (error && error.name === 'HttpErrorResponse' && error.status < 500 && error.status >= 400) {
-          super.handleError(error);
-          return;
-      }
-      if (this.environment.sentry.environment !== 'local') {
-        const exception = error.error || error.message || error.originalError || error;
-        Sentry.captureException(exception);
-      }
+    if (error && error.name === 'HttpErrorResponse' && error.status < 500 && error.status >= 400) {
       super.handleError(error);
+      return;
+    }
+    if (this.environment.sentry.environment !== 'local') {
+      const exception = error.error || error.message || error.originalError || error;
+      Sentry.captureException(exception);
+    }
+    super.handleError(error);
   }
 }

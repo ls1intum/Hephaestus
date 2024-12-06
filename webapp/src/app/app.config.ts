@@ -29,10 +29,10 @@ export const appConfig: ApplicationConfig = {
     { provide: ErrorHandler, useClass: SentryErrorHandler },
     { provide: TraceService, deps: [Router] },
     {
-        provide: APP_INITIALIZER,
-        useFactory: () => () => {},
-        deps: [TraceService],
-        multi: true,
-    },
+      provide: APP_INITIALIZER,
+      useFactory: () => () => {},
+      deps: [TraceService],
+      multi: true
+    }
   ]
 };
