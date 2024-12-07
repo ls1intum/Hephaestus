@@ -19,6 +19,8 @@ export class SentryErrorHandler extends ErrorHandler {
       return;
     }
 
+    console.log('Initializing Sentry: ', env.version);
+
     Sentry.init({
       dsn: env.sentry.dsn,
       release: env.version,

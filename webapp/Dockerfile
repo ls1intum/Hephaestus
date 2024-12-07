@@ -50,6 +50,7 @@ EOF
 
 RUN npm install
 RUN npm run build
+RUN npx sentry-cli sourcemaps inject --org aet --project hephaestus ./dist/webapp && sentry-cli sourcemaps upload --org aet --project hephaestus --release=${SENRY_RELEASE} ./dist/webapp
 
 FROM nginx:latest
 

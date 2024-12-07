@@ -13,7 +13,8 @@
     "prettier:check": "prettier --check src/",
     "prettier:write": "prettier --write src/",
     "lint": "eslint",
-    "lint:fix": "eslint --fix"
+    "lint:fix": "eslint --fix",
+    "sentry:sourcemaps": "sentry-cli sourcemaps inject --org aet --project hephaestus ./dist/webapp && sentry-cli sourcemaps upload --org aet --project hephaestus --release=0.0.1 ./dist/webapp"
   },
   "private": true,
   "engines": {
@@ -34,6 +35,7 @@
     "@ng-icons/octicons": "29.5.0",
     "@primer/primitives": "9.1.1",
     "@sentry/angular": "^8.42.0",
+    "@sentry/cli": "^2.39.1",
     "@spartan-ng/ui-accordion-brain": "0.0.1-alpha.356",
     "@spartan-ng/ui-alertdialog-brain": "0.0.1-alpha.356",
     "@spartan-ng/ui-avatar-brain": "0.0.1-alpha.356",
