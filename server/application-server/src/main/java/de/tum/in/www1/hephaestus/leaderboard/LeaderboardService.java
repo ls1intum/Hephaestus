@@ -117,6 +117,7 @@ public class LeaderboardService {
                 List<PullRequestInfoDTO> reviewedPullRequests = userReviews
                     .stream()
                     .map(review -> review.getPullRequest())
+                    .filter(pullRequest -> pullRequest.getAuthor().getId() != userId)
                     // First collect to a map keyed by PR ID to ensure uniqueness
                     .collect(
                         Collectors.groupingBy(
