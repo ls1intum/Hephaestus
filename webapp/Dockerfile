@@ -50,8 +50,11 @@ EOF
 
 RUN npm install
 RUN npm run build
-# Fix buggy replacement of COOLIFY_URL in .env
-RUN ./node_modules/.bin/sentry-cli sourcemaps inject --org aet --project hephaestus ./dist/webapp && ./node_modules/.bin/sentry-cli sourcemaps upload --org aet --project hephaestus --release=${SENTRY_RELEASE} ./dist/webapp
+RUN set -a && \
+    . /app/.env && \
+    set +a && \
+    ./node_modules/.bin/sentry-cli sourcemaps inject --org aet --project hephaestus ./dist/webapp && \
+    ./node_modules/.bin/sentry-cli sourcemaps upload --org aet --project hephaestus --release=${SENTRY_RELEASE} ./dist/webapp
 
 FROM nginx:latest
 
