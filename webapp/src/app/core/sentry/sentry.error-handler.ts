@@ -19,8 +19,6 @@ export class SentryErrorHandler extends ErrorHandler {
       return;
     }
 
-    console.log('Initializing Sentry: ', env.version);
-
     Sentry.init({
       dsn: env.sentry.dsn,
       release: env.version,
@@ -28,8 +26,6 @@ export class SentryErrorHandler extends ErrorHandler {
       integrations: [Sentry.browserTracingIntegration()],
       tracesSampleRate: env.sentry.environment !== 'prod' ? 1.0 : 0.2
     });
-
-    console.log('Sentry initialized');
   }
 
   /**
