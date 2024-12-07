@@ -1,7 +1,7 @@
 export const environment = {
   clientUrl: 'http://localhost:4200',
   serverUrl: 'http://localhost:8080',
-  version: '0.0.2',
+  version: '0.0.1',
   sentry: {
     dsn: 'https://289f1f62feeb4f70a8878dc0101825cd@sentry.ase.in.tum.de/3',
     environment: 'prod'
