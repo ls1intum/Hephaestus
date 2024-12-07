@@ -32,6 +32,7 @@ export class SentryErrorHandler extends ErrorHandler {
    * Send an HttpError to Sentry. Only if it's not in the range 400-499.
    * @param error
    */
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   override handleError(error: any): void {
     if (error && error.name === 'HttpErrorResponse' && error.status < 500 && error.status >= 400) {
       super.handleError(error);
