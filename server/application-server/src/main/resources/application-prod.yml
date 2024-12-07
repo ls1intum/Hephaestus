@@ -51,3 +51,6 @@ github:
 slack:
     token: ${SLACK_BOT_TOKEN}
     signing-secret: ${SLACK_SIGNING_SECRET}
+
+sentry:
+  dsn: ${SENTRY_DSN}
