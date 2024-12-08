@@ -10,6 +10,7 @@ services:
       - DATABASE_PASSWORD=root
       - SECURITY_USER_NAME=${SECURITY_USER_NAME:-admin}
       - SECURITY_USER_PASSWORD=${SECURITY_USER_NAME:-admin_password}
+      - INTELLIGENCE_SERVICE_URL=http://intelligence-service:8000
     depends_on:
       - postgres
     networks:
@@ -23,8 +24,6 @@ services:
 
   intelligence-service:
     build: server/intelligence-service
-    ports:
-      - "8000"
     environment:
       # Either OPENAI_API_KEY or AZURE_OPENAI_API_KEY must be set
       - OPENAI_API_KEY
