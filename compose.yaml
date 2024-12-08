@@ -10,7 +10,7 @@ services:
       - DATABASE_PASSWORD=root
       - SECURITY_USER_NAME=${SECURITY_USER_NAME:-admin}
       - SECURITY_USER_PASSWORD=${SECURITY_USER_NAME:-admin_password}
-      - INTELLIGENCE_SERVICE_URL=http://intelligence-service:8000
+      - INTELLIGENCE_SERVICE_URL=http://intelligence-service:5000
     depends_on:
       - postgres
     networks:
