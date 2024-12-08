@@ -21,6 +21,30 @@ services:
       retries: 5
       start_period: 30s
 
+  intelligence-service:
+    build: server/intelligence-service
+    ports:
+      - "8000"
+    environment:
+      # Either OPENAI_API_KEY or AZURE_OPENAI_API_KEY must be set
+      - OPENAI_API_KEY
+      - AZURE_OPENAI_API_KEY
+      - AZURE_OPENAI_ENDPOINT
+      - AZURE_OPENAI_API_VERSION
+    networks:
+      - app-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 3s
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
   postgres:
     image: 'postgres:16'
     environment:
