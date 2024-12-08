@@ -1,13 +1,23 @@
-<div hlmCard class="flex flex-col gap-6 p-4">
-  <button hlmBtn aria-describedby=">New Session" class="w-full gap-2 justify-start" (click)="this.createNewSession.emit()">
+<div hlmCard class="flex flex-col px-6 max-h-80 md:max-h-[calc(100dvh-100px)] pb-6 overflow-auto">
+  <button hlmBtn aria-describedby=">New Session" class="w-full gap-2 mt-6 justify-start h-9" (click)="this.createNewSession.emit()">
     <lucide-angular [img]="Plus" class="size-4" />
     <span>New Session</span>
   </button>
-  @if ((sessions()?.length ?? 0) > 0) {
+  @if (isLoading()){
     <div class="flex flex-col gap-2">
-      <h4 class="text-lg font-semibold sticky top-0">Past Sessions</h4>
+      <hlm-skeleton class='w-48 h-6 mt-6 pt-3' />
+      <hlm-skeleton class='w-full h-9' />
+      <hlm-skeleton class='w-full h-9' />
+      <hlm-skeleton class='w-full h-9' />
+      <hlm-skeleton class='w-full h-9' />
+      <hlm-skeleton class='w-full h-9' />
+    </div>
+  }
+  @else if ((sessions()?.length ?? 0) > 0) {
+    <div class="flex flex-col gap-2">
+      <h4 class="text-lg font-semibold mt-2 pt-3">Past Sessions</h4>
       @for (session of sessions(); track session.id) {
-        <button brnToggle [state]="selectedSessionId() === session.id ? 'on' : 'off'" hlm (click)="selectedSessionId.set(session.id)" class="justify-start">
+        <button brnToggle hlm [state]="selectedSessionId() === session.id ? 'on' : 'off'" (click)="selectedSessionId.set(session.id)" class="justify-start">
           {{ session.createdAt | date: 'short' }}
         </button>
       }

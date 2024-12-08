@@ -1,5 +1,5 @@
 import { type Meta, type StoryObj } from '@storybook/angular';
-import { FirstSessionCardComponent } from './first-session-card.component';
+import { FirstSessionCardComponent } from './start-session-card.component';
 
 const meta: Meta<FirstSessionCardComponent> = {
   component: FirstSessionCardComponent,

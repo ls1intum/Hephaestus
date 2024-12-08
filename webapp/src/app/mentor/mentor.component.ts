@@ -8,8 +8,7 @@ import { ChatInputComponent } from './chat-input/chat-input.component';
 import { LucideAngularModule, CircleX } from 'lucide-angular';
 import { MessageService, SessionService } from '@app/core/modules/openapi';
 import { HlmButtonModule } from '@spartan-ng/ui-button-helm';
-import { HlmSpinnerComponent } from '@spartan-ng/ui-spinner-helm';
-import { FirstSessionCardComponent } from './first-session-card/first-session-card.component';
+import { FirstSessionCardComponent } from './start-session-card/start-session-card.component';
 import { HlmAlertModule } from '@spartan-ng/ui-alert-helm';
 
 @Component({
@@ -19,7 +18,6 @@ import { HlmAlertModule } from '@spartan-ng/ui-alert-helm';
   imports: [
     CommonModule,
     FirstSessionCardComponent,
-    HlmSpinnerComponent,
     SessionsCardComponent,
     MessagesComponent,
     ChatInputComponent,
@@ -40,7 +38,7 @@ export class MentorComponent {
 
   sessions = injectQuery(() => ({
     queryKey: ['sessions'],
-    queryFn: async () => lastValueFrom(this.sessionService.getAllSessions())
+    queryFn: async () => (await lastValueFrom(this.sessionService.getAllSessions())).reverse()
   }));
 
   selectedSessionMessages = injectQuery(() => ({
@@ -51,15 +49,18 @@ export class MentorComponent {
 
   createNewSession = injectMutation(() => ({
     mutationFn: async () => lastValueFrom(this.sessionService.createNewSession()),
+    onSettled: async () => {
+      return await this.queryClient.invalidateQueries({ queryKey: ['sessions'] });
+    },
     onSuccess: (session) => {
-      this.queryClient.invalidateQueries({ queryKey: ['sessions'] });
       this.selectedSessionId.set(session.id);
     }
   }));
 
   sendMessage = injectMutation(() => ({
     mutationFn: async ({ sessionId, message }: { sessionId: number; message: string }) => lastValueFrom(this.messageService.createMessage(sessionId, message)),
-    onSuccess: () => {
+
+    onSettled: () => {
       this.queryClient.invalidateQueries({ queryKey: ['sessions', this.selectedSessionId()] });
     }
   }));

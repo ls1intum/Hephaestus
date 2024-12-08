@@ -5,6 +5,7 @@ const meta: Meta<SessionsCardComponent> = {
   component: SessionsCardComponent,
   tags: ['autodocs'],
   args: {
+    selectedSessionId: 2,
     sessions: [
       {
         id: 1,
@@ -34,6 +35,14 @@ export default meta;
 type Story = StoryObj<SessionsCardComponent>;
 
 export const Default: Story = {};
+
+export const IsLoading: Story = {
+  args: {
+    isLoading: true,
+    sessions: [],
+    selectedSessionId: undefined
+  }
+};
 
 export const Empty: Story = {
   args: {

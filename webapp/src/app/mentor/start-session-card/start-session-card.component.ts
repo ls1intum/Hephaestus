@@ -1,11 +1,11 @@
-import { Component, output } from '@angular/core';
+import { Component, input, output } from '@angular/core';
 import { LucideAngularModule, Plus, BotMessageSquare } from 'lucide-angular';
 import { HlmButtonModule } from '@spartan-ng/ui-button-helm';
 
 @Component({
-  selector: 'app-first-session-card',
+  selector: 'app-start-session-card',
   standalone: true,
-  templateUrl: './first-session-card.component.html',
+  templateUrl: './start-session-card.component.html',
   imports: [LucideAngularModule, HlmButtonModule]
 })
 export class FirstSessionCardComponent {
