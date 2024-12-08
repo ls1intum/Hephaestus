@@ -15,20 +15,53 @@ package de.tum.in.www1.hephaestus.intelligenceservice.model;
 
 import java.util.Objects;
 import java.util.Arrays;
+import com.fasterxml.jackson.annotation.JsonInclude;
+import com.fasterxml.jackson.annotation.JsonProperty;
+import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonTypeName;
+import com.fasterxml.jackson.annotation.JsonValue;
 import com.fasterxml.jackson.annotation.JsonPropertyOrder;
 import com.fasterxml.jackson.annotation.JsonTypeName;
 import org.hibernate.validator.constraints.*;
 
 /**
- * ValidationErrorLocInner
+ * ISMentorMessage
  */
 @JsonPropertyOrder({
+  ISMentorMessage.JSON_PROPERTY_CONTENT
 })
-@JsonTypeName("ValidationError_loc_inner")
+@JsonTypeName("MentorMessage")
 @jakarta.annotation.Generated(value = "org.openapitools.codegen.languages.JavaClientCodegen", comments = "Generator version: 7.7.0")
-public class ValidationErrorLocInner {
-  public ValidationErrorLocInner() {
+public class ISMentorMessage {
+  public static final String JSON_PROPERTY_CONTENT = "content";
+  private String content;
+
+  public ISMentorMessage() {
+  }
+
+  public ISMentorMessage content(String content) {
+    
+    this.content = content;
+    return this;
+  }
+
+  /**
+   * Get content
+   * @return content
+   */
+  @jakarta.annotation.Nonnull
+  @JsonProperty(JSON_PROPERTY_CONTENT)
+  @JsonInclude(value = JsonInclude.Include.ALWAYS)
+
+  public String getContent() {
+    return content;
+  }
+
+
+  @JsonProperty(JSON_PROPERTY_CONTENT)
+  @JsonInclude(value = JsonInclude.Include.ALWAYS)
+  public void setContent(String content) {
+    this.content = content;
   }
 
   @Override
@@ -39,18 +72,20 @@ public class ValidationErrorLocInner {
     if (o == null || getClass() != o.getClass()) {
       return false;
     }
-    return true;
+    ISMentorMessage mentorMessage = (ISMentorMessage) o;
+    return Objects.equals(this.content, mentorMessage.content);
   }
 
   @Override
   public int hashCode() {
-    return Objects.hash();
+    return Objects.hash(content);
   }
 
   @Override
   public String toString() {
     StringBuilder sb = new StringBuilder();
-    sb.append("class ValidationErrorLocInner {\n");
+    sb.append("class ISMentorMessage {\n");
+    sb.append("    content: ").append(toIndentedString(content)).append("\n");
     sb.append("}");
     return sb.toString();
   }

@@ -34,6 +34,7 @@ springdoc:
 
 hephaestus:
     host-url: https://hephaestus.ase.cit.tum.de/
+    
     leaderboard:
         schedule:
             day: 2
@@ -41,10 +42,15 @@ hephaestus:
         notification:
             enabled: false
             channel-id: ""
+    
     workspace:
         init-default: true
         default:
             repositories-to-monitor: ls1intum/Artemis,ls1intum/Hephaestus
+    
+    intelligence-service:
+        url: http://localhost:8000
+
 
 keycloak:
     url: http://localhost:8081
