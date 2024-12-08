@@ -5,7 +5,7 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
 import de.tum.in.www1.hephaestus.intelligenceservice.ApiClient;
-import de.tum.in.www1.hephaestus.intelligenceservice.api.DefaultApi;
+import de.tum.in.www1.hephaestus.intelligenceservice.api.MentorApi;
 
 @Configuration
 public class IntelligenceServiceConfig {
@@ -18,7 +18,7 @@ public class IntelligenceServiceConfig {
         return new IntelligenceServiceApi();
     }
 
-    public class IntelligenceServiceApi extends DefaultApi {
+    public class IntelligenceServiceApi extends MentorApi {
         public IntelligenceServiceApi() {
             super(new ApiClient().setBasePath(intelligenceServiceUrl));
         }

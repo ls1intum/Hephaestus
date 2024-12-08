@@ -25,71 +25,43 @@ import com.fasterxml.jackson.annotation.JsonTypeName;
 import org.hibernate.validator.constraints.*;
 
 /**
- * ChatMessage
+ * Response model to validate and return when performing a health check.
  */
 @JsonPropertyOrder({
-  ChatMessage.JSON_PROPERTY_CONTENT,
-  ChatMessage.JSON_PROPERTY_SENDER
+  ISHealthCheck.JSON_PROPERTY_STATUS
 })
+@JsonTypeName("HealthCheck")
 @jakarta.annotation.Generated(value = "org.openapitools.codegen.languages.JavaClientCodegen", comments = "Generator version: 7.7.0")
-public class ChatMessage {
-  public static final String JSON_PROPERTY_CONTENT = "content";
-  private String content;
+public class ISHealthCheck {
+  public static final String JSON_PROPERTY_STATUS = "status";
+  private String status = "OK";
 
-  public static final String JSON_PROPERTY_SENDER = "sender";
-  private String sender;
-
-  public ChatMessage() {
+  public ISHealthCheck() {
   }
 
-  public ChatMessage content(String content) {
+  public ISHealthCheck status(String status) {
     
-    this.content = content;
+    this.status = status;
     return this;
   }
 
   /**
-   * Get content
-   * @return content
+   * Get status
+   * @return status
    */
-  @jakarta.annotation.Nonnull
-  @JsonProperty(JSON_PROPERTY_CONTENT)
-  @JsonInclude(value = JsonInclude.Include.ALWAYS)
+  @jakarta.annotation.Nullable
+  @JsonProperty(JSON_PROPERTY_STATUS)
+  @JsonInclude(value = JsonInclude.Include.USE_DEFAULTS)
 
-  public String getContent() {
-    return content;
+  public String getStatus() {
+    return status;
   }
 
 
-  @JsonProperty(JSON_PROPERTY_CONTENT)
-  @JsonInclude(value = JsonInclude.Include.ALWAYS)
-  public void setContent(String content) {
-    this.content = content;
-  }
-
-  public ChatMessage sender(String sender) {
-    
-    this.sender = sender;
-    return this;
-  }
-
-  /**
-   * Get sender
-   * @return sender
-   */
-  @jakarta.annotation.Nonnull
-  @JsonProperty(JSON_PROPERTY_SENDER)
-  @JsonInclude(value = JsonInclude.Include.ALWAYS)
-
-  public String getSender() {
-    return sender;
-  }
-
-
-  @JsonProperty(JSON_PROPERTY_SENDER)
-  @JsonInclude(value = JsonInclude.Include.ALWAYS)
-  public void setSender(String sender) {
-    this.sender = sender;
+  @JsonProperty(JSON_PROPERTY_STATUS)
+  @JsonInclude(value = JsonInclude.Include.USE_DEFAULTS)
+  public void setStatus(String status) {
+    this.status = status;
   }
 
   @Override
@@ -100,22 +72,20 @@ public class ChatMessage {
     if (o == null || getClass() != o.getClass()) {
       return false;
     }
-    ChatMessage chatMessage = (ChatMessage) o;
-    return Objects.equals(this.content, chatMessage.content) &&
-        Objects.equals(this.sender, chatMessage.sender);
+    ISHealthCheck healthCheck = (ISHealthCheck) o;
+    return Objects.equals(this.status, healthCheck.status);
   }
 
   @Override
   public int hashCode() {
-    return Objects.hash(content, sender);
+    return Objects.hash(status);
   }
 
   @Override
   public String toString() {
     StringBuilder sb = new StringBuilder();
-    sb.append("class ChatMessage {\n");
-    sb.append("    content: ").append(toIndentedString(content)).append("\n");
-    sb.append("    sender: ").append(toIndentedString(sender)).append("\n");
+    sb.append("class ISHealthCheck {\n");
+    sb.append("    status: ").append(toIndentedString(status)).append("\n");
     sb.append("}");
     return sb.toString();
   }

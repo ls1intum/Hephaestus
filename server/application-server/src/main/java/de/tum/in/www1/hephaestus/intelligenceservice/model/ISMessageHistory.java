@@ -20,47 +20,60 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonTypeName;
 import com.fasterxml.jackson.annotation.JsonValue;
+import de.tum.in.www1.hephaestus.intelligenceservice.model.ISMessage;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
 import com.fasterxml.jackson.annotation.JsonPropertyOrder;
 import com.fasterxml.jackson.annotation.JsonTypeName;
 import org.hibernate.validator.constraints.*;
 
 /**
- * ChatResponse
+ * ISMessageHistory
  */
 @JsonPropertyOrder({
-  ChatResponse.JSON_PROPERTY_RESPONCE
+  ISMessageHistory.JSON_PROPERTY_MESSAGES
 })
+@JsonTypeName("MessageHistory")
 @jakarta.annotation.Generated(value = "org.openapitools.codegen.languages.JavaClientCodegen", comments = "Generator version: 7.7.0")
-public class ChatResponse {
-  public static final String JSON_PROPERTY_RESPONCE = "responce";
-  private String responce;
+public class ISMessageHistory {
+  public static final String JSON_PROPERTY_MESSAGES = "messages";
+  private List<ISMessage> messages = new ArrayList<>();
 
-  public ChatResponse() {
+  public ISMessageHistory() {
   }
 
-  public ChatResponse responce(String responce) {
+  public ISMessageHistory messages(List<ISMessage> messages) {
     
-    this.responce = responce;
+    this.messages = messages;
+    return this;
+  }
+
+  public ISMessageHistory addMessagesItem(ISMessage messagesItem) {
+    if (this.messages == null) {
+      this.messages = new ArrayList<>();
+    }
+    this.messages.add(messagesItem);
     return this;
   }
 
   /**
-   * Get responce
-   * @return responce
+   * Get messages
+   * @return messages
    */
   @jakarta.annotation.Nonnull
-  @JsonProperty(JSON_PROPERTY_RESPONCE)
+  @JsonProperty(JSON_PROPERTY_MESSAGES)
   @JsonInclude(value = JsonInclude.Include.ALWAYS)
 
-  public String getResponce() {
-    return responce;
+  public List<ISMessage> getMessages() {
+    return messages;
   }
 
 
-  @JsonProperty(JSON_PROPERTY_RESPONCE)
+  @JsonProperty(JSON_PROPERTY_MESSAGES)
   @JsonInclude(value = JsonInclude.Include.ALWAYS)
-  public void setResponce(String responce) {
-    this.responce = responce;
+  public void setMessages(List<ISMessage> messages) {
+    this.messages = messages;
   }
 
   @Override
@@ -71,20 +84,20 @@ public class ChatResponse {
     if (o == null || getClass() != o.getClass()) {
       return false;
     }
-    ChatResponse chatResponse = (ChatResponse) o;
-    return Objects.equals(this.responce, chatResponse.responce);
+    ISMessageHistory messageHistory = (ISMessageHistory) o;
+    return Objects.equals(this.messages, messageHistory.messages);
   }
 
   @Override
   public int hashCode() {
-    return Objects.hash(responce);
+    return Objects.hash(messages);
   }
 
   @Override
   public String toString() {
     StringBuilder sb = new StringBuilder();
-    sb.append("class ChatResponse {\n");
-    sb.append("    responce: ").append(toIndentedString(responce)).append("\n");
+    sb.append("class ISMessageHistory {\n");
+    sb.append("    messages: ").append(toIndentedString(messages)).append("\n");
     sb.append("}");
     return sb.toString();
   }

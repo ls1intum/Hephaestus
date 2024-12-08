@@ -25,43 +25,72 @@ import com.fasterxml.jackson.annotation.JsonTypeName;
 import org.hibernate.validator.constraints.*;
 
 /**
- * ISChatResponse
+ * ISMessage
  */
 @JsonPropertyOrder({
-  ISChatResponse.JSON_PROPERTY_RESPONCE
+  ISMessage.JSON_PROPERTY_CONTENT,
+  ISMessage.JSON_PROPERTY_SENDER
 })
-@JsonTypeName("ChatResponse")
+@JsonTypeName("Message")
 @jakarta.annotation.Generated(value = "org.openapitools.codegen.languages.JavaClientCodegen", comments = "Generator version: 7.7.0")
-public class ISChatResponse {
-  public static final String JSON_PROPERTY_RESPONCE = "responce";
-  private String responce;
+public class ISMessage {
+  public static final String JSON_PROPERTY_CONTENT = "content";
+  private String content;
 
-  public ISChatResponse() {
+  public static final String JSON_PROPERTY_SENDER = "sender";
+  private String sender;
+
+  public ISMessage() {
   }
 
-  public ISChatResponse responce(String responce) {
+  public ISMessage content(String content) {
     
-    this.responce = responce;
+    this.content = content;
     return this;
   }
 
   /**
-   * Get responce
-   * @return responce
+   * Get content
+   * @return content
    */
   @jakarta.annotation.Nonnull
-  @JsonProperty(JSON_PROPERTY_RESPONCE)
+  @JsonProperty(JSON_PROPERTY_CONTENT)
   @JsonInclude(value = JsonInclude.Include.ALWAYS)
 
-  public String getResponce() {
-    return responce;
+  public String getContent() {
+    return content;
   }
 
 
-  @JsonProperty(JSON_PROPERTY_RESPONCE)
+  @JsonProperty(JSON_PROPERTY_CONTENT)
   @JsonInclude(value = JsonInclude.Include.ALWAYS)
-  public void setResponce(String responce) {
-    this.responce = responce;
+  public void setContent(String content) {
+    this.content = content;
+  }
+
+  public ISMessage sender(String sender) {
+    
+    this.sender = sender;
+    return this;
+  }
+
+  /**
+   * Get sender
+   * @return sender
+   */
+  @jakarta.annotation.Nonnull
+  @JsonProperty(JSON_PROPERTY_SENDER)
+  @JsonInclude(value = JsonInclude.Include.ALWAYS)
+
+  public String getSender() {
+    return sender;
+  }
+
+
+  @JsonProperty(JSON_PROPERTY_SENDER)
+  @JsonInclude(value = JsonInclude.Include.ALWAYS)
+  public void setSender(String sender) {
+    this.sender = sender;
   }
 
   @Override
@@ -72,20 +101,22 @@ public class ISChatResponse {
     if (o == null || getClass() != o.getClass()) {
       return false;
     }
-    ISChatResponse chatResponse = (ISChatResponse) o;
-    return Objects.equals(this.responce, chatResponse.responce);
+    ISMessage message = (ISMessage) o;
+    return Objects.equals(this.content, message.content) &&
+        Objects.equals(this.sender, message.sender);
   }
 
   @Override
   public int hashCode() {
-    return Objects.hash(responce);
+    return Objects.hash(content, sender);
   }
 
   @Override
   public String toString() {
     StringBuilder sb = new StringBuilder();
-    sb.append("class ISChatResponse {\n");
-    sb.append("    responce: ").append(toIndentedString(responce)).append("\n");
+    sb.append("class ISMessage {\n");
+    sb.append("    content: ").append(toIndentedString(content)).append("\n");
+    sb.append("    sender: ").append(toIndentedString(sender)).append("\n");
     sb.append("}");
     return sb.toString();
   }

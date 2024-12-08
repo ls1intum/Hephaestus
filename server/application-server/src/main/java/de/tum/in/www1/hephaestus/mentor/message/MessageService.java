@@ -11,9 +11,9 @@ import de.tum.in.www1.hephaestus.config.IntelligenceServiceConfig.IntelligenceSe
 import de.tum.in.www1.hephaestus.mentor.message.Message.MessageSender;
 import de.tum.in.www1.hephaestus.mentor.session.Session;
 import de.tum.in.www1.hephaestus.mentor.session.SessionRepository;
-import de.tum.in.www1.hephaestus.intelligenceservice.model.ISChatMessage;
-import de.tum.in.www1.hephaestus.intelligenceservice.model.ISChatRequest;
-import de.tum.in.www1.hephaestus.intelligenceservice.model.ISChatResponse;
+import de.tum.in.www1.hephaestus.intelligenceservice.model.ISMentorMessage;
+import de.tum.in.www1.hephaestus.intelligenceservice.model.ISMessage;
+import de.tum.in.www1.hephaestus.intelligenceservice.model.ISMessageHistory;
 
 @Service
 public class MessageService {
@@ -73,13 +73,13 @@ public class MessageService {
     private String generateResponse(Long sessionId, String messageContent) {
         List<Message> messages = messageRepository.findBySessionId(sessionId);
 
-        ISChatRequest chatRequest = new ISChatRequest();
-        chatRequest.setMessageHistory(messages.stream()
-                .<ISChatMessage>map(message -> new ISChatMessage().content(message.getContent()).sender(message.getSender().toString()))
+        ISMessageHistory messageHistory = new ISMessageHistory();
+        messageHistory.setMessages(messages.stream()
+                .<ISMessage>map(message -> new ISMessage().content(message.getContent()).sender(message.getSender().toString()))
                 .toList());
         try {
-            ISChatResponse chatResponse = intelligenceServiceApi.chatChatPost(chatRequest);
-            return chatResponse.getResponce();
+            ISMentorMessage mentorMessage = intelligenceServiceApi.generateMentorPost(messageHistory);
+            return mentorMessage.getContent();
             
         } catch (Exception e) {
             logger.error("Failed to generate response for message: {}", e.getMessage());
