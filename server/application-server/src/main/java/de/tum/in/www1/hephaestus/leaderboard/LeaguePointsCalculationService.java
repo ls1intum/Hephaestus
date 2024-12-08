@@ -47,7 +47,7 @@ public class LeaguePointsCalculationService {
         // Calculate final point change
         int pointChange = (int) (kFactor * (performanceBonus + placementBonus - decay));
         // Apply minimum change to prevent extreme swings
-        int newPoints = Math.max(0, oldPoints + pointChange);
+        int newPoints = Math.max(1, oldPoints + pointChange);
         
         logger.info("Points calculation: old={}, k={}, decay={}, performanceBonus={}, placement={}, pointchange={}, new={}", 
             oldPoints, kFactor, decay, performanceBonus, placementBonus, pointChange, newPoints);

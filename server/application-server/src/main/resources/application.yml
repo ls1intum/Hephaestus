@@ -1,6 +1,7 @@
 spring:
     application:
         name: Hephaestus
+        version: "0.0.1"
 
     datasource:
         url: jdbc:postgresql://localhost:5432/hephaestus
@@ -74,3 +75,6 @@ github:
 slack:
     token: ""
     signing-secret: ""
+
+sentry:
+    dsn: ""
