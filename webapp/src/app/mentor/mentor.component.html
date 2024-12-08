@@ -25,7 +25,7 @@
           [class.border-t]="selectedSessionMessages.data()?.length"
         />
       } @else {
-        <app-start-session-card (createSession)="this.createNewSession.mutate()" class="place-content-center"> </app-start-session-card>
+        <app-start-session-card (createNewSession)="this.createNewSession.mutate()" />
       }
     </div>
   </div>
