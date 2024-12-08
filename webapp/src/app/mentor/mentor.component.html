@@ -10,7 +10,7 @@
       />
     }
 
-    @if (((selectedSessionMessages.data()?.length ?? 0) === 0)) {
+    @if (((sessions.data()?.length ?? 0) === 0)) {
       <div class="flex flex-col lg:col-span-4 my-32">
         <app-start-session-card (createNewSession)="this.createNewSession.mutate()" [isLoading]="sessions.isPending()" [hasSessions]="(sessions.data()?.length ?? 0) > 0" />
       </div>
