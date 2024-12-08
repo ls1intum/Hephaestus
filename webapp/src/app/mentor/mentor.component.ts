@@ -8,7 +8,7 @@ import { ChatInputComponent } from './chat-input/chat-input.component';
 import { LucideAngularModule, CircleX } from 'lucide-angular';
 import { Message, MessageService, SessionService } from '@app/core/modules/openapi';
 import { HlmButtonModule } from '@spartan-ng/ui-button-helm';
-import { FirstSessionCardComponent } from './start-session-card/start-session-card.component';
+import { StartSessionCardComponent } from './start-session-card/start-session-card.component';
 import { HlmAlertModule } from '@spartan-ng/ui-alert-helm';
 import { HlmScrollAreaComponent } from '@spartan-ng/ui-scrollarea-helm';
 
@@ -18,7 +18,7 @@ import { HlmScrollAreaComponent } from '@spartan-ng/ui-scrollarea-helm';
   standalone: true,
   imports: [
     CommonModule,
-    FirstSessionCardComponent,
+    StartSessionCardComponent,
     SessionsCardComponent,
     MessagesComponent,
     ChatInputComponent,
