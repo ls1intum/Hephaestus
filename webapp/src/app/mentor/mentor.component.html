@@ -10,7 +10,7 @@
     <div class="flex flex-col lg:col-span-3 lg:justify-center" [class.my-32]="(selectedSessionMessages.data()?.length ?? 0) === 0">
       @if (selectedSessionId() !== undefined) {
         @if ((selectedSessionMessages.data()?.length ?? 0) > 0) {
-          <hlm-scroll-area class="h-[calc(100dvh-200px)] lg:h-[calc(100dvh-300px)] -mr-2.5">
+          <hlm-scroll-area #messagesScrollArea class="h-[calc(100dvh-200px)] lg:h-[calc(100dvh-300px)] -mr-2.5">
             <div class="pr-3">
               <app-messages [messages]="selectedSessionMessages.data() ?? []" class="p-4 space-y-4" />
             </div>

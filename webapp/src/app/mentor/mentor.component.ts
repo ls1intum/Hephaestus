@@ -1,4 +1,4 @@
-import { Component, inject, signal } from '@angular/core';
+import { Component, effect, inject, signal, viewChild } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { lastValueFrom } from 'rxjs';
 import { injectMutation, injectQuery, injectQueryClient } from '@tanstack/angular-query-experimental';
@@ -6,7 +6,7 @@ import { SessionsCardComponent } from './sessions-card/sessions-card.component';
 import { MessagesComponent } from './messages/messages.component';
 import { ChatInputComponent } from './chat-input/chat-input.component';
 import { LucideAngularModule, CircleX } from 'lucide-angular';
-import { MessageService, SessionService } from '@app/core/modules/openapi';
+import { Message, MessageService, SessionService } from '@app/core/modules/openapi';
 import { HlmButtonModule } from '@spartan-ng/ui-button-helm';
 import { FirstSessionCardComponent } from './start-session-card/start-session-card.component';
 import { HlmAlertModule } from '@spartan-ng/ui-alert-helm';
@@ -35,8 +35,16 @@ export class MentorComponent {
   sessionService = inject(SessionService);
 
   selectedSessionId = signal<number | undefined>(undefined);
+  messagesScrollArea = viewChild(HlmScrollAreaComponent);
 
   queryClient = injectQueryClient();
+
+  constructor() {
+    effect(() => {
+      this.selectedSessionMessages.data(); // captures the dependency
+      setTimeout(() => this.scrollToBottom(), 0);
+    });
+  }
 
   sessions = injectQuery(() => ({
     queryKey: ['sessions'],
@@ -61,9 +69,25 @@ export class MentorComponent {
 
   sendMessage = injectMutation(() => ({
     mutationFn: async ({ sessionId, message }: { sessionId: number; message: string }) => lastValueFrom(this.messageService.createMessage(sessionId, message)),
+    onMutate: async ({ message }) => {
+      // Do optimistic update
+      await this.queryClient.cancelQueries({ queryKey: ['sessions', this.selectedSessionId()] });
+      const previousMessages = this.queryClient.getQueryData(['sessions', this.selectedSessionId()]) as Message[];
 
+      const newMessage: Message = { id: -1, sender: 'USER', content: message, sessionId: this.selectedSessionId()!, sentAt: new Date().toISOString() };
+      this.queryClient.setQueryData(['sessions', this.selectedSessionId()], (old: Message[]) => [...old, newMessage]);
+
+      return { previousMessages };
+    },
+    onError: (err, newTodo, context) => {
+      this.queryClient.setQueryData(['sessions', this.selectedSessionId()], context?.previousMessages);
+    },
     onSettled: () => {
       this.queryClient.invalidateQueries({ queryKey: ['sessions', this.selectedSessionId()] });
     }
   }));
+
+  scrollToBottom() {
+    this.messagesScrollArea()?.scrollbar().scrollTo({ bottom: 0, duration: 300 });
+  }
 }
