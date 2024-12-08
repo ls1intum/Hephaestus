@@ -90,7 +90,7 @@ public class LeaderboardService {
                 Collectors.toMap(Map.Entry::getKey, entry ->
                     calculateTotalScore(
                         entry.getValue(),
-                        issueCommentsByUserId.getOrDefault(entry.getKey(), List.of()).size()
+                        issueCommentsByUserId.getOrDefault(entry.getKey(), List.of())
                     )
                 )
             );
@@ -117,6 +117,7 @@ public class LeaderboardService {
                 List<PullRequestInfoDTO> reviewedPullRequests = userReviews
                     .stream()
                     .map(review -> review.getPullRequest())
+                    .filter(pullRequest -> pullRequest.getAuthor().getId() != userId)
                     // First collect to a map keyed by PR ID to ensure uniqueness
                     .collect(
                         Collectors.groupingBy(
@@ -179,7 +180,8 @@ public class LeaderboardService {
         return leaderboard;
     }
 
-    private int calculateTotalScore(List<PullRequestReview> reviews, int numberOfIssueComments) {
+    private int calculateTotalScore(List<PullRequestReview> reviews, List<IssueComment> issueComments) {
+        int numberOfIssueComments = issueComments.stream().filter(issueComment -> issueComment.getIssue().getAuthor().getId() != issueComment.getAuthor().getId()).collect(Collectors.toList()).size();
         // Could contain multiple reviews for the same pull request
         Map<Long, List<PullRequestReview>> reviewsByPullRequestId = reviews
             .stream()
