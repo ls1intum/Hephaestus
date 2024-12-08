@@ -24,6 +24,11 @@ RUN set -a && \
 export const environment = {
   clientUrl: '${APPLICATION_CLIENT_URL}',
   serverUrl: '${APPLICATION_SERVER_URL}',
+  version: '${APPLICATION_VERSION}',
+  sentry: {
+    dsn: '${SENTRY_DSN}',
+    environment: 'prod',
+  },
   keycloak: {
     url: '${KEYCLOAK_URL}',
     realm: '${KEYCLOAK_REALM}',
