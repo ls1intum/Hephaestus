@@ -1,4 +1,4 @@
-import { Component, inject } from '@angular/core';
+import { Component, inject, signal } from '@angular/core';
 import { PullRequestInfo, PullRequestReviewInfo, UserService } from 'app/core/modules/openapi';
 import { HlmAvatarModule } from '@spartan-ng/ui-avatar-helm';
 import { HlmSkeletonModule } from '@spartan-ng/ui-skeleton-helm';
@@ -37,10 +37,15 @@ export class UserProfileComponent {
   protected CircleX = CircleX;
   protected Info = Info;
   // get user id from the url
-  protected userLogin: string | null = null;
+  protected userLogin = signal<string | null>(null);
 
   constructor(private route: ActivatedRoute) {
-    this.userLogin = this.route.snapshot.paramMap.get('id');
+    this.userLogin.set(this.route.snapshot.paramMap.get('id'));
+    this.route.params.subscribe((params) => {
+      if (params['id']) {
+        this.userLogin.set(params['id']);
+      }
+    });
   }
 
   skeletonReviews = this.genSkeletonArray<PullRequestReviewInfo>(3);
@@ -57,8 +62,8 @@ export class UserProfileComponent {
   };
 
   query = injectQuery(() => ({
-    queryKey: ['user', { id: this.userLogin }],
-    enabled: !!this.userLogin,
-    queryFn: async () => lastValueFrom(combineLatest([this.userService.getUserProfile(this.userLogin!), timer(400)]).pipe(map(([user]) => user)))
+    queryKey: ['user', { id: this.userLogin() }],
+    enabled: !!this.userLogin(),
+    queryFn: async () => lastValueFrom(combineLatest([this.userService.getUserProfile(this.userLogin()!), timer(400)]).pipe(map(([user]) => user)))
   }));
 }
