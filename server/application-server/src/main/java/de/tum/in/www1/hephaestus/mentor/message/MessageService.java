@@ -75,8 +75,8 @@ public class MessageService {
 
     }
 
-    private String generateResponse(Long session_id, String messageContent) {
-        List<Message> messages = messageRepository.findBySessionId(session_id);
+    private String generateResponse(Long sessionId, String messageContent) {
+        List<Message> messages = messageRepository.findBySessionId(sessionId);
 
         ChatRequest chatRequest = new ChatRequest();
         chatRequest.setMessageHistory(messages.stream()
