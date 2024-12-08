@@ -3,9 +3,9 @@ package de.tum.in.www1.hephaestus.intelligenceservice.api;
 import de.tum.in.www1.hephaestus.intelligenceservice.ApiClient;
 import de.tum.in.www1.hephaestus.intelligenceservice.BaseApi;
 
-import de.tum.in.www1.hephaestus.intelligenceservice.model.ChatRequest;
-import de.tum.in.www1.hephaestus.intelligenceservice.model.ChatResponse;
-import de.tum.in.www1.hephaestus.intelligenceservice.model.HTTPValidationError;
+import de.tum.in.www1.hephaestus.intelligenceservice.model.ISChatRequest;
+import de.tum.in.www1.hephaestus.intelligenceservice.model.ISChatResponse;
+import de.tum.in.www1.hephaestus.intelligenceservice.model.ISHTTPValidationError;
 
 import java.util.Collections;
 import java.util.HashMap;
@@ -29,14 +29,12 @@ import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 
 @jakarta.annotation.Generated(value = "org.openapitools.codegen.languages.JavaClientCodegen", comments = "Generator version: 7.7.0")
-@Component("de.tum.in.www1.hephaestus.intelligenceservice.api.DefaultApi")
 public class DefaultApi extends BaseApi {
 
     public DefaultApi() {
         super(new ApiClient());
     }
 
-    @Autowired
     public DefaultApi(ApiClient apiClient) {
         super(apiClient);
     }
@@ -46,12 +44,12 @@ public class DefaultApi extends BaseApi {
      * 
      * <p><b>200</b> - Successful Response
      * <p><b>422</b> - Validation Error
-     * @param chatRequest  (required)
-     * @return ChatResponse
+     * @param isChatRequest  (required)
+     * @return ISChatResponse
      * @throws RestClientException if an error occurs while attempting to invoke the API
      */
-    public ChatResponse chatChatPost(ChatRequest chatRequest) throws RestClientException {
-        return chatChatPostWithHttpInfo(chatRequest).getBody();
+    public ISChatResponse chatChatPost(ISChatRequest isChatRequest) throws RestClientException {
+        return chatChatPostWithHttpInfo(isChatRequest).getBody();
     }
 
     /**
@@ -59,16 +57,16 @@ public class DefaultApi extends BaseApi {
      * 
      * <p><b>200</b> - Successful Response
      * <p><b>422</b> - Validation Error
-     * @param chatRequest  (required)
-     * @return ResponseEntity&lt;ChatResponse&gt;
+     * @param isChatRequest  (required)
+     * @return ResponseEntity&lt;ISChatResponse&gt;
      * @throws RestClientException if an error occurs while attempting to invoke the API
      */
-    public ResponseEntity<ChatResponse> chatChatPostWithHttpInfo(ChatRequest chatRequest) throws RestClientException {
-        Object localVarPostBody = chatRequest;
+    public ResponseEntity<ISChatResponse> chatChatPostWithHttpInfo(ISChatRequest isChatRequest) throws RestClientException {
+        Object localVarPostBody = isChatRequest;
         
-        // verify the required parameter 'chatRequest' is set
-        if (chatRequest == null) {
-            throw new HttpClientErrorException(HttpStatus.BAD_REQUEST, "Missing the required parameter 'chatRequest' when calling chatChatPost");
+        // verify the required parameter 'isChatRequest' is set
+        if (isChatRequest == null) {
+            throw new HttpClientErrorException(HttpStatus.BAD_REQUEST, "Missing the required parameter 'isChatRequest' when calling chatChatPost");
         }
         
 
@@ -88,7 +86,7 @@ public class DefaultApi extends BaseApi {
 
         String[] localVarAuthNames = new String[] {  };
 
-        ParameterizedTypeReference<ChatResponse> localReturnType = new ParameterizedTypeReference<ChatResponse>() {};
+        ParameterizedTypeReference<ISChatResponse> localReturnType = new ParameterizedTypeReference<ISChatResponse>() {};
         return apiClient.invokeAPI("/chat", HttpMethod.POST, Collections.<String, Object>emptyMap(), localVarQueryParams, localVarPostBody, localVarHeaderParams, localVarCookieParams, localVarFormParams, localVarAccept, localVarContentType, localVarAuthNames, localReturnType);
     }
 

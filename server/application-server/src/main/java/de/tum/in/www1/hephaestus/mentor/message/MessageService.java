@@ -6,32 +6,28 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
-import de.tum.in.www1.hephaestus.intelligenceservice.ApiClient;
-import de.tum.in.www1.hephaestus.intelligenceservice.api.DefaultApi;
-import de.tum.in.www1.hephaestus.intelligenceservice.model.ChatMessage;
-import de.tum.in.www1.hephaestus.intelligenceservice.model.ChatRequest;
 
-import de.tum.in.www1.hephaestus.intelligenceservice.model.ChatResponse;
+import de.tum.in.www1.hephaestus.config.IntelligenceServiceConfig.IntelligenceServiceApi;
 import de.tum.in.www1.hephaestus.mentor.message.Message.MessageSender;
 import de.tum.in.www1.hephaestus.mentor.session.Session;
 import de.tum.in.www1.hephaestus.mentor.session.SessionRepository;
+import de.tum.in.www1.hephaestus.intelligenceservice.model.ISChatMessage;
+import de.tum.in.www1.hephaestus.intelligenceservice.model.ISChatRequest;
+import de.tum.in.www1.hephaestus.intelligenceservice.model.ISChatResponse;
 
 @Service
 public class MessageService {
 
-    private DefaultApi sessionApiClient;
+    @Autowired
+    private IntelligenceServiceApi intelligenceServiceApi;
+
     @Autowired
     private SessionRepository sessionRepository;
+
     @Autowired
     private MessageRepository messageRepository;
 
     private static final Logger logger = LoggerFactory.getLogger(MessageService.class);
-
-    public MessageService() {
-        ApiClient apiClient = new ApiClient();
-        apiClient.setBasePath("http://127.0.0.1:8000");
-        this.sessionApiClient = new DefaultApi(apiClient);
-    }
 
     public List<MessageDTO> getMessagesBySessionId(Long sessionId) {
         return messageRepository.findBySessionId(sessionId).stream()
@@ -72,18 +68,17 @@ public class MessageService {
         sessionRepository.save(currentSession);
 
         return MessageDTO.fromMessage(savedSystemMessage);
-
     }
 
     private String generateResponse(Long sessionId, String messageContent) {
         List<Message> messages = messageRepository.findBySessionId(sessionId);
 
-        ChatRequest chatRequest = new ChatRequest();
+        ISChatRequest chatRequest = new ISChatRequest();
         chatRequest.setMessageHistory(messages.stream()
-                .<ChatMessage>map(message -> new ChatMessage().content(message.getContent()).sender(message.getSender().toString()))
+                .<ISChatMessage>map(message -> new ISChatMessage().content(message.getContent()).sender(message.getSender().toString()))
                 .toList());
         try {
-            ChatResponse chatResponse = sessionApiClient.chatChatPost(chatRequest);
+            ISChatResponse chatResponse = intelligenceServiceApi.chatChatPost(chatRequest);
             return chatResponse.getResponce();
             
         } catch (Exception e) {
