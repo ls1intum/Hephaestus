@@ -10,7 +10,7 @@ import { HlmButtonModule } from '@spartan-ng/ui-button-helm';
 import dayjs from 'dayjs';
 import advancedFormat from 'dayjs/plugin/advancedFormat';
 import { RepositoryInfo, UserInfo } from '@app/core/modules/openapi';
-import { LeagueIconComponent } from '@app/ui/league-icon/league-icon.component';
+import { LeagueIconComponent } from '@app/ui/league/icon/league-icon.component';
 
 dayjs.extend(advancedFormat);
 

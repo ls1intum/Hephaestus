@@ -48,7 +48,7 @@ export class LeagueIconComponent {
   league = input<LeagueVariants['league']>('none');
   class = input<string>('');
 
-  computedLeague = computed(() => this.leaguePoints() ? getLeagueFromPoints(this.leaguePoints()!) : this.league());
+  computedLeague = computed(() => this.leaguePoints() ? getLeagueFromPoints(this.leaguePoints()!)?.name.toLowerCase() : this.league());
 
-  computedClass = computed(() => cn(leagueVariants({ size: this.size(), league: this.computedLeague() }), this.class()));
+  computedClass = computed(() => cn(leagueVariants({ size: this.size(), league: this.computedLeague() as LeagueVariants['league'] }), this.class()));
 }

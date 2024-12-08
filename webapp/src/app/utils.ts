@@ -17,15 +17,33 @@ export function groupBy<T, K extends keyof any>(arr: T[], key: (i: T) => K) {
 }
 
 export function getLeagueFromPoints(points: number) {
-  if (points < 1250) {
-    return 'bronze';
-  } else if (points < 1500) {
-    return 'silver';
-  } else if (points < 1750) {
-    return 'gold';
-  } else if (points < 2000) {
-    return 'diamond';
-  } else {
-    return 'master';
-  }
+  return Leagues.find(league => points >= league.minPoints && points < league.maxPoints);
 }
+
+export const Leagues = [
+  {
+    name: 'Bronze',
+    minPoints: 0,
+    maxPoints: 1250
+  },
+  {
+    name: 'Silver',
+    minPoints: 1250,
+    maxPoints: 1500
+  },
+  {
+    name: 'Gold',
+    minPoints: 1500,
+    maxPoints: 1750
+  },
+  {
+    name: 'Diamond',
+    minPoints: 1750,
+    maxPoints: 2000
+  },
+  {
+    name: 'Master',
+    minPoints: 2000,
+    maxPoints: Infinity
+  }
+]

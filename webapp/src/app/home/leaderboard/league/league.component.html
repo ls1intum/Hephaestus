@@ -1,0 +1,16 @@
+<div hlmCard>
+  <div hlmCardContent class="py-4">
+    <span class="flex justify-between items-center pb-2 gap-2">
+      <h3 class="text-base font-semibold tracking-wide">Your League</h3>
+      <app-league-info-modal />
+    </span>
+    <div class="flex items-center justify-between gap-2">
+      <app-league-elo-card [leaguePoints]="leaguePoints()" />
+      <div class="flex-1"></div>
+      <!-- Action area -->
+      <div class="flex flex-col gap-2">
+        <a hlmBtn href="https://github.com/ls1intum/Artemis/pulls" target="_blank" variant="secondary" size="default"> Start&nbsp;Reviewing </a>
+      </div>
+    </div>
+  </div>
+</div>
