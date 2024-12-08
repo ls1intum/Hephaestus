@@ -16,6 +16,13 @@ const meta: Meta<UserProfileComponent> = {
               paramMap: {
                 get: () => 'krusche'
               }
+            },
+            params: {
+              id: 'krusche',
+              subscribe: (injected: (params: { id: string }) => void) => {
+                injected({ id: 'krusche' });
+                return { unsubscribe: () => {} };
+              }
             }
           }
         }
