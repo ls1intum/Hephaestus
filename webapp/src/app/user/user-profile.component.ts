@@ -42,7 +42,9 @@ export class UserProfileComponent {
   constructor(private route: ActivatedRoute) {
     this.userLogin.set(this.route.snapshot.paramMap.get('id'));
     this.route.params.subscribe((params) => {
-      this.userLogin.set(params['id']);
+      if (params['id']) {
+        this.userLogin.set(params['id']);
+      }
     });
   }
 
