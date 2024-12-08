@@ -2,7 +2,7 @@ from typing import List
 from fastapi import APIRouter
 from pydantic import BaseModel
 
-from langchain_core.messages import  HumanMessage, AIMessage
+from langchain_core.messages import HumanMessage, AIMessage
 
 from ..mentor.run import graph
 

@@ -13,7 +13,7 @@ model: BaseChatModel
 if os.getenv("GITHUB_ACTIONS") == "true":
     model = FakeListChatModel(responses=["Response 1", "Response 2"])
 else:
-    
+
     if settings.is_openai_available:
         Model = ChatOpenAI
     elif settings.is_azure_openai_available:
