@@ -1,36 +1,27 @@
-
-<div class="gap-4 overflow-auto max-h-full flex flex-col">
-  @if (messages().length > 0) {
-    @for (message of messages(); track message.id) {
-      <div class="flex w-full" [ngClass]="{ 'justify-end': message.sender === Message.SenderEnum.User, 'justify-start': message.sender === Message.SenderEnum.Mentor }">
-        <div class="flex space-x-2 md:w-3/5" [ngClass]="{ 'flex-row-reverse': message.sender === Message.SenderEnum.User }">
-          @if (message.sender === Message.SenderEnum.Mentor) {
-            <div class="mr-2 flex flex-col">
-              <div class="w-10 h-10 bg-transparent border-2 border-cyan-500 rounded-full flex items-center justify-center">
-                <lucide-angular [img]="BotMessageSquare" class="size-6 text-cyan-500" />
-              </div>
+<div class="flex flex-col gap-4">
+  @for (message of messages(); track message.id) {
+    <div class="flex w-full" [ngClass]="{ 'justify-end': message.sender === Message.SenderEnum.User, 'justify-start': message.sender === Message.SenderEnum.Mentor }">
+      <div class="flex space-x-2 md:w-3/5" [ngClass]="{ 'flex-row-reverse': message.sender === Message.SenderEnum.User }">
+        @if (message.sender === Message.SenderEnum.Mentor) {
+          <div class="mr-2 flex flex-col">
+            <div class="w-10 h-10 bg-transparent border-2 border-cyan-500 rounded-full flex items-center justify-center">
+              <lucide-angular [img]="BotMessageSquare" class="size-6 text-cyan-500" />
             </div>
-          }
-          <div class="flex flex-col space-y-2" [ngClass]="{ 'items-end': message.sender === Message.SenderEnum.User, 'items-start': message.sender === Message.SenderEnum.Mentor }">
-            
-              <div
-              [ngClass]="{
-                'bg-cyan-500 dark:bg-cyan-600 text-white': message.sender === Message.SenderEnum.User,
-                'bg-muted text-primary': message.sender === Message.SenderEnum.Mentor
-              }"
-              class="p-3 px-4 rounded-lg inline-block w-fit"
-            >
-              <p>{{ message.content }}</p>
-            </div>
-            <span class="text-xs text-muted-foreground"> {{ message.sender === Message.SenderEnum.User ? 'You' : 'AI Mentor' }} · {{ message.sentAt | date: 'shortTime' }} </span>
-          
-            
-            </div>
+          </div>
+        }
+        <div class="flex flex-col space-y-2" [ngClass]="{ 'items-end': message.sender === Message.SenderEnum.User, 'items-start': message.sender === Message.SenderEnum.Mentor }">
+          <div
+            [ngClass]="{
+              'bg-cyan-500 dark:bg-cyan-600 text-white': message.sender === Message.SenderEnum.User,
+              'bg-muted text-primary': message.sender === Message.SenderEnum.Mentor
+            }"
+            class="p-3 px-4 rounded-lg inline-block w-fit"
+          >
+            <p>{{ message.content }}</p>
+          </div>
+          <span class="text-xs text-muted-foreground"> {{ message.sender === Message.SenderEnum.User ? 'You' : 'AI Mentor' }} · {{ message.sentAt | date: 'shortTime' }} </span>
         </div>
       </div>
-    }
-  } @else {
-    <h2 class="text-xl text-center font-medium">What can I help with?</h2>
+    </div>
   }
 </div>
-

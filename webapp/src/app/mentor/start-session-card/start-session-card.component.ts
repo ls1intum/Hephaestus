@@ -1,4 +1,4 @@
-import { Component, input, output } from '@angular/core';
+import { Component, output } from '@angular/core';
 import { LucideAngularModule, Plus, BotMessageSquare } from 'lucide-angular';
 import { HlmButtonModule } from '@spartan-ng/ui-button-helm';
 

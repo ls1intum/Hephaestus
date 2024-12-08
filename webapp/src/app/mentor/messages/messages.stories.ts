@@ -50,9 +50,3 @@ export default meta;
 type Story = StoryObj<MessagesComponent>;
 
 export const Default: Story = {};
-
-export const Empty: Story = {
-  args: {
-    messages: []
-  }
-};

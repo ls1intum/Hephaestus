@@ -10,6 +10,7 @@ import { MessageService, SessionService } from '@app/core/modules/openapi';
 import { HlmButtonModule } from '@spartan-ng/ui-button-helm';
 import { FirstSessionCardComponent } from './start-session-card/start-session-card.component';
 import { HlmAlertModule } from '@spartan-ng/ui-alert-helm';
+import { HlmScrollAreaComponent } from '@spartan-ng/ui-scrollarea-helm';
 
 @Component({
   selector: 'app-mentor',
@@ -23,6 +24,7 @@ import { HlmAlertModule } from '@spartan-ng/ui-alert-helm';
     ChatInputComponent,
     HlmButtonModule,
     HlmAlertModule,
+    HlmScrollAreaComponent,
     LucideAngularModule
   ]
 })
