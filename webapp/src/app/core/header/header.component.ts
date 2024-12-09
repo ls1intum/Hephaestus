@@ -12,6 +12,7 @@ import { RequestFeatureComponent } from './request-feature/request-feature.compo
 import { lucideUser, lucideLogOut, lucideSettings } from '@ng-icons/lucide';
 import { provideIcons } from '@ng-icons/core';
 import { EnvironmentService } from '@app/environment.service';
+import { AiMentorComponent } from './ai-mentor/ai-mentor.component';
 
 @Component({
   selector: 'app-header',
@@ -27,7 +28,8 @@ import { EnvironmentService } from '@app/environment.service';
     HlmAvatarModule,
     HlmMenuModule,
     BrnMenuTriggerDirective,
-    HlmIconComponent
+    HlmIconComponent,
+    AiMentorComponent
   ],
   providers: [
     provideIcons({

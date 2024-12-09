@@ -1,4 +1,4 @@
-FROM node:22 as build
+FROM node:22 AS build
 
 WORKDIR /app
 
@@ -10,10 +10,15 @@ COPY . ./
 
 RUN npm run build
 
+# Extract version from package.json and save to version.txt
+RUN node -e "console.log(require('./package.json').version)" > /app/version.txt
+
 FROM nginx:stable-alpine
 
 ENV APPLICATION_CLIENT_URL=https://default-client.url
 ENV APPLICATION_SERVER_URL=https://default-server.url
+
+ENV SENTRY_DNS=https://289f1f62feeb4f70a8878dc0101825cd@sentry.ase.in.tum.de/3
 
 ENV KEYCLOAK_URL=https://default-keycloak.url
 ENV KEYCLOAK_REALM=default-realm

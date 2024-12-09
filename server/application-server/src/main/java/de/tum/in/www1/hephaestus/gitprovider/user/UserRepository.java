@@ -1,5 +1,6 @@
 package de.tum.in.www1.hephaestus.gitprovider.user;
 
+import de.tum.in.www1.hephaestus.SecurityUtils;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
@@ -16,6 +17,14 @@ public interface UserRepository extends JpaRepository<User, Long> {
                 WHERE u.login ILIKE :login
             """)
     Optional<User> findByLogin(@Param("login") String login);
+
+    @Query("""
+                SELECT u
+                FROM User u
+                LEFT JOIN FETCH u.mergedPullRequests
+                WHERE u.login ILIKE :login
+            """)
+    Optional<User> findByLoginWithEagerMergedPullRequests(@Param("login") String login);
 
     @Query("""
                 SELECT u
@@ -61,4 +70,12 @@ public interface UserRepository extends JpaRepository<User, Long> {
                 )
             """)
     Set<User> findAllContributingToTeam(@Param("teamId") Long teamId);
+
+    /**
+     * @return existing user object by current user login
+     */
+    default Optional<User> getCurrentUser() {
+        var currentUserLogin = SecurityUtils.getCurrentUserLogin();
+        return currentUserLogin.map(this::findByLogin).orElse(Optional.empty());
+    }
 }

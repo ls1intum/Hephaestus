@@ -20,7 +20,7 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonTypeName;
 import com.fasterxml.jackson.annotation.JsonValue;
-import de.tum.in.www1.hephaestus.intelligenceservice.model.ValidationError;
+import de.tum.in.www1.hephaestus.intelligenceservice.model.ISMessage;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
@@ -29,50 +29,51 @@ import com.fasterxml.jackson.annotation.JsonTypeName;
 import org.hibernate.validator.constraints.*;
 
 /**
- * HTTPValidationError
+ * ISMessageHistory
  */
 @JsonPropertyOrder({
-  HTTPValidationError.JSON_PROPERTY_DETAIL
+  ISMessageHistory.JSON_PROPERTY_MESSAGES
 })
+@JsonTypeName("MessageHistory")
 @jakarta.annotation.Generated(value = "org.openapitools.codegen.languages.JavaClientCodegen", comments = "Generator version: 7.7.0")
-public class HTTPValidationError {
-  public static final String JSON_PROPERTY_DETAIL = "detail";
-  private List<ValidationError> detail = new ArrayList<>();
+public class ISMessageHistory {
+  public static final String JSON_PROPERTY_MESSAGES = "messages";
+  private List<ISMessage> messages = new ArrayList<>();
 
-  public HTTPValidationError() {
+  public ISMessageHistory() {
   }
 
-  public HTTPValidationError detail(List<ValidationError> detail) {
+  public ISMessageHistory messages(List<ISMessage> messages) {
     
-    this.detail = detail;
+    this.messages = messages;
     return this;
   }
 
-  public HTTPValidationError addDetailItem(ValidationError detailItem) {
-    if (this.detail == null) {
-      this.detail = new ArrayList<>();
+  public ISMessageHistory addMessagesItem(ISMessage messagesItem) {
+    if (this.messages == null) {
+      this.messages = new ArrayList<>();
     }
-    this.detail.add(detailItem);
+    this.messages.add(messagesItem);
     return this;
   }
 
   /**
-   * Get detail
-   * @return detail
+   * Get messages
+   * @return messages
    */
-  @jakarta.annotation.Nullable
-  @JsonProperty(JSON_PROPERTY_DETAIL)
-  @JsonInclude(value = JsonInclude.Include.USE_DEFAULTS)
+  @jakarta.annotation.Nonnull
+  @JsonProperty(JSON_PROPERTY_MESSAGES)
+  @JsonInclude(value = JsonInclude.Include.ALWAYS)
 
-  public List<ValidationError> getDetail() {
-    return detail;
+  public List<ISMessage> getMessages() {
+    return messages;
   }
 
 
-  @JsonProperty(JSON_PROPERTY_DETAIL)
-  @JsonInclude(value = JsonInclude.Include.USE_DEFAULTS)
-  public void setDetail(List<ValidationError> detail) {
-    this.detail = detail;
+  @JsonProperty(JSON_PROPERTY_MESSAGES)
+  @JsonInclude(value = JsonInclude.Include.ALWAYS)
+  public void setMessages(List<ISMessage> messages) {
+    this.messages = messages;
   }
 
   @Override
@@ -83,20 +84,20 @@ public class HTTPValidationError {
     if (o == null || getClass() != o.getClass()) {
       return false;
     }
-    HTTPValidationError htTPValidationError = (HTTPValidationError) o;
-    return Objects.equals(this.detail, htTPValidationError.detail);
+    ISMessageHistory messageHistory = (ISMessageHistory) o;
+    return Objects.equals(this.messages, messageHistory.messages);
   }
 
   @Override
   public int hashCode() {
-    return Objects.hash(detail);
+    return Objects.hash(messages);
   }
 
   @Override
   public String toString() {
     StringBuilder sb = new StringBuilder();
-    sb.append("class HTTPValidationError {\n");
-    sb.append("    detail: ").append(toIndentedString(detail)).append("\n");
+    sb.append("class ISMessageHistory {\n");
+    sb.append("    messages: ").append(toIndentedString(messages)).append("\n");
     sb.append("}");
     return sb.toString();
   }

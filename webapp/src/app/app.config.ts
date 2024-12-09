@@ -1,5 +1,5 @@
-import { APP_INITIALIZER, ApplicationConfig, provideExperimentalZonelessChangeDetection } from '@angular/core';
-import { provideRouter } from '@angular/router';
+import { APP_INITIALIZER, ApplicationConfig, ErrorHandler, provideExperimentalZonelessChangeDetection } from '@angular/core';
+import { provideRouter, Router } from '@angular/router';
 import { provideAnimationsAsync } from '@angular/platform-browser/animations/async';
 import { provideHttpClient, withInterceptors } from '@angular/common/http';
 import { provideAngularQuery, QueryClient } from '@tanstack/angular-query-experimental';
@@ -8,6 +8,8 @@ import { routes } from 'app/app.routes';
 import { AnalyticsService } from './analytics.service';
 import { securityInterceptor } from './core/security/security-interceptor';
 import { EnvironmentService } from './environment.service';
+import { TraceService } from '@sentry/angular';
+import { SentryErrorHandler } from './core/sentry/sentry.error-handler';
 
 function initializeApp(environmentService: EnvironmentService, analyticsService: AnalyticsService) {
   return () => {
@@ -28,6 +30,14 @@ export const appConfig: ApplicationConfig = {
       provide: BASE_PATH,
       useFactory: (environmentService: EnvironmentService) => environmentService.env.serverUrl,
       deps: [EnvironmentService]
+    },
+    { provide: ErrorHandler, useClass: SentryErrorHandler },
+    { provide: TraceService, deps: [Router] },
+    {
+      provide: APP_INITIALIZER,
+      useFactory: () => () => {},
+      deps: [TraceService],
+      multi: true
     }
   ]
 };

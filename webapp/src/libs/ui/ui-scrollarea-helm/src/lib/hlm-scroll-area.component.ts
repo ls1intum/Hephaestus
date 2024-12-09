@@ -1,7 +1,7 @@
-import { ChangeDetectionStrategy, Component, Input, ViewEncapsulation, booleanAttribute, computed, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, Input, ViewEncapsulation, booleanAttribute, computed, signal, viewChild } from '@angular/core';
 import { hlm } from '@spartan-ng/ui-core';
 import type { ClassValue } from 'clsx';
-import { NgScrollbarModule } from 'ngx-scrollbar';
+import { NgScrollbar, NgScrollbarModule } from 'ngx-scrollbar';
 
 @Component({
   selector: 'hlm-scroll-area',
@@ -9,6 +9,7 @@ import { NgScrollbarModule } from 'ngx-scrollbar';
   imports: [NgScrollbarModule],
   template: `
     <ng-scrollbar
+      #scrollbar
       [visibility]="_visibility()"
       [autoHeightDisabled]="_autoHeightDisabled()"
       [autoWidthDisabled]="_autoWidthDisabled()"
@@ -32,6 +33,8 @@ import { NgScrollbarModule } from 'ngx-scrollbar';
 })
 export class HlmScrollAreaComponent {
   protected readonly _computedClass = computed(() => hlm('block', this._class()));
+
+  scrollbar = viewChild.required(NgScrollbar);
 
   @Input()
   set class(value: ClassValue) {

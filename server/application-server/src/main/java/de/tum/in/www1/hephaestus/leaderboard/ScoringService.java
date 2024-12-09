@@ -71,6 +71,9 @@ public class ScoringService {
             }
             pullRequest = optionalPR.get();
         }
+        if (pullRequest.getAuthor().getId() == issueComment.getAuthor().getId()) {
+            return 0;
+        }
         
         int complexityScore = calculateComplexityScore(pullRequest);
         
