@@ -2,6 +2,7 @@ import { computed, inject, Injectable, PLATFORM_ID, signal } from '@angular/core
 import { isPlatformServer } from '@angular/common';
 import { KeycloakService } from './keycloak.service';
 import { ANONYMOUS_USER, User } from './models';
+import { setUser } from '@sentry/angular';
 
 @Injectable({ providedIn: 'root' })
 export class SecurityStore {
@@ -23,6 +24,7 @@ export class SecurityStore {
     if (isServer) {
       this.user.set(ANONYMOUS_USER);
       this.loaded.set(true);
+      setUser(ANONYMOUS_USER);
       return;
     }
 
@@ -40,9 +42,11 @@ export class SecurityStore {
       };
       this.user.set(user);
       this.loaded.set(true);
+      setUser(user);
     } else {
       this.user.set(ANONYMOUS_USER);
       this.loaded.set(true);
+      setUser(ANONYMOUS_USER);
     }
   }
 

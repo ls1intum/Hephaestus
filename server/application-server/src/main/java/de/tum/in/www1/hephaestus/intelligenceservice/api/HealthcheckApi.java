@@ -3,9 +3,7 @@ package de.tum.in.www1.hephaestus.intelligenceservice.api;
 import de.tum.in.www1.hephaestus.intelligenceservice.ApiClient;
 import de.tum.in.www1.hephaestus.intelligenceservice.BaseApi;
 
-import de.tum.in.www1.hephaestus.intelligenceservice.model.ChatRequest;
-import de.tum.in.www1.hephaestus.intelligenceservice.model.ChatResponse;
-import de.tum.in.www1.hephaestus.intelligenceservice.model.HTTPValidationError;
+import de.tum.in.www1.hephaestus.intelligenceservice.model.ISHealthCheck;
 
 import java.util.Collections;
 import java.util.HashMap;
@@ -29,47 +27,36 @@ import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 
 @jakarta.annotation.Generated(value = "org.openapitools.codegen.languages.JavaClientCodegen", comments = "Generator version: 7.7.0")
-@Component("de.tum.in.www1.hephaestus.intelligenceservice.api.DefaultApi")
-public class DefaultApi extends BaseApi {
+public class HealthcheckApi extends BaseApi {
 
-    public DefaultApi() {
+    public HealthcheckApi() {
         super(new ApiClient());
     }
 
-    @Autowired
-    public DefaultApi(ApiClient apiClient) {
+    public HealthcheckApi(ApiClient apiClient) {
         super(apiClient);
     }
 
     /**
-     * Start and continue a chat session with an LLM.
-     * 
-     * <p><b>200</b> - Successful Response
-     * <p><b>422</b> - Validation Error
-     * @param chatRequest  (required)
-     * @return ChatResponse
+     * Perform a Health Check
+     * ## Perform a Health Check Endpoint to perform a healthcheck on. This endpoint can primarily be used Docker to ensure a robust container orchestration and management is in place. Other services which rely on proper functioning of the API service will not deploy if this endpoint returns any other HTTP status code except 200 (OK). Returns:     HealthCheck: Returns a JSON response with the health status
+     * <p><b>200</b> - Return HTTP Status Code 200 (OK)
+     * @return ISHealthCheck
      * @throws RestClientException if an error occurs while attempting to invoke the API
      */
-    public ChatResponse chatChatPost(ChatRequest chatRequest) throws RestClientException {
-        return chatChatPostWithHttpInfo(chatRequest).getBody();
+    public ISHealthCheck getHealthHealthGet() throws RestClientException {
+        return getHealthHealthGetWithHttpInfo().getBody();
     }
 
     /**
-     * Start and continue a chat session with an LLM.
-     * 
-     * <p><b>200</b> - Successful Response
-     * <p><b>422</b> - Validation Error
-     * @param chatRequest  (required)
-     * @return ResponseEntity&lt;ChatResponse&gt;
+     * Perform a Health Check
+     * ## Perform a Health Check Endpoint to perform a healthcheck on. This endpoint can primarily be used Docker to ensure a robust container orchestration and management is in place. Other services which rely on proper functioning of the API service will not deploy if this endpoint returns any other HTTP status code except 200 (OK). Returns:     HealthCheck: Returns a JSON response with the health status
+     * <p><b>200</b> - Return HTTP Status Code 200 (OK)
+     * @return ResponseEntity&lt;ISHealthCheck&gt;
      * @throws RestClientException if an error occurs while attempting to invoke the API
      */
-    public ResponseEntity<ChatResponse> chatChatPostWithHttpInfo(ChatRequest chatRequest) throws RestClientException {
-        Object localVarPostBody = chatRequest;
-        
-        // verify the required parameter 'chatRequest' is set
-        if (chatRequest == null) {
-            throw new HttpClientErrorException(HttpStatus.BAD_REQUEST, "Missing the required parameter 'chatRequest' when calling chatChatPost");
-        }
+    public ResponseEntity<ISHealthCheck> getHealthHealthGetWithHttpInfo() throws RestClientException {
+        Object localVarPostBody = null;
         
 
         final MultiValueMap<String, String> localVarQueryParams = new LinkedMultiValueMap<String, String>();
@@ -81,15 +68,13 @@ public class DefaultApi extends BaseApi {
             "application/json"
          };
         final List<MediaType> localVarAccept = apiClient.selectHeaderAccept(localVarAccepts);
-        final String[] localVarContentTypes = { 
-            "application/json"
-         };
+        final String[] localVarContentTypes = {  };
         final MediaType localVarContentType = apiClient.selectHeaderContentType(localVarContentTypes);
 
         String[] localVarAuthNames = new String[] {  };
 
-        ParameterizedTypeReference<ChatResponse> localReturnType = new ParameterizedTypeReference<ChatResponse>() {};
-        return apiClient.invokeAPI("/chat", HttpMethod.POST, Collections.<String, Object>emptyMap(), localVarQueryParams, localVarPostBody, localVarHeaderParams, localVarCookieParams, localVarFormParams, localVarAccept, localVarContentType, localVarAuthNames, localReturnType);
+        ParameterizedTypeReference<ISHealthCheck> localReturnType = new ParameterizedTypeReference<ISHealthCheck>() {};
+        return apiClient.invokeAPI("/health", HttpMethod.GET, Collections.<String, Object>emptyMap(), localVarQueryParams, localVarPostBody, localVarHeaderParams, localVarCookieParams, localVarFormParams, localVarAccept, localVarContentType, localVarAuthNames, localReturnType);
     }
 
     @Override
@@ -107,9 +92,7 @@ public class DefaultApi extends BaseApi {
             "application/json"
          };
         final List<MediaType> localVarAccept = apiClient.selectHeaderAccept(localVarAccepts);
-        final String[] localVarContentTypes = { 
-            "application/json"
-         };
+        final String[] localVarContentTypes = {  };
         final MediaType localVarContentType = apiClient.selectHeaderContentType(localVarContentTypes);
 
         String[] localVarAuthNames = new String[] {  };

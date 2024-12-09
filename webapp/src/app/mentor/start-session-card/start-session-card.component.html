@@ -1,0 +1,25 @@
+<div class="flex flex-col items-center justify-center space-y-6">
+  @if (isLoading()) {
+    <hlm-skeleton class="size-20 rounded-full" />
+    <div class="grid gap-4 justify-items-center items-center">
+      <hlm-skeleton class="w-72 h-5" />
+      <hlm-skeleton class="w-96 h-5" />
+      <hlm-skeleton class="w-[420px] h-4" />
+      <hlm-skeleton class="w-32 h-10 mt-2" />
+    </div>
+  } @else {
+    <div class="size-20 border-cyan-500 rounded-full flex items-center justify-center border-4">
+      <lucide-angular [img]="BotMessageSquare" class="size-10 text-cyan-500" />
+    </div>
+    <div>
+      <h2 class="text-center text-xl text-primary font-semibold max-w-3xl dark:text-white">Meet Your Personal AI Mentor:<br />Designed to help you grow and stay focused.</h2>
+      @if (hasSessions()) {
+        <p class="text-center text-l pt-2">Review past sessions or begin a new conversation to stay on track.</p>
+      } @else {
+        <p class="text-center text-l pt-2">Begin your first session to stay on track.</p>
+      }
+    </div>
+
+    <button hlmBtn aria-describedby="Start Session" (click)="this.createNewSession.emit()">Start Session</button>
+  }
+</div>

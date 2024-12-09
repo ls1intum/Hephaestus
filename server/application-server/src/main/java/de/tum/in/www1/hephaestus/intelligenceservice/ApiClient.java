@@ -59,7 +59,6 @@ import java.time.OffsetDateTime;
 import de.tum.in.www1.hephaestus.intelligenceservice.auth.Authentication;
 
 @jakarta.annotation.Generated(value = "org.openapitools.codegen.languages.JavaClientCodegen", comments = "Generator version: 7.7.0")
-@Component("de.tum.in.www1.hephaestus.intelligenceservice.ApiClient")
 public class ApiClient extends JavaTimeFormatter {
     public enum CollectionFormat {
         CSV(","), TSV("\t"), SSV(" "), PIPES("|"), MULTI(null);
@@ -97,7 +96,6 @@ public class ApiClient extends JavaTimeFormatter {
         init();
     }
 
-    @Autowired
     public ApiClient(RestTemplate restTemplate) {
         this.restTemplate = restTemplate;
         init();
