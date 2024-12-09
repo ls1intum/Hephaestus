@@ -1,14 +1,16 @@
-import { Injectable } from '@angular/core';
-import { environment } from 'environments/environment';
+import { inject, Injectable } from '@angular/core';
+import { EnvironmentService } from './environment.service';
 
 @Injectable({
   providedIn: 'root'
 })
 export class AnalyticsService {
+  private environmentService = inject(EnvironmentService);
+
   private scriptLoaded = false;
 
   initialize(): void {
-    if (environment.umami.enabled) {
+    if (this.environmentService.env.umami.enabled) {
       this.loadUmamiScript();
     }
   }
@@ -20,9 +22,9 @@ export class AnalyticsService {
 
     const script = document.createElement('script');
     script.defer = true;
-    script.src = environment.umami.scriptUrl;
-    script.setAttribute('data-website-id', environment.umami.websiteId);
-    script.setAttribute('data-domains', environment.umami.domains);
+    script.src = this.environmentService.env.umami.scriptUrl;
+    script.setAttribute('data-website-id', this.environmentService.env.umami.websiteId);
+    script.setAttribute('data-domains', this.environmentService.env.umami.domains);
 
     script.onload = () => {
       console.log('Umami analytics script loaded successfully.');

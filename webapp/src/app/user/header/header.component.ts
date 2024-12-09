@@ -7,8 +7,8 @@ import { HlmIconModule } from 'libs/ui/ui-icon-helm/src/index';
 import { BrnTooltipContentDirective } from '@spartan-ng/ui-tooltip-brain';
 import { HlmTooltipComponent, HlmTooltipTriggerDirective } from '@spartan-ng/ui-tooltip-helm';
 import { HlmButtonModule } from '@spartan-ng/ui-button-helm';
-import dayjs from 'dayjs';
-import advancedFormat from 'dayjs/plugin/advancedFormat';
+import dayjs from 'dayjs/esm';
+import advancedFormat from 'dayjs/esm/plugin/advancedFormat';
 import { RepositoryInfo, UserInfo } from '@app/core/modules/openapi';
 
 dayjs.extend(advancedFormat);
