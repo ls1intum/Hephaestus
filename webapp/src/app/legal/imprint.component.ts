@@ -1,5 +1,5 @@
-import { Component, inject } from '@angular/core';
-import { EnvironmentService } from '@app/environment.service';
+import { Component } from '@angular/core';
+import { environment } from 'environments/environment';
 
 @Component({
   selector: 'app-imprint',
@@ -12,6 +12,5 @@ import { EnvironmentService } from '@app/environment.service';
   `
 })
 export class ImprintComponent {
-  private environmentService = inject(EnvironmentService);
-  imprintHtml = this.environmentService.env.legal.imprintHtml;
+  imprintHtml = environment.legal.imprintHtml;
 }

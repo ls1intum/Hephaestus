@@ -14,7 +14,7 @@ spring:
           issuer-uri: ${KEYCLOAK_URL}/realms/${KEYCLOAK_REALM}
 
 hephaestus:
-    host-url: ${APPLICATION_CLIENT_URL}
+    host-url: ${APPLICATION_HOST_URL}
     
     leaderboard:
       schedule:
@@ -33,8 +33,8 @@ hephaestus:
 keycloak:
     url: ${KEYCLOAK_URL}
     realm: ${KEYCLOAK_REALM}
-    client-id: ${KEYCLOAK_CONFIDENTIAL_CLIENT_ID}
-    client-secret: ${KEYCLOAK_CONFIDENTIAL_CLIENT_SECRET}
+    client-id: ${KEYCLOAK_CLIENT_ID}
+    client-secret: ${KEYCLOAK_CLIENT_SECRET}
 
 nats:
     enabled: ${NATS_ENABLED:false}

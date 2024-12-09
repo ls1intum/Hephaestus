@@ -1,31 +1,6 @@
 services:
-  webapp:
-    build:
-      context: ./webapp
-    ports:
-      - '80'
-    environment:
-      - APPLICATION_CLIENT_URL
-      - APPLICATION_SERVER_URL
-      - SENTRY_DNS
-      - KEYCLOAK_URL
-      - KEYCLOAK_REALM
-      - KEYCLOAK_CLIENT_ID
-      - KEYCLOAK_SKIP_LOGIN
-      - LEGAL_IMPRINT_HTML
-      - LEGAL_PRIVACY_HTML
-      - UMAMI_ENABLED
-      - UMAMI_SCRIPT_URL
-      - UMAMI_WEBSITE_ID
-      - UMAMI_DOMAINS
-    depends_on:
-      - application-server
-    networks:
-      - app-network
-
   application-server:
-    build:
-      context: ./server/application-server
+    image: hephaestus-application-server
     ports:
       - '8080'
     environment:
@@ -91,7 +66,4 @@ services:
 
 networks:
   app-network:
-    driver: bridge
-
-volumes:
-  postgresql-data:
+    driver: bridge`

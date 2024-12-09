@@ -1,10 +1,10 @@
-import { ErrorHandler, inject, Injectable } from '@angular/core';
-import { EnvironmentService } from '@app/environment.service';
+import { ErrorHandler, Injectable } from '@angular/core';
+import { environment } from 'environments/environment';
 import * as Sentry from '@sentry/angular';
 
 @Injectable({ providedIn: 'root' })
 export class SentryErrorHandler extends ErrorHandler {
-  private environmentService = inject(EnvironmentService);
+  private environment = environment;
 
   constructor() {
     super();
@@ -14,7 +14,7 @@ export class SentryErrorHandler extends ErrorHandler {
    * Initialize Sentry with environment.
    */
   async init() {
-    const env = this.environmentService.env;
+    const env = this.environment;
     if (!env || !env.version || !env.sentry?.dsn) {
       return;
     }
@@ -38,7 +38,7 @@ export class SentryErrorHandler extends ErrorHandler {
       super.handleError(error);
       return;
     }
-    if (this.environmentService.env.sentry.environment !== 'local') {
+    if (this.environment.sentry.environment !== 'local') {
       const exception = error.error || error.message || error.originalError || error;
       Sentry.captureException(exception);
     }

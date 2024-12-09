@@ -1,5 +1,5 @@
-import dayjs from 'dayjs/esm';
-import isoWeek from 'dayjs/esm/plugin/isoWeek';
+import dayjs from 'dayjs';
+import isoWeek from 'dayjs/plugin/isoWeek';
 import { lastValueFrom } from 'rxjs';
 import { Component, computed, inject } from '@angular/core';
 import { ActivatedRoute } from '@angular/router';
