@@ -52,6 +52,10 @@ export class HeaderComponent {
     this.securityStore.signOut();
   }
 
+  protected get appVersion() {
+    return this.environmentService.env.version;
+  }
+
   protected signIn() {
     if (this.environmentService.env.keycloak.skipLoginPage) {
       const authUrl =

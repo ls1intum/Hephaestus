@@ -3,8 +3,13 @@ import { HttpClient } from '@angular/common/http';
 import { lastValueFrom } from 'rxjs';
 
 export interface Environment {
+  version: string;
   clientUrl: string;
   serverUrl: string;
+  sentry: {
+    dsn: string;
+    environment: string;
+  };
   keycloak: {
     url: string;
     realm: string;
