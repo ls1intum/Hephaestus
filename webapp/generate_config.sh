@@ -1,7 +1,7 @@
 #!/bin/sh
 # This script generates the environment.json file for the webapp based on the environment variables during the docker container startup.
 
-APP_VERSION=$(cat /version.txt)
+APP_VERSION=$(cat /usr/share/nginx/html/version.txt)
 
 cat <<EOF > /usr/share/nginx/html/environment.json
 {

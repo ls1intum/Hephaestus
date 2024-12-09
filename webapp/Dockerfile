@@ -33,6 +33,7 @@ ENV UMAMI_SCRIPT_URL=""
 ENV UMAMI_WEBSITE_ID=""
 ENV UMAMI_DOMAINS=""
 
+COPY --from=build /app/version.txt /usr/share/nginx/html/version.txt
 COPY --from=build /app/dist/webapp/browser /usr/share/nginx/html
 
 COPY generate_config.sh /usr/local/bin/generate_config.sh
