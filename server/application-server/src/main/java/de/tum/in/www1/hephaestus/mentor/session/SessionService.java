@@ -1,15 +1,15 @@
 package de.tum.in.www1.hephaestus.mentor.session;
 
-import java.util.Optional;
-import java.util.List;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.stereotype.Service;
 import de.tum.in.www1.hephaestus.core.exception.AccessForbiddenException;
 import de.tum.in.www1.hephaestus.gitprovider.user.User;
+import java.util.List;
+import java.util.Optional;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Service;
 
 @Service
 public class SessionService {
-    
+
     @Autowired
     private SessionRepository sessionRepository;
 

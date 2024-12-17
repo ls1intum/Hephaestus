@@ -1,14 +1,8 @@
 package de.tum.in.www1.hephaestus.syncing;
 
-import java.io.IOException;
-import java.time.Duration;
-import java.time.ZonedDateTime;
-import java.util.Arrays;
-import java.util.HashMap;
-import java.util.Map;
-import org.kohsuke.github.GHEvent;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubMessageHandler;
+import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubMessageHandlerRegistry;
+import de.tum.in.www1.hephaestus.workspace.RepositoryToMonitor;
 import io.nats.client.Connection;
 import io.nats.client.ConsumerContext;
 import io.nats.client.JetStreamApiException;
@@ -20,16 +14,21 @@ import io.nats.client.Options;
 import io.nats.client.StreamContext;
 import io.nats.client.api.ConsumerConfiguration;
 import io.nats.client.api.DeliverPolicy;
+import java.io.IOException;
+import java.time.Duration;
+import java.time.ZonedDateTime;
+import java.util.Arrays;
+import java.util.HashMap;
+import java.util.Map;
+import org.kohsuke.github.GHEvent;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.context.event.ApplicationReadyEvent;
 import org.springframework.context.event.EventListener;
 import org.springframework.core.annotation.Order;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
-
-import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubMessageHandler;
-import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubMessageHandlerRegistry;
-import de.tum.in.www1.hephaestus.workspace.RepositoryToMonitor;
 
 @Order(value = 1)
 @Service
@@ -110,19 +109,26 @@ public class NatsConsumerService {
                     logger.error("Failed to connect to NATS server: {}", e.getMessage(), e);
                 }
             }
-    
+
             if (natsConnection != null && natsConnection.getStatus() == Connection.Status.CONNECTED) {
                 try {
                     setupConsumer(natsConnection, repositoryToMonitor);
-                    logger.info("Consumer setup successful for repository: {} with monitoring ID: {}",
-                        repositoryToMonitor.getNameWithOwner(), repositoryToMonitor.getId());
+                    logger.info(
+                        "Consumer setup successful for repository: {} with monitoring ID: {}",
+                        repositoryToMonitor.getNameWithOwner(),
+                        repositoryToMonitor.getId()
+                    );
                     break;
                 } catch (IOException | InterruptedException e) {
-                    logger.error("Failed to set up consumer for repository: {} with monitoring ID: {} - {}",
-                        repositoryToMonitor.getNameWithOwner(), repositoryToMonitor.getId(), e.getMessage());
+                    logger.error(
+                        "Failed to set up consumer for repository: {} with monitoring ID: {} - {}",
+                        repositoryToMonitor.getNameWithOwner(),
+                        repositoryToMonitor.getId(),
+                        e.getMessage()
+                    );
                 }
             }
-    
+
             try {
                 Thread.sleep(2000);
             } catch (InterruptedException e) {
@@ -133,12 +139,13 @@ public class NatsConsumerService {
         }
     }
 
-    private void setupConsumer(Connection connection, RepositoryToMonitor repositoryToMonitor) throws IOException, InterruptedException {
+    private void setupConsumer(Connection connection, RepositoryToMonitor repositoryToMonitor)
+        throws IOException, InterruptedException {
         try {
             StreamContext streamContext = connection.getStreamContext("github");
             ConsumerContext consumerContext = null;
             var subjects = getSubjects(repositoryToMonitor.getNameWithOwner());
-            
+
             String repositoryDurableConsumerName = "";
             if (durableConsumerName != null && !durableConsumerName.isEmpty()) {
                 repositoryDurableConsumerName = durableConsumerName + "-" + repositoryToMonitor.getId();
@@ -148,17 +155,24 @@ public class NatsConsumerService {
             if (!repositoryDurableConsumerName.isEmpty()) {
                 try {
                     consumerContext = streamContext.getConsumerContext(repositoryDurableConsumerName);
-                    
+
                     var config = consumerContext.getConsumerInfo().getConsumerConfiguration();
                     var filterSubjects = config.getFilterSubjects();
-                    var filterMatches = filterSubjects.containsAll(Arrays.asList(subjects)) && filterSubjects.size() == subjects.length;
+                    var filterMatches =
+                        filterSubjects.containsAll(Arrays.asList(subjects)) && filterSubjects.size() == subjects.length;
                     if (!filterMatches) {
                         logger.info("Consumer exists but with different subjects. Updating consumer.");
-                        consumerContext = streamContext.createOrUpdateConsumer(ConsumerConfiguration.builder(config).filterSubjects(subjects).build());
+                        consumerContext = streamContext.createOrUpdateConsumer(
+                            ConsumerConfiguration.builder(config).filterSubjects(subjects).build()
+                        );
                     }
                 } catch (JetStreamApiException e) {
-                    logger.error("Failed to get consumer context for repository: {} with monitoring ID: {} - {}",
-                        repositoryToMonitor.getNameWithOwner(), repositoryToMonitor.getId(), e.getMessage());
+                    logger.error(
+                        "Failed to get consumer context for repository: {} with monitoring ID: {} - {}",
+                        repositoryToMonitor.getNameWithOwner(),
+                        repositoryToMonitor.getId(),
+                        e.getMessage()
+                    );
                 }
             }
 
@@ -183,8 +197,11 @@ public class NatsConsumerService {
 
             MessageHandler handler = this::handleMessage;
             consumerContext.consume(handler);
-            logger.info("Successfully started consuming messages for repository: {} with monitoring ID: {}",
-                repositoryToMonitor.getNameWithOwner(), repositoryToMonitor.getId());
+            logger.info(
+                "Successfully started consuming messages for repository: {} with monitoring ID: {}",
+                repositoryToMonitor.getNameWithOwner(),
+                repositoryToMonitor.getId()
+            );
         } catch (JetStreamApiException e) {
             logger.error("JetStream API exception: {}", e.getMessage(), e);
             throw new IOException("Failed to set up consumer.", e);
@@ -199,11 +216,18 @@ public class NatsConsumerService {
 
         try {
             cleanupConsumer(natsConnection, repositoryToMonitor);
-            logger.info("Consumer cleanup successful for repository: {} with monitoring ID: {}",
-                repositoryToMonitor.getNameWithOwner(), repositoryToMonitor.getId());
+            logger.info(
+                "Consumer cleanup successful for repository: {} with monitoring ID: {}",
+                repositoryToMonitor.getNameWithOwner(),
+                repositoryToMonitor.getId()
+            );
         } catch (IOException e) {
-            logger.error("Failed to clean up consumer for repository: {} with monitoring ID: {} - {}",
-                repositoryToMonitor.getNameWithOwner(), repositoryToMonitor.getId(), e.getMessage());
+            logger.error(
+                "Failed to clean up consumer for repository: {} with monitoring ID: {} - {}",
+                repositoryToMonitor.getNameWithOwner(),
+                repositoryToMonitor.getId(),
+                e.getMessage()
+            );
         }
     }
 
@@ -211,8 +235,11 @@ public class NatsConsumerService {
         try {
             ConsumerContext consumerContext = repositoryToMonitorIdToConsumerContext.get(repositoryToMonitor.getId());
             if (consumerContext == null) {
-                logger.info("No consumer context found for repository: {} with monitoring ID: {}",
-                    repositoryToMonitor.getNameWithOwner(), repositoryToMonitor.getId());
+                logger.info(
+                    "No consumer context found for repository: {} with monitoring ID: {}",
+                    repositoryToMonitor.getNameWithOwner(),
+                    repositoryToMonitor.getId()
+                );
                 return;
             }
 

@@ -5,7 +5,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.stream.Stream;
-
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.core.convert.converter.Converter;
@@ -25,8 +24,8 @@ import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 @Configuration
 @EnableWebSecurity
 public class SecurityConfig {
-    interface AuthoritiesConverter extends Converter<Map<String, Object>, Collection<GrantedAuthority>> {
-    }
+
+    interface AuthoritiesConverter extends Converter<Map<String, Object>, Collection<GrantedAuthority>> {}
 
     @SuppressWarnings("unchecked")
     @Bean
@@ -34,14 +33,19 @@ public class SecurityConfig {
         return claims -> {
             final var realmAccess = Optional.ofNullable((Map<String, Object>) claims.get("realm_access"));
             final var roles = realmAccess.flatMap(map -> Optional.ofNullable((List<String>) map.get("roles")));
-            return roles.map(List::stream).orElse(Stream.empty()).map(SimpleGrantedAuthority::new)
-                    .map(GrantedAuthority.class::cast).toList();
+            return roles
+                .map(List::stream)
+                .orElse(Stream.empty())
+                .map(SimpleGrantedAuthority::new)
+                .map(GrantedAuthority.class::cast)
+                .toList();
         };
     }
 
     @Bean
     JwtAuthenticationConverter authenticationConverter(
-            Converter<Map<String, Object>, Collection<GrantedAuthority>> authoritiesConverter) {
+        Converter<Map<String, Object>, Collection<GrantedAuthority>> authoritiesConverter
+    ) {
         var authenticationConverter = new JwtAuthenticationConverter();
         authenticationConverter.setJwtGrantedAuthoritiesConverter(jwt -> {
             return authoritiesConverter.convert(jwt.getClaims());
@@ -51,18 +55,21 @@ public class SecurityConfig {
 
     @Bean
     SecurityFilterChain resourceServerSecurityFilterChain(
-            HttpSecurity http,
-            Converter<Jwt, AbstractAuthenticationToken> authenticationConverter) throws Exception {
+        HttpSecurity http,
+        Converter<Jwt, AbstractAuthenticationToken> authenticationConverter
+    ) throws Exception {
         http.oauth2ResourceServer(resourceServer -> {
             resourceServer.jwt(jwtDecoder -> {
                 jwtDecoder.jwtAuthenticationConverter(authenticationConverter);
             });
         });
 
-        http.sessionManagement(sessions -> {
-            sessions.sessionCreationPolicy(SessionCreationPolicy.STATELESS);
-        }).csrf(csrf -> csrf.disable())
-                .cors(cors -> cors.configurationSource(corsConfigurationSource()));
+        http
+            .sessionManagement(sessions -> {
+                sessions.sessionCreationPolicy(SessionCreationPolicy.STATELESS);
+            })
+            .csrf(csrf -> csrf.disable())
+            .cors(cors -> cors.configurationSource(corsConfigurationSource()));
 
         http.authorizeHttpRequests(requests -> {
             requests.requestMatchers("/workspace/**").hasAuthority("admin");

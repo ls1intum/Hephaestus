@@ -1,11 +1,10 @@
 package de.tum.in.www1.hephaestus.config;
 
+import de.tum.in.www1.hephaestus.intelligenceservice.ApiClient;
+import de.tum.in.www1.hephaestus.intelligenceservice.api.MentorApi;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-
-import de.tum.in.www1.hephaestus.intelligenceservice.ApiClient;
-import de.tum.in.www1.hephaestus.intelligenceservice.api.MentorApi;
 
 @Configuration
 public class IntelligenceServiceConfig {
@@ -19,6 +18,7 @@ public class IntelligenceServiceConfig {
     }
 
     public class IntelligenceServiceApi extends MentorApi {
+
         public IntelligenceServiceApi() {
             super(new ApiClient().setBasePath(intelligenceServiceUrl));
         }

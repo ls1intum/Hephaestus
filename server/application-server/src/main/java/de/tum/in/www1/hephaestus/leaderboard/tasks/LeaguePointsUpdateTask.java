@@ -26,8 +26,10 @@ public class LeaguePointsUpdateTask implements Runnable {
 
     @Autowired
     private UserRepository userRepository;
+
     @Autowired
     private LeaderboardService leaderboardService;
+
     @Autowired
     private LeaguePointsCalculationService leaguePointsCalculationService;
 
@@ -66,5 +68,4 @@ public class LeaguePointsUpdateTask implements Runnable {
         OffsetDateTime after = before.minusWeeks(1);
         return leaderboardService.createLeaderboard(after, before, Optional.empty());
     }
-    
 }

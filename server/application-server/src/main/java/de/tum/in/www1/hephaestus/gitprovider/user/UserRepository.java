@@ -4,71 +4,81 @@ import de.tum.in.www1.hephaestus.SecurityUtils;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
-
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
 public interface UserRepository extends JpaRepository<User, Long> {
-
-    @Query("""
-                SELECT u
-                FROM User u
-                WHERE u.login ILIKE :login
-            """)
+    @Query(
+        """
+            SELECT u
+            FROM User u
+            WHERE u.login ILIKE :login
+        """
+    )
     Optional<User> findByLogin(@Param("login") String login);
 
-    @Query("""
-                SELECT u
-                FROM User u
-                LEFT JOIN FETCH u.mergedPullRequests
-                WHERE u.login ILIKE :login
-            """)
+    @Query(
+        """
+            SELECT u
+            FROM User u
+            LEFT JOIN FETCH u.mergedPullRequests
+            WHERE u.login ILIKE :login
+        """
+    )
     Optional<User> findByLoginWithEagerMergedPullRequests(@Param("login") String login);
 
-    @Query("""
-                SELECT u
-                FROM User u
-                LEFT JOIN FETCH u.teams
-                WHERE u.type = 'USER'
-            """)
+    @Query(
+        """
+            SELECT u
+            FROM User u
+            LEFT JOIN FETCH u.teams
+            WHERE u.type = 'USER'
+        """
+    )
     List<User> findAllWithEagerTeams();
 
-    @Query("""
-                SELECT u
-                FROM User u
-                WHERE u.type = 'USER'
-            """)
+    @Query(
+        """
+            SELECT u
+            FROM User u
+            WHERE u.type = 'USER'
+        """
+    )
     List<User> findAllHuman();
 
-    @Query("""
-                SELECT u
-                FROM User u
-                JOIN u.teams t
-                WHERE t.id = :teamId
-                AND u.type = 'USER'
-            """)
+    @Query(
+        """
+            SELECT u
+            FROM User u
+            JOIN u.teams t
+            WHERE t.id = :teamId
+            AND u.type = 'USER'
+        """
+    )
     List<User> findAllByTeamId(@Param("teamId") Long teamId);
 
-    @Query("""
-                SELECT DISTINCT pr.author
-                FROM PullRequest pr
-                JOIN Team t ON pr.repository MEMBER OF t.repositories
-                WHERE t.id = :teamId
-                AND (
-                    NOT EXISTS (SELECT l
-                        FROM t.labels l
-                        WHERE l.repository = pr.repository
-                    )
-                    OR
-                    EXISTS (
-                        SELECT l
-                        FROM t.labels l
-                        WHERE l.repository = pr.repository
-                        AND l MEMBER OF pr.labels
-                    )
+    @Query(
+        """
+            SELECT DISTINCT pr.author
+            FROM PullRequest pr
+            JOIN Team t ON pr.repository MEMBER OF t.repositories
+            WHERE t.id = :teamId
+            AND (
+                NOT EXISTS (SELECT l
+                    FROM t.labels l
+                    WHERE l.repository = pr.repository
                 )
-            """)
+                OR
+                EXISTS (
+                    SELECT l
+                    FROM t.labels l
+                    WHERE l.repository = pr.repository
+                    AND l MEMBER OF pr.labels
+                )
+            )
+        """
+    )
     Set<User> findAllContributingToTeam(@Param("teamId") Long teamId);
 
     /**

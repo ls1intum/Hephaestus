@@ -45,10 +45,8 @@ public class LeaderboardTaskScheduler {
     @Autowired
     private LeaguePointsUpdateTask leaguePointsUpdateTask;
 
-
     @EventListener(ApplicationReadyEvent.class)
     public void activateTaskScheduler() {
-
         var timeParts = scheduledTime.split(":");
 
         // CRON for the end of every leaderboard cycle
@@ -82,7 +80,7 @@ public class LeaderboardTaskScheduler {
         logger.info("Scheduling Slack message to run with {}", cron);
         taskScheduler.schedule(slackWeeklyLeaderboardTask, new CronTrigger(cron));
     }
-  
+
     private void scheduleLeaguePointsUpdate(String cron) {
         logger.info("Scheduling league points update to run with {}", cron);
         taskScheduler.schedule(leaguePointsUpdateTask, new CronTrigger(cron));

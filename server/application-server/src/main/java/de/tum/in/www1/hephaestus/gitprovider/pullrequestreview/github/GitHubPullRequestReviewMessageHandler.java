@@ -1,14 +1,13 @@
 package de.tum.in.www1.hephaestus.gitprovider.pullrequestreview.github;
 
+import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubMessageHandler;
+import de.tum.in.www1.hephaestus.gitprovider.pullrequest.github.GitHubPullRequestSyncService;
+import de.tum.in.www1.hephaestus.gitprovider.repository.github.GitHubRepositorySyncService;
 import org.kohsuke.github.GHEvent;
 import org.kohsuke.github.GHEventPayload;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
-
-import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubMessageHandler;
-import de.tum.in.www1.hephaestus.gitprovider.pullrequest.github.GitHubPullRequestSyncService;
-import de.tum.in.www1.hephaestus.gitprovider.repository.github.GitHubRepositorySyncService;
 
 @Component
 public class GitHubPullRequestReviewMessageHandler extends GitHubMessageHandler<GHEventPayload.PullRequestReview> {
@@ -20,9 +19,10 @@ public class GitHubPullRequestReviewMessageHandler extends GitHubMessageHandler<
     private final GitHubRepositorySyncService repositorySyncService;
 
     private GitHubPullRequestReviewMessageHandler(
-            GitHubPullRequestReviewSyncService pullRequestReviewSyncService,
-            GitHubPullRequestSyncService pullRequestSyncService,
-            GitHubRepositorySyncService repositorySyncService) {
+        GitHubPullRequestReviewSyncService pullRequestReviewSyncService,
+        GitHubPullRequestSyncService pullRequestSyncService,
+        GitHubRepositorySyncService repositorySyncService
+    ) {
         super(GHEventPayload.PullRequestReview.class);
         this.pullRequestReviewSyncService = pullRequestReviewSyncService;
         this.pullRequestSyncService = pullRequestSyncService;
@@ -34,8 +34,13 @@ public class GitHubPullRequestReviewMessageHandler extends GitHubMessageHandler<
         var pullRequest = eventPayload.getPullRequest();
         var repository = pullRequest.getRepository();
         var review = eventPayload.getReview();
-        logger.info("Received pull request review event for repository: {}, pull request: {}, action: {}, reviewId: {}",
-                repository.getFullName(), pullRequest.getNumber(), eventPayload.getAction(), review.getId());
+        logger.info(
+            "Received pull request review event for repository: {}, pull request: {}, action: {}, reviewId: {}",
+            repository.getFullName(),
+            pullRequest.getNumber(),
+            eventPayload.getAction(),
+            review.getId()
+        );
         repositorySyncService.processRepository(repository);
         pullRequestSyncService.processPullRequest(pullRequest);
         // We don't need to handle the deleted action here, as reviews are not deleted, they are only dismissed

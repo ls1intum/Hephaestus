@@ -1,18 +1,16 @@
 package de.tum.in.www1.hephaestus.gitprovider.label.github;
 
+import de.tum.in.www1.hephaestus.gitprovider.label.Label;
+import de.tum.in.www1.hephaestus.gitprovider.label.LabelRepository;
+import de.tum.in.www1.hephaestus.gitprovider.repository.RepositoryRepository;
+import jakarta.transaction.Transactional;
 import java.io.IOException;
 import java.util.List;
-
 import org.kohsuke.github.GHLabel;
 import org.kohsuke.github.GHRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
-import jakarta.transaction.Transactional;
-
-import de.tum.in.www1.hephaestus.gitprovider.label.Label;
-import de.tum.in.www1.hephaestus.gitprovider.label.LabelRepository;
-import de.tum.in.www1.hephaestus.gitprovider.repository.RepositoryRepository;
 
 @Service
 public class GitHubLabelSyncService {
@@ -24,9 +22,10 @@ public class GitHubLabelSyncService {
     private final GitHubLabelConverter labelConverter;
 
     public GitHubLabelSyncService(
-            LabelRepository labelRepository,
-            RepositoryRepository repositoryRepository,
-            GitHubLabelConverter labelConverter) {
+        LabelRepository labelRepository,
+        RepositoryRepository repositoryRepository,
+        GitHubLabelConverter labelConverter
+    ) {
         this.labelRepository = labelRepository;
         this.repositoryRepository = repositoryRepository;
         this.labelConverter = labelConverter;
@@ -66,10 +65,12 @@ public class GitHubLabelSyncService {
      */
     @Transactional
     public Label processLabel(GHLabel ghLabel) {
-        var result = labelRepository.findById(ghLabel.getId())
-                .map(label -> {
-                    return labelConverter.update(ghLabel, label);
-                }).orElseGet(() -> labelConverter.convert(ghLabel));
+        var result = labelRepository
+            .findById(ghLabel.getId())
+            .map(label -> {
+                return labelConverter.update(ghLabel, label);
+            })
+            .orElseGet(() -> labelConverter.convert(ghLabel));
 
         if (result == null) {
             return null;
