@@ -1,14 +1,13 @@
 package de.tum.in.www1.hephaestus.gitprovider.milestone.github;
 
+import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubMessageHandler;
+import de.tum.in.www1.hephaestus.gitprovider.milestone.MilestoneRepository;
+import de.tum.in.www1.hephaestus.gitprovider.repository.github.GitHubRepositorySyncService;
 import org.kohsuke.github.GHEvent;
 import org.kohsuke.github.GHEventPayload;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
-
-import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubMessageHandler;
-import de.tum.in.www1.hephaestus.gitprovider.milestone.MilestoneRepository;
-import de.tum.in.www1.hephaestus.gitprovider.repository.github.GitHubRepositorySyncService;
 
 @Component
 public class GitHubMilestoneMessageHandler extends GitHubMessageHandler<GHEventPayload.Milestone> {
@@ -20,9 +19,10 @@ public class GitHubMilestoneMessageHandler extends GitHubMessageHandler<GHEventP
     private final GitHubRepositorySyncService repositorySyncService;
 
     private GitHubMilestoneMessageHandler(
-            MilestoneRepository milestoneRepository,
-            GitHubMilestoneSyncService milestoneSyncService,
-            GitHubRepositorySyncService repositorySyncService) {
+        MilestoneRepository milestoneRepository,
+        GitHubMilestoneSyncService milestoneSyncService,
+        GitHubRepositorySyncService repositorySyncService
+    ) {
         super(GHEventPayload.Milestone.class);
         this.milestoneRepository = milestoneRepository;
         this.milestoneSyncService = milestoneSyncService;
@@ -34,8 +34,12 @@ public class GitHubMilestoneMessageHandler extends GitHubMessageHandler<GHEventP
         var action = eventPayload.getAction();
         var milestone = eventPayload.getMilestone();
         var repository = eventPayload.getRepository();
-        logger.info("Received milestone event for repository: {}, action: {}, milestoneId: {}", repository.getFullName(),
-                action, milestone.getId());
+        logger.info(
+            "Received milestone event for repository: {}, action: {}, milestoneId: {}",
+            repository.getFullName(),
+            action,
+            milestone.getId()
+        );
 
         repositorySyncService.processRepository(repository);
 

@@ -1,11 +1,10 @@
 package de.tum.in.www1.hephaestus.gitprovider.repository;
 
-import java.util.HashSet;
-import java.util.Set;
-import java.time.OffsetDateTime;
-
-import org.springframework.lang.NonNull;
-
+import de.tum.in.www1.hephaestus.gitprovider.common.BaseGitServiceEntity;
+import de.tum.in.www1.hephaestus.gitprovider.issue.Issue;
+import de.tum.in.www1.hephaestus.gitprovider.label.Label;
+import de.tum.in.www1.hephaestus.gitprovider.milestone.Milestone;
+import de.tum.in.www1.hephaestus.gitprovider.team.Team;
 import jakarta.persistence.CascadeType;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
@@ -13,16 +12,14 @@ import jakarta.persistence.Enumerated;
 import jakarta.persistence.ManyToMany;
 import jakarta.persistence.OneToMany;
 import jakarta.persistence.Table;
+import java.time.OffsetDateTime;
+import java.util.HashSet;
+import java.util.Set;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 import lombok.ToString;
-
-import de.tum.in.www1.hephaestus.gitprovider.common.BaseGitServiceEntity;
-import de.tum.in.www1.hephaestus.gitprovider.issue.Issue;
-import de.tum.in.www1.hephaestus.gitprovider.label.Label;
-import de.tum.in.www1.hephaestus.gitprovider.milestone.Milestone;
-import de.tum.in.www1.hephaestus.gitprovider.team.Team;
+import org.springframework.lang.NonNull;
 
 @Entity
 @Table(name = "repository")
@@ -84,24 +81,26 @@ public class Repository extends BaseGitServiceEntity {
     @OneToMany(mappedBy = "repository", cascade = CascadeType.REMOVE, orphanRemoval = true)
     @ToString.Exclude
     private Set<Milestone> milestones = new HashSet<>();
-    
+
     @ManyToMany(mappedBy = "repositories")
     @ToString.Exclude
     private Set<Team> teams = new HashSet<>();
 
     public enum Visibility {
-        PUBLIC, PRIVATE, INTERNAL, UNKNOWN
+        PUBLIC,
+        PRIVATE,
+        INTERNAL,
+        UNKNOWN,
     }
 
     public void removeAllTeams() {
         this.teams.forEach(team -> team.getRepositories().remove(this));
         this.teams.clear();
     }
-
     // TODO:
     // owner
     // organization
-    
+
     // Ignored GitHub properties:
     // - subscribersCount
     // - hasPages

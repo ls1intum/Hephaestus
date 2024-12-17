@@ -1,11 +1,5 @@
 package de.tum.in.www1.hephaestus.gitprovider.team;
 
-import jakarta.persistence.Table;
-
-import java.util.HashSet;
-import java.util.Set;
-
-import org.springframework.lang.NonNull;
 import de.tum.in.www1.hephaestus.gitprovider.label.Label;
 import de.tum.in.www1.hephaestus.gitprovider.repository.Repository;
 import de.tum.in.www1.hephaestus.gitprovider.user.User;
@@ -17,10 +11,14 @@ import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.JoinTable;
 import jakarta.persistence.ManyToMany;
+import jakarta.persistence.Table;
+import java.util.HashSet;
+import java.util.Set;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 import lombok.ToString;
+import org.springframework.lang.NonNull;
 
 @Entity
 @Table(name = "team")
@@ -29,6 +27,7 @@ import lombok.ToString;
 @NoArgsConstructor
 @ToString(callSuper = true)
 public class Team {
+
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
@@ -40,17 +39,29 @@ public class Team {
     private String color;
 
     @ManyToMany
-    @JoinTable(name = "team_repositories", joinColumns = @JoinColumn(name = "team_id"), inverseJoinColumns = @JoinColumn(name = "repository_id"))
+    @JoinTable(
+        name = "team_repositories",
+        joinColumns = @JoinColumn(name = "team_id"),
+        inverseJoinColumns = @JoinColumn(name = "repository_id")
+    )
     @ToString.Exclude
     private Set<Repository> repositories = new HashSet<>();
 
     @ManyToMany
-    @JoinTable(name = "team_labels", joinColumns = @JoinColumn(name = "team_id"), inverseJoinColumns = @JoinColumn(name = "label_id"))
+    @JoinTable(
+        name = "team_labels",
+        joinColumns = @JoinColumn(name = "team_id"),
+        inverseJoinColumns = @JoinColumn(name = "label_id")
+    )
     @ToString.Exclude
     private Set<Label> labels = new HashSet<>();
 
     @ManyToMany
-    @JoinTable(name = "team_members", joinColumns = @JoinColumn(name = "team_id"), inverseJoinColumns = @JoinColumn(name = "user_id"))
+    @JoinTable(
+        name = "team_members",
+        joinColumns = @JoinColumn(name = "team_id"),
+        inverseJoinColumns = @JoinColumn(name = "user_id")
+    )
     @ToString.Exclude
     private Set<User> members = new HashSet<>();
 

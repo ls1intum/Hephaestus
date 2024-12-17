@@ -1,18 +1,5 @@
 package de.tum.in.www1.hephaestus.workspace;
 
-import jakarta.transaction.Transactional;
-import java.util.List;
-import java.util.Optional;
-import java.util.Set;
-import java.util.stream.Collectors;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.beans.factory.annotation.Value;
-import org.springframework.boot.context.event.ApplicationReadyEvent;
-import org.springframework.context.event.EventListener;
-import org.springframework.stereotype.Service;
-
 import de.tum.in.www1.hephaestus.gitprovider.label.Label;
 import de.tum.in.www1.hephaestus.gitprovider.label.LabelRepository;
 import de.tum.in.www1.hephaestus.gitprovider.repository.RepositoryRepository;
@@ -27,6 +14,18 @@ import de.tum.in.www1.hephaestus.gitprovider.user.UserRepository;
 import de.tum.in.www1.hephaestus.gitprovider.user.UserTeamsDTO;
 import de.tum.in.www1.hephaestus.syncing.GitHubDataSyncService;
 import de.tum.in.www1.hephaestus.syncing.NatsConsumerService;
+import jakarta.transaction.Transactional;
+import java.util.List;
+import java.util.Optional;
+import java.util.Set;
+import java.util.stream.Collectors;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.boot.context.event.ApplicationReadyEvent;
+import org.springframework.context.event.EventListener;
+import org.springframework.stereotype.Service;
 
 @Service
 public class WorkspaceService {
@@ -62,7 +61,7 @@ public class WorkspaceService {
 
     @Autowired
     private LabelRepository labelRepository;
-    
+
     @Value("${nats.enabled}")
     private boolean isNatsEnabled;
 
@@ -104,7 +103,7 @@ public class WorkspaceService {
 
     private Workspace createInitialWorkspace() {
         Workspace workspace = new Workspace();
-        
+
         // If the default workspace should be initialized, add the default repositories to monitor
         if (initDefaultWorkspace) {
             logger.info("Initializing default workspace");
@@ -129,17 +128,14 @@ public class WorkspaceService {
 
     public List<String> getRepositoriesToMonitor() {
         logger.info("Getting repositories to monitor");
-        return getWorkspace()
-            .getRepositoriesToMonitor()
-            .stream()
-            .map(RepositoryToMonitor::getNameWithOwner)
-            .toList();
+        return getWorkspace().getRepositoriesToMonitor().stream().map(RepositoryToMonitor::getNameWithOwner).toList();
     }
 
-    public void addRepositoryToMonitor(String nameWithOwner) throws RepositoryAlreadyMonitoredException, RepositoryNotFoundException {
+    public void addRepositoryToMonitor(String nameWithOwner)
+        throws RepositoryAlreadyMonitoredException, RepositoryNotFoundException {
         logger.info("Adding repository to monitor: " + nameWithOwner);
         Workspace workspace = getWorkspace();
-        
+
         if (workspace.getRepositoriesToMonitor().stream().anyMatch(r -> r.getNameWithOwner().equals(nameWithOwner))) {
             logger.info("Repository is already being monitored");
             throw new RepositoryAlreadyMonitoredException(nameWithOwner);
@@ -169,8 +165,10 @@ public class WorkspaceService {
     public void removeRepositoryToMonitor(String nameWithOwner) throws RepositoryNotFoundException {
         logger.info("Removing repository from monitor: " + nameWithOwner);
         Workspace workspace = getWorkspace();
-        
-        RepositoryToMonitor repositoryToMonitor = workspace.getRepositoriesToMonitor().stream()
+
+        RepositoryToMonitor repositoryToMonitor = workspace
+            .getRepositoriesToMonitor()
+            .stream()
             .filter(r -> r.getNameWithOwner().equals(nameWithOwner))
             .findFirst()
             .orElse(null);
@@ -268,7 +266,9 @@ public class WorkspaceService {
     }
 
     public Optional<TeamInfoDTO> addLabelToTeam(Long teamId, Long repositoryId, String label) {
-        logger.info("Adding label '" + label + "' of repository with ID: " + repositoryId + " to team with ID: " + teamId);
+        logger.info(
+            "Adding label '" + label + "' of repository with ID: " + repositoryId + " to team with ID: " + teamId
+        );
         Optional<Team> optionalTeam = teamRepository.findById(teamId);
         if (optionalTeam.isEmpty()) {
             return Optional.empty();

@@ -30,6 +30,7 @@ import org.springframework.stereotype.Component;
  */
 @Component
 public class SlackWeeklyLeaderboardTask implements Runnable {
+
     private static final Logger logger = LoggerFactory.getLogger(SlackWeeklyLeaderboardTask.class);
 
     @Value("${hephaestus.leaderboard.notification.channel-id}")

@@ -1,19 +1,18 @@
 package de.tum.in.www1.hephaestus.mentor.message;
 
+import de.tum.in.www1.hephaestus.config.IntelligenceServiceConfig.IntelligenceServiceApi;
+import de.tum.in.www1.hephaestus.intelligenceservice.model.ISMentorMessage;
+import de.tum.in.www1.hephaestus.intelligenceservice.model.ISMessage;
+import de.tum.in.www1.hephaestus.intelligenceservice.model.ISMessageHistory;
+import de.tum.in.www1.hephaestus.mentor.message.Message.MessageSender;
+import de.tum.in.www1.hephaestus.mentor.session.Session;
+import de.tum.in.www1.hephaestus.mentor.session.SessionRepository;
 import java.util.List;
 import java.util.Optional;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
-
-import de.tum.in.www1.hephaestus.config.IntelligenceServiceConfig.IntelligenceServiceApi;
-import de.tum.in.www1.hephaestus.mentor.message.Message.MessageSender;
-import de.tum.in.www1.hephaestus.mentor.session.Session;
-import de.tum.in.www1.hephaestus.mentor.session.SessionRepository;
-import de.tum.in.www1.hephaestus.intelligenceservice.model.ISMentorMessage;
-import de.tum.in.www1.hephaestus.intelligenceservice.model.ISMessage;
-import de.tum.in.www1.hephaestus.intelligenceservice.model.ISMessageHistory;
 
 @Service
 public class MessageService {
@@ -30,7 +29,9 @@ public class MessageService {
     private static final Logger logger = LoggerFactory.getLogger(MessageService.class);
 
     public List<MessageDTO> getMessagesBySessionId(Long sessionId) {
-        return messageRepository.findBySessionId(sessionId).stream()
+        return messageRepository
+                .findBySessionId(sessionId)
+                .stream()
                 .map(message -> MessageDTO.fromMessage(message))
                 .toList();
     }
@@ -69,7 +70,6 @@ public class MessageService {
             return null;
         }
         Session currentSession = session.get();
-
         String systemResponse = generateResponse(sessionId, "");
 
         // prevent saving empty system messages if the intelligence service is down
@@ -84,8 +84,8 @@ public class MessageService {
 
     private String generateResponse(Long sessionId, String messageContent) {
         List<Message> messages = messageRepository.findBySessionId(sessionId);
-
         ISMessageHistory messageHistory = new ISMessageHistory();
+
         messageHistory.setMessages(messages.stream()
                 .<ISMessage>map(
                         message -> new ISMessage().content(message.getContent()).sender(message.getSender().toString()))

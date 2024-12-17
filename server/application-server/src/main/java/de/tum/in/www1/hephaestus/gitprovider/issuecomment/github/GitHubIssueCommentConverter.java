@@ -1,12 +1,11 @@
 package de.tum.in.www1.hephaestus.gitprovider.issuecomment.github;
 
-import org.kohsuke.github.GHIssueComment;
-import org.springframework.lang.NonNull;
-import org.springframework.stereotype.Component;
-
 import de.tum.in.www1.hephaestus.gitprovider.common.BaseGitServiceEntityConverter;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubAuthorAssociationConverter;
 import de.tum.in.www1.hephaestus.gitprovider.issuecomment.IssueComment;
+import org.kohsuke.github.GHIssueComment;
+import org.springframework.lang.NonNull;
+import org.springframework.stereotype.Component;
 
 @Component
 public class GitHubIssueCommentConverter extends BaseGitServiceEntityConverter<GHIssueComment, IssueComment> {
@@ -30,5 +29,4 @@ public class GitHubIssueCommentConverter extends BaseGitServiceEntityConverter<G
         comment.setAuthorAssociation(authorAssociationConverter.convert(source.getAuthorAssociation()));
         return comment;
     }
-
 }

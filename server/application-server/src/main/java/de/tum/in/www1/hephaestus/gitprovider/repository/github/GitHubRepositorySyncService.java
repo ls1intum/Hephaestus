@@ -1,20 +1,19 @@
 package de.tum.in.www1.hephaestus.gitprovider.repository.github;
 
+import de.tum.in.www1.hephaestus.gitprovider.common.DateUtil;
+import de.tum.in.www1.hephaestus.gitprovider.repository.Repository;
+import de.tum.in.www1.hephaestus.gitprovider.repository.RepositoryRepository;
+import jakarta.transaction.Transactional;
 import java.io.IOException;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
-
 import org.kohsuke.github.GHRepository;
 import org.kohsuke.github.GitHub;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
-import jakarta.transaction.Transactional;
-import de.tum.in.www1.hephaestus.gitprovider.common.DateUtil;
-import de.tum.in.www1.hephaestus.gitprovider.repository.Repository;
-import de.tum.in.www1.hephaestus.gitprovider.repository.RepositoryRepository;
 
 @Service
 public class GitHubRepositorySyncService {
@@ -23,8 +22,10 @@ public class GitHubRepositorySyncService {
 
     @Autowired
     private GitHub github;
+
     @Autowired
     private RepositoryRepository repositoryRepository;
+
     @Autowired
     private GitHubRepositoryConverter repositoryConverter;
 
@@ -51,11 +52,12 @@ public class GitHubRepositorySyncService {
      * @return A list of successfully fetched GitHub repositories.
      */
     public List<GHRepository> syncAllRepositories(Set<String> nameWithOwners) {
-        return nameWithOwners.stream()
-                .map(this::syncRepository)
-                .filter(Optional::isPresent)
-                .map(Optional::get)
-                .toList();
+        return nameWithOwners
+            .stream()
+            .map(this::syncRepository)
+            .filter(Optional::isPresent)
+            .map(Optional::get)
+            .toList();
     }
 
     /**
@@ -87,19 +89,25 @@ public class GitHubRepositorySyncService {
      */
     @Transactional
     public Repository processRepository(GHRepository ghRepository) {
-        var result = repositoryRepository.findById(ghRepository.getId())
-                .map(repository -> {
-                    try {
-                        if (repository.getUpdatedAt() == null || repository.getUpdatedAt()
-                                .isBefore(DateUtil.convertToOffsetDateTime(ghRepository.getUpdatedAt()))) {
-                            return repositoryConverter.update(ghRepository, repository);
-                        }
-                        return repository;
-                    } catch (IOException e) {
-                        logger.error("Failed to update repository {}: {}", ghRepository.getId(), e.getMessage());
-                        return null;
+        var result = repositoryRepository
+            .findById(ghRepository.getId())
+            .map(repository -> {
+                try {
+                    if (
+                        repository.getUpdatedAt() == null ||
+                        repository
+                            .getUpdatedAt()
+                            .isBefore(DateUtil.convertToOffsetDateTime(ghRepository.getUpdatedAt()))
+                    ) {
+                        return repositoryConverter.update(ghRepository, repository);
                     }
-                }).orElseGet(() -> repositoryConverter.convert(ghRepository));
+                    return repository;
+                } catch (IOException e) {
+                    logger.error("Failed to update repository {}: {}", ghRepository.getId(), e.getMessage());
+                    return null;
+                }
+            })
+            .orElseGet(() -> repositoryConverter.convert(ghRepository));
 
         if (result == null) {
             return null;

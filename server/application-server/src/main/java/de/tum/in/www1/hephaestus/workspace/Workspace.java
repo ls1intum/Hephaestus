@@ -1,8 +1,5 @@
 package de.tum.in.www1.hephaestus.workspace;
 
-import java.time.OffsetDateTime;
-import java.util.HashSet;
-import java.util.Set;
 import jakarta.persistence.CascadeType;
 import jakarta.persistence.Entity;
 import jakarta.persistence.FetchType;
@@ -11,6 +8,9 @@ import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.OneToMany;
 import jakarta.persistence.Table;
+import java.time.OffsetDateTime;
+import java.util.HashSet;
+import java.util.Set;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
@@ -30,7 +30,12 @@ public class Workspace {
 
     private OffsetDateTime usersSyncedAt;
 
-    @OneToMany(mappedBy = "workspace", fetch = FetchType.EAGER, cascade = {CascadeType.PERSIST, CascadeType.REMOVE}, orphanRemoval = true)
+    @OneToMany(
+        mappedBy = "workspace",
+        fetch = FetchType.EAGER,
+        cascade = { CascadeType.PERSIST, CascadeType.REMOVE },
+        orphanRemoval = true
+    )
     @ToString.Exclude
     private Set<RepositoryToMonitor> repositoriesToMonitor = new HashSet<>();
 }

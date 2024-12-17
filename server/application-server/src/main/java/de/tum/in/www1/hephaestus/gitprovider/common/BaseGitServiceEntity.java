@@ -1,9 +1,8 @@
 package de.tum.in.www1.hephaestus.gitprovider.common;
 
-import java.time.OffsetDateTime;
-
 import jakarta.persistence.Id;
 import jakarta.persistence.MappedSuperclass;
+import java.time.OffsetDateTime;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
@@ -17,6 +16,7 @@ import lombok.ToString;
 @AllArgsConstructor
 @ToString
 public abstract class BaseGitServiceEntity {
+
     @Id
     protected Long id;
 
