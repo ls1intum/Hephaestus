@@ -1,14 +1,13 @@
 package de.tum.in.www1.hephaestus.gitprovider.label.github;
 
+import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubMessageHandler;
+import de.tum.in.www1.hephaestus.gitprovider.label.LabelRepository;
+import de.tum.in.www1.hephaestus.gitprovider.repository.github.GitHubRepositorySyncService;
 import org.kohsuke.github.GHEvent;
 import org.kohsuke.github.GHEventPayload;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
-
-import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubMessageHandler;
-import de.tum.in.www1.hephaestus.gitprovider.label.LabelRepository;
-import de.tum.in.www1.hephaestus.gitprovider.repository.github.GitHubRepositorySyncService;
 
 @Component
 public class GitHubLabelMessageHandler extends GitHubMessageHandler<GHEventPayload.Label> {
@@ -20,9 +19,10 @@ public class GitHubLabelMessageHandler extends GitHubMessageHandler<GHEventPaylo
     private final GitHubRepositorySyncService repositorySyncService;
 
     private GitHubLabelMessageHandler(
-            LabelRepository labelRepository,
-            GitHubLabelSyncService labelSyncService,
-            GitHubRepositorySyncService repositorySyncService) {
+        LabelRepository labelRepository,
+        GitHubLabelSyncService labelSyncService,
+        GitHubRepositorySyncService repositorySyncService
+    ) {
         super(GHEventPayload.Label.class);
         this.labelRepository = labelRepository;
         this.labelSyncService = labelSyncService;
@@ -34,8 +34,12 @@ public class GitHubLabelMessageHandler extends GitHubMessageHandler<GHEventPaylo
         var action = eventPayload.getAction();
         var repository = eventPayload.getRepository();
         var label = eventPayload.getLabel();
-        logger.info("Received label event for repository: {}, action: {}, labelId: {}", repository.getFullName(),
-                action, label.getId());
+        logger.info(
+            "Received label event for repository: {}, action: {}, labelId: {}",
+            repository.getFullName(),
+            action,
+            label.getId()
+        );
 
         repositorySyncService.processRepository(repository);
 

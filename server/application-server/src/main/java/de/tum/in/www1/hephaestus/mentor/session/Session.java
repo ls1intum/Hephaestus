@@ -1,5 +1,8 @@
 package de.tum.in.www1.hephaestus.mentor.session;
 
+import de.tum.in.www1.hephaestus.gitprovider.user.User;
+import de.tum.in.www1.hephaestus.mentor.message.Message;
+import jakarta.persistence.*;
 import java.time.OffsetDateTime;
 import java.util.ArrayList;
 import java.util.List;
@@ -8,9 +11,6 @@ import lombok.NoArgsConstructor;
 import lombok.Setter;
 import lombok.ToString;
 import org.springframework.lang.NonNull;
-import jakarta.persistence.*;
-import de.tum.in.www1.hephaestus.gitprovider.user.User;
-import de.tum.in.www1.hephaestus.mentor.message.Message;
 
 @Entity
 @Table(name = "session")
@@ -19,6 +19,7 @@ import de.tum.in.www1.hephaestus.mentor.message.Message;
 @ToString
 @NoArgsConstructor
 public class Session {
+
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;

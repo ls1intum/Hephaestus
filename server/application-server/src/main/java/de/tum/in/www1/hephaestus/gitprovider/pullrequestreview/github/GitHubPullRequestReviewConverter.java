@@ -1,8 +1,8 @@
 package de.tum.in.www1.hephaestus.gitprovider.pullrequestreview.github;
 
+import de.tum.in.www1.hephaestus.gitprovider.pullrequestreview.PullRequestReview;
 import java.io.IOException;
 import java.time.ZoneOffset;
-
 import org.kohsuke.github.GHPullRequestReview;
 import org.kohsuke.github.GHPullRequestReviewState;
 import org.slf4j.Logger;
@@ -10,8 +10,6 @@ import org.slf4j.LoggerFactory;
 import org.springframework.core.convert.converter.Converter;
 import org.springframework.lang.NonNull;
 import org.springframework.stereotype.Component;
-
-import de.tum.in.www1.hephaestus.gitprovider.pullrequestreview.PullRequestReview;
 
 @Component
 public class GitHubPullRequestReviewConverter implements Converter<GHPullRequestReview, PullRequestReview> {
@@ -26,7 +24,7 @@ public class GitHubPullRequestReviewConverter implements Converter<GHPullRequest
     public PullRequestReview update(@NonNull GHPullRequestReview source, @NonNull PullRequestReview review) {
         review.setId(source.getId());
         review.setBody(source.getBody());
-        
+
         if (review.getState() == null || source.getState() != GHPullRequestReviewState.DISMISSED) {
             review.setState(convertState(source.getState()));
         }
@@ -34,7 +32,7 @@ public class GitHubPullRequestReviewConverter implements Converter<GHPullRequest
         if (!review.isDismissed()) {
             review.setDismissed(source.getState() == GHPullRequestReviewState.DISMISSED);
         }
-        
+
         review.setHtmlUrl(source.getHtmlUrl().toString());
         try {
             if (source.getSubmittedAt() != null) {

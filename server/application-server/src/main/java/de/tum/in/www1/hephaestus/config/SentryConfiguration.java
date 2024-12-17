@@ -49,7 +49,7 @@ public class SentryConfiguration {
                 options.setRelease(hephaestusVersion);
                 options.setTracesSampleRate(getTracesSampleRate());
             });
-            
+
             logger.info("Sentry configuration was successful");
         } catch (Exception ex) {
             logger.error("Sentry configuration was not successful due to exception!", ex);

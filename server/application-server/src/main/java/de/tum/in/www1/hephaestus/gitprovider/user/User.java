@@ -1,21 +1,5 @@
 package de.tum.in.www1.hephaestus.gitprovider.user;
 
-import jakarta.persistence.Table;
-
-import java.util.HashSet;
-import java.util.Set;
-
-import org.springframework.lang.NonNull;
-
-import jakarta.persistence.Entity;
-import jakarta.persistence.EnumType;
-import jakarta.persistence.Enumerated;
-import jakarta.persistence.ManyToMany;
-import jakarta.persistence.OneToMany;
-import lombok.Getter;
-import lombok.NoArgsConstructor;
-import lombok.Setter;
-import lombok.ToString;
 import de.tum.in.www1.hephaestus.gitprovider.common.BaseGitServiceEntity;
 import de.tum.in.www1.hephaestus.gitprovider.issue.Issue;
 import de.tum.in.www1.hephaestus.gitprovider.issuecomment.IssueComment;
@@ -24,6 +8,19 @@ import de.tum.in.www1.hephaestus.gitprovider.pullrequestreview.PullRequestReview
 import de.tum.in.www1.hephaestus.gitprovider.pullrequestreviewcomment.PullRequestReviewComment;
 import de.tum.in.www1.hephaestus.gitprovider.team.Team;
 import de.tum.in.www1.hephaestus.mentor.session.Session;
+import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
+import jakarta.persistence.ManyToMany;
+import jakarta.persistence.OneToMany;
+import jakarta.persistence.Table;
+import java.util.HashSet;
+import java.util.Set;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+import lombok.Setter;
+import lombok.ToString;
+import org.springframework.lang.NonNull;
 
 @Entity
 @Table(name = "user", schema = "public")
@@ -97,7 +94,7 @@ public class User extends BaseGitServiceEntity {
     @OneToMany(mappedBy = "user")
     @ToString.Exclude
     private Set<Session> sessions = new HashSet<>();
-    
+
     @OneToMany(mappedBy = "author")
     @ToString.Exclude
     private Set<PullRequestReviewComment> reviewComments = new HashSet<>();
@@ -106,7 +103,9 @@ public class User extends BaseGitServiceEntity {
     private int leaguePoints;
 
     public enum Type {
-        USER, ORGANIZATION, BOT
+        USER,
+        ORGANIZATION,
+        BOT,
     }
 
     public void addTeam(Team team) {
@@ -116,7 +115,6 @@ public class User extends BaseGitServiceEntity {
     public void removeTeam(Team team) {
         teams.remove(team);
     }
-
     // Ignored GitHub properties:
     // - totalPrivateRepos
     // - ownedPrivateRepos

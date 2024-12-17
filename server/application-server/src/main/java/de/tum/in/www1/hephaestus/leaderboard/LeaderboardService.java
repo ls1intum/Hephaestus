@@ -31,12 +31,16 @@ public class LeaderboardService {
 
     @Autowired
     private UserRepository userRepository;
+
     @Autowired
     private PullRequestReviewRepository pullRequestReviewRepository;
+
     @Autowired
     private IssueCommentRepository issueCommentRepository;
+
     @Autowired
     private ScoringService scoringService;
+
     @Autowired
     private TeamRepository teamRepository;
 
@@ -47,34 +51,41 @@ public class LeaderboardService {
         Optional<String> team
     ) {
         Optional<Team> teamEntity = team.map(t -> teamRepository.findByName(t)).orElse(Optional.empty());
-        logger.info("Creating leaderboard dataset with timeframe: {} - {} and team: {}", after, before, teamEntity.map(Team::getName).orElse("all"));
-        
+        logger.info(
+            "Creating leaderboard dataset with timeframe: {} - {} and team: {}",
+            after,
+            before,
+            teamEntity.map(Team::getName).orElse("all")
+        );
+
         List<PullRequestReview> reviews;
         List<IssueComment> issueComments;
         if (teamEntity.isPresent()) {
             reviews = pullRequestReviewRepository.findAllInTimeframeOfTeam(after, before, teamEntity.get().getId());
-            issueComments = issueCommentRepository.findAllInTimeframeOfTeam(after, before, teamEntity.get().getId(), true);
+            issueComments = issueCommentRepository.findAllInTimeframeOfTeam(
+                after,
+                before,
+                teamEntity.get().getId(),
+                true
+            );
         } else {
             reviews = pullRequestReviewRepository.findAllInTimeframe(after, before);
             issueComments = issueCommentRepository.findAllInTimeframe(after, before, true);
         }
 
-        
         Map<Long, User> usersById = reviews
             .stream()
             .map(PullRequestReview::getAuthor)
             .collect(Collectors.toMap(User::getId, user -> user, (u1, u2) -> u1));
-        
-        issueComments
-            .stream()
-            .map(IssueComment::getAuthor)
-            .forEach(user -> usersById.putIfAbsent(user.getId(), user));
-        
+
+        issueComments.stream().map(IssueComment::getAuthor).forEach(user -> usersById.putIfAbsent(user.getId(), user));
+
         if (teamEntity.isPresent()) {
-            userRepository.findAllByTeamId(teamEntity.get().getId())
+            userRepository
+                .findAllByTeamId(teamEntity.get().getId())
                 .forEach(user -> usersById.putIfAbsent(user.getId(), user));
         }
-        
+
         // Review activity
         Map<Long, List<PullRequestReview>> reviewsByUserId = reviews
             .stream()
@@ -88,13 +99,10 @@ public class LeaderboardService {
             .stream()
             .collect(
                 Collectors.toMap(Map.Entry::getKey, entry ->
-                    calculateTotalScore(
-                        entry.getValue(),
-                        issueCommentsByUserId.getOrDefault(entry.getKey(), List.of())
-                    )
+                    calculateTotalScore(entry.getValue(), issueCommentsByUserId.getOrDefault(entry.getKey(), List.of()))
                 )
             );
-        
+
         // Add missing users with score 0
         usersById.keySet().forEach(userId -> scoresByUserId.putIfAbsent(userId, 0));
 
@@ -181,7 +189,11 @@ public class LeaderboardService {
     }
 
     private int calculateTotalScore(List<PullRequestReview> reviews, List<IssueComment> issueComments) {
-        int numberOfIssueComments = issueComments.stream().filter(issueComment -> issueComment.getIssue().getAuthor().getId() != issueComment.getAuthor().getId()).collect(Collectors.toList()).size();
+        int numberOfIssueComments = issueComments
+            .stream()
+            .filter(issueComment -> issueComment.getIssue().getAuthor().getId() != issueComment.getAuthor().getId())
+            .collect(Collectors.toList())
+            .size();
         // Could contain multiple reviews for the same pull request
         Map<Long, List<PullRequestReview>> reviewsByPullRequestId = reviews
             .stream()

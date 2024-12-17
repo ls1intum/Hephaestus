@@ -6,14 +6,14 @@ import io.micrometer.common.lang.NonNull;
 import java.util.List;
 
 public record LeaderboardEntryDTO(
-        @NonNull Integer rank,
-        @NonNull Integer score,
-        @NonNull UserInfoDTO user,
-        @NonNull List<PullRequestInfoDTO> reviewedPullRequests,
-        @NonNull Integer numberOfReviewedPRs,
-        @NonNull Integer numberOfApprovals,
-        @NonNull Integer numberOfChangeRequests,
-        @NonNull Integer numberOfComments,
-        @NonNull Integer numberOfUnknowns,
-        @NonNull Integer numberOfCodeComments) {
-}
+    @NonNull Integer rank,
+    @NonNull Integer score,
+    @NonNull UserInfoDTO user,
+    @NonNull List<PullRequestInfoDTO> reviewedPullRequests,
+    @NonNull Integer numberOfReviewedPRs,
+    @NonNull Integer numberOfApprovals,
+    @NonNull Integer numberOfChangeRequests,
+    @NonNull Integer numberOfComments,
+    @NonNull Integer numberOfUnknowns,
+    @NonNull Integer numberOfCodeComments
+) {}

@@ -1,17 +1,15 @@
 package de.tum.in.www1.hephaestus.gitprovider.user.github;
 
+import de.tum.in.www1.hephaestus.gitprovider.common.DateUtil;
+import de.tum.in.www1.hephaestus.gitprovider.user.User;
+import de.tum.in.www1.hephaestus.gitprovider.user.UserRepository;
+import jakarta.transaction.Transactional;
 import java.io.IOException;
-
 import org.kohsuke.github.GHUser;
 import org.kohsuke.github.GitHub;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
-import jakarta.transaction.Transactional;
-
-import de.tum.in.www1.hephaestus.gitprovider.common.DateUtil;
-import de.tum.in.www1.hephaestus.gitprovider.user.User;
-import de.tum.in.www1.hephaestus.gitprovider.user.UserRepository;
 
 @Service
 public class GitHubUserSyncService {
@@ -22,10 +20,7 @@ public class GitHubUserSyncService {
     private final UserRepository userRepository;
     private final GitHubUserConverter userConverter;
 
-    public GitHubUserSyncService(
-            GitHub github,
-            UserRepository userRepository,
-            GitHubUserConverter userConverter) {
+    public GitHubUserSyncService(GitHub github, UserRepository userRepository, GitHubUserConverter userConverter) {
         this.github = github;
         this.userRepository = userRepository;
         this.userConverter = userConverter;
@@ -36,10 +31,7 @@ public class GitHubUserSyncService {
      * data.
      */
     public void syncAllExistingUsers() {
-        userRepository.findAll()
-                .stream()
-                .map(User::getLogin)
-                .forEach(this::syncUser);
+        userRepository.findAll().stream().map(User::getLogin).forEach(this::syncUser);
     }
 
     /**
@@ -66,19 +58,23 @@ public class GitHubUserSyncService {
      */
     @Transactional
     public User processUser(GHUser ghUser) {
-        var result = userRepository.findById(ghUser.getId())
-                .map(user -> {
-                    try {
-                        if (user.getUpdatedAt() == null || user.getUpdatedAt()
-                                .isBefore(DateUtil.convertToOffsetDateTime(ghUser.getUpdatedAt()))) {
-                            return userConverter.update(ghUser, user);
-                        }
-                        return user;
-                    } catch (IOException e) {
-                        logger.error("Failed to update repository {}: {}", ghUser.getId(), e.getMessage());
-                        return null;
+        var result = userRepository
+            .findById(ghUser.getId())
+            .map(user -> {
+                try {
+                    if (
+                        user.getUpdatedAt() == null ||
+                        user.getUpdatedAt().isBefore(DateUtil.convertToOffsetDateTime(ghUser.getUpdatedAt()))
+                    ) {
+                        return userConverter.update(ghUser, user);
                     }
-                }).orElseGet(() -> userConverter.convert(ghUser));
+                    return user;
+                } catch (IOException e) {
+                    logger.error("Failed to update repository {}: {}", ghUser.getId(), e.getMessage());
+                    return null;
+                }
+            })
+            .orElseGet(() -> userConverter.convert(ghUser));
 
         if (result == null) {
             return null;

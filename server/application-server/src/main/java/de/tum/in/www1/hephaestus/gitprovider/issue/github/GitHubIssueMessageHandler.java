@@ -1,14 +1,13 @@
 package de.tum.in.www1.hephaestus.gitprovider.issue.github;
 
+import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubMessageHandler;
+import de.tum.in.www1.hephaestus.gitprovider.issue.IssueRepository;
+import de.tum.in.www1.hephaestus.gitprovider.repository.github.GitHubRepositorySyncService;
 import org.kohsuke.github.GHEvent;
 import org.kohsuke.github.GHEventPayload;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
-
-import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubMessageHandler;
-import de.tum.in.www1.hephaestus.gitprovider.issue.IssueRepository;
-import de.tum.in.www1.hephaestus.gitprovider.repository.github.GitHubRepositorySyncService;
 
 @Component
 public class GitHubIssueMessageHandler extends GitHubMessageHandler<GHEventPayload.Issue> {
@@ -20,9 +19,10 @@ public class GitHubIssueMessageHandler extends GitHubMessageHandler<GHEventPaylo
     private final GitHubRepositorySyncService repositorySyncService;
 
     private GitHubIssueMessageHandler(
-            IssueRepository issueRepository,
-            GitHubIssueSyncService issueSyncService,
-            GitHubRepositorySyncService repositorySyncService) {
+        IssueRepository issueRepository,
+        GitHubIssueSyncService issueSyncService,
+        GitHubRepositorySyncService repositorySyncService
+    ) {
         super(GHEventPayload.Issue.class);
         this.issueRepository = issueRepository;
         this.issueSyncService = issueSyncService;
@@ -34,12 +34,14 @@ public class GitHubIssueMessageHandler extends GitHubMessageHandler<GHEventPaylo
         var action = eventPayload.getAction();
         var repository = eventPayload.getRepository();
         var issue = eventPayload.getIssue();
-        logger.info("Received issue event for repository: {}, issue: {}, action: {}",
-                repository.getFullName(),
-                issue.getNumber(),
-                action);
+        logger.info(
+            "Received issue event for repository: {}, issue: {}, action: {}",
+            repository.getFullName(),
+            issue.getNumber(),
+            action
+        );
         repositorySyncService.processRepository(repository);
-        
+
         if (action.equals("deleted")) {
             issueRepository.deleteById(issue.getId());
         } else {

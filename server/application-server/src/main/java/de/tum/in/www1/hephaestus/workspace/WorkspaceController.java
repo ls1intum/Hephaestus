@@ -1,7 +1,9 @@
 package de.tum.in.www1.hephaestus.workspace;
 
+import de.tum.in.www1.hephaestus.gitprovider.team.TeamInfoDTO;
+import de.tum.in.www1.hephaestus.gitprovider.user.UserInfoDTO;
+import de.tum.in.www1.hephaestus.gitprovider.user.UserTeamsDTO;
 import java.util.List;
-
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.DeleteMapping;
@@ -13,10 +15,6 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
-import de.tum.in.www1.hephaestus.gitprovider.team.TeamInfoDTO;
-import de.tum.in.www1.hephaestus.gitprovider.user.UserInfoDTO;
-import de.tum.in.www1.hephaestus.gitprovider.user.UserTeamsDTO;
-
 @RestController
 @RequestMapping("/workspace")
 public class WorkspaceController {
@@ -26,10 +24,7 @@ public class WorkspaceController {
 
     @GetMapping("/repositories")
     public ResponseEntity<List<String>> getRepositoriesToMonitor() {
-        var repositories = workspaceService.getRepositoriesToMonitor()
-            .stream()
-            .sorted()
-            .toList();
+        var repositories = workspaceService.getRepositoriesToMonitor().stream().sorted().toList();
         return ResponseEntity.ok(repositories);
     }
 
@@ -62,16 +57,18 @@ public class WorkspaceController {
 
     @PutMapping("/user/{login}/team/{teamId}")
     public ResponseEntity<UserInfoDTO> addTeamToUser(@PathVariable String login, @PathVariable Long teamId) {
-        return workspaceService.addTeamToUser(login, teamId)
-                .map(ResponseEntity::ok)
-                .orElseGet(() -> ResponseEntity.notFound().build());
+        return workspaceService
+            .addTeamToUser(login, teamId)
+            .map(ResponseEntity::ok)
+            .orElseGet(() -> ResponseEntity.notFound().build());
     }
 
     @DeleteMapping("/user/{login}/team/{teamId}")
     public ResponseEntity<UserInfoDTO> removeUserFromTeam(@PathVariable String login, @PathVariable Long teamId) {
-        return workspaceService.removeUserFromTeam(login, teamId)
-                .map(ResponseEntity::ok)
-                .orElseGet(() -> ResponseEntity.notFound().build());
+        return workspaceService
+            .removeUserFromTeam(login, teamId)
+            .map(ResponseEntity::ok)
+            .orElseGet(() -> ResponseEntity.notFound().build());
     }
 
     @PutMapping("/teams")
@@ -90,37 +87,54 @@ public class WorkspaceController {
     }
 
     @PostMapping("/team/{teamId}/repository/{repositoryOwner}/{repositoryName}")
-    public ResponseEntity<TeamInfoDTO> addRepositoryToTeam(@PathVariable Long teamId, @PathVariable String repositoryOwner, @PathVariable String repositoryName) {
-        return workspaceService.addRepositoryToTeam(teamId, repositoryOwner + '/' + repositoryName)
-                .map(ResponseEntity::ok)
-                .orElseGet(() -> ResponseEntity.notFound().build());
+    public ResponseEntity<TeamInfoDTO> addRepositoryToTeam(
+        @PathVariable Long teamId,
+        @PathVariable String repositoryOwner,
+        @PathVariable String repositoryName
+    ) {
+        return workspaceService
+            .addRepositoryToTeam(teamId, repositoryOwner + '/' + repositoryName)
+            .map(ResponseEntity::ok)
+            .orElseGet(() -> ResponseEntity.notFound().build());
     }
 
     @DeleteMapping("/team/{teamId}/repository/{repositoryOwner}/{repositoryName}")
-    public ResponseEntity<TeamInfoDTO> removeRepositoryFromTeam(@PathVariable Long teamId, @PathVariable String repositoryOwner, @PathVariable String repositoryName) {
-        return workspaceService.removeRepositoryFromTeam(teamId, repositoryOwner + '/' + repositoryName)
-                .map(ResponseEntity::ok)
-                .orElseGet(() -> ResponseEntity.notFound().build());
+    public ResponseEntity<TeamInfoDTO> removeRepositoryFromTeam(
+        @PathVariable Long teamId,
+        @PathVariable String repositoryOwner,
+        @PathVariable String repositoryName
+    ) {
+        return workspaceService
+            .removeRepositoryFromTeam(teamId, repositoryOwner + '/' + repositoryName)
+            .map(ResponseEntity::ok)
+            .orElseGet(() -> ResponseEntity.notFound().build());
     }
 
     @PostMapping("/team/{teamId}/label/{repositoryId}/{label}")
-    public ResponseEntity<TeamInfoDTO> addLabelToTeam(@PathVariable Long teamId, @PathVariable Long repositoryId, @PathVariable String label) {
-        return workspaceService.addLabelToTeam(teamId, repositoryId, label)
-                .map(ResponseEntity::ok)
-                .orElseGet(() -> ResponseEntity.notFound().build());
+    public ResponseEntity<TeamInfoDTO> addLabelToTeam(
+        @PathVariable Long teamId,
+        @PathVariable Long repositoryId,
+        @PathVariable String label
+    ) {
+        return workspaceService
+            .addLabelToTeam(teamId, repositoryId, label)
+            .map(ResponseEntity::ok)
+            .orElseGet(() -> ResponseEntity.notFound().build());
     }
 
     @DeleteMapping("/team/{teamId}/label/{labelId}")
     public ResponseEntity<TeamInfoDTO> removeLabelFromTeam(@PathVariable Long teamId, @PathVariable Long labelId) {
-        return workspaceService.removeLabelFromTeam(teamId, labelId)
-                .map(ResponseEntity::ok)
-                .orElseGet(() -> ResponseEntity.notFound().build());
+        return workspaceService
+            .removeLabelFromTeam(teamId, labelId)
+            .map(ResponseEntity::ok)
+            .orElseGet(() -> ResponseEntity.notFound().build());
     }
 
     @DeleteMapping("/team/{teamId}")
     public ResponseEntity<TeamInfoDTO> deleteTeam(@PathVariable Long teamId) {
-        return workspaceService.deleteTeam(teamId)
-                .map(ResponseEntity::ok)
-                .orElseGet(() -> ResponseEntity.notFound().build());
+        return workspaceService
+            .deleteTeam(teamId)
+            .map(ResponseEntity::ok)
+            .orElseGet(() -> ResponseEntity.notFound().build());
     }
 }

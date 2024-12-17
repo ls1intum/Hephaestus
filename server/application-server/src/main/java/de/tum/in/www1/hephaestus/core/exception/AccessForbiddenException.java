@@ -1,7 +1,6 @@
 package de.tum.in.www1.hephaestus.core.exception;
 
 import java.io.Serial;
-
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.ResponseStatus;
 

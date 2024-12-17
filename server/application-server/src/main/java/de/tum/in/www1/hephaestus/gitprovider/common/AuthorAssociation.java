@@ -9,5 +9,5 @@ public enum AuthorAssociation {
     MANNEQUIN,
     MEMBER,
     NONE,
-    OWNER
+    OWNER,
 }

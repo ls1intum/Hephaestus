@@ -1,19 +1,18 @@
 package de.tum.in.www1.hephaestus.mentor.message;
 
+import de.tum.in.www1.hephaestus.config.IntelligenceServiceConfig.IntelligenceServiceApi;
+import de.tum.in.www1.hephaestus.intelligenceservice.model.ISMentorMessage;
+import de.tum.in.www1.hephaestus.intelligenceservice.model.ISMessage;
+import de.tum.in.www1.hephaestus.intelligenceservice.model.ISMessageHistory;
+import de.tum.in.www1.hephaestus.mentor.message.Message.MessageSender;
+import de.tum.in.www1.hephaestus.mentor.session.Session;
+import de.tum.in.www1.hephaestus.mentor.session.SessionRepository;
 import java.util.List;
 import java.util.Optional;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
-
-import de.tum.in.www1.hephaestus.config.IntelligenceServiceConfig.IntelligenceServiceApi;
-import de.tum.in.www1.hephaestus.mentor.message.Message.MessageSender;
-import de.tum.in.www1.hephaestus.mentor.session.Session;
-import de.tum.in.www1.hephaestus.mentor.session.SessionRepository;
-import de.tum.in.www1.hephaestus.intelligenceservice.model.ISMentorMessage;
-import de.tum.in.www1.hephaestus.intelligenceservice.model.ISMessage;
-import de.tum.in.www1.hephaestus.intelligenceservice.model.ISMessageHistory;
 
 @Service
 public class MessageService {
@@ -30,9 +29,11 @@ public class MessageService {
     private static final Logger logger = LoggerFactory.getLogger(MessageService.class);
 
     public List<MessageDTO> getMessagesBySessionId(Long sessionId) {
-        return messageRepository.findBySessionId(sessionId).stream()
-                .map(message -> MessageDTO.fromMessage(message))
-                .toList();
+        return messageRepository
+            .findBySessionId(sessionId)
+            .stream()
+            .map(message -> MessageDTO.fromMessage(message))
+            .toList();
     }
 
     public MessageDTO sendMessage(String content, Long sessionId) {
@@ -74,13 +75,17 @@ public class MessageService {
         List<Message> messages = messageRepository.findBySessionId(sessionId);
 
         ISMessageHistory messageHistory = new ISMessageHistory();
-        messageHistory.setMessages(messages.stream()
-                .<ISMessage>map(message -> new ISMessage().content(message.getContent()).sender(message.getSender().toString()))
-                .toList());
+        messageHistory.setMessages(
+            messages
+                .stream()
+                .<ISMessage>map(message ->
+                    new ISMessage().content(message.getContent()).sender(message.getSender().toString())
+                )
+                .toList()
+        );
         try {
             ISMentorMessage mentorMessage = intelligenceServiceApi.generateMentorPost(messageHistory);
             return mentorMessage.getContent();
-            
         } catch (Exception e) {
             logger.error("Failed to generate response for message: {}", e.getMessage());
             return null;

@@ -1,15 +1,14 @@
 package de.tum.in.www1.hephaestus.gitprovider.repository.github;
 
+import de.tum.in.www1.hephaestus.gitprovider.common.BaseGitServiceEntityConverter;
+import de.tum.in.www1.hephaestus.gitprovider.common.DateUtil;
+import de.tum.in.www1.hephaestus.gitprovider.repository.Repository;
 import org.kohsuke.github.GHRepository;
 import org.kohsuke.github.GHRepository.Visibility;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.lang.NonNull;
 import org.springframework.stereotype.Component;
-
-import de.tum.in.www1.hephaestus.gitprovider.common.BaseGitServiceEntityConverter;
-import de.tum.in.www1.hephaestus.gitprovider.common.DateUtil;
-import de.tum.in.www1.hephaestus.gitprovider.repository.Repository;
 
 @Component
 public class GitHubRepositoryConverter extends BaseGitServiceEntityConverter<GHRepository, Repository> {
@@ -20,7 +19,7 @@ public class GitHubRepositoryConverter extends BaseGitServiceEntityConverter<GHR
     public Repository convert(@NonNull GHRepository source) {
         return update(source, new Repository());
     }
-    
+
     @Override
     public Repository update(@NonNull GHRepository source, @NonNull Repository repository) {
         convertBaseFields(source, repository);
