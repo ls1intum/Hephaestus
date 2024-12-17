@@ -39,7 +39,7 @@ const meta: Meta<MessagesComponent> = {
         id: 5,
         sentAt: '2024-12-05T10:18:10Z',
         sender: Message.SenderEnum.Mentor,
-        content: "A good first step is identifying the main entities: users, products, orders, and the cart. Let’s start with that — do you have any initial thoughts?",
+        content: 'A good first step is identifying the main entities: users, products, orders, and the cart. Let’s start with that — do you have any initial thoughts?',
         sessionId: 101
       }
     ]

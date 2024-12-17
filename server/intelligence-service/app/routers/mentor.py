@@ -31,7 +31,7 @@ class MentorMessage(BaseModel):
 def generate(request: MessageHistory):
     messages = []
     for message in request.messages:
-        if message.content: 
+        if message.content:
             if message.sender == "USER":
                 messages.append(HumanMessage(content=message.content))
             else:

@@ -30,10 +30,10 @@ public class MessageService {
 
     public List<MessageDTO> getMessagesBySessionId(Long sessionId) {
         return messageRepository
-                .findBySessionId(sessionId)
-                .stream()
-                .map(message -> MessageDTO.fromMessage(message))
-                .toList();
+            .findBySessionId(sessionId)
+            .stream()
+            .map(message -> MessageDTO.fromMessage(message))
+            .toList();
     }
 
     public MessageDTO sendMessage(String content, Long sessionId) {
@@ -86,14 +86,17 @@ public class MessageService {
         List<Message> messages = messageRepository.findBySessionId(sessionId);
         ISMessageHistory messageHistory = new ISMessageHistory();
 
-        messageHistory.setMessages(messages.stream()
-                .<ISMessage>map(
-                        message -> new ISMessage().content(message.getContent()).sender(message.getSender().toString()))
-                .toList());
+        messageHistory.setMessages(
+            messages
+                .stream()
+                .<ISMessage>map(message ->
+                    new ISMessage().content(message.getContent()).sender(message.getSender().toString())
+                )
+                .toList()
+        );
         try {
             ISMentorMessage mentorMessage = intelligenceServiceApi.generateMentorPost(messageHistory);
             return mentorMessage.getContent();
-
         } catch (Exception e) {
             logger.error("Failed to generate response for message: {}", e.getMessage());
             return null;
