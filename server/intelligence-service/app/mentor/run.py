@@ -1,5 +1,6 @@
 from typing_extensions import Annotated, TypedDict
 
+from .persona_prompt import persona_prompt
 from langgraph.graph import START, StateGraph, END
 from langgraph.graph.message import add_messages
 from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
@@ -14,9 +15,10 @@ class State(TypedDict):
 def mentor(state: State):
     prompt = ChatPromptTemplate(
         [
+            ("system", persona_prompt),
             (
                 "system",
-                "You are an AI mentor helping a students working on the software engineering projects embracing structured self-reflection practices. You need to guide the student through the set questions regarding their work on the project during the last week (sprint). Your value is the fact, that you help students to reflect on their past progress. Throughout the conversation you need to perform all of the following tasks in the given order: Task 1: Greet the student and say you are happy to start the session. Task 2: Ask the student about the overall progress on the project. Task 3: Ask the student about the challenges faced during the sprint referring to what he said about progress. Task 4: Ask about the plan for the next sprint. You need to understand at which task in the conversation you are from the message history and what is the next task. Please, don't repeat yourself throughout the conversation. Don't perform more then one task at a time. If the user already shared something to a task you can go to the next. Be polite, friendly and do not let the student drive the conversation to any other topic except for the current project. Do not make a questionaire out of the conversation, but rather make it a natural conversation. Don't repeat the answer of the student to your latest question but try to react on it. If the student asks questions be helpful and try to find solutions.",
+                "You need to guide the student through the set questions regarding their work on the project during the last week (sprint). Your value is the fact, that you help students to reflect on their past progress. Throughout the conversation you need to perform all of the following tasks in the given order: Task 1: Ask the student about the overall progress on the project. Task 2: Ask the student about the challenges faced during the sprint referring to what he said about progress. Task 3: Ask about the plan for the next sprint. You need to understand at which task in the conversation you are from the message history and what is the next task. Please, don't repeat yourself throughout the conversation. Don't perform more then one task at a time. If the user already shared something to a task you can go to the next.",
             ),
             MessagesPlaceholder("messages"),
         ]
@@ -25,9 +27,32 @@ def mentor(state: State):
     return {"messages": [chain.invoke({"messages": state["messages"]})]}
 
 
+def greeting(state: State):
+    prompt = ChatPromptTemplate(
+        [
+            ("system", persona_prompt),
+            (
+                "system",
+                "Greet the user warmly and express excitement about starting today’s session. Keep the greeting friendly and encouraging. Mention that you are here to support them and look forward to making progress together.",
+            ),
+        ]
+    )
+    chain = prompt | model
+    return {"messages": [chain.invoke({"messages": state["messages"]})]}
+
+
+def isFirstInteraction(state: State):
+    if len(state["messages"]) == 0:
+        return "greeting"
+    return "mentor"
+
+
 graph_builder = StateGraph(State)
 graph_builder.add_node("mentor", mentor)
-graph_builder.add_edge(START, "mentor")
+graph_builder.add_node("greeting", greeting)
+
+graph_builder.add_conditional_edges(START, isFirstInteraction)
 graph_builder.add_edge("mentor", END)
+graph_builder.add_edge("greeting", END)
 
 graph = graph_builder.compile()

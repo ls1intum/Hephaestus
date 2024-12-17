@@ -55,9 +55,52 @@ public class MessageService {
 
         // prevent saving empty system messages if the intelligence service is down
         if (systemResponse == null) {
+            logger.error("Failed to generate response for message: {}", content);
             return MessageDTO.fromMessage(savedUserMessage);
         }
 
+        Message savedSystemMessage = createSystemMessage(currentSession, systemResponse);
+        return MessageDTO.fromMessage(savedSystemMessage);
+    }
+
+    public MessageDTO generateFirstSystemMessage(Long sessionId) {
+        Optional<Session> session = sessionRepository.findById(sessionId);
+        if (session.isEmpty()) {
+            return null;
+        }
+        Session currentSession = session.get();
+
+        String systemResponse = generateResponse(sessionId, "");
+
+        // prevent saving empty system messages if the intelligence service is down
+        if (systemResponse == null) {
+            logger.error("Failed to generate response for the conversation start");
+            return null;
+        }
+
+        Message savedSystemMessage = createSystemMessage(currentSession, systemResponse);
+        return MessageDTO.fromMessage(savedSystemMessage);
+    }
+
+    private String generateResponse(Long sessionId, String messageContent) {
+        List<Message> messages = messageRepository.findBySessionId(sessionId);
+
+        ISMessageHistory messageHistory = new ISMessageHistory();
+        messageHistory.setMessages(messages.stream()
+                .<ISMessage>map(
+                        message -> new ISMessage().content(message.getContent()).sender(message.getSender().toString()))
+                .toList());
+        try {
+            ISMentorMessage mentorMessage = intelligenceServiceApi.generateMentorPost(messageHistory);
+            return mentorMessage.getContent();
+
+        } catch (Exception e) {
+            logger.error("Failed to generate response for message: {}", e.getMessage());
+            return null;
+        }
+    }
+
+    private Message createSystemMessage(Session currentSession, String systemResponse) {
         Message systemMessage = new Message();
         systemMessage.setSender(MessageSender.MENTOR);
         systemMessage.setContent(systemResponse);
@@ -67,23 +110,6 @@ public class MessageService {
         currentSession.getMessages().add(savedSystemMessage);
         sessionRepository.save(currentSession);
 
-        return MessageDTO.fromMessage(savedSystemMessage);
-    }
-
-    private String generateResponse(Long sessionId, String messageContent) {
-        List<Message> messages = messageRepository.findBySessionId(sessionId);
-
-        ISMessageHistory messageHistory = new ISMessageHistory();
-        messageHistory.setMessages(messages.stream()
-                .<ISMessage>map(message -> new ISMessage().content(message.getContent()).sender(message.getSender().toString()))
-                .toList());
-        try {
-            ISMentorMessage mentorMessage = intelligenceServiceApi.generateMentorPost(messageHistory);
-            return mentorMessage.getContent();
-            
-        } catch (Exception e) {
-            logger.error("Failed to generate response for message: {}", e.getMessage());
-            return null;
-        }
+        return savedSystemMessage;
     }
 }

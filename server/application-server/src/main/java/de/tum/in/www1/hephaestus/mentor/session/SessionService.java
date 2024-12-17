@@ -6,12 +6,15 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import de.tum.in.www1.hephaestus.core.exception.AccessForbiddenException;
 import de.tum.in.www1.hephaestus.gitprovider.user.User;
+import de.tum.in.www1.hephaestus.mentor.message.MessageService;
 
 @Service
 public class SessionService {
-    
+
     @Autowired
     private SessionRepository sessionRepository;
+    @Autowired
+    private MessageService messageService;
 
     public void checkAccessElseThrow(User user, Session session) {
         if (!session.getUser().getId().equals(user.getId())) {
@@ -32,6 +35,8 @@ public class SessionService {
         Session session = new Session();
         session.setUser(user);
 
-        return SessionDTO.fromSession(sessionRepository.save(session));
+        Session savedSession = sessionRepository.save(session);
+        messageService.generateFirstSystemMessage(session.getId());
+        return SessionDTO.fromSession(savedSession);
     }
 }

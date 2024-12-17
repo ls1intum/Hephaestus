@@ -31,9 +31,10 @@ class MentorMessage(BaseModel):
 def generate(request: MessageHistory):
     messages = []
     for message in request.messages:
-        if message.sender == "USER":
-            messages.append(HumanMessage(content=message.content))
-        else:
-            messages.append(AIMessage(content=message.content))
+        if message.content: 
+            if message.sender == "USER":
+                messages.append(HumanMessage(content=message.content))
+            else:
+                messages.append(AIMessage(content=message.content))
     response_message = graph.invoke({"messages": messages})["messages"][-1].content
     return MentorMessage(content=response_message)
