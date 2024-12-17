@@ -64,6 +64,7 @@ export class MentorComponent {
     },
     onSuccess: (session) => {
       this.selectedSessionId.set(session.id);
+      this.queryClient.invalidateQueries({ queryKey: ['sessions', this.selectedSessionId()] });
     }
   }));
 
