@@ -9,6 +9,7 @@ from ..model import model
 prompt_loader = PromptLoader()
 persona_prompt = prompt_loader.get_prompt("mentor_persona")
 
+
 class State(TypedDict):
     messages: Annotated[list, add_messages]
 
