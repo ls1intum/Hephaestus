@@ -1,10 +1,6 @@
 package de.tum.in.www1.hephaestus.mentor.message;
 
 import de.tum.in.www1.hephaestus.config.IntelligenceServiceConfig.IntelligenceServiceApi;
-import de.tum.in.www1.hephaestus.gitprovider.issue.Issue;
-import de.tum.in.www1.hephaestus.gitprovider.pullrequest.PullRequestInfoDTO;
-import de.tum.in.www1.hephaestus.gitprovider.pullrequest.PullRequestRepository;
-import de.tum.in.www1.hephaestus.gitprovider.user.UserRepository;
 import de.tum.in.www1.hephaestus.intelligenceservice.model.ISMentorMessage;
 import de.tum.in.www1.hephaestus.intelligenceservice.model.ISMessage;
 import de.tum.in.www1.hephaestus.intelligenceservice.model.ISMessageHistory;
@@ -13,7 +9,6 @@ import de.tum.in.www1.hephaestus.mentor.session.Session;
 import de.tum.in.www1.hephaestus.mentor.session.SessionRepository;
 import java.util.List;
 import java.util.Optional;
-import java.util.Set;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -31,9 +26,6 @@ public class MessageService {
     @Autowired
     private MessageRepository messageRepository;
 
-    @Autowired
-    private PullRequestRepository pullRequestRepository;
-
     private static final Logger logger = LoggerFactory.getLogger(MessageService.class);
 
     public List<MessageDTO> getMessagesBySessionId(Long sessionId) {
@@ -50,19 +42,6 @@ public class MessageService {
             return null;
         }
         Session currentSession = session.get();
-        
-        //TODO: 
-        List<PullRequestInfoDTO> openPullRequests = pullRequestRepository
-            .findAssignedByLoginAndStates(currentSession.getUser().getLogin(), Set.of(Issue.State.OPEN))
-            .stream()
-            .map(PullRequestInfoDTO::fromPullRequest)
-            .toList();
-
-        List<PullRequestInfoDTO> closedPullRequests = pullRequestRepository
-        .findAssignedByLoginAndStates(currentSession.getUser().getLogin(), Set.of(Issue.State.CLOSED))
-        .stream()
-        .map(PullRequestInfoDTO::fromPullRequest)
-        .toList();
 
         Message userMessage = new Message();
         userMessage.setSender(MessageSender.USER);
