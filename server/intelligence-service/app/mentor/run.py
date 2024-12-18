@@ -1,12 +1,13 @@
 from typing_extensions import Annotated, TypedDict
-
-from .persona_prompt import persona_prompt
+from .prompt_loader import PromptLoader
 from langgraph.graph import START, StateGraph, END
 from langgraph.graph.message import add_messages
 from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
 
 from ..model import model
 
+prompt_loader = PromptLoader()
+persona_prompt = prompt_loader.get_prompt("mentor_persona")
 
 class State(TypedDict):
     messages: Annotated[list, add_messages]
