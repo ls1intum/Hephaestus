@@ -64,22 +64,16 @@ public class MessageService {
         return MessageDTO.fromMessage(savedSystemMessage);
     }
 
-    public MessageDTO generateFirstSystemMessage(Long sessionId) {
-        Optional<Session> session = sessionRepository.findById(sessionId);
-        if (session.isEmpty()) {
-            return null;
-        }
-        Session currentSession = session.get();
-        String systemResponse = generateResponse(sessionId, "");
+    public void generateFirstSystemMessage(Session session) {
+        String systemResponse = generateResponse(session.getId(), "");
 
         // prevent saving empty system messages if the intelligence service is down
         if (systemResponse == null) {
             logger.error("Failed to generate response for the conversation start");
-            return null;
+            return;
         }
 
-        Message savedSystemMessage = createSystemMessage(currentSession, systemResponse);
-        return MessageDTO.fromMessage(savedSystemMessage);
+        createSystemMessage(session, systemResponse);
     }
 
     private String generateResponse(Long sessionId, String messageContent) {

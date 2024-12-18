@@ -37,7 +37,7 @@ public class SessionService {
         session.setUser(user);
 
         Session savedSession = sessionRepository.save(session);
-        messageService.generateFirstSystemMessage(session.getId());
+        messageService.generateFirstSystemMessage(session);
         return SessionDTO.fromSession(savedSession);
     }
 }
