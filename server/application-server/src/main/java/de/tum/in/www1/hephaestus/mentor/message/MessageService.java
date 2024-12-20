@@ -52,7 +52,7 @@ public class MessageService {
         currentSession.getMessages().add(savedUserMessage);
         sessionRepository.save(currentSession);
 
-        String systemResponse = generateResponse(sessionId, content);
+        String systemResponse = generateResponse(sessionId);
 
         // prevent saving empty system messages if the intelligence service is down
         if (systemResponse == null) {
@@ -65,7 +65,7 @@ public class MessageService {
     }
 
     public void generateFirstSystemMessage(Session session) {
-        String systemResponse = generateResponse(session.getId(), "");
+        String systemResponse = generateResponse(session.getId());
 
         // prevent saving empty system messages if the intelligence service is down
         if (systemResponse == null) {
@@ -76,7 +76,7 @@ public class MessageService {
         createSystemMessage(session, systemResponse);
     }
 
-    private String generateResponse(Long sessionId, String messageContent) {
+    private String generateResponse(Long sessionId) {
         List<Message> messages = messageRepository.findBySessionId(sessionId);
         ISMessageHistory messageHistory = new ISMessageHistory();
 
