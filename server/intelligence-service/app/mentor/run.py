@@ -13,15 +13,23 @@ persona_prompt = prompt_loader.get_prompt("mentor_persona")
 class State(TypedDict):
     messages: Annotated[list, add_messages]
 
+    status_started: bool 
+    status_completed: bool
+
+    impediments_started: bool
+    impediments_completed: bool
+
+    promises_started: bool
+    promises_completed: bool
+
+    summary_started: bool
+    summary_completed: bool
+
 
 def mentor(state: State):
     prompt = ChatPromptTemplate(
         [
             ("system", persona_prompt),
-            (
-                "system",
-                "You need to guide the student through the set questions regarding their work on the project during the last week (sprint). Your value is the fact, that you help students to reflect on their past progress. Throughout the conversation you need to perform all of the following tasks in the given order: Task 1: Ask the student about the overall progress on the project. Task 2: Ask the student about the challenges faced during the sprint referring to what he said about progress. Task 3: Ask about the plan for the next sprint. You need to understand at which task in the conversation you are from the message history and what is the next task. Please, don't repeat yourself throughout the conversation. Don't perform more then one task at a time. If the user already shared something to a task you can go to the next.",
-            ),
             MessagesPlaceholder("messages"),
         ]
     )
@@ -43,18 +51,115 @@ def greeting(state: State):
     return {"messages": [chain.invoke({"messages": state["messages"]})]}
 
 
-def isFirstInteraction(state: State):
+def check_state(state: State):
+    if state["status_started"] and not state["status_completed"]:
+        step = "status"
+    elif state["impediments_started"] and not state["impediments_completed"]:
+        step = "impediments"
+    elif state["promises_started"] and not state["promises_completed"]:
+        step = "promises"
+    elif state["summary_started"] and not state["summary_completed"]:
+        step = "summary"
+    else:
+        step = "mentor"
+
+    prompt = ChatPromptTemplate(
+        [
+            ("system", prompt_loader.get_prompt("state_check").format(step)),
+            MessagesPlaceholder("messages"),
+        ]
+    )
+
+    chain = prompt | model
+    if chain.invoke({"messages": state["messages"]}).content == "YES":
+        if step == "status":
+            state["status_completed"] = True
+        elif step == "impediments":
+            state["impediments_completed"] = True
+        elif step == "promises":
+            state["promises_completed"] = True
+        elif step == "summary":
+            state["summary_completed"] = True
+    
+    return {"messages": state["messages"]}
+
+
+def status(state: State):
+    prompt = ChatPromptTemplate(
+        (
+            "system",
+            "Analyze the conversation. If you haven't already, ask the user how the project is going. If you have already asked, ask if there is anything left that user wants to share about the project status.",
+        )
+    )
+    chain = prompt | model
+    return {"messages": [chain.invoke({"messages": state["messages"]})]}
+
+
+def impediments(state: State):
+    prompt = ChatPromptTemplate(
+        (
+            "system",
+            "Analyze the conversation. If you haven't already, ask the user if they are facing any impediments. If you have already asked, ask if there is anything else the user wants to share about their impediments.",
+        )
+    )
+    chain = prompt | model
+    return {"messages": [chain.invoke({"messages": state["messages"]})]}
+
+
+def promises(state: State):
+    prompt = ChatPromptTemplate(
+        (
+            "system",
+            "Analyze the conversation. If you haven't already, ask the user about any promises they can make regarding the project. If you have already asked, ask if there is anything else the user wants to share about their promises.",
+        )
+    )
+
+    chain = prompt | model
+    return {"messages": [chain.invoke({"messages": state["messages"]})]}
+
+
+def summary(state: State):
+    prompt = ChatPromptTemplate(
+        (
+            "system",
+            "Analyze the conversation. If you haven't already, ask the user to provide a summary of the project. If you have already asked, ask if there is anything else the user wants to share about the project summary.",
+        )
+    )
+    chain = prompt | model
+    return {"messages": [chain.invoke({"messages": state["messages"]})]}
+
+
+# router defines the next step in the conversation
+def router(state: State):
     if len(state["messages"]) == 0:
         return "greeting"
-    return "mentor"
+    elif state["status_started"] and not state["status_completed"]:
+        return "status"
+    elif state["impediments_started"] and not state["impediments_completed"]:
+        return "impediments"
+    elif state["promises_started"] and not state["promises_completed"]:
+        return "promises"
+    elif state["summary_started"] and not state["summary_completed"]:
+        return "summary"
+    else:
+        return "mentor"
 
 
 graph_builder = StateGraph(State)
-graph_builder.add_node("mentor", mentor)
 graph_builder.add_node("greeting", greeting)
+graph_builder.add_node("status", status)
+graph_builder.add_node("impediments", impediments)
+graph_builder.add_node("promises", promises)
+graph_builder.add_node("summary", summary)
+graph_builder.add_node("mentor", mentor)
+graph_builder.add_node("check_state", check_state)
 
-graph_builder.add_conditional_edges(START, isFirstInteraction)
-graph_builder.add_edge("mentor", END)
+graph_builder.add_conditional_edges(START, router)
 graph_builder.add_edge("greeting", END)
+graph_builder.add_edge("status", "check_state")
+graph_builder.add_edge("impediments", "check_state")
+graph_builder.add_edge("promises", "check_state")
+graph_builder.add_edge("summary", "check_state")
+graph_builder.add_edge("check_state", END)
 
 graph = graph_builder.compile()
