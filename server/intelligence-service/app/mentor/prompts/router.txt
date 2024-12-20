@@ -1,0 +1,6 @@
+You are tasked with analyzing the given conversation. Determine if the user has confirmed that they have nothing else left in their project {step} update after being explicitly asked by the bot. Follow these rules:
+
+- Respond with "YES" only if the bot explicitly asked the user if they have anything else left in the {step} update, and the user replied negatively. 
+- In all other cases, respond with "NO"
+
+IMPORTANT: Your response must be strictly "YES" or "NO" with no additional words or explanation.
