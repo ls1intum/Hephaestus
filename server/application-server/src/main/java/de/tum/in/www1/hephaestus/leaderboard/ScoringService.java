@@ -42,12 +42,19 @@ public class ScoringService {
             .stream()
             .filter(review -> review.getState() == PullRequestReview.State.CHANGES_REQUESTED)
             .filter(review -> review.getAuthor().getId() != review.getPullRequest().getAuthor().getId())
-            .map(review -> WEIGHT_CHANGESREQUESTED * calculateCodeReviewBonus(review.getComments().size(), complexityScore))
+            .map(
+                review ->
+                    WEIGHT_CHANGESREQUESTED * calculateCodeReviewBonus(review.getComments().size(), complexityScore)
+            )
             .reduce(0.0, Double::sum);
 
         double commentScore = pullRequestReviews
             .stream()
-            .filter(review -> review.getState() == PullRequestReview.State.COMMENTED || review.getState() == PullRequestReview.State.UNKNOWN)
+            .filter(
+                review ->
+                    review.getState() == PullRequestReview.State.COMMENTED ||
+                    review.getState() == PullRequestReview.State.UNKNOWN
+            )
             .filter(review -> review.getAuthor().getId() != review.getPullRequest().getAuthor().getId())
             .map(review -> WEIGHT_COMMENT * calculateCodeReviewBonus(review.getComments().size(), complexityScore))
             .reduce(0.0, Double::sum);
@@ -55,7 +62,7 @@ public class ScoringService {
         double issueCommentScore = WEIGHT_COMMENT * numberOfIssueComments;
 
         double interactionScore = approvalScore + changesRequestedScore + commentScore + issueCommentScore;
-        return 10 * interactionScore * complexityScore / (interactionScore + complexityScore);
+        return (10 * interactionScore * complexityScore) / (interactionScore + complexityScore);
     }
 
     public double calculateReviewScore(IssueComment issueComment) {
@@ -64,7 +71,10 @@ public class ScoringService {
         if (issue.isPullRequest()) {
             pullRequest = (PullRequest) issue;
         } else {
-            var optionalPR = pullRequestRepository.findByRepositoryIdAndNumber(issue.getRepository().getId(), issue.getNumber());
+            var optionalPR = pullRequestRepository.findByRepositoryIdAndNumber(
+                issue.getRepository().getId(),
+                issue.getNumber()
+            );
             if (optionalPR.isEmpty()) {
                 logger.error("Issue comment is not associated with a pull request.");
                 return 0;
@@ -74,10 +84,10 @@ public class ScoringService {
         if (pullRequest.getAuthor().getId() == issueComment.getAuthor().getId()) {
             return 0;
         }
-        
+
         int complexityScore = calculateComplexityScore(pullRequest);
-        
-        return 10 * WEIGHT_COMMENT * complexityScore / (WEIGHT_COMMENT + complexityScore);
+
+        return (10 * WEIGHT_COMMENT * complexityScore) / (WEIGHT_COMMENT + complexityScore);
     }
 
     /**
@@ -95,12 +105,13 @@ public class ScoringService {
         double codeReviewBonus = 1;
         if (codeComments < complexityScore) {
             // Function goes from 0 at codeComments = 0 to 1 at codeComments = complexityScore
-            codeReviewBonus +=  2 * Math.sqrt(complexityScore) * Math.sqrt(codeComments) / (codeComments + complexityScore);
+            codeReviewBonus +=
+                (2 * Math.sqrt(complexityScore) * Math.sqrt(codeComments)) / (codeComments + complexityScore);
         } else {
             // Saturate at 1
             codeReviewBonus += 1;
         }
-        return codeReviewBonus / 2 * maxBonus;
+        return (codeReviewBonus / 2) * maxBonus;
     }
 
     /**

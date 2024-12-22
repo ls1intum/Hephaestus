@@ -1,15 +1,13 @@
 package de.tum.in.www1.hephaestus.mentor.session;
 
+import de.tum.in.www1.hephaestus.gitprovider.user.UserRepository;
 import java.util.List;
-
-import org.springframework.web.bind.annotation.RestController;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
-
-import de.tum.in.www1.hephaestus.gitprovider.user.UserRepository;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RestController;
 
 @RestController
 @RequestMapping("/mentor/sessions")

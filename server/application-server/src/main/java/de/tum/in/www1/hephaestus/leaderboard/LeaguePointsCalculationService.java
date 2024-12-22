@@ -9,6 +9,7 @@ import org.springframework.stereotype.Service;
 
 @Service
 public class LeaguePointsCalculationService {
+
     private final Logger logger = LoggerFactory.getLogger(LeaguePointsCalculationService.class);
 
     // Starting points for new players
@@ -26,8 +27,6 @@ public class LeaguePointsCalculationService {
     public static double K_FACTOR_LOW_POINTS = 1.5;
     public static double K_FACTOR_MEDIUM_POINTS = 1.2;
     public static double K_FACTOR_HIGH_POINTS = 1.1;
-
-
 
     public int calculateNewPoints(User user, LeaderboardEntryDTO entry) {
         // Initialize points for new players
@@ -48,10 +47,18 @@ public class LeaguePointsCalculationService {
         int pointChange = (int) (kFactor * (performanceBonus + placementBonus - decay));
         // Apply minimum change to prevent extreme swings
         int newPoints = Math.max(1, oldPoints + pointChange);
-        
-        logger.info("Points calculation: old={}, k={}, decay={}, performanceBonus={}, placement={}, pointchange={}, new={}", 
-            oldPoints, kFactor, decay, performanceBonus, placementBonus, pointChange, newPoints);
-        
+
+        logger.info(
+            "Points calculation: old={}, k={}, decay={}, performanceBonus={}, placement={}, pointchange={}, new={}",
+            oldPoints,
+            kFactor,
+            decay,
+            performanceBonus,
+            placementBonus,
+            pointChange,
+            newPoints
+        );
+
         return newPoints;
     }
 
@@ -81,12 +88,14 @@ public class LeaguePointsCalculationService {
      * @return true if the pull request is within the last 30 days
      */
     private boolean isNewPlayer(User user) {
-        return user.getMergedPullRequests().stream()
+        return user
+            .getMergedPullRequests()
+            .stream()
             .filter(PullRequest::isMerged)
             .map(PullRequest::getMergedAt)
             .noneMatch(date -> date.isAfter(OffsetDateTime.now().minusDays(30)));
     }
-    
+
     /**
      * Calculate the base decay in points based on the current points.
      * @param currentPoints Current amount of league points
@@ -94,9 +103,9 @@ public class LeaguePointsCalculationService {
      */
     private int calculateDecay(int currentPoints) {
         // decay a part of the current points, at least DECAY_MINIMUM points
-        return currentPoints > 0 ? Math.max(DECAY_MINIMUM, (int)(currentPoints * DECAY_FACTOR)) : 0;
+        return currentPoints > 0 ? Math.max(DECAY_MINIMUM, (int) (currentPoints * DECAY_FACTOR)) : 0;
     }
-    
+
     /**
      * Calculate the bonus points based on the leaderboard score.
      * @param score Leaderboard score
@@ -104,7 +113,7 @@ public class LeaguePointsCalculationService {
      */
     private int calculatePerformanceBonus(int score) {
         // Convert leaderboard score directly to points with diminishing returns
-        return (int)(Math.sqrt(score) * 10);
+        return (int) (Math.sqrt(score) * 10);
     }
 
     /**

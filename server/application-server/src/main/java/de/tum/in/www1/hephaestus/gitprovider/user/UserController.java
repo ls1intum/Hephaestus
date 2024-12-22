@@ -1,9 +1,9 @@
 package de.tum.in.www1.hephaestus.gitprovider.user;
 
 import java.util.Optional;
+import org.keycloak.admin.client.Keycloak;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.keycloak.admin.client.Keycloak;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.ResponseEntity;
@@ -23,11 +23,12 @@ public class UserController {
 
     @Autowired
     private UserService userService;
+
     @Autowired
     private Keycloak keycloak;
+
     @Value("${keycloak.realm}")
     private String realm;
-    
 
     public UserController(UserService actorService) {
         this.userService = actorService;

@@ -10,9 +10,9 @@ import org.springframework.stereotype.Repository;
 public interface LabelRepository extends JpaRepository<Label, Long> {
     @Query(
         """
-        SELECT l 
-        FROM Label l 
-        WHERE l.repository.id = :repositoryId 
+        SELECT l
+        FROM Label l
+        WHERE l.repository.id = :repositoryId
         AND l.name = :name
         """
     )

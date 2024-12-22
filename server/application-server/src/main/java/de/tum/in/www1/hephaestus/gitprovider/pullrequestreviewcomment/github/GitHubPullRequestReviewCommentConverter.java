@@ -1,5 +1,8 @@
 package de.tum.in.www1.hephaestus.gitprovider.pullrequestreviewcomment.github;
 
+import de.tum.in.www1.hephaestus.gitprovider.common.BaseGitServiceEntityConverter;
+import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubAuthorAssociationConverter;
+import de.tum.in.www1.hephaestus.gitprovider.pullrequestreviewcomment.PullRequestReviewComment;
 import org.kohsuke.github.GHPullRequestReviewComment;
 import org.kohsuke.github.GHPullRequestReviewComment.Side;
 import org.slf4j.Logger;
@@ -7,13 +10,9 @@ import org.slf4j.LoggerFactory;
 import org.springframework.lang.NonNull;
 import org.springframework.stereotype.Component;
 
-import de.tum.in.www1.hephaestus.gitprovider.common.BaseGitServiceEntityConverter;
-import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubAuthorAssociationConverter;
-import de.tum.in.www1.hephaestus.gitprovider.pullrequestreviewcomment.PullRequestReviewComment;
-
 @Component
 public class GitHubPullRequestReviewCommentConverter
-        extends BaseGitServiceEntityConverter<GHPullRequestReviewComment, PullRequestReviewComment> {
+    extends BaseGitServiceEntityConverter<GHPullRequestReviewComment, PullRequestReviewComment> {
 
     protected static final Logger logger = LoggerFactory.getLogger(GitHubPullRequestReviewCommentConverter.class);
 
@@ -29,8 +28,10 @@ public class GitHubPullRequestReviewCommentConverter
     }
 
     @Override
-    public PullRequestReviewComment update(@NonNull GHPullRequestReviewComment source,
-            @NonNull PullRequestReviewComment comment) {
+    public PullRequestReviewComment update(
+        @NonNull GHPullRequestReviewComment source,
+        @NonNull PullRequestReviewComment comment
+    ) {
         convertBaseFields(source, comment);
         comment.setDiffHunk(source.getDiffHunk());
         comment.setPath(source.getPath());

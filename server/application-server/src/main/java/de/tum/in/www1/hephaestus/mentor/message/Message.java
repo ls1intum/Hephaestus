@@ -17,6 +17,7 @@ import org.springframework.lang.NonNull;
 @ToString
 @NoArgsConstructor
 public class Message {
+
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
@@ -38,6 +39,7 @@ public class Message {
     private Session session;
 
     public enum MessageSender {
-        MENTOR, USER
+        MENTOR,
+        USER,
     }
 }

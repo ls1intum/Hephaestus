@@ -1,19 +1,18 @@
 package de.tum.in.www1.hephaestus.mentor.message;
 
+import de.tum.in.www1.hephaestus.config.IntelligenceServiceConfig.IntelligenceServiceApi;
+import de.tum.in.www1.hephaestus.intelligenceservice.model.ISMentorMessage;
+import de.tum.in.www1.hephaestus.intelligenceservice.model.ISMessage;
+import de.tum.in.www1.hephaestus.intelligenceservice.model.ISMessageHistory;
+import de.tum.in.www1.hephaestus.mentor.message.Message.MessageSender;
+import de.tum.in.www1.hephaestus.mentor.session.Session;
+import de.tum.in.www1.hephaestus.mentor.session.SessionRepository;
 import java.util.List;
 import java.util.Optional;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
-
-import de.tum.in.www1.hephaestus.config.IntelligenceServiceConfig.IntelligenceServiceApi;
-import de.tum.in.www1.hephaestus.mentor.message.Message.MessageSender;
-import de.tum.in.www1.hephaestus.mentor.session.Session;
-import de.tum.in.www1.hephaestus.mentor.session.SessionRepository;
-import de.tum.in.www1.hephaestus.intelligenceservice.model.ISMentorMessage;
-import de.tum.in.www1.hephaestus.intelligenceservice.model.ISMessage;
-import de.tum.in.www1.hephaestus.intelligenceservice.model.ISMessageHistory;
 
 @Service
 public class MessageService {
@@ -30,9 +29,11 @@ public class MessageService {
     private static final Logger logger = LoggerFactory.getLogger(MessageService.class);
 
     public List<MessageDTO> getMessagesBySessionId(Long sessionId) {
-        return messageRepository.findBySessionId(sessionId).stream()
-                .map(message -> MessageDTO.fromMessage(message))
-                .toList();
+        return messageRepository
+            .findBySessionId(sessionId)
+            .stream()
+            .map(message -> MessageDTO.fromMessage(message))
+            .toList();
     }
 
     public MessageDTO sendMessage(String content, Long sessionId) {
@@ -51,13 +52,52 @@ public class MessageService {
         currentSession.getMessages().add(savedUserMessage);
         sessionRepository.save(currentSession);
 
-        String systemResponse = generateResponse(sessionId, content);
+        String systemResponse = generateResponse(sessionId);
 
         // prevent saving empty system messages if the intelligence service is down
         if (systemResponse == null) {
+            logger.error("Failed to generate response for message: {}", content);
             return MessageDTO.fromMessage(savedUserMessage);
         }
 
+        Message savedSystemMessage = createSystemMessage(currentSession, systemResponse);
+        return MessageDTO.fromMessage(savedSystemMessage);
+    }
+
+    public void generateFirstSystemMessage(Session session) {
+        String systemResponse = generateResponse(session.getId());
+
+        // prevent saving empty system messages if the intelligence service is down
+        if (systemResponse == null) {
+            logger.error("Failed to generate response for the conversation start");
+            return;
+        }
+
+        createSystemMessage(session, systemResponse);
+    }
+
+    private String generateResponse(Long sessionId) {
+        List<Message> messages = messageRepository.findBySessionId(sessionId);
+        ISMessageHistory messageHistory = new ISMessageHistory();
+
+        messageHistory.setMessages(
+            messages
+                .stream()
+                .<ISMessage>map(message ->
+                    new ISMessage().content(message.getContent()).sender(message.getSender().toString())
+                )
+                .toList()
+        );
+        try {
+            ISMentorMessage mentorMessage = intelligenceServiceApi.generateMentorPost(messageHistory);
+            return mentorMessage.getContent();
+        } catch (Exception e) {
+            logger.error("Failed to generate response for message: {}", e.getMessage());
+            return null;
+        }
+    }
+
+    private Message createSystemMessage(Session currentSession, String systemResponse) {
         Message systemMessage = new Message();
         systemMessage.setSender(MessageSender.MENTOR);
         systemMessage.setContent(systemResponse);
@@ -67,23 +107,6 @@ public class MessageService {
         currentSession.getMessages().add(savedSystemMessage);
         sessionRepository.save(currentSession);
 
-        return MessageDTO.fromMessage(savedSystemMessage);
-    }
-
-    private String generateResponse(Long sessionId, String messageContent) {
-        List<Message> messages = messageRepository.findBySessionId(sessionId);
-
-        ISMessageHistory messageHistory = new ISMessageHistory();
-        messageHistory.setMessages(messages.stream()
-                .<ISMessage>map(message -> new ISMessage().content(message.getContent()).sender(message.getSender().toString()))
-                .toList());
-        try {
-            ISMentorMessage mentorMessage = intelligenceServiceApi.generateMentorPost(messageHistory);
-            return mentorMessage.getContent();
-            
-        } catch (Exception e) {
-            logger.error("Failed to generate response for message: {}", e.getMessage());
-            return null;
-        }
+        return savedSystemMessage;
     }
 }
