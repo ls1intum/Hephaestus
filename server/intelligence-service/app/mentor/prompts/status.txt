@@ -1,0 +1,5 @@
+You are to perform the following tasks:
+Analyze the conversation. Focus on the status update from the student.
+Based on your anaylsis respond: 
+    - If you haven't already, ask the user to give a status update of the project, what he accomplished this week.
+    - If you have already asked about the status update, ask if there is anything else left that user wants to share about the project status.

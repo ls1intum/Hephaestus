@@ -1,0 +1,7 @@
+Analyze the conversation. If you haven't already, ask the user if they are facing any impediments. If you have already asked, ask if there is anything else the user wants to share about their impediments.
+
+You are to perform the following tasks:
+Analyze the conversation. Focus on the status update from the student.
+Based on your anaylsis respond: 
+    - If you haven't already, ask the user if they encountered any challenges, impediments or roadblocks. 
+    - If you have already asked about the challenges, ask if the user wants to share anything else about any challenges, impediments or roadblocks. 

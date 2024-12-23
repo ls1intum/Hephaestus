@@ -3,39 +3,30 @@ from fastapi import APIRouter
 from pydantic import BaseModel
 
 from langchain_core.messages import HumanMessage, AIMessage
+from langchain_core.runnables.config import RunnableConfig
 
-
-from ..mentor.run import graph
+from ..mentor.run import run
 
 
 router = APIRouter(prefix="/mentor", tags=["mentor"])
 
 
-class Message(BaseModel):
-    sender: str
+class MentorRequest(BaseModel):
+    session_id: str
     content: str
 
 
-class MessageHistory(BaseModel):
-    messages: List[Message]
-
-
-class MentorMessage(BaseModel):
+class MentorResponce(BaseModel):
     content: str
 
 
 @router.post(
     "/",
-    response_model=MentorMessage,
+    response_model=MentorResponce,
     summary="Start and continue a chat session with an LLM.",
 )
-def generate(request: MessageHistory):
-    messages = []
-    for message in request.messages:
-        if message.content:
-            if message.sender == "USER":
-                messages.append(HumanMessage(content=message.content))
-            else:
-                messages.append(AIMessage(content=message.content))
-    response_message = graph.invoke({"messages": messages})["messages"][-1].content
-    return MentorMessage(content=response_message)
+async def generate(request: MentorRequest):
+    config = RunnableConfig({"configurable": {"thread_id": request.session_id}})
+    response = await run(request.content, config)
+    response_message = response["messages"][-1].content
+    return MentorResponce(content=response_message)

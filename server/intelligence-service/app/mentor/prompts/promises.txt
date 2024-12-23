@@ -1,0 +1,1 @@
+Analyze the conversation. If you haven't already, ask the user about any promises they can make regarding the project. If you have already asked, ask if there is anything else the user wants to share about their promises.
