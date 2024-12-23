@@ -43,6 +43,7 @@ Architecture
 
   dev/getting_started/getting_started
   dev/setup_guide
+  dev/guidelines
 
 .. toctree::
   :caption: System
