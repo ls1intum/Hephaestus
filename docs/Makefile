@@ -6,7 +6,7 @@
 SPHINXAUTOBUILD = sphinx-autobuild
 ALLSPHINXLIVEOPTS = $(ALLSPHINXOPTS) -q \
    --port 0 \
-   --host 0.0.0.0 \
+   --host localhost \
    --open-browser \
    --delay 1 \
    --ignore "*.swp" \

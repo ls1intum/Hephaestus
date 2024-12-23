@@ -10,7 +10,10 @@ Optional: Create a virtual environment
 
 ```bash
 python3 -m venv venv
+# Unix
 source venv/bin/activate
+# Windows
+.\venv\Scripts\Activate.ps1
 ```
 
 Install the required packages
