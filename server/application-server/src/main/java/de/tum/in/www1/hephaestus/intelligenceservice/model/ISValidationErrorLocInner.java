@@ -10,60 +10,61 @@
  * Do not edit the class manually.
  */
 
+
 package de.tum.in.www1.hephaestus.intelligenceservice.model;
 
+import java.util.Objects;
+import java.util.Arrays;
+import com.fasterxml.jackson.annotation.JsonTypeName;
 import com.fasterxml.jackson.annotation.JsonPropertyOrder;
 import com.fasterxml.jackson.annotation.JsonTypeName;
-import com.fasterxml.jackson.annotation.JsonTypeName;
-import java.util.Arrays;
-import java.util.Objects;
 import org.hibernate.validator.constraints.*;
 
 /**
  * ISValidationErrorLocInner
  */
-@JsonPropertyOrder({})
+@JsonPropertyOrder({
+})
 @JsonTypeName("ValidationError_loc_inner")
-@jakarta.annotation.Generated(
-    value = "org.openapitools.codegen.languages.JavaClientCodegen",
-    comments = "Generator version: 7.7.0"
-)
+@jakarta.annotation.Generated(value = "org.openapitools.codegen.languages.JavaClientCodegen", comments = "Generator version: 7.7.0")
 public class ISValidationErrorLocInner {
+  public ISValidationErrorLocInner() {
+  }
 
-    public ISValidationErrorLocInner() {}
-
-    @Override
-    public boolean equals(Object o) {
-        if (this == o) {
-            return true;
-        }
-        if (o == null || getClass() != o.getClass()) {
-            return false;
-        }
-        return true;
+  @Override
+  public boolean equals(Object o) {
+    if (this == o) {
+      return true;
     }
-
-    @Override
-    public int hashCode() {
-        return Objects.hash();
+    if (o == null || getClass() != o.getClass()) {
+      return false;
     }
+    return true;
+  }
 
-    @Override
-    public String toString() {
-        StringBuilder sb = new StringBuilder();
-        sb.append("class ISValidationErrorLocInner {\n");
-        sb.append("}");
-        return sb.toString();
-    }
+  @Override
+  public int hashCode() {
+    return Objects.hash();
+  }
 
-    /**
-     * Convert the given object to string with each line indented by 4 spaces
-     * (except the first line).
-     */
-    private String toIndentedString(Object o) {
-        if (o == null) {
-            return "null";
-        }
-        return o.toString().replace("\n", "\n    ");
+  @Override
+  public String toString() {
+    StringBuilder sb = new StringBuilder();
+    sb.append("class ISValidationErrorLocInner {\n");
+    sb.append("}");
+    return sb.toString();
+  }
+
+  /**
+   * Convert the given object to string with each line indented by 4 spaces
+   * (except the first line).
+   */
+  private String toIndentedString(Object o) {
+    if (o == null) {
+      return "null";
     }
+    return o.toString().replace("\n", "\n    ");
+  }
+
 }
+

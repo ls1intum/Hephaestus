@@ -10,91 +10,96 @@
  * Do not edit the class manually.
  */
 
+
 package de.tum.in.www1.hephaestus.intelligenceservice.model;
 
-import com.fasterxml.jackson.annotation.JsonCreator;
+import java.util.Objects;
+import java.util.Arrays;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.annotation.JsonProperty;
-import com.fasterxml.jackson.annotation.JsonPropertyOrder;
-import com.fasterxml.jackson.annotation.JsonTypeName;
+import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonTypeName;
 import com.fasterxml.jackson.annotation.JsonValue;
-import java.util.Arrays;
-import java.util.Objects;
+import com.fasterxml.jackson.annotation.JsonPropertyOrder;
+import com.fasterxml.jackson.annotation.JsonTypeName;
 import org.hibernate.validator.constraints.*;
 
 /**
  * Response model to validate and return when performing a health check.
  */
-@JsonPropertyOrder({ ISHealthCheck.JSON_PROPERTY_STATUS })
+@JsonPropertyOrder({
+  ISHealthCheck.JSON_PROPERTY_STATUS
+})
 @JsonTypeName("HealthCheck")
-@jakarta.annotation.Generated(
-    value = "org.openapitools.codegen.languages.JavaClientCodegen",
-    comments = "Generator version: 7.7.0"
-)
+@jakarta.annotation.Generated(value = "org.openapitools.codegen.languages.JavaClientCodegen", comments = "Generator version: 7.7.0")
 public class ISHealthCheck {
+  public static final String JSON_PROPERTY_STATUS = "status";
+  private String status = "OK";
 
-    public static final String JSON_PROPERTY_STATUS = "status";
-    private String status = "OK";
+  public ISHealthCheck() {
+  }
 
-    public ISHealthCheck() {}
+  public ISHealthCheck status(String status) {
+    
+    this.status = status;
+    return this;
+  }
 
-    public ISHealthCheck status(String status) {
-        this.status = status;
-        return this;
+  /**
+   * Get status
+   * @return status
+   */
+  @jakarta.annotation.Nullable
+  @JsonProperty(JSON_PROPERTY_STATUS)
+  @JsonInclude(value = JsonInclude.Include.USE_DEFAULTS)
+
+  public String getStatus() {
+    return status;
+  }
+
+
+  @JsonProperty(JSON_PROPERTY_STATUS)
+  @JsonInclude(value = JsonInclude.Include.USE_DEFAULTS)
+  public void setStatus(String status) {
+    this.status = status;
+  }
+
+  @Override
+  public boolean equals(Object o) {
+    if (this == o) {
+      return true;
     }
-
-    /**
-     * Get status
-     * @return status
-     */
-    @jakarta.annotation.Nullable
-    @JsonProperty(JSON_PROPERTY_STATUS)
-    @JsonInclude(value = JsonInclude.Include.USE_DEFAULTS)
-    public String getStatus() {
-        return status;
+    if (o == null || getClass() != o.getClass()) {
+      return false;
     }
+    ISHealthCheck healthCheck = (ISHealthCheck) o;
+    return Objects.equals(this.status, healthCheck.status);
+  }
 
-    @JsonProperty(JSON_PROPERTY_STATUS)
-    @JsonInclude(value = JsonInclude.Include.USE_DEFAULTS)
-    public void setStatus(String status) {
-        this.status = status;
-    }
+  @Override
+  public int hashCode() {
+    return Objects.hash(status);
+  }
 
-    @Override
-    public boolean equals(Object o) {
-        if (this == o) {
-            return true;
-        }
-        if (o == null || getClass() != o.getClass()) {
-            return false;
-        }
-        ISHealthCheck healthCheck = (ISHealthCheck) o;
-        return Objects.equals(this.status, healthCheck.status);
-    }
+  @Override
+  public String toString() {
+    StringBuilder sb = new StringBuilder();
+    sb.append("class ISHealthCheck {\n");
+    sb.append("    status: ").append(toIndentedString(status)).append("\n");
+    sb.append("}");
+    return sb.toString();
+  }
 
-    @Override
-    public int hashCode() {
-        return Objects.hash(status);
+  /**
+   * Convert the given object to string with each line indented by 4 spaces
+   * (except the first line).
+   */
+  private String toIndentedString(Object o) {
+    if (o == null) {
+      return "null";
     }
+    return o.toString().replace("\n", "\n    ");
+  }
 
-    @Override
-    public String toString() {
-        StringBuilder sb = new StringBuilder();
-        sb.append("class ISHealthCheck {\n");
-        sb.append("    status: ").append(toIndentedString(status)).append("\n");
-        sb.append("}");
-        return sb.toString();
-    }
-
-    /**
-     * Convert the given object to string with each line indented by 4 spaces
-     * (except the first line).
-     */
-    private String toIndentedString(Object o) {
-        if (o == null) {
-            return "null";
-        }
-        return o.toString().replace("\n", "\n    ");
-    }
 }
+

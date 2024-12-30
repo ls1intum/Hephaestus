@@ -10,103 +10,108 @@
  * Do not edit the class manually.
  */
 
+
 package de.tum.in.www1.hephaestus.intelligenceservice.model;
 
-import com.fasterxml.jackson.annotation.JsonCreator;
+import java.util.Objects;
+import java.util.Arrays;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.annotation.JsonProperty;
-import com.fasterxml.jackson.annotation.JsonPropertyOrder;
-import com.fasterxml.jackson.annotation.JsonTypeName;
+import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonTypeName;
 import com.fasterxml.jackson.annotation.JsonValue;
 import de.tum.in.www1.hephaestus.intelligenceservice.model.ISMessage;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Arrays;
 import java.util.List;
-import java.util.Objects;
+import com.fasterxml.jackson.annotation.JsonPropertyOrder;
+import com.fasterxml.jackson.annotation.JsonTypeName;
 import org.hibernate.validator.constraints.*;
 
 /**
  * ISMessageHistory
  */
-@JsonPropertyOrder({ ISMessageHistory.JSON_PROPERTY_MESSAGES })
+@JsonPropertyOrder({
+  ISMessageHistory.JSON_PROPERTY_MESSAGES
+})
 @JsonTypeName("MessageHistory")
-@jakarta.annotation.Generated(
-    value = "org.openapitools.codegen.languages.JavaClientCodegen",
-    comments = "Generator version: 7.7.0"
-)
+@jakarta.annotation.Generated(value = "org.openapitools.codegen.languages.JavaClientCodegen", comments = "Generator version: 7.7.0")
 public class ISMessageHistory {
+  public static final String JSON_PROPERTY_MESSAGES = "messages";
+  private List<ISMessage> messages = new ArrayList<>();
 
-    public static final String JSON_PROPERTY_MESSAGES = "messages";
-    private List<ISMessage> messages = new ArrayList<>();
+  public ISMessageHistory() {
+  }
 
-    public ISMessageHistory() {}
+  public ISMessageHistory messages(List<ISMessage> messages) {
+    
+    this.messages = messages;
+    return this;
+  }
 
-    public ISMessageHistory messages(List<ISMessage> messages) {
-        this.messages = messages;
-        return this;
+  public ISMessageHistory addMessagesItem(ISMessage messagesItem) {
+    if (this.messages == null) {
+      this.messages = new ArrayList<>();
     }
+    this.messages.add(messagesItem);
+    return this;
+  }
 
-    public ISMessageHistory addMessagesItem(ISMessage messagesItem) {
-        if (this.messages == null) {
-            this.messages = new ArrayList<>();
-        }
-        this.messages.add(messagesItem);
-        return this;
-    }
+  /**
+   * Get messages
+   * @return messages
+   */
+  @jakarta.annotation.Nonnull
+  @JsonProperty(JSON_PROPERTY_MESSAGES)
+  @JsonInclude(value = JsonInclude.Include.ALWAYS)
 
-    /**
-     * Get messages
-     * @return messages
-     */
-    @jakarta.annotation.Nonnull
-    @JsonProperty(JSON_PROPERTY_MESSAGES)
-    @JsonInclude(value = JsonInclude.Include.ALWAYS)
-    public List<ISMessage> getMessages() {
-        return messages;
-    }
+  public List<ISMessage> getMessages() {
+    return messages;
+  }
 
-    @JsonProperty(JSON_PROPERTY_MESSAGES)
-    @JsonInclude(value = JsonInclude.Include.ALWAYS)
-    public void setMessages(List<ISMessage> messages) {
-        this.messages = messages;
-    }
 
-    @Override
-    public boolean equals(Object o) {
-        if (this == o) {
-            return true;
-        }
-        if (o == null || getClass() != o.getClass()) {
-            return false;
-        }
-        ISMessageHistory messageHistory = (ISMessageHistory) o;
-        return Objects.equals(this.messages, messageHistory.messages);
-    }
+  @JsonProperty(JSON_PROPERTY_MESSAGES)
+  @JsonInclude(value = JsonInclude.Include.ALWAYS)
+  public void setMessages(List<ISMessage> messages) {
+    this.messages = messages;
+  }
 
-    @Override
-    public int hashCode() {
-        return Objects.hash(messages);
+  @Override
+  public boolean equals(Object o) {
+    if (this == o) {
+      return true;
     }
+    if (o == null || getClass() != o.getClass()) {
+      return false;
+    }
+    ISMessageHistory messageHistory = (ISMessageHistory) o;
+    return Objects.equals(this.messages, messageHistory.messages);
+  }
 
-    @Override
-    public String toString() {
-        StringBuilder sb = new StringBuilder();
-        sb.append("class ISMessageHistory {\n");
-        sb.append("    messages: ").append(toIndentedString(messages)).append("\n");
-        sb.append("}");
-        return sb.toString();
-    }
+  @Override
+  public int hashCode() {
+    return Objects.hash(messages);
+  }
 
-    /**
-     * Convert the given object to string with each line indented by 4 spaces
-     * (except the first line).
-     */
-    private String toIndentedString(Object o) {
-        if (o == null) {
-            return "null";
-        }
-        return o.toString().replace("\n", "\n    ");
+  @Override
+  public String toString() {
+    StringBuilder sb = new StringBuilder();
+    sb.append("class ISMessageHistory {\n");
+    sb.append("    messages: ").append(toIndentedString(messages)).append("\n");
+    sb.append("}");
+    return sb.toString();
+  }
+
+  /**
+   * Convert the given object to string with each line indented by 4 spaces
+   * (except the first line).
+   */
+  private String toIndentedString(Object o) {
+    if (o == null) {
+      return "null";
     }
+    return o.toString().replace("\n", "\n    ");
+  }
+
 }
+
