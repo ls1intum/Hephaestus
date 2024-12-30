@@ -42,6 +42,7 @@ Architecture
   :maxdepth: 3
 
   dev/getting_started/getting_started
+  dev/setup_guide
 
 .. toctree::
   :caption: System
