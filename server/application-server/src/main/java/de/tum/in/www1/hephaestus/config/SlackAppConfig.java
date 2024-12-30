@@ -1,14 +1,14 @@
 package de.tum.in.www1.hephaestus.config;
 
+import com.slack.api.bolt.App;
+import com.slack.api.bolt.AppConfig;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
-import com.slack.api.bolt.App;
-import com.slack.api.bolt.AppConfig;
-
 @Configuration
 public class SlackAppConfig {
+
     @Value("${slack.token}")
     private String botToken;
 

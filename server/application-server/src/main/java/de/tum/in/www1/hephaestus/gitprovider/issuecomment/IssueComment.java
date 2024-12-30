@@ -1,23 +1,21 @@
 package de.tum.in.www1.hephaestus.gitprovider.issuecomment;
 
-import org.springframework.lang.NonNull;
-
-import jakarta.persistence.Table;
+import de.tum.in.www1.hephaestus.gitprovider.common.AuthorAssociation;
+import de.tum.in.www1.hephaestus.gitprovider.common.BaseGitServiceEntity;
+import de.tum.in.www1.hephaestus.gitprovider.issue.Issue;
+import de.tum.in.www1.hephaestus.gitprovider.user.User;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.Lob;
 import jakarta.persistence.ManyToOne;
+import jakarta.persistence.Table;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 import lombok.ToString;
-
-import de.tum.in.www1.hephaestus.gitprovider.common.BaseGitServiceEntity;
-import de.tum.in.www1.hephaestus.gitprovider.common.AuthorAssociation;
-import de.tum.in.www1.hephaestus.gitprovider.issue.Issue;
-import de.tum.in.www1.hephaestus.gitprovider.user.User;
+import org.springframework.lang.NonNull;
 
 @Entity
 @Table(name = "issue_comment")
@@ -33,11 +31,11 @@ public class IssueComment extends BaseGitServiceEntity {
 
     @NonNull
     private String htmlUrl;
-    
+
     @NonNull
     @Enumerated(EnumType.STRING)
     private AuthorAssociation authorAssociation;
-    
+
     @ManyToOne
     @JoinColumn(name = "author_id")
     @ToString.Exclude
@@ -47,7 +45,6 @@ public class IssueComment extends BaseGitServiceEntity {
     @JoinColumn(name = "issue_id")
     @ToString.Exclude
     private Issue issue;
-
     // Ignored GitHub properties:
     // - performed_via_github_app
     // - reactions

@@ -1,7 +1,33 @@
 package de.tum.in.www1.hephaestus.intelligenceservice;
 
+import de.tum.in.www1.hephaestus.intelligenceservice.auth.Authentication;
+import java.io.BufferedReader;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.InputStreamReader;
+import java.io.UnsupportedEncodingException;
+import java.net.URI;
+import java.net.URISyntaxException;
+import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
+import java.text.DateFormat;
+import java.text.ParseException;
+import java.time.OffsetDateTime;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collection;
+import java.util.Collections;
+import java.util.Date;
+import java.util.HashMap;
+import java.util.Iterator;
+import java.util.List;
+import java.util.Map;
+import java.util.Map.Entry;
+import java.util.TimeZone;
+import java.util.function.Supplier;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
+import org.openapitools.jackson.nullable.JsonNullableModule;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.http.HttpHeaders;
@@ -26,42 +52,21 @@ import org.springframework.web.client.HttpClientErrorException;
 import org.springframework.web.client.HttpServerErrorException;
 import org.springframework.web.client.RestClientException;
 import org.springframework.web.client.RestTemplate;
-import org.springframework.web.util.UriComponentsBuilder;
 import org.springframework.web.util.DefaultUriBuilderFactory;
-import org.openapitools.jackson.nullable.JsonNullableModule;
+import org.springframework.web.util.UriComponentsBuilder;
 
-
-import java.io.BufferedReader;
-import java.io.IOException;
-import java.io.InputStream;
-import java.io.InputStreamReader;
-import java.io.UnsupportedEncodingException;
-import java.net.URI;
-import java.net.URISyntaxException;
-import java.net.URLEncoder;
-import java.nio.charset.StandardCharsets;
-import java.text.DateFormat;
-import java.text.ParseException;
-import java.util.Arrays;
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.Collections;
-import java.util.Date;
-import java.util.HashMap;
-import java.util.Iterator;
-import java.util.List;
-import java.util.Map;
-import java.util.Map.Entry;
-import java.util.TimeZone;
-import java.util.function.Supplier;
-import java.time.OffsetDateTime;
-
-import de.tum.in.www1.hephaestus.intelligenceservice.auth.Authentication;
-
-@jakarta.annotation.Generated(value = "org.openapitools.codegen.languages.JavaClientCodegen", comments = "Generator version: 7.7.0")
+@jakarta.annotation.Generated(
+    value = "org.openapitools.codegen.languages.JavaClientCodegen",
+    comments = "Generator version: 7.7.0"
+)
 public class ApiClient extends JavaTimeFormatter {
+
     public enum CollectionFormat {
-        CSV(","), TSV("\t"), SSV(" "), PIPES("|"), MULTI(null);
+        CSV(","),
+        TSV("\t"),
+        SSV(" "),
+        PIPES("|"),
+        MULTI(null);
 
         private final String separator;
 
@@ -197,10 +202,6 @@ public class ApiClient extends JavaTimeFormatter {
         return authentications.get(authName);
     }
 
-
-
-
-
     /**
      * Set the User-Agent header's value (by adding to the default header map).
      *
@@ -326,7 +327,7 @@ public class ApiClient extends JavaTimeFormatter {
         if (param == null) {
             return "";
         } else if (param instanceof Date) {
-            return formatDate( (Date) param);
+            return formatDate((Date) param);
         } else if (param instanceof OffsetDateTime) {
             return formatOffsetDateTime((OffsetDateTime) param);
         } else if (param instanceof Collection) {
@@ -344,12 +345,12 @@ public class ApiClient extends JavaTimeFormatter {
     }
 
     /**
-    * Formats the specified collection path parameter to a string value.
-    *
-    * @param collectionFormat The collection format of the parameter.
-    * @param values The values of the parameter.
-    * @return String representation of the parameter
-    */
+     * Formats the specified collection path parameter to a string value.
+     *
+     * @param collectionFormat The collection format of the parameter.
+     * @param values The values of the parameter.
+     * @return String representation of the parameter
+     */
     public String collectionPathParameterToString(CollectionFormat collectionFormat, Collection<?> values) {
         // create the value based on the collection format
         if (CollectionFormat.MULTI.equals(collectionFormat)) {
@@ -373,7 +374,11 @@ public class ApiClient extends JavaTimeFormatter {
      * @param value The parameter's value
      * @return a Map containing the String value(s) of the input parameter
      */
-    public MultiValueMap<String, String> parameterToMultiValueMap(CollectionFormat collectionFormat, String name, Object value) {
+    public MultiValueMap<String, String> parameterToMultiValueMap(
+        CollectionFormat collectionFormat,
+        String name,
+        Object value
+    ) {
         final MultiValueMap<String, String> params = new LinkedMultiValueMap<String, String>();
 
         if (name == null || name.isEmpty() || value == null) {
@@ -421,12 +426,12 @@ public class ApiClient extends JavaTimeFormatter {
         return params;
     }
 
-   /**
-    * Check if the given {@code String} is a JSON MIME.
-    *
-    * @param mediaType the input MediaType
-    * @return boolean true if the MediaType represents JSON, false otherwise
-    */
+    /**
+     * Check if the given {@code String} is a JSON MIME.
+     *
+     * @param mediaType the input MediaType
+     * @return boolean true if the MediaType represents JSON, false otherwise
+     */
     public boolean isJsonMime(String mediaType) {
         // "* / *" is default to JSON
         if ("*/*".equals(mediaType)) {
@@ -435,8 +440,7 @@ public class ApiClient extends JavaTimeFormatter {
 
         try {
             return isJsonMime(MediaType.parseMediaType(mediaType));
-        } catch (InvalidMediaTypeException e) {
-        }
+        } catch (InvalidMediaTypeException e) {}
         return false;
     }
 
@@ -451,15 +455,19 @@ public class ApiClient extends JavaTimeFormatter {
      * @return boolean true if the MediaType represents JSON, false otherwise
      */
     public boolean isJsonMime(MediaType mediaType) {
-        return mediaType != null && (MediaType.APPLICATION_JSON.isCompatibleWith(mediaType) || mediaType.getSubtype().matches("^.*\\+json[;]?\\s*$"));
+        return (
+            mediaType != null &&
+            (MediaType.APPLICATION_JSON.isCompatibleWith(mediaType) ||
+                mediaType.getSubtype().matches("^.*\\+json[;]?\\s*$"))
+        );
     }
 
-   /**
-    * Check if the given {@code String} is a Problem JSON MIME (RFC-7807).
-    *
-    * @param mediaType the input MediaType
-    * @return boolean true if the MediaType represents Problem JSON, false otherwise
-    */
+    /**
+     * Check if the given {@code String} is a Problem JSON MIME (RFC-7807).
+     *
+     * @param mediaType the input MediaType
+     * @return boolean true if the MediaType represents Problem JSON, false otherwise
+     */
     public boolean isProblemJsonMime(String mediaType) {
         return "application/problem+json".equalsIgnoreCase(mediaType);
     }
@@ -515,7 +523,9 @@ public class ApiClient extends JavaTimeFormatter {
      * @return Object the selected body
      */
     protected Object selectBody(Object obj, MultiValueMap<String, Object> formParams, MediaType contentType) {
-        boolean isForm = MediaType.MULTIPART_FORM_DATA.isCompatibleWith(contentType) || MediaType.APPLICATION_FORM_URLENCODED.isCompatibleWith(contentType);
+        boolean isForm =
+            MediaType.MULTIPART_FORM_DATA.isCompatibleWith(contentType) ||
+            MediaType.APPLICATION_FORM_URLENCODED.isCompatibleWith(contentType);
         return isForm ? formParams : obj;
     }
 
@@ -561,12 +571,9 @@ public class ApiClient extends JavaTimeFormatter {
                         }
                     }
                 }
-            } catch (UnsupportedEncodingException e) {
-
-            }
+            } catch (UnsupportedEncodingException e) {}
         });
         return queryBuilder.toString();
-
     }
 
     /**
@@ -587,10 +594,23 @@ public class ApiClient extends JavaTimeFormatter {
      * @param returnType The return type into which to deserialize the response
      * @return ResponseEntity&lt;T&gt; The response of the chosen type
      */
-    public <T> ResponseEntity<T> invokeAPI(String path, HttpMethod method, Map<String, Object> pathParams, MultiValueMap<String, String> queryParams, Object body, HttpHeaders headerParams, MultiValueMap<String, String> cookieParams, MultiValueMap<String, Object> formParams, List<MediaType> accept, MediaType contentType, String[] authNames, ParameterizedTypeReference<T> returnType) throws RestClientException {
+    public <T> ResponseEntity<T> invokeAPI(
+        String path,
+        HttpMethod method,
+        Map<String, Object> pathParams,
+        MultiValueMap<String, String> queryParams,
+        Object body,
+        HttpHeaders headerParams,
+        MultiValueMap<String, String> cookieParams,
+        MultiValueMap<String, Object> formParams,
+        List<MediaType> accept,
+        MediaType contentType,
+        String[] authNames,
+        ParameterizedTypeReference<T> returnType
+    ) throws RestClientException {
         updateParamsForAuth(authNames, queryParams, headerParams, cookieParams);
 
-        Map<String,Object> uriParams = new HashMap<>();
+        Map<String, Object> uriParams = new HashMap<>();
         uriParams.putAll(pathParams);
 
         String finalUri = path;
@@ -607,11 +627,15 @@ public class ApiClient extends JavaTimeFormatter {
         URI uri;
         try {
             uri = new URI(builder.build().toUriString());
-        } catch (URISyntaxException ex)  {
+        } catch (URISyntaxException ex) {
             throw new RestClientException("Could not build URL: " + builder.toUriString(), ex);
         }
 
-        final BodyBuilder requestBuilder = RequestEntity.method(method, UriComponentsBuilder.fromHttpUrl(basePath).toUriString() + finalUri, uriParams);
+        final BodyBuilder requestBuilder = RequestEntity.method(
+            method,
+            UriComponentsBuilder.fromHttpUrl(basePath).toUriString() + finalUri,
+            uriParams
+        );
         if (accept != null) {
             requestBuilder.accept(accept.toArray(new MediaType[accept.size()]));
         }
@@ -633,10 +657,10 @@ public class ApiClient extends JavaTimeFormatter {
                 responseEntity = restTemplate.exchange(requestEntity, returnType);
                 break;
             } catch (HttpServerErrorException | HttpClientErrorException ex) {
-                if (ex instanceof HttpServerErrorException
-                        || ((HttpClientErrorException) ex)
-                        .getStatusCode()
-                        .equals(HttpStatus.TOO_MANY_REQUESTS)) {
+                if (
+                    ex instanceof HttpServerErrorException ||
+                    ((HttpClientErrorException) ex).getStatusCode().equals(HttpStatus.TOO_MANY_REQUESTS)
+                ) {
                     attempts++;
                     if (attempts < maxAttemptsForRetry) {
                         try {
@@ -661,7 +685,11 @@ public class ApiClient extends JavaTimeFormatter {
             return responseEntity;
         } else {
             // The error handler built into the RestTemplate should handle 400 and 500 series errors.
-            throw new RestClientException("API returned " + responseEntity.getStatusCode() + " and it wasn't handled by the RestTemplate error handler");
+            throw new RestClientException(
+                "API returned " +
+                responseEntity.getStatusCode() +
+                " and it wasn't handled by the RestTemplate error handler"
+            );
         }
     }
 
@@ -734,7 +762,12 @@ public class ApiClient extends JavaTimeFormatter {
      * @param queryParams The query parameters
      * @param headerParams The header parameters
      */
-    protected void updateParamsForAuth(String[] authNames, MultiValueMap<String, String> queryParams, HttpHeaders headerParams, MultiValueMap<String, String> cookieParams) {
+    protected void updateParamsForAuth(
+        String[] authNames,
+        MultiValueMap<String, String> queryParams,
+        HttpHeaders headerParams,
+        MultiValueMap<String, String> cookieParams
+    ) {
         for (String authName : authNames) {
             Authentication auth = authentications.get(authName);
             if (auth == null) {
@@ -745,10 +778,12 @@ public class ApiClient extends JavaTimeFormatter {
     }
 
     private class ApiClientHttpRequestInterceptor implements ClientHttpRequestInterceptor {
+
         private final Log log = LogFactory.getLog(ApiClientHttpRequestInterceptor.class);
 
         @Override
-        public ClientHttpResponse intercept(HttpRequest request, byte[] body, ClientHttpRequestExecution execution) throws IOException {
+        public ClientHttpResponse intercept(HttpRequest request, byte[] body, ClientHttpRequestExecution execution)
+            throws IOException {
             logRequest(request, body);
             ClientHttpResponse response = execution.execute(request, body);
             logResponse(response);
@@ -770,7 +805,7 @@ public class ApiClient extends JavaTimeFormatter {
         }
 
         private String headersToString(HttpHeaders headers) {
-            if(headers == null || headers.isEmpty()) {
+            if (headers == null || headers.isEmpty()) {
                 return "";
             }
             StringBuilder builder = new StringBuilder();

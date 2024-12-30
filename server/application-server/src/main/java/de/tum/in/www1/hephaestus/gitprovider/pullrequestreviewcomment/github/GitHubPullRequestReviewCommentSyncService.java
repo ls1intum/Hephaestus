@@ -1,16 +1,5 @@
 package de.tum.in.www1.hephaestus.gitprovider.pullrequestreviewcomment.github;
 
-import java.io.IOException;
-import java.util.List;
-
-import org.kohsuke.github.GHPullRequest;
-import org.kohsuke.github.GHPullRequestReviewComment;
-import org.kohsuke.github.GHUser;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-import org.springframework.stereotype.Service;
-import jakarta.transaction.Transactional;
-
 import de.tum.in.www1.hephaestus.gitprovider.common.DateUtil;
 import de.tum.in.www1.hephaestus.gitprovider.pullrequest.PullRequestRepository;
 import de.tum.in.www1.hephaestus.gitprovider.pullrequest.github.GitHubPullRequestConverter;
@@ -19,6 +8,15 @@ import de.tum.in.www1.hephaestus.gitprovider.pullrequestreviewcomment.PullReques
 import de.tum.in.www1.hephaestus.gitprovider.pullrequestreviewcomment.PullRequestReviewCommentRepository;
 import de.tum.in.www1.hephaestus.gitprovider.user.UserRepository;
 import de.tum.in.www1.hephaestus.gitprovider.user.github.GitHubUserConverter;
+import jakarta.transaction.Transactional;
+import java.io.IOException;
+import java.util.List;
+import org.kohsuke.github.GHPullRequest;
+import org.kohsuke.github.GHPullRequestReviewComment;
+import org.kohsuke.github.GHUser;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.stereotype.Service;
 
 @Service
 public class GitHubPullRequestReviewCommentSyncService {
@@ -34,13 +32,14 @@ public class GitHubPullRequestReviewCommentSyncService {
     private final GitHubUserConverter userConverter;
 
     public GitHubPullRequestReviewCommentSyncService(
-            PullRequestReviewCommentRepository pullRequestReviewCommentRepository,
-            PullRequestReviewRepository pullRequestReviewRepository,
-            PullRequestRepository pullRequestRepository,
-            UserRepository userRepository,
-            GitHubPullRequestReviewCommentConverter pullRequestReviewCommentConverter,
-            GitHubPullRequestConverter pullRequestConverter,
-            GitHubUserConverter userConverter) {
+        PullRequestReviewCommentRepository pullRequestReviewCommentRepository,
+        PullRequestReviewRepository pullRequestReviewRepository,
+        PullRequestRepository pullRequestRepository,
+        UserRepository userRepository,
+        GitHubPullRequestReviewCommentConverter pullRequestReviewCommentConverter,
+        GitHubPullRequestConverter pullRequestConverter,
+        GitHubUserConverter userConverter
+    ) {
         this.pullRequestReviewCommentRepository = pullRequestReviewCommentRepository;
         this.pullRequestReviewRepository = pullRequestReviewRepository;
         this.pullRequestRepository = pullRequestRepository;
@@ -69,8 +68,11 @@ public class GitHubPullRequestReviewCommentSyncService {
         try {
             pullRequest.listReviewComments().withPageSize(100).forEach(this::processPullRequestReviewComment);
         } catch (IOException e) {
-            logger.error("Failed to fetch review comments for pull request {}: {}", pullRequest.getId(),
-                    e.getMessage());
+            logger.error(
+                "Failed to fetch review comments for pull request {}: {}",
+                pullRequest.getId(),
+                e.getMessage()
+            );
         }
     }
 
@@ -87,23 +89,34 @@ public class GitHubPullRequestReviewCommentSyncService {
      */
     @Transactional
     public PullRequestReviewComment processPullRequestReviewComment(
-            GHPullRequestReviewComment ghPullRequestReviewComment) {
-        var result = pullRequestReviewCommentRepository.findById(ghPullRequestReviewComment.getId())
-                .map(pullRequestReviewComment -> {
-                    try {
-                        if (pullRequestReviewComment.getUpdatedAt() == null || pullRequestReviewComment.getUpdatedAt()
-                                .isBefore(
-                                        DateUtil.convertToOffsetDateTime(ghPullRequestReviewComment.getUpdatedAt()))) {
-                            return pullRequestReviewCommentConverter.update(ghPullRequestReviewComment,
-                                    pullRequestReviewComment);
-                        }
-                        return pullRequestReviewComment;
-                    } catch (IOException e) {
-                        logger.error("Failed to update pull request review comment {}: {}",
-                                ghPullRequestReviewComment.getId(), e.getMessage());
-                        return null;
+        GHPullRequestReviewComment ghPullRequestReviewComment
+    ) {
+        var result = pullRequestReviewCommentRepository
+            .findById(ghPullRequestReviewComment.getId())
+            .map(pullRequestReviewComment -> {
+                try {
+                    if (
+                        pullRequestReviewComment.getUpdatedAt() == null ||
+                        pullRequestReviewComment
+                            .getUpdatedAt()
+                            .isBefore(DateUtil.convertToOffsetDateTime(ghPullRequestReviewComment.getUpdatedAt()))
+                    ) {
+                        return pullRequestReviewCommentConverter.update(
+                            ghPullRequestReviewComment,
+                            pullRequestReviewComment
+                        );
                     }
-                }).orElseGet(() -> pullRequestReviewCommentConverter.convert(ghPullRequestReviewComment));
+                    return pullRequestReviewComment;
+                } catch (IOException e) {
+                    logger.error(
+                        "Failed to update pull request review comment {}: {}",
+                        ghPullRequestReviewComment.getId(),
+                        e.getMessage()
+                    );
+                    return null;
+                }
+            })
+            .orElseGet(() -> pullRequestReviewCommentConverter.convert(ghPullRequestReviewComment));
 
         if (result == null) {
             return null;
@@ -111,8 +124,9 @@ public class GitHubPullRequestReviewCommentSyncService {
 
         // Link pull request
         var pullRequest = ghPullRequestReviewComment.getParent();
-        var resultPullRequest = pullRequestRepository.findById(pullRequest.getId())
-                .orElseGet(() -> pullRequestRepository.save(pullRequestConverter.convert(pullRequest)));
+        var resultPullRequest = pullRequestRepository
+            .findById(pullRequest.getId())
+            .orElseGet(() -> pullRequestRepository.save(pullRequestConverter.convert(pullRequest)));
         result.setPullRequest(resultPullRequest);
 
         // Link review
@@ -122,21 +136,26 @@ public class GitHubPullRequestReviewCommentSyncService {
         } else {
             // If review is not found, we cannot link the review comment and would need to
             // fetch the associated review
-            logger.error("Failed to link review for pull request review comment {}: {}",
-                    ghPullRequestReviewComment.getId(),
-                    "Review not found");
+            logger.error(
+                "Failed to link review for pull request review comment {}: {}",
+                ghPullRequestReviewComment.getId(),
+                "Review not found"
+            );
         }
 
         // Link author
         try {
             GHUser user = ghPullRequestReviewComment.getUser();
-            var resultAuthor = userRepository.findById(user.getId())
-                    .orElseGet(() -> userRepository.save(userConverter.convert(user)));
+            var resultAuthor = userRepository
+                .findById(user.getId())
+                .orElseGet(() -> userRepository.save(userConverter.convert(user)));
             result.setAuthor(resultAuthor);
         } catch (IOException e) {
-            logger.error("Failed to link author for pull request review comment {}: {}",
-                    ghPullRequestReviewComment.getId(),
-                    e.getMessage());
+            logger.error(
+                "Failed to link author for pull request review comment {}: {}",
+                ghPullRequestReviewComment.getId(),
+                e.getMessage()
+            );
         }
 
         return pullRequestReviewCommentRepository.save(result);

@@ -1,17 +1,15 @@
 package de.tum.in.www1.hephaestus.gitprovider.common.github;
 
+import io.nats.client.Message;
+import io.nats.client.MessageHandler;
 import java.io.IOException;
 import java.io.StringReader;
 import java.nio.charset.StandardCharsets;
-
 import org.kohsuke.github.GHEvent;
 import org.kohsuke.github.GHEventPayload;
 import org.kohsuke.github.GitHub;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import io.nats.client.Message;
-import io.nats.client.MessageHandler;
 import org.springframework.stereotype.Component;
 
 @Component

@@ -1,13 +1,12 @@
 package de.tum.in.www1.hephaestus.syncing;
 
+import de.tum.in.www1.hephaestus.workspace.WorkspaceService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.core.annotation.Order;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
-
-import de.tum.in.www1.hephaestus.workspace.WorkspaceService;
 
 @Order(value = 2)
 @Component

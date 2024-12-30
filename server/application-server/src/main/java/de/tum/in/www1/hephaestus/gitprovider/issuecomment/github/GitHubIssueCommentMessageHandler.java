@@ -1,15 +1,14 @@
 package de.tum.in.www1.hephaestus.gitprovider.issuecomment.github;
 
+import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubMessageHandler;
+import de.tum.in.www1.hephaestus.gitprovider.issue.github.GitHubIssueSyncService;
+import de.tum.in.www1.hephaestus.gitprovider.issuecomment.IssueCommentRepository;
+import de.tum.in.www1.hephaestus.gitprovider.repository.github.GitHubRepositorySyncService;
 import org.kohsuke.github.GHEvent;
 import org.kohsuke.github.GHEventPayload;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
-
-import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubMessageHandler;
-import de.tum.in.www1.hephaestus.gitprovider.issue.github.GitHubIssueSyncService;
-import de.tum.in.www1.hephaestus.gitprovider.issuecomment.IssueCommentRepository;
-import de.tum.in.www1.hephaestus.gitprovider.repository.github.GitHubRepositorySyncService;
 
 @Component
 public class GitHubIssueCommentMessageHandler extends GitHubMessageHandler<GHEventPayload.IssueComment> {
@@ -22,10 +21,11 @@ public class GitHubIssueCommentMessageHandler extends GitHubMessageHandler<GHEve
     private final GitHubIssueCommentSyncService issueCommentSyncService;
 
     private GitHubIssueCommentMessageHandler(
-            IssueCommentRepository issueCommentRepository,
-            GitHubRepositorySyncService repositorySyncService,
-            GitHubIssueSyncService issueSyncService,
-            GitHubIssueCommentSyncService issueCommentSyncService) {
+        IssueCommentRepository issueCommentRepository,
+        GitHubRepositorySyncService repositorySyncService,
+        GitHubIssueSyncService issueSyncService,
+        GitHubIssueCommentSyncService issueCommentSyncService
+    ) {
         super(GHEventPayload.IssueComment.class);
         this.issueCommentRepository = issueCommentRepository;
         this.repositorySyncService = repositorySyncService;
@@ -39,11 +39,13 @@ public class GitHubIssueCommentMessageHandler extends GitHubMessageHandler<GHEve
         var repository = eventPayload.getRepository();
         var issue = eventPayload.getIssue();
         var comment = eventPayload.getComment();
-        logger.info("Received issue comment event for repository: {}, issue: {}, action: {}, commentId: {}",
-                repository.getFullName(),
-                issue.getNumber(),
-                action,
-                comment.getId());
+        logger.info(
+            "Received issue comment event for repository: {}, issue: {}, action: {}, commentId: {}",
+            repository.getFullName(),
+            issue.getNumber(),
+            action,
+            comment.getId()
+        );
         repositorySyncService.processRepository(repository);
         issueSyncService.processIssue(issue);
 

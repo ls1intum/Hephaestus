@@ -10,127 +10,117 @@
  * Do not edit the class manually.
  */
 
-
 package de.tum.in.www1.hephaestus.intelligenceservice.model;
 
-import java.util.Objects;
-import java.util.Arrays;
+import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.annotation.JsonProperty;
-import com.fasterxml.jackson.annotation.JsonCreator;
-import com.fasterxml.jackson.annotation.JsonTypeName;
-import com.fasterxml.jackson.annotation.JsonValue;
 import com.fasterxml.jackson.annotation.JsonPropertyOrder;
 import com.fasterxml.jackson.annotation.JsonTypeName;
+import com.fasterxml.jackson.annotation.JsonTypeName;
+import com.fasterxml.jackson.annotation.JsonValue;
+import java.util.Arrays;
+import java.util.Objects;
 import org.hibernate.validator.constraints.*;
 
 /**
  * ISMessage
  */
-@JsonPropertyOrder({
-  ISMessage.JSON_PROPERTY_CONTENT,
-  ISMessage.JSON_PROPERTY_SENDER
-})
+@JsonPropertyOrder({ ISMessage.JSON_PROPERTY_CONTENT, ISMessage.JSON_PROPERTY_SENDER })
 @JsonTypeName("Message")
-@jakarta.annotation.Generated(value = "org.openapitools.codegen.languages.JavaClientCodegen", comments = "Generator version: 7.7.0")
+@jakarta.annotation.Generated(
+    value = "org.openapitools.codegen.languages.JavaClientCodegen",
+    comments = "Generator version: 7.7.0"
+)
 public class ISMessage {
-  public static final String JSON_PROPERTY_CONTENT = "content";
-  private String content;
 
-  public static final String JSON_PROPERTY_SENDER = "sender";
-  private String sender;
+    public static final String JSON_PROPERTY_CONTENT = "content";
+    private String content;
 
-  public ISMessage() {
-  }
+    public static final String JSON_PROPERTY_SENDER = "sender";
+    private String sender;
 
-  public ISMessage content(String content) {
-    
-    this.content = content;
-    return this;
-  }
+    public ISMessage() {}
 
-  /**
-   * Get content
-   * @return content
-   */
-  @jakarta.annotation.Nonnull
-  @JsonProperty(JSON_PROPERTY_CONTENT)
-  @JsonInclude(value = JsonInclude.Include.ALWAYS)
-
-  public String getContent() {
-    return content;
-  }
-
-
-  @JsonProperty(JSON_PROPERTY_CONTENT)
-  @JsonInclude(value = JsonInclude.Include.ALWAYS)
-  public void setContent(String content) {
-    this.content = content;
-  }
-
-  public ISMessage sender(String sender) {
-    
-    this.sender = sender;
-    return this;
-  }
-
-  /**
-   * Get sender
-   * @return sender
-   */
-  @jakarta.annotation.Nonnull
-  @JsonProperty(JSON_PROPERTY_SENDER)
-  @JsonInclude(value = JsonInclude.Include.ALWAYS)
-
-  public String getSender() {
-    return sender;
-  }
-
-
-  @JsonProperty(JSON_PROPERTY_SENDER)
-  @JsonInclude(value = JsonInclude.Include.ALWAYS)
-  public void setSender(String sender) {
-    this.sender = sender;
-  }
-
-  @Override
-  public boolean equals(Object o) {
-    if (this == o) {
-      return true;
+    public ISMessage content(String content) {
+        this.content = content;
+        return this;
     }
-    if (o == null || getClass() != o.getClass()) {
-      return false;
+
+    /**
+     * Get content
+     * @return content
+     */
+    @jakarta.annotation.Nonnull
+    @JsonProperty(JSON_PROPERTY_CONTENT)
+    @JsonInclude(value = JsonInclude.Include.ALWAYS)
+    public String getContent() {
+        return content;
     }
-    ISMessage message = (ISMessage) o;
-    return Objects.equals(this.content, message.content) &&
-        Objects.equals(this.sender, message.sender);
-  }
 
-  @Override
-  public int hashCode() {
-    return Objects.hash(content, sender);
-  }
-
-  @Override
-  public String toString() {
-    StringBuilder sb = new StringBuilder();
-    sb.append("class ISMessage {\n");
-    sb.append("    content: ").append(toIndentedString(content)).append("\n");
-    sb.append("    sender: ").append(toIndentedString(sender)).append("\n");
-    sb.append("}");
-    return sb.toString();
-  }
-
-  /**
-   * Convert the given object to string with each line indented by 4 spaces
-   * (except the first line).
-   */
-  private String toIndentedString(Object o) {
-    if (o == null) {
-      return "null";
+    @JsonProperty(JSON_PROPERTY_CONTENT)
+    @JsonInclude(value = JsonInclude.Include.ALWAYS)
+    public void setContent(String content) {
+        this.content = content;
     }
-    return o.toString().replace("\n", "\n    ");
-  }
 
+    public ISMessage sender(String sender) {
+        this.sender = sender;
+        return this;
+    }
+
+    /**
+     * Get sender
+     * @return sender
+     */
+    @jakarta.annotation.Nonnull
+    @JsonProperty(JSON_PROPERTY_SENDER)
+    @JsonInclude(value = JsonInclude.Include.ALWAYS)
+    public String getSender() {
+        return sender;
+    }
+
+    @JsonProperty(JSON_PROPERTY_SENDER)
+    @JsonInclude(value = JsonInclude.Include.ALWAYS)
+    public void setSender(String sender) {
+        this.sender = sender;
+    }
+
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) {
+            return true;
+        }
+        if (o == null || getClass() != o.getClass()) {
+            return false;
+        }
+        ISMessage message = (ISMessage) o;
+        return Objects.equals(this.content, message.content) && Objects.equals(this.sender, message.sender);
+    }
+
+    @Override
+    public int hashCode() {
+        return Objects.hash(content, sender);
+    }
+
+    @Override
+    public String toString() {
+        StringBuilder sb = new StringBuilder();
+        sb.append("class ISMessage {\n");
+        sb.append("    content: ").append(toIndentedString(content)).append("\n");
+        sb.append("    sender: ").append(toIndentedString(sender)).append("\n");
+        sb.append("}");
+        return sb.toString();
+    }
+
+    /**
+     * Convert the given object to string with each line indented by 4 spaces
+     * (except the first line).
+     */
+    private String toIndentedString(Object o) {
+        if (o == null) {
+            return "null";
+        }
+        return o.toString().replace("\n", "\n    ");
+    }
 }
-

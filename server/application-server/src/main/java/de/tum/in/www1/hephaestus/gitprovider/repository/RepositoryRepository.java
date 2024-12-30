@@ -7,17 +7,17 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
 @org.springframework.stereotype.Repository
-public interface RepositoryRepository
-        extends JpaRepository<Repository, Long> {
-
+public interface RepositoryRepository extends JpaRepository<Repository, Long> {
     Optional<Repository> findByNameWithOwner(String nameWithOwner);
 
-    @Query("""
-            SELECT r
-            FROM Repository r
-            JOIN PullRequest pr ON r.id = pr.repository.id
-            WHERE pr.author.login ILIKE :contributorLogin
-            ORDER BY r.name ASC
-            """)
+    @Query(
+        """
+        SELECT r
+        FROM Repository r
+        JOIN PullRequest pr ON r.id = pr.repository.id
+        WHERE pr.author.login ILIKE :contributorLogin
+        ORDER BY r.name ASC
+        """
+    )
     List<Repository> findContributedByLogin(@Param("contributorLogin") String contributorLogin);
 }

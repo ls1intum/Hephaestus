@@ -1,6 +1,5 @@
 package de.tum.in.www1.hephaestus.workspace;
 
-import org.springframework.lang.NonNull;
 import jakarta.persistence.Entity;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
@@ -13,6 +12,7 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 import lombok.ToString;
+import org.springframework.lang.NonNull;
 
 @Entity
 @Table(name = "repository_to_monitor")

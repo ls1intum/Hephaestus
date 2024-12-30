@@ -1,11 +1,11 @@
 package de.tum.in.www1.hephaestus.intelligenceservice;
 
-import java.util.Set;
-
 import jakarta.validation.ConstraintViolation;
 import jakarta.validation.ValidationException;
+import java.util.Set;
 
 public class BeanValidationException extends ValidationException {
+
     /**
      *
      */
@@ -23,5 +23,4 @@ public class BeanValidationException extends ValidationException {
     public void setViolations(Set<ConstraintViolation<Object>> violations) {
         this.violations = violations;
     }
-
 }

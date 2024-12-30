@@ -10,108 +10,103 @@
  * Do not edit the class manually.
  */
 
-
 package de.tum.in.www1.hephaestus.intelligenceservice.model;
 
-import java.util.Objects;
-import java.util.Arrays;
+import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.annotation.JsonProperty;
-import com.fasterxml.jackson.annotation.JsonCreator;
+import com.fasterxml.jackson.annotation.JsonPropertyOrder;
+import com.fasterxml.jackson.annotation.JsonTypeName;
 import com.fasterxml.jackson.annotation.JsonTypeName;
 import com.fasterxml.jackson.annotation.JsonValue;
 import de.tum.in.www1.hephaestus.intelligenceservice.model.ISValidationError;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Arrays;
 import java.util.List;
-import com.fasterxml.jackson.annotation.JsonPropertyOrder;
-import com.fasterxml.jackson.annotation.JsonTypeName;
+import java.util.Objects;
 import org.hibernate.validator.constraints.*;
 
 /**
  * ISHTTPValidationError
  */
-@JsonPropertyOrder({
-  ISHTTPValidationError.JSON_PROPERTY_DETAIL
-})
+@JsonPropertyOrder({ ISHTTPValidationError.JSON_PROPERTY_DETAIL })
 @JsonTypeName("HTTPValidationError")
-@jakarta.annotation.Generated(value = "org.openapitools.codegen.languages.JavaClientCodegen", comments = "Generator version: 7.7.0")
+@jakarta.annotation.Generated(
+    value = "org.openapitools.codegen.languages.JavaClientCodegen",
+    comments = "Generator version: 7.7.0"
+)
 public class ISHTTPValidationError {
-  public static final String JSON_PROPERTY_DETAIL = "detail";
-  private List<ISValidationError> detail = new ArrayList<>();
 
-  public ISHTTPValidationError() {
-  }
+    public static final String JSON_PROPERTY_DETAIL = "detail";
+    private List<ISValidationError> detail = new ArrayList<>();
 
-  public ISHTTPValidationError detail(List<ISValidationError> detail) {
-    
-    this.detail = detail;
-    return this;
-  }
+    public ISHTTPValidationError() {}
 
-  public ISHTTPValidationError addDetailItem(ISValidationError detailItem) {
-    if (this.detail == null) {
-      this.detail = new ArrayList<>();
+    public ISHTTPValidationError detail(List<ISValidationError> detail) {
+        this.detail = detail;
+        return this;
     }
-    this.detail.add(detailItem);
-    return this;
-  }
 
-  /**
-   * Get detail
-   * @return detail
-   */
-  @jakarta.annotation.Nullable
-  @JsonProperty(JSON_PROPERTY_DETAIL)
-  @JsonInclude(value = JsonInclude.Include.USE_DEFAULTS)
-
-  public List<ISValidationError> getDetail() {
-    return detail;
-  }
-
-
-  @JsonProperty(JSON_PROPERTY_DETAIL)
-  @JsonInclude(value = JsonInclude.Include.USE_DEFAULTS)
-  public void setDetail(List<ISValidationError> detail) {
-    this.detail = detail;
-  }
-
-  @Override
-  public boolean equals(Object o) {
-    if (this == o) {
-      return true;
+    public ISHTTPValidationError addDetailItem(ISValidationError detailItem) {
+        if (this.detail == null) {
+            this.detail = new ArrayList<>();
+        }
+        this.detail.add(detailItem);
+        return this;
     }
-    if (o == null || getClass() != o.getClass()) {
-      return false;
+
+    /**
+     * Get detail
+     * @return detail
+     */
+    @jakarta.annotation.Nullable
+    @JsonProperty(JSON_PROPERTY_DETAIL)
+    @JsonInclude(value = JsonInclude.Include.USE_DEFAULTS)
+    public List<ISValidationError> getDetail() {
+        return detail;
     }
-    ISHTTPValidationError htTPValidationError = (ISHTTPValidationError) o;
-    return Objects.equals(this.detail, htTPValidationError.detail);
-  }
 
-  @Override
-  public int hashCode() {
-    return Objects.hash(detail);
-  }
-
-  @Override
-  public String toString() {
-    StringBuilder sb = new StringBuilder();
-    sb.append("class ISHTTPValidationError {\n");
-    sb.append("    detail: ").append(toIndentedString(detail)).append("\n");
-    sb.append("}");
-    return sb.toString();
-  }
-
-  /**
-   * Convert the given object to string with each line indented by 4 spaces
-   * (except the first line).
-   */
-  private String toIndentedString(Object o) {
-    if (o == null) {
-      return "null";
+    @JsonProperty(JSON_PROPERTY_DETAIL)
+    @JsonInclude(value = JsonInclude.Include.USE_DEFAULTS)
+    public void setDetail(List<ISValidationError> detail) {
+        this.detail = detail;
     }
-    return o.toString().replace("\n", "\n    ");
-  }
 
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) {
+            return true;
+        }
+        if (o == null || getClass() != o.getClass()) {
+            return false;
+        }
+        ISHTTPValidationError htTPValidationError = (ISHTTPValidationError) o;
+        return Objects.equals(this.detail, htTPValidationError.detail);
+    }
+
+    @Override
+    public int hashCode() {
+        return Objects.hash(detail);
+    }
+
+    @Override
+    public String toString() {
+        StringBuilder sb = new StringBuilder();
+        sb.append("class ISHTTPValidationError {\n");
+        sb.append("    detail: ").append(toIndentedString(detail)).append("\n");
+        sb.append("}");
+        return sb.toString();
+    }
+
+    /**
+     * Convert the given object to string with each line indented by 4 spaces
+     * (except the first line).
+     */
+    private String toIndentedString(Object o) {
+        if (o == null) {
+            return "null";
+        }
+        return o.toString().replace("\n", "\n    ");
+    }
 }
-

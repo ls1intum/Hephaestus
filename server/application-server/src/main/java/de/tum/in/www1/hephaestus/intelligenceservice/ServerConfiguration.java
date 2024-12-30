@@ -5,8 +5,12 @@ import java.util.Map;
 /**
  * Representing a Server configuration.
  */
-@jakarta.annotation.Generated(value = "org.openapitools.codegen.languages.JavaClientCodegen", comments = "Generator version: 7.7.0")
+@jakarta.annotation.Generated(
+    value = "org.openapitools.codegen.languages.JavaClientCodegen",
+    comments = "Generator version: 7.7.0"
+)
 public class ServerConfiguration {
+
     public String URL;
     public String description;
     public Map<String, ServerVariable> variables;
@@ -32,7 +36,7 @@ public class ServerConfiguration {
         String url = this.URL;
 
         // go through variables and replace placeholders
-        for (Map.Entry<String, ServerVariable> variable: this.variables.entrySet()) {
+        for (Map.Entry<String, ServerVariable> variable : this.variables.entrySet()) {
             String name = variable.getKey();
             ServerVariable serverVariable = variable.getValue();
             String value = serverVariable.defaultValue;
@@ -40,7 +44,9 @@ public class ServerConfiguration {
             if (variables != null && variables.containsKey(name)) {
                 value = variables.get(name);
                 if (serverVariable.enumValues.size() > 0 && !serverVariable.enumValues.contains(value)) {
-                    throw new IllegalArgumentException("The variable " + name + " in the server URL has invalid value " + value + ".");
+                    throw new IllegalArgumentException(
+                        "The variable " + name + " in the server URL has invalid value " + value + "."
+                    );
                 }
             }
             url = url.replace("{" + name + "}", value);

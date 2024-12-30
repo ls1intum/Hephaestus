@@ -10,170 +10,161 @@
  * Do not edit the class manually.
  */
 
-
 package de.tum.in.www1.hephaestus.intelligenceservice.model;
 
-import java.util.Objects;
-import java.util.Arrays;
+import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.annotation.JsonProperty;
-import com.fasterxml.jackson.annotation.JsonCreator;
+import com.fasterxml.jackson.annotation.JsonPropertyOrder;
+import com.fasterxml.jackson.annotation.JsonTypeName;
 import com.fasterxml.jackson.annotation.JsonTypeName;
 import com.fasterxml.jackson.annotation.JsonValue;
 import de.tum.in.www1.hephaestus.intelligenceservice.model.ISValidationErrorLocInner;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Arrays;
 import java.util.List;
-import com.fasterxml.jackson.annotation.JsonPropertyOrder;
-import com.fasterxml.jackson.annotation.JsonTypeName;
+import java.util.Objects;
 import org.hibernate.validator.constraints.*;
 
 /**
  * ISValidationError
  */
-@JsonPropertyOrder({
-  ISValidationError.JSON_PROPERTY_LOC,
-  ISValidationError.JSON_PROPERTY_MSG,
-  ISValidationError.JSON_PROPERTY_TYPE
-})
+@JsonPropertyOrder(
+    { ISValidationError.JSON_PROPERTY_LOC, ISValidationError.JSON_PROPERTY_MSG, ISValidationError.JSON_PROPERTY_TYPE }
+)
 @JsonTypeName("ValidationError")
-@jakarta.annotation.Generated(value = "org.openapitools.codegen.languages.JavaClientCodegen", comments = "Generator version: 7.7.0")
+@jakarta.annotation.Generated(
+    value = "org.openapitools.codegen.languages.JavaClientCodegen",
+    comments = "Generator version: 7.7.0"
+)
 public class ISValidationError {
-  public static final String JSON_PROPERTY_LOC = "loc";
-  private List<ISValidationErrorLocInner> loc = new ArrayList<>();
 
-  public static final String JSON_PROPERTY_MSG = "msg";
-  private String msg;
+    public static final String JSON_PROPERTY_LOC = "loc";
+    private List<ISValidationErrorLocInner> loc = new ArrayList<>();
 
-  public static final String JSON_PROPERTY_TYPE = "type";
-  private String type;
+    public static final String JSON_PROPERTY_MSG = "msg";
+    private String msg;
 
-  public ISValidationError() {
-  }
+    public static final String JSON_PROPERTY_TYPE = "type";
+    private String type;
 
-  public ISValidationError loc(List<ISValidationErrorLocInner> loc) {
-    
-    this.loc = loc;
-    return this;
-  }
+    public ISValidationError() {}
 
-  public ISValidationError addLocItem(ISValidationErrorLocInner locItem) {
-    if (this.loc == null) {
-      this.loc = new ArrayList<>();
+    public ISValidationError loc(List<ISValidationErrorLocInner> loc) {
+        this.loc = loc;
+        return this;
     }
-    this.loc.add(locItem);
-    return this;
-  }
 
-  /**
-   * Get loc
-   * @return loc
-   */
-  @jakarta.annotation.Nonnull
-  @JsonProperty(JSON_PROPERTY_LOC)
-  @JsonInclude(value = JsonInclude.Include.ALWAYS)
-
-  public List<ISValidationErrorLocInner> getLoc() {
-    return loc;
-  }
-
-
-  @JsonProperty(JSON_PROPERTY_LOC)
-  @JsonInclude(value = JsonInclude.Include.ALWAYS)
-  public void setLoc(List<ISValidationErrorLocInner> loc) {
-    this.loc = loc;
-  }
-
-  public ISValidationError msg(String msg) {
-    
-    this.msg = msg;
-    return this;
-  }
-
-  /**
-   * Get msg
-   * @return msg
-   */
-  @jakarta.annotation.Nonnull
-  @JsonProperty(JSON_PROPERTY_MSG)
-  @JsonInclude(value = JsonInclude.Include.ALWAYS)
-
-  public String getMsg() {
-    return msg;
-  }
-
-
-  @JsonProperty(JSON_PROPERTY_MSG)
-  @JsonInclude(value = JsonInclude.Include.ALWAYS)
-  public void setMsg(String msg) {
-    this.msg = msg;
-  }
-
-  public ISValidationError type(String type) {
-    
-    this.type = type;
-    return this;
-  }
-
-  /**
-   * Get type
-   * @return type
-   */
-  @jakarta.annotation.Nonnull
-  @JsonProperty(JSON_PROPERTY_TYPE)
-  @JsonInclude(value = JsonInclude.Include.ALWAYS)
-
-  public String getType() {
-    return type;
-  }
-
-
-  @JsonProperty(JSON_PROPERTY_TYPE)
-  @JsonInclude(value = JsonInclude.Include.ALWAYS)
-  public void setType(String type) {
-    this.type = type;
-  }
-
-  @Override
-  public boolean equals(Object o) {
-    if (this == o) {
-      return true;
+    public ISValidationError addLocItem(ISValidationErrorLocInner locItem) {
+        if (this.loc == null) {
+            this.loc = new ArrayList<>();
+        }
+        this.loc.add(locItem);
+        return this;
     }
-    if (o == null || getClass() != o.getClass()) {
-      return false;
+
+    /**
+     * Get loc
+     * @return loc
+     */
+    @jakarta.annotation.Nonnull
+    @JsonProperty(JSON_PROPERTY_LOC)
+    @JsonInclude(value = JsonInclude.Include.ALWAYS)
+    public List<ISValidationErrorLocInner> getLoc() {
+        return loc;
     }
-    ISValidationError validationError = (ISValidationError) o;
-    return Objects.equals(this.loc, validationError.loc) &&
-        Objects.equals(this.msg, validationError.msg) &&
-        Objects.equals(this.type, validationError.type);
-  }
 
-  @Override
-  public int hashCode() {
-    return Objects.hash(loc, msg, type);
-  }
-
-  @Override
-  public String toString() {
-    StringBuilder sb = new StringBuilder();
-    sb.append("class ISValidationError {\n");
-    sb.append("    loc: ").append(toIndentedString(loc)).append("\n");
-    sb.append("    msg: ").append(toIndentedString(msg)).append("\n");
-    sb.append("    type: ").append(toIndentedString(type)).append("\n");
-    sb.append("}");
-    return sb.toString();
-  }
-
-  /**
-   * Convert the given object to string with each line indented by 4 spaces
-   * (except the first line).
-   */
-  private String toIndentedString(Object o) {
-    if (o == null) {
-      return "null";
+    @JsonProperty(JSON_PROPERTY_LOC)
+    @JsonInclude(value = JsonInclude.Include.ALWAYS)
+    public void setLoc(List<ISValidationErrorLocInner> loc) {
+        this.loc = loc;
     }
-    return o.toString().replace("\n", "\n    ");
-  }
 
+    public ISValidationError msg(String msg) {
+        this.msg = msg;
+        return this;
+    }
+
+    /**
+     * Get msg
+     * @return msg
+     */
+    @jakarta.annotation.Nonnull
+    @JsonProperty(JSON_PROPERTY_MSG)
+    @JsonInclude(value = JsonInclude.Include.ALWAYS)
+    public String getMsg() {
+        return msg;
+    }
+
+    @JsonProperty(JSON_PROPERTY_MSG)
+    @JsonInclude(value = JsonInclude.Include.ALWAYS)
+    public void setMsg(String msg) {
+        this.msg = msg;
+    }
+
+    public ISValidationError type(String type) {
+        this.type = type;
+        return this;
+    }
+
+    /**
+     * Get type
+     * @return type
+     */
+    @jakarta.annotation.Nonnull
+    @JsonProperty(JSON_PROPERTY_TYPE)
+    @JsonInclude(value = JsonInclude.Include.ALWAYS)
+    public String getType() {
+        return type;
+    }
+
+    @JsonProperty(JSON_PROPERTY_TYPE)
+    @JsonInclude(value = JsonInclude.Include.ALWAYS)
+    public void setType(String type) {
+        this.type = type;
+    }
+
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) {
+            return true;
+        }
+        if (o == null || getClass() != o.getClass()) {
+            return false;
+        }
+        ISValidationError validationError = (ISValidationError) o;
+        return (
+            Objects.equals(this.loc, validationError.loc) &&
+            Objects.equals(this.msg, validationError.msg) &&
+            Objects.equals(this.type, validationError.type)
+        );
+    }
+
+    @Override
+    public int hashCode() {
+        return Objects.hash(loc, msg, type);
+    }
+
+    @Override
+    public String toString() {
+        StringBuilder sb = new StringBuilder();
+        sb.append("class ISValidationError {\n");
+        sb.append("    loc: ").append(toIndentedString(loc)).append("\n");
+        sb.append("    msg: ").append(toIndentedString(msg)).append("\n");
+        sb.append("    type: ").append(toIndentedString(type)).append("\n");
+        sb.append("}");
+        return sb.toString();
+    }
+
+    /**
+     * Convert the given object to string with each line indented by 4 spaces
+     * (except the first line).
+     */
+    private String toIndentedString(Object o) {
+        if (o == null) {
+            return "null";
+        }
+        return o.toString().replace("\n", "\n    ");
+    }
 }
-
