@@ -6,7 +6,7 @@ const meta: Meta<LeagueInfoModalComponent> = {
   tags: ['autodocs'],
   parameters: {
     layout: 'centered'
-  },
+  }
 };
 
 export default meta;

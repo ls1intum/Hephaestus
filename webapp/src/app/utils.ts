@@ -17,7 +17,7 @@ export function groupBy<T, K extends keyof any>(arr: T[], key: (i: T) => K) {
 }
 
 export function getLeagueFromPoints(points: number) {
-  return Leagues.find(league => points >= league.minPoints && points < league.maxPoints);
+  return Leagues.find((league) => points >= league.minPoints && points < league.maxPoints);
 }
 
 export const Leagues = [
@@ -46,4 +46,4 @@ export const Leagues = [
     minPoints: 2000,
     maxPoints: Infinity
   }
-]
+];

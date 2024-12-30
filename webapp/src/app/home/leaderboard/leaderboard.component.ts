@@ -35,7 +35,7 @@ import { LeagueIconComponent } from '@app/ui/league/icon/league-icon.component';
     HlmIconComponent,
     RouterLink,
     LeagueIconComponent
-],
+  ],
   providers: [provideIcons({ lucideAward })],
   templateUrl: './leaderboard.component.html'
 })
