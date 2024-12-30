@@ -3,13 +3,14 @@ import { ActivityService } from '@app/core/modules/openapi';
 import { injectQuery } from '@tanstack/angular-query-experimental';
 import { combineLatest, lastValueFrom, map, timer } from 'rxjs';
 import { ActivatedRoute } from '@angular/router';
-import { IssueCardComponent } from '@app/user/issue-card/issue-card.component';
-import { BadPracticeCardComponent } from '@app/user/bad-practice-card/bad-practice-card.component';
+import { PullRequestBadPracticeCardComponent } from '@app/user/pull-request-bad-practice-card/pull-request-bad-practice-card.component';
+import { LucideAngularModule, RefreshCcw } from 'lucide-angular';
+import { HlmButtonDirective } from '@spartan-ng/ui-button-helm';
 
 @Component({
   selector: 'app-activity-dashboard',
   standalone: true,
-  imports: [IssueCardComponent, BadPracticeCardComponent],
+  imports: [PullRequestBadPracticeCardComponent, LucideAngularModule, HlmButtonDirective],
   templateUrl: './activity-dashboard.component.html',
   styles: ``
 })
@@ -29,4 +30,10 @@ export class ActivityDashboardComponent {
     enabled: !!this.userLogin,
     queryFn: async () => lastValueFrom(combineLatest([this.activityService.getActivityByUser(this.userLogin!), timer(400)]).pipe(map(([activity]) => activity)))
   }));
+
+  detectBadPractices = () => {
+    console.log('Detecting bad practices');
+    //this.activityService.detectBadPractices(this.userLogin!).subscribe();
+  };
+  protected readonly RefreshCcw = RefreshCcw;
 }

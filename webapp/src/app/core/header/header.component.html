@@ -6,6 +6,7 @@
     </a>
     @if (user()?.roles?.includes('admin')) {
       <a hlmBtn variant="link" routerLink="/workspace">Workspace</a>
+      <a hlmBtn variant="link" [routerLink]="'/activity/' + user()!.username">Activity</a>
     }
   </div>
   @if (user()?.roles?.includes('mentor_access')) {

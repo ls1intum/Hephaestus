@@ -1,0 +1,48 @@
+<brn-collapsible>
+  <button brnCollapsibleTrigger>
+    <a hlmCard variant="profile">
+      <div hlmCardHeader>
+        <div class="flex justify-between items-center text-sm text-github-muted-foreground">
+          <span class="font-medium flex justify-center items-center space-x-1">
+            @if (isLoading()) {
+              <hlm-skeleton class="size-5 bg-green-500/30"></hlm-skeleton>
+              <hlm-skeleton class="h-4 w-16 lg:w-36"></hlm-skeleton>
+            } @else {
+              <ng-icon [svg]="issueIconAndColor().icon" size="18" [class]="'mr-1 ' + issueIconAndColor().color"></ng-icon>
+              {{ repositoryName() }} #{{ number() }} on {{ displayCreated().format('MMM D') }}
+            }
+          </span>
+          <span class="flex items-center space-x-2">
+            @if (isLoading()) {
+              <hlm-skeleton class="h-4 w-8 bg-green-500/30"></hlm-skeleton>
+              <hlm-skeleton class="h-4 w-8 bg-destructive/20"></hlm-skeleton>
+            } @else {
+              <span class="text-github-success-foreground font-bold">+{{ additions() }}</span>
+              <span class="text-github-danger-foreground font-bold">-{{ deletions() }}</span>
+            }
+          </span>
+        </div>
+        <span class="flex justify-between font-medium">
+          @if (isLoading()) {
+            <hlm-skeleton class="h-6 w-3/4"></hlm-skeleton>
+          } @else {
+            <div [innerHTML]="displayTitle()" class="truncate"></div>
+          }
+        </span>
+        <span>
+          <div class="text-left">You have {{ badPractices()?.length }} bad practices in this pull request.</div>
+        </span>
+      </div>
+      @if (!isLoading()) {
+        <div hlmCardContent class="gap-2 p-0 space-x-0 pl-6 text-left">
+          <brn-collapsible-content>
+            @for (badpractice of badPractices(); track badpractice.title) {
+              <brn-separator hlmSeparator />
+              <app-bad-practice-card [title]="badpractice.title" [description]="badpractice.description"></app-bad-practice-card>
+            }
+          </brn-collapsible-content>
+        </div>
+      }
+    </a>
+  </button>
+</brn-collapsible>
