@@ -1,13 +1,10 @@
 package de.tum.in.www1.hephaestus.activity.badpracticedetector;
 
 import de.tum.in.www1.hephaestus.activity.PullRequestBadPracticeRepository;
-import de.tum.in.www1.hephaestus.activity.badpracticedetector.guideline.PullRequestBadPracticeGuideline;
 import de.tum.in.www1.hephaestus.activity.model.PullRequestBadPractice;
 import de.tum.in.www1.hephaestus.activity.model.PullRequestBadPracticeType;
 import de.tum.in.www1.hephaestus.gitprovider.pullrequest.PullRequest;
-import de.tum.in.www1.hephaestus.leaderboard.LeaderboardService;
 import java.util.List;
-import java.util.Set;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -21,25 +18,18 @@ public class PullRequestBadPracticeDetector {
     @Autowired
     private PullRequestBadPracticeRepository pullRequestBadPracticeRepository;
 
-    @Autowired
-    private Set<PullRequestBadPracticeGuideline> pullRequestBadPracticeGuidelines;
-
     public List<PullRequestBadPractice> detectAndSyncBadPractices(PullRequest pullRequest) {
         logger.info(
-            "Detecting bad practices for pull request: {} using guidelines: {}",
-            pullRequest.getId(),
-            pullRequestBadPracticeGuidelines
+            "Detecting bad practices for pull request: {}.",
+            pullRequest.getId()
         );
 
         List<PullRequestBadPractice> existingBadPractices = pullRequestBadPracticeRepository.findByPullRequestId(
             pullRequest.getId()
         );
 
-        List<PullRequestBadPractice> newBadPractices = pullRequestBadPracticeGuidelines
-            .stream()
-            .map(guideline -> guideline.detectBadPractices(pullRequest))
-            .flatMap(List::stream)
-            .toList();
+        //TODO connect LLM based detection
+        List<PullRequestBadPractice> newBadPractices = List.of();
 
         updateExistingBadPractices(existingBadPractices, newBadPractices);
 
@@ -50,14 +40,14 @@ public class PullRequestBadPracticeDetector {
         List<PullRequestBadPractice> existingBadPractices,
         List<PullRequestBadPractice> detectedBadPractices
     ) {
-        List<PullRequestBadPracticeType> types = detectedBadPractices
+        List<PullRequestBadPracticeType> existingTypes = existingBadPractices
             .stream()
             .map(PullRequestBadPractice::getType)
             .toList();
 
         List<PullRequestBadPractice> newBadPractices = detectedBadPractices
             .stream()
-            .filter(badPractice -> !existingBadPractices.contains(badPractice))
+            .filter(badPractice -> !existingTypes.contains(badPractice.getType()))
             .toList();
 
         return pullRequestBadPracticeRepository.saveAll(newBadPractices);
