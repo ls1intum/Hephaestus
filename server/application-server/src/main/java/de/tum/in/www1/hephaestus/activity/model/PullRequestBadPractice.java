@@ -1,4 +1,4 @@
-package de.tum.in.www1.hephaestus.activity;
+package de.tum.in.www1.hephaestus.activity.model;
 
 import de.tum.in.www1.hephaestus.gitprovider.pullrequest.PullRequest;
 import jakarta.persistence.Entity;
@@ -25,4 +25,6 @@ public class PullRequestBadPractice {
     @ManyToOne
     @JoinColumn(name = "pullrequest_id")
     private PullRequest pullrequest;
+
+    private boolean resolved;
 }
