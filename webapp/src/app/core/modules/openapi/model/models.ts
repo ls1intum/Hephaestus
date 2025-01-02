@@ -4,6 +4,7 @@ export * from './leaderboard-entry';
 export * from './message';
 export * from './meta-data';
 export * from './pull-request-bad-practice';
+export * from './pull-request-bad-practice-rule';
 export * from './pull-request-base-info';
 export * from './pull-request-info';
 export * from './pull-request-review-info';

@@ -9,11 +9,15 @@
  * https://openapi-generator.tech
  * Do not edit the class manually.
  */
+import { RepositoryInfo } from './repository-info';
 
 
-export interface PullRequestBadPractice { 
+export interface PullRequestBadPracticeRule { 
+    id?: number;
     title?: string;
     description?: string;
-    resolved?: boolean;
+    conditions?: string;
+    repository?: RepositoryInfo;
+    active?: boolean;
 }
 

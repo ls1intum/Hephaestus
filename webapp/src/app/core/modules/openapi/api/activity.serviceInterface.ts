@@ -14,6 +14,8 @@ import { HttpHeaders }                                       from '@angular/comm
 import { Observable }                                        from 'rxjs';
 
 import { Activity } from '../model/models';
+import { PullRequestBadPractice } from '../model/models';
+import { PullRequestBadPracticeRule } from '../model/models';
 
 
 import { Configuration }                                     from '../configuration';
@@ -29,6 +31,27 @@ export interface ActivityServiceInterface {
      * 
      * @param login 
      */
+    detectBadPracticesByUser(login: string, extraHttpRequestParams?: any): Observable<Array<PullRequestBadPractice>>;
+
+    /**
+     * 
+     * 
+     * @param login 
+     */
     getActivityByUser(login: string, extraHttpRequestParams?: any): Observable<Activity>;
+
+    /**
+     * 
+     * 
+     * @param repository 
+     */
+    getRulesByRepository(repository: string, extraHttpRequestParams?: any): Observable<Array<PullRequestBadPracticeRule>>;
+
+    /**
+     * 
+     * 
+     * @param pullRequestBadPracticeRule 
+     */
+    updateOrCreateRule(pullRequestBadPracticeRule: PullRequestBadPracticeRule, extraHttpRequestParams?: any): Observable<PullRequestBadPracticeRule>;
 
 }

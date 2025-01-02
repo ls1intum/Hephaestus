@@ -29,6 +29,7 @@ model/leaderboard-entry.ts
 model/message.ts
 model/meta-data.ts
 model/models.ts
+model/pull-request-bad-practice-rule.ts
 model/pull-request-bad-practice.ts
 model/pull-request-base-info.ts
 model/pull-request-info.ts
