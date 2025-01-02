@@ -2,7 +2,6 @@ package de.tum.in.www1.hephaestus.activity.badpracticedetector;
 
 import de.tum.in.www1.hephaestus.activity.PullRequestBadPracticeRepository;
 import de.tum.in.www1.hephaestus.activity.model.PullRequestBadPractice;
-import de.tum.in.www1.hephaestus.activity.model.PullRequestBadPracticeType;
 import de.tum.in.www1.hephaestus.gitprovider.pullrequest.PullRequest;
 import java.util.List;
 import org.slf4j.Logger;
@@ -20,17 +19,20 @@ public class PullRequestBadPracticeDetector {
 
     public List<PullRequestBadPractice> detectAndSyncBadPractices(PullRequest pullRequest) {
         logger.info(
-            "Detecting bad practices for pull request: {}.",
-            pullRequest.getId()
+                "Detecting bad practices for pull request: {}.",
+                pullRequest.getId()
         );
 
         List<PullRequestBadPractice> existingBadPractices = pullRequestBadPracticeRepository.findByPullRequestId(
-            pullRequest.getId()
+                pullRequest.getId()
         );
 
         //TODO connect LLM based detection
         List<PullRequestBadPractice> newBadPractices = List.of();
 
+        return newBadPractices;
+    }
+/*
         updateExistingBadPractices(existingBadPractices, newBadPractices);
 
         return saveBadPractices(existingBadPractices, newBadPractices);
@@ -40,14 +42,9 @@ public class PullRequestBadPracticeDetector {
         List<PullRequestBadPractice> existingBadPractices,
         List<PullRequestBadPractice> detectedBadPractices
     ) {
-        List<PullRequestBadPracticeType> existingTypes = existingBadPractices
-            .stream()
-            .map(PullRequestBadPractice::getType)
-            .toList();
-
         List<PullRequestBadPractice> newBadPractices = detectedBadPractices
             .stream()
-            .filter(badPractice -> !existingTypes.contains(badPractice.getType()))
+            .filter(badPractice -> !existingBadPractices.contains(badPractice))
             .toList();
 
         return pullRequestBadPracticeRepository.saveAll(newBadPractices);
@@ -69,5 +66,5 @@ public class PullRequestBadPracticeDetector {
                 pullRequestBadPracticeRepository.save(existingBadPractice);
             }
         }
-    }
+    }*/
 }

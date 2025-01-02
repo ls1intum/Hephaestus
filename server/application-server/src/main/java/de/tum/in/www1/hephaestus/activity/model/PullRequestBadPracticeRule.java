@@ -1,6 +1,6 @@
 package de.tum.in.www1.hephaestus.activity.model;
 
-import de.tum.in.www1.hephaestus.gitprovider.pullrequest.PullRequest;
+import de.tum.in.www1.hephaestus.gitprovider.repository.Repository;
 import jakarta.persistence.Entity;
 import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
@@ -11,22 +11,24 @@ import lombok.Setter;
 import lombok.ToString;
 
 @Entity
-@Getter
 @Setter
+@Getter
 @NoArgsConstructor
 @ToString
-public class PullRequestBadPractice {
+public class PullRequestBadPracticeRule {
 
-    @Id
+   @Id
     private Long id;
 
-    @ManyToOne
-    @JoinColumn(name = "rule_id")
-    private PullRequestBadPracticeRule rule;
+   private String title;
 
-    @ManyToOne
-    @JoinColumn(name = "pullrequest_id")
-    private PullRequest pullrequest;
+   private String description;
 
-    private boolean resolved;
+   private String conditions;
+
+   @ManyToOne
+   @JoinColumn(name = "repository_id")
+   private Repository repository;
+
+    private boolean active;
 }
