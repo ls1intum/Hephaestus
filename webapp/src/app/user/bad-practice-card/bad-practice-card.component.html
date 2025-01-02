@@ -1,6 +1,13 @@
-<a class="shadow-sm">
+<div class="flex flex-row justify-start items-center gap-2">
   <div>
-    <h1 class="text-lg font-semibold">{{ title() }}</h1>
-    <div class="text-sm">{{ description() }}</div>
+    @if (resolved()) {
+      <ng-icon [svg]="octCheck" size="24" class="text-github-success-foreground" />
+    } @else {
+      <ng-icon [svg]="octX" size="24" class="text-github-danger-foreground" />
+    }
   </div>
-</a>
+  <div class="flex flex-col">
+    <h1 class="text-lg font-semibold">{{ title() }}</h1>
+    <p class="text-sm">{{ description() }}</p>
+  </div>
+</div>

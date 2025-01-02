@@ -1,7 +1,7 @@
 import { Component, computed, input } from '@angular/core';
 import { PullRequestInfo, LabelInfo, PullRequestBadPractice } from '@app/core/modules/openapi';
 import { NgIcon } from '@ng-icons/core';
-import { octCheck, octComment, octFileDiff, octGitPullRequest, octGitPullRequestClosed, octGitPullRequestDraft, octGitMerge, octX } from '@ng-icons/octicons';
+import { octCheck, octComment, octFileDiff, octGitPullRequest, octGitPullRequestClosed, octGitPullRequestDraft, octGitMerge, octX, octFold } from '@ng-icons/octicons';
 import { HlmCardModule } from '@spartan-ng/ui-card-helm';
 import { HlmSkeletonComponent } from '@spartan-ng/ui-skeleton-helm';
 
@@ -10,6 +10,9 @@ import { BadPracticeCardComponent } from '@app/user/bad-practice-card/bad-practi
 import { BrnSeparatorComponent } from '@spartan-ng/ui-separator-brain';
 import { HlmSeparatorDirective } from '@spartan-ng/ui-separator-helm';
 import { BrnCollapsibleComponent, BrnCollapsibleContentComponent, BrnCollapsibleTriggerDirective } from '@spartan-ng/ui-collapsible-brain';
+import { HlmButtonDirective } from '@spartan-ng/ui-button-helm';
+import { GithubLabelComponent } from '@app/ui/github-label/github-label.component';
+import { cn } from '@app/utils';
 
 @Component({
   selector: 'app-pull-request-bad-practice-card',
@@ -23,7 +26,9 @@ import { BrnCollapsibleComponent, BrnCollapsibleContentComponent, BrnCollapsible
     HlmSeparatorDirective,
     BrnCollapsibleComponent,
     BrnCollapsibleContentComponent,
-    BrnCollapsibleTriggerDirective
+    BrnCollapsibleTriggerDirective,
+    HlmButtonDirective,
+    GithubLabelComponent
   ],
   standalone: true
 })
@@ -32,6 +37,7 @@ export class PullRequestBadPracticeCardComponent {
   protected readonly octX = octX;
   protected readonly octComment = octComment;
   protected readonly octFileDiff = octFileDiff;
+  protected readonly octFold = octFold;
 
   isLoading = input(false);
   class = input('');
@@ -50,6 +56,7 @@ export class PullRequestBadPracticeCardComponent {
 
   displayCreated = computed(() => dayjs(this.createdAt()));
   displayTitle = computed(() => (this.title() ?? '').replace(/`([^`]+)`/g, '<code class="textCode">$1</code>'));
+  computedClass = computed(() => cn('w-full', !this.isLoading() ? 'hover:bg-accent/50 cursor-pointer' : '', this.class()));
 
   issueIconAndColor = computed(() => {
     var icon: string;

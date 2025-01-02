@@ -14,8 +14,7 @@ export const Default: Story = {
   args: {
     title: 'Avoid using any type',
     description: 'Using the any type defeats the purpose of TypeScript.',
-    repositoryName: 'Hepheastus',
-    number: 200
+    resolved: false
   }
 };
 /*

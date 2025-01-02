@@ -38,3 +38,33 @@ export const Default: Story = {
     ]
   }
 };
+
+export const isLoading: Story = {
+  args: {
+    title: 'Add feature X',
+    number: 12,
+    additions: 10,
+    deletions: 5,
+    htmlUrl: 'http://example.com',
+    state: 'OPEN',
+    isDraft: false,
+    isMerged: false,
+    repositoryName: 'Artemis',
+    createdAt: '2024-01-01',
+    pullRequestLabels: [
+      { id: 1, name: 'bug', color: 'f00000' },
+      { id: 2, name: 'enhancement', color: '008000' }
+    ],
+    badPractices: [
+      {
+        title: 'Avoid using any type',
+        description: 'Using the any type defeats the purpose of TypeScript.'
+      },
+      {
+        title: 'Unchecked checkbox in description',
+        description: 'Unchecked checkboxes in the description are not allowed.'
+      }
+    ],
+    isLoading: true
+  }
+};
