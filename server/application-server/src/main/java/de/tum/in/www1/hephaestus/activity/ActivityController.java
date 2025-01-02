@@ -28,7 +28,7 @@ public class ActivityController {
         return ResponseEntity.ok(badPractices);
     }
 
-    @GetMapping("/rules/{repository")
+    @GetMapping("/rules/{repository}")
     public ResponseEntity<List<PullRequestBadPracticeRuleDTO>> getRulesByRepository(@PathVariable String repository) {
         List<PullRequestBadPracticeRuleDTO> rules = activityService.getRules(repository);
         return ResponseEntity.ok(rules);
