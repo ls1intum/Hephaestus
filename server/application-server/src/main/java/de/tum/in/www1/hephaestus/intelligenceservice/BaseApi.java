@@ -1,14 +1,11 @@
 package de.tum.in.www1.hephaestus.intelligenceservice;
 
+import org.springframework.web.client.RestClientException;
 import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.client.RestClientException;
 
-@jakarta.annotation.Generated(
-    value = "org.openapitools.codegen.languages.JavaClientCodegen",
-    comments = "Generator version: 7.7.0"
-)
+@jakarta.annotation.Generated(value = "org.openapitools.codegen.languages.JavaClientCodegen", comments = "Generator version: 7.7.0")
 public abstract class BaseApi {
 
     protected ApiClient apiClient;
@@ -60,8 +57,7 @@ public abstract class BaseApi {
      * @return ResponseEntity in the specified type.
      * @throws RestClientException if an error occurs while attempting to invoke the API
      */
-    public <T> ResponseEntity<T> invokeAPI(String url, HttpMethod method, ParameterizedTypeReference<T> returnType)
-        throws RestClientException {
+    public <T> ResponseEntity<T> invokeAPI(String url, HttpMethod method, ParameterizedTypeReference<T> returnType) throws RestClientException {
         return invokeAPI(url, method, null, returnType);
     }
 
@@ -74,10 +70,5 @@ public abstract class BaseApi {
      * @return ResponseEntity in the specified type.
      * @throws RestClientException if an error occurs while attempting to invoke the API
      */
-    public abstract <T> ResponseEntity<T> invokeAPI(
-        String url,
-        HttpMethod method,
-        Object request,
-        ParameterizedTypeReference<T> returnType
-    ) throws RestClientException;
+    public abstract <T> ResponseEntity<T> invokeAPI(String url, HttpMethod method, Object request, ParameterizedTypeReference<T> returnType) throws RestClientException;
 }
