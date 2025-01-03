@@ -86,6 +86,14 @@ paths:
       responses:
         "200":
           description: OK
+  /workspace/league/reset:
+    put:
+      tags:
+      - workspace
+      operationId: resetAndRecalculateLeagues
+      responses:
+        "200":
+          description: OK
   /workspace/team/{teamId}/repository/{repositoryOwner}/{repositoryName}:
     post:
       tags:

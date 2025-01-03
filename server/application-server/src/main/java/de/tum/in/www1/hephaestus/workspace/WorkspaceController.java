@@ -137,4 +137,14 @@ public class WorkspaceController {
             .map(ResponseEntity::ok)
             .orElseGet(() -> ResponseEntity.notFound().build());
     }
+
+    @PutMapping("/league/reset")
+    public ResponseEntity<Void> resetAndRecalculateLeagues() {
+        try {
+            workspaceService.resetAndRecalculateLeagues();
+            return ResponseEntity.ok().build();
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().build();
+        }
+    }
 }
