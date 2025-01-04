@@ -62,7 +62,6 @@ export class HomeComponent {
     queryFn: async () => lastValueFrom(this.metaService.getMetaData())
   }));
 
-
   userMeQuery = injectQuery(() => ({
     enabled: !!this.user(),
     queryKey: ['user', { id: this.user()?.username }],
