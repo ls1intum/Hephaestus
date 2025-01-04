@@ -18,7 +18,7 @@
             <p hlmAlertDesc>We couldn't load the leaderboard. Please try again later.</p>
           </div>
         } @else {
-          <app-leaderboard-league [leaguePoints]="1400" />
+          <app-leaderboard-league [leaguePoints]="userMeQuery.data()?.userInfo?.leaguePoints" />
           <div class="border rounded-md border-input overflow-auto">
             <app-leaderboard [leaderboard]="query.data()" [isLoading]="query.isPending()" />
           </div>

@@ -1,4 +1,4 @@
-import { Component, computed, input, signal, OnInit } from '@angular/core';
+import { Component, computed, input } from '@angular/core';
 import { HlmCardModule } from '@spartan-ng/ui-card-helm';
 import { BrnProgressComponent, BrnProgressIndicatorComponent } from '@spartan-ng/ui-progress-brain';
 import { HlmProgressIndicatorDirective } from '@spartan-ng/ui-progress-helm';
@@ -13,18 +13,12 @@ import { LucideAngularModule, Star } from 'lucide-angular';
   imports: [HlmCardModule, LeagueIconComponent, BrnProgressComponent, BrnProgressIndicatorComponent, HlmProgressIndicatorDirective, HlmButtonModule, LucideAngularModule],
   templateUrl: './elo-card.component.html'
 })
-export class LeagueEloCardComponent implements OnInit {
+export class LeagueEloCardComponent {
   protected Star = Star;
   protected Infinity = Infinity;
   leaguePoints = input<number>();
 
   currentLeague = computed(() => getLeagueFromPoints(this.leaguePoints()!));
 
-  progressValue = signal(0);
-
-  ngOnInit() {
-    if (this.leaguePoints() && this.currentLeague()) {
-      this.progressValue.set(((this.leaguePoints()! - this.currentLeague()!.minPoints) * 100) / (this.currentLeague()!.maxPoints - this.currentLeague()!.minPoints));
-    }
-  }
+  progressValue = computed(() => ((this.leaguePoints()! - this.currentLeague()!.minPoints) * 100) / (this.currentLeague()!.maxPoints - this.currentLeague()!.minPoints));
 }

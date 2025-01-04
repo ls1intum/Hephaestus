@@ -33,7 +33,7 @@ type LeagueVariants = VariantProps<typeof leagueVariants>;
   selector: 'app-icon-league',
   standalone: true,
   imports: [LucideAngularModule],
-  template: ` <lucide-angular [img]="Crown" strokeWidth="2px" [class]="computedClass()" /> `
+  template: ` <lucide-angular [img]="Crown" strokeWidth="2px" [class]="computedClass()" [title]="computedLeague()" /> `
 })
 export class LeagueIconComponent {
   protected Crown = Crown;

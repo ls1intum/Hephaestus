@@ -11,7 +11,7 @@ import { LeaderboardComponent } from '@app/home/leaderboard/leaderboard.componen
 import { LeaderboardFilterComponent } from './leaderboard/filter/filter.component';
 import { SecurityStore } from '@app/core/security/security-store.service';
 import { HlmAlertModule } from '@spartan-ng/ui-alert-helm';
-import { MetaService } from '@app/core/modules/openapi';
+import { MetaService, UserService } from '@app/core/modules/openapi';
 import { LeaderboardLegendComponent } from './leaderboard/legend/legends.component';
 import { LeaderboardLeagueComponent } from './leaderboard/league/league.component';
 
@@ -29,6 +29,7 @@ export class HomeComponent {
   securityStore = inject(SecurityStore);
   metaService = inject(MetaService);
   leaderboardService = inject(LeaderboardService);
+  userService = inject(UserService);
 
   signedIn = this.securityStore.signedIn;
   user = this.securityStore.loadedUser;
@@ -59,5 +60,12 @@ export class HomeComponent {
   metaQuery = injectQuery(() => ({
     queryKey: ['meta'],
     queryFn: async () => lastValueFrom(this.metaService.getMetaData())
+  }));
+
+
+  userMeQuery = injectQuery(() => ({
+    enabled: !!this.user(),
+    queryKey: ['user', { id: this.user()?.username }],
+    queryFn: async () => lastValueFrom(this.userService.getUserProfile(this.user()!.username))
   }));
 }
