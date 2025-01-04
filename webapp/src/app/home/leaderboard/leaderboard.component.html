@@ -31,7 +31,7 @@
           </td>
         </tr>
       }
-    } @else if (!leaderboard() || leaderboard()?.length === 0) {
+    } @else if (!adjustedLeaderboard() || adjustedLeaderboard()?.length === 0) {
       <tr appTableRow>
         <td appTableCell colspan="4">
           <div class="flex flex-col items-center justify-center gap-2 mt-1">
@@ -41,7 +41,7 @@
         </td>
       </tr>
     } @else {
-      @for (entry of leaderboard(); track entry.user.login) {
+      @for (entry of adjustedLeaderboard(); track entry.user.login) {
         <tr appTableRow routerLink="/user/{{ entry.user.login }}" routerLinkActive="active" ariaCurrentWhenActive="page" [class]="trClass(entry)">
           <td appTableCell class="text-center">{{ entry.rank }}</td>
           <td appTableCell class="py-2">
