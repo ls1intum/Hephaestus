@@ -53,6 +53,7 @@ export class LeaderboardComponent {
   leaderboard = input<LeaderboardEntry[]>();
   isLoading = input<boolean>();
 
+  // Leaderboard with the current user's entry at the top
   protected adjustedLeaderboard = computed(() => {
     const entries = this.leaderboard();
     if (!this.signedIn() || !entries || entries.length === 0) return entries;
