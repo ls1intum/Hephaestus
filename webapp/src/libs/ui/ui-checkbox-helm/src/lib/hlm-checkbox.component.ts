@@ -12,10 +12,9 @@ export const HLM_CHECKBOX_VALUE_ACCESSOR = {
 };
 
 @Component({
-	selector: 'hlm-checkbox',
-	standalone: true,
-	imports: [BrnCheckboxComponent, HlmCheckboxCheckIconComponent],
-	template: `
+    selector: 'hlm-checkbox',
+    imports: [BrnCheckboxComponent, HlmCheckboxCheckIconComponent],
+    template: `
 		<brn-checkbox
 			[id]="id()"
 			[name]="name()"
@@ -32,14 +31,14 @@ export const HLM_CHECKBOX_VALUE_ACCESSOR = {
 			<hlm-checkbox-checkicon [class]="checkIconClass()" [iconName]="checkIconName()" />
 		</brn-checkbox>
 	`,
-	host: {
-		class: 'contents',
-		'[attr.id]': 'null',
-		'[attr.aria-label]': 'null',
-		'[attr.aria-labelledby]': 'null',
-		'[attr.aria-describedby]': 'null',
-	},
-	providers: [HLM_CHECKBOX_VALUE_ACCESSOR],
+    host: {
+        class: 'contents',
+        '[attr.id]': 'null',
+        '[attr.aria-label]': 'null',
+        '[attr.aria-labelledby]': 'null',
+        '[attr.aria-describedby]': 'null',
+    },
+    providers: [HLM_CHECKBOX_VALUE_ACCESSOR]
 })
 export class HlmCheckboxComponent {
 	public readonly userClass = input<ClassValue>('', { alias: 'class' });

@@ -13,17 +13,16 @@ export const HLM_SWITCH_VALUE_ACCESSOR = {
 };
 
 @Component({
-	selector: 'hlm-switch',
-	imports: [BrnSwitchThumbComponent, BrnSwitchComponent, HlmSwitchThumbDirective],
-	standalone: true,
-	host: {
-		class: 'contents',
-		'[attr.id]': 'null',
-		'[attr.aria-label]': 'null',
-		'[attr.aria-labelledby]': 'null',
-		'[attr.aria-describedby]': 'null',
-	},
-	template: `
+    selector: 'hlm-switch',
+    imports: [BrnSwitchThumbComponent, BrnSwitchComponent, HlmSwitchThumbDirective],
+    host: {
+        class: 'contents',
+        '[attr.id]': 'null',
+        '[attr.aria-label]': 'null',
+        '[attr.aria-labelledby]': 'null',
+        '[attr.aria-describedby]': 'null',
+    },
+    template: `
 		<brn-switch
 			[class]="_computedClass()"
 			[checked]="checked()"
@@ -38,7 +37,7 @@ export const HLM_SWITCH_VALUE_ACCESSOR = {
 			<brn-switch-thumb hlm />
 		</brn-switch>
 	`,
-	providers: [HLM_SWITCH_VALUE_ACCESSOR],
+    providers: [HLM_SWITCH_VALUE_ACCESSOR]
 })
 export class HlmSwitchComponent {
 	public readonly userClass = input<ClassValue>('', { alias: 'class' });

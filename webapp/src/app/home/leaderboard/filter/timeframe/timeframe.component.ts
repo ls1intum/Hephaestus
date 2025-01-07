@@ -35,11 +35,10 @@ function formatLabel(weekIndex: number) {
 }
 
 @Component({
-  selector: 'app-leaderboard-filter-timeframe',
-  standalone: true,
-  imports: [BrnSelectModule, HlmSelectModule, HlmLabelModule, FormsModule, HlmTooltipComponent, HlmTooltipTriggerDirective, BrnTooltipContentDirective, HlmIconComponent],
-  providers: [provideIcons({ lucideCircleHelp })],
-  templateUrl: './timeframe.component.html'
+    selector: 'app-leaderboard-filter-timeframe',
+    imports: [BrnSelectModule, HlmSelectModule, HlmLabelModule, FormsModule, HlmTooltipComponent, HlmTooltipTriggerDirective, BrnTooltipContentDirective, HlmIconComponent],
+    providers: [provideIcons({ lucideCircleHelp })],
+    templateUrl: './timeframe.component.html'
 })
 export class LeaderboardFilterTimeframeComponent {
   private readonly route = inject(ActivatedRoute);

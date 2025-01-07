@@ -4,14 +4,13 @@ import { BrnAvatarFallbackDirective, BrnAvatarImageDirective } from '@spartan-ng
 import { HlmAvatarComponent } from './hlm-avatar.component';
 
 @Component({
-	selector: 'hlm-mock',
-	imports: [BrnAvatarImageDirective, BrnAvatarFallbackDirective, HlmAvatarComponent],
-	template: `
+    selector: 'hlm-mock',
+    imports: [BrnAvatarImageDirective, BrnAvatarFallbackDirective, HlmAvatarComponent],
+    template: `
 		<hlm-avatar [class]="class" id="fallbackOnly">
 			<span brnAvatarFallback>fallback</span>
 		</hlm-avatar>
-	`,
-	standalone: true,
+	`
 })
 class MockComponent {
 	@Input() public class = '';

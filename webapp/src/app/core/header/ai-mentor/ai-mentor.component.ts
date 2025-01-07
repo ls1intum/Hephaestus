@@ -6,10 +6,9 @@ import { HlmTooltipComponent, HlmTooltipTriggerDirective } from '@spartan-ng/ui-
 import { LucideAngularModule, BotMessageSquare } from 'lucide-angular';
 
 @Component({
-  selector: 'app-ai-mentor',
-  standalone: true,
-  imports: [LucideAngularModule, HlmButtonModule, HlmTooltipComponent, HlmTooltipTriggerDirective, BrnTooltipContentDirective, RouterModule],
-  templateUrl: './ai-mentor.component.html'
+    selector: 'app-ai-mentor',
+    imports: [LucideAngularModule, HlmButtonModule, HlmTooltipComponent, HlmTooltipTriggerDirective, BrnTooltipContentDirective, RouterModule],
+    templateUrl: './ai-mentor.component.html'
 })
 export class AiMentorComponent {
   protected BotMessageSquare = BotMessageSquare;

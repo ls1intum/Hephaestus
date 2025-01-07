@@ -6,10 +6,9 @@ import { GitHub } from 'app/@types/github';
 import { HlmAvatarModule } from '@spartan-ng/ui-avatar-helm';
 
 @Component({
-  selector: 'app-about',
-  standalone: true,
-  imports: [HlmAvatarModule],
-  templateUrl: './about.component.html'
+    selector: 'app-about',
+    imports: [HlmAvatarModule],
+    templateUrl: './about.component.html'
 })
 export class AboutComponent {
   http = inject(HttpClient);

@@ -6,16 +6,15 @@ import { HlmIconComponent, provideIcons } from '@spartan-ng/ui-icon-helm';
 import type { ClassValue } from 'clsx';
 
 @Component({
-	selector: 'hlm-checkbox-checkicon',
-	standalone: true,
-	imports: [HlmIconComponent],
-	providers: [provideIcons({ lucideCheck })],
-	host: {
-		'[class]': '_computedClass()',
-	},
-	template: `
+    selector: 'hlm-checkbox-checkicon',
+    imports: [HlmIconComponent],
+    providers: [provideIcons({ lucideCheck })],
+    host: {
+        '[class]': '_computedClass()',
+    },
+    template: `
 		<hlm-icon size="sm" [name]="iconName()" />
-	`,
+	`
 })
 export class HlmCheckboxCheckIconComponent {
 	private readonly _brnCheckbox = inject(BrnCheckboxComponent);

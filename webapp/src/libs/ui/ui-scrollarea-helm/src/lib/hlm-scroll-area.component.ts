@@ -12,10 +12,9 @@ import type { ClassValue } from 'clsx';
 import { NgScrollbarModule } from 'ngx-scrollbar';
 
 @Component({
-	selector: 'hlm-scroll-area',
-	standalone: true,
-	imports: [NgScrollbarModule],
-	template: `
+    selector: 'hlm-scroll-area',
+    imports: [NgScrollbarModule],
+    template: `
 		<ng-scrollbar
 			[visibility]="visibility()"
 			[autoHeightDisabled]="autoHeightDisabled()"
@@ -32,11 +31,11 @@ import { NgScrollbarModule } from 'ngx-scrollbar';
 			<ng-content />
 		</ng-scrollbar>
 	`,
-	changeDetection: ChangeDetectionStrategy.OnPush,
-	encapsulation: ViewEncapsulation.None,
-	host: {
-		'[class]': '_computedClass()',
-	},
+    changeDetection: ChangeDetectionStrategy.OnPush,
+    encapsulation: ViewEncapsulation.None,
+    host: {
+        '[class]': '_computedClass()',
+    }
 })
 export class HlmScrollAreaComponent {
 	protected readonly _computedClass = computed(() => hlm('block', this.userClass()));

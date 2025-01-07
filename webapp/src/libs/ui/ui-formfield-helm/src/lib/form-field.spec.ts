@@ -15,10 +15,9 @@ import { HlmHintDirective } from './hlm-hint.directive';
 const DIRECTIVES = [HlmFormFieldComponent, HlmErrorDirective, HlmHintDirective, HlmInputDirective];
 
 @Component({
-	standalone: true,
-	selector: 'single-form-field-example',
-	imports: [ReactiveFormsModule, ...DIRECTIVES],
-	template: `
+    selector: 'single-form-field-example',
+    imports: [ReactiveFormsModule, ...DIRECTIVES],
+    template: `
 		<hlm-form-field>
 			<input
 				data-testid="hlm-input"
@@ -32,17 +31,16 @@ const DIRECTIVES = [HlmFormFieldComponent, HlmErrorDirective, HlmHintDirective, 
 			<hlm-error data-testid="hlm-error">Your name is required</hlm-error>
 			<hlm-hint data-testid="hlm-hint">This is your public display name.</hlm-hint>
 		</hlm-form-field>
-	`,
+	`
 })
 class SingleFormFieldMock {
 	public name = new FormControl('', Validators.required);
 }
 
 @Component({
-	standalone: true,
-	selector: 'single-form-field-dirty-example',
-	imports: [ReactiveFormsModule, ...DIRECTIVES],
-	template: `
+    selector: 'single-form-field-dirty-example',
+    imports: [ReactiveFormsModule, ...DIRECTIVES],
+    template: `
 		<hlm-form-field>
 			<input
 				data-testid="hlm-input"
@@ -57,7 +55,7 @@ class SingleFormFieldMock {
 			<hlm-hint data-testid="hlm-hint">This is your public display name.</hlm-hint>
 		</hlm-form-field>
 	`,
-	providers: [{ provide: ErrorStateMatcher, useClass: ShowOnDirtyErrorStateMatcher }],
+    providers: [{ provide: ErrorStateMatcher, useClass: ShowOnDirtyErrorStateMatcher }]
 })
 class SingleFormFieldDirtyMock {
 	public name = new FormControl('', Validators.required);

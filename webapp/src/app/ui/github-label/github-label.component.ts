@@ -3,19 +3,18 @@ import type { LabelInfo } from '@app/core/modules/openapi';
 import { HlmSkeletonModule } from '@spartan-ng/ui-skeleton-helm';
 
 @Component({
-  selector: 'app-github-label',
-  standalone: true,
-  imports: [HlmSkeletonModule],
-  styleUrls: ['./github-label.component.scss'],
-  host: {
-    '[style.--label-r]': 'colors().r',
-    '[style.--label-g]': 'colors().g',
-    '[style.--label-b]': 'colors().b',
-    '[style.--label-h]': 'colors().h',
-    '[style.--label-s]': 'colors().s',
-    '[style.--label-l]': 'colors().l'
-  },
-  template: `
+    selector: 'app-github-label',
+    imports: [HlmSkeletonModule],
+    styleUrls: ['./github-label.component.scss'],
+    host: {
+        '[style.--label-r]': 'colors().r',
+        '[style.--label-g]': 'colors().g',
+        '[style.--label-b]': 'colors().b',
+        '[style.--label-h]': 'colors().h',
+        '[style.--label-s]': 'colors().s',
+        '[style.--label-l]': 'colors().l'
+    },
+    template: `
     @if (isLoading()) {
       <hlm-skeleton class="w-14 h-6" />
     } @else {

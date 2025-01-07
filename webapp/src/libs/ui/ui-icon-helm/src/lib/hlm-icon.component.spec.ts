@@ -6,14 +6,13 @@ import { type RenderResult, render } from '@testing-library/angular';
 import { HlmIconComponent } from './hlm-icon.component';
 
 @Component({
-	selector: 'hlm-mock',
-	standalone: true,
-	changeDetection: ChangeDetectionStrategy.OnPush,
-	imports: [HlmIconComponent],
-	providers: [provideIcons({ lucideCheck })],
-	template: `
+    selector: 'hlm-mock',
+    changeDetection: ChangeDetectionStrategy.OnPush,
+    imports: [HlmIconComponent],
+    providers: [provideIcons({ lucideCheck })],
+    template: `
 		<hlm-icon class="test" ngIconClass="test2" name="lucideCheck" [size]="size" color="red" strokeWidth="2" />
-	`,
+	`
 })
 class HlmMockComponent {
 	@Input() public size = 'base';

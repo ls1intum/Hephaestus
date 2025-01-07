@@ -15,29 +15,28 @@ import { provideIcons } from '@ng-icons/core';
 import { AiMentorComponent } from './ai-mentor/ai-mentor.component';
 
 @Component({
-  selector: 'app-header',
-  templateUrl: './header.component.html',
-  standalone: true,
-  imports: [
-    RouterLink,
-    RouterModule,
-    LucideAngularModule,
-    ThemeSwitcherComponent,
-    HlmButtonModule,
-    RequestFeatureComponent,
-    HlmAvatarModule,
-    HlmMenuModule,
-    BrnMenuTriggerDirective,
-    HlmIconComponent,
-    AiMentorComponent
-  ],
-  providers: [
-    provideIcons({
-      lucideUser,
-      lucideLogOut,
-      lucideSettings
-    })
-  ]
+    selector: 'app-header',
+    templateUrl: './header.component.html',
+    imports: [
+        RouterLink,
+        RouterModule,
+        LucideAngularModule,
+        ThemeSwitcherComponent,
+        HlmButtonModule,
+        RequestFeatureComponent,
+        HlmAvatarModule,
+        HlmMenuModule,
+        BrnMenuTriggerDirective,
+        HlmIconComponent,
+        AiMentorComponent
+    ],
+    providers: [
+        provideIcons({
+            lucideUser,
+            lucideLogOut,
+            lucideSettings
+        })
+    ]
 })
 export class HeaderComponent {
   protected Hammer = Hammer;

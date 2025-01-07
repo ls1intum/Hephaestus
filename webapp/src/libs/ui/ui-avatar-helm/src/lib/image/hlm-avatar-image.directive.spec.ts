@@ -3,12 +3,11 @@ import { type ComponentFixture, TestBed } from '@angular/core/testing';
 import { HlmAvatarImageDirective } from './hlm-avatar-image.directive';
 
 @Component({
-	selector: 'hlm-mock',
-	standalone: true,
-	imports: [HlmAvatarImageDirective],
-	template: `
+    selector: 'hlm-mock',
+    imports: [HlmAvatarImageDirective],
+    template: `
 		<img hlmAvatarImage alt="Avatar image" [class]="userCls" />
-	`,
+	`
 })
 class HlmMockComponent {
 	public userCls = '';

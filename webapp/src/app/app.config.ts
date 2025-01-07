@@ -1,4 +1,4 @@
-import { APP_INITIALIZER, ApplicationConfig, ErrorHandler, provideExperimentalZonelessChangeDetection } from '@angular/core';
+import { ApplicationConfig, ErrorHandler, provideExperimentalZonelessChangeDetection, inject, provideAppInitializer } from '@angular/core';
 import { provideRouter, Router } from '@angular/router';
 import { provideAnimationsAsync } from '@angular/platform-browser/animations/async';
 import { provideHttpClient, withInterceptors } from '@angular/common/http';
@@ -25,14 +25,17 @@ export const appConfig: ApplicationConfig = {
     provideHttpClient(withInterceptors([securityInterceptor])),
     provideAnimationsAsync(),
     { provide: BASE_PATH, useValue: environment.serverUrl },
-    { provide: APP_INITIALIZER, useFactory: initializeAnalytics, multi: true, deps: [AnalyticsService] },
+    provideAppInitializer(() => {
+      const initializerFn = initializeAnalytics(inject(AnalyticsService));
+      return initializerFn();
+    }),
     { provide: ErrorHandler, useClass: SentryErrorHandler },
     { provide: TraceService, deps: [Router] },
-    {
-      provide: APP_INITIALIZER,
-      useFactory: () => () => {},
-      deps: [TraceService],
-      multi: true
-    }
+    provideAppInitializer(() => {
+      const initializerFn = (() => () => {
+        inject(TraceService);
+      })();
+      return initializerFn();
+    })
   ]
 };

@@ -5,17 +5,16 @@ import { animate, state, style, transition, trigger } from '@angular/animations'
 import { HlmButtonModule } from '@spartan-ng/ui-button-helm';
 
 @Component({
-  selector: 'app-theme-switcher',
-  standalone: true,
-  imports: [HlmButtonModule, LucideAngularModule],
-  templateUrl: './theme-switcher.component.html',
-  animations: [
-    trigger('iconTrigger', [
-      state('*', style({ transform: 'rotate(0deg)' })),
-      transition('light => dark', animate('0.25s ease-out', style({ transform: 'rotate(90deg)' }))),
-      transition('dark => light', animate('0.25s ease-out', style({ transform: 'rotate(360deg)' })))
-    ])
-  ]
+    selector: 'app-theme-switcher',
+    imports: [HlmButtonModule, LucideAngularModule],
+    templateUrl: './theme-switcher.component.html',
+    animations: [
+        trigger('iconTrigger', [
+            state('*', style({ transform: 'rotate(0deg)' })),
+            transition('light => dark', animate('0.25s ease-out', style({ transform: 'rotate(90deg)' }))),
+            transition('dark => light', animate('0.25s ease-out', style({ transform: 'rotate(360deg)' })))
+        ])
+    ]
 })
 export class ThemeSwitcherComponent {
   themeSwitcherService = inject(ThemeSwitcherService);

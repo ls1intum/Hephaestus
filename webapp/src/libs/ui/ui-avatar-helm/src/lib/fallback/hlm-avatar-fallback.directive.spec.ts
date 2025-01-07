@@ -4,12 +4,11 @@ import { hexColorFor, isBright } from '@spartan-ng/ui-avatar-brain';
 import { HlmAvatarFallbackDirective } from './hlm-avatar-fallback.directive';
 
 @Component({
-	selector: 'hlm-mock',
-	standalone: true,
-	imports: [HlmAvatarFallbackDirective],
-	template: `
+    selector: 'hlm-mock',
+    imports: [HlmAvatarFallbackDirective],
+    template: `
 		<span hlmAvatarFallback [class]="userCls" [autoColor]="autoColor">fallback2</span>
-	`,
+	`
 })
 class HlmMockComponent {
 	public userCls = '';

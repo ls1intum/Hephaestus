@@ -13,13 +13,12 @@ import { BrnColumnDefComponent } from '@spartan-ng/ui-table-brain';
 import type { ClassValue } from 'clsx';
 
 @Component({
-	selector: 'hlm-th',
-	standalone: true,
-	imports: [NgTemplateOutlet],
-	host: {
-		'[class]': '_computedClass()',
-	},
-	template: `
+    selector: 'hlm-th',
+    imports: [NgTemplateOutlet],
+    host: {
+        '[class]': '_computedClass()',
+    },
+    template: `
 		<ng-template #content>
 			<ng-content />
 		</ng-template>
@@ -31,8 +30,8 @@ import type { ClassValue } from 'clsx';
 			<ng-container [ngTemplateOutlet]="content" />
 		}
 	`,
-	changeDetection: ChangeDetectionStrategy.OnPush,
-	encapsulation: ViewEncapsulation.None,
+    changeDetection: ChangeDetectionStrategy.OnPush,
+    encapsulation: ViewEncapsulation.None
 })
 export class HlmThComponent {
 	private readonly _columnDef? = inject(BrnColumnDefComponent, { optional: true });

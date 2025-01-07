@@ -6,10 +6,9 @@ import { FooterComponent } from './core/footer/footer.component';
 import { SentryErrorHandler } from './core/sentry/sentry.error-handler';
 
 @Component({
-  selector: 'app-root',
-  standalone: true,
-  imports: [RouterOutlet, AngularQueryDevtools, HeaderComponent, FooterComponent],
-  templateUrl: './app.component.html'
+    selector: 'app-root',
+    imports: [RouterOutlet, AngularQueryDevtools, HeaderComponent, FooterComponent],
+    templateUrl: './app.component.html'
 })
 export class AppComponent {
   title = 'Hephaestus';

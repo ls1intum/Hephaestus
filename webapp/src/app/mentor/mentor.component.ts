@@ -13,20 +13,19 @@ import { HlmAlertModule } from '@spartan-ng/ui-alert-helm';
 import { HlmScrollAreaComponent } from '@spartan-ng/ui-scrollarea-helm';
 
 @Component({
-  selector: 'app-mentor',
-  templateUrl: './mentor.component.html',
-  standalone: true,
-  imports: [
-    CommonModule,
-    StartSessionCardComponent,
-    SessionsCardComponent,
-    MessagesComponent,
-    ChatInputComponent,
-    HlmButtonModule,
-    HlmAlertModule,
-    HlmScrollAreaComponent,
-    LucideAngularModule
-  ]
+    selector: 'app-mentor',
+    templateUrl: './mentor.component.html',
+    imports: [
+        CommonModule,
+        StartSessionCardComponent,
+        SessionsCardComponent,
+        MessagesComponent,
+        ChatInputComponent,
+        HlmButtonModule,
+        HlmAlertModule,
+        HlmScrollAreaComponent,
+        LucideAngularModule
+    ]
 })
 export class MentorComponent {
   protected CircleX = CircleX;
