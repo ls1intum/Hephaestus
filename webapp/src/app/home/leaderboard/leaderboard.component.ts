@@ -16,6 +16,7 @@ import { TableComponent } from 'app/ui/table/table.component';
 import { ReviewsPopoverComponent } from './reviews-popover/reviews-popover.component';
 import { HlmIconComponent, provideIcons } from '@spartan-ng/ui-icon-helm';
 import { lucideAward } from '@ng-icons/lucide';
+import { User } from '@app/core/security/models';
 
 @Component({
   selector: 'app-leaderboard',
@@ -63,15 +64,15 @@ export class LeaderboardComponent {
 
     const userInLeaderboard = entries.find((entry) => entry.user.login.toLowerCase() === currentUser.username);
 
-    return [userInLeaderboard ?? this.defaultSelfEntry(), ...entries];
+    return [userInLeaderboard ?? this.defaultSelfEntry(currentUser), ...entries];
   });
 
-  defaultSelfEntry = computed(() => {
+  defaultSelfEntry = (currentUser: User) => {
     return {
       user: {
-        login: this.user()?.username,
-        avatarUrl: `https://github.com/${this.user()?.username}.png`,
-        name: this.user()?.name
+        login: currentUser.username,
+        avatarUrl: `https://github.com/${currentUser.username}.png`,
+        name: currentUser.name
       },
       rank: this.leaderboard()?.length ?? 0 + 1,
       score: 0,
@@ -83,7 +84,7 @@ export class LeaderboardComponent {
       numberOfUnknowns: 0,
       reviewedPullRequests: [] as PullRequestInfo[]
     } as LeaderboardEntry;
-  });
+  };
 
   trClass = (entry: LeaderboardEntry) => {
     return cn(
