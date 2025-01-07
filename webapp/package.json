@@ -67,7 +67,7 @@
     "dayjs": "1.11.13",
     "embla-carousel-angular": "18.0.0",
     "keycloak-js": "^26.0.0",
-    "lucide-angular": "0.429.0",
+    "lucide-angular": "^0.469.0",
     "ngx-scrollbar": "^13.0.3",
     "ngx-sonner": "^2.0.0",
     "postcss": "8.4.41",
