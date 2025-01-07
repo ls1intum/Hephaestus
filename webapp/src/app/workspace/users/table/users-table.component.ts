@@ -2,7 +2,7 @@ import { SelectionModel } from '@angular/cdk/collections';
 import { Component, TrackByFunction, computed, effect, inject, input, signal } from '@angular/core';
 import { toObservable, toSignal } from '@angular/core/rxjs-interop';
 import { FormsModule } from '@angular/forms';
-import { lucideArrowUpDown, lucideChevronDown, lucideMoreHorizontal, lucideRotateCw, lucideXOctagon } from '@ng-icons/lucide';
+import { lucideArrowUpDown, lucideChevronDown, lucideGripHorizontal, lucideRotateCw, lucideOctagonX } from '@ng-icons/lucide';
 import { HlmButtonModule } from '@spartan-ng/ui-button-helm';
 import { HlmCheckboxComponent } from '@spartan-ng/ui-checkbox-helm';
 import { HlmIconComponent, provideIcons } from '@spartan-ng/ui-icon-helm';
@@ -73,7 +73,7 @@ const LOADING_DATA: UserTeams[] = [
     HlmSkeletonModule,
     GithubLabelComponent
   ],
-  providers: [provideIcons({ lucideChevronDown, lucideMoreHorizontal, lucideArrowUpDown, lucideRotateCw, lucideXOctagon })],
+  providers: [provideIcons({ lucideChevronDown, lucideGripHorizontal, lucideArrowUpDown, lucideRotateCw, lucideOctagonX })],
   templateUrl: './users-table.component.html'
 })
 export class WorkspaceUsersTableComponent {

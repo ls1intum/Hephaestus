@@ -2,7 +2,7 @@ import { SelectionModel } from '@angular/cdk/collections';
 import { Component, TrackByFunction, computed, effect, inject, input, signal } from '@angular/core';
 import { toObservable, toSignal } from '@angular/core/rxjs-interop';
 import { FormControl, FormsModule, ReactiveFormsModule } from '@angular/forms';
-import { lucideArrowUpDown, lucideChevronDown, lucideMoreHorizontal, lucideRotateCw, lucideXOctagon, lucidePlus, lucideCheck, lucideTrash2 } from '@ng-icons/lucide';
+import { lucideArrowUpDown, lucideChevronDown, lucideGripHorizontal, lucideRotateCw, lucideOctagonX, lucidePlus, lucideCheck, lucideTrash2 } from '@ng-icons/lucide';
 import { HlmButtonModule } from '@spartan-ng/ui-button-helm';
 import { HlmIconComponent, provideIcons } from '@spartan-ng/ui-icon-helm';
 import { HlmInputDirective } from '@spartan-ng/ui-input-helm';
@@ -65,7 +65,7 @@ const LOADING_TEAMS: TeamInfo[] = [
     BrnPopoverTriggerDirective,
     GithubLabelComponent
   ],
-  providers: [provideIcons({ lucideChevronDown, lucideMoreHorizontal, lucideArrowUpDown, lucideRotateCw, lucideXOctagon, lucidePlus, lucideCheck, lucideTrash2 })],
+  providers: [provideIcons({ lucideChevronDown, lucideGripHorizontal, lucideArrowUpDown, lucideRotateCw, lucideOctagonX, lucidePlus, lucideCheck, lucideTrash2 })],
   templateUrl: './teams-table.component.html'
 })
 export class WorkspaceTeamsTableComponent {

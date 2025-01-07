@@ -10,7 +10,7 @@ import { BrnTooltipContentDirective } from '@spartan-ng/ui-tooltip-brain';
 import { HlmTooltipComponent, HlmTooltipTriggerDirective } from '@spartan-ng/ui-tooltip-helm';
 import { HlmIconComponent } from '@spartan-ng/ui-icon-helm';
 import { provideIcons } from '@spartan-ng/ui-icon-helm';
-import { lucideHelpCircle } from '@ng-icons/lucide';
+import { lucideCircleHelp } from '@ng-icons/lucide';
 import { injectQuery } from '@tanstack/angular-query-experimental';
 import { lastValueFrom } from 'rxjs';
 import { MetaService } from '@app/core/modules/openapi';
@@ -38,7 +38,7 @@ function formatLabel(weekIndex: number) {
   selector: 'app-leaderboard-filter-timeframe',
   standalone: true,
   imports: [BrnSelectModule, HlmSelectModule, HlmLabelModule, FormsModule, HlmTooltipComponent, HlmTooltipTriggerDirective, BrnTooltipContentDirective, HlmIconComponent],
-  providers: [provideIcons({ lucideHelpCircle })],
+  providers: [provideIcons({ lucideCircleHelp })],
   templateUrl: './timeframe.component.html'
 })
 export class LeaderboardFilterTimeframeComponent {

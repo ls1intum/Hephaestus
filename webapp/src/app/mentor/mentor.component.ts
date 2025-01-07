@@ -89,6 +89,6 @@ export class MentorComponent {
   }));
 
   scrollToBottom() {
-    this.messagesScrollArea()?.scrollbar().scrollTo({ bottom: 0, duration: 300 });
+    // this.messagesScrollArea()?.scrollbar().scrollTo({ bottom: 0, duration: 300 });
   }
 }

@@ -4,20 +4,20 @@ import { ReactiveFormsModule } from '@angular/forms';
 import { HlmButtonModule } from '@spartan-ng/ui-button-helm';
 import { RouterLinkActive, RouterModule, RouterOutlet } from '@angular/router';
 import { HlmIconComponent, provideIcons } from '@spartan-ng/ui-icon-helm';
-import { lucideUserCircle, lucideCog, lucideUsers2 } from '@ng-icons/lucide';
+import { lucideCircleUser, lucideCog, lucideUsers } from '@ng-icons/lucide';
 
 type NavItem = { icon: string; label: string; route: string; exact?: boolean };
 @Component({
   selector: 'app-workspace-layout',
   standalone: true,
   imports: [CommonModule, RouterModule, ReactiveFormsModule, HlmButtonModule, RouterOutlet, RouterLinkActive, HlmIconComponent],
-  providers: [provideIcons({ lucideUserCircle, lucideCog, lucideUsers2 })],
+  providers: [provideIcons({ lucideCircleUser, lucideCog, lucideUsers })],
   templateUrl: './layout.component.html'
 })
 export class WorkspaceLayoutComponent {
   navItems: NavItem[] = [
     { icon: 'lucideCog', label: 'Settings', route: '.', exact: true },
-    { icon: 'lucideUserCircle', label: 'Users', route: 'users' },
-    { icon: 'lucideUsers2', label: 'Teams', route: 'teams' }
+    { icon: 'lucideCircleUser', label: 'Users', route: 'users' },
+    { icon: 'lucideUsers', label: 'Teams', route: 'teams' }
   ];
 }

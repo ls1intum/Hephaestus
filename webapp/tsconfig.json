@@ -25,6 +25,12 @@
       "@app/*": [
         "./app/*"
       ],
+      "@spartan-ng/ui-breadcrumb-helm": [
+        "./libs/ui/ui-breadcrumb-helm/src/index.ts"
+      ],
+      "@spartan-ng/ui-calendar-helm": [
+        "./libs/ui/ui-calendar-helm/src/index.ts"
+      ],
       "@spartan-ng/ui-accordion-helm": [
         "./libs/ui/ui-accordion-helm/src/index.ts"
       ],
