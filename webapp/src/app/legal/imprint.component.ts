@@ -3,7 +3,6 @@ import { environment } from 'environments/environment';
 
 @Component({
   selector: 'app-imprint',
-  standalone: true,
   template: `
     <div class="container prose dark:prose-invert">
       <h1>Imprint</h1>
