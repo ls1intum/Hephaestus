@@ -25,29 +25,29 @@ import { LucideAngularModule, Trash2 } from 'lucide-angular';
 import { FormsModule } from '@angular/forms';
 
 @Component({
-    selector: 'app-workspace',
-    imports: [
-        FormsModule,
-        CommonModule,
-        RouterModule,
-        HlmCardModule,
-        HlmInputDirective,
-        HlmSkeletonModule,
-        HlmScrollAreaModule,
-        BrnAlertDialogTriggerDirective,
-        BrnAlertDialogContentDirective,
-        HlmAlertDialogComponent,
-        HlmAlertDialogHeaderComponent,
-        HlmAlertDialogFooterComponent,
-        HlmAlertDialogTitleDirective,
-        HlmAlertDialogDescriptionDirective,
-        HlmAlertDialogCancelButtonDirective,
-        HlmAlertDialogActionButtonDirective,
-        HlmAlertDialogContentComponent,
-        HlmButtonDirective,
-        LucideAngularModule
-    ],
-    templateUrl: './workspace.component.html'
+  selector: 'app-workspace',
+  imports: [
+    FormsModule,
+    CommonModule,
+    RouterModule,
+    HlmCardModule,
+    HlmInputDirective,
+    HlmSkeletonModule,
+    HlmScrollAreaModule,
+    BrnAlertDialogTriggerDirective,
+    BrnAlertDialogContentDirective,
+    HlmAlertDialogComponent,
+    HlmAlertDialogHeaderComponent,
+    HlmAlertDialogFooterComponent,
+    HlmAlertDialogTitleDirective,
+    HlmAlertDialogDescriptionDirective,
+    HlmAlertDialogCancelButtonDirective,
+    HlmAlertDialogActionButtonDirective,
+    HlmAlertDialogContentComponent,
+    HlmButtonDirective,
+    LucideAngularModule
+  ],
+  templateUrl: './workspace.component.html'
 })
 export class WorkspaceComponent {
   protected Trash2 = Trash2;

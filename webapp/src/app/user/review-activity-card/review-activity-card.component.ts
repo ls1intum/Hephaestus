@@ -22,10 +22,10 @@ type ReviewStateCases = {
 };
 
 @Component({
-    selector: 'app-review-activity-card',
-    templateUrl: './review-activity-card.component.html',
-    imports: [NgIcon, HlmCardModule, HlmSkeletonComponent, HlmIconComponent, HlmTooltipTriggerDirective, HlmButtonModule],
-    providers: [provideIcons({ lucideAward })]
+  selector: 'app-review-activity-card',
+  templateUrl: './review-activity-card.component.html',
+  imports: [NgIcon, HlmCardModule, HlmSkeletonComponent, HlmIconComponent, HlmTooltipTriggerDirective, HlmButtonModule],
+  providers: [provideIcons({ lucideAward })]
 })
 export class ReviewActivityCardComponent {
   protected readonly octCheck = octCheck;

@@ -15,20 +15,20 @@ import { CircleX, LucideAngularModule, Info } from 'lucide-angular';
 import { UserHeaderComponent } from './header/header.component';
 
 @Component({
-    selector: 'app-user-profile',
-    imports: [
-        LucideAngularModule,
-        ReviewActivityCardComponent,
-        IssueCardComponent,
-        HlmAvatarModule,
-        HlmSkeletonModule,
-        HlmIconModule,
-        HlmButtonModule,
-        HlmScrollAreaComponent,
-        UserHeaderComponent,
-        HlmAlertModule
-    ],
-    templateUrl: './user-profile.component.html'
+  selector: 'app-user-profile',
+  imports: [
+    LucideAngularModule,
+    ReviewActivityCardComponent,
+    IssueCardComponent,
+    HlmAvatarModule,
+    HlmSkeletonModule,
+    HlmIconModule,
+    HlmButtonModule,
+    HlmScrollAreaComponent,
+    UserHeaderComponent,
+    HlmAlertModule
+  ],
+  templateUrl: './user-profile.component.html'
 })
 export class UserProfileComponent {
   userService = inject(UserService);

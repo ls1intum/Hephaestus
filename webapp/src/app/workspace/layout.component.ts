@@ -8,10 +8,10 @@ import { lucideCircleUser, lucideCog, lucideUsers } from '@ng-icons/lucide';
 
 type NavItem = { icon: string; label: string; route: string; exact?: boolean };
 @Component({
-    selector: 'app-workspace-layout',
-    imports: [CommonModule, RouterModule, ReactiveFormsModule, HlmButtonModule, RouterOutlet, RouterLinkActive, HlmIconComponent],
-    providers: [provideIcons({ lucideCircleUser, lucideCog, lucideUsers })],
-    templateUrl: './layout.component.html'
+  selector: 'app-workspace-layout',
+  imports: [CommonModule, RouterModule, ReactiveFormsModule, HlmButtonModule, RouterOutlet, RouterLinkActive, HlmIconComponent],
+  providers: [provideIcons({ lucideCircleUser, lucideCog, lucideUsers })],
+  templateUrl: './layout.component.html'
 })
 export class WorkspaceLayoutComponent {
   navItems: NavItem[] = [

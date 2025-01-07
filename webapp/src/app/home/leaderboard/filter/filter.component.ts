@@ -5,9 +5,9 @@ import { LeaderboardFilterTimeframeComponent } from './timeframe/timeframe.compo
 import { LeaderboardFilterTeamComponent } from './team/team.component';
 
 @Component({
-    selector: 'app-leaderboard-filter',
-    imports: [LucideAngularModule, FormsModule, LeaderboardFilterTimeframeComponent, LeaderboardFilterTeamComponent],
-    templateUrl: './filter.component.html'
+  selector: 'app-leaderboard-filter',
+  imports: [LucideAngularModule, FormsModule, LeaderboardFilterTimeframeComponent, LeaderboardFilterTeamComponent],
+  templateUrl: './filter.component.html'
 })
 export class LeaderboardFilterComponent {
   protected ListFilter = ListFilter;

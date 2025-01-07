@@ -9,9 +9,9 @@ import { HlmCardDirective } from '@spartan-ng/ui-card-helm';
 import { HlmSkeletonComponent } from '@spartan-ng/ui-skeleton-helm';
 
 @Component({
-    selector: 'app-sessions-card',
-    templateUrl: './sessions-card.component.html',
-    imports: [CommonModule, HlmSkeletonComponent, LucideAngularModule, BrnToggleDirective, HlmToggleDirective, HlmButtonModule, HlmCardDirective]
+  selector: 'app-sessions-card',
+  templateUrl: './sessions-card.component.html',
+  imports: [CommonModule, HlmSkeletonComponent, LucideAngularModule, BrnToggleDirective, HlmToggleDirective, HlmButtonModule, HlmCardDirective]
 })
 export class SessionsCardComponent {
   protected Plus = Plus;

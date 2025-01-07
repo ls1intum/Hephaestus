@@ -12,9 +12,9 @@ interface SelectOption {
 }
 
 @Component({
-    selector: 'app-leaderboard-filter-team',
-    imports: [BrnSelectModule, HlmSelectModule, HlmLabelModule, FormsModule],
-    templateUrl: './team.component.html'
+  selector: 'app-leaderboard-filter-team',
+  imports: [BrnSelectModule, HlmSelectModule, HlmLabelModule, FormsModule],
+  templateUrl: './team.component.html'
 })
 export class LeaderboardFilterTeamComponent {
   teams = input.required<string[]>();

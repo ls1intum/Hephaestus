@@ -5,9 +5,9 @@ import { injectQuery } from '@tanstack/angular-query-experimental';
 import { WorkspaceTeamsTableComponent } from './table/teams-table.component';
 
 @Component({
-    selector: 'app-workspace-teams',
-    imports: [WorkspaceTeamsTableComponent],
-    template: `
+  selector: 'app-workspace-teams',
+  imports: [WorkspaceTeamsTableComponent],
+  template: `
     <h1 class="text-3xl font-bold mb-4">Teams</h1>
     <app-workspace-teams-table [teamData]="teamsQuery.data()" [isLoading]="teamsQuery.isPending() || teamsQuery.isRefetching()" [allRepositories]="allReposQuery.data()" />
   `

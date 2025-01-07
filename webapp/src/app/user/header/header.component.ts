@@ -20,9 +20,9 @@ const repoImages: { [key: string]: string } = {
 };
 
 @Component({
-    selector: 'app-user-header',
-    imports: [NgIconComponent, HlmAvatarModule, HlmSkeletonModule, HlmIconModule, HlmTooltipComponent, HlmTooltipTriggerDirective, BrnTooltipContentDirective, HlmButtonModule],
-    templateUrl: './header.component.html'
+  selector: 'app-user-header',
+  imports: [NgIconComponent, HlmAvatarModule, HlmSkeletonModule, HlmIconModule, HlmTooltipComponent, HlmTooltipTriggerDirective, BrnTooltipContentDirective, HlmButtonModule],
+  templateUrl: './header.component.html'
 })
 export class UserHeaderComponent {
   protected octClockFill = octClockFill;

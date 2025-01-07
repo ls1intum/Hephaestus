@@ -18,21 +18,21 @@ import {
 import { HlmButtonDirective } from '@spartan-ng/ui-button-helm';
 
 @Component({
-    selector: 'app-settings',
-    imports: [
-        BrnAlertDialogTriggerDirective,
-        BrnAlertDialogContentDirective,
-        HlmAlertDialogComponent,
-        HlmAlertDialogHeaderComponent,
-        HlmAlertDialogFooterComponent,
-        HlmAlertDialogTitleDirective,
-        HlmAlertDialogDescriptionDirective,
-        HlmAlertDialogCancelButtonDirective,
-        HlmAlertDialogActionButtonDirective,
-        HlmAlertDialogContentComponent,
-        HlmButtonDirective
-    ],
-    template: `
+  selector: 'app-settings',
+  imports: [
+    BrnAlertDialogTriggerDirective,
+    BrnAlertDialogContentDirective,
+    HlmAlertDialogComponent,
+    HlmAlertDialogHeaderComponent,
+    HlmAlertDialogFooterComponent,
+    HlmAlertDialogTitleDirective,
+    HlmAlertDialogDescriptionDirective,
+    HlmAlertDialogCancelButtonDirective,
+    HlmAlertDialogActionButtonDirective,
+    HlmAlertDialogContentComponent,
+    HlmButtonDirective
+  ],
+  template: `
     <div class="flex flex-col gap-4">
       <h1 class="text-3xl font-bold">Settings</h1>
       <hlm-alert-dialog>

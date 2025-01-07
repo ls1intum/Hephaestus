@@ -9,9 +9,9 @@ import { HlmSpinnerComponent } from '@spartan-ng/ui-spinner-helm';
 import { HlmInputDirective } from '@spartan-ng/ui-input-helm';
 
 @Component({
-    selector: 'app-chat-input',
-    templateUrl: './chat-input.component.html',
-    imports: [CommonModule, HlmButtonModule, HlmSpinnerComponent, FormsModule, HlmCardModule, HlmInputDirective, LucideAngularModule]
+  selector: 'app-chat-input',
+  templateUrl: './chat-input.component.html',
+  imports: [CommonModule, HlmButtonModule, HlmSpinnerComponent, FormsModule, HlmCardModule, HlmInputDirective, LucideAngularModule]
 })
 export class ChatInputComponent {
   protected Send = Send;

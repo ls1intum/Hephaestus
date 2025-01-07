@@ -12,18 +12,18 @@ import {
 } from '@spartan-ng/ui-accordion-helm';
 
 @Component({
-    selector: 'app-leaderboard-legend',
-    imports: [
-        HlmAccordionDirective,
-        HlmAccordionItemDirective,
-        HlmAccordionTriggerDirective,
-        HlmAccordionContentComponent,
-        HlmAccordionIconDirective,
-        HlmCardModule,
-        NgIconComponent,
-        HlmIconComponent,
-    ],
-    templateUrl: './legend.component.html'
+  selector: 'app-leaderboard-legend',
+  imports: [
+    HlmAccordionDirective,
+    HlmAccordionItemDirective,
+    HlmAccordionTriggerDirective,
+    HlmAccordionContentComponent,
+    HlmAccordionIconDirective,
+    HlmCardModule,
+    NgIconComponent,
+    HlmIconComponent
+  ],
+  templateUrl: './legend.component.html'
 })
 export class LeaderboardLegendComponent {
   protected octFileDiff = octFileDiff;

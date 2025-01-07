@@ -55,25 +55,25 @@ const LOADING_DATA: UserTeams[] = [
 ];
 
 @Component({
-    selector: 'app-workspace-users-table',
-    imports: [
-        FormsModule,
-        RouterLink,
-        BrnMenuTriggerDirective,
-        HlmMenuModule,
-        BrnTableModule,
-        HlmTableModule,
-        HlmButtonModule,
-        HlmIconComponent,
-        HlmInputDirective,
-        HlmCheckboxComponent,
-        BrnSelectModule,
-        HlmSelectModule,
-        HlmSkeletonModule,
-        GithubLabelComponent
-    ],
-    providers: [provideIcons({ lucideChevronDown, lucideGripHorizontal, lucideArrowUpDown, lucideRotateCw, lucideOctagonX })],
-    templateUrl: './users-table.component.html'
+  selector: 'app-workspace-users-table',
+  imports: [
+    FormsModule,
+    RouterLink,
+    BrnMenuTriggerDirective,
+    HlmMenuModule,
+    BrnTableModule,
+    HlmTableModule,
+    HlmButtonModule,
+    HlmIconComponent,
+    HlmInputDirective,
+    HlmCheckboxComponent,
+    BrnSelectModule,
+    HlmSelectModule,
+    HlmSkeletonModule,
+    GithubLabelComponent
+  ],
+  providers: [provideIcons({ lucideChevronDown, lucideGripHorizontal, lucideArrowUpDown, lucideRotateCw, lucideOctagonX })],
+  templateUrl: './users-table.component.html'
 })
 export class WorkspaceUsersTableComponent {
   protected workspaceService = inject(WorkspaceService);

@@ -17,9 +17,9 @@ import { LeaderboardLegendComponent } from './leaderboard/legend/legends.compone
 dayjs.extend(isoWeek);
 
 @Component({
-    selector: 'app-home',
-    imports: [LeaderboardComponent, LeaderboardFilterComponent, HlmAlertModule, LucideAngularModule, LeaderboardLegendComponent],
-    templateUrl: './home.component.html'
+  selector: 'app-home',
+  imports: [LeaderboardComponent, LeaderboardFilterComponent, HlmAlertModule, LucideAngularModule, LeaderboardLegendComponent],
+  templateUrl: './home.component.html'
 })
 export class HomeComponent {
   protected CircleX = CircleX;

@@ -7,9 +7,9 @@ import { Message } from '@app/core/modules/openapi';
 import { HlmSkeletonComponent } from '@spartan-ng/ui-skeleton-helm';
 
 @Component({
-    selector: 'app-messages',
-    templateUrl: './messages.component.html',
-    imports: [CommonModule, LucideAngularModule, HlmAvatarModule, HlmSkeletonComponent]
+  selector: 'app-messages',
+  templateUrl: './messages.component.html',
+  imports: [CommonModule, LucideAngularModule, HlmAvatarModule, HlmSkeletonComponent]
 })
 export class MessagesComponent {
   protected BotMessageSquare = BotMessageSquare;

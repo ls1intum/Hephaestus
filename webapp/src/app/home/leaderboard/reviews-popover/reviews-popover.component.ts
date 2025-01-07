@@ -18,18 +18,18 @@ interface PullRequestInfo {
 }
 
 @Component({
-    selector: 'app-reviews-popover',
-    imports: [
-        HlmPopoverModule,
-        BrnPopoverComponent,
-        BrnPopoverContentDirective,
-        BrnPopoverTriggerDirective,
-        HlmScrollAreaComponent,
-        HlmButtonModule,
-        NgIconComponent,
-        LucideAngularModule
-    ],
-    templateUrl: './reviews-popover.component.html'
+  selector: 'app-reviews-popover',
+  imports: [
+    HlmPopoverModule,
+    BrnPopoverComponent,
+    BrnPopoverContentDirective,
+    BrnPopoverTriggerDirective,
+    HlmScrollAreaComponent,
+    HlmButtonModule,
+    NgIconComponent,
+    LucideAngularModule
+  ],
+  templateUrl: './reviews-popover.component.html'
 })
 export class ReviewsPopoverComponent {
   protected ClipboardCopy = ClipboardCopy;

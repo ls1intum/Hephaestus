@@ -18,23 +18,23 @@ import { HlmIconComponent, provideIcons } from '@spartan-ng/ui-icon-helm';
 import { lucideAward } from '@ng-icons/lucide';
 
 @Component({
-    selector: 'app-leaderboard',
-    imports: [
-        HlmAvatarModule,
-        HlmSkeletonModule,
-        TableComponent,
-        TableBodyDirective,
-        TableCellDirective,
-        TableHeaderDirective,
-        TableHeadDirective,
-        TableRowDirective,
-        ReviewsPopoverComponent,
-        NgIconComponent,
-        HlmIconComponent,
-        RouterLink
-    ],
-    providers: [provideIcons({ lucideAward })],
-    templateUrl: './leaderboard.component.html'
+  selector: 'app-leaderboard',
+  imports: [
+    HlmAvatarModule,
+    HlmSkeletonModule,
+    TableComponent,
+    TableBodyDirective,
+    TableCellDirective,
+    TableHeaderDirective,
+    TableHeadDirective,
+    TableRowDirective,
+    ReviewsPopoverComponent,
+    NgIconComponent,
+    HlmIconComponent,
+    RouterLink
+  ],
+  providers: [provideIcons({ lucideAward })],
+  templateUrl: './leaderboard.component.html'
 })
 export class LeaderboardComponent {
   securityStore = inject(SecurityStore);

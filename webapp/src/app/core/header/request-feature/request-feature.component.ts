@@ -5,9 +5,9 @@ import { HlmTooltipComponent, HlmTooltipTriggerDirective } from '@spartan-ng/ui-
 import { LucideAngularModule, Sparkles } from 'lucide-angular';
 
 @Component({
-    selector: 'app-request-feature',
-    imports: [LucideAngularModule, HlmButtonModule, HlmTooltipComponent, HlmTooltipTriggerDirective, BrnTooltipContentDirective],
-    templateUrl: './request-feature.component.html'
+  selector: 'app-request-feature',
+  imports: [LucideAngularModule, HlmButtonModule, HlmTooltipComponent, HlmTooltipTriggerDirective, BrnTooltipContentDirective],
+  templateUrl: './request-feature.component.html'
 })
 export class RequestFeatureComponent {
   protected Sparkles = Sparkles;

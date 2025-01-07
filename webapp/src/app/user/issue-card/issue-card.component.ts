@@ -9,9 +9,9 @@ import dayjs from 'dayjs';
 import { cn } from '@app/utils';
 
 @Component({
-    selector: 'app-issue-card',
-    templateUrl: './issue-card.component.html',
-    imports: [NgIcon, HlmCardModule, HlmSkeletonComponent, GithubLabelComponent]
+  selector: 'app-issue-card',
+  templateUrl: './issue-card.component.html',
+  imports: [NgIcon, HlmCardModule, HlmSkeletonComponent, GithubLabelComponent]
 })
 export class IssueCardComponent {
   protected readonly octCheck = octCheck;

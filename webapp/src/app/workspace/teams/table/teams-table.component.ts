@@ -42,30 +42,30 @@ const LOADING_TEAMS: TeamInfo[] = [
 ];
 
 @Component({
-    selector: 'app-workspace-teams-table',
-    imports: [
-        FormsModule,
-        ReactiveFormsModule,
-        BrnMenuTriggerDirective,
-        HlmMenuModule,
-        BrnTableModule,
-        HlmTableModule,
-        HlmButtonModule,
-        HlmIconComponent,
-        HlmInputDirective,
-        HlmScrollAreaComponent,
-        BrnSelectModule,
-        HlmSelectModule,
-        HlmSkeletonModule,
-        HlmCardModule,
-        HlmPopoverModule,
-        BrnPopoverComponent,
-        BrnPopoverContentDirective,
-        BrnPopoverTriggerDirective,
-        GithubLabelComponent
-    ],
-    providers: [provideIcons({ lucideChevronDown, lucideGripHorizontal, lucideArrowUpDown, lucideRotateCw, lucideOctagonX, lucidePlus, lucideCheck, lucideTrash2 })],
-    templateUrl: './teams-table.component.html'
+  selector: 'app-workspace-teams-table',
+  imports: [
+    FormsModule,
+    ReactiveFormsModule,
+    BrnMenuTriggerDirective,
+    HlmMenuModule,
+    BrnTableModule,
+    HlmTableModule,
+    HlmButtonModule,
+    HlmIconComponent,
+    HlmInputDirective,
+    HlmScrollAreaComponent,
+    BrnSelectModule,
+    HlmSelectModule,
+    HlmSkeletonModule,
+    HlmCardModule,
+    HlmPopoverModule,
+    BrnPopoverComponent,
+    BrnPopoverContentDirective,
+    BrnPopoverTriggerDirective,
+    GithubLabelComponent
+  ],
+  providers: [provideIcons({ lucideChevronDown, lucideGripHorizontal, lucideArrowUpDown, lucideRotateCw, lucideOctagonX, lucidePlus, lucideCheck, lucideTrash2 })],
+  templateUrl: './teams-table.component.html'
 })
 export class WorkspaceTeamsTableComponent {
   protected workspaceService = inject(WorkspaceService);
