@@ -1,6 +1,6 @@
 import { Component, computed, input } from '@angular/core';
 import { cn, getLeagueFromPoints } from '@app/utils';
-import { LucideAngularModule, Crown } from 'lucide-angular';
+import { LucideAngularModule, Medal } from 'lucide-angular';
 import { type VariantProps, cva } from 'class-variance-authority';
 
 export const leagueVariants = cva('size-8', {
@@ -33,10 +33,10 @@ type LeagueVariants = VariantProps<typeof leagueVariants>;
   selector: 'app-icon-league',
   standalone: true,
   imports: [LucideAngularModule],
-  template: ` <lucide-angular [img]="Crown" strokeWidth="2px" [class]="computedClass()" [title]="computedLeague()" /> `
+  template: ` <lucide-angular [img]="Medal" strokeWidth="2px" [class]="computedClass()" [title]="computedLeague()" /> `
 })
 export class LeagueIconComponent {
-  protected Crown = Crown;
+  protected Medal = Medal;
 
   size = input<LeagueVariants['size']>('default');
   leaguePoints = input<number>();
