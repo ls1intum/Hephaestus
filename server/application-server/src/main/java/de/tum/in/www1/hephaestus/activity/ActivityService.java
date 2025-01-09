@@ -5,7 +5,6 @@ import de.tum.in.www1.hephaestus.activity.model.*;
 import de.tum.in.www1.hephaestus.gitprovider.issue.Issue;
 import de.tum.in.www1.hephaestus.gitprovider.pullrequest.PullRequest;
 import de.tum.in.www1.hephaestus.gitprovider.pullrequest.PullRequestRepository;
-import de.tum.in.www1.hephaestus.gitprovider.repository.RepositoryRepository;
 import de.tum.in.www1.hephaestus.gitprovider.user.User;
 import de.tum.in.www1.hephaestus.gitprovider.user.UserRepository;
 import jakarta.transaction.Transactional;
@@ -35,12 +34,6 @@ public class ActivityService {
 
     @Autowired
     private UserRepository userRepository;
-
-    @Autowired
-    private PullRequestBadPracticeRuleRepository pullRequestBadPracticeRuleRepository;
-
-    @Autowired
-    private RepositoryRepository repositoryRepository;
 
     @Transactional
     public ActivityDTO getActivity(String login) {
@@ -107,33 +100,5 @@ public class ActivityService {
             .flatMap(List::stream)
             .map(PullRequestBadPracticeDTO::fromPullRequestBadPractice)
             .collect(Collectors.toList());
-    }
-
-    @Transactional
-    public List<PullRequestBadPracticeRuleDTO> getRules(String repository) {
-        logger.info("Getting rules for repository: {}", repository);
-
-        return pullRequestBadPracticeRuleRepository.findByRepositoryName(repository)
-                .stream()
-                .map(PullRequestBadPracticeRuleDTO::fromPullRequestBadPracticeRule)
-                .toList();
-    }
-
-    @Transactional
-    public PullRequestBadPracticeRuleDTO createOrUpdateRule(PullRequestBadPracticeRuleDTO rule) {
-        logger.info("Creating rule: {}", rule);
-
-        PullRequestBadPracticeRule existingOrNewRule = pullRequestBadPracticeRuleRepository.findById(rule.id()).orElse(null);
-        if (existingOrNewRule == null) {
-            existingOrNewRule = new PullRequestBadPracticeRule();
-            repositoryRepository.findByNameWithOwner(rule.repository().nameWithOwner()).ifPresent(existingOrNewRule::setRepository);
-        }
-        existingOrNewRule.setTitle(rule.title());
-        existingOrNewRule.setDescription(rule.description());
-        existingOrNewRule.setConditions(rule.conditions());
-        existingOrNewRule.setActive(rule.active());
-
-        return  PullRequestBadPracticeRuleDTO.fromPullRequestBadPracticeRule(
-                pullRequestBadPracticeRuleRepository.save(existingOrNewRule));
     }
 }

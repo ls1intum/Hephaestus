@@ -14,8 +14,8 @@ public interface PullRequestBadPracticeRuleRepository extends JpaRepository<Pull
         """
         SELECT prbp
         FROM PullRequestBadPracticeRule prbp
-        WHERE prbp.repository.name = :repositoryName
+        WHERE prbp.repository.nameWithOwner = :repositoryName
         """
     )
-    List<PullRequestBadPracticeRule> findByRepositoryName(String repositoryName);
+    List<PullRequestBadPracticeRule> findByRepositoryName(String repositoryNameWithOwner);
 }
