@@ -86,6 +86,45 @@ paths:
       responses:
         "200":
           description: OK
+  /rules/{id}:
+    put:
+      tags:
+      - bad-practice-rule
+      operationId: updateRule
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: integer
+          format: int64
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateOrUpdateBadPracticeRule"
+        required: true
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PullRequestBadPracticeRule"
+    delete:
+      tags:
+      - bad-practice-rule
+      operationId: deleteRule
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: integer
+          format: int64
+      responses:
+        "200":
+          description: OK
   /workspace/team/{teamId}/repository/{repositoryOwner}/{repositoryName}:
     post:
       tags:
@@ -210,6 +249,59 @@ paths:
       responses:
         "200":
           description: OK
+  /rules/{owner}/{repository}:
+    get:
+      tags:
+      - bad-practice-rule
+      operationId: getRulesByRepository
+      parameters:
+      - name: owner
+        in: path
+        required: true
+        schema:
+          type: string
+      - name: repository
+        in: path
+        required: true
+        schema:
+          type: string
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/PullRequestBadPracticeRule"
+    post:
+      tags:
+      - bad-practice-rule
+      operationId: createRule
+      parameters:
+      - name: owner
+        in: path
+        required: true
+        schema:
+          type: string
+      - name: repository
+        in: path
+        required: true
+        schema:
+          type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateOrUpdateBadPracticeRule"
+        required: true
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PullRequestBadPracticeRule"
   /mentor/sessions:
     get:
       tags:
@@ -300,24 +392,6 @@ paths:
                 type: array
                 items:
                   $ref: "#/components/schemas/PullRequestBadPractice"
-  /activity/rules:
-    post:
-      tags:
-      - activity
-      operationId: updateOrCreateRule
-      requestBody:
-        content:
-          application/json:
-            schema:
-              $ref: "#/components/schemas/PullRequestBadPracticeRule"
-        required: true
-      responses:
-        "200":
-          description: OK
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/PullRequestBadPracticeRule"
   /workspace/users:
     get:
       tags:
@@ -440,26 +514,6 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/Activity"
-  /activity/rules/{repository}:
-    get:
-      tags:
-      - activity
-      operationId: getRulesByRepository
-      parameters:
-      - name: repository
-        in: path
-        required: true
-        schema:
-          type: string
-      responses:
-        "200":
-          description: OK
-          content:
-            application/json:
-              schema:
-                type: array
-                items:
-                  $ref: "#/components/schemas/PullRequestBadPracticeRule"
   /workspace/team/{teamId}:
     delete:
       tags:
@@ -946,6 +1000,17 @@ components:
         numberOfCodeComments:
           type: integer
           format: int32
+    CreateOrUpdateBadPracticeRule:
+      type: object
+      properties:
+        title:
+          type: string
+        description:
+          type: string
+        conditions:
+          type: string
+        active:
+          type: boolean
     Session:
       required:
       - createdAt

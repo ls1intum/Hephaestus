@@ -5,6 +5,8 @@ api.module.ts
 api/activity.service.ts
 api/activity.serviceInterface.ts
 api/api.ts
+api/bad-practice-rule.service.ts
+api/bad-practice-rule.serviceInterface.ts
 api/leaderboard.service.ts
 api/leaderboard.serviceInterface.ts
 api/message.service.ts
@@ -24,6 +26,7 @@ encoder.ts
 git_push.sh
 index.ts
 model/activity.ts
+model/create-or-update-bad-practice-rule.ts
 model/label-info.ts
 model/leaderboard-entry.ts
 model/message.ts

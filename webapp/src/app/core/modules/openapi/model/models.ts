@@ -1,4 +1,5 @@
 export * from './activity';
+export * from './create-or-update-bad-practice-rule';
 export * from './label-info';
 export * from './leaderboard-entry';
 export * from './message';
