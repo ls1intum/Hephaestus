@@ -45,3 +45,4 @@ async def generate(request: MentorRequest):
     response = await run(request.content, config)
     response_message = response["messages"][-1].content
     return MentorResponce(content=response_message, closed=response["closed"])
+

@@ -20,6 +20,10 @@
 			"name": "server/webhook-ingest",
 			"path": "./server/webhook-ingest",
 		},
+		{
+			"name": "docs",
+			"path": "./docs",
+		}
 	],
 	"settings": {
 		"java.compile.nullAnalysis.mode": "automatic",
