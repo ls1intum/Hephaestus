@@ -20,60 +20,76 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonTypeName;
 import com.fasterxml.jackson.annotation.JsonValue;
-import de.tum.in.www1.hephaestus.intelligenceservice.model.ISValidationError;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.List;
 import com.fasterxml.jackson.annotation.JsonPropertyOrder;
 import com.fasterxml.jackson.annotation.JsonTypeName;
 import org.hibernate.validator.constraints.*;
 
 /**
- * ISHTTPValidationError
+ * MentorRequest
  */
 @JsonPropertyOrder({
-  ISHTTPValidationError.JSON_PROPERTY_DETAIL
+  MentorRequest.JSON_PROPERTY_CONTENT,
+  MentorRequest.JSON_PROPERTY_SESSION_ID
 })
-@JsonTypeName("HTTPValidationError")
 @jakarta.annotation.Generated(value = "org.openapitools.codegen.languages.JavaClientCodegen", comments = "Generator version: 7.7.0")
-public class ISHTTPValidationError {
-  public static final String JSON_PROPERTY_DETAIL = "detail";
-  private List<ISValidationError> detail = new ArrayList<>();
+public class MentorRequest {
+  public static final String JSON_PROPERTY_CONTENT = "content";
+  private String content;
 
-  public ISHTTPValidationError() {
+  public static final String JSON_PROPERTY_SESSION_ID = "session_id";
+  private String sessionId;
+
+  public MentorRequest() {
   }
 
-  public ISHTTPValidationError detail(List<ISValidationError> detail) {
+  public MentorRequest content(String content) {
     
-    this.detail = detail;
-    return this;
-  }
-
-  public ISHTTPValidationError addDetailItem(ISValidationError detailItem) {
-    if (this.detail == null) {
-      this.detail = new ArrayList<>();
-    }
-    this.detail.add(detailItem);
+    this.content = content;
     return this;
   }
 
   /**
-   * Get detail
-   * @return detail
+   * Get content
+   * @return content
    */
-  @jakarta.annotation.Nullable
-  @JsonProperty(JSON_PROPERTY_DETAIL)
-  @JsonInclude(value = JsonInclude.Include.USE_DEFAULTS)
+  @jakarta.annotation.Nonnull
+  @JsonProperty(JSON_PROPERTY_CONTENT)
+  @JsonInclude(value = JsonInclude.Include.ALWAYS)
 
-  public List<ISValidationError> getDetail() {
-    return detail;
+  public String getContent() {
+    return content;
   }
 
 
-  @JsonProperty(JSON_PROPERTY_DETAIL)
-  @JsonInclude(value = JsonInclude.Include.USE_DEFAULTS)
-  public void setDetail(List<ISValidationError> detail) {
-    this.detail = detail;
+  @JsonProperty(JSON_PROPERTY_CONTENT)
+  @JsonInclude(value = JsonInclude.Include.ALWAYS)
+  public void setContent(String content) {
+    this.content = content;
+  }
+
+  public MentorRequest sessionId(String sessionId) {
+    
+    this.sessionId = sessionId;
+    return this;
+  }
+
+  /**
+   * Get sessionId
+   * @return sessionId
+   */
+  @jakarta.annotation.Nonnull
+  @JsonProperty(JSON_PROPERTY_SESSION_ID)
+  @JsonInclude(value = JsonInclude.Include.ALWAYS)
+
+  public String getSessionId() {
+    return sessionId;
+  }
+
+
+  @JsonProperty(JSON_PROPERTY_SESSION_ID)
+  @JsonInclude(value = JsonInclude.Include.ALWAYS)
+  public void setSessionId(String sessionId) {
+    this.sessionId = sessionId;
   }
 
   @Override
@@ -84,20 +100,22 @@ public class ISHTTPValidationError {
     if (o == null || getClass() != o.getClass()) {
       return false;
     }
-    ISHTTPValidationError htTPValidationError = (ISHTTPValidationError) o;
-    return Objects.equals(this.detail, htTPValidationError.detail);
+    MentorRequest mentorRequest = (MentorRequest) o;
+    return Objects.equals(this.content, mentorRequest.content) &&
+        Objects.equals(this.sessionId, mentorRequest.sessionId);
   }
 
   @Override
   public int hashCode() {
-    return Objects.hash(detail);
+    return Objects.hash(content, sessionId);
   }
 
   @Override
   public String toString() {
     StringBuilder sb = new StringBuilder();
-    sb.append("class ISHTTPValidationError {\n");
-    sb.append("    detail: ").append(toIndentedString(detail)).append("\n");
+    sb.append("class MentorRequest {\n");
+    sb.append("    content: ").append(toIndentedString(content)).append("\n");
+    sb.append("    sessionId: ").append(toIndentedString(sessionId)).append("\n");
     sb.append("}");
     return sb.toString();
   }

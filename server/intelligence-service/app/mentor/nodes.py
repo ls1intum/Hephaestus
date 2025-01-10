@@ -1,30 +1,20 @@
 from .state import State
 from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
 from ..model import model
+from uuid import uuid4
+from langchain_core.runnables.config import RunnableConfig
+from langgraph.store.base import BaseStore
 from .prompt_loader import PromptLoader
 
 prompt_loader = PromptLoader()
-persona_prompt = prompt_loader.get_prompt("mentor_persona")
+persona_prompt = prompt_loader.get_prompt(type="mentor", name="persona")
 
 
-def mentor(state: State):
+def greet(state: State):
     prompt = ChatPromptTemplate(
         [
             ("system", persona_prompt),
-            MessagesPlaceholder("messages"),
-        ]
-    )
-    chain = prompt | model
-    return {"messages": [chain.invoke({"messages": state["messages"]})]}
-
-# greeting is the first node to be called in the graph: it initializes the full state
-def greeting(state: State):
-    prompt = ChatPromptTemplate(
-        [
-            ("system", persona_prompt),
-            (
-                "system", prompt_loader.get_prompt("greeting")
-            ),
+            ("system", prompt_loader.get_prompt(type="mentor", name="greeting")),
             MessagesPlaceholder("messages"),
         ]
     )
@@ -32,33 +22,63 @@ def greeting(state: State):
     return {
         "messages": [chain.invoke({"messages": state["messages"]})],
         "status": True,
-        "impediments": False,
-        "promises": False,
-        "summary": False,
     }
 
 
-def ask_status(state: State):
+async def ask_status(state: State, store: BaseStore):
+    previous_session_id = state["last_thread"]
+    if state["last_thread"] == "":
+        previous_promises = ""
+    else:
+        namespace = (previous_session_id, "summary")
+        previous_promises = await store.asearch(namespace)
+        if not previous_promises:
+            previous_promises = ""
+        else:
+            previous_promises = previous_promises[-1]["promises"]
+            # TODO: delete print
+            print("[ask_status]: previous_promises: ", previous_promises)
+
     prompt = ChatPromptTemplate(
         [
-            #("system", persona_prompt),
+            ("system", persona_prompt),
             (
-                "system", prompt_loader.get_prompt("status")
+                "system",
+                (
+                    prompt_loader.get_prompt(type="mentor", name="status").format_map(
+                        {"previous_promises": previous_promises}
+                    )
+                ),
             ),
             MessagesPlaceholder("messages"),
         ]
     )
-    print("-------------------------------------------------------------------------------")
+
     chain = prompt | model
     return {"messages": [chain.invoke({"messages": state["messages"]})]}
 
 
-def ask_impediments(state: State):
+async def ask_impediments(state: State, store: BaseStore):
+    previous_session_id = state["last_thread"]
+    previous_impediments = ""
+    if state["last_thread"] != "":
+        namespace = (previous_session_id, "summary")
+        previous_impediments = await store.asearch(namespace)
+        if previous_impediments:
+            previous_impediments = previous_impediments[-1]["impediments"]
+            # TODO: delete print
+            print("[ask_impediments]: previous_impediments: ", previous_impediments)
+
     prompt = ChatPromptTemplate(
         [
-            #("system", persona_prompt),
+            ("system", persona_prompt),
             (
-                "system", prompt_loader.get_prompt("impediments")
+                "system",
+                (
+                    prompt_loader.get_prompt(
+                        type="mentor", name="impediments"
+                    ).format_map({"previous_impediments": previous_impediments})
+                ),
             ),
             MessagesPlaceholder("messages"),
         ]
@@ -70,10 +90,8 @@ def ask_impediments(state: State):
 def ask_promises(state: State):
     prompt = ChatPromptTemplate(
         [
-            #("system", persona_prompt),
-            (
-                "system", prompt_loader.get_prompt("promises")
-            ),
+            ("system", persona_prompt),
+            ("system", prompt_loader.get_prompt(type="mentor", name="promises")),
             MessagesPlaceholder("messages"),
         ]
     )
@@ -84,10 +102,8 @@ def ask_promises(state: State):
 def ask_summary(state: State):
     prompt = ChatPromptTemplate(
         [
-            #("system", persona_prompt),
-            (
-                "system", prompt_loader.get_prompt("summary")
-            ),
+            ("system", persona_prompt),
+            ("system", prompt_loader.get_prompt(type="mentor", name="summary")),
             MessagesPlaceholder("messages"),
         ]
     )
@@ -95,43 +111,82 @@ def ask_summary(state: State):
     return {"messages": [chain.invoke({"messages": state["messages"]})]}
 
 
-def check_state(state: State):
-    if state["status"]:
-        step = "status"
-    elif state["impediments"]:
-        step = "impediments"
-    elif state["promises"]:
-        step = "promises"
-    elif state["summary"]:
-        step = "summary"
-    else:
-        return
-    
-    print("step: ", step)
-    
+def finish(state: State):
     prompt = ChatPromptTemplate(
         [
-            ("system", prompt_loader.get_prompt("check_state").format_map({"step": step})),
+            ("system", persona_prompt),
+            ("system", prompt_loader.get_prompt(type="mentor", name="finish")),
+            MessagesPlaceholder("messages"),
+        ]
+    )
+    chain = prompt | model
+    return {
+        "messages": [chain.invoke({"messages": state["messages"]})],
+        "finish": True,
+        "closed": True,
+    }
+
+
+# node responsible for checking the state of the conversation and updating it accordingly
+def check_state(state: State):
+    step_order = ["status", "impediments", "promises", "summary", "finish"]
+    step = next((key for key in step_order if state.get(key)), None)
+    if not step:
+        return  # exit early if no step is active without state update
+
+    print("[check_state]: current step: " + step)  # TODO: remove prints
+
+    prompt = ChatPromptTemplate(
+        [
+            (
+                "system",
+                prompt_loader.get_prompt(
+                    type="analyzer", name="check_state"
+                ).format_map({"step": step}),
+            ),
             MessagesPlaceholder("messages"),
         ]
     )
 
     chain = prompt | model
-    resp = chain.invoke({"messages": state["messages"]}).content
+    test = chain.invoke({"messages": state["messages"]})
+    responce = test.content
 
-    print("check_state", resp)
-   
-    if resp == "YES":
-        if step == "status":
-            print("\n----------------HEY! the state[status] changed----------------\n")
-            return {"status": False, "impediments": True}
-        elif step == "impediments":
-            print("\n----------------HEY! the state[impediments] changed----------------\n")
-            return {"impediments": False, "promises": True}
-        elif step == "promises":
-            print("\n----------------HEY! the state[promises] changed----------------\n")
-            return {"promises": False, "summary": True}
-        elif step == "summary":
-            print("\n----------------HEY! the state[summary] changed----------------\n")
-            return {"summary": False}
+    print("[check_state]: responce from the LLM: ", responce)
+    print("\n\n[check_state]: test: ", test)
+
+    if responce == "YES":
+        step_index = step_order.index(step)
+        if step_index < len(step_order) - 1:
+            next_step = step_order[step_index + 1]
+            return {step: False, next_step: True}
+        else:
+            # if on the last step, mark as closed
+            return {"finish": False, "closed": True}
+    return
+
+
+# node responsible for updating the long-term session memory, that can be used across multiple sessions
+async def update_memory(state: State, config: RunnableConfig, *, store: BaseStore):
+    session_id = config["configurable"]["thread_id"]
+    namespace = (session_id, "summary")
+    steps = ["impediments", "promises"]  # steps to process
+
+    for step in steps:
+        prompt = ChatPromptTemplate(
+            [
+                (
+                    "system",
+                    prompt_loader.get_prompt(
+                        type="analyzer", name="update_memory"
+                    ).format_map({"step": step}),
+                ),
+                MessagesPlaceholder("messages"),
+            ]
+        )
+
+        chain = prompt | model
+        response = chain.invoke({"messages": state["messages"]}).content
+        await store.aput(namespace, key=str(uuid4()), value={step: response})
+
     return

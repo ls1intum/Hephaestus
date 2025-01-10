@@ -10,6 +10,7 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 import lombok.ToString;
+import org.hibernate.Length;
 import org.springframework.lang.NonNull;
 
 @Entity
@@ -30,6 +31,9 @@ public class Session {
 
     @NonNull
     private OffsetDateTime createdAt = OffsetDateTime.now();
+
+    @NonNull
+    private boolean isClosed = false;
 
     @ManyToOne
     @JoinColumn(name = "user_id")

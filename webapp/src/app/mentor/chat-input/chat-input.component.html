@@ -1,10 +1,11 @@
 <div class="flex items-start space-x-3">
-  <textarea hlmInput [(ngModel)]="message" placeholder="Message AI Mentor" style="resize: none" (keydown.enter)="onSendMessage()" class="w-full min-h-20"></textarea>
+  <textarea hlmInput [(ngModel)]="message" placeholder="Message AI Mentor" style="resize: none" (keydown.enter)="onSendMessage()" class="w-full min-h-20"
+  [disabled]="isClosed()"></textarea>
   <button
     hlmBtn
     hlmTooltipTrigger
     hlmTooltipContentClass="bg-cyan-500 text-white"
-    [disabled]="isSending()"
+    [disabled]="isSending() || isClosed()"
     aria-describedby="Send Message"
     (click)="onSendMessage()"
     variant="default"

@@ -36,8 +36,13 @@ public class SessionService {
         Session session = new Session();
         session.setUser(user);
 
+        String previous_session_id = sessionRepository
+            .findFirstByUserOrderByCreatedAtDesc(user)
+            .map(Session::getId)
+            .map(String::valueOf)
+            .orElse("");
         Session savedSession = sessionRepository.save(session);
-        messageService.generateFirstSystemMessage(session);
+        messageService.sendFirstMessage(session, previous_session_id);
         return SessionDTO.fromSession(savedSession);
     }
 }

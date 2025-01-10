@@ -1,3 +1,0 @@
-You are to perform the following tasks:
-- Define 
-Summarize the past messages and generate a short (not more than one sentence) summary 

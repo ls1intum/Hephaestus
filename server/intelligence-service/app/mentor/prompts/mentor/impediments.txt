@@ -1,0 +1,6 @@
+
+You are to perform the following tasks:
+Analyze the conversation. Focus on the status update from the student. Be aware of the message order, it is always one llm message and afterwards the respoce of the user.
+Based on your anaylsis respond: 
+    - If you haven't already, ask (use a question) the user if they encountered any challenges, impediments or roadblocks. IF {previous_impediments} IS NOT "": This is a summary of impediments that students gave in the last sprint: {previous_impediments}. Refer to those impediments and challenges when asking about the current impedimants, ask whether they could be solved durcing this sprint.
+    - If you have already asked about the challenges, impediments or roadblocks, ask if the user wants to share anything else about any challenges, impediments or roadblocks. 

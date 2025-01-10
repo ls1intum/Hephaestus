@@ -20,60 +20,47 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonTypeName;
 import com.fasterxml.jackson.annotation.JsonValue;
-import de.tum.in.www1.hephaestus.intelligenceservice.model.ISMessage;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.List;
 import com.fasterxml.jackson.annotation.JsonPropertyOrder;
 import com.fasterxml.jackson.annotation.JsonTypeName;
 import org.hibernate.validator.constraints.*;
 
 /**
- * ISMessageHistory
+ * Response model to validate and return when performing a health check.
  */
 @JsonPropertyOrder({
-  ISMessageHistory.JSON_PROPERTY_MESSAGES
+  HealthCheck.JSON_PROPERTY_STATUS
 })
-@JsonTypeName("MessageHistory")
 @jakarta.annotation.Generated(value = "org.openapitools.codegen.languages.JavaClientCodegen", comments = "Generator version: 7.7.0")
-public class ISMessageHistory {
-  public static final String JSON_PROPERTY_MESSAGES = "messages";
-  private List<ISMessage> messages = new ArrayList<>();
+public class HealthCheck {
+  public static final String JSON_PROPERTY_STATUS = "status";
+  private String status = "OK";
 
-  public ISMessageHistory() {
+  public HealthCheck() {
   }
 
-  public ISMessageHistory messages(List<ISMessage> messages) {
+  public HealthCheck status(String status) {
     
-    this.messages = messages;
-    return this;
-  }
-
-  public ISMessageHistory addMessagesItem(ISMessage messagesItem) {
-    if (this.messages == null) {
-      this.messages = new ArrayList<>();
-    }
-    this.messages.add(messagesItem);
+    this.status = status;
     return this;
   }
 
   /**
-   * Get messages
-   * @return messages
+   * Get status
+   * @return status
    */
-  @jakarta.annotation.Nonnull
-  @JsonProperty(JSON_PROPERTY_MESSAGES)
-  @JsonInclude(value = JsonInclude.Include.ALWAYS)
+  @jakarta.annotation.Nullable
+  @JsonProperty(JSON_PROPERTY_STATUS)
+  @JsonInclude(value = JsonInclude.Include.USE_DEFAULTS)
 
-  public List<ISMessage> getMessages() {
-    return messages;
+  public String getStatus() {
+    return status;
   }
 
 
-  @JsonProperty(JSON_PROPERTY_MESSAGES)
-  @JsonInclude(value = JsonInclude.Include.ALWAYS)
-  public void setMessages(List<ISMessage> messages) {
-    this.messages = messages;
+  @JsonProperty(JSON_PROPERTY_STATUS)
+  @JsonInclude(value = JsonInclude.Include.USE_DEFAULTS)
+  public void setStatus(String status) {
+    this.status = status;
   }
 
   @Override
@@ -84,20 +71,20 @@ public class ISMessageHistory {
     if (o == null || getClass() != o.getClass()) {
       return false;
     }
-    ISMessageHistory messageHistory = (ISMessageHistory) o;
-    return Objects.equals(this.messages, messageHistory.messages);
+    HealthCheck healthCheck = (HealthCheck) o;
+    return Objects.equals(this.status, healthCheck.status);
   }
 
   @Override
   public int hashCode() {
-    return Objects.hash(messages);
+    return Objects.hash(status);
   }
 
   @Override
   public String toString() {
     StringBuilder sb = new StringBuilder();
-    sb.append("class ISMessageHistory {\n");
-    sb.append("    messages: ").append(toIndentedString(messages)).append("\n");
+    sb.append("class HealthCheck {\n");
+    sb.append("    status: ").append(toIndentedString(status)).append("\n");
     sb.append("}");
     return sb.toString();
   }

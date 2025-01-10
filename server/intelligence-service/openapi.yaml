@@ -19,38 +19,44 @@ components:
           type: string
       title: HealthCheck
       type: object
-    MentorMessage:
+    MentorRequest:
       properties:
+        content:
+          title: Content
+          type: string
+        session_id:
+          title: Session Id
+          type: string
+      required:
+      - session_id
+      - content
+      title: MentorRequest
+      type: object
+    MentorResponce:
+      properties:
+        closed:
+          title: Closed
+          type: boolean
         content:
           title: Content
           type: string
       required:
       - content
-      title: MentorMessage
+      - closed
+      title: MentorResponce
       type: object
-    Message:
+    MentorStartRequest:
       properties:
-        content:
-          title: Content
+        previous_session_id:
+          title: Previous Session Id
           type: string
-        sender:
-          title: Sender
+        session_id:
+          title: Session Id
           type: string
       required:
-      - sender
-      - content
-      title: Message
-      type: object
-    MessageHistory:
-      properties:
-        messages:
-          items:
-            $ref: '#/components/schemas/Message'
-          title: Messages
-          type: array
-      required:
-      - messages
-      title: MessageHistory
+      - session_id
+      - previous_session_id
+      title: MentorStartRequest
       type: object
     ValidationError:
       properties:
@@ -108,14 +114,14 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/MessageHistory'
+              $ref: '#/components/schemas/MentorRequest'
         required: true
       responses:
         '200':
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/MentorMessage'
+                $ref: '#/components/schemas/MentorResponce'
           description: Successful Response
         '422':
           content:
@@ -123,6 +129,31 @@ paths:
               schema:
                 $ref: '#/components/schemas/HTTPValidationError'
           description: Validation Error
-      summary: Start and continue a chat session with an LLM.
+      summary: Continue a chat session with an LLM.
+      tags:
+      - mentor
+  /mentor/start:
+    post:
+      operationId: start_mentor_start_post
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/MentorStartRequest'
+        required: true
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MentorResponce'
+          description: Successful Response
+        '422':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+          description: Validation Error
+      summary: Start a chat session with an LLM.
       tags:
       - mentor

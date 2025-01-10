@@ -17,6 +17,7 @@ import { HlmInputDirective } from '@spartan-ng/ui-input-helm';
 export class ChatInputComponent {
   protected Send = Send;
 
+  isClosed = input.required<boolean>();
   isSending = input.required<boolean>();
   message = signal<string>('');
   sendMessage = output<string>();

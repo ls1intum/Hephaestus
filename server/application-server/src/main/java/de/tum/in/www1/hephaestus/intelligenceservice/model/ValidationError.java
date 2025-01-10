@@ -20,7 +20,7 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonTypeName;
 import com.fasterxml.jackson.annotation.JsonValue;
-import de.tum.in.www1.hephaestus.intelligenceservice.model.ISValidationErrorLocInner;
+import de.tum.in.www1.hephaestus.intelligenceservice.model.ValidationErrorLocInner;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
@@ -29,18 +29,17 @@ import com.fasterxml.jackson.annotation.JsonTypeName;
 import org.hibernate.validator.constraints.*;
 
 /**
- * ISValidationError
+ * ValidationError
  */
 @JsonPropertyOrder({
-  ISValidationError.JSON_PROPERTY_LOC,
-  ISValidationError.JSON_PROPERTY_MSG,
-  ISValidationError.JSON_PROPERTY_TYPE
+  ValidationError.JSON_PROPERTY_LOC,
+  ValidationError.JSON_PROPERTY_MSG,
+  ValidationError.JSON_PROPERTY_TYPE
 })
-@JsonTypeName("ValidationError")
 @jakarta.annotation.Generated(value = "org.openapitools.codegen.languages.JavaClientCodegen", comments = "Generator version: 7.7.0")
-public class ISValidationError {
+public class ValidationError {
   public static final String JSON_PROPERTY_LOC = "loc";
-  private List<ISValidationErrorLocInner> loc = new ArrayList<>();
+  private List<ValidationErrorLocInner> loc = new ArrayList<>();
 
   public static final String JSON_PROPERTY_MSG = "msg";
   private String msg;
@@ -48,16 +47,16 @@ public class ISValidationError {
   public static final String JSON_PROPERTY_TYPE = "type";
   private String type;
 
-  public ISValidationError() {
+  public ValidationError() {
   }
 
-  public ISValidationError loc(List<ISValidationErrorLocInner> loc) {
+  public ValidationError loc(List<ValidationErrorLocInner> loc) {
     
     this.loc = loc;
     return this;
   }
 
-  public ISValidationError addLocItem(ISValidationErrorLocInner locItem) {
+  public ValidationError addLocItem(ValidationErrorLocInner locItem) {
     if (this.loc == null) {
       this.loc = new ArrayList<>();
     }
@@ -73,18 +72,18 @@ public class ISValidationError {
   @JsonProperty(JSON_PROPERTY_LOC)
   @JsonInclude(value = JsonInclude.Include.ALWAYS)
 
-  public List<ISValidationErrorLocInner> getLoc() {
+  public List<ValidationErrorLocInner> getLoc() {
     return loc;
   }
 
 
   @JsonProperty(JSON_PROPERTY_LOC)
   @JsonInclude(value = JsonInclude.Include.ALWAYS)
-  public void setLoc(List<ISValidationErrorLocInner> loc) {
+  public void setLoc(List<ValidationErrorLocInner> loc) {
     this.loc = loc;
   }
 
-  public ISValidationError msg(String msg) {
+  public ValidationError msg(String msg) {
     
     this.msg = msg;
     return this;
@@ -109,7 +108,7 @@ public class ISValidationError {
     this.msg = msg;
   }
 
-  public ISValidationError type(String type) {
+  public ValidationError type(String type) {
     
     this.type = type;
     return this;
@@ -142,7 +141,7 @@ public class ISValidationError {
     if (o == null || getClass() != o.getClass()) {
       return false;
     }
-    ISValidationError validationError = (ISValidationError) o;
+    ValidationError validationError = (ValidationError) o;
     return Objects.equals(this.loc, validationError.loc) &&
         Objects.equals(this.msg, validationError.msg) &&
         Objects.equals(this.type, validationError.type);
@@ -156,7 +155,7 @@ public class ISValidationError {
   @Override
   public String toString() {
     StringBuilder sb = new StringBuilder();
-    sb.append("class ISValidationError {\n");
+    sb.append("class ValidationError {\n");
     sb.append("    loc: ").append(toIndentedString(loc)).append("\n");
     sb.append("    msg: ").append(toIndentedString(msg)).append("\n");
     sb.append("    type: ").append(toIndentedString(type)).append("\n");

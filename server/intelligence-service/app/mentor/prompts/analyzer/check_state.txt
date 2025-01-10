@@ -1,0 +1,7 @@
+You are tasked with analyzing the given conversation to determine whether the user has shared all relevant information about their {step} update. Follow these rules:  
+
+1. If the LLM asked the user if they have anything (or anything else, in case if the user has already provided information) to share in the {step} update and the user explicitely replied negatively, respond with "YES"
+2. In all other cases, respond with "NO."
+
+Response Rules:
+- Your response must be strictly "YES" or "NO" without additional words, explanation, or formatting.

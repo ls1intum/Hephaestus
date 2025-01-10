@@ -19,3 +19,9 @@ export const Sending: Story = {
     isSending: true
   }
 };
+
+export const Closed: Story = {
+  args: {
+    isClosed: true
+  }
+};

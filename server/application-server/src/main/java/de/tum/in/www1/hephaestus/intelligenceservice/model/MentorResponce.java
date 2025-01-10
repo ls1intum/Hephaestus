@@ -25,43 +25,71 @@ import com.fasterxml.jackson.annotation.JsonTypeName;
 import org.hibernate.validator.constraints.*;
 
 /**
- * Response model to validate and return when performing a health check.
+ * MentorResponce
  */
 @JsonPropertyOrder({
-  ISHealthCheck.JSON_PROPERTY_STATUS
+  MentorResponce.JSON_PROPERTY_CLOSED,
+  MentorResponce.JSON_PROPERTY_CONTENT
 })
-@JsonTypeName("HealthCheck")
 @jakarta.annotation.Generated(value = "org.openapitools.codegen.languages.JavaClientCodegen", comments = "Generator version: 7.7.0")
-public class ISHealthCheck {
-  public static final String JSON_PROPERTY_STATUS = "status";
-  private String status = "OK";
+public class MentorResponce {
+  public static final String JSON_PROPERTY_CLOSED = "closed";
+  private Boolean closed;
 
-  public ISHealthCheck() {
+  public static final String JSON_PROPERTY_CONTENT = "content";
+  private String content;
+
+  public MentorResponce() {
   }
 
-  public ISHealthCheck status(String status) {
+  public MentorResponce closed(Boolean closed) {
     
-    this.status = status;
+    this.closed = closed;
     return this;
   }
 
   /**
-   * Get status
-   * @return status
+   * Get closed
+   * @return closed
    */
-  @jakarta.annotation.Nullable
-  @JsonProperty(JSON_PROPERTY_STATUS)
-  @JsonInclude(value = JsonInclude.Include.USE_DEFAULTS)
+  @jakarta.annotation.Nonnull
+  @JsonProperty(JSON_PROPERTY_CLOSED)
+  @JsonInclude(value = JsonInclude.Include.ALWAYS)
 
-  public String getStatus() {
-    return status;
+  public Boolean getClosed() {
+    return closed;
   }
 
 
-  @JsonProperty(JSON_PROPERTY_STATUS)
-  @JsonInclude(value = JsonInclude.Include.USE_DEFAULTS)
-  public void setStatus(String status) {
-    this.status = status;
+  @JsonProperty(JSON_PROPERTY_CLOSED)
+  @JsonInclude(value = JsonInclude.Include.ALWAYS)
+  public void setClosed(Boolean closed) {
+    this.closed = closed;
+  }
+
+  public MentorResponce content(String content) {
+    
+    this.content = content;
+    return this;
+  }
+
+  /**
+   * Get content
+   * @return content
+   */
+  @jakarta.annotation.Nonnull
+  @JsonProperty(JSON_PROPERTY_CONTENT)
+  @JsonInclude(value = JsonInclude.Include.ALWAYS)
+
+  public String getContent() {
+    return content;
+  }
+
+
+  @JsonProperty(JSON_PROPERTY_CONTENT)
+  @JsonInclude(value = JsonInclude.Include.ALWAYS)
+  public void setContent(String content) {
+    this.content = content;
   }
 
   @Override
@@ -72,20 +100,22 @@ public class ISHealthCheck {
     if (o == null || getClass() != o.getClass()) {
       return false;
     }
-    ISHealthCheck healthCheck = (ISHealthCheck) o;
-    return Objects.equals(this.status, healthCheck.status);
+    MentorResponce mentorResponce = (MentorResponce) o;
+    return Objects.equals(this.closed, mentorResponce.closed) &&
+        Objects.equals(this.content, mentorResponce.content);
   }
 
   @Override
   public int hashCode() {
-    return Objects.hash(status);
+    return Objects.hash(closed, content);
   }
 
   @Override
   public String toString() {
     StringBuilder sb = new StringBuilder();
-    sb.append("class ISHealthCheck {\n");
-    sb.append("    status: ").append(toIndentedString(status)).append("\n");
+    sb.append("class MentorResponce {\n");
+    sb.append("    closed: ").append(toIndentedString(closed)).append("\n");
+    sb.append("    content: ").append(toIndentedString(content)).append("\n");
     sb.append("}");
     return sb.toString();
   }

@@ -1,4 +1,4 @@
-import { Component, effect, inject, signal, viewChild } from '@angular/core';
+import { Component, effect, inject, computed, signal, viewChild } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { lastValueFrom } from 'rxjs';
 import { injectMutation, injectQuery, injectQueryClient } from '@tanstack/angular-query-experimental';
@@ -56,6 +56,21 @@ export class MentorComponent {
     queryKey: ['sessions', this.selectedSessionId()],
     queryFn: async () => lastValueFrom(this.messageService.getMessages(this.selectedSessionId()!))
   }));
+
+  sessionClosed = signal<boolean>(true);
+  // sessionClosed = injectQuery(() => ({
+  //   queryKey: ['session', 'closed', this.selectedSessionId()],
+  //   queryFn: async () => {
+  //     const sessions = this.sessions.data();
+  //     const currentSessionId = this.selectedSessionId();
+      
+  //     if (sessions && currentSessionId) {
+  //       const currentSession = sessions.find(session => session.id === currentSessionId);
+  //       return currentSession?.isClosed ?? false;
+  //     }
+  //     return false;
+  //   }
+  // }));
 
   createNewSession = injectMutation(() => ({
     mutationFn: async () => lastValueFrom(this.sessionService.createNewSession()),

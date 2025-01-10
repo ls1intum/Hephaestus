@@ -28,6 +28,7 @@
           }
           <app-chat-input
             [isSending]="sendMessage.isPending()"
+            [isClosed]="sessionClosed()"
             (sendMessage)="sendMessage.mutate({ sessionId: selectedSessionId()!, message: $event })"
             class="pt-4 px-4 sticky bg-background"
             [class.border-t]="selectedSessionMessages.data()?.length"

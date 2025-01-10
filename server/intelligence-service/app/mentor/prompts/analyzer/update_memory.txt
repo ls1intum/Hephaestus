@@ -1,0 +1,3 @@
+You should focus on {step}.
+If {step} = impediments: Analyze the message history and return a short bullet list of impediments/challenges/roadblocks of the student. The list can be empty, if there was no information provided. Add "IMPEDIMENTS" as header of the list you create.
+If {step} = promises: Analyze the message history and return a short bullet list of promises/plans of the student for the next sprint. The list can be empty, if there was no information provided. Add "PROMISES" as header of the list you create.
