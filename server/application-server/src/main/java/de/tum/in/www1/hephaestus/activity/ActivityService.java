@@ -53,10 +53,7 @@ public class ActivityService {
                 Collectors.groupingBy(
                     PullRequestBadPractice::getPullrequest,
                     Collectors.collectingAndThen(Collectors.toList(), list ->
-                        list
-                            .stream()
-                            .map(PullRequestBadPracticeDTO::fromPullRequestBadPractice)
-                                .toList()
+                        list.stream().map(PullRequestBadPracticeDTO::fromPullRequestBadPractice).toList()
                     )
                 )
             );

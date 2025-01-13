@@ -14,19 +14,19 @@ import lombok.ToString;
 @ToString
 public class PullRequestBadPracticeRule {
 
-   @Id
-   @GeneratedValue
-   private Long id;
+    @Id
+    @GeneratedValue
+    private Long id;
 
-   private String title;
+    private String title;
 
-   private String description;
+    private String description;
 
-   private String conditions;
+    private String conditions;
 
-   @ManyToOne
-   @JoinColumn(name = "repository_id")
-   private Repository repository;
+    @ManyToOne
+    @JoinColumn(name = "repository_id")
+    private Repository repository;
 
     private boolean active;
 }

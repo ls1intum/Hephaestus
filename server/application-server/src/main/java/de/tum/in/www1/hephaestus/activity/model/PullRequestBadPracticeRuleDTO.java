@@ -1,6 +1,5 @@
 package de.tum.in.www1.hephaestus.activity.model;
 
-
 import de.tum.in.www1.hephaestus.gitprovider.repository.RepositoryInfoDTO;
 
 public record PullRequestBadPracticeRuleDTO(

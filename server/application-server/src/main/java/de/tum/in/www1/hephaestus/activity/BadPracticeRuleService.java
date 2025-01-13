@@ -8,12 +8,11 @@ import de.tum.in.www1.hephaestus.gitprovider.repository.Repository;
 import de.tum.in.www1.hephaestus.gitprovider.repository.RepositoryRepository;
 import de.tum.in.www1.hephaestus.workspace.RepositoryNotFoundException;
 import jakarta.transaction.Transactional;
+import java.util.List;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
-
-import java.util.List;
 
 @Service
 public class BadPracticeRuleService {
@@ -30,18 +29,23 @@ public class BadPracticeRuleService {
     public List<PullRequestBadPracticeRuleDTO> getRules(String repositoryNameWithOwner) {
         logger.info("Getting rules for repository: {}", repositoryNameWithOwner);
 
-        return pullRequestBadPracticeRuleRepository.findByRepositoryName(repositoryNameWithOwner)
-                .stream()
-                .map(PullRequestBadPracticeRuleDTO::fromPullRequestBadPracticeRule)
-                .toList();
+        return pullRequestBadPracticeRuleRepository
+            .findByRepositoryName(repositoryNameWithOwner)
+            .stream()
+            .map(PullRequestBadPracticeRuleDTO::fromPullRequestBadPracticeRule)
+            .toList();
     }
 
     @Transactional
-    public PullRequestBadPracticeRuleDTO createRule(String repositoryNameWithOwner, CreateOrUpdateBadPracticeRuleDTO rule) {
+    public PullRequestBadPracticeRuleDTO createRule(
+        String repositoryNameWithOwner,
+        CreateOrUpdateBadPracticeRuleDTO rule
+    ) {
         logger.info("Creating rule: {}", rule);
 
-        Repository repository = repositoryRepository.findByNameWithOwner(repositoryNameWithOwner)
-                .orElseThrow(() -> new RepositoryNotFoundException(repositoryNameWithOwner));
+        Repository repository = repositoryRepository
+            .findByNameWithOwner(repositoryNameWithOwner)
+            .orElseThrow(() -> new RepositoryNotFoundException(repositoryNameWithOwner));
 
         PullRequestBadPracticeRule newRule = new PullRequestBadPracticeRule();
         newRule.setTitle(rule.title());
@@ -52,8 +56,9 @@ public class BadPracticeRuleService {
 
         logger.debug("Saving rule: {}", newRule);
 
-        return  PullRequestBadPracticeRuleDTO.fromPullRequestBadPracticeRule(
-                pullRequestBadPracticeRuleRepository.save(newRule));
+        return PullRequestBadPracticeRuleDTO.fromPullRequestBadPracticeRule(
+            pullRequestBadPracticeRuleRepository.save(newRule)
+        );
     }
 
     @Transactional
@@ -72,7 +77,8 @@ public class BadPracticeRuleService {
         existingRule.setActive(rule.active());
 
         return PullRequestBadPracticeRuleDTO.fromPullRequestBadPracticeRule(
-                pullRequestBadPracticeRuleRepository.save(existingRule));
+            pullRequestBadPracticeRuleRepository.save(existingRule)
+        );
     }
 
     @Transactional

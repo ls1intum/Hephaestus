@@ -18,13 +18,10 @@ public class PullRequestBadPracticeDetector {
     private PullRequestBadPracticeRepository pullRequestBadPracticeRepository;
 
     public List<PullRequestBadPractice> detectAndSyncBadPractices(PullRequest pullRequest) {
-        logger.info(
-                "Detecting bad practices for pull request: {}.",
-                pullRequest.getId()
-        );
+        logger.info("Detecting bad practices for pull request: {}.", pullRequest.getId());
 
         List<PullRequestBadPractice> existingBadPractices = pullRequestBadPracticeRepository.findByPullRequestId(
-                pullRequest.getId()
+            pullRequest.getId()
         );
 
         //TODO connect LLM based detection
@@ -32,7 +29,7 @@ public class PullRequestBadPracticeDetector {
 
         return newBadPractices;
     }
-/*
+    /*
         updateExistingBadPractices(existingBadPractices, newBadPractices);
 
         return saveBadPractices(existingBadPractices, newBadPractices);
