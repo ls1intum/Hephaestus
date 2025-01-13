@@ -1,0 +1,100 @@
+<div class="flex flex-col gap-2">
+  <div>
+    <brn-select class="inline-block" placeholder="Select a repository" [(ngModel)]="_selectedRepo">
+      <hlm-select-trigger class="inline-flex">
+        <hlm-select-value />
+      </hlm-select-trigger>
+      <hlm-select-content class="min-w-[9.5rem]">
+        @for (repo of availableRepos(); track repo) {
+          <hlm-option [value]="repo" class="containerSize">
+            <span class="">{{ repo }}</span>
+          </hlm-option>
+        }
+      </hlm-select-content>
+    </brn-select>
+  </div>
+  @if (_selectedRepo()) {
+    <div class="grid grid-cols-3 gap-2">
+      <div class="flex flex-col justify-start col-span-1 gap-2">
+        <brn-popover sideOffset="5" closeDelay="100">
+          <button brnPopoverTrigger (click)="resetCreateForm()" hlmBtn variant="outline" class="w-full">Create new rule</button>
+          <div hlmPopoverContent class="w-full grid gap-4" *brnPopoverContent="let ctx">
+            <div class="space-y-2">
+              <h4 class="font-medium leading-none">New bad practice rule</h4>
+              <p class="text-sm text-muted-foreground">Create a new bad practice rule for pull requests.</p>
+            </div>
+            <div class="grid gap-2">
+              <div class="items-center grid grid-cols-3 gap-4">
+                <label hlmLabel for="title">Title</label>
+                <input hlmInput [formControl]="_newTitle" id="title" placeholder="Title" class="h-8 col-span-2" />
+              </div>
+              <div class="items-start grid grid-cols-3 gap-4">
+                <label hlmLabel for="description">Description</label>
+                <textarea hlmInput [formControl]="_newDescription" id="description" placeholder="Description" class="h-32 col-span-2 resize-none"></textarea>
+              </div>
+              <div class="items-start grid grid-cols-3 gap-4">
+                <label hlmLabel for="conditions">Conditions</label>
+                <textarea hlmInput [formControl]="_newConditions" id="conditions" placeholder="Conditions" class="h-32 col-span-2 resize-none"></textarea>
+              </div>
+              <button hlmBtn variant="default" (click)="createRule.mutate()" class="w-full">Create rule</button>
+            </div>
+          </div>
+        </brn-popover>
+        <brn-table
+          hlm
+          stickyHeader
+          class="border-border block overflow-auto rounded-md border cursor-pointer"
+          [dataSource]="rules()"
+          [displayedColumns]="['active', 'title']"
+          [trackBy]="_trackBy"
+        >
+          <brn-column-def name="active">
+            <hlm-th *brnHeaderDef>
+              <span class="text-sm font-semibold">Active</span>
+            </hlm-th>
+            <hlm-td *brnCellDef="let element">
+              @if (element.active) {
+                <hlm-icon name="lucideCheck" class="text-github-success-foreground" />
+              } @else {
+                <hlm-icon name="lucideX" class="text-github-danger-foreground" />
+              }
+            </hlm-td>
+          </brn-column-def>
+          <brn-column-def name="title">
+            <hlm-th *brnHeaderDef>
+              <span class="text-sm font-semibold">Title</span>
+            </hlm-th>
+            <hlm-td truncate *brnCellDef="let element" (click)="selectRule(element)">
+              <span class="text-sm">{{ element.title }}</span>
+            </hlm-td>
+          </brn-column-def>
+        </brn-table>
+      </div>
+      <div class="col-span-2">
+        @if (_selectedRule()) {
+          <section hlmCard>
+            <div hlmCardContent class="grid gap-2">
+              <div class="flex flex-row justify-between items-baseline gap-2">
+                <input hlmInput [formControl]="_newEditTitle" placeholder="Title" class="w-full" />
+                <button hlmBtn variant="outline" (click)="cancelEdit()">Cancel</button>
+              </div>
+              <label hlmLabel>
+                Description
+                <textarea hlmInput [formControl]="_newEditDescription" placeholder="Description" class="w-full h-32 resize-none"></textarea>
+              </label>
+              <label hlmLabel>
+                Conditions
+                <textarea hlmInput [formControl]="_newEditConditions" placeholder="Conditions" class="w-full h-32 resize-none"></textarea>
+              </label>
+              <label class="flex items-center" hlmLabel>
+                <hlm-switch class="mr-2" [formControl]="_newEditIsActive" />
+                Active
+              </label>
+              <button hlmBtn variant="default" (click)="save()">Save rule</button>
+            </div>
+          </section>
+        }
+      </div>
+    </div>
+  }
+</div>

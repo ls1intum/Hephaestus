@@ -50,6 +50,8 @@ public class BadPracticeRuleService {
         newRule.setRepository(repository);
         newRule.setActive(rule.active());
 
+        logger.debug("Saving rule: {}", newRule);
+
         return  PullRequestBadPracticeRuleDTO.fromPullRequestBadPracticeRule(
                 pullRequestBadPracticeRuleRepository.save(newRule));
     }

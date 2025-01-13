@@ -1,10 +1,7 @@
 package de.tum.in.www1.hephaestus.activity.model;
 
 import de.tum.in.www1.hephaestus.gitprovider.repository.Repository;
-import jakarta.persistence.Entity;
-import jakarta.persistence.Id;
-import jakarta.persistence.JoinColumn;
-import jakarta.persistence.ManyToOne;
+import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
@@ -18,7 +15,8 @@ import lombok.ToString;
 public class PullRequestBadPracticeRule {
 
    @Id
-    private Long id;
+   @GeneratedValue
+   private Long id;
 
    private String title;
 

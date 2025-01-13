@@ -14,6 +14,7 @@ import { AdminGuard } from '@app/core/security/admin.guard';
 import { AuthGuard } from '@app/core/security/auth.guard';
 import { MentorGuard } from '@app/core/security/mentor.guard';
 import { ActivityDashboardComponent } from '@app/home/activity/activity-dashboard.component';
+import { WorkspaceRulesComponent } from '@app/workspace/badpractices/rules.component';
 
 export const routes: Routes = [
   // Public routes
@@ -34,6 +35,10 @@ export const routes: Routes = [
       {
         path: 'teams',
         component: WorkspaceTeamsComponent
+      },
+      {
+        path: 'rules',
+        component: WorkspaceRulesComponent
       }
     ]
   },
