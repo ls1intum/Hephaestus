@@ -1,6 +1,6 @@
 <brn-collapsible>
   <a hlmCard variant="profile">
-    <div hlmCardHeader>
+    <div>
       <div class="flex justify-between items-center text-sm text-github-muted-foreground">
         <span class="font-medium flex justify-center items-center space-x-1">
           @if (isLoading()) {
@@ -16,7 +16,11 @@
             <hlm-skeleton class="h-4 w-16 lg:w-36"></hlm-skeleton>
             <hlm-skeleton class="size-5"></hlm-skeleton>
           } @else {
-            <span> {{ badPractices()?.length }} bad practices detected </span>
+            @if (badPractices()?.length == 1) {
+              <span> {{ badPractices()?.length }} bad practice detected </span>
+            } @else {
+              <span> {{ badPractices()?.length }} bad practices detected </span>
+            }
             <button brnCollapsibleTrigger hlmBtn variant="ghost">
               <ng-icon [svg]="octFold" size="18" class="text-github-muted-foreground"></ng-icon>
             </button>
@@ -50,7 +54,7 @@
       }
     </div>
     @if (!isLoading()) {
-      <div hlmCardContent class="gap-2 p-0 space-x-0 pl-6 text-left">
+      <div class="gap-2 p-0 space-x-0 text-left">
         <brn-collapsible-content>
           @for (badpractice of badPractices(); track badpractice.title) {
             <brn-separator hlmSeparator />
