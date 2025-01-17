@@ -288,6 +288,26 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/Message"
+  /activity/{login}/badpractices:
+    post:
+      tags:
+      - activity
+      operationId: detectBadPracticesByUser
+      parameters:
+      - name: login
+        in: path
+        required: true
+        schema:
+          type: string
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/PullRequestBadPractice"
   /workspace/users:
     get:
       tags:
@@ -392,6 +412,24 @@ paths:
                 type: array
                 items:
                   $ref: "#/components/schemas/LeaderboardEntry"
+  /activity/{login}:
+    get:
+      tags:
+      - activity
+      operationId: getActivityByUser
+      parameters:
+      - name: login
+        in: path
+        required: true
+        schema:
+          type: string
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Activity"
   /workspace/team/{teamId}:
     delete:
       tags:
@@ -603,6 +641,57 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/TeamInfo"
+    PullRequestWithBadPractices:
+      required:
+      - additions
+      - deletions
+      - htmlUrl
+      - id
+      - isDraft
+      - isMerged
+      - number
+      - state
+      - title
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+        number:
+          type: integer
+          format: int32
+        title:
+          type: string
+        state:
+          type: string
+          enum:
+          - OPEN
+          - CLOSED
+        isDraft:
+          type: boolean
+        isMerged:
+          type: boolean
+        labels:
+          type: array
+          items:
+            $ref: "#/components/schemas/LabelInfo"
+        repository:
+          $ref: "#/components/schemas/RepositoryInfo"
+        additions:
+          type: integer
+          format: int32
+        deletions:
+          type: integer
+          format: int32
+        htmlUrl:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+        badPractices:
+          type: array
+          items:
+            $ref: "#/components/schemas/PullRequestBadPractice"
     PullRequestBaseInfo:
       required:
       - htmlUrl
@@ -635,6 +724,15 @@ components:
           $ref: "#/components/schemas/RepositoryInfo"
         htmlUrl:
           type: string
+    Activity:
+      required:
+      - pullRequests
+      type: object
+      properties:
+        pullRequests:
+          type: array
+          items:
+            $ref: "#/components/schemas/PullRequestWithBadPractices"
     UserInfo:
       required:
       - avatarUrl
@@ -684,6 +782,15 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/LabelInfo"
+    PullRequestBadPractice:
+      type: object
+      properties:
+        title:
+          type: string
+        description:
+          type: string
+        resolved:
+          type: boolean
     LabelInfo:
       required:
       - color
