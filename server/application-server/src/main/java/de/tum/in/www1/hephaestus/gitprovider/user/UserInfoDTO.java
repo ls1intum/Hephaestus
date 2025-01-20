@@ -10,7 +10,8 @@ public record UserInfoDTO(
     String email,
     @NonNull String avatarUrl,
     @NonNull String name,
-    @NonNull String htmlUrl
+    @NonNull String htmlUrl,
+    int leaguePoints
 ) {
     public static UserInfoDTO fromUser(User user) {
         return new UserInfoDTO(
@@ -19,7 +20,8 @@ public record UserInfoDTO(
             user.getEmail(),
             user.getAvatarUrl(),
             user.getName(),
-            user.getHtmlUrl()
+            user.getHtmlUrl(),
+            user.getLeaguePoints()
         );
     }
 }

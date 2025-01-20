@@ -10,6 +10,7 @@ import { HlmButtonModule } from '@spartan-ng/ui-button-helm';
 import dayjs from 'dayjs';
 import advancedFormat from 'dayjs/plugin/advancedFormat';
 import { RepositoryInfo, UserInfo } from '@app/core/modules/openapi';
+import { LeagueIconComponent } from '@app/ui/league/icon/league-icon.component';
 
 dayjs.extend(advancedFormat);
 
@@ -21,7 +22,17 @@ const repoImages: { [key: string]: string } = {
 
 @Component({
   selector: 'app-user-header',
-  imports: [NgIconComponent, HlmAvatarModule, HlmSkeletonModule, HlmIconModule, HlmTooltipComponent, HlmTooltipTriggerDirective, BrnTooltipContentDirective, HlmButtonModule],
+  imports: [
+    NgIconComponent,
+    HlmAvatarModule,
+    HlmSkeletonModule,
+    HlmIconModule,
+    HlmTooltipComponent,
+    HlmTooltipTriggerDirective,
+    BrnTooltipContentDirective,
+    HlmButtonModule,
+    LeagueIconComponent
+  ],
   templateUrl: './header.component.html'
 })
 export class UserHeaderComponent {
@@ -31,6 +42,7 @@ export class UserHeaderComponent {
   user = input<UserInfo>();
   firstContribution = input<string>();
   contributedRepositories = input<RepositoryInfo[]>();
+  leaguePoints = input<number>();
 
   displayFirstContribution = computed(() => {
     if (this.firstContribution()) {

@@ -85,4 +85,9 @@ export class WorkspaceComponent {
     },
     onSuccess: () => this.queryClient.invalidateQueries({ queryKey: ['workspace', 'repositoriesToMonitor'] })
   }));
+
+  resetAndRecalculateLeagues = injectMutation(() => ({
+    mutationFn: () => lastValueFrom(this.workspaceService.resetAndRecalculateLeagues()),
+    onSuccess: () => this.queryClient.invalidateQueries({ queryKey: ['workspace', 'resetAndRecalculateLeagues'] })
+  }));
 }
