@@ -42,9 +42,11 @@ public class MessageService {
             return null;
         }
         Session currentSession = session.get();
-        
+
         // prevent sending messages to closed sessions
-        Session previouSession = sessionRepository.findFirstByUserOrderByCreatedAtDesc(currentSession.getUser()).orElse(null);
+        Session previouSession = sessionRepository
+            .findFirstByUserOrderByCreatedAtDesc(currentSession.getUser())
+            .orElse(null);
         if (previouSession != null && previouSession.isClosed()) {
             return null;
         }

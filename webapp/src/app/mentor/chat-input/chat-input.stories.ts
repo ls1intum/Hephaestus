@@ -5,7 +5,8 @@ const meta: Meta<ChatInputComponent> = {
   component: ChatInputComponent,
   tags: ['autodocs'],
   args: {
-    isSending: false
+    isSending: false,
+    isClosed: false
   }
 };
 

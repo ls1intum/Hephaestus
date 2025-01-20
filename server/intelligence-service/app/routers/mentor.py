@@ -44,4 +44,3 @@ def generate(request: MentorRequest):
     response = run(request.content, config)
     response_message = response["messages"][-1].content
     return MentorResponce(content=response_message)
-

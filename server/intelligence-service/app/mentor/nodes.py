@@ -85,19 +85,21 @@ def ask_impediments(state: State, store: BaseStore):
             (
                 "system",
                 (
-                    prompt_loader.get_prompt(type="mentor", name="impediments").format_map(
-                        {"previous_impediments": previous_impediments}
-                    )
+                    prompt_loader.get_prompt(
+                        type="mentor", name="impediments"
+                    ).format_map({"previous_impediments": previous_impediments})
                 ),
             ),
             MessagesPlaceholder("messages"),
         ]
     )
     chain = prompt | model
-    print("[impediments] prompt: " +  prompt_loader.get_prompt(type="mentor", name="impediments").format_map(
-                        {"previous_impediments": previous_impediments}
-                    ))
-
+    print(
+        "[impediments] prompt: "
+        + prompt_loader.get_prompt(type="mentor", name="impediments").format_map(
+            {"previous_impediments": previous_impediments}
+        )
+    )
 
     return {"messages": [chain.invoke({"messages": state["messages"]})]}
 
@@ -125,7 +127,10 @@ def ask_summary(state: State):
     )
     chain = prompt | model
     response = chain.invoke({"messages": state["messages"]})
-    print("[ask_summary]: prompt: ", prompt_loader.get_prompt(type="mentor", name="summary"))
+    print(
+        "[ask_summary]: prompt: ",
+        prompt_loader.get_prompt(type="mentor", name="summary"),
+    )
     print("[ask_summary]: response from the LLM: ", response.content)
     return {"messages": [response]}
 
@@ -201,10 +206,10 @@ def update_memory(state: State, config: RunnableConfig, *, store: BaseStore):
                         type="analyzer", name="update_memory"
                     ).format_map({"step": step}),
                 ),
-                MessagesPlaceholder("messages")
+                MessagesPlaceholder("messages"),
             ]
         )
-        
+
         print("[update_memory]: step: ", step)
         chain = prompt | model
         response = chain.invoke({"messages": state["messages"]}).content

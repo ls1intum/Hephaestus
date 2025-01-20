@@ -17,7 +17,6 @@ type Story = StoryObj<ChatSummaryComponent>;
 export const Default: Story = {
   render: (args) => ({
     props: args,
-
     template: `<app-chat-summary ${argsToTemplate(args)} />`
   })
 };
