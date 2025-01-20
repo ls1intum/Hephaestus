@@ -16,6 +16,7 @@ module.exports = [
       'node/',
       'node_modules/',
       'src/app/core/modules/openapi/',
+      'src/libs/ui/'
     ],
   },
   {

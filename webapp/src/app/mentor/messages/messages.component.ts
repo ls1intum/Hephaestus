@@ -9,7 +9,6 @@ import { HlmSkeletonComponent } from '@spartan-ng/ui-skeleton-helm';
 @Component({
   selector: 'app-messages',
   templateUrl: './messages.component.html',
-  standalone: true,
   imports: [CommonModule, LucideAngularModule, HlmAvatarModule, HlmSkeletonComponent]
 })
 export class MessagesComponent {

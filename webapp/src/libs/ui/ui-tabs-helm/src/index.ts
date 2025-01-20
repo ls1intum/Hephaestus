@@ -12,10 +12,16 @@ export * from './lib/hlm-tabs-paginated-list.component';
 export * from './lib/hlm-tabs-trigger.directive';
 export * from './lib/hlm-tabs.component';
 
-export const HlmTabsImports = [HlmTabsComponent, HlmTabsListComponent, HlmTabsTriggerDirective, HlmTabsContentDirective, HlmTabsPaginatedListComponent] as const;
+export const HlmTabsImports = [
+	HlmTabsComponent,
+	HlmTabsListComponent,
+	HlmTabsTriggerDirective,
+	HlmTabsContentDirective,
+	HlmTabsPaginatedListComponent,
+] as const;
 
 @NgModule({
-  imports: [...HlmTabsImports],
-  exports: [...HlmTabsImports]
+	imports: [...HlmTabsImports],
+	exports: [...HlmTabsImports],
 })
 export class HlmTabsModule {}

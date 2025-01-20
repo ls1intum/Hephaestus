@@ -20,7 +20,6 @@ import { User } from '@app/core/security/models';
 
 @Component({
   selector: 'app-leaderboard',
-  standalone: true,
   imports: [
     HlmAvatarModule,
     HlmSkeletonModule,

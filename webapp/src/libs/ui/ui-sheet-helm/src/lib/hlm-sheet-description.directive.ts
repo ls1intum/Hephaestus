@@ -4,14 +4,14 @@ import { BrnSheetDescriptionDirective } from '@spartan-ng/ui-sheet-brain';
 import type { ClassValue } from 'clsx';
 
 @Directive({
-  selector: '[hlmSheetDescription]',
-  standalone: true,
-  host: {
-    '[class]': '_computedClass()'
-  },
-  hostDirectives: [BrnSheetDescriptionDirective]
+	selector: '[hlmSheetDescription]',
+	standalone: true,
+	host: {
+		'[class]': '_computedClass()',
+	},
+	hostDirectives: [BrnSheetDescriptionDirective],
 })
 export class HlmSheetDescriptionDirective {
-  public readonly userClass = input<ClassValue>('', { alias: 'class' });
-  protected _computedClass = computed(() => hlm('text-sm text-muted-foreground', this.userClass()));
+	public readonly userClass = input<ClassValue>('', { alias: 'class' });
+	protected _computedClass = computed(() => hlm('text-sm text-muted-foreground', this.userClass()));
 }
