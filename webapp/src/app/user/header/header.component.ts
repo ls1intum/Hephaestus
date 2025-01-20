@@ -22,7 +22,6 @@ const repoImages: { [key: string]: string } = {
 
 @Component({
   selector: 'app-user-header',
-  standalone: true,
   imports: [
     NgIconComponent,
     HlmAvatarModule,

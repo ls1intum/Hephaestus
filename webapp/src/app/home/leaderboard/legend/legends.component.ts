@@ -3,7 +3,6 @@ import { NgIconComponent } from '@ng-icons/core';
 import { octFileDiff, octCheck, octComment, octCommentDiscussion, octGitPullRequest } from '@ng-icons/octicons';
 import { HlmIconComponent } from '@spartan-ng/ui-icon-helm';
 import { HlmCardModule } from '@spartan-ng/ui-card-helm';
-import { HlmButtonDirective } from '@spartan-ng/ui-button-helm';
 import {
   HlmAccordionContentComponent,
   HlmAccordionDirective,
@@ -14,7 +13,6 @@ import {
 
 @Component({
   selector: 'app-leaderboard-legend',
-  standalone: true,
   imports: [
     HlmAccordionDirective,
     HlmAccordionItemDirective,
@@ -23,8 +21,7 @@ import {
     HlmAccordionIconDirective,
     HlmCardModule,
     NgIconComponent,
-    HlmIconComponent,
-    HlmButtonDirective
+    HlmIconComponent
   ],
   templateUrl: './legend.component.html'
 })

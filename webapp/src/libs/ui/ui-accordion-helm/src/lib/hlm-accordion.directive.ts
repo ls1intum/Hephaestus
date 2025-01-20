@@ -4,16 +4,18 @@ import { hlm } from '@spartan-ng/ui-core';
 import type { ClassValue } from 'clsx';
 
 @Directive({
-  selector: '[hlmAccordion], hlm-accordion',
-  standalone: true,
-  host: {
-    '[class]': '_computedClass()'
-  },
-  hostDirectives: [{ directive: BrnAccordionDirective, inputs: ['type', 'dir', 'orientation'] }]
+	selector: '[hlmAccordion], hlm-accordion',
+	standalone: true,
+	host: {
+		'[class]': '_computedClass()',
+	},
+	hostDirectives: [{ directive: BrnAccordionDirective, inputs: ['type', 'dir', 'orientation'] }],
 })
 export class HlmAccordionDirective {
-  private readonly _brn = inject(BrnAccordionDirective);
+	private readonly _brn = inject(BrnAccordionDirective);
 
-  public readonly userClass = input<ClassValue>('', { alias: 'class' });
-  protected readonly _computedClass = computed(() => hlm('flex', this._brn.orientation === 'horizontal' ? 'flex-row' : 'flex-col', this.userClass()));
+	public readonly userClass = input<ClassValue>('', { alias: 'class' });
+	protected readonly _computedClass = computed(() =>
+		hlm('flex', this._brn.orientation() === 'horizontal' ? 'flex-row' : 'flex-col', this.userClass()),
+	);
 }

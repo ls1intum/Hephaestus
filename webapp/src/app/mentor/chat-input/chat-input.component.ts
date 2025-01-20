@@ -11,7 +11,6 @@ import { HlmInputDirective } from '@spartan-ng/ui-input-helm';
 @Component({
   selector: 'app-chat-input',
   templateUrl: './chat-input.component.html',
-  standalone: true,
   imports: [CommonModule, HlmButtonModule, HlmSpinnerComponent, FormsModule, HlmCardModule, HlmInputDirective, LucideAngularModule]
 })
 export class ChatInputComponent {

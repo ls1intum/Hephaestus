@@ -5,7 +5,6 @@ import { HlmSkeletonComponent } from '@spartan-ng/ui-skeleton-helm';
 
 @Component({
   selector: 'app-start-session-card',
-  standalone: true,
   templateUrl: './start-session-card.component.html',
   imports: [LucideAngularModule, HlmButtonModule, HlmSkeletonComponent]
 })

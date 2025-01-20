@@ -20,7 +20,6 @@ import { LeagueIconComponent } from '@app/ui/league/icon/league-icon.component';
 
 @Component({
   selector: 'app-leaderboard',
-  standalone: true,
   imports: [
     HlmAvatarModule,
     HlmSkeletonModule,

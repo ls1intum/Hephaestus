@@ -19,7 +19,6 @@ dayjs.extend(isoWeek);
 
 @Component({
   selector: 'app-home',
-  standalone: true,
   imports: [LeaderboardComponent, LeaderboardFilterComponent, HlmAlertModule, LucideAngularModule, LeaderboardLegendComponent, LeaderboardLeagueComponent],
   templateUrl: './home.component.html'
 })
