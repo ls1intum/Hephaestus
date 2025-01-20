@@ -13,7 +13,6 @@ interface SelectOption {
 
 @Component({
   selector: 'app-leaderboard-filter-team',
-  standalone: true,
   imports: [BrnSelectModule, HlmSelectModule, HlmLabelModule, FormsModule],
   templateUrl: './team.component.html'
 })

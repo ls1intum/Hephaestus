@@ -4,7 +4,6 @@ import { HlmSkeletonModule } from '@spartan-ng/ui-skeleton-helm';
 
 @Component({
   selector: 'app-github-label',
-  standalone: true,
   imports: [HlmSkeletonModule],
   styleUrls: ['./github-label.component.scss'],
   host: {

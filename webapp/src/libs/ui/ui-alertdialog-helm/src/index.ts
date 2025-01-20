@@ -21,19 +21,19 @@ export * from './lib/hlm-alert-dialog-title.directive';
 export * from './lib/hlm-alert-dialog.component';
 
 export const HlmAlertDialogImports = [
-  HlmAlertDialogContentComponent,
-  HlmAlertDialogDescriptionDirective,
-  HlmAlertDialogFooterComponent,
-  HlmAlertDialogHeaderComponent,
-  HlmAlertDialogOverlayDirective,
-  HlmAlertDialogTitleDirective,
-  HlmAlertDialogActionButtonDirective,
-  HlmAlertDialogCancelButtonDirective,
-  HlmAlertDialogComponent
+	HlmAlertDialogContentComponent,
+	HlmAlertDialogDescriptionDirective,
+	HlmAlertDialogFooterComponent,
+	HlmAlertDialogHeaderComponent,
+	HlmAlertDialogOverlayDirective,
+	HlmAlertDialogTitleDirective,
+	HlmAlertDialogActionButtonDirective,
+	HlmAlertDialogCancelButtonDirective,
+	HlmAlertDialogComponent,
 ] as const;
 
 @NgModule({
-  imports: [...HlmAlertDialogImports],
-  exports: [...HlmAlertDialogImports]
+	imports: [...HlmAlertDialogImports],
+	exports: [...HlmAlertDialogImports],
 })
 export class HlmAlertDialogModule {}

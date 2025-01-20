@@ -5,13 +5,13 @@ import type { ClassValue } from 'clsx';
 export const hlmBlockquote = 'mt-6 border-border border-l-2 pl-6 italic';
 
 @Directive({
-  selector: '[hlmBlockquote]',
-  standalone: true,
-  host: {
-    '[class]': '_computedClass()'
-  }
+	selector: '[hlmBlockquote]',
+	standalone: true,
+	host: {
+		'[class]': '_computedClass()',
+	},
 })
 export class HlmBlockquoteDirective {
-  public readonly userClass = input<ClassValue>('', { alias: 'class' });
-  protected _computedClass = computed(() => hlm(hlmBlockquote, this.userClass()));
+	public readonly userClass = input<ClassValue>('', { alias: 'class' });
+	protected _computedClass = computed(() => hlm(hlmBlockquote, this.userClass()));
 }

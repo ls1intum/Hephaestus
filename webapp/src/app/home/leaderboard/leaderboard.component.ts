@@ -19,7 +19,6 @@ import { lucideAward } from '@ng-icons/lucide';
 
 @Component({
   selector: 'app-leaderboard',
-  standalone: true,
   imports: [
     HlmAvatarModule,
     HlmSkeletonModule,

@@ -19,7 +19,6 @@ interface PullRequestInfo {
 
 @Component({
   selector: 'app-reviews-popover',
-  standalone: true,
   imports: [
     HlmPopoverModule,
     BrnPopoverComponent,

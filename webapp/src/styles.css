@@ -68,8 +68,4 @@
   code.textCode {
     @apply bg-github-muted tracking-tight rounded px-1 py-0.5;
   }
-
-  .containerSize {
-    container-type: inline-size;
-  }
 }

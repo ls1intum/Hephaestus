@@ -21,7 +21,6 @@ const repoImages: { [key: string]: string } = {
 
 @Component({
   selector: 'app-user-header',
-  standalone: true,
   imports: [NgIconComponent, HlmAvatarModule, HlmSkeletonModule, HlmIconModule, HlmTooltipComponent, HlmTooltipTriggerDirective, BrnTooltipContentDirective, HlmButtonModule],
   templateUrl: './header.component.html'
 })

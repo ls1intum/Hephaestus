@@ -4,22 +4,24 @@ import { type VariantProps, cva } from 'class-variance-authority';
 import type { ClassValue } from 'clsx';
 
 export const paginationVariants = cva('mx-auto flex w-full justify-center', {
-  variants: {},
-  defaultVariants: {}
+	variants: {},
+	defaultVariants: {},
 });
 export type PaginationVariants = VariantProps<typeof paginationVariants>;
 
 @Directive({
-  selector: '[hlmPagination]',
-  standalone: true,
-  host: {
-    '[class]': '_computedClass()',
-    '[attr.role]': '"navigation"',
-    '[attr.aria-label]': '"pagination"'
-  }
+	selector: '[hlmPagination]',
+	standalone: true,
+	host: {
+		role: 'navigation',
+		'[class]': '_computedClass()',
+		'[attr.aria-label]': 'ariaLabel()',
+	},
 })
 export class HlmPaginationDirective {
-  public readonly class = input<ClassValue>('');
+	public readonly userClass = input<ClassValue>('', { alias: 'class' });
 
-  protected _computedClass = computed(() => hlm(paginationVariants(), this.class()));
+	public readonly ariaLabel = input<string>('pagination', { alias: 'aria-label' });
+
+	protected readonly _computedClass = computed(() => hlm(paginationVariants(), this.userClass()));
 }

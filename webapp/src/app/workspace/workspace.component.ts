@@ -26,7 +26,6 @@ import { FormsModule } from '@angular/forms';
 
 @Component({
   selector: 'app-workspace',
-  standalone: true,
   imports: [
     FormsModule,
     CommonModule,

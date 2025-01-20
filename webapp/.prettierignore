@@ -7,3 +7,6 @@ package-lock.json
 
 # Ignore OpenAPI generated files:
 src/app/core/modules/openapi
+
+# Ignore spartan-ng files:
+src/libs/ui

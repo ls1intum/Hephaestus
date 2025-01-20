@@ -6,7 +6,6 @@ import { HlmButtonModule } from '@spartan-ng/ui-button-helm';
 
 @Component({
   selector: 'app-theme-switcher',
-  standalone: true,
   imports: [HlmButtonModule, LucideAngularModule],
   templateUrl: './theme-switcher.component.html',
   animations: [

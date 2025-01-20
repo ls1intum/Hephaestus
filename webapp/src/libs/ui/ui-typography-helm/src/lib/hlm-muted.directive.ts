@@ -5,13 +5,13 @@ import type { ClassValue } from 'clsx';
 export const hlmMuted = 'text-sm text-muted-foreground';
 
 @Directive({
-  selector: '[hlmMuted]',
-  standalone: true,
-  host: {
-    '[class]': '_computedClass()'
-  }
+	selector: '[hlmMuted]',
+	standalone: true,
+	host: {
+		'[class]': '_computedClass()',
+	},
 })
 export class HlmMutedDirective {
-  public readonly userClass = input<ClassValue>('', { alias: 'class' });
-  protected _computedClass = computed(() => hlm(hlmMuted, this.userClass()));
+	public readonly userClass = input<ClassValue>('', { alias: 'class' });
+	protected _computedClass = computed(() => hlm(hlmMuted, this.userClass()));
 }
