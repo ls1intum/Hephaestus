@@ -20,7 +20,6 @@ class MentorRequest(BaseModel):
 
 class MentorResponce(BaseModel):
     content: str
-    closed: bool  # signifies if the session should be closed after the response
 
 
 @router.post(
@@ -28,11 +27,11 @@ class MentorResponce(BaseModel):
     response_model=MentorResponce,
     summary="Start a chat session with an LLM.",
 )
-async def start(request: MentorStartRequest):
+def start(request: MentorStartRequest):
     config = RunnableConfig({"configurable": {"thread_id": request.session_id}})
-    response = await start_session(request.previous_session_id, config)
+    response = start_session(request.previous_session_id, config)
     response_message = response["messages"][-1].content
-    return MentorResponce(content=response_message, closed=response["closed"])
+    return MentorResponce(content=response_message)
 
 
 @router.post(
@@ -40,9 +39,9 @@ async def start(request: MentorStartRequest):
     response_model=MentorResponce,
     summary="Continue a chat session with an LLM.",
 )
-async def generate(request: MentorRequest):
+def generate(request: MentorRequest):
     config = RunnableConfig({"configurable": {"thread_id": request.session_id}})
-    response = await run(request.content, config)
+    response = run(request.content, config)
     response_message = response["messages"][-1].content
-    return MentorResponce(content=response_message, closed=response["closed"])
+    return MentorResponce(content=response_message)
 

@@ -34,15 +34,11 @@ components:
       type: object
     MentorResponce:
       properties:
-        closed:
-          title: Closed
-          type: boolean
         content:
           title: Content
           type: string
       required:
       - content
-      - closed
       title: MentorResponce
       type: object
     MentorStartRequest:

@@ -28,43 +28,14 @@ import org.hibernate.validator.constraints.*;
  * MentorResponce
  */
 @JsonPropertyOrder({
-  MentorResponce.JSON_PROPERTY_CLOSED,
   MentorResponce.JSON_PROPERTY_CONTENT
 })
 @jakarta.annotation.Generated(value = "org.openapitools.codegen.languages.JavaClientCodegen", comments = "Generator version: 7.7.0")
 public class MentorResponce {
-  public static final String JSON_PROPERTY_CLOSED = "closed";
-  private Boolean closed;
-
   public static final String JSON_PROPERTY_CONTENT = "content";
   private String content;
 
   public MentorResponce() {
-  }
-
-  public MentorResponce closed(Boolean closed) {
-    
-    this.closed = closed;
-    return this;
-  }
-
-  /**
-   * Get closed
-   * @return closed
-   */
-  @jakarta.annotation.Nonnull
-  @JsonProperty(JSON_PROPERTY_CLOSED)
-  @JsonInclude(value = JsonInclude.Include.ALWAYS)
-
-  public Boolean getClosed() {
-    return closed;
-  }
-
-
-  @JsonProperty(JSON_PROPERTY_CLOSED)
-  @JsonInclude(value = JsonInclude.Include.ALWAYS)
-  public void setClosed(Boolean closed) {
-    this.closed = closed;
   }
 
   public MentorResponce content(String content) {
@@ -101,20 +72,18 @@ public class MentorResponce {
       return false;
     }
     MentorResponce mentorResponce = (MentorResponce) o;
-    return Objects.equals(this.closed, mentorResponce.closed) &&
-        Objects.equals(this.content, mentorResponce.content);
+    return Objects.equals(this.content, mentorResponce.content);
   }
 
   @Override
   public int hashCode() {
-    return Objects.hash(closed, content);
+    return Objects.hash(content);
   }
 
   @Override
   public String toString() {
     StringBuilder sb = new StringBuilder();
     sb.append("class MentorResponce {\n");
-    sb.append("    closed: ").append(toIndentedString(closed)).append("\n");
     sb.append("    content: ").append(toIndentedString(content)).append("\n");
     sb.append("}");
     return sb.toString();

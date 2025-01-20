@@ -1,8 +1,8 @@
 from .state import State
 from langgraph.graph import START, StateGraph, END
-from psycopg_pool import AsyncConnectionPool
-from langgraph.checkpoint.postgres.aio import AsyncPostgresSaver
-from langgraph.store.postgres import AsyncPostgresStore
+from psycopg_pool import ConnectionPool
+from langgraph.checkpoint.postgres import PostgresSaver
+from langgraph.store.postgres import PostgresStore
 from langchain_core.messages import HumanMessage
 
 from .nodes import (
@@ -50,19 +50,19 @@ graph_builder.add_edge("finish_node", "update_memory")
 graph_builder.add_edge("update_memory", END)
 
 
-async def start_session(last_thread: str, config):
-    async with AsyncConnectionPool(kwargs=POSTGRES_CONFIG) as pool:
-        checkpointer = AsyncPostgresSaver(pool)
-        await checkpointer.setup()
+def start_session(last_thread: str, config):
+    with ConnectionPool(kwargs=POSTGRES_CONFIG) as pool:
+        checkpointer = PostgresSaver(pool)
+        checkpointer.setup()
 
-        async with AsyncPostgresStore.from_conn_string(
+        with PostgresStore.from_conn_string(
             "postgresql://root:root@localhost:5432/hephaestus"
         ) as store:
-            await store.setup()
+            store.setup()
             graph = graph_builder.compile(checkpointer=checkpointer, store=store)
 
             # set the initial state of the graph
-            result = await graph.ainvoke(
+            result = graph.invoke(
                 {
                     "last_thread": last_thread,
                     "messages": [],
@@ -76,24 +76,22 @@ async def start_session(last_thread: str, config):
                 config,
             )
 
-        await pool.close()
+        pool.close()
         return result
 
 
-async def run(message: str, config):
-    async with AsyncConnectionPool(kwargs=POSTGRES_CONFIG) as pool:
-        checkpointer = AsyncPostgresSaver(pool)
-        await checkpointer.setup()
+def run(message: str, config):
+    with ConnectionPool(kwargs=POSTGRES_CONFIG) as pool:
+        checkpointer = PostgresSaver(pool)
+        checkpointer.setup()
 
-        async with AsyncPostgresStore.from_conn_string(
+        with PostgresStore.from_conn_string(
             "postgresql://root:root@localhost:5432/hephaestus"
         ) as store:
-            await store.setup()
+            store.setup()
             graph = graph_builder.compile(checkpointer=checkpointer, store=store)
             # update the state with the new message (the rest of the state is preserved by the checkpointer)
-            result = await graph.ainvoke(
-                {"messages": [HumanMessage(content=message)]}, config
-            )
+            result = graph.invoke({"messages": [HumanMessage(content=message)]}, config)
 
-        await pool.close()
+        pool.close()
         return result

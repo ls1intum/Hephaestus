@@ -46,6 +46,17 @@ export class MentorComponent {
     });
   }
 
+  selectedSessionClosed = computed(() => {
+    const selectedId = this.selectedSessionId();
+    if (!selectedId) return false;
+    
+    const sessions = this.sessions.data();
+    if (!sessions) return false;
+    
+    const selectedSession = sessions.find(session => session.id === selectedId);
+    return selectedSession?.isClosed ?? false;
+  });
+
   sessions = injectQuery(() => ({
     queryKey: ['sessions'],
     queryFn: async () => (await lastValueFrom(this.sessionService.getAllSessions())).reverse()
@@ -56,21 +67,6 @@ export class MentorComponent {
     queryKey: ['sessions', this.selectedSessionId()],
     queryFn: async () => lastValueFrom(this.messageService.getMessages(this.selectedSessionId()!))
   }));
-
-  sessionClosed = signal<boolean>(true);
-  // sessionClosed = injectQuery(() => ({
-  //   queryKey: ['session', 'closed', this.selectedSessionId()],
-  //   queryFn: async () => {
-  //     const sessions = this.sessions.data();
-  //     const currentSessionId = this.selectedSessionId();
-      
-  //     if (sessions && currentSessionId) {
-  //       const currentSession = sessions.find(session => session.id === currentSessionId);
-  //       return currentSession?.isClosed ?? false;
-  //     }
-  //     return false;
-  //   }
-  // }));
 
   createNewSession = injectMutation(() => ({
     mutationFn: async () => lastValueFrom(this.sessionService.createNewSession()),
@@ -84,7 +80,7 @@ export class MentorComponent {
   }));
 
   sendMessage = injectMutation(() => ({
-    mutationFn: async ({ sessionId, message }: { sessionId: number; message: string }) => lastValueFrom(this.messageService.createMessage(sessionId, message)),
+    mutationFn: async ({ sessionId, message }: { sessionId: number; message: string }) => await lastValueFrom(this.messageService.createMessage(sessionId, message)),
     onMutate: async ({ message }) => {
       // Do optimistic update
       await this.queryClient.cancelQueries({ queryKey: ['sessions', this.selectedSessionId()] });

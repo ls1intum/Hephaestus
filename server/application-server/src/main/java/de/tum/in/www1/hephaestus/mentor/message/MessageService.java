@@ -42,6 +42,12 @@ public class MessageService {
             return null;
         }
         Session currentSession = session.get();
+        
+        // prevent sending messages to closed sessions
+        Session previouSession = sessionRepository.findFirstByUserOrderByCreatedAtDesc(currentSession.getUser()).orElse(null);
+        if (previouSession != null && previouSession.isClosed()) {
+            return null;
+        }
 
         Message userMessage = new Message();
         userMessage.setSender(MessageSender.USER);
@@ -59,12 +65,6 @@ public class MessageService {
             MentorResponce mentorMessage = intelligenceServiceApi.generateMentorPost(mentorRequest);
             String mentorResponse = mentorMessage.getContent();
             Message savedMentorMessage = createMentorMessage(currentSession, mentorResponse);
-
-            // close session if intelligence service returns a closed flag
-            if (mentorMessage.getClosed()) {
-                currentSession.setClosed(true);
-                sessionRepository.save(currentSession);
-            }
 
             return MessageDTO.fromMessage(savedMentorMessage);
         } catch (Exception e) {

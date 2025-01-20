@@ -37,8 +37,18 @@
               }"
               class="p-3 px-4 rounded-lg inline-block w-fit"
             >
-              <p>{{ message.content }}</p>
+              @if (getSummary(message) !== null) {
+                <app-chat-summary
+                  [status]="getSummary(message)?.status || []"
+                  [impediments]="getSummary(message)?.impediments || []"
+                  [promises]="getSummary(message)?.promises || []"
+                />
+                <p>{{ getSummary(message)?.text }}</p>
+              } @else {
+                <p>{{ message.content }}</p>
+              }
             </div>
+
             <span class="text-xs text-muted-foreground"> {{ message.sender === Message.SenderEnum.User ? 'You' : 'AI Mentor' }} · {{ message.sentAt | date: 'shortTime' }} </span>
           </div>
         </div>
