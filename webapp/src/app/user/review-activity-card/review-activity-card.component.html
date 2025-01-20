@@ -1,6 +1,6 @@
 @if (isLoading()) {
-  <div hlmCard variant="profile" [class]="class()">
-    <div hlmCardContent variant="profile">
+  <div hlmCard [class]="class()">
+    <div hlmCardContent>
       <hlm-skeleton class="h-4 w-1/2"></hlm-skeleton>
       <div class="flex items-center gap-2 font-medium">
         <hlm-skeleton [class]="'h-7 w-7 ' + this.skeletonColorForReviewState()"></hlm-skeleton>
@@ -9,8 +9,8 @@
     </div>
   </div>
 } @else {
-  <a hlmCard variant="profile" class="hover:bg-accent/50" [href]="htmlUrl() ?? this.pullRequest()?.htmlUrl" target="_blank" rel="noopener noreferrer" [class]="class()">
-    <div hlmCardContent variant="profile">
+  <a hlmCard class="hover:bg-accent/50" [href]="htmlUrl() ?? this.pullRequest()?.htmlUrl" target="_blank" rel="noopener noreferrer" [class]="class()">
+    <div hlmCardContent>
       <div class="flex items-center justify-between">
         <span class="text-sm text-muted-foreground first-letter:uppercase">
           {{ relativeActivityTime() }}
