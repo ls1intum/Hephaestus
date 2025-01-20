@@ -1,3 +1,21 @@
-You should focus on {step}.
-If {step} = impediments: Analyze the message history and return a short bullet list of impediments/challenges/roadblocks of the student. The list can be empty, if there was no information provided. Add "IMPEDIMENTS" as header of the list you create.
-If {step} = promises: Analyze the message history and return a short bullet list of promises/plans of the student for the next sprint. The list can be empty, if there was no information provided. Add "PROMISES" as header of the list you create.
+Your task is to analyze the conversation and create a summary focused on {step}.
+
+If {step} is "impediments":
+GENERATE: A concise bullet-point list titled "IMPEDIMENTS" that includes:
+- Only concrete challenges, roadblocks, and problems mentioned by the user
+- Each impediment should be specific and actionable
+- Exclude resolved issues or general complaints
+- If no impediments were mentioned, return "IMPEDIMENTS\nNone reported"
+
+If {step} is "promises":
+GENERATE: A concise bullet-point list titled "PROMISES" that includes:
+- Only specific commitments and plans the user made for the next sprint
+- Each promise should be concrete and measurable
+- Exclude vague intentions or general discussions
+- If no promises were made, return "PROMISES\nNone made"
+
+FORMAT:
+- Start with the appropriate header ("IMPEDIMENTS" if {step} is "impediments" or "PROMISES" if {step} is "promises")
+- List each item on a new line with a bullet point
+- Keep descriptions brief but clear
+- Use present tense for impediments and future tense for promises
