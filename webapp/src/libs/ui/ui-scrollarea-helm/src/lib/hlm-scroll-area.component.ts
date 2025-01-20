@@ -6,16 +6,18 @@ import {
 	booleanAttribute,
 	computed,
 	input,
+  viewChild,
 } from '@angular/core';
 import { hlm } from '@spartan-ng/ui-core';
 import type { ClassValue } from 'clsx';
-import { NgScrollbarModule } from 'ngx-scrollbar';
+import { NgScrollbar, NgScrollbarModule } from 'ngx-scrollbar';
 
 @Component({
     selector: 'hlm-scroll-area',
     imports: [NgScrollbarModule],
     template: `
 		<ng-scrollbar
+      #scrollbar
 			[visibility]="visibility()"
 			[autoHeightDisabled]="autoHeightDisabled()"
 			[autoWidthDisabled]="autoWidthDisabled()"
@@ -38,8 +40,9 @@ import { NgScrollbarModule } from 'ngx-scrollbar';
     }
 })
 export class HlmScrollAreaComponent {
-	protected readonly _computedClass = computed(() => hlm('block', this.userClass()));
+  protected readonly _computedClass = computed(() => hlm('block', this.userClass()));
 
+  public readonly scrollbar = viewChild.required(NgScrollbar);
 	public readonly userClass = input<ClassValue>('', { alias: 'class' });
 	public readonly track = input<'vertical' | 'horizontal' | 'all'>('all');
 	public readonly autoHeightDisabled = input<boolean, BooleanInput>(true, { transform: booleanAttribute });

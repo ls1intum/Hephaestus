@@ -35,7 +35,7 @@ export class IssueCardComponent {
 
   displayCreated = computed(() => dayjs(this.createdAt()));
   displayTitle = computed(() => (this.title() ?? '').replace(/`([^`]+)`/g, '<code class="textCode">$1</code>'));
-  computedClass = computed(() => cn('w-72', !this.isLoading() ? 'hover:bg-accent/50 cursor-pointer' : '', this.class()));
+  computedClass = computed(() => cn('flex flex-col gap-1 pt-6 w-72', !this.isLoading() ? 'hover:bg-accent/50 cursor-pointer' : '', this.class()));
 
   issueIconAndColor = computed(() => {
     var icon: string;

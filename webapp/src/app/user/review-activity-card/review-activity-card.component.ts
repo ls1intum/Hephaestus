@@ -10,6 +10,7 @@ import { HlmButtonModule } from '@spartan-ng/ui-button-helm';
 import dayjs from 'dayjs';
 import relativeTime from 'dayjs/plugin/relativeTime';
 import { lucideAward } from '@ng-icons/lucide';
+import { cn } from '@app/utils';
 
 dayjs.extend(relativeTime);
 
@@ -43,6 +44,7 @@ export class ReviewActivityCardComponent {
   repositoryName = input<string>();
   score = input<number>();
 
+  computedClass = computed(() => cn('flex flex-col gap-1 p-6 hover:bg-accent/50 container-inline-size', this.class()));
   relativeActivityTime = computed(() => dayjs(this.submittedAt()).fromNow());
   displayPullRequestTitle = computed(() => (this.pullRequest()?.title ?? '').replace(/`([^`]+)`/g, '<code class="textCode">$1</code>'));
 

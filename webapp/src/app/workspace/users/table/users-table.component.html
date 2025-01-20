@@ -141,7 +141,7 @@
     </hlm-select-trigger>
     <hlm-select-content class="min-w-[9.5rem]">
       @for (team of _availableTeams(); track team.id) {
-        <hlm-option [value]="team" class="containerSize">
+        <hlm-option [value]="team" class="container-inline-size">
           <span class="">{{ team.name }}</span>
         </hlm-option>
       }
