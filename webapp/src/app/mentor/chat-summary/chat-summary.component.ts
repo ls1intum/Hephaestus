@@ -6,7 +6,6 @@ import { BrnSeparatorComponent } from '@spartan-ng/ui-separator-brain';
 
 @Component({
   selector: 'app-chat-summary',
-  standalone: true,
   imports: [BrnSeparatorComponent, HlmSeparatorDirective, HlmUlDirective],
   templateUrl: './chat-summary.component.html'
 })

@@ -11,7 +11,6 @@ import { HlmAlertDescriptionDirective, HlmAlertDirective, HlmAlertTitleDirective
 @Component({
   selector: 'app-chat-input',
   templateUrl: './chat-input.component.html',
-  standalone: true,
   imports: [
     CommonModule,
     HlmButtonModule,

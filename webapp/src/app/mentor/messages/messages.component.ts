@@ -17,7 +17,6 @@ export interface Summary extends Message {
 @Component({
   selector: 'app-messages',
   templateUrl: './messages.component.html',
-  standalone: true,
   imports: [CommonModule, LucideAngularModule, HlmAvatarModule, HlmSkeletonComponent, ChatSummaryComponent]
 })
 export class MessagesComponent {
