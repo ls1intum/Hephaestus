@@ -2,10 +2,11 @@ import { Component, input } from '@angular/core';
 import { HlmUlDirective } from '@spartan-ng/ui-typography-helm';
 import { HlmSeparatorDirective } from '@spartan-ng/ui-separator-helm';
 import { BrnSeparatorComponent } from '@spartan-ng/ui-separator-brain';
+import { HlmCardDirective } from '@spartan-ng/ui-card-helm';
 
 @Component({
   selector: 'app-chat-summary',
-  imports: [BrnSeparatorComponent, HlmSeparatorDirective, HlmUlDirective],
+  imports: [BrnSeparatorComponent, HlmSeparatorDirective, HlmUlDirective, HlmCardDirective],
   templateUrl: './chat-summary.component.html'
 })
 export class ChatSummaryComponent {
