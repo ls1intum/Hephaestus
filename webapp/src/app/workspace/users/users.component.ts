@@ -6,7 +6,6 @@ import { WorkspaceUsersTableComponent } from './table/users-table.component';
 
 @Component({
   selector: 'app-workspace-users',
-  standalone: true,
   imports: [WorkspaceUsersTableComponent],
   template: `
     <h1 class="text-3xl font-bold mb-4">Users</h1>

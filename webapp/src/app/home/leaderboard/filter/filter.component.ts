@@ -6,7 +6,6 @@ import { LeaderboardFilterTeamComponent } from './team/team.component';
 
 @Component({
   selector: 'app-leaderboard-filter',
-  standalone: true,
   imports: [LucideAngularModule, FormsModule, LeaderboardFilterTimeframeComponent, LeaderboardFilterTeamComponent],
   templateUrl: './filter.component.html'
 })

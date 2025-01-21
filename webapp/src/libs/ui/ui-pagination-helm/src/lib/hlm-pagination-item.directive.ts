@@ -1,22 +1,24 @@
 import { Directive, computed, input } from '@angular/core';
 import { hlm } from '@spartan-ng/ui-core';
 import { type VariantProps, cva } from 'class-variance-authority';
+import { ClassValue } from 'clsx';
 
 export const paginationItemVariants = cva('', {
-  variants: {},
-  defaultVariants: {}
+	variants: {},
+	defaultVariants: {},
 });
+
 export type PaginationItemVariants = VariantProps<typeof paginationItemVariants>;
 
 @Directive({
-  selector: '[hlmPaginationItem]',
-  standalone: true,
-  host: {
-    '[class]': '_computedClass()'
-  }
+	selector: '[hlmPaginationItem]',
+	standalone: true,
+	host: {
+		'[class]': '_computedClass()',
+	},
 })
 export class HlmPaginationItemDirective {
-  public readonly class = input('');
+	public readonly userClass = input<ClassValue>('', { alias: 'class' });
 
-  protected _computedClass = computed(() => hlm(paginationItemVariants(), this.class()));
+	protected readonly _computedClass = computed(() => hlm(paginationItemVariants(), this.userClass()));
 }

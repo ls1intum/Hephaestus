@@ -18,5 +18,6 @@ export interface UserInfo {
     avatarUrl: string;
     name: string;
     htmlUrl: string;
+    leaguePoints?: number;
 }
 

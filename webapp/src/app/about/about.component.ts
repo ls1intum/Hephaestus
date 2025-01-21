@@ -7,7 +7,6 @@ import { HlmAvatarModule } from '@spartan-ng/ui-avatar-helm';
 
 @Component({
   selector: 'app-about',
-  standalone: true,
   imports: [HlmAvatarModule],
   templateUrl: './about.component.html'
 })

@@ -9,35 +9,47 @@ import { HlmSliderTrackActiveDirective } from './hlm-slider-track-active.directi
 import { HlmSliderTrackInactiveDirective } from './hlm-slider-track-inactive.directive';
 
 @Component({
-  selector: 'hlm-slider-track, brn-slider-track [hlm]',
-  standalone: true,
-  changeDetection: ChangeDetectionStrategy.OnPush,
-  template: `
-    <ng-content></ng-content>
-    <div class="flex w-full flex-wrap">
-      <div hlmSliderTrackInactive></div>
-      <div hlmSliderTrackActive>
-        <div hlmSliderTrackActiveFill></div>
-      </div>
-      @if (_brnSlider.showTickMarks()) {
-        <div hlmSliderTickMarks>
-          @for (tickMark of _brnSliderTrack.tickMarks(); track $index) {
-            <div hlmSliderTickMark [data]="{ tickMarkIndex: $index, totalTickMarks: _brnSliderTrack.tickMarks().length }" [active]="tickMark"></div>
-          }
-        </div>
-      }
-    </div>
-  `,
-  host: {
-    '[class]': '_computedClass()'
-  },
-  hostDirectives: [BrnSliderTrackDirective],
-  imports: [HlmSliderTrackInactiveDirective, HlmSliderTrackActiveDirective, HlmSliderTrackActiveFillDirective, HlmSliderTickMarksDirective, HlmSliderTickMarkDirective]
+	selector: 'hlm-slider-track, brn-slider-track [hlm]',
+	standalone: true,
+	changeDetection: ChangeDetectionStrategy.OnPush,
+	template: `
+		<ng-content></ng-content>
+		<div class="flex w-full flex-wrap">
+			<div hlmSliderTrackInactive></div>
+			<div hlmSliderTrackActive>
+				<div hlmSliderTrackActiveFill></div>
+			</div>
+			@if (_brnSlider.showTickMarks()) {
+				<div hlmSliderTickMarks>
+					@for (tickMark of _brnSliderTrack.tickMarks(); track $index) {
+						<div
+							hlmSliderTickMark
+							[data]="{ tickMarkIndex: $index, totalTickMarks: _brnSliderTrack.tickMarks().length }"
+							[active]="tickMark"
+						></div>
+					}
+				</div>
+			}
+		</div>
+	`,
+	host: {
+		'[class]': '_computedClass()',
+	},
+	hostDirectives: [BrnSliderTrackDirective],
+	imports: [
+		HlmSliderTrackInactiveDirective,
+		HlmSliderTrackActiveDirective,
+		HlmSliderTrackActiveFillDirective,
+		HlmSliderTickMarksDirective,
+		HlmSliderTickMarkDirective,
+	],
 })
 export class HlmSliderTrackComponent {
-  public readonly userClass = input<ClassValue>('', { alias: 'class' });
-  protected _computedClass = computed(() => hlm('flex w-full h-2 px-3 self-center relative transition-all', this.userClass()));
+	public readonly userClass = input<ClassValue>('', { alias: 'class' });
+	protected _computedClass = computed(() =>
+		hlm('flex w-full h-2 px-3 self-center relative transition-all', this.userClass()),
+	);
 
-  protected readonly _brnSlider = inject(BRN_SLIDER);
-  protected readonly _brnSliderTrack = inject(BRN_SLIDER_TRACK, { host: true });
+	protected readonly _brnSlider = inject(BRN_SLIDER);
+	protected readonly _brnSliderTrack = inject(BRN_SLIDER_TRACK, { host: true });
 }

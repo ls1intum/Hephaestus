@@ -15,16 +15,16 @@ export * from './lib/hlm-card-title.directive';
 export * from './lib/hlm-card.directive';
 
 export const HlmCardImports = [
-  HlmCardDirective,
-  HlmCardHeaderDirective,
-  HlmCardFooterDirective,
-  HlmCardTitleDirective,
-  HlmCardDescriptionDirective,
-  HlmCardContentDirective
+	HlmCardDirective,
+	HlmCardHeaderDirective,
+	HlmCardFooterDirective,
+	HlmCardTitleDirective,
+	HlmCardDescriptionDirective,
+	HlmCardContentDirective,
 ] as const;
 
 @NgModule({
-  imports: [...HlmCardImports],
-  exports: [...HlmCardImports]
+	imports: [...HlmCardImports],
+	exports: [...HlmCardImports],
 })
 export class HlmCardModule {}

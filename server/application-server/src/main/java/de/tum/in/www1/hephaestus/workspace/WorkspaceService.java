@@ -12,9 +12,12 @@ import de.tum.in.www1.hephaestus.gitprovider.user.User;
 import de.tum.in.www1.hephaestus.gitprovider.user.UserInfoDTO;
 import de.tum.in.www1.hephaestus.gitprovider.user.UserRepository;
 import de.tum.in.www1.hephaestus.gitprovider.user.UserTeamsDTO;
+import de.tum.in.www1.hephaestus.leaderboard.LeaderboardService;
+import de.tum.in.www1.hephaestus.leaderboard.LeaguePointsCalculationService;
 import de.tum.in.www1.hephaestus.syncing.GitHubDataSyncService;
 import de.tum.in.www1.hephaestus.syncing.NatsConsumerService;
 import jakarta.transaction.Transactional;
+import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
@@ -61,6 +64,12 @@ public class WorkspaceService {
 
     @Autowired
     private LabelRepository labelRepository;
+
+    @Autowired
+    private LeaderboardService leaderboardService;
+
+    @Autowired
+    private LeaguePointsCalculationService leaguePointsCalculationService;
 
     @Value("${nats.enabled}")
     private boolean isNatsEnabled;
@@ -323,5 +332,48 @@ public class WorkspaceService {
                 teamRepository.save(team);
             });
         });
+    }
+
+    /**
+     * Reset and recalculate league points for all users until 01/01/2024
+     */
+    @Transactional
+    public void resetAndRecalculateLeagues() {
+        logger.info("Resetting and recalculating league points for all users");
+
+        // Reset all users to default points (1000)
+        userRepository
+            .findAll()
+            .forEach(user -> {
+                user.setLeaguePoints(LeaguePointsCalculationService.POINTS_DEFAULT);
+                userRepository.save(user);
+            });
+
+        // Get all pull request reviews and issue comments to calculate past leaderboards
+        var now = OffsetDateTime.now();
+        var weekAgo = now.minusWeeks(1);
+
+        // While we still have reviews in the past, calculate leaderboard and update points
+        do {
+            var leaderboard = leaderboardService.createLeaderboard(weekAgo, now, Optional.empty());
+            if (leaderboard.isEmpty()) {
+                break;
+            }
+
+            // Update league points for each user
+            leaderboard.forEach(entry -> {
+                var user = userRepository.findByLoginWithEagerMergedPullRequests(entry.user().login()).orElseThrow();
+                int newPoints = leaguePointsCalculationService.calculateNewPoints(user, entry);
+                user.setLeaguePoints(newPoints);
+                userRepository.save(user);
+            });
+
+            // Move time window back one week
+            now = weekAgo;
+            weekAgo = weekAgo.minusWeeks(1);
+            // only recalculate points for the last year
+        } while (weekAgo.isAfter(OffsetDateTime.parse("2024-01-01T00:00:00Z")));
+
+        logger.info("Finished recalculating league points");
     }
 }

@@ -15,7 +15,6 @@ import { HlmScrollAreaComponent } from '@spartan-ng/ui-scrollarea-helm';
 @Component({
   selector: 'app-mentor',
   templateUrl: './mentor.component.html',
-  standalone: true,
   imports: [
     CommonModule,
     StartSessionCardComponent,

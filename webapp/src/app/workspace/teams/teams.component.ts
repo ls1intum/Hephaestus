@@ -6,7 +6,6 @@ import { WorkspaceTeamsTableComponent } from './table/teams-table.component';
 
 @Component({
   selector: 'app-workspace-teams',
-  standalone: true,
   imports: [WorkspaceTeamsTableComponent],
   template: `
     <h1 class="text-3xl font-bold mb-4">Teams</h1>

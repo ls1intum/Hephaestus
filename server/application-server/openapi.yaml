@@ -86,6 +86,14 @@ paths:
       responses:
         "200":
           description: OK
+  /workspace/league/reset:
+    put:
+      tags:
+      - workspace
+      operationId: resetAndRecalculateLeagues
+      responses:
+        "200":
+          description: OK
   /workspace/team/{teamId}/repository/{repositoryOwner}/{repositoryName}:
     post:
       tags:
@@ -649,6 +657,9 @@ components:
           type: string
         htmlUrl:
           type: string
+        leaguePoints:
+          type: integer
+          format: int32
     TeamInfo:
       required:
       - color

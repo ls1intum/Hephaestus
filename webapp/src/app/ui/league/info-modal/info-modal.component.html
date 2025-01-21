@@ -1,0 +1,26 @@
+<hlm-dialog>
+  <button brnDialogTrigger hlmBtn variant="ghost" size="sm">
+    <lucide-angular [img]="Info" class="size-4 text-github-muted-foreground" />
+  </button>
+  <hlm-dialog-content *brnDialogContent="let ctx">
+    <hlm-dialog-header>
+      <h3 brnDialogTitle hlm>All Leagues</h3>
+    </hlm-dialog-header>
+    <div class="flex flex-col gap-4">
+      @for (league of Leagues; track league.name) {
+        <div class="flex items-center gap-4">
+          <app-icon-league [leaguePoints]="league.minPoints + 1" size="lg" />
+          <span class="font-semibold">{{ league.name }}</span>
+          <div class="flex items-center text-sm text-github-muted-foreground gap-1">
+            <lucide-angular [img]="Star" class="size-4" />
+            @if (league.maxPoints === Infinity) {
+              <span>{{ league.maxPoints }}+</span>
+            } @else {
+              <span>{{ league.minPoints }} - {{ league.maxPoints }}</span>
+            }
+          </div>
+        </div>
+      }
+    </div>
+  </hlm-dialog-content>
+</hlm-dialog>

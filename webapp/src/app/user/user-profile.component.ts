@@ -16,7 +16,6 @@ import { UserHeaderComponent } from './header/header.component';
 
 @Component({
   selector: 'app-user-profile',
-  standalone: true,
   imports: [
     LucideAngularModule,
     ReviewActivityCardComponent,

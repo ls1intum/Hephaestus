@@ -9,7 +9,6 @@ import { HlmCardDirective } from '@spartan-ng/ui-card-helm';
 import { HlmSkeletonComponent } from '@spartan-ng/ui-skeleton-helm';
 
 @Component({
-  standalone: true,
   selector: 'app-sessions-card',
   templateUrl: './sessions-card.component.html',
   imports: [CommonModule, HlmSkeletonComponent, LucideAngularModule, BrnToggleDirective, HlmToggleDirective, HlmButtonModule, HlmCardDirective]

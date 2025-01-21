@@ -7,7 +7,6 @@ import { SentryErrorHandler } from './core/sentry/sentry.error-handler';
 
 @Component({
   selector: 'app-root',
-  standalone: true,
   imports: [RouterOutlet, AngularQueryDevtools, HeaderComponent, FooterComponent],
   templateUrl: './app.component.html'
 })

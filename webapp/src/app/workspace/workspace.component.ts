@@ -26,7 +26,6 @@ import { FormsModule } from '@angular/forms';
 
 @Component({
   selector: 'app-workspace',
-  standalone: true,
   imports: [
     FormsModule,
     CommonModule,
@@ -85,5 +84,10 @@ export class WorkspaceComponent {
       return lastValueFrom(this.workspaceService.removeRepositoryToMonitor(owner, name));
     },
     onSuccess: () => this.queryClient.invalidateQueries({ queryKey: ['workspace', 'repositoriesToMonitor'] })
+  }));
+
+  resetAndRecalculateLeagues = injectMutation(() => ({
+    mutationFn: () => lastValueFrom(this.workspaceService.resetAndRecalculateLeagues()),
+    onSuccess: () => this.queryClient.invalidateQueries({ queryKey: ['workspace', 'resetAndRecalculateLeagues'] })
   }));
 }

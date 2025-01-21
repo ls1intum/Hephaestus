@@ -17,7 +17,6 @@ import { AiMentorComponent } from './ai-mentor/ai-mentor.component';
 @Component({
   selector: 'app-header',
   templateUrl: './header.component.html',
-  standalone: true,
   imports: [
     RouterLink,
     RouterModule,
