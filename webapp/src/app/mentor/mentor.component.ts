@@ -48,11 +48,11 @@ export class MentorComponent {
   selectedSessionClosed = computed(() => {
     const selectedId = this.selectedSessionId();
     if (!selectedId) return false;
-    
+
     const sessions = this.sessions.data();
     if (!sessions) return false;
-    
-    const selectedSession = sessions.find(session => session.id === selectedId);
+
+    const selectedSession = sessions.find((session) => session.id === selectedId);
     return selectedSession?.isClosed ?? false;
   });
 

@@ -3,7 +3,6 @@ import { HlmUlDirective } from '@spartan-ng/ui-typography-helm';
 import { HlmSeparatorDirective } from '@spartan-ng/ui-separator-helm';
 import { BrnSeparatorComponent } from '@spartan-ng/ui-separator-brain';
 
-
 @Component({
   selector: 'app-chat-summary',
   imports: [BrnSeparatorComponent, HlmSeparatorDirective, HlmUlDirective],
