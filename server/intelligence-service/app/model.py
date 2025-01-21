@@ -21,4 +21,4 @@ else:
     else:
         raise EnvironmentError("No LLM available")
 
-    model = Model(temperature=temperature, max_tokens=max_tokens)
+    model = Model(temperature=temperature, max_tokens=max_tokens, model="gpt-4o")
