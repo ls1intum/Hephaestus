@@ -45,6 +45,25 @@ public interface PullRequestRepository extends JpaRepository<PullRequest, Long> 
         JOIN FETCH p.author
         LEFT JOIN FETCH p.assignees
         LEFT JOIN FETCH p.repository
+        WHERE (p.author.login ILIKE :assigneeLogin OR LOWER(:assigneeLogin) IN (SELECT LOWER(u.login) FROM p.assignees u)) AND p.state IN :states AND p.updatedAt >= :activitySince
+        ORDER BY p.createdAt DESC
+        """
+    )
+    List<PullRequest> findAssignedByLoginAndStatesUpdatedSince(
+        @Param("assigneeLogin") String assigneeLogin,
+        @Param("states") Set<PullRequest.State> states,
+        @Param("activitySince") OffsetDateTime activitySince
+    );
+
+
+    @Query(
+        """
+        SELECT p
+        FROM PullRequest p
+        LEFT JOIN FETCH p.labels
+        JOIN FETCH p.author
+        LEFT JOIN FETCH p.assignees
+        LEFT JOIN FETCH p.repository
         WHERE p.repository.id = :repositoryId AND p.number = :number
         """
     )
