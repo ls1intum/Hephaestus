@@ -32,5 +32,6 @@ FORMAT:
 - If referencing previous promises, be specific about which ones
 
 Example responses:
-- "What have you accomplished on your project this week? Last week you mentioned plans to [specific promise] - how did that progress?"
+- "What have you accomplished on your project this week? 
+- Last week you mentioned plans to (use one of the [{previous_promises}]) - how did that progress?"
 - "Could you share any other progress you've made on the project that you haven't mentioned yet?""

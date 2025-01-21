@@ -42,7 +42,6 @@ public class SessionService {
         if (previous_session_id != "") {
             Session previous_session = sessionRepository.findFirstByUserOrderByCreatedAtDesc(user).get();
             previous_session.setClosed(true);
-            System.out.println("Closing previous session with id: " + previous_session.getId());
             sessionRepository.save(previous_session);
         }
 
