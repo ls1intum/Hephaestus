@@ -28,11 +28,15 @@ import org.hibernate.validator.constraints.*;
  * MentorStartRequest
  */
 @JsonPropertyOrder({
+  MentorStartRequest.JSON_PROPERTY_DEV_PROGRESS,
   MentorStartRequest.JSON_PROPERTY_PREVIOUS_SESSION_ID,
   MentorStartRequest.JSON_PROPERTY_SESSION_ID
 })
 @jakarta.annotation.Generated(value = "org.openapitools.codegen.languages.JavaClientCodegen", comments = "Generator version: 7.7.0")
 public class MentorStartRequest {
+  public static final String JSON_PROPERTY_DEV_PROGRESS = "dev_progress";
+  private String devProgress;
+
   public static final String JSON_PROPERTY_PREVIOUS_SESSION_ID = "previous_session_id";
   private String previousSessionId;
 
@@ -40,6 +44,31 @@ public class MentorStartRequest {
   private String sessionId;
 
   public MentorStartRequest() {
+  }
+
+  public MentorStartRequest devProgress(String devProgress) {
+    
+    this.devProgress = devProgress;
+    return this;
+  }
+
+  /**
+   * Get devProgress
+   * @return devProgress
+   */
+  @jakarta.annotation.Nonnull
+  @JsonProperty(JSON_PROPERTY_DEV_PROGRESS)
+  @JsonInclude(value = JsonInclude.Include.ALWAYS)
+
+  public String getDevProgress() {
+    return devProgress;
+  }
+
+
+  @JsonProperty(JSON_PROPERTY_DEV_PROGRESS)
+  @JsonInclude(value = JsonInclude.Include.ALWAYS)
+  public void setDevProgress(String devProgress) {
+    this.devProgress = devProgress;
   }
 
   public MentorStartRequest previousSessionId(String previousSessionId) {
@@ -101,19 +130,21 @@ public class MentorStartRequest {
       return false;
     }
     MentorStartRequest mentorStartRequest = (MentorStartRequest) o;
-    return Objects.equals(this.previousSessionId, mentorStartRequest.previousSessionId) &&
+    return Objects.equals(this.devProgress, mentorStartRequest.devProgress) &&
+        Objects.equals(this.previousSessionId, mentorStartRequest.previousSessionId) &&
         Objects.equals(this.sessionId, mentorStartRequest.sessionId);
   }
 
   @Override
   public int hashCode() {
-    return Objects.hash(previousSessionId, sessionId);
+    return Objects.hash(devProgress, previousSessionId, sessionId);
   }
 
   @Override
   public String toString() {
     StringBuilder sb = new StringBuilder();
     sb.append("class MentorStartRequest {\n");
+    sb.append("    devProgress: ").append(toIndentedString(devProgress)).append("\n");
     sb.append("    previousSessionId: ").append(toIndentedString(previousSessionId)).append("\n");
     sb.append("    sessionId: ").append(toIndentedString(sessionId)).append("\n");
     sb.append("}");

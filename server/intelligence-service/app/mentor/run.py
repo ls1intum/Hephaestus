@@ -14,6 +14,7 @@ from .nodes import (
     check_state,
     finish,
     update_memory,
+    get_dev_progress,
 )
 from .conditions import start_router, main_router
 
@@ -30,6 +31,7 @@ POSTGRES_CONFIG = {
 
 graph_builder = StateGraph(State)
 graph_builder.add_node("greeting", greet)
+graph_builder.add_node("development_node", get_dev_progress)
 graph_builder.add_node("status_node", ask_status)
 graph_builder.add_node("impediments_node", ask_impediments)
 graph_builder.add_node("promises_node", ask_promises)
@@ -42,6 +44,7 @@ graph_builder.add_conditional_edges(START, start_router)
 graph_builder.add_conditional_edges("check_state", main_router)
 
 graph_builder.add_edge("greeting", END)
+graph_builder.add_edge("development_node", END)
 graph_builder.add_edge("status_node", END)
 graph_builder.add_edge("impediments_node", END)
 graph_builder.add_edge("promises_node", END)
@@ -50,7 +53,7 @@ graph_builder.add_edge("finish_node", "update_memory")
 graph_builder.add_edge("update_memory", END)
 
 
-def start_session(last_thread: str, config):
+def start_session(last_thread: str, dev_progress: str, config):
     with ConnectionPool(kwargs=POSTGRES_CONFIG) as pool:
         checkpointer = PostgresSaver(pool)
         checkpointer.setup()
@@ -65,9 +68,11 @@ def start_session(last_thread: str, config):
             result = graph.invoke(
                 {
                     "last_thread": last_thread,
+                    "dev_progress": dev_progress,
                     "messages": [],
-                    "impediments": False,
+                    "development": False,
                     "status": False,
+                    "impediments": False,
                     "promises": False,
                     "summary": False,
                     "finish": False,

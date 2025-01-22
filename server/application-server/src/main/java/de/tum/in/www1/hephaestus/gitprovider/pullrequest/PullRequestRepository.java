@@ -55,7 +55,6 @@ public interface PullRequestRepository extends JpaRepository<PullRequest, Long> 
         @Param("activitySince") OffsetDateTime activitySince
     );
 
-
     @Query(
         """
         SELECT p

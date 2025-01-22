@@ -25,20 +25,20 @@ import com.fasterxml.jackson.annotation.JsonTypeName;
 import org.hibernate.validator.constraints.*;
 
 /**
- * MentorResponce
+ * MentorResponse
  */
 @JsonPropertyOrder({
-  MentorResponce.JSON_PROPERTY_CONTENT
+  MentorResponse.JSON_PROPERTY_CONTENT
 })
 @jakarta.annotation.Generated(value = "org.openapitools.codegen.languages.JavaClientCodegen", comments = "Generator version: 7.7.0")
-public class MentorResponce {
+public class MentorResponse {
   public static final String JSON_PROPERTY_CONTENT = "content";
   private String content;
 
-  public MentorResponce() {
+  public MentorResponse() {
   }
 
-  public MentorResponce content(String content) {
+  public MentorResponse content(String content) {
     
     this.content = content;
     return this;
@@ -71,8 +71,8 @@ public class MentorResponce {
     if (o == null || getClass() != o.getClass()) {
       return false;
     }
-    MentorResponce mentorResponce = (MentorResponce) o;
-    return Objects.equals(this.content, mentorResponce.content);
+    MentorResponse mentorResponse = (MentorResponse) o;
+    return Objects.equals(this.content, mentorResponse.content);
   }
 
   @Override
@@ -83,7 +83,7 @@ public class MentorResponce {
   @Override
   public String toString() {
     StringBuilder sb = new StringBuilder();
-    sb.append("class MentorResponce {\n");
+    sb.append("class MentorResponse {\n");
     sb.append("    content: ").append(toIndentedString(content)).append("\n");
     sb.append("}");
     return sb.toString();

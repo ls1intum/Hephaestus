@@ -15,14 +15,36 @@ def greet(state: State):
         [
             ("system", persona_prompt),
             ("system", prompt_loader.get_prompt(type="mentor", name="greeting")),
-            MessagesPlaceholder("messages"),
         ]
     )
     chain = prompt | model
 
     return {
         "messages": [chain.invoke({"messages": state["messages"]})],
-        "status": True,  # directly update the state to the next step
+        "development": True,  # directly update the state to the next step
+    }
+
+
+def get_dev_progress(state: State):
+    progress = state["dev_progress"]
+    prompt = ChatPromptTemplate(
+        [
+            ("system", persona_prompt),
+            (
+                "system",
+                prompt_loader.get_prompt(type="mentor", name="dev_progress").format_map(
+                    {"progress": progress}
+                ),
+            ),
+        ]
+    )
+    chain = prompt | model
+    resp = chain.invoke({"messages": state["messages"]})
+    print("get_DEV_progress", resp.content)
+    print("state:", state["dev_progress"])
+    return {
+        "messages": [resp],
+        "status": True,
     }
 
 
@@ -133,6 +155,13 @@ def finish(state: State):
 
 # node responsible for checking the state of the conversation and updating it accordingly
 def check_state(state: State):
+    if state["development"]:
+        # call dev_progress node only if there is development progress to show
+        if state["dev_progress"] == "":
+            return {"development": False, "status": True}
+        else:
+            return
+
     step_order = ["status", "impediments", "promises", "summary", "finish"]
     step = next((key for key in step_order if state.get(key)), None)
     if not step:

@@ -32,17 +32,20 @@ components:
       - content
       title: MentorRequest
       type: object
-    MentorResponce:
+    MentorResponse:
       properties:
         content:
           title: Content
           type: string
       required:
       - content
-      title: MentorResponce
+      title: MentorResponse
       type: object
     MentorStartRequest:
       properties:
+        dev_progress:
+          title: Dev Progress
+          type: string
         previous_session_id:
           title: Previous Session Id
           type: string
@@ -52,6 +55,7 @@ components:
       required:
       - session_id
       - previous_session_id
+      - dev_progress
       title: MentorStartRequest
       type: object
     ValidationError:
@@ -117,7 +121,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/MentorResponce'
+                $ref: '#/components/schemas/MentorResponse'
           description: Successful Response
         '422':
           content:
@@ -142,7 +146,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/MentorResponce'
+                $ref: '#/components/schemas/MentorResponse'
           description: Successful Response
         '422':
           content:

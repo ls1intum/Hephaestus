@@ -11,6 +11,7 @@ router = APIRouter(prefix="/mentor", tags=["mentor"])
 class MentorStartRequest(BaseModel):
     session_id: str
     previous_session_id: str
+    dev_progress: str
 
 
 class MentorRequest(BaseModel):
@@ -18,29 +19,29 @@ class MentorRequest(BaseModel):
     content: str
 
 
-class MentorResponce(BaseModel):
+class MentorResponse(BaseModel):
     content: str
 
 
 @router.post(
     "/start",
-    response_model=MentorResponce,
+    response_model=MentorResponse,
     summary="Start a chat session with an LLM.",
 )
 def start(request: MentorStartRequest):
     config = RunnableConfig({"configurable": {"thread_id": request.session_id}})
-    response = start_session(request.previous_session_id, config)
+    response = start_session(request.previous_session_id, request.dev_progress, config)
     response_message = response["messages"][-1].content
-    return MentorResponce(content=response_message)
+    return MentorResponse(content=response_message)
 
 
 @router.post(
     "/",
-    response_model=MentorResponce,
+    response_model=MentorResponse,
     summary="Continue a chat session with an LLM.",
 )
 def generate(request: MentorRequest):
     config = RunnableConfig({"configurable": {"thread_id": request.session_id}})
     response = run(request.content, config)
     response_message = response["messages"][-1].content
-    return MentorResponce(content=response_message)
+    return MentorResponse(content=response_message)
