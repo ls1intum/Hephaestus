@@ -24,44 +24,6 @@ public class PullRequestBadPracticeDetector {
             pullRequest.getId()
         );
 
-        //TODO connect LLM based detection
-        List<PullRequestBadPractice> newBadPractices = List.of();
-
-        return newBadPractices;
+        return existingBadPractices;
     }
-    /*
-        updateExistingBadPractices(existingBadPractices, newBadPractices);
-
-        return saveBadPractices(existingBadPractices, newBadPractices);
-    }
-
-    private List<PullRequestBadPractice> saveBadPractices(
-        List<PullRequestBadPractice> existingBadPractices,
-        List<PullRequestBadPractice> detectedBadPractices
-    ) {
-        List<PullRequestBadPractice> newBadPractices = detectedBadPractices
-            .stream()
-            .filter(badPractice -> !existingBadPractices.contains(badPractice))
-            .toList();
-
-        return pullRequestBadPracticeRepository.saveAll(newBadPractices);
-    }
-
-    private void updateExistingBadPractices(
-        List<PullRequestBadPractice> existingBadPractices,
-        List<PullRequestBadPractice> detectedBadPractices
-    ) {
-        List<PullRequestBadPracticeType> types = detectedBadPractices
-            .stream()
-            .map(PullRequestBadPractice::getType)
-            .toList();
-
-        for (PullRequestBadPractice existingBadPractice : existingBadPractices) {
-            if (!types.contains(existingBadPractice.getType())) {
-                logger.info("Resolving bad practice: {}", existingBadPractice.getType());
-                existingBadPractice.setResolved(true);
-                pullRequestBadPracticeRepository.save(existingBadPractice);
-            }
-        }
-    }*/
 }
