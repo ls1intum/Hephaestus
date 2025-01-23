@@ -1,6 +1,7 @@
 <div hlmCard class="flex flex-col px-5 py-4">
   @for (pr of pullRequests(); track pr.number) {
-    <div class="flex gap-4 items-center">
+    @if(pr.state != "CLOSED"){
+      <div class="flex gap-4 items-center">
       @if (pr.isDraft) {
         <a class="flex gap-1 items-center text-github-muted-foreground" [href]="pr.url">
           <ng-icon [svg]="OctGitPullRequestDraft" size="18" />
@@ -22,5 +23,6 @@
         }
       }
     </div>
+    }
   }
 </div>
