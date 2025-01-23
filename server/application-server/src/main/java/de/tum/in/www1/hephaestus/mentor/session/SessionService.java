@@ -38,6 +38,11 @@ public class SessionService {
         return sessions.stream().map(SessionDTO::fromSession).toList();
     }
 
+    public List<SessionDTO> findAllSessionsByUserByCreatedAtDesc(User user) {
+        List<Session> sessions = sessionRepository.findByUserOrderByCreatedAtDesc(user);
+        return sessions.stream().map(SessionDTO::fromSession).toList();
+    }
+
     public Optional<SessionDTO> findSessionById(Long sessionId) {
         return sessionRepository.findById(sessionId).map(SessionDTO::fromSession);
     }
