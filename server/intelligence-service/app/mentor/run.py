@@ -15,8 +15,11 @@ from .nodes import (
     finish,
     update_memory,
     get_dev_progress,
+    ask_goals,
+    reflect_goals,
+    reflect_update,
 )
-from .conditions import start_router, main_router
+from .conditions import start_router, main_router, goal_reflection_router, goal_setting_router
 
 
 POSTGRES_CONFIG = {
@@ -30,18 +33,30 @@ POSTGRES_CONFIG = {
 }
 
 graph_builder = StateGraph(State)
+# mentor interaction nodes
 graph_builder.add_node("greeting", greet)
 graph_builder.add_node("development_node", get_dev_progress)
 graph_builder.add_node("status_node", ask_status)
 graph_builder.add_node("impediments_node", ask_impediments)
 graph_builder.add_node("promises_node", ask_promises)
 graph_builder.add_node("summary_node", ask_summary)
-graph_builder.add_node("check_state", check_state)
 graph_builder.add_node("finish_node", finish)
+graph_builder.add_node("goal_setting_node", ask_goals)
+graph_builder.add_node("goal_reflection_node", reflect_goals)
+graph_builder.add_node("update_reflection_node", reflect_update)
+
+# analysis nodes
+graph_builder.add_node("check_state", check_state)
 graph_builder.add_node("update_memory", update_memory)
+graph_builder.add_edge("save_goals", save_goals)
+graph_builder.add_edge("adjust_goals", adjust_goals)
+graph_builder.add_edge("check_goals", check_goals)
+graph_builder.add_edge("check_goal_reflection", check_goal_reflection)
 
 graph_builder.add_conditional_edges(START, start_router)
 graph_builder.add_conditional_edges("check_state", main_router)
+graph_builder.add_conditional_edges("check_goals", goal_setting_router)
+graph_builder.add_conditional_edges("check_goal_reflection", goal_reflection_router)
 
 graph_builder.add_edge("greeting", END)
 graph_builder.add_edge("development_node", END)
@@ -50,6 +65,11 @@ graph_builder.add_edge("impediments_node", END)
 graph_builder.add_edge("promises_node", END)
 graph_builder.add_edge("summary_node", END)
 graph_builder.add_edge("finish_node", "update_memory")
+graph_builder.add_edge("goal_reflection_node", "adjust_goals")
+graph_builder.add_edge("adjust_goals", END)
+graph_builder.add_edge("update_reflection_node", END)
+graph_builder.add_edge("goal_setting_node", "check_goals")
+graph_builder.add_edge("save_goals", END)
 graph_builder.add_edge("update_memory", END)
 
 

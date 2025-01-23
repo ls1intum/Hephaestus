@@ -21,7 +21,7 @@ def greet(state: State):
 
     return {
         "messages": [chain.invoke({"messages": state["messages"]})],
-        "development": True,  # directly update the state to the next step
+        "goal_setting": True,  # directly update the state to the next possible step
     }
 
 
@@ -154,15 +154,29 @@ def finish(state: State):
         "closed": True,
     }
 
+def ask_goals(state: State):
+    prompt = ChatPromptTemplate(
+        [
+            ("system", persona_prompt),
+            ("system", prompt_loader.get_prompt(type="mentor", name="goal_setting")),
+            MessagesPlaceholder("messages"),
+        ]
+    )
+    chain = prompt | model
+    return {"messages": [chain.invoke({"messages": state["messages"]})]}
 
 # node responsible for checking the state of the conversation and updating it accordingly
 def check_state(state: State):
+    if state["goal_setting"]:
+        if state["last_thread"] == "":
+            return
+    
     if state["development"]:
         # call dev_progress node only if there is development progress to show
         if state["dev_progress"] == "":
             return {"development": False, "status": True}
         else:
-            return
+            return {"goal_setting": False, "development": True}
 
     step_order = ["status", "impediments", "promises", "summary", "finish"]
     step = next((key for key in step_order if state.get(key)), None)
@@ -194,7 +208,7 @@ def check_state(state: State):
     return
 
 
-# node responsible for updating the long-term session memory, that can be used across multiple sessions
+# node responsible for updating the long-term session memory with the pogress update to be used across multiple sessions
 def update_memory(state: State, config: RunnableConfig, *, store: BaseStore):
     session_id = config["configurable"]["thread_id"]
     namespace = (session_id, "summary")
@@ -218,3 +232,5 @@ def update_memory(state: State, config: RunnableConfig, *, store: BaseStore):
         store.put(namespace, key=str(uuid4()), value={step: response})
 
     return
+
+
