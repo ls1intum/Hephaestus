@@ -126,7 +126,7 @@ def finish(state: State):
     chain = prompt | model
     return {
         "messages": [chain.invoke({"messages": state["messages"]})],
-        "finish": True,
+        "finish": False,
         "closed": True,
     }
 
@@ -157,9 +157,6 @@ def check_state(state: State):
         if step_index < len(step_order) - 1:
             next_step = step_order[step_index + 1]
             return {step: False, next_step: True}
-        else:
-            # if on the last step, mark as closed
-            return {"finish": False, "closed": True}
     return
 
 
@@ -187,3 +184,15 @@ def update_memory(state: State, config: RunnableConfig, *, store: BaseStore):
         store.put(namespace, key=str(uuid4()), value={step: response})
 
     return
+
+
+# node responsible for generating responses after the user has finished the project update
+def talk_to_mentor(state: State):
+    prompt = ChatPromptTemplate(
+        [
+            ("system", persona_prompt),
+            MessagesPlaceholder("messages"),
+        ]
+    )
+    chain = prompt | model
+    return {"messages": [chain.invoke({"messages": state["messages"]})]}
