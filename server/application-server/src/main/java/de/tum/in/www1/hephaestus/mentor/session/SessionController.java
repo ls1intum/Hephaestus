@@ -25,7 +25,7 @@ public class SessionController {
         if (user.isEmpty()) {
             return ResponseEntity.notFound().build();
         }
-        
+
         // returnes list is sorted by createdAt in descending order by default
         List<SessionDTO> sessions = sessionService.findAllSessionsByUserByCreatedAtDesc(user.get());
         return ResponseEntity.ok(sessions);

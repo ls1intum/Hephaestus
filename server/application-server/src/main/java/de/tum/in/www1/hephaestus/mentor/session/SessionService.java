@@ -50,10 +50,10 @@ public class SessionService {
     @Transactional
     public SessionDTO createSession(User user) {
         String previous_session_id = sessionRepository
-                .findFirstByUserOrderByCreatedAtDesc(user)
-                .map(Session::getId)
-                .map(String::valueOf)
-                .orElse("");
+            .findFirstByUserOrderByCreatedAtDesc(user)
+            .map(Session::getId)
+            .map(String::valueOf)
+            .orElse("");
         // close the previous session if it exists to prevent multiple open sessions
         if (previous_session_id != "") {
             Session previous_session = sessionRepository.findFirstByUserOrderByCreatedAtDesc(user).get();
@@ -63,13 +63,14 @@ public class SessionService {
 
         // get the last sprints's PRs
         List<PullRequestBaseInfoDTO> pullRequests = pullRequestRepository
-                .findAssignedByLoginAndStatesUpdatedSince(
-                        user.getLogin(),
-                        Set.of(Issue.State.OPEN, Issue.State.CLOSED),
-                        OffsetDateTime.now().minusDays(7)) // length ot the sprint is 7 days
-                .stream()
-                .map(PullRequestBaseInfoDTO::fromPullRequest)
-                .toList();
+            .findAssignedByLoginAndStatesUpdatedSince(
+                user.getLogin(),
+                Set.of(Issue.State.OPEN, Issue.State.CLOSED),
+                OffsetDateTime.now().minusDays(7)
+            ) // length ot the sprint is 7 days
+            .stream()
+            .map(PullRequestBaseInfoDTO::fromPullRequest)
+            .toList();
         String devProgress = formatPullRequests(pullRequests);
 
         // create a new session
@@ -82,15 +83,18 @@ public class SessionService {
 
     private String formatPullRequests(List<PullRequestBaseInfoDTO> pullRequests) {
         return pullRequests
-                .stream()
-                .map(pr -> String.format(
-                        "PR\nNumber: %d\nTitle: %s\nState: %s\nDraft: %b\nMerged: %b\nURL: %s\n",
-                        pr.number(),
-                        pr.title(),
-                        pr.state(),
-                        pr.isDraft(),
-                        pr.isMerged(),
-                        pr.htmlUrl()))
-                .collect(Collectors.joining("\n---\n")); // add separators between PRs
+            .stream()
+            .map(pr ->
+                String.format(
+                    "PR\nNumber: %d\nTitle: %s\nState: %s\nDraft: %b\nMerged: %b\nURL: %s\n",
+                    pr.number(),
+                    pr.title(),
+                    pr.state(),
+                    pr.isDraft(),
+                    pr.isMerged(),
+                    pr.htmlUrl()
+                )
+            )
+            .collect(Collectors.joining("\n---\n")); // add separators between PRs
     }
 }
