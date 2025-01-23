@@ -85,6 +85,7 @@ def ask_status(state: State, store: BaseStore):
 
 def ask_impediments(state: State, store: BaseStore):
     previous_session_id = state["last_thread"]
+    progress = state["dev_progress"]
     previous_impediments = ""
     if state["last_thread"] != "":
         namespace = (previous_session_id, "summary")
@@ -103,7 +104,7 @@ def ask_impediments(state: State, store: BaseStore):
                 (
                     prompt_loader.get_prompt(
                         type="mentor", name="impediments"
-                    ).format_map({"previous_impediments": previous_impediments})
+                    ).format_map({"previous_impediments": previous_impediments, "dev_progress": progress})
                 ),
             ),
             MessagesPlaceholder("messages"),

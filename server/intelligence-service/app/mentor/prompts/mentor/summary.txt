@@ -12,8 +12,8 @@ You are to perform the following tasks:
     - DO NOT USE "**" in your response for formatting!
 
 If you can, use the following emojis for the single bullet points, use them in the beginning of a bullet point if they related to the sense of it:
-✅ Done
-🛠️ Work in progress 
+✅ Done (also for PRs which are merged or open)
+🛠️ Work in progress (also for PRs which are drafts)
 ❌ Not done
 ⚠️ Generic impediment
 🏁 Promise to finish Work in progress
