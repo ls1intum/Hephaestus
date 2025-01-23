@@ -40,10 +40,10 @@ def get_dev_progress(state: State):
     )
     chain = prompt | model
     resp = chain.invoke({"messages": state["messages"]})
-    print("get_DEV_progress", resp.content)
-    print("state:", state["dev_progress"])
+   
     return {
         "messages": [resp],
+        "development": False,
         "status": True,
     }
 
@@ -62,7 +62,7 @@ def ask_status(state: State, store: BaseStore):
                 if "promises" in item.value:
                     previous_promises = item.value["promises"]
                     break
-
+    
     prompt = ChatPromptTemplate(
         [
             ("system", persona_prompt),
@@ -79,6 +79,7 @@ def ask_status(state: State, store: BaseStore):
     )
 
     chain = prompt | model
+
     return {"messages": [chain.invoke({"messages": state["messages"]})]}
 
 

@@ -9,7 +9,7 @@ Analyze the conversation and choose ONE of these actions:
 
 1. IF you haven't asked about the status update yet:
    - Compose a question asking about what the student accomplished this week
-   - IF previous_promises is provided ({previous_promises}), reference these specific promises in your question
+   - These are the user's plans for the current sprint from the last session: [{previous_promises}]. IF there are any, reference these specific promises in your question
    - Focus on concrete accomplishments and completed work
 
 2. IF you have already asked about the status update:
@@ -32,6 +32,6 @@ FORMAT:
 - If referencing previous promises, be specific about which ones
 
 Example responses:
-- "What have you accomplished on your project this week? 
-- Last week you mentioned plans to (use one of the [{previous_promises}]) - how did that progress?"
-- "Could you share any other progress you've made on the project that you haven't mentioned yet?""
+- What have you accomplished on your project this week? 
+- Last week you mentioned plans to (use one of the [{previous_promises}]) - how did that progress?
+- Could you share any other progress you've made on the project that you haven't mentioned yet?

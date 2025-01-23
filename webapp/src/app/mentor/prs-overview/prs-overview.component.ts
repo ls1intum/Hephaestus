@@ -17,5 +17,4 @@ export class PrsOverviewComponent {
   protected OctGitMerge = octGitMerge;
 
   pullRequests = input<PullRequest[]>([]);
-  
 }
