@@ -5,7 +5,6 @@ import { octGitPullRequest, octGitPullRequestDraft, octGitMerge } from '@ng-icon
 import { HlmCardDirective } from '@spartan-ng/ui-card-helm';
 import { PullRequest } from '../messages/message-parser';
 
-
 @Component({
   selector: 'app-prs-overview',
   templateUrl: './prs-overview.component.html',

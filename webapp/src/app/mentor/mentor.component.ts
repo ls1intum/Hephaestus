@@ -58,7 +58,7 @@ export class MentorComponent {
 
   sessions = injectQuery(() => ({
     queryKey: ['sessions'],
-    queryFn: async () => (await lastValueFrom(this.sessionService.getAllSessions()))
+    queryFn: async () => await lastValueFrom(this.sessionService.getAllSessions())
   }));
 
   selectedSessionMessages = injectQuery(() => ({
