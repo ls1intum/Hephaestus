@@ -19,5 +19,7 @@ def main_router(state: State):
         return "promises_node"
     elif state["summary"]:
         return "summary_node"
-    else:  # state["finish"]
+    elif state["finish"]:
         return "finish_node"
+    else:
+        return "mentor_node"
