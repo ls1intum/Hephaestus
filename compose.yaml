@@ -25,6 +25,9 @@ services:
   intelligence-service:
     build: server/intelligence-service
     environment:
+      - DATABASE_URL=postgresql://postgres:5432/hephaestus
+      - DATABASE_USERNAME=root
+      - DATABASE_PASSWORD=root
       # Either OPENAI_API_KEY or AZURE_OPENAI_API_KEY must be set
       - OPENAI_API_KEY
       - AZURE_OPENAI_API_KEY
