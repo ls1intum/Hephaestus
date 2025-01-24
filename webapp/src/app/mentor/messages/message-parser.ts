@@ -82,7 +82,14 @@ export function getPullRequests(message: Message): PullRequests | null {
   const prBlocks = developmentSection.split('PR').slice(1);
 
   result.development = prBlocks.map((block) => {
-    const pr: any = {};
+    const pr = {
+      number: 0,
+      title: '',
+      state: '',
+      isDraft: false,
+      isMerged: false,
+      url: ''
+    };
     block.split('\n').forEach((line) => {
       const [key, value] = line.split(':').map((s) => s.trim());
       if (!key || !value) return;

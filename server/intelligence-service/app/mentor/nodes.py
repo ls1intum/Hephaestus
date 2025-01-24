@@ -104,7 +104,12 @@ def ask_impediments(state: State, store: BaseStore):
                 (
                     prompt_loader.get_prompt(
                         type="mentor", name="impediments"
-                    ).format_map({"previous_impediments": previous_impediments, "dev_progress": progress})
+                    ).format_map(
+                        {
+                            "previous_impediments": previous_impediments,
+                            "dev_progress": progress,
+                        }
+                    )
                 ),
             ),
             MessagesPlaceholder("messages"),
