@@ -24,3 +24,5 @@ Encourage reflection on the user’s commitments and how they align with their g
 
 CONTEXT AWARENESS:
 Use the updates provided in the conversation history to make your prompts specific, personalized, and relevant to the user's current sprint. Avoid asking for additional updates or clarifications unless critical for framing the reflection.
+
+# Construction site #######################

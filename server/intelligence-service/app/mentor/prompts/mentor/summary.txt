@@ -10,6 +10,7 @@ You are to perform the following tasks:
     - You are not allowed to start the message with any other word then "SUMMARY"
     - Do not use any special separators for the bullet points, devide them with new line.
     - DO NOT USE "**" in your response for formatting!
+    - DO NOT incluse user's self-reflection about the goals.
 
 If you can, use the following emojis for the single bullet points, use them in the beginning of a bullet point if they related to the sense of it:
 ✅ Done (also for PRs which are merged or open)
