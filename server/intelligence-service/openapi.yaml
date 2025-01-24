@@ -32,14 +32,14 @@ components:
       - content
       title: MentorRequest
       type: object
-    MentorResponce:
+    MentorResponse:
       properties:
         content:
           title: Content
           type: string
       required:
       - content
-      title: MentorResponce
+      title: MentorResponse
       type: object
     MentorStartRequest:
       properties:
@@ -117,7 +117,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/MentorResponce'
+                $ref: '#/components/schemas/MentorResponse'
           description: Successful Response
         '422':
           content:
@@ -142,7 +142,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/MentorResponce'
+                $ref: '#/components/schemas/MentorResponse'
           description: Successful Response
         '422':
           content:

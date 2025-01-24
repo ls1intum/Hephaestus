@@ -33,23 +33,23 @@ public class SessionService {
     }
 
     public SessionDTO createSession(User user) {
-        String previous_session_id = sessionRepository
+        String previousSessionId = sessionRepository
             .findFirstByUserOrderByCreatedAtDesc(user)
             .map(Session::getId)
             .map(String::valueOf)
             .orElse("");
         // close the previous session if it exists to prevent multiple open sessions
-        if (previous_session_id != "") {
-            Session previous_session = sessionRepository.findFirstByUserOrderByCreatedAtDesc(user).get();
-            previous_session.setClosed(true);
-            sessionRepository.save(previous_session);
+        if (previousSessionId != "") {
+            Session previousSession = sessionRepository.findFirstByUserOrderByCreatedAtDesc(user).get();
+            previousSession.setClosed(true);
+            sessionRepository.save(previousSession);
         }
 
         // create a new session
         Session session = new Session();
         session.setUser(user);
         Session savedSession = sessionRepository.save(session);
-        messageService.sendFirstMessage(session, previous_session_id);
+        messageService.sendFirstMessage(session, previousSessionId);
         return SessionDTO.fromSession(savedSession);
     }
 }

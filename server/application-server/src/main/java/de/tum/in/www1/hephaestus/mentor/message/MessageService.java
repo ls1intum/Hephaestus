@@ -2,7 +2,7 @@ package de.tum.in.www1.hephaestus.mentor.message;
 
 import de.tum.in.www1.hephaestus.config.IntelligenceServiceConfig.IntelligenceServiceApi;
 import de.tum.in.www1.hephaestus.intelligenceservice.model.MentorRequest;
-import de.tum.in.www1.hephaestus.intelligenceservice.model.MentorResponce;
+import de.tum.in.www1.hephaestus.intelligenceservice.model.MentorResponse;
 import de.tum.in.www1.hephaestus.intelligenceservice.model.MentorStartRequest;
 import de.tum.in.www1.hephaestus.mentor.message.Message.MessageSender;
 import de.tum.in.www1.hephaestus.mentor.session.Session;
@@ -44,10 +44,10 @@ public class MessageService {
         Session currentSession = session.get();
 
         // prevent sending messages to closed sessions
-        Session previouSession = sessionRepository
+        Session previousSession = sessionRepository
             .findFirstByUserOrderByCreatedAtDesc(currentSession.getUser())
             .orElse(null);
-        if (previouSession != null && previouSession.isClosed()) {
+        if (previousSession != null && previousSession.isClosed()) {
             return null;
         }
 
@@ -64,7 +64,7 @@ public class MessageService {
             MentorRequest mentorRequest = new MentorRequest();
             mentorRequest.setContent(content);
             mentorRequest.setSessionId(String.valueOf(sessionId));
-            MentorResponce mentorMessage = intelligenceServiceApi.generateMentorPost(mentorRequest);
+            MentorResponse mentorMessage = intelligenceServiceApi.generateMentorPost(mentorRequest);
             String mentorResponse = mentorMessage.getContent();
             Message savedMentorMessage = createMentorMessage(currentSession, mentorResponse);
 
@@ -81,7 +81,7 @@ public class MessageService {
             MentorStartRequest mentorStartRequest = new MentorStartRequest();
             mentorStartRequest.setPreviousSessionId(previousSessionId);
             mentorStartRequest.setSessionId(String.valueOf(session.getId()));
-            MentorResponce mentorMessage = intelligenceServiceApi.startMentorStartPost(mentorStartRequest);
+            MentorResponse mentorMessage = intelligenceServiceApi.startMentorStartPost(mentorStartRequest);
             createMentorMessage(session, mentorMessage.getContent());
         } catch (Exception e) {
             // prevent saving empty system messages if the intelligence service is down

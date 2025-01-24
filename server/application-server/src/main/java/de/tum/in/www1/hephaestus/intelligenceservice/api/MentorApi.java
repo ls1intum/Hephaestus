@@ -5,7 +5,7 @@ import de.tum.in.www1.hephaestus.intelligenceservice.BaseApi;
 
 import de.tum.in.www1.hephaestus.intelligenceservice.model.HTTPValidationError;
 import de.tum.in.www1.hephaestus.intelligenceservice.model.MentorRequest;
-import de.tum.in.www1.hephaestus.intelligenceservice.model.MentorResponce;
+import de.tum.in.www1.hephaestus.intelligenceservice.model.MentorResponse;
 import de.tum.in.www1.hephaestus.intelligenceservice.model.MentorStartRequest;
 
 import java.util.Collections;
@@ -46,10 +46,10 @@ public class MentorApi extends BaseApi {
      * <p><b>200</b> - Successful Response
      * <p><b>422</b> - Validation Error
      * @param mentorRequest  (required)
-     * @return MentorResponce
+     * @return MentorResponse
      * @throws RestClientException if an error occurs while attempting to invoke the API
      */
-    public MentorResponce generateMentorPost(MentorRequest mentorRequest) throws RestClientException {
+    public MentorResponse generateMentorPost(MentorRequest mentorRequest) throws RestClientException {
         return generateMentorPostWithHttpInfo(mentorRequest).getBody();
     }
 
@@ -59,10 +59,10 @@ public class MentorApi extends BaseApi {
      * <p><b>200</b> - Successful Response
      * <p><b>422</b> - Validation Error
      * @param mentorRequest  (required)
-     * @return ResponseEntity&lt;MentorResponce&gt;
+     * @return ResponseEntity&lt;MentorResponse&gt;
      * @throws RestClientException if an error occurs while attempting to invoke the API
      */
-    public ResponseEntity<MentorResponce> generateMentorPostWithHttpInfo(MentorRequest mentorRequest) throws RestClientException {
+    public ResponseEntity<MentorResponse> generateMentorPostWithHttpInfo(MentorRequest mentorRequest) throws RestClientException {
         Object localVarPostBody = mentorRequest;
         
         // verify the required parameter 'mentorRequest' is set
@@ -87,7 +87,7 @@ public class MentorApi extends BaseApi {
 
         String[] localVarAuthNames = new String[] {  };
 
-        ParameterizedTypeReference<MentorResponce> localReturnType = new ParameterizedTypeReference<MentorResponce>() {};
+        ParameterizedTypeReference<MentorResponse> localReturnType = new ParameterizedTypeReference<MentorResponse>() {};
         return apiClient.invokeAPI("/mentor/", HttpMethod.POST, Collections.<String, Object>emptyMap(), localVarQueryParams, localVarPostBody, localVarHeaderParams, localVarCookieParams, localVarFormParams, localVarAccept, localVarContentType, localVarAuthNames, localReturnType);
     }
     /**
@@ -96,10 +96,10 @@ public class MentorApi extends BaseApi {
      * <p><b>200</b> - Successful Response
      * <p><b>422</b> - Validation Error
      * @param mentorStartRequest  (required)
-     * @return MentorResponce
+     * @return MentorResponse
      * @throws RestClientException if an error occurs while attempting to invoke the API
      */
-    public MentorResponce startMentorStartPost(MentorStartRequest mentorStartRequest) throws RestClientException {
+    public MentorResponse startMentorStartPost(MentorStartRequest mentorStartRequest) throws RestClientException {
         return startMentorStartPostWithHttpInfo(mentorStartRequest).getBody();
     }
 
@@ -109,10 +109,10 @@ public class MentorApi extends BaseApi {
      * <p><b>200</b> - Successful Response
      * <p><b>422</b> - Validation Error
      * @param mentorStartRequest  (required)
-     * @return ResponseEntity&lt;MentorResponce&gt;
+     * @return ResponseEntity&lt;MentorResponse&gt;
      * @throws RestClientException if an error occurs while attempting to invoke the API
      */
-    public ResponseEntity<MentorResponce> startMentorStartPostWithHttpInfo(MentorStartRequest mentorStartRequest) throws RestClientException {
+    public ResponseEntity<MentorResponse> startMentorStartPostWithHttpInfo(MentorStartRequest mentorStartRequest) throws RestClientException {
         Object localVarPostBody = mentorStartRequest;
         
         // verify the required parameter 'mentorStartRequest' is set
@@ -137,7 +137,7 @@ public class MentorApi extends BaseApi {
 
         String[] localVarAuthNames = new String[] {  };
 
-        ParameterizedTypeReference<MentorResponce> localReturnType = new ParameterizedTypeReference<MentorResponce>() {};
+        ParameterizedTypeReference<MentorResponse> localReturnType = new ParameterizedTypeReference<MentorResponse>() {};
         return apiClient.invokeAPI("/mentor/start", HttpMethod.POST, Collections.<String, Object>emptyMap(), localVarQueryParams, localVarPostBody, localVarHeaderParams, localVarCookieParams, localVarFormParams, localVarAccept, localVarContentType, localVarAuthNames, localReturnType);
     }
 
