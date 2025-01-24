@@ -5,7 +5,8 @@ const meta: Meta<ChatInputComponent> = {
   component: ChatInputComponent,
   tags: ['autodocs'],
   args: {
-    isSending: false
+    isSending: false,
+    isClosed: false
   }
 };
 
@@ -17,5 +18,11 @@ export const Default: Story = {};
 export const Sending: Story = {
   args: {
     isSending: true
+  }
+};
+
+export const Closed: Story = {
+  args: {
+    isClosed: true
   }
 };

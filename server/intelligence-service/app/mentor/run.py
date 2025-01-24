@@ -1,60 +1,104 @@
-from typing_extensions import Annotated, TypedDict
-from .prompt_loader import PromptLoader
+from psycopg_pool import ConnectionPool
 from langgraph.graph import START, StateGraph, END
-from langgraph.graph.message import add_messages
-from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
+from langgraph.checkpoint.postgres import PostgresSaver
+from langgraph.store.postgres import PostgresStore
+from langchain_core.messages import HumanMessage
 
-from ..model import model
+from .state import State
+from ..settings import settings
 
-prompt_loader = PromptLoader()
-persona_prompt = prompt_loader.get_prompt("mentor_persona")
+from .nodes import (
+    greet,
+    ask_impediments,
+    ask_status,
+    ask_promises,
+    ask_summary,
+    check_state,
+    finish,
+    update_memory,
+    talk_to_mentor,
+)
+from .conditions import start_router, main_router
 
-
-class State(TypedDict):
-    messages: Annotated[list, add_messages]
-
-
-def mentor(state: State):
-    prompt = ChatPromptTemplate(
-        [
-            ("system", persona_prompt),
-            (
-                "system",
-                "You need to guide the student through the set questions regarding their work on the project during the last week (sprint). Your value is the fact, that you help students to reflect on their past progress. Throughout the conversation you need to perform all of the following tasks in the given order: Task 1: Ask the student about the overall progress on the project. Task 2: Ask the student about the challenges faced during the sprint referring to what he said about progress. Task 3: Ask about the plan for the next sprint. You need to understand at which task in the conversation you are from the message history and what is the next task. Please, don't repeat yourself throughout the conversation. Don't perform more then one task at a time. If the user already shared something to a task you can go to the next.",
-            ),
-            MessagesPlaceholder("messages"),
-        ]
-    )
-    chain = prompt | model
-    return {"messages": [chain.invoke({"messages": state["messages"]})]}
-
-
-def greeting(state: State):
-    prompt = ChatPromptTemplate(
-        [
-            ("system", persona_prompt),
-            (
-                "system",
-                "Greet the user warmly and express excitement about starting today’s session. Keep the greeting friendly and encouraging. Mention that you are here to support them and look forward to making progress together.",
-            ),
-        ]
-    )
-    chain = prompt | model
-    return {"messages": [chain.invoke({"messages": state["messages"]})]}
-
-
-def isFirstInteraction(state: State):
-    if len(state["messages"]) == 0:
-        return "greeting"
-    return "mentor"
-
+connection_kwargs = {
+    "autocommit": True,
+    "prepare_threshold": 0,
+}
 
 graph_builder = StateGraph(State)
-graph_builder.add_node("mentor", mentor)
-graph_builder.add_node("greeting", greeting)
+graph_builder.add_node("greeting", greet)
+graph_builder.add_node("status_node", ask_status)
+graph_builder.add_node("impediments_node", ask_impediments)
+graph_builder.add_node("promises_node", ask_promises)
+graph_builder.add_node("summary_node", ask_summary)
+graph_builder.add_node("check_state", check_state)
+graph_builder.add_node("finish_node", finish)
+graph_builder.add_node("update_memory", update_memory)
+graph_builder.add_node("mentor_node", talk_to_mentor)
 
-graph_builder.add_conditional_edges(START, isFirstInteraction)
-graph_builder.add_edge("mentor", END)
+graph_builder.add_conditional_edges(START, start_router)
+graph_builder.add_conditional_edges("check_state", main_router)
+
 graph_builder.add_edge("greeting", END)
+graph_builder.add_edge("status_node", END)
+graph_builder.add_edge("impediments_node", END)
+graph_builder.add_edge("promises_node", END)
+graph_builder.add_edge("summary_node", END)
+graph_builder.add_edge("finish_node", "update_memory")
+graph_builder.add_edge("update_memory", END)
+graph_builder.add_edge("mentor_node", END)
 
-graph = graph_builder.compile()
+
+def start_session(last_thread: str, config):
+    with ConnectionPool(
+        conninfo=settings.DATABASE_CONNECTION_STRING,
+        max_size=20,
+        kwargs=connection_kwargs,
+    ) as pool:
+        checkpointer = PostgresSaver(pool)
+        checkpointer.setup()
+
+        with PostgresStore.from_conn_string(
+            settings.DATABASE_CONNECTION_STRING
+        ) as store:
+            store.setup()
+            graph = graph_builder.compile(checkpointer=checkpointer, store=store)
+
+            # set the initial state of the graph
+            result = graph.invoke(
+                {
+                    "last_thread": last_thread,
+                    "messages": [],
+                    "impediments": False,
+                    "status": False,
+                    "promises": False,
+                    "summary": False,
+                    "finish": False,
+                    "closed": False,
+                },
+                config,
+            )
+
+        pool.close()
+        return result
+
+
+def run(message: str, config):
+    with ConnectionPool(
+        conninfo=settings.DATABASE_CONNECTION_STRING,
+        max_size=20,
+        kwargs=connection_kwargs,
+    ) as pool:
+        checkpointer = PostgresSaver(pool)
+        checkpointer.setup()
+
+        with PostgresStore.from_conn_string(
+            settings.DATABASE_CONNECTION_STRING
+        ) as store:
+            store.setup()
+            graph = graph_builder.compile(checkpointer=checkpointer, store=store)
+            # update the state with the new message (the rest of the state is preserved by the checkpointer)
+            result = graph.invoke({"messages": [HumanMessage(content=message)]}, config)
+
+        pool.close()
+        return result

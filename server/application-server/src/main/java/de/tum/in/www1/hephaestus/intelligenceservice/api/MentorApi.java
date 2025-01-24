@@ -3,9 +3,10 @@ package de.tum.in.www1.hephaestus.intelligenceservice.api;
 import de.tum.in.www1.hephaestus.intelligenceservice.ApiClient;
 import de.tum.in.www1.hephaestus.intelligenceservice.BaseApi;
 
-import de.tum.in.www1.hephaestus.intelligenceservice.model.ISHTTPValidationError;
-import de.tum.in.www1.hephaestus.intelligenceservice.model.ISMentorMessage;
-import de.tum.in.www1.hephaestus.intelligenceservice.model.ISMessageHistory;
+import de.tum.in.www1.hephaestus.intelligenceservice.model.HTTPValidationError;
+import de.tum.in.www1.hephaestus.intelligenceservice.model.MentorRequest;
+import de.tum.in.www1.hephaestus.intelligenceservice.model.MentorResponse;
+import de.tum.in.www1.hephaestus.intelligenceservice.model.MentorStartRequest;
 
 import java.util.Collections;
 import java.util.HashMap;
@@ -40,33 +41,33 @@ public class MentorApi extends BaseApi {
     }
 
     /**
-     * Start and continue a chat session with an LLM.
+     * Continue a chat session with an LLM.
      * 
      * <p><b>200</b> - Successful Response
      * <p><b>422</b> - Validation Error
-     * @param isMessageHistory  (required)
-     * @return ISMentorMessage
+     * @param mentorRequest  (required)
+     * @return MentorResponse
      * @throws RestClientException if an error occurs while attempting to invoke the API
      */
-    public ISMentorMessage generateMentorPost(ISMessageHistory isMessageHistory) throws RestClientException {
-        return generateMentorPostWithHttpInfo(isMessageHistory).getBody();
+    public MentorResponse generateMentorPost(MentorRequest mentorRequest) throws RestClientException {
+        return generateMentorPostWithHttpInfo(mentorRequest).getBody();
     }
 
     /**
-     * Start and continue a chat session with an LLM.
+     * Continue a chat session with an LLM.
      * 
      * <p><b>200</b> - Successful Response
      * <p><b>422</b> - Validation Error
-     * @param isMessageHistory  (required)
-     * @return ResponseEntity&lt;ISMentorMessage&gt;
+     * @param mentorRequest  (required)
+     * @return ResponseEntity&lt;MentorResponse&gt;
      * @throws RestClientException if an error occurs while attempting to invoke the API
      */
-    public ResponseEntity<ISMentorMessage> generateMentorPostWithHttpInfo(ISMessageHistory isMessageHistory) throws RestClientException {
-        Object localVarPostBody = isMessageHistory;
+    public ResponseEntity<MentorResponse> generateMentorPostWithHttpInfo(MentorRequest mentorRequest) throws RestClientException {
+        Object localVarPostBody = mentorRequest;
         
-        // verify the required parameter 'isMessageHistory' is set
-        if (isMessageHistory == null) {
-            throw new HttpClientErrorException(HttpStatus.BAD_REQUEST, "Missing the required parameter 'isMessageHistory' when calling generateMentorPost");
+        // verify the required parameter 'mentorRequest' is set
+        if (mentorRequest == null) {
+            throw new HttpClientErrorException(HttpStatus.BAD_REQUEST, "Missing the required parameter 'mentorRequest' when calling generateMentorPost");
         }
         
 
@@ -86,8 +87,58 @@ public class MentorApi extends BaseApi {
 
         String[] localVarAuthNames = new String[] {  };
 
-        ParameterizedTypeReference<ISMentorMessage> localReturnType = new ParameterizedTypeReference<ISMentorMessage>() {};
+        ParameterizedTypeReference<MentorResponse> localReturnType = new ParameterizedTypeReference<MentorResponse>() {};
         return apiClient.invokeAPI("/mentor/", HttpMethod.POST, Collections.<String, Object>emptyMap(), localVarQueryParams, localVarPostBody, localVarHeaderParams, localVarCookieParams, localVarFormParams, localVarAccept, localVarContentType, localVarAuthNames, localReturnType);
+    }
+    /**
+     * Start a chat session with an LLM.
+     * 
+     * <p><b>200</b> - Successful Response
+     * <p><b>422</b> - Validation Error
+     * @param mentorStartRequest  (required)
+     * @return MentorResponse
+     * @throws RestClientException if an error occurs while attempting to invoke the API
+     */
+    public MentorResponse startMentorStartPost(MentorStartRequest mentorStartRequest) throws RestClientException {
+        return startMentorStartPostWithHttpInfo(mentorStartRequest).getBody();
+    }
+
+    /**
+     * Start a chat session with an LLM.
+     * 
+     * <p><b>200</b> - Successful Response
+     * <p><b>422</b> - Validation Error
+     * @param mentorStartRequest  (required)
+     * @return ResponseEntity&lt;MentorResponse&gt;
+     * @throws RestClientException if an error occurs while attempting to invoke the API
+     */
+    public ResponseEntity<MentorResponse> startMentorStartPostWithHttpInfo(MentorStartRequest mentorStartRequest) throws RestClientException {
+        Object localVarPostBody = mentorStartRequest;
+        
+        // verify the required parameter 'mentorStartRequest' is set
+        if (mentorStartRequest == null) {
+            throw new HttpClientErrorException(HttpStatus.BAD_REQUEST, "Missing the required parameter 'mentorStartRequest' when calling startMentorStartPost");
+        }
+        
+
+        final MultiValueMap<String, String> localVarQueryParams = new LinkedMultiValueMap<String, String>();
+        final HttpHeaders localVarHeaderParams = new HttpHeaders();
+        final MultiValueMap<String, String> localVarCookieParams = new LinkedMultiValueMap<String, String>();
+        final MultiValueMap<String, Object> localVarFormParams = new LinkedMultiValueMap<String, Object>();
+
+        final String[] localVarAccepts = { 
+            "application/json"
+         };
+        final List<MediaType> localVarAccept = apiClient.selectHeaderAccept(localVarAccepts);
+        final String[] localVarContentTypes = { 
+            "application/json"
+         };
+        final MediaType localVarContentType = apiClient.selectHeaderContentType(localVarContentTypes);
+
+        String[] localVarAuthNames = new String[] {  };
+
+        ParameterizedTypeReference<MentorResponse> localReturnType = new ParameterizedTypeReference<MentorResponse>() {};
+        return apiClient.invokeAPI("/mentor/start", HttpMethod.POST, Collections.<String, Object>emptyMap(), localVarQueryParams, localVarPostBody, localVarHeaderParams, localVarCookieParams, localVarFormParams, localVarAccept, localVarContentType, localVarAuthNames, localReturnType);
     }
 
     @Override

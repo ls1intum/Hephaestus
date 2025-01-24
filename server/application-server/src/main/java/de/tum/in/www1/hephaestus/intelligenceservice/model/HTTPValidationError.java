@@ -20,48 +20,59 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonTypeName;
 import com.fasterxml.jackson.annotation.JsonValue;
+import de.tum.in.www1.hephaestus.intelligenceservice.model.ValidationError;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
 import com.fasterxml.jackson.annotation.JsonPropertyOrder;
 import com.fasterxml.jackson.annotation.JsonTypeName;
 import org.hibernate.validator.constraints.*;
 
 /**
- * Response model to validate and return when performing a health check.
+ * HTTPValidationError
  */
 @JsonPropertyOrder({
-  ISHealthCheck.JSON_PROPERTY_STATUS
+  HTTPValidationError.JSON_PROPERTY_DETAIL
 })
-@JsonTypeName("HealthCheck")
 @jakarta.annotation.Generated(value = "org.openapitools.codegen.languages.JavaClientCodegen", comments = "Generator version: 7.7.0")
-public class ISHealthCheck {
-  public static final String JSON_PROPERTY_STATUS = "status";
-  private String status = "OK";
+public class HTTPValidationError {
+  public static final String JSON_PROPERTY_DETAIL = "detail";
+  private List<ValidationError> detail = new ArrayList<>();
 
-  public ISHealthCheck() {
+  public HTTPValidationError() {
   }
 
-  public ISHealthCheck status(String status) {
+  public HTTPValidationError detail(List<ValidationError> detail) {
     
-    this.status = status;
+    this.detail = detail;
+    return this;
+  }
+
+  public HTTPValidationError addDetailItem(ValidationError detailItem) {
+    if (this.detail == null) {
+      this.detail = new ArrayList<>();
+    }
+    this.detail.add(detailItem);
     return this;
   }
 
   /**
-   * Get status
-   * @return status
+   * Get detail
+   * @return detail
    */
   @jakarta.annotation.Nullable
-  @JsonProperty(JSON_PROPERTY_STATUS)
+  @JsonProperty(JSON_PROPERTY_DETAIL)
   @JsonInclude(value = JsonInclude.Include.USE_DEFAULTS)
 
-  public String getStatus() {
-    return status;
+  public List<ValidationError> getDetail() {
+    return detail;
   }
 
 
-  @JsonProperty(JSON_PROPERTY_STATUS)
+  @JsonProperty(JSON_PROPERTY_DETAIL)
   @JsonInclude(value = JsonInclude.Include.USE_DEFAULTS)
-  public void setStatus(String status) {
-    this.status = status;
+  public void setDetail(List<ValidationError> detail) {
+    this.detail = detail;
   }
 
   @Override
@@ -72,20 +83,20 @@ public class ISHealthCheck {
     if (o == null || getClass() != o.getClass()) {
       return false;
     }
-    ISHealthCheck healthCheck = (ISHealthCheck) o;
-    return Objects.equals(this.status, healthCheck.status);
+    HTTPValidationError htTPValidationError = (HTTPValidationError) o;
+    return Objects.equals(this.detail, htTPValidationError.detail);
   }
 
   @Override
   public int hashCode() {
-    return Objects.hash(status);
+    return Objects.hash(detail);
   }
 
   @Override
   public String toString() {
     StringBuilder sb = new StringBuilder();
-    sb.append("class ISHealthCheck {\n");
-    sb.append("    status: ").append(toIndentedString(status)).append("\n");
+    sb.append("class HTTPValidationError {\n");
+    sb.append("    detail: ").append(toIndentedString(detail)).append("\n");
     sb.append("}");
     return sb.toString();
   }

@@ -800,6 +800,7 @@ components:
       required:
       - createdAt
       - id
+      - isClosed
       type: object
       properties:
         id:
@@ -808,3 +809,5 @@ components:
         createdAt:
           type: string
           format: date-time
+        isClosed:
+          type: boolean

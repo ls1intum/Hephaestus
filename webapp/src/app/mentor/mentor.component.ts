@@ -1,4 +1,4 @@
-import { Component, effect, inject, signal, viewChild } from '@angular/core';
+import { Component, effect, inject, computed, signal, viewChild } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { lastValueFrom } from 'rxjs';
 import { injectMutation, injectQuery, injectQueryClient } from '@tanstack/angular-query-experimental';
@@ -45,6 +45,17 @@ export class MentorComponent {
     });
   }
 
+  selectedSessionClosed = computed(() => {
+    const selectedId = this.selectedSessionId();
+    if (!selectedId) return false;
+
+    const sessions = this.sessions.data();
+    if (!sessions) return false;
+
+    const selectedSession = sessions.find((session) => session.id === selectedId);
+    return selectedSession?.isClosed ?? false;
+  });
+
   sessions = injectQuery(() => ({
     queryKey: ['sessions'],
     queryFn: async () => (await lastValueFrom(this.sessionService.getAllSessions())).reverse()
@@ -68,7 +79,7 @@ export class MentorComponent {
   }));
 
   sendMessage = injectMutation(() => ({
-    mutationFn: async ({ sessionId, message }: { sessionId: number; message: string }) => lastValueFrom(this.messageService.createMessage(sessionId, message)),
+    mutationFn: async ({ sessionId, message }: { sessionId: number; message: string }) => await lastValueFrom(this.messageService.createMessage(sessionId, message)),
     onMutate: async ({ message }) => {
       // Do optimistic update
       await this.queryClient.cancelQueries({ queryKey: ['sessions', this.selectedSessionId()] });

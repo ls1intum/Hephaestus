@@ -25,72 +25,71 @@ import com.fasterxml.jackson.annotation.JsonTypeName;
 import org.hibernate.validator.constraints.*;
 
 /**
- * ISMessage
+ * MentorStartRequest
  */
 @JsonPropertyOrder({
-  ISMessage.JSON_PROPERTY_CONTENT,
-  ISMessage.JSON_PROPERTY_SENDER
+  MentorStartRequest.JSON_PROPERTY_PREVIOUS_SESSION_ID,
+  MentorStartRequest.JSON_PROPERTY_SESSION_ID
 })
-@JsonTypeName("Message")
 @jakarta.annotation.Generated(value = "org.openapitools.codegen.languages.JavaClientCodegen", comments = "Generator version: 7.7.0")
-public class ISMessage {
-  public static final String JSON_PROPERTY_CONTENT = "content";
-  private String content;
+public class MentorStartRequest {
+  public static final String JSON_PROPERTY_PREVIOUS_SESSION_ID = "previous_session_id";
+  private String previousSessionId;
 
-  public static final String JSON_PROPERTY_SENDER = "sender";
-  private String sender;
+  public static final String JSON_PROPERTY_SESSION_ID = "session_id";
+  private String sessionId;
 
-  public ISMessage() {
+  public MentorStartRequest() {
   }
 
-  public ISMessage content(String content) {
+  public MentorStartRequest previousSessionId(String previousSessionId) {
     
-    this.content = content;
+    this.previousSessionId = previousSessionId;
     return this;
   }
 
   /**
-   * Get content
-   * @return content
+   * Get previousSessionId
+   * @return previousSessionId
    */
   @jakarta.annotation.Nonnull
-  @JsonProperty(JSON_PROPERTY_CONTENT)
+  @JsonProperty(JSON_PROPERTY_PREVIOUS_SESSION_ID)
   @JsonInclude(value = JsonInclude.Include.ALWAYS)
 
-  public String getContent() {
-    return content;
+  public String getPreviousSessionId() {
+    return previousSessionId;
   }
 
 
-  @JsonProperty(JSON_PROPERTY_CONTENT)
+  @JsonProperty(JSON_PROPERTY_PREVIOUS_SESSION_ID)
   @JsonInclude(value = JsonInclude.Include.ALWAYS)
-  public void setContent(String content) {
-    this.content = content;
+  public void setPreviousSessionId(String previousSessionId) {
+    this.previousSessionId = previousSessionId;
   }
 
-  public ISMessage sender(String sender) {
+  public MentorStartRequest sessionId(String sessionId) {
     
-    this.sender = sender;
+    this.sessionId = sessionId;
     return this;
   }
 
   /**
-   * Get sender
-   * @return sender
+   * Get sessionId
+   * @return sessionId
    */
   @jakarta.annotation.Nonnull
-  @JsonProperty(JSON_PROPERTY_SENDER)
+  @JsonProperty(JSON_PROPERTY_SESSION_ID)
   @JsonInclude(value = JsonInclude.Include.ALWAYS)
 
-  public String getSender() {
-    return sender;
+  public String getSessionId() {
+    return sessionId;
   }
 
 
-  @JsonProperty(JSON_PROPERTY_SENDER)
+  @JsonProperty(JSON_PROPERTY_SESSION_ID)
   @JsonInclude(value = JsonInclude.Include.ALWAYS)
-  public void setSender(String sender) {
-    this.sender = sender;
+  public void setSessionId(String sessionId) {
+    this.sessionId = sessionId;
   }
 
   @Override
@@ -101,22 +100,22 @@ public class ISMessage {
     if (o == null || getClass() != o.getClass()) {
       return false;
     }
-    ISMessage message = (ISMessage) o;
-    return Objects.equals(this.content, message.content) &&
-        Objects.equals(this.sender, message.sender);
+    MentorStartRequest mentorStartRequest = (MentorStartRequest) o;
+    return Objects.equals(this.previousSessionId, mentorStartRequest.previousSessionId) &&
+        Objects.equals(this.sessionId, mentorStartRequest.sessionId);
   }
 
   @Override
   public int hashCode() {
-    return Objects.hash(content, sender);
+    return Objects.hash(previousSessionId, sessionId);
   }
 
   @Override
   public String toString() {
     StringBuilder sb = new StringBuilder();
-    sb.append("class ISMessage {\n");
-    sb.append("    content: ").append(toIndentedString(content)).append("\n");
-    sb.append("    sender: ").append(toIndentedString(sender)).append("\n");
+    sb.append("class MentorStartRequest {\n");
+    sb.append("    previousSessionId: ").append(toIndentedString(previousSessionId)).append("\n");
+    sb.append("    sessionId: ").append(toIndentedString(sessionId)).append("\n");
     sb.append("}");
     return sb.toString();
   }
