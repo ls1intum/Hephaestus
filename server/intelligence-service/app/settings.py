@@ -7,6 +7,10 @@ load_dotenv()
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env")
 
+    DATABASE_URL: str = "postgresql://localhost:5432/hephaestus"
+    DATABASE_USERNAME: str = "root"
+    DATABASE_PASSWORD: str = "root"
+
     OPENAI_API_KEY: str = ""
 
     AZURE_OPENAI_API_KEY: str = ""
@@ -28,6 +32,15 @@ class Settings(BaseSettings):
             and bool(self.AZURE_OPENAI_ENDPOINT)
             and bool(self.AZURE_OPENAI_API_VERSION)
         )
+
+    @property
+    def DATABASE_CONNECTION_STRING(self):
+        result = (
+            f"postgresql://{self.DATABASE_USERNAME}:{self.DATABASE_PASSWORD}@{self.DATABASE_URL.replace('postgresql://', '')}"
+            + "?sslmode=disable"
+        )
+        print(result)
+        return result
 
 
 settings = Settings()

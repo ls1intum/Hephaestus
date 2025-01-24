@@ -1,9 +1,11 @@
-from .state import State
-from langgraph.graph import START, StateGraph, END
 from psycopg_pool import ConnectionPool
+from langgraph.graph import START, StateGraph, END
 from langgraph.checkpoint.postgres import PostgresSaver
 from langgraph.store.postgres import PostgresStore
 from langchain_core.messages import HumanMessage
+
+from .state import State
+from ..settings import settings
 
 from .nodes import (
     greet,
@@ -18,13 +20,7 @@ from .nodes import (
 )
 from .conditions import start_router, main_router
 
-
-POSTGRES_CONFIG = {
-    "dbname": "hephaestus",
-    "user": "root",
-    "password": "root",
-    "host": "localhost",
-    "port": "5432",
+connection_kwargs = {
     "autocommit": True,
     "prepare_threshold": 0,
 }
@@ -54,12 +50,16 @@ graph_builder.add_edge("mentor_node", END)
 
 
 def start_session(last_thread: str, config):
-    with ConnectionPool(kwargs=POSTGRES_CONFIG) as pool:
+    with ConnectionPool(
+        conninfo=settings.DATABASE_CONNECTION_STRING,
+        max_size=20,
+        kwargs=connection_kwargs,
+    ) as pool:
         checkpointer = PostgresSaver(pool)
         checkpointer.setup()
 
         with PostgresStore.from_conn_string(
-            "postgresql://root:root@localhost:5432/hephaestus"
+            settings.DATABASE_CONNECTION_STRING
         ) as store:
             store.setup()
             graph = graph_builder.compile(checkpointer=checkpointer, store=store)
@@ -84,12 +84,16 @@ def start_session(last_thread: str, config):
 
 
 def run(message: str, config):
-    with ConnectionPool(kwargs=POSTGRES_CONFIG) as pool:
+    with ConnectionPool(
+        conninfo=settings.DATABASE_CONNECTION_STRING,
+        max_size=20,
+        kwargs=connection_kwargs,
+    ) as pool:
         checkpointer = PostgresSaver(pool)
         checkpointer.setup()
 
         with PostgresStore.from_conn_string(
-            "postgresql://root:root@localhost:5432/hephaestus"
+            settings.DATABASE_CONNECTION_STRING
         ) as store:
             store.setup()
             graph = graph_builder.compile(checkpointer=checkpointer, store=store)
