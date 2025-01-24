@@ -19,7 +19,7 @@ export class MessagesComponent {
   protected Message = Message;
 
   securityStore = inject(SecurityStore);
-  messages = input<Message[]>([]);
+  messages = input<(Message | Summary)[]>([]);
   isLoading = input<boolean>(false);
 
   getSummary = getSummary;

@@ -39,10 +39,9 @@ def get_dev_progress(state: State):
         ]
     )
     chain = prompt | model
-    resp = chain.invoke({"messages": state["messages"]})
 
     return {
-        "messages": [resp],
+        "messages": [chain.invoke({"messages": state["messages"]})],
         "development": False,
         "status": True,
     }
@@ -79,7 +78,6 @@ def ask_status(state: State, store: BaseStore):
     )
 
     chain = prompt | model
-
     return {"messages": [chain.invoke({"messages": state["messages"]})]}
 
 
@@ -140,8 +138,7 @@ def ask_summary(state: State):
         ]
     )
     chain = prompt | model
-    response = chain.invoke({"messages": state["messages"]})
-    return {"messages": [response]}
+    return {"messages": [chain.invoke({"messages": state["messages"]})]}
 
 
 def finish(state: State):

@@ -5,7 +5,7 @@ Your task is to ensure the student's impediments and challenges are thoroughly d
 1. Review the conversation history carefully.
 
 2. IF YOU HAVEN'T YET ASKED about impediments/challenges in this conversation:
-   - ONLY IT there are impediments among the following: "{previous_impediments}", reference them specifically, say that they were mentioned in the last session and ask if they were resolved.
+   - ONLY IF there are impediments among the following: "{previous_impediments}", reference them specifically, say that they were mentioned in the last session and ask if they were resolved.
    - Ask the student about any challenges, impediments, or roadblocks they're facing now.
 
 IF YOU HAVE ALREADY ASKED about impediments/challenges:

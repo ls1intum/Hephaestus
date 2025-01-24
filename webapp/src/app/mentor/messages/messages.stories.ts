@@ -40,7 +40,10 @@ const meta: Meta<MessagesComponent> = {
         sentAt: '2024-12-05T10:16:30Z',
         sender: Message.SenderEnum.Mentor,
         content: 'Keep up the good work!',
-        sessionId: 101
+        sessionId: 101,
+        status: ['Database schema completed', 'API design started'],
+        impediments: [],
+        promises: []
       }
     ]
   }
