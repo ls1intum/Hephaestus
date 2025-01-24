@@ -7,7 +7,7 @@ import { Message } from '@app/core/modules/openapi';
 import { HlmSkeletonComponent } from '@spartan-ng/ui-skeleton-helm';
 import { ChatSummaryComponent } from '../chat-summary/chat-summary.component';
 import { PrsOverviewComponent } from '../prs-overview/prs-overview.component';
-import { getSummary, getPullRequests } from './message-parser';
+import { getSummary, getPullRequests, Summary } from './message-parser';
 
 @Component({
   selector: 'app-messages',
