@@ -7,8 +7,8 @@ import { HlmSkeletonComponent } from '@spartan-ng/ui-skeleton-helm';
 import { HlmIconComponent } from '@spartan-ng/ui-icon-helm';
 import { HlmTooltipTriggerDirective } from '@spartan-ng/ui-tooltip-helm';
 import { HlmButtonModule } from '@spartan-ng/ui-button-helm';
-import dayjs from 'dayjs';
-import relativeTime from 'dayjs/plugin/relativeTime';
+import dayjs from 'dayjs/esm';
+import relativeTime from 'dayjs/esm/plugin/relativeTime';
 import { lucideAward } from '@ng-icons/lucide';
 import { cn } from '@app/utils';
 

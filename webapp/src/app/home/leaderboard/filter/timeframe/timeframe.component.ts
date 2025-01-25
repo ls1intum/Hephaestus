@@ -1,8 +1,8 @@
 import { Component, computed, effect, inject, signal } from '@angular/core';
+import dayjs from 'dayjs/esm';
+import isoWeek from 'dayjs/esm/plugin/isoWeek';
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, Router } from '@angular/router';
-import dayjs from 'dayjs';
-import isoWeek from 'dayjs/plugin/isoWeek';
 import { BrnSelectModule } from '@spartan-ng/ui-select-brain';
 import { HlmSelectModule } from '@spartan-ng/ui-select-helm';
 import { HlmLabelModule } from '@spartan-ng/ui-label-helm';

@@ -1,60 +1,41 @@
-FROM node:latest as build
+# Stage 1: Build the Angular application
+FROM node:22-alpine AS build
 
 WORKDIR /app
 
-COPY ./ /app/
-
-# Ensure .env file exists
-RUN mv .env* .env || true
-RUN touch .env
-RUN cat .env
-
-# Fix buggy replacement of COOLIFY_URL in .env
-RUN COOLIFY_URL_VALUE=$(grep '^COOLIFY_URL=' .env | cut -d '=' -f2) && \
-    sed -i "s|\$COOLIFY_URL|$COOLIFY_URL_VALUE|g" .env
-
-# Export environment variables from .env
-# This assumes that .env contains lines like VARIABLE=value
-# and does not contain spaces around the '='
-RUN set -a && \
-    . /app/.env && \
-    set +a && \
-    echo "Generating environment.prod.ts" && \
-    cat > src/environments/environment.prod.ts <<EOF
-export const environment = {
-  clientUrl: '${APPLICATION_CLIENT_URL}',
-  serverUrl: '${APPLICATION_SERVER_URL}',
-  version: '${APPLICATION_VERSION}',
-  sentry: {
-    dsn: '${SENTRY_DSN}',
-    environment: 'prod',
-  },
-  keycloak: {
-    url: '${KEYCLOAK_URL}',
-    realm: '${KEYCLOAK_REALM}',
-    clientId: '${KEYCLOAK_CLIENT_ID}',
-    skipLoginPage: ${KEYCLOAK_SKIP_LOGIN}
-  },
-  umami: {
-    enabled: '${UMAMI_ENABLED}',
-    scriptUrl: '${UMAMI_SCRIPT_URL}',
-    websiteId: '${UMAMI_WEBSITE_ID}',
-    domains: '${UMAMI_DOMAINS}'
-  },
-  legal: {
-    imprintHtml: '${LEGAL_IMPRINT_HTML}',
-    privacyHtml: '${LEGAL_PRIVACY_HTML}'
-  }
-};
-EOF
+# Copy and install dependencies early to leverage Docker layer caching
+COPY package.json package-lock.json /app/
 
 RUN npm install
-RUN npm run build
 
-FROM nginx:latest
+# Copy the rest of the application code
+COPY ./ /app/
 
+# Ensure that environment.prod.ts contains placeholders (already present in codebase)
+
+# Build the Angular application
+RUN npm run build --prod
+
+# Stage 2: Serve the app with Nginx
+FROM nginx:stable-alpine
+
+# Install necessary packages: bash, grep, perl
+RUN apk update && apk add --no-cache bash grep perl
+
+# Copy built Angular app from the build stage
 COPY --from=build /app/dist/webapp/browser /usr/share/nginx/html
 
+# Copy the substitution script into the image
+COPY substitute_env_variables.sh /usr/local/bin/
+
+# Make the substitution script executable
+RUN chmod +x /usr/local/bin/substitute_env_variables.sh
+
+# Copy custom Nginx configuration if necessary
 COPY nginx.conf /etc/nginx/conf.d/default.conf
 
+# Expose port 80
 EXPOSE 80
+
+# Set the substitution script to run before starting Nginx
+ENTRYPOINT ["/bin/bash", "-c", "/usr/local/bin/substitute_env_variables.sh && exec nginx -g 'daemon off;'"]

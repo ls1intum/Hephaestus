@@ -1,0 +1,52 @@
+name: Build Docker Images
+
+on:
+  pull_request:
+    paths-ignore:
+    - 'README.md'
+    - 'CODE_OF_CONDUCT.md'
+    - 'CONTRIBUTING.md'
+    - 'LICENSE'
+    - 'SECURITY.md'
+    - 'docs/**'
+    - 'keycloakify/**'
+    - '.github/**'
+    - '!.github/workflows/build-and-push-docker.yml'
+  push:
+    branches:
+      - develop
+      - release/*
+  release:
+    types:
+      - created
+
+jobs:
+  build:
+    name: ${{ matrix.name }}
+    if: github.actor != 'dependabot[bot]'
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: Webapp
+            dockerfile: ./webapp/Dockerfile
+            image: ghcr.io/ls1intum/hephaestus/webapp
+            context: ./webapp
+          - name: Application Server
+            dockerfile: ./server/application-server/Dockerfile
+            image: ghcr.io/ls1intum/hephaestus/application-server
+            context: ./server/application-server
+          - name: Intelligence Service
+            dockerfile: ./server/intelligence-service/Dockerfile
+            image: ghcr.io/ls1intum/hephaestus/intelligence-service
+            context: ./server/intelligence-service
+          - name: Webhook Ingest
+            dockerfile: ./server/webhook-ingest/Dockerfile
+            image: ghcr.io/ls1intum/hephaestus/webhook-ingest
+            context: ./server/webhook-ingest
+    # Uses https://github.com/ls1intum/.github/pull/16/commits/a35192af6c834a72cb12fe6b772c0cfb70b45eae
+    uses: ls1intum/.github/.github/workflows/build-and-push-docker-image.yml@feat/minor-build-improvements
+    with:
+      image-name: ${{ matrix.image }}
+      docker-file: ${{ matrix.dockerfile }}
+      docker-context: ${{ matrix.context }}

@@ -40,6 +40,7 @@ import { AiMentorComponent } from './ai-mentor/ai-mentor.component';
 })
 export class HeaderComponent {
   protected Hammer = Hammer;
+  protected version = environment.version;
 
   securityStore = inject(SecurityStore);
   signedIn = this.securityStore.signedIn;

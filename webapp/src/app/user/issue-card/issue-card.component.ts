@@ -5,7 +5,7 @@ import { octCheck, octComment, octFileDiff, octGitPullRequest, octGitPullRequest
 import { HlmCardModule } from '@spartan-ng/ui-card-helm';
 import { HlmSkeletonComponent } from '@spartan-ng/ui-skeleton-helm';
 import { GithubLabelComponent } from '@app/ui/github-label/github-label.component';
-import dayjs from 'dayjs';
+import dayjs from 'dayjs/esm';
 import { cn } from '@app/utils';
 
 @Component({
