@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "intelligence-service"
-version = "0.1.0"
+version = "0.0.1"
 description = "A FastAPI service for interfacing with machine learning models."
 authors = ["Felix T.J. Dietrich <felixtj.dietrich@tum.de>", "milenasrb <mi.serbinova@gmail.com>"]
 readme = "README.md"
