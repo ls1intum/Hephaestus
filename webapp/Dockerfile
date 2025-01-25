@@ -3,11 +3,11 @@ FROM node:latest as build
 WORKDIR /app
 
 # Copy and install dependencies early to cache them in a separate layer
-COPY package.json package-lock.json ./
+COPY package.json package-lock.json /app/
 
 RUN npm install
 
-COPY . ./
+COPY ./ /app/
 
 # Ensure .env file exists
 RUN mv .env* .env || true
