@@ -15,7 +15,6 @@ jobs:
       env: |
         APPLICATION_CLIENT_URL=${{ vars.APPLICATION_CLIENT_URL }}
         APPLICATION_SERVER_URL=${{ vars.APPLICATION_SERVER_URL }}
-        NATS_SERVER_URL=${{ vars.NATS_SERVER_URL }}
         KEYCLOAK_URL=${{ vars.KEYCLOAK_URL }}
         KEYCLOAK_REALM=${{ vars.KEYCLOAK_REALM }}
         KEYCLOAK_CLIENT_ID=${{ vars.KEYCLOAK_CLIENT_ID }}
@@ -30,8 +29,9 @@ jobs:
         UMAMI_SCRIPT_URL=${{ vars.UMAMI_SCRIPT_URL }}
         UMAMI_WEBSITE_ID=${{ vars.UMAMI_WEBSITE_ID }}
         UMAMI_DOMAINS=${{ vars.UMAMI_DOMAINS }}
-
+        
         # Application Server
+        NATS_SERVER_URL=${{ secrets.NATS_SERVER_URL }}
         KEYCLOAK_CLIENT_SECRET=${{ secrets.KEYCLOAK_CLIENT_SECRET }}
         GITHUB_AUTH_TOKEN=${{ secrets.GH_AUTH_TOKEN }}
         SLACK_BOT_TOKEN=${{ secrets.SLACK_BOT_TOKEN }}
