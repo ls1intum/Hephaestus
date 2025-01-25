@@ -1,5 +1,5 @@
 # Stage 1: Build the Angular application
-FROM node:22-alpine as build
+FROM node:22-alpine AS build
 
 WORKDIR /app
 
@@ -10,6 +10,8 @@ RUN npm install
 
 # Copy the rest of the application code
 COPY ./ /app/
+
+# Ensure that environment.prod.ts contains placeholders (already present in codebase)
 
 # Build the Angular application
 RUN npm run build --prod
