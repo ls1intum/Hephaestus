@@ -60,10 +60,9 @@ replace_vars() {
 
   # Use Perl's quotemeta to escape special characters
   local escaped_value
-  escaped_value=$(perl -MString::Escape -e 'print quotemeta($ARGV[0]);' "$value")
+  escaped_value=$(perl -e 'print quotemeta($ARGV[0]);' "$value")
 
-  # Use Perl for in-place substitution to handle special characters gracefully
-  # Only process text files to avoid binary corruption
+  # Perform in-place substitution
   find "${BUILD_DIR}" -type f \( -name "*.js" -o -name "*.html" -o -name "*.css" \) -exec grep -Il "${placeholder}" {} \; | while read -r file; do
     perl -pi -e "s/${placeholder}/${escaped_value}/g" "$file"
     log "✅ Replaced '${placeholder}' in '${file}'"
