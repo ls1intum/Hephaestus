@@ -1,6 +1,7 @@
 services:
   application-server:
-    image: hephaestus-application-server
+    build:
+      context: ./server/application-server
     ports:
       - '8080'
     environment:
@@ -70,3 +71,6 @@ services:
 networks:
   app-network:
     driver: bridge`
+
+volumes:
+  postgresql-data:

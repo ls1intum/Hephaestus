@@ -2,7 +2,12 @@ FROM node:latest as build
 
 WORKDIR /app
 
-COPY ./ /app/
+# Copy and install dependencies early to cache them in a separate layer
+COPY package.json package-lock.json ./
+
+RUN npm install
+
+COPY . ./
 
 # Ensure .env file exists
 RUN mv .env* .env || true
@@ -48,7 +53,6 @@ export const environment = {
 };
 EOF
 
-RUN npm install
 RUN npm run build
 
 FROM nginx:latest
