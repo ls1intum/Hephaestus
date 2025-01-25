@@ -1,0 +1,50 @@
+name: Build and Push Docker Images
+
+on:
+  pull_request:
+    paths-ignore:
+    - 'README.md'
+    - 'CODE_OF_CONDUCT.md'
+    - 'CONTRIBUTING.md'
+    - 'LICENSE'
+    - 'SECURITY.md'
+    - 'docs/**'
+    - 'keycloakify/**'
+    - '.github/**'
+    - '!.github/workflows/build-and-push-docker-image.yml'
+  push:
+    branches:
+      - develop
+
+jobs:
+  build-webapp:
+    uses: ls1intum/.github/.github/workflows/build-and-push-docker-image.yml@main
+    with:
+      image-name: ls1intum/Hephaestus/webapp
+      docker-file: ./webapp/Dockerfile
+      docker-context: ./webapp
+    secrets: inherit
+
+  build-intelligence-service:
+    uses: ls1intum/.github/.github/workflows/build-and-push-docker-image.yml@main
+    with:
+      image-name: ls1intum/Hephaestus/intelligence-service
+      docker-file: ./server/intelligence-service/Dockerfile
+      docker-context: ./server/intelligence-service
+    secrets: inherit
+
+  build-webhook-ingest:
+    uses: ls1intum/.github/.github/workflows/build-and-push-docker-image.yml@main
+    with:
+      image-name: ls1intum/Hephaestus/webhook-ingest
+      docker-file: ./server/webhook-ingest/Dockerfile
+      docker-context: ./server/webhook-ingest
+    secrets: inherit
+
+  build-application-server:
+    uses: ls1intum/.github/.github/workflows/build-and-push-docker-image.yml@main
+    with:
+      image-name: ls1intum/Hephaestus/application-server
+      docker-file: ./server/application-server/Dockerfile
+      docker-context: ./server/application-server
+    secrets: inherit
