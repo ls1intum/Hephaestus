@@ -58,9 +58,9 @@ replace_vars() {
   # Log the substitution process
   log "🔄 Replacing placeholder '${placeholder}' with environment variable '${env_var}' value..."
 
-  # Escape characters that might interfere with sed/perl
+  # Use Perl's quotemeta to escape special characters
   local escaped_value
-  escaped_value=$(printf '%s' "$value" | sed 's/[&/\]/\\&/g')
+  escaped_value=$(perl -MString::Escape -e 'print quotemeta($ARGV[0]);' "$value")
 
   # Use Perl for in-place substitution to handle special characters gracefully
   # Only process text files to avoid binary corruption
