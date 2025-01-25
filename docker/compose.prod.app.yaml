@@ -1,0 +1,116 @@
+services:
+  webapp:
+    image: "ghcr.io/ls1intum/hephaestus/webapp:${IMAGE_TAG}"
+    environment:
+      APPLICATION_CLIENT_URL: ${APPLICATION_CLIENT_URL}
+      APPLICATION_SERVER_URL: ${APPLICATION_SERVER_URL}
+      SENTRY_ENVIRONMENT: ${SENTRY_ENVIRONMENT}
+      SENTRY_DSN: ${SENTRY_DSN}
+      KEYCLOAK_URL: ${KEYCLOAK_URL}
+      KEYCLOAK_REALM: ${KEYCLOAK_REALM}
+      KEYCLOAK_CLIENT_ID: ${KEYCLOAK_CLIENT_ID}
+      KEYCLOAK_SKIP_LOGIN: ${KEYCLOAK_SKIP_LOGIN}
+      UMAMI_ENABLED: ${UMAMI_ENABLED}
+      UMAMI_SCRIPT_URL: ${UMAMI_SCRIPT_URL}
+      UMAMI_WEBSITE_ID: ${UMAMI_WEBSITE_ID}
+      UMAMI_DOMAINS: ${UMAMI_DOMAINS}
+      LEGAL_IMPRINT_HTML: ${LEGAL_IMPRINT_HTML}
+      LEGAL_PRIVACY_HTML: ${LEGAL_PRIVACY_HTML}
+    env_file:
+      - .env.prod.app
+    ports:
+      - '80'
+    depends_on:
+      - application-server
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost"]
+      interval: 1m30s
+      timeout: 10s
+      retries: 3
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "50m"
+        max-file: "5"
+
+  application-server:
+    image: "ghcr.io/ls1intum/hephaestus/application-server:${IMAGE_TAG}"
+    ports:
+      - '8080'
+    environment:
+      SPRING_PROFILES_ACTIVE: prod
+      DATABASE_URL: postgresql://postgres:5432/hephaestus
+      DATABASE_USERNAME: root
+      DATABASE_PASSWORD: root
+      INTELLIGENCE_SERVICE_URL: http://intelligence-service:5000
+      SECURITY_USER_NAME: ${SECURITY_USER_NAME}
+      SECURITY_USER_PASSWORD: ${SECURITY_USER_NAME}
+    env_file:
+      - .env.prod.app
+    depends_on:
+      - postgres
+    networks:
+      - app-network
+    healthcheck:
+      test: "wget -qO- http://localhost:8080/actuator/health || exit 1"
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
+
+  intelligence-service:
+    image: "ghcr.io/ls1intum/hephaestus/intelligence-service:${IMAGE_TAG}"
+    environment:
+      DATABASE_URL: postgresql://postgres:5432/hephaestus
+      DATABASE_USERNAME: root
+      DATABASE_PASSWORD: root
+      # Either OPENAI_API_KEY or AZURE_OPENAI_API_KEY must be set
+      OPENAI_API_KEY: ${OPENAI_API_KEY}
+      AZURE_OPENAI_API_KEY: ${AZURE_OPENAI_API_KEY}
+      AZURE_OPENAI_ENDPOINT: ${AZURE_OPENAI_ENDPOINT}
+      AZURE_OPENAI_API_VERSION: ${AZURE_OPENAI_API_VERSION}
+    env_file:
+      - .env.prod.app
+    depends_on:
+      - postgres
+    networks:
+      - app-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 3s
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  postgres:
+    image: 'postgres:16'
+    environment:
+      - POSTGRES_DB=hephaestus
+      - POSTGRES_PASSWORD=root
+      - POSTGRES_USER=root
+    ports:
+      - '5432'
+    networks:
+      app-network:
+        aliases:
+          - postgres
+    volumes:
+      - postgresql-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+networks:
+  app-network:
+    driver: bridge`
+
+volumes:
+  postgresql-data:
