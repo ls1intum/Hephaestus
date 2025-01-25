@@ -20,7 +20,7 @@ jobs:
   build-webapp:
     uses: ls1intum/.github/.github/workflows/build-and-push-docker-image.yml@main
     with:
-      image-name: ls1intum/Hephaestus/webapp
+      image-name: ls1intum/hephaestus/webapp
       docker-file: ./webapp/Dockerfile
       docker-context: ./webapp
     secrets: inherit
@@ -28,7 +28,7 @@ jobs:
   build-intelligence-service:
     uses: ls1intum/.github/.github/workflows/build-and-push-docker-image.yml@main
     with:
-      image-name: ls1intum/Hephaestus/intelligence-service
+      image-name: ls1intum/hephaestus/intelligence-service
       docker-file: ./server/intelligence-service/Dockerfile
       docker-context: ./server/intelligence-service
     secrets: inherit
@@ -36,7 +36,7 @@ jobs:
   build-webhook-ingest:
     uses: ls1intum/.github/.github/workflows/build-and-push-docker-image.yml@main
     with:
-      image-name: ls1intum/Hephaestus/webhook-ingest
+      image-name: ls1intum/hephaestus/webhook-ingest
       docker-file: ./server/webhook-ingest/Dockerfile
       docker-context: ./server/webhook-ingest
     secrets: inherit
@@ -44,7 +44,7 @@ jobs:
   build-application-server:
     uses: ls1intum/.github/.github/workflows/build-and-push-docker-image.yml@main
     with:
-      image-name: ls1intum/Hephaestus/application-server
+      image-name: ls1intum/hephaestus/application-server
       docker-file: ./server/application-server/Dockerfile
       docker-context: ./server/application-server
     secrets: inherit
