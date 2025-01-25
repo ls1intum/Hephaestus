@@ -49,6 +49,16 @@ validate_env_vars() {
   fi
 }
 
+# Function to escape single quotes and backslashes
+escape_js_string() {
+  local input="$1"
+  # Escape backslashes first
+  input="${input//\\/\\\\}"
+  # Escape single quotes
+  input="${input//\'/\\\'}"
+  echo "$input"
+}
+
 # Function to replace placeholders with actual environment variable values
 replace_vars() {
   local placeholder="$1"
@@ -58,11 +68,11 @@ replace_vars() {
   # Log the substitution process
   log "🔄 Replacing placeholder '${placeholder}' with environment variable '${env_var}' value..."
 
-  # Use Perl's quotemeta to escape special characters
+  # Escape single quotes and backslashes
   local escaped_value
-  escaped_value=$(perl -e 'print quotemeta($ARGV[0]);' "$value")
+  escaped_value=$(escape_js_string "$value")
 
-  # Perform in-place substitution
+  # Perform in-place substitution using Perl
   find "${BUILD_DIR}" -type f \( -name "*.js" -o -name "*.html" -o -name "*.css" \) -exec grep -Il "${placeholder}" {} \; | while read -r file; do
     perl -pi -e "s/${placeholder}/${escaped_value}/g" "$file"
     log "✅ Replaced '${placeholder}' in '${file}'"
