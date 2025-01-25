@@ -52,8 +52,12 @@ components:
         session_id:
           title: Session Id
           type: string
+        user_id:
+          title: User Id
+          type: string
       required:
       - session_id
+      - user_id
       - previous_session_id
       - dev_progress
       title: MentorStartRequest

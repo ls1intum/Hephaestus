@@ -14,6 +14,7 @@ Analyze the conversation and choose ONE of these actions:
 
 2. IF you have already asked about the status update:
    - Ask if there are any other completed tasks or progress to share
+   - IF previous promises are provided: ({previous_promises}), and you HAVE NOT refernced some of those yet, ask about these specific promises in your question
    - Continue this until the student indicates they have nothing more to share
 
 STRICT REQUIREMENTS:
@@ -31,7 +32,7 @@ FORMAT:
 - Ask your question directly
 - If referencing previous promises, be specific about which ones
 
-Example responses:
+Example responses (NOTE: you do not need to ask these exact questions, but they may help you to understand the concept):
 - What have you accomplished on your project this week? 
-- Last week you mentioned plans to (use one of the [{previous_promises}]) - how did that progress?
+- During our previous session you mentioned plans to (use one of the [{previous_promises}]) - how did that progress?
 - Could you share any other progress you've made on the project that you haven't mentioned yet?

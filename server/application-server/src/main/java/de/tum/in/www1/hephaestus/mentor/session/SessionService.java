@@ -49,13 +49,13 @@ public class SessionService {
 
     @Transactional
     public SessionDTO createSession(User user) {
-        String previous_session_id = sessionRepository
+        String previousSessionId = sessionRepository
             .findFirstByUserOrderByCreatedAtDesc(user)
             .map(Session::getId)
             .map(String::valueOf)
             .orElse("");
         // close the previous session if it exists to prevent multiple open sessions
-        if (previous_session_id != "") {
+        if (previousSessionId != "") {
             Session previous_session = sessionRepository.findFirstByUserOrderByCreatedAtDesc(user).get();
             previous_session.setClosed(true);
             sessionRepository.save(previous_session);
@@ -77,7 +77,7 @@ public class SessionService {
         Session session = new Session();
         session.setUser(user);
         Session savedSession = sessionRepository.save(session);
-        messageService.sendFirstMessage(session, previous_session_id, devProgress);
+        messageService.sendFirstMessage(session, previousSessionId, devProgress);
         return SessionDTO.fromSession(savedSession);
     }
 

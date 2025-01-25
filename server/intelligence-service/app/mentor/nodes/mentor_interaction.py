@@ -1,10 +1,9 @@
-from .state import State
+from ..state import State
 from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
-from ..model import model
+from ...model import model
 from uuid import uuid4
-from langchain_core.runnables.config import RunnableConfig
 from langgraph.store.base import BaseStore
-from .prompt_loader import PromptLoader
+from ..prompt_loader import PromptLoader
 
 prompt_loader = PromptLoader()
 persona_prompt = prompt_loader.get_prompt(type="mentor", name="persona")
@@ -163,3 +162,17 @@ def ask_goals(state: State):
     )
     chain = prompt | model
     return {"messages": [chain.invoke({"messages": state["messages"]})]}
+
+# generate responses after the user has finished the project update
+def talk_to_mentor(state: State):
+    prompt = ChatPromptTemplate(
+        [
+            ("system", persona_prompt),
+            MessagesPlaceholder("messages"),
+        ]
+    )
+    chain = prompt | model
+    return {"messages": [chain.invoke({"messages": state["messages"]})]}
+
+def reflect_goals(state: State):
+    pass
