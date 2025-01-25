@@ -52,16 +52,8 @@ validate_env_vars() {
 # Function to escape characters for safe JavaScript string insertion
 escape_js_string() {
   local input="$1"
-  # Escape backslashes first
-  input="${input//\\/\\\\}"
-  # Escape single quotes
-  input="${input//\'/\\\'}"
   # Escape double quotes
-  input="${input//\"/\\\"}"
-  # Escape newlines and carriage returns
-  input="${input//$'\n'/\\n}"
-  input="${input//$'\r'/\\r}"
-
+  input="${input//\"/\\\\\"}"
   echo "$input"
 }
 
@@ -77,13 +69,15 @@ replace_vars() {
   # Escape characters for safe JavaScript insertion
   local escaped_value
   escaped_value=$(escape_js_string "$value")
-  # Escape characters that might interfere with sed/perl
-  escaped_value=$(printf '%s' "$escaped_value" | sed 's/[&/\]/\\&/g')
 
-  # Perform in-place substitution using Perl with a different delimiter to avoid conflicts
-  # Using '|' as the delimiter
+  # Iterate over each relevant file and perform substitution with awk
   find "${BUILD_DIR}" -type f \( -name "*.js" -o -name "*.html" -o -name "*.css" \) -exec grep -Il "${placeholder}" {} \; | while read -r file; do
-    perl -pi -e "s|${placeholder}|${escaped_value}|g" "$file"
+    awk -v placeholder="$placeholder" -v replacement="$escaped_value" '
+      {
+        gsub(placeholder, replacement)
+      }
+      { print }
+    ' "$file" > "${file}.tmp" && mv "${file}.tmp" "$file"
     log "✅ Replaced '${placeholder}' in '${file}'"
   done
 }
