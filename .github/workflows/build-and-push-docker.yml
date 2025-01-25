@@ -44,7 +44,8 @@ jobs:
             dockerfile: ./server/webhook-ingest/Dockerfile
             image: ghcr.io/ls1intum/hephaestus/webhook-ingest
             context: ./server/webhook-ingest
-    uses: ls1intum/.github/.github/workflows/build-and-push-docker-image.yml@main
+    # Uses https://github.com/ls1intum/.github/pull/16/commits/a35192af6c834a72cb12fe6b772c0cfb70b45eae
+    uses: ls1intum/.github/.github/workflows/build-and-push-docker-image.yml@feat/minor-build-improvements
     with:
       image-name: ${{ matrix.image }}
       docker-file: ${{ matrix.dockerfile }}
