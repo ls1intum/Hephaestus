@@ -11,7 +11,7 @@ on:
     - 'docs/**'
     - 'keycloakify/**'
     - '.github/**'
-    - '!.github/workflows/build-and-push-docker-image.yml'
+    - '!.github/workflows/build-and-push-docker.yml'
   push:
     branches:
       - develop
