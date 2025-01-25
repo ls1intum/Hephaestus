@@ -69,3 +69,4 @@ jobs:
       image-tag: ${{ inputs.image-tag }}
       env-file-name: .env.prod.app
       env-secrets-and-variables: ${{ needs.read-environment.outputs.env }}
+    secrets: inherit
