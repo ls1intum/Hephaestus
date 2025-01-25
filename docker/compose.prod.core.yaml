@@ -27,6 +27,10 @@ services:
         max-size: "10m"
         max-file: "3"
 
+  keycloak:
+    image: keycloak
+    # TODO: !!!
+
   nats-server:
     image: nats:alpine
     ports:
