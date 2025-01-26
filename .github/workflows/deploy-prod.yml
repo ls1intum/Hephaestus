@@ -17,7 +17,7 @@ on:
 
 jobs:  
   deploy-app:
-    if: ${{ github.event.inputs.deploy-app == true }}
+    if: ${{ github.event.inputs.deploy-app }}
     uses: ls1intum/.github/.github/workflows/deploy-docker-compose.yml@deployment-workflow
     with:
       environment: Production
@@ -28,7 +28,7 @@ jobs:
     secrets: inherit
   
   deploy-core:
-    if: ${{ github.event.inputs.deploy-core == true }}
+    if: ${{ github.event.inputs.deploy-core }}
     #TODO: Implement deployment of core
     runs-on: ubuntu-latest
     steps:
