@@ -1,4 +1,4 @@
-name: Deploy to Production (App)
+name: Deploy to Production
 
 on:
   workflow_dispatch:
@@ -6,61 +6,69 @@ on:
       image-tag:
         type: string
         description: "Image tag to deploy (default: pr-<number> if PR exists, latest for default branch)"
+      deploy-app:
+        type: boolean
+        default: true
+        description: (Re-)deploys the app components
+      deploy-core:
+        default: false
+        type: boolean
+        description: (Re-)deploys NATS, Keycloak, Webhook Inject is usually not necessary and might cause data gaps.
 
 jobs:  
-  read-environment:
-    runs-on: ubuntu-latest
-    environment: Production
-    outputs:
-      env: |
-        APPLICATION_CLIENT_URL=${{ vars.APPLICATION_CLIENT_URL }}
-        APPLICATION_SERVER_URL=${{ vars.APPLICATION_SERVER_URL }}
-        KEYCLOAK_URL=${{ vars.KEYCLOAK_URL }}
-        KEYCLOAK_REALM=${{ vars.KEYCLOAK_REALM }}
-        KEYCLOAK_CLIENT_ID=${{ vars.KEYCLOAK_CLIENT_ID }}
+  # read-environment:
+  #   runs-on: ubuntu-latest
+  #   environment: Production
+  #   outputs:
+  #     env: |
+  #       APPLICATION_CLIENT_URL=${{ vars.APPLICATION_CLIENT_URL }}
+  #       APPLICATION_SERVER_URL=${{ vars.APPLICATION_SERVER_URL }}
+  #       KEYCLOAK_URL=${{ vars.KEYCLOAK_URL }}
+  #       KEYCLOAK_REALM=${{ vars.KEYCLOAK_REALM }}
+  #       KEYCLOAK_CLIENT_ID=${{ vars.KEYCLOAK_CLIENT_ID }}
         
-        # Webapp
-        KEYCLOAK_SKIP_LOGIN=${{ vars.KEYCLOAK_SKIP_LOGIN }}
-        LEGAL_IMPRINT_HTML=${{ vars.LEGAL_IMPRINT_HTML }}
-        LEGAL_PRIVACY_HTML=${{ vars.LEGAL_PRIVACY_HTML }}
-        SENTRY_ENVIRONMENT=${{ vars.SENTRY_ENVIRONMENT }}
-        SENTRY_DSN=${{ vars.SENTRY_DSN }}
-        UMAMI_ENABLED=${{ vars.UMAMI_ENABLED }}
-        UMAMI_SCRIPT_URL=${{ vars.UMAMI_SCRIPT_URL }}
-        UMAMI_WEBSITE_ID=${{ vars.UMAMI_WEBSITE_ID }}
-        UMAMI_DOMAINS=${{ vars.UMAMI_DOMAINS }}
+  #       # Webapp
+  #       KEYCLOAK_SKIP_LOGIN=${{ vars.KEYCLOAK_SKIP_LOGIN }}
+  #       LEGAL_IMPRINT_HTML=${{ vars.LEGAL_IMPRINT_HTML }}
+  #       LEGAL_PRIVACY_HTML=${{ vars.LEGAL_PRIVACY_HTML }}
+  #       SENTRY_ENVIRONMENT=${{ vars.SENTRY_ENVIRONMENT }}
+  #       SENTRY_DSN=${{ vars.SENTRY_DSN }}
+  #       UMAMI_ENABLED=${{ vars.UMAMI_ENABLED }}
+  #       UMAMI_SCRIPT_URL=${{ vars.UMAMI_SCRIPT_URL }}
+  #       UMAMI_WEBSITE_ID=${{ vars.UMAMI_WEBSITE_ID }}
+  #       UMAMI_DOMAINS=${{ vars.UMAMI_DOMAINS }}
         
-        # Application Server
-        NATS_SERVER_URL=${{ secrets.NATS_SERVER_URL }}
-        KEYCLOAK_CLIENT_SECRET=${{ secrets.KEYCLOAK_CLIENT_SECRET }}
-        GITHUB_AUTH_TOKEN=${{ secrets.GH_AUTH_TOKEN }}
-        SLACK_BOT_TOKEN=${{ secrets.SLACK_BOT_TOKEN }}
-        SLACK_SIGNING_SECRET=${{ secrets.SLACK_SIGNING_SECRET }}
+  #       # Application Server
+  #       NATS_SERVER_URL=${{ secrets.NATS_SERVER_URL }}
+  #       KEYCLOAK_CLIENT_SECRET=${{ secrets.KEYCLOAK_CLIENT_SECRET }}
+  #       GITHUB_AUTH_TOKEN=${{ secrets.GH_AUTH_TOKEN }}
+  #       SLACK_BOT_TOKEN=${{ secrets.SLACK_BOT_TOKEN }}
+  #       SLACK_SIGNING_SECRET=${{ secrets.SLACK_SIGNING_SECRET }}
 
-        NATS_ENABLED=${{ vars.NATS_ENABLED }}
-        NATS_DURABLE_CONSUMER_NAME=${{ vars.NATS_DURABLE_CONSUMER_NAME }}
-        MONITORING_TIMEFRAME=${{ vars.MONITORING_TIMEFRAME }}
-        MONITORING_RUN_ON_STARTUP=${{ vars.MONITORING_RUN_ON_STARTUP }}
-        MONITORING_SYNC_CRON=${{ vars.MONITORING_SYNC_CRON }}
-        MONITORING_SYNC_COOLDOWN_IN_MINUTES=${{ vars.MONITORING_SYNC_COOLDOWN_IN_MINUTES }}
-        MONITORING_SYNC_ALL_ISSUES_AND_PULL_REQUESTS=${{ vars.MONITORING_SYNC_ALL_ISSUES_AND_PULL_REQUESTS }}
-        LEADERBOARD_SCHEDULE_DAY=${{ vars.LEADERBOARD_SCHEDULE_DAY }}
-        LEADERBOARD_SCHEDULE_TIME=${{ vars.LEADERBOARD_SCHEDULE_TIME }}
-        LEADERBOARD_NOTIFICATION_ENABLED=${{ vars.LEADERBOARD_NOTIFICATION_ENABLED }}
-        LEADERBOARD_NOTIFICATION_CHANNEL_ID=${{ vars.LEADERBOARD_NOTIFICATION_CHANNEL_ID }}
+  #       NATS_ENABLED=${{ vars.NATS_ENABLED }}
+  #       NATS_DURABLE_CONSUMER_NAME=${{ vars.NATS_DURABLE_CONSUMER_NAME }}
+  #       MONITORING_TIMEFRAME=${{ vars.MONITORING_TIMEFRAME }}
+  #       MONITORING_RUN_ON_STARTUP=${{ vars.MONITORING_RUN_ON_STARTUP }}
+  #       MONITORING_SYNC_CRON=${{ vars.MONITORING_SYNC_CRON }}
+  #       MONITORING_SYNC_COOLDOWN_IN_MINUTES=${{ vars.MONITORING_SYNC_COOLDOWN_IN_MINUTES }}
+  #       MONITORING_SYNC_ALL_ISSUES_AND_PULL_REQUESTS=${{ vars.MONITORING_SYNC_ALL_ISSUES_AND_PULL_REQUESTS }}
+  #       LEADERBOARD_SCHEDULE_DAY=${{ vars.LEADERBOARD_SCHEDULE_DAY }}
+  #       LEADERBOARD_SCHEDULE_TIME=${{ vars.LEADERBOARD_SCHEDULE_TIME }}
+  #       LEADERBOARD_NOTIFICATION_ENABLED=${{ vars.LEADERBOARD_NOTIFICATION_ENABLED }}
+  #       LEADERBOARD_NOTIFICATION_CHANNEL_ID=${{ vars.LEADERBOARD_NOTIFICATION_CHANNEL_ID }}
         
-        # Intelligence Service 
-        OPENAI_API_KEY=${{ secrets.OPENAI_API_KEY }}
-        AZURE_OPENAI_API_KEY=${{ secrets.AZURE_OPENAI_API_KEY }}
+  #       # Intelligence Service 
+  #       OPENAI_API_KEY=${{ secrets.OPENAI_API_KEY }}
+  #       AZURE_OPENAI_API_KEY=${{ secrets.AZURE_OPENAI_API_KEY }}
 
-        AZURE_OPENAI_ENDPOINT=${{ vars.AZURE_OPENAI_ENDPOINT }}
-        AZURE_OPENAI_API_VERSION=${{ vars.AZURE_OPENAI_API_VERSION }}
-    steps:
-      - name: Do nothing
-        run: echo "Nothing to do here"
+  #       AZURE_OPENAI_ENDPOINT=${{ vars.AZURE_OPENAI_ENDPOINT }}
+  #       AZURE_OPENAI_API_VERSION=${{ vars.AZURE_OPENAI_API_VERSION }}
+  #   steps:
+  #     - name: Do nothing
+  #       run: echo "Nothing to do here"
 
   deploy:
-    needs: read-environment
+    # needs: read-environment
     uses: ls1intum/.github/.github/workflows/deploy-docker-compose.yml@deployment-workflow
     with:
       environment: Production
@@ -68,5 +76,11 @@ jobs:
       main-image-name: ls1intum/hephaestus/application-server
       image-tag: ${{ inputs.image-tag }}
       env-file-name: .env.prod.app
-      env-secrets-and-variables: ${{ needs.read-environment.outputs.env }}
+      github-env-secret-names: |
+        NATS_SERVER_URL
+        KEYCLOAK_CLIENT_SECRET  
+      github-env-variable-names: |
+        APPLICATION_CLIENT_URL
+        APPLICATION_SERVER_URL
+      # env-secrets-and-variables: ${{ needs.read-environment.outputs.env }}
     secrets: inherit
