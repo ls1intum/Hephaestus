@@ -16,7 +16,8 @@ on:
         description: (Re-)deploys NATS, Keycloak, Webhook Inject is usually not necessary and might cause data gaps.
 
 jobs:  
-  deploy:
+  deploy-app:
+    if: ${{ github.event.inputs.deploy-app == true }}
     uses: ls1intum/.github/.github/workflows/deploy-docker-compose.yml@deployment-workflow
     with:
       environment: Production
@@ -25,3 +26,11 @@ jobs:
       image-tag: ${{ inputs.image-tag }}
       env-file-name: .env.prod.app
     secrets: inherit
+  
+  deploy-core:
+    if: ${{ github.event.inputs.deploy-core == true }}
+    #TODO: Implement deployment of core
+    runs-on: ubuntu-latest
+    steps:
+      - name: TODO
+        run: echo "TODO - Implement deployment of core"
