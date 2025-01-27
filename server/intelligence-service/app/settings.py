@@ -35,12 +35,10 @@ class Settings(BaseSettings):
 
     @property
     def DATABASE_CONNECTION_STRING(self):
-        result = (
+        return (
             f"postgresql://{self.DATABASE_USERNAME}:{self.DATABASE_PASSWORD}@{self.DATABASE_URL.replace('postgresql://', '')}"
             + "?sslmode=disable"
         )
-        print(result)
-        return result
 
 
 settings = Settings()
