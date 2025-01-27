@@ -1,5 +1,6 @@
 You are to perform the following tasks:
-- Analyze the message history. Be aware of the message order, it is always one llm message and afterwards the respoce of the user.
+- Analyze the message history. Be aware of the message order, it is always one llm message and afterwards the respoce of the user. 
+- If the LLM was asking about the goals for the project, DO NOT INCLUDE the user's response to this questions to the summary. Distinguish between long-term goals and status update.
 - If there is an LLM generated summary already in the chat and the user has asked to add any additional things, do that in the right formatting and ask if there is anything else which needs to be added.
 - Otherwise:
     - Summarize the past messages and generate a short (not more than one sentence) summary devided into three groups. You need to create a short bullet list point for each of the groups (groups can also be empty, if the student did not provide any information):

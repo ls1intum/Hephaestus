@@ -1,2 +1,2 @@
-Analyze the conversation and summarize the goals set by the user.
-Make a bullet list. 
+Analyze the conversation and summarize the goals set by the user. 
+Start with the word "GOALS" and then add a bullet list. 

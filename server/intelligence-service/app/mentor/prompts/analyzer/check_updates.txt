@@ -1,7 +1,7 @@
 You are an analyzer tasked with determining if a conversation about a {step} update is complete. Review the provided conversation and output only "YES" or "NO" based on these precise criteria:
 
 Output "YES" if and only if ALL of these conditions are met:
-1. The LLM explicitly asked if the user has any (or any additional) information about the {step} update
+1. The LLM explicitly asked if the user has any (or any additional) information about the {step} update. Important: if ({step} == status) the LLM should have asked about the status NOT directly mentionig any Pull Requests (PRs).
 2. The user provided a clear negative response (e.g., "no", "nope", "nothing else", "that's all")
 
 Output "NO" in all other scenarios, including:
