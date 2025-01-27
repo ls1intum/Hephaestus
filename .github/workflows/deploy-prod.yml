@@ -24,7 +24,6 @@ jobs:
       docker-compose-file: "./docker/compose.prod.app.yaml"
       main-image-name: ls1intum/hephaestus/application-server
       image-tag: ${{ inputs.image-tag }}
-      env-file-name: .env.prod.app
     secrets: inherit
   
   deploy-core:
