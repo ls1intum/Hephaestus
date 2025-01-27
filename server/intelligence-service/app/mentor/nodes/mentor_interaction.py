@@ -8,6 +8,7 @@ from ..prompt_loader import PromptLoader
 prompt_loader = PromptLoader()
 persona_prompt = prompt_loader.get_prompt(type="mentor", name="persona")
 
+
 def greet(state: State):
     prompt = ChatPromptTemplate(
         [
@@ -102,7 +103,12 @@ def ask_impediments(state: State, store: BaseStore):
                 (
                     prompt_loader.get_prompt(
                         type="mentor", name="impediments"
-                    ).format_map({"previous_impediments": previous_impediments, "dev_progress": progress})
+                    ).format_map(
+                        {
+                            "previous_impediments": previous_impediments,
+                            "dev_progress": progress,
+                        }
+                    )
                 ),
             ),
             MessagesPlaceholder("messages"),
@@ -148,20 +154,11 @@ def finish(state: State):
     chain = prompt | model
     return {
         "messages": [chain.invoke({"messages": state["messages"]})],
-        "finish": True,
+        "finish": False,
         "closed": True,
+        "mentor_node": True,
     }
 
-def ask_goals(state: State):
-    prompt = ChatPromptTemplate(
-        [
-            ("system", persona_prompt),
-            ("system", prompt_loader.get_prompt(type="mentor", name="goal_setting")),
-            MessagesPlaceholder("messages"),
-        ]
-    )
-    chain = prompt | model
-    return {"messages": [chain.invoke({"messages": state["messages"]})]}
 
 # generate responses after the user has finished the project update
 def talk_to_mentor(state: State):
@@ -174,5 +171,45 @@ def talk_to_mentor(state: State):
     chain = prompt | model
     return {"messages": [chain.invoke({"messages": state["messages"]})]}
 
-def reflect_goals(state: State):
-    pass
+
+
+def ask_goals(state: State):
+    prompt = ChatPromptTemplate(
+        [
+            ("system", persona_prompt),
+            ("system", prompt_loader.get_prompt(type="mentor", name="goal_setting")),
+            MessagesPlaceholder("messages"),
+        ]
+    )
+    chain = prompt | model
+    response = chain.invoke({"messages": state["messages"]}).content
+    print("\nset_goals", response, "\n")
+
+    return {"messages": [response]}
+
+# TODO: implement the store connection
+def reflect_goals(state: State, store: BaseStore):
+    user_id = state["user_id"]
+    namespace = (user_id, "goals")
+    goals = store.search(namespace)
+    if not goals:
+        goals = ""
+    else:
+        for item in goals:
+            if "goal_list" in item.value:
+                goals = item.value["goal_list"]
+
+    prompt = ChatPromptTemplate(
+        [
+            ("system", persona_prompt),
+            ("system", prompt_loader.get_prompt(type="mentor", name="goal_reflection").format_map(
+                    {"goals": goals}
+                ),),
+            MessagesPlaceholder("messages"),
+        ]
+    )
+    chain = prompt | model
+    response = chain.invoke({"messages": state["messages"]}).content
+    print("\nadjust_goals", response, "\n")
+
+    return {"messages": [response]}

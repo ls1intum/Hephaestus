@@ -82,6 +82,7 @@ public class MessageService {
             mentorStartRequest.setPreviousSessionId(previousSessionId);
             mentorStartRequest.setSessionId(String.valueOf(session.getId()));
             mentorStartRequest.setDevProgress(devProgress);
+            mentorStartRequest.setUserId(Long.toString(session.getUser().getId()));
             MentorResponse mentorMessage = intelligenceServiceApi.startMentorStartPost(mentorStartRequest);
             createMentorMessage(session, mentorMessage.getContent());
         } catch (Exception e) {

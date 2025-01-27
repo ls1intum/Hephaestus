@@ -14,7 +14,7 @@ from .conditions import (
     goal_reflection_router,
     goal_setting_router,
 )
-from .nodes.memory_updates import update_memory, save_goals, adjust_goals
+from .nodes.memory_updates import update_memory, set_goals, adjust_goals
 from .nodes.state_updates import check_state, check_goals, check_goal_reflection
 from .nodes.mentor_interaction import (
     greet,
@@ -58,13 +58,15 @@ graph_builder.add_edge("check_goal_reflection", check_goal_reflection)
 
 # memory nodes: update the long-term memory of the mentor
 graph_builder.add_node("update_memory", update_memory)
-graph_builder.add_edge("save_goals", save_goals)
+graph_builder.add_edge("set_goals", set_goals)
 graph_builder.add_edge("adjust_goals", adjust_goals)
 
 graph_builder.add_conditional_edges(START, start_router)
 graph_builder.add_conditional_edges("check_state", main_router)
 graph_builder.add_conditional_edges("check_goals", goal_setting_router)
 graph_builder.add_conditional_edges("check_goal_reflection", goal_reflection_router)
+graph_builder.add_conditional_edges("set_goals", main_router)
+graph_builder.add_conditional_edges("adjust_goals", main_router)
 
 graph_builder.add_edge("greeting", END)
 graph_builder.add_edge("development_node", END)
@@ -72,18 +74,11 @@ graph_builder.add_edge("status_node", END)
 graph_builder.add_edge("impediments_node", END)
 graph_builder.add_edge("promises_node", END)
 graph_builder.add_edge("summary_node", END)
-graph_builder.add_edge("adjust_goals", END)
-graph_builder.add_edge("save_goals", END)
 graph_builder.add_edge("update_memory", END)
 graph_builder.add_edge("mentor_node", END)
-
+graph_builder.add_edge("goal_setting_node", END)
+graph_builder.add_edge("goal_reflection_node", END)
 graph_builder.add_edge("finish_node", "update_memory")
-# Test out
-# graph_builder.add_edge("save_goals", "check_state") # could also be main_router direct most probably
-# graph_builder.add_edge("goal_setting_node", "check_goals")
-
-graph_builder.add_conditional_edges("save_goals", main_router)
-graph_builder.add_conditional_edges("adjust_goals", main_router)
 
 
 def start_session(last_thread: str, user_id: str, dev_progress: str, config):

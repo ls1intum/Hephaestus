@@ -35,14 +35,16 @@ def update_memory(state: State, config: RunnableConfig, *, store: BaseStore):
     return
 
 
-def save_goals(state: State, config: RunnableConfig, *, store: BaseStore):
+def set_goals(state: State, config: RunnableConfig, *, store: BaseStore):
     user_id = state["user_id"]
     namespace = (user_id, "goals")
+
+
     prompt = ChatPromptTemplate(
         [
             (
                 "system",
-                prompt_loader.get_prompt(type="analyzer", name="update_memory"),
+                prompt_loader.get_prompt(type="analyzer", name="set_goals"),
             ),
             MessagesPlaceholder("messages"),
         ]
@@ -50,14 +52,14 @@ def save_goals(state: State, config: RunnableConfig, *, store: BaseStore):
 
     chain = prompt | model
     response = chain.invoke({"messages": state["messages"]}).content
-    store.put(namespace, key=str(uuid4()), value={step: response})
-
-    return
+    print("\nset_goals", response, "\n")
+    store.put(namespace, key=str(uuid4()), value={"goal_list": response})
+    return 
 
 def adjust_goals(state: State, config: RunnableConfig, *, store: BaseStore):
     user_id = state["user_id"]
-    # find a goal -> re-write it 
     namespace = (user_id, "goals")
+
     prompt = ChatPromptTemplate(
         [
             (
@@ -70,6 +72,7 @@ def adjust_goals(state: State, config: RunnableConfig, *, store: BaseStore):
 
     chain = prompt | model
     response = chain.invoke({"messages": state["messages"]}).content
-    store.put(namespace, key=str(uuid4()), value={step: response})
+    print("\nadjust_goals", response, "\n")
+    store.put(namespace, key=str(uuid4()), value={"goal_list": response})
 
     return

@@ -1,0 +1,3 @@
+Analyze the current set of goals defined by the user: {goals}.
+Alalyze the conversation and update the list of the goals.
+Make a bullet list.

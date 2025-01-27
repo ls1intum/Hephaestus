@@ -1,5 +1,4 @@
 from .state import State
-from langgraph.graph import END
 
 
 def start_router(state: State):
@@ -10,11 +9,7 @@ def start_router(state: State):
 
 def main_router(state: State):
     if state["goal_setting"]:
-        return "goal_setting_node"
-    elif state["update_reflection"]:
-        return "update_reflection_node"
-    elif state["goal_setting"]:
-        return "goal_setting_node"
+        return "check_goals"
     elif state["development"]:
         return "development_node"
     elif state["status"]:
@@ -26,16 +21,18 @@ def main_router(state: State):
     elif state["summary"]:
         return "summary_node"
     elif state["goal_reflection"]:
-        return "goal_reflection_node"
+        return "check_goal_reflection"
     else:  # state["finish"]
         return "finish_node"
 
 def goal_setting_router(state: State):
-    if state["save_goals"]:
-        return "save_goals"
-    return END
+    # check_goals updated the state and finished the goal setting
+    if not state["goal_setting"]:
+        return "set_goals"
+    return "goal_setting_node"
 
 def goal_reflection_router(state: State):
-    if state["adjust_goals"]:
+    # check_goal_reflection updated the state and finished the goal reflection
+    if not state["adjust_goals"]:
         return "adjust_goals"
-    return END
+    return "goal_reflection_node"

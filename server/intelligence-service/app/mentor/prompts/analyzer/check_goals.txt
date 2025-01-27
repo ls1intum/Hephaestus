@@ -1,18 +1,17 @@
-You are an analyzer tasked with determining if a conversation about a {step} update is complete. Review the provided conversation and output only "YES" or "NO" based on these precise criteria:
+You are an analyzer tasked with determining if the user has shared all the goals they set for their software engineering project. Review the provided conversation and output only "YES" or "NO" based on these precise criteria:
 
 Output "YES" if and only if ALL of these conditions are met:
-1. The LLM explicitly asked if the user has any (or any additional) information about the {step} update
-2. The user provided a clear negative response (e.g., "no", "nope", "nothing else", "that's all")
+1. The LLM explicitly asked about the user's goals while working o the current software engineering project.
+2. The user provided a clear negative response, when asked whether there are any other goals they want to add or share. (e.g., "no", "nope", "nothing else", "that's all")
 
 Output "NO" in all other scenarios, including:
 - If the LLM didn't explicitly ask about additional information
 - If the user's response was ambiguous or implicit
 - If the user didn't directly answer the LLM's question
-- If there was no clear conclusion to the {step} discussion
+- If there was no clear conclusion to the goal discussion
+- If the user has told they do not have any goals 
 
 Response Requirements:
 1. Respond ONLY with "YES" or "NO"
 2. No additional text, explanation, or formatting
 3. Case-sensitive response (all capitals)
-
-# Construction site #######################
