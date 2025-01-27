@@ -54,20 +54,20 @@ public class SessionService {
             .map(Session::getId)
             .map(String::valueOf)
             .orElse("");
-        // close the previous session if it exists to prevent multiple open sessions
+        // Close the previous session if it exists to prevent multiple open sessions
         if (previousSessionId != "") {
-            Session previous_session = sessionRepository.findFirstByUserOrderByCreatedAtDesc(user).get();
-            previous_session.setClosed(true);
-            sessionRepository.save(previous_session);
+            Session previousSession = sessionRepository.findFirstByUserOrderByCreatedAtDesc(user).get();
+            previousSession.setClosed(true);
+            sessionRepository.save(previousSession);
         }
 
-        // get the last sprints's PRs
+        // Get the last time interval's PRs
         List<PullRequestBaseInfoDTO> pullRequests = pullRequestRepository
             .findAssignedByLoginAndStatesUpdatedSince(
                 user.getLogin(),
                 Set.of(Issue.State.OPEN, Issue.State.CLOSED),
                 OffsetDateTime.now().minusDays(7)
-            ) // length ot the sprint is 7 days
+            )
             .stream()
             .map(PullRequestBaseInfoDTO::fromPullRequest)
             .toList();
