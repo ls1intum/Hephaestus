@@ -1,8 +1,7 @@
 from typing import List
 from fastapi import APIRouter
 from pydantic import BaseModel
-
-from app.detector.bad_practice_detector import PullRequestWithBadPractices, PullRequest, Rule, detectbadpractices
+from ..detector.bad_practice_detector import PullRequestWithBadPractices, PullRequest, Rule, detectbadpractices
 
 router = APIRouter(prefix="/detector", tags=["detector"])
 

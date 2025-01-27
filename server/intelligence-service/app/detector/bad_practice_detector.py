@@ -1,16 +1,19 @@
 from typing import List
 
-class PullRequest:
+from pydantic import BaseModel
+
+
+class PullRequest(BaseModel):
     id: str
     title: str
     description: str
 
-class Rule:
+class Rule(BaseModel):
     name: str
     description: str
     bad_practice_id: str
 
-class PullRequestWithBadPractices:
+class PullRequestWithBadPractices(BaseModel):
     pull_request_id: str
     bad_practice_ids: List[str]
 
