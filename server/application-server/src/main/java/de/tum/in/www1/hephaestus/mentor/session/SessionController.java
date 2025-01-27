@@ -26,7 +26,7 @@ public class SessionController {
             return ResponseEntity.notFound().build();
         }
 
-        List<SessionDTO> sessions = sessionService.findAllSessionsByUser(user.get());
+        List<SessionDTO> sessions = sessionService.findAllSessionsByUserByCreatedAtDesc(user.get());
         return ResponseEntity.ok(sessions);
     }
 

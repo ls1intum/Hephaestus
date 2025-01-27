@@ -64,12 +64,18 @@
               class="p-3 px-4 rounded-lg inline-block w-fit"
             >
               @if (getSummary(message) !== null) {
-                <p>{{ getSummary(message)?.text }}</p>
+                <p>{{ getSummary(message)?.response }}</p>
               } @else {
-                <p>{{ message.content }}</p>
+                @if (getPullRequests(message) !== null) {
+                  <p>{{ getPullRequests(message)?.response }}</p>
+                } @else {
+                  <p>{{ message.content }}</p>
+                }
               }
             </div>
-
+            @if (getPullRequests(message) !== null) {
+              <app-prs-overview [pullRequests]="getPullRequests(message)?.development || []"></app-prs-overview>
+            }
             <span class="text-xs text-muted-foreground"> {{ message.sender === Message.SenderEnum.User ? 'You' : 'AI Mentor' }} · {{ message.sentAt | date: 'shortTime' }} </span>
           </div>
         </div>

@@ -43,7 +43,7 @@ public class MessageService {
         }
         Session currentSession = session.get();
 
-        // prevent sending messages to closed sessions
+        // Prevent sending messages to closed sessions
         Session previousSession = sessionRepository
             .findFirstByUserOrderByCreatedAtDesc(currentSession.getUser())
             .orElse(null);
@@ -76,11 +76,12 @@ public class MessageService {
         }
     }
 
-    public void sendFirstMessage(Session session, String previousSessionId) {
+    public void sendFirstMessage(Session session, String previousSessionId, String devProgress) {
         try {
             MentorStartRequest mentorStartRequest = new MentorStartRequest();
             mentorStartRequest.setPreviousSessionId(previousSessionId);
             mentorStartRequest.setSessionId(String.valueOf(session.getId()));
+            mentorStartRequest.setDevProgress(devProgress);
             MentorResponse mentorMessage = intelligenceServiceApi.startMentorStartPost(mentorStartRequest);
             createMentorMessage(session, mentorMessage.getContent());
         } catch (Exception e) {

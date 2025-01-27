@@ -1,4 +1,5 @@
 from .state import State
+from langgraph.graph import END
 
 
 def start_router(state: State):
@@ -8,7 +9,9 @@ def start_router(state: State):
 
 
 def main_router(state: State):
-    if state["status"]:
+    if state["development"]:
+        return "development_node"
+    elif state["status"]:
         return "status_node"
     elif state["impediments"]:
         return "impediments_node"

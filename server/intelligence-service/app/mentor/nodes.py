@@ -15,14 +15,35 @@ def greet(state: State):
         [
             ("system", persona_prompt),
             ("system", prompt_loader.get_prompt(type="mentor", name="greeting")),
-            MessagesPlaceholder("messages"),
         ]
     )
     chain = prompt | model
 
     return {
         "messages": [chain.invoke({"messages": state["messages"]})],
-        "status": True,  # directly update the state to the next step
+        "development": True,  # directly update the state to the next step
+    }
+
+
+def get_dev_progress(state: State):
+    progress = state["dev_progress"]
+    prompt = ChatPromptTemplate(
+        [
+            ("system", persona_prompt),
+            (
+                "system",
+                prompt_loader.get_prompt(type="mentor", name="dev_progress").format_map(
+                    {"progress": progress}
+                ),
+            ),
+        ]
+    )
+    chain = prompt | model
+
+    return {
+        "messages": [chain.invoke({"messages": state["messages"]})],
+        "development": False,
+        "status": True,
     }
 
 
@@ -62,6 +83,7 @@ def ask_status(state: State, store: BaseStore):
 
 def ask_impediments(state: State, store: BaseStore):
     previous_session_id = state["last_thread"]
+    progress = state["dev_progress"]
     previous_impediments = ""
     if state["last_thread"] != "":
         namespace = (previous_session_id, "summary")
@@ -80,7 +102,12 @@ def ask_impediments(state: State, store: BaseStore):
                 (
                     prompt_loader.get_prompt(
                         type="mentor", name="impediments"
-                    ).format_map({"previous_impediments": previous_impediments})
+                    ).format_map(
+                        {
+                            "previous_impediments": previous_impediments,
+                            "dev_progress": progress,
+                        }
+                    )
                 ),
             ),
             MessagesPlaceholder("messages"),
@@ -111,8 +138,7 @@ def ask_summary(state: State):
         ]
     )
     chain = prompt | model
-    response = chain.invoke({"messages": state["messages"]})
-    return {"messages": [response]}
+    return {"messages": [chain.invoke({"messages": state["messages"]})]}
 
 
 def finish(state: State):
@@ -133,6 +159,13 @@ def finish(state: State):
 
 # node responsible for checking the state of the conversation and updating it accordingly
 def check_state(state: State):
+    if state["development"]:
+        # call dev_progress node only if there is development progress to show
+        if state["dev_progress"] == "":
+            return {"development": False, "status": True}
+        else:
+            return
+
     step_order = ["status", "impediments", "promises", "summary", "finish"]
     step = next((key for key in step_order if state.get(key)), None)
     if not step:

@@ -43,6 +43,9 @@ components:
       type: object
     MentorStartRequest:
       properties:
+        dev_progress:
+          title: Dev Progress
+          type: string
         previous_session_id:
           title: Previous Session Id
           type: string
@@ -52,6 +55,7 @@ components:
       required:
       - session_id
       - previous_session_id
+      - dev_progress
       title: MentorStartRequest
       type: object
     ValidationError:

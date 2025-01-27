@@ -1,0 +1,32 @@
+<div hlmCard class="flex gap-2 divide-y-2 flex-col px-5 py-2">
+  @for (pr of pullRequests(); track pr.number) {
+    <div class="flex gap-4 items-center py-1">
+      @if (pr.isDraft) {
+        <a class="flex gap-2 items-center text-github-muted-foreground" [href]="pr.url">
+          <span class="size-4 self-baseline mt-1">
+            <ng-icon [svg]="OctGitPullRequestDraft" size="18" />
+          </span>
+          {{ pr.title }} #{{ pr.number }}
+        </a>
+      } @else {
+        @if (pr.isMerged) {
+          <a class="flex gap-2 items-center text-github-done-foreground" [href]="pr.url">
+            <span class="size-4 self-baseline mt-1">
+              <ng-icon [svg]="OctGitMerge" size="18" />
+            </span>
+            {{ pr.title }} #{{ pr.number }}
+          </a>
+        } @else {
+          @if (pr.state == 'OPEN') {
+            <a class="flex gap-2 items-center text-github-success-foreground" [href]="pr.url">
+              <span class="size-4 self-baseline mt-1">
+                <ng-icon [svg]="OctGitPullRequest" size="18" />
+              </span>
+              {{ pr.title }} #{{ pr.number }}
+            </a>
+          }
+        }
+      }
+    </div>
+  }
+</div>
