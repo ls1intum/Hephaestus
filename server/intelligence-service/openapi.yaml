@@ -1,5 +1,33 @@
 components:
   schemas:
+    DetectorRequest:
+      properties:
+        pull_requests:
+          items:
+            $ref: '#/components/schemas/PullRequest'
+          title: Pull Requests
+          type: array
+        rules:
+          items:
+            $ref: '#/components/schemas/Rule'
+          title: Rules
+          type: array
+      required:
+      - pull_requests
+      - rules
+      title: DetectorRequest
+      type: object
+    DetectorResponse:
+      properties:
+        detectBadPractices:
+          items:
+            $ref: '#/components/schemas/PullRequestWithBadPractices'
+          title: Detectbadpractices
+          type: array
+      required:
+      - detectBadPractices
+      title: DetectorResponse
+      type: object
     HTTPValidationError:
       properties:
         detail:
@@ -58,6 +86,55 @@ components:
       - dev_progress
       title: MentorStartRequest
       type: object
+    PullRequest:
+      properties:
+        description:
+          title: Description
+          type: string
+        id:
+          title: Id
+          type: string
+        title:
+          title: Title
+          type: string
+      required:
+      - id
+      - title
+      - description
+      title: PullRequest
+      type: object
+    PullRequestWithBadPractices:
+      properties:
+        bad_practice_ids:
+          items:
+            type: string
+          title: Bad Practice Ids
+          type: array
+        pull_request_id:
+          title: Pull Request Id
+          type: string
+      required:
+      - pull_request_id
+      - bad_practice_ids
+      title: PullRequestWithBadPractices
+      type: object
+    Rule:
+      properties:
+        bad_practice_id:
+          title: Bad Practice Id
+          type: string
+        description:
+          title: Description
+          type: string
+        name:
+          title: Name
+          type: string
+      required:
+      - name
+      - description
+      - bad_practice_id
+      title: Rule
+      type: object
     ValidationError:
       properties:
         loc:
@@ -88,6 +165,31 @@ info:
   version: 0.0.1
 openapi: 3.1.0
 paths:
+  /detector/:
+    post:
+      operationId: detect_detector__post
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DetectorRequest'
+        required: true
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DetectorResponse'
+          description: Successful Response
+        '422':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+          description: Validation Error
+      summary: Detect bad practices given rules.
+      tags:
+      - detector
   /health:
     get:
       description: "## Perform a Health Check\nEndpoint to perform a healthcheck on.\
