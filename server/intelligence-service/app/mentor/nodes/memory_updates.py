@@ -39,7 +39,6 @@ def set_goals(state: State, config: RunnableConfig, *, store: BaseStore):
     user_id = state["user_id"]
     namespace = (user_id, "goals")
 
-
     prompt = ChatPromptTemplate(
         [
             (
@@ -54,7 +53,8 @@ def set_goals(state: State, config: RunnableConfig, *, store: BaseStore):
     response = chain.invoke({"messages": state["messages"]}).content
     print("\nset_goals", response, "\n")
     store.put(namespace, key=str(uuid4()), value={"goal_list": response})
-    return 
+    return
+
 
 def adjust_goals(state: State, config: RunnableConfig, *, store: BaseStore):
     user_id = state["user_id"]

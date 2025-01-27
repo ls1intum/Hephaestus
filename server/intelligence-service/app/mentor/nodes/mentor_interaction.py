@@ -38,10 +38,8 @@ def get_dev_progress(state: State):
         ]
     )
     chain = prompt | model
-    resp = chain.invoke({"messages": state["messages"]})
-
     return {
-        "messages": [resp],
+        "messages": [chain.invoke({"messages": state["messages"]})],
         "development": False,
         "status": True,
     }
@@ -78,7 +76,6 @@ def ask_status(state: State, store: BaseStore):
     )
 
     chain = prompt | model
-
     return {"messages": [chain.invoke({"messages": state["messages"]})]}
 
 
@@ -139,8 +136,7 @@ def ask_summary(state: State):
         ]
     )
     chain = prompt | model
-    response = chain.invoke({"messages": state["messages"]})
-    return {"messages": [response]}
+    return {"messages": [chain.invoke({"messages": state["messages"]})]}
 
 
 def finish(state: State):
@@ -172,7 +168,6 @@ def talk_to_mentor(state: State):
     return {"messages": [chain.invoke({"messages": state["messages"]})]}
 
 
-
 def ask_goals(state: State):
     prompt = ChatPromptTemplate(
         [
@@ -182,12 +177,9 @@ def ask_goals(state: State):
         ]
     )
     chain = prompt | model
-    response = chain.invoke({"messages": state["messages"]}).content
-    print("\nset_goals", response, "\n")
+    return {"messages": [chain.invoke({"messages": state["messages"]})]}
 
-    return {"messages": [response]}
 
-# TODO: implement the store connection
 def reflect_goals(state: State, store: BaseStore):
     user_id = state["user_id"]
     namespace = (user_id, "goals")
@@ -202,14 +194,14 @@ def reflect_goals(state: State, store: BaseStore):
     prompt = ChatPromptTemplate(
         [
             ("system", persona_prompt),
-            ("system", prompt_loader.get_prompt(type="mentor", name="goal_reflection").format_map(
-                    {"goals": goals}
-                ),),
+            (
+                "system",
+                prompt_loader.get_prompt(
+                    type="mentor", name="goal_reflection"
+                ).format_map({"goals": goals}),
+            ),
             MessagesPlaceholder("messages"),
         ]
     )
     chain = prompt | model
-    response = chain.invoke({"messages": state["messages"]}).content
-    print("\nadjust_goals", response, "\n")
-
-    return {"messages": [response]}
+    return {"messages": [chain.invoke({"messages": state["messages"]})]}

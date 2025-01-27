@@ -25,14 +25,16 @@ def main_router(state: State):
     else:  # state["finish"]
         return "finish_node"
 
+
 def goal_setting_router(state: State):
     # check_goals updated the state and finished the goal setting
     if not state["goal_setting"]:
         return "set_goals"
     return "goal_setting_node"
 
+
 def goal_reflection_router(state: State):
     # check_goal_reflection updated the state and finished the goal reflection
-    if not state["adjust_goals"]:
+    if not state["goal_reflection"]:
         return "adjust_goals"
     return "goal_reflection_node"

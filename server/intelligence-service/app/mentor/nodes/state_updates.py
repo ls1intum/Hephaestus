@@ -7,7 +7,7 @@ prompt_loader = PromptLoader()
 
 
 def check_state(state: State):
-    if state["closed"] or state["goal_reflection"]:
+    if state["closed"] or state["goal_reflection"] or state["finish"]:
         # closed session state does not need to be updated
         # when goal reflection is active, state is updated in the check_goal_reflection node
         return
@@ -24,7 +24,14 @@ def check_state(state: State):
         else:
             return {"goal_setting": False, "development": True}
 
-    step_order = ["status", "impediments", "promises", "summary", "finish"]
+    step_order = [
+        "status",
+        "impediments",
+        "promises",
+        "summary",
+        "goal_reflection",
+        "finish",
+    ]
     step = next((key for key in step_order if state.get(key)), None)
     if not step:
         return  # exit early if no step is active without state update
@@ -73,9 +80,8 @@ def check_goals(state: State):
 
     if resp == "YES":
         return {"goal_setting": False, "development": True}
-    
-    return 
 
+    return
 
 
 def check_goal_reflection(state: State):
@@ -97,5 +103,5 @@ def check_goal_reflection(state: State):
 
     if resp == "YES":
         return {"goal_reflection": False, "finish": True}
-    
-    return 
+
+    return

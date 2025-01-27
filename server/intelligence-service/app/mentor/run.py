@@ -30,7 +30,12 @@ from .nodes.mentor_interaction import (
     talk_to_mentor,
 )
 
-from .conditions import start_router, main_router, goal_reflection_router, goal_setting_router
+from .conditions import (
+    start_router,
+    main_router,
+    goal_reflection_router,
+    goal_setting_router,
+)
 
 connection_kwargs = {
     "autocommit": True,
@@ -53,13 +58,13 @@ graph_builder.add_node("mentor_node", talk_to_mentor)
 
 # chat analysis nodes: update the state of the conversation
 graph_builder.add_node("check_state", check_state)
-graph_builder.add_edge("check_goals", check_goals)
-graph_builder.add_edge("check_goal_reflection", check_goal_reflection)
+graph_builder.add_node("check_goals", check_goals)
+graph_builder.add_node("check_goal_reflection", check_goal_reflection)
 
 # memory nodes: update the long-term memory of the mentor
 graph_builder.add_node("update_memory", update_memory)
-graph_builder.add_edge("set_goals", set_goals)
-graph_builder.add_edge("adjust_goals", adjust_goals)
+graph_builder.add_node("set_goals", set_goals)
+graph_builder.add_node("adjust_goals", adjust_goals)
 
 graph_builder.add_conditional_edges(START, start_router)
 graph_builder.add_conditional_edges("check_state", main_router)
@@ -103,11 +108,13 @@ def start_session(last_thread: str, user_id: str, dev_progress: str, config):
                     "last_thread": last_thread,
                     "dev_progress": dev_progress,
                     "messages": [],
+                    "goal_setting": False,
                     "development": False,
                     "status": False,
                     "impediments": False,
                     "promises": False,
                     "summary": False,
+                    "goal_reflection": False,
                     "finish": False,
                     "closed": False,
                 },
