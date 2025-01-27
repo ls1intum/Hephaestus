@@ -1,6 +1,7 @@
 services:
   application-server:
-    image: hephaestus-application-server
+    build:
+      context: ./server/application-server
     ports:
       - '8080'
     environment:
@@ -8,8 +9,6 @@ services:
       - DATABASE_URL=postgresql://postgres:5432/hephaestus
       - DATABASE_USERNAME=root
       - DATABASE_PASSWORD=root
-      - SECURITY_USER_NAME=${SECURITY_USER_NAME:-admin}
-      - SECURITY_USER_PASSWORD=${SECURITY_USER_NAME:-admin_password}
       - INTELLIGENCE_SERVICE_URL=http://intelligence-service:5000
     depends_on:
       - postgres
@@ -70,3 +69,6 @@ services:
 networks:
   app-network:
     driver: bridge`
+
+volumes:
+  postgresql-data:

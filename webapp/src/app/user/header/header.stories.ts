@@ -1,5 +1,5 @@
 import { argsToTemplate, Meta, StoryObj } from '@storybook/angular';
-import dayjs from 'dayjs';
+import dayjs from 'dayjs/esm';
 import { UserHeaderComponent } from './header.component';
 
 type FlatArgs = {

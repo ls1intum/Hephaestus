@@ -1,6 +1,6 @@
 import { argsToTemplate, Meta, StoryObj } from '@storybook/angular';
 import { ReviewActivityCardComponent } from './review-activity-card.component';
-import dayjs from 'dayjs';
+import dayjs from 'dayjs/esm';
 
 type FlatArgs = {
   isLoading: boolean;
