@@ -85,10 +85,10 @@ public class ActivityService {
             Set.of(Issue.State.OPEN)
         );
 
-        return pullRequests
+        List<PullRequestBadPractice> badPractices = pullRequestBadPracticeDetector.detectAndSyncBadPractices(pullRequests);
+
+        return badPractices
             .stream()
-            .map(pullRequestBadPracticeDetector::detectAndSyncBadPractices)
-            .flatMap(List::stream)
             .map(PullRequestBadPracticeDTO::fromPullRequestBadPractice)
             .collect(Collectors.toList());
     }
