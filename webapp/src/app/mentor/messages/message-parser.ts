@@ -79,7 +79,10 @@ export function getPullRequests(message: Message): PullRequests | null {
     return result;
   }
 
-  const prBlocks = developmentSection.split('PR').slice(1);
+  const prBlocks = developmentSection
+    .split('PR')
+    .slice(1)
+    .map((s) => s.trim());
 
   result.development = prBlocks.map((block) => {
     const pr = {
@@ -91,7 +94,8 @@ export function getPullRequests(message: Message): PullRequests | null {
       url: ''
     };
     block.split('\n').forEach((line) => {
-      const [key, value] = line.split(':').map((s) => s.trim());
+      const key = line.split(':', 1)[0].trim();
+      const value = line.slice(key.length + 1).trim();
       if (!key || !value) return;
 
       switch (key) {
