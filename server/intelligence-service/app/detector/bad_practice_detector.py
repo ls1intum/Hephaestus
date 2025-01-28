@@ -1,3 +1,4 @@
+from pathlib import Path
 from typing import List
 
 from langchain_core.prompts import PromptTemplate, ChatPromptTemplate
@@ -23,11 +24,12 @@ class BadPracticeList(BaseModel):
     bad_practices: List[BadPractice] = Field(description="A list of bad practices detected in a pull request.")
 
 
-def detectbadpractices(pull_requests: PullRequest) -> BadPracticeList:
-   with open("./prompts/pullrequest_badpractice_detector.txt", "r") as f:
+def detectbadpractices(title, description) -> BadPracticeList:
+   prompt_path = Path(__file__).parent / "prompts" / "pullrequest_badpractice_detector.txt"
+   with open(prompt_path, "r", encoding="utf-8") as f:
        prompt_text = f.read()
    prompt_template = ChatPromptTemplate.from_template(prompt_text)
-   prompt = prompt_template.invoke(title=pull_requests.title, description=pull_requests.description)
+   prompt = prompt_template.invoke({"title": title, "description": description})
    structured_llm = model.with_structured_output(BadPracticeList)
    response = structured_llm.invoke(prompt)
    return response
