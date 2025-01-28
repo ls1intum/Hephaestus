@@ -16,18 +16,31 @@ components:
       - description
       title: BadPractice
       type: object
-    BadPracticeList:
-      description: A list of bad practices detected in a pull request.
+    DetectorRequest:
+      additionalProperties: true
+      properties:
+        description:
+          title: Description
+          type: string
+        title:
+          title: Title
+          type: string
+      required:
+      - title
+      - description
+      title: DetectorRequest
+      type: object
+    DetectorResponse:
+      additionalProperties: true
       properties:
         bad_practices:
-          description: A list of bad practices detected in a pull request.
           items:
             $ref: '#/components/schemas/BadPractice'
           title: Bad Practices
           type: array
       required:
       - bad_practices
-      title: BadPracticeList
+      title: DetectorResponse
       type: object
     HTTPValidationError:
       properties:
@@ -87,23 +100,6 @@ components:
       - dev_progress
       title: MentorStartRequest
       type: object
-    PullRequest:
-      properties:
-        description:
-          title: Description
-          type: string
-        id:
-          title: Id
-          type: string
-        title:
-          title: Title
-          type: string
-      required:
-      - id
-      - title
-      - description
-      title: PullRequest
-      type: object
     ValidationError:
       properties:
         loc:
@@ -141,14 +137,14 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/PullRequest'
+              $ref: '#/components/schemas/DetectorRequest'
         required: true
       responses:
         '200':
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/BadPracticeList'
+                $ref: '#/components/schemas/DetectorResponse'
           description: Successful Response
         '422':
           content:

@@ -3,9 +3,9 @@ package de.tum.in.www1.hephaestus.intelligenceservice.api;
 import de.tum.in.www1.hephaestus.intelligenceservice.ApiClient;
 import de.tum.in.www1.hephaestus.intelligenceservice.BaseApi;
 
-import de.tum.in.www1.hephaestus.intelligenceservice.model.BadPracticeList;
+import de.tum.in.www1.hephaestus.intelligenceservice.model.DetectorRequest;
+import de.tum.in.www1.hephaestus.intelligenceservice.model.DetectorResponse;
 import de.tum.in.www1.hephaestus.intelligenceservice.model.HTTPValidationError;
-import de.tum.in.www1.hephaestus.intelligenceservice.model.PullRequest;
 
 import java.util.Collections;
 import java.util.HashMap;
@@ -44,12 +44,12 @@ public class DetectorApi extends BaseApi {
      * 
      * <p><b>200</b> - Successful Response
      * <p><b>422</b> - Validation Error
-     * @param pullRequest  (required)
-     * @return BadPracticeList
+     * @param detectorRequest  (required)
+     * @return DetectorResponse
      * @throws RestClientException if an error occurs while attempting to invoke the API
      */
-    public BadPracticeList detectDetectorPost(PullRequest pullRequest) throws RestClientException {
-        return detectDetectorPostWithHttpInfo(pullRequest).getBody();
+    public DetectorResponse detectDetectorPost(DetectorRequest detectorRequest) throws RestClientException {
+        return detectDetectorPostWithHttpInfo(detectorRequest).getBody();
     }
 
     /**
@@ -57,16 +57,16 @@ public class DetectorApi extends BaseApi {
      * 
      * <p><b>200</b> - Successful Response
      * <p><b>422</b> - Validation Error
-     * @param pullRequest  (required)
-     * @return ResponseEntity&lt;BadPracticeList&gt;
+     * @param detectorRequest  (required)
+     * @return ResponseEntity&lt;DetectorResponse&gt;
      * @throws RestClientException if an error occurs while attempting to invoke the API
      */
-    public ResponseEntity<BadPracticeList> detectDetectorPostWithHttpInfo(PullRequest pullRequest) throws RestClientException {
-        Object localVarPostBody = pullRequest;
+    public ResponseEntity<DetectorResponse> detectDetectorPostWithHttpInfo(DetectorRequest detectorRequest) throws RestClientException {
+        Object localVarPostBody = detectorRequest;
         
-        // verify the required parameter 'pullRequest' is set
-        if (pullRequest == null) {
-            throw new HttpClientErrorException(HttpStatus.BAD_REQUEST, "Missing the required parameter 'pullRequest' when calling detectDetectorPost");
+        // verify the required parameter 'detectorRequest' is set
+        if (detectorRequest == null) {
+            throw new HttpClientErrorException(HttpStatus.BAD_REQUEST, "Missing the required parameter 'detectorRequest' when calling detectDetectorPost");
         }
         
 
@@ -86,7 +86,7 @@ public class DetectorApi extends BaseApi {
 
         String[] localVarAuthNames = new String[] {  };
 
-        ParameterizedTypeReference<BadPracticeList> localReturnType = new ParameterizedTypeReference<BadPracticeList>() {};
+        ParameterizedTypeReference<DetectorResponse> localReturnType = new ParameterizedTypeReference<DetectorResponse>() {};
         return apiClient.invokeAPI("/detector/", HttpMethod.POST, Collections.<String, Object>emptyMap(), localVarQueryParams, localVarPostBody, localVarHeaderParams, localVarCookieParams, localVarFormParams, localVarAccept, localVarContentType, localVarAuthNames, localReturnType);
     }
 

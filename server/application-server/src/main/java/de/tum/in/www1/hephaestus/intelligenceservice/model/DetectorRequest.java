@@ -20,59 +20,79 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonTypeName;
 import com.fasterxml.jackson.annotation.JsonValue;
-import de.tum.in.www1.hephaestus.intelligenceservice.model.BadPractice;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.List;
+import java.util.HashMap;
+import java.util.Map;
 import com.fasterxml.jackson.annotation.JsonPropertyOrder;
 import com.fasterxml.jackson.annotation.JsonTypeName;
 import org.hibernate.validator.constraints.*;
 
 /**
- * A list of bad practices detected in a pull request.
+ * DetectorRequest
  */
 @JsonPropertyOrder({
-  BadPracticeList.JSON_PROPERTY_BAD_PRACTICES
+  DetectorRequest.JSON_PROPERTY_DESCRIPTION,
+  DetectorRequest.JSON_PROPERTY_TITLE
 })
 @jakarta.annotation.Generated(value = "org.openapitools.codegen.languages.JavaClientCodegen", comments = "Generator version: 7.7.0")
-public class BadPracticeList {
-  public static final String JSON_PROPERTY_BAD_PRACTICES = "bad_practices";
-  private List<BadPractice> badPractices = new ArrayList<>();
+public class DetectorRequest extends HashMap<String, Object> {
+  public static final String JSON_PROPERTY_DESCRIPTION = "description";
+  private String description;
 
-  public BadPracticeList() {
+  public static final String JSON_PROPERTY_TITLE = "title";
+  private String title;
+
+  public DetectorRequest() {
+
   }
 
-  public BadPracticeList badPractices(List<BadPractice> badPractices) {
+  public DetectorRequest description(String description) {
     
-    this.badPractices = badPractices;
-    return this;
-  }
-
-  public BadPracticeList addBadPracticesItem(BadPractice badPracticesItem) {
-    if (this.badPractices == null) {
-      this.badPractices = new ArrayList<>();
-    }
-    this.badPractices.add(badPracticesItem);
+    this.description = description;
     return this;
   }
 
   /**
-   * A list of bad practices detected in a pull request.
-   * @return badPractices
+   * Get description
+   * @return description
    */
   @jakarta.annotation.Nonnull
-  @JsonProperty(JSON_PROPERTY_BAD_PRACTICES)
+  @JsonProperty(JSON_PROPERTY_DESCRIPTION)
   @JsonInclude(value = JsonInclude.Include.ALWAYS)
 
-  public List<BadPractice> getBadPractices() {
-    return badPractices;
+  public String getDescription() {
+    return description;
   }
 
 
-  @JsonProperty(JSON_PROPERTY_BAD_PRACTICES)
+  @JsonProperty(JSON_PROPERTY_DESCRIPTION)
   @JsonInclude(value = JsonInclude.Include.ALWAYS)
-  public void setBadPractices(List<BadPractice> badPractices) {
-    this.badPractices = badPractices;
+  public void setDescription(String description) {
+    this.description = description;
+  }
+
+  public DetectorRequest title(String title) {
+    
+    this.title = title;
+    return this;
+  }
+
+  /**
+   * Get title
+   * @return title
+   */
+  @jakarta.annotation.Nonnull
+  @JsonProperty(JSON_PROPERTY_TITLE)
+  @JsonInclude(value = JsonInclude.Include.ALWAYS)
+
+  public String getTitle() {
+    return title;
+  }
+
+
+  @JsonProperty(JSON_PROPERTY_TITLE)
+  @JsonInclude(value = JsonInclude.Include.ALWAYS)
+  public void setTitle(String title) {
+    this.title = title;
   }
 
   @Override
@@ -83,20 +103,24 @@ public class BadPracticeList {
     if (o == null || getClass() != o.getClass()) {
       return false;
     }
-    BadPracticeList badPracticeList = (BadPracticeList) o;
-    return Objects.equals(this.badPractices, badPracticeList.badPractices);
+    DetectorRequest detectorRequest = (DetectorRequest) o;
+    return Objects.equals(this.description, detectorRequest.description) &&
+        Objects.equals(this.title, detectorRequest.title) &&
+        super.equals(o);
   }
 
   @Override
   public int hashCode() {
-    return Objects.hash(badPractices);
+    return Objects.hash(description, title, super.hashCode());
   }
 
   @Override
   public String toString() {
     StringBuilder sb = new StringBuilder();
-    sb.append("class BadPracticeList {\n");
-    sb.append("    badPractices: ").append(toIndentedString(badPractices)).append("\n");
+    sb.append("class DetectorRequest {\n");
+    sb.append("    ").append(toIndentedString(super.toString())).append("\n");
+    sb.append("    description: ").append(toIndentedString(description)).append("\n");
+    sb.append("    title: ").append(toIndentedString(title)).append("\n");
     sb.append("}");
     return sb.toString();
   }
