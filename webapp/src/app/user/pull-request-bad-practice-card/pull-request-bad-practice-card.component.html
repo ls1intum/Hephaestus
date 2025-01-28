@@ -1,6 +1,6 @@
 <brn-collapsible>
-  <a hlmCard variant="profile">
-    <div>
+  <section hlmCard>
+    <div class="pl-6 pr-2">
       <div class="flex justify-between items-center text-sm text-github-muted-foreground">
         <span class="font-medium flex justify-center items-center space-x-1">
           @if (isLoading()) {
@@ -35,7 +35,7 @@
             <div [innerHTML]="displayTitle()" class="truncate"></div>
           }
         </span>
-        <span class="flex items-center space-x-2">
+        <span class="flex items-center space-x-2 pr-4">
           @if (isLoading()) {
             <hlm-skeleton class="h-4 w-8 bg-green-500/30"></hlm-skeleton>
             <hlm-skeleton class="h-4 w-8 bg-destructive/20"></hlm-skeleton>
@@ -46,7 +46,7 @@
         </span>
       </div>
       @if (!isLoading()) {
-        <div class="flex flex-wrap gap-2 p-0 space-x-0">
+        <div class="flex flex-wrap pb-1 gap-2 space-x-0">
           @for (label of pullRequestLabels(); track label.name) {
             <app-github-label [label]="label"></app-github-label>
           }
@@ -54,7 +54,7 @@
       }
     </div>
     @if (!isLoading()) {
-      <div class="gap-2 p-0 space-x-0 text-left">
+      <div class="gap-2 space-x-0 text-left px-6 pb-2">
         <brn-collapsible-content>
           @for (badpractice of badPractices(); track badpractice.title) {
             <brn-separator hlmSeparator />
@@ -63,5 +63,5 @@
         </brn-collapsible-content>
       </div>
     }
-  </a>
+  </section>
 </brn-collapsible>
