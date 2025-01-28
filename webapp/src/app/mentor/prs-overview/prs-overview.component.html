@@ -1,4 +1,4 @@
-<div hlmCard class="flex gap-2 divide-y-2 flex-col px-5 py-2">
+<div hlmCard class="flex divide-y-[1px] gap-1 flex-col px-5 py-2">
   @for (pr of pullRequests(); track pr.number) {
     <div class="flex gap-4 items-center py-1">
       @if (pr.isDraft) {
