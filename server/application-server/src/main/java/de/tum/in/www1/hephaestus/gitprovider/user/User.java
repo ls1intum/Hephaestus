@@ -14,7 +14,6 @@ import jakarta.persistence.Enumerated;
 import jakarta.persistence.ManyToMany;
 import jakarta.persistence.OneToMany;
 import jakarta.persistence.Table;
-import java.time.OffsetDateTime;
 import java.util.HashSet;
 import java.util.Set;
 import lombok.Getter;
@@ -102,8 +101,6 @@ public class User extends BaseGitServiceEntity {
 
     // Current ranking points for the leaderboard leagues
     private int leaguePoints;
-
-    private OffsetDateTime lastSyncBadPracticeAt;
 
     public enum Type {
         USER,

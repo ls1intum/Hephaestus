@@ -20,9 +20,9 @@ public class PullRequestBadPractice {
     @Id
     private Long id;
 
-    @ManyToOne
-    @JoinColumn(name = "rule_id")
-    private PullRequestBadPracticeRule rule;
+    private String title;
+
+    private String description;
 
     @ManyToOne
     @JoinColumn(name = "pullrequest_id")
