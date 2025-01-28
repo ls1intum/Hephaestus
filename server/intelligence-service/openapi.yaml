@@ -1,32 +1,33 @@
 components:
   schemas:
-    DetectorRequest:
+    BadPractice:
+      description: A detected bad practice in a pull request.
       properties:
-        pull_requests:
-          items:
-            $ref: '#/components/schemas/PullRequest'
-          title: Pull Requests
-          type: array
-        rules:
-          items:
-            $ref: '#/components/schemas/Rule'
-          title: Rules
-          type: array
+        description:
+          description: The description of the bad practice.
+          title: Description
+          type: string
+        title:
+          description: The title of the bad practice.
+          title: Title
+          type: string
       required:
-      - pull_requests
-      - rules
-      title: DetectorRequest
+      - title
+      - description
+      title: BadPractice
       type: object
-    DetectorResponse:
+    BadPracticeList:
+      description: A list of bad practices detected in a pull request.
       properties:
-        detectBadPractices:
+        bad_practices:
+          description: A list of bad practices detected in a pull request.
           items:
-            $ref: '#/components/schemas/PullRequestWithBadPractices'
-          title: Detectbadpractices
+            $ref: '#/components/schemas/BadPractice'
+          title: Bad Practices
           type: array
       required:
-      - detectBadPractices
-      title: DetectorResponse
+      - bad_practices
+      title: BadPracticeList
       type: object
     HTTPValidationError:
       properties:
@@ -103,38 +104,6 @@ components:
       - description
       title: PullRequest
       type: object
-    PullRequestWithBadPractices:
-      properties:
-        bad_practice_ids:
-          items:
-            type: string
-          title: Bad Practice Ids
-          type: array
-        pull_request_id:
-          title: Pull Request Id
-          type: string
-      required:
-      - pull_request_id
-      - bad_practice_ids
-      title: PullRequestWithBadPractices
-      type: object
-    Rule:
-      properties:
-        bad_practice_id:
-          title: Bad Practice Id
-          type: string
-        description:
-          title: Description
-          type: string
-        name:
-          title: Name
-          type: string
-      required:
-      - name
-      - description
-      - bad_practice_id
-      title: Rule
-      type: object
     ValidationError:
       properties:
         loc:
@@ -172,14 +141,14 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/DetectorRequest'
+              $ref: '#/components/schemas/PullRequest'
         required: true
       responses:
         '200':
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/DetectorResponse'
+                $ref: '#/components/schemas/BadPracticeList'
           description: Successful Response
         '422':
           content:

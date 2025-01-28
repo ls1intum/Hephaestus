@@ -25,60 +25,31 @@ import com.fasterxml.jackson.annotation.JsonTypeName;
 import org.hibernate.validator.constraints.*;
 
 /**
- * Rule
+ * A detected bad practice in a pull request.
  */
 @JsonPropertyOrder({
-  Rule.JSON_PROPERTY_BAD_PRACTICE_ID,
-  Rule.JSON_PROPERTY_DESCRIPTION,
-  Rule.JSON_PROPERTY_NAME
+  BadPractice.JSON_PROPERTY_DESCRIPTION,
+  BadPractice.JSON_PROPERTY_TITLE
 })
 @jakarta.annotation.Generated(value = "org.openapitools.codegen.languages.JavaClientCodegen", comments = "Generator version: 7.7.0")
-public class Rule {
-  public static final String JSON_PROPERTY_BAD_PRACTICE_ID = "bad_practice_id";
-  private String badPracticeId;
-
+public class BadPractice {
   public static final String JSON_PROPERTY_DESCRIPTION = "description";
   private String description;
 
-  public static final String JSON_PROPERTY_NAME = "name";
-  private String name;
+  public static final String JSON_PROPERTY_TITLE = "title";
+  private String title;
 
-  public Rule() {
+  public BadPractice() {
   }
 
-  public Rule badPracticeId(String badPracticeId) {
-    
-    this.badPracticeId = badPracticeId;
-    return this;
-  }
-
-  /**
-   * Get badPracticeId
-   * @return badPracticeId
-   */
-  @jakarta.annotation.Nonnull
-  @JsonProperty(JSON_PROPERTY_BAD_PRACTICE_ID)
-  @JsonInclude(value = JsonInclude.Include.ALWAYS)
-
-  public String getBadPracticeId() {
-    return badPracticeId;
-  }
-
-
-  @JsonProperty(JSON_PROPERTY_BAD_PRACTICE_ID)
-  @JsonInclude(value = JsonInclude.Include.ALWAYS)
-  public void setBadPracticeId(String badPracticeId) {
-    this.badPracticeId = badPracticeId;
-  }
-
-  public Rule description(String description) {
+  public BadPractice description(String description) {
     
     this.description = description;
     return this;
   }
 
   /**
-   * Get description
+   * The description of the bad practice.
    * @return description
    */
   @jakarta.annotation.Nonnull
@@ -96,29 +67,29 @@ public class Rule {
     this.description = description;
   }
 
-  public Rule name(String name) {
+  public BadPractice title(String title) {
     
-    this.name = name;
+    this.title = title;
     return this;
   }
 
   /**
-   * Get name
-   * @return name
+   * The title of the bad practice.
+   * @return title
    */
   @jakarta.annotation.Nonnull
-  @JsonProperty(JSON_PROPERTY_NAME)
+  @JsonProperty(JSON_PROPERTY_TITLE)
   @JsonInclude(value = JsonInclude.Include.ALWAYS)
 
-  public String getName() {
-    return name;
+  public String getTitle() {
+    return title;
   }
 
 
-  @JsonProperty(JSON_PROPERTY_NAME)
+  @JsonProperty(JSON_PROPERTY_TITLE)
   @JsonInclude(value = JsonInclude.Include.ALWAYS)
-  public void setName(String name) {
-    this.name = name;
+  public void setTitle(String title) {
+    this.title = title;
   }
 
   @Override
@@ -129,24 +100,22 @@ public class Rule {
     if (o == null || getClass() != o.getClass()) {
       return false;
     }
-    Rule rule = (Rule) o;
-    return Objects.equals(this.badPracticeId, rule.badPracticeId) &&
-        Objects.equals(this.description, rule.description) &&
-        Objects.equals(this.name, rule.name);
+    BadPractice badPractice = (BadPractice) o;
+    return Objects.equals(this.description, badPractice.description) &&
+        Objects.equals(this.title, badPractice.title);
   }
 
   @Override
   public int hashCode() {
-    return Objects.hash(badPracticeId, description, name);
+    return Objects.hash(description, title);
   }
 
   @Override
   public String toString() {
     StringBuilder sb = new StringBuilder();
-    sb.append("class Rule {\n");
-    sb.append("    badPracticeId: ").append(toIndentedString(badPracticeId)).append("\n");
+    sb.append("class BadPractice {\n");
     sb.append("    description: ").append(toIndentedString(description)).append("\n");
-    sb.append("    name: ").append(toIndentedString(name)).append("\n");
+    sb.append("    title: ").append(toIndentedString(title)).append("\n");
     sb.append("}");
     return sb.toString();
   }

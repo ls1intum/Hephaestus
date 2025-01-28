@@ -20,7 +20,7 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonTypeName;
 import com.fasterxml.jackson.annotation.JsonValue;
-import de.tum.in.www1.hephaestus.intelligenceservice.model.PullRequestWithBadPractices;
+import de.tum.in.www1.hephaestus.intelligenceservice.model.BadPractice;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
@@ -29,50 +29,50 @@ import com.fasterxml.jackson.annotation.JsonTypeName;
 import org.hibernate.validator.constraints.*;
 
 /**
- * DetectorResponse
+ * A list of bad practices detected in a pull request.
  */
 @JsonPropertyOrder({
-  DetectorResponse.JSON_PROPERTY_DETECT_BAD_PRACTICES
+  BadPracticeList.JSON_PROPERTY_BAD_PRACTICES
 })
 @jakarta.annotation.Generated(value = "org.openapitools.codegen.languages.JavaClientCodegen", comments = "Generator version: 7.7.0")
-public class DetectorResponse {
-  public static final String JSON_PROPERTY_DETECT_BAD_PRACTICES = "detectBadPractices";
-  private List<PullRequestWithBadPractices> detectBadPractices = new ArrayList<>();
+public class BadPracticeList {
+  public static final String JSON_PROPERTY_BAD_PRACTICES = "bad_practices";
+  private List<BadPractice> badPractices = new ArrayList<>();
 
-  public DetectorResponse() {
+  public BadPracticeList() {
   }
 
-  public DetectorResponse detectBadPractices(List<PullRequestWithBadPractices> detectBadPractices) {
+  public BadPracticeList badPractices(List<BadPractice> badPractices) {
     
-    this.detectBadPractices = detectBadPractices;
+    this.badPractices = badPractices;
     return this;
   }
 
-  public DetectorResponse addDetectBadPracticesItem(PullRequestWithBadPractices detectBadPracticesItem) {
-    if (this.detectBadPractices == null) {
-      this.detectBadPractices = new ArrayList<>();
+  public BadPracticeList addBadPracticesItem(BadPractice badPracticesItem) {
+    if (this.badPractices == null) {
+      this.badPractices = new ArrayList<>();
     }
-    this.detectBadPractices.add(detectBadPracticesItem);
+    this.badPractices.add(badPracticesItem);
     return this;
   }
 
   /**
-   * Get detectBadPractices
-   * @return detectBadPractices
+   * A list of bad practices detected in a pull request.
+   * @return badPractices
    */
   @jakarta.annotation.Nonnull
-  @JsonProperty(JSON_PROPERTY_DETECT_BAD_PRACTICES)
+  @JsonProperty(JSON_PROPERTY_BAD_PRACTICES)
   @JsonInclude(value = JsonInclude.Include.ALWAYS)
 
-  public List<PullRequestWithBadPractices> getDetectBadPractices() {
-    return detectBadPractices;
+  public List<BadPractice> getBadPractices() {
+    return badPractices;
   }
 
 
-  @JsonProperty(JSON_PROPERTY_DETECT_BAD_PRACTICES)
+  @JsonProperty(JSON_PROPERTY_BAD_PRACTICES)
   @JsonInclude(value = JsonInclude.Include.ALWAYS)
-  public void setDetectBadPractices(List<PullRequestWithBadPractices> detectBadPractices) {
-    this.detectBadPractices = detectBadPractices;
+  public void setBadPractices(List<BadPractice> badPractices) {
+    this.badPractices = badPractices;
   }
 
   @Override
@@ -83,20 +83,20 @@ public class DetectorResponse {
     if (o == null || getClass() != o.getClass()) {
       return false;
     }
-    DetectorResponse detectorResponse = (DetectorResponse) o;
-    return Objects.equals(this.detectBadPractices, detectorResponse.detectBadPractices);
+    BadPracticeList badPracticeList = (BadPracticeList) o;
+    return Objects.equals(this.badPractices, badPracticeList.badPractices);
   }
 
   @Override
   public int hashCode() {
-    return Objects.hash(detectBadPractices);
+    return Objects.hash(badPractices);
   }
 
   @Override
   public String toString() {
     StringBuilder sb = new StringBuilder();
-    sb.append("class DetectorResponse {\n");
-    sb.append("    detectBadPractices: ").append(toIndentedString(detectBadPractices)).append("\n");
+    sb.append("class BadPracticeList {\n");
+    sb.append("    badPractices: ").append(toIndentedString(badPractices)).append("\n");
     sb.append("}");
     return sb.toString();
   }
