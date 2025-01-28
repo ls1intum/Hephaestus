@@ -1,0 +1,19 @@
+<?xml version="1.1" encoding="UTF-8" standalone="no"?>
+<databaseChangeLog xmlns="http://www.liquibase.org/xml/ns/dbchangelog" xmlns:ext="http://www.liquibase.org/xml/ns/dbchangelog-ext" xmlns:pro="http://www.liquibase.org/xml/ns/pro" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog-ext http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-ext.xsd http://www.liquibase.org/xml/ns/pro http://www.liquibase.org/xml/ns/pro/liquibase-pro-latest.xsd http://www.liquibase.org/xml/ns/dbchangelog http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+    <changeSet author="iam-flo" id="1738063112622-1">
+        <createTable tableName="pull_request_bad_practice">
+            <column name="id" type="BIGINT">
+                <constraints nullable="false" primaryKey="true" primaryKeyName="pull_request_bad_practicePK"/>
+            </column>
+            <column name="description" type="VARCHAR(255)"/>
+            <column name="resolved" type="BOOLEAN">
+                <constraints nullable="false"/>
+            </column>
+            <column name="title" type="VARCHAR(255)"/>
+            <column name="pullrequest_id" type="BIGINT"/>
+        </createTable>
+    </changeSet>
+    <changeSet author="iam-flo" id="1738063112622-2">
+        <addForeignKeyConstraint baseColumnNames="pullrequest_id" baseTableName="pull_request_bad_practice" constraintName="FK3e8oyqf1a5g1bspal23e1r4nr" deferrable="false" initiallyDeferred="false" referencedColumnNames="id" referencedTableName="issue" validate="true"/>
+    </changeSet>
+</databaseChangeLog>
