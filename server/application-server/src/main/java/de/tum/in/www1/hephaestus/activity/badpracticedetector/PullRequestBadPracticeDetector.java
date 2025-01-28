@@ -1,12 +1,8 @@
 package de.tum.in.www1.hephaestus.activity.badpracticedetector;
 
 import de.tum.in.www1.hephaestus.activity.PullRequestBadPracticeRepository;
-import de.tum.in.www1.hephaestus.activity.PullRequestBadPracticeRuleRepository;
-import de.tum.in.www1.hephaestus.activity.model.BadPracticeType;
 import de.tum.in.www1.hephaestus.activity.model.PullRequestBadPractice;
-import de.tum.in.www1.hephaestus.activity.model.PullRequestBadPracticeRule;
 import de.tum.in.www1.hephaestus.gitprovider.pullrequest.PullRequest;
-
 import java.util.LinkedList;
 import java.util.List;
 import java.util.stream.Collectors;
@@ -33,19 +29,14 @@ public class PullRequestBadPracticeDetector {
     @Autowired
     private PullRequestBadPracticeRepository pullRequestBadPracticeRepository;
 
-    @Autowired
-    private PullRequestBadPracticeRuleRepository pullRequestBadPracticeRuleRepository;
-
     private final DetectorApi detectorApi = new DetectorApi();
 
     public List<PullRequestBadPractice> detectAndSyncBadPractices(List<PullRequest> pullRequests) {
         logger.info("Detecting bad practices for pull requests.");
 
-        List<PullRequestBadPracticeRule> rules = pullRequestBadPracticeRuleRepository.findAllActive();
 
         DetectorRequest detectorRequest = new DetectorRequest();
         detectorRequest.setPullRequests(mapToApiPullRequests(pullRequests));
-        detectorRequest.setRules(mapToApiRules(rules));
         DetectorResponse detectorResponse = detectorApi.detectDetectorPost(detectorRequest);
 
         List<PullRequestBadPractice> detectedBadPractices = new LinkedList<>();
@@ -75,7 +66,6 @@ public class PullRequestBadPracticeDetector {
                 .map(badPracticeRule -> {
                     PullRequestBadPractice pullRequestBadPractice = new PullRequestBadPractice();
                     pullRequestBadPractice.setPullrequest(pullRequest);
-                    pullRequestBadPractice.setType(findBadPracticeType(badPracticeRule));
                     pullRequestBadPractice.setResolved(false);
                     return pullRequestBadPractice;
                 })

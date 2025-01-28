@@ -1,6 +1,9 @@
 from typing import List
 
-from pydantic import BaseModel
+from langchain_core.prompts import PromptTemplate, ChatPromptTemplate
+from pydantic import BaseModel, Field
+
+from ..model import model
 
 
 class PullRequest(BaseModel):
@@ -8,21 +11,23 @@ class PullRequest(BaseModel):
     title: str
     description: str
 
-class Rule(BaseModel):
-    name: str
-    description: str
-    bad_practice_id: str
+class BadPractice(BaseModel):
+    """A detected bad practice in a pull request."""
 
-class PullRequestWithBadPractices(BaseModel):
-    pull_request_id: str
-    bad_practice_ids: List[str]
+    title: str = Field(description="The title of the bad practice.")
+    description: str = Field(description="The description of the bad practice.")
 
-def detectbadpractices(pull_requests: List[PullRequest], rules: List[Rule]) -> List[PullRequestWithBadPractices]:
-    bad_practices = []
-    for pull_request in pull_requests:
-        bad_practice_ids = []
-        for rule in rules:
-            if rule.bad_practice_id in pull_request.description:
-                bad_practice_ids.append(rule.bad_practice_id)
-        bad_practices.append(PullRequestWithBadPractices(pull_request_id=pull_request.id, bad_practice_ids=bad_practice_ids))
-    return bad_practices
+class BadPracticeList(BaseModel):
+    """A list of bad practices detected in a pull request."""
+
+    bad_practices: List[BadPractice] = Field(description="A list of bad practices detected in a pull request.")
+
+
+def detectbadpractices(pull_requests: PullRequest) -> BadPracticeList:
+   with open("./prompts/pullrequest_badpractice_detector.txt", "r") as f:
+       prompt_text = f.read()
+   prompt_template = ChatPromptTemplate.from_template(prompt_text)
+   prompt = prompt_template.invoke(title=pull_requests.title, description=pull_requests.description)
+   structured_llm = model.with_structured_output(BadPracticeList)
+   response = structured_llm.invoke(prompt)
+   return response
