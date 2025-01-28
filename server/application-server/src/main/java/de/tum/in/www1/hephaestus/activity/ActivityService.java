@@ -5,10 +5,8 @@ import de.tum.in.www1.hephaestus.activity.model.*;
 import de.tum.in.www1.hephaestus.gitprovider.issue.Issue;
 import de.tum.in.www1.hephaestus.gitprovider.pullrequest.PullRequest;
 import de.tum.in.www1.hephaestus.gitprovider.pullrequest.PullRequestRepository;
-import de.tum.in.www1.hephaestus.gitprovider.user.User;
 import de.tum.in.www1.hephaestus.gitprovider.user.UserRepository;
 import jakarta.transaction.Transactional;
-import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -80,16 +78,12 @@ public class ActivityService {
     public List<PullRequestBadPracticeDTO> detectBadPractices(String login) {
         logger.info("Detecting bad practices for user with login: {}", login);
 
-        User user = userRepository.findByLogin(login).orElseThrow(() -> new IllegalArgumentException("User not found"));
+        userRepository.findByLogin(login).orElseThrow(() -> new IllegalArgumentException("User not found"));
 
-        List<PullRequest> pullRequests = pullRequestRepository.findAssignedByLoginAndStatesAndUpdatedAtAfter(
+        List<PullRequest> pullRequests = pullRequestRepository.findAssignedByLoginAndStates(
             login,
-            Set.of(Issue.State.OPEN),
-            user.getLastSyncBadPracticeAt()
+            Set.of(Issue.State.OPEN)
         );
-
-        user.setLastSyncBadPracticeAt(OffsetDateTime.now());
-        userRepository.save(user);
 
         return pullRequests
             .stream()
