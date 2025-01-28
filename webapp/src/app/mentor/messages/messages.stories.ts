@@ -86,3 +86,18 @@ export const WithPrOverview: Story = {
     ]
   }
 };
+
+export const WithPrOverview: Story = {
+  args: {
+    messages: [
+      {
+        id: 1,
+        sentAt: '2024-12-05T10:17:00Z',
+        sender: Message.SenderEnum.Mentor,
+        content:
+          'DEVELOPMENT\n\nPR\nNumber: 230\nTitle: Testing of the GitHub Integration Functionality for AI Mentor\nState: OPEN\nDraft: true\nMerged: false\nURL: https://github.com/ls1intum/Hephaestus/pull/230\n\n---\n\nPR\nNumber: 220\nTitle: AI Mentor memory integration\nState: OPEN\nDraft: false\nMerged: false\nURL: https://github.com/ls1intum/Hephaestus/pull/220\n\nRESPONSE\n\nI have found you worked on these PRs during the last spring. Do you want me to add them to your status update?',
+        sessionId: 101
+      }
+    ]
+  }
+};

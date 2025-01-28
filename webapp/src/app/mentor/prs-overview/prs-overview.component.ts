@@ -1,4 +1,4 @@
-import { Component, inject, input } from '@angular/core';
+import { Component, input } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { NgIconComponent } from '@ng-icons/core';
 import { octGitPullRequest, octGitPullRequestDraft, octGitMerge } from '@ng-icons/octicons';

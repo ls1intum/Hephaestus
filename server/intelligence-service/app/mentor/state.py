@@ -7,12 +7,12 @@ class State(TypedDict):
     user_id: str
     dev_progress: str  # a summary of the user's PRs
     messages: Annotated[list, add_messages]
-    goal_setting: bool  # NEW
+    goal_setting: bool  
     development: bool
     status: bool
     impediments: bool
     promises: bool
     summary: bool
-    goal_reflection: bool  # NEW
+    goal_reflection: bool  
     finish: bool  # thank the user and say goodbye
     closed: bool

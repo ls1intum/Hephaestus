@@ -43,7 +43,7 @@ public class MessageService {
         }
         Session currentSession = session.get();
 
-        // prevent sending messages to closed sessions
+        // Prevent sending messages to closed sessions
         Session previouSession = sessionRepository
             .findFirstByUserOrderByCreatedAtDesc(currentSession.getUser())
             .orElse(null);
@@ -70,7 +70,7 @@ public class MessageService {
 
             return MessageDTO.fromMessage(savedMentorMessage);
         } catch (Exception e) {
-            // prevent saving empty system messages if the intelligence service is down
+            // Prevent saving empty system messages if the intelligence service is down
             logger.error("Failed to generate response for message: {}", content);
             return null;
         }
@@ -86,7 +86,7 @@ public class MessageService {
             MentorResponse mentorMessage = intelligenceServiceApi.startMentorStartPost(mentorStartRequest);
             createMentorMessage(session, mentorMessage.getContent());
         } catch (Exception e) {
-            // prevent saving empty system messages if the intelligence service is down
+            // Prevent saving empty system messages if the intelligence service is down
             logger.error("Failed to generate response during session start");
         }
     }
