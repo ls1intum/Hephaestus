@@ -1,65 +1,121 @@
 services:
-  webhook-ingest:
-    image: "ghcr.io/ls1intum/hephaestus/webhook-ingest:${IMAGE_TAG}"
-    ports:
-      - "4200"
-    environment:
-      # For production use tls://<host>
-      NATS_URL: ${NATS_URL}
-      NATS_AUTH_TOKEN: ${NATS_AUTH_TOKEN}
-      WEBHOOK_SECRET: ${WEBHOOK_SECRET}
-    env_file:
-      - .env.prod.core
-    depends_on:
-      nats-server:
-        condition: service_healthy
-    networks:
-      - core-network
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:4200/health"]
-      interval: 30s
-      timeout: 10s
-      retries: 5
-      start_period: 3s
-    logging:
-      driver: "json-file"
-      options:
-        max-size: "10m"
-        max-file: "3"
+  # webhook-ingest:
+  #   image: "ghcr.io/ls1intum/hephaestus/webhook-ingest:${IMAGE_TAG}"
+  #   ports:
+  #     - "4200"
+  #   environment:
+  #     NATS_URL: ${NATS_URL}
+  #     NATS_AUTH_TOKEN: ${NATS_AUTH_TOKEN}
+  #     WEBHOOK_SECRET: ${WEBHOOK_SECRET}
+  #   depends_on:
+  #     nats-server:
+  #       condition: service_healthy
+  #   networks:
+  #     - core-network
+  #   healthcheck:
+  #     test: ["CMD", "curl", "-f", "http://localhost:4200/health"]
+  #     interval: 30s
+  #     timeout: 10s
+  #     retries: 5
+  #     start_period: 3s
+  #   logging:
+  #     driver: "json-file"
+  #     options:
+  #       max-size: "10m"
+  #       max-file: "3"
+
+  # nats-server:
+  #   image: nats:alpine
+  #   ports:
+  #     - "4222:4222"
+  #     - "8222:8222"
+  #   command: ["--config", "/etc/nats/nats-server.conf"]
+  #   environment:
+  #     TLS_CERT_FILE: ${TLS_CERT_FILE}
+  #     TLS_KEY_FILE: ${TLS_KEY_FILE}
+  #     NATS_AUTH_TOKEN: ${NATS_AUTH_TOKEN}
+  #   volumes:
+  #     - nats_data:/data
+  #     - ./nats-server.conf:/etc/nats/nats-server.conf
+  #     - /etc/letsencrypt:/etc/letsencrypt:ro
+  #   networks:
+  #     - core-network
+  #   healthcheck:
+  #     test: ["CMD", "wget", "--spider", "--quiet", "http://localhost:8222/healthz"]
+  #     interval: 30s
+  #     timeout: 10s
+  #     retries: 5
+  #     start_period: 3s
+  #   logging:
+  #     driver: "json-file"
+  #     options:
+  #       max-size: "10m"
+  #       max-file: "3"
 
   keycloak:
-    image: keycloak
-    # TODO: !!!
-
-  nats-server:
-    image: nats:alpine
-    ports:
-      - "4222:4222"
-      - "8222:8222"
-    command: ["--config", "/etc/nats/nats-server.conf"]
+    image: quay.io/keycloak/keycloak:26.0
+    command:
+      - start
     environment:
-      TLS_CERT_FILE: ${TLS_CERT_FILE}
-      TLS_KEY_FILE: ${TLS_KEY_FILE}
-      NATS_AUTH_TOKEN: ${NATS_AUTH_TOKEN}
-    env_file:
-      - .env.prod.core
+      - TZ=${TIMEZONE:-UTC}
+      - KEYCLOAK_ADMIN=${KEYCLOAK_USER_ADMIN}
+      - KEYCLOAK_ADMIN_PASSWORD=${KEYCLOAK_PASSWORD_ADMIN}
+      - KC_DB=keycloak
+      - KC_DB_USERNAME=root
+      - KC_DB_PASSWORD=root
+      - KC_DB_URL_PORT=5432
+      - KC_DB_URL=jdbc:postgresql://postgres/${POSTGRESQL_DATABASE:-keycloak}
+      - KC_HOSTNAME=${APP_HOSTNAME}/keycloak
+      - KC_HTTP_ENABLED=${KC_HTTP_ENABLED:-true}
+      - KC_HEALTH_ENABLED=${KC_HEALTH_ENABLED:-true}
+      - KC_PROXY_HEADERS=${KC_PROXY_HEADERS:-xforwarded}
     volumes:
-      - nats_data:/data
-      - ./nats-server.conf:/etc/nats/nats-server.conf
-      - /etc/letsencrypt:/etc/letsencrypt:ro
-    networks:
-      - core-network
+      - keycloak-data:/opt/keycloak/data
+    depends_on:
+      postgres:
+        condition: service_healthy
     healthcheck:
-      test: ["CMD", "wget", "--spider", "--quiet", "http://localhost:8222/healthz"]
-      interval: 30s
-      timeout: 10s
-      retries: 5
-      start_period: 3s
-    logging:
-      driver: "json-file"
-      options:
-        max-size: "10m"
-        max-file: "3"
+      test:
+        [
+          "CMD-SHELL",
+          "exec 3<>/dev/tcp/127.0.0.1/9000; echo -e 'GET /health/ready HTTP/1.1\r\nHost: localhost:9000\r\nConnection: close\r\n\r\n' >&3;cat <&3 | grep -q '\"status\": \"UP\"' && exit 0 || exit 1",
+        ]
+      interval: 5s
+      timeout: 20s
+      retries: 10
+    restart: unless-stopped
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.middlewares.gzip.compress=true"
+      - "traefik.http.middlewares.redirect-to-https.redirectscheme.scheme=https"
+      - "traefik.http.middlewares.https-keycloak-stripprefix.stripprefix.prefixes=/keycloak"
+      - "traefik.http.routers.http-keycloak.rule=Host(`${APP_HOSTNAME}`) && PathPrefix(`/keycloak`)"
+      - "traefik.http.routers.http-keycloak.entryPoints=http"
+      - "traefik.http.routers.http-keycloak.middlewares=redirect-to-https"
+      - "traefik.http.routers.http-keycloak.priority=5"
+      - "traefik.http.routers.https-keycloak.rule=Host(`${APP_HOSTNAME}`) && PathPrefix(`/keycloak`)"
+      - "traefik.http.routers.https-keycloak.entryPoints=https"
+      - "traefik.http.routers.https-keycloak.middlewares=https-keycloak-stripprefix,gzip"
+      - "traefik.http.routers.https-keycloak.tls.certresolver=letsencrypt"
+      - "traefik.http.routers.https-keycloak.tls=true"
+      - "traefik.http.routers.https-keycloak.priority=10"
+
+  postgres:
+    image: postgres:16-alpine
+    volumes:
+      - keycloak-postgresql-data:/var/lib/postgresql/data
+    environment:
+      - POSTGRES_DB=keycloak
+      - POSTGRES_USER=root
+      - POSTGRES_PASSWORD=root
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - pg_isready
+      interval: 5s
+      timeout: 20s
+      retries: 10
+    restart: unless-stopped
 
 networks:
   core-network:
