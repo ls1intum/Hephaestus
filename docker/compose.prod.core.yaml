@@ -58,7 +58,7 @@ services:
   #     TLS_KEY_FILE: ${TLS_KEY_FILE}
   #     NATS_AUTH_TOKEN: ${NATS_AUTH_TOKEN}
   #   volumes:
-  #     - nats_data:/data
+  #     - nats-data:/data
   #     - ./nats-server.conf:/etc/nats/nats-server.conf
   #     - /etc/letsencrypt:/etc/letsencrypt:ro
   #   networks:
@@ -144,4 +144,6 @@ networks:
   core-network:
 
 volumes:
-  nats_data: 
+  nats-data: 
+  keycloak-data:
+  keycloak-postgresql-data:
