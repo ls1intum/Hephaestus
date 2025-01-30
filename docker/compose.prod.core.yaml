@@ -1,26 +1,43 @@
 services:
   reverse-proxy:
     image: traefik:v3.2
-    command:
-      - "--providers.docker=true"
-      - "--providers.docker.exposedByDefault=false"
-      - "--providers.docker.network=core-network"
-      - "--entrypoints.web.address=:80"
-      - "--entrypoints.websecure.address=:443"
-      - "--entrypoints.web.http.redirections.entryPoint.to=websecure"
-      - "--entrypoints.web.http.redirections.entryPoint.scheme=https"
-      - "--certificatesresolvers.letsencrypt.acme.httpchallenge.entrypoint=web"
-      - "--certificatesresolvers.letsencrypt.acme.email=admin@tum.de"
-      - "--certificatesresolvers.letsencrypt.acme.storage=/letsencrypt/acme.json"
     restart: unless-stopped
+    networks:
+      - core-network
     ports:
       - "80:80"
       - "443:443"
+      - "8080:8080"
     volumes:
-      - /var/run/docker.sock:/var/run/docker.sock
+      - /var/run/docker.sock:/var/run/docker.sock:ro
       - ./letsencrypt:/letsencrypt
-    networks:
-      - core-network
+    command:
+      - "--ping=true"
+      - "--ping.entrypoint=http"
+      - "--api.dashboard=true"
+      - "--api.insecure=false"
+      - "--entrypoints.http.address=:80"
+      - "--entrypoints.https.address=:443"
+      - "--entrypoints.http.http.encodequerysemicolons=true"
+      - "--entryPoints.http.http2.maxConcurrentStreams=50"
+      - "--entrypoints.https.http.encodequerysemicolons=true"
+      - "--entryPoints.https.http2.maxConcurrentStreams=50"
+      - "--providers.docker.exposedbydefault=false"
+      - "--certificatesresolvers.letsencrypt.acme.httpchallenge=true"
+      - "--certificatesresolvers.letsencrypt.acme.storage=/traefik/acme.json"
+      - "--certificatesresolvers.letsencrypt.acme.email=admin@tum.de"
+      - "--certificatesresolvers.letsencrypt.acme.httpchallenge.entrypoint=http"
+      - "--providers.docker=true"
+    labels:
+      - traefik.enable=true
+      - traefik.http.routers.traefik.entrypoints=http
+      - traefik.http.routers.traefik.service=api@internal
+      - traefik.http.services.traefik.loadbalancer.server.port=8080
+    healthcheck:
+      test: 'wget -qO- http://localhost:80/ping || exit 1'
+      interval: 4s
+      timeout: 2s
+      retries: 5
 
   # webhook-ingest:
   #   image: "ghcr.io/ls1intum/hephaestus/webhook-ingest:${IMAGE_TAG}"
@@ -77,6 +94,14 @@ services:
 
   keycloak:
     image: quay.io/keycloak/keycloak:26.0
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - core-network
+    volumes:
+      - keycloak-data:/opt/keycloak/data
     command:
       - start
     environment:
@@ -92,11 +117,21 @@ services:
       - KC_HTTP_ENABLED=${KC_HTTP_ENABLED:-true}
       - KC_HEALTH_ENABLED=${KC_HEALTH_ENABLED:-true}
       - KC_PROXY_HEADERS=${KC_PROXY_HEADERS:-xforwarded}
-    volumes:
-      - keycloak-data:/opt/keycloak/data
-    depends_on:
-      postgres:
-        condition: service_healthy
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.middlewares.gzip.compress=true"
+      - "traefik.http.middlewares.redirect-to-https.redirectscheme.scheme=https"
+      - "traefik.http.middlewares.https-keycloak-stripprefix.stripprefix.prefixes=/keycloak"
+      - "traefik.http.routers.http-keycloak.rule=Host(`${APP_HOSTNAME}`) && PathPrefix(`/keycloak`)"
+      - "traefik.http.routers.http-keycloak.entryPoints=http"
+      - "traefik.http.routers.http-keycloak.middlewares=redirect-to-https"
+      - "traefik.http.routers.http-keycloak.priority=5"
+      - "traefik.http.routers.https-keycloak.rule=Host(`${APP_HOSTNAME}`) && PathPrefix(`/keycloak`)"
+      - "traefik.http.routers.https-keycloak.entryPoints=https"
+      - "traefik.http.routers.https-keycloak.middlewares=https-keycloak-stripprefix,gzip"
+      - "traefik.http.routers.https-keycloak.tls.certresolver=letsencrypt"
+      - "traefik.http.routers.https-keycloak.tls=true"
+      - "traefik.http.routers.https-keycloak.priority=10"
     healthcheck:
       test:
         [
@@ -106,25 +141,12 @@ services:
       interval: 5s
       timeout: 20s
       retries: 10
-    restart: unless-stopped
-    labels:
-      - "traefik.enable=true"
-      - "traefik.http.middlewares.gzip.compress=true"
-      - "traefik.http.middlewares.redirect-to-https.redirectscheme.scheme=https"
-      - "traefik.http.middlewares.https-keycloak-stripprefix.stripprefix.prefixes=/keycloak"
-      - "traefik.http.routers.http-keycloak.rule=Host(`${APP_HOSTNAME}`) && PathPrefix(`/keycloak`)"
-      - "traefik.http.routers.http-keycloak.entryPoints=web"
-      - "traefik.http.routers.http-keycloak.middlewares=redirect-to-https"
-      - "traefik.http.routers.http-keycloak.priority=5"
-      - "traefik.http.routers.https-keycloak.rule=Host(`${APP_HOSTNAME}`) && PathPrefix(`/keycloak`)"
-      - "traefik.http.routers.https-keycloak.entryPoints=websecure"
-      - "traefik.http.routers.https-keycloak.middlewares=https-keycloak-stripprefix,gzip"
-      - "traefik.http.routers.https-keycloak.tls.certresolver=letsencrypt"
-      - "traefik.http.routers.https-keycloak.tls=true"
-      - "traefik.http.routers.https-keycloak.priority=10"
 
   postgres:
     image: postgres:16-alpine
+    restart: unless-stopped
+    networks:
+      - core-network
     volumes:
       - keycloak-postgresql-data:/var/lib/postgresql/data
     environment:
@@ -138,7 +160,6 @@ services:
       interval: 5s
       timeout: 20s
       retries: 10
-    restart: unless-stopped
 
 networks:
   core-network:
