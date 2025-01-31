@@ -33,7 +33,7 @@ export class ActivityDashboardComponent {
 
   detectBadPractices = () => {
     console.log('Detecting bad practices');
-    //this.activityService.detectBadPractices(this.userLogin!).subscribe();
+    this.activityService.detectBadPracticesByUser(this.userLogin!).subscribe();
   };
   protected readonly RefreshCcw = RefreshCcw;
 }

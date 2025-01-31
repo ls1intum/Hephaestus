@@ -7,6 +7,8 @@ import de.tum.in.www1.hephaestus.gitprovider.pullrequest.PullRequest;
 import de.tum.in.www1.hephaestus.gitprovider.pullrequest.PullRequestRepository;
 import de.tum.in.www1.hephaestus.gitprovider.user.UserRepository;
 import jakarta.transaction.Transactional;
+
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -61,12 +63,7 @@ public class ActivityService {
             .map(pullRequest ->
                 PullRequestWithBadPracticesDTO.fromPullRequest(
                     pullRequest,
-                    pullRequestBadPracticesMap.getOrDefault(
-                        pullRequest,
-                        List.of(
-                            new PullRequestBadPracticeDTO("Unchecked checkbox.", "The checkbox is not checked.", false)
-                        )
-                    )
+                    pullRequestBadPracticesMap.getOrDefault(pullRequest, List.of())
                 )
             )
             .collect(Collectors.toList());
@@ -78,18 +75,17 @@ public class ActivityService {
     public List<PullRequestBadPracticeDTO> detectBadPractices(String login) {
         logger.info("Detecting bad practices for user with login: {}", login);
 
-        userRepository.findByLogin(login).orElseThrow(() -> new IllegalArgumentException("User not found"));
-
         List<PullRequest> pullRequests = pullRequestRepository.findAssignedByLoginAndStates(
             login,
             Set.of(Issue.State.OPEN)
         );
 
-        List<PullRequestBadPractice> badPractices = pullRequestBadPracticeDetector.detectAndSyncBadPractices(pullRequests);
-
-        return badPractices
-            .stream()
-            .map(PullRequestBadPracticeDTO::fromPullRequestBadPractice)
-            .collect(Collectors.toList());
+        List<PullRequestBadPractice> detectedBadPractices = new ArrayList<>();
+        for (PullRequest pullRequest : pullRequests) {
+            detectedBadPractices.addAll(pullRequestBadPracticeDetector.detectAndSyncBadPractices(pullRequest));
+        }
+        return detectedBadPractices.stream().map(PullRequestBadPracticeDTO::fromPullRequestBadPractice).toList();
     }
+
+
 }

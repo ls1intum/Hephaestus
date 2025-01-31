@@ -17,7 +17,7 @@ class DetectorResponse(BaseModel):
 @router.post(
     "/",
     response_model=DetectorResponse,
-    summary="Detect bad practices given rules.",
+    summary="Detect bad practices for given pull request.",
 )
 def detect(request: DetectorRequest):
     return detectbadpractices(request.title, request.description)
