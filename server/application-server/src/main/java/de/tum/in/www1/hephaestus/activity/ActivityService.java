@@ -48,7 +48,7 @@ public class ActivityService {
             pullRequestBadPracticeRepository.findAssignedByLoginAndOpen(login);
 
         Map<PullRequest, List<PullRequestBadPracticeDTO>> pullRequestBadPracticesMap = openPulLRequestBadPractices
-            .stream()
+            .stream().filter(pullRequestBadPractice -> !pullRequestBadPractice.isResolved())
             .collect(
                 Collectors.groupingBy(
                     PullRequestBadPractice::getPullrequest,
@@ -71,7 +71,6 @@ public class ActivityService {
         return new ActivityDTO(openPullRequestsWithBadPractices);
     }
 
-    @Transactional
     public List<PullRequestBadPracticeDTO> detectBadPractices(String login) {
         logger.info("Detecting bad practices for user with login: {}", login);
 
@@ -80,12 +79,14 @@ public class ActivityService {
             Set.of(Issue.State.OPEN)
         );
 
+        List<PullRequestBadPractice> existingBadPractices = pullRequestBadPracticeRepository.findAssignedByLoginAndOpen(login);
+        existingBadPractices.forEach(existingBadPractice -> existingBadPractice.setResolved(true));
+        pullRequestBadPracticeRepository.saveAll(existingBadPractices);
+
         List<PullRequestBadPractice> detectedBadPractices = new ArrayList<>();
         for (PullRequest pullRequest : pullRequests) {
             detectedBadPractices.addAll(pullRequestBadPracticeDetector.detectAndSyncBadPractices(pullRequest));
         }
         return detectedBadPractices.stream().map(PullRequestBadPracticeDTO::fromPullRequestBadPractice).toList();
     }
-
-
 }

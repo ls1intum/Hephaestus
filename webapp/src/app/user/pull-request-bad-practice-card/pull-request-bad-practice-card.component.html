@@ -58,7 +58,7 @@
         <brn-collapsible-content>
           @for (badpractice of badPractices(); track badpractice.title) {
             <brn-separator hlmSeparator />
-            <app-bad-practice-card [title]="badpractice.title" [description]="badpractice.description" [resolved]="false"></app-bad-practice-card>
+            <app-bad-practice-card [title]="badpractice.title" [description]="badpractice.description" [resolved]="badpractice.resolved"></app-bad-practice-card>
           }
         </brn-collapsible-content>
       </div>

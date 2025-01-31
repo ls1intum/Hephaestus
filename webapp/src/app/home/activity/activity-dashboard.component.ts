@@ -20,6 +20,7 @@ export class ActivityDashboardComponent {
   protected userLogin: string | null = null;
   protected numberOfPullRequests = computed(() => this.query.data()?.pullRequests?.length ?? 0);
   protected numberOfBadPractices = computed(() => this.query.data()?.pullRequests?.reduce((acc, pr) => acc + (pr.badPractices?.length ?? 0), 0) ?? 0);
+  protected readonly RefreshCcw = RefreshCcw;
 
   constructor(private route: ActivatedRoute) {
     this.userLogin = this.route.snapshot.paramMap.get('id');
@@ -35,5 +36,4 @@ export class ActivityDashboardComponent {
     console.log('Detecting bad practices');
     this.activityService.detectBadPracticesByUser(this.userLogin!).subscribe();
   };
-  protected readonly RefreshCcw = RefreshCcw;
 }

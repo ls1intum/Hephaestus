@@ -44,7 +44,8 @@ public class PullRequestBadPracticeDetector {
         return detectedBadPractices;
     }
 
-    private PullRequestBadPractice handleDetectedBadPractices(PullRequest pullRequest, BadPractice badPractice) {
+    @Transactional
+    protected PullRequestBadPractice handleDetectedBadPractices(PullRequest pullRequest, BadPractice badPractice) {
 
         PullRequestBadPractice pullRequestBadPractice = new PullRequestBadPractice();
         pullRequestBadPractice.setTitle(badPractice.getTitle());
