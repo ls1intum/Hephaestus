@@ -21,6 +21,7 @@ public interface PullRequestRepository extends JpaRepository<PullRequest, Long> 
     )
     Optional<OffsetDateTime> firstContributionByAuthorLogin(@Param("authorLogin") String authorLogin);
 
+    @Transactional
     @Query(
         """
         SELECT p
