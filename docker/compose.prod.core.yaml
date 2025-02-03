@@ -54,17 +54,19 @@ services:
     labels:
       - "traefik.enable=true"
       - "traefik.http.middlewares.gzip.compress=true"
+      - "traefik.http.middlewares.https-webhook-ingest-stripprefix.stripprefix.prefixes=/webhooks"
       - "traefik.http.middlewares.redirect-to-https.redirectscheme.scheme=https"
       - "traefik.http.routers.http-webhook-ingest.entryPoints=http"
       - "traefik.http.routers.http-webhook-ingest.middlewares=redirect-to-https"
       - "traefik.http.routers.http-webhook-ingest.rule=Host(`${APP_HOSTNAME}`) && PathPrefix(`/webhooks`)"
       - "traefik.http.routers.https-webhook-ingest.entryPoints=https"
+      - "traefik.http.routers.https-webhook-ingest.middlewares=https-webhook-ingest-stripprefix,gzip"
       - "traefik.http.routers.https-webhook-ingest.middlewares=gzip"
       - "traefik.http.routers.https-webhook-ingest.rule=Host(`${APP_HOSTNAME}`) && PathPrefix(`/webhooks`)"
       - "traefik.http.routers.https-webhook-ingest.tls.certresolver=letsencrypt"
       - "traefik.http.routers.https-webhook-ingest.tls=true"
-      - "traefik.http.routers.http-keycloak.priority=5"
-      - "traefik.http.routers.https-keycloak.priority=10"
+      - "traefik.http.routers.http-webhook-ingest.priority=5"
+      - "traefik.http.routers.https-webhook-ingest.priority=10"
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:4200/health"]
       interval: 30s
