@@ -29,7 +29,7 @@ jobs:
           java-version: '21'
 
       - name: Install dependencies
-        run: npm install
+        run: npm ci
 
       - name: Run Liquibase update and diff
         run: npm run db:changelog:diff
