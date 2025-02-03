@@ -1,0 +1,49 @@
+name: Liquibase Migration Check
+
+on:
+  pull_request:
+    types: [opened, synchronize, labeled, reopened]
+    paths:
+      - 'server/application-server/**'
+      - '.github/workflows/liquibase-migration-check.yml'
+  workflow_dispatch:
+
+jobs:
+  liquibase-check:
+    name: Liquibase Migration Check
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '21'
+
+      - name: Set up directories
+        working-directory: server/application-server/src/main/resources/db/changelog
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Run Liquibase update and diff
+        run: npm run db:changelog:diff
+
+      - name: Check for changes in the liquibase changelog
+        id: check_changes
+        run: |
+          echo "Checking for changes in the liquibase changelog..."
+          git add .
+          if git diff --cached --quiet; then
+            echo "No changes detected in the liquibase changelog."
+            echo "NO_CHANGES_DETECTED=true" >> $GITHUB_ENV
+          else
+            echo "Changes detected in the liquibase changelog."
+            echo "NO_CHANGES_DETECTED=false" >> $GITHUB_ENV
+            exit 1
+          fi
