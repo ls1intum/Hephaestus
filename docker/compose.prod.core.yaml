@@ -112,8 +112,8 @@ services:
       - KC_DB_USERNAME=root
       - KC_DB_PASSWORD=root
       - KC_DB_URL_PORT=5432
-      - KC_DB_URL=jdbc:postgresql://postgres/${POSTGRESQL_DATABASE:-keycloak}
-      - KC_HOSTNAME=${APP_HOSTNAME}
+      - KC_DB_URL=jdbc:postgresql://postgres/keycloak
+      - KC_HOSTNAME="${APP_HOSTNAME}/keycloak"
       - KC_HTTP_ENABLED=${KC_HTTP_ENABLED:-true}
       - KC_HEALTH_ENABLED=${KC_HEALTH_ENABLED:-true}
       - KC_PROXY_HEADERS=${KC_PROXY_HEADERS:-xforwarded}
@@ -156,7 +156,7 @@ services:
     healthcheck:
       test:
         - CMD-SHELL
-        - pg_isready
+        - pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}
       interval: 5s
       timeout: 20s
       retries: 10
