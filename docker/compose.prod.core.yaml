@@ -113,20 +113,19 @@ services:
       - KC_DB_PASSWORD=root
       - KC_DB_URL_PORT=5432
       - KC_DB_URL=jdbc:postgresql://postgres/keycloak
-      - KC_HOSTNAME="${APP_HOSTNAME}/keycloak"
+      - KC_HOSTNAME=${APP_HOSTNAME}
+      - KC_HTTP_RELATIVE_PATH=/keycloak
       - KC_HTTP_ENABLED=${KC_HTTP_ENABLED:-true}
       - KC_HEALTH_ENABLED=${KC_HEALTH_ENABLED:-true}
       - KC_PROXY_HEADERS=${KC_PROXY_HEADERS:-xforwarded}
     labels:
       - "traefik.enable=true"
       - "traefik.http.middlewares.gzip.compress=true"
-      - "traefik.http.middlewares.https-keycloak-stripprefix.stripprefix.prefixes=/keycloak"
       - "traefik.http.middlewares.redirect-to-https.redirectscheme.scheme=https"
       - "traefik.http.routers.http-keycloak.entryPoints=http"
       - "traefik.http.routers.http-keycloak.middlewares=redirect-to-https"
       - "traefik.http.routers.http-keycloak.rule=Host(`${APP_HOSTNAME}`) && PathPrefix(`/keycloak`)"
       - "traefik.http.routers.https-keycloak.entryPoints=https"
-      - "traefik.http.routers.https-keycloak.middlewares=https-keycloak-stripprefix,gzip"
       - "traefik.http.routers.https-keycloak.rule=Host(`${APP_HOSTNAME}`) && PathPrefix(`/keycloak`)"
       - "traefik.http.routers.https-keycloak.tls.certresolver=letsencrypt"
       - "traefik.http.routers.https-keycloak.tls=true"
@@ -136,7 +135,7 @@ services:
       test:
         [
           "CMD-SHELL",
-          "exec 3<>/dev/tcp/127.0.0.1/9000; echo -e 'GET /health/ready HTTP/1.1\r\nHost: localhost:9000\r\nConnection: close\r\n\r\n' >&3;cat <&3 | grep -q '\"status\": \"UP\"' && exit 0 || exit 1",
+          "exec 3<>/dev/tcp/127.0.0.1/9000; echo -e 'GET /keycloak/health/ready HTTP/1.1\r\nHost: localhost:9000\r\nConnection: close\r\n\r\n' >&3;cat <&3 | grep -q '\"status\": \"UP\"' && exit 0 || exit 1",
         ]
       interval: 5s
       timeout: 20s
