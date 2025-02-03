@@ -35,8 +35,35 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Run Liquibase update and diff
-        run: npm run db:changelog:diff
+      - name: Navigate to application server directory
+        run: cd server/application-server
+
+      - name: Stop PostgreSQL container
+        run: docker compose down postgres
+
+      - name: Move PostgreSQL data to temporary location
+        run: shx --silent mv postgres-data postgres-data-temp
+
+      - name: Start PostgreSQL container
+        run: docker compose up -d postgres
+
+      - name: Wait for PostgreSQL to be ready
+        run: docker compose exec postgres sh -c "until pg_isready -h localhost -p 5432; do sleep 1; done"
+
+      - name: Run Liquibase update
+        run: mvn liquibase:update
+
+      - name: Run Liquibase diff
+        run: mvn liquibase:diff
+
+      - name: Stop PostgreSQL container
+        run: docker compose down postgres
+
+      - name: Remove PostgreSQL data
+        run: shx rm -rf postgres-data
+
+      - name: Move PostgreSQL data back from temporary location
+        run: shx --silent mv postgres-data-temp postgres-data
 
       - name: Check for changes in the liquibase changelog
         id: check_changes
