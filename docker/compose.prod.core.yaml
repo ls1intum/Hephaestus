@@ -80,7 +80,10 @@ services:
   nats-server:
     image: nats:alpine
     restart: unless-stopped
-    # We don't need to expose the NATS ports to the host since we are not accessing it from outside in production
+    # Lock down the 4222 port from the internet for production
+    # We expose it to the host so we can interact with it from the host machine via the nats cli
+    ports:
+      - "4222:4222"
     command: ["--config", "/etc/nats/nats-server.conf"]
     volumes:
       - nats-data:/data
