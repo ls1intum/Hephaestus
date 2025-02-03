@@ -61,7 +61,6 @@ services:
       - "traefik.http.routers.http-webhook-ingest.rule=Host(`${APP_HOSTNAME}`) && PathPrefix(`/webhooks`)"
       - "traefik.http.routers.https-webhook-ingest.entryPoints=https"
       - "traefik.http.routers.https-webhook-ingest.middlewares=https-webhook-ingest-stripprefix,gzip"
-      - "traefik.http.routers.https-webhook-ingest.middlewares=gzip"
       - "traefik.http.routers.https-webhook-ingest.rule=Host(`${APP_HOSTNAME}`) && PathPrefix(`/webhooks`)"
       - "traefik.http.routers.https-webhook-ingest.tls.certresolver=letsencrypt"
       - "traefik.http.routers.https-webhook-ingest.tls=true"
