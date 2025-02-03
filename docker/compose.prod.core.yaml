@@ -39,58 +39,67 @@ services:
       timeout: 2s
       retries: 5
 
-  # webhook-ingest:
-  #   image: "ghcr.io/ls1intum/hephaestus/webhook-ingest:${IMAGE_TAG}"
-  #   ports:
-  #     - "4200"
-  #   environment:
-  #     NATS_URL: ${NATS_URL}
-  #     NATS_AUTH_TOKEN: ${NATS_AUTH_TOKEN}
-  #     WEBHOOK_SECRET: ${WEBHOOK_SECRET}
-  #   depends_on:
-  #     nats-server:
-  #       condition: service_healthy
-  #   networks:
-  #     - core-network
-  #   healthcheck:
-  #     test: ["CMD", "curl", "-f", "http://localhost:4200/health"]
-  #     interval: 30s
-  #     timeout: 10s
-  #     retries: 5
-  #     start_period: 3s
-  #   logging:
-  #     driver: "json-file"
-  #     options:
-  #       max-size: "10m"
-  #       max-file: "3"
+  webhook-ingest:
+    image: "ghcr.io/ls1intum/hephaestus/webhook-ingest:${IMAGE_TAG}"
+    ports:
+      - "4200"
+    environment:
+      NATS_URL: "nats://nats-server:4222"
+      WEBHOOK_SECRET: ${WEBHOOK_SECRET}
+    depends_on:
+      nats-server:
+        condition: service_healthy
+    networks:
+      - core-network
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.middlewares.gzip.compress=true"
+      - "traefik.http.middlewares.redirect-to-https.redirectscheme.scheme=https"
+      - "traefik.http.routers.http-webhook-ingest.entryPoints=http"
+      - "traefik.http.routers.http-webhook-ingest.middlewares=redirect-to-https"
+      - "traefik.http.routers.http-webhook-ingest.rule=Host(`${APP_HOSTNAME}`) && PathPrefix(`/webhooks`)"
+      - "traefik.http.routers.https-webhook-ingest.entryPoints=https"
+      - "traefik.http.routers.https-webhook-ingest.middlewares=gzip"
+      - "traefik.http.routers.https-webhook-ingest.rule=Host(`${APP_HOSTNAME}`) && PathPrefix(`/webhooks`)"
+      - "traefik.http.routers.https-webhook-ingest.tls.certresolver=letsencrypt"
+      - "traefik.http.routers.https-webhook-ingest.tls=true"
+      - "traefik.http.routers.http-keycloak.priority=5"
+      - "traefik.http.routers.https-keycloak.priority=10"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:4200/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 3s
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
 
-  # nats-server:
-  #   image: nats:alpine
-  #   ports:
-  #     - "4222:4222"
-  #     - "8222:8222"
-  #   command: ["--config", "/etc/nats/nats-server.conf"]
-  #   environment:
-  #     TLS_CERT_FILE: ${TLS_CERT_FILE}
-  #     TLS_KEY_FILE: ${TLS_KEY_FILE}
-  #     NATS_AUTH_TOKEN: ${NATS_AUTH_TOKEN}
-  #   volumes:
-  #     - nats-data:/data
-  #     - ./nats-server.conf:/etc/nats/nats-server.conf
-  #     - /etc/letsencrypt:/etc/letsencrypt:ro
-  #   networks:
-  #     - core-network
-  #   healthcheck:
-  #     test: ["CMD", "wget", "--spider", "--quiet", "http://localhost:8222/healthz"]
-  #     interval: 30s
-  #     timeout: 10s
-  #     retries: 5
-  #     start_period: 3s
-  #   logging:
-  #     driver: "json-file"
-  #     options:
-  #       max-size: "10m"
-  #       max-file: "3"
+  nats-server:
+    image: nats:alpine
+    restart: unless-stopped
+    # We don't need to expose the NATS ports to the host since we are not accessing it from outside in production
+    command: ["--config", "/etc/nats/nats-server.conf"]
+    volumes:
+      - nats-data:/data
+    configs:
+      - source: nats-server.conf
+        target: /etc/nats/nats-server.conf
+    networks:
+      - core-network
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "--quiet", "http://localhost:8222/healthz"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 3s
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
 
   keycloak:
     image: quay.io/keycloak/keycloak:26.0
@@ -167,3 +176,18 @@ volumes:
   nats-data: 
   keycloak-data:
   keycloak-postgresql-data:
+
+configs:
+  nats-server.conf:
+    content: |
+      listen: "0.0.0.0:4222" 
+
+      http_port: 8222
+
+      jetstream {
+        store_dir: "/data"
+        max_mem: 4G
+        max_file: 50G
+      }
+
+      # No tls for production since we are not exposing the NATS ports to the host
