@@ -39,7 +39,7 @@ jobs:
         run: docker compose down postgres
 
       - name: Move PostgreSQL data to temporary location
-        run: shx --silent mv postgres-data postgres-data-temp
+        run: npm run shx --silent mv postgres-data postgres-data-temp
 
       - name: Start PostgreSQL container
         run: docker compose up -d postgres
