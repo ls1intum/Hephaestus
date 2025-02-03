@@ -13,13 +13,24 @@ jobs:
     name: Liquibase Migration Check
     runs-on: ubuntu-latest
 
+    services:
+      # Label used to access the service container
+      postgres:
+        # Docker Hub image
+        image: postgres
+        # Provide the password for postgres
+        env:
+          POSTGRES_PASSWORD: root
+        # Set health checks to wait until postgres has started
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
-        with:
-          ref: ${{ github.event.pull_request.head.ref }}
-          persist-credentials: false # otherwise, the token used is the GITHUB_TOKEN, instead of your personal access token.
-          fetch-depth: 0
 
       - name: Set up Node.js
         uses: actions/setup-node@v4
@@ -35,12 +46,6 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Start PostgreSQL container
-        run: docker compose up -d postgres
-
-      - name: Wait for PostgreSQL to be ready
-        run: docker compose exec postgres sh -c "until pg_isready -h localhost -p 5432; do sleep 1; done"
-
       - name: Navigate to application server directory
         run: cd server/application-server
 
@@ -49,9 +54,6 @@ jobs:
 
       - name: Run Liquibase diff
         run: mvn liquibase:diff
-
-      - name: Stop PostgreSQL container
-        run: docker compose down postgres
 
       - name: Check for changes in the liquibase changelog
         id: check_changes
