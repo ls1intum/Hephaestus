@@ -35,9 +35,6 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Navigate to application server directory
-        run: cd server/application-server
-
       - name: Stop PostgreSQL container
         run: docker compose down postgres
 
@@ -49,6 +46,9 @@ jobs:
 
       - name: Wait for PostgreSQL to be ready
         run: docker compose exec postgres sh -c "until pg_isready -h localhost -p 5432; do sleep 1; done"
+
+      - name: Navigate to application server directory
+        run: cd server/application-server
 
       - name: Run Liquibase update
         run: mvn liquibase:update
