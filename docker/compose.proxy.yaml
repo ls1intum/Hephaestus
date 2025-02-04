@@ -48,6 +48,8 @@ services:
     configs:
       - source: maintenance-page
         target: /usr/share/nginx/html/index.html
+      - source: nginx-default-config
+        target: /etc/nginx/conf.d/default.conf
     labels:
       - "traefik.enable=true"
       - "traefik.http.middlewares.gzip.compress=true"
@@ -75,6 +77,19 @@ networks:
     driver: bridge
 
 configs:
+  nginx-default-config:
+    content: |
+      server {
+        listen 80;
+        server_name _;
+
+        root /usr/share/nginx/html;
+
+        location / {
+            try_files $uri /index.html;
+        }
+      }
+
   maintenance-page:
     content: |
       <!DOCTYPE html>
