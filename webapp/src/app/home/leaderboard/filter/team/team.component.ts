@@ -51,8 +51,10 @@ export class LeaderboardFilterTeamComponent {
       } else {
         queryParams['team'] = this.value();
       }
-      this.router.navigate([], {
-        queryParams
+      setTimeout(() => {
+        this.router.navigate([], {
+          queryParams
+        });
       });
     });
   }

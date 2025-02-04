@@ -2,7 +2,7 @@ import { ApplicationConfig, ErrorHandler, provideExperimentalZonelessChangeDetec
 import { provideRouter, Router } from '@angular/router';
 import { provideAnimationsAsync } from '@angular/platform-browser/animations/async';
 import { provideHttpClient, withInterceptors } from '@angular/common/http';
-import { provideAngularQuery, QueryClient } from '@tanstack/angular-query-experimental';
+import { QueryClient, provideTanStackQuery, withDevtools } from '@tanstack/angular-query-experimental';
 import { environment } from 'environments/environment';
 import { BASE_PATH } from 'app/core/modules/openapi';
 import { routes } from 'app/app.routes';
@@ -21,7 +21,10 @@ export const appConfig: ApplicationConfig = {
   providers: [
     provideExperimentalZonelessChangeDetection(),
     provideRouter(routes),
-    provideAngularQuery(new QueryClient()),
+    provideTanStackQuery(
+      new QueryClient(),
+      withDevtools(() => ({ loadDevtools: 'auto' }))
+    ),
     provideHttpClient(withInterceptors([securityInterceptor])),
     provideAnimationsAsync(),
     { provide: BASE_PATH, useValue: environment.serverUrl },

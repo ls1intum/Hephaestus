@@ -150,8 +150,10 @@ export class LeaderboardFilterTimeframeComponent {
     queryParams['after'] = dates[0];
     queryParams['before'] = dates[1];
 
-    this.router.navigate([], {
-      queryParams
+    setTimeout(() => {
+      this.router.navigate([], {
+        queryParams
+      });
     });
   }
 }
