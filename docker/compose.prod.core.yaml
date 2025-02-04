@@ -35,7 +35,7 @@ services:
       - traefik.http.services.traefik.loadbalancer.server.port=8080
       - traefik.http.middlewares.errorpage.errors.status=501,502,503,504
       - traefik.http.middlewares.errorpage.errors.service=maintenance
-      - traefik.http.middlewares.errorpage.errors.query=/maintenance.html
+      - traefik.http.middlewares.errorpage.errors.query=/index.html
     healthcheck:
       test: 'wget -qO- http://localhost:80/ping || exit 1'
       interval: 4s
@@ -181,7 +181,7 @@ services:
     restart: unless-stopped
     configs:
       - source: maintenance-page
-        target: /usr/share/nginx/html/maintenance.html
+        target: /usr/share/nginx/html/index.html
     labels:
       - "traefik.enable=true"
       - "traefik.http.routers.maintenance.rule=Host(`${APP_HOSTNAME}`)"
@@ -190,7 +190,7 @@ services:
     networks:
       - core-network
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost/maintenance.html"]
+      test: ["CMD", "curl", "-f", "http://localhost/"]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -222,7 +222,7 @@ configs:
     content: |
       <!DOCTYPE html>
       <html lang="en">
-      <title>Artemis Maintenance</title>
+      <title>Hephaestus Maintenance</title>
       <meta http-equiv="refresh" content="5"/>
       <style>
           html, body { padding: 0; margin: 0; width: 100%; height: 100%; }
