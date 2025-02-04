@@ -69,7 +69,8 @@ services:
       test: ["CMD", "curl", "-f", "http://localhost/"]
       interval: 30s
       timeout: 10s
-      retries: 3
+      retries: 5
+      start_period: 3s
 
 networks:
   shared-network:
@@ -86,7 +87,7 @@ configs:
         root /usr/share/nginx/html;
 
         location / {
-            try_files $uri /index.html;
+            rewrite ^ /index.html break;
         }
       }
 
