@@ -184,9 +184,17 @@ services:
         target: /usr/share/nginx/html/index.html
     labels:
       - "traefik.enable=true"
-      - "traefik.http.routers.maintenance.rule=Host(`${APP_HOSTNAME}`)"
-      - "traefik.http.routers.maintenance.entrypoints=http,https"
-      - "traefik.http.routers.maintenance.priority=100"
+      - "traefik.http.middlewares.gzip.compress=true"
+      - "traefik.http.middlewares.redirect-to-https.redirectscheme.scheme=https"
+      - "traefik.http.routers.http-maintenance.entryPoints=http"
+      - "traefik.http.routers.http-maintenance.middlewares=redirect-to-https"
+      - "traefik.http.routers.http-maintenance.rule=Host(`${APP_HOSTNAME}`)"
+      - "traefik.http.routers.https-maintenance.entryPoints=https"
+      - "traefik.http.routers.https-maintenance.rule=Host(`${APP_HOSTNAME}`)"
+      - "traefik.http.routers.https-maintenance.tls.certresolver=letsencrypt"
+      - "traefik.http.routers.https-maintenance.tls=true"
+      - "traefik.http.routers.http-maintenance.priority=1"
+      - "traefik.http.routers.https-maintenance.priority=1"
     networks:
       - core-network
     healthcheck:
