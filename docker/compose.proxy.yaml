@@ -11,8 +11,6 @@ services:
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock:ro
       - ./letsencrypt:/letsencrypt
-    environment:
-      - TRAEFIK_BASIC_AUTH=${TRAEFIK_BASIC_AUTH} # `htpasswd -nb <user> <password>` to generate
     command:
       - "--ping=true"
       - "--ping.entrypoint=http"
@@ -31,17 +29,13 @@ services:
       - "--certificatesresolvers.letsencrypt.acme.httpchallenge.entrypoint=http"
       - "--providers.docker=true"
     labels:
-      - "traefik.enable=true"
-      - "traefik.http.routers.traefik.entrypoints=https"
-      - "traefik.http.routers.traefik.service=api@internal"
-      - "traefik.http.routers.traefik.rule=Host(`${APP_HOSTNAME}`) && PathPrefix(`/traefik`)"
-      - "traefik.http.routers.traefik.tls=true"
-      - "traefik.http.routers.traefik.middlewares=auth"
-      - "traefik.http.middlewares.auth.basicauth.users=${TRAEFIK_BASIC_AUTH}"
-      - "traefik.http.services.traefik.loadbalancer.server.port=8080"
-      - "traefik.http.middlewares.errorpage.errors.status=501,502,503,504"
-      - "traefik.http.middlewares.errorpage.errors.service=maintenance"
-      - "traefik.http.middlewares.errorpage.errors.query=/index.html"
+      - traefik.enable=true
+      - traefik.http.routers.traefik.entrypoints=http
+      - traefik.http.routers.traefik.service=api@internal
+      - traefik.http.services.traefik.loadbalancer.server.port=8080
+      - traefik.http.middlewares.errorpage.errors.status=501,502,503,504
+      - traefik.http.middlewares.errorpage.errors.service=maintenance
+      - traefik.http.middlewares.errorpage.errors.query=/index.html
     healthcheck:
       test: 'wget -qO- http://localhost:80/ping || exit 1'
       interval: 4s
