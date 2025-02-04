@@ -61,7 +61,7 @@ services:
     depends_on:
       - postgres
     networks:
-      - app-network
+      - shared-network
     healthcheck:
       test: "wget -qO- http://localhost:8080/actuator/health || exit 1"
       interval: 30s
@@ -83,7 +83,7 @@ services:
     depends_on:
       - postgres
     networks:
-      - app-network
+      - shared-network
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
       interval: 30s
@@ -105,7 +105,7 @@ services:
     ports:
       - '5432'
     networks:
-      app-network:
+      shared-network:
         aliases:
           - postgres
     volumes:
@@ -117,7 +117,8 @@ services:
       retries: 5
 
 networks:
-  app-network:
+  shared-network:
+    name: shared-network
     driver: bridge
 
 volumes:
