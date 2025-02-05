@@ -30,16 +30,16 @@ jobs:
   docs: 
     runs-on: ubuntu-22.04
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - uses: FelixTJDietrich/sphinx-action@java
         with:
           docs-folder: "docs/"
           build-command: make html dirhtml
-      - uses: actions/upload-artifact@v3
+      - uses: actions/upload-artifact@v4
         with:
           name: Documentation
           path: docs/_build/html/
-      - uses: actions/upload-pages-artifact@v1
+      - uses: actions/upload-pages-artifact@v3
         with:
           path: docs/_build/dirhtml/
   deploy:
