@@ -51,6 +51,9 @@ jobs:
           pip install --upgrade pip
           pip install -r docs/requirements.txt
 
+      - name: Setup Graphviz
+        uses: ts-graphviz/setup-graphviz@v2
+
       - name: Build Sphinx HTML
         run: |
           cd docs
