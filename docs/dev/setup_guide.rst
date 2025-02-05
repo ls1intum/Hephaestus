@@ -67,7 +67,7 @@ Server Setup
 Note that the following steps vary depending on your choice of IDE. This guide takes a terminal-based approach optimized for developers who prefer working with the command line. If you are using an IDE like IntelliJ, you may find it easier to use the built-in tools instead.
 
 Maven Profiles and Configuration Setup
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 Maven profiles help you manage different build configurations. Hephaestus currently uses the following profiles:
 
