@@ -29,6 +29,12 @@ permissions:
 jobs: 
   docs: 
     runs-on: ubuntu-22.04
+    permissions:
+      contents: read
+      # Needed to upload the artifact containing the built docs
+      # The 'pages: write' and 'id-token: write' are required for deploying to GitHub Pages
+      pages: write
+      id-token: write
     steps:
       - uses: actions/checkout@v4
       - uses: FelixTJDietrich/sphinx-action@java
