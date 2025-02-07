@@ -40,7 +40,7 @@ public class DetectorApi extends BaseApi {
     }
 
     /**
-     * Detect bad practices given rules.
+     * Detect bad practices for given pull request.
      * 
      * <p><b>200</b> - Successful Response
      * <p><b>422</b> - Validation Error
@@ -53,7 +53,7 @@ public class DetectorApi extends BaseApi {
     }
 
     /**
-     * Detect bad practices given rules.
+     * Detect bad practices for given pull request.
      * 
      * <p><b>200</b> - Successful Response
      * <p><b>422</b> - Validation Error
