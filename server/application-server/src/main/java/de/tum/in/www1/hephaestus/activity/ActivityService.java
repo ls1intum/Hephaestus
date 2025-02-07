@@ -48,7 +48,6 @@ public class ActivityService {
 
         Map<PullRequest, List<PullRequestBadPracticeDTO>> pullRequestBadPracticesMap = openPulLRequestBadPractices
             .stream()
-            .filter(pullRequestBadPractice -> !pullRequestBadPractice.isResolved())
             .collect(
                 Collectors.groupingBy(
                     PullRequestBadPractice::getPullrequest,
@@ -71,19 +70,14 @@ public class ActivityService {
         return new ActivityDTO(openPullRequestsWithBadPractices);
     }
 
-    public List<PullRequestBadPracticeDTO> detectBadPractices(String login) {
+    @Transactional
+    public List<PullRequestBadPracticeDTO> detectBadPracticesForUser(String login) {
         logger.info("Detecting bad practices for user with login: {}", login);
 
         List<PullRequest> pullRequests = pullRequestRepository.findAssignedByLoginAndStates(
             login,
             Set.of(Issue.State.OPEN)
         );
-
-        List<PullRequestBadPractice> existingBadPractices = pullRequestBadPracticeRepository.findAssignedByLoginAndOpen(
-            login
-        );
-        existingBadPractices.forEach(existingBadPractice -> existingBadPractice.setResolved(true));
-        pullRequestBadPracticeRepository.saveAll(existingBadPractices);
 
         List<PullRequestBadPractice> detectedBadPractices = new ArrayList<>();
         for (PullRequest pullRequest : pullRequests) {
@@ -92,17 +86,14 @@ public class ActivityService {
         return detectedBadPractices.stream().map(PullRequestBadPracticeDTO::fromPullRequestBadPractice).toList();
     }
 
-    public List<PullRequestBadPracticeDTO> detectBadPractices(Long prId) {
+    @Transactional
+    public List<PullRequestBadPracticeDTO> detectBadPracticesForPr(Long prId) {
         logger.info("Detecting bad practices for PR: {}", prId);
 
         PullRequest pullRequest = pullRequestRepository.findById(prId).orElse(null);
         if (pullRequest == null) {
             throw new IllegalArgumentException("Pull request " + prId + " not found");
         }
-
-        List<PullRequestBadPractice> existingBadPractices = pullRequestBadPracticeRepository.findByPullRequestId(prId);
-        existingBadPractices.forEach(existingBadPractice -> existingBadPractice.setResolved(true));
-        pullRequestBadPracticeRepository.saveAll(existingBadPractices);
 
         List<PullRequestBadPractice> detectedBadPractices = pullRequestBadPracticeDetector.detectAndSyncBadPractices(pullRequest);
         return detectedBadPractices.stream().map(PullRequestBadPracticeDTO::fromPullRequestBadPractice).toList();

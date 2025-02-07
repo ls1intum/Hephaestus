@@ -1,7 +1,18 @@
-import { Component, computed, input } from '@angular/core';
-import { PullRequestInfo, LabelInfo, PullRequestBadPractice } from '@app/core/modules/openapi';
+import { Component, computed, inject, input } from '@angular/core';
+import { PullRequestInfo, LabelInfo, PullRequestBadPractice, ActivityService } from '@app/core/modules/openapi';
 import { NgIcon } from '@ng-icons/core';
-import { octCheck, octComment, octFileDiff, octGitPullRequest, octGitPullRequestClosed, octGitPullRequestDraft, octGitMerge, octX, octFold } from '@ng-icons/octicons';
+import {
+  octCheck,
+  octComment,
+  octFileDiff,
+  octGitPullRequest,
+  octGitPullRequestClosed,
+  octGitPullRequestDraft,
+  octGitMerge,
+  octX,
+  octFold,
+  octSync
+} from '@ng-icons/octicons';
 import { HlmCardModule } from '@spartan-ng/ui-card-helm';
 import { HlmSkeletonComponent } from '@spartan-ng/ui-skeleton-helm';
 
@@ -33,6 +44,8 @@ import { formatTitle } from '@app/utils';
   ]
 })
 export class PullRequestBadPracticeCardComponent {
+  activityService = inject(ActivityService);
+
   protected readonly octCheck = octCheck;
   protected readonly octX = octX;
   protected readonly octComment = octComment;
@@ -41,6 +54,7 @@ export class PullRequestBadPracticeCardComponent {
 
   isLoading = input(false);
   class = input('');
+  id = input.required<number>();
   title = input<string>();
   number = input<number>();
   additions = input<number>();
@@ -82,4 +96,10 @@ export class PullRequestBadPracticeCardComponent {
 
     return { icon, color };
   });
+  protected readonly octSync = octSync;
+
+  detectBadPractices = () => {
+    console.log('Detecting bad practices for PR ' + this.id());
+    this.activityService.detectBadPracticesByUserAndPr(this.id()).subscribe();
+  };
 }

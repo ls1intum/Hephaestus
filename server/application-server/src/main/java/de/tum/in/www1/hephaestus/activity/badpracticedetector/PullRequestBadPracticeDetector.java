@@ -33,27 +33,53 @@ public class PullRequestBadPracticeDetector {
      */
     public List<PullRequestBadPractice> detectAndSyncBadPractices(PullRequest pullRequest) {
         logger.info("Detecting bad practices for pull request: {}", pullRequest.getId());
+
+        List<PullRequestBadPractice> existingBadPractices = pullRequestBadPracticeRepository.findByPullRequestId(pullRequest.getId());
+
         DetectorRequest detectorRequest = new DetectorRequest();
         detectorRequest.setDescription(pullRequest.getBody());
         detectorRequest.setTitle(pullRequest.getTitle());
+        detectorRequest.setBadPractices(existingBadPractices.stream().map(this::convertToIntelligenceBadPractice).toList());
         DetectorResponse detectorResponse = detectorApi.detectDetectorPost(detectorRequest);
 
         List<PullRequestBadPractice> detectedBadPractices = new LinkedList<>();
 
+        // Check if there are returned bad practices in the response with the same title as an existing bad practice
         for (BadPractice badPractice : detectorResponse.getBadPractices()) {
-            detectedBadPractices.add(handleDetectedBadPractices(pullRequest, badPractice));
+            boolean exists = false;
+            for (PullRequestBadPractice existingBadPractice : existingBadPractices) {
+                if (existingBadPractice.getTitle().equals(badPractice.getTitle())) {
+                    existingBadPractice.setDescription(badPractice.getDescription());
+                    existingBadPractice.setResolved(badPractice.getResolved());
+                    detectedBadPractices.add(pullRequestBadPracticeRepository.save(existingBadPractice));
+                    exists = true;
+                    break;
+                }
+            }
+            if (!exists) {
+                detectedBadPractices.add(saveDetectedBadPractices(pullRequest, badPractice));
+            }
         }
 
         logger.info("Detected {} bad practices for pull request: {}", detectedBadPractices.size(), pullRequest.getId());
         return detectedBadPractices;
     }
 
-    protected PullRequestBadPractice handleDetectedBadPractices(PullRequest pullRequest, BadPractice badPractice) {
+    protected PullRequestBadPractice saveDetectedBadPractices(PullRequest pullRequest, BadPractice badPractice) {
+
         PullRequestBadPractice pullRequestBadPractice = new PullRequestBadPractice();
         pullRequestBadPractice.setTitle(badPractice.getTitle());
         pullRequestBadPractice.setDescription(badPractice.getDescription());
         pullRequestBadPractice.setPullrequest(pullRequest);
-        pullRequestBadPractice.setResolved(false);
+        pullRequestBadPractice.setResolved(badPractice.getResolved());
         return pullRequestBadPracticeRepository.save(pullRequestBadPractice);
+    }
+
+    private BadPractice convertToIntelligenceBadPractice(PullRequestBadPractice pullRequestBadPractice) {
+        BadPractice badPractice = new BadPractice();
+        badPractice.setTitle(pullRequestBadPractice.getTitle());
+        badPractice.setDescription(pullRequestBadPractice.getDescription());
+        badPractice.setResolved(pullRequestBadPractice.isResolved());
+        return badPractice;
     }
 }

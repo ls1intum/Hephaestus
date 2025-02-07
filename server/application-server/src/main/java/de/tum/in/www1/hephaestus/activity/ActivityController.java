@@ -22,13 +22,13 @@ public class ActivityController {
 
     @PostMapping("/{login}/badpractices")
     public ResponseEntity<List<PullRequestBadPracticeDTO>> detectBadPracticesByUser(@PathVariable String login) {
-        List<PullRequestBadPracticeDTO> badPractices = activityService.detectBadPractices(login);
+        List<PullRequestBadPracticeDTO> badPractices = activityService.detectBadPracticesForUser(login);
         return ResponseEntity.ok(badPractices);
     }
 
     @PostMapping("{prId}/badpractices/")
-    public ResponseEntity<List<PullRequestBadPracticeDTO>> detectBadPracticesByUserAndPr(@PathVariable Long prId) {
-        List<PullRequestBadPracticeDTO> badPractice = activityService.detectBadPractices(prId);
+    public ResponseEntity<List<PullRequestBadPracticeDTO>> detectBadPracticesByPr(@PathVariable Long prId) {
+        List<PullRequestBadPracticeDTO> badPractice = activityService.detectBadPracticesForPr(prId);
         return ResponseEntity.ok(badPractice);
     }
 }
