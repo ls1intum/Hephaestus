@@ -25,4 +25,10 @@ public class ActivityController {
         List<PullRequestBadPracticeDTO> badPractices = activityService.detectBadPractices(login);
         return ResponseEntity.ok(badPractices);
     }
+
+    @PostMapping("{prId}/badpractices/")
+    public ResponseEntity<List<PullRequestBadPracticeDTO>> detectBadPracticesByUserAndPr(@PathVariable Long prId) {
+        List<PullRequestBadPracticeDTO> badPractice = activityService.detectBadPractices(prId);
+        return ResponseEntity.ok(badPractice);
+    }
 }

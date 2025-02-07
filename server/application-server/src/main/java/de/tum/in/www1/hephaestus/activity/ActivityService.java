@@ -91,4 +91,20 @@ public class ActivityService {
         }
         return detectedBadPractices.stream().map(PullRequestBadPracticeDTO::fromPullRequestBadPractice).toList();
     }
+
+    public List<PullRequestBadPracticeDTO> detectBadPractices(Long prId) {
+        logger.info("Detecting bad practices for PR: {}", prId);
+
+        PullRequest pullRequest = pullRequestRepository.findById(prId).orElse(null);
+        if (pullRequest == null) {
+            throw new IllegalArgumentException("Pull request " + prId + " not found");
+        }
+
+        List<PullRequestBadPractice> existingBadPractices = pullRequestBadPracticeRepository.findByPullRequestId(prId);
+        existingBadPractices.forEach(existingBadPractice -> existingBadPractice.setResolved(true));
+        pullRequestBadPracticeRepository.saveAll(existingBadPractices);
+
+        List<PullRequestBadPractice> detectedBadPractices = pullRequestBadPracticeDetector.detectAndSyncBadPractices(pullRequest);
+        return detectedBadPractices.stream().map(PullRequestBadPracticeDTO::fromPullRequestBadPractice).toList();
+    }
 }

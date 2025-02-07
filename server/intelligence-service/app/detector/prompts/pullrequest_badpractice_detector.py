@@ -7,7 +7,11 @@ PRIMARY TASK:
 Detect and identify any bad practices in the provided pull request title and description.
 - Review the title and description for any issues or violations of the guidelines.
 - For each detected bad practice, provide a title and a brief description of the issue.
-- Return a list of all detected bad practices in the pull request.
+- Check the list of existing bad practices and add any new bad practices to the list.
+- If the same bad practice is detected multiple times, return it consistently in the same way.
+- If a bad practice was resolved, meaning it is no longer present in the title or description, mark it as resolved.
+- If a bad practice was marked as resolved, but is detected again, mark it as detected again.
+- Return a list of all detected and all resolved bad practices in the pull request.
 
 GUIDELINES:
 1. The title and description should be clear, concise, and descriptive.
@@ -30,4 +34,5 @@ REQUIREMENTS:
 6. Multiple runs on the same title and description should return the same results if nothing has changed.
 
 Pull Request Title: {title}
-Pull Request Description: {description}"""
+Pull Request Description: {description}
+Existing Bad Practices: {bad_practices}"""
