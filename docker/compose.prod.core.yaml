@@ -77,12 +77,12 @@ services:
       - keycloak-data:/opt/keycloak/data
     configs:
       - source: realm-import.json
-        target: /opt/keycloak/data/import
-    command:
-      - start --import-realm
+        target: /opt/keycloak/realm-import.json
+    # Workaround for working with configs instead of mounting the file
+    entrypoint: [ "sh", "-c", "if [ ! -d /opt/keycloak/data/import ]; then rm -f /opt/keycloak/data/import && mkdir -p /opt/keycloak/data/import; fi && mv /opt/keycloak/data/realm-import.json /opt/keycloak/data/import/realm-import.json && exec /opt/keycloak/bin/kc.sh start --import-realm" ]
     environment:
       - TZ=${TIMEZONE:-UTC}
-      - KEYCLOAK_ADMIN=${KEYCLOAK_ADMIN_USER}
+      - KEYCLOAK_ADMIN=${KEYCLOAK_ADMIN}
       - KEYCLOAK_ADMIN_PASSWORD=${KEYCLOAK_ADMIN_PASSWORD}
       - KC_DB=postgres
       - KC_DB_USERNAME=root
