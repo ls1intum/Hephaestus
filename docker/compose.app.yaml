@@ -23,9 +23,10 @@ services:
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost"]
-      interval: 1m30s
+      interval: 5s
       timeout: 10s
-      retries: 3
+      retries: 10
+      start_period: 5s
     logging:
       driver: "json-file"
       options:
@@ -69,10 +70,10 @@ services:
       - shared-network
     healthcheck:
       test: "wget -qO- http://localhost:8080/actuator/health || exit 1"
-      interval: 30s
+      interval: 5s
       timeout: 10s
-      retries: 5
-      start_period: 30s
+      retries: 10
+      start_period: 10s
 
   intelligence-service:
     image: "ghcr.io/ls1intum/hephaestus/intelligence-service:${IMAGE_TAG}"
@@ -93,10 +94,10 @@ services:
       - shared-network
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:5000/health"]
-      interval: 30s
+      interval: 5s
       timeout: 10s
-      retries: 5
-      start_period: 3s
+      retries: 10
+      start_period: 5s
     logging:
       driver: "json-file"
       options:
@@ -121,9 +122,9 @@ services:
       test:
         - CMD-SHELL
         - pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}
-      interval: 10s
-      timeout: 5s
-      retries: 5
+      interval: 5s
+      timeout: 10s
+      retries: 10
 
 networks:
   shared-network:
