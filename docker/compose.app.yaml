@@ -42,7 +42,7 @@ services:
       DATABASE_URL: postgresql://postgres:5432/hephaestus
       DATABASE_USERNAME: root
       DATABASE_PASSWORD: root
-      INTELLIGENCE_SERVICE_URL: http://intelligence-service:8000
+      INTELLIGENCE_SERVICE_URL: http://intelligence-service:5000
       NATS_SERVER: nats://nats-server:4222
       KEYCLOAK_URL: https://${APP_HOSTNAME}/keycloak
       KEYCLOAK_REALM: hephaestus
@@ -88,11 +88,11 @@ services:
     depends_on:
       - postgres
     ports:
-      - '8000'
+      - '5000'
     networks:
       - shared-network
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      test: ["CMD", "curl", "-f", "http://localhost:5000/health"]
       interval: 30s
       timeout: 10s
       retries: 5
