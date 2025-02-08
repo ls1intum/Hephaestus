@@ -25,7 +25,7 @@ jobs:
     uses: ls1intum/.github/.github/workflows/deploy-docker-compose.yml@main
     with:
       environment: Production
-      docker-compose-file: "./docker/compose.prod.app.yaml"
+      docker-compose-file: "./docker/compose.app.yaml"
       main-image-name: ls1intum/hephaestus/application-server
       image-tag: ${{ inputs.image-tag }}
       deployment-base-path: "/opt/hephaestus/app"
@@ -36,7 +36,7 @@ jobs:
     uses: ls1intum/.github/.github/workflows/deploy-docker-compose.yml@main
     with:
       environment: Production
-      docker-compose-file: "./docker/compose.prod.core.yaml"
+      docker-compose-file: "./docker/compose.core.yaml"
       main-image-name: ls1intum/hephaestus/application-server
       image-tag: ${{ inputs.image-tag }}
       deployment-base-path: "/opt/hephaestus/core"
