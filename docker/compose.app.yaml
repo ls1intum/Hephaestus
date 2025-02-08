@@ -21,6 +21,8 @@ services:
     depends_on:
       - application-server
     restart: unless-stopped
+    networks:
+      - shared-network
     labels:
       - "traefik.enable=true"
       - "traefik.http.middlewares.gzip.compress=true"
