@@ -21,6 +21,19 @@ services:
     depends_on:
       - application-server
     restart: unless-stopped
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.middlewares.gzip.compress=true"
+      - "traefik.http.middlewares.redirect-to-https.redirectscheme.scheme=https"
+      - "traefik.http.routers.http-webapp.entryPoints=http"
+      - "traefik.http.routers.http-webapp.middlewares=redirect-to-https"
+      - "traefik.http.routers.http-webapp.rule=Host(`${APP_HOSTNAME}`)"
+      - "traefik.http.routers.https-webapp.entryPoints=https"
+      - "traefik.http.routers.https-webapp.rule=Host(`${APP_HOSTNAME}`)"
+      - "traefik.http.routers.https-webapp.tls.certresolver=letsencrypt"
+      - "traefik.http.routers.https-webapp.tls=true"
+      - "traefik.http.routers.http-webapp.priority=2"
+      - "traefik.http.routers.https-webapp.priority=3"
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost"]
       interval: 5s
@@ -66,14 +79,33 @@ services:
       SENTRY_DSN: ${SENTRY_DSN}
     depends_on:
       - postgres
+    restart: unless-stopped
     networks:
       - shared-network
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.middlewares.gzip.compress=true"
+      - "traefik.http.middlewares.redirect-to-https.redirectscheme.scheme=https"
+      - "traefik.http.routers.http-application-server.entryPoints=http"
+      - "traefik.http.routers.http-application-server.middlewares=redirect-to-https"
+      - "traefik.http.routers.http-application-server.rule=Host(`${APP_HOSTNAME}`) && PathPrefix(`/api`)"
+      - "traefik.http.routers.https-application-server.entryPoints=https"
+      - "traefik.http.routers.https-application-server.rule=Host(`${APP_HOSTNAME}`) && PathPrefix(`/api`)"
+      - "traefik.http.routers.https-application-server.tls.certresolver=letsencrypt"
+      - "traefik.http.routers.https-application-server.tls=true"
+      - "traefik.http.routers.http-application-server.priority=5"
+      - "traefik.http.routers.https-application-server.priority=10"
     healthcheck:
       test: "wget -qO- http://localhost:8080/actuator/health || exit 1"
       interval: 5s
       timeout: 10s
       retries: 10
       start_period: 10s
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "50m"
+        max-file: "5"
 
   intelligence-service:
     image: "ghcr.io/ls1intum/hephaestus/intelligence-service:${IMAGE_TAG}"
@@ -88,6 +120,7 @@ services:
       AZURE_OPENAI_API_VERSION: ${AZURE_OPENAI_API_VERSION}
     depends_on:
       - postgres
+    restart: unless-stopped
     ports:
       - '5000'
     networks:
@@ -101,8 +134,8 @@ services:
     logging:
       driver: "json-file"
       options:
-        max-size: "10m"
-        max-file: "3"
+        max-size: "50m"
+        max-file: "5"
 
   postgres:
     image: 'postgres:16'
@@ -116,6 +149,7 @@ services:
       shared-network:
         aliases:
           - postgres
+    restart: unless-stopped
     volumes:
       - postgresql-data:/var/lib/postgresql/data
     healthcheck:

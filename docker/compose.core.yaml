@@ -9,6 +9,7 @@ services:
     depends_on:
       nats-server:
         condition: service_healthy
+    restart: unless-stopped
     networks:
       - shared-network
     labels:
