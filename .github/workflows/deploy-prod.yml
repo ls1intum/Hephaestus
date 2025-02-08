@@ -28,7 +28,7 @@ jobs:
       docker-compose-file: "./docker/compose.prod.app.yaml"
       main-image-name: ls1intum/hephaestus/application-server
       image-tag: ${{ inputs.image-tag }}
-      deployment-base-path: "/opt/hephaestus"
+      deployment-base-path: "/opt/hephaestus/app"
     secrets: inherit
 
   deploy-core:
@@ -39,7 +39,7 @@ jobs:
       docker-compose-file: "./docker/compose.prod.core.yaml"
       main-image-name: ls1intum/hephaestus/application-server
       image-tag: ${{ inputs.image-tag }}
-      deployment-base-path: "/opt/hephaestus"
+      deployment-base-path: "/opt/hephaestus/core"
     secrets: inherit
 
   deploy-proxy:
@@ -51,6 +51,6 @@ jobs:
       # We just keep the main-image-name and image-tag as placeholders
       main-image-name: ls1intum/hephaestus/application-server
       image-tag: ${{ inputs.image-tag }}
-      deployment-base-path: "/opt/hephaestus"
+      deployment-base-path: "/opt/hephaestus/proxy"
     secrets: inherit
   
