@@ -1,6 +1,6 @@
 import { Routes } from '@angular/router';
+import { RootContainerComponent } from '@app/root-container.component';
 import { AboutComponent } from '@app/about/about.component';
-import { HomeComponent } from '@app/home/home.component';
 import { MentorComponent } from '@app/mentor/mentor.component';
 import { WorkspaceComponent } from '@app/workspace/workspace.component';
 import { UserProfileComponent } from '@app/user/user-profile.component';
@@ -16,6 +16,7 @@ import { MentorGuard } from '@app/core/security/mentor.guard';
 
 export const routes: Routes = [
   // Public routes
+  { path: '', component: RootContainerComponent }, // Landing page if not logged in, otherwise home
   { path: 'about', component: AboutComponent },
   {
     path: 'workspace',
@@ -40,16 +41,10 @@ export const routes: Routes = [
   { path: 'settings', component: SettingsComponent },
   { path: 'imprint', component: ImprintComponent },
   { path: 'privacy', component: PrivacyComponent },
+
   // Protected routes
-  {
-    path: '',
-    canActivate: [AuthGuard],
-    children: [
-      { path: '', component: HomeComponent },
-      { path: 'user/:id', component: UserProfileComponent },
-      { path: 'settings', component: SettingsComponent },
-      { path: 'mentor', component: MentorComponent, canActivate: [MentorGuard] },
-      { path: 'workspace', component: WorkspaceComponent, canActivate: [AdminGuard] }
-    ]
-  }
+  { path: 'user/:id', component: UserProfileComponent, canActivate: [AuthGuard] },
+  { path: 'settings', component: SettingsComponent, canActivate: [AuthGuard] },
+  { path: 'mentor', component: MentorComponent, canActivate: [AuthGuard, MentorGuard] },
+  { path: 'workspace', component: WorkspaceComponent, canActivate: [AuthGuard, AdminGuard] }
 ];

@@ -43,6 +43,7 @@ export class HeaderComponent {
   protected version = environment.version;
 
   securityStore = inject(SecurityStore);
+  loaded = this.securityStore.loaded;
   signedIn = this.securityStore.signedIn;
   user = this.securityStore.loadedUser;
 

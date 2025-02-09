@@ -1,0 +1,143 @@
+<div class="flex flex-col min-h-screen -mx-8 -mb-8">
+  <section class="w-full pt-12 md:pt-24 lg:pt-32 xl:pt-48 text-foreground">
+    <div class="container px-4 md:px-6">
+      <div class="flex flex-col items-center space-y-4 text-center">
+        <div class="space-y-2">
+          <h1 class="text-3xl font-bold tracking-tighter sm:text-4xl md:text-5xl lg:text-6xl/none">Forge Healthy Software Teams with Hephaestus</h1>
+          <p class="mx-auto max-w-[700px] text-secondary-foreground md:text-xl">
+            Empower your novice engineers, foster collaboration, and build sustainable development practices with our AI-powered platform.
+          </p>
+        </div>
+        <div class="space-x-4">
+          <button hlmBtn (click)="signIn()">Get Started</button>
+          <a hlmBtn variant="outline" href="#features">Learn More</a>
+        </div>
+      </div>
+    </div>
+    <div class="mx-4 md:mx-10">
+      <div class="shadow-2xl mt-24 max-w-4xl mx-auto">
+        <div class="border border-b-0 rounded-bl-none rounded-br-none rounded-md border-input overflow-auto leaderboard-fade-out pointer-events-none">
+          <app-leaderboard [leaderboard]="leaderboardEntries" />
+        </div>
+      </div>
+    </div>
+  </section>
+  <section id="features" class="relative left-1/2 -translate-x-1/2 w-screen py-12 md:py-24 lg:py-32 bg-github-muted -mt-2">
+    <div class="container px-4 md:px-6">
+      <h2 class="text-3xl font-bold tracking-tighter sm:text-4xl md:text-5xl text-center mb-12">Forge Excellence with Our Features</h2>
+      <div class="grid gap-6 lg:grid-cols-2">
+        <div hlmCard>
+          <div hlmCardHeader>
+            <lucide-angular [img]="Trophy" class="w-10 h-10 mb-2 text-yellow-500" />
+            <div hlmCardTitle>Code Review Gamification</div>
+            <div hlmCardDescription>Transform code reviews into an engaging, competitive experience</div>
+          </div>
+          <div hlmCardContent>
+            <ul class="list-disc pl-5 space-y-2">
+              <li>Dynamic weekly leaderboards with real-time GitHub integration</li>
+              <li>Team competitions across multiple repositories</li>
+              <li>Elo-like ranking system in structured leagues</li>
+              <li>Automated Slack recognition for top reviewers</li>
+            </ul>
+          </div>
+        </div>
+        <div hlmCard>
+          <div hlmCardHeader>
+            <lucide-angular [img]="BotMessageSquare" class="w-10 h-10 mb-2 text-cyan-500 hover:text-cyan-500" />
+            <div hlmCardTitle>AI Mentor</div>
+            <div hlmCardDescription>Personalized guidance for continuous improvement</div>
+          </div>
+          <div hlmCardContent>
+            <ul class="list-disc pl-5 space-y-2">
+              <li>AI-assisted weekly reflective sessions</li>
+              <li>Automated standups from reflection insights</li>
+              <li>GitHub activity awareness for data-driven feedback</li>
+              <li>Structured goal-setting and adjustment</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+  <section class="w-full py-12 md:py-24 lg:py-32">
+    <div class="container px-4 md:px-6">
+      <div class="grid gap-6 lg:grid-cols-[1fr_400px] lg:gap-12 xl:grid-cols-[1fr_600px]">
+        <img src="/images/agile_hephaestus.png" alt="Agile Hephaestus" width="600" height="400" class="mx-auto aspect-square sm:max-w-xs md:sm:max-w-md lg:order-last" />
+        <div class="flex flex-col justify-center space-y-4">
+          <h2 class="text-3xl font-bold tracking-tighter sm:text-4xl md:text-5xl">Why Choose Hephaestus?</h2>
+          <p class="max-w-[600px] text-gray-500 md:text-xl/relaxed lg:text-base/relaxed xl:text-xl/relaxed">
+            Hephaestus, named after the Greek god of craftsmen, fuses creativity with technical skill to forge the future of software development teams.
+          </p>
+          <ul class="grid gap-6 mt-6">
+            <li class="flex items-center gap-2">
+              <lucide-angular [img]="Hammer" class="w-6 h-6 text-primary" />
+              <span>Empower novice engineers with actionable tools</span>
+            </li>
+            <li class="flex items-center gap-2">
+              <lucide-angular [img]="Users" class="w-6 h-6 text-primary" />
+              <span>Foster sustainable, collaborative practices</span>
+            </li>
+            <li class="flex items-center gap-2">
+              <lucide-angular [img]="Trophy" class="w-6 h-6 text-primary" />
+              <span>Gamify code reviews for increased engagement</span>
+            </li>
+            <li class="flex items-center gap-2">
+              <lucide-angular [img]="BotMessageSquare" class="w-6 h-6 text-primary" />
+              <span>Leverage AI for personalized team growth</span>
+            </li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </section>
+  <section id="testimonials" class="relative left-1/2 -translate-x-1/2 w-screen py-12 md:py-24 lg:py-32 bg-github-muted">
+    <div class="container px-4 md:px-6 flex flex-col items-center">
+      <h2 class="text-3xl font-bold tracking-tighter sm:text-4xl md:text-5xl text-center mb-12">What Teams Are Saying</h2>
+      <div class="lg:w-1/2">
+        <div hlmCard>
+          <div hlmCardHeader>
+            <div hlmCardTitle>Instant Team Insights</div>
+            <div hlmCardDescription>Ege Kocabas at <a hlmBtn class="text-muted-foreground" variant="link" size="none" href="https://github.com/ls1intum/helios">Helios</a></div>
+          </div>
+          <div hlmCardContent>
+            "I heavily use Hepheastus just to see how our team is doing. It also helps me to write all the things I have made for a week when its time to fill a weekly report."
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+  <section id="faq" class="w-full py-12 md:py-24 lg:py-32">
+    <div class="container px-4 md:px-6">
+      <h2 class="text-3xl font-bold tracking-tighter sm:text-4xl md:text-5xl text-center mb-12">Frequently Asked Questions</h2>
+      <div class="">
+        <div hlmAccordion>
+          @for (entry of faq; track entry.q) {
+            <div hlmAccordionItem>
+              <button hlmAccordionTrigger hlmCardTitle>
+                {{ entry.q }}
+                <lucide-angular [img]="ChevronDown" hlm hlmAccIcon />
+              </button>
+              <hlm-accordion-content> {{ entry.a }} </hlm-accordion-content>
+            </div>
+          }
+        </div>
+      </div>
+    </div>
+  </section>
+  <section class="relative left-1/2 -translate-x-1/2 w-screen py-12 md:py-24 lg:py-32 bg-foreground">
+    <div class="container px-4 md:px-6">
+      <div class="flex flex-col items-center space-y-4 text-center">
+        <div class="space-y-2">
+          <h2 class="text-3xl font-bold tracking-tighter sm:text-4xl md:text-5xl text-primary-foreground">Ready to Forge a Stronger Team?</h2>
+          <p class="mx-auto max-w-[700px] text-secondary md:text-xl/relaxed lg:text-base/relaxed xl:text-xl/relaxed">
+            Join the growing community of teams using Hephaestus to build sustainable, collaborative, and effective software development practices.
+          </p>
+        </div>
+        <div class="w-full max-w-sm space-y-2">
+          <button hlmBtn class="w-full bg-background text-foreground hover:bg-background/90" (click)="signIn()">Get Started Now</button>
+          <p class="text-xs text-secondary">No credit card required. Start for free today.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+</div>
