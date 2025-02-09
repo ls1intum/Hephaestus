@@ -34,12 +34,16 @@ public class PullRequestBadPracticeDetector {
     public List<PullRequestBadPractice> detectAndSyncBadPractices(PullRequest pullRequest) {
         logger.info("Detecting bad practices for pull request: {}", pullRequest.getId());
 
-        List<PullRequestBadPractice> existingBadPractices = pullRequestBadPracticeRepository.findByPullRequestId(pullRequest.getId());
+        List<PullRequestBadPractice> existingBadPractices = pullRequestBadPracticeRepository.findByPullRequestId(
+            pullRequest.getId()
+        );
 
         DetectorRequest detectorRequest = new DetectorRequest();
         detectorRequest.setDescription(pullRequest.getBody());
         detectorRequest.setTitle(pullRequest.getTitle());
-        detectorRequest.setBadPractices(existingBadPractices.stream().map(this::convertToIntelligenceBadPractice).toList());
+        detectorRequest.setBadPractices(
+            existingBadPractices.stream().map(this::convertToIntelligenceBadPractice).toList()
+        );
         DetectorResponse detectorResponse = detectorApi.detectDetectorPost(detectorRequest);
 
         List<PullRequestBadPractice> detectedBadPractices = new LinkedList<>();

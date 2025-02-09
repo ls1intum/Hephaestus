@@ -1,18 +1,7 @@
 import { Component, computed, inject, input } from '@angular/core';
 import { PullRequestInfo, LabelInfo, PullRequestBadPractice, ActivityService } from '@app/core/modules/openapi';
 import { NgIcon } from '@ng-icons/core';
-import {
-  octCheck,
-  octComment,
-  octFileDiff,
-  octGitPullRequest,
-  octGitPullRequestClosed,
-  octGitPullRequestDraft,
-  octGitMerge,
-  octX,
-  octFold,
-  octSync
-} from '@ng-icons/octicons';
+import { octCheck, octComment, octFileDiff, octGitPullRequest, octGitPullRequestClosed, octGitPullRequestDraft, octGitMerge, octX, octFold, octSync } from '@ng-icons/octicons';
 import { HlmCardModule } from '@spartan-ng/ui-card-helm';
 import { HlmSkeletonComponent } from '@spartan-ng/ui-skeleton-helm';
 

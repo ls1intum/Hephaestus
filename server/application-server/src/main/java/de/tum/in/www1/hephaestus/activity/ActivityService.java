@@ -95,7 +95,9 @@ public class ActivityService {
             throw new IllegalArgumentException("Pull request " + prId + " not found");
         }
 
-        List<PullRequestBadPractice> detectedBadPractices = pullRequestBadPracticeDetector.detectAndSyncBadPractices(pullRequest);
+        List<PullRequestBadPractice> detectedBadPractices = pullRequestBadPracticeDetector.detectAndSyncBadPractices(
+            pullRequest
+        );
         return detectedBadPractices.stream().map(PullRequestBadPracticeDTO::fromPullRequestBadPractice).toList();
     }
 }
