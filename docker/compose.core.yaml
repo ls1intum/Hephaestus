@@ -356,7 +356,7 @@ configs:
           "realm" : [
             {
               "name": "admin",
-              "description": "Administrator privileges"
+              "description": "Administrator privileges",
               "composites": {
                 "realm": [
                   "mentor_access"
