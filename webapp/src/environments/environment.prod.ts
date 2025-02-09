@@ -15,11 +15,9 @@ export const environment = {
     clientId: 'WEB_ENV_KEYCLOAK_CLIENT_ID',
     skipLoginPage: 'WEB_ENV_KEYCLOAK_SKIP_LOGIN'
   },
-  umami: {
-    enabled: 'WEB_ENV_UMAMI_ENABLED',
-    scriptUrl: 'WEB_ENV_UMAMI_SCRIPT_URL',
-    websiteId: 'WEB_ENV_UMAMI_WEBSITE_ID',
-    domains: 'WEB_ENV_UMAMI_DOMAINS'
+  posthog: {
+    projectApiKey: 'WEB_ENV_POSTHOG_PROJECT_API_KEY',
+    apiHost: 'WEB_ENV_POSTHOG_API_HOST'
   },
   legal: {
     imprintHtml: 'WEB_ENV_LEGAL_IMPRINT_HTML',
