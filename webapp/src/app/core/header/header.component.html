@@ -7,11 +7,11 @@
       </a>
       <span class="text-xs font-semibold mt-1 text-muted-foreground">{{ version }}</span>
     </div>
-    @if (user()?.roles?.includes('admin')) {
+    @if (signedIn() && user()?.roles?.includes('admin')) {
       <a hlmBtn variant="link" routerLink="/workspace">Workspace</a>
     }
   </div>
-  @if (user()?.roles?.includes('mentor_access')) {
+  @if (signedIn() && user()?.roles?.includes('mentor_access')) {
     <app-ai-mentor class="hidden sm:inline-block" />
     <app-ai-mentor class="sm:hidden" iconOnly />
   }
@@ -48,7 +48,7 @@
         </hlm-menu-group>
       </hlm-menu>
     </ng-template>
-  } @else {
+  } @else if (loaded()) {
     <button hlmBtn (click)="signIn()">Sign&nbsp;In</button>
   }
 </header>
