@@ -25,14 +25,12 @@ services:
       - shared-network
     labels:
       - "traefik.enable=true"
-      - "traefik.http.middlewares.gzip.compress=true"
       - "traefik.http.middlewares.redirect-to-https.redirectscheme.scheme=https"
       - "traefik.http.routers.http-webapp.entryPoints=http"
       - "traefik.http.routers.http-webapp.middlewares=redirect-to-https"
       - "traefik.http.routers.http-webapp.rule=Host(`${APP_HOSTNAME}`) && PathPrefix(`/`)"
       - "traefik.http.routers.http-webapp.service=http-webapp"
       - "traefik.http.routers.https-webapp.entryPoints=https"
-      - "traefik.http.routers.https-webapp.middlewares=gzip"
       - "traefik.http.routers.https-webapp.rule=Host(`${APP_HOSTNAME}`) && PathPrefix(`/`)"
       - "traefik.http.routers.https-webapp.service=https-webapp"
       - "traefik.http.routers.https-webapp.tls.certresolver=letsencrypt"
@@ -91,14 +89,13 @@ services:
       - shared-network
     labels:
       - "traefik.enable=true"
-      - "traefik.http.middlewares.gzip.compress=true"
       - "traefik.http.middlewares.https-application-server-stripprefix.stripprefix.prefixes=/api"
       - "traefik.http.middlewares.redirect-to-https.redirectscheme.scheme=https"
       - "traefik.http.routers.http-application-server.entryPoints=http"
       - "traefik.http.routers.http-application-server.middlewares=redirect-to-https"
       - "traefik.http.routers.http-application-server.rule=Host(`${APP_HOSTNAME}`) && PathPrefix(`/api`)"
       - "traefik.http.routers.https-application-server.entryPoints=https"
-      - "traefik.http.routers.https-application-server.middlewares=https-application-server-stripprefix,gzip"
+      - "traefik.http.routers.https-application-server.middlewares=https-application-server-stripprefix"
       - "traefik.http.routers.https-application-server.rule=Host(`${APP_HOSTNAME}`) && PathPrefix(`/api`)"
       - "traefik.http.routers.https-application-server.tls.certresolver=letsencrypt"
       - "traefik.http.routers.https-application-server.tls=true"
