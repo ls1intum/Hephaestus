@@ -58,7 +58,7 @@ jobs:
 
       - name: Install Python dependencies
         working-directory: server/intelligence-service
-        run: poetry lock --no-update && poetry install --no-interaction --no-root
+        run: poetry lock && poetry install --no-interaction --no-root
 
       - name: Generate API client for the application server
         working-directory: server/intelligence-service
