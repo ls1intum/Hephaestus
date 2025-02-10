@@ -37,7 +37,7 @@ import org.hibernate.validator.constraints.*;
   DetectorResponse.JSON_PROPERTY_BAD_PRACTICES
 })
 @jakarta.annotation.Generated(value = "org.openapitools.codegen.languages.JavaClientCodegen", comments = "Generator version: 7.7.0")
-public class DetectorResponse extends HashMap<String, Object> {
+public class DetectorResponse {
   public static final String JSON_PROPERTY_BAD_PRACTICES = "bad_practices";
   private List<BadPractice> badPractices = new ArrayList<>();
 
@@ -87,13 +87,12 @@ public class DetectorResponse extends HashMap<String, Object> {
       return false;
     }
     DetectorResponse detectorResponse = (DetectorResponse) o;
-    return Objects.equals(this.badPractices, detectorResponse.badPractices) &&
-        super.equals(o);
+    return Objects.equals(this.badPractices, detectorResponse.badPractices);
   }
 
   @Override
   public int hashCode() {
-    return Objects.hash(badPractices, super.hashCode());
+    return Objects.hash(badPractices);
   }
 
   @Override

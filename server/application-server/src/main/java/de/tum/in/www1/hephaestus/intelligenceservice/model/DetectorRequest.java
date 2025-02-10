@@ -39,7 +39,7 @@ import org.hibernate.validator.constraints.*;
   DetectorRequest.JSON_PROPERTY_TITLE
 })
 @jakarta.annotation.Generated(value = "org.openapitools.codegen.languages.JavaClientCodegen", comments = "Generator version: 7.7.0")
-public class DetectorRequest extends HashMap<String, Object> {
+public class DetectorRequest {
   public static final String JSON_PROPERTY_BAD_PRACTICES = "bad_practices";
   private List<BadPractice> badPractices = new ArrayList<>();
 
@@ -147,20 +147,18 @@ public class DetectorRequest extends HashMap<String, Object> {
     DetectorRequest detectorRequest = (DetectorRequest) o;
     return Objects.equals(this.badPractices, detectorRequest.badPractices) &&
         Objects.equals(this.description, detectorRequest.description) &&
-        Objects.equals(this.title, detectorRequest.title) &&
-        super.equals(o);
+        Objects.equals(this.title, detectorRequest.title);
   }
 
   @Override
   public int hashCode() {
-    return Objects.hash(badPractices, description, title, super.hashCode());
+    return Objects.hash(badPractices, description, title);
   }
 
   @Override
   public String toString() {
     StringBuilder sb = new StringBuilder();
     sb.append("class DetectorRequest {\n");
-    sb.append("    ").append(toIndentedString(super.toString())).append("\n");
     sb.append("    badPractices: ").append(toIndentedString(badPractices)).append("\n");
     sb.append("    description: ").append(toIndentedString(description)).append("\n");
     sb.append("    title: ").append(toIndentedString(title)).append("\n");
