@@ -292,7 +292,7 @@ paths:
     post:
       tags:
       - activity
-      operationId: detectBadPracticesByUserAndPr
+      operationId: detectBadPracticesByPr
       parameters:
       - name: prId
         in: path

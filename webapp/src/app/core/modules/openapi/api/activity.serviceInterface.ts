@@ -28,16 +28,16 @@ export interface ActivityServiceInterface {
     /**
      * 
      * 
-     * @param login 
+     * @param prId 
      */
-    detectBadPracticesByUser(login: string, extraHttpRequestParams?: any): Observable<Array<PullRequestBadPractice>>;
+    detectBadPracticesByPr(prId: number, extraHttpRequestParams?: any): Observable<Array<PullRequestBadPractice>>;
 
     /**
      * 
      * 
-     * @param prId 
+     * @param login 
      */
-    detectBadPracticesByUserAndPr(prId: number, extraHttpRequestParams?: any): Observable<Array<PullRequestBadPractice>>;
+    detectBadPracticesByUser(login: string, extraHttpRequestParams?: any): Observable<Array<PullRequestBadPractice>>;
 
     /**
      * 
