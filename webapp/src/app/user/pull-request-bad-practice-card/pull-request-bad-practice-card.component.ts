@@ -1,4 +1,4 @@
-import { Component, computed, inject, input } from '@angular/core';
+import { Component, computed, inject, input, output } from '@angular/core';
 import { PullRequestInfo, LabelInfo, PullRequestBadPractice, ActivityService } from '@app/core/modules/openapi';
 import { NgIcon } from '@ng-icons/core';
 import { octCheck, octComment, octFileDiff, octGitPullRequest, octGitPullRequestClosed, octGitPullRequestDraft, octGitMerge, octX, octFold, octSync } from '@ng-icons/octicons';
@@ -14,6 +14,9 @@ import { HlmButtonDirective } from '@spartan-ng/ui-button-helm';
 import { GithubLabelComponent } from '@app/ui/github-label/github-label.component';
 import { cn } from '@app/utils';
 import { formatTitle } from '@app/utils';
+import { HlmSpinnerComponent } from '@spartan-ng/ui-spinner-helm';
+import { injectMutation, QueryClient } from '@tanstack/angular-query-experimental';
+import { lastValueFrom } from 'rxjs';
 
 @Component({
   selector: 'app-pull-request-bad-practice-card',
@@ -29,11 +32,14 @@ import { formatTitle } from '@app/utils';
     BrnCollapsibleContentComponent,
     BrnCollapsibleTriggerDirective,
     HlmButtonDirective,
-    GithubLabelComponent
-  ]
+    GithubLabelComponent,
+    HlmSpinnerComponent
+  ],
+  standalone: true
 })
 export class PullRequestBadPracticeCardComponent {
   activityService = inject(ActivityService);
+  queryClient = inject(QueryClient);
 
   protected readonly octCheck = octCheck;
   protected readonly octX = octX;
@@ -56,6 +62,8 @@ export class PullRequestBadPracticeCardComponent {
   isMerged = input<boolean>();
   pullRequestLabels = input<Array<LabelInfo>>();
   badPractices = input<Array<PullRequestBadPractice>>();
+
+  detectBadPracticesForPr = output<void>();
 
   displayCreated = computed(() => dayjs(this.createdAt()));
   displayTitle = computed(() => formatTitle(this.title() ?? ''));
@@ -89,6 +97,13 @@ export class PullRequestBadPracticeCardComponent {
 
   detectBadPractices = () => {
     console.log('Detecting bad practices for PR ' + this.id());
-    this.activityService.detectBadPracticesByUserAndPr(this.id()).subscribe();
+    this.detectBadPracticesForPr.emit();
   };
+
+  detectBadPracticesForPrMutation = injectMutation(() => ({
+    mutationFn: (prId: number) => lastValueFrom(this.activityService.detectBadPracticesByPr(prId)),
+    onSuccess: () => {
+      this.queryClient.invalidateQueries({ queryKey: ['activity'] });
+    }
+  }));
 }

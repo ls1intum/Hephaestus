@@ -21,8 +21,12 @@
             } @else {
               <span> {{ badPractices()?.length }} bad practices detected </span>
             }
-            <button hlmBtn variant="outline" size="sm" class="gap-1" (click)="this.detectBadPractices()">
-              <ng-icon [svg]="octSync" class="size-8" />
+            <button hlmBtn variant="outline" size="sm" class="gap-1" (click)="this.detectBadPracticesForPrMutation.mutate(id())">
+              @if (this.detectBadPracticesForPrMutation.isPending()) {
+                <hlm-spinner class="size-4" />
+              } @else {
+                <ng-icon [svg]="octSync" class="size-8" />
+              }
               <span>Detect</span>
             </button>
             <button brnCollapsibleTrigger hlmBtn variant="ghost">
