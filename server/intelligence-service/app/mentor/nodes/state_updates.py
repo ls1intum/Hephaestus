@@ -73,12 +73,9 @@ def check_goals(state: State):
     )
 
     chain = prompt | model
+    response = chain.invoke({"messages": state["messages"]}).content
 
-    # TODO: change before the final release
-    resp = chain.invoke({"messages": state["messages"]}).content
-    print("\ncheck_goals", resp, "\n")
-
-    if resp == "YES":
+    if response == "YES":
         return {"goal_setting": False, "development": True}
 
     return
@@ -97,11 +94,9 @@ def check_goal_reflection(state: State):
 
     chain = prompt | model
 
-    # TODO: change before the final release
-    resp = chain.invoke({"messages": state["messages"]}).content
-    print("\ncheck_goal_reflection", resp, "\n")
+    response = chain.invoke({"messages": state["messages"]}).content
 
-    if resp == "YES":
+    if response == "YES":
         return {"goal_reflection": False, "finish": True}
 
     return

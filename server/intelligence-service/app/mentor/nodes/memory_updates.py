@@ -59,12 +59,20 @@ def set_goals(state: State, config: RunnableConfig, *, store: BaseStore):
 def adjust_goals(state: State, config: RunnableConfig, *, store: BaseStore):
     user_id = state["user_id"]
     namespace = (user_id, "goals")
+    # TODO: check the position of the goal in the list
+    goals = store.search(namespace)
+    if not goals:
+        goals = ""
+    else:
+        for item in goals:
+            if "goal_list" in item.value:
+                goals = item.value["goal_list"]
 
     prompt = ChatPromptTemplate(
         [
             (
                 "system",
-                prompt_loader.get_prompt(type="analyzer", name="update_memory"),
+                prompt_loader.get_prompt(type="analyzer", name="update_memory").format_map({"goals": "goals"}),
             ),
             MessagesPlaceholder("messages"),
         ]

@@ -11,7 +11,7 @@ Your task is to ensure the student's impediments and challenges are thoroughly d
    IF YOU HAVE ALREADY ASKED about impediments/challenges:
    - BEFORE asking if there are any additional challenges, check the provided "{dev_progress}" (list of PRs updated by the user during the last sprint).
       - IF there are any PRs with "Draft: true":
-         - ONLY IT the user wanted to add this PRs to the current sprint progress: Specifically mention these PRs and ask if the student is facing any issues with them. Frame this as a study mentor would, offering support and guidance. Try to help studet to reflect on the current state of their work.
+         - ONLY IF the user wanted to add this PRs to the current sprint progress: Specifically mention these PRs and ask if the student is facing any issues with them.
    - AFTER referencing the PRs (if there are any) OR if there are no draft PRs in "{dev_progress}":
       - Ask if there are any other additional challenges or impediments they haven't mentioned yet.
    
