@@ -2,6 +2,12 @@ import { Component, computed, input } from '@angular/core';
 import { cn, getLeagueFromPoints } from '@app/utils';
 import { LucideAngularModule, Medal } from 'lucide-angular';
 import { type VariantProps, cva } from 'class-variance-authority';
+import { LeagueBronzeIconComponent } from './league-bronze-icon.component';
+import { LeagueNoneIconComponent } from './league-none-icon.component';
+import { LeagueSilverIconComponent } from './league-silver-icon.component';
+import { LeagueGoldIconComponent } from './league-gold-icon.component';
+import { LeagueDiamondIconComponent } from './league-diamond-icon.component';
+import { LeagueMasterIconComponent } from './league-master-icon.component';
 
 export const leagueVariants = cva('size-8', {
   variants: {
@@ -32,8 +38,37 @@ type LeagueVariants = VariantProps<typeof leagueVariants>;
 @Component({
   selector: 'app-icon-league',
   standalone: true,
-  imports: [LucideAngularModule],
-  template: ` <lucide-angular [img]="Medal" strokeWidth="2px" [class]="computedClass()" [title]="computedLeague()" /> `
+  imports: [
+    LucideAngularModule,
+    LeagueBronzeIconComponent,
+    LeagueNoneIconComponent,
+    LeagueSilverIconComponent,
+    LeagueGoldIconComponent,
+    LeagueDiamondIconComponent,
+    LeagueMasterIconComponent
+  ],
+  template: `
+    @switch (computedLeague()) {
+      @case ('none') {
+        <app-league-none-icon [class]="computedClass()" />
+      }
+      @case ('bronze') {
+        <app-league-bronze-icon [class]="computedClass()" />
+      }
+      @case ('silver') {
+        <app-league-silver-icon [class]="computedClass()" />
+      }
+      @case ('gold') {
+        <app-league-gold-icon [class]="computedClass()" />
+      }
+      @case ('diamond') {
+        <app-league-diamond-icon [class]="computedClass()" />
+      }
+      @case ('master') {
+        <app-league-master-icon [class]="computedClass()" />
+      }
+    }
+  `
 })
 export class LeagueIconComponent {
   protected Medal = Medal;
