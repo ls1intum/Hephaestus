@@ -8,6 +8,8 @@ import { LeagueSilverIconComponent } from './league-silver-icon.component';
 import { LeagueGoldIconComponent } from './league-gold-icon.component';
 import { LeagueDiamondIconComponent } from './league-diamond-icon.component';
 import { LeagueMasterIconComponent } from './league-master-icon.component';
+import { HlmTooltipComponent, HlmTooltipTriggerDirective } from '@spartan-ng/ui-tooltip-helm';
+import { BrnTooltipContentDirective } from '@spartan-ng/ui-tooltip-brain';
 
 export const leagueVariants = cva('size-8', {
   variants: {
@@ -45,29 +47,37 @@ type LeagueVariants = VariantProps<typeof leagueVariants>;
     LeagueSilverIconComponent,
     LeagueGoldIconComponent,
     LeagueDiamondIconComponent,
-    LeagueMasterIconComponent
+    LeagueMasterIconComponent,
+    HlmTooltipComponent,
+    HlmTooltipTriggerDirective,
+    BrnTooltipContentDirective
   ],
   template: `
-    @switch (computedLeague()) {
-      @case ('none') {
-        <app-league-none-icon [class]="computedClass()" />
+    <hlm-tooltip>
+      @switch (league()) {
+        @case ('none') {
+          <app-league-none-icon [class]="computedClass()" hlmTooltipTrigger />
+        }
+        @case ('bronze') {
+          <app-league-bronze-icon [class]="computedClass()" hlmTooltipTrigger />
+        }
+        @case ('silver') {
+          <app-league-silver-icon [class]="computedClass()" hlmTooltipTrigger />
+        }
+        @case ('gold') {
+          <app-league-gold-icon [class]="computedClass()" hlmTooltipTrigger />
+        }
+        @case ('diamond') {
+          <app-league-diamond-icon [class]="computedClass()" hlmTooltipTrigger />
+        }
+        @case ('master') {
+          <app-league-master-icon [class]="computedClass()" hlmTooltipTrigger />
+        }
       }
-      @case ('bronze') {
-        <app-league-bronze-icon [class]="computedClass()" />
-      }
-      @case ('silver') {
-        <app-league-silver-icon [class]="computedClass()" />
-      }
-      @case ('gold') {
-        <app-league-gold-icon [class]="computedClass()" />
-      }
-      @case ('diamond') {
-        <app-league-diamond-icon [class]="computedClass()" />
-      }
-      @case ('master') {
-        <app-league-master-icon [class]="computedClass()" />
-      }
-    }
+      <span *brnTooltipContent class="flex items-center capitalize">
+        {{ this.leagueTooltip() }}
+      </span>
+    </hlm-tooltip>
   `
 })
 export class LeagueIconComponent {
@@ -75,10 +85,25 @@ export class LeagueIconComponent {
 
   size = input<LeagueVariants['size']>('default');
   leaguePoints = input<number>();
-  league = input<LeagueVariants['league']>('none');
   class = input<string>('');
 
-  computedLeague = computed(() => (this.leaguePoints() ? getLeagueFromPoints(this.leaguePoints()!)?.name.toLowerCase() : this.league()));
+  league = computed(() => (this.leaguePoints() ? getLeagueFromPoints(this.leaguePoints()!)?.name.toLowerCase() : 'none'));
+  computedClass = computed(() => cn(leagueVariants({ size: this.size(), league: this.league() as LeagueVariants['league'] }), this.class()));
 
-  computedClass = computed(() => cn(leagueVariants({ size: this.size(), league: this.computedLeague() as LeagueVariants['league'] }), this.class()));
+  leagueTooltip = computed(() => {
+    switch (this.league()) {
+      case 'bronze':
+        return 'Bronze League';
+      case 'silver':
+        return 'Silver League';
+      case 'gold':
+        return 'Gold League';
+      case 'diamond':
+        return 'Diamond League';
+      case 'master':
+        return 'Master League';
+      default:
+        return 'No League';
+    }
+  });
 }
