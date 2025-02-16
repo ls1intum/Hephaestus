@@ -86,8 +86,7 @@ public class LeaderboardService {
                 .forEach(user -> usersById.putIfAbsent(user.getId(), user));
         } else {
             // Show all active users in the total leaderboard
-            userRepository.findAllHumanInTeams().stream()
-                .forEach(user -> usersById.putIfAbsent(user.getId(), user));
+            userRepository.findAllHumanInTeams().stream().forEach(user -> usersById.putIfAbsent(user.getId(), user));
         }
 
         // Review activity
