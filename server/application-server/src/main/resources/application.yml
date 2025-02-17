@@ -29,6 +29,23 @@ spring:
                 jwt:
                     issuer-uri: http://localhost:8081/realms/hephaestus
 
+    thymeleaf:
+        prefix: ${MAIL_TEMPLATE_FOLDER:classpath:/mail-templates/}
+        suffix: .html
+
+    mail:
+        host: ${POSTFIX_HOST:localhost}
+        port: ${POSTFIX_PORT:25}
+        username: ${POSTFIX_USERNAME:}
+        password: ${POSTFIX_PASSWORD:}
+        properties:
+            mail:
+                transport:
+                    protocol: smtp
+                smtp:
+                    starttls:
+                        enable: true
+
 springdoc:
     default-produces-media-type: application/json
 
@@ -55,6 +72,10 @@ hephaestus:
         contributors:
             # Eviction rate in milliseconds (1 hour)
             evict-rate: 3600000
+    mail:
+        enabled: ${MAIL_ENABLED:true}
+        sender: ${MAIL_SENDER:test@hephaestus.ase.cit.tum.de}
+        signature: ${MAIL_SIGNATURE:}
 
 keycloak:
     url: http://localhost:8081
