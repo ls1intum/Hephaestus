@@ -20,6 +20,8 @@ jobs:
           POSTGRES_DB: hephaestus
           POSTGRES_PASSWORD: root
           POSTGRES_USER: root
+        ports:
+          - 5432:5432
         options: >-
           --health-cmd pg_isready
           --health-interval 10s
