@@ -41,22 +41,21 @@ jobs:
 
       - name: Run Liquibase update
         working-directory: server/application-server
-        run: >
-          mvn -Dapp.profiles=specs
-              -Dapp.db.url=jdbc:postgresql://localhost:5432/hephaestus
-              -Dapp.db.username=root
-              -Dapp.db.password=root
+        run: |
+          mvn -Dapp.profiles=specs \
+              -Dapp.db.url=jdbc:postgresql://localhost:5432/hephaestus \
+              -Dapp.db.username=root \
+              -Dapp.db.password=root \
               liquibase:update
 
       - name: Run Liquibase diff
         working-directory: server/application-server
-        run: >
-          mvn -Dapp.profiles=specs
-              -Dapp.db.url=jdbc:postgresql://localhost:5432/hephaestus
-              -Dapp.db.username=root
-              -Dapp.db.password=root
+        run: |
+          mvn -Dapp.profiles=specs \
+              -Dapp.db.url=jdbc:postgresql://localhost:5432/hephaestus \
+              -Dapp.db.username=root \
+              -Dapp.db.password=root \
               liquibase:diff
-
 
       - name: Check for changes in the liquibase changelog
         id: check_changes
