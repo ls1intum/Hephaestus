@@ -121,10 +121,16 @@ public class LeaderboardService {
                 }
                 // If both users have a score of 0, compare by total comment count.
                 // Calculate total code review comment count from reviews.
-                int e1ReviewComments = reviewsByUserId.getOrDefault(e1.getKey(), List.of())
-                    .stream().mapToInt(review -> review.getComments().size()).sum();
-                int e2ReviewComments = reviewsByUserId.getOrDefault(e2.getKey(), List.of())
-                    .stream().mapToInt(review -> review.getComments().size()).sum();
+                int e1ReviewComments = reviewsByUserId
+                    .getOrDefault(e1.getKey(), List.of())
+                    .stream()
+                    .mapToInt(review -> review.getComments().size())
+                    .sum();
+                int e2ReviewComments = reviewsByUserId
+                    .getOrDefault(e2.getKey(), List.of())
+                    .stream()
+                    .mapToInt(review -> review.getComments().size())
+                    .sum();
                 // Calculate total issue comments.
                 int e1IssueComments = issueCommentsByUserId.getOrDefault(e1.getKey(), List.of()).size();
                 int e2IssueComments = issueCommentsByUserId.getOrDefault(e2.getKey(), List.of()).size();
