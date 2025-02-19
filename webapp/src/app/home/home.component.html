@@ -3,14 +3,14 @@
     <div class="grid grid-cols-1 xl:grid-cols-4 gap-y-4 xl:gap-8">
       <div class="space-y-2 col-span-1">
         <div class="flex flex-col gap-2 mb-4">
-          <h1 class="text-3xl font-bold">Artemis Leaderboard</h1>
+          <h1 class="text-3xl font-bold">AET Leaderboard</h1>
           @if (signedIn() && user(); as userValue) {
             <h2 class="text-xl text-muted-foreground">Hi {{ userValue.name }} 👋</h2>
           }
         </div>
-        <app-leaderboard-filter [repositories]="metaQuery.data()?.repositoriesToMonitor" />
+        <app-leaderboard-filter [teams]="teams()" />
       </div>
-      <div class="col-span-2">
+      <div class="col-span-2 space-y-4">
         @if (query.error()) {
           <div hlmAlert class="max-w-xl" variant="destructive">
             <lucide-angular [img]="CircleX" hlmAlertIcon />
@@ -18,13 +18,15 @@
             <p hlmAlertDesc>We couldn't load the leaderboard. Please try again later.</p>
           </div>
         } @else {
+          <app-leaderboard-league [leaguePoints]="userMeQuery.data()?.userInfo?.leaguePoints" />
           <div class="border rounded-md border-input overflow-auto">
             <app-leaderboard [leaderboard]="query.data()" [isLoading]="query.isPending()" />
           </div>
         }
       </div>
-      <!-- Spacer -->
-      <div class="col-span-1"></div>
+      <div class="col-span-1">
+        <app-leaderboard-legend />
+      </div>
     </div>
   </div>
 </div>

@@ -1,11 +1,12 @@
 import { argsToTemplate, Meta, StoryObj } from '@storybook/angular';
 import { ReviewActivityCardComponent } from './review-activity-card.component';
-import dayjs from 'dayjs';
+import dayjs from 'dayjs/esm';
 
 type FlatArgs = {
   isLoading: boolean;
   reviewActivityCreatedAt: string;
   reviewActivityState: string;
+  reviewActivityScore: number;
   pullRequestNumber: number;
   pullRequestState: string;
   pullRequestUrl: string;
@@ -18,6 +19,7 @@ function flatArgsToProps(args: FlatArgs) {
     isLoading: args.isLoading,
     createdAt: dayjs(args.reviewActivityCreatedAt),
     state: args.reviewActivityState,
+    score: args.reviewActivityScore,
     pullRequest: {
       number: args.pullRequestNumber,
       title: args.pullRequestTitle,
@@ -34,6 +36,7 @@ const meta: Meta<FlatArgs> = {
     isLoading: false,
     reviewActivityCreatedAt: dayjs().subtract(4, 'days').toISOString(),
     reviewActivityState: 'CHANGES_REQUESTED',
+    reviewActivityScore: 3,
     pullRequestNumber: 100,
     pullRequestTitle: '`Leaderboard`: Custom Sliding Time Window',
     pullRequestUrl: 'https://github.com/ls1intum/Hephaestus/pull/100',

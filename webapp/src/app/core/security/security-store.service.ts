@@ -2,6 +2,8 @@ import { computed, inject, Injectable, PLATFORM_ID, signal } from '@angular/core
 import { isPlatformServer } from '@angular/common';
 import { KeycloakService } from './keycloak.service';
 import { ANONYMOUS_USER, User } from './models';
+import { setUser } from '@sentry/angular';
+import posthog from 'posthog-js';
 
 @Injectable({ providedIn: 'root' })
 export class SecurityStore {
@@ -23,6 +25,7 @@ export class SecurityStore {
     if (isServer) {
       this.user.set(ANONYMOUS_USER);
       this.loaded.set(true);
+      setUser(ANONYMOUS_USER);
       return;
     }
 
@@ -40,9 +43,15 @@ export class SecurityStore {
       };
       this.user.set(user);
       this.loaded.set(true);
+      setUser(user);
+
+      posthog.identify(email, { sub, email, name, username });
+      posthog.alias(sub, email);
     } else {
       this.user.set(ANONYMOUS_USER);
       this.loaded.set(true);
+      setUser(ANONYMOUS_USER);
+      posthog.reset();
     }
   }
 
@@ -52,5 +61,16 @@ export class SecurityStore {
 
   async signOut() {
     await this.keycloakService.logout();
+    posthog.reset();
+  }
+
+  async updateToken() {
+    await this.keycloakService.updateToken();
+    // update bearer in user with new token
+    const user = this.user();
+    if (user && this.keycloakService.profile) {
+      user.bearer = this.keycloakService.profile.token;
+      this.user.set(user);
+    }
   }
 }

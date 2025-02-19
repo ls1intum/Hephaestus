@@ -4,26 +4,25 @@ import { BrnDialogComponent } from '@spartan-ng/ui-dialog-brain';
 import { HlmAlertDialogOverlayDirective } from './hlm-alert-dialog-overlay.directive';
 
 @Component({
-  selector: 'hlm-alert-dialog',
-  standalone: true,
-  template: `
-    <brn-alert-dialog-overlay hlm />
-    <ng-content />
-  `,
-  providers: [
-    {
-      provide: BrnDialogComponent,
-      useExisting: forwardRef(() => HlmAlertDialogComponent)
-    }
-  ],
-  changeDetection: ChangeDetectionStrategy.OnPush,
-  encapsulation: ViewEncapsulation.None,
-  exportAs: 'hlmAlertDialog',
-  imports: [BrnAlertDialogOverlayComponent, HlmAlertDialogOverlayDirective]
+    selector: 'hlm-alert-dialog',
+    template: `
+		<brn-alert-dialog-overlay hlm />
+		<ng-content />
+	`,
+    providers: [
+        {
+            provide: BrnDialogComponent,
+            useExisting: forwardRef(() => HlmAlertDialogComponent),
+        },
+    ],
+    changeDetection: ChangeDetectionStrategy.OnPush,
+    encapsulation: ViewEncapsulation.None,
+    exportAs: 'hlmAlertDialog',
+    imports: [BrnAlertDialogOverlayComponent, HlmAlertDialogOverlayDirective]
 })
 export class HlmAlertDialogComponent extends BrnAlertDialogComponent {
-  constructor() {
-    super();
-    this.closeDelay = 100;
-  }
+	constructor() {
+		super();
+		this.closeDelay = 100;
+	}
 }

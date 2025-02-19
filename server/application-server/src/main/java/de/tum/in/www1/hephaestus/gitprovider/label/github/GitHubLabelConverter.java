@@ -1,11 +1,10 @@
 package de.tum.in.www1.hephaestus.gitprovider.label.github;
 
+import de.tum.in.www1.hephaestus.gitprovider.label.Label;
 import org.kohsuke.github.GHLabel;
 import org.springframework.core.convert.converter.Converter;
 import org.springframework.lang.NonNull;
 import org.springframework.stereotype.Component;
-
-import de.tum.in.www1.hephaestus.gitprovider.label.Label;
 
 @Component
 public class GitHubLabelConverter implements Converter<GHLabel, Label> {

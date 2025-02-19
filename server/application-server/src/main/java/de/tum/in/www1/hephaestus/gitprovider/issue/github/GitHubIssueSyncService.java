@@ -1,22 +1,5 @@
 package de.tum.in.www1.hephaestus.gitprovider.issue.github;
 
-import java.io.IOException;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Optional;
-import java.util.ArrayList;
-import java.util.Date;
-import java.time.OffsetDateTime;
-
-import org.kohsuke.github.GHIssue;
-import org.kohsuke.github.GHIssueQueryBuilder;
-import org.kohsuke.github.GHIssueState;
-import org.kohsuke.github.GHRepository;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-import org.springframework.stereotype.Service;
-import jakarta.transaction.Transactional;
-
 import de.tum.in.www1.hephaestus.gitprovider.common.DateUtil;
 import de.tum.in.www1.hephaestus.gitprovider.issue.Issue;
 import de.tum.in.www1.hephaestus.gitprovider.issue.IssueRepository;
@@ -29,6 +12,24 @@ import de.tum.in.www1.hephaestus.gitprovider.repository.RepositoryRepository;
 import de.tum.in.www1.hephaestus.gitprovider.user.User;
 import de.tum.in.www1.hephaestus.gitprovider.user.UserRepository;
 import de.tum.in.www1.hephaestus.gitprovider.user.github.GitHubUserConverter;
+import jakarta.transaction.Transactional;
+import java.io.IOException;
+import java.time.OffsetDateTime;
+import java.util.ArrayList;
+import java.util.Date;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Optional;
+import org.kohsuke.github.GHDirection;
+import org.kohsuke.github.GHIssue;
+import org.kohsuke.github.GHIssueQueryBuilder;
+import org.kohsuke.github.GHIssueQueryBuilder.Sort;
+import org.kohsuke.github.GHIssueState;
+import org.kohsuke.github.GHRepository;
+import org.kohsuke.github.PagedIterator;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.stereotype.Service;
 
 @Service
 public class GitHubIssueSyncService {
@@ -46,15 +47,16 @@ public class GitHubIssueSyncService {
     private final GitHubUserConverter userConverter;
 
     public GitHubIssueSyncService(
-            IssueRepository issueRepository,
-            RepositoryRepository repositoryRepository,
-            LabelRepository labelRepository,
-            MilestoneRepository milestoneRepository,
-            UserRepository userRepository,
-            GitHubIssueConverter issueConverter,
-            GitHubLabelConverter labelConverter,
-            GitHubMilestoneConverter milestoneConverter,
-            GitHubUserConverter userConverter) {
+        IssueRepository issueRepository,
+        RepositoryRepository repositoryRepository,
+        LabelRepository labelRepository,
+        MilestoneRepository milestoneRepository,
+        UserRepository userRepository,
+        GitHubIssueConverter issueConverter,
+        GitHubLabelConverter labelConverter,
+        GitHubMilestoneConverter milestoneConverter,
+        GitHubUserConverter userConverter
+    ) {
         this.issueRepository = issueRepository;
         this.repositoryRepository = repositoryRepository;
         this.labelRepository = labelRepository;
@@ -74,10 +76,11 @@ public class GitHubIssueSyncService {
      * @return A list of successfully fetched GitHub issues.
      */
     public List<GHIssue> syncIssuesOfAllRepositories(List<GHRepository> repositories, Optional<OffsetDateTime> since) {
-        return repositories.stream()
-                .map(repository -> syncIssuesOfRepository(repository, since))
-                .flatMap(List::stream)
-                .toList();
+        return repositories
+            .stream()
+            .map(repository -> syncIssuesOfRepository(repository, since))
+            .flatMap(List::stream)
+            .toList();
     }
 
     /**
@@ -102,6 +105,47 @@ public class GitHubIssueSyncService {
     }
 
     /**
+     * Returns a paged iterator for fetching issues from a specific GitHub repository.
+     *
+     * @param repository The repository to fetch issues from.
+     * @param since      An date to filter issues by their last update.
+     * @return A paged iterator for fetching issues.
+     */
+    public PagedIterator<GHIssue> getIssuesIterator(GHRepository repository, OffsetDateTime since) {
+        var builder = repository
+            .queryIssues()
+            .pageSize(100)
+            .state(GHIssueState.ALL)
+            .since(Date.from(since.toInstant()))
+            .sort(Sort.UPDATED)
+            .direction(GHDirection.ASC);
+        return builder.list().iterator();
+    }
+
+    /**
+     * Syncs a single GitHub issue by its number from a specific repository.
+     *
+     * @param repository  The repository to fetch the issue from.
+     * @param issueNumber The number of the issue to fetch.
+     * @return An optional containing the fetched GitHub issue, or an empty optional if the issue could not be fetched.
+     */
+    public Optional<GHIssue> syncIssue(GHRepository repository, int issueNumber) {
+        try {
+            var ghIssue = repository.getIssue(issueNumber);
+            processIssue(ghIssue);
+            return Optional.of(ghIssue);
+        } catch (IOException e) {
+            logger.error(
+                "Failed to fetch issue {} from repository {}: {}",
+                issueNumber,
+                repository.getFullName(),
+                e.getMessage()
+            );
+            return Optional.empty();
+        }
+    }
+
+    /**
      * Processes a single GitHub issue by updating or creating it in the local
      * repository.
      * Manages associations with repositories, labels, milestones, authors, and
@@ -113,19 +157,23 @@ public class GitHubIssueSyncService {
      */
     @Transactional
     public Issue processIssue(GHIssue ghIssue) {
-        var result = issueRepository.findById(ghIssue.getId())
-                .map(issue -> {
-                    try {
-                        if (issue.getUpdatedAt() == null || issue.getUpdatedAt()
-                                .isBefore(DateUtil.convertToOffsetDateTime(ghIssue.getUpdatedAt()))) {
-                            return issueConverter.update(ghIssue, issue);
-                        }
-                        return issue;
-                    } catch (IOException e) {
-                        logger.error("Failed to update issue {}: {}", ghIssue.getId(), e.getMessage());
-                        return null;
+        var result = issueRepository
+            .findById(ghIssue.getId())
+            .map(issue -> {
+                try {
+                    if (
+                        issue.getUpdatedAt() == null ||
+                        issue.getUpdatedAt().isBefore(DateUtil.convertToOffsetDateTime(ghIssue.getUpdatedAt()))
+                    ) {
+                        return issueConverter.update(ghIssue, issue);
                     }
-                }).orElseGet(() -> issueConverter.convert(ghIssue));
+                    return issue;
+                } catch (IOException e) {
+                    logger.error("Failed to update issue {}: {}", ghIssue.getId(), e.getMessage());
+                    return null;
+                }
+            })
+            .orElseGet(() -> issueConverter.convert(ghIssue));
 
         if (result == null) {
             return null;
@@ -136,22 +184,20 @@ public class GitHubIssueSyncService {
             // Extract name with owner from the repository URL
             // Example: https://api.github.com/repos/ls1intum/Artemis/issues/9463
             var nameWithOwner = ghIssue.getUrl().toString().split("/repos/")[1].split("/issues")[0];
-            var repository = repositoryRepository.findByNameWithOwner(nameWithOwner);
-            if (repository != null) {
-                result.setRepository(repository);
-            }
+            repositoryRepository.findByNameWithOwner(nameWithOwner).ifPresent(result::setRepository);
         }
 
         // Link new labels and remove labels that are not present anymore
         var ghLabels = ghIssue.getLabels();
         var resultLabels = new HashSet<Label>();
         ghLabels.forEach(ghLabel -> {
-            var resultLabel = labelRepository.findById(ghLabel.getId())
-                    .orElseGet(() -> {
-                        var label = labelConverter.convert(ghLabel);
-                        label.setRepository(result.getRepository());
-                        return labelRepository.save(label);
-                    });
+            var resultLabel = labelRepository
+                .findById(ghLabel.getId())
+                .orElseGet(() -> {
+                    var label = labelConverter.convert(ghLabel);
+                    label.setRepository(result.getRepository());
+                    return labelRepository.save(label);
+                });
             resultLabels.add(resultLabel);
         });
         result.getLabels().clear();
@@ -159,12 +205,13 @@ public class GitHubIssueSyncService {
 
         // Link milestone
         if (ghIssue.getMilestone() != null) {
-            var resultMilestone = milestoneRepository.findById(ghIssue.getMilestone().getId())
-                    .orElseGet(() -> {
-                        var milestone = milestoneConverter.convert(ghIssue.getMilestone());
-                        milestone.setRepository(result.getRepository());
-                        return milestoneRepository.save(milestone);
-                    });
+            var resultMilestone = milestoneRepository
+                .findById(ghIssue.getMilestone().getId())
+                .orElseGet(() -> {
+                    var milestone = milestoneConverter.convert(ghIssue.getMilestone());
+                    milestone.setRepository(result.getRepository());
+                    return milestoneRepository.save(milestone);
+                });
             result.setMilestone(resultMilestone);
         } else {
             result.setMilestone(null);
@@ -173,8 +220,9 @@ public class GitHubIssueSyncService {
         // Link author
         try {
             var author = ghIssue.getUser();
-            var resultAuthor = userRepository.findById(author.getId())
-                    .orElseGet(() -> userRepository.save(userConverter.convert(author)));
+            var resultAuthor = userRepository
+                .findById(author.getId())
+                .orElseGet(() -> userRepository.save(userConverter.convert(author)));
             result.setAuthor(resultAuthor);
         } catch (IOException e) {
             logger.error("Failed to link author for issue {}: {}", ghIssue.getId(), e.getMessage());
@@ -184,8 +232,9 @@ public class GitHubIssueSyncService {
         var assignees = ghIssue.getAssignees();
         var resultAssignees = new HashSet<User>();
         assignees.forEach(assignee -> {
-            var resultAssignee = userRepository.findById(assignee.getId())
-                    .orElseGet(() -> userRepository.save(userConverter.convert(assignee)));
+            var resultAssignee = userRepository
+                .findById(assignee.getId())
+                .orElseGet(() -> userRepository.save(userConverter.convert(assignee)));
             resultAssignees.add(resultAssignee);
         });
         result.getAssignees().clear();

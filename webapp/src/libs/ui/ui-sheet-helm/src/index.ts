@@ -19,18 +19,18 @@ export * from './lib/hlm-sheet-title.directive';
 export * from './lib/hlm-sheet.component';
 
 export const HlmSheetImports = [
-  HlmSheetComponent,
-  HlmSheetCloseDirective,
-  HlmSheetContentComponent,
-  HlmSheetDescriptionDirective,
-  HlmSheetFooterComponent,
-  HlmSheetHeaderComponent,
-  HlmSheetOverlayDirective,
-  HlmSheetTitleDirective
+	HlmSheetComponent,
+	HlmSheetCloseDirective,
+	HlmSheetContentComponent,
+	HlmSheetDescriptionDirective,
+	HlmSheetFooterComponent,
+	HlmSheetHeaderComponent,
+	HlmSheetOverlayDirective,
+	HlmSheetTitleDirective,
 ] as const;
 
 @NgModule({
-  imports: [...HlmSheetImports],
-  exports: [...HlmSheetImports]
+	imports: [...HlmSheetImports],
+	exports: [...HlmSheetImports],
 })
 export class HlmSheetModule {}

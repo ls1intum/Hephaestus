@@ -1,8 +1,20 @@
 <header class="container flex items-center justify-between pt-4 gap-2">
-  <a class="flex gap-2 items-center hover:text-muted-foreground flex-1" routerLink="/">
-    <lucide-angular [img]="Hammer" class="size-8 sm:size-6" />
-    <span class="hidden sm:inline-block text-xl font-semibold">Hephaestus</span>
-  </a>
+  <div class="flex gap-4 items-center flex-1">
+    <div class="flex items-center gap-2">
+      <a class="flex gap-2 items-center hover:text-muted-foreground" routerLink="/">
+        <lucide-angular [img]="Hammer" class="size-8 sm:size-6" />
+        <span class="hidden sm:inline-block text-xl font-semibold">Hephaestus</span>
+      </a>
+      <span class="text-xs font-semibold mt-1 text-muted-foreground">{{ version }}</span>
+    </div>
+    @if (signedIn() && user()?.roles?.includes('admin')) {
+      <a hlmBtn variant="link" routerLink="/workspace">Workspace</a>
+    }
+  </div>
+  @if (signedIn() && user()?.roles?.includes('mentor_access')) {
+    <app-ai-mentor class="hidden sm:inline-block" />
+    <app-ai-mentor class="sm:hidden" iconOnly />
+  }
   <app-request-feature class="hidden sm:inline-block" />
   <app-request-feature class="sm:hidden" iconOnly />
   <app-theme-switcher />
@@ -15,7 +27,6 @@
         </span>
       </hlm-avatar>
     </button>
-
     <ng-template #usermenu>
       <hlm-menu>
         <hlm-menu-label>{{ user()!.name }}</hlm-menu-label>
@@ -25,6 +36,10 @@
             <hlm-icon name="lucideUser" hlmMenuIcon />
             <span>My Profile</span>
           </a>
+          <a hlmMenuItem routerLink="/settings" class="cursor-pointer">
+            <hlm-icon name="lucideSettings" hlmMenuIcon />
+            <span>Settings</span>
+          </a>
           <hlm-menu-separator />
           <button hlmMenuItem (click)="signOut()" class="cursor-pointer">
             <hlm-icon name="lucideLogOut" hlmMenuIcon />
@@ -33,7 +48,7 @@
         </hlm-menu-group>
       </hlm-menu>
     </ng-template>
-  } @else {
+  } @else if (loaded()) {
     <button hlmBtn (click)="signIn()">Sign&nbsp;In</button>
   }
 </header>

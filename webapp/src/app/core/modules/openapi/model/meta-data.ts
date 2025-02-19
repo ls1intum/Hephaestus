@@ -9,9 +9,12 @@
  * https://openapi-generator.tech
  * Do not edit the class manually.
  */
+import { TeamInfo } from './team-info';
 
 
 export interface MetaData { 
-    repositoriesToMonitor?: Array<string>;
+    teams: Array<TeamInfo>;
+    scheduledDay: string;
+    scheduledTime: string;
 }
 

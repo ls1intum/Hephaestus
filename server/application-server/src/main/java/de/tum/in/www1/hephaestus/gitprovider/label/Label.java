@@ -1,22 +1,21 @@
 package de.tum.in.www1.hephaestus.gitprovider.label;
 
-import java.util.HashSet;
-import java.util.Set;
-
+import de.tum.in.www1.hephaestus.gitprovider.issue.Issue;
+import de.tum.in.www1.hephaestus.gitprovider.repository.Repository;
+import de.tum.in.www1.hephaestus.gitprovider.team.Team;
 import jakarta.persistence.Entity;
 import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToMany;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
+import java.util.HashSet;
+import java.util.Set;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.NonNull;
 import lombok.Setter;
 import lombok.ToString;
-
-import de.tum.in.www1.hephaestus.gitprovider.issue.Issue;
-import de.tum.in.www1.hephaestus.gitprovider.repository.Repository;
 
 @Entity
 @Table(name = "label")
@@ -27,7 +26,7 @@ public class Label {
 
     @Id
     protected Long id;
-   
+
     // Note: This entity does not have a createdAt and updatedAt field
 
     @NonNull
@@ -48,6 +47,14 @@ public class Label {
     @ToString.Exclude
     private Repository repository;
 
+    @ManyToMany(mappedBy = "labels")
+    @ToString.Exclude
+    private Set<Team> teams = new HashSet<>();
+
+    public void removeAllTeams() {
+        this.teams.forEach(team -> team.getLabels().remove(this));
+        this.teams.clear();
+    }
     // Ignored GitHub properties:
     // - default
 }

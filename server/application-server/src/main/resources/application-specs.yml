@@ -2,7 +2,7 @@ nats:
     enabled: false
 
 monitoring:
-    runOnStartup: false
+    run-on-startup: false
 
 github:
-    authToken: ""
+    auth-token: ""

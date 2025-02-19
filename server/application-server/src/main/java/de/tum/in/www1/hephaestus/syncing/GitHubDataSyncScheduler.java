@@ -1,10 +1,9 @@
 package de.tum.in.www1.hephaestus.syncing;
 
+import de.tum.in.www1.hephaestus.workspace.WorkspaceService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Value;
-import org.springframework.boot.context.event.ApplicationReadyEvent;
-import org.springframework.context.event.EventListener;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.core.annotation.Order;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
@@ -14,28 +13,19 @@ import org.springframework.stereotype.Component;
 public class GitHubDataSyncScheduler {
 
     private static final Logger logger = LoggerFactory.getLogger(GitHubDataSyncScheduler.class);
-    private final GitHubDataSyncService dataSyncService;
 
-    @Value("${monitoring.runOnStartup:true}")
-    private boolean runOnStartup;
+    @Autowired
+    private WorkspaceService workspaceService;
 
-    public GitHubDataSyncScheduler(GitHubDataSyncService dataSyncService) {
-        this.dataSyncService = dataSyncService;
-    }
+    @Autowired
+    private GitHubDataSyncService dataSyncService;
 
-    @EventListener(ApplicationReadyEvent.class)
-    public void run() {
-        if (runOnStartup) {
-            logger.info("Starting initial GitHub data sync...");
-            dataSyncService.syncData();
-            logger.info("Initial GitHub data sync completed.");
-        }
-    }
-
-    @Scheduled(cron = "${monitoring.repository-sync-cron}")
+    @Scheduled(cron = "${monitoring.sync-cron}")
     public void syncDataCron() {
         logger.info("Starting scheduled GitHub data sync...");
-        dataSyncService.syncData();
+        var workspace = workspaceService.getWorkspace();
+        workspace.getRepositoriesToMonitor().forEach(dataSyncService::syncRepositoryToMonitor);
+        dataSyncService.syncUsers(workspace);
         logger.info("Scheduled GitHub data sync completed.");
     }
 }

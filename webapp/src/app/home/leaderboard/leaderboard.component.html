@@ -2,8 +2,12 @@
   <thead appTableHeader>
     <tr appTableRow>
       <th appTableHead class="text-center">Rank</th>
+      <th appTableHead class="text-center px-0.5">League</th>
       <th appTableHead>Contributor</th>
-      <th appTableHead class="text-center">Score</th>
+      <th appTableHead class="flex justify-center items-center gap-1 text-github-done-foreground">
+        <hlm-icon size="sm" name="lucideAward" />
+        Score
+      </th>
       <th appTableHead>Activity</th>
     </tr>
   </thead>
@@ -11,8 +15,11 @@
     @if (isLoading()) {
       @for (entry of [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]; track entry; let idx = $index) {
         <tr appTableRow id="skeleton">
-          <td appTableCell class="flex justify-center">
+          <td appTableCell>
             <hlm-skeleton class="h-5 w-7" [style.width.px]="20 + 1 * idx" />
+          </td>
+          <td appTableCell>
+            <hlm-skeleton class="h-8 w-8" />
           </td>
           <td appTableCell class="py-2">
             <span class="flex items-center gap-2">
@@ -30,7 +37,7 @@
       }
     } @else if (!leaderboard() || leaderboard()?.length === 0) {
       <tr appTableRow>
-        <td appTableCell colspan="4">
+        <td appTableCell colspan="5">
           <div class="flex flex-col items-center justify-center gap-2 mt-1">
             <ng-icon [svg]="octNoEntry" size="32" class="text-github-danger-foreground" />
             <span class="font-semibold text-muted-foreground">No entries found</span>
@@ -41,6 +48,9 @@
       @for (entry of leaderboard(); track entry.user.login) {
         <tr appTableRow routerLink="/user/{{ entry.user.login }}" routerLinkActive="active" ariaCurrentWhenActive="page" [class]="trClass(entry)">
           <td appTableCell class="text-center">{{ entry.rank }}</td>
+          <td appTableCell class="flex justify-center items-center px-0.5">
+            <app-icon-league [leaguePoints]="entry.user.leaguePoints" />
+          </td>
           <td appTableCell class="py-2">
             <span class="flex items-center gap-2 font-medium">
               <hlm-avatar>
@@ -56,10 +66,7 @@
           <td appTableCell class="py-2">
             <div class="flex items-center gap-2">
               @if (entry.numberOfReviewedPRs) {
-                <div class="flex items-center gap-1 text-github-muted-foreground" title="Total reviewed PRs">
-                  <ng-icon [svg]="octGitPullRequest" size="16" />
-                  {{ entry.numberOfReviewedPRs }}
-                </div>
+                <app-reviews-popover [reviewedPRs]="entry.reviewedPullRequests" [highlight]="this.user()?.username?.toLowerCase() === entry.user.login.toLowerCase()" />
                 <div class="flex items-center text-github-muted-foreground">
                   <ng-icon [svg]="octChevronLeft" size="16" />
                 </div>

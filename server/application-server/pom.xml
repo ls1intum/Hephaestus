@@ -1,7 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <project xmlns="http://maven.apache.org/POM/4.0.0"
-	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-	xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
 	<modelVersion>4.0.0</modelVersion>
 	<parent>
 		<groupId>org.springframework.boot</groupId>
@@ -125,15 +124,6 @@
 			<version>0.15.0</version>
 		</dependency>
 		<dependency>
-			<groupId>org.springframework.modulith</groupId>
-			<artifactId>spring-modulith-starter-core</artifactId>
-		</dependency>
-		<dependency>
-			<groupId>org.springframework.modulith</groupId>
-			<artifactId>spring-modulith-starter-test</artifactId>
-			<scope>test</scope>
-		</dependency>
-		<dependency>
 			<groupId>com.github.FelixTJDietrich</groupId>
 			<artifactId>github-api</artifactId>
 			<version>2.0.5</version>
@@ -147,6 +137,11 @@
 			<groupId>io.nats</groupId>
 			<artifactId>jnats</artifactId>
 			<version>2.20.2</version>
+		</dependency>
+		<dependency>
+			<groupId>com.slack.api</groupId>
+			<artifactId>bolt</artifactId>
+			<version>1.44.1</version>
 		</dependency>
 		<dependency>
 			<groupId>org.openapitools</groupId>
@@ -195,6 +190,16 @@
 		<dependency>
 			<groupId>org.hibernate.validator</groupId>
 			<artifactId>hibernate-validator</artifactId>
+		</dependency>
+		<dependency>
+			<groupId>org.keycloak</groupId>
+			<artifactId>keycloak-admin-client</artifactId>
+			<version>26.0.3</version>
+		</dependency>
+		<dependency>
+			<groupId>io.sentry</groupId>
+			<artifactId>sentry-spring-boot-starter-jakarta</artifactId>
+			<version>7.18.1</version>
 		</dependency>
 	</dependencies>
 	<dependencyManagement>
@@ -282,10 +287,7 @@
 					<username>root</username>
 					<password>root</password>
 					<!-- Hibernate URL for reference schema using the Hibernate 6 dialect -->
-					<referenceUrl>hibernate:spring:de.tum.in.www1.hephaestus?dialect=org.hibernate.dialect.PostgreSQLDialect
-						&amp;hibernate.physical_naming_strategy=org.hibernate.boot.model.naming.CamelCaseToUnderscoresNamingStrategy
-						&amp;hibernate.implicit_naming_strategy=org.springframework.boot.orm.jpa.hibernate.SpringImplicitNamingStrategy
-					</referenceUrl>
+					<referenceUrl>hibernate:spring:de.tum.in.www1.hephaestus?dialect=org.hibernate.dialect.PostgreSQLDialect&amp;hibernate.physical_naming_strategy=org.hibernate.boot.model.naming.CamelCaseToUnderscoresNamingStrategy&amp;hibernate.implicit_naming_strategy=org.springframework.boot.orm.jpa.hibernate.SpringImplicitNamingStrategy</referenceUrl>
 					<!-- Enable detailed logging output -->
 					<verbose>true</verbose>
 				</configuration>

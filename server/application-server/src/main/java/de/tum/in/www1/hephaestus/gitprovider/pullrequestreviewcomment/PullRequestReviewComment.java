@@ -1,7 +1,10 @@
 package de.tum.in.www1.hephaestus.gitprovider.pullrequestreviewcomment;
 
-import org.springframework.lang.NonNull;
-
+import de.tum.in.www1.hephaestus.gitprovider.common.AuthorAssociation;
+import de.tum.in.www1.hephaestus.gitprovider.common.BaseGitServiceEntity;
+import de.tum.in.www1.hephaestus.gitprovider.pullrequest.PullRequest;
+import de.tum.in.www1.hephaestus.gitprovider.pullrequestreview.PullRequestReview;
+import de.tum.in.www1.hephaestus.gitprovider.user.User;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
@@ -13,12 +16,7 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 import lombok.ToString;
-
-import de.tum.in.www1.hephaestus.gitprovider.common.AuthorAssociation;
-import de.tum.in.www1.hephaestus.gitprovider.common.BaseGitServiceEntity;
-import de.tum.in.www1.hephaestus.gitprovider.pullrequest.PullRequest;
-import de.tum.in.www1.hephaestus.gitprovider.pullrequestreview.PullRequestReview;
-import de.tum.in.www1.hephaestus.gitprovider.user.User;
+import org.springframework.lang.NonNull;
 
 @Entity
 @Table(name = "pull_request_review_comment")
@@ -54,7 +52,7 @@ public class PullRequestReviewComment extends BaseGitServiceEntity {
 
     @NonNull
     @Enumerated(EnumType.STRING)
-    private AuthorAssociation authorAssociation;    
+    private AuthorAssociation authorAssociation;
 
     // The first line of the range for a multi-line comment.
     private Integer startLine;
@@ -99,9 +97,10 @@ public class PullRequestReviewComment extends BaseGitServiceEntity {
     private PullRequest pullRequest;
 
     public enum Side {
-        LEFT, RIGHT, UNKNOWN
+        LEFT,
+        RIGHT,
+        UNKNOWN,
     }
-
     // Ignored GitHub properties:
     // - subject_type (FILE, LINE is not supported by our API client)
 }

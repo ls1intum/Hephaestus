@@ -7,10 +7,10 @@ import { HlmIconModule } from 'libs/ui/ui-icon-helm/src/index';
 import { BrnTooltipContentDirective } from '@spartan-ng/ui-tooltip-brain';
 import { HlmTooltipComponent, HlmTooltipTriggerDirective } from '@spartan-ng/ui-tooltip-helm';
 import { HlmButtonModule } from '@spartan-ng/ui-button-helm';
-import { LucideAngularModule } from 'lucide-angular';
-import dayjs from 'dayjs';
-import advancedFormat from 'dayjs/plugin/advancedFormat';
+import dayjs from 'dayjs/esm';
+import advancedFormat from 'dayjs/esm/plugin/advancedFormat';
 import { RepositoryInfo, UserInfo } from '@app/core/modules/openapi';
+import { LeagueIconComponent } from '@app/ui/league/icon/league-icon.component';
 
 dayjs.extend(advancedFormat);
 
@@ -22,9 +22,7 @@ const repoImages: { [key: string]: string } = {
 
 @Component({
   selector: 'app-user-header',
-  standalone: true,
   imports: [
-    LucideAngularModule,
     NgIconComponent,
     HlmAvatarModule,
     HlmSkeletonModule,
@@ -32,7 +30,8 @@ const repoImages: { [key: string]: string } = {
     HlmTooltipComponent,
     HlmTooltipTriggerDirective,
     BrnTooltipContentDirective,
-    HlmButtonModule
+    HlmButtonModule,
+    LeagueIconComponent
   ],
   templateUrl: './header.component.html'
 })
@@ -43,6 +42,7 @@ export class UserHeaderComponent {
   user = input<UserInfo>();
   firstContribution = input<string>();
   contributedRepositories = input<RepositoryInfo[]>();
+  leaguePoints = input<number>();
 
   displayFirstContribution = computed(() => {
     if (this.firstContribution()) {

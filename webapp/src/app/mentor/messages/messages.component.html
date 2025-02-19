@@ -1,0 +1,85 @@
+<div class="flex flex-col gap-4">
+  @if (isLoading()) {
+    @for (i of [1, 2, 3, 4]; track i) {
+      <div class="flex w-full" [ngClass]="{ 'justify-end': i % 2 === 0 }">
+        @if (i % 2 === 0) {
+          <div>
+            <hlm-skeleton class="rounded-lg inline-block w-64 h-12" />
+            <div class="flex justify-end">
+              <hlm-skeleton class="h-4 w-32 justify-end" />
+            </div>
+          </div>
+        } @else {
+          <hlm-skeleton class="w-10 h-10 rounded-full" />
+          <div class="ml-3">
+            <hlm-skeleton class="rounded-lg inline-block w-64 h-12" />
+            <hlm-skeleton class="h-4 w-32" />
+          </div>
+        }
+      </div>
+    }
+  } @else {
+    @for (message of messages(); track message.id) {
+      <div
+        class="flex w-full"
+        [ngClass]="{
+          'justify-end': message.sender === Message.SenderEnum.User,
+          'justify-start': message.sender === Message.SenderEnum.Mentor
+        }"
+      >
+        <div
+          class="flex space-x-2"
+          [ngClass]="{
+            'flex-row-reverse': message.sender === Message.SenderEnum.User,
+            'md:max-w-[60%]': getSummary(message) == null
+          }"
+        >
+          @if (message.sender === Message.SenderEnum.Mentor) {
+            <div class="mr-2 flex flex-col">
+              <div class="w-10 h-10 bg-transparent border-2 border-cyan-500 rounded-full flex items-center justify-center">
+                <lucide-angular [img]="BotMessageSquare" class="size-6 text-cyan-500" />
+              </div>
+            </div>
+          }
+          <div
+            class="flex flex-col space-y-2"
+            [ngClass]="{
+              'items-end': message.sender === Message.SenderEnum.User,
+              'items-start': message.sender === Message.SenderEnum.Mentor
+            }"
+          >
+            @if (getSummary(message) !== null) {
+              <app-chat-summary
+                [status]="getSummary(message)?.status || []"
+                [impediments]="getSummary(message)?.impediments || []"
+                [promises]="getSummary(message)?.promises || []"
+              />
+            }
+            <div
+              [ngClass]="{
+                'bg-cyan-500 dark:bg-cyan-600 text-white': message.sender === Message.SenderEnum.User,
+                'bg-muted text-primary': message.sender === Message.SenderEnum.Mentor,
+                'md:max-w-[60%]': getSummary(message) !== null
+              }"
+              class="p-3 px-4 rounded-lg inline-block w-fit"
+            >
+              @if (getSummary(message) !== null) {
+                <p>{{ getSummary(message)?.response }}</p>
+              } @else {
+                @if (getPullRequests(message) !== null) {
+                  <p>{{ getPullRequests(message)?.response }}</p>
+                } @else {
+                  <p>{{ message.content }}</p>
+                }
+              }
+            </div>
+            @if (getPullRequests(message) !== null) {
+              <app-prs-overview [pullRequests]="getPullRequests(message)?.development || []"></app-prs-overview>
+            }
+            <span class="text-xs text-muted-foreground"> {{ message.sender === Message.SenderEnum.User ? 'You' : 'AI Mentor' }} · {{ message.sentAt | date: 'shortTime' }} </span>
+          </div>
+        </div>
+      </div>
+    }
+  }
+</div>

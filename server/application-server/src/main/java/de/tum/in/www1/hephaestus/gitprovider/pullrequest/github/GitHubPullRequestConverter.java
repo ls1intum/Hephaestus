@@ -1,17 +1,15 @@
 package de.tum.in.www1.hephaestus.gitprovider.pullrequest.github;
 
+import de.tum.in.www1.hephaestus.gitprovider.common.BaseGitServiceEntityConverter;
+import de.tum.in.www1.hephaestus.gitprovider.common.DateUtil;
+import de.tum.in.www1.hephaestus.gitprovider.issue.github.GitHubIssueConverter;
+import de.tum.in.www1.hephaestus.gitprovider.pullrequest.PullRequest;
 import java.io.IOException;
-
 import org.kohsuke.github.GHPullRequest;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.lang.NonNull;
 import org.springframework.stereotype.Component;
-
-import de.tum.in.www1.hephaestus.gitprovider.common.BaseGitServiceEntityConverter;
-import de.tum.in.www1.hephaestus.gitprovider.common.DateUtil;
-import de.tum.in.www1.hephaestus.gitprovider.issue.github.GitHubIssueConverter;
-import de.tum.in.www1.hephaestus.gitprovider.pullrequest.PullRequest;
 
 @Component
 public class GitHubPullRequestConverter extends BaseGitServiceEntityConverter<GHPullRequest, PullRequest> {
@@ -64,7 +62,11 @@ public class GitHubPullRequestConverter extends BaseGitServiceEntityConverter<GH
         try {
             pullRequest.setMaintainerCanModify(source.canMaintainerModify());
         } catch (IOException e) {
-            logger.error("Failed to convert maintainerCanModify field for source {}: {}", source.getId(), e.getMessage());
+            logger.error(
+                "Failed to convert maintainerCanModify field for source {}: {}",
+                source.getId(),
+                e.getMessage()
+            );
         }
         try {
             pullRequest.setCommits(source.getCommits());

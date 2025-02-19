@@ -14,8 +14,10 @@
 export interface UserInfo { 
     id: number;
     login: string;
+    email?: string;
     avatarUrl: string;
     name: string;
     htmlUrl: string;
+    leaguePoints?: number;
 }
 

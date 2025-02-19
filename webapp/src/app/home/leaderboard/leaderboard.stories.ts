@@ -13,6 +13,7 @@ const leaderboardEntries: LeaderboardEntry[] = [
       name: 'Armin Stanitzok',
       htmlUrl: 'https://github.com/GODrums'
     },
+    reviewedPullRequests: [],
     numberOfReviewedPRs: 18,
     numberOfApprovals: 8,
     numberOfChangeRequests: 7,
@@ -30,6 +31,7 @@ const leaderboardEntries: LeaderboardEntry[] = [
       name: 'Felix T.J. Dietrich',
       htmlUrl: 'https://github.com/FelixTJDietrich'
     },
+    reviewedPullRequests: [],
     numberOfReviewedPRs: 8,
     numberOfApprovals: 1,
     numberOfChangeRequests: 5,
@@ -47,6 +49,7 @@ const leaderboardEntries: LeaderboardEntry[] = [
       name: 'Stephan Krusche',
       htmlUrl: 'https://github.com/krusche'
     },
+    reviewedPullRequests: [],
     numberOfReviewedPRs: 5,
     numberOfApprovals: 3,
     numberOfChangeRequests: 1,
@@ -64,6 +67,7 @@ const leaderboardEntries: LeaderboardEntry[] = [
       name: 'shadcn',
       htmlUrl: 'https://github.com/shadcn'
     },
+    reviewedPullRequests: [],
     numberOfReviewedPRs: 3,
     numberOfApprovals: 0,
     numberOfChangeRequests: 1,
@@ -81,6 +85,7 @@ const leaderboardEntries: LeaderboardEntry[] = [
       name: 'NoAvatarUser',
       htmlUrl: 'https://github.com/NoAvatarUser'
     },
+    reviewedPullRequests: [],
     numberOfReviewedPRs: 0,
     numberOfApprovals: 0,
     numberOfChangeRequests: 0,

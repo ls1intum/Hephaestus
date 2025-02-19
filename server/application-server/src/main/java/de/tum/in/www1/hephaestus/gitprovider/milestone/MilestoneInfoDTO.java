@@ -1,10 +1,8 @@
 package de.tum.in.www1.hephaestus.gitprovider.milestone;
 
-import java.time.OffsetDateTime;
-
-import org.springframework.lang.NonNull;
-
 import de.tum.in.www1.hephaestus.gitprovider.milestone.Milestone.State;
+import java.time.OffsetDateTime;
+import org.springframework.lang.NonNull;
 
 public record MilestoneInfoDTO(
     @NonNull Long id,
@@ -17,5 +15,4 @@ public record MilestoneInfoDTO(
     @NonNull String htmlUrl,
     OffsetDateTime createdAt,
     OffsetDateTime updatedAt
-) {
-}
+) {}

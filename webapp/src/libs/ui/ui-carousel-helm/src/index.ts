@@ -11,10 +11,16 @@ export * from './lib/hlm-carousel-next.component';
 export * from './lib/hlm-carousel-previous.component';
 export * from './lib/hlm-carousel.component';
 
-export const HlmCarouselImports = [HlmCarouselComponent, HlmCarouselContentComponent, HlmCarouselItemComponent, HlmCarouselPreviousComponent, HlmCarouselNextComponent] as const;
+export const HlmCarouselImports = [
+	HlmCarouselComponent,
+	HlmCarouselContentComponent,
+	HlmCarouselItemComponent,
+	HlmCarouselPreviousComponent,
+	HlmCarouselNextComponent,
+] as const;
 
 @NgModule({
-  imports: [...HlmCarouselImports],
-  exports: [...HlmCarouselImports]
+	imports: [...HlmCarouselImports],
+	exports: [...HlmCarouselImports],
 })
 export class HlmCarouselModule {}

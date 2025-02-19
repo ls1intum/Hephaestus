@@ -13,6 +13,309 @@ servers:
 - url: /
   description: Default Server URL
 paths:
+  /workspace/user/{login}/team/{teamId}:
+    put:
+      tags:
+      - workspace
+      operationId: addTeamToUser
+      parameters:
+      - name: login
+        in: path
+        required: true
+        schema:
+          type: string
+      - name: teamId
+        in: path
+        required: true
+        schema:
+          type: integer
+          format: int64
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UserInfo"
+    delete:
+      tags:
+      - workspace
+      operationId: removeUserFromTeam
+      parameters:
+      - name: login
+        in: path
+        required: true
+        schema:
+          type: string
+      - name: teamId
+        in: path
+        required: true
+        schema:
+          type: integer
+          format: int64
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UserInfo"
+  /workspace/teams:
+    put:
+      tags:
+      - workspace
+      operationId: createTeam
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/TeamInfo"
+        required: true
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TeamInfo"
+  /workspace/teams/autoassign:
+    put:
+      tags:
+      - workspace
+      operationId: automaticallyAssignTeams
+      responses:
+        "200":
+          description: OK
+  /workspace/league/reset:
+    put:
+      tags:
+      - workspace
+      operationId: resetAndRecalculateLeagues
+      responses:
+        "200":
+          description: OK
+  /workspace/team/{teamId}/repository/{repositoryOwner}/{repositoryName}:
+    post:
+      tags:
+      - workspace
+      operationId: addRepositoryToTeam
+      parameters:
+      - name: teamId
+        in: path
+        required: true
+        schema:
+          type: integer
+          format: int64
+      - name: repositoryOwner
+        in: path
+        required: true
+        schema:
+          type: string
+      - name: repositoryName
+        in: path
+        required: true
+        schema:
+          type: string
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TeamInfo"
+    delete:
+      tags:
+      - workspace
+      operationId: removeRepositoryFromTeam
+      parameters:
+      - name: teamId
+        in: path
+        required: true
+        schema:
+          type: integer
+          format: int64
+      - name: repositoryOwner
+        in: path
+        required: true
+        schema:
+          type: string
+      - name: repositoryName
+        in: path
+        required: true
+        schema:
+          type: string
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TeamInfo"
+  /workspace/team/{teamId}/label/{repositoryId}/{label}:
+    post:
+      tags:
+      - workspace
+      operationId: addLabelToTeam
+      parameters:
+      - name: teamId
+        in: path
+        required: true
+        schema:
+          type: integer
+          format: int64
+      - name: repositoryId
+        in: path
+        required: true
+        schema:
+          type: integer
+          format: int64
+      - name: label
+        in: path
+        required: true
+        schema:
+          type: string
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TeamInfo"
+  /workspace/repositories/{owner}/{name}:
+    post:
+      tags:
+      - workspace
+      operationId: addRepositoryToMonitor
+      parameters:
+      - name: owner
+        in: path
+        required: true
+        schema:
+          type: string
+      - name: name
+        in: path
+        required: true
+        schema:
+          type: string
+      responses:
+        "200":
+          description: OK
+    delete:
+      tags:
+      - workspace
+      operationId: removeRepositoryToMonitor
+      parameters:
+      - name: owner
+        in: path
+        required: true
+        schema:
+          type: string
+      - name: name
+        in: path
+        required: true
+        schema:
+          type: string
+      responses:
+        "200":
+          description: OK
+  /mentor/sessions:
+    get:
+      tags:
+      - session
+      operationId: getAllSessions
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Session"
+    post:
+      tags:
+      - session
+      operationId: createNewSession
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Session"
+  /mentor/sessions/{sessionId}:
+    get:
+      tags:
+      - message
+      operationId: getMessages
+      parameters:
+      - name: sessionId
+        in: path
+        required: true
+        schema:
+          type: integer
+          format: int64
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Message"
+    post:
+      tags:
+      - message
+      operationId: createMessage
+      parameters:
+      - name: sessionId
+        in: path
+        required: true
+        schema:
+          type: integer
+          format: int64
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: string
+        required: true
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Message"
+  /workspace/users:
+    get:
+      tags:
+      - workspace
+      operationId: getUsersWithTeams
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/UserTeams"
+  /workspace/repositories:
+    get:
+      tags:
+      - workspace
+      operationId: getRepositoriesToMonitor
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: string
   /user/{login}/profile:
     get:
       tags:
@@ -31,6 +334,20 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/UserProfile"
+  /team/all:
+    get:
+      tags:
+      - team
+      operationId: getTeams
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/TeamInfo"
   /meta:
     get:
       tags:
@@ -51,17 +368,17 @@ paths:
       parameters:
       - name: after
         in: query
-        required: false
+        required: true
         schema:
           type: string
-          format: date
+          format: date-time
       - name: before
         in: query
-        required: false
+        required: true
         schema:
           type: string
-          format: date
-      - name: repository
+          format: date-time
+      - name: team
         in: query
         required: false
         schema:
@@ -75,30 +392,58 @@ paths:
                 type: array
                 items:
                   $ref: "#/components/schemas/LeaderboardEntry"
-  /admin:
-    get:
+  /workspace/team/{teamId}:
+    delete:
       tags:
-      - admin
-      operationId: admin
+      - workspace
+      operationId: deleteTeam
+      parameters:
+      - name: teamId
+        in: path
+        required: true
+        schema:
+          type: integer
+          format: int64
       responses:
         "200":
           description: OK
           content:
             application/json:
               schema:
-                type: string
-  /admin/me:
-    get:
+                $ref: "#/components/schemas/TeamInfo"
+  /workspace/team/{teamId}/label/{labelId}:
+    delete:
       tags:
-      - admin
-      operationId: getGretting
+      - workspace
+      operationId: removeLabelFromTeam
+      parameters:
+      - name: teamId
+        in: path
+        required: true
+        schema:
+          type: integer
+          format: int64
+      - name: labelId
+        in: path
+        required: true
+        schema:
+          type: integer
+          format: int64
       responses:
         "200":
           description: OK
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/AuthUserInfo"
+                $ref: "#/components/schemas/TeamInfo"
+  /user:
+    delete:
+      tags:
+      - user
+      operationId: deleteUser
+      responses:
+        "200":
+          description: OK
 components:
   schemas:
     PullRequestInfo:
@@ -167,20 +512,31 @@ components:
         updatedAt:
           type: string
           format: date-time
-    LabelInfo:
+    Message:
       required:
-      - color
+      - content
       - id
-      - name
+      - sender
+      - sentAt
+      - sessionId
       type: object
       properties:
         id:
           type: integer
           format: int64
-        name:
+        sentAt:
           type: string
-        color:
+          format: date-time
+        sender:
           type: string
+          enum:
+          - MENTOR
+          - USER
+        content:
+          type: string
+        sessionId:
+          type: integer
+          format: int64
     UserProfile:
       required:
       - contributedRepositories
@@ -205,39 +561,6 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/PullRequestInfo"
-    PullRequestReviewInfo:
-      required:
-      - codeComments
-      - htmlUrl
-      - id
-      - isDismissed
-      - state
-      type: object
-      properties:
-        id:
-          type: integer
-          format: int64
-        isDismissed:
-          type: boolean
-        state:
-          type: string
-          enum:
-          - COMMENTED
-          - APPROVED
-          - CHANGES_REQUESTED
-          - UNKNOWN
-        codeComments:
-          type: integer
-          format: int32
-        author:
-          $ref: "#/components/schemas/UserInfo"
-        pullRequest:
-          $ref: "#/components/schemas/PullRequestBaseInfo"
-        htmlUrl:
-          type: string
-        submittedAt:
-          type: string
-          format: date-time
     RepositoryInfo:
       required:
       - htmlUrl
@@ -257,13 +580,29 @@ components:
           type: string
         htmlUrl:
           type: string
-    MetaData:
+    UserTeams:
+      required:
+      - id
+      - login
+      - name
+      - teams
+      - url
       type: object
       properties:
-        repositoriesToMonitor:
+        id:
+          type: integer
+          format: int64
+        login:
+          type: string
+        name:
+          type: string
+        url:
+          type: string
+        teams:
+          uniqueItems: true
           type: array
           items:
-            type: string
+            $ref: "#/components/schemas/TeamInfo"
     PullRequestBaseInfo:
       required:
       - htmlUrl
@@ -296,15 +635,6 @@ components:
           $ref: "#/components/schemas/RepositoryInfo"
         htmlUrl:
           type: string
-    AuthUserInfo:
-      type: object
-      properties:
-        name:
-          type: string
-        roles:
-          type: array
-          items:
-            type: string
     UserInfo:
       required:
       - avatarUrl
@@ -319,11 +649,108 @@ components:
           format: int64
         login:
           type: string
+        email:
+          type: string
         avatarUrl:
           type: string
         name:
           type: string
         htmlUrl:
+          type: string
+        leaguePoints:
+          type: integer
+          format: int32
+    TeamInfo:
+      required:
+      - color
+      - id
+      - labels
+      - name
+      - repositories
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+        name:
+          type: string
+        color:
+          type: string
+        repositories:
+          type: array
+          items:
+            $ref: "#/components/schemas/RepositoryInfo"
+        labels:
+          type: array
+          items:
+            $ref: "#/components/schemas/LabelInfo"
+    LabelInfo:
+      required:
+      - color
+      - id
+      - name
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+        name:
+          type: string
+        color:
+          type: string
+        repository:
+          $ref: "#/components/schemas/RepositoryInfo"
+    PullRequestReviewInfo:
+      required:
+      - codeComments
+      - htmlUrl
+      - id
+      - isDismissed
+      - score
+      - state
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+        isDismissed:
+          type: boolean
+        state:
+          type: string
+          enum:
+          - COMMENTED
+          - APPROVED
+          - CHANGES_REQUESTED
+          - UNKNOWN
+        codeComments:
+          type: integer
+          format: int32
+        author:
+          $ref: "#/components/schemas/UserInfo"
+        pullRequest:
+          $ref: "#/components/schemas/PullRequestBaseInfo"
+        htmlUrl:
+          type: string
+        score:
+          type: integer
+          format: int32
+        submittedAt:
+          type: string
+          format: date-time
+    MetaData:
+      required:
+      - scheduledDay
+      - scheduledTime
+      - teams
+      type: object
+      properties:
+        teams:
+          type: array
+          items:
+            $ref: "#/components/schemas/TeamInfo"
+        scheduledDay:
+          type: string
+        scheduledTime:
           type: string
     LeaderboardEntry:
       required:
@@ -334,6 +761,7 @@ components:
       - numberOfReviewedPRs
       - numberOfUnknowns
       - rank
+      - reviewedPullRequests
       - score
       - user
       type: object
@@ -346,6 +774,10 @@ components:
           format: int32
         user:
           $ref: "#/components/schemas/UserInfo"
+        reviewedPullRequests:
+          type: array
+          items:
+            $ref: "#/components/schemas/PullRequestInfo"
         numberOfReviewedPRs:
           type: integer
           format: int32
@@ -364,3 +796,18 @@ components:
         numberOfCodeComments:
           type: integer
           format: int32
+    Session:
+      required:
+      - createdAt
+      - id
+      - isClosed
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+        createdAt:
+          type: string
+          format: date-time
+        isClosed:
+          type: boolean

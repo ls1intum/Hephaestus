@@ -6,7 +6,6 @@ import { LucideAngularModule, Sparkles } from 'lucide-angular';
 
 @Component({
   selector: 'app-request-feature',
-  standalone: true,
   imports: [LucideAngularModule, HlmButtonModule, HlmTooltipComponent, HlmTooltipTriggerDirective, BrnTooltipContentDirective],
   templateUrl: './request-feature.component.html'
 })

@@ -13,6 +13,7 @@
       [user]="query.data()?.userInfo"
       [firstContribution]="query.data()?.firstContribution"
       [contributedRepositories]="query.data()?.contributedRepositories"
+      [leaguePoints]="query.data()?.userInfo?.leaguePoints"
       [isLoading]="showSkeleton"
     />
     <div class="flex flex-col lg:flex-row gap-y-8 border-t border-border pt-6">
@@ -29,6 +30,7 @@
                 [htmlUrl]="activity?.htmlUrl"
                 [pullRequest]="activity?.pullRequest"
                 [repositoryName]="activity?.pullRequest?.repository?.name"
+                [score]="activity?.score"
               />
             }
             @if (!showSkeleton && (!query.data()?.reviewActivity || query.data()?.reviewActivity?.length === 0)) {

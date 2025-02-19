@@ -1,13 +1,12 @@
 package de.tum.in.www1.hephaestus.gitprovider.issue.github;
 
+import de.tum.in.www1.hephaestus.gitprovider.common.BaseGitServiceEntityConverter;
+import de.tum.in.www1.hephaestus.gitprovider.common.DateUtil;
+import de.tum.in.www1.hephaestus.gitprovider.issue.Issue;
 import org.kohsuke.github.GHIssue;
 import org.kohsuke.github.GHIssueState;
 import org.springframework.lang.NonNull;
 import org.springframework.stereotype.Component;
-
-import de.tum.in.www1.hephaestus.gitprovider.common.BaseGitServiceEntityConverter;
-import de.tum.in.www1.hephaestus.gitprovider.common.DateUtil;
-import de.tum.in.www1.hephaestus.gitprovider.issue.Issue;
 
 @Component
 public class GitHubIssueConverter extends BaseGitServiceEntityConverter<GHIssue, Issue> {
@@ -28,6 +27,7 @@ public class GitHubIssueConverter extends BaseGitServiceEntityConverter<GHIssue,
         issue.setLocked(source.isLocked());
         issue.setClosedAt(DateUtil.convertToOffsetDateTime(source.getClosedAt()));
         issue.setCommentsCount(issue.getCommentsCount());
+        issue.setHasPullRequest(source.getPullRequest() != null);
         return issue;
     }
 

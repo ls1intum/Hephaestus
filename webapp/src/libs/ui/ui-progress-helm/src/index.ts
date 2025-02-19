@@ -9,7 +9,7 @@ export * from './lib/hlm-progress.directive';
 export const HlmProgressImports = [HlmProgressDirective, HlmProgressIndicatorDirective] as const;
 
 @NgModule({
-  imports: [...HlmProgressImports],
-  exports: [...HlmProgressImports]
+	imports: [...HlmProgressImports],
+	exports: [...HlmProgressImports],
 })
 export class HlmProgressModule {}

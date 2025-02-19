@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "webhook-ingest"
-version = "1.0.0"
+version = "0.0.1"
 description = "A FastAPI service for ingesting GitHub webhooks and publishing events to NATS JetStream."
 authors = ["Felix T.J. Dietrich <felixtj.dietrich@tum.de>"]
 readme = "README.md"

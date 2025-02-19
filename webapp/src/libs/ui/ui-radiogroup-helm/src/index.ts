@@ -11,7 +11,7 @@ export * from './lib/hlm-radio.directive';
 export const HlmRadioGroupImports = [HlmRadioGroupDirective, HlmRadioDirective, HlmRadioIndicatorComponent];
 
 @NgModule({
-  imports: [...HlmRadioGroupImports],
-  exports: [...HlmRadioGroupImports]
+	imports: [...HlmRadioGroupImports],
+	exports: [...HlmRadioGroupImports],
 })
 export class HlmRadioGroupModule {}

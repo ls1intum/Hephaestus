@@ -1,33 +1,5 @@
 components:
   schemas:
-    ChatRequest:
-      properties:
-        message:
-          title: Message
-          type: string
-        thread_id:
-          anyOf:
-          - type: string
-          - type: 'null'
-          title: Thread Id
-      required:
-      - message
-      title: ChatRequest
-      type: object
-    ChatResponse:
-      properties:
-        response:
-          title: Response
-          type: string
-        thread_id:
-          anyOf:
-          - type: string
-          - type: 'null'
-          title: Thread Id
-      required:
-      - response
-      title: ChatResponse
-      type: object
     HTTPValidationError:
       properties:
         detail:
@@ -36,6 +8,55 @@ components:
           title: Detail
           type: array
       title: HTTPValidationError
+      type: object
+    HealthCheck:
+      description: Response model to validate and return when performing a health
+        check.
+      properties:
+        status:
+          default: OK
+          title: Status
+          type: string
+      title: HealthCheck
+      type: object
+    MentorRequest:
+      properties:
+        content:
+          title: Content
+          type: string
+        session_id:
+          title: Session Id
+          type: string
+      required:
+      - session_id
+      - content
+      title: MentorRequest
+      type: object
+    MentorResponse:
+      properties:
+        content:
+          title: Content
+          type: string
+      required:
+      - content
+      title: MentorResponse
+      type: object
+    MentorStartRequest:
+      properties:
+        dev_progress:
+          title: Dev Progress
+          type: string
+        previous_session_id:
+          title: Previous Session Id
+          type: string
+        session_id:
+          title: Session Id
+          type: string
+      required:
+      - session_id
+      - previous_session_id
+      - dev_progress
+      title: MentorStartRequest
       type: object
     ValidationError:
       properties:
@@ -67,21 +88,40 @@ info:
   version: 0.0.1
 openapi: 3.1.0
 paths:
-  /chat:
+  /health:
+    get:
+      description: "## Perform a Health Check\nEndpoint to perform a healthcheck on.\
+        \ This endpoint can primarily be used Docker\nto ensure a robust container\
+        \ orchestration and management is in place. Other\nservices which rely on\
+        \ proper functioning of the API service will not deploy if this\nendpoint\
+        \ returns any other HTTP status code except 200 (OK).\nReturns:\n    HealthCheck:\
+        \ Returns a JSON response with the health status"
+      operationId: get_health_health_get
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HealthCheck'
+          description: Return HTTP Status Code 200 (OK)
+      summary: Perform a Health Check
+      tags:
+      - healthcheck
+  /mentor/:
     post:
-      operationId: chat_chat_post
+      operationId: generate_mentor__post
       requestBody:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/ChatRequest'
+              $ref: '#/components/schemas/MentorRequest'
         required: true
       responses:
         '200':
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ChatResponse'
+                $ref: '#/components/schemas/MentorResponse'
           description: Successful Response
         '422':
           content:
@@ -89,4 +129,31 @@ paths:
               schema:
                 $ref: '#/components/schemas/HTTPValidationError'
           description: Validation Error
-      summary: Start and continue a chat session with an LLM.
+      summary: Continue a chat session with an LLM.
+      tags:
+      - mentor
+  /mentor/start:
+    post:
+      operationId: start_mentor_start_post
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/MentorStartRequest'
+        required: true
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MentorResponse'
+          description: Successful Response
+        '422':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+          description: Validation Error
+      summary: Start a chat session with an LLM.
+      tags:
+      - mentor

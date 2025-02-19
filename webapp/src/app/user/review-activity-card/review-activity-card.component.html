@@ -1,6 +1,6 @@
 @if (isLoading()) {
-  <div hlmCard variant="profile" [class]="class()">
-    <div hlmCardContent variant="profile">
+  <div hlmCard [class]="computedClass()">
+    <div class="flex flex-col gap-1">
       <hlm-skeleton class="h-4 w-1/2"></hlm-skeleton>
       <div class="flex items-center gap-2 font-medium">
         <hlm-skeleton [class]="'h-7 w-7 ' + this.skeletonColorForReviewState()"></hlm-skeleton>
@@ -9,16 +9,29 @@
     </div>
   </div>
 } @else {
-  <a hlmCard variant="profile" class="hover:bg-accent/50" [href]="htmlUrl() ?? this.pullRequest()?.htmlUrl" target="_blank" rel="noopener noreferrer" [class]="class()">
-    <div hlmCardContent variant="profile">
-      <div class="text-sm text-muted-foreground first-letter:uppercase">
-        {{ relativeActivityTime() }}
-        in
-        {{ this.repositoryName() }} #{{ this.pullRequest()?.number }}
+  <a hlmCard [href]="htmlUrl() ?? this.pullRequest()?.htmlUrl" target="_blank" rel="noopener noreferrer" [class]="computedClass()">
+    <div class="flex flex-col gap-1">
+      <div class="flex items-center justify-between">
+        <span class="text-sm text-muted-foreground first-letter:uppercase">
+          {{ relativeActivityTime() }}
+          in
+          {{ this.repositoryName() }} #{{ this.pullRequest()?.number }}
+        </span>
+        <button
+          hlmBtn
+          [hlmTooltipTrigger]="'Points awarded for this activity'"
+          variant="ghost"
+          size="sm"
+          aria-describedby="Points Activity"
+          class="flex items-center text-github-done-foreground h-8"
+        >
+          <hlm-icon size="sm" name="lucideAward" />
+          <span>+{{ this.score() }}</span>
+        </button>
       </div>
-      <div class="containerSize flex items-center gap-2 font-medium">
+      <div class="flex items-center gap-2 font-medium">
         <ng-icon [className]="this.reviewStateProps().color" [svg]="this.reviewStateProps().icon" size="20"></ng-icon>
-        <span [innerHTML]="displayPullRequestTitle()" class="truncate w-[95%]"></span>
+        <span [innerHTML]="displayPullRequestTitle()" class="w-[95%]"></span>
       </div>
     </div>
   </a>

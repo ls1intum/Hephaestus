@@ -1,0 +1,48 @@
+<!doctype html>
+<html>
+    <head>
+        <meta charset="utf-8" />
+        <meta name="theme-color" content="default-color" />
+        <meta name="viewport" content="width=device-width, initial-scale=1" />
+
+        <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png" />
+    </head>
+
+    <script>
+        // JavaScript should be placed inside <script> tags and not as FreeMarker expressions
+        const theme = localStorage.getItem("theme");
+        const browserDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
+        if (theme !== null) {
+            if (theme === "dark") {
+                document.documentElement.classList.add("dark");
+            }
+            document.documentElement.setAttribute("data-color-mode", theme);
+        } else {
+            if (browserDark) {
+                document.documentElement.classList.add("dark");
+            }
+            document.documentElement.setAttribute(
+                "data-color-mode",
+                browserDark ? "dark" : "light"
+            );
+            localStorage.setItem("theme", browserDark ? "dark" : "light");
+        }
+
+        const metaThemeColor = document.querySelector('meta[name="theme-color"]');
+        if (metaThemeColor) {
+            metaThemeColor.setAttribute(
+                "content",
+                "hsl(" +
+                    getComputedStyle(document.documentElement).getPropertyValue(
+                        "--background"
+                    ) +
+                    ")"
+            );
+        }
+    </script>
+
+    <body>
+        <div id="root"></div>
+        <script type="module" src="/src/main.tsx"></script>
+    </body>
+</html>

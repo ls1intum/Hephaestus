@@ -1,5 +1,5 @@
-<a hlmCard variant="profile" [class]="computedClass()" [href]="htmlUrl()" target="_blank" rel="noopener noreferrer">
-  <div hlmCardContent variant="profile">
+<a hlmCard [class]="computedClass()" [href]="htmlUrl()" target="_blank" rel="noopener noreferrer">
+  <div class="flex flex-col gap-1 px-6">
     <div class="flex justify-between items-center text-sm text-github-muted-foreground">
       <span class="font-medium flex justify-center items-center space-x-1">
         @if (isLoading()) {
@@ -21,29 +21,18 @@
       </span>
     </div>
 
-    <span class="containerSize flex justify-between font-medium mb-3">
+    <span class="flex justify-between font-medium contain-inline-size">
       @if (isLoading()) {
-        <hlm-skeleton class="h-6 w-3/4"></hlm-skeleton>
+        <hlm-skeleton class="h-6 w-3/4 mb-6"></hlm-skeleton>
       } @else {
-        <div [innerHTML]="displayTitle()" class="truncate"></div>
+        <div [innerHTML]="displayTitle()"></div>
       }
     </span>
   </div>
   @if (!isLoading()) {
-    <div hlmCardFooter class="flex flex-wrap gap-2 p-0 space-x-0">
+    <div hlmCardFooter class="flex flex-wrap gap-2 px-6 pb-6 space-x-0">
       @for (label of pullRequestLabels(); track label.name) {
-        @let labelColors = hexToRgb(label.color);
-        <span
-          class="px-2 py-0.5 rounded-[2rem] text-xs font-medium dark:border gh-label"
-          [style.--label-r]="labelColors.r"
-          [style.--label-g]="labelColors.g"
-          [style.--label-b]="labelColors.b"
-          [style.--label-h]="labelColors.h"
-          [style.--label-s]="labelColors.s"
-          [style.--label-l]="labelColors.l"
-        >
-          {{ label.name }}
-        </span>
+        <app-github-label [label]="label"></app-github-label>
       }
     </div>
   }

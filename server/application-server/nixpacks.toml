@@ -1,8 +1,0 @@
-[variables]
-NIXPACKS_JDK_VERSION = '21'
-
-[phases.setup]
-aptPkgs = ["...", "wget"]
-
-[phases.build]
-cmds = ["chmod +x ./mvnw", "./mvnw -DskipTests clean package"]
