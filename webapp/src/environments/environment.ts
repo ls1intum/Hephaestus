@@ -12,11 +12,9 @@ export const environment = {
     clientId: 'hephaestus',
     skipLoginPage: false // If true, it will directly use github IDP for login
   },
-  umami: {
-    enabled: false,
-    scriptUrl: '',
-    websiteId: '',
-    domains: ''
+  posthog: {
+    projectApiKey: '',
+    apiHost: ''
   },
   legal: {
     imprintHtml: '<p>This is the imprint.</p>',

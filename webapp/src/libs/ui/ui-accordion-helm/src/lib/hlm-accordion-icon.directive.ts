@@ -6,7 +6,6 @@ import type { ClassValue } from 'clsx';
 
 @Directive({
 	selector: 'hlm-icon[hlmAccordionIcon], hlm-icon[hlmAccIcon]',
-	standalone: true,
 	providers: [provideIcons({ lucideChevronDown }), provideHlmIconConfig({ name: 'lucideChevronDown', size: 'none' })],
 	host: {
 		'[class]': '_computedClass()',

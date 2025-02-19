@@ -8,7 +8,6 @@ import { HlmPaginationLinkDirective } from './hlm-pagination-link.directive';
 
 @Component({
 	selector: 'hlm-pagination-next',
-	standalone: true,
 	imports: [HlmPaginationLinkDirective, HlmIconComponent],
 	providers: [provideIcons({ lucideChevronRight })],
 	template: `

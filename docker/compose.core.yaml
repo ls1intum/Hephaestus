@@ -1,0 +1,410 @@
+services:
+  webhook-ingest:
+    image: "ghcr.io/ls1intum/hephaestus/webhook-ingest:${IMAGE_TAG}"
+    ports:
+      - "4200"
+    environment:
+      NATS_URL: "nats://nats-server:4222"
+      WEBHOOK_SECRET: ${WEBHOOK_SECRET}
+    depends_on:
+      nats-server:
+        condition: service_healthy
+    restart: unless-stopped
+    networks:
+      - shared-network
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.middlewares.gzip.compress=true"
+      - "traefik.http.middlewares.https-webhook-ingest-stripprefix.stripprefix.prefixes=/webhooks"
+      - "traefik.http.middlewares.redirect-to-https.redirectscheme.scheme=https"
+      - "traefik.http.routers.http-webhook-ingest.entryPoints=http"
+      - "traefik.http.routers.http-webhook-ingest.middlewares=redirect-to-https"
+      - "traefik.http.routers.http-webhook-ingest.rule=Host(`${APP_HOSTNAME}`) && PathPrefix(`/webhooks`)"
+      - "traefik.http.routers.https-webhook-ingest.entryPoints=https"
+      - "traefik.http.routers.https-webhook-ingest.middlewares=https-webhook-ingest-stripprefix,gzip"
+      - "traefik.http.routers.https-webhook-ingest.rule=Host(`${APP_HOSTNAME}`) && PathPrefix(`/webhooks`)"
+      - "traefik.http.routers.https-webhook-ingest.tls.certresolver=letsencrypt"
+      - "traefik.http.routers.https-webhook-ingest.tls=true"
+      - "traefik.http.routers.http-webhook-ingest.priority=5"
+      - "traefik.http.routers.https-webhook-ingest.priority=10"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:4200/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 3s
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  nats-server:
+    image: nats:alpine
+    restart: unless-stopped
+    # Lock down the 4222 port from the internet for production
+    # We expose it to the host so we can interact with it from the host machine via the nats cli
+    ports:
+      - "4222:4222"
+    command: ["--config", "/etc/nats/nats-server.conf"]
+    volumes:
+      - nats-data:/data
+    configs:
+      - source: nats-server.conf
+        target: /etc/nats/nats-server.conf
+    networks:
+      - shared-network
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "--quiet", "http://localhost:8222/healthz"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 3s
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  keycloak:
+    image: quay.io/keycloak/keycloak:26.0
+    restart: unless-stopped
+    depends_on:
+      keycloak-postgres:
+        condition: service_healthy
+    networks:
+      - shared-network
+    volumes:
+      - keycloak-data:/opt/keycloak/data
+      # Place keycloakify/dist_keycloak/keycloak-theme-for-kc-all-other-versions.jar into themes folder
+      - ./themes:/opt/keycloak/providers/
+    configs:
+      - source: realm-import.json
+        target: /opt/keycloak/data/realm-import.json
+    # Workaround for working with configs instead of mounting the file
+    entrypoint: [ "sh", "-c", "if [ ! -d /opt/keycloak/data/import ]; then rm -f /opt/keycloak/data/import && mkdir -p /opt/keycloak/data/import; fi && mv /opt/keycloak/data/realm-import.json /opt/keycloak/data/import/realm-import.json && exec /opt/keycloak/bin/kc.sh start --import-realm" ]
+    environment:
+      - TZ=${TIMEZONE:-UTC}
+      - KEYCLOAK_ADMIN=${KEYCLOAK_ADMIN}
+      - KEYCLOAK_ADMIN_PASSWORD=${KEYCLOAK_ADMIN_PASSWORD}
+      - KC_DB=postgres
+      - KC_DB_USERNAME=root
+      - KC_DB_PASSWORD=root
+      - KC_DB_URL_PORT=5432
+      - KC_DB_URL=jdbc:postgresql://keycloak-postgres/keycloak
+      - KC_HOSTNAME=${APP_HOSTNAME}
+      - KC_HTTP_RELATIVE_PATH=/keycloak
+      - KC_HTTP_ENABLED=${KC_HTTP_ENABLED:-true}
+      - KC_HEALTH_ENABLED=${KC_HEALTH_ENABLED:-true}
+      - KC_PROXY_HEADERS=${KC_PROXY_HEADERS:-xforwarded}
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.middlewares.gzip.compress=true"
+      - "traefik.http.middlewares.redirect-to-https.redirectscheme.scheme=https"
+      - "traefik.http.routers.http-keycloak.entryPoints=http"
+      - "traefik.http.routers.http-keycloak.middlewares=redirect-to-https"
+      - "traefik.http.routers.http-keycloak.rule=Host(`${APP_HOSTNAME}`) && PathPrefix(`/keycloak`)"
+      - "traefik.http.routers.https-keycloak.entryPoints=https"
+      - "traefik.http.routers.https-keycloak.rule=Host(`${APP_HOSTNAME}`) && PathPrefix(`/keycloak`)"
+      - "traefik.http.routers.https-keycloak.tls.certresolver=letsencrypt"
+      - "traefik.http.routers.https-keycloak.tls=true"
+      - "traefik.http.routers.http-keycloak.priority=5"
+      - "traefik.http.routers.https-keycloak.priority=10"
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "exec 3<>/dev/tcp/127.0.0.1/9000; echo -e 'GET /keycloak/health/ready HTTP/1.1\r\nHost: localhost:9000\r\nConnection: close\r\n\r\n' >&3;cat <&3 | grep -q '\"status\": \"UP\"' && exit 0 || exit 1",
+        ]
+      interval: 5s
+      timeout: 20s
+      retries: 10
+
+  keycloak-postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    networks:
+      - shared-network
+    volumes:
+      - keycloak-postgresql-data:/var/lib/postgresql/data
+    environment:
+      - POSTGRES_DB=keycloak
+      - POSTGRES_USER=root
+      - POSTGRES_PASSWORD=root
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}
+      interval: 5s
+      timeout: 20s
+      retries: 10
+
+networks:
+  shared-network:
+    name: shared-network
+    driver: bridge
+
+volumes:
+  nats-data: 
+  keycloak-data:
+  keycloak-postgresql-data:
+
+configs:
+  nats-server.conf:
+    content: |
+      listen: "0.0.0.0:4222" 
+
+      http_port: 8222
+
+      jetstream {
+        store_dir: "/data"
+        max_mem: 4G
+        max_file: 50G
+      }
+
+      # No tls for production since we are not exposing the NATS ports to the host
+
+  realm-import.json:
+    content: |
+      {
+        "realm": "hephaestus",
+        "displayName": "Hephaestus",
+        "enabled": true,
+        "ssoSessionIdleTimeout": 1209600,
+        "ssoSessionMaxLifespan": 2592000,
+        "clients": [
+          {
+            "clientId": "hephaestus",
+            "enabled": true,
+            "rootUrl": "https://${APP_HOSTNAME}",
+            "surrogateAuthRequired": false,
+            "alwaysDisplayInConsole": false,
+            "clientAuthenticatorType": "client-secret",
+            "redirectUris": [
+              "https://${APP_HOSTNAME}/*"
+            ],
+            "webOrigins": [
+              "+"
+            ],
+            "notBefore": 0,
+            "bearerOnly": false,
+            "consentRequired": false,
+            "standardFlowEnabled": true,
+            "implicitFlowEnabled": false,
+            "directAccessGrantsEnabled": true,
+            "serviceAccountsEnabled": false,
+            "publicClient": true,
+            "frontchannelLogout": true,
+            "protocol": "openid-connect",
+            "attributes": {
+              "client.introspection.response.allow.jwt.claim.enabled": "false",
+              "post.logout.redirect.uris": "https://${APP_HOSTNAME}/*",
+              "oauth2.device.authorization.grant.enabled": "false",
+              "backchannel.logout.revoke.offline.tokens": "false",
+              "use.refresh.tokens": "true",
+              "realm_client": "false",
+              "oidc.ciba.grant.enabled": "false",
+              "client.use.lightweight.access.token.enabled": "false",
+              "backchannel.logout.session.required": "true",
+              "client_credentials.use_refresh_token": "false",
+              "acr.loa.map": "{}",
+              "require.pushed.authorization.requests": "false",
+              "tls.client.certificate.bound.access.tokens": "false",
+              "display.on.consent.screen": "false",
+              "token.response.type.bearer.lower-case": "false"
+            },
+            "authenticationFlowBindingOverrides": {},
+            "fullScopeAllowed": true,
+            "nodeReRegistrationTimeout": -1,
+            "defaultClientScopes": [
+              "web-origins",
+              "acr",
+              "profile",
+              "roles",
+              "basic",
+              "email"
+            ],
+            "optionalClientScopes": [
+              "address",
+              "phone",
+              "offline_access",
+              "organization",
+              "microprofile-jwt"
+            ]
+          },
+          {
+            "clientId": "hephaestus-confidential",
+            "rootUrl": "https://${APP_HOSTNAME}",
+            "adminUrl": "https://${APP_HOSTNAME}",
+            "baseUrl": "https://${APP_HOSTNAME}/",
+            "surrogateAuthRequired": false,
+            "enabled": true,
+            "alwaysDisplayInConsole": false,
+            "clientAuthenticatorType": "client-secret",
+            "secret": "${KEYCLOAK_HEPHAESTUS_CONFIDENTIAL_CLIENT_SECRET}",
+            "redirectUris": [
+              "https://${APP_HOSTNAME}/"
+            ],
+            "webOrigins": [
+              "+"
+            ],
+            "notBefore": 0,
+            "bearerOnly": false,
+            "consentRequired": false,
+            "standardFlowEnabled": false,
+            "implicitFlowEnabled": false,
+            "directAccessGrantsEnabled": true,
+            "serviceAccountsEnabled": true,
+            "publicClient": false,
+            "frontchannelLogout": true,
+            "protocol": "openid-connect",
+            "attributes": {
+              "realm_client": "false",
+              "oidc.ciba.grant.enabled": "false",
+              "client.secret.creation.time": "1728160951",
+              "backchannel.logout.session.required": "true",
+              "post.logout.redirect.uris": "https://${APP_HOSTNAME}/",
+              "display.on.consent.screen": "false",
+              "oauth2.device.authorization.grant.enabled": "false",
+              "use.jwks.url": "false",
+              "backchannel.logout.revoke.offline.tokens": "false"
+            },
+            "authenticationFlowBindingOverrides": {},
+            "fullScopeAllowed": true,
+            "nodeReRegistrationTimeout": -1,
+            "protocolMappers": [
+              {
+                "name": "Client ID",
+                "protocol": "openid-connect",
+                "protocolMapper": "oidc-usersessionmodel-note-mapper",
+                "consentRequired": false,
+                "config": {
+                  "user.session.note": "client_id",
+                  "id.token.claim": "true",
+                  "introspection.token.claim": "true",
+                  "access.token.claim": "true",
+                  "claim.name": "client_id",
+                  "jsonType.label": "String"
+                }
+              },
+              {
+                "name": "Client IP Address",
+                "protocol": "openid-connect",
+                "protocolMapper": "oidc-usersessionmodel-note-mapper",
+                "consentRequired": false,
+                "config": {
+                  "user.session.note": "clientAddress",
+                  "id.token.claim": "true",
+                  "introspection.token.claim": "true",
+                  "access.token.claim": "true",
+                  "claim.name": "clientAddress",
+                  "jsonType.label": "String"
+                }
+              },
+              {
+                "name": "Client Host",
+                "protocol": "openid-connect",
+                "protocolMapper": "oidc-usersessionmodel-note-mapper",
+                "consentRequired": false,
+                "config": {
+                  "user.session.note": "clientHost",
+                  "id.token.claim": "true",
+                  "introspection.token.claim": "true",
+                  "access.token.claim": "true",
+                  "claim.name": "clientHost",
+                  "jsonType.label": "String"
+                }
+              }
+            ],
+            "defaultClientScopes": [
+              "web-origins",
+              "acr",
+              "profile",
+              "roles",
+              "basic",
+              "email"
+            ],
+            "optionalClientScopes": [
+              "address",
+              "phone",
+              "offline_access",
+              "organization",
+              "microprofile-jwt"
+            ]
+          }
+        ],
+        "identityProviders": [
+          {
+            "alias": "github",
+            "displayName": "GitHub",
+            "providerId": "github",
+            "enabled": true,
+            "updateProfileFirstLoginMode": "on",
+            "trustEmail": true,
+            "storeToken": false,
+            "addReadTokenRoleOnCreate": false,
+            "authenticateByDefault": false,
+            "linkOnly": false,
+            "hideOnLogin": false,
+            "config": {
+              "syncMode": "LEGACY",
+              "clientSecret": "${KEYCLOAK_GITHUB_CLIENT_SECRET}",
+              "clientId": "${KEYCLOAK_GITHUB_CLIENT_ID}",
+              "guiOrder": "1"
+            }
+          }
+        ],
+        "roles" : {
+          "realm" : [
+            {
+              "name": "admin",
+              "description": "Administrator privileges",
+              "composites": {
+                "realm": [
+                  "mentor_access"
+                ]
+              }
+            },
+            {
+              "name": "mentor_access",
+              "description": "Access to AI Mentor"
+            },
+            {
+              "name": "offline_access",
+              "description": "${role_offline-access}",
+              "composite": false,
+              "clientRole": false
+            },
+            {
+              "name": "uma_authorization",
+              "description": "${role_uma_authorization}",
+              "composite": false,
+              "clientRole": false
+            },
+            {
+              "name": "default-roles-hephaestus",
+              "description": "${role_default-roles}",
+              "composite": true,
+              "composites": {
+                "realm": [
+                  "offline_access",
+                  "uma_authorization"
+                ],
+                "client": {
+                  "account": [
+                    "view-profile",
+                    "manage-account"
+                  ]
+                }
+              },
+              "clientRole": false
+            }
+          ]
+        },
+        "defaultRole": {
+          "name": "default-roles-hephaestus",
+          "description": "${role_default-roles}",
+          "composite": true,
+          "clientRole": false
+        }
+      }

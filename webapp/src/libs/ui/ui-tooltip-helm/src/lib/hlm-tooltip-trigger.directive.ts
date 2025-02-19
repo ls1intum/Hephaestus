@@ -3,7 +3,6 @@ import { BrnTooltipTriggerDirective } from '@spartan-ng/ui-tooltip-brain';
 
 @Directive({
 	selector: '[hlmTooltipTrigger]',
-	standalone: true,
 	hostDirectives: [
 		{
 			directive: BrnTooltipTriggerDirective,
