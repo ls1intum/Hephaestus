@@ -6,7 +6,6 @@ import { LeagueInfoModalComponent } from '@app/ui/league/info-modal/info-modal.c
 
 @Component({
   selector: 'app-leaderboard-league',
-  standalone: true,
   imports: [HlmCardModule, HlmButtonModule, LeagueEloCardComponent, LeagueInfoModalComponent],
   templateUrl: './league.component.html'
 })
