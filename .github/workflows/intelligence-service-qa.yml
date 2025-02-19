@@ -24,7 +24,7 @@ jobs:
       - name: Install Poetry
         uses: snok/install-poetry@v1
         with:
-          version: 1.8.5
+          version: 2.1.1
           virtualenvs-create: true
           virtualenvs-in-project: true
           virtualenvs-path: .venv
@@ -39,7 +39,7 @@ jobs:
 
       - name: Install Python dependencies
         working-directory: server/intelligence-service
-        run: poetry lock --no-update && poetry install --no-interaction --no-root
+        run: poetry lock && poetry install --no-interaction --no-root
 
       - name: Check formatting with Black
         working-directory: ./server/intelligence-service
