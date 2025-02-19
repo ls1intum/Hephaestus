@@ -39,7 +39,6 @@ type LeagueVariants = VariantProps<typeof leagueVariants>;
 
 @Component({
   selector: 'app-icon-league',
-  standalone: true,
   imports: [
     LucideAngularModule,
     LeagueBronzeIconComponent,

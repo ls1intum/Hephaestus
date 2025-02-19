@@ -4,7 +4,6 @@ import { cn } from 'app/utils';
 
 @Directive({
   selector: 'tfoot[appTableFooter]',
-  standalone: true,
   host: {
     '[class]': 'computedClass()'
   }

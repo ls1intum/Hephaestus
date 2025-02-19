@@ -1,0 +1,30 @@
+<div class="flex items-center gap-2">
+  <div class="block md:hidden">
+    <hlm-sheet side="left">
+      <app-workspace-thumb [iconUrl]="selectedWorkspace().iconUrl" [hoverRingEnabled]="false" />
+      <hlm-sheet-content *brnSheetContent="let ctx" class="w-11/12 p-2.5 flex flex-col gap-2">
+        <hlm-sheet-header class="text-left mt-2">
+          <h3 hlmSheetTitle>Workspaces</h3>
+        </hlm-sheet-header>
+        <hlm-scroll-area class="h-full scrollbar-thin -mr-2.5">
+          <div class="pr-2.5">
+            <app-workspace-option-selector
+              [isCompact]="false"
+              [selectedWorkspace]="selectedWorkspace()"
+              [workspaces]="workspaces()"
+              (onSelect)="onSelect.emit($event)"
+              (onSignOut)="onSignOut.emit($event)"
+            />
+          </div>
+        </hlm-scroll-area>
+        <hlm-sheet-footer>
+          <app-workspace-add-button [isCompact]="false" />
+          <hlm-menu-separator />
+        </hlm-sheet-footer>
+      </hlm-sheet-content>
+    </hlm-sheet>
+  </div>
+  <span class="text-xl font-semibold">
+    {{ selectedWorkspace().title }}
+  </span>
+</div>

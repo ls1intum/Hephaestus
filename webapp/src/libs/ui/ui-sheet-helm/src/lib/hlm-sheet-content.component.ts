@@ -28,7 +28,6 @@ export const sheetVariants = cva(
 
 @Component({
 	selector: 'hlm-sheet-content',
-	standalone: true,
 	imports: [HlmSheetCloseDirective, BrnSheetCloseDirective, HlmIconComponent],
 	providers: [provideIcons({ lucideX })],
 	host: {

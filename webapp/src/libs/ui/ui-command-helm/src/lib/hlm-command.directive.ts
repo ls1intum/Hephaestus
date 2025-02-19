@@ -4,7 +4,6 @@ import type { ClassValue } from 'clsx';
 
 @Directive({
 	selector: 'cmdk-command[hlm],brn-cmd[hlm]',
-	standalone: true,
 	host: {
 		'[class]': '_computedClass()',
 	},

@@ -34,7 +34,6 @@ export type ButtonVariants = VariantProps<typeof buttonVariants>;
 
 @Directive({
 	selector: '[hlmBtn]',
-	standalone: true,
 	exportAs: 'hlmBtn',
 	host: {
 		'[class]': '_computedClass()',
