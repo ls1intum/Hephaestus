@@ -18,7 +18,6 @@ import { HlmCarouselComponent } from './hlm-carousel.component';
 @Component({
 	// eslint-disable-next-line @angular-eslint/component-selector
 	selector: 'button[hlm-carousel-next], button[hlmCarouselNext]',
-	standalone: true,
 	changeDetection: ChangeDetectionStrategy.OnPush,
 	encapsulation: ViewEncapsulation.None,
 	host: {

@@ -3,7 +3,6 @@ import { BrnTabsDirective } from '@spartan-ng/ui-tabs-brain';
 
 @Component({
 	selector: 'hlm-tabs',
-	standalone: true,
 	hostDirectives: [
 		{
 			directive: BrnTabsDirective,

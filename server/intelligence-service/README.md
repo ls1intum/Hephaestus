@@ -20,6 +20,10 @@ Install dependencies using Poetry:
 pip install poetry
 poetry install
 ```
+If you have poetry < 2.0.0 installed, please run
+```bash
+poetry self update
+```
 
 ## Running the Service
 

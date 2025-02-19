@@ -5,7 +5,6 @@ import type { ClassValue } from 'clsx';
 
 @Directive({
 	selector: '[hlmSliderTrackActiveFill]',
-	standalone: true,
 	hostDirectives: [BrnSliderTrackActiveFillDirective],
 	host: {
 		'[class]': '_computedClass()',

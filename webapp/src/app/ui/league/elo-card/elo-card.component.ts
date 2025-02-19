@@ -9,7 +9,6 @@ import { LucideAngularModule, Star } from 'lucide-angular';
 
 @Component({
   selector: 'app-league-elo-card',
-  standalone: true,
   imports: [HlmCardModule, LeagueIconComponent, BrnProgressComponent, BrnProgressIndicatorComponent, HlmProgressIndicatorDirective, HlmButtonModule, LucideAngularModule],
   templateUrl: './elo-card.component.html'
 })

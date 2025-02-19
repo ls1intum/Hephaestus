@@ -4,7 +4,6 @@ import { cn } from 'app/utils';
 
 @Directive({
   selector: 'caption[appTableCaption]',
-  standalone: true,
   host: {
     '[class]': 'computedClass()'
   }

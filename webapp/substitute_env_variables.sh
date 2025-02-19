@@ -41,11 +41,10 @@ validate_env_vars() {
   done
 
   if [ ${#missing_vars[@]} -ne 0 ]; then
-    log "❌ Error: The following environment variables are not set:"
+    log "⚠️ Warning: The following environment variables are not set:"
     for var in "${missing_vars[@]}"; do
       echo "  - $var" >&2
     done
-    exit 1
   fi
 }
 

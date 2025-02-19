@@ -9,7 +9,6 @@ import { LeagueIconComponent } from '@app/ui/league/icon/league-icon.component';
 
 @Component({
   selector: 'app-league-info-modal',
-  standalone: true,
   imports: [
     HlmCardModule,
     HlmButtonModule,

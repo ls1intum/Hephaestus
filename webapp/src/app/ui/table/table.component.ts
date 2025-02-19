@@ -4,7 +4,6 @@ import { cn } from 'app/utils';
 
 @Component({
   selector: 'app-table',
-  standalone: true,
   template: `<table [class]="computedClass()">
     <ng-content />
   </table>`,

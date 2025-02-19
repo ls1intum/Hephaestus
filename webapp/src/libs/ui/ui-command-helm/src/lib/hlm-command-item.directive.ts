@@ -4,7 +4,6 @@ import type { ClassValue } from 'clsx';
 
 @Directive({
 	selector: '[hlm][brnCmdItem],[hlm][cmdkItem]',
-	standalone: true,
 	host: {
 		'[class]': '_computedClass()',
 		// This is needed after changes to the underlying CMDK library used for the BrnCommand primitive
