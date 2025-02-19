@@ -30,9 +30,6 @@
 	<properties>
 		<java.version>21</java.version>
 		<app.profiles>local,dev</app.profiles>
-		<app.db.url>jdbc:postgresql://localhost:5432/hephaestus</app.db.url>
-		<app.db.username>root</app.db.username>
-		<app.db.password>root</app.db.password>
 	</properties>
 	<repositories>
 		<repository>
@@ -284,12 +281,12 @@
 				<version>4.27.0</version>
 				<configuration>
 					<changeLogFile>db/master.xml</changeLogFile>
-					<searchPath>${project.basedir}/src/main/resources</searchPath>
 					<diffChangeLogFile>src/main/resources/db/changelog_new.xml</diffChangeLogFile>
+					<searchPath>${project.basedir}/src/main/resources</searchPath>
 					<driver>org.postgresql.Driver</driver>
-					<url>${app.db.url}</url>
-					<username>${app.db.username}</username>
-					<password>${app.db.password}</password>
+					<url>jdbc:postgresql://localhost:5432/hephaestus</url>
+					<username>root</username>
+					<password>root</password>
 					<!-- Hibernate URL for reference schema using the Hibernate 6 dialect -->
 					<referenceUrl>hibernate:spring:de.tum.in.www1.hephaestus?dialect=org.hibernate.dialect.PostgreSQLDialect&amp;hibernate.physical_naming_strategy=org.hibernate.boot.model.naming.CamelCaseToUnderscoresNamingStrategy&amp;hibernate.implicit_naming_strategy=org.springframework.boot.orm.jpa.hibernate.SpringImplicitNamingStrategy</referenceUrl>
 					<!-- Enable detailed logging output -->
