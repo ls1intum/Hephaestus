@@ -5,7 +5,6 @@ import type { ClassValue } from 'clsx';
 
 @Directive({
 	selector: '[hlmSliderTickMark]',
-	standalone: true,
 	host: {
 		'[class]': '_computedClass()',
 		'[attr.dir]': '_direction()',

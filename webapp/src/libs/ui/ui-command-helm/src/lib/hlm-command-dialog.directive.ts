@@ -5,7 +5,6 @@ import { HlmCommandDirective } from './hlm-command.directive';
 
 @Directive({
 	selector: '[hlmCmdDialog]',
-	standalone: true,
 	hostDirectives: [HlmCommandDirective],
 	host: {
 		'[class]': '_computedClass()',

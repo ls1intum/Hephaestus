@@ -1,0 +1,37 @@
+@if (isCompact()) {
+  <hlm-tooltip>
+    <app-workspace-thumb
+      [iconUrl]="iconUrl()"
+      [isSelected]="isSelected()"
+      (onClick)="onSelect.emit()"
+      hlmTooltipTrigger
+      position="right"
+      [aria-describedby]="title()"
+      [brnCtxMenuTriggerFor]="menu"
+    />
+    <span *brnTooltipContent class="flex items-center"> {{ title() }} </span>
+  </hlm-tooltip>
+} @else {
+  <div [class]="computedClass()">
+    <app-workspace-thumb [iconUrl]="iconUrl()" [isSelected]="isSelected()" [hoverRingEnabled]="false" variant="base" />
+    <span class="text-base font-semibold flex-1">
+      {{ title() }}
+    </span>
+    @if (isSelected()) {
+      <button [brnMenuTriggerFor]="menu">
+        <lucide-angular [img]="Ellipsis" class="size-5 text-muted-foreground block" />
+      </button>
+    }
+  </div>
+}
+
+<ng-template #menu>
+  <hlm-menu>
+    <hlm-menu-group>
+      <button hlmMenuItem class="text-destructive hover:text-destructive" (click)="onSignOut.emit()">
+        <lucide-angular [img]="LogOut" hlmMenuIcon class="size-4" />
+        Sign Out
+      </button>
+    </hlm-menu-group>
+  </hlm-menu>
+</ng-template>

@@ -45,7 +45,8 @@ export class SecurityStore {
       this.loaded.set(true);
       setUser(user);
 
-      posthog.identify(sub, { email, name, username });
+      posthog.identify(email, { sub, email, name, username });
+      posthog.alias(sub, email);
     } else {
       this.user.set(ANONYMOUS_USER);
       this.loaded.set(true);
