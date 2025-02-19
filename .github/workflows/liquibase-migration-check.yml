@@ -61,12 +61,16 @@ jobs:
         run: |
           echo "Checking for changes in the liquibase changelog..."
           git add .
+          
+          echo "Running git diff --cached..."
+          git diff --cached
+
           if git diff --cached --quiet; then
             echo "No changes detected in the liquibase changelog."
             echo "NO_CHANGES_DETECTED=true" >> $GITHUB_ENV
           else
             echo "Changes detected in the liquibase changelog."
-            cat src/main/resources/db/changelog_new.xml
+            cat ./src/main/resources/db/changelog_new.xml
             echo "NO_CHANGES_DETECTED=false" >> $GITHUB_ENV
             exit 1
           fi
