@@ -6,16 +6,9 @@ import { QueryClient, provideTanStackQuery, withDevtools } from '@tanstack/angul
 import { environment } from 'environments/environment';
 import { BASE_PATH } from 'app/core/modules/openapi';
 import { routes } from 'app/app.routes';
-import { AnalyticsService } from './analytics.service';
 import { securityInterceptor } from './core/security/security-interceptor';
 import { TraceService } from '@sentry/angular';
 import { SentryErrorHandler } from './core/sentry/sentry.error-handler';
-
-function initializeAnalytics(analyticsService: AnalyticsService): () => void {
-  return () => {
-    analyticsService.initialize();
-  };
-}
 
 export const appConfig: ApplicationConfig = {
   providers: [
@@ -28,10 +21,6 @@ export const appConfig: ApplicationConfig = {
     provideHttpClient(withInterceptors([securityInterceptor])),
     provideAnimationsAsync(),
     { provide: BASE_PATH, useValue: environment.serverUrl },
-    provideAppInitializer(() => {
-      const initializerFn = initializeAnalytics(inject(AnalyticsService));
-      return initializerFn();
-    }),
     { provide: ErrorHandler, useClass: SentryErrorHandler },
     { provide: TraceService, deps: [Router] },
     provideAppInitializer(() => {

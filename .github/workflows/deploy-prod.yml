@@ -13,7 +13,11 @@ on:
       deploy-core:
         default: false
         type: boolean
-        description: (Re-)deploys NATS, Keycloak, Webhook Inject is usually not necessary and might cause data gaps.
+        description: (Re-)deploys NATS, Keycloak, Webhook Ingest. Usually not necessary and might cause data gaps.
+      deploy-proxy:
+        default: false
+        type: boolean
+        description: (Re-)deploys the proxy components. Usually not necessary and might cause downtime.
 
 jobs:  
   deploy-app:
@@ -21,9 +25,10 @@ jobs:
     uses: ls1intum/.github/.github/workflows/deploy-docker-compose.yml@main
     with:
       environment: Production
-      docker-compose-file: "./docker/compose.prod.app.yaml"
+      docker-compose-file: "./docker/compose.app.yaml"
       main-image-name: ls1intum/hephaestus/application-server
       image-tag: ${{ inputs.image-tag }}
+      deployment-base-path: "/opt/hephaestus/app"
     secrets: inherit
 
   deploy-core:
@@ -31,8 +36,21 @@ jobs:
     uses: ls1intum/.github/.github/workflows/deploy-docker-compose.yml@main
     with:
       environment: Production
-      docker-compose-file: "./docker/compose.prod.core.yaml"
+      docker-compose-file: "./docker/compose.core.yaml"
       main-image-name: ls1intum/hephaestus/application-server
       image-tag: ${{ inputs.image-tag }}
+      deployment-base-path: "/opt/hephaestus/core"
+    secrets: inherit
+
+  deploy-proxy:
+    if: ${{ inputs.deploy-proxy }}
+    uses: ls1intum/.github/.github/workflows/deploy-docker-compose.yml@main
+    with:
+      environment: Production
+      docker-compose-file: "./docker/compose.proxy.yaml"
+      # We just keep the main-image-name and image-tag as placeholders
+      main-image-name: ls1intum/hephaestus/application-server
+      image-tag: ${{ inputs.image-tag }}
+      deployment-base-path: "/opt/hephaestus/proxy"
     secrets: inherit
   

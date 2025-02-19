@@ -27,29 +27,51 @@ permissions:
   id-token: write
 
 jobs: 
-  docs: 
+  build-docs: 
     runs-on: ubuntu-22.04
+
+    permissions:
+      contents: read
+      # Needed to upload the artifact containing the built docs
+      # The 'pages: write' and 'id-token: write' are required for deploying to GitHub Pages
+      pages: write
+      id-token: write
+
     steps:
-      - uses: actions/checkout@v3
-      - uses: FelixTJDietrich/sphinx-action@java
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
         with:
-          docs-folder: "docs/"
-          build-command: make html dirhtml
-      - uses: actions/upload-artifact@v3
+          python-version: '3.12'
+
+      - name: Install dependencies
+        run: |
+          pip install --upgrade pip
+          pip install -r docs/requirements.txt
+
+      - name: Setup Graphviz
+        uses: ts-graphviz/setup-graphviz@v2
+
+      - name: Build Sphinx HTML
+        run: |
+          cd docs
+          make html
+
+      - name: Upload generated HTML as artifact
+        id: deployment
+        uses: actions/upload-pages-artifact@v3
         with:
-          name: Documentation
-          path: docs/_build/html/
-      - uses: actions/upload-pages-artifact@v1
-        with:
-          path: docs/_build/dirhtml/
-  deploy:
+          path: docs/_build/html
+  
+  deploy-docs:
     if: github.ref == 'refs/heads/develop'
     environment:
       name: github-pages
-      url: "https://ls1intum.github.io/Hephaestus/"
+      url: ${{ steps.deployment.outputs.page_url }}
     runs-on: ubuntu-22.04
-    needs: docs
+    needs: build-docs
     steps:
       - name: Deploy to GitHub Pages
-        id: deployment
-        uses: actions/deploy-pages@v1
+        uses: actions/deploy-pages@v4

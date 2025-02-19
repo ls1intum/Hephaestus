@@ -6,7 +6,6 @@ import type { ClassValue } from 'clsx';
 
 @Component({
 	selector: 'hlm-breadcrumb-ellipsis',
-	standalone: true,
 	imports: [HlmIconComponent],
 	providers: [provideIcons({ lucideEllipsis })],
 	template: `

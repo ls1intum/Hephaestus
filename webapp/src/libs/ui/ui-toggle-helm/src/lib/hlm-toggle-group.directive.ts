@@ -4,7 +4,6 @@ import type { ClassValue } from 'clsx';
 
 @Directive({
 	selector: 'brn-toggle-group[hlm],[hlmToggleGroup]',
-	standalone: true,
 	host: {
 		'[class]': '_computedClass()',
 	},

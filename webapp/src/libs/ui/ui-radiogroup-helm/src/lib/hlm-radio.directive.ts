@@ -4,7 +4,6 @@ import type { ClassValue } from 'clsx';
 
 @Directive({
 	selector: 'brn-radio[hlm],[hlmRadio]',
-	standalone: true,
 	host: {
 		'[class]': '_computedClass()',
 	},
