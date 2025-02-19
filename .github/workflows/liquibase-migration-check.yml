@@ -53,19 +53,11 @@ jobs:
 
       - name: Run Liquibase update
         working-directory: server/application-server
-        run: mvn liquibase:update \
-          -Dapp.profiles=specs \
-          -Dliquibase.url=jdbc:postgresql://postgres:5432/hephaestus \
-          -Dliquibase.username=root \
-          -Dliquibase.password=root
+        run: mvn -Dapp.profiles=specs -Dliquibase.url=jdbc:postgresql://postgres:5432/hephaestus -Dliquibase.username=root -Dliquibase.password=root liquibase:update
 
       - name: Run Liquibase diff
         working-directory: server/application-server
-        run: mvn liquibase:diff \
-          -Dapp.profiles=specs \
-          -Dliquibase.url=jdbc:postgresql://postgres:5432/hephaestus \
-          -Dliquibase.username=root \
-          -Dliquibase.password=root
+        run: mvn -Dapp.profiles=specs -Dliquibase.url=jdbc:postgresql://postgres:5432/hephaestus -Dliquibase.username=root -Dliquibase.password=root liquibase:diff
 
 
       - name: Check for changes in the liquibase changelog
