@@ -90,6 +90,20 @@ export class MentorComponent {
 
       return { previousMessages };
     },
+
+    onSuccess: (response) => {
+      if (!response) {
+        const errorMessage: Message = { 
+          id: -2, sender: 'MENTOR', content: 'There was an error generating response.', 
+          sessionId: this.selectedSessionId()!, sentAt: new Date().toISOString() 
+        };
+  
+        this.queryClient.setQueryData(['sessions', this.selectedSessionId()], (old: Message[]) => [...old, errorMessage]);
+      }
+  
+      this.queryClient.invalidateQueries({ queryKey: ['sessions', this.selectedSessionId()] });
+    },
+
     onError: (err, newTodo, context) => {
       this.queryClient.setQueryData(['sessions', this.selectedSessionId()], context?.previousMessages);
     },
