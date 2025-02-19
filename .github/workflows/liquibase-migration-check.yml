@@ -53,11 +53,11 @@ jobs:
 
       - name: Run Liquibase update
         working-directory: server/application-server
-        run: mvn liquibase:update
+        run: mvn liquibase:update -Dapp.profiles=specs -Dliquibase.url=jdbc:postgresql://postgres:5432/hephaestus
 
       - name: Run Liquibase diff
         working-directory: server/application-server
-        run: mvn liquibase:diff
+        run: mvn liquibase:diff -Dapp.profiles=specs -Dliquibase.url=jdbc:postgresql://postgres:5432/hephaestus
 
       - name: Check for changes in the liquibase changelog
         id: check_changes
