@@ -20,7 +20,9 @@ jobs:
         image: postgres
         # Provide the password for postgres
         env:
+          POSTGRES_DB: hephaestus
           POSTGRES_PASSWORD: root
+          POSTGRES_USER: root
         # Set health checks to wait until postgres has started
         options: >-
           --health-cmd pg_isready
