@@ -38,13 +38,10 @@ jobs:
           distribution: 'temurin'
           java-version: '21'
 
-      - name: Navigate to application server directory
-        run: cd server/application-server
-
       - name: Run Liquibase update
         working-directory: server/application-server
         run: |
-          mvn -Dapp.profiles=specs \
+          cd server/application-server && mvn -Dapp.profiles=specs \
               -Dapp.db.url=jdbc:postgresql://localhost:5432/hephaestus \
               -Dapp.db.username=root \
               -Dapp.db.password=root \
@@ -53,7 +50,7 @@ jobs:
       - name: Run Liquibase diff
         working-directory: server/application-server
         run: |
-          mvn -Dapp.profiles=specs \
+          cd server/application-server && mvn -Dapp.profiles=specs \
               -Dapp.db.url=jdbc:postgresql://localhost:5432/hephaestus \
               -Dapp.db.username=root \
               -Dapp.db.password=root \
