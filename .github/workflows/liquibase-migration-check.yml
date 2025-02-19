@@ -66,6 +66,7 @@ jobs:
             echo "NO_CHANGES_DETECTED=true" >> $GITHUB_ENV
           else
             echo "Changes detected in the liquibase changelog."
+            cat src/main/resources/db/changelog_new.xml
             echo "NO_CHANGES_DETECTED=false" >> $GITHUB_ENV
             exit 1
           fi
