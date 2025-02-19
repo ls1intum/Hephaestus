@@ -50,9 +50,11 @@ jobs:
         run: cd server/application-server
 
       - name: Run Liquibase update
+        working-directory: server/application-server
         run: mvn org.liquibase:liquibase-maven-plugin:4.27.0:update
 
       - name: Run Liquibase diff
+        working-directory: server/application-server
         run: mvn org.liquibase:liquibase-maven-plugin:4.27.0:diff
 
       - name: Check for changes in the liquibase changelog
