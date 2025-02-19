@@ -39,16 +39,18 @@ jobs:
           java-version: '21'
 
       - name: Run Liquibase update
+        working-directory: server/application-server
         run: |
-          cd server/application-server && mvn -Dapp.profiles=specs \
+          mvn -Dapp.profiles=specs \
               -Dapp.db.url=jdbc:postgresql://localhost:5432/hephaestus \
               -Dapp.db.username=root \
               -Dapp.db.password=root \
               liquibase:update
 
       - name: Run Liquibase diff
+        working-directory: server/application-server
         run: |
-          cd server/application-server && mvn -Dapp.profiles=specs \
+          mvn -Dapp.profiles=specs \
               -Dapp.db.url=jdbc:postgresql://localhost:5432/hephaestus \
               -Dapp.db.username=root \
               -Dapp.db.password=root \
