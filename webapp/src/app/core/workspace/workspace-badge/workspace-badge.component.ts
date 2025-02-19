@@ -34,6 +34,6 @@ export class WorkspaceBadgeComponent {
   selectedWorkspace = input.required<Workspace>();
   workspaces = input.required<Workspace[]>();
 
-  onSelect = output<Workspace>();
-  onSignOut = output<Workspace>();
+  select = output<Workspace>();
+  signOut = output<Workspace>();
 }

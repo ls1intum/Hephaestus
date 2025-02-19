@@ -3,7 +3,7 @@
     <app-workspace-thumb
       [iconUrl]="iconUrl()"
       [isSelected]="isSelected()"
-      (onClick)="onSelect.emit()"
+      (select)="select.emit()"
       hlmTooltipTrigger
       position="right"
       [aria-describedby]="title()"
@@ -28,7 +28,7 @@
 <ng-template #menu>
   <hlm-menu>
     <hlm-menu-group>
-      <button hlmMenuItem class="text-destructive hover:text-destructive" (click)="onSignOut.emit()">
+      <button hlmMenuItem class="text-destructive hover:text-destructive" (click)="signOut.emit()">
         <lucide-angular [img]="LogOut" hlmMenuIcon class="size-4" />
         Sign Out
       </button>

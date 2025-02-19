@@ -19,8 +19,8 @@ type Workspace = {
           [isSelected]="selectedWorkspace().id === workspace.id"
           [iconUrl]="workspace.iconUrl"
           [title]="workspace.title"
-          (onSelect)="onSelect.emit(workspace)"
-          (onSignOut)="onSignOut.emit(workspace)"
+          (select)="select.emit(workspace)"
+          (signOut)="signOut.emit(workspace)"
         />
       }
     </div>
@@ -31,8 +31,8 @@ export class WorkspaceOptionSelectorComponent {
   selectedWorkspace = input.required<Workspace>();
   workspaces = input.required<Workspace[]>();
 
-  onSelect = output<Workspace>();
-  onSignOut = output<Workspace>();
+  select = output<Workspace>();
+  signOut = output<Workspace>();
 
   computedClass = computed(() => hlm('flex flex-col', this.isCompact() ? 'gap-3' : 'gap-1'));
 }

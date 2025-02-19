@@ -33,8 +33,8 @@ export class WorkspaceOptionComponent {
   iconUrl = input<string>();
   title = input.required<string>();
 
-  onSelect = output<void>();
-  onSignOut = output<void>();
+  select = output<void>();
+  signOut = output<void>();
 
   computedClass = computed(() => hlm('flex items-center gap-2 hover:bg-accent/50 p-3 rounded-xl cursor-pointer duration-300 transition-all', this.isSelected() && 'bg-accent'));
 }

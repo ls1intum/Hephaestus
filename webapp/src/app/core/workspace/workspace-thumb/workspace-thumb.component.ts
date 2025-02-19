@@ -25,7 +25,7 @@ export class WorkspaceThumbComponent {
   isSelected = input<boolean>();
   hoverRingEnabled = input<boolean>(true);
   iconUrl = input<string>();
-  onClick = output<MouseEvent>();
+  select = output<MouseEvent>();
 
   computedClass = computed(() => {
     return hlm(
@@ -35,6 +35,6 @@ export class WorkspaceThumbComponent {
   });
 
   handleClick(event: MouseEvent) {
-    this.onClick.emit(event);
+    this.select.emit(event);
   }
 }
