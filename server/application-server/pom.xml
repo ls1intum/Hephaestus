@@ -284,6 +284,7 @@
 				<version>4.27.0</version>
 				<configuration>
 					<changeLogFile>db/master.xml</changeLogFile>
+					<searchPath>${project.basedir}/src/main/resources</searchPath>
 					<diffChangeLogFile>src/main/resources/db/changelog_new.xml</diffChangeLogFile>
 					<driver>org.postgresql.Driver</driver>
 					<url>${app.db.url}</url>
