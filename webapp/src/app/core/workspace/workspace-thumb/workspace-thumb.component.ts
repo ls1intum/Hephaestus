@@ -6,7 +6,6 @@ import { hlm } from '@spartan-ng/ui-core';
 
 @Component({
   selector: 'app-workspace-thumb',
-  standalone: true,
   imports: [BrnSheetTriggerDirective, HlmAvatarModule, LucideAngularModule],
   template: `
     <button [class]="computedClass()" (click)="handleClick($event)" brnSheetTrigger>

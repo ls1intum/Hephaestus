@@ -5,7 +5,6 @@ import type { ClassValue } from 'clsx';
 
 @Directive({
 	selector: '[hlmCmdDialogCloseBtn]',
-	standalone: true,
 	hostDirectives: [HlmButtonDirective],
 	providers: [provideBrnButtonConfig({ variant: 'ghost' })],
 	host: {

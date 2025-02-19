@@ -15,7 +15,6 @@ type Workspace = {
 
 @Component({
   selector: 'app-workspace-badge',
-  standalone: true,
   imports: [
     BrnSheetContentDirective,
     HlmSheetComponent,

@@ -5,7 +5,6 @@ import { LucideAngularModule, CirclePlus, Plus } from 'lucide-angular';
 
 @Component({
   selector: 'app-workspace-add-button',
-  standalone: true,
   imports: [HlmButtonDirective, LucideAngularModule],
   template: `
     <button hlmBtn variant="ghost" [class]="computedClass()" [size]="isCompact() ? 'icon' : 'default'">

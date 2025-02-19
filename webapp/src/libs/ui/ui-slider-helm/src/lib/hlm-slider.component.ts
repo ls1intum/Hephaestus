@@ -5,7 +5,6 @@ import type { ClassValue } from 'clsx';
 
 @Component({
 	selector: 'hlm-slider, brn-slider [hlm]',
-	standalone: true,
 	changeDetection: ChangeDetectionStrategy.OnPush,
 	hostDirectives: [
 		{

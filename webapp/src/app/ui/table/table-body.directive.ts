@@ -4,7 +4,6 @@ import { cn } from 'app/utils';
 
 @Directive({
   selector: 'tbody[appTableBody]',
-  standalone: true,
   host: {
     '[class]': 'computedClass()'
   }

@@ -9,7 +9,6 @@ import { HlmMenuComponent, HlmMenuGroupComponent, HlmMenuItemDirective, HlmMenuI
 
 @Component({
   selector: 'app-workspace-option',
-  standalone: true,
   imports: [
     HlmTooltipComponent,
     BrnContextMenuTriggerDirective,

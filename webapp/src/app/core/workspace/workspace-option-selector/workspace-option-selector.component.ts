@@ -10,7 +10,6 @@ type Workspace = {
 
 @Component({
   selector: 'app-workspace-option-selector',
-  standalone: true,
   imports: [WorkspaceOptionComponent],
   template: `
     <div [class]="computedClass()">

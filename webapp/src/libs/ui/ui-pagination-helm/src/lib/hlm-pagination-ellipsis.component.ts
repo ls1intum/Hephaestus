@@ -6,7 +6,6 @@ import { ClassValue } from 'clsx';
 
 @Component({
 	selector: 'hlm-pagination-ellipsis',
-	standalone: true,
 	imports: [HlmIconComponent],
 	providers: [provideIcons({ lucideEllipsis })],
 	template: `
