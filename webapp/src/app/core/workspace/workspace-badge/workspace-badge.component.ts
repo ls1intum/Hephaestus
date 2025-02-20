@@ -1,5 +1,5 @@
 import { Component, input, output } from '@angular/core';
-import { BrnSheetContentDirective } from '@spartan-ng/ui-sheet-brain';
+import { BrnSheetContentDirective } from '@spartan-ng/brain/sheet';
 import { HlmSheetComponent, HlmSheetContentComponent, HlmSheetFooterComponent, HlmSheetHeaderComponent, HlmSheetTitleDirective } from '@spartan-ng/ui-sheet-helm';
 import { HlmMenuSeparatorComponent } from '@spartan-ng/ui-menu-helm';
 import { HlmScrollAreaComponent } from '@spartan-ng/ui-scrollarea-helm';

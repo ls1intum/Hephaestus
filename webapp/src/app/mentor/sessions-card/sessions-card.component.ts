@@ -2,7 +2,7 @@ import { Component, input, model, output } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { LucideAngularModule, Plus } from 'lucide-angular';
 import { HlmButtonModule } from '@spartan-ng/ui-button-helm';
-import { BrnToggleDirective } from '@spartan-ng/ui-toggle-brain';
+import { BrnToggleDirective } from '@spartan-ng/brain/toggle';
 import { Session } from '@app/core/modules/openapi';
 import { HlmToggleDirective } from '@spartan-ng/ui-toggle-helm';
 import { HlmCardDirective } from '@spartan-ng/ui-card-helm';

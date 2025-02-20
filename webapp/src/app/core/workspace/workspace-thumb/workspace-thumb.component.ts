@@ -1,7 +1,7 @@
 import { Component, computed, input, output } from '@angular/core';
 import { LucideAngularModule, Hammer } from 'lucide-angular';
 import { HlmAvatarModule } from '@spartan-ng/ui-avatar-helm';
-import { BrnSheetTriggerDirective } from '@spartan-ng/ui-sheet-brain';
+import { BrnSheetTriggerDirective } from '@spartan-ng/brain/sheet';
 import { hlm } from '@spartan-ng/ui-core';
 
 @Component({

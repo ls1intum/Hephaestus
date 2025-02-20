@@ -1,7 +1,7 @@
 import { Component } from '@angular/core';
 import { HlmCardModule } from '@spartan-ng/ui-card-helm';
 import { HlmButtonModule } from '@spartan-ng/ui-button-helm';
-import { BrnDialogContentDirective, BrnDialogTriggerDirective } from '@spartan-ng/ui-dialog-brain';
+import { BrnDialogContentDirective, BrnDialogTriggerDirective } from '@spartan-ng/brain/dialog';
 import { HlmDialogComponent, HlmDialogContentComponent, HlmDialogHeaderComponent } from '@spartan-ng/ui-dialog-helm';
 import { LucideAngularModule, Info, Star } from 'lucide-angular';
 import { Leagues } from '@app/utils';

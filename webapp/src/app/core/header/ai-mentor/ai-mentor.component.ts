@@ -1,7 +1,7 @@
 import { booleanAttribute, Component, input } from '@angular/core';
 import { RouterModule } from '@angular/router';
 import { HlmButtonModule } from '@spartan-ng/ui-button-helm';
-import { BrnTooltipContentDirective } from '@spartan-ng/ui-tooltip-brain';
+import { BrnTooltipContentDirective } from '@spartan-ng/brain/tooltip';
 import { HlmTooltipComponent, HlmTooltipTriggerDirective } from '@spartan-ng/ui-tooltip-helm';
 import { LucideAngularModule, BotMessageSquare } from 'lucide-angular';
 

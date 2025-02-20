@@ -2,7 +2,7 @@ import { Component, computed, input, signal } from '@angular/core';
 import { LucideAngularModule, ClipboardCopy, Check } from 'lucide-angular';
 import { octGitPullRequest } from '@ng-icons/octicons';
 import { HlmPopoverModule } from '@spartan-ng/ui-popover-helm';
-import { BrnPopoverComponent, BrnPopoverContentDirective, BrnPopoverTriggerDirective } from '@spartan-ng/ui-popover-brain';
+import { BrnPopoverComponent, BrnPopoverContentDirective, BrnPopoverTriggerDirective } from '@spartan-ng/brain/popover';
 import { HlmScrollAreaComponent } from '@spartan-ng/ui-scrollarea-helm';
 import { HlmButtonModule } from '@spartan-ng/ui-button-helm';
 import { NgIconComponent } from '@ng-icons/core';

@@ -1,6 +1,6 @@
 import { Component, computed, input } from '@angular/core';
 import { HlmCardModule } from '@spartan-ng/ui-card-helm';
-import { BrnProgressComponent, BrnProgressIndicatorComponent } from '@spartan-ng/ui-progress-brain';
+import { BrnProgressComponent, BrnProgressIndicatorComponent } from '@spartan-ng/brain/progress';
 import { HlmProgressIndicatorDirective } from '@spartan-ng/ui-progress-helm';
 import { LeagueIconComponent } from '@app/ui/league/icon/league-icon.component';
 import { getLeagueFromPoints } from '@app/utils';

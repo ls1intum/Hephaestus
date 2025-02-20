@@ -6,20 +6,20 @@ import { lucideArrowUpDown, lucideChevronDown, lucideGripHorizontal, lucideRotat
 import { HlmButtonModule } from '@spartan-ng/ui-button-helm';
 import { HlmIconComponent, provideIcons } from '@spartan-ng/ui-icon-helm';
 import { HlmInputDirective } from '@spartan-ng/ui-input-helm';
-import { BrnMenuTriggerDirective } from '@spartan-ng/ui-menu-brain';
+import { BrnMenuTriggerDirective } from '@spartan-ng/brain/menu';
 import { HlmMenuModule } from '@spartan-ng/ui-menu-helm';
-import { BrnTableModule, PaginatorState } from '@spartan-ng/ui-table-brain';
+import { BrnTableModule, PaginatorState } from '@spartan-ng/brain/table';
 import { HlmTableModule } from '@spartan-ng/ui-table-helm';
-import { BrnSelectModule } from '@spartan-ng/ui-select-brain';
+import { BrnSelectModule } from '@spartan-ng/brain/select';
 import { HlmSelectModule } from '@spartan-ng/ui-select-helm';
 import { HlmSkeletonModule } from '@spartan-ng/ui-skeleton-helm';
 import { HlmCardModule } from '@spartan-ng/ui-card-helm';
 import { debounceTime, lastValueFrom, map } from 'rxjs';
 import { WorkspaceService, TeamInfo } from '@app/core/modules/openapi';
-import { injectMutation, injectQueryClient } from '@tanstack/angular-query-experimental';
+import { injectMutation, QueryClient } from '@tanstack/angular-query-experimental';
 import { octNoEntry } from '@ng-icons/octicons';
 import { HlmPopoverModule } from '@spartan-ng/ui-popover-helm';
-import { BrnPopoverComponent, BrnPopoverContentDirective, BrnPopoverTriggerDirective } from '@spartan-ng/ui-popover-brain';
+import { BrnPopoverComponent, BrnPopoverContentDirective, BrnPopoverTriggerDirective } from '@spartan-ng/brain/popover';
 import { GithubLabelComponent } from '@app/ui/github-label/github-label.component';
 import { HlmScrollAreaComponent } from '@spartan-ng/ui-scrollarea-helm';
 import { groupBy } from '@app/utils';
@@ -69,7 +69,7 @@ const LOADING_TEAMS: TeamInfo[] = [
 })
 export class WorkspaceTeamsTableComponent {
   protected workspaceService = inject(WorkspaceService);
-  protected queryClient = injectQueryClient();
+  protected queryClient = inject(QueryClient);
   protected octNoEntry = octNoEntry;
 
   isLoading = input(false);

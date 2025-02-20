@@ -1,7 +1,7 @@
 import { Component, effect, inject, computed, signal, viewChild } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { lastValueFrom } from 'rxjs';
-import { injectMutation, injectQuery, injectQueryClient } from '@tanstack/angular-query-experimental';
+import { injectMutation, injectQuery, QueryClient } from '@tanstack/angular-query-experimental';
 import { SessionsCardComponent } from './sessions-card/sessions-card.component';
 import { MessagesComponent } from './messages/messages.component';
 import { ChatInputComponent } from './chat-input/chat-input.component';
@@ -36,7 +36,7 @@ export class MentorComponent {
   selectedSessionId = signal<number | undefined>(undefined);
   messagesScrollArea = viewChild(HlmScrollAreaComponent);
 
-  queryClient = injectQueryClient();
+  queryClient = inject(QueryClient);
 
   constructor() {
     effect(() => {

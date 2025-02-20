@@ -3,8 +3,8 @@ import { WorkspaceThumbComponent } from '../workspace-thumb/workspace-thumb.comp
 import { LucideAngularModule, Ellipsis, LogOut } from 'lucide-angular';
 import { hlm } from '@spartan-ng/ui-core';
 import { HlmTooltipComponent, HlmTooltipTriggerDirective } from '@spartan-ng/ui-tooltip-helm';
-import { BrnTooltipContentDirective } from '@spartan-ng/ui-tooltip-brain';
-import { BrnContextMenuTriggerDirective, BrnMenuTriggerDirective } from '@spartan-ng/ui-menu-brain';
+import { BrnTooltipContentDirective } from '@spartan-ng/brain/tooltip';
+import { BrnContextMenuTriggerDirective, BrnMenuTriggerDirective } from '@spartan-ng/brain/menu';
 import { HlmMenuComponent, HlmMenuGroupComponent, HlmMenuItemDirective, HlmMenuItemIconDirective } from '@spartan-ng/ui-menu-helm';
 
 @Component({

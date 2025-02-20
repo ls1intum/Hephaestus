@@ -9,7 +9,7 @@ import { LeagueGoldIconComponent } from './league-gold-icon.component';
 import { LeagueDiamondIconComponent } from './league-diamond-icon.component';
 import { LeagueMasterIconComponent } from './league-master-icon.component';
 import { HlmTooltipComponent, HlmTooltipTriggerDirective } from '@spartan-ng/ui-tooltip-helm';
-import { BrnTooltipContentDirective } from '@spartan-ng/ui-tooltip-brain';
+import { BrnTooltipContentDirective } from '@spartan-ng/brain/tooltip';
 
 export const leagueVariants = cva('size-8', {
   variants: {
