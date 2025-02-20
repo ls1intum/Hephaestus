@@ -1,6 +1,7 @@
 import { Component, computed, input, output } from '@angular/core';
 import { WorkspaceThumbComponent } from '../workspace-thumb/workspace-thumb.component';
-import { LucideAngularModule, Ellipsis, LogOut } from 'lucide-angular';
+import { NgIconComponent, provideIcons } from '@ng-icons/core';
+import { lucideEllipsis, lucideLogOut } from '@ng-icons/lucide';
 import { hlm } from '@spartan-ng/brain/core';
 import { HlmTooltipComponent, HlmTooltipTriggerDirective } from '@spartan-ng/ui-tooltip-helm';
 import { BrnTooltipContentDirective } from '@spartan-ng/brain/tooltip';
@@ -20,14 +21,12 @@ import { HlmMenuComponent, HlmMenuGroupComponent, HlmMenuItemDirective, HlmMenuI
     HlmMenuItemIconDirective,
     HlmMenuGroupComponent,
     WorkspaceThumbComponent,
-    LucideAngularModule
+    NgIconComponent
   ],
+  providers: [provideIcons({ lucideEllipsis, lucideLogOut })],
   templateUrl: './workspace-option.component.html'
 })
 export class WorkspaceOptionComponent {
-  protected Ellipsis = Ellipsis;
-  protected LogOut = LogOut;
-
   isCompact = input.required<boolean>();
   isSelected = input<boolean>();
   iconUrl = input<string>();

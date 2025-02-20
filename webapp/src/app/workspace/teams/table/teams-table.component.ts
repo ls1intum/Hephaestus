@@ -5,7 +5,7 @@ import { FormControl, FormsModule, ReactiveFormsModule } from '@angular/forms';
 import { lucideArrowUpDown, lucideChevronDown, lucideGripHorizontal, lucideRotateCw, lucideOctagonX, lucidePlus, lucideCheck, lucideTrash2 } from '@ng-icons/lucide';
 import { HlmButtonModule } from '@spartan-ng/ui-button-helm';
 import { HlmIconDirective } from '@spartan-ng/ui-icon-helm';
-import { provideIcons } from '@ng-icons/core';
+import { NgIconComponent, provideIcons } from '@ng-icons/core';
 import { HlmInputDirective } from '@spartan-ng/ui-input-helm';
 import { BrnMenuTriggerDirective } from '@spartan-ng/brain/menu';
 import { HlmMenuModule } from '@spartan-ng/ui-menu-helm';
@@ -22,7 +22,8 @@ import { octNoEntry } from '@ng-icons/octicons';
 import { HlmPopoverModule } from '@spartan-ng/ui-popover-helm';
 import { BrnPopoverComponent, BrnPopoverContentDirective, BrnPopoverTriggerDirective } from '@spartan-ng/brain/popover';
 import { GithubLabelComponent } from '@app/ui/github-label/github-label.component';
-import { HlmScrollAreaComponent } from '@spartan-ng/ui-scrollarea-helm';
+import { NgScrollbarModule } from 'ngx-scrollbar';
+import { HlmScrollAreaDirective } from '@spartan-ng/ui-scrollarea-helm';
 import { groupBy } from '@app/utils';
 
 const LOADING_TEAMS: TeamInfo[] = [
@@ -43,7 +44,6 @@ const LOADING_TEAMS: TeamInfo[] = [
 ];
 
 @Component({
-  selector: 'app-workspace-teams-table',
   imports: [
     FormsModule,
     ReactiveFormsModule,
@@ -54,7 +54,9 @@ const LOADING_TEAMS: TeamInfo[] = [
     HlmButtonModule,
     HlmIconDirective,
     HlmInputDirective,
-    HlmScrollAreaComponent,
+    NgScrollbarModule,
+    NgIconComponent,
+    HlmScrollAreaDirective,
     BrnSelectModule,
     HlmSelectModule,
     HlmSkeletonModule,
@@ -63,6 +65,7 @@ const LOADING_TEAMS: TeamInfo[] = [
     BrnPopoverComponent,
     BrnPopoverContentDirective,
     BrnPopoverTriggerDirective,
+    GithubLabelComponent,
     GithubLabelComponent
   ],
   providers: [provideIcons({ lucideChevronDown, lucideGripHorizontal, lucideArrowUpDown, lucideRotateCw, lucideOctagonX, lucidePlus, lucideCheck, lucideTrash2 })],

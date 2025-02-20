@@ -1,6 +1,5 @@
 import { Component, inject } from '@angular/core';
 import { RouterLink, RouterModule } from '@angular/router';
-import { LucideAngularModule, Hammer } from 'lucide-angular';
 import { HlmButtonModule } from '@spartan-ng/ui-button-helm';
 import { HlmAvatarModule } from '@spartan-ng/ui-avatar-helm';
 import { HlmMenuModule } from '@spartan-ng/ui-menu-helm';
@@ -10,8 +9,8 @@ import { SecurityStore } from '@app/core/security/security-store.service';
 import { ThemeSwitcherComponent } from '@app/core/theme/theme-switcher.component';
 import { RequestFeatureComponent } from './request-feature/request-feature.component';
 import { environment } from 'environments/environment';
-import { lucideUser, lucideLogOut, lucideSettings } from '@ng-icons/lucide';
-import { provideIcons } from '@ng-icons/core';
+import { lucideUser, lucideLogOut, lucideSettings, lucideHammer } from '@ng-icons/lucide';
+import { NgIconComponent, provideIcons } from '@ng-icons/core';
 import { AiMentorComponent } from './ai-mentor/ai-mentor.component';
 
 @Component({
@@ -20,7 +19,6 @@ import { AiMentorComponent } from './ai-mentor/ai-mentor.component';
   imports: [
     RouterLink,
     RouterModule,
-    LucideAngularModule,
     ThemeSwitcherComponent,
     HlmButtonModule,
     RequestFeatureComponent,
@@ -28,18 +26,19 @@ import { AiMentorComponent } from './ai-mentor/ai-mentor.component';
     HlmMenuModule,
     BrnMenuTriggerDirective,
     HlmIconDirective,
+    NgIconComponent,
     AiMentorComponent
   ],
   providers: [
     provideIcons({
       lucideUser,
       lucideLogOut,
-      lucideSettings
+      lucideSettings,
+      lucideHammer
     })
   ]
 })
 export class HeaderComponent {
-  protected Hammer = Hammer;
   protected version = environment.version;
 
   securityStore = inject(SecurityStore);

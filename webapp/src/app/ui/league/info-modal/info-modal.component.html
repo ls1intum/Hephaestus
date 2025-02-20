@@ -1,6 +1,6 @@
 <hlm-dialog>
   <button brnDialogTrigger hlmBtn variant="ghost" size="sm">
-    <lucide-angular [img]="Info" class="size-4 text-github-muted-foreground" />
+    <ng-icon name="lucideInfo" class="size-4 text-github-muted-foreground" />
   </button>
   <hlm-dialog-content *brnDialogContent="let ctx">
     <hlm-dialog-header>
@@ -12,7 +12,7 @@
           <app-icon-league [leaguePoints]="league.minPoints + 1" size="lg" />
           <span class="font-semibold">{{ league.name }}</span>
           <div class="flex items-center text-sm text-github-muted-foreground gap-1">
-            <lucide-angular [img]="Star" class="size-4" />
+            <ng-icon name="lucideStar" class="size-4" />
             @if (league.maxPoints === Infinity) {
               <span>{{ league.maxPoints }}+</span>
             } @else {

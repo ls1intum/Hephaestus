@@ -109,7 +109,7 @@
               <h4 class="font-medium leading-none">Repositories</h4>
               <p class="text-sm text-muted-foreground">Select repositories the team actively uses.</p>
             </div>
-            <hlm-scroll-area class="border h-72 rounded-md border-border">
+            <ng-scrollbar hlm class="border h-72 rounded-md border-border">
               @for (repo of allRepositories(); track repo) {
                 @let isSelected = isRepositoryInTeam(element, repo);
                 <button hlmBtn variant="outline" class="flex items-center justify-between w-full" (click)="toggleRepository(element, repo, isSelected)">
@@ -119,7 +119,7 @@
                   }
                 </button>
               }
-            </hlm-scroll-area>
+            </ng-scrollbar>
           </div>
         </brn-popover>
       }

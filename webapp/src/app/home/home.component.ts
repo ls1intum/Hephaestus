@@ -4,7 +4,8 @@ import { lastValueFrom } from 'rxjs';
 import { Component, computed, inject } from '@angular/core';
 import { ActivatedRoute } from '@angular/router';
 import { toSignal } from '@angular/core/rxjs-interop';
-import { LucideAngularModule, CircleX } from 'lucide-angular';
+import { NgIconComponent, provideIcons } from '@ng-icons/core';
+import { lucideCircleX } from '@ng-icons/lucide';
 import { injectQuery } from '@tanstack/angular-query-experimental';
 import { LeaderboardService } from '@app/core/modules/openapi/api/leaderboard.service';
 import { LeaderboardComponent } from '@app/home/leaderboard/leaderboard.component';
@@ -19,12 +20,11 @@ dayjs.extend(isoWeek);
 
 @Component({
   selector: 'app-home',
-  imports: [LeaderboardComponent, LeaderboardFilterComponent, HlmAlertModule, LucideAngularModule, LeaderboardLegendComponent, LeaderboardLeagueComponent],
+  imports: [LeaderboardComponent, LeaderboardFilterComponent, HlmAlertModule, NgIconComponent, LeaderboardLegendComponent, LeaderboardLeagueComponent],
+  providers: [provideIcons({ lucideCircleX })],
   templateUrl: './home.component.html'
 })
 export class HomeComponent {
-  protected CircleX = CircleX;
-
   securityStore = inject(SecurityStore);
   metaService = inject(MetaService);
   leaderboardService = inject(LeaderboardService);

@@ -21,7 +21,8 @@ import {
   HlmAlertDialogTitleDirective
 } from '@spartan-ng/ui-alertdialog-helm';
 import { HlmButtonDirective } from '@spartan-ng/ui-button-helm';
-import { LucideAngularModule, Trash2 } from 'lucide-angular';
+import { NgIconComponent, provideIcons } from '@ng-icons/core';
+import { lucideTrash2 } from '@ng-icons/lucide';
 import { FormsModule } from '@angular/forms';
 
 @Component({
@@ -45,13 +46,12 @@ import { FormsModule } from '@angular/forms';
     HlmAlertDialogActionButtonDirective,
     HlmAlertDialogContentComponent,
     HlmButtonDirective,
-    LucideAngularModule
+    NgIconComponent
   ],
+  providers: [provideIcons({ lucideTrash2 })],
   templateUrl: './workspace.component.html'
 })
 export class WorkspaceComponent {
-  protected Trash2 = Trash2;
-
   workspaceService = inject(WorkspaceService);
   securityStore = inject(SecurityStore);
   queryClient = inject(QueryClient);

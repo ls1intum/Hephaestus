@@ -1,11 +1,12 @@
 import { Component, computed, input, signal } from '@angular/core';
-import { LucideAngularModule, ClipboardCopy, Check } from 'lucide-angular';
 import { octGitPullRequest } from '@ng-icons/octicons';
+import { lucideClipboardCopy, lucideCheck } from '@ng-icons/lucide';
 import { HlmPopoverModule } from '@spartan-ng/ui-popover-helm';
 import { BrnPopoverComponent, BrnPopoverContentDirective, BrnPopoverTriggerDirective } from '@spartan-ng/brain/popover';
-import { HlmScrollAreaComponent } from '@spartan-ng/ui-scrollarea-helm';
 import { HlmButtonModule } from '@spartan-ng/ui-button-helm';
-import { NgIconComponent } from '@ng-icons/core';
+import { NgIconComponent, provideIcons } from '@ng-icons/core';
+import { NgScrollbarModule } from 'ngx-scrollbar';
+import { HlmScrollAreaDirective } from '@spartan-ng/ui-scrollarea-helm';
 
 interface PullRequestInfo {
   id: number;
@@ -24,18 +25,16 @@ interface PullRequestInfo {
     BrnPopoverComponent,
     BrnPopoverContentDirective,
     BrnPopoverTriggerDirective,
-    HlmScrollAreaComponent,
     HlmButtonModule,
     NgIconComponent,
-    LucideAngularModule
+    NgScrollbarModule,
+    HlmScrollAreaDirective,
+    HlmScrollAreaDirective
   ],
+  providers: [provideIcons({ octGitPullRequest, lucideCheck, lucideClipboardCopy })],
   templateUrl: './reviews-popover.component.html'
 })
 export class ReviewsPopoverComponent {
-  protected ClipboardCopy = ClipboardCopy;
-  protected Check = Check;
-  protected octGitPullRequest = octGitPullRequest;
-
   highlight = input.required<boolean>();
   reviewedPRs = input.required<PullRequestInfo[]>();
 

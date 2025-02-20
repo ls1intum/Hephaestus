@@ -30,7 +30,7 @@
         </button>
       </div>
       <div class="flex items-center gap-2 font-medium">
-        <ng-icon [className]="this.reviewStateProps().color" [svg]="this.reviewStateProps().icon" size="20"></ng-icon>
+        <ng-icon [className]="this.reviewStateProps().color" [name]="this.reviewStateProps().iconName" size="20"></ng-icon>
         <span [innerHTML]="displayPullRequestTitle()" class="w-[95%]"></span>
       </div>
     </div>

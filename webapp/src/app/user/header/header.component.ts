@@ -1,5 +1,5 @@
 import { Component, computed, input } from '@angular/core';
-import { NgIconComponent } from '@ng-icons/core';
+import { NgIconComponent, provideIcons } from '@ng-icons/core';
 import { octClockFill } from '@ng-icons/octicons';
 import { HlmAvatarModule } from '@spartan-ng/ui-avatar-helm';
 import { HlmSkeletonModule } from '@spartan-ng/ui-skeleton-helm';
@@ -33,11 +33,10 @@ const repoImages: { [key: string]: string } = {
     HlmButtonModule,
     LeagueIconComponent
   ],
+  providers: [provideIcons({ octClockFill })],
   templateUrl: './header.component.html'
 })
 export class UserHeaderComponent {
-  protected octClockFill = octClockFill;
-
   isLoading = input(false);
   user = input<UserInfo>();
   firstContribution = input<string>();

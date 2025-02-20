@@ -5,12 +5,12 @@ import { injectMutation, injectQuery, QueryClient } from '@tanstack/angular-quer
 import { SessionsCardComponent } from './sessions-card/sessions-card.component';
 import { MessagesComponent } from './messages/messages.component';
 import { ChatInputComponent } from './chat-input/chat-input.component';
-import { LucideAngularModule, CircleX } from 'lucide-angular';
 import { Message, MessageService, SessionService } from '@app/core/modules/openapi';
 import { HlmButtonModule } from '@spartan-ng/ui-button-helm';
 import { StartSessionCardComponent } from './start-session-card/start-session-card.component';
 import { HlmAlertModule } from '@spartan-ng/ui-alert-helm';
-import { HlmScrollAreaComponent } from '@spartan-ng/ui-scrollarea-helm';
+import { NgScrollbar, NgScrollbarModule } from 'ngx-scrollbar';
+import { HlmScrollAreaDirective } from '@spartan-ng/ui-scrollarea-helm';
 
 @Component({
   selector: 'app-mentor',
@@ -23,18 +23,16 @@ import { HlmScrollAreaComponent } from '@spartan-ng/ui-scrollarea-helm';
     ChatInputComponent,
     HlmButtonModule,
     HlmAlertModule,
-    HlmScrollAreaComponent,
-    LucideAngularModule
+    NgScrollbarModule,
+    HlmScrollAreaDirective
   ]
 })
 export class MentorComponent {
-  protected CircleX = CircleX;
-
   messageService = inject(MessageService);
   sessionService = inject(SessionService);
 
   selectedSessionId = signal<number | undefined>(undefined);
-  messagesScrollArea = viewChild(HlmScrollAreaComponent);
+  messagesScrollBar = viewChild(NgScrollbar);
 
   queryClient = inject(QueryClient);
 
@@ -99,6 +97,6 @@ export class MentorComponent {
   }));
 
   scrollToBottom() {
-    this.messagesScrollArea()?.scrollbar().scrollTo({ bottom: 0, duration: 300 });
+    this.messagesScrollBar()?.scrollTo({ bottom: 0, duration: 300 });
   }
 }

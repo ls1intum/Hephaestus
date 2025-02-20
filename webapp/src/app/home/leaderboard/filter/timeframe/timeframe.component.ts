@@ -9,7 +9,7 @@ import { HlmLabelModule } from '@spartan-ng/ui-label-helm';
 import { BrnTooltipContentDirective } from '@spartan-ng/brain/tooltip';
 import { HlmTooltipComponent, HlmTooltipTriggerDirective } from '@spartan-ng/ui-tooltip-helm';
 import { HlmIconDirective } from '@spartan-ng/ui-icon-helm';
-import { provideIcons } from '@ng-icons/core';
+import { NgIconComponent, provideIcons } from '@ng-icons/core';
 import { lucideCircleHelp } from '@ng-icons/lucide';
 import { injectQuery } from '@tanstack/angular-query-experimental';
 import { lastValueFrom } from 'rxjs';
@@ -36,7 +36,17 @@ function formatLabel(weekIndex: number) {
 
 @Component({
   selector: 'app-leaderboard-filter-timeframe',
-  imports: [BrnSelectModule, HlmSelectModule, HlmLabelModule, FormsModule, HlmTooltipComponent, HlmTooltipTriggerDirective, BrnTooltipContentDirective, HlmIconDirective],
+  imports: [
+    BrnSelectModule,
+    HlmSelectModule,
+    HlmLabelModule,
+    FormsModule,
+    HlmTooltipComponent,
+    HlmTooltipTriggerDirective,
+    BrnTooltipContentDirective,
+    HlmIconDirective,
+    NgIconComponent
+  ],
   providers: [provideIcons({ lucideCircleHelp })],
   templateUrl: './timeframe.component.html'
 })

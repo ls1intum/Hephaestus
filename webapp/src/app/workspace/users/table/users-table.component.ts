@@ -6,7 +6,7 @@ import { lucideArrowUpDown, lucideChevronDown, lucideGripHorizontal, lucideRotat
 import { HlmButtonModule } from '@spartan-ng/ui-button-helm';
 import { HlmCheckboxComponent } from '@spartan-ng/ui-checkbox-helm';
 import { HlmIconDirective } from '@spartan-ng/ui-icon-helm';
-import { provideIcons } from '@ng-icons/core';
+import { NgIconComponent, provideIcons } from '@ng-icons/core';
 import { HlmInputDirective } from '@spartan-ng/ui-input-helm';
 import { BrnMenuTriggerDirective } from '@spartan-ng/brain/menu';
 import { HlmMenuModule } from '@spartan-ng/ui-menu-helm';
@@ -71,6 +71,7 @@ const LOADING_DATA: UserTeams[] = [
     BrnSelectModule,
     HlmSelectModule,
     HlmSkeletonModule,
+    NgIconComponent,
     GithubLabelComponent
   ],
   providers: [provideIcons({ lucideChevronDown, lucideGripHorizontal, lucideArrowUpDown, lucideRotateCw, lucideOctagonX })],

@@ -19,7 +19,7 @@
     </span>
     @if (isSelected()) {
       <button [brnMenuTriggerFor]="menu">
-        <lucide-angular [img]="Ellipsis" class="size-5 text-muted-foreground block" />
+        <ng-icon name="lucideEllipsis" class="size-5 text-muted-foreground block" />
       </button>
     }
   </div>
@@ -29,7 +29,7 @@
   <hlm-menu>
     <hlm-menu-group>
       <button hlmMenuItem class="text-destructive hover:text-destructive" (click)="signOut.emit()">
-        <lucide-angular [img]="LogOut" hlmMenuIcon class="size-4" />
+        <ng-icon name="lucideLogOut" hlmMenuIcon class="size-4" />
         Sign Out
       </button>
     </hlm-menu-group>

@@ -5,15 +5,16 @@ import { HlmProgressIndicatorDirective } from '@spartan-ng/ui-progress-helm';
 import { LeagueIconComponent } from '@app/ui/league/icon/league-icon.component';
 import { getLeagueFromPoints } from '@app/utils';
 import { HlmButtonModule } from '@spartan-ng/ui-button-helm';
-import { LucideAngularModule, Star } from 'lucide-angular';
+import { NgIconComponent, provideIcons } from '@ng-icons/core';
+import { lucideStar } from '@ng-icons/lucide';
 
 @Component({
   selector: 'app-league-elo-card',
-  imports: [HlmCardModule, LeagueIconComponent, BrnProgressComponent, BrnProgressIndicatorComponent, HlmProgressIndicatorDirective, HlmButtonModule, LucideAngularModule],
+  imports: [HlmCardModule, LeagueIconComponent, BrnProgressComponent, BrnProgressIndicatorComponent, HlmProgressIndicatorDirective, HlmButtonModule, NgIconComponent],
+  providers: [provideIcons({ lucideStar })],
   templateUrl: './elo-card.component.html'
 })
 export class LeagueEloCardComponent {
-  protected Star = Star;
   protected Infinity = Infinity;
   leaguePoints = input<number>();
 
