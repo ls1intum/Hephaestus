@@ -6,17 +6,17 @@
         <hlm-sheet-header class="text-left mt-2">
           <h3 hlmSheetTitle>Workspaces</h3>
         </hlm-sheet-header>
-        <hlm-scroll-area class="h-full scrollbar-thin -mr-2.5">
+        <ng-scrollbar hlm class="h-full scrollbar-thin -mr-2.5">
           <div class="pr-2.5">
             <app-workspace-option-selector
               [isCompact]="false"
               [selectedWorkspace]="selectedWorkspace()"
               [workspaces]="workspaces()"
-              (onSelect)="onSelect.emit($event)"
-              (onSignOut)="onSignOut.emit($event)"
+              (select)="select.emit($event)"
+              (signOut)="signOut.emit($event)"
             />
           </div>
-        </hlm-scroll-area>
+        </ng-scrollbar>
         <hlm-sheet-footer>
           <app-workspace-add-button [isCompact]="false" />
           <hlm-menu-separator />

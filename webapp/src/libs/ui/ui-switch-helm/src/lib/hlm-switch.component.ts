@@ -1,9 +1,9 @@
 import { BooleanInput } from '@angular/cdk/coercion';
 import { Component, booleanAttribute, computed, forwardRef, input, model, output } from '@angular/core';
 import { NG_VALUE_ACCESSOR } from '@angular/forms';
-import { hlm } from '@spartan-ng/ui-core';
-import { ChangeFn, TouchFn } from '@spartan-ng/ui-forms-brain';
-import { BrnSwitchComponent, BrnSwitchThumbComponent } from '@spartan-ng/ui-switch-brain';
+import { hlm } from '@spartan-ng/brain/core';
+import { ChangeFn, TouchFn } from '@spartan-ng/brain/forms';
+import { BrnSwitchComponent, BrnSwitchThumbComponent } from '@spartan-ng/brain/switch';
 import type { ClassValue } from 'clsx';
 import { HlmSwitchThumbDirective } from './hlm-switch-thumb.directive';
 export const HLM_SWITCH_VALUE_ACCESSOR = {
@@ -13,21 +13,21 @@ export const HLM_SWITCH_VALUE_ACCESSOR = {
 };
 
 @Component({
-    selector: 'hlm-switch',
-    imports: [BrnSwitchThumbComponent, BrnSwitchComponent, HlmSwitchThumbDirective],
-    host: {
-        class: 'contents',
-        '[attr.id]': 'null',
-        '[attr.aria-label]': 'null',
-        '[attr.aria-labelledby]': 'null',
-        '[attr.aria-describedby]': 'null',
-    },
-    template: `
+	selector: 'hlm-switch',
+	imports: [BrnSwitchThumbComponent, BrnSwitchComponent, HlmSwitchThumbDirective],
+	host: {
+		class: 'contents',
+		'[attr.id]': 'null',
+		'[attr.aria-label]': 'null',
+		'[attr.aria-labelledby]': 'null',
+		'[attr.aria-describedby]': 'null',
+	},
+	template: `
 		<brn-switch
 			[class]="_computedClass()"
 			[checked]="checked()"
 			(changed)="handleChange($event)"
-			(touched)="_onTouched()"
+			(touched)="_onTouched?.()"
 			[disabled]="disabled()"
 			[id]="id()"
 			[aria-label]="ariaLabel()"
@@ -37,7 +37,7 @@ export const HLM_SWITCH_VALUE_ACCESSOR = {
 			<brn-switch-thumb hlm />
 		</brn-switch>
 	`,
-    providers: [HLM_SWITCH_VALUE_ACCESSOR]
+	providers: [HLM_SWITCH_VALUE_ACCESSOR],
 })
 export class HlmSwitchComponent {
 	public readonly userClass = input<ClassValue>('', { alias: 'class' });
@@ -49,8 +49,10 @@ export class HlmSwitchComponent {
 		),
 	);
 
+	/** The checked state of the switch. */
 	public readonly checked = model<boolean>(false);
 
+	/** The disabled state of the switch. */
 	public readonly disabled = input<boolean, BooleanInput>(false, {
 		transform: booleanAttribute,
 	});
@@ -67,16 +69,15 @@ export class HlmSwitchComponent {
 	/** Used to set the aria-describedby attribute on the underlying brn element. */
 	public readonly ariaDescribedby = input<string | null>(null, { alias: 'aria-describedby' });
 
+	/** Emits when the checked state of the switch changes. */
 	public readonly changed = output<boolean>();
 
-	// eslint-disable-next-line @typescript-eslint/no-empty-function
-	protected _onChange: ChangeFn<boolean> = () => {};
-	// eslint-disable-next-line @typescript-eslint/no-empty-function
-	protected _onTouched: TouchFn = () => {};
+	protected _onChange?: ChangeFn<boolean>;
+	protected _onTouched?: TouchFn;
 
 	protected handleChange(value: boolean): void {
 		this.checked.set(value);
-		this._onChange(value);
+		this._onChange?.(value);
 		this.changed.emit(value);
 	}
 

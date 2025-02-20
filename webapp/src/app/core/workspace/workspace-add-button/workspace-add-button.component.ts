@@ -1,14 +1,16 @@
 import { Component, computed, input } from '@angular/core';
 import { HlmButtonDirective } from '@spartan-ng/ui-button-helm';
-import { hlm } from '@spartan-ng/ui-core';
-import { LucideAngularModule, CirclePlus, Plus } from 'lucide-angular';
+import { hlm } from '@spartan-ng/brain/core';
+import { NgIconComponent, provideIcons } from '@ng-icons/core';
+import { lucideCirclePlus, lucidePlus } from '@ng-icons/lucide';
 
 @Component({
   selector: 'app-workspace-add-button',
-  imports: [HlmButtonDirective, LucideAngularModule],
+  imports: [HlmButtonDirective, NgIconComponent],
+  providers: [provideIcons({ lucideCirclePlus, lucidePlus })],
   template: `
     <button hlmBtn variant="ghost" [class]="computedClass()" [size]="isCompact() ? 'icon' : 'default'">
-      <lucide-angular [img]="isCompact() ? Plus : CirclePlus" class="size-5" />
+      <ng-icon [name]="isCompact() ? 'lucidePlus' : 'lucideCirclePlus'" class="text-xl" />
       @if (!isCompact()) {
         Add a Workspace
       }
@@ -16,9 +18,6 @@ import { LucideAngularModule, CirclePlus, Plus } from 'lucide-angular';
   `
 })
 export class WorkspaceAddButtonComponent {
-  protected CirclePlus = CirclePlus;
-  protected Plus = Plus;
-
   isCompact = input.required<boolean>();
 
   computedClass = computed(() => hlm(this.isCompact() ? '' : 'flex gap-2 w-full justify-start'));

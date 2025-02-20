@@ -6,35 +6,38 @@ import { ActivatedRoute } from '@angular/router';
 import { injectQuery } from '@tanstack/angular-query-experimental';
 import { HlmIconModule } from 'libs/ui/ui-icon-helm/src/index';
 import { HlmButtonModule } from '@spartan-ng/ui-button-helm';
-import { HlmScrollAreaComponent } from '@spartan-ng/ui-scrollarea-helm';
 import { HlmAlertModule } from '@spartan-ng/ui-alert-helm';
 import { ReviewActivityCardComponent } from '@app/user/review-activity-card/review-activity-card.component';
 import { IssueCardComponent } from '@app/user/issue-card/issue-card.component';
 import { combineLatest, lastValueFrom, map, timer } from 'rxjs';
-import { CircleX, LucideAngularModule, Info } from 'lucide-angular';
+import { NgIconComponent, provideIcons } from '@ng-icons/core';
+import { lucideCircleX, lucideInfo } from '@ng-icons/lucide';
 import { UserHeaderComponent } from './header/header.component';
+import { NgScrollbarModule } from 'ngx-scrollbar';
+import { HlmScrollAreaDirective } from '@spartan-ng/ui-scrollarea-helm';
 
 @Component({
-  selector: 'app-user-profile',
   imports: [
-    LucideAngularModule,
+    NgIconComponent,
     ReviewActivityCardComponent,
     IssueCardComponent,
     HlmAvatarModule,
     HlmSkeletonModule,
     HlmIconModule,
     HlmButtonModule,
-    HlmScrollAreaComponent,
     UserHeaderComponent,
-    HlmAlertModule
+    HlmAlertModule,
+    NgScrollbarModule,
+    HlmScrollAreaDirective,
+    HlmAlertModule,
+    HlmScrollAreaDirective
   ],
+  providers: [provideIcons({ lucideCircleX, lucideInfo })],
   templateUrl: './user-profile.component.html'
 })
 export class UserProfileComponent {
   userService = inject(UserService);
 
-  protected CircleX = CircleX;
-  protected Info = Info;
   // get user id from the url
   protected userLogin = signal<string | null>(null);
 

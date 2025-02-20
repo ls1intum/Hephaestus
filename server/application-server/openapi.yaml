@@ -1,4 +1,4 @@
-openapi: 3.0.1
+openapi: 3.1.0
 info:
   title: Hephaestus API
   description: API documentation for the Hephaestus application server.
@@ -447,17 +447,6 @@ paths:
 components:
   schemas:
     PullRequestInfo:
-      required:
-      - additions
-      - commentsCount
-      - deletions
-      - htmlUrl
-      - id
-      - isDraft
-      - isMerged
-      - number
-      - state
-      - title
       type: object
       properties:
         id:
@@ -512,13 +501,18 @@ components:
         updatedAt:
           type: string
           format: date-time
-    Message:
       required:
-      - content
+      - additions
+      - commentsCount
+      - deletions
+      - htmlUrl
       - id
-      - sender
-      - sentAt
-      - sessionId
+      - isDraft
+      - isMerged
+      - number
+      - state
+      - title
+    Message:
       type: object
       properties:
         id:
@@ -537,11 +531,13 @@ components:
         sessionId:
           type: integer
           format: int64
-    UserProfile:
       required:
-      - contributedRepositories
-      - firstContribution
-      - userInfo
+      - content
+      - id
+      - sender
+      - sentAt
+      - sessionId
+    UserProfile:
       type: object
       properties:
         userInfo:
@@ -561,12 +557,11 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/PullRequestInfo"
-    RepositoryInfo:
       required:
-      - htmlUrl
-      - id
-      - name
-      - nameWithOwner
+      - contributedRepositories
+      - firstContribution
+      - userInfo
+    RepositoryInfo:
       type: object
       properties:
         id:
@@ -580,13 +575,12 @@ components:
           type: string
         htmlUrl:
           type: string
-    UserTeams:
       required:
+      - htmlUrl
       - id
-      - login
       - name
-      - teams
-      - url
+      - nameWithOwner
+    UserTeams:
       type: object
       properties:
         id:
@@ -599,19 +593,17 @@ components:
         url:
           type: string
         teams:
-          uniqueItems: true
           type: array
           items:
             $ref: "#/components/schemas/TeamInfo"
-    PullRequestBaseInfo:
+          uniqueItems: true
       required:
-      - htmlUrl
       - id
-      - isDraft
-      - isMerged
-      - number
-      - state
-      - title
+      - login
+      - name
+      - teams
+      - url
+    PullRequestBaseInfo:
       type: object
       properties:
         id:
@@ -635,13 +627,15 @@ components:
           $ref: "#/components/schemas/RepositoryInfo"
         htmlUrl:
           type: string
-    UserInfo:
       required:
-      - avatarUrl
       - htmlUrl
       - id
-      - login
-      - name
+      - isDraft
+      - isMerged
+      - number
+      - state
+      - title
+    UserInfo:
       type: object
       properties:
         id:
@@ -660,13 +654,13 @@ components:
         leaguePoints:
           type: integer
           format: int32
-    TeamInfo:
       required:
-      - color
+      - avatarUrl
+      - htmlUrl
       - id
-      - labels
+      - login
       - name
-      - repositories
+    TeamInfo:
       type: object
       properties:
         id:
@@ -684,11 +678,13 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/LabelInfo"
-    LabelInfo:
       required:
       - color
       - id
+      - labels
       - name
+      - repositories
+    LabelInfo:
       type: object
       properties:
         id:
@@ -700,14 +696,11 @@ components:
           type: string
         repository:
           $ref: "#/components/schemas/RepositoryInfo"
-    PullRequestReviewInfo:
       required:
-      - codeComments
-      - htmlUrl
+      - color
       - id
-      - isDismissed
-      - score
-      - state
+      - name
+    PullRequestReviewInfo:
       type: object
       properties:
         id:
@@ -737,11 +730,14 @@ components:
         submittedAt:
           type: string
           format: date-time
-    MetaData:
       required:
-      - scheduledDay
-      - scheduledTime
-      - teams
+      - codeComments
+      - htmlUrl
+      - id
+      - isDismissed
+      - score
+      - state
+    MetaData:
       type: object
       properties:
         teams:
@@ -752,18 +748,11 @@ components:
           type: string
         scheduledTime:
           type: string
-    LeaderboardEntry:
       required:
-      - numberOfApprovals
-      - numberOfChangeRequests
-      - numberOfCodeComments
-      - numberOfComments
-      - numberOfReviewedPRs
-      - numberOfUnknowns
-      - rank
-      - reviewedPullRequests
-      - score
-      - user
+      - scheduledDay
+      - scheduledTime
+      - teams
+    LeaderboardEntry:
       type: object
       properties:
         rank:
@@ -796,11 +785,18 @@ components:
         numberOfCodeComments:
           type: integer
           format: int32
-    Session:
       required:
-      - createdAt
-      - id
-      - isClosed
+      - numberOfApprovals
+      - numberOfChangeRequests
+      - numberOfCodeComments
+      - numberOfComments
+      - numberOfReviewedPRs
+      - numberOfUnknowns
+      - rank
+      - reviewedPullRequests
+      - score
+      - user
+    Session:
       type: object
       properties:
         id:
@@ -811,3 +807,7 @@ components:
           format: date-time
         isClosed:
           type: boolean
+      required:
+      - createdAt
+      - id
+      - isClosed

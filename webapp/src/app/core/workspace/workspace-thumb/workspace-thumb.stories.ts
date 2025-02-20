@@ -9,7 +9,7 @@ const meta: Meta<WorkspaceThumbComponent> = {
     isSelected: false,
     hoverRingEnabled: true,
     iconUrl: 'https://avatars.githubusercontent.com/u/11064260?s=48&v=4',
-    onClick: fn()
+    select: fn()
   },
   argTypes: {
     isSelected: {

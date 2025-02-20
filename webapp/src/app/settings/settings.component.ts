@@ -4,7 +4,7 @@ import { lastValueFrom } from 'rxjs';
 import { UserService } from '@app/core/modules/openapi';
 import { SecurityStore } from '@app/core/security/security-store.service';
 import { injectMutation } from '@tanstack/angular-query-experimental';
-import { BrnAlertDialogContentDirective, BrnAlertDialogTriggerDirective } from '@spartan-ng/ui-alertdialog-brain';
+import { BrnAlertDialogContentDirective, BrnAlertDialogTriggerDirective } from '@spartan-ng/brain/alert-dialog';
 import {
   HlmAlertDialogActionButtonDirective,
   HlmAlertDialogCancelButtonDirective,

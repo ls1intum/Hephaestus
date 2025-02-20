@@ -1,31 +1,31 @@
 import { Component, computed, input, output } from '@angular/core';
-import { LucideAngularModule, Hammer } from 'lucide-angular';
+import { NgIconComponent, provideIcons } from '@ng-icons/core';
+import { lucideHammer } from '@ng-icons/lucide';
 import { HlmAvatarModule } from '@spartan-ng/ui-avatar-helm';
-import { BrnSheetTriggerDirective } from '@spartan-ng/ui-sheet-brain';
-import { hlm } from '@spartan-ng/ui-core';
+import { BrnSheetTriggerDirective } from '@spartan-ng/brain/sheet';
+import { hlm } from '@spartan-ng/brain/core';
 
 @Component({
   selector: 'app-workspace-thumb',
-  imports: [BrnSheetTriggerDirective, HlmAvatarModule, LucideAngularModule],
+  imports: [BrnSheetTriggerDirective, HlmAvatarModule, NgIconComponent],
+  providers: [provideIcons({ lucideHammer })],
   template: `
     <button [class]="computedClass()" (click)="handleClick($event)" brnSheetTrigger>
       <hlm-avatar [variant]="variant()" shape="square">
         <img [src]="iconUrl()" hlmAvatarImage />
         <span class="inset-2 rounded-md" hlmAvatarFallback>
-          <lucide-angular [img]="Hammer" class="size-6" />
+          <ng-icon name="lucideHammer" class="text-xl" />
         </span>
       </hlm-avatar>
     </button>
   `
 })
 export class WorkspaceThumbComponent {
-  protected Hammer = Hammer;
-
   variant = input<'small' | 'base' | 'medium'>('base');
   isSelected = input<boolean>();
   hoverRingEnabled = input<boolean>(true);
   iconUrl = input<string>();
-  onClick = output<MouseEvent>();
+  select = output<MouseEvent>();
 
   computedClass = computed(() => {
     return hlm(
@@ -35,6 +35,6 @@ export class WorkspaceThumbComponent {
   });
 
   handleClick(event: MouseEvent) {
-    this.onClick.emit(event);
+    this.select.emit(event);
   }
 }
