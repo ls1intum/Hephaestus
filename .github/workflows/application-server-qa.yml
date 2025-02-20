@@ -1,4 +1,4 @@
-name: Application-Server QA
+name: Application Server QA
 
 on:
     pull_request:

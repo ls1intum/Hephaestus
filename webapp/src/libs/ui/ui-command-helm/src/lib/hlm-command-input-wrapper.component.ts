@@ -4,7 +4,6 @@ import type { ClassValue } from 'clsx';
 
 @Component({
 	selector: 'hlm-cmd-input-wrapper',
-	standalone: true,
 	template: '<ng-content/>',
 	host: {
 		'[class]': '_computedClass()',

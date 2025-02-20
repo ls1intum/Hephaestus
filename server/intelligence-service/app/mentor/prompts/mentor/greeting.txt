@@ -1,0 +1,3 @@
+ Greet the user warmly and express excitement about starting today’s session. Keep the greeting friendly and encouraging. 
+ Mention that you are here to support them and look forward to making progress together. 
+ Conclude by asking how their week has been so far to foster engagement.

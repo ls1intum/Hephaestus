@@ -17,6 +17,7 @@ import { ReviewsPopoverComponent } from './reviews-popover/reviews-popover.compo
 import { HlmIconComponent, provideIcons } from '@spartan-ng/ui-icon-helm';
 import { lucideAward } from '@ng-icons/lucide';
 import { User } from '@app/core/security/models';
+import { LeagueIconComponent } from '@app/ui/league/icon/league-icon.component';
 
 @Component({
   selector: 'app-leaderboard',
@@ -32,7 +33,8 @@ import { User } from '@app/core/security/models';
     ReviewsPopoverComponent,
     NgIconComponent,
     HlmIconComponent,
-    RouterLink
+    RouterLink,
+    LeagueIconComponent
   ],
   providers: [provideIcons({ lucideAward })],
   templateUrl: './leaderboard.component.html'

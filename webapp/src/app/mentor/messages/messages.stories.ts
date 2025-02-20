@@ -11,36 +11,39 @@ const meta: Meta<MessagesComponent> = {
         id: 1,
         sentAt: '2024-12-05T10:15:00Z',
         sender: Message.SenderEnum.Mentor,
-        content: 'Hello! I’m excited to help you with your software engineering project today. What are you currently working on?',
+        content: 'Good morning! How are you today?',
         sessionId: 101
       },
       {
         id: 2,
-        sentAt: '2024-12-05T10:16:30Z',
+        sentAt: '2024-12-05T10:15:30Z',
         sender: Message.SenderEnum.User,
-        content: 'Hi! I’m struggling with designing the database schema for my project.',
+        content: 'Good morning! I’m doing well, thank you!',
         sessionId: 101
       },
       {
         id: 3,
-        sentAt: '2024-12-05T10:17:00Z',
+        sentAt: '2024-12-05T10:16:00Z',
         sender: Message.SenderEnum.Mentor,
-        content: 'Got it! Can you tell me a bit more about the project?',
+        content: 'Great to hear! Can you give me a quick status update on your project?',
         sessionId: 101
       },
       {
         id: 4,
-        sentAt: '2024-12-05T10:17:45Z',
+        sentAt: '2024-12-05T10:16:30Z',
         sender: Message.SenderEnum.User,
-        content: 'It’s an e-commerce app where users can browse products, add them to a cart, and place orders.',
+        content: 'Sure! I’ve completed the database schema and started working on the API design.',
         sessionId: 101
       },
       {
         id: 5,
-        sentAt: '2024-12-05T10:18:10Z',
+        sentAt: '2024-12-05T10:16:30Z',
         sender: Message.SenderEnum.Mentor,
-        content: 'A good first step is identifying the main entities: users, products, orders, and the cart. Let’s start with that — do you have any initial thoughts?',
-        sessionId: 101
+        content: 'Keep up the good work!',
+        sessionId: 101,
+        status: ['Database schema completed', 'API design started'],
+        impediments: [],
+        promises: []
       }
     ]
   }
@@ -54,5 +57,35 @@ export const Default: Story = {};
 export const isLoading: Story = {
   args: {
     isLoading: true
+  }
+};
+
+export const WithSummary: Story = {
+  args: {
+    messages: [
+      {
+        id: 1,
+        sentAt: '2024-12-05T10:17:00Z',
+        sender: Message.SenderEnum.Mentor,
+        content:
+          "SUMMARY\nSTATUS\n✅ Focused on refining chatbot's NLP responses and adding user authentication features.\nIMPEDIMENTS\n⚠️ Handling ambiguous user inputs causing challenges for Dialogflow in determining correct intents due to variations in phrasing and context.\nPROMISES\n🏁 Continuation of testing and refining chatbot's response flow to address ambiguity in user inputs.\nTEXT\nGreat progress on multiple fronts with the chatbot development! If there's anything else you'd like to add or discuss further, feel free to share.",
+        sessionId: 101
+      }
+    ]
+  }
+};
+
+export const WithPrOverview: Story = {
+  args: {
+    messages: [
+      {
+        id: 1,
+        sentAt: '2024-12-05T10:17:00Z',
+        sender: Message.SenderEnum.Mentor,
+        content:
+          'DEVELOPMENT\n\nPR\nNumber: 230\nTitle: Testing of the GitHub Integration Functionality for AI Mentor\nState: OPEN\nDraft: true\nMerged: false\nURL: https://github.com/ls1intum/Hephaestus/pull/230\n\n---\n\nPR\nNumber: 220\nTitle: AI Mentor memory integration\nState: OPEN\nDraft: false\nMerged: false\nURL: https://github.com/ls1intum/Hephaestus/pull/220\n\nRESPONSE\n\nI have found you worked on these PRs during the last spring. Do you want me to add them to your status update?',
+        sessionId: 101
+      }
+    ]
   }
 };

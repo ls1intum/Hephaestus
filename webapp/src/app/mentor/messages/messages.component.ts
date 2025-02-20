@@ -5,17 +5,23 @@ import { HlmAvatarModule } from '@spartan-ng/ui-avatar-helm';
 import { SecurityStore } from '@app/core/security/security-store.service';
 import { Message } from '@app/core/modules/openapi';
 import { HlmSkeletonComponent } from '@spartan-ng/ui-skeleton-helm';
+import { ChatSummaryComponent } from '../chat-summary/chat-summary.component';
+import { PrsOverviewComponent } from '../prs-overview/prs-overview.component';
+import { getSummary, getPullRequests, Summary } from './message-parser';
 
 @Component({
   selector: 'app-messages',
   templateUrl: './messages.component.html',
-  imports: [CommonModule, LucideAngularModule, HlmAvatarModule, HlmSkeletonComponent]
+  imports: [CommonModule, LucideAngularModule, HlmAvatarModule, HlmSkeletonComponent, ChatSummaryComponent, PrsOverviewComponent]
 })
 export class MessagesComponent {
   protected BotMessageSquare = BotMessageSquare;
   protected Message = Message;
 
   securityStore = inject(SecurityStore);
-  messages = input<Message[]>([]);
+  messages = input<(Message | Summary)[]>([]);
   isLoading = input<boolean>(false);
+
+  getSummary = getSummary;
+  getPullRequests = getPullRequests;
 }

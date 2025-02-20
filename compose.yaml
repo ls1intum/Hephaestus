@@ -1,15 +1,14 @@
 services:
   application-server:
-    image: hephaestus-application-server
+    build:
+      context: ./server/application-server
     ports:
       - '8080'
     environment:
       - SPRING_PROFILES_ACTIVE=prod
-      - DATABASE_URL=jdbc:postgresql://postgres:5432/hephaestus
+      - DATABASE_URL=postgresql://postgres:5432/hephaestus
       - DATABASE_USERNAME=root
       - DATABASE_PASSWORD=root
-      - SECURITY_USER_NAME=${SECURITY_USER_NAME:-admin}
-      - SECURITY_USER_PASSWORD=${SECURITY_USER_NAME:-admin_password}
       - INTELLIGENCE_SERVICE_URL=http://intelligence-service:5000
     depends_on:
       - postgres
@@ -25,6 +24,9 @@ services:
   intelligence-service:
     build: server/intelligence-service
     environment:
+      - DATABASE_URL=postgresql://postgres:5432/hephaestus
+      - DATABASE_USERNAME=root
+      - DATABASE_PASSWORD=root
       # Either OPENAI_API_KEY or AZURE_OPENAI_API_KEY must be set
       - OPENAI_API_KEY
       - AZURE_OPENAI_API_KEY
@@ -67,3 +69,6 @@ services:
 networks:
   app-network:
     driver: bridge`
+
+volumes:
+  postgresql-data:

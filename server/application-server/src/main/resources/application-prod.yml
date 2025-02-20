@@ -1,6 +1,6 @@
 spring:
   datasource:
-    url: ${DATABASE_URL}
+    url: jdbc:${DATABASE_URL}
     username: ${DATABASE_USERNAME}
     password: ${DATABASE_PASSWORD}
   jpa:
@@ -47,8 +47,8 @@ monitoring:
     # Fetching timeframe in days
     timeframe: ${MONITORING_TIMEFRAME:7}
     sync-cron: ${MONITORING_SYNC_CRON:0 0 * * * *}
-    sync-cooldown-in-minutes: {MONITORING_SYNC_COOLDOWN_IN_MINUTES:0}
-    sync-all-issues-and-pull-requests: {MONITORING_SYNC_ALL_ISSUES_AND_PULL_REQUESTS:true}
+    sync-cooldown-in-minutes: ${MONITORING_SYNC_COOLDOWN_IN_MINUTES:0}
+    sync-all-issues-and-pull-requests: ${MONITORING_SYNC_ALL_ISSUES_AND_PULL_REQUESTS:true}
 
 github:
   auth-token: ${GITHUB_AUTH_TOKEN}

@@ -20,7 +20,6 @@ import { hlm } from '@spartan-ng/ui-core';
 import { HlmIconComponent, provideIcons } from '@spartan-ng/ui-icon-helm';
 
 @Component({
-	standalone: true,
 	selector: 'hlm-calendar',
 	imports: [
 		BrnCalendarDirective,

@@ -33,4 +33,19 @@
 		"java.configuration.updateBuildConfiguration": "interactive",
 		"java.completion.importOrder": ["#"],
 	},
+	"extensions": {
+		"recommendations": [
+			"vscjava.vscode-java-pack",
+			"redhat.java",
+			"vscjava.vscode-maven",
+			"ms-python.python",
+			"bradlc.vscode-tailwindcss",
+			"dbaeumer.vscode-eslint",
+			"github.vscode-pull-request-github",
+			"davidanson.vscode-markdownlint",
+			"streetsidesoftware.code-spell-checker",
+			"njpwerner.autodocstring",
+			"formulahendry.auto-rename-tag"
+		]
+	},
 }

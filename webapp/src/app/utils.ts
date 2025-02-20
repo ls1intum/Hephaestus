@@ -15,3 +15,35 @@ export function groupBy<T, K extends keyof any>(arr: T[], key: (i: T) => K) {
     {} as Record<K, T[]>
   );
 }
+
+export function getLeagueFromPoints(points: number) {
+  return Leagues.find((league) => points >= league.minPoints && points < league.maxPoints);
+}
+
+export const Leagues = [
+  {
+    name: 'Bronze',
+    minPoints: 0,
+    maxPoints: 1250
+  },
+  {
+    name: 'Silver',
+    minPoints: 1250,
+    maxPoints: 1500
+  },
+  {
+    name: 'Gold',
+    minPoints: 1500,
+    maxPoints: 1750
+  },
+  {
+    name: 'Diamond',
+    minPoints: 1750,
+    maxPoints: 2000
+  },
+  {
+    name: 'Master',
+    minPoints: 2000,
+    maxPoints: Infinity
+  }
+];

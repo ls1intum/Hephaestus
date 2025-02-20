@@ -7,7 +7,6 @@ import type { ClassValue } from 'clsx';
 @Component({
 	// eslint-disable-next-line @angular-eslint/component-selector
 	selector: '[hlmBreadcrumbSeparator]',
-	standalone: true,
 	imports: [HlmIconComponent],
 	providers: [provideIcons({ lucideChevronRight })],
 	host: {

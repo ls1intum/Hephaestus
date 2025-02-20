@@ -5,9 +5,6 @@ from langchain_openai import ChatOpenAI, AzureChatOpenAI
 
 from .settings import settings
 
-temperature = 0.7
-max_tokens = 4096
-
 model: BaseChatModel
 
 if os.getenv("GITHUB_ACTIONS") == "true":
@@ -21,4 +18,8 @@ else:
     else:
         raise EnvironmentError("No LLM available")
 
-    model = Model(temperature=temperature, max_tokens=max_tokens)
+    model = Model(
+        temperature=settings.MODEL_TEMPERATURE,
+        max_tokens=settings.MODEL_MAX_TOKENS,
+        model=settings.MODEL_NAME,
+    )

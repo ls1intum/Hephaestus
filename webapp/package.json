@@ -1,6 +1,6 @@
 {
   "name": "hephaestus",
-  "version": "0.0.0",
+  "version": "0.0.1",
   "scripts": {
     "ng": "ng",
     "start": "ng serve",
@@ -59,8 +59,7 @@
     "@spartan-ng/ui-tabs-brain": "0.0.1-alpha.374",
     "@spartan-ng/ui-toggle-brain": "0.0.1-alpha.374",
     "@spartan-ng/ui-tooltip-brain": "0.0.1-alpha.374",
-    "@tanstack/angular-query-devtools-experimental": "5.52.0",
-    "@tanstack/angular-query-experimental": "5.52.0",
+    "@tanstack/angular-query-experimental": "5.66.0",
     "autoprefixer": "10.4.20",
     "class-variance-authority": "^0.7.0",
     "clsx": "2.1.1",
@@ -71,6 +70,7 @@
     "ngx-scrollbar": "^13.0.3",
     "ngx-sonner": "^2.0.0",
     "postcss": "8.4.41",
+    "posthog-js": "^1.215.6",
     "rxjs": "7.8.1",
     "tailwind-merge": "2.5.2",
     "tailwindcss": "^3.4.17",

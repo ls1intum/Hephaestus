@@ -3,7 +3,7 @@ package de.tum.in.www1.hephaestus.intelligenceservice.api;
 import de.tum.in.www1.hephaestus.intelligenceservice.ApiClient;
 import de.tum.in.www1.hephaestus.intelligenceservice.BaseApi;
 
-import de.tum.in.www1.hephaestus.intelligenceservice.model.ISHealthCheck;
+import de.tum.in.www1.hephaestus.intelligenceservice.model.HealthCheck;
 
 import java.util.Collections;
 import java.util.HashMap;
@@ -41,10 +41,10 @@ public class HealthcheckApi extends BaseApi {
      * Perform a Health Check
      * ## Perform a Health Check Endpoint to perform a healthcheck on. This endpoint can primarily be used Docker to ensure a robust container orchestration and management is in place. Other services which rely on proper functioning of the API service will not deploy if this endpoint returns any other HTTP status code except 200 (OK). Returns:     HealthCheck: Returns a JSON response with the health status
      * <p><b>200</b> - Return HTTP Status Code 200 (OK)
-     * @return ISHealthCheck
+     * @return HealthCheck
      * @throws RestClientException if an error occurs while attempting to invoke the API
      */
-    public ISHealthCheck getHealthHealthGet() throws RestClientException {
+    public HealthCheck getHealthHealthGet() throws RestClientException {
         return getHealthHealthGetWithHttpInfo().getBody();
     }
 
@@ -52,10 +52,10 @@ public class HealthcheckApi extends BaseApi {
      * Perform a Health Check
      * ## Perform a Health Check Endpoint to perform a healthcheck on. This endpoint can primarily be used Docker to ensure a robust container orchestration and management is in place. Other services which rely on proper functioning of the API service will not deploy if this endpoint returns any other HTTP status code except 200 (OK). Returns:     HealthCheck: Returns a JSON response with the health status
      * <p><b>200</b> - Return HTTP Status Code 200 (OK)
-     * @return ResponseEntity&lt;ISHealthCheck&gt;
+     * @return ResponseEntity&lt;HealthCheck&gt;
      * @throws RestClientException if an error occurs while attempting to invoke the API
      */
-    public ResponseEntity<ISHealthCheck> getHealthHealthGetWithHttpInfo() throws RestClientException {
+    public ResponseEntity<HealthCheck> getHealthHealthGetWithHttpInfo() throws RestClientException {
         Object localVarPostBody = null;
         
 
@@ -73,7 +73,7 @@ public class HealthcheckApi extends BaseApi {
 
         String[] localVarAuthNames = new String[] {  };
 
-        ParameterizedTypeReference<ISHealthCheck> localReturnType = new ParameterizedTypeReference<ISHealthCheck>() {};
+        ParameterizedTypeReference<HealthCheck> localReturnType = new ParameterizedTypeReference<HealthCheck>() {};
         return apiClient.invokeAPI("/health", HttpMethod.GET, Collections.<String, Object>emptyMap(), localVarQueryParams, localVarPostBody, localVarHeaderParams, localVarCookieParams, localVarFormParams, localVarAccept, localVarContentType, localVarAuthNames, localReturnType);
     }
 

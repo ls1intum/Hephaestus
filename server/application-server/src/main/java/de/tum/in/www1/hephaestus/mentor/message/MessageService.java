@@ -1,9 +1,9 @@
 package de.tum.in.www1.hephaestus.mentor.message;
 
 import de.tum.in.www1.hephaestus.config.IntelligenceServiceConfig.IntelligenceServiceApi;
-import de.tum.in.www1.hephaestus.intelligenceservice.model.ISMentorMessage;
-import de.tum.in.www1.hephaestus.intelligenceservice.model.ISMessage;
-import de.tum.in.www1.hephaestus.intelligenceservice.model.ISMessageHistory;
+import de.tum.in.www1.hephaestus.intelligenceservice.model.MentorRequest;
+import de.tum.in.www1.hephaestus.intelligenceservice.model.MentorResponse;
+import de.tum.in.www1.hephaestus.intelligenceservice.model.MentorStartRequest;
 import de.tum.in.www1.hephaestus.mentor.message.Message.MessageSender;
 import de.tum.in.www1.hephaestus.mentor.session.Session;
 import de.tum.in.www1.hephaestus.mentor.session.SessionRepository;
@@ -43,6 +43,14 @@ public class MessageService {
         }
         Session currentSession = session.get();
 
+        // Prevent sending messages to closed sessions
+        Session previousSession = sessionRepository
+            .findFirstByUserOrderByCreatedAtDesc(currentSession.getUser())
+            .orElse(null);
+        if (previousSession != null && previousSession.isClosed()) {
+            return null;
+        }
+
         Message userMessage = new Message();
         userMessage.setSender(MessageSender.USER);
         userMessage.setContent(content);
@@ -52,52 +60,37 @@ public class MessageService {
         currentSession.getMessages().add(savedUserMessage);
         sessionRepository.save(currentSession);
 
-        String systemResponse = generateResponse(sessionId);
-
-        // prevent saving empty system messages if the intelligence service is down
-        if (systemResponse == null) {
-            logger.error("Failed to generate response for message: {}", content);
-            return MessageDTO.fromMessage(savedUserMessage);
-        }
-
-        Message savedSystemMessage = createSystemMessage(currentSession, systemResponse);
-        return MessageDTO.fromMessage(savedSystemMessage);
-    }
-
-    public void generateFirstSystemMessage(Session session) {
-        String systemResponse = generateResponse(session.getId());
-
-        // prevent saving empty system messages if the intelligence service is down
-        if (systemResponse == null) {
-            logger.error("Failed to generate response for the conversation start");
-            return;
-        }
-
-        createSystemMessage(session, systemResponse);
-    }
-
-    private String generateResponse(Long sessionId) {
-        List<Message> messages = messageRepository.findBySessionId(sessionId);
-        ISMessageHistory messageHistory = new ISMessageHistory();
-
-        messageHistory.setMessages(
-            messages
-                .stream()
-                .<ISMessage>map(message ->
-                    new ISMessage().content(message.getContent()).sender(message.getSender().toString())
-                )
-                .toList()
-        );
         try {
-            ISMentorMessage mentorMessage = intelligenceServiceApi.generateMentorPost(messageHistory);
-            return mentorMessage.getContent();
+            MentorRequest mentorRequest = new MentorRequest();
+            mentorRequest.setContent(content);
+            mentorRequest.setSessionId(String.valueOf(sessionId));
+            MentorResponse mentorMessage = intelligenceServiceApi.generateMentorPost(mentorRequest);
+            String mentorResponse = mentorMessage.getContent();
+            Message savedMentorMessage = createMentorMessage(currentSession, mentorResponse);
+
+            return MessageDTO.fromMessage(savedMentorMessage);
         } catch (Exception e) {
-            logger.error("Failed to generate response for message: {}", e.getMessage());
+            // prevent saving empty system messages if the intelligence service is down
+            logger.error("Failed to generate response for message: {}", content);
             return null;
         }
     }
 
-    private Message createSystemMessage(Session currentSession, String systemResponse) {
+    public void sendFirstMessage(Session session, String previousSessionId, String devProgress) {
+        try {
+            MentorStartRequest mentorStartRequest = new MentorStartRequest();
+            mentorStartRequest.setPreviousSessionId(previousSessionId);
+            mentorStartRequest.setSessionId(String.valueOf(session.getId()));
+            mentorStartRequest.setDevProgress(devProgress);
+            MentorResponse mentorMessage = intelligenceServiceApi.startMentorStartPost(mentorStartRequest);
+            createMentorMessage(session, mentorMessage.getContent());
+        } catch (Exception e) {
+            // prevent saving empty system messages if the intelligence service is down
+            logger.error("Failed to generate response during session start");
+        }
+    }
+
+    private Message createMentorMessage(Session currentSession, String systemResponse) {
         Message systemMessage = new Message();
         systemMessage.setSender(MessageSender.MENTOR);
         systemMessage.setContent(systemResponse);

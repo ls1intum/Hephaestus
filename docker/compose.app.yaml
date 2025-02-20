@@ -1,0 +1,173 @@
+services:
+  webapp:
+    image: "ghcr.io/ls1intum/hephaestus/webapp:${IMAGE_TAG}"
+    environment:
+      APPLICATION_CLIENT_URL: https://${APP_HOSTNAME}
+      APPLICATION_SERVER_URL: https://${APP_HOSTNAME}/api
+      KEYCLOAK_URL: https://${APP_HOSTNAME}/keycloak
+      KEYCLOAK_REALM: hephaestus
+      KEYCLOAK_CLIENT_ID: hephaestus
+      KEYCLOAK_SKIP_LOGIN: ${KEYCLOAK_SKIP_LOGIN}
+      LEGAL_IMPRINT_HTML: ${LEGAL_IMPRINT_HTML}
+      LEGAL_PRIVACY_HTML: ${LEGAL_PRIVACY_HTML}
+      SENTRY_ENVIRONMENT: ${SENTRY_ENVIRONMENT}
+      SENTRY_DSN: ${SENTRY_DSN}
+      POSTHOG_PROJECT_API_KEY: ${POSTHOG_PROJECT_API_KEY}
+      POSTHOG_API_HOST: ${POSTHOG_API_HOST}
+    ports:
+      - '80'
+    depends_on:
+      - application-server
+    restart: unless-stopped
+    networks:
+      - shared-network
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.middlewares.redirect-to-https.redirectscheme.scheme=https"
+      - "traefik.http.routers.http-webapp.entryPoints=http"
+      - "traefik.http.routers.http-webapp.middlewares=redirect-to-https"
+      - "traefik.http.routers.http-webapp.rule=Host(`${APP_HOSTNAME}`) && PathPrefix(`/`)"
+      - "traefik.http.routers.http-webapp.service=http-webapp"
+      - "traefik.http.routers.https-webapp.entryPoints=https"
+      - "traefik.http.routers.https-webapp.rule=Host(`${APP_HOSTNAME}`) && PathPrefix(`/`)"
+      - "traefik.http.routers.https-webapp.service=https-webapp"
+      - "traefik.http.routers.https-webapp.tls.certresolver=letsencrypt"
+      - "traefik.http.routers.https-webapp.tls=true"
+      - "traefik.http.services.http-webapp.loadbalancer.server.port=80"
+      - "traefik.http.services.https-webapp.loadbalancer.server.port=80"
+      - "traefik.http.routers.http-webapp.priority=2"
+      - "traefik.http.routers.https-webapp.priority=3"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost"]
+      interval: 5s
+      timeout: 10s
+      retries: 10
+      start_period: 5s
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "50m"
+        max-file: "5"
+
+  application-server:
+    image: "ghcr.io/ls1intum/hephaestus/application-server:${IMAGE_TAG}"
+    ports:
+      - '8080'
+    environment:
+      SPRING_PROFILES_ACTIVE: prod
+      APPLICATION_HOST_URL: https://${APP_HOSTNAME}
+      DATABASE_URL: postgresql://postgres:5432/hephaestus
+      DATABASE_USERNAME: root
+      DATABASE_PASSWORD: root
+      INTELLIGENCE_SERVICE_URL: http://intelligence-service:5000
+      NATS_SERVER: nats://nats-server:4222
+      KEYCLOAK_URL: https://${APP_HOSTNAME}/keycloak
+      KEYCLOAK_REALM: hephaestus
+      KEYCLOAK_CLIENT_ID: hephaestus-confidential
+      KEYCLOAK_CLIENT_SECRET: ${KEYCLOAK_HEPHAESTUS_CONFIDENTIAL_CLIENT_SECRET}
+      GITHUB_AUTH_TOKEN: ${GH_AUTH_TOKEN}
+      SLACK_BOT_TOKEN: ${SLACK_BOT_TOKEN}
+      SLACK_SIGNING_SECRET: ${SLACK_SIGNING_SECRET}
+      NATS_ENABLED: ${NATS_ENABLED}
+      NATS_DURABLE_CONSUMER_NAME: ${NATS_DURABLE_CONSUMER_NAME}
+      MONITORING_TIMEFRAME: ${MONITORING_TIMEFRAME}
+      MONITORING_RUN_ON_STARTUP: ${MONITORING_RUN_ON_STARTUP}
+      MONITORING_SYNC_CRON: ${MONITORING_SYNC_CRON}
+      MONITORING_SYNC_COOLDOWN_IN_MINUTES: ${MONITORING_SYNC_COOLDOWN_IN_MINUTES}
+      MONITORING_SYNC_ALL_ISSUES_AND_PULL_REQUESTS: ${MONITORING_SYNC_ALL_ISSUES_AND_PULL_REQUESTS}
+      LEADERBOARD_NOTIFICATION_ENABLED: ${LEADERBOARD_NOTIFICATION_ENABLED}
+      LEADERBOARD_NOTIFICATION_CHANNEL_ID: ${LEADERBOARD_NOTIFICATION_CHANNEL_ID}
+      LEADERBOARD_SCHEDULE_DAY: ${LEADERBOARD_SCHEDULE_DAY}
+      LEADERBOARD_SCHEDULE_TIME: ${LEADERBOARD_SCHEDULE_TIME}
+      SENTRY_DSN: ${SENTRY_DSN}
+    depends_on:
+      - postgres
+    restart: unless-stopped
+    networks:
+      - shared-network
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.middlewares.https-application-server-stripprefix.stripprefix.prefixes=/api"
+      - "traefik.http.middlewares.redirect-to-https.redirectscheme.scheme=https"
+      - "traefik.http.routers.http-application-server.entryPoints=http"
+      - "traefik.http.routers.http-application-server.middlewares=redirect-to-https"
+      - "traefik.http.routers.http-application-server.rule=Host(`${APP_HOSTNAME}`) && PathPrefix(`/api`)"
+      - "traefik.http.routers.https-application-server.entryPoints=https"
+      - "traefik.http.routers.https-application-server.middlewares=https-application-server-stripprefix"
+      - "traefik.http.routers.https-application-server.rule=Host(`${APP_HOSTNAME}`) && PathPrefix(`/api`)"
+      - "traefik.http.routers.https-application-server.tls.certresolver=letsencrypt"
+      - "traefik.http.routers.https-application-server.tls=true"
+      - "traefik.http.routers.http-application-server.priority=5"
+      - "traefik.http.routers.https-application-server.priority=10"
+    healthcheck:
+      test: "wget -qO- http://localhost:8080/actuator/health || exit 1"
+      interval: 5s
+      timeout: 10s
+      retries: 10
+      start_period: 10s
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "50m"
+        max-file: "5"
+
+  intelligence-service:
+    image: "ghcr.io/ls1intum/hephaestus/intelligence-service:${IMAGE_TAG}"
+    environment:
+      DATABASE_URL: postgresql://postgres:5432/hephaestus
+      DATABASE_USERNAME: root
+      DATABASE_PASSWORD: root
+      # Either OPENAI_API_KEY or AZURE_OPENAI_API_KEY must be set
+      OPENAI_API_KEY: ${OPENAI_API_KEY}
+      AZURE_OPENAI_API_KEY: ${AZURE_OPENAI_API_KEY}
+      AZURE_OPENAI_ENDPOINT: ${AZURE_OPENAI_ENDPOINT}
+      AZURE_OPENAI_API_VERSION: ${AZURE_OPENAI_API_VERSION}
+    depends_on:
+      - postgres
+    restart: unless-stopped
+    ports:
+      - '5000'
+    networks:
+      - shared-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5000/health"]
+      interval: 5s
+      timeout: 10s
+      retries: 10
+      start_period: 5s
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "50m"
+        max-file: "5"
+
+  postgres:
+    image: 'postgres:16'
+    environment:
+      - POSTGRES_DB=hephaestus
+      - POSTGRES_PASSWORD=root
+      - POSTGRES_USER=root
+    ports:
+      - '5432'
+    networks:
+      shared-network:
+        aliases:
+          - postgres
+    restart: unless-stopped
+    volumes:
+      - postgresql-data:/var/lib/postgresql/data
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}
+      interval: 5s
+      timeout: 10s
+      retries: 10
+
+networks:
+  shared-network:
+    name: shared-network
+    driver: bridge
+
+volumes:
+  postgresql-data:

@@ -62,7 +62,7 @@ public class LeaguePointsUpdateTask implements Runnable {
         OffsetDateTime before = OffsetDateTime.now()
             .with(TemporalAdjusters.previousOrSame(DayOfWeek.of(Integer.parseInt(scheduledDay))))
             .withHour(Integer.parseInt(timeParts[0]))
-            .withMinute(timeParts.length > 0 ? Integer.parseInt(timeParts[1]) : 0)
+            .withMinute(timeParts.length > 1 ? Integer.parseInt(timeParts[1]) : 0)
             .withSecond(0)
             .withNano(0);
         OffsetDateTime after = before.minusWeeks(1);

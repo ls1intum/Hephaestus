@@ -125,4 +125,10 @@ export interface WorkspaceServiceInterface {
      */
     removeUserFromTeam(login: string, teamId: number, extraHttpRequestParams?: any): Observable<UserInfo>;
 
+    /**
+     * 
+     * 
+     */
+    resetAndRecalculateLeagues(extraHttpRequestParams?: any): Observable<{}>;
+
 }

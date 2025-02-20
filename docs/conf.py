@@ -9,21 +9,27 @@ import os
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#project-information
 
 project = 'Hephaestus'
-copyright = '2024, Technical University of Munich, Chair for Applied Software Engineering'
-author = 'Chair for Applied Software Engineering, TUM'
-release = '0.1'
+copyright = '2025, Technical University of Munich, Chair for Applied Software Engineering'
+author = 'Applied Education Technologies, Technical University of Munich'
 
 # -- General configuration ---------------------------------------------------
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#general-configuration
 
 master_doc = "index"
+
 extensions = [
     "sphinx_rtd_theme",
+    "myst_parser",
     "sphinx.ext.autodoc",
     'sphinxcontrib.plantuml',
 ]
 
-exclude_patterns = ['_build', 'Thumbs.db', '.DS_Store', 'venv', '.venv']
+exclude_patterns = ['_build', 'Thumbs.db', '.DS_Store', 'venv', '.venv', 'README.md']
+
+source_suffix = {
+    '.rst': 'restructuredtext',
+    '.md': 'markdown',
+}
 
 autodoc_mock_imports = [
     'sqlalchemy',
@@ -54,7 +60,6 @@ html_context = {
 html_logo = "images/logo.svg"
 html_theme_options = {
     'logo_only': True,
-    'display_version': False,
     'style_nav_header_background': '#3b82f6',
 }
 html_style = 'css/style.css'

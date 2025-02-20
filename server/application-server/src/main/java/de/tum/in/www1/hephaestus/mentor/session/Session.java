@@ -31,6 +31,9 @@ public class Session {
     @NonNull
     private OffsetDateTime createdAt = OffsetDateTime.now();
 
+    @NonNull
+    private boolean isClosed = false;
+
     @ManyToOne
     @JoinColumn(name = "user_id")
     @ToString.Exclude
