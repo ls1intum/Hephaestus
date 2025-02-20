@@ -14,7 +14,8 @@ import { TableHeaderDirective } from 'app/ui/table/table-header.directive';
 import { TableRowDirective } from 'app/ui/table/table-row.directive';
 import { TableComponent } from 'app/ui/table/table.component';
 import { ReviewsPopoverComponent } from './reviews-popover/reviews-popover.component';
-import { HlmIconComponent, provideIcons } from '@spartan-ng/ui-icon-helm';
+import { HlmIconDirective } from '@spartan-ng/ui-icon-helm';
+import { provideIcons } from '@ng-icons/core';
 import { lucideAward } from '@ng-icons/lucide';
 import { LeagueIconComponent } from '@app/ui/league/icon/league-icon.component';
 
@@ -31,7 +32,7 @@ import { LeagueIconComponent } from '@app/ui/league/icon/league-icon.component';
     TableRowDirective,
     ReviewsPopoverComponent,
     NgIconComponent,
-    HlmIconComponent,
+    HlmIconDirective,
     RouterLink,
     LeagueIconComponent
   ],

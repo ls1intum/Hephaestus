@@ -1,7 +1,7 @@
 import { Component, computed, input, output } from '@angular/core';
 import { WorkspaceThumbComponent } from '../workspace-thumb/workspace-thumb.component';
 import { LucideAngularModule, Ellipsis, LogOut } from 'lucide-angular';
-import { hlm } from '@spartan-ng/ui-core';
+import { hlm } from '@spartan-ng/brain/core';
 import { HlmTooltipComponent, HlmTooltipTriggerDirective } from '@spartan-ng/ui-tooltip-helm';
 import { BrnTooltipContentDirective } from '@spartan-ng/brain/tooltip';
 import { BrnContextMenuTriggerDirective, BrnMenuTriggerDirective } from '@spartan-ng/brain/menu';

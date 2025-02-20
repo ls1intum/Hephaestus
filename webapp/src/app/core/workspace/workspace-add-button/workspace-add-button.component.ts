@@ -1,6 +1,6 @@
 import { Component, computed, input } from '@angular/core';
 import { HlmButtonDirective } from '@spartan-ng/ui-button-helm';
-import { hlm } from '@spartan-ng/ui-core';
+import { hlm } from '@spartan-ng/brain/core';
 import { LucideAngularModule, CirclePlus, Plus } from 'lucide-angular';
 
 @Component({

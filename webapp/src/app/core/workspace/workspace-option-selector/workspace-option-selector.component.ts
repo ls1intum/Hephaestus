@@ -1,6 +1,6 @@
 import { Component, computed, input, output } from '@angular/core';
 import { WorkspaceOptionComponent } from '../workspace-option/workspace-option.component';
-import { hlm } from '@spartan-ng/ui-core';
+import { hlm } from '@spartan-ng/brain/core';
 
 type Workspace = {
   id: string;

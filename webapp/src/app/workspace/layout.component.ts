@@ -3,13 +3,14 @@ import { Component } from '@angular/core';
 import { ReactiveFormsModule } from '@angular/forms';
 import { HlmButtonModule } from '@spartan-ng/ui-button-helm';
 import { RouterLinkActive, RouterModule, RouterOutlet } from '@angular/router';
-import { HlmIconComponent, provideIcons } from '@spartan-ng/ui-icon-helm';
+import { HlmIconDirective } from '@spartan-ng/ui-icon-helm';
+import { provideIcons } from '@ng-icons/core';
 import { lucideCircleUser, lucideCog, lucideUsers } from '@ng-icons/lucide';
 
 type NavItem = { icon: string; label: string; route: string; exact?: boolean };
 @Component({
   selector: 'app-workspace-layout',
-  imports: [CommonModule, RouterModule, ReactiveFormsModule, HlmButtonModule, RouterOutlet, RouterLinkActive, HlmIconComponent],
+  imports: [CommonModule, RouterModule, ReactiveFormsModule, HlmButtonModule, RouterOutlet, RouterLinkActive, HlmIconDirective],
   providers: [provideIcons({ lucideCircleUser, lucideCog, lucideUsers })],
   templateUrl: './layout.component.html'
 })

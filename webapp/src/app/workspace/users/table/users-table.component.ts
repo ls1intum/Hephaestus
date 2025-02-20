@@ -5,7 +5,8 @@ import { FormsModule } from '@angular/forms';
 import { lucideArrowUpDown, lucideChevronDown, lucideGripHorizontal, lucideRotateCw, lucideOctagonX } from '@ng-icons/lucide';
 import { HlmButtonModule } from '@spartan-ng/ui-button-helm';
 import { HlmCheckboxComponent } from '@spartan-ng/ui-checkbox-helm';
-import { HlmIconComponent, provideIcons } from '@spartan-ng/ui-icon-helm';
+import { HlmIconDirective } from '@spartan-ng/ui-icon-helm';
+import { provideIcons } from '@ng-icons/core';
 import { HlmInputDirective } from '@spartan-ng/ui-input-helm';
 import { BrnMenuTriggerDirective } from '@spartan-ng/brain/menu';
 import { HlmMenuModule } from '@spartan-ng/ui-menu-helm';
@@ -64,7 +65,7 @@ const LOADING_DATA: UserTeams[] = [
     BrnTableModule,
     HlmTableModule,
     HlmButtonModule,
-    HlmIconComponent,
+    HlmIconDirective,
     HlmInputDirective,
     HlmCheckboxComponent,
     BrnSelectModule,

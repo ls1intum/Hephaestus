@@ -4,7 +4,8 @@ import { toObservable, toSignal } from '@angular/core/rxjs-interop';
 import { FormControl, FormsModule, ReactiveFormsModule } from '@angular/forms';
 import { lucideArrowUpDown, lucideChevronDown, lucideGripHorizontal, lucideRotateCw, lucideOctagonX, lucidePlus, lucideCheck, lucideTrash2 } from '@ng-icons/lucide';
 import { HlmButtonModule } from '@spartan-ng/ui-button-helm';
-import { HlmIconComponent, provideIcons } from '@spartan-ng/ui-icon-helm';
+import { HlmIconDirective } from '@spartan-ng/ui-icon-helm';
+import { provideIcons } from '@ng-icons/core';
 import { HlmInputDirective } from '@spartan-ng/ui-input-helm';
 import { BrnMenuTriggerDirective } from '@spartan-ng/brain/menu';
 import { HlmMenuModule } from '@spartan-ng/ui-menu-helm';
@@ -51,7 +52,7 @@ const LOADING_TEAMS: TeamInfo[] = [
     BrnTableModule,
     HlmTableModule,
     HlmButtonModule,
-    HlmIconComponent,
+    HlmIconDirective,
     HlmInputDirective,
     HlmScrollAreaComponent,
     BrnSelectModule,

@@ -4,9 +4,9 @@
   <div class="flex items-center gap-4">
     <button hlmBtn variant="outline" size="icon" (click)="invalidateTeams()">
       @if (this.isLoading()) {
-        <hlm-icon name="lucideRotateCw" strokeWidth="2px" size="sm" class="animate-spin" />
+        <ng-icon hlm name="lucideRotateCw" strokeWidth="2px" size="sm" class="animate-spin" />
       } @else {
-        <hlm-icon name="lucideRotateCw" strokeWidth="2px" size="sm" />
+        <ng-icon hlm name="lucideRotateCw" strokeWidth="2px" size="sm" />
       }
     </button>
   </div>
@@ -24,7 +24,7 @@
     <hlm-th *brnHeaderDef>
       <button hlmBtn size="sm" variant="ghost" (click)="handleNameSortChange()">
         Name
-        <hlm-icon class="ml-3" size="sm" name="lucideArrowUpDown" />
+        <ng-icon hlm class="ml-3" size="sm" name="lucideArrowUpDown" />
       </button>
     </hlm-th>
     <hlm-td truncate *brnCellDef="let element">
@@ -70,7 +70,7 @@
                   <ng-template #labelMenu>
                     <hlm-menu>
                       <button hlmMenuItem (click)="removeLabelFromTeam.mutate({ teamId: element.id, labelId: label.id })">
-                        <hlm-icon name="lucideTrash2" hlmMenuIcon />
+                        <ng-icon hlm hlmMenuIcon name="lucideTrash2" />
                         <span>Delete</span>
                       </button>
                     </hlm-menu>
@@ -78,7 +78,7 @@
                 }
                 <brn-popover sideOffset="5" closeDelay="100">
                   <button id="add-label" size="icon" variant="outline" class="h-6 w-6 p-0.5" brnPopoverTrigger hlmBtn>
-                    <hlm-icon class="w-4 h-4" name="lucidePlus" />
+                    <ng-icon hlm class="w-4 h-4" name="lucidePlus" />
                   </button>
                   <div hlmPopoverContent class="w-80 p-4 gap-4 flex flex-wrap items-center justify-center" *brnPopoverContent="let ctx">
                     <input hlmInput placeholder="Label name" [formControl]="_newLabelName" [class]="displayLabelAlert() ? 'border-destructive' : ''" />
@@ -89,7 +89,7 @@
                       class="ml-2"
                       (click)="addLabelToTeam.mutate({ teamId: element.id, repositoryId: group.repositoryId, label: _newLabelName.value ?? '' })"
                     >
-                      <hlm-icon class="w-4 h-4" name="lucidePlus" />
+                      <ng-icon hlm class="w-4 h-4" name="lucidePlus" />
                     </button>
                     @if (displayLabelAlert()) {
                       <div class="text-sm text-github-danger-foreground">Invalid label name</div>
@@ -102,7 +102,7 @@
         </div>
         <brn-popover sideOffset="5" closeDelay="100" class="pl-2">
           <button id="add-repository" size="icon" variant="outline" class="h-6 w-6 p-0.5" brnPopoverTrigger hlmBtn>
-            <hlm-icon class="w-4 h-4" name="lucidePlus" />
+            <ng-icon hlm class="w-4 h-4" name="lucidePlus" />
           </button>
           <div hlmPopoverContent class="w-80 h-96 space-y-4" *brnPopoverContent="let ctx">
             <div class="space-y-2">
@@ -115,7 +115,7 @@
                 <button hlmBtn variant="outline" class="flex items-center justify-between w-full" (click)="toggleRepository(element, repo, isSelected)">
                   <span>{{ repo }}</span>
                   @if (isSelected) {
-                    <hlm-icon class="w-4 h-4" name="lucideCheck" />
+                    <ng-icon hlm class="w-4 h-4" name="lucideCheck" />
                   }
                 </button>
               }
@@ -129,7 +129,7 @@
     <hlm-th *brnHeaderDef></hlm-th>
     <hlm-td *brnCellDef="let element">
       <button hlmBtn variant="ghost" class="h-6 w-6 p-0.5" align="end" [brnMenuTriggerFor]="menu">
-        <hlm-icon class="w-4 h-4" name="lucideGripHorizontal" />
+        <ng-icon hlm class="w-4 h-4" name="lucideGripHorizontal" />
       </button>
 
       <ng-template #menu>
@@ -147,7 +147,7 @@
   </brn-column-def>
   <div class="flex items-center justify-center p-20 text-muted-foreground" brnNoDataRow>
     <div class="flex flex-col items-center justify-center gap-2 mt-1">
-      <hlm-icon name="lucideOctagonX" strokeWidth="2px" size="lg" class="text-github-danger-foreground" />
+      <ng-icon hlm name="lucideOctagonX" strokeWidth="2px" size="lg" class="text-github-danger-foreground" />
       <span class="font-semibold text-muted-foreground">No entries found</span>
     </div>
   </div>

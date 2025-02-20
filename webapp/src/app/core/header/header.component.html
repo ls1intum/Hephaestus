@@ -33,16 +33,16 @@
         <hlm-menu-separator />
         <hlm-menu-group>
           <a hlmMenuItem [routerLink]="'/user/' + user()!.username" class="cursor-pointer">
-            <hlm-icon name="lucideUser" hlmMenuIcon />
+            <ng-icon hlm hlmMenuIcon name="lucideUser" />
             <span>My Profile</span>
           </a>
           <a hlmMenuItem routerLink="/settings" class="cursor-pointer">
-            <hlm-icon name="lucideSettings" hlmMenuIcon />
+            <ng-icon hlm hlmMenuIcon name="lucideSettings" />
             <span>Settings</span>
           </a>
           <hlm-menu-separator />
           <button hlmMenuItem (click)="signOut()" class="cursor-pointer">
-            <hlm-icon name="lucideLogOut" hlmMenuIcon />
+            <ng-icon hlm hlmMenuIcon name="lucideLogOut" />
             <span>Sign&nbsp;Out</span>
           </button>
         </hlm-menu-group>

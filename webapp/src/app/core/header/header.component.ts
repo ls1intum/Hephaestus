@@ -4,7 +4,7 @@ import { LucideAngularModule, Hammer } from 'lucide-angular';
 import { HlmButtonModule } from '@spartan-ng/ui-button-helm';
 import { HlmAvatarModule } from '@spartan-ng/ui-avatar-helm';
 import { HlmMenuModule } from '@spartan-ng/ui-menu-helm';
-import { HlmIconComponent } from '@spartan-ng/ui-icon-helm';
+import { HlmIconDirective } from '@spartan-ng/ui-icon-helm';
 import { BrnMenuTriggerDirective } from '@spartan-ng/brain/menu';
 import { SecurityStore } from '@app/core/security/security-store.service';
 import { ThemeSwitcherComponent } from '@app/core/theme/theme-switcher.component';
@@ -27,7 +27,7 @@ import { AiMentorComponent } from './ai-mentor/ai-mentor.component';
     HlmAvatarModule,
     HlmMenuModule,
     BrnMenuTriggerDirective,
-    HlmIconComponent,
+    HlmIconDirective,
     AiMentorComponent
   ],
   providers: [

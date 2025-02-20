@@ -2,7 +2,7 @@ import { Component, computed, input, output } from '@angular/core';
 import { LucideAngularModule, Hammer } from 'lucide-angular';
 import { HlmAvatarModule } from '@spartan-ng/ui-avatar-helm';
 import { BrnSheetTriggerDirective } from '@spartan-ng/brain/sheet';
-import { hlm } from '@spartan-ng/ui-core';
+import { hlm } from '@spartan-ng/brain/core';
 
 @Component({
   selector: 'app-workspace-thumb',
