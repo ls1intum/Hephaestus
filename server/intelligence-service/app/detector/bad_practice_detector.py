@@ -4,6 +4,7 @@ from typing import List
 from langchain_core.prompts import PromptTemplate, ChatPromptTemplate
 from pydantic import BaseModel, Field
 
+from .prompts.pullrequest_badpractice_detector import BAD_PRACTICE_PROMPT_TEST
 from ..model import model
 
 
@@ -24,10 +25,8 @@ class BadPracticeList(BaseModel):
     bad_practices: List[BadPractice] = Field(description="A list of bad practices detected in a pull request.")
 
 
-def detectbadpractices(title, description) -> BadPracticeList:
-   prompt_path = Path(__file__).parent / "prompts" / "pullrequest_badpractice_detector.txt"
-   with open(prompt_path, "r", encoding="utf-8") as f:
-       prompt_text = f.read()
+def detect_bad_practices(title, description) -> BadPracticeList:
+   prompt_text = BAD_PRACTICE_PROMPT_TEST
    prompt_template = ChatPromptTemplate.from_template(prompt_text)
    prompt = prompt_template.invoke({"title": title, "description": description})
    structured_llm = model.with_structured_output(BadPracticeList)

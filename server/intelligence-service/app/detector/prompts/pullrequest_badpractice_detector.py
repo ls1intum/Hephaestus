@@ -1,3 +1,4 @@
+BAD_PRACTICE_PROMPT_TEST = """
 You are a bad practice detector reviewing pull requests for bad practices.
 You analyze and review the title and description of the pull request to identify any bad practices.
 You detect bad practices based on guidelines for good pull request titles and descriptions.
@@ -29,4 +30,4 @@ REQUIREMENTS:
 6. Multiple runs on the same title and description should return the same results if nothing has changed.
 
 Pull Request Title: {title}
-Pull Request Description: {description}
+Pull Request Description: {description}"""

@@ -2,7 +2,7 @@ package de.tum.in.www1.hephaestus.activity.badpracticedetector;
 
 import de.tum.in.www1.hephaestus.activity.PullRequestBadPracticeRepository;
 import de.tum.in.www1.hephaestus.activity.model.PullRequestBadPractice;
-import de.tum.in.www1.hephaestus.config.BadPracticeDetectorConfig.BadPracticeDetectorService;
+import de.tum.in.www1.hephaestus.config.IntelligenceServiceConfig.BadPracticeDetectorService;
 import de.tum.in.www1.hephaestus.gitprovider.pullrequest.PullRequest;
 import java.util.LinkedList;
 import java.util.List;
@@ -27,6 +27,11 @@ public class PullRequestBadPracticeDetector {
     @Autowired
     private BadPracticeDetectorService detectorApi;
 
+    /**
+     * Detects bad practices in the given pull request and syncs them with the database.
+     * @param pullRequest The pull request to detect bad practices in.
+     * @return The detected bad practices.
+     */
     public List<PullRequestBadPractice> detectAndSyncBadPractices(PullRequest pullRequest) {
         logger.info("Detecting bad practices for pull request: {}", pullRequest.getId());
         DetectorRequest detectorRequest = new DetectorRequest();
@@ -44,7 +49,6 @@ public class PullRequestBadPracticeDetector {
         return detectedBadPractices;
     }
 
-    @Transactional
     protected PullRequestBadPractice handleDetectedBadPractices(PullRequest pullRequest, BadPractice badPractice) {
 
         PullRequestBadPractice pullRequestBadPractice = new PullRequestBadPractice();

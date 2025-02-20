@@ -2,7 +2,13 @@ package de.tum.in.www1.hephaestus.activity.model;
 
 import de.tum.in.www1.hephaestus.gitprovider.pullrequest.PullRequest;
 
-import jakarta.persistence.*;
+import jakarta.persistence.Id;
+import jakarta.persistence.JoinColumn;
+import jakarta.persistence.ManyToOne;
+import jakarta.persistence.Entity;
+import jakarta.persistence.GeneratedValue;
+import jakarta.persistence.GenerationType;
+import jakarta.persistence.Table;
 import lombok.*;
 
 @Entity
