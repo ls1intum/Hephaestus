@@ -15,7 +15,7 @@ import { LeagueIconComponent } from '@app/ui/league/icon/league-icon.component';
 dayjs.extend(advancedFormat);
 
 const repoImages: { [key: string]: string } = {
-  Hephaestus: 'https://github.com/ls1intum/Hephaestus/raw/refs/heads/develop/docs/images/hammer.svg',
+  Hephaestus: 'https://github.com/ls1intum/Hephaestus/raw/refs/heads/develop/docs/images/hammer_bg.svg',
   Artemis: 'https://artemis.in.tum.de/public/images/logo.png',
   Athena: 'https://raw.githubusercontent.com/ls1intum/Athena/develop/playground/public/logo.png'
 };

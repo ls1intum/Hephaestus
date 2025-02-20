@@ -10,7 +10,7 @@ import { lucideCirclePlus, lucidePlus } from '@ng-icons/lucide';
   providers: [provideIcons({ lucideCirclePlus, lucidePlus })],
   template: `
     <button hlmBtn variant="ghost" [class]="computedClass()" [size]="isCompact() ? 'icon' : 'default'">
-      <ng-icon [name]="isCompact() ? 'lucidePlus' : 'lucideCirclePlus'" class="size-5" />
+      <ng-icon [name]="isCompact() ? 'lucidePlus' : 'lucideCirclePlus'" class="text-xl" />
       @if (!isCompact()) {
         Add a Workspace
       }

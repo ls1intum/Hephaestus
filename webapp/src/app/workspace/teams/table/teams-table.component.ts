@@ -44,6 +44,7 @@ const LOADING_TEAMS: TeamInfo[] = [
 ];
 
 @Component({
+  selector: 'app-workspace-teams-table',
   imports: [
     FormsModule,
     ReactiveFormsModule,

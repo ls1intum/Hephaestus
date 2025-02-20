@@ -14,7 +14,7 @@ import { hlm } from '@spartan-ng/brain/core';
       <hlm-avatar [variant]="variant()" shape="square">
         <img [src]="iconUrl()" hlmAvatarImage />
         <span class="inset-2 rounded-md" hlmAvatarFallback>
-          <ng-icon name="lucideHammer" class="size-6" />
+          <ng-icon name="lucideHammer" class="text-xl" />
         </span>
       </hlm-avatar>
     </button>
