@@ -37,7 +37,7 @@ jobs:
     with:
       environment: Production
       docker-compose-file: "./docker/compose.core.yaml"
-      main-image-name: ls1intum/hephaestus/application-server
+      main-image-name: ls1intum/hephaestus/webhook-ingest
       image-tag: ${{ inputs.image-tag }}
       deployment-base-path: "/opt/hephaestus/core"
     secrets: inherit
