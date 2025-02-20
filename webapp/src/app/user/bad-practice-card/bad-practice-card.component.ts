@@ -5,7 +5,6 @@ import { octCheck, octX } from '@ng-icons/octicons';
 
 @Component({
   selector: 'app-bad-practice-card',
-  standalone: true,
   imports: [HlmCardModule, NgIcon],
   templateUrl: './bad-practice-card.component.html',
   styles: ``

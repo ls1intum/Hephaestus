@@ -47,3 +47,7 @@ export const Leagues = [
     maxPoints: Infinity
   }
 ];
+
+export function formatTitle(title: string): string {
+  return title.replace(/`([^`]+)`/g, '<code class="textCode">$1</code>');
+}

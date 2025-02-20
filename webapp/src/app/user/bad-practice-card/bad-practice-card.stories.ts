@@ -17,10 +17,3 @@ export const Default: Story = {
     resolved: false
   }
 };
-/*
-export const isLoading: Story = {
-  args: {
-    title: 'Avoid using any type',
-    description: 'Using the any type defeats the purpose of TypeScript.'
-  }
-};*/

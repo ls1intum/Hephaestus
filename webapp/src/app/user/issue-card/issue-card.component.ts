@@ -7,7 +7,7 @@ import { HlmSkeletonComponent } from '@spartan-ng/ui-skeleton-helm';
 import { GithubLabelComponent } from '@app/ui/github-label/github-label.component';
 import dayjs from 'dayjs/esm';
 import { cn } from '@app/utils';
-
+import { formatTitle } from '@app/utils';
 @Component({
   selector: 'app-issue-card',
   templateUrl: './issue-card.component.html',
@@ -34,7 +34,7 @@ export class IssueCardComponent {
   pullRequestLabels = input<Array<LabelInfo>>();
 
   displayCreated = computed(() => dayjs(this.createdAt()));
-  displayTitle = computed(() => (this.title() ?? '').replace(/`([^`]+)`/g, '<code class="textCode">$1</code>'));
+  displayTitle = computed(() => formatTitle(this.title() ?? ''));
   computedClass = computed(() => cn('flex flex-col gap-1 pt-6 w-72', !this.isLoading() ? 'hover:bg-accent/50 cursor-pointer' : '', this.class()));
 
   issueIconAndColor = computed(() => {

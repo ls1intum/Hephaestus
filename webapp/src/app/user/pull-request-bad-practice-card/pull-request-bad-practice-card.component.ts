@@ -5,7 +5,7 @@ import { octCheck, octComment, octFileDiff, octGitPullRequest, octGitPullRequest
 import { HlmCardModule } from '@spartan-ng/ui-card-helm';
 import { HlmSkeletonComponent } from '@spartan-ng/ui-skeleton-helm';
 
-import dayjs from 'dayjs';
+import dayjs from 'dayjs/esm';
 import { BadPracticeCardComponent } from '@app/user/bad-practice-card/bad-practice-card.component';
 import { BrnSeparatorComponent } from '@spartan-ng/ui-separator-brain';
 import { HlmSeparatorDirective } from '@spartan-ng/ui-separator-helm';
@@ -13,6 +13,7 @@ import { BrnCollapsibleComponent, BrnCollapsibleContentComponent, BrnCollapsible
 import { HlmButtonDirective } from '@spartan-ng/ui-button-helm';
 import { GithubLabelComponent } from '@app/ui/github-label/github-label.component';
 import { cn } from '@app/utils';
+import { formatTitle } from '@app/utils';
 
 @Component({
   selector: 'app-pull-request-bad-practice-card',
@@ -30,7 +31,6 @@ import { cn } from '@app/utils';
     HlmButtonDirective,
     GithubLabelComponent
   ],
-  standalone: true
 })
 export class PullRequestBadPracticeCardComponent {
   protected readonly octCheck = octCheck;
@@ -55,7 +55,7 @@ export class PullRequestBadPracticeCardComponent {
   badPractices = input<Array<PullRequestBadPractice>>();
 
   displayCreated = computed(() => dayjs(this.createdAt()));
-  displayTitle = computed(() => (this.title() ?? '').replace(/`([^`]+)`/g, '<code class="textCode">$1</code>'));
+  displayTitle = computed(() => formatTitle(this.title() ?? ''));
   computedClass = computed(() => cn('w-full', !this.isLoading() ? 'hover:bg-accent/50 cursor-pointer' : '', this.class()));
 
   issueIconAndColor = computed(() => {

@@ -48,6 +48,6 @@ export const routes: Routes = [
   { path: 'settings', component: SettingsComponent, canActivate: [AuthGuard] },
   { path: 'mentor', component: MentorComponent, canActivate: [AuthGuard, MentorGuard] },
   { path: 'workspace', component: WorkspaceComponent, canActivate: [AuthGuard, AdminGuard] },
-  { path: 'activity/:id', component: ActivityDashboardComponent, canActivate: [AuthGuard, AdminGuard] }
+  { path: 'user/:id/activity', component: ActivityDashboardComponent, canActivate: [AuthGuard, AdminGuard] }
 
 ];
