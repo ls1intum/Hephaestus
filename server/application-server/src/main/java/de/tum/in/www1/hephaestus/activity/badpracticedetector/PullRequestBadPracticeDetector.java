@@ -4,13 +4,12 @@ import de.tum.in.www1.hephaestus.activity.PullRequestBadPracticeRepository;
 import de.tum.in.www1.hephaestus.activity.model.PullRequestBadPractice;
 import de.tum.in.www1.hephaestus.config.IntelligenceServiceConfig.BadPracticeDetectorService;
 import de.tum.in.www1.hephaestus.gitprovider.pullrequest.PullRequest;
-import java.util.LinkedList;
-import java.util.List;
-
 import de.tum.in.www1.hephaestus.intelligenceservice.model.BadPractice;
 import de.tum.in.www1.hephaestus.intelligenceservice.model.DetectorRequest;
 import de.tum.in.www1.hephaestus.intelligenceservice.model.DetectorResponse;
 import jakarta.transaction.Transactional;
+import java.util.LinkedList;
+import java.util.List;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -50,7 +49,6 @@ public class PullRequestBadPracticeDetector {
     }
 
     protected PullRequestBadPractice handleDetectedBadPractices(PullRequest pullRequest, BadPractice badPractice) {
-
         PullRequestBadPractice pullRequestBadPractice = new PullRequestBadPractice();
         pullRequestBadPractice.setTitle(badPractice.getTitle());
         pullRequestBadPractice.setDescription(badPractice.getDescription());

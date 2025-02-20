@@ -7,7 +7,6 @@ import de.tum.in.www1.hephaestus.gitprovider.pullrequest.PullRequest;
 import de.tum.in.www1.hephaestus.gitprovider.pullrequest.PullRequestRepository;
 import de.tum.in.www1.hephaestus.gitprovider.user.UserRepository;
 import jakarta.transaction.Transactional;
-
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -48,7 +47,8 @@ public class ActivityService {
             pullRequestBadPracticeRepository.findAssignedByLoginAndOpen(login);
 
         Map<PullRequest, List<PullRequestBadPracticeDTO>> pullRequestBadPracticesMap = openPulLRequestBadPractices
-            .stream().filter(pullRequestBadPractice -> !pullRequestBadPractice.isResolved())
+            .stream()
+            .filter(pullRequestBadPractice -> !pullRequestBadPractice.isResolved())
             .collect(
                 Collectors.groupingBy(
                     PullRequestBadPractice::getPullrequest,
@@ -79,7 +79,9 @@ public class ActivityService {
             Set.of(Issue.State.OPEN)
         );
 
-        List<PullRequestBadPractice> existingBadPractices = pullRequestBadPracticeRepository.findAssignedByLoginAndOpen(login);
+        List<PullRequestBadPractice> existingBadPractices = pullRequestBadPracticeRepository.findAssignedByLoginAndOpen(
+            login
+        );
         existingBadPractices.forEach(existingBadPractice -> existingBadPractice.setResolved(true));
         pullRequestBadPracticeRepository.saveAll(existingBadPractices);
 

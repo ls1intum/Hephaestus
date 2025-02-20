@@ -3,16 +3,24 @@ from typing import List
 from fastapi import APIRouter
 from openai import BaseModel
 
-from ..detector.bad_practice_detector import PullRequest, detectbadpractices, BadPracticeList, BadPractice
+from ..detector.bad_practice_detector import (
+    PullRequest,
+    detect_bad_practices,
+    BadPracticeList,
+    BadPractice,
+)
 
 router = APIRouter(prefix="/detector", tags=["detector"])
+
 
 class DetectorRequest(BaseModel):
     title: str
     description: str
 
+
 class DetectorResponse(BaseModel):
     bad_practices: List[BadPractice]
+
 
 @router.post(
     "/",

@@ -13,22 +13,26 @@ class PullRequest(BaseModel):
     title: str
     description: str
 
+
 class BadPractice(BaseModel):
     """A detected bad practice in a pull request."""
 
     title: str = Field(description="The title of the bad practice.")
     description: str = Field(description="The description of the bad practice.")
 
+
 class BadPracticeList(BaseModel):
     """A list of bad practices detected in a pull request."""
 
-    bad_practices: List[BadPractice] = Field(description="A list of bad practices detected in a pull request.")
+    bad_practices: List[BadPractice] = Field(
+        description="A list of bad practices detected in a pull request."
+    )
 
 
 def detect_bad_practices(title, description) -> BadPracticeList:
-   prompt_text = BAD_PRACTICE_PROMPT_TEST
-   prompt_template = ChatPromptTemplate.from_template(prompt_text)
-   prompt = prompt_template.invoke({"title": title, "description": description})
-   structured_llm = model.with_structured_output(BadPracticeList)
-   response = structured_llm.invoke(prompt)
-   return response
+    prompt_text = BAD_PRACTICE_PROMPT_TEST
+    prompt_template = ChatPromptTemplate.from_template(prompt_text)
+    prompt = prompt_template.invoke({"title": title, "description": description})
+    structured_llm = model.with_structured_output(BadPracticeList)
+    response = structured_llm.invoke(prompt)
+    return response
