@@ -30,7 +30,7 @@ import { formatTitle } from '@app/utils';
     BrnCollapsibleTriggerDirective,
     HlmButtonDirective,
     GithubLabelComponent
-  ],
+  ]
 })
 export class PullRequestBadPracticeCardComponent {
   protected readonly octCheck = octCheck;

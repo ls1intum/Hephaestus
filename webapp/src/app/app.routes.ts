@@ -49,5 +49,4 @@ export const routes: Routes = [
   { path: 'mentor', component: MentorComponent, canActivate: [AuthGuard, MentorGuard] },
   { path: 'workspace', component: WorkspaceComponent, canActivate: [AuthGuard, AdminGuard] },
   { path: 'user/:id/activity', component: ActivityDashboardComponent, canActivate: [AuthGuard, AdminGuard] }
-
 ];
