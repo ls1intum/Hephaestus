@@ -62,7 +62,7 @@ export class PullRequestBadPracticeCardComponent {
   isMerged = input<boolean>();
   pullRequestLabels = input<Array<LabelInfo>>();
   badPractices = input<Array<PullRequestBadPractice>>();
-  
+
   displayCreated = computed(() => dayjs(this.createdAt()));
   displayTitle = computed(() => formatTitle(this.title() ?? ''));
   computedClass = computed(() => cn('w-full', !this.isLoading() ? 'hover:bg-accent/50 cursor-pointer' : '', this.class()));
@@ -94,7 +94,7 @@ export class PullRequestBadPracticeCardComponent {
   protected readonly octSync = octSync;
 
   detectBadPracticesForPrMutation = injectMutation(() => ({
-    mutationFn: (prId: number) => lastValueFrom(this.activityService.detectBadPracticesByPr(prId)),
+    mutationFn: (prId: number) => lastValueFrom(this.activityService.detectBadPracticesForPullRequest(prId)),
     onSuccess: () => {
       this.queryClient.invalidateQueries({ queryKey: ['activity'] });
     }
