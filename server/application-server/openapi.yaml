@@ -288,12 +288,18 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/Message"
-  /activity/{prId}/badpractices/:
+  /activity/{pullRequestId}/badpractices/:
     post:
       tags:
       - activity
       operationId: detectBadPracticesForPullRequest
-      parameters: []
+      parameters:
+      - name: pullRequestId
+        in: path
+        required: true
+        schema:
+          type: integer
+          format: int64
       responses:
         "200":
           description: OK
