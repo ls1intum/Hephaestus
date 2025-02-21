@@ -1,12 +1,12 @@
 import { RouterLink } from '@angular/router';
-import { Component, computed, inject, input } from '@angular/core';
+import { Component, inject, input } from '@angular/core';
 import { NgIconComponent } from '@ng-icons/core';
 import { octFileDiff, octCheck, octComment, octCommentDiscussion, octGitPullRequest, octChevronLeft, octNoEntry } from '@ng-icons/octicons';
 import { cn } from '@app/utils';
 import { HlmAvatarModule } from '@spartan-ng/ui-avatar-helm';
 import { HlmSkeletonModule } from '@spartan-ng/ui-skeleton-helm';
 import { SecurityStore } from '@app/core/security/security-store.service';
-import { LeaderboardEntry, PullRequestInfo } from 'app/core/modules/openapi';
+import { LeaderboardEntry } from 'app/core/modules/openapi';
 import { TableBodyDirective } from 'app/ui/table/table-body.directive';
 import { TableCellDirective } from 'app/ui/table/table-cell.directive';
 import { TableHeadDirective } from 'app/ui/table/table-head.directive';
@@ -16,7 +16,6 @@ import { TableComponent } from 'app/ui/table/table.component';
 import { ReviewsPopoverComponent } from './reviews-popover/reviews-popover.component';
 import { HlmIconComponent, provideIcons } from '@spartan-ng/ui-icon-helm';
 import { lucideAward } from '@ng-icons/lucide';
-import { User } from '@app/core/security/models';
 import { LeagueIconComponent } from '@app/ui/league/icon/league-icon.component';
 
 @Component({
@@ -54,38 +53,6 @@ export class LeaderboardComponent {
 
   leaderboard = input<LeaderboardEntry[]>();
   isLoading = input<boolean>();
-
-  // Leaderboard with the current user's entry at the top
-  protected adjustedLeaderboard = computed(() => {
-    const entries = this.leaderboard();
-    if (!this.signedIn() || !entries || entries.length === 0) return entries;
-
-    const currentUser = this.user();
-    if (!currentUser) return entries;
-
-    const userInLeaderboard = entries.find((entry) => entry.user.login.toLowerCase() === currentUser.username);
-
-    return [userInLeaderboard ?? this.defaultSelfEntry(currentUser), ...entries];
-  });
-
-  defaultSelfEntry = (currentUser: User) => {
-    return {
-      user: {
-        login: currentUser.username,
-        avatarUrl: `https://github.com/${currentUser.username}.png`,
-        name: currentUser.name
-      },
-      rank: this.leaderboard()?.length ?? 0 + 1,
-      score: 0,
-      numberOfApprovals: 0,
-      numberOfChangeRequests: 0,
-      numberOfComments: 0,
-      numberOfCodeComments: 0,
-      numberOfReviewedPRs: 0,
-      numberOfUnknowns: 0,
-      reviewedPullRequests: [] as PullRequestInfo[]
-    } as LeaderboardEntry;
-  };
 
   trClass = (entry: LeaderboardEntry) => {
     return cn(
