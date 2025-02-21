@@ -292,14 +292,8 @@ paths:
     post:
       tags:
       - activity
-      operationId: detectBadPracticesByPr
-      parameters:
-      - name: prId
-        in: path
-        required: true
-        schema:
-          type: integer
-          format: int64
+      operationId: detectBadPracticesForPullRequest
+      parameters: []
       responses:
         "200":
           description: OK
