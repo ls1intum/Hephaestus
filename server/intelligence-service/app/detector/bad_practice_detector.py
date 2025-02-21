@@ -23,7 +23,7 @@ class BadPracticeList(BaseModel):
     )
 
 
-def detect_bad_practices(title, description) -> BadPracticeList:
+def detect_bad_practices(title, description, bad_practices) -> BadPracticeList:
     prompt_text = BAD_PRACTICE_PROMPT_TEST
     prompt_template = ChatPromptTemplate.from_template(prompt_text)
     prompt = prompt_template.invoke({"title": title, "description": description, "bad_practices": bad_practices})

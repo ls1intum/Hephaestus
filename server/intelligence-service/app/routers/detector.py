@@ -3,7 +3,7 @@ from typing import List
 from fastapi import APIRouter
 from openai import BaseModel
 
-from ..detector.bad_practice_detector import detectbadpractices, BadPractice
+from ..detector.bad_practice_detector import detect_bad_practices, BadPractice
 
 router = APIRouter(prefix="/detector", tags=["detector"])
 
@@ -24,4 +24,4 @@ class DetectorResponse(BaseModel):
     summary="Detect bad practices for given pull request.",
 )
 def detect(request: DetectorRequest):
-    return detectbadpractices(request.title, request.description, request.bad_practices)
+    return detect_bad_practices(request.title, request.description, request.bad_practices)
