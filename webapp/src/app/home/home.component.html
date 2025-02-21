@@ -13,7 +13,7 @@
       <div class="col-span-2 space-y-4">
         @if (query.error()) {
           <div hlmAlert class="max-w-xl" variant="destructive">
-            <lucide-angular [img]="CircleX" hlmAlertIcon />
+            <ng-icon name="lucideCircleX" hlmAlertIcon />
             <h4 hlmAlertTitle>Something went wrong...</h4>
             <p hlmAlertDesc>We couldn't load the leaderboard. Please try again later.</p>
           </div>

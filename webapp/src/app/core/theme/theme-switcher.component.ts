@@ -1,13 +1,15 @@
 import { Component, inject } from '@angular/core';
-import { LucideAngularModule, Sun, Moon } from 'lucide-angular';
+import { NgIconComponent, provideIcons } from '@ng-icons/core';
+import { lucideSun, lucideMoon } from '@ng-icons/lucide';
 import { AppTheme, ThemeSwitcherService } from './theme-switcher.service';
 import { animate, state, style, transition, trigger } from '@angular/animations';
 import { HlmButtonModule } from '@spartan-ng/ui-button-helm';
 
 @Component({
   selector: 'app-theme-switcher',
-  imports: [HlmButtonModule, LucideAngularModule],
+  imports: [HlmButtonModule, NgIconComponent],
   templateUrl: './theme-switcher.component.html',
+  providers: [provideIcons({ lucideSun, lucideMoon })],
   animations: [
     trigger('iconTrigger', [
       state('*', style({ transform: 'rotate(0deg)' })),
@@ -18,9 +20,6 @@ import { HlmButtonModule } from '@spartan-ng/ui-button-helm';
 })
 export class ThemeSwitcherComponent {
   themeSwitcherService = inject(ThemeSwitcherService);
-
-  protected Sun = Sun;
-  protected Moon = Moon;
 
   toggleTheme() {
     if (this.themeSwitcherService.currentTheme() === AppTheme.DARK) {

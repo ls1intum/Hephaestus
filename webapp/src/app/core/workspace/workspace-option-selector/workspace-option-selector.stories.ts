@@ -27,8 +27,8 @@ const meta: Meta<WorkspaceOptionSelectorComponent> = {
     isCompact: false,
     selectedWorkspace: workspaces[0],
     workspaces,
-    onSelect: fn(),
-    onSignOut: fn()
+    select: fn(),
+    signOut: fn()
   },
   argTypes: {
     isCompact: {

@@ -1,7 +1,7 @@
 import { Component, input } from '@angular/core';
-import { NgIconComponent } from '@ng-icons/core';
+import { NgIconComponent, provideIcons } from '@ng-icons/core';
 import { octFileDiff, octCheck, octComment, octCommentDiscussion, octGitPullRequest } from '@ng-icons/octicons';
-import { HlmIconComponent } from '@spartan-ng/ui-icon-helm';
+import { HlmIconDirective } from '@spartan-ng/ui-icon-helm';
 import { HlmCardModule } from '@spartan-ng/ui-card-helm';
 import {
   HlmAccordionContentComponent,
@@ -21,16 +21,11 @@ import {
     HlmAccordionIconDirective,
     HlmCardModule,
     NgIconComponent,
-    HlmIconComponent
+    HlmIconDirective
   ],
+  providers: [provideIcons({ octFileDiff, octCheck, octComment, octCommentDiscussion, octGitPullRequest })],
   templateUrl: './legend.component.html'
 })
 export class LeaderboardLegendComponent {
-  protected octFileDiff = octFileDiff;
-  protected octCheck = octCheck;
-  protected octComment = octComment;
-  protected octCommentDiscussion = octCommentDiscussion;
-  protected octGitPullRequest = octGitPullRequest;
-
   isLoading = input<boolean>();
 }

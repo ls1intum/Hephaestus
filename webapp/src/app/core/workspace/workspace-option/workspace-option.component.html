@@ -3,7 +3,7 @@
     <app-workspace-thumb
       [iconUrl]="iconUrl()"
       [isSelected]="isSelected()"
-      (onClick)="onSelect.emit()"
+      (select)="select.emit()"
       hlmTooltipTrigger
       position="right"
       [aria-describedby]="title()"
@@ -19,7 +19,7 @@
     </span>
     @if (isSelected()) {
       <button [brnMenuTriggerFor]="menu">
-        <lucide-angular [img]="Ellipsis" class="size-5 text-muted-foreground block" />
+        <ng-icon name="lucideEllipsis" class="text-xl text-muted-foreground block" />
       </button>
     }
   </div>
@@ -28,8 +28,8 @@
 <ng-template #menu>
   <hlm-menu>
     <hlm-menu-group>
-      <button hlmMenuItem class="text-destructive hover:text-destructive" (click)="onSignOut.emit()">
-        <lucide-angular [img]="LogOut" hlmMenuIcon class="size-4" />
+      <button hlmMenuItem class="text-destructive hover:text-destructive" (click)="signOut.emit()">
+        <ng-icon name="lucideLogOut" hlmMenuIcon class="text-base" />
         Sign Out
       </button>
     </hlm-menu-group>

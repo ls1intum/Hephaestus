@@ -3,13 +3,13 @@ import dayjs from 'dayjs/esm';
 import isoWeek from 'dayjs/esm/plugin/isoWeek';
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, Router } from '@angular/router';
-import { BrnSelectModule } from '@spartan-ng/ui-select-brain';
+import { BrnSelectModule } from '@spartan-ng/brain/select';
 import { HlmSelectModule } from '@spartan-ng/ui-select-helm';
 import { HlmLabelModule } from '@spartan-ng/ui-label-helm';
-import { BrnTooltipContentDirective } from '@spartan-ng/ui-tooltip-brain';
+import { BrnTooltipContentDirective } from '@spartan-ng/brain/tooltip';
 import { HlmTooltipComponent, HlmTooltipTriggerDirective } from '@spartan-ng/ui-tooltip-helm';
-import { HlmIconComponent } from '@spartan-ng/ui-icon-helm';
-import { provideIcons } from '@spartan-ng/ui-icon-helm';
+import { HlmIconDirective } from '@spartan-ng/ui-icon-helm';
+import { NgIconComponent, provideIcons } from '@ng-icons/core';
 import { lucideCircleHelp } from '@ng-icons/lucide';
 import { injectQuery } from '@tanstack/angular-query-experimental';
 import { lastValueFrom } from 'rxjs';
@@ -36,7 +36,17 @@ function formatLabel(weekIndex: number) {
 
 @Component({
   selector: 'app-leaderboard-filter-timeframe',
-  imports: [BrnSelectModule, HlmSelectModule, HlmLabelModule, FormsModule, HlmTooltipComponent, HlmTooltipTriggerDirective, BrnTooltipContentDirective, HlmIconComponent],
+  imports: [
+    BrnSelectModule,
+    HlmSelectModule,
+    HlmLabelModule,
+    FormsModule,
+    HlmTooltipComponent,
+    HlmTooltipTriggerDirective,
+    BrnTooltipContentDirective,
+    HlmIconDirective,
+    NgIconComponent
+  ],
   providers: [provideIcons({ lucideCircleHelp })],
   templateUrl: './timeframe.component.html'
 })
