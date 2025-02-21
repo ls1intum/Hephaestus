@@ -9,11 +9,11 @@
       @if (leaderboardEntry(); as entry) {
         <div class="grid grid-cols-2 place-items-center gap-4">
           <div class="flex items-center gap-1 text-github-done-foreground">
-            <hlm-icon size="sm" name="lucideAward" />
+            <ng-icon hlm size="sm" name="lucideAward" />
             <span class="text-muted-foreground">{{ entry.score }}</span>
           </div>
           <div class="flex items-center gap-1">
-            <hlm-icon size="sm" name="lucideTrophy" />
+            <ng-icon hlm size="sm" name="lucideTrophy" />
             <span class="text-muted-foreground">#{{ entry.rank }}</span>
           </div>
           <div class="col-span-2 flex items-center gap-1">
