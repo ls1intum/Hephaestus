@@ -4,8 +4,52 @@
       <h3 class="text-base font-semibold tracking-wide">Your League</h3>
       <app-league-info-modal />
     </span>
-    <div class="flex items-center gap-2">
+    <div class="flex justify-between items-center gap-2">
       <app-league-elo-card [leaguePoints]="leaguePoints()" />
+      @if (leaderboardEntry(); as entry) {
+        <div class="grid grid-cols-2 place-items-center gap-4">
+          <div class="flex items-center gap-1 text-github-done-foreground">
+            <hlm-icon size="sm" name="lucideAward" />
+            <span class="text-muted-foreground">{{ entry.score }}</span>
+          </div>
+          <div class="flex items-center gap-1">
+            <hlm-icon size="sm" name="lucideTrophy" />
+            <span class="text-muted-foreground">#{{ entry.rank }}</span>
+          </div>
+          <div class="col-span-2 flex items-center gap-1">
+            @if (entry.numberOfReviewedPRs) {
+              <app-reviews-popover [reviewedPRs]="entry.reviewedPullRequests" [highlight]="true" />
+              <div class="flex items-center text-github-muted-foreground">
+                <ng-icon [svg]="octChevronLeft" size="16" />
+              </div>
+            }
+            @if (entry.numberOfChangeRequests > 0) {
+              <div class="flex items-center gap-1 text-github-danger-foreground" title="Changes Requested">
+                <ng-icon [svg]="octFileDiff" size="16" />
+                {{ entry.numberOfChangeRequests }}
+              </div>
+            }
+            @if (entry.numberOfApprovals > 0) {
+              <div class="flex items-center gap-1 text-github-success-foreground" title="Approvals">
+                <ng-icon [svg]="octCheck" size="16" />
+                {{ entry.numberOfApprovals }}
+              </div>
+            }
+            @if (entry.numberOfComments + entry.numberOfUnknowns > 0) {
+              <div class="flex items-center gap-1 text-github-muted-foreground" title="Comments">
+                <ng-icon [svg]="octComment" size="16" />
+                {{ entry.numberOfComments + entry.numberOfUnknowns }}
+              </div>
+            }
+            @if (entry.numberOfCodeComments > 0) {
+              <div class="flex items-center gap-1 text-github-muted-foreground" title="Code comments">
+                <ng-icon [svg]="octCommentDiscussion" size="16" />
+                {{ entry.numberOfCodeComments }}
+              </div>
+            }
+          </div>
+        </div>
+      }
     </div>
   </div>
 </div>

@@ -66,4 +66,8 @@ export class HomeComponent {
     queryKey: ['user', { id: this.user()?.username }],
     queryFn: async () => lastValueFrom(this.userService.getUserProfile(this.user()!.username))
   }));
+
+  ownLeaderboardEntry = computed(() => {
+    return this.query.data()?.find((entry) => entry.user.login.toLowerCase() === this.user()?.username);
+  });
 }
