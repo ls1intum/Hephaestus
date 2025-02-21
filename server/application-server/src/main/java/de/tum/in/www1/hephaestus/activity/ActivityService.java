@@ -34,7 +34,6 @@ public class ActivityService {
     @Autowired
     private UserRepository userRepository;
 
-    @Transactional
     public ActivityDTO getActivity(String login) {
         logger.info("Getting activity for user with login: {}", login);
 
@@ -70,7 +69,6 @@ public class ActivityService {
         return new ActivityDTO(openPullRequestsWithBadPractices);
     }
 
-    @Transactional
     public List<PullRequestBadPracticeDTO> detectBadPracticesForUser(String login) {
         logger.info("Detecting bad practices for user with login: {}", login);
 
@@ -86,13 +84,12 @@ public class ActivityService {
         return detectedBadPractices.stream().map(PullRequestBadPracticeDTO::fromPullRequestBadPractice).toList();
     }
 
-    @Transactional
-    public List<PullRequestBadPracticeDTO> detectBadPracticesForPr(Long prId) {
-        logger.info("Detecting bad practices for PR: {}", prId);
+    public List<PullRequestBadPracticeDTO> detectBadPracticesForPullRequest(Long pullRequestId) {
+        logger.info("Detecting bad practices for PR: {}", pullRequestId);
 
-        PullRequest pullRequest = pullRequestRepository.findById(prId).orElse(null);
+        PullRequest pullRequest = pullRequestRepository.findById(pullRequestId).orElse(null);
         if (pullRequest == null) {
-            throw new IllegalArgumentException("Pull request " + prId + " not found");
+            throw new IllegalArgumentException("Pull request " + pullRequestId + " not found");
         }
 
         List<PullRequestBadPractice> detectedBadPractices = pullRequestBadPracticeDetector.detectAndSyncBadPractices(

@@ -8,7 +8,7 @@ import org.springframework.stereotype.Component;
 @Component
 public class BadPracticeDetectorScheduler {
 
-    private final String readyToMerge = "ready to merge";
+    private static final String READY_TO_MERGE = "ready to merge";
 
     public void detectBadPracticeForPrIfReadyToMerge(
         PullRequest pullRequest,
@@ -16,8 +16,8 @@ public class BadPracticeDetectorScheduler {
         Set<Label> newLabels
     ) {
         if (
-            newLabels.stream().anyMatch(label -> readyToMerge.equals(label.getName())) &&
-            oldLabels.stream().noneMatch(label -> readyToMerge.equals(label.getName()))
+            newLabels.stream().anyMatch(label -> READY_TO_MERGE.equals(label.getName())) &&
+            oldLabels.stream().noneMatch(label -> READY_TO_MERGE.equals(label.getName()))
         ) {
             BadPracticeDetectorTask badPracticeDetectorTask = new BadPracticeDetectorTask();
             badPracticeDetectorTask.setPullRequest(pullRequest);

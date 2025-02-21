@@ -62,9 +62,7 @@ export class PullRequestBadPracticeCardComponent {
   isMerged = input<boolean>();
   pullRequestLabels = input<Array<LabelInfo>>();
   badPractices = input<Array<PullRequestBadPractice>>();
-
-  detectBadPracticesForPr = output<void>();
-
+  
   displayCreated = computed(() => dayjs(this.createdAt()));
   displayTitle = computed(() => formatTitle(this.title() ?? ''));
   computedClass = computed(() => cn('w-full', !this.isLoading() ? 'hover:bg-accent/50 cursor-pointer' : '', this.class()));
@@ -94,11 +92,6 @@ export class PullRequestBadPracticeCardComponent {
     return { icon, color };
   });
   protected readonly octSync = octSync;
-
-  detectBadPractices = () => {
-    console.log('Detecting bad practices for PR ' + this.id());
-    this.detectBadPracticesForPr.emit();
-  };
 
   detectBadPracticesForPrMutation = injectMutation(() => ({
     mutationFn: (prId: number) => lastValueFrom(this.activityService.detectBadPracticesByPr(prId)),
