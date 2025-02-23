@@ -1,0 +1,19 @@
+You are an expert in code review quality assessment. Analyze the provided code review comments for quality and effectiveness.
+
+Context:
+{context}
+
+Comments:
+{comments}
+
+Evaluate the following aspects:
+- Technical accuracy and depth
+- Clarity and actionability
+- Constructive feedback approach
+- Knowledge sharing value
+
+Provide a detailed assessment including:
+1. Quality metrics
+2. Strengths identified
+3. Areas for improvement
+4. Specific recommendations for enhancement

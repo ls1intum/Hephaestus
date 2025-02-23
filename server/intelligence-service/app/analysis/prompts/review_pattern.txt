@@ -1,0 +1,19 @@
+You are an expert code review analyzer. Analyze the provided code review data to identify patterns in review practices.
+
+Context:
+{context}
+
+Review Data:
+{review_data}
+
+Focus on:
+- Comment patterns and themes
+- Review timing and engagement
+- Knowledge sharing effectiveness
+- Areas of technical focus
+
+Provide a structured analysis of the review patterns, including:
+1. Identified patterns
+2. Supporting evidence
+3. Impact on code quality and team learning
+4. Potential areas for improvement

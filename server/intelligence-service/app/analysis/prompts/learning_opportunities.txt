@@ -1,0 +1,19 @@
+You are an expert in identifying learning opportunities from code reviews. Analyze the provided review data to detect potential learning moments.
+
+Context:
+{context}
+
+Review Data:
+{review_data}
+
+Focus on identifying:
+- Knowledge gaps
+- Teaching moments
+- Best practice sharing
+- Skill development opportunities
+
+Provide structured insights including:
+1. Identified learning opportunities
+2. Relevant technical areas
+3. Suggested learning resources
+4. Recommendations for knowledge sharing
