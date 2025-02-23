@@ -1,6 +1,5 @@
 import { Component, computed, input } from '@angular/core';
-import { cn, getLeagueFromPoints } from '@app/utils';
-import { LucideAngularModule, Medal } from 'lucide-angular';
+import { getLeagueFromPoints } from '@app/utils';
 import { type VariantProps, cva } from 'class-variance-authority';
 import { LeagueBronzeIconComponent } from './league-bronze-icon.component';
 import { LeagueNoneIconComponent } from './league-none-icon.component';
@@ -9,7 +8,8 @@ import { LeagueGoldIconComponent } from './league-gold-icon.component';
 import { LeagueDiamondIconComponent } from './league-diamond-icon.component';
 import { LeagueMasterIconComponent } from './league-master-icon.component';
 import { HlmTooltipComponent, HlmTooltipTriggerDirective } from '@spartan-ng/ui-tooltip-helm';
-import { BrnTooltipContentDirective } from '@spartan-ng/ui-tooltip-brain';
+import { BrnTooltipContentDirective } from '@spartan-ng/brain/tooltip';
+import { hlm } from '@spartan-ng/brain/core';
 
 export const leagueVariants = cva('size-8', {
   variants: {
@@ -40,7 +40,6 @@ type LeagueVariants = VariantProps<typeof leagueVariants>;
 @Component({
   selector: 'app-icon-league',
   imports: [
-    LucideAngularModule,
     LeagueBronzeIconComponent,
     LeagueNoneIconComponent,
     LeagueSilverIconComponent,
@@ -80,14 +79,12 @@ type LeagueVariants = VariantProps<typeof leagueVariants>;
   `
 })
 export class LeagueIconComponent {
-  protected Medal = Medal;
-
   size = input<LeagueVariants['size']>('default');
   leaguePoints = input<number>();
   class = input<string>('');
 
   league = computed(() => (this.leaguePoints() ? getLeagueFromPoints(this.leaguePoints()!)?.name.toLowerCase() : 'none'));
-  computedClass = computed(() => cn(leagueVariants({ size: this.size(), league: this.league() as LeagueVariants['league'] }), this.class()));
+  computedClass = computed(() => hlm(leagueVariants({ size: this.size(), league: this.league() as LeagueVariants['league'] }), this.class()));
 
   leagueTooltip = computed(() => {
     switch (this.league()) {

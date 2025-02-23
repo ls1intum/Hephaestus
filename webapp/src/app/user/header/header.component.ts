@@ -1,10 +1,10 @@
 import { Component, computed, input } from '@angular/core';
-import { NgIconComponent } from '@ng-icons/core';
+import { NgIconComponent, provideIcons } from '@ng-icons/core';
 import { octClockFill } from '@ng-icons/octicons';
 import { HlmAvatarModule } from '@spartan-ng/ui-avatar-helm';
 import { HlmSkeletonModule } from '@spartan-ng/ui-skeleton-helm';
 import { HlmIconModule } from 'libs/ui/ui-icon-helm/src/index';
-import { BrnTooltipContentDirective } from '@spartan-ng/ui-tooltip-brain';
+import { BrnTooltipContentDirective } from '@spartan-ng/brain/tooltip';
 import { HlmTooltipComponent, HlmTooltipTriggerDirective } from '@spartan-ng/ui-tooltip-helm';
 import { HlmButtonModule } from '@spartan-ng/ui-button-helm';
 import dayjs from 'dayjs/esm';
@@ -15,7 +15,7 @@ import { LeagueIconComponent } from '@app/ui/league/icon/league-icon.component';
 dayjs.extend(advancedFormat);
 
 const repoImages: { [key: string]: string } = {
-  Hephaestus: 'https://github.com/ls1intum/Hephaestus/raw/refs/heads/develop/docs/images/hammer.svg',
+  Hephaestus: 'https://github.com/ls1intum/Hephaestus/raw/refs/heads/develop/docs/images/hammer_bg.svg',
   Artemis: 'https://artemis.in.tum.de/public/images/logo.png',
   Athena: 'https://raw.githubusercontent.com/ls1intum/Athena/develop/playground/public/logo.png'
 };
@@ -33,11 +33,10 @@ const repoImages: { [key: string]: string } = {
     HlmButtonModule,
     LeagueIconComponent
   ],
+  providers: [provideIcons({ octClockFill })],
   templateUrl: './header.component.html'
 })
 export class UserHeaderComponent {
-  protected octClockFill = octClockFill;
-
   isLoading = input(false);
   user = input<UserInfo>();
   firstContribution = input<string>();

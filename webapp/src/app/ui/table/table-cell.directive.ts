@@ -1,6 +1,6 @@
 import { Directive, computed, input } from '@angular/core';
+import { hlm } from '@spartan-ng/brain/core';
 import { ClassValue } from 'clsx';
-import { cn } from 'app/utils';
 
 @Directive({
   selector: 'td[appTableCell]',
@@ -10,5 +10,5 @@ import { cn } from 'app/utils';
 })
 export class TableCellDirective {
   class = input<ClassValue>();
-  computedClass = computed(() => cn('p-4 align-middle [&:has([role=checkbox])]:pr-0', this.class()));
+  computedClass = computed(() => hlm('p-4 align-middle [&:has([role=checkbox])]:pr-0', this.class()));
 }

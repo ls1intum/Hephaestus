@@ -26,8 +26,8 @@ const meta: Meta<WorkspaceBadgeComponent> = {
   args: {
     selectedWorkspace: workspaces[0],
     workspaces,
-    onSelect: fn(),
-    onSignOut: fn()
+    select: fn(),
+    signOut: fn()
   },
   argTypes: {
     selectedWorkspace: {

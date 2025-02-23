@@ -1,20 +1,21 @@
 import { Component, computed, input } from '@angular/core';
+import { NgIcon, provideIcons } from '@ng-icons/core';
 import { lucideCircle } from '@ng-icons/lucide';
-import { hlm } from '@spartan-ng/ui-core';
-import { HlmIconComponent, provideIcons } from '@spartan-ng/ui-icon-helm';
+import { hlm } from '@spartan-ng/brain/core';
+import { HlmIconDirective } from '@spartan-ng/ui-icon-helm';
 import type { ClassValue } from 'clsx';
 
 @Component({
-    selector: 'hlm-menu-item-radio',
-    providers: [provideIcons({ lucideCircle })],
-    imports: [HlmIconComponent],
-    template: `
+	selector: 'hlm-menu-item-radio',
+	providers: [provideIcons({ lucideCircle })],
+	imports: [NgIcon, HlmIconDirective],
+	template: `
 		<!-- Using 0.5rem for size to mimick h-2 w-2 -->
-		<hlm-icon size="0.5rem" class="*:*:fill-current" name="lucideCircle" />
+		<ng-icon hlm size="0.5rem" class="*:*:fill-current" name="lucideCircle" />
 	`,
-    host: {
-        '[class]': '_computedClass()',
-    }
+	host: {
+		'[class]': '_computedClass()',
+	},
 })
 export class HlmMenuItemRadioComponent {
 	public readonly userClass = input<ClassValue>('', { alias: 'class' });

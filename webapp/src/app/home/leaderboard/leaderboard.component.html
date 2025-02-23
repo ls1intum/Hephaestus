@@ -5,7 +5,7 @@
       <th appTableHead class="text-center px-0.5">League</th>
       <th appTableHead>Contributor</th>
       <th appTableHead class="flex justify-center items-center gap-1 text-github-done-foreground">
-        <hlm-icon size="sm" name="lucideAward" />
+        <ng-icon hlm size="sm" name="lucideAward" />
         Score
       </th>
       <th appTableHead>Activity</th>
@@ -39,14 +39,14 @@
       <tr appTableRow>
         <td appTableCell colspan="5">
           <div class="flex flex-col items-center justify-center gap-2 mt-1">
-            <ng-icon [svg]="octNoEntry" size="32" class="text-github-danger-foreground" />
+            <ng-icon name="octNoEntry" size="32" class="text-github-danger-foreground" />
             <span class="font-semibold text-muted-foreground">No entries found</span>
           </div>
         </td>
       </tr>
     } @else {
       @for (entry of leaderboard(); track entry.user.login) {
-        <tr appTableRow routerLink="/user/{{ entry.user.login }}" routerLinkActive="active" ariaCurrentWhenActive="page" [class]="trClass(entry)">
+        <tr [id]="'rank-' + entry.rank" appTableRow routerLink="/user/{{ entry.user.login }}" routerLinkActive="active" ariaCurrentWhenActive="page" [class]="trClass(entry)">
           <td appTableCell class="text-center">{{ entry.rank }}</td>
           <td appTableCell class="flex justify-center items-center px-0.5">
             <app-icon-league [leaguePoints]="entry.user.leaguePoints" />
@@ -68,30 +68,30 @@
               @if (entry.numberOfReviewedPRs) {
                 <app-reviews-popover [reviewedPRs]="entry.reviewedPullRequests" [highlight]="this.user()?.username?.toLowerCase() === entry.user.login.toLowerCase()" />
                 <div class="flex items-center text-github-muted-foreground">
-                  <ng-icon [svg]="octChevronLeft" size="16" />
+                  <ng-icon name="octChevronLeft" size="16" />
                 </div>
               }
               @if (entry.numberOfChangeRequests > 0) {
                 <div class="flex items-center gap-1 text-github-danger-foreground" title="Changes Requested">
-                  <ng-icon [svg]="octFileDiff" size="16" />
+                  <ng-icon name="octFileDiff" size="16" />
                   {{ entry.numberOfChangeRequests }}
                 </div>
               }
               @if (entry.numberOfApprovals > 0) {
                 <div class="flex items-center gap-1 text-github-success-foreground" title="Approvals">
-                  <ng-icon [svg]="octCheck" size="16" />
+                  <ng-icon name="octCheck" size="16" />
                   {{ entry.numberOfApprovals }}
                 </div>
               }
               @if (entry.numberOfComments + entry.numberOfUnknowns > 0) {
                 <div class="flex items-center gap-1 text-github-muted-foreground" title="Comments">
-                  <ng-icon [svg]="octComment" size="16" />
+                  <ng-icon name="octComment" size="16" />
                   {{ entry.numberOfComments + entry.numberOfUnknowns }}
                 </div>
               }
               @if (entry.numberOfCodeComments > 0) {
                 <div class="flex items-center gap-1 text-github-muted-foreground" title="Code comments">
-                  <ng-icon [svg]="octCommentDiscussion" size="16" />
+                  <ng-icon name="octCommentDiscussion" size="16" />
                   {{ entry.numberOfCodeComments }}
                 </div>
               }

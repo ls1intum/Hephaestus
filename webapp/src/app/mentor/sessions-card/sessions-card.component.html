@@ -1,13 +1,13 @@
 <div hlmCard class="flex flex-col px-6 lg:max-h-[calc(100dvh-200px)] pb-6 overflow-auto">
   @if (isLastSessionClosed()) {
     <button hlmBtn aria-describedby=">New Session" class="w-full gap-2 mt-6 justify-start h-9" (click)="this.createNewSession.emit()">
-      <lucide-angular [img]="Plus" class="size-4" />
+      <ng-icon name="lucidePlus" class="size-4" />
       <span>New Session</span>
     </button>
   } @else {
     <hlm-alert-dialog>
       <button hlmBtn brnAlertDialogTrigger aria-describedby=">New Session" class="w-full gap-2 mt-6 justify-start h-9">
-        <lucide-angular [img]="Plus" class="size-4" />
+        <ng-icon name="lucidePlus" class="size-4" />
         <span>New Session</span>
       </button>
       <hlm-alert-dialog-content *brnAlertDialogContent="let ctx">

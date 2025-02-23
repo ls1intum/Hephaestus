@@ -51,6 +51,16 @@ public interface UserRepository extends JpaRepository<User, Long> {
         """
             SELECT u
             FROM User u
+            JOIN FETCH u.teams
+            WHERE u.type = 'USER'
+        """
+    )
+    List<User> findAllHumanInTeams();
+
+    @Query(
+        """
+            SELECT u
+            FROM User u
             JOIN u.teams t
             WHERE t.id = :teamId
             AND u.type = 'USER'

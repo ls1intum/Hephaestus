@@ -84,6 +84,9 @@ public class LeaderboardService {
             userRepository
                 .findAllByTeamId(teamEntity.get().getId())
                 .forEach(user -> usersById.putIfAbsent(user.getId(), user));
+        } else {
+            // Show all active users in the total leaderboard
+            userRepository.findAllHumanInTeams().stream().forEach(user -> usersById.putIfAbsent(user.getId(), user));
         }
 
         // Review activity
@@ -110,7 +113,32 @@ public class LeaderboardService {
         List<Long> rankingByUserId = scoresByUserId
             .entrySet()
             .stream()
-            .sorted(Map.Entry.comparingByValue(Comparator.reverseOrder()))
+            .sorted((e1, e2) -> {
+                // Primary sort: descending order by score
+                int scoreCompare = e2.getValue().compareTo(e1.getValue());
+                if (scoreCompare != 0) {
+                    return scoreCompare;
+                }
+                // If both users have a score of 0, compare by total comment count.
+                // Calculate total code review comment count from reviews.
+                int e1ReviewComments = reviewsByUserId
+                    .getOrDefault(e1.getKey(), List.of())
+                    .stream()
+                    .mapToInt(review -> review.getComments().size())
+                    .sum();
+                int e2ReviewComments = reviewsByUserId
+                    .getOrDefault(e2.getKey(), List.of())
+                    .stream()
+                    .mapToInt(review -> review.getComments().size())
+                    .sum();
+                // Calculate total issue comments.
+                int e1IssueComments = issueCommentsByUserId.getOrDefault(e1.getKey(), List.of()).size();
+                int e2IssueComments = issueCommentsByUserId.getOrDefault(e2.getKey(), List.of()).size();
+                int e1TotalComments = e1ReviewComments + e1IssueComments;
+                int e2TotalComments = e2ReviewComments + e2IssueComments;
+                // Sort descending by total comment count.
+                return Integer.compare(e2TotalComments, e1TotalComments);
+            })
             .map(Map.Entry::getKey)
             .collect(Collectors.toList());
 
