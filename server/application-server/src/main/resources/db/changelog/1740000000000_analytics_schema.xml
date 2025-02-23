@@ -1,0 +1,92 @@
+<?xml version="1.0" encoding="utf-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-4.6.xsd">
+
+    <changeSet id="1740000000000" author="hephaestus">
+        <createTable tableName="review_metrics">
+            <column name="id" type="bigint" autoIncrement="true">
+                <constraints primaryKey="true" nullable="false"/>
+            </column>
+            <column name="pull_request_id" type="bigint">
+                <constraints nullable="false" foreignKeyName="fk_review_metrics_pull_request" references="pull_request(id)"/>
+            </column>
+            <column name="reviewer_id" type="bigint">
+                <constraints nullable="false" foreignKeyName="fk_review_metrics_user" references="user(id)"/>
+            </column>
+            <column name="review_time_minutes" type="int"/>
+            <column name="comment_count" type="int"/>
+            <column name="code_suggestions_count" type="int"/>
+            <column name="review_quality_score" type="decimal(5,2)"/>
+            <column name="created_at" type="timestamp">
+                <constraints nullable="false"/>
+            </column>
+            <column name="updated_at" type="timestamp">
+                <constraints nullable="false"/>
+            </column>
+        </createTable>
+
+        <createTable tableName="analysis_results">
+            <column name="id" type="bigint" autoIncrement="true">
+                <constraints primaryKey="true" nullable="false"/>
+            </column>
+            <column name="team_id" type="bigint">
+                <constraints nullable="false" foreignKeyName="fk_analysis_results_team" references="team(id)"/>
+            </column>
+            <column name="analysis_type" type="varchar(50)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="time_period_start" type="timestamp">
+                <constraints nullable="false"/>
+            </column>
+            <column name="time_period_end" type="timestamp">
+                <constraints nullable="false"/>
+            </column>
+            <column name="analysis_data" type="jsonb">
+                <constraints nullable="false"/>
+            </column>
+            <column name="created_at" type="timestamp">
+                <constraints nullable="false"/>
+            </column>
+        </createTable>
+
+        <createTable tableName="insight_recommendations">
+            <column name="id" type="bigint" autoIncrement="true">
+                <constraints primaryKey="true" nullable="false"/>
+            </column>
+            <column name="team_id" type="bigint">
+                <constraints nullable="false" foreignKeyName="fk_insight_recommendations_team" references="team(id)"/>
+            </column>
+            <column name="analysis_result_id" type="bigint">
+                <constraints nullable="false" foreignKeyName="fk_insight_recommendations_analysis" references="analysis_results(id)"/>
+            </column>
+            <column name="recommendation_type" type="varchar(50)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="recommendation_text" type="text">
+                <constraints nullable="false"/>
+            </column>
+            <column name="priority_level" type="int"/>
+            <column name="created_at" type="timestamp">
+                <constraints nullable="false"/>
+            </column>
+        </createTable>
+
+        <!-- Indexes for better query performance -->
+        <createIndex indexName="idx_review_metrics_pull_request" tableName="review_metrics">
+            <column name="pull_request_id"/>
+        </createIndex>
+        <createIndex indexName="idx_review_metrics_reviewer" tableName="review_metrics">
+            <column name="reviewer_id"/>
+        </createIndex>
+        <createIndex indexName="idx_analysis_results_team_period" tableName="analysis_results">
+            <column name="team_id"/>
+            <column name="time_period_start"/>
+            <column name="time_period_end"/>
+        </createIndex>
+        <createIndex indexName="idx_insight_recommendations_team" tableName="insight_recommendations">
+            <column name="team_id"/>
+        </createIndex>
+    </changeSet>
+</databaseChangeLog>
