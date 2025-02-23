@@ -8,7 +8,7 @@ import { NgIconComponent, provideIcons } from '@ng-icons/core';
 import { NgScrollbarModule } from 'ngx-scrollbar';
 import { HlmScrollAreaDirective } from '@spartan-ng/ui-scrollarea-helm';
 
-interface PullRequestInfo {
+export interface PullRequestInfo {
   id: number;
   repository?: {
     name: string;
