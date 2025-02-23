@@ -4,7 +4,6 @@ import { MetricsViewComponent } from '../metrics/metrics-view.component';
 import { InsightsPanelComponent } from '../insights/insights-panel.component';
 import { AnalyticsStoreService } from '../../services/analytics-store.service';
 import { HlmSpinnerComponent } from '@spartan-ng/ui-spinner-helm';
-import { HlmAlertComponent } from '@spartan-ng/ui-alert-helm';
 
 @Component({
   selector: 'app-analytics-dashboard',
@@ -15,8 +14,7 @@ import { HlmAlertComponent } from '@spartan-ng/ui-alert-helm';
     HlmCardContentDirective,
     MetricsViewComponent,
     InsightsPanelComponent,
-    HlmSpinnerComponent,
-    HlmAlertComponent
+    HlmSpinnerComponent
   ],
   template: `
     <div class="container mx-auto p-4 space-y-6">
@@ -31,9 +29,9 @@ import { HlmAlertComponent } from '@spartan-ng/ui-alert-helm';
 
       <!-- Error alert -->
       @if (store.currentError()) {
-        <hlm-alert variant="destructive">
+        <div class="p-4 mb-4 text-sm text-red-800 rounded-lg bg-red-50 dark:bg-red-900 dark:text-red-100" role="alert">
           {{ store.currentError() }}
-        </hlm-alert>
+        </div>
       }
       
       <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
