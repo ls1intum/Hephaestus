@@ -79,12 +79,12 @@ public class SessionService {
             return null;
         }
 
-        // close the previous session if it exists to prevent multiple open sessions 
+        // close the previous session if it exists to prevent multiple open sessions
         if (previousSessionId != "") {
             previousSession.setClosed(true);
             sessionRepository.save(previousSession);
         }
-        
+
         return SessionDTO.fromSession(savedSession);
     }
 

@@ -14,7 +14,6 @@ import { HlmToasterComponent } from '@spartan-ng/ui-sonner-helm';
 import { NgScrollbar, NgScrollbarModule } from 'ngx-scrollbar';
 import { HlmScrollAreaDirective } from '@spartan-ng/ui-scrollarea-helm';
 
-
 @Component({
   selector: 'app-mentor',
   templateUrl: './mentor.component.html',
@@ -50,9 +49,7 @@ export class MentorComponent {
   }
 
   showToast() {
-    toast('Something went wrong...', {
-      description: 'There was an error trying to generate response to your last message. If this issue persists, please contact the AET Team.'
-    });
+    toast('Something went wrong...', { description: 'There was an error trying to generate response to your last message. If this issue persists, please contact the AET Team.' });
   }
 
   selectedSessionClosed = computed(() => {

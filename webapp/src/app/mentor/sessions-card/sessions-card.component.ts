@@ -18,9 +18,8 @@ import {
   HlmAlertDialogDescriptionDirective,
   HlmAlertDialogFooterComponent,
   HlmAlertDialogHeaderComponent,
-  HlmAlertDialogTitleDirective,
+  HlmAlertDialogTitleDirective
 } from '@spartan-ng/ui-alertdialog-helm';
-
 
 @Component({
   selector: 'app-sessions-card',
@@ -43,7 +42,7 @@ import {
     BrnAlertDialogContentDirective,
     HlmAlertDialogFooterComponent,
     HlmAlertDialogHeaderComponent,
-    BrnAlertDialogTriggerDirective,
+    BrnAlertDialogTriggerDirective
   ],
   providers: [provideIcons({ lucidePlus })]
 })

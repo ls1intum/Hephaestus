@@ -30,10 +30,10 @@ public class MessageService {
 
     public List<MessageDTO> getMessagesBySessionId(Long sessionId) {
         return messageRepository
-                .findBySessionId(sessionId)
-                .stream()
-                .map(message -> MessageDTO.fromMessage(message))
-                .toList();
+            .findBySessionId(sessionId)
+            .stream()
+            .map(message -> MessageDTO.fromMessage(message))
+            .toList();
     }
 
     public MessageDTO sendMessage(String content, Long sessionId) {
@@ -45,8 +45,8 @@ public class MessageService {
 
         // prevent sending messages to closed sessions
         Session previousSession = sessionRepository
-                .findFirstByUserOrderByCreatedAtDesc(currentSession.getUser())
-                .orElse(null);
+            .findFirstByUserOrderByCreatedAtDesc(currentSession.getUser())
+            .orElse(null);
         if (previousSession != null && previousSession.isClosed()) {
             return null;
         }

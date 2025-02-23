@@ -12,9 +12,8 @@ import {
   HlmAlertDialogDescriptionDirective,
   HlmAlertDialogFooterComponent,
   HlmAlertDialogHeaderComponent,
-  HlmAlertDialogTitleDirective,
+  HlmAlertDialogTitleDirective
 } from '@spartan-ng/ui-alertdialog-helm';
-
 
 @Component({
   selector: 'app-start-session-card',

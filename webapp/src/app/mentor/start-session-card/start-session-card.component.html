@@ -22,7 +22,6 @@
 
     @if (isLastSessionClosed()) {
       <button hlmBtn aria-describedby="Start Session" (click)="this.createNewSession.emit()">Start Session</button>
-
     } @else {
       <hlm-alert-dialog>
         <button hlmBtn brnAlertDialogTrigger aria-describedby=">Start Session" class="w-full gap-2 mt-6 justify-start h-9">
