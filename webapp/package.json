@@ -68,7 +68,7 @@
     "keycloak-js": "^26.0.0",
     "lucide-angular": "^0.469.0",
     "ngx-scrollbar": "^13.0.3",
-    "ngx-sonner": "^2.0.0",
+    "ngx-sonner": "^3.0.0",
     "postcss": "8.4.41",
     "posthog-js": "^1.215.6",
     "rxjs": "7.8.1",

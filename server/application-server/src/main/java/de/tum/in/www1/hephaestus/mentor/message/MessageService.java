@@ -30,10 +30,10 @@ public class MessageService {
 
     public List<MessageDTO> getMessagesBySessionId(Long sessionId) {
         return messageRepository
-            .findBySessionId(sessionId)
-            .stream()
-            .map(message -> MessageDTO.fromMessage(message))
-            .toList();
+                .findBySessionId(sessionId)
+                .stream()
+                .map(message -> MessageDTO.fromMessage(message))
+                .toList();
     }
 
     public MessageDTO sendMessage(String content, Long sessionId) {
@@ -43,10 +43,10 @@ public class MessageService {
         }
         Session currentSession = session.get();
 
-        // Prevent sending messages to closed sessions
+        // prevent sending messages to closed sessions
         Session previousSession = sessionRepository
-            .findFirstByUserOrderByCreatedAtDesc(currentSession.getUser())
-            .orElse(null);
+                .findFirstByUserOrderByCreatedAtDesc(currentSession.getUser())
+                .orElse(null);
         if (previousSession != null && previousSession.isClosed()) {
             return null;
         }
@@ -67,6 +67,11 @@ public class MessageService {
             MentorResponse mentorMessage = intelligenceServiceApi.generateMentorPost(mentorRequest);
             String mentorResponse = mentorMessage.getContent();
             Message savedMentorMessage = createMentorMessage(currentSession, mentorResponse);
+            // update session status if mentor finished the conversation
+            if (mentorMessage.getClosed()) {
+                currentSession.setClosed(true);
+                sessionRepository.save(currentSession);
+            }
 
             return MessageDTO.fromMessage(savedMentorMessage);
         } catch (Exception e) {
@@ -76,7 +81,8 @@ public class MessageService {
         }
     }
 
-    public void sendFirstMessage(Session session, String previousSessionId, String devProgress) {
+    // returns true if the message was sent successfully
+    public boolean sendFirstMessage(Session session, String previousSessionId, String devProgress) {
         try {
             MentorStartRequest mentorStartRequest = new MentorStartRequest();
             mentorStartRequest.setPreviousSessionId(previousSessionId);
@@ -84,9 +90,11 @@ public class MessageService {
             mentorStartRequest.setDevProgress(devProgress);
             MentorResponse mentorMessage = intelligenceServiceApi.startMentorStartPost(mentorStartRequest);
             createMentorMessage(session, mentorMessage.getContent());
+            return true;
         } catch (Exception e) {
             // prevent saving empty system messages if the intelligence service is down
             logger.error("Failed to generate response during session start");
+            return false;
         }
     }
 

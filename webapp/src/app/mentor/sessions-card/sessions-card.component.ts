@@ -7,11 +7,40 @@ import { Session } from '@app/core/modules/openapi';
 import { HlmToggleDirective } from '@spartan-ng/ui-toggle-helm';
 import { HlmCardDirective } from '@spartan-ng/ui-card-helm';
 import { HlmSkeletonComponent } from '@spartan-ng/ui-skeleton-helm';
+import {
+  HlmAlertDialogActionButtonDirective,
+  HlmAlertDialogCancelButtonDirective,
+  HlmAlertDialogComponent,
+  HlmAlertDialogContentComponent,
+  HlmAlertDialogDescriptionDirective,
+  HlmAlertDialogFooterComponent,
+  HlmAlertDialogHeaderComponent,
+  HlmAlertDialogTitleDirective
+} from '@spartan-ng/ui-alertdialog-helm';
+import { BrnAlertDialogTriggerDirective, BrnAlertDialogContentDirective } from '@spartan-ng/ui-alertdialog-brain';
 
 @Component({
   selector: 'app-sessions-card',
   templateUrl: './sessions-card.component.html',
-  imports: [CommonModule, HlmSkeletonComponent, LucideAngularModule, BrnToggleDirective, HlmToggleDirective, HlmButtonModule, HlmCardDirective]
+  imports: [
+    CommonModule,
+    HlmSkeletonComponent,
+    LucideAngularModule,
+    BrnToggleDirective,
+    HlmToggleDirective,
+    HlmButtonModule,
+    HlmCardDirective,
+    HlmAlertDialogActionButtonDirective,
+    HlmAlertDialogCancelButtonDirective,
+    HlmAlertDialogComponent,
+    HlmAlertDialogContentComponent,
+    BrnAlertDialogContentDirective,
+    HlmAlertDialogDescriptionDirective,
+    HlmAlertDialogFooterComponent,
+    HlmAlertDialogHeaderComponent,
+    BrnAlertDialogTriggerDirective,
+    HlmAlertDialogTitleDirective
+  ]
 })
 export class SessionsCardComponent {
   protected Plus = Plus;
@@ -20,4 +49,5 @@ export class SessionsCardComponent {
   selectedSessionId = model<number | null>();
   createNewSession = output<void>();
   isLoading = input<boolean>();
+  isLastSessionClosed = input<boolean>();
 }

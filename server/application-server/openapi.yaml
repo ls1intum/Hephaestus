@@ -360,6 +360,18 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/MetaData"
+  /mentor/sessions/last:
+    get:
+      tags:
+      - session
+      operationId: getLastSession
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Session"
   /leaderboard:
     get:
       tags:

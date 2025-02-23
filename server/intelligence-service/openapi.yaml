@@ -34,6 +34,10 @@ components:
       type: object
     MentorResponse:
       properties:
+        closed:
+          default: false
+          title: Closed
+          type: boolean
         content:
           title: Content
           type: string

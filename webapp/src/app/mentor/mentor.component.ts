@@ -11,6 +11,8 @@ import { HlmButtonModule } from '@spartan-ng/ui-button-helm';
 import { StartSessionCardComponent } from './start-session-card/start-session-card.component';
 import { HlmAlertModule } from '@spartan-ng/ui-alert-helm';
 import { HlmScrollAreaComponent } from '@spartan-ng/ui-scrollarea-helm';
+import { toast } from 'ngx-sonner';
+import { HlmToasterComponent } from '@spartan-ng/ui-sonner-helm';
 
 @Component({
   selector: 'app-mentor',
@@ -20,6 +22,7 @@ import { HlmScrollAreaComponent } from '@spartan-ng/ui-scrollarea-helm';
     StartSessionCardComponent,
     SessionsCardComponent,
     MessagesComponent,
+    HlmToasterComponent,
     ChatInputComponent,
     HlmButtonModule,
     HlmAlertModule,
@@ -34,6 +37,7 @@ export class MentorComponent {
   sessionService = inject(SessionService);
 
   selectedSessionId = signal<number | undefined>(undefined);
+  lastSessionClosed = signal<boolean>(true);
   messagesScrollArea = viewChild(HlmScrollAreaComponent);
 
   queryClient = injectQueryClient();
@@ -42,6 +46,12 @@ export class MentorComponent {
     effect(() => {
       this.selectedSessionMessages.data(); // captures the dependency
       setTimeout(() => this.scrollToBottom(), 0);
+    });
+  }
+
+  showToast() {
+    toast('Something went wrong...', {
+      description: 'There was an error trying to generate response to your last message. If this issue persists, please contact the AET Team.'
     });
   }
 
@@ -58,7 +68,11 @@ export class MentorComponent {
 
   sessions = injectQuery(() => ({
     queryKey: ['sessions'],
-    queryFn: async () => await lastValueFrom(this.sessionService.getAllSessions())
+    queryFn: async () => {
+      const sessions = await lastValueFrom(this.sessionService.getAllSessions());
+      this.lastSessionClosed.set(sessions[sessions.length - 1].isClosed);
+      return sessions;
+    }
   }));
 
   selectedSessionMessages = injectQuery(() => ({
@@ -73,6 +87,10 @@ export class MentorComponent {
       return await this.queryClient.invalidateQueries({ queryKey: ['sessions'] });
     },
     onSuccess: (session) => {
+      if (session === undefined || session === null) {
+        this.showToast();
+        return;
+      }
       this.selectedSessionId.set(session.id);
       this.queryClient.invalidateQueries({ queryKey: ['sessions', this.selectedSessionId()] });
     }
@@ -90,22 +108,20 @@ export class MentorComponent {
 
       return { previousMessages };
     },
-
-    onSuccess: (response) => {
-      if (!response) {
-        const errorMessage: Message = { 
-          id: -2, sender: 'MENTOR', content: 'There was an error generating response.', 
-          sessionId: this.selectedSessionId()!, sentAt: new Date().toISOString() 
-        };
-  
-        this.queryClient.setQueryData(['sessions', this.selectedSessionId()], (old: Message[]) => [...old, errorMessage]);
+    onSuccess: (message) => {
+      if (message === undefined || message === null) {
+        this.showToast();
+        return;
       }
-  
-      this.queryClient.invalidateQueries({ queryKey: ['sessions', this.selectedSessionId()] });
+      // if the last session is closed, do not show the alert dialog when creating a new session
+      const lastSession = this.sessionService.getLastSession();
+      lastSession.forEach((session) => {
+        this.lastSessionClosed.set(session.isClosed);
+      });
     },
-
     onError: (err, newTodo, context) => {
       this.queryClient.setQueryData(['sessions', this.selectedSessionId()], context?.previousMessages);
+      this.showToast();
     },
     onSettled: () => {
       this.queryClient.invalidateQueries({ queryKey: ['sessions', this.selectedSessionId()] });

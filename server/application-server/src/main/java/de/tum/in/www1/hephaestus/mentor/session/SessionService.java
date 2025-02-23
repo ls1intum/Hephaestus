@@ -54,14 +54,9 @@ public class SessionService {
             .map(Session::getId)
             .map(String::valueOf)
             .orElse("");
-        // Close the previous session if it exists to prevent multiple open sessions
-        if (previousSessionId != "") {
-            Session previousSession = sessionRepository.findFirstByUserOrderByCreatedAtDesc(user).get();
-            previousSession.setClosed(true);
-            sessionRepository.save(previousSession);
-        }
+        Session previousSession = sessionRepository.findFirstByUserOrderByCreatedAtDesc(user).get();
 
-        // Get the last time interval's PRs
+        // get the last time interval's PRs
         List<PullRequestBaseInfoDTO> pullRequests = pullRequestRepository
             .findAssignedByLoginAndStatesUpdatedSince(
                 user.getLogin(),
@@ -77,7 +72,19 @@ public class SessionService {
         Session session = new Session();
         session.setUser(user);
         Session savedSession = sessionRepository.save(session);
-        messageService.sendFirstMessage(session, previousSessionId, devProgress);
+
+        if (!messageService.sendFirstMessage(session, previousSessionId, devProgress)) {
+            // if the intelligence service is down, do not create a session
+            sessionRepository.delete(savedSession);
+            return null;
+        }
+
+        // close the previous session if it exists to prevent multiple open sessions 
+        if (previousSessionId != "") {
+            previousSession.setClosed(true);
+            sessionRepository.save(previousSession);
+        }
+        
         return SessionDTO.fromSession(savedSession);
     }
 

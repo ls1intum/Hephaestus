@@ -12,18 +12,28 @@ type Story = StoryObj<StartSessionCardComponent>;
 
 export const Default: Story = {
   args: {
-    hasSessions: true
+    hasSessions: true,
+    isLastSessionClosed: true
   }
 };
 
 export const StartFirstSession: Story = {
   args: {
-    hasSessions: false
+    hasSessions: false,
+    isLastSessionClosed: true
   }
 };
 
 export const IsLoading: Story = {
   args: {
-    isLoading: true
+    isLoading: true,
+    isLastSessionClosed: true
+  }
+};
+
+export const LastSessionOpen: Story = {
+  args: {
+    hasSessions: true,
+    isLastSessionClosed: false
   }
 };

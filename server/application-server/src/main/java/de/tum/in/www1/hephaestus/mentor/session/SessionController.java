@@ -30,6 +30,17 @@ public class SessionController {
         return ResponseEntity.ok(sessions);
     }
 
+    @GetMapping("/last")
+    public ResponseEntity<SessionDTO> getLastSession() {
+        var user = userRepository.getCurrentUser();
+        if (user.isEmpty()) {
+            return ResponseEntity.notFound().build();
+        }
+
+        SessionDTO session = sessionService.findAllSessionsByUserByCreatedAtDesc(user.get()).getFirst();
+        return ResponseEntity.ok(session);
+    }
+
     @PostMapping
     public ResponseEntity<SessionDTO> createNewSession() {
         var user = userRepository.getCurrentUser();
