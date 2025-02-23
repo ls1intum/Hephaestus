@@ -9,15 +9,18 @@ import { HlmToggleDirective } from '@spartan-ng/ui-toggle-helm';
 import { HlmCardDirective } from '@spartan-ng/ui-card-helm';
 import { HlmSkeletonComponent } from '@spartan-ng/ui-skeleton-helm';
 import { BrnAlertDialogModule } from '@spartan-ng/brain/alert-dialog';
+import { BrnAlertDialogContentDirective, BrnAlertDialogTriggerDirective } from '@spartan-ng/brain/alert-dialog';
 import {
   HlmAlertDialogActionButtonDirective,
   HlmAlertDialogCancelButtonDirective,
   HlmAlertDialogComponent,
   HlmAlertDialogContentComponent,
+  HlmAlertDialogDescriptionDirective,
   HlmAlertDialogFooterComponent,
   HlmAlertDialogHeaderComponent,
+  HlmAlertDialogTitleDirective,
 } from '@spartan-ng/ui-alertdialog-helm';
-import { BrnAlertDialogTriggerDirective, BrnAlertDialogContentDirective } from '@spartan-ng/brain/alert-dialog';
+
 
 @Component({
   selector: 'app-sessions-card',
@@ -28,6 +31,8 @@ import { BrnAlertDialogTriggerDirective, BrnAlertDialogContentDirective } from '
     NgIconComponent,
     HlmSkeletonComponent,
     BrnAlertDialogModule,
+    HlmAlertDialogDescriptionDirective,
+    HlmAlertDialogTitleDirective,
     HlmToggleDirective,
     HlmButtonModule,
     HlmCardDirective,

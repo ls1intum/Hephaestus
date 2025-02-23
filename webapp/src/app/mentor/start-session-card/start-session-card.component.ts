@@ -3,21 +3,26 @@ import { NgIconComponent, provideIcons } from '@ng-icons/core';
 import { lucidePlus, lucideBotMessageSquare } from '@ng-icons/lucide';
 import { HlmButtonModule } from '@spartan-ng/ui-button-helm';
 import { HlmSkeletonComponent } from '@spartan-ng/ui-skeleton-helm';
+import { BrnAlertDialogContentDirective, BrnAlertDialogTriggerDirective } from '@spartan-ng/brain/alert-dialog';
 import {
   HlmAlertDialogActionButtonDirective,
   HlmAlertDialogCancelButtonDirective,
   HlmAlertDialogComponent,
   HlmAlertDialogContentComponent,
+  HlmAlertDialogDescriptionDirective,
   HlmAlertDialogFooterComponent,
   HlmAlertDialogHeaderComponent,
+  HlmAlertDialogTitleDirective,
 } from '@spartan-ng/ui-alertdialog-helm';
-import { BrnAlertDialogTriggerDirective, BrnAlertDialogContentDirective } from '@spartan-ng/brain/alert-dialog';
+
 
 @Component({
   selector: 'app-start-session-card',
   templateUrl: './start-session-card.component.html',
   imports: [
     NgIconComponent,
+    HlmAlertDialogDescriptionDirective,
+    HlmAlertDialogTitleDirective,
     HlmButtonModule,
     HlmSkeletonComponent,
     HlmAlertDialogActionButtonDirective,
