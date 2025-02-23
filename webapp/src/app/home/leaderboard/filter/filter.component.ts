@@ -4,10 +4,11 @@ import { NgIconComponent, provideIcons } from '@ng-icons/core';
 import { lucideListFilter } from '@ng-icons/lucide';
 import { LeaderboardFilterTimeframeComponent } from './timeframe/timeframe.component';
 import { LeaderboardFilterTeamComponent } from './team/team.component';
+import { LeaderboardFilterSortComponent } from './sort/sort.component';
 
 @Component({
   selector: 'app-leaderboard-filter',
-  imports: [NgIconComponent, FormsModule, LeaderboardFilterTimeframeComponent, LeaderboardFilterTeamComponent],
+  imports: [NgIconComponent, FormsModule, LeaderboardFilterTimeframeComponent, LeaderboardFilterTeamComponent, LeaderboardFilterSortComponent],
   providers: [provideIcons({ lucideListFilter })],
   templateUrl: './filter.component.html'
 })
