@@ -46,5 +46,11 @@ export const routes: Routes = [
   { path: 'user/:id', component: UserProfileComponent, canActivate: [AuthGuard] },
   { path: 'settings', component: SettingsComponent, canActivate: [AuthGuard] },
   { path: 'mentor', component: MentorComponent, canActivate: [AuthGuard, MentorGuard] },
-  { path: 'workspace', component: WorkspaceComponent, canActivate: [AuthGuard, AdminGuard] }
+  { path: 'workspace', component: WorkspaceComponent, canActivate: [AuthGuard, AdminGuard] },
+  {
+    path: 'analytics',
+    loadChildren: () => import('./analytics/analytics.routes').then(m => m.ANALYTICS_ROUTES),
+    canActivate: [AuthGuard, AdminGuard],
+    title: 'Analytics'
+  }
 ];
