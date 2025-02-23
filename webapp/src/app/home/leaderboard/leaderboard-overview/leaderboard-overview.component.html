@@ -1,0 +1,24 @@
+<div hlmCard>
+  <div hlmCardContent class="py-4">
+    <div class="flex gap-8">
+      <button hlmBtn variant="ghost" class="h-full" (click)="scrollToRank(leaderboardEntry().rank)">
+        <div class="flex flex-col items-center gap-2">
+          <div class="flex items-end gap-2">
+            <span>
+              <span class="text-3xl font-light text-muted-foreground">#</span>
+              <span class="text-4xl text-primary font-light">{{ leaderboardEntry().rank }}</span>
+            </span>
+            <hlm-avatar>
+              <img [src]="leaderboardEntry().user.avatarUrl" [alt]="leaderboardEntry().user.name + '\'s avatar'" hlmAvatarImage />
+              <span hlmAvatarFallback>
+                {{ leaderboardEntry().user.name.slice(0, 2).toUpperCase() }}
+              </span>
+            </hlm-avatar>
+          </div>
+          <span class="text-muted-foreground">{{ leaderboardEntry().user.name }}</span>
+        </div>
+      </button>
+      <app-league-elo-card [leaguePoints]="leaguePoints()" />
+    </div>
+  </div>
+</div>

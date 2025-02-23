@@ -2,17 +2,22 @@
   <app-icon-league [leaguePoints]="leaguePoints()" size="lg" />
   @if (currentLeague(); as currentLeague) {
     <div class="flex flex-col">
-      <span class="text-sm font-semibold text-github-muted-foreground">{{ currentLeague.name }}</span>
-      <!-- Points display -->
-      <div class="flex justify-between text-sm text-github-muted-foreground">
-        <div class="flex items-center gap-2">
-          @if (currentLeague.maxPoints === Infinity) {
-            <span>{{ leaguePoints() }}</span>
-          } @else {
-            <span>{{ leaguePoints() }} / {{ currentLeague.maxPoints }}</span>
-          }
-          <ng-icon name="lucideStar" class="text-base" />
+      <div class="flex items-center gap-2">
+        <div>
+          <span class="text-sm font-semibold text-github-muted-foreground">{{ currentLeague.name }}</span>
+          <!-- Points display -->
+          <div class="flex justify-between text-sm text-github-muted-foreground">
+            <div class="flex items-center gap-2">
+              @if (currentLeague.maxPoints === Infinity) {
+                <span>{{ leaguePoints() }}</span>
+              } @else {
+                <span>{{ leaguePoints() }} / {{ currentLeague.maxPoints }}</span>
+              }
+              <ng-icon name="lucideStar" class="text-base" />
+            </div>
+          </div>
         </div>
+        <app-league-info-modal />
       </div>
       <!-- Progress bar container -->
       <div class="flex justify-center items-center gap-2">
