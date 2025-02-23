@@ -203,6 +203,17 @@
 			<artifactId>sentry-spring-boot-starter-jakarta</artifactId>
 			<version>8.2.0</version>
 		</dependency>
+		<!-- Rate limiting dependency -->
+		<dependency>
+			<groupId>com.bucket4j</groupId>
+			<artifactId>bucket4j-core</artifactId>
+			<version>8.10.0</version>
+		</dependency>
+		<!-- Spring Cache dependency -->
+		<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-starter-cache</artifactId>
+		</dependency>
 	</dependencies>
 	<dependencyManagement>
 		<dependencies>

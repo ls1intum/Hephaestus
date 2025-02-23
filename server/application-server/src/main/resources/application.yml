@@ -35,6 +35,16 @@ springdoc:
 hephaestus:
     host-url: https://hephaestus.ase.cit.tum.de/
     
+    analytics:
+        rate-limit:
+            capacity: 100
+            refill-tokens: 100
+            refill-minutes: 1
+        cache:
+            team-metrics-ttl-minutes: 15
+            analysis-results-ttl-minutes: 30
+            recommendations-ttl-minutes: 60
+    
     leaderboard:
         schedule:
             day: 2

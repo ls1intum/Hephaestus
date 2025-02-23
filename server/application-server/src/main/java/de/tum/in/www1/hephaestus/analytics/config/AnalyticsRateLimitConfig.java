@@ -3,6 +3,7 @@ package de.tum.in.www1.hephaestus.analytics.config;
 import io.github.bucket4j.Bandwidth;
 import io.github.bucket4j.Bucket;
 import io.github.bucket4j.Refill;
+import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
@@ -11,8 +12,10 @@ import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
 @Configuration
+@RequiredArgsConstructor
 public class AnalyticsRateLimitConfig {
 
+    private final AnalyticsProperties analyticsProperties;
     private final Map<String, Bucket> buckets = new ConcurrentHashMap<>();
 
     @Bean
@@ -25,8 +28,12 @@ public class AnalyticsRateLimitConfig {
     }
 
     private Bucket newBucket(String key) {
+        AnalyticsProperties.RateLimit rateLimitProps = analyticsProperties.getRateLimit();
         return Bucket.builder()
-            .addLimit(Bandwidth.classic(100, Refill.intervally(100, Duration.ofMinutes(1))))
+            .addLimit(Bandwidth.classic(
+                rateLimitProps.getCapacity(),
+                Refill.intervally(rateLimitProps.getRefillTokens(), 
+                                Duration.ofMinutes(rateLimitProps.getRefillMinutes()))))
             .build();
     }
 }
