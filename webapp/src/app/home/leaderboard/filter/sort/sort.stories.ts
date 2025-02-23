@@ -1,4 +1,4 @@
-import { argsToTemplate, type Meta, type StoryObj } from '@storybook/angular';
+import { type Meta, type StoryObj } from '@storybook/angular';
 import { LeaderboardFilterSortComponent } from './sort.component';
 
 const meta: Meta<LeaderboardFilterSortComponent> = {
@@ -10,8 +10,7 @@ export default meta;
 type Story = StoryObj<LeaderboardFilterSortComponent>;
 
 export const Default: Story = {
-  render: (args) => ({
-    props: args,
-    template: `<app-leaderboard-filter-repository ${argsToTemplate(args)}/>`
+  render: () => ({
+    template: '<app-leaderboard-filter-sort />'
   })
 };
