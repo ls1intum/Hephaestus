@@ -14,12 +14,13 @@ import { SecurityStore } from '@app/core/security/security-store.service';
 import { HlmAlertModule } from '@spartan-ng/ui-alert-helm';
 import { MetaService, UserService } from '@app/core/modules/openapi';
 import { LeaderboardOverviewComponent } from './leaderboard/leaderboard-overview/leaderboard-overview.component';
+import { LeaderboardLegendComponent } from './leaderboard/legend/legends.component';
 
 dayjs.extend(isoWeek);
 
 @Component({
   selector: 'app-home',
-  imports: [LeaderboardComponent, LeaderboardFilterComponent, HlmAlertModule, NgIconComponent, LeaderboardOverviewComponent],
+  imports: [LeaderboardComponent, LeaderboardFilterComponent, HlmAlertModule, NgIconComponent, LeaderboardOverviewComponent, LeaderboardLegendComponent],
   providers: [provideIcons({ lucideCircleX })],
   templateUrl: './home.component.html'
 })

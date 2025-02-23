@@ -20,7 +20,7 @@
         } @else {
           @let leaguePoints = userMeQuery.data()?.userInfo?.leaguePoints;
           @let leaderboardEntry = ownLeaderboardEntry();
-          @if (leaguePoints && leaderboardEntry) {
+          @if (leaguePoints !== undefined && leaderboardEntry !== undefined) {
             <app-leaderboard-overview [leaguePoints]="leaguePoints" [leaderboardEntry]="leaderboardEntry" />
           }
           <div class="border rounded-md border-input overflow-auto">
