@@ -7,10 +7,20 @@ import { getLeagueFromPoints } from '@app/utils';
 import { HlmButtonModule } from '@spartan-ng/ui-button-helm';
 import { NgIconComponent, provideIcons } from '@ng-icons/core';
 import { lucideStar } from '@ng-icons/lucide';
+import { LeagueInfoModalComponent } from '../info-modal/info-modal.component';
 
 @Component({
   selector: 'app-league-elo-card',
-  imports: [HlmCardModule, LeagueIconComponent, BrnProgressComponent, BrnProgressIndicatorComponent, HlmProgressIndicatorDirective, HlmButtonModule, NgIconComponent],
+  imports: [
+    HlmCardModule,
+    LeagueIconComponent,
+    LeagueInfoModalComponent,
+    BrnProgressComponent,
+    BrnProgressIndicatorComponent,
+    HlmProgressIndicatorDirective,
+    HlmButtonModule,
+    NgIconComponent
+  ],
   providers: [provideIcons({ lucideStar })],
   templateUrl: './elo-card.component.html'
 })

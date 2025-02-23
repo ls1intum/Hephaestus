@@ -46,7 +46,7 @@
       </tr>
     } @else {
       @for (entry of leaderboard(); track entry.user.login) {
-        <tr appTableRow routerLink="/user/{{ entry.user.login }}" routerLinkActive="active" ariaCurrentWhenActive="page" [class]="trClass(entry)">
+        <tr [id]="'rank-' + entry.rank" appTableRow routerLink="/user/{{ entry.user.login }}" routerLinkActive="active" ariaCurrentWhenActive="page" [class]="trClass(entry)">
           <td appTableCell class="text-center">{{ entry.rank }}</td>
           <td appTableCell class="flex flex-col justify-center items-center px-0.5">
             <app-icon-league [leaguePoints]="entry.user.leaguePoints" />

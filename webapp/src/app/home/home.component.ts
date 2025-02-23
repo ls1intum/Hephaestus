@@ -13,14 +13,14 @@ import { LeaderboardFilterComponent } from './leaderboard/filter/filter.componen
 import { SecurityStore } from '@app/core/security/security-store.service';
 import { HlmAlertModule } from '@spartan-ng/ui-alert-helm';
 import { MetaService, UserService } from '@app/core/modules/openapi';
+import { LeaderboardOverviewComponent } from './leaderboard/leaderboard-overview/leaderboard-overview.component';
 import { LeaderboardLegendComponent } from './leaderboard/legend/legends.component';
-import { LeaderboardLeagueComponent } from './leaderboard/league/league.component';
 
 dayjs.extend(isoWeek);
 
 @Component({
   selector: 'app-home',
-  imports: [LeaderboardComponent, LeaderboardFilterComponent, HlmAlertModule, NgIconComponent, LeaderboardLegendComponent, LeaderboardLeagueComponent],
+  imports: [LeaderboardComponent, LeaderboardFilterComponent, HlmAlertModule, NgIconComponent, LeaderboardOverviewComponent, LeaderboardLegendComponent],
   providers: [provideIcons({ lucideCircleX })],
   templateUrl: './home.component.html'
 })
@@ -68,4 +68,8 @@ export class HomeComponent {
     queryKey: ['user', { id: this.user()?.username }],
     queryFn: async () => lastValueFrom(this.userService.getUserProfile(this.user()!.username))
   }));
+
+  ownLeaderboardEntry = computed(() => {
+    return this.query.data()?.find((entry) => entry.user.login.toLowerCase() === this.user()?.username);
+  });
 }
