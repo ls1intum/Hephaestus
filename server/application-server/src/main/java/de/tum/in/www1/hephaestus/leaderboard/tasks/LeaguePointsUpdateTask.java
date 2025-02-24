@@ -66,6 +66,6 @@ public class LeaguePointsUpdateTask implements Runnable {
             .withSecond(0)
             .withNano(0);
         OffsetDateTime after = before.minusWeeks(1);
-        return leaderboardService.createLeaderboard(after, before, Optional.empty());
+        return leaderboardService.createLeaderboard(after, before, Optional.empty(), Optional.empty());
     }
 }

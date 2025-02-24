@@ -355,7 +355,7 @@ public class WorkspaceService {
 
         // While we still have reviews in the past, calculate leaderboard and update points
         do {
-            var leaderboard = leaderboardService.createLeaderboard(weekAgo, now, Optional.empty());
+            var leaderboard = leaderboardService.createLeaderboard(weekAgo, now, Optional.empty(), Optional.empty());
             if (leaderboard.isEmpty()) {
                 break;
             }

@@ -26,7 +26,7 @@ public class LeaderboardController {
         @RequestParam @DateTimeFormat(iso = ISO.DATE_TIME) OffsetDateTime after,
         @RequestParam @DateTimeFormat(iso = ISO.DATE_TIME) OffsetDateTime before,
         @RequestParam Optional<String> team,
-        @RequestParam String sort
+        @RequestParam Optional<String> sort
     ) {
         return ResponseEntity.ok(leaderboardService.createLeaderboard(after, before, team, sort));
     }

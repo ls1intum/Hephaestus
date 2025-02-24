@@ -124,7 +124,7 @@ public class LeaderboardService {
         OffsetDateTime after,
         OffsetDateTime before,
         Optional<String> team,
-        String sort
+        Optional<String> sort
     ) {
         Optional<Team> teamEntity = team.map(t -> teamRepository.findByName(t)).orElse(Optional.empty());
         logger.info(
@@ -189,7 +189,7 @@ public class LeaderboardService {
         List<Long> rankingByUserId = scoresByUserId
             .entrySet()
             .stream()
-            .sorted(getComparator(sort, usersById, reviewsByUserId, issueCommentsByUserId))
+            .sorted(getComparator(sort.orElse("sort"), usersById, reviewsByUserId, issueCommentsByUserId))
             .map(Map.Entry::getKey)
             .collect(Collectors.toList());
 
