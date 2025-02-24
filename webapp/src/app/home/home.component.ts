@@ -54,7 +54,7 @@ export class HomeComponent {
     enabled: !!this.metaQuery.data() && !!this.afterParam() && !!this.beforeParam() && !!this.teamParam(),
     queryKey: ['leaderboard', { after: this.afterParam(), before: this.beforeParam(), team: this.teamParam(), sort: this.sortParam() }],
     queryFn: async () =>
-      lastValueFrom(this.leaderboardService.getLeaderboard(this.afterParam()!, this.beforeParam()!, this.sortParam(), this.teamParam() !== 'all' ? this.teamParam() : undefined))
+      lastValueFrom(this.leaderboardService.getLeaderboard(this.afterParam()!, this.beforeParam()!, this.teamParam() !== 'all' ? this.teamParam() : undefined, this.sortParam()))
   }));
 
   protected teams = computed(() => this.metaQuery.data()?.teams?.map((team) => team.name) ?? []);
