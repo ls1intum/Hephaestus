@@ -189,7 +189,7 @@ public class LeaderboardService {
         List<Long> rankingByUserId = scoresByUserId
             .entrySet()
             .stream()
-            .sorted(getComparator(sort.orElse("sort"), usersById, reviewsByUserId, issueCommentsByUserId))
+            .sorted(getComparator(sort.orElse("score"), usersById, reviewsByUserId, issueCommentsByUserId))
             .map(Map.Entry::getKey)
             .collect(Collectors.toList());
 
