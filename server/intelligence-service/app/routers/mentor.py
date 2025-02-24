@@ -33,7 +33,7 @@ def start(request: MentorStartRequest):
     config = RunnableConfig({"configurable": {"thread_id": request.session_id}})
     response = start_session(request.previous_session_id, request.dev_progress, config)
     response_message = response["messages"][-1].content
-    return MentorResponse(content=response_message)
+    return MentorResponse(content=response_message, closed=response["closed"])
 
 
 @router.post(

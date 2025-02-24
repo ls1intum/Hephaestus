@@ -36,9 +36,12 @@ public class SessionController {
         if (user.isEmpty()) {
             return ResponseEntity.notFound().build();
         }
+        List<SessionDTO> sessions = sessionService.findAllSessionsByUserByCreatedAtDesc(user.get());
+        if (sessions.isEmpty()) {
+            return ResponseEntity.notFound().build();
+        }
 
-        SessionDTO session = sessionService.findAllSessionsByUserByCreatedAtDesc(user.get()).getFirst();
-        return ResponseEntity.ok(session);
+        return ResponseEntity.ok(sessions.getFirst());
     }
 
     @PostMapping

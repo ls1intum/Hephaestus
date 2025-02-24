@@ -50,22 +50,21 @@ public class SessionService {
     @Transactional
     public SessionDTO createSession(User user) {
         String previousSessionId = sessionRepository
-            .findFirstByUserOrderByCreatedAtDesc(user)
-            .map(Session::getId)
-            .map(String::valueOf)
-            .orElse("");
-        Session previousSession = sessionRepository.findFirstByUserOrderByCreatedAtDesc(user).get();
+                .findFirstByUserOrderByCreatedAtDesc(user)
+                .map(Session::getId)
+                .map(String::valueOf)
+                .orElse("");
+        Session previousSession = sessionRepository.findFirstByUserOrderByCreatedAtDesc(user).orElse(null);
 
         // get the last time interval's PRs
         List<PullRequestBaseInfoDTO> pullRequests = pullRequestRepository
-            .findAssignedByLoginAndStatesUpdatedSince(
-                user.getLogin(),
-                Set.of(Issue.State.OPEN, Issue.State.CLOSED),
-                OffsetDateTime.now().minusDays(7)
-            )
-            .stream()
-            .map(PullRequestBaseInfoDTO::fromPullRequest)
-            .toList();
+                .findAssignedByLoginAndStatesUpdatedSince(
+                        user.getLogin(),
+                        Set.of(Issue.State.OPEN, Issue.State.CLOSED),
+                        OffsetDateTime.now().minusDays(7))
+                .stream()
+                .map(PullRequestBaseInfoDTO::fromPullRequest)
+                .toList();
         String devProgress = formatPullRequests(pullRequests);
 
         // create a new session
@@ -80,7 +79,7 @@ public class SessionService {
         }
 
         // close the previous session if it exists to prevent multiple open sessions
-        if (previousSessionId != "") {
+        if (previousSession != null) {
             previousSession.setClosed(true);
             sessionRepository.save(previousSession);
         }
@@ -90,18 +89,15 @@ public class SessionService {
 
     private String formatPullRequests(List<PullRequestBaseInfoDTO> pullRequests) {
         return pullRequests
-            .stream()
-            .map(pr ->
-                String.format(
-                    "PR\nNumber: %d\nTitle: %s\nState: %s\nDraft: %b\nMerged: %b\nURL: %s\n",
-                    pr.number(),
-                    pr.title(),
-                    pr.state(),
-                    pr.isDraft(),
-                    pr.isMerged(),
-                    pr.htmlUrl()
-                )
-            )
-            .collect(Collectors.joining("\n---\n")); // add separators between PRs
+                .stream()
+                .map(pr -> String.format(
+                        "PR\nNumber: %d\nTitle: %s\nState: %s\nDraft: %b\nMerged: %b\nURL: %s\n",
+                        pr.number(),
+                        pr.title(),
+                        pr.state(),
+                        pr.isDraft(),
+                        pr.isMerged(),
+                        pr.htmlUrl()))
+                .collect(Collectors.joining("\n---\n")); // add separators between PRs
     }
 }

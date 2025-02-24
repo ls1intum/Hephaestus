@@ -67,7 +67,9 @@ export class MentorComponent {
     queryKey: ['sessions'],
     queryFn: async () => {
       const sessions = await lastValueFrom(this.sessionService.getAllSessions());
-      this.lastSessionClosed.set(sessions[sessions.length - 1].isClosed);
+      if (sessions.length != 0) {
+        this.lastSessionClosed.set(sessions[sessions.length - 1].isClosed);
+      }
       return sessions;
     }
   }));
