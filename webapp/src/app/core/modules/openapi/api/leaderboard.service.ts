@@ -103,10 +103,10 @@ export class LeaderboardService implements LeaderboardServiceInterface {
      * @param observe set whether or not to return the data Observable as the body, response or events. defaults to returning the body.
      * @param reportProgress flag to report request and response progress.
      */
-    public getLeaderboard(after: string, before: string, team?: string, sort?: string, observe?: 'body', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<Array<LeaderboardEntry>>;
-    public getLeaderboard(after: string, before: string, team?: string, sort?: string, observe?: 'response', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<HttpResponse<Array<LeaderboardEntry>>>;
-    public getLeaderboard(after: string, before: string, team?: string, sort?: string, observe?: 'events', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<HttpEvent<Array<LeaderboardEntry>>>;
-    public getLeaderboard(after: string, before: string, team?: string, sort?: string, observe: any = 'body', reportProgress: boolean = false, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<any> {
+    public getLeaderboard(after: string, before: string, team?: string, sort?: 'SCORE' | 'LEAGUE_POINTS', observe?: 'body', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<Array<LeaderboardEntry>>;
+    public getLeaderboard(after: string, before: string, team?: string, sort?: 'SCORE' | 'LEAGUE_POINTS', observe?: 'response', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<HttpResponse<Array<LeaderboardEntry>>>;
+    public getLeaderboard(after: string, before: string, team?: string, sort?: 'SCORE' | 'LEAGUE_POINTS', observe?: 'events', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<HttpEvent<Array<LeaderboardEntry>>>;
+    public getLeaderboard(after: string, before: string, team?: string, sort?: 'SCORE' | 'LEAGUE_POINTS', observe: any = 'body', reportProgress: boolean = false, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<any> {
         if (after === null || after === undefined) {
             throw new Error('Required parameter after was null or undefined when calling getLeaderboard.');
         }

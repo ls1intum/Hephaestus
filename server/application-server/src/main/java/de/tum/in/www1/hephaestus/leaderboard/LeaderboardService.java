@@ -45,15 +45,14 @@ public class LeaderboardService {
     private TeamRepository teamRepository;
 
     private Comparator<Map.Entry<Long, Integer>> getComparator(
-        String sortType,
+        LeaderboardSortType sortType,
         Map<Long, User> usersById,
         Map<Long, List<PullRequestReview>> reviewsByUserId,
         Map<Long, List<IssueComment>> issueCommentsByUserId
     ) {
         return switch (sortType) {
-            case "league_points" -> compareByLeaguePoints(usersById, reviewsByUserId, issueCommentsByUserId);
-            case "score" -> compareByScore(reviewsByUserId, issueCommentsByUserId);
-            default -> throw new IllegalArgumentException("Invalid sort type: " + sortType);
+            case LEAGUE_POINTS -> compareByLeaguePoints(usersById, reviewsByUserId, issueCommentsByUserId);
+            case SCORE -> compareByScore(reviewsByUserId, issueCommentsByUserId);
         };
     }
 
@@ -124,7 +123,7 @@ public class LeaderboardService {
         OffsetDateTime after,
         OffsetDateTime before,
         Optional<String> team,
-        Optional<String> sort
+        Optional<LeaderboardSortType> sort
     ) {
         Optional<Team> teamEntity = team.map(t -> teamRepository.findByName(t)).orElse(Optional.empty());
         logger.info(
@@ -189,7 +188,9 @@ public class LeaderboardService {
         List<Long> rankingByUserId = scoresByUserId
             .entrySet()
             .stream()
-            .sorted(getComparator(sort.orElse("score"), usersById, reviewsByUserId, issueCommentsByUserId))
+            .sorted(
+                getComparator(sort.orElse(LeaderboardSortType.SCORE), usersById, reviewsByUserId, issueCommentsByUserId)
+            )
             .map(Map.Entry::getKey)
             .collect(Collectors.toList());
 

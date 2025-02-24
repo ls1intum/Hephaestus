@@ -7,9 +7,11 @@ import { HlmLabelModule } from '@spartan-ng/ui-label-helm';
 import { NgIconComponent, provideIcons } from '@ng-icons/core';
 import { lucideArrowDownUp } from '@ng-icons/lucide';
 
+export type LeaderboardSortType = 'SCORE' | 'LEAGUE_POINTS';
+
 interface SelectOption {
   id: number;
-  value: string;
+  value: LeaderboardSortType;
   label: string;
 }
 
@@ -29,8 +31,8 @@ export class LeaderboardFilterSortComponent {
 
   options = computed(() => {
     return [
-      { id: 0, value: 'score', label: 'Score' },
-      { id: 1, value: 'league_points', label: 'League Points' }
+      { id: 0, value: 'SCORE', label: 'Score' },
+      { id: 1, value: 'LEAGUE_POINTS', label: 'League Points' }
     ] as SelectOption[];
   });
 

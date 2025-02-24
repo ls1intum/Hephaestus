@@ -388,6 +388,9 @@ paths:
         required: false
         schema:
           type: string
+          enum:
+          - SCORE
+          - LEAGUE_POINTS
       responses:
         "200":
           description: OK

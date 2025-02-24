@@ -15,6 +15,7 @@ import { HlmAlertModule } from '@spartan-ng/ui-alert-helm';
 import { MetaService, UserService } from '@app/core/modules/openapi';
 import { LeaderboardOverviewComponent } from './leaderboard/leaderboard-overview/leaderboard-overview.component';
 import { LeaderboardLegendComponent } from './leaderboard/legend/legends.component';
+import { LeaderboardSortType } from './leaderboard/filter/sort/sort.component';
 
 dayjs.extend(isoWeek);
 
@@ -48,7 +49,7 @@ export class HomeComponent {
   protected afterParam = computed(() => this.queryParams().get('after'));
   protected beforeParam = computed(() => this.queryParams().get('before'));
   protected teamParam = computed(() => this.queryParams().get('team') ?? 'all');
-  protected sortParam = computed(() => this.queryParams().get('sort') ?? 'score');
+  protected sortParam = computed(() => (this.queryParams().get('sort') ?? 'SCORE') as LeaderboardSortType);
 
   query = injectQuery(() => ({
     enabled: !!this.metaQuery.data() && !!this.afterParam() && !!this.beforeParam() && !!this.teamParam(),
