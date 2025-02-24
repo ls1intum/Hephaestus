@@ -41,7 +41,12 @@
             [class.border-t]="selectedSessionMessages.data()?.length"
           />
         } @else {
-          <app-start-session-card (createNewSession)="this.createNewSession.mutate()" [isLoading]="sessions.isPending()" [hasSessions]="(sessions.data()?.length ?? 0) > 0" />
+          <app-start-session-card
+            (createNewSession)="this.createNewSession.mutate()"
+            [isLoading]="sessions.isPending()"
+            [isLastSessionClosed]="this.lastSessionClosed()"
+            [hasSessions]="(sessions.data()?.length ?? 0) > 0"
+          />
         }
       </div>
     }

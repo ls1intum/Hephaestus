@@ -55,7 +55,6 @@ public class SessionService {
     public SessionDTO createSession(User user) {
         // if the intelligence service is not available, return null
         try {
-            System.out.println("statusMentorHealthGet");
             intelligenceServiceApi.statusMentorHealthGet();
         } catch (Exception e) {
             return null;

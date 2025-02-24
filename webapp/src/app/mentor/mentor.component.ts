@@ -53,22 +53,20 @@ export class MentorComponent {
   }
 
   selectedSessionClosed = computed(() => {
-    const selectedId = this.selectedSessionId();
-    if (!selectedId) return false;
-
-    const sessions = this.sessions.data();
-    if (!sessions) return false;
-
-    const selectedSession = sessions.find((session) => session.id === selectedId);
+    if (!this.selectedSessionId() || !this.sessions.data()?.length) return false;
+  
+    const selectedSession = this.sessions.data()?.find((session) => session.id === this.selectedSessionId());
     return selectedSession?.isClosed ?? false;
   });
+  
 
   sessions = injectQuery(() => ({
     queryKey: ['sessions'],
     queryFn: async () => {
       const sessions = await lastValueFrom(this.sessionService.getAllSessions());
-      if (sessions.length != 0) {
-        this.lastSessionClosed.set(sessions[sessions.length - 1].isClosed);
+      const lastSession = await lastValueFrom(this.sessionService.getLastSession());
+      if (lastSession) {
+        this.lastSessionClosed.set(lastSession.isClosed);
       }
       return sessions;
     }
@@ -85,12 +83,15 @@ export class MentorComponent {
     onSettled: async () => {
       return await this.queryClient.invalidateQueries({ queryKey: ['sessions'] });
     },
-    onSuccess: (session) => {
-      if (session === undefined || session === null) {
+    onSuccess: async (session) => {
+      if (!session) {
         this.showToast();
         return;
       }
+      this.lastSessionClosed.set(session.isClosed);
       this.selectedSessionId.set(session.id);
+    
+      await this.queryClient.invalidateQueries({ queryKey: ['sessions'] }); 
       this.queryClient.invalidateQueries({ queryKey: ['sessions', this.selectedSessionId()] });
     }
   }));
@@ -113,8 +114,7 @@ export class MentorComponent {
         return;
       }
       // if the last session is closed, do not show the alert dialog when creating a new session
-      const lastSession = this.sessionService.getLastSession();
-      lastSession.forEach((session) => {
+      this.sessionService.getLastSession().subscribe((session) => {
         this.lastSessionClosed.set(session.isClosed);
       });
     },
