@@ -1,4 +1,4 @@
-name: Deploy to Production
+name: Deploy to Staging
 
 on:
   workflow_dispatch:
