@@ -136,6 +136,18 @@ paths:
       summary: Continue a chat session with an LLM.
       tags:
       - mentor
+  /mentor/health:
+    get:
+      operationId: status_mentor_health_get
+      responses:
+        '200':
+          content:
+            application/json:
+              schema: {}
+          description: Successful Response
+      summary: Check if the intelligence service is running
+      tags:
+      - mentor
   /mentor/start:
     post:
       operationId: start_mentor_start_post

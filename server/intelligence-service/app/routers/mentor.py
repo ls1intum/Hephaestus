@@ -24,6 +24,13 @@ class MentorResponse(BaseModel):
     closed: bool = False
 
 
+@router.get(
+    "/health", summary="Check if the intelligence service is running", status_code=200
+)
+def status():
+    return {"status": "ok"}
+
+
 @router.post(
     "/start",
     response_model=MentorResponse,
