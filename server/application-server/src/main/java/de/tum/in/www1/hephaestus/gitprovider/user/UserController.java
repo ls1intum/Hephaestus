@@ -14,6 +14,9 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+
 
 @RestController
 @RequestMapping("/user")
@@ -26,6 +29,9 @@ public class UserController {
 
     @Autowired
     private Keycloak keycloak;
+
+    @Autowired
+    private UserRepository userRepository;
 
     @Value("${keycloak.realm}")
     private String realm;
@@ -55,5 +61,27 @@ public class UserController {
             return ResponseEntity.badRequest().body(null);
         }
         return ResponseEntity.ok().build();
+    }
+
+    @GetMapping("/settings")
+    public ResponseEntity<UserSettingsDTO> getUserSettings() {
+        var user = userRepository.getCurrentUser();
+        if (user.isEmpty()) {
+            return ResponseEntity.notFound().build();
+        }
+
+        UserSettingsDTO userSettings = userService.getUserSettings(user.get());
+        return ResponseEntity.ok(userSettings);
+    }
+
+    @PostMapping("/settings")
+    public ResponseEntity<UserSettingsDTO> updateUserSettings(@RequestBody UserSettingsDTO userSettings) {
+        var user = userRepository.getCurrentUser();
+        if (user.isEmpty()) {
+            return ResponseEntity.notFound().build();
+        }
+
+        UserSettingsDTO updatedUserSettings = userService.updateUserSettings(user.get(), userSettings);
+        return ResponseEntity.ok(updatedUserSettings);
     }
 }
