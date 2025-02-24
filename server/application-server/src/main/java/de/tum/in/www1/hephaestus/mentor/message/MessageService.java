@@ -37,13 +37,6 @@ public class MessageService {
     }
 
     public MessageDTO sendMessage(String content, Long sessionId) {
-        // if the intelligence service is not available, return null
-        try {
-            intelligenceServiceApi.statusMentorHealthGet();
-        } catch (Exception e) {
-            return null;
-        }
-
         Optional<Session> session = sessionRepository.findById(sessionId);
         if (session.isEmpty() || content == null) {
             return null;
