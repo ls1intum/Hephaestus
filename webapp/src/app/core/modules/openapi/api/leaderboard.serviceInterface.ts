@@ -29,9 +29,9 @@ export interface LeaderboardServiceInterface {
      * 
      * @param after 
      * @param before 
-     * @param sort 
      * @param team 
+     * @param sort 
      */
-    getLeaderboard(after: string, before: string, sort: string, team?: string, extraHttpRequestParams?: any): Observable<Array<LeaderboardEntry>>;
+    getLeaderboard(after: string, before: string, team?: string, sort?: string, extraHttpRequestParams?: any): Observable<Array<LeaderboardEntry>>;
 
 }
