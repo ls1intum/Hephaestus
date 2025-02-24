@@ -14,6 +14,7 @@ import { HttpHeaders }                                       from '@angular/comm
 import { Observable }                                        from 'rxjs';
 
 import { UserProfile } from '../model/models';
+import { UserSettings } from '../model/models';
 
 
 import { Configuration }                                     from '../configuration';
@@ -36,5 +37,18 @@ export interface UserServiceInterface {
      * @param login 
      */
     getUserProfile(login: string, extraHttpRequestParams?: any): Observable<UserProfile>;
+
+    /**
+     * 
+     * 
+     */
+    getUserSettings(extraHttpRequestParams?: any): Observable<UserSettings>;
+
+    /**
+     * 
+     * 
+     * @param userSettings 
+     */
+    updateUserSettings(userSettings: UserSettings, extraHttpRequestParams?: any): Observable<UserSettings>;
 
 }
