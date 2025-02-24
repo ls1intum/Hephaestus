@@ -74,12 +74,30 @@ public class MailBuilder {
         return this;
     }
 
+    public MailBuilder fillPlaceholder(String placeholder, Object value) {
+        this.variables.put(placeholder, value);
+
+        return this;
+    }
+
+    public MailBuilder fillUserPlaceholders(User user, String placeholder) {
+        fillPlaceholder(placeholder, UserInfoDTO.fromUser(user));
+
+        return this;
+    }
+
+    public MailBuilder fillBadPracticePlaceholders(String badPractice, String placeholder) {
+        fillPlaceholder(placeholder, badPractice);
+
+        return this;
+    }
+
 
     public void send(JavaMailSender mailSender) {
         List<User> toRecipients = new ArrayList<>();
 
         for (User recipient : primaryRecipients) {
-            if (!recipient.isNotificationsEnabled()) {
+            if (!recipient.isNotificationsEnabled() || recipient.getEmail() == null || !recipient.getEmail().contains("@")) {
                 continue;
             }
             toRecipients.add(recipient);
@@ -89,7 +107,7 @@ public class MailBuilder {
             try {
                 MimeMessage message = mailSender.createMimeMessage();
 
-                message.setFrom("ThesisManagement <" + config.getSender().getAddress() + ">");
+                message.setFrom("Hephaestus <" + config.getSender().getAddress() + ">");
                 message.setSender(config.getSender());
 
                 message.addRecipient(Message.RecipientType.TO, new InternetAddress(recipient.getEmail()));
@@ -109,6 +127,7 @@ public class MailBuilder {
                 message.setContent(messageContent);
 
                 if (config.isEnabled()) {
+                    log.info("Sending Mail\n{}", messageBody.getContent());
                     mailSender.send(message);
                 } else {
                     log.info("Sending Mail (postfix disabled)\n{}", messageBody.getContent());

@@ -16,9 +16,6 @@ public class MailConfig {
     private final Boolean enabled;
 
     @Getter
-    private final String clientHost;
-
-    @Getter
     private final InternetAddress sender;
 
     @Getter
@@ -32,13 +29,11 @@ public class MailConfig {
             @Value("${hephaestus.mail.sender}") InternetAddress sender,
             @Value("${hephaestus.mail.enabled}") boolean enabled,
             @Value("${hephaestus.mail.signature}") String mailSignature,
-            @Value("${hephaestus.client.host}") String clientHost,
             TemplateEngine templateEngine
     ) {
         this.enabled = enabled;
         this.sender = sender;
         this.signature = mailSignature;
-        this.clientHost = clientHost;
         this.templateEngine = templateEngine;
     }
 
@@ -47,14 +42,12 @@ public class MailConfig {
     }
 
     public record MailConfigDto(
-            String signature,
-            String clientHost
+            String signature
     ) {}
 
     public MailConfigDto getConfigDto() {
         return new MailConfigDto(
-                Objects.requireNonNullElse(signature, ""),
-                Objects.requireNonNullElse(getClientHost(), "")
+                Objects.requireNonNullElse(signature, "")
         );
     }
 }
