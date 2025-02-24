@@ -84,9 +84,9 @@ public class LeaderboardService {
     /**
      * Creates a comparator that compares users by their score.
      * If two users have the same score, they are compared by the total number of comments.
-     * @param reviewsByUserId
-     * @param issueCommentsByUserId
-     * @return
+     * @param reviewsByUserId map of reviews by user ID
+     * @param issueCommentsByUserId map of issue comments by user ID
+     * @return a comparator that sorts by score descending
      */
     private Comparator<Map.Entry<Long, Integer>> compareByScore(
         Map<Long, List<PullRequestReview>> reviewsByUserId,
