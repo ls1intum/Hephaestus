@@ -25,10 +25,10 @@ services:
       - "traefik.http.routers.https-webhook-ingest.rule=Host(`${APP_HOSTNAME}`) && PathPrefix(`/webhooks`)"
       - "traefik.http.routers.https-webhook-ingest.tls.certresolver=letsencrypt"
       - "traefik.http.routers.https-webhook-ingest.tls=true"
+      - "traefik.http.routers.http-webhook-ingest.priority=100"
+      - "traefik.http.routers.https-webhook-ingest.priority=100"
       - "traefik.http.services.http-webhook-ingest.loadbalancer.server.port=4200"
       - "traefik.http.services.https-webhook-ingest.loadbalancer.server.port=4200"
-      - "traefik.http.routers.http-webhook-ingest.priority=5"
-      - "traefik.http.routers.https-webhook-ingest.priority=10"
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:4200/health"]
       interval: 30s
