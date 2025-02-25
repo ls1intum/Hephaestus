@@ -1,6 +1,6 @@
 import { Component, effect, inject, computed, signal, viewChild } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { lastValueFrom } from 'rxjs';
+import { lastValueFrom, take } from 'rxjs';
 import { injectMutation, injectQuery, QueryClient } from '@tanstack/angular-query-experimental';
 import { SessionsCardComponent } from './sessions-card/sessions-card.component';
 import { MessagesComponent } from './messages/messages.component';
@@ -18,7 +18,6 @@ import { HlmScrollAreaDirective } from '@spartan-ng/ui-scrollarea-helm';
   templateUrl: './mentor.component.html',
   imports: [
     CommonModule,
-    NgScrollbarModule,
     StartSessionCardComponent,
     SessionsCardComponent,
     MessagesComponent,
@@ -109,10 +108,14 @@ export class MentorComponent {
         this.showToast();
         return;
       }
+
       // if the last session is closed, do not show the alert dialog when creating a new session
-      this.sessionService.getLastSession().subscribe((session) => {
-        this.lastSessionClosed.set(session.isClosed);
-      });
+      this.sessionService
+        .getLastSession()
+        .pipe(take(1))
+        .subscribe((session) => {
+          this.lastSessionClosed.set(session.isClosed);
+        });
     },
     onError: (err, newTodo, context) => {
       this.queryClient.setQueryData(['sessions', this.selectedSessionId()], context?.previousMessages);
