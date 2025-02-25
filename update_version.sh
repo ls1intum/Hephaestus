@@ -30,10 +30,10 @@ if [[ "$INCREMENT_TYPE" != "major" && "$INCREMENT_TYPE" != "minor" && "$INCREMEN
 fi
 
 # Ensure git working directory is clean
-if ! git diff-index --quiet HEAD --; then
-    echo "Error: Git working tree is not clean. Please commit or stash your changes before updating version."
-    exit 1
-fi
+# if ! git diff-index --quiet HEAD --; then
+#     echo "Error: Git working tree is not clean. Please commit or stash your changes before updating version."
+#     exit 1
+# fi
 
 # Function to increment a semantic version number (format: X.Y.Z)
 increment_version() {
@@ -106,8 +106,13 @@ sed -E -i '' "s#(version *= *\")[0-9]+(\.[0-9]+){2}\"#\1${NEW_VERSION}\"#" serve
 # Update server/intelligence-service/app/main.py
 sed -E -i '' "s#(version *= *\")[0-9]+(\.[0-9]+){2}\"#\1${NEW_VERSION}\"#" server/intelligence-service/app/main.py
 
-# Update Maven POM (preserving -SNAPSHOT suffix)
-sed -E -i '' "s#(<version>)[0-9]+(\.[0-9]+){2}(-SNAPSHOT)?(</version>)#\1${NEW_VERSION}-SNAPSHOT\4#" server/application-server/pom.xml
+# Update Maven POM (only update the project version for hephaestus)
+# This awk script looks for the line with <artifactId>hephaestus</artifactId>,
+# then updates the next <version> element.
+awk -v new_version="${NEW_VERSION}" '
+    /<artifactId>hephaestus<\/artifactId>/ { print; getline; if ($0 ~ /<version>/) { sub(/<version>[0-9]+\.[0-9]+\.[0-9]+(-SNAPSHOT)?<\/version>/, "<version>" new_version "-SNAPSHOT</version>") } }
+    { print }
+' server/application-server/pom.xml > server/application-server/pom.xml.tmp && mv server/application-server/pom.xml.tmp server/application-server/pom.xml
 
 # Update server/application-server/openapi.yaml (non-quoted version)
 sed -E -i '' "s#(version:[[:space:]]*)[0-9]+(\.[0-9]+){2}#\1${NEW_VERSION}#" server/application-server/openapi.yaml
@@ -130,6 +135,6 @@ echo "Staging changes for git..."
 git add -A
 
 echo "Creating git commit..."
-git commit -m "Release: Bump version to ${NEW_VERSION} (${INCREMENT_TYPE} update)"
+# git commit -m "Release: Bump version to ${NEW_VERSION} (${INCREMENT_TYPE} update)"
 
 echo "Version update complete. New version: ${NEW_VERSION}"
