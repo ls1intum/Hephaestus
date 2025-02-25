@@ -5,13 +5,13 @@
 	<parent>
 		<groupId>org.springframework.boot</groupId>
 		<artifactId>spring-boot-starter-parent</artifactId>
-		<version>0.1.0-SNAPSHOT</version>
+		<version>3.4.3</version>
 		<relativePath />
 		<!-- lookup parent from repository -->
 	</parent>
 	<groupId>de.tum.in.www1</groupId>
 	<artifactId>hephaestus</artifactId>
-	<version>0.1.0-SNAPSHOT</version>
+	<version>0.0.1-SNAPSHOT</version>
 	<name>Hephaestus</name>
 	<description>AI-driven learning for better software development</description>
 	<url />
@@ -65,7 +65,7 @@
 		<dependency>
 			<groupId>org.springdoc</groupId>
 			<artifactId>springdoc-openapi-starter-webmvc-ui</artifactId>
-			<version>0.1.0-SNAPSHOT</version>
+			<version>2.8.5</version>
 		</dependency>
 		<dependency>
 			<groupId>org.liquibase</groupId>
@@ -74,7 +74,7 @@
 		<dependency>
 			<groupId>org.liquibase.ext</groupId>
 			<artifactId>liquibase-hibernate6</artifactId>
-			<version>0.1.0-SNAPSHOT</version>
+			<version>4.31.1</version>
 		</dependency>
 		<dependency>
 			<groupId>org.springframework.boot</groupId>
@@ -115,48 +115,48 @@
 		<dependency>
 			<groupId>io.zonky.test</groupId>
 			<artifactId>embedded-database-spring-test</artifactId>
-			<version>0.1.0-SNAPSHOT</version>
+			<version>2.6.0</version>
 			<scope>test</scope>
 		</dependency>
 		<dependency>
 			<groupId>com.github.therapi</groupId>
 			<artifactId>therapi-runtime-javadoc</artifactId>
-			<version>0.1.0-SNAPSHOT</version>
+			<version>0.15.0</version>
 		</dependency>
 		<dependency>
 			<groupId>com.github.FelixTJDietrich</groupId>
 			<artifactId>github-api</artifactId>
-			<version>0.1.0-SNAPSHOT</version>
+			<version>2.0.5</version>
 		</dependency>
 		<dependency>
 			<groupId>io.hypersistence</groupId>
 			<artifactId>hypersistence-utils-hibernate-63</artifactId>
-			<version>0.1.0-SNAPSHOT</version>
+			<version>3.9.2</version>
 		</dependency>
 		<dependency>
 			<groupId>io.nats</groupId>
 			<artifactId>jnats</artifactId>
-			<version>0.1.0-SNAPSHOT</version>
+			<version>2.20.5</version>
 		</dependency>
 		<dependency>
 			<groupId>com.slack.api</groupId>
 			<artifactId>bolt</artifactId>
-			<version>0.1.0-SNAPSHOT</version>
+			<version>1.45.3</version>
 		</dependency>
 		<dependency>
 			<groupId>org.openapitools</groupId>
 			<artifactId>openapi-generator-maven-plugin</artifactId>
-			<version>0.1.0-SNAPSHOT</version>
+			<version>7.11.0</version>
 		</dependency>
 		<dependency>
 			<groupId>org.openapitools</groupId>
 			<artifactId>openapi-generator</artifactId>
-			<version>0.1.0-SNAPSHOT</version>
+			<version>7.11.0</version>
 		</dependency>
 		<dependency>
 			<groupId>com.squareup.okhttp3</groupId>
 			<artifactId>okhttp</artifactId>
-			<version>0.1.0-SNAPSHOT</version>
+			<version>3.5.0</version>
 		</dependency>
 		<dependency>
 			<groupId>com.squareup.okhttp3</groupId>
@@ -170,7 +170,7 @@
 		<dependency>
 			<groupId>io.gsonfire</groupId>
 			<artifactId>gson-fire</artifactId>
-			<version>0.1.0-SNAPSHOT</version>
+			<version>1.9.0</version>
 		</dependency>
 		<dependency>
 			<groupId>jakarta.ws.rs</groupId>
@@ -183,7 +183,7 @@
 		<dependency>
 			<groupId>org.openapitools</groupId>
 			<artifactId>jackson-databind-nullable</artifactId>
-			<version>0.1.0-SNAPSHOT</version>
+			<version>0.2.6</version>
 		</dependency>
 		<dependency>
 			<groupId>org.glassfish.jersey.core</groupId>
@@ -196,12 +196,12 @@
 		<dependency>
 			<groupId>org.keycloak</groupId>
 			<artifactId>keycloak-admin-client</artifactId>
-			<version>0.1.0-SNAPSHOT</version>
+			<version>26.0.4</version>
 		</dependency>
 		<dependency>
 			<groupId>io.sentry</groupId>
 			<artifactId>sentry-spring-boot-starter-jakarta</artifactId>
-			<version>0.1.0-SNAPSHOT</version>
+			<version>8.2.0</version>
 		</dependency>
 	</dependencies>
 	<dependencyManagement>
@@ -209,7 +209,7 @@
 			<dependency>
 				<groupId>org.springframework.modulith</groupId>
 				<artifactId>spring-modulith-bom</artifactId>
-				<version>0.1.0-SNAPSHOT</version>
+				<version>1.2.2</version>
 				<scope>import</scope>
 				<type>pom</type>
 			</dependency>
@@ -225,7 +225,7 @@
 						<path>
 							<groupId>com.github.therapi</groupId>
 							<artifactId>therapi-runtime-javadoc-scribe</artifactId>
-							<version>0.1.0-SNAPSHOT</version>
+							<version>0.15.0</version>
 						</path>
 						<path>
 							<groupId>org.projectlombok</groupId>
@@ -280,7 +280,7 @@
 			<plugin>
 				<groupId>org.liquibase</groupId>
 				<artifactId>liquibase-maven-plugin</artifactId>
-				<version>0.1.0-SNAPSHOT</version>
+				<version>4.27.0</version>
 				<configuration>
 					<changeLogFile>db/master.xml</changeLogFile>
 					<diffChangeLogFile>src/main/resources/db/changelog_new.xml</diffChangeLogFile>
@@ -296,22 +296,22 @@
 					<dependency>
 						<groupId>org.liquibase.ext</groupId>
 						<artifactId>liquibase-hibernate6</artifactId>
-						<version>0.1.0-SNAPSHOT</version>
+						<version>4.31.1</version>
 					</dependency>
 					<dependency>
 						<groupId>org.springframework.boot</groupId>
 						<artifactId>spring-boot-starter-data-jpa</artifactId>
-						<version>0.1.0-SNAPSHOT</version>
+						<version>3.4.2</version>
 					</dependency>
 					<dependency>
 						<groupId>jakarta.validation</groupId>
 						<artifactId>jakarta.validation-api</artifactId>
-						<version>0.1.0-SNAPSHOT</version>
+						<version>3.1.1</version>
 					</dependency>
 					<dependency>
 						<groupId>org.postgresql</groupId>
 						<artifactId>postgresql</artifactId>
-						<version>0.1.0-SNAPSHOT</version>
+						<version>42.7.5</version>
 					</dependency>
 				</dependencies>
 			</plugin>
