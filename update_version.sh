@@ -30,10 +30,10 @@ if [[ "$INCREMENT_TYPE" != "major" && "$INCREMENT_TYPE" != "minor" && "$INCREMEN
 fi
 
 # Ensure git working directory is clean
-# if ! git diff-index --quiet HEAD --; then
-#     echo "Error: Git working tree is not clean. Please commit or stash your changes before updating version."
-#     exit 1
-# fi
+if ! git diff-index --quiet HEAD --; then
+    echo "Error: Git working tree is not clean. Please commit or stash your changes before updating version."
+    exit 1
+fi
 
 # Function to increment a semantic version number (format: X.Y.Z)
 increment_version() {
@@ -135,6 +135,6 @@ echo "Staging changes for git..."
 git add -A
 
 echo "Creating git commit..."
-# git commit -m "Release: Bump version to ${NEW_VERSION} (${INCREMENT_TYPE} update)"
+git commit -m "Release: Bump version to ${NEW_VERSION} (${INCREMENT_TYPE} update)"
 
 echo "Version update complete. New version: ${NEW_VERSION}"
