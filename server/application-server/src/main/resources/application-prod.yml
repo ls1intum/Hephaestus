@@ -13,6 +13,19 @@ spring:
         jwt:
           issuer-uri: ${KEYCLOAK_URL}/realms/${KEYCLOAK_REALM}
 
+  mail:
+    host: ${POSTFIX_HOST:localhost}
+    port: ${POSTFIX_PORT:25}
+    username: ${POSTFIX_USERNAME:}
+    password: ${POSTFIX_PASSWORD:}
+    properties:
+      mail:
+        transport:
+          protocol: smtp
+        smtp:
+          starttls:
+            enable: true
+
 hephaestus:
     host-url: ${APPLICATION_HOST_URL}
     
@@ -29,6 +42,11 @@ hephaestus:
 
     intelligence-service:
         url: ${INTELLIGENCE_SERVICE_URL}
+
+    mail:
+      enabled: ${MAIL_ENABLED:false}
+      sender: ${MAIL_SENDER:}
+      signature: ${MAIL_SIGNATURE:}
 
 keycloak:
     url: ${KEYCLOAK_URL}

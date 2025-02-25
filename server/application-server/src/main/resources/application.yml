@@ -34,10 +34,10 @@ spring:
         suffix: .html
 
     mail:
-        host: ${POSTFIX_HOST:localhost}
-        port: ${POSTFIX_PORT:25}
-        username: ${POSTFIX_USERNAME:}
-        password: ${POSTFIX_PASSWORD:}
+        host: smtp.gmail.com
+        port: 587
+        username: ${POSTFIX_USERNAME:} # gmail email address e.g hephaestus@gmail.com
+        password: ${POSTFIX_PASSWORD:} # app code password from gmail. how to: https://support.google.com/mail/answer/185833?hl=en
         properties:
             mail:
                 transport:
@@ -45,6 +45,7 @@ spring:
                 smtp:
                     starttls:
                         enable: true
+                debug: true
 
 springdoc:
     default-produces-media-type: application/json
@@ -73,8 +74,8 @@ hephaestus:
             # Eviction rate in milliseconds (1 hour)
             evict-rate: 3600000
     mail:
-        enabled: ${MAIL_ENABLED:true}
-        sender: ${MAIL_SENDER:test@hephaestus.ase.cit.tum.de}
+        enabled: false
+        sender: ${MAIL_SENDER:}
         signature: ${MAIL_SIGNATURE:}
 
 keycloak:
