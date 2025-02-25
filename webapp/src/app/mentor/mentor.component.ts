@@ -10,7 +10,6 @@ import { HlmButtonModule } from '@spartan-ng/ui-button-helm';
 import { StartSessionCardComponent } from './start-session-card/start-session-card.component';
 import { HlmAlertModule } from '@spartan-ng/ui-alert-helm';
 import { toast } from 'ngx-sonner';
-import { HlmToasterComponent } from '@spartan-ng/ui-sonner-helm';
 import { NgScrollbar, NgScrollbarModule } from 'ngx-scrollbar';
 import { HlmScrollAreaDirective } from '@spartan-ng/ui-scrollarea-helm';
 
@@ -23,7 +22,6 @@ import { HlmScrollAreaDirective } from '@spartan-ng/ui-scrollarea-helm';
     StartSessionCardComponent,
     SessionsCardComponent,
     MessagesComponent,
-    HlmToasterComponent,
     ChatInputComponent,
     HlmButtonModule,
     HlmAlertModule,
