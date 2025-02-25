@@ -1,0 +1,56 @@
+name: Deploy to Staging
+
+on:
+  workflow_dispatch:
+    inputs:
+      image-tag:
+        type: string
+        description: "Image tag to deploy (default: pr-<number> if PR exists, latest for default branch)"
+      deploy-app:
+        type: boolean
+        default: true
+        description: (Re-)deploys the app components
+      deploy-core:
+        default: false
+        type: boolean
+        description: (Re-)deploys NATS, Keycloak, Webhook Ingest. Usually not necessary and might cause data gaps.
+      deploy-proxy:
+        default: false
+        type: boolean
+        description: (Re-)deploys the proxy components. Usually not necessary and might cause downtime.
+
+jobs:  
+  deploy-app:
+    if: ${{ inputs.deploy-app }}
+    uses: ls1intum/.github/.github/workflows/deploy-docker-compose.yml@main
+    with:
+      environment: Staging
+      docker-compose-file: "./docker/compose.app.yaml"
+      main-image-name: ls1intum/hephaestus/application-server
+      image-tag: ${{ inputs.image-tag }}
+      deployment-base-path: "/opt/hephaestus/app"
+    secrets: inherit
+
+  deploy-core:
+    if: ${{ inputs.deploy-core }}
+    uses: ls1intum/.github/.github/workflows/deploy-docker-compose.yml@main
+    with:
+      environment: Staging
+      docker-compose-file: "./docker/compose.core.yaml"
+      main-image-name: ls1intum/hephaestus/webhook-ingest
+      image-tag: ${{ inputs.image-tag }}
+      deployment-base-path: "/opt/hephaestus/core"
+    secrets: inherit
+
+  deploy-proxy:
+    if: ${{ inputs.deploy-proxy }}
+    uses: ls1intum/.github/.github/workflows/deploy-docker-compose.yml@main
+    with:
+      environment: Staging
+      docker-compose-file: "./docker/compose.proxy.yaml"
+      # We just keep the main-image-name and image-tag as placeholders
+      main-image-name: ls1intum/hephaestus/application-server
+      image-tag: ${{ inputs.image-tag }}
+      deployment-base-path: "/opt/hephaestus/proxy"
+    secrets: inherit
+  
