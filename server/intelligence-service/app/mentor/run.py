@@ -1,6 +1,5 @@
 from psycopg_pool import ConnectionPool
 from langgraph.graph import START, StateGraph, END
-
 from langgraph.checkpoint.postgres import PostgresSaver
 from langgraph.store.postgres import PostgresStore
 from langchain_core.messages import HumanMessage
@@ -28,13 +27,6 @@ from .nodes.mentor_interaction import (
     ask_goals,
     reflect_goals,
     talk_to_mentor,
-)
-
-from .conditions import (
-    start_router,
-    main_router,
-    goal_reflection_router,
-    goal_setting_router,
 )
 
 connection_kwargs = {
