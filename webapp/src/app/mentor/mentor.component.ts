@@ -52,19 +52,17 @@ export class MentorComponent {
 
   selectedSessionClosed = computed(() => {
     if (!this.selectedSessionId() || !this.sessions.data()?.length) return false;
-  
+
     const selectedSession = this.sessions.data()?.find((session) => session.id === this.selectedSessionId());
     return selectedSession?.isClosed ?? false;
   });
-  
 
   sessions = injectQuery(() => ({
     queryKey: ['sessions'],
     queryFn: async () => {
       const sessions = await lastValueFrom(this.sessionService.getAllSessions());
-      const lastSession = await lastValueFrom(this.sessionService.getLastSession());
-      if (lastSession) {
-        this.lastSessionClosed.set(lastSession.isClosed);
+      if (sessions.length != 0) {
+        this.lastSessionClosed.set(sessions[0].isClosed);
       }
       return sessions;
     }
@@ -88,8 +86,8 @@ export class MentorComponent {
       }
       this.lastSessionClosed.set(session.isClosed);
       this.selectedSessionId.set(session.id);
-    
-      await this.queryClient.invalidateQueries({ queryKey: ['sessions'] }); 
+
+      await this.queryClient.invalidateQueries({ queryKey: ['sessions'] });
       this.queryClient.invalidateQueries({ queryKey: ['sessions', this.selectedSessionId()] });
     }
   }));

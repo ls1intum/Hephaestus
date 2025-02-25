@@ -30,10 +30,10 @@ public class MessageService {
 
     public List<MessageDTO> getMessagesBySessionId(Long sessionId) {
         return messageRepository
-                .findBySessionId(sessionId)
-                .stream()
-                .map(message -> MessageDTO.fromMessage(message))
-                .toList();
+            .findBySessionId(sessionId)
+            .stream()
+            .map(message -> MessageDTO.fromMessage(message))
+            .toList();
     }
 
     public MessageDTO sendMessage(String content, Long sessionId) {
