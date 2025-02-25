@@ -1,11 +1,10 @@
 import { Component, computed, input } from '@angular/core';
-import { hlm } from '@spartan-ng/ui-core';
-import { BrnMenuBarDirective } from '@spartan-ng/ui-menu-brain';
+import { hlm } from '@spartan-ng/brain/core';
+import { BrnMenuBarDirective } from '@spartan-ng/brain/menu';
 import type { ClassValue } from 'clsx';
 
 @Component({
 	selector: 'hlm-menu-bar',
-	standalone: true,
 	host: {
 		'[class]': '_computedClass()',
 	},

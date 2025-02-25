@@ -19,7 +19,7 @@ ALLSPHINXLIVEOPTS = $(ALLSPHINXOPTS) -q \
    --ignore "*.ind" \
    --ignore "*.ilg" \
    --ignore "*.tex" \
-   --watch source
+   --watch .
 
 SPHINXOPTS    ?=
 SPHINXBUILD   ?= sphinx-build

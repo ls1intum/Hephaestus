@@ -1,7 +1,7 @@
 import { Component, input } from '@angular/core';
 import { HlmUlDirective } from '@spartan-ng/ui-typography-helm';
 import { HlmSeparatorDirective } from '@spartan-ng/ui-separator-helm';
-import { BrnSeparatorComponent } from '@spartan-ng/ui-separator-brain';
+import { BrnSeparatorComponent } from '@spartan-ng/brain/separator';
 import { HlmCardDirective } from '@spartan-ng/ui-card-helm';
 
 @Component({

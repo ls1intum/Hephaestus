@@ -1,11 +1,10 @@
 import { Directive, computed, input } from '@angular/core';
-import { hlm } from '@spartan-ng/ui-core';
-import { BrnSheetTitleDirective } from '@spartan-ng/ui-sheet-brain';
+import { hlm } from '@spartan-ng/brain/core';
+import { BrnSheetTitleDirective } from '@spartan-ng/brain/sheet';
 import type { ClassValue } from 'clsx';
 
 @Directive({
 	selector: '[hlmSheetTitle]',
-	standalone: true,
 	host: {
 		'[class]': '_computedClass()',
 	},

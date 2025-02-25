@@ -1,11 +1,10 @@
 import { Directive, computed, inject, input } from '@angular/core';
-import { hlm } from '@spartan-ng/ui-core';
-import { BRN_SLIDER, BrnSliderThumbDirective } from '@spartan-ng/ui-slider-brain';
+import { hlm } from '@spartan-ng/brain/core';
+import { BRN_SLIDER, BrnSliderThumbDirective } from '@spartan-ng/brain/slider';
 import type { ClassValue } from 'clsx';
 
 @Directive({
 	selector: 'hlm-slider-thumb, brn-slider-thumb [hlm]',
-	standalone: true,
 	host: {
 		'[class]': '_computedClass()',
 		'[attr.dir]': '_direction()',

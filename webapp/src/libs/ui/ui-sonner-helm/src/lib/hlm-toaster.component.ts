@@ -1,11 +1,10 @@
 import { ChangeDetectionStrategy, Component, booleanAttribute, computed, input, numberAttribute } from '@angular/core';
-import { hlm } from '@spartan-ng/ui-core';
+import { hlm } from '@spartan-ng/brain/core';
 import type { ClassValue } from 'clsx';
 import { NgxSonnerToaster, type ToasterProps } from 'ngx-sonner';
 
 @Component({
 	selector: 'hlm-toaster',
-	standalone: true,
 	imports: [NgxSonnerToaster],
 	template: `
 		<ngx-sonner-toaster

@@ -1,5 +1,5 @@
 import { Component, computed, input } from '@angular/core';
-import { hlm } from '@spartan-ng/ui-core';
+import { hlm } from '@spartan-ng/brain/core';
 import type { ClassValue } from 'clsx';
 
 const btnLike =
@@ -7,7 +7,6 @@ const btnLike =
 
 @Component({
 	selector: 'hlm-radio-indicator',
-	standalone: true,
 	host: {
 		'[class]': '_computedClass()',
 	},

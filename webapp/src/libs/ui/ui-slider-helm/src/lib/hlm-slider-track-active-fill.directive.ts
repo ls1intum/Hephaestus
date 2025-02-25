@@ -1,11 +1,10 @@
 import { Directive, computed, inject, input } from '@angular/core';
-import { hlm } from '@spartan-ng/ui-core';
-import { BRN_SLIDER, BrnSliderTrackActiveFillDirective } from '@spartan-ng/ui-slider-brain';
+import { hlm } from '@spartan-ng/brain/core';
+import { BRN_SLIDER, BrnSliderTrackActiveFillDirective } from '@spartan-ng/brain/slider';
 import type { ClassValue } from 'clsx';
 
 @Directive({
 	selector: '[hlmSliderTrackActiveFill]',
-	standalone: true,
 	hostDirectives: [BrnSliderTrackActiveFillDirective],
 	host: {
 		'[class]': '_computedClass()',

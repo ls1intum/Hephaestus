@@ -1,5 +1,5 @@
 import { Directive, computed, input } from '@angular/core';
-import { hlm } from '@spartan-ng/ui-core';
+import { hlm } from '@spartan-ng/brain/core';
 import { type VariantProps, cva } from 'class-variance-authority';
 import type { ClassValue } from 'clsx';
 
@@ -27,7 +27,6 @@ type ToggleVariants = VariantProps<typeof toggleVariants>;
 
 @Directive({
 	selector: '[hlmToggle],[brnToggle][hlm]',
-	standalone: true,
 	host: {
 		'[class]': '_computedClass()',
 	},

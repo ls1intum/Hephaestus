@@ -1,11 +1,12 @@
 import { Component, input, output, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
-import { LucideAngularModule, Send, CircleAlert } from 'lucide-angular';
 import { HlmCardModule } from '@spartan-ng/ui-card-helm';
 import { HlmButtonModule } from '@spartan-ng/ui-button-helm';
 import { HlmSpinnerComponent } from '@spartan-ng/ui-spinner-helm';
 import { HlmInputDirective } from '@spartan-ng/ui-input-helm';
+import { NgIconComponent, provideIcons } from '@ng-icons/core';
+import { lucideSend, lucideCircleAlert } from '@ng-icons/lucide';
 import { HlmAlertDescriptionDirective, HlmAlertDirective, HlmAlertTitleDirective } from '@spartan-ng/ui-alert-helm';
 
 @Component({
@@ -21,13 +22,11 @@ import { HlmAlertDescriptionDirective, HlmAlertDirective, HlmAlertTitleDirective
     FormsModule,
     HlmCardModule,
     HlmInputDirective,
-    LucideAngularModule
-  ]
+    NgIconComponent
+  ],
+  providers: [provideIcons({ lucideSend, lucideCircleAlert })]
 })
 export class ChatInputComponent {
-  protected Send = Send;
-  protected Alert = CircleAlert;
-
   isClosed = input.required<boolean>();
   isSending = input.required<boolean>();
   message = signal<string>('');

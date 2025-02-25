@@ -1,12 +1,11 @@
 import { Directive, computed, input } from '@angular/core';
-import { hlm } from '@spartan-ng/ui-core';
+import { hlm } from '@spartan-ng/brain/core';
 import type { ClassValue } from 'clsx';
 
 export const hlmH4 = 'scroll-m-20 text-xl font-semibold tracking-tight';
 
 @Directive({
 	selector: '[hlmH4]',
-	standalone: true,
 	host: {
 		'[class]': '_computedClass()',
 	},

@@ -2,7 +2,7 @@
   @if (query.error()) {
     <div class="flex items-center justify-center gap-2">
       <div hlmAlert class="max-w-xl" variant="destructive">
-        <lucide-angular [img]="CircleX" hlmAlertIcon />
+        <ng-icon name="lucideCircleX" hlmAlertIcon />
         <h4 hlmAlertTitle>Something went wrong...</h4>
         <p hlmAlertDesc>User couldn't be loaded. Please try again later.</p>
       </div>
@@ -20,7 +20,7 @@
       <div class="flex flex-col flex-1 gap-4 ml-3">
         <h2 class="text-xl font-semibold">Latest Review Activity</h2>
         @let userActivity = showSkeleton ? skeletonReviews : query.data()?.reviewActivity;
-        <hlm-scroll-area [autoHeightDisabled]="false" [style]="'height : ' + calcScrollHeight(userActivity)">
+        <ng-scrollbar hlm [style]="'height : ' + calcScrollHeight(userActivity)">
           <div class="flex flex-col gap-2 m-1 mr-3">
             @for (activity of userActivity; track activity.id) {
               <app-review-activity-card
@@ -35,17 +35,17 @@
             }
             @if (!showSkeleton && (!query.data()?.reviewActivity || query.data()?.reviewActivity?.length === 0)) {
               <div class="w-full h-20 flex justify-center items-center gap-4 border border-border bg-card rounded-lg p-4">
-                <lucide-angular [img]="Info" class="text-muted-foreground" />
+                <ng-icon name="lucideInfo" class="text-muted-foreground" />
                 <span class="text-muted-foreground font-normal">No activity found</span>
               </div>
             }
           </div>
-        </hlm-scroll-area>
+        </ng-scrollbar>
       </div>
       <div class="flex flex-col flex-1 gap-4 ml-3">
         <h2 class="text-xl font-semibold">Open Pull Requests</h2>
         @let userPullRequests = showSkeleton ? skeletonPullRequests : query.data()?.openPullRequests;
-        <hlm-scroll-area [autoHeightDisabled]="false" [style]="'height : ' + calcScrollHeight(userPullRequests, 200)">
+        <ng-scrollbar hlm [style]="'height : ' + calcScrollHeight(userPullRequests, 200)">
           <div class="flex flex-col gap-2 m-1 mr-3">
             @for (pullRequest of userPullRequests; track pullRequest.id) {
               <app-issue-card
@@ -67,12 +67,12 @@
 
             @if (!showSkeleton && (!query.data()?.openPullRequests || query.data()?.openPullRequests?.length === 0)) {
               <div class="w-full h-20 flex justify-center items-center gap-4 border border-border bg-card rounded-lg p-4">
-                <lucide-angular [img]="Info" class="text-muted-foreground" />
+                <ng-icon name="lucideInfo" class="text-muted-foreground" />
                 <span class="text-muted-foreground font-normal">No open pull requests found</span>
               </div>
             }
           </div>
-        </hlm-scroll-area>
+        </ng-scrollbar>
       </div>
     </div>
   }

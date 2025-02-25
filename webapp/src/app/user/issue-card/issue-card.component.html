@@ -6,7 +6,7 @@
           <hlm-skeleton class="size-5 bg-green-500/30"></hlm-skeleton>
           <hlm-skeleton class="h-4 w-16 lg:w-36"></hlm-skeleton>
         } @else {
-          <ng-icon [svg]="issueIconAndColor().icon" size="18" [class]="'mr-1 ' + issueIconAndColor().color"></ng-icon>
+          <ng-icon [name]="issueIconAndColor().iconName" size="18" [class]="'mr-1 ' + issueIconAndColor().color"></ng-icon>
           {{ repositoryName() }} #{{ number() }} on {{ displayCreated().format('MMM D') }}
         }
       </span>

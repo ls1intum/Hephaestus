@@ -1,12 +1,11 @@
 import { Directive, computed, input } from '@angular/core';
-import { hlm } from '@spartan-ng/ui-core';
+import { hlm } from '@spartan-ng/brain/core';
 import type { ClassValue } from 'clsx';
 
 export const hlmBlockquote = 'mt-6 border-border border-l-2 pl-6 italic';
 
 @Directive({
 	selector: '[hlmBlockquote]',
-	standalone: true,
 	host: {
 		'[class]': '_computedClass()',
 	},

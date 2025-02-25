@@ -1,11 +1,10 @@
 import { Directive, computed, input } from '@angular/core';
-import { hlm } from '@spartan-ng/ui-core';
+import { hlm } from '@spartan-ng/brain/core';
 import type { ClassValue } from 'clsx';
 
 export type HlmSeparatorOrientation = 'horizontal' | 'vertical';
 @Directive({
 	selector: '[hlmSeparator],brn-separator[hlm]',
-	standalone: true,
 	host: {
 		'[class]': '_computedClass()',
 	},

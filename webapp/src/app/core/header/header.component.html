@@ -2,16 +2,16 @@
   <div class="flex gap-4 items-center flex-1">
     <div class="flex items-center gap-2">
       <a class="flex gap-2 items-center hover:text-muted-foreground" routerLink="/">
-        <lucide-angular [img]="Hammer" class="size-8 sm:size-6" />
+        <ng-icon name="lucideHammer" class="text-2xl sm:text-3xl" />
         <span class="hidden sm:inline-block text-xl font-semibold">Hephaestus</span>
       </a>
       <span class="text-xs font-semibold mt-1 text-muted-foreground">{{ version }}</span>
     </div>
-    @if (user()?.roles?.includes('admin')) {
+    @if (signedIn() && user()?.roles?.includes('admin')) {
       <a hlmBtn variant="link" routerLink="/workspace">Workspace</a>
     }
   </div>
-  @if (user()?.roles?.includes('mentor_access')) {
+  @if (signedIn() && user()?.roles?.includes('mentor_access')) {
     <app-ai-mentor class="hidden sm:inline-block" />
     <app-ai-mentor class="sm:hidden" iconOnly />
   }
@@ -33,22 +33,22 @@
         <hlm-menu-separator />
         <hlm-menu-group>
           <a hlmMenuItem [routerLink]="'/user/' + user()!.username" class="cursor-pointer">
-            <hlm-icon name="lucideUser" hlmMenuIcon />
+            <ng-icon hlm hlmMenuIcon name="lucideUser" />
             <span>My Profile</span>
           </a>
           <a hlmMenuItem routerLink="/settings" class="cursor-pointer">
-            <hlm-icon name="lucideSettings" hlmMenuIcon />
+            <ng-icon hlm hlmMenuIcon name="lucideSettings" />
             <span>Settings</span>
           </a>
           <hlm-menu-separator />
           <button hlmMenuItem (click)="signOut()" class="cursor-pointer">
-            <hlm-icon name="lucideLogOut" hlmMenuIcon />
+            <ng-icon hlm hlmMenuIcon name="lucideLogOut" />
             <span>Sign&nbsp;Out</span>
           </button>
         </hlm-menu-group>
       </hlm-menu>
     </ng-template>
-  } @else {
+  } @else if (loaded()) {
     <button hlmBtn (click)="signIn()">Sign&nbsp;In</button>
   }
 </header>

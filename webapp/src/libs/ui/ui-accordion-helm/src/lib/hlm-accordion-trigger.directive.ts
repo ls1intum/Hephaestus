@@ -1,11 +1,10 @@
 import { Directive, computed, input } from '@angular/core';
-import { BrnAccordionTriggerDirective } from '@spartan-ng/ui-accordion-brain';
-import { hlm } from '@spartan-ng/ui-core';
+import { BrnAccordionTriggerDirective } from '@spartan-ng/brain/accordion';
+import { hlm } from '@spartan-ng/brain/core';
 import type { ClassValue } from 'clsx';
 
 @Directive({
 	selector: '[hlmAccordionTrigger]',
-	standalone: true,
 	host: {
 		'[style.--tw-ring-offset-shadow]': '"0 0 #000"',
 		'[class]': '_computedClass()',

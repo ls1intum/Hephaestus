@@ -8,7 +8,7 @@ import {
 	inject,
 	input,
 } from '@angular/core';
-import { hlm } from '@spartan-ng/ui-core';
+import { hlm } from '@spartan-ng/brain/core';
 import type { ClassValue } from 'clsx';
 import { HlmTableComponent } from './hlm-table.component';
 
@@ -16,7 +16,6 @@ let captionIdSequence = 0;
 
 @Component({
 	selector: 'hlm-caption',
-	standalone: true,
 	host: {
 		'[class]': '_computedClass()',
 		'[id]': 'id()',

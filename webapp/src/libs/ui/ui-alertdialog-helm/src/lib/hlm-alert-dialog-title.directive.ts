@@ -1,11 +1,10 @@
 import { Directive, computed, input } from '@angular/core';
-import { BrnAlertDialogTitleDirective } from '@spartan-ng/ui-alertdialog-brain';
-import { hlm } from '@spartan-ng/ui-core';
+import { BrnAlertDialogTitleDirective } from '@spartan-ng/brain/alert-dialog';
+import { hlm } from '@spartan-ng/brain/core';
 import type { ClassValue } from 'clsx';
 
 @Directive({
 	selector: '[hlmAlertDialogTitle]',
-	standalone: true,
 	host: {
 		'[class]': '_computedClass()',
 	},

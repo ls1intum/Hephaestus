@@ -1,6 +1,7 @@
 import { Component, inject, input } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { LucideAngularModule, BotMessageSquare } from 'lucide-angular';
+import { NgIconComponent, provideIcons } from '@ng-icons/core';
+import { lucideBotMessageSquare } from '@ng-icons/lucide';
 import { HlmAvatarModule } from '@spartan-ng/ui-avatar-helm';
 import { SecurityStore } from '@app/core/security/security-store.service';
 import { Message } from '@app/core/modules/openapi';
@@ -12,10 +13,10 @@ import { getSummary, getPullRequests } from './message-parser';
 @Component({
   selector: 'app-messages',
   templateUrl: './messages.component.html',
-  imports: [CommonModule, LucideAngularModule, HlmAvatarModule, HlmSkeletonComponent, ChatSummaryComponent, PrsOverviewComponent]
+  imports: [CommonModule, NgIconComponent, HlmAvatarModule, HlmSkeletonComponent, ChatSummaryComponent, PrsOverviewComponent],
+  providers: [provideIcons({ lucideBotMessageSquare })]
 })
 export class MessagesComponent {
-  protected BotMessageSquare = BotMessageSquare;
   protected Message = Message;
 
   securityStore = inject(SecurityStore);

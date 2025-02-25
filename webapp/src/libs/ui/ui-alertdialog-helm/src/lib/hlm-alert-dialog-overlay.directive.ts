@@ -1,10 +1,9 @@
-import { Directive, computed, effect, input } from '@angular/core';
-import { hlm, injectCustomClassSettable } from '@spartan-ng/ui-core';
+import { Directive, computed, effect, input, untracked } from '@angular/core';
+import { hlm, injectCustomClassSettable } from '@spartan-ng/brain/core';
 import type { ClassValue } from 'clsx';
 
 @Directive({
 	selector: '[hlmAlertDialogOverlay],brn-alert-dialog-overlay[hlm]',
-	standalone: true,
 })
 export class HlmAlertDialogOverlayDirective {
 	private readonly _classSettable = injectCustomClassSettable({ optional: true, host: true });
@@ -18,6 +17,9 @@ export class HlmAlertDialogOverlayDirective {
 	);
 
 	constructor() {
-		effect(() => this._classSettable?.setClassToCustomElement(this._computedClass()));
+		effect(() => {
+			const classValue = this._computedClass();
+			untracked(() => this._classSettable?.setClassToCustomElement(classValue));
+		});
 	}
 }

@@ -1,5 +1,5 @@
 import { Directive, computed, input, signal } from '@angular/core';
-import { hlm } from '@spartan-ng/ui-core';
+import { hlm } from '@spartan-ng/brain/core';
 import { type VariantProps, cva } from 'class-variance-authority';
 import type { ClassValue } from 'clsx';
 import { injectBrnButtonConfig } from './hlm-button.token';
@@ -21,6 +21,7 @@ export const buttonVariants = cva(
 				sm: 'h-9 px-3 rounded-md',
 				lg: 'h-11 px-8 rounded-md',
 				icon: 'h-10 w-10',
+        none: '',
 			},
 		},
 		defaultVariants: {
@@ -33,7 +34,6 @@ export type ButtonVariants = VariantProps<typeof buttonVariants>;
 
 @Directive({
 	selector: '[hlmBtn]',
-	standalone: true,
 	exportAs: 'hlmBtn',
 	host: {
 		'[class]': '_computedClass()',

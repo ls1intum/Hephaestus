@@ -1,6 +1,6 @@
 import { Component, computed, input } from '@angular/core';
-import { hlm } from '@spartan-ng/ui-core';
-import { BrnTabsListDirective } from '@spartan-ng/ui-tabs-brain';
+import { hlm } from '@spartan-ng/brain/core';
+import { BrnTabsListDirective } from '@spartan-ng/brain/tabs';
 import { type VariantProps, cva } from 'class-variance-authority';
 import type { ClassValue } from 'clsx';
 
@@ -22,7 +22,6 @@ type ListVariants = VariantProps<typeof listVariants>;
 
 @Component({
 	selector: 'hlm-tabs-list',
-	standalone: true,
 	hostDirectives: [BrnTabsListDirective],
 	template: '<ng-content/>',
 	host: {

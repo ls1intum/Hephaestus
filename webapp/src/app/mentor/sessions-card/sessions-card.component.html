@@ -1,6 +1,6 @@
 <div hlmCard class="flex flex-col px-6 lg:max-h-[calc(100dvh-200px)] pb-6 overflow-auto">
   <button hlmBtn aria-describedby=">New Session" class="w-full gap-2 mt-6 justify-start h-9" (click)="this.createNewSession.emit()">
-    <lucide-angular [img]="Plus" class="size-4" />
+    <ng-icon name="lucidePlus" class="text-base" />
     <span>New Session</span>
   </button>
   @if (isLoading()) {

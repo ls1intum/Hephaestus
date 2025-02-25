@@ -1,11 +1,10 @@
 import { Directive, computed, input } from '@angular/core';
-import { hlm } from '@spartan-ng/ui-core';
-import { injectBrnProgress } from '@spartan-ng/ui-progress-brain';
+import { hlm } from '@spartan-ng/brain/core';
+import { injectBrnProgress } from '@spartan-ng/brain/progress';
 import type { ClassValue } from 'clsx';
 
 @Directive({
 	selector: '[hlmProgressIndicator],brn-progress-indicator[hlm]',
-	standalone: true,
 	host: {
 		'[class]': '_computedClass()',
 		'[class.animate-indeterminate]': 'indeterminate()',

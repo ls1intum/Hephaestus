@@ -1,10 +1,9 @@
 import { ChangeDetectionStrategy, Component, ViewEncapsulation, computed, input, signal } from '@angular/core';
-import { hlm, injectExposesStateProvider } from '@spartan-ng/ui-core';
+import { hlm, injectExposesStateProvider } from '@spartan-ng/brain/core';
 import type { ClassValue } from 'clsx';
 
 @Component({
 	selector: 'hlm-alert-dialog-content',
-	standalone: true,
 	host: {
 		'[class]': '_computedClass()',
 		'[attr.data-state]': 'state()',

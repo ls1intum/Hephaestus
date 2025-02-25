@@ -1,6 +1,6 @@
 import { type NumberInput, coerceNumberProperty } from '@angular/cdk/coercion';
 import { type AfterViewInit, Directive, ElementRef, computed, inject, input } from '@angular/core';
-import { hlm } from '@spartan-ng/ui-core';
+import { hlm } from '@spartan-ng/brain/core';
 import type { ClassValue } from 'clsx';
 
 const parseDividedString = (value: NumberInput): NumberInput => {
@@ -13,7 +13,6 @@ const parseDividedString = (value: NumberInput): NumberInput => {
 
 @Directive({
 	selector: '[hlmAspectRatio]',
-	standalone: true,
 	host: {
 		'[class]': '_computedClass()',
 		'[style.padding-bottom]': '_computedPaddingBottom()',

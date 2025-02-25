@@ -1,10 +1,9 @@
 import { Directive, computed, inject } from '@angular/core';
-import { BrnAvatarFallbackDirective, hexColorFor, isBright } from '@spartan-ng/ui-avatar-brain';
-import { hlm } from '@spartan-ng/ui-core';
+import { BrnAvatarFallbackDirective, hexColorFor, isBright } from '@spartan-ng/brain/avatar';
+import { hlm } from '@spartan-ng/brain/core';
 
 @Directive({
 	selector: '[hlmAvatarFallback]',
-	standalone: true,
 	exportAs: 'avatarFallback',
 	hostDirectives: [
 		{

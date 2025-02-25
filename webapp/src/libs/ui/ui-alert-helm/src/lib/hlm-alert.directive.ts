@@ -1,5 +1,5 @@
 import { Directive, computed, input } from '@angular/core';
-import { hlm } from '@spartan-ng/ui-core';
+import { hlm } from '@spartan-ng/brain/core';
 import { type VariantProps, cva } from 'class-variance-authority';
 import type { ClassValue } from 'clsx';
 
@@ -22,7 +22,6 @@ export type AlertVariants = VariantProps<typeof alertVariants>;
 
 @Directive({
 	selector: '[hlmAlert]',
-	standalone: true,
 	host: {
 		role: 'alert',
 		'[class]': '_computedClass()',

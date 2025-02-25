@@ -4,7 +4,7 @@
       @if (pr.isDraft) {
         <a class="flex gap-2 items-center text-github-muted-foreground" [href]="pr.url">
           <span class="size-4 self-baseline mt-1">
-            <ng-icon [svg]="OctGitPullRequestDraft" size="18" />
+            <ng-icon name="octGitPullRequestDraft" size="18" />
           </span>
           {{ pr.title }} #{{ pr.number }}
         </a>
@@ -12,7 +12,7 @@
         @if (pr.isMerged) {
           <a class="flex gap-2 items-center text-github-done-foreground" [href]="pr.url">
             <span class="size-4 self-baseline mt-1">
-              <ng-icon [svg]="OctGitMerge" size="18" />
+              <ng-icon name="octGitMerge" size="18" />
             </span>
             {{ pr.title }} #{{ pr.number }}
           </a>
@@ -20,7 +20,7 @@
           @if (pr.state == 'OPEN') {
             <a class="flex gap-2 items-center text-github-success-foreground" [href]="pr.url">
               <span class="size-4 self-baseline mt-1">
-                <ng-icon [svg]="OctGitPullRequest" size="18" />
+                <ng-icon name="octGitPullRequest" size="18" />
               </span>
               {{ pr.title }} #{{ pr.number }}
             </a>
