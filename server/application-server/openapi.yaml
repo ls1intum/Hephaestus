@@ -429,38 +429,6 @@ paths:
                 type: array
                 items:
                   $ref: "#/components/schemas/Contributor"
-  /leaderboard:
-    get:
-      tags:
-      - leaderboard
-      operationId: getLeaderboard
-      parameters:
-      - name: after
-        in: query
-        required: true
-        schema:
-          type: string
-          format: date-time
-      - name: before
-        in: query
-        required: true
-        schema:
-          type: string
-          format: date-time
-      - name: team
-        in: query
-        required: false
-        schema:
-          type: string
-      responses:
-        "200":
-          description: OK
-          content:
-            application/json:
-              schema:
-                type: array
-                items:
-                  $ref: "#/components/schemas/LeaderboardEntry"
   /workspace/team/{teamId}:
     delete:
       tags:
