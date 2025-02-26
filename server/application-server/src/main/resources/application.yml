@@ -51,6 +51,10 @@ hephaestus:
     intelligence-service:
         url: http://localhost:8000
 
+    cache:
+        contributors:
+            evict-rate: 3600000
+
 
 keycloak:
     url: http://localhost:8081

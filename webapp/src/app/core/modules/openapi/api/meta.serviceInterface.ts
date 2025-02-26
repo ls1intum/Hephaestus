@@ -13,6 +13,7 @@ import { HttpHeaders }                                       from '@angular/comm
 
 import { Observable }                                        from 'rxjs';
 
+import { Contributor } from '../model/models';
 import { MetaData } from '../model/models';
 
 
@@ -23,6 +24,12 @@ import { Configuration }                                     from '../configurat
 export interface MetaServiceInterface {
     defaultHeaders: HttpHeaders;
     configuration: Configuration;
+
+    /**
+     * 
+     * 
+     */
+    getContributors(extraHttpRequestParams?: any): Observable<Array<Contributor>>;
 
     /**
      * 
