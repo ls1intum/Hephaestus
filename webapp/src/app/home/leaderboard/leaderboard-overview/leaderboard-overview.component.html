@@ -1,7 +1,7 @@
 <div hlmCard>
   <div hlmCardContent class="py-4">
-    <div class="flex flex-wrap items-center justify-between gap-4">
-      <button hlmBtn variant="ghost" class="h-full" (click)="scrollToRank(leaderboardEntry().rank)">
+    <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 items-center justify-between gap-4">
+      <button hlmBtn variant="ghost" class="h-full sm:col-span-2 md:col-span-1" (click)="scrollToRank(leaderboardEntry().rank)">
         <div class="flex flex-col items-center gap-2">
           <div class="flex items-end gap-2">
             <span>
@@ -20,9 +20,9 @@
       </button>
 
       <div class="flex flex-col items-center gap-1 text-center">
-        <div class="flex items-center gap-2">
+        <div class="flex items-center gap-1">
           <ng-icon name="lucideClock" class="text-muted-foreground" />
-          <span class="text-sm text-muted-foreground">Next leaderboard in:</span>
+          <span class="text-sm text-muted-foreground">Leaderboard ends in:</span>
         </div>
         <span class="text-xl font-medium">{{ leaderboardTimeUntilEnd() }}</span>
         <div class="flex items-center gap-1 mt-1 text-sm">
@@ -30,19 +30,23 @@
           @if (leagueChangeQuery.isSuccess()) {
             @let change = leagueChangeQuery.data();
             <span class="font-medium">{{ change }}</span>
-            @if (change >= 0) {
+            @if (change > 0) {
               <ng-icon name="lucideTrendingUp" />
-            } @else {
+            } @else if (change < 0) {
               <ng-icon name="lucideTrendingDown" />
+            } @else {
+              <ng-icon name="lucideMoveRight" />
             }
           } @else {
             <span class="font-medium">0</span>
-            <ng-icon name="lucideTrendingUp" />
+            <ng-icon name="lucideMoveRight" />
           }
         </div>
       </div>
 
-      <app-league-elo-card [leaguePoints]="leaguePoints()" />
+      <div class="flex flex-col items-center gap-1 text-center">
+        <app-league-elo-card [leaguePoints]="leaguePoints()" />
+      </div>
     </div>
   </div>
 </div>

@@ -6,7 +6,7 @@ import { LeagueEloCardComponent } from '@app/ui/league/elo-card/elo-card.compone
 import { HlmAvatarModule } from '@spartan-ng/ui-avatar-helm';
 import { NgIconComponent } from '@ng-icons/core';
 import { provideIcons } from '@ng-icons/core';
-import { lucideClock, lucideTrendingUp, lucideTrendingDown } from '@ng-icons/lucide';
+import { lucideClock, lucideTrendingUp, lucideTrendingDown, lucideMoveRight } from '@ng-icons/lucide';
 import { injectQuery } from '@tanstack/angular-query-experimental';
 import { lastValueFrom } from 'rxjs';
 import { ActivatedRoute } from '@angular/router';
@@ -16,7 +16,7 @@ import dayjs, { Dayjs } from 'dayjs/esm';
   selector: 'app-leaderboard-overview',
   imports: [HlmCardModule, HlmButtonModule, HlmAvatarModule, LeagueEloCardComponent, NgIconComponent],
   templateUrl: './leaderboard-overview.component.html',
-  providers: [provideIcons({ lucideClock, lucideTrendingUp, lucideTrendingDown })]
+  providers: [provideIcons({ lucideClock, lucideTrendingUp, lucideTrendingDown, lucideMoveRight })]
 })
 export class LeaderboardOverviewComponent {
   private readonly route = inject(ActivatedRoute);
