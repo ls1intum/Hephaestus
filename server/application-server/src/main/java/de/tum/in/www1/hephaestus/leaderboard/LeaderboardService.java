@@ -243,6 +243,7 @@ public class LeaderboardService {
      * @param entry current leaderboard entry of the user
      * @return LeaderboardUserStatsDTO containing league point change
      */
+    // @Transactional
     public LeagueChangeDTO getUserLeagueStats(String login, LeaderboardEntryDTO entry) {
         // Get the user
         User user = userRepository
