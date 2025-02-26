@@ -29,9 +29,7 @@ public class RepositoryService {
             logger.warn("Repository with name {} not found", nameWithOwner);
             return Collections.emptyList();
         }
-        
-        return repository.get().getContributors().stream()
-            .map(ContributorInfoDTO::fromContributor)
-            .toList();
+
+        return repository.get().getContributors().stream().map(ContributorInfoDTO::fromContributor).toList();
     }
-} 
+}

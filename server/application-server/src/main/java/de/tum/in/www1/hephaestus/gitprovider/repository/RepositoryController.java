@@ -9,7 +9,6 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
-
 @RestController
 @RequestMapping("/repository")
 public class RepositoryController {
@@ -19,9 +18,10 @@ public class RepositoryController {
 
     @GetMapping("/{owner}/{repo}/contributors")
     public ResponseEntity<List<ContributorInfoDTO>> getContributorsByRepositoryName(
-            @PathVariable String owner,
-            @PathVariable String repo) {
+        @PathVariable String owner,
+        @PathVariable String repo
+    ) {
         String nameWithOwner = owner + "/" + repo;
         return ResponseEntity.ok(repositoryService.getContributorsByRepositoryName(nameWithOwner));
     }
-} 
+}

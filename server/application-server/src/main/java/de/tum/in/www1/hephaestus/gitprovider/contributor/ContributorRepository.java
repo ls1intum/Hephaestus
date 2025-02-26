@@ -8,10 +8,9 @@ import org.springframework.data.jpa.repository.JpaRepository;
 
 @org.springframework.stereotype.Repository
 public interface ContributorRepository extends JpaRepository<Contributor, Long> {
-    
     List<Contributor> findByRepository(Repository repository);
-    
+
     Optional<Contributor> findByRepositoryAndUser(Repository repository, User user);
-    
+
     List<Contributor> findByUser(User user);
-} 
+}

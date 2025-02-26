@@ -1,5 +1,6 @@
 package de.tum.in.www1.hephaestus.syncing;
 
+import de.tum.in.www1.hephaestus.gitprovider.contributor.github.GitHubContributorSyncService;
 import de.tum.in.www1.hephaestus.gitprovider.issue.Issue;
 import de.tum.in.www1.hephaestus.gitprovider.issue.IssueRepository;
 import de.tum.in.www1.hephaestus.gitprovider.issue.github.GitHubIssueSyncService;
@@ -13,7 +14,6 @@ import de.tum.in.www1.hephaestus.gitprovider.pullrequestreviewcomment.github.Git
 import de.tum.in.www1.hephaestus.gitprovider.repository.RepositoryRepository;
 import de.tum.in.www1.hephaestus.gitprovider.repository.github.GitHubRepositorySyncService;
 import de.tum.in.www1.hephaestus.gitprovider.user.github.GitHubUserSyncService;
-import de.tum.in.www1.hephaestus.gitprovider.contributor.github.GitHubContributorSyncService;
 import de.tum.in.www1.hephaestus.workspace.RepositoryToMonitor;
 import de.tum.in.www1.hephaestus.workspace.RepositoryToMonitorRepository;
 import de.tum.in.www1.hephaestus.workspace.Workspace;
@@ -222,7 +222,7 @@ public class GitHubDataSyncService {
 
     /**
      * Synchronizes all contributors for a specific GitHub repository and updates the sync timestamp.
-     * 
+     *
      * @param repository GitHub repository to sync
      * @param repositoryToMonitor syncing status
      */

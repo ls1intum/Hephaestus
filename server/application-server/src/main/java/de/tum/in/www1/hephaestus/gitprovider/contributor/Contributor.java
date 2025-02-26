@@ -34,4 +34,4 @@ public class Contributor extends BaseGitServiceEntity {
     private User user;
 
     private int contributions;
-} 
+}
