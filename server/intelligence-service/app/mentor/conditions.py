@@ -22,9 +22,9 @@ def main_router(state: State):
         return "summary_node"
     elif state["goal_reflection"]:
         return "check_goal_reflection"
-    elif  state["finish"]:
+    elif state["finish"]:
         return "finish"
-    else:  
+    else:
         return "mentor_node"
 
 
