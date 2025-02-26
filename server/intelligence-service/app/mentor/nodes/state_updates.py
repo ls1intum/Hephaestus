@@ -1,5 +1,5 @@
 from ..state import State
-from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
+from langchain_core.prompts import ChatPromptTemplate
 from ...model import model
 from ..prompt_loader import PromptLoader
 
@@ -7,8 +7,8 @@ prompt_loader = PromptLoader()
 
 
 def check_state(state: State):
-    if state["closed"] or state["goal_reflection"] or state["finish"]:
-        # closed session state does not need to be updated
+    if state["closed"] or state["finish"] or state["goal_reflection"]:
+        # closed (finished) session state does not need to be updated
         # when goal reflection is active, state is updated in the check_goal_reflection node
         return
 
@@ -42,15 +42,14 @@ def check_state(state: State):
                 "system",
                 prompt_loader.get_prompt(
                     type="analyzer", name="check_updates"
-                ).format_map({"step": step}),
+                ).format_map({"step": step, "history": state["messages"]}),
             ),
-            MessagesPlaceholder("messages"),
         ]
     )
 
     chain = prompt | model
 
-    if chain.invoke({"messages": state["messages"]}).content == "YES":
+    if chain.invoke().content == "YES":
         step_index = step_order.index(step)
         if step_index < len(step_order) - 1:
             next_step = step_order[step_index + 1]
@@ -61,14 +60,16 @@ def check_state(state: State):
     return
 
 
+# decides on wether the goal setting process is finished
 def check_goals(state: State):
     prompt = ChatPromptTemplate(
         [
             (
                 "system",
-                prompt_loader.get_prompt(type="analyzer", name="check_goals"),
-            ),
-            MessagesPlaceholder("messages"),
+                prompt_loader.get_prompt(
+                    type="analyzer", name="check_goals"
+                ).format_map({"history": state["messages"]}),
+            )
         ]
     )
 
@@ -81,20 +82,21 @@ def check_goals(state: State):
     return
 
 
+# decides on wether the goal reflection process is finished
 def check_goal_reflection(state: State):
     prompt = ChatPromptTemplate(
         [
             (
                 "system",
-                prompt_loader.get_prompt(type="analyzer", name="check_goal_reflection"),
+                prompt_loader.get_prompt(
+                    type="analyzer", name="check_goal_reflection"
+                ).format_map({"history": state["messages"]}),
             ),
-            MessagesPlaceholder("messages"),
         ]
     )
 
     chain = prompt | model
-
-    response = chain.invoke({"messages": state["messages"]}).content
+    response = chain.invoke().content
 
     if response == "YES":
         return {"goal_reflection": False, "finish": True}

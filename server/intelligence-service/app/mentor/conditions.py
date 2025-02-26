@@ -1,5 +1,4 @@
 from .state import State
-from langgraph.graph import END
 
 
 def start_router(state: State):
@@ -23,8 +22,10 @@ def main_router(state: State):
         return "summary_node"
     elif state["goal_reflection"]:
         return "check_goal_reflection"
-    else:  # state["finish"]
-        return "finish_node"
+    elif  state["finish"]:
+        return "finish"
+    else:  
+        return "mentor_node"
 
 
 def goal_setting_router(state: State):

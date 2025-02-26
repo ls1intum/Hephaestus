@@ -1,10 +1,11 @@
 from ..state import State
-from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
 from ...model import model
+from ..prompt_loader import PromptLoader
+from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
 from uuid import uuid4
 from langchain_core.runnables.config import RunnableConfig
 from langgraph.store.base import BaseStore
-from ..prompt_loader import PromptLoader
+
 
 prompt_loader = PromptLoader()
 
@@ -22,20 +23,19 @@ def update_memory(state: State, config: RunnableConfig, *, store: BaseStore):
                     "system",
                     prompt_loader.get_prompt(
                         type="analyzer", name="update_memory"
-                    ).format_map({"step": step}),
-                ),
-                MessagesPlaceholder("messages"),
+                    ).format_map({"step": step, "history": state["messages"]}),
+                )
             ]
         )
 
         chain = prompt | model
-        response = chain.invoke({"messages": state["messages"]}).content
+        response = chain.invoke().content
         store.put(namespace, key=str(uuid4()), value={step: response})
 
     return
 
 
-def set_goals(state: State, config: RunnableConfig, *, store: BaseStore):
+def set_goals(state: State, *, store: BaseStore):
     user_id = state["user_id"]
     namespace = (user_id, "goals")
 
@@ -51,12 +51,11 @@ def set_goals(state: State, config: RunnableConfig, *, store: BaseStore):
 
     chain = prompt | model
     response = chain.invoke({"messages": state["messages"]}).content
-    print("\nset_goals", response, "\n")
     store.put(namespace, key=str(uuid4()), value={"goal_list": response})
     return
 
 
-def adjust_goals(state: State, config: RunnableConfig, *, store: BaseStore):
+def adjust_goals(state: State, *, store: BaseStore):
     user_id = state["user_id"]
     namespace = (user_id, "goals")
     # TODO: check the position of the goal in the list
@@ -64,7 +63,9 @@ def adjust_goals(state: State, config: RunnableConfig, *, store: BaseStore):
     if not goals:
         goals = ""
     else:
+        print(goals)
         for item in goals:
+            print(item)
             if "goal_list" in item.value:
                 goals = item.value["goal_list"]
 
@@ -72,15 +73,14 @@ def adjust_goals(state: State, config: RunnableConfig, *, store: BaseStore):
         [
             (
                 "system",
-                prompt_loader.get_prompt(type="analyzer", name="update_memory").format_map({"goals": "goals"}),
-            ),
-            MessagesPlaceholder("messages"),
+                prompt_loader.get_prompt(
+                    type="analyzer", name="update_memory"
+                ).format_map({"goals": "goals", "history": state["messages"]}),
+            )
         ]
     )
 
     chain = prompt | model
-    response = chain.invoke({"messages": state["messages"]}).content
-    print("\nadjust_goals", response, "\n")
+    response = chain.invoke().content
     store.put(namespace, key=str(uuid4()), value={"goal_list": response})
-
     return
