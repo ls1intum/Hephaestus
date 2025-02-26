@@ -1,3 +1,4 @@
+export * from './contributor-info';
 export * from './label-info';
 export * from './leaderboard-entry';
 export * from './message';

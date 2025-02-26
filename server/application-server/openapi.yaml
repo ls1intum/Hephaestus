@@ -348,6 +348,35 @@ paths:
                 type: array
                 items:
                   $ref: "#/components/schemas/TeamInfo"
+  /repository/{owner}/{repo}/contributors:
+    get:
+      tags:
+      - repository
+      summary: Get all contributors for a repository by its full name (owner/repo).
+      description: Get all contributors for a repository by its full name (owner/repo).
+      operationId: getContributorsByRepositoryName
+      parameters:
+      - name: owner
+        in: path
+        description: the owner of the repository
+        required: true
+        schema:
+          type: string
+      - name: repo
+        in: path
+        description: the name of the repository
+        required: true
+        schema:
+          type: string
+      responses:
+        "200":
+          description: a list of contributors for the repository
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ContributorInfo"
   /meta:
     get:
       tags:
@@ -737,6 +766,21 @@ components:
       - isDismissed
       - score
       - state
+    ContributorInfo:
+      type: object
+      description: Data Transfer Object for contributor information.
+      properties:
+        id:
+          type: integer
+          format: int64
+        user:
+          $ref: "#/components/schemas/UserInfo"
+        contributions:
+          type: integer
+          format: int32
+      required:
+      - id
+      - user
     MetaData:
       type: object
       properties:

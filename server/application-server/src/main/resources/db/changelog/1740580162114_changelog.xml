@@ -1,0 +1,31 @@
+<?xml version="1.1" encoding="UTF-8" standalone="no"?>
+<databaseChangeLog xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:ext="http://www.liquibase.org/xml/ns/dbchangelog-ext"
+    xmlns:pro="http://www.liquibase.org/xml/ns/pro"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog-ext http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-ext.xsd http://www.liquibase.org/xml/ns/pro http://www.liquibase.org/xml/ns/pro/liquibase-pro-latest.xsd http://www.liquibase.org/xml/ns/dbchangelog http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+    <changeSet author="godrums" id="1740580162114-1">
+        <createTable tableName="contributor">
+            <column name="id" type="BIGINT">
+                <constraints nullable="false" primaryKey="true" primaryKeyName="contributorPK"/>
+            </column>
+            <column name="created_at" type="TIMESTAMP(6) WITH TIME ZONE"/>
+            <column name="updated_at" type="TIMESTAMP(6) WITH TIME ZONE"/>
+            <column name="contributions" type="INTEGER">
+                <constraints nullable="false"/>
+            </column>
+            <column name="repository_id" type="BIGINT"/>
+            <column name="user_id" type="BIGINT"/>
+        </createTable>
+    </changeSet>
+    <changeSet author="godrums" id="1740580162114-2">
+        <addColumn tableName="repository_to_monitor">
+            <column name="contributors_synced_at" type="timestamp with timezone(6)"/>
+        </addColumn>
+    </changeSet>
+    <changeSet author="godrums" id="1740580162114-3">
+        <addForeignKeyConstraint baseColumnNames="repository_id" baseTableName="contributor" constraintName="FKokmfv39iyfw9vv97tpyf2775n" deferrable="false" initiallyDeferred="false" referencedColumnNames="id" referencedTableName="repository" validate="true"/>
+    </changeSet>
+    <changeSet author="godrums" id="1740580162114-4">
+        <addForeignKeyConstraint baseColumnNames="user_id" baseTableName="contributor" constraintName="FKrygiemk5fb5drrv4xxxmfhf1k" deferrable="false" initiallyDeferred="false" referencedColumnNames="id" referencedTableName="user" validate="true"/>
+    </changeSet>
+</databaseChangeLog>

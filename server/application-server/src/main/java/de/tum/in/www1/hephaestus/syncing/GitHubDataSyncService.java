@@ -13,6 +13,7 @@ import de.tum.in.www1.hephaestus.gitprovider.pullrequestreviewcomment.github.Git
 import de.tum.in.www1.hephaestus.gitprovider.repository.RepositoryRepository;
 import de.tum.in.www1.hephaestus.gitprovider.repository.github.GitHubRepositorySyncService;
 import de.tum.in.www1.hephaestus.gitprovider.user.github.GitHubUserSyncService;
+import de.tum.in.www1.hephaestus.gitprovider.contributor.github.GitHubContributorSyncService;
 import de.tum.in.www1.hephaestus.workspace.RepositoryToMonitor;
 import de.tum.in.www1.hephaestus.workspace.RepositoryToMonitorRepository;
 import de.tum.in.www1.hephaestus.workspace.Workspace;
@@ -83,6 +84,9 @@ public class GitHubDataSyncService {
     private GitHubPullRequestReviewCommentSyncService pullRequestReviewCommentSyncService;
 
     @Autowired
+    private GitHubContributorSyncService contributorSyncService;
+
+    @Autowired
     private RepositoryRepository repositoryRepository;
 
     @Autowired
@@ -139,9 +143,12 @@ public class GitHubDataSyncService {
         boolean shouldSyncIssuesAndPullRequests =
             repositoryToMonitor.getIssuesAndPullRequestsSyncedAt() == null ||
             repositoryToMonitor.getIssuesAndPullRequestsSyncedAt().isBefore(cooldownTime);
+        boolean shouldSyncContributors =
+            repositoryToMonitor.getContributorsSyncedAt() == null ||
+            repositoryToMonitor.getContributorsSyncedAt().isBefore(cooldownTime);
 
         // Sync repository is required if any of the following is true
-        if (shouldSyncLabels || shouldSyncMilestones || shouldSyncIssuesAndPullRequests) {
+        if (shouldSyncLabels || shouldSyncMilestones || shouldSyncIssuesAndPullRequests || shouldSyncContributors) {
             shouldSyncRepository = true;
         }
 
@@ -175,6 +182,12 @@ public class GitHubDataSyncService {
             syncRepositoryRecentIssuesAndPullRequests(ghRepository, repositoryToMonitor);
         }
 
+        // Sync contributors
+        if (shouldSyncContributors) {
+            logger.info(repositoryToMonitor.getNameWithOwner() + " - Syncing contributors...");
+            syncRepositoryContributors(ghRepository, repositoryToMonitor);
+        }
+
         // TODO: Re-enable once it works without exceptions
         //
         // if (shouldSyncAllPastIssuesAndPullRequests(repositoryToMonitor)) {
@@ -204,6 +217,19 @@ public class GitHubDataSyncService {
         var currentTime = OffsetDateTime.now();
         milestoneSyncService.syncMilestonesOfRepository(repository);
         repositoryToMonitor.setMilestonesSyncedAt(currentTime);
+        repositoryToMonitorRepository.save(repositoryToMonitor);
+    }
+
+    /**
+     * Synchronizes all contributors for a specific GitHub repository and updates the sync timestamp.
+     * 
+     * @param repository GitHub repository to sync
+     * @param repositoryToMonitor syncing status
+     */
+    private void syncRepositoryContributors(GHRepository repository, RepositoryToMonitor repositoryToMonitor) {
+        var currentTime = OffsetDateTime.now();
+        contributorSyncService.syncContributorsOfRepository(repository);
+        repositoryToMonitor.setContributorsSyncedAt(currentTime);
         repositoryToMonitorRepository.save(repositoryToMonitor);
     }
 

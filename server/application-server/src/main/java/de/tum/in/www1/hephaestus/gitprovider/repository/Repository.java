@@ -1,6 +1,7 @@
 package de.tum.in.www1.hephaestus.gitprovider.repository;
 
 import de.tum.in.www1.hephaestus.gitprovider.common.BaseGitServiceEntity;
+import de.tum.in.www1.hephaestus.gitprovider.contributor.Contributor;
 import de.tum.in.www1.hephaestus.gitprovider.issue.Issue;
 import de.tum.in.www1.hephaestus.gitprovider.label.Label;
 import de.tum.in.www1.hephaestus.gitprovider.milestone.Milestone;
@@ -85,6 +86,10 @@ public class Repository extends BaseGitServiceEntity {
     @ManyToMany(mappedBy = "repositories")
     @ToString.Exclude
     private Set<Team> teams = new HashSet<>();
+
+    @OneToMany(mappedBy = "repository", cascade = CascadeType.REMOVE, orphanRemoval = true)
+    @ToString.Exclude
+    private Set<Contributor> contributors = new HashSet<>();
 
     public enum Visibility {
         PUBLIC,

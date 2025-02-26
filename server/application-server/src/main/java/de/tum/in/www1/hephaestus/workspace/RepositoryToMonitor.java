@@ -35,6 +35,9 @@ public class RepositoryToMonitor {
 
     // The time up to which issues and pull requests have been synced in the recent sync
     private OffsetDateTime issuesAndPullRequestsSyncedAt;
+    
+    // The time up to which contributors have been synced in the recent sync
+    private OffsetDateTime contributorsSyncedAt;
 
     @ManyToOne
     @JoinColumn(name = "workspace_id")

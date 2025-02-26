@@ -9,6 +9,8 @@ api/message.service.ts
 api/message.serviceInterface.ts
 api/meta.service.ts
 api/meta.serviceInterface.ts
+api/repository.service.ts
+api/repository.serviceInterface.ts
 api/session.service.ts
 api/session.serviceInterface.ts
 api/team.service.ts
@@ -21,6 +23,7 @@ configuration.ts
 encoder.ts
 git_push.sh
 index.ts
+model/contributor-info.ts
 model/label-info.ts
 model/leaderboard-entry.ts
 model/message.ts
