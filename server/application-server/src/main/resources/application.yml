@@ -53,6 +53,9 @@ hephaestus:
 
     cache:
         contributors:
+                cache:
+        contributors:
++           # Eviction rate in milliseconds (1 hour)
             evict-rate: 3600000
 
 
