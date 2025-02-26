@@ -1,3 +1,4 @@
+export * from './contributor';
 export * from './label-info';
 export * from './leaderboard-entry';
 export * from './league-change';

@@ -34,7 +34,7 @@
     "@ng-icons/octicons": "30.3.0",
     "@primer/primitives": "10.3.4",
     "@sentry/angular": "9.2.0",
-    "@spartan-ng/brain": "0.0.1-alpha.406",
+    "@spartan-ng/brain": "^0.0.1-alpha.410",
     "@tanstack/angular-query-experimental": "5.66.9",
     "autoprefixer": "10.4.20",
     "class-variance-authority": "0.7.1",
