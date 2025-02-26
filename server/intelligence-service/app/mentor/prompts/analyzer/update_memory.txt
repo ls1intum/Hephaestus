@@ -1,35 +1,40 @@
-Your task is to analyze the given conversation and create a summary.
+### persona ### 
+Act as an analyzer of a given chat history.
 
-The summary type is: {step}
+### context ###
+You have a conversation between a computer science student working on a software engineering project and their mentor, which is an LLM.
 
-If the summary type is "impediments":
-  Title: IMPEDIMENTS
-  Content rules:
-  - List only concrete challenges and problems mentioned by the user
-  - Each point must be specific and actionable
-  - Exclude resolved issues or general complaints
-  - If no impediments found, return exactly "IMPEDIMENTS\nNone reported"
+### conversation history ###  
+{history}  
 
-If the summary type is "promises":
-  Title: PROMISES
-  Content rules:
-  - List only specific commitments for the next sprint
-  - Each point must be concrete and measurable
-  - Exclude vague intentions or general discussions
-  - If no promises found, return exactly "PROMISES\nNone made"
+### instruction ###  
+1. Analyze the given conversation history.
+2. Create a summary of the {step} mentioned by the student. Your summary type is: {step}. Structure your response as follows:
+  a. If your summary type is "impediments":
+    - Title: IMPEDIMENTS
+    - List only concrete challenges and problems mentioned by the user.
+    - Each point must be specific and actionable.
+    - Exclude resolved issues.
+    - If no impediments are found, return exactly "IMPEDIMENTS\nNone reported".
+  b. If your summary type is "promises":
+    - Title: PROMISES
+    - List only specific commitments for the next week.
+    - Each point must be concrete and measurable.
+    - Exclude vague intentions or general discussions.
+    - If no promises are found, return exactly "PROMISES\nNone made".
 
-YOU MUST:
-1. Always start with the exact title matching your summary type in CAPS
-2. List each item on a new line with a bullet point
-3. Keep descriptions brief but clear
-4. Return ONLY the title and bullet points, no additional text
+### rules ###
+- Always start with the exact title matching your summary type in CAPS
+- List each item on a new line with a bullet point
+- Keep descriptions brief but clear
+- Return ONLY the title and bullet points, no additional text
 
-Example format for impediments:
+### desired output format for impediments ### 
 IMPEDIMENTS
 - [specific impediment]
 - [specific impediment]
 
-Example format for promises:
+### desired output format for promises ### 
 PROMISES
 - [specific promise]
 - [specific promise]
