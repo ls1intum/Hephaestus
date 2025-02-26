@@ -288,6 +288,61 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/Message"
+  /leaderboard:
+    get:
+      tags:
+      - leaderboard
+      operationId: getLeaderboard
+      parameters:
+      - name: after
+        in: query
+        required: true
+        schema:
+          type: string
+          format: date-time
+      - name: before
+        in: query
+        required: true
+        schema:
+          type: string
+          format: date-time
+      - name: team
+        in: query
+        required: false
+        schema:
+          type: string
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/LeaderboardEntry"
+    post:
+      tags:
+      - leaderboard
+      operationId: getUserLeagueStats
+      parameters:
+      - name: login
+        in: query
+        required: true
+        schema:
+          type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/LeaderboardEntry"
+        required: true
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LeagueChange"
   /workspace/users:
     get:
       tags:
@@ -360,38 +415,6 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/MetaData"
-  /leaderboard:
-    get:
-      tags:
-      - leaderboard
-      operationId: getLeaderboard
-      parameters:
-      - name: after
-        in: query
-        required: true
-        schema:
-          type: string
-          format: date-time
-      - name: before
-        in: query
-        required: true
-        schema:
-          type: string
-          format: date-time
-      - name: team
-        in: query
-        required: false
-        schema:
-          type: string
-      responses:
-        "200":
-          description: OK
-          content:
-            application/json:
-              schema:
-                type: array
-                items:
-                  $ref: "#/components/schemas/LeaderboardEntry"
   /workspace/team/{teamId}:
     delete:
       tags:
@@ -684,6 +707,17 @@ components:
       - labels
       - name
       - repositories
+    LeagueChange:
+      type: object
+      properties:
+        login:
+          type: string
+        leaguePointsChange:
+          type: integer
+          format: int32
+      required:
+      - leaguePointsChange
+      - login
     LabelInfo:
       type: object
       properties:

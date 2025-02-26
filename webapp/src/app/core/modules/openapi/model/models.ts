@@ -1,5 +1,6 @@
 export * from './label-info';
 export * from './leaderboard-entry';
+export * from './league-change';
 export * from './message';
 export * from './meta-data';
 export * from './pull-request-base-info';

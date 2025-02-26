@@ -14,6 +14,7 @@ import { HttpHeaders }                                       from '@angular/comm
 import { Observable }                                        from 'rxjs';
 
 import { LeaderboardEntry } from '../model/models';
+import { LeagueChange } from '../model/models';
 
 
 import { Configuration }                                     from '../configuration';
@@ -32,5 +33,13 @@ export interface LeaderboardServiceInterface {
      * @param team 
      */
     getLeaderboard(after: string, before: string, team?: string, extraHttpRequestParams?: any): Observable<Array<LeaderboardEntry>>;
+
+    /**
+     * 
+     * 
+     * @param login 
+     * @param leaderboardEntry 
+     */
+    getUserLeagueStats(login: string, leaderboardEntry: LeaderboardEntry, extraHttpRequestParams?: any): Observable<LeagueChange>;
 
 }
