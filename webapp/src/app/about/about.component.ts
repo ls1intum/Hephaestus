@@ -2,8 +2,8 @@ import { HttpClient } from '@angular/common/http';
 import { Component, computed, inject } from '@angular/core';
 import { injectQuery } from '@tanstack/angular-query-experimental';
 import { lastValueFrom } from 'rxjs';
-import { GitHub } from 'app/@types/github';
 import { HlmAvatarModule } from '@spartan-ng/ui-avatar-helm';
+import { RepositoryService } from '@app/core/modules/openapi';
 
 @Component({
   selector: 'app-about',
@@ -12,10 +12,11 @@ import { HlmAvatarModule } from '@spartan-ng/ui-avatar-helm';
 })
 export class AboutComponent {
   http = inject(HttpClient);
+  repositoryService = inject(RepositoryService);
 
   query = injectQuery(() => ({
     queryKey: ['contributors'],
-    queryFn: async () => lastValueFrom(this.http.get('https://api.github.com/repos/ls1intum/hephaestus/contributors')) as Promise<GitHub.Contributor[]>,
+    queryFn: async () => lastValueFrom(this.repositoryService.getContributorsByRepositoryName('ls1intum', 'Hephaestus')),
     gcTime: Infinity
   }));
 
@@ -33,6 +34,6 @@ export class AboutComponent {
     if (!data) {
       return undefined;
     }
-    return data.filter((contributor) => contributor.id !== 5898705 && !contributor.login.includes('[bot]'));
+    return data.filter((contributor) => contributor.user.id !== 5898705 && !contributor.user.login.includes('[bot]'));
   });
 }

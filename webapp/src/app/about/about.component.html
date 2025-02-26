@@ -14,14 +14,14 @@
   @if (projectManager(); as projectManager) {
     <div class="flex items-center gap-3 mb-4">
       <a
-        [href]="projectManager.html_url"
+        [href]="projectManager.user.htmlUrl"
         target="_blank"
         rel="noopener noreferrer"
         class="hover:scale-105 transition-all hover:shadow-secondary-foreground/15 hover:shadow-lg rounded-full"
       >
         <hlm-avatar class="size-32">
-          <img [src]="projectManager.avatar_url" [alt]="projectManager.login + '\'s avatar'" hlmAvatarImage />
-          <span hlmAvatarFallback>{{ projectManager.login.slice(0, 2).toUpperCase() }}</span>
+          <img [src]="projectManager.user.avatarUrl" [alt]="projectManager.user.login + '\'s avatar'" hlmAvatarImage />
+          <span hlmAvatarFallback>{{ projectManager.user.login.slice(0, 2).toUpperCase() }}</span>
         </hlm-avatar>
       </a>
       <div>
@@ -37,14 +37,14 @@
     <div class="flex flex-wrap gap-2">
       @for (contributor of contributors; track contributor.id) {
         <a
-          [href]="contributor.html_url"
+          [href]="contributor.user.htmlUrl"
           target="_blank"
           rel="noopener noreferrer"
           class="hover:scale-105 transition-all hover:shadow-secondary-foreground/15 hover:shadow-lg rounded-full"
         >
           <hlm-avatar class="size-20">
-            <img [src]="contributor.avatar_url" [alt]="contributor.login + '\'s avatar'" hlmAvatarImage />
-            <span hlmAvatarFallback>{{ contributor.login.slice(0, 2).toUpperCase() }}</span>
+            <img [src]="contributor.user.avatarUrl" [alt]="contributor.user.login + '\'s avatar'" hlmAvatarImage />
+            <span hlmAvatarFallback>{{ contributor.user.login.slice(0, 2).toUpperCase() }}</span>
           </hlm-avatar>
         </a>
       }
