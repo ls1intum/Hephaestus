@@ -2,9 +2,8 @@ import { HttpClient } from '@angular/common/http';
 import { Component, computed, inject } from '@angular/core';
 import { injectQuery } from '@tanstack/angular-query-experimental';
 import { lastValueFrom } from 'rxjs';
-import { GitHub } from 'app/@types/github';
 import { HlmAvatarModule } from '@spartan-ng/ui-avatar-helm';
-
+import { MetaService } from '@app/core/modules/openapi';
 @Component({
   selector: 'app-about',
   imports: [HlmAvatarModule],
@@ -12,10 +11,11 @@ import { HlmAvatarModule } from '@spartan-ng/ui-avatar-helm';
 })
 export class AboutComponent {
   http = inject(HttpClient);
+  metaService = inject(MetaService);
 
   query = injectQuery(() => ({
     queryKey: ['contributors'],
-    queryFn: async () => lastValueFrom(this.http.get('https://api.github.com/repos/ls1intum/hephaestus/contributors')) as Promise<GitHub.Contributor[]>,
+    queryFn: async () => lastValueFrom(this.metaService.getContributors()),
     gcTime: Infinity
   }));
 

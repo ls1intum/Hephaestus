@@ -37,9 +37,6 @@ public class GitHubDataSyncService {
 
     private static final Logger logger = LoggerFactory.getLogger(GitHubDataSyncService.class);
 
-    @Value("${github.auth-token:null}")
-    private String ghAuthToken;
-
     @Value("${monitoring.timeframe}")
     private int timeframe;
 
