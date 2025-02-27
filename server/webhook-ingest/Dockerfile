@@ -1,5 +1,8 @@
 FROM python:3.13-alpine
 
+# For healthcheck
+RUN apk add --no-cache curl
+
 RUN pip install poetry==2.1.1
 
 WORKDIR /app

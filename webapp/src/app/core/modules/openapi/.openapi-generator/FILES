@@ -21,8 +21,10 @@ configuration.ts
 encoder.ts
 git_push.sh
 index.ts
+model/contributor.ts
 model/label-info.ts
 model/leaderboard-entry.ts
+model/league-change.ts
 model/message.ts
 model/meta-data.ts
 model/models.ts

@@ -9,12 +9,10 @@
  * https://openapi-generator.tech
  * Do not edit the class manually.
  */
-import { TeamInfo } from './team-info';
 
 
-export interface MetaData { 
-    teams: Array<TeamInfo>;
-    scheduledDay: string;
-    scheduledTime: string;
+export interface LeagueChange { 
+    login: string;
+    leaguePointsChange: number;
 }
 

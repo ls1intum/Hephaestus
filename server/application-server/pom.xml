@@ -11,7 +11,7 @@
 	</parent>
 	<groupId>de.tum.in.www1</groupId>
 	<artifactId>hephaestus</artifactId>
-	<version>0.0.1-SNAPSHOT</version>
+	<version>0.1.1-SNAPSHOT</version>
 	<name>Hephaestus</name>
 	<description>AI-driven learning for better software development</description>
 	<url />
@@ -290,11 +290,9 @@
 					<password>root</password>
 					<!-- Hibernate URL for reference schema using the Hibernate 6 dialect -->
 					<referenceUrl>hibernate:spring:de.tum.in.www1.hephaestus?dialect=org.hibernate.dialect.PostgreSQLDialect&amp;hibernate.physical_naming_strategy=org.hibernate.boot.model.naming.CamelCaseToUnderscoresNamingStrategy&amp;hibernate.implicit_naming_strategy=org.springframework.boot.orm.jpa.hibernate.SpringImplicitNamingStrategy</referenceUrl>
-					<!-- Enable detailed logging output -->
 					<verbose>true</verbose>
 				</configuration>
 				<dependencies>
-					<!-- Plugin-specific dependency for liquibase-hibernate6 -->
 					<dependency>
 						<groupId>org.liquibase.ext</groupId>
 						<artifactId>liquibase-hibernate6</artifactId>
