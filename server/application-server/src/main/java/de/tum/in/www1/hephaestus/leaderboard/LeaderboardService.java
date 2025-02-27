@@ -13,7 +13,6 @@ import de.tum.in.www1.hephaestus.gitprovider.user.UserInfoDTO;
 import de.tum.in.www1.hephaestus.gitprovider.user.UserRepository;
 import jakarta.transaction.Transactional;
 import java.time.OffsetDateTime;
-import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -43,6 +42,9 @@ public class LeaderboardService {
 
     @Autowired
     private TeamRepository teamRepository;
+
+    @Autowired
+    private LeaguePointsCalculationService leaguePointsCalculationService;
 
     @Transactional
     public List<LeaderboardEntryDTO> createLeaderboard(
@@ -233,5 +235,26 @@ public class LeaderboardService {
             .map(pullRequestReviews -> scoringService.calculateReviewScore(pullRequestReviews, numberOfIssueComments))
             .reduce(0.0, Double::sum);
         return (int) Math.ceil(totalScore);
+    }
+
+    /**
+     * Get the league point change for a specific user
+     * @param login user login
+     * @param entry current leaderboard entry of the user
+     * @return LeaderboardUserStatsDTO containing league point change
+     */
+    @Transactional
+    public LeagueChangeDTO getUserLeagueStats(String login, LeaderboardEntryDTO entry) {
+        // Get the user
+        User user = userRepository
+            .findByLogin(login)
+            .orElseThrow(() -> new IllegalArgumentException("User not found with login: " + login));
+
+        // Calculate league point change
+        int currentLeaguePoints = user.getLeaguePoints();
+        int projectedNewPoints = leaguePointsCalculationService.calculateNewPoints(user, entry);
+        int leaguePointsChange = projectedNewPoints - currentLeaguePoints;
+
+        return new LeagueChangeDTO(user.getLogin(), leaguePointsChange);
     }
 }

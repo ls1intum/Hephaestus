@@ -9,12 +9,14 @@
  * https://openapi-generator.tech
  * Do not edit the class manually.
  */
-import { TeamInfo } from './team-info';
 
 
-export interface MetaData { 
-    teams: Array<TeamInfo>;
-    scheduledDay: string;
-    scheduledTime: string;
+export interface Contributor { 
+    id: number;
+    login: string;
+    name: string;
+    avatarUrl: string;
+    htmlUrl: string;
+    contributions?: number;
 }
 

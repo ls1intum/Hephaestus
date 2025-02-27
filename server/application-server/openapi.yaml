@@ -8,7 +8,7 @@ info:
   license:
     name: MIT License
     url: https://github.com/ls1intum/Hephaestus/blob/develop/LICENSE
-  version: 0.0.1
+  version: 0.1.1
 servers:
 - url: /
   description: Default Server URL
@@ -288,6 +288,61 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/Message"
+  /leaderboard:
+    get:
+      tags:
+      - leaderboard
+      operationId: getLeaderboard
+      parameters:
+      - name: after
+        in: query
+        required: true
+        schema:
+          type: string
+          format: date-time
+      - name: before
+        in: query
+        required: true
+        schema:
+          type: string
+          format: date-time
+      - name: team
+        in: query
+        required: false
+        schema:
+          type: string
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/LeaderboardEntry"
+    post:
+      tags:
+      - leaderboard
+      operationId: getUserLeagueStats
+      parameters:
+      - name: login
+        in: query
+        required: true
+        schema:
+          type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/LeaderboardEntry"
+        required: true
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LeagueChange"
   /workspace/users:
     get:
       tags:
@@ -360,29 +415,11 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/MetaData"
-  /leaderboard:
+  /meta/contributors:
     get:
       tags:
-      - leaderboard
-      operationId: getLeaderboard
-      parameters:
-      - name: after
-        in: query
-        required: true
-        schema:
-          type: string
-          format: date-time
-      - name: before
-        in: query
-        required: true
-        schema:
-          type: string
-          format: date-time
-      - name: team
-        in: query
-        required: false
-        schema:
-          type: string
+      - meta
+      operationId: getContributors
       responses:
         "200":
           description: OK
@@ -391,7 +428,7 @@ paths:
               schema:
                 type: array
                 items:
-                  $ref: "#/components/schemas/LeaderboardEntry"
+                  $ref: "#/components/schemas/Contributor"
   /workspace/team/{teamId}:
     delete:
       tags:
@@ -635,6 +672,29 @@ components:
       - number
       - state
       - title
+    Contributor:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+        login:
+          type: string
+        name:
+          type: string
+        avatarUrl:
+          type: string
+        htmlUrl:
+          type: string
+        contributions:
+          type: integer
+          format: int32
+      required:
+      - avatarUrl
+      - htmlUrl
+      - id
+      - login
+      - name
     UserInfo:
       type: object
       properties:
@@ -684,6 +744,17 @@ components:
       - labels
       - name
       - repositories
+    LeagueChange:
+      type: object
+      properties:
+        login:
+          type: string
+        leaguePointsChange:
+          type: integer
+          format: int32
+      required:
+      - leaguePointsChange
+      - login
     LabelInfo:
       type: object
       properties:
