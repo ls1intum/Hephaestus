@@ -1,6 +1,6 @@
 import { Component, effect, inject, computed, signal, viewChild } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { lastValueFrom } from 'rxjs';
+import { lastValueFrom, take } from 'rxjs';
 import { injectMutation, injectQuery, QueryClient } from '@tanstack/angular-query-experimental';
 import { SessionsCardComponent } from './sessions-card/sessions-card.component';
 import { MessagesComponent } from './messages/messages.component';
@@ -9,6 +9,7 @@ import { Message, MessageService, SessionService } from '@app/core/modules/opena
 import { HlmButtonModule } from '@spartan-ng/ui-button-helm';
 import { StartSessionCardComponent } from './start-session-card/start-session-card.component';
 import { HlmAlertModule } from '@spartan-ng/ui-alert-helm';
+import { toast } from 'ngx-sonner';
 import { NgScrollbar, NgScrollbarModule } from 'ngx-scrollbar';
 import { HlmScrollAreaDirective } from '@spartan-ng/ui-scrollarea-helm';
 
@@ -32,6 +33,7 @@ export class MentorComponent {
   sessionService = inject(SessionService);
 
   selectedSessionId = signal<number | undefined>(undefined);
+  lastSessionClosed = signal<boolean>(true);
   messagesScrollBar = viewChild(NgScrollbar);
 
   queryClient = inject(QueryClient);
@@ -43,20 +45,26 @@ export class MentorComponent {
     });
   }
 
+  showToast() {
+    toast('Something went wrong...', { description: 'There was an error trying to generate response to your last message. If this issue persists, please contact the AET Team.' });
+  }
+
   selectedSessionClosed = computed(() => {
-    const selectedId = this.selectedSessionId();
-    if (!selectedId) return false;
+    if (!this.selectedSessionId() || !this.sessions.data()?.length) return false;
 
-    const sessions = this.sessions.data();
-    if (!sessions) return false;
-
-    const selectedSession = sessions.find((session) => session.id === selectedId);
+    const selectedSession = this.sessions.data()?.find((session) => session.id === this.selectedSessionId());
     return selectedSession?.isClosed ?? false;
   });
 
   sessions = injectQuery(() => ({
     queryKey: ['sessions'],
-    queryFn: async () => await lastValueFrom(this.sessionService.getAllSessions())
+    queryFn: async () => {
+      const sessions = await lastValueFrom(this.sessionService.getAllSessions());
+      if (sessions.length != 0) {
+        this.lastSessionClosed.set(sessions[0].isClosed);
+      }
+      return sessions;
+    }
   }));
 
   selectedSessionMessages = injectQuery(() => ({
@@ -70,8 +78,15 @@ export class MentorComponent {
     onSettled: async () => {
       return await this.queryClient.invalidateQueries({ queryKey: ['sessions'] });
     },
-    onSuccess: (session) => {
+    onSuccess: async (session) => {
+      if (!session) {
+        this.showToast();
+        return;
+      }
+      this.lastSessionClosed.set(session.isClosed);
       this.selectedSessionId.set(session.id);
+
+      await this.queryClient.invalidateQueries({ queryKey: ['sessions'] });
       this.queryClient.invalidateQueries({ queryKey: ['sessions', this.selectedSessionId()] });
     }
   }));
@@ -88,8 +103,23 @@ export class MentorComponent {
 
       return { previousMessages };
     },
+    onSuccess: (message) => {
+      if (message === undefined || message === null) {
+        this.showToast();
+        return;
+      }
+
+      // if the last session is closed, do not show the alert dialog when creating a new session
+      this.sessionService
+        .getLastSession()
+        .pipe(take(1))
+        .subscribe((session) => {
+          this.lastSessionClosed.set(session.isClosed);
+        });
+    },
     onError: (err, newTodo, context) => {
       this.queryClient.setQueryData(['sessions', this.selectedSessionId()], context?.previousMessages);
+      this.showToast();
     },
     onSettled: () => {
       this.queryClient.invalidateQueries({ queryKey: ['sessions', this.selectedSessionId()] });

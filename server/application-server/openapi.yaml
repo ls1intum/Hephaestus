@@ -429,6 +429,18 @@ paths:
                 type: array
                 items:
                   $ref: "#/components/schemas/Contributor"
+  /mentor/sessions/last:
+    get:
+      tags:
+      - session
+      operationId: getLastSession
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Session"
   /workspace/team/{teamId}:
     delete:
       tags:

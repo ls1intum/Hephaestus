@@ -21,6 +21,14 @@ class MentorRequest(BaseModel):
 
 class MentorResponse(BaseModel):
     content: str
+    closed: bool = False
+
+
+@router.get(
+    "/health", summary="Check if the intelligence service is running", status_code=200
+)
+def status():
+    return {"status": "ok"}
 
 
 @router.post(
@@ -32,7 +40,7 @@ def start(request: MentorStartRequest):
     config = RunnableConfig({"configurable": {"thread_id": request.session_id}})
     response = start_session(request.previous_session_id, request.dev_progress, config)
     response_message = response["messages"][-1].content
-    return MentorResponse(content=response_message)
+    return MentorResponse(content=response_message, closed=response["closed"])
 
 
 @router.post(
@@ -44,4 +52,4 @@ def generate(request: MentorRequest):
     config = RunnableConfig({"configurable": {"thread_id": request.session_id}})
     response = run(request.content, config)
     response_message = response["messages"][-1].content
-    return MentorResponse(content=response_message)
+    return MentorResponse(content=response_message, closed=response["closed"])

@@ -20,6 +20,26 @@
       }
     </div>
 
-    <button hlmBtn aria-describedby="Start Session" (click)="this.createNewSession.emit()">Start Session</button>
+    @if (isLastSessionClosed()) {
+      <button hlmBtn aria-describedby="Start Session" (click)="this.createNewSession.emit()">Start Session</button>
+    } @else {
+      <hlm-alert-dialog>
+        <button hlmBtn brnAlertDialogTrigger aria-describedby=">Start Session" class="w-full gap-2 mt-6 justify-start h-9">
+          <span>Start Session</span>
+        </button>
+        <hlm-alert-dialog-content *brnAlertDialogContent="let ctx">
+          <hlm-alert-dialog-header>
+            <h3 hlmAlertDialogTitle>Are you absolutely sure?</h3>
+            <p hlmAlertDialogDescription>
+              You have not finished your most recent session yet. If you start a new session, your current session will be closed. It may affect the quality of your mentorship.
+            </p>
+          </hlm-alert-dialog-header>
+          <hlm-alert-dialog-footer>
+            <button hlmAlertDialogCancel (click)="ctx.close()">Cancel</button>
+            <button hlmAlertDialogAction (click)="ctx.close(); this.createNewSession.emit()">Start New Session</button>
+          </hlm-alert-dialog-footer>
+        </hlm-alert-dialog-content>
+      </hlm-alert-dialog>
+    }
   }
 </div>

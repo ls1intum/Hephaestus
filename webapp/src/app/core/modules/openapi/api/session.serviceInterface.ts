@@ -36,4 +36,10 @@ export interface SessionServiceInterface {
      */
     getAllSessions(extraHttpRequestParams?: any): Observable<Array<Session>>;
 
+    /**
+     * 
+     * 
+     */
+    getLastSession(extraHttpRequestParams?: any): Observable<Session>;
+
 }
