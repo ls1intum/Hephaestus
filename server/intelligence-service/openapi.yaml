@@ -34,6 +34,10 @@ components:
       type: object
     MentorResponse:
       properties:
+        closed:
+          default: false
+          title: Closed
+          type: boolean
         content:
           title: Content
           type: string
@@ -130,6 +134,18 @@ paths:
                 $ref: '#/components/schemas/HTTPValidationError'
           description: Validation Error
       summary: Continue a chat session with an LLM.
+      tags:
+      - mentor
+  /mentor/health:
+    get:
+      operationId: status_mentor_health_get
+      responses:
+        '200':
+          content:
+            application/json:
+              schema: {}
+          description: Successful Response
+      summary: Check if the intelligence service is running
       tags:
       - mentor
   /mentor/start:

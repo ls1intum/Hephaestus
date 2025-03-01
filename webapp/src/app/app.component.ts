@@ -3,13 +3,14 @@ import { RouterOutlet, Router, Event, NavigationEnd } from '@angular/router';
 import { filter } from 'rxjs/operators';
 import { Observable } from 'rxjs';
 import posthog from 'posthog-js';
+import { HlmToasterComponent } from '@spartan-ng/ui-sonner-helm';
 import { HeaderComponent } from '@app/core/header/header.component';
 import { FooterComponent } from './core/footer/footer.component';
 import { SentryErrorHandler } from './core/sentry/sentry.error-handler';
 
 @Component({
   selector: 'app-root',
-  imports: [RouterOutlet, HeaderComponent, FooterComponent],
+  imports: [RouterOutlet, HeaderComponent, FooterComponent, HlmToasterComponent],
   templateUrl: './app.component.html'
 })
 export class AppComponent implements OnInit {

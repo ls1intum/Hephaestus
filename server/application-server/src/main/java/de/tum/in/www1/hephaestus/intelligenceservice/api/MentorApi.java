@@ -140,6 +140,45 @@ public class MentorApi extends BaseApi {
         ParameterizedTypeReference<MentorResponse> localReturnType = new ParameterizedTypeReference<MentorResponse>() {};
         return apiClient.invokeAPI("/mentor/start", HttpMethod.POST, Collections.<String, Object>emptyMap(), localVarQueryParams, localVarPostBody, localVarHeaderParams, localVarCookieParams, localVarFormParams, localVarAccept, localVarContentType, localVarAuthNames, localReturnType);
     }
+    /**
+     * Check if the intelligence service is running
+     * 
+     * <p><b>200</b> - Successful Response
+     * @return Object
+     * @throws RestClientException if an error occurs while attempting to invoke the API
+     */
+    public Object statusMentorHealthGet() throws RestClientException {
+        return statusMentorHealthGetWithHttpInfo().getBody();
+    }
+
+    /**
+     * Check if the intelligence service is running
+     * 
+     * <p><b>200</b> - Successful Response
+     * @return ResponseEntity&lt;Object&gt;
+     * @throws RestClientException if an error occurs while attempting to invoke the API
+     */
+    public ResponseEntity<Object> statusMentorHealthGetWithHttpInfo() throws RestClientException {
+        Object localVarPostBody = null;
+        
+
+        final MultiValueMap<String, String> localVarQueryParams = new LinkedMultiValueMap<String, String>();
+        final HttpHeaders localVarHeaderParams = new HttpHeaders();
+        final MultiValueMap<String, String> localVarCookieParams = new LinkedMultiValueMap<String, String>();
+        final MultiValueMap<String, Object> localVarFormParams = new LinkedMultiValueMap<String, Object>();
+
+        final String[] localVarAccepts = { 
+            "application/json"
+         };
+        final List<MediaType> localVarAccept = apiClient.selectHeaderAccept(localVarAccepts);
+        final String[] localVarContentTypes = {  };
+        final MediaType localVarContentType = apiClient.selectHeaderContentType(localVarContentTypes);
+
+        String[] localVarAuthNames = new String[] {  };
+
+        ParameterizedTypeReference<Object> localReturnType = new ParameterizedTypeReference<Object>() {};
+        return apiClient.invokeAPI("/mentor/health", HttpMethod.GET, Collections.<String, Object>emptyMap(), localVarQueryParams, localVarPostBody, localVarHeaderParams, localVarCookieParams, localVarFormParams, localVarAccept, localVarContentType, localVarAuthNames, localReturnType);
+    }
 
     @Override
     public <T> ResponseEntity<T> invokeAPI(String url, HttpMethod method, Object request, ParameterizedTypeReference<T> returnType) throws RestClientException {
@@ -156,9 +195,7 @@ public class MentorApi extends BaseApi {
             "application/json"
          };
         final List<MediaType> localVarAccept = apiClient.selectHeaderAccept(localVarAccepts);
-        final String[] localVarContentTypes = { 
-            "application/json"
-         };
+        final String[] localVarContentTypes = {  };
         final MediaType localVarContentType = apiClient.selectHeaderContentType(localVarContentTypes);
 
         String[] localVarAuthNames = new String[] {  };
