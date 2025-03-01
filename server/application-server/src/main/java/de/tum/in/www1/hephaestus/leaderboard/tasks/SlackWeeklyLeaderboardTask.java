@@ -67,7 +67,7 @@ public class SlackWeeklyLeaderboardTask implements Runnable {
      * @return
      */
     private List<User> getTop3SlackReviewers(OffsetDateTime after, OffsetDateTime before) {
-        var leaderboard = leaderboardService.createLeaderboard(after, before, Optional.empty());
+        var leaderboard = leaderboardService.createLeaderboard(after, before, Optional.empty(), Optional.empty());
         var top3 = leaderboard.subList(0, Math.min(3, leaderboard.size()));
         logger.debug("Top 3 Users of the last week: " + top3.stream().map(e -> e.user().name()).toList());
 
