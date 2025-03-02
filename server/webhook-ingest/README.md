@@ -8,7 +8,7 @@ A service to ingest GitHub webhooks and publish the data to NATS JetStream.
 
 ### Prerequisites
 
-- **Python 3.12**
+- **Python 3.13**
 - **Poetry** for dependency management
 - **Docker** for containerization
 
@@ -89,7 +89,7 @@ A service to ingest GitHub webhooks and publish the data to NATS JetStream.
 
 ### Prerequisites
 
-- **Python 3.12**
+- **Python 3.13**
 - **Poetry** for dependency management
 - **Docker** for containerization
 
