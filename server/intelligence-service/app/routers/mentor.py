@@ -1,4 +1,4 @@
-from typing import Optional
+from typing import List
 from fastapi import APIRouter
 from pydantic import BaseModel
 from langfuse.callback import CallbackHandler
@@ -10,10 +10,11 @@ from app.mentor.run import run, start_session
 router = APIRouter(prefix="/mentor", tags=["mentor"])
 
 
-langfuse_handler: Optional[CallbackHandler] = None
+callbacks: List[CallbackHandler] = []
 if settings.langfuse_enabled:
     langfuse_handler = CallbackHandler()
     langfuse_handler.auth_check()
+    callbacks.append(langfuse_handler)
 
 
 class MentorStartRequest(BaseModel):
@@ -58,7 +59,7 @@ def start(request: MentorStartRequest):
 )
 def generate(request: MentorRequest):
     config = RunnableConfig(
-        configurable={"thread_id": request.session_id}, callbacks=langfuse_handler
+        configurable={"thread_id": request.session_id}, callbacks=callbacks
     )
     response = run(request.content, config)
     response_message = response["messages"][-1].content
