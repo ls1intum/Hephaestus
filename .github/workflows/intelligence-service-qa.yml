@@ -44,3 +44,7 @@ jobs:
       - name: Check formatting with Black
         working-directory: ./server/intelligence-service
         run: poetry run black --check .
+
+      - name: Check for linting issues with Flake8
+        working-directory: ./server/intelligence-service
+        run: poetry run flake8 .

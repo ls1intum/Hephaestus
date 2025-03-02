@@ -1,13 +1,18 @@
-from .state import State
 from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
-from ..model import model
 from uuid import uuid4
 from langchain_core.runnables.config import RunnableConfig
 from langgraph.store.base import BaseStore
-from .prompt_loader import PromptLoader
+
+from app.settings import settings
+from app.models import get_model
+from app.mentor.state import State
+from app.mentor.prompt_loader import PromptLoader
 
 prompt_loader = PromptLoader()
 persona_prompt = prompt_loader.get_prompt(type="mentor", name="persona")
+
+ChatModel = get_model(settings.MODEL_NAME)
+model = ChatModel(temperature=0.7, max_tokens=4096)
 
 
 def greet(state: State):

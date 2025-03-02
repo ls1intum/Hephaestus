@@ -1,9 +1,8 @@
-from typing import List
 from fastapi import APIRouter
 from pydantic import BaseModel
 from langchain_core.runnables.config import RunnableConfig
-from ..mentor.run import run, start_session
 
+from app.mentor.run import run, start_session
 
 router = APIRouter(prefix="/mentor", tags=["mentor"])
 
