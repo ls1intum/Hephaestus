@@ -9,10 +9,6 @@ load_dotenv(override=True)
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", extra="allow")
 
-    DATABASE_URL: str = "postgresql://localhost:5432/hephaestus"
-    DATABASE_USERNAME: str = "root"
-    DATABASE_PASSWORD: str = "root"
-
     # Model to use prefixed by provider, i.e. "openai:gpt-4o"
     MODEL_NAME: str = ""
 
@@ -36,12 +32,26 @@ class Settings(BaseSettings):
             return "fake:model"
         return value
 
+    DATABASE_URL: str = "postgresql://localhost:5432/hephaestus"
+    DATABASE_USERNAME: str = "root"
+    DATABASE_PASSWORD: str = "root"
+
     @property
     def DATABASE_CONNECTION_STRING(self):
         return (
             f"postgresql://{self.DATABASE_USERNAME}:{self.DATABASE_PASSWORD}"
             + f"@{self.DATABASE_URL.replace('postgresql://', '')}"
             + "?sslmode=disable"
+        )
+
+    LANGFUSE_PUBLIC_KEY: str = ""
+    LANGFUSE_SECRET_KEY: str = ""
+    LANGFUSE_HOST: str = ""
+
+    @property
+    def langfuse_enabled(self):
+        return bool(
+            self.LANGFUSE_PUBLIC_KEY and self.LANGFUSE_SECRET_KEY and self.LANGFUSE_HOST
         )
 
 
