@@ -1,7 +1,7 @@
 from typing import List
 
 from fastapi import APIRouter
-from openai import BaseModel
+from pydantic import BaseModel
 
 from ..detector.bad_practice_detector import detect_bad_practices, BadPractice
 

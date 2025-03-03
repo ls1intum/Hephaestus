@@ -4,14 +4,16 @@ import { injectMutation, injectQuery, QueryClient } from '@tanstack/angular-quer
 import { combineLatest, lastValueFrom, map, timer } from 'rxjs';
 import { ActivatedRoute } from '@angular/router';
 import { PullRequestBadPracticeCardComponent } from '@app/user/pull-request-bad-practice-card/pull-request-bad-practice-card.component';
-import { LucideAngularModule, RefreshCcw } from 'lucide-angular';
+import { lucideRefreshCcw } from '@ng-icons/lucide';
 import { HlmButtonDirective } from '@spartan-ng/ui-button-helm';
 import { HlmSpinnerComponent } from '@spartan-ng/ui-spinner-helm';
+import { NgIcon, provideIcons } from '@ng-icons/core';
 
 @Component({
   selector: 'app-activity-dashboard',
   standalone: true,
-  imports: [PullRequestBadPracticeCardComponent, LucideAngularModule, HlmButtonDirective, HlmSpinnerComponent],
+  imports: [PullRequestBadPracticeCardComponent, HlmButtonDirective, HlmSpinnerComponent, NgIcon],
+  providers: [provideIcons({ lucideRefreshCcw })],
   templateUrl: './activity-dashboard.component.html',
   styles: ``
 })
@@ -22,7 +24,6 @@ export class ActivityDashboardComponent {
   protected userLogin: string | null = null;
   protected numberOfPullRequests = computed(() => this.query.data()?.pullRequests?.length ?? 0);
   protected numberOfBadPractices = computed(() => this.query.data()?.pullRequests?.reduce((acc, pr) => acc + (pr.badPractices?.length ?? 0), 0) ?? 0);
-  protected readonly RefreshCcw = RefreshCcw;
 
   constructor(private route: ActivatedRoute) {
     this.userLogin = this.route.snapshot.paramMap.get('id');
