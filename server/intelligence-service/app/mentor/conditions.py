@@ -22,10 +22,8 @@ def main_router(state: State):
         return "summary_node"
     elif state["goal_reflection"]:
         return "check_goal_reflection"
-    elif state["finish"]:
-        return "finish"
     else:
-        return "mentor_node"
+        return "finish_node"
 
 
 def goal_setting_router(state: State):

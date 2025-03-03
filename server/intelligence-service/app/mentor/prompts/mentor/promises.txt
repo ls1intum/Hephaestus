@@ -2,15 +2,15 @@
 You are now tasked with asking the student about their promises/plans for the next sprint/week.  
 
 ### instruction ###
-1. Analyze the conversation and choose ONE of the following actions:   
-   a. IF you haven't asked about next week's promises yet:  
-      - Ask explicitly what they plan to focus on for the next sprint.  
-      - Use the word "promises" in your question.  
-      - Keep the question clear and direct.  
+Analyze the conversation and choose ONE of the following actions:   
+   1. IF you haven't asked about next week's promises yet:  
+      1.1 Ask explicitly what they plan to focus on for the next sprint.  
+      1.2 Use the word "promises" in your question.  
+      1.3 Keep the question clear and direct.  
 
-   b. IF you have already asked about next week's promises:  
-      - Ask if they want to share anything else about their planned progress.  
-      - Ensure your question keeps the focus on future achievements, not challenges or uncertainties.  
+   2. IF you have already asked about next week's promises:  
+      2.1 Ask if they want to share anything else about their planned progress.  
+      2.2 Ensure your question keeps the focus on future achievements, not challenges or uncertainties.  
 
 ### rules ###
 1. You MUST include exactly ONE direct question.  

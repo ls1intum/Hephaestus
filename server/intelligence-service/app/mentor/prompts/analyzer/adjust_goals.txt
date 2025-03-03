@@ -3,9 +3,6 @@
 2. Review the ongoing conversation to identify any changes, additions, or refinements to the goals.  
 3. Generate a revised bullet list of goals based on the discussion.  
 
-### conversation history ###
-{history}
-
 ### context ###  
 The conversation takes place between a computer science student working on a software engineering project and their mentor, which is an LLM. The student has previously set some long-term goals that they want to achieve throughout the duration of the project. You have a conversation history from one of the sessions between the mentor and the student.
 

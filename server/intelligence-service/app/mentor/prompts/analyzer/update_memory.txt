@@ -4,9 +4,6 @@ Act as an analyzer of a given chat history.
 ### context ###
 You have a conversation between a computer science student working on a software engineering project and their mentor, which is an LLM.
 
-### conversation history ###  
-{history}  
-
 ### instruction ###  
 1. Analyze the given conversation history.
 2. Create a summary of the {step} mentioned by the student. Your summary type is: {step}. Structure your response as follows:

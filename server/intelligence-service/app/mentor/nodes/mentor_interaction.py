@@ -79,6 +79,7 @@ def ask_status(state: State, store: BaseStore):
 
 
 def ask_impediments(state: State, store: BaseStore):
+    print("I am in ask_impediments")
     previous_session_id = state["last_thread"]
     progress = state["dev_progress"]
     previous_impediments = ""
@@ -155,18 +156,6 @@ def finish(state: State):
     }
 
 
-# generate responses after the user has finished the project update
-def talk_to_mentor(state: State):
-    prompt = ChatPromptTemplate(
-        [
-            ("system", persona_prompt),
-            MessagesPlaceholder("messages"),
-        ]
-    )
-    chain = prompt | model
-    return {"messages": [chain.invoke({"messages": state["messages"]})]}
-
-
 def ask_goals(state: State):
     prompt = ChatPromptTemplate(
         [
@@ -180,6 +169,7 @@ def ask_goals(state: State):
 
 
 def reflect_goals(state: State, store: BaseStore):
+    print("I am in reflect_goals")
     user_id = state["user_id"]
     namespace = (user_id, "goals")
     goals = store.search(namespace)

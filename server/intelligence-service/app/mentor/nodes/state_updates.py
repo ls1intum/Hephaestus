@@ -1,12 +1,23 @@
 from ..state import State
-from langchain_core.prompts import ChatPromptTemplate
+from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
 from ...model import model
 from ..prompt_loader import PromptLoader
 
 prompt_loader = PromptLoader()
-
+#TODO: delete prints
 
 def check_state(state: State):
+    print(
+        "State before the update: "
+        + ", ".join(
+            [
+                f"{k}: {v}"
+                for k, v in state.items()
+                if k != "messages" and k != "dev_progress"
+            ]
+        )
+        + "\n"
+    )
     if state["closed"] or state["finish"] or state["goal_reflection"]:
         # closed (finished) session state does not need to be updated
         # when goal reflection is active, state is updated in the check_goal_reflection node
@@ -20,8 +31,10 @@ def check_state(state: State):
     if state["development"] or state["goal_setting"]:
         # call dev_progress node only if there is development progress to show
         if state["dev_progress"] == "":
+            print("development: false, goal_setting: false, status: true")
             return {"goal_setting": False, "development": False, "status": True}
         else:
+            print("goal_setting: false, development: true")
             return {"goal_setting": False, "development": True}
 
     step_order = [
@@ -42,21 +55,25 @@ def check_state(state: State):
                 "system",
                 prompt_loader.get_prompt(
                     type="analyzer", name="check_updates"
-                ).format_map({"step": step, "history": state["messages"]}),
+                ).format_map({"step": step}),
             ),
+            MessagesPlaceholder("messages"),
         ]
     )
 
     chain = prompt | model
 
-    if chain.invoke().content == "YES":
+    if chain.invoke({"messages": state["messages"]}).content == "YES":
         step_index = step_order.index(step)
         if step_index < len(step_order) - 1:
             next_step = step_order[step_index + 1]
+            print(step + " -> " + next_step)
             return {step: False, next_step: True}
         else:
             # if on the last step, mark as closed
+            print("finish: false, closed: true")
             return {"finish": False, "closed": True}
+
     return
 
 
@@ -69,7 +86,8 @@ def check_goals(state: State):
                 prompt_loader.get_prompt(
                     type="analyzer", name="check_goals"
                 ).format_map({"history": state["messages"]}),
-            )
+            ),
+            MessagesPlaceholder("messages"),
         ]
     )
 
@@ -88,15 +106,14 @@ def check_goal_reflection(state: State):
         [
             (
                 "system",
-                prompt_loader.get_prompt(
-                    type="analyzer", name="check_goal_reflection"
-                ).format_map({"history": state["messages"]}),
+                prompt_loader.get_prompt(type="analyzer", name="check_goal_reflection"),
             ),
+            MessagesPlaceholder("messages"),
         ]
     )
 
     chain = prompt | model
-    response = chain.invoke().content
+    response = chain.invoke({"messages": state["messages"]}).content
 
     if response == "YES":
         return {"goal_reflection": False, "finish": True}

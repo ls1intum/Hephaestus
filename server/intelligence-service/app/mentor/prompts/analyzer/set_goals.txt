@@ -3,9 +3,6 @@
 2. Summarize the goals concisely in a bullet list.  
 3. Start the response with the word "GOALS" followed by a newline, then list the goals.  
 
-### conversation history ###  
-{history}  
-
 ### desired output formatting ###  
 GOALS  
 - [Goal 1]  

@@ -4,17 +4,14 @@ Act as an analyzer of a given chat history.
 ### context ###
 You have a conversation between a computer science student working on a software engineering project and their mentor, which is an LLM. The mentor wants to understand the {step} of the student during the last week.
 
-### conversation history ###
-{history}
-
 ### instruction ###
 1. Analyze the given conversation history.
 2. Provide an output, which is ALWAYS either "YES" OR "NO". No additional text, explanation, or formatting is allowed. Your output should be based on the following rules:
 - Output "YES" if and only if ALL of the following conditions are met:
-    a. The LLM (mentor) explicitly asked about the user's {step} this week while working on their software engineering project.
+    a. The LLM (mentor) explicitly asked about the user's {step} this week.
     b. The user has provided their update about {step} this week.
     c. The LLM (mentor) explicitly asked if there is anything else the student wants to add to their {step} update this week.
-    d. The user provided a clear negative response to a question about additional goals.
+    d. The user provided a clear response to a question about additional goals like "no", "I don't think so", "that is it", "done", "completed".
 - Output "NO" in all other scenarios, including:
     a. If the user did not directly answer the LLM's question. 
     b. If the user's response was ambiguous or implicit.

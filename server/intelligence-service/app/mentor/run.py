@@ -19,14 +19,12 @@ from .nodes.mentor_interaction import (
     greet,
     get_dev_progress,
     ask_status,
-    talk_to_mentor,
     ask_impediments,
     ask_promises,
     ask_summary,
     finish,
     ask_goals,
     reflect_goals,
-    talk_to_mentor,
 )
 
 connection_kwargs = {
@@ -46,7 +44,6 @@ graph_builder.add_node("summary_node", ask_summary)
 graph_builder.add_node("finish_node", finish)
 graph_builder.add_node("goal_setting_node", ask_goals)
 graph_builder.add_node("goal_reflection_node", reflect_goals)
-graph_builder.add_node("mentor_node", talk_to_mentor)
 
 # chat analysis nodes: update the state of the conversation
 graph_builder.add_node("check_state", check_state)
@@ -72,7 +69,6 @@ graph_builder.add_edge("impediments_node", END)
 graph_builder.add_edge("promises_node", END)
 graph_builder.add_edge("summary_node", END)
 graph_builder.add_edge("update_memory", END)
-graph_builder.add_edge("mentor_node", END)
 graph_builder.add_edge("goal_setting_node", END)
 graph_builder.add_edge("goal_reflection_node", END)
 graph_builder.add_edge("finish_node", "update_memory")

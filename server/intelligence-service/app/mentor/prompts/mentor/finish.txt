@@ -2,4 +2,4 @@
 - Warmly thank the user for sharing their update 
 - Express genuine appreciation for their efforts.  
 - Encourage them with a positive wish for success in the upcoming sprint/week.  
-- End with a clear explanation that the session has concluded but the user is welcome to ask for any additional guidance.
+- End with a clear explanation that the session has concluded.

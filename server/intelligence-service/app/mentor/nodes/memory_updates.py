@@ -23,13 +23,14 @@ def update_memory(state: State, config: RunnableConfig, *, store: BaseStore):
                     "system",
                     prompt_loader.get_prompt(
                         type="analyzer", name="update_memory"
-                    ).format_map({"step": step, "history": state["messages"]}),
-                )
+                    ).format_map({"step": step}),
+                ),
+                MessagesPlaceholder("messages"),
             ]
         )
 
         chain = prompt | model
-        response = chain.invoke().content
+        response = chain.invoke({"messages": state["messages"]}).content
         store.put(namespace, key=str(uuid4()), value={step: response})
 
     return
@@ -56,6 +57,7 @@ def set_goals(state: State, *, store: BaseStore):
 
 
 def adjust_goals(state: State, *, store: BaseStore):
+    print("i am in adjust goals")
     user_id = state["user_id"]
     namespace = (user_id, "goals")
     # TODO: check the position of the goal in the list
@@ -63,7 +65,6 @@ def adjust_goals(state: State, *, store: BaseStore):
     if not goals:
         goals = ""
     else:
-        print(goals)
         for item in goals:
             print(item)
             if "goal_list" in item.value:
@@ -74,13 +75,14 @@ def adjust_goals(state: State, *, store: BaseStore):
             (
                 "system",
                 prompt_loader.get_prompt(
-                    type="analyzer", name="update_memory"
-                ).format_map({"goals": "goals", "history": state["messages"]}),
-            )
+                    type="analyzer", name="adjust_goals"
+                ).format_map({"goals": goals}),
+            ),
+            MessagesPlaceholder("messages"),
         ]
     )
 
     chain = prompt | model
-    response = chain.invoke().content
+    response = chain.invoke({"messages": state["messages"]}).content
     store.put(namespace, key=str(uuid4()), value={"goal_list": response})
     return
