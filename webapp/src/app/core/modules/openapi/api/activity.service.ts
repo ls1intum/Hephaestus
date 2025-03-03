@@ -146,7 +146,7 @@ export class ActivityService implements ActivityServiceInterface {
             }
         }
 
-        let localVarPath = `/activity/${this.configuration.encodeParam({name: "login", value: login, in: "path", style: "simple", explode: false, dataType: "string", dataFormat: undefined})}/badpractices`;
+        let localVarPath = `/activity/user/${this.configuration.encodeParam({name: "login", value: login, in: "path", style: "simple", explode: false, dataType: "string", dataFormat: undefined})}/badpractices`;
         return this.httpClient.request<Array<PullRequestBadPractice>>('post', `${this.configuration.basePath}${localVarPath}`,
             {
                 context: localVarHttpContext,
@@ -209,7 +209,7 @@ export class ActivityService implements ActivityServiceInterface {
             }
         }
 
-        let localVarPath = `/activity/${this.configuration.encodeParam({name: "pullRequestId", value: pullRequestId, in: "path", style: "simple", explode: false, dataType: "number", dataFormat: "int64"})}/badpractices`;
+        let localVarPath = `/activity/pullrequest/${this.configuration.encodeParam({name: "pullRequestId", value: pullRequestId, in: "path", style: "simple", explode: false, dataType: "number", dataFormat: "int64"})}/badpractices`;
         return this.httpClient.request<Array<PullRequestBadPractice>>('post', `${this.configuration.basePath}${localVarPath}`,
             {
                 context: localVarHttpContext,

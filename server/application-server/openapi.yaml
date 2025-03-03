@@ -351,7 +351,27 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/LeagueChange"
-  /activity/{pullRequestId}/badpractices:
+  /activity/user/{login}/badpractices:
+    post:
+      tags:
+      - activity
+      operationId: detectBadPracticesByUser
+      parameters:
+      - name: login
+        in: path
+        required: true
+        schema:
+          type: string
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/PullRequestBadPractice"
+  /activity/pullrequest/{pullRequestId}/badpractices:
     post:
       tags:
       - activity
@@ -363,26 +383,6 @@ paths:
         schema:
           type: integer
           format: int64
-      responses:
-        "200":
-          description: OK
-          content:
-            application/json:
-              schema:
-                type: array
-                items:
-                  $ref: "#/components/schemas/PullRequestBadPractice"
-  /activity/{login}/badpractices:
-    post:
-      tags:
-      - activity
-      operationId: detectBadPracticesByUser
-      parameters:
-      - name: login
-        in: path
-        required: true
-        schema:
-          type: string
       responses:
         "200":
           description: OK
