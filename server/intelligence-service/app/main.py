@@ -5,7 +5,7 @@ from .routers.health import router as health_router
 app = FastAPI(
     title="Hephaestus Intelligence Service API",
     description="API documentation for the Hephaestus Intelligence Service.",
-    version="0.2.0",
+    version="0.3.0",
     contact={"name": "Felix T.J. Dietrich", "email": "felixtj.dietrich@tum.de"},
 )
 
