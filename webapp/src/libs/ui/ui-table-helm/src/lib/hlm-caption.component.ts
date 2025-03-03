@@ -7,8 +7,9 @@ import {
 	effect,
 	inject,
 	input,
+	untracked,
 } from '@angular/core';
-import { hlm } from '@spartan-ng/ui-core';
+import { hlm } from '@spartan-ng/brain/core';
 import type { ClassValue } from 'clsx';
 import { HlmTableComponent } from './hlm-table.component';
 
@@ -42,13 +43,12 @@ export class HlmCaptionComponent {
 	);
 
 	constructor() {
-		effect(
-			() => {
-				const id = this.id();
+		effect(() => {
+			const id = this.id();
+			untracked(() => {
 				if (!this._table) return;
 				this._table.labeledBy.set(id);
-			},
-			{ allowSignalWrites: true },
-		);
+			});
+		});
 	}
 }

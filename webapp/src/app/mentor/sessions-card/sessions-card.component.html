@@ -1,8 +1,30 @@
 <div hlmCard class="flex flex-col px-6 lg:max-h-[calc(100dvh-200px)] pb-6 overflow-auto">
-  <button hlmBtn aria-describedby=">New Session" class="w-full gap-2 mt-6 justify-start h-9" (click)="this.createNewSession.emit()">
-    <lucide-angular [img]="Plus" class="size-4" />
-    <span>New Session</span>
-  </button>
+  @if (isLastSessionClosed()) {
+    <button hlmBtn aria-describedby=">New Session" class="w-full gap-2 mt-6 justify-start h-9" (click)="this.createNewSession.emit()">
+      <ng-icon name="lucidePlus" class="size-4" />
+      <span>New Session</span>
+    </button>
+  } @else {
+    <hlm-alert-dialog>
+      <button hlmBtn brnAlertDialogTrigger aria-describedby=">New Session" class="w-full gap-2 mt-6 justify-start h-9">
+        <ng-icon name="lucidePlus" class="size-4" />
+        <span>New Session</span>
+      </button>
+      <hlm-alert-dialog-content *brnAlertDialogContent="let ctx">
+        <hlm-alert-dialog-header>
+          <h3 hlmAlertDialogTitle>Are you absolutely sure?</h3>
+          <p hlmAlertDialogDescription>
+            You have not finished your most recent session yet. If you start a new session, your current session will be closed. It may affect the quality of your mentorship.
+          </p>
+        </hlm-alert-dialog-header>
+        <hlm-alert-dialog-footer>
+          <button hlmAlertDialogCancel (click)="ctx.close()">Cancel</button>
+          <button hlmAlertDialogAction (click)="ctx.close(); this.createNewSession.emit()">Start New Session</button>
+        </hlm-alert-dialog-footer>
+      </hlm-alert-dialog-content>
+    </hlm-alert-dialog>
+  }
+
   @if (isLoading()) {
     <div class="flex flex-col gap-2">
       <hlm-skeleton class="w-48 h-6 mt-6 pt-3" />

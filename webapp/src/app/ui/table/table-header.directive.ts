@@ -1,6 +1,6 @@
 import { Directive, computed, input } from '@angular/core';
+import { hlm } from '@spartan-ng/brain/core';
 import { ClassValue } from 'clsx';
-import { cn } from 'app/utils';
 
 @Directive({
   selector: 'thead[appTableHeader]',
@@ -10,5 +10,5 @@ import { cn } from 'app/utils';
 })
 export class TableHeaderDirective {
   class = input<ClassValue>();
-  computedClass = computed(() => cn('w-full caption-bottom text-sm', this.class()));
+  computedClass = computed(() => hlm('w-full caption-bottom text-sm', this.class()));
 }

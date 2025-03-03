@@ -1,7 +1,7 @@
 <div class="flex items-start space-x-3">
   @if (isClosed()) {
     <div hlmAlert class="flex flex-row space-x-3">
-      <lucide-angular [img]="Alert" class="size-4" />
+      <ng-icon name="lucideCircleAlert" class="text-base" />
       <div>
         <h4 hlmAlertTitle>Please continue messaging in your most recent session.</h4>
         <p hlmAlertDesc>To stay organized, starting a new session automatically closes the previous one. <br /></p>
@@ -22,7 +22,7 @@
     @if (isSending()) {
       <hlm-spinner size="sm" />
     } @else {
-      <lucide-angular [img]="Send" class="size-5" />
+      <ng-icon name="lucideSend" class="text-xl" />
     }
   </button>
 </div>

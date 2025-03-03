@@ -1,6 +1,6 @@
-import { ChangeDetectionStrategy, Component, ViewEncapsulation, computed, effect, input } from '@angular/core';
-import { BrnAccordionContentComponent } from '@spartan-ng/ui-accordion-brain';
-import { hlm } from '@spartan-ng/ui-core';
+import { ChangeDetectionStrategy, Component, ViewEncapsulation, computed, input } from '@angular/core';
+import { BrnAccordionContentComponent } from '@spartan-ng/brain/accordion';
+import { hlm } from '@spartan-ng/brain/core';
 import type { ClassValue } from 'clsx';
 
 @Component({
@@ -27,11 +27,6 @@ export class HlmAccordionContentComponent extends BrnAccordionContentComponent {
 
 	constructor() {
 		super();
-		effect(
-			() => {
-				this.setClassToCustomElement('pt-1 pb-4');
-			},
-			{ allowSignalWrites: true },
-		);
+		this.setClassToCustomElement('pt-1 pb-4');
 	}
 }

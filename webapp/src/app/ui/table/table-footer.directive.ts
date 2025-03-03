@@ -1,6 +1,6 @@
 import { Directive, computed, input } from '@angular/core';
+import { hlm } from '@spartan-ng/brain/core';
 import { ClassValue } from 'clsx';
-import { cn } from 'app/utils';
 
 @Directive({
   selector: 'tfoot[appTableFooter]',
@@ -10,5 +10,5 @@ import { cn } from 'app/utils';
 })
 export class TableFooterDirective {
   class = input<ClassValue>();
-  computedClass = computed(() => cn('border-t bg-muted/50 font-medium [&>tr]:last:border-b-0', this.class()));
+  computedClass = computed(() => hlm('border-t bg-muted/50 font-medium [&>tr]:last:border-b-0', this.class()));
 }
