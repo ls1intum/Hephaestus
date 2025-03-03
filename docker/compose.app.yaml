@@ -175,7 +175,7 @@ services:
       - ./postfix-config:/config # See https://github.com/ls1admin/postfix-container-tum-mailrelay/tree/main for details
     hostname: aet.cit.tum.de
     networks:
-      - app-network
+      - shared-network
 
 networks:
   shared-network:
