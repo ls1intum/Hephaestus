@@ -22,7 +22,6 @@ components:
       title: BadPractice
       type: object
     DetectorRequest:
-      additionalProperties: true
       properties:
         bad_practices:
           items:
@@ -42,7 +41,6 @@ components:
       title: DetectorRequest
       type: object
     DetectorResponse:
-      additionalProperties: true
       properties:
         bad_practices:
           items:
