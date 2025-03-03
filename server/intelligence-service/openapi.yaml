@@ -1,5 +1,56 @@
 components:
   schemas:
+    BadPractice:
+      description: A detected bad practice in a pull request.
+      properties:
+        description:
+          description: The description of the bad practice.
+          title: Description
+          type: string
+        resolved:
+          description: Whether the bad practice has been resolved.
+          title: Resolved
+          type: boolean
+        title:
+          description: The title of the bad practice.
+          title: Title
+          type: string
+      required:
+      - title
+      - description
+      - resolved
+      title: BadPractice
+      type: object
+    DetectorRequest:
+      properties:
+        bad_practices:
+          items:
+            $ref: '#/components/schemas/BadPractice'
+          title: Bad Practices
+          type: array
+        description:
+          title: Description
+          type: string
+        title:
+          title: Title
+          type: string
+      required:
+      - title
+      - description
+      - bad_practices
+      title: DetectorRequest
+      type: object
+    DetectorResponse:
+      properties:
+        bad_practices:
+          items:
+            $ref: '#/components/schemas/BadPractice'
+          title: Bad Practices
+          type: array
+      required:
+      - bad_practices
+      title: DetectorResponse
+      type: object
     HTTPValidationError:
       properties:
         detail:
@@ -92,6 +143,31 @@ info:
   version: 0.3.0
 openapi: 3.1.0
 paths:
+  /detector/:
+    post:
+      operationId: detect_detector__post
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DetectorRequest'
+        required: true
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DetectorResponse'
+          description: Successful Response
+        '422':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+          description: Validation Error
+      summary: Detect bad practices for given pull request.
+      tags:
+      - detector
   /health:
     get:
       description: "## Perform a Health Check\nEndpoint to perform a healthcheck on.\
