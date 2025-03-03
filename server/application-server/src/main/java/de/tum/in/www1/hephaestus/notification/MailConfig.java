@@ -2,13 +2,12 @@ package de.tum.in.www1.hephaestus.notification;
 
 import jakarta.mail.internet.AddressException;
 import jakarta.mail.internet.InternetAddress;
+import java.util.*;
 import lombok.Getter;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 import org.thymeleaf.TemplateEngine;
-
-import java.util.*;
 
 @Component
 public class MailConfig {
@@ -26,10 +25,10 @@ public class MailConfig {
 
     @Autowired
     public MailConfig(
-            @Value("${hephaestus.mail.sender}") InternetAddress sender,
-            @Value("${hephaestus.mail.enabled}") boolean enabled,
-            @Value("${hephaestus.mail.signature}") String mailSignature,
-            TemplateEngine templateEngine
+        @Value("${hephaestus.mail.sender}") InternetAddress sender,
+        @Value("${hephaestus.mail.enabled}") boolean enabled,
+        @Value("${hephaestus.mail.signature}") String mailSignature,
+        TemplateEngine templateEngine
     ) {
         this.enabled = enabled;
         this.sender = sender;
@@ -41,13 +40,9 @@ public class MailConfig {
         return enabled;
     }
 
-    public record MailConfigDto(
-            String signature
-    ) {}
+    public record MailConfigDto(String signature) {}
 
     public MailConfigDto getConfigDto() {
-        return new MailConfigDto(
-                Objects.requireNonNullElse(signature, "")
-        );
+        return new MailConfigDto(Objects.requireNonNullElse(signature, ""));
     }
 }

@@ -2,13 +2,12 @@ package de.tum.in.www1.hephaestus.notification;
 
 import de.tum.in.www1.hephaestus.gitprovider.user.User;
 import de.tum.in.www1.hephaestus.gitprovider.user.UserService;
+import java.util.List;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.stereotype.Service;
-
-import java.util.List;
 
 @Service
 public class MailService {
@@ -27,14 +26,13 @@ public class MailService {
 
     public void sendBadPracticesDetectedEmail(User user, String badPractice) {
         logger.info("Sending bad practice detected email to user: " + user.getLogin());
-        if (!user.getLogin().equals("iam-flo"))
-            return;
+        if (!user.getLogin().equals("iam-flo")) return;
 
         MailBuilder mailBuilder = new MailBuilder(mailConfig, "Bad Practices Detected", "bad-practices-detected");
         mailBuilder
-                .addPrimaryRecipient(user)
-                .fillUserPlaceholders(user, "user")
-                .fillBadPracticePlaceholders(badPractice, "badPractice")
-                .send(javaMailSender);
+            .addPrimaryRecipient(user)
+            .fillUserPlaceholders(user, "user")
+            .fillBadPracticePlaceholders(badPractice, "badPractice")
+            .send(javaMailSender);
     }
 }

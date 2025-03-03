@@ -10,15 +10,15 @@ import jakarta.mail.internet.MimeBodyPart;
 import jakarta.mail.internet.MimeMessage;
 import jakarta.mail.internet.MimeMultipart;
 import jakarta.mail.util.ByteArrayDataSource;
+import java.util.*;
 import lombok.Getter;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.mail.javamail.JavaMailSender;
 import org.thymeleaf.context.Context;
 
-import java.util.*;
-
 public class MailBuilder {
+
     private static final Logger log = LoggerFactory.getLogger(MailBuilder.class);
     private final MailConfig config;
 
@@ -92,7 +92,6 @@ public class MailBuilder {
         return this;
     }
 
-
     public void send(JavaMailSender mailSender) {
         List<User> toRecipients = new ArrayList<>();
 
@@ -122,7 +121,10 @@ public class MailBuilder {
                 Multipart messageContent = new MimeMultipart();
 
                 BodyPart messageBody = new MimeBodyPart();
-                messageBody.setContent(config.getTemplateEngine().process(template, templateContext), "text/html; charset=utf-8");
+                messageBody.setContent(
+                    config.getTemplateEngine().process(template, templateContext),
+                    "text/html; charset=utf-8"
+                );
                 messageContent.addBodyPart(messageBody);
 
                 message.setContent(messageContent);
