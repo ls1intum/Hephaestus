@@ -27,7 +27,9 @@ public class ActivityController {
     }
 
     @PostMapping("{pullRequestId}/badpractices/")
-    public ResponseEntity<List<PullRequestBadPracticeDTO>> detectBadPracticesForPullRequest(@PathVariable Long pullRequestId) {
+    public ResponseEntity<List<PullRequestBadPracticeDTO>> detectBadPracticesForPullRequest(
+        @PathVariable Long pullRequestId
+    ) {
         List<PullRequestBadPracticeDTO> badPractice = activityService.detectBadPracticesForPullRequest(pullRequestId);
         return ResponseEntity.ok(badPractice);
     }

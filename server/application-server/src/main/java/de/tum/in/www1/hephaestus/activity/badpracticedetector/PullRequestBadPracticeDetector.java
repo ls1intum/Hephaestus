@@ -7,7 +7,6 @@ import de.tum.in.www1.hephaestus.gitprovider.pullrequest.PullRequest;
 import de.tum.in.www1.hephaestus.intelligenceservice.model.BadPractice;
 import de.tum.in.www1.hephaestus.intelligenceservice.model.DetectorRequest;
 import de.tum.in.www1.hephaestus.intelligenceservice.model.DetectorResponse;
-import jakarta.transaction.Transactional;
 import java.util.LinkedList;
 import java.util.List;
 import org.slf4j.Logger;
@@ -70,7 +69,6 @@ public class PullRequestBadPracticeDetector {
     }
 
     protected PullRequestBadPractice saveDetectedBadPractices(PullRequest pullRequest, BadPractice badPractice) {
-
         PullRequestBadPractice pullRequestBadPractice = new PullRequestBadPractice();
         pullRequestBadPractice.setTitle(badPractice.getTitle());
         pullRequestBadPractice.setDescription(badPractice.getDescription());

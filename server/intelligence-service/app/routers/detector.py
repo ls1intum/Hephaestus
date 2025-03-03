@@ -24,4 +24,6 @@ class DetectorResponse(BaseModel):
     summary="Detect bad practices for given pull request.",
 )
 def detect(request: DetectorRequest):
-    return detect_bad_practices(request.title, request.description, request.bad_practices)
+    return detect_bad_practices(
+        request.title, request.description, request.bad_practices
+    )
