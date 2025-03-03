@@ -14,7 +14,7 @@ spring:
           issuer-uri: ${KEYCLOAK_URL}/realms/${KEYCLOAK_REALM}
 
   mail:
-    host: ${POSTFIX_HOST:postfix}
+    host: ${POSTFIX_HOST:localhost}
     port: ${POSTFIX_PORT:25}
     username: ${POSTFIX_USERNAME:}
     password: ${POSTFIX_PASSWORD:}
