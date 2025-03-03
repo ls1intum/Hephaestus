@@ -68,7 +68,7 @@ services:
 
 networks:
   app-network:
-    driver: bridge`
+    driver: bridge
 
 volumes:
   postgresql-data:

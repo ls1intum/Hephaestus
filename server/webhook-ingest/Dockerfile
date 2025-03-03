@@ -1,17 +1,14 @@
-FROM python:3.12 as requirements-stage
+FROM python:3.13-alpine
 
-WORKDIR /tmp
+# For healthcheck
+RUN apk add --no-cache curl
 
-RUN pip install poetry==1.8.5
-COPY ./pyproject.toml ./poetry.lock* /tmp/
-RUN poetry export -f requirements.txt --output requirements.txt --without-hashes
+RUN pip install poetry==2.1.1
 
-FROM python:3.12
+WORKDIR /app
+COPY pyproject.toml poetry.lock ./
+RUN poetry install --no-root
 
-WORKDIR /code
+COPY app/ ./app
 
-COPY --from=requirements-stage /tmp/requirements.txt /code/requirements.txt
-RUN pip install --no-cache-dir --upgrade -r /code/requirements.txt
-COPY ./app /code/app
-
-CMD ["fastapi", "run", "app/main.py", "--port", "4200"]
+CMD ["poetry", "run",  "fastapi", "run", "app/main.py", "--port", "4200"]

@@ -2,7 +2,7 @@
 
 ## Writing Documentation
 
-We are using [Sphinx](http://www.sphinx-doc.org/en/stable/) to generate the documentation. The documentation is written in [reStructuredText](http://docutils.sourceforge.net/rst.html) format.
+We are using [Sphinx](http://www.sphinx-doc.org/en/stable/) to generate the documentation. The documentation is written in Markdown format.
 
 ### Installation
 
@@ -10,7 +10,15 @@ Optional: Create a virtual environment
 
 ```bash
 python3 -m venv venv
+```
+
+Activate the virtual environment:
+
+```bash
+# Unix:
 source venv/bin/activate
+# Windows:
+.\venv\Scripts\activate
 ```
 
 Install the required packages

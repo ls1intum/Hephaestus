@@ -1,10 +1,3 @@
-import { type ClassValue, clsx } from 'clsx';
-import { twMerge } from 'tailwind-merge';
-
-export function cn(...inputs: ClassValue[]) {
-  return twMerge(clsx(inputs));
-}
-
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export function groupBy<T, K extends keyof any>(arr: T[], key: (i: T) => K) {
   return arr.reduce(
@@ -47,3 +40,7 @@ export const Leagues = [
     maxPoints: Infinity
   }
 ];
+
+export function formatTitle(title: string): string {
+  return title.replace(/`([^`]+)`/g, '<code class="textCode">$1</code>');
+}

@@ -42,12 +42,7 @@ public class MessageService {
             return null;
         }
         Session currentSession = session.get();
-
-        // Prevent sending messages to closed sessions
-        Session previousSession = sessionRepository
-            .findFirstByUserOrderByCreatedAtDesc(currentSession.getUser())
-            .orElse(null);
-        if (previousSession != null && previousSession.isClosed()) {
+        if (currentSession.isClosed()) {
             return null;
         }
 
@@ -67,10 +62,14 @@ public class MessageService {
             MentorResponse mentorMessage = intelligenceServiceApi.generateMentorPost(mentorRequest);
             String mentorResponse = mentorMessage.getContent();
             Message savedMentorMessage = createMentorMessage(currentSession, mentorResponse);
+            // update session status if mentor finished the conversation
+            if (mentorMessage.getClosed()) {
+                currentSession.setClosed(true);
+                sessionRepository.save(currentSession);
+            }
 
             return MessageDTO.fromMessage(savedMentorMessage);
         } catch (Exception e) {
-            // prevent saving empty system messages if the intelligence service is down
             logger.error("Failed to generate response for message: {}", content);
             return null;
         }
@@ -85,7 +84,6 @@ public class MessageService {
             MentorResponse mentorMessage = intelligenceServiceApi.startMentorStartPost(mentorStartRequest);
             createMentorMessage(session, mentorMessage.getContent());
         } catch (Exception e) {
-            // prevent saving empty system messages if the intelligence service is down
             logger.error("Failed to generate response during session start");
         }
     }

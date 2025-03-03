@@ -1,12 +1,12 @@
 import { Component, input, output } from '@angular/core';
-import { BrnSheetContentDirective } from '@spartan-ng/ui-sheet-brain';
+import { BrnSheetContentDirective } from '@spartan-ng/brain/sheet';
 import { HlmSheetComponent, HlmSheetContentComponent, HlmSheetFooterComponent, HlmSheetHeaderComponent, HlmSheetTitleDirective } from '@spartan-ng/ui-sheet-helm';
 import { HlmMenuSeparatorComponent } from '@spartan-ng/ui-menu-helm';
-import { HlmScrollAreaComponent } from '@spartan-ng/ui-scrollarea-helm';
 import { WorkspaceThumbComponent } from '../workspace-thumb/workspace-thumb.component';
 import { WorkspaceOptionSelectorComponent } from '../workspace-option-selector/workspace-option-selector.component';
 import { WorkspaceAddButtonComponent } from '../workspace-add-button/workspace-add-button.component';
-
+import { NgScrollbarModule } from 'ngx-scrollbar';
+import { HlmScrollAreaDirective } from '@spartan-ng/ui-scrollarea-helm';
 type Workspace = {
   id: string;
   title: string;
@@ -14,7 +14,6 @@ type Workspace = {
 };
 
 @Component({
-  selector: 'app-workspace-badge',
   imports: [
     BrnSheetContentDirective,
     HlmSheetComponent,
@@ -22,11 +21,14 @@ type Workspace = {
     HlmSheetHeaderComponent,
     HlmSheetFooterComponent,
     HlmSheetTitleDirective,
-    HlmScrollAreaComponent,
     HlmMenuSeparatorComponent,
     WorkspaceThumbComponent,
     WorkspaceOptionSelectorComponent,
-    WorkspaceAddButtonComponent
+    WorkspaceAddButtonComponent,
+    NgScrollbarModule,
+    HlmScrollAreaDirective,
+    WorkspaceAddButtonComponent,
+    HlmScrollAreaDirective
   ],
   templateUrl: './workspace-badge.component.html'
 })
@@ -34,6 +36,6 @@ export class WorkspaceBadgeComponent {
   selectedWorkspace = input.required<Workspace>();
   workspaces = input.required<Workspace[]>();
 
-  onSelect = output<Workspace>();
-  onSignOut = output<Workspace>();
+  select = output<Workspace>();
+  signOut = output<Workspace>();
 }

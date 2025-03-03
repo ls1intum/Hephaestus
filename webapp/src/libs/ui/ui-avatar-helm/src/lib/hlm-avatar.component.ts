@@ -1,6 +1,6 @@
 import { ChangeDetectionStrategy, Component, ViewEncapsulation, computed, input } from '@angular/core';
-import { BrnAvatarComponent } from '@spartan-ng/ui-avatar-brain';
-import { hlm } from '@spartan-ng/ui-core';
+import { BrnAvatarComponent } from '@spartan-ng/brain/avatar';
+import { hlm } from '@spartan-ng/brain/core';
 import { type VariantProps, cva } from 'class-variance-authority';
 import type { ClassValue } from 'clsx';
 

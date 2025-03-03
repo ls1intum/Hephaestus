@@ -1,5 +1,6 @@
 package de.tum.in.www1.hephaestus.gitprovider.pullrequest;
 
+import jakarta.transaction.Transactional;
 import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.Optional;
@@ -20,6 +21,7 @@ public interface PullRequestRepository extends JpaRepository<PullRequest, Long> 
     )
     Optional<OffsetDateTime> firstContributionByAuthorLogin(@Param("authorLogin") String authorLogin);
 
+    @Transactional
     @Query(
         """
         SELECT p

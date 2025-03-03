@@ -5,20 +5,21 @@ import { FormsModule } from '@angular/forms';
 import { lucideArrowUpDown, lucideChevronDown, lucideGripHorizontal, lucideRotateCw, lucideOctagonX } from '@ng-icons/lucide';
 import { HlmButtonModule } from '@spartan-ng/ui-button-helm';
 import { HlmCheckboxComponent } from '@spartan-ng/ui-checkbox-helm';
-import { HlmIconComponent, provideIcons } from '@spartan-ng/ui-icon-helm';
+import { HlmIconDirective } from '@spartan-ng/ui-icon-helm';
+import { NgIconComponent, provideIcons } from '@ng-icons/core';
 import { HlmInputDirective } from '@spartan-ng/ui-input-helm';
-import { BrnMenuTriggerDirective } from '@spartan-ng/ui-menu-brain';
+import { BrnMenuTriggerDirective } from '@spartan-ng/brain/menu';
 import { HlmMenuModule } from '@spartan-ng/ui-menu-helm';
-import { BrnTableModule, PaginatorState, useBrnColumnManager } from '@spartan-ng/ui-table-brain';
+import { BrnTableModule, PaginatorState, useBrnColumnManager } from '@spartan-ng/brain/table';
 import { HlmTableModule } from '@spartan-ng/ui-table-helm';
-import { BrnSelectModule } from '@spartan-ng/ui-select-brain';
+import { BrnSelectModule } from '@spartan-ng/brain/select';
 import { HlmSelectModule } from '@spartan-ng/ui-select-helm';
 import { HlmSkeletonModule } from '@spartan-ng/ui-skeleton-helm';
 import { debounceTime, lastValueFrom, map } from 'rxjs';
 import { WorkspaceService, TeamInfo, UserTeams } from '@app/core/modules/openapi';
 import { RouterLink } from '@angular/router';
 import { GithubLabelComponent } from '@app/ui/github-label/github-label.component';
-import { injectMutation, injectQueryClient } from '@tanstack/angular-query-experimental';
+import { injectMutation, QueryClient } from '@tanstack/angular-query-experimental';
 import { octNoEntry } from '@ng-icons/octicons';
 
 const LOADING_DATA: UserTeams[] = [
@@ -64,12 +65,13 @@ const LOADING_DATA: UserTeams[] = [
     BrnTableModule,
     HlmTableModule,
     HlmButtonModule,
-    HlmIconComponent,
+    HlmIconDirective,
     HlmInputDirective,
     HlmCheckboxComponent,
     BrnSelectModule,
     HlmSelectModule,
     HlmSkeletonModule,
+    NgIconComponent,
     GithubLabelComponent
   ],
   providers: [provideIcons({ lucideChevronDown, lucideGripHorizontal, lucideArrowUpDown, lucideRotateCw, lucideOctagonX })],
@@ -77,7 +79,7 @@ const LOADING_DATA: UserTeams[] = [
 })
 export class WorkspaceUsersTableComponent {
   protected workspaceService = inject(WorkspaceService);
-  protected queryClient = injectQueryClient();
+  protected queryClient = inject(QueryClient);
   protected octNoEntry = octNoEntry;
 
   isLoading = input(false);

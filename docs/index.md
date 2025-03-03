@@ -37,6 +37,7 @@ user/getting_started
 dev/setup_guide
 dev/getting_started/index
 dev/system_design/index
+dev/coding_design_guidelines/index
 ```
 
 ```{toctree}

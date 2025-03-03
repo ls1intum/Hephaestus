@@ -13,12 +13,16 @@
       <div class="col-span-2 space-y-4">
         @if (query.error()) {
           <div hlmAlert class="max-w-xl" variant="destructive">
-            <lucide-angular [img]="CircleX" hlmAlertIcon />
+            <ng-icon name="lucideCircleX" hlmAlertIcon />
             <h4 hlmAlertTitle>Something went wrong...</h4>
             <p hlmAlertDesc>We couldn't load the leaderboard. Please try again later.</p>
           </div>
         } @else {
-          <app-leaderboard-league [leaguePoints]="userMeQuery.data()?.userInfo?.leaguePoints" />
+          @let leaguePoints = userMeQuery.data()?.userInfo?.leaguePoints;
+          @let leaderboardEntry = ownLeaderboardEntry();
+          @if (leaguePoints !== undefined && leaderboardEntry !== undefined) {
+            <app-leaderboard-overview [leaguePoints]="leaguePoints" [leaderboardEntry]="leaderboardEntry" />
+          }
           <div class="border rounded-md border-input overflow-auto">
             <app-leaderboard [leaderboard]="query.data()" [isLoading]="query.isPending()" />
           </div>

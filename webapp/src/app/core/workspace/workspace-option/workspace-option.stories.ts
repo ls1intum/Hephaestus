@@ -10,8 +10,8 @@ const meta: Meta<WorkspaceOptionComponent> = {
     isSelected: false,
     iconUrl: 'https://avatars.githubusercontent.com/u/11064260?s=48&v=4',
     title: 'AET TUM',
-    onSelect: fn(),
-    onSignOut: fn()
+    select: fn(),
+    signOut: fn()
   }
 };
 

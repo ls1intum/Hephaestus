@@ -1,5 +1,5 @@
-import { ChangeDetectionStrategy, Component, ViewEncapsulation, computed, effect, input, signal } from '@angular/core';
-import { hlm } from '@spartan-ng/ui-core';
+import { ChangeDetectionStrategy, Component, ViewEncapsulation, computed, effect, input, signal, untracked } from '@angular/core';
+import { hlm } from '@spartan-ng/brain/core';
 import type { ClassValue } from 'clsx';
 
 @Component({
@@ -26,6 +26,11 @@ export class HlmTableComponent {
 	public readonly labeledBy = signal<string | null | undefined>(undefined);
 
 	constructor() {
-		effect(() => this.labeledBy.set(this._labeledByInput()), { allowSignalWrites: true });
+		effect(() => {
+			const labeledBy = this._labeledByInput();
+			untracked(() => {
+				this.labeledBy.set(labeledBy);
+			});
+		});
 	}
 }

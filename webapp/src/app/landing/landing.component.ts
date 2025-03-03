@@ -2,7 +2,8 @@ import { Component, inject } from '@angular/core';
 import { HlmAccordionModule } from '@spartan-ng/ui-accordion-helm';
 import { HlmButtonDirective } from '@spartan-ng/ui-button-helm';
 import { HlmCardModule } from '@spartan-ng/ui-card-helm';
-import { BotMessageSquare, ChevronDown, Hammer, LucideAngularModule, Trophy, Users } from 'lucide-angular';
+import { NgIconComponent, provideIcons } from '@ng-icons/core';
+import { lucideBotMessageSquare, lucideChevronDown, lucideHammer, lucideTrophy, lucideUsers } from '@ng-icons/lucide';
 import { LeaderboardComponent } from '../home/leaderboard/leaderboard.component';
 import { LeaderboardEntry, PullRequestInfo } from '@app/core/modules/openapi';
 import { environment } from 'environments/environment';
@@ -32,16 +33,11 @@ function samplePullRequests(count: number): Array<PullRequestInfo> {
       mask-image: linear-gradient(to bottom, rgba(0, 0, 0, 1) 60%, rgba(0, 0, 0, 0));
     }
   `,
-  imports: [HlmCardModule, HlmButtonDirective, LucideAngularModule, HlmAccordionModule, LeaderboardComponent]
+  imports: [HlmCardModule, HlmButtonDirective, NgIconComponent, HlmAccordionModule, LeaderboardComponent],
+  providers: [provideIcons({ lucideBotMessageSquare, lucideChevronDown, lucideHammer, lucideTrophy, lucideUsers })]
 })
 export class LandingComponent {
   securityStore = inject(SecurityStore);
-
-  Hammer = Hammer;
-  Trophy = Trophy;
-  Users = Users;
-  BotMessageSquare = BotMessageSquare;
-  ChevronDown = ChevronDown;
 
   protected faq = [
     {

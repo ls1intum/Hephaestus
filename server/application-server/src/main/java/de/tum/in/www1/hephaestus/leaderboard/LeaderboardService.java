@@ -44,11 +44,89 @@ public class LeaderboardService {
     @Autowired
     private TeamRepository teamRepository;
 
+    @Autowired
+    private LeaguePointsCalculationService leaguePointsCalculationService;
+
+    private Comparator<Map.Entry<Long, Integer>> getComparator(
+        LeaderboardSortType sortType,
+        Map<Long, User> usersById,
+        Map<Long, List<PullRequestReview>> reviewsByUserId,
+        Map<Long, List<IssueComment>> issueCommentsByUserId
+    ) {
+        return switch (sortType) {
+            case LEAGUE_POINTS -> compareByLeaguePoints(usersById, reviewsByUserId, issueCommentsByUserId);
+            case SCORE -> compareByScore(reviewsByUserId, issueCommentsByUserId);
+        };
+    }
+
+    /**
+     * Creates a comparator that compares users by their league points.
+     * If two users have the same league points, they are compared by their score.
+     * @param usersById map of users by ID
+     * @param reviewsByUserId map of reviews by user ID
+     * @param issueCommentsByUserId map of issue comments by user ID
+     * @return a comparator that sorts by league points descending
+     */
+    private Comparator<Map.Entry<Long, Integer>> compareByLeaguePoints(
+        Map<Long, User> usersById,
+        Map<Long, List<PullRequestReview>> reviewsByUserId,
+        Map<Long, List<IssueComment>> issueCommentsByUserId
+    ) {
+        return (e1, e2) -> {
+            int e1LeaguePoints = usersById.get(e1.getKey()).getLeaguePoints();
+            int e2LeaguePoints = usersById.get(e2.getKey()).getLeaguePoints();
+            int leagueCompare = Integer.compare(e2LeaguePoints, e1LeaguePoints);
+            if (leagueCompare != 0) {
+                return leagueCompare;
+            }
+            return compareByScore(reviewsByUserId, issueCommentsByUserId).compare(e1, e2);
+        };
+    }
+
+    /**
+     * Creates a comparator that compares users by their score.
+     * If two users have the same score, they are compared by the total number of comments.
+     * @param reviewsByUserId map of reviews by user ID
+     * @param issueCommentsByUserId map of issue comments by user ID
+     * @return a comparator that sorts by score descending
+     */
+    private Comparator<Map.Entry<Long, Integer>> compareByScore(
+        Map<Long, List<PullRequestReview>> reviewsByUserId,
+        Map<Long, List<IssueComment>> issueCommentsByUserId
+    ) {
+        return (e1, e2) -> {
+            int scoreCompare = e2.getValue().compareTo(e1.getValue());
+            if (scoreCompare != 0) {
+                return scoreCompare;
+            }
+            // If both users have a score of 0, compare by total comment count.
+            // Calculate total code review comment count from reviews.
+            int e1ReviewComments = reviewsByUserId
+                .getOrDefault(e1.getKey(), List.of())
+                .stream()
+                .mapToInt(review -> review.getComments().size())
+                .sum();
+            int e2ReviewComments = reviewsByUserId
+                .getOrDefault(e2.getKey(), List.of())
+                .stream()
+                .mapToInt(review -> review.getComments().size())
+                .sum();
+            // Calculate total issue comments.
+            int e1IssueComments = issueCommentsByUserId.getOrDefault(e1.getKey(), List.of()).size();
+            int e2IssueComments = issueCommentsByUserId.getOrDefault(e2.getKey(), List.of()).size();
+            int e1TotalComments = e1ReviewComments + e1IssueComments;
+            int e2TotalComments = e2ReviewComments + e2IssueComments;
+            // Sort descending by total comment count.
+            return Integer.compare(e2TotalComments, e1TotalComments);
+        };
+    }
+
     @Transactional
     public List<LeaderboardEntryDTO> createLeaderboard(
         OffsetDateTime after,
         OffsetDateTime before,
-        Optional<String> team
+        Optional<String> team,
+        Optional<LeaderboardSortType> sort
     ) {
         Optional<Team> teamEntity = team.map(t -> teamRepository.findByName(t)).orElse(Optional.empty());
         logger.info(
@@ -84,6 +162,9 @@ public class LeaderboardService {
             userRepository
                 .findAllByTeamId(teamEntity.get().getId())
                 .forEach(user -> usersById.putIfAbsent(user.getId(), user));
+        } else {
+            // Show all active users in the total leaderboard
+            userRepository.findAllHumanInTeams().stream().forEach(user -> usersById.putIfAbsent(user.getId(), user));
         }
 
         // Review activity
@@ -110,7 +191,9 @@ public class LeaderboardService {
         List<Long> rankingByUserId = scoresByUserId
             .entrySet()
             .stream()
-            .sorted(Map.Entry.comparingByValue(Comparator.reverseOrder()))
+            .sorted(
+                getComparator(sort.orElse(LeaderboardSortType.SCORE), usersById, reviewsByUserId, issueCommentsByUserId)
+            )
             .map(Map.Entry::getKey)
             .collect(Collectors.toList());
 
@@ -205,5 +288,26 @@ public class LeaderboardService {
             .map(pullRequestReviews -> scoringService.calculateReviewScore(pullRequestReviews, numberOfIssueComments))
             .reduce(0.0, Double::sum);
         return (int) Math.ceil(totalScore);
+    }
+
+    /**
+     * Get the league point change for a specific user
+     * @param login user login
+     * @param entry current leaderboard entry of the user
+     * @return LeaderboardUserStatsDTO containing league point change
+     */
+    @Transactional
+    public LeagueChangeDTO getUserLeagueStats(String login, LeaderboardEntryDTO entry) {
+        // Get the user
+        User user = userRepository
+            .findByLogin(login)
+            .orElseThrow(() -> new IllegalArgumentException("User not found with login: " + login));
+
+        // Calculate league point change
+        int currentLeaguePoints = user.getLeaguePoints();
+        int projectedNewPoints = leaguePointsCalculationService.calculateNewPoints(user, entry);
+        int leaguePointsChange = projectedNewPoints - currentLeaguePoints;
+
+        return new LeagueChangeDTO(user.getLogin(), leaguePointsChange);
     }
 }

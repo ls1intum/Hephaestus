@@ -1,16 +1,16 @@
 import { booleanAttribute, Component, input } from '@angular/core';
 import { HlmButtonModule } from '@spartan-ng/ui-button-helm';
-import { BrnTooltipContentDirective } from '@spartan-ng/ui-tooltip-brain';
-import { HlmTooltipComponent, HlmTooltipTriggerDirective } from '@spartan-ng/ui-tooltip-helm';
-import { LucideAngularModule, Sparkles } from 'lucide-angular';
+import { HlmTooltipModule } from '@spartan-ng/ui-tooltip-helm';
+import { NgIconComponent, provideIcons } from '@ng-icons/core';
+import { lucideSparkles } from '@ng-icons/lucide';
+import { BrnTooltipContentDirective } from '@spartan-ng/brain/tooltip';
 
 @Component({
   selector: 'app-request-feature',
-  imports: [LucideAngularModule, HlmButtonModule, HlmTooltipComponent, HlmTooltipTriggerDirective, BrnTooltipContentDirective],
-  templateUrl: './request-feature.component.html'
+  templateUrl: './request-feature.component.html',
+  imports: [HlmButtonModule, BrnTooltipContentDirective, NgIconComponent, HlmTooltipModule],
+  providers: [provideIcons({ lucideSparkles })]
 })
 export class RequestFeatureComponent {
-  protected Sparkles = Sparkles;
-
   iconOnly = input(false, { transform: booleanAttribute });
 }
