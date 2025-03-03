@@ -9,6 +9,7 @@ import de.tum.in.www1.hephaestus.gitprovider.pullrequestreview.PullRequestReview
 import de.tum.in.www1.hephaestus.gitprovider.pullrequestreview.PullRequestReviewRepository;
 import de.tum.in.www1.hephaestus.gitprovider.repository.RepositoryInfoDTO;
 import de.tum.in.www1.hephaestus.gitprovider.repository.RepositoryRepository;
+import de.tum.in.www1.hephaestus.notification.MailService;
 import jakarta.transaction.Transactional;
 import java.time.OffsetDateTime;
 import java.util.ArrayList;
@@ -45,6 +46,9 @@ public class UserService {
     @Autowired
     private PullRequestReviewInfoDTOConverter pullRequestReviewInfoDTOConverter;
 
+    @Autowired
+    private MailService mailService;
+
     @Transactional
     public Optional<UserProfileDTO> getUserProfile(String login) {
         logger.info("Getting user profile with login: " + login);
@@ -53,6 +57,10 @@ public class UserService {
         if (optionalUser.isEmpty()) {
             return Optional.empty();
         }
+
+        userRepository.findByLogin(login).ifPresent(user -> {
+            mailService.sendBadPracticesDetectedEmail(user, "badPractice");
+        });
 
         UserInfoDTO user = optionalUser.get();
         OffsetDateTime firstContribution = pullRequestRepository.firstContributionByAuthorLogin(login).orElse(null);
