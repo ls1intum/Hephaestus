@@ -1,5 +1,6 @@
 package de.tum.in.www1.hephaestus.mentor.session;
 
+import de.tum.in.www1.hephaestus.config.IntelligenceServiceConfig.IntelligenceServiceApi;
 import de.tum.in.www1.hephaestus.core.exception.AccessForbiddenException;
 import de.tum.in.www1.hephaestus.gitprovider.issue.Issue;
 import de.tum.in.www1.hephaestus.gitprovider.pullrequest.PullRequestBaseInfoDTO;
@@ -27,6 +28,9 @@ public class SessionService {
     @Autowired
     private PullRequestRepository pullRequestRepository;
 
+    @Autowired
+    private IntelligenceServiceApi intelligenceServiceApi;
+
     public void checkAccessElseThrow(User user, Session session) {
         if (!session.getUser().getId().equals(user.getId())) {
             throw new AccessForbiddenException("Session", session.getId());
@@ -49,19 +53,22 @@ public class SessionService {
 
     @Transactional
     public SessionDTO createSession(User user) {
-        String previousSessionId = sessionRepository
-            .findFirstByUserOrderByCreatedAtDesc(user)
-            .map(Session::getId)
-            .map(String::valueOf)
-            .orElse("");
-        // Close the previous session if it exists to prevent multiple open sessions
-        if (previousSessionId != "") {
-            Session previous_session = sessionRepository.findFirstByUserOrderByCreatedAtDesc(user).get();
-            previous_session.setClosed(true);
-            sessionRepository.save(previous_session);
+        // if the intelligence service is not available, return null
+        try {
+            intelligenceServiceApi.statusMentorHealthGet();
+        } catch (Exception e) {
+            return null;
         }
 
-        // Get the last time interval's PRs
+        Session previousSession = sessionRepository.findFirstByUserOrderByCreatedAtDesc(user).orElse(null);
+        // close the previous session if it exists to prevent multiple open sessions
+        if (previousSession != null) {
+            previousSession.setClosed(true);
+            sessionRepository.save(previousSession);
+        }
+        String previousSessionId = previousSession != null ? previousSession.getId().toString() : "";
+
+        // get the last time interval's PRs
         List<PullRequestBaseInfoDTO> pullRequests = pullRequestRepository
             .findAssignedByLoginAndStatesUpdatedSince(
                 user.getLogin(),
@@ -77,6 +84,7 @@ public class SessionService {
         session.setUser(user);
         Session savedSession = sessionRepository.save(session);
         messageService.sendFirstMessage(session, previousSessionId, devProgress);
+
         return SessionDTO.fromSession(savedSession);
     }
 

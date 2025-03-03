@@ -13,6 +13,7 @@ import de.tum.in.www1.hephaestus.gitprovider.user.UserInfoDTO;
 import de.tum.in.www1.hephaestus.gitprovider.user.UserRepository;
 import jakarta.transaction.Transactional;
 import java.time.OffsetDateTime;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -46,11 +47,86 @@ public class LeaderboardService {
     @Autowired
     private LeaguePointsCalculationService leaguePointsCalculationService;
 
+    private Comparator<Map.Entry<Long, Integer>> getComparator(
+        LeaderboardSortType sortType,
+        Map<Long, User> usersById,
+        Map<Long, List<PullRequestReview>> reviewsByUserId,
+        Map<Long, List<IssueComment>> issueCommentsByUserId
+    ) {
+        return switch (sortType) {
+            case LEAGUE_POINTS -> compareByLeaguePoints(usersById, reviewsByUserId, issueCommentsByUserId);
+            case SCORE -> compareByScore(reviewsByUserId, issueCommentsByUserId);
+        };
+    }
+
+    /**
+     * Creates a comparator that compares users by their league points.
+     * If two users have the same league points, they are compared by their score.
+     * @param usersById map of users by ID
+     * @param reviewsByUserId map of reviews by user ID
+     * @param issueCommentsByUserId map of issue comments by user ID
+     * @return a comparator that sorts by league points descending
+     */
+    private Comparator<Map.Entry<Long, Integer>> compareByLeaguePoints(
+        Map<Long, User> usersById,
+        Map<Long, List<PullRequestReview>> reviewsByUserId,
+        Map<Long, List<IssueComment>> issueCommentsByUserId
+    ) {
+        return (e1, e2) -> {
+            int e1LeaguePoints = usersById.get(e1.getKey()).getLeaguePoints();
+            int e2LeaguePoints = usersById.get(e2.getKey()).getLeaguePoints();
+            int leagueCompare = Integer.compare(e2LeaguePoints, e1LeaguePoints);
+            if (leagueCompare != 0) {
+                return leagueCompare;
+            }
+            return compareByScore(reviewsByUserId, issueCommentsByUserId).compare(e1, e2);
+        };
+    }
+
+    /**
+     * Creates a comparator that compares users by their score.
+     * If two users have the same score, they are compared by the total number of comments.
+     * @param reviewsByUserId map of reviews by user ID
+     * @param issueCommentsByUserId map of issue comments by user ID
+     * @return a comparator that sorts by score descending
+     */
+    private Comparator<Map.Entry<Long, Integer>> compareByScore(
+        Map<Long, List<PullRequestReview>> reviewsByUserId,
+        Map<Long, List<IssueComment>> issueCommentsByUserId
+    ) {
+        return (e1, e2) -> {
+            int scoreCompare = e2.getValue().compareTo(e1.getValue());
+            if (scoreCompare != 0) {
+                return scoreCompare;
+            }
+            // If both users have a score of 0, compare by total comment count.
+            // Calculate total code review comment count from reviews.
+            int e1ReviewComments = reviewsByUserId
+                .getOrDefault(e1.getKey(), List.of())
+                .stream()
+                .mapToInt(review -> review.getComments().size())
+                .sum();
+            int e2ReviewComments = reviewsByUserId
+                .getOrDefault(e2.getKey(), List.of())
+                .stream()
+                .mapToInt(review -> review.getComments().size())
+                .sum();
+            // Calculate total issue comments.
+            int e1IssueComments = issueCommentsByUserId.getOrDefault(e1.getKey(), List.of()).size();
+            int e2IssueComments = issueCommentsByUserId.getOrDefault(e2.getKey(), List.of()).size();
+            int e1TotalComments = e1ReviewComments + e1IssueComments;
+            int e2TotalComments = e2ReviewComments + e2IssueComments;
+            // Sort descending by total comment count.
+            return Integer.compare(e2TotalComments, e1TotalComments);
+        };
+    }
+
     @Transactional
     public List<LeaderboardEntryDTO> createLeaderboard(
         OffsetDateTime after,
         OffsetDateTime before,
-        Optional<String> team
+        Optional<String> team,
+        Optional<LeaderboardSortType> sort
     ) {
         Optional<Team> teamEntity = team.map(t -> teamRepository.findByName(t)).orElse(Optional.empty());
         logger.info(
@@ -115,32 +191,9 @@ public class LeaderboardService {
         List<Long> rankingByUserId = scoresByUserId
             .entrySet()
             .stream()
-            .sorted((e1, e2) -> {
-                // Primary sort: descending order by score
-                int scoreCompare = e2.getValue().compareTo(e1.getValue());
-                if (scoreCompare != 0) {
-                    return scoreCompare;
-                }
-                // If both users have a score of 0, compare by total comment count.
-                // Calculate total code review comment count from reviews.
-                int e1ReviewComments = reviewsByUserId
-                    .getOrDefault(e1.getKey(), List.of())
-                    .stream()
-                    .mapToInt(review -> review.getComments().size())
-                    .sum();
-                int e2ReviewComments = reviewsByUserId
-                    .getOrDefault(e2.getKey(), List.of())
-                    .stream()
-                    .mapToInt(review -> review.getComments().size())
-                    .sum();
-                // Calculate total issue comments.
-                int e1IssueComments = issueCommentsByUserId.getOrDefault(e1.getKey(), List.of()).size();
-                int e2IssueComments = issueCommentsByUserId.getOrDefault(e2.getKey(), List.of()).size();
-                int e1TotalComments = e1ReviewComments + e1IssueComments;
-                int e2TotalComments = e2ReviewComments + e2IssueComments;
-                // Sort descending by total comment count.
-                return Integer.compare(e2TotalComments, e1TotalComments);
-            })
+            .sorted(
+                getComparator(sort.orElse(LeaderboardSortType.SCORE), usersById, reviewsByUserId, issueCommentsByUserId)
+            )
             .map(Map.Entry::getKey)
             .collect(Collectors.toList());
 

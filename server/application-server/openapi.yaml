@@ -8,7 +8,7 @@ info:
   license:
     name: MIT License
     url: https://github.com/ls1intum/Hephaestus/blob/develop/LICENSE
-  version: 0.1.1
+  version: 0.2.0
 servers:
 - url: /
   description: Default Server URL
@@ -311,6 +311,14 @@ paths:
         required: false
         schema:
           type: string
+      - name: sort
+        in: query
+        required: false
+        schema:
+          type: string
+          enum:
+          - SCORE
+          - LEAGUE_POINTS
       responses:
         "200":
           description: OK
@@ -429,6 +437,18 @@ paths:
                 type: array
                 items:
                   $ref: "#/components/schemas/Contributor"
+  /mentor/sessions/last:
+    get:
+      tags:
+      - session
+      operationId: getLastSession
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Session"
   /workspace/team/{teamId}:
     delete:
       tags:
