@@ -351,6 +351,47 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/LeagueChange"
+  /activity/user/{login}/badpractices:
+    post:
+      tags:
+      - activity
+      operationId: detectBadPracticesByUser
+      parameters:
+      - name: login
+        in: path
+        required: true
+        schema:
+          type: string
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/PullRequestBadPractice"
+  /activity/pullrequest/{pullRequestId}/badpractices:
+    post:
+      tags:
+      - activity
+      operationId: detectBadPracticesForPullRequest
+      parameters:
+      - name: pullRequestId
+        in: path
+        required: true
+        schema:
+          type: integer
+          format: int64
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/PullRequestBadPractice"
   /workspace/users:
     get:
       tags:
@@ -449,6 +490,24 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/Session"
+  /activity/{login}:
+    get:
+      tags:
+      - activity
+      operationId: getActivityByUser
+      parameters:
+      - name: login
+        in: path
+        required: true
+        schema:
+          type: string
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Activity"
   /workspace/team/{teamId}:
     delete:
       tags:
@@ -660,6 +719,57 @@ components:
       - name
       - teams
       - url
+    PullRequestWithBadPractices:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+        number:
+          type: integer
+          format: int32
+        title:
+          type: string
+        state:
+          type: string
+          enum:
+          - OPEN
+          - CLOSED
+        isDraft:
+          type: boolean
+        isMerged:
+          type: boolean
+        labels:
+          type: array
+          items:
+            $ref: "#/components/schemas/LabelInfo"
+        repository:
+          $ref: "#/components/schemas/RepositoryInfo"
+        additions:
+          type: integer
+          format: int32
+        deletions:
+          type: integer
+          format: int32
+        htmlUrl:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+        badPractices:
+          type: array
+          items:
+            $ref: "#/components/schemas/PullRequestBadPractice"
+      required:
+      - additions
+      - deletions
+      - htmlUrl
+      - id
+      - isDraft
+      - isMerged
+      - number
+      - state
+      - title
     PullRequestBaseInfo:
       type: object
       properties:
@@ -715,6 +825,15 @@ components:
       - id
       - login
       - name
+    Activity:
+      type: object
+      properties:
+        pullRequests:
+          type: array
+          items:
+            $ref: "#/components/schemas/PullRequestWithBadPractices"
+      required:
+      - pullRequests
     UserInfo:
       type: object
       properties:
@@ -764,6 +883,15 @@ components:
       - labels
       - name
       - repositories
+    PullRequestBadPractice:
+      type: object
+      properties:
+        title:
+          type: string
+        description:
+          type: string
+        resolved:
+          type: boolean
     LeagueChange:
       type: object
       properties:
