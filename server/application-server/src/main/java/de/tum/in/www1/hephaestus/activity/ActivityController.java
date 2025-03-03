@@ -20,13 +20,13 @@ public class ActivityController {
         return ResponseEntity.ok(activity);
     }
 
-    @PostMapping("/{login}/badpractices")
+    @PostMapping("/user/{login}/badpractices")
     public ResponseEntity<List<PullRequestBadPracticeDTO>> detectBadPracticesByUser(@PathVariable String login) {
         List<PullRequestBadPracticeDTO> badPractices = activityService.detectBadPracticesForUser(login);
         return ResponseEntity.ok(badPractices);
     }
 
-    @PostMapping("{pullRequestId}/badpractices")
+    @PostMapping("/pullrequest/{pullRequestId}/badpractices")
     public ResponseEntity<List<PullRequestBadPracticeDTO>> detectBadPracticesForPullRequest(
         @PathVariable Long pullRequestId
     ) {
