@@ -1,4 +1,4 @@
-import { Component, computed, inject, input, output } from '@angular/core';
+import { Component, computed, inject, input } from '@angular/core';
 import { PullRequestInfo, LabelInfo, PullRequestBadPractice, ActivityService } from '@app/core/modules/openapi';
 import { NgIcon } from '@ng-icons/core';
 import { octCheck, octComment, octFileDiff, octGitPullRequest, octGitPullRequestClosed, octGitPullRequestDraft, octGitMerge, octX, octFold, octSync } from '@ng-icons/octicons';
@@ -66,8 +66,8 @@ export class PullRequestBadPracticeCardComponent {
   displayTitle = computed(() => formatTitle(this.title() ?? ''));
 
   issueIconAndColor = computed(() => {
-    var icon: string;
-    var color: string;
+    let icon: string;
+    let color: string;
 
     if (this.state() === PullRequestInfo.StateEnum.Open) {
       if (this.isDraft()) {

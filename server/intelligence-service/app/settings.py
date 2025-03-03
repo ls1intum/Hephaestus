@@ -17,11 +17,6 @@ class Settings(BaseSettings):
     AZURE_OPENAI_ENDPOINT: str = ""
     AZURE_OPENAI_API_VERSION: str = ""
 
-    LANGSMITH_TRACING: bool = True
-    LANGSMITH_ENDPOINT: str = ""
-    LANGSMITH_API_KEY: str = ""
-    LANGSMITH_PROJECT: str = ""
-
     MODEL_NAME: str = "gpt-4o"
     MODEL_TEMPERATURE: float = 0.7
     MODEL_MAX_TOKENS: int = 4096
