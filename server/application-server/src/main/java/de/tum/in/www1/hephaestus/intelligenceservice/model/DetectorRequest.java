@@ -20,7 +20,11 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonTypeName;
 import com.fasterxml.jackson.annotation.JsonValue;
+import de.tum.in.www1.hephaestus.intelligenceservice.model.BadPractice;
+import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import com.fasterxml.jackson.annotation.JsonPropertyOrder;
 import com.fasterxml.jackson.annotation.JsonTypeName;
@@ -30,11 +34,15 @@ import org.hibernate.validator.constraints.*;
  * DetectorRequest
  */
 @JsonPropertyOrder({
+  DetectorRequest.JSON_PROPERTY_BAD_PRACTICES,
   DetectorRequest.JSON_PROPERTY_DESCRIPTION,
   DetectorRequest.JSON_PROPERTY_TITLE
 })
 @jakarta.annotation.Generated(value = "org.openapitools.codegen.languages.JavaClientCodegen", comments = "Generator version: 7.7.0")
-public class DetectorRequest {
+public class DetectorRequest extends HashMap<String, Object> {
+  public static final String JSON_PROPERTY_BAD_PRACTICES = "bad_practices";
+  private List<BadPractice> badPractices = new ArrayList<>();
+
   public static final String JSON_PROPERTY_DESCRIPTION = "description";
   private String description;
 
@@ -43,6 +51,39 @@ public class DetectorRequest {
 
   public DetectorRequest() {
 
+  }
+
+  public DetectorRequest badPractices(List<BadPractice> badPractices) {
+    
+    this.badPractices = badPractices;
+    return this;
+  }
+
+  public DetectorRequest addBadPracticesItem(BadPractice badPracticesItem) {
+    if (this.badPractices == null) {
+      this.badPractices = new ArrayList<>();
+    }
+    this.badPractices.add(badPracticesItem);
+    return this;
+  }
+
+  /**
+   * Get badPractices
+   * @return badPractices
+   */
+  @jakarta.annotation.Nonnull
+  @JsonProperty(JSON_PROPERTY_BAD_PRACTICES)
+  @JsonInclude(value = JsonInclude.Include.ALWAYS)
+
+  public List<BadPractice> getBadPractices() {
+    return badPractices;
+  }
+
+
+  @JsonProperty(JSON_PROPERTY_BAD_PRACTICES)
+  @JsonInclude(value = JsonInclude.Include.ALWAYS)
+  public void setBadPractices(List<BadPractice> badPractices) {
+    this.badPractices = badPractices;
   }
 
   public DetectorRequest description(String description) {
@@ -104,19 +145,23 @@ public class DetectorRequest {
       return false;
     }
     DetectorRequest detectorRequest = (DetectorRequest) o;
-    return Objects.equals(this.description, detectorRequest.description) &&
-        Objects.equals(this.title, detectorRequest.title);
+    return Objects.equals(this.badPractices, detectorRequest.badPractices) &&
+        Objects.equals(this.description, detectorRequest.description) &&
+        Objects.equals(this.title, detectorRequest.title) &&
+        super.equals(o);
   }
 
   @Override
   public int hashCode() {
-    return Objects.hash(description, title);
+    return Objects.hash(badPractices, description, title, super.hashCode());
   }
 
   @Override
   public String toString() {
     StringBuilder sb = new StringBuilder();
     sb.append("class DetectorRequest {\n");
+    sb.append("    ").append(toIndentedString(super.toString())).append("\n");
+    sb.append("    badPractices: ").append(toIndentedString(badPractices)).append("\n");
     sb.append("    description: ").append(toIndentedString(description)).append("\n");
     sb.append("    title: ").append(toIndentedString(title)).append("\n");
     sb.append("}");

@@ -7,6 +7,10 @@ components:
           description: The description of the bad practice.
           title: Description
           type: string
+        resolved:
+          description: Whether the bad practice has been resolved.
+          title: Resolved
+          type: boolean
         title:
           description: The title of the bad practice.
           title: Title
@@ -14,11 +18,17 @@ components:
       required:
       - title
       - description
+      - resolved
       title: BadPractice
       type: object
     DetectorRequest:
       additionalProperties: true
       properties:
+        bad_practices:
+          items:
+            $ref: '#/components/schemas/BadPractice'
+          title: Bad Practices
+          type: array
         description:
           title: Description
           type: string
@@ -28,6 +38,7 @@ components:
       required:
       - title
       - description
+      - bad_practices
       title: DetectorRequest
       type: object
     DetectorResponse:
@@ -152,7 +163,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/HTTPValidationError'
           description: Validation Error
-      summary: Detect bad practices given rules.
+      summary: Detect bad practices for given pull request.
       tags:
       - detector
   /health:

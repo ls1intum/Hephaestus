@@ -288,6 +288,27 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/Message"
+  /activity/{pullRequestId}/badpractices/:
+    post:
+      tags:
+      - activity
+      operationId: detectBadPracticesForPullRequest
+      parameters:
+      - name: pullRequestId
+        in: path
+        required: true
+        schema:
+          type: integer
+          format: int64
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/PullRequestBadPractice"
   /activity/{login}/badpractices:
     post:
       tags:

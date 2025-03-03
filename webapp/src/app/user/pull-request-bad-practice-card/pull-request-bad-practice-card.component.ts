@@ -1,7 +1,7 @@
-import { Component, computed, input } from '@angular/core';
-import { PullRequestInfo, LabelInfo, PullRequestBadPractice } from '@app/core/modules/openapi';
+import { Component, computed, inject, input, output } from '@angular/core';
+import { PullRequestInfo, LabelInfo, PullRequestBadPractice, ActivityService } from '@app/core/modules/openapi';
 import { NgIcon } from '@ng-icons/core';
-import { octCheck, octComment, octFileDiff, octGitPullRequest, octGitPullRequestClosed, octGitPullRequestDraft, octGitMerge, octX, octFold } from '@ng-icons/octicons';
+import { octCheck, octComment, octFileDiff, octGitPullRequest, octGitPullRequestClosed, octGitPullRequestDraft, octGitMerge, octX, octFold, octSync } from '@ng-icons/octicons';
 import { HlmCardModule } from '@spartan-ng/ui-card-helm';
 import { HlmSkeletonComponent } from '@spartan-ng/ui-skeleton-helm';
 
@@ -14,6 +14,9 @@ import { HlmButtonDirective } from '@spartan-ng/ui-button-helm';
 import { GithubLabelComponent } from '@app/ui/github-label/github-label.component';
 import { cn } from '@app/utils';
 import { formatTitle } from '@app/utils';
+import { HlmSpinnerComponent } from '@spartan-ng/ui-spinner-helm';
+import { injectMutation, QueryClient } from '@tanstack/angular-query-experimental';
+import { lastValueFrom } from 'rxjs';
 
 @Component({
   selector: 'app-pull-request-bad-practice-card',
@@ -29,10 +32,15 @@ import { formatTitle } from '@app/utils';
     BrnCollapsibleContentComponent,
     BrnCollapsibleTriggerDirective,
     HlmButtonDirective,
-    GithubLabelComponent
-  ]
+    GithubLabelComponent,
+    HlmSpinnerComponent
+  ],
+  standalone: true
 })
 export class PullRequestBadPracticeCardComponent {
+  activityService = inject(ActivityService);
+  queryClient = inject(QueryClient);
+
   protected readonly octCheck = octCheck;
   protected readonly octX = octX;
   protected readonly octComment = octComment;
@@ -41,6 +49,7 @@ export class PullRequestBadPracticeCardComponent {
 
   isLoading = input(false);
   class = input('');
+  id = input.required<number>();
   title = input<string>();
   number = input<number>();
   additions = input<number>();
@@ -82,4 +91,12 @@ export class PullRequestBadPracticeCardComponent {
 
     return { icon, color };
   });
+  protected readonly octSync = octSync;
+
+  detectBadPracticesForPrMutation = injectMutation(() => ({
+    mutationFn: (prId: number) => lastValueFrom(this.activityService.detectBadPracticesForPullRequest(prId)),
+    onSuccess: () => {
+      this.queryClient.invalidateQueries({ queryKey: ['activity'] });
+    }
+  }));
 }

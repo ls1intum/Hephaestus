@@ -29,12 +29,16 @@ import org.hibernate.validator.constraints.*;
  */
 @JsonPropertyOrder({
   BadPractice.JSON_PROPERTY_DESCRIPTION,
+  BadPractice.JSON_PROPERTY_RESOLVED,
   BadPractice.JSON_PROPERTY_TITLE
 })
 @jakarta.annotation.Generated(value = "org.openapitools.codegen.languages.JavaClientCodegen", comments = "Generator version: 7.7.0")
 public class BadPractice {
   public static final String JSON_PROPERTY_DESCRIPTION = "description";
   private String description;
+
+  public static final String JSON_PROPERTY_RESOLVED = "resolved";
+  private Boolean resolved;
 
   public static final String JSON_PROPERTY_TITLE = "title";
   private String title;
@@ -65,6 +69,31 @@ public class BadPractice {
   @JsonInclude(value = JsonInclude.Include.ALWAYS)
   public void setDescription(String description) {
     this.description = description;
+  }
+
+  public BadPractice resolved(Boolean resolved) {
+    
+    this.resolved = resolved;
+    return this;
+  }
+
+  /**
+   * Whether the bad practice has been resolved.
+   * @return resolved
+   */
+  @jakarta.annotation.Nonnull
+  @JsonProperty(JSON_PROPERTY_RESOLVED)
+  @JsonInclude(value = JsonInclude.Include.ALWAYS)
+
+  public Boolean getResolved() {
+    return resolved;
+  }
+
+
+  @JsonProperty(JSON_PROPERTY_RESOLVED)
+  @JsonInclude(value = JsonInclude.Include.ALWAYS)
+  public void setResolved(Boolean resolved) {
+    this.resolved = resolved;
   }
 
   public BadPractice title(String title) {
@@ -102,12 +131,13 @@ public class BadPractice {
     }
     BadPractice badPractice = (BadPractice) o;
     return Objects.equals(this.description, badPractice.description) &&
+        Objects.equals(this.resolved, badPractice.resolved) &&
         Objects.equals(this.title, badPractice.title);
   }
 
   @Override
   public int hashCode() {
-    return Objects.hash(description, title);
+    return Objects.hash(description, resolved, title);
   }
 
   @Override
@@ -115,6 +145,7 @@ public class BadPractice {
     StringBuilder sb = new StringBuilder();
     sb.append("class BadPractice {\n");
     sb.append("    description: ").append(toIndentedString(description)).append("\n");
+    sb.append("    resolved: ").append(toIndentedString(resolved)).append("\n");
     sb.append("    title: ").append(toIndentedString(title)).append("\n");
     sb.append("}");
     return sb.toString();

@@ -1,5 +1,6 @@
 package de.tum.in.www1.hephaestus.gitprovider.pullrequest.github;
 
+import de.tum.in.www1.hephaestus.activity.badpracticedetector.BadPracticeDetectorScheduler;
 import de.tum.in.www1.hephaestus.gitprovider.common.DateUtil;
 import de.tum.in.www1.hephaestus.gitprovider.label.Label;
 import de.tum.in.www1.hephaestus.gitprovider.label.LabelRepository;
@@ -61,6 +62,9 @@ public class GitHubPullRequestSyncService {
 
     @Autowired
     private GitHubUserConverter userConverter;
+
+    @Autowired
+    private BadPracticeDetectorScheduler badPracticeDetectorScheduler;
 
     /**
      * Synchronizes all pull requests from the specified GitHub repositories.
@@ -233,6 +237,7 @@ public class GitHubPullRequestSyncService {
                 });
             resultLabels.add(resultLabel);
         });
+        badPracticeDetectorScheduler.detectBadPracticeForPrIfReadyToMerge(result, result.getLabels(), resultLabels);
         result.getLabels().clear();
         result.getLabels().addAll(resultLabels);
 
