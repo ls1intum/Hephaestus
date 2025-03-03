@@ -48,8 +48,9 @@
       @for (entry of leaderboard(); track entry.user.login) {
         <tr [id]="'rank-' + entry.rank" appTableRow routerLink="/user/{{ entry.user.login }}" routerLinkActive="active" ariaCurrentWhenActive="page" [class]="trClass(entry)">
           <td appTableCell class="text-center">{{ entry.rank }}</td>
-          <td appTableCell class="flex justify-center items-center px-0.5">
+          <td appTableCell class="flex flex-col justify-center items-center px-0.5">
             <app-icon-league [leaguePoints]="entry.user.leaguePoints" />
+            <span class="text-xs font-semibold text-muted-foreground">{{ entry.user.leaguePoints }}</span>
           </td>
           <td appTableCell class="py-2">
             <span class="flex items-center gap-2 font-medium">

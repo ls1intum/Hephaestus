@@ -15,6 +15,7 @@ import { HlmAlertModule } from '@spartan-ng/ui-alert-helm';
 import { MetaService, UserService } from '@app/core/modules/openapi';
 import { LeaderboardOverviewComponent } from './leaderboard/leaderboard-overview/leaderboard-overview.component';
 import { LeaderboardLegendComponent } from './leaderboard/legend/legends.component';
+import { LeaderboardSortType } from './leaderboard/filter/sort/sort.component';
 
 dayjs.extend(isoWeek);
 
@@ -48,11 +49,13 @@ export class HomeComponent {
   protected afterParam = computed(() => this.queryParams().get('after'));
   protected beforeParam = computed(() => this.queryParams().get('before'));
   protected teamParam = computed(() => this.queryParams().get('team') ?? 'all');
+  protected sortParam = computed(() => (this.queryParams().get('sort') ?? 'SCORE') as LeaderboardSortType);
 
   query = injectQuery(() => ({
     enabled: !!this.metaQuery.data() && !!this.afterParam() && !!this.beforeParam() && !!this.teamParam(),
-    queryKey: ['leaderboard', { after: this.afterParam(), before: this.beforeParam(), team: this.teamParam() }],
-    queryFn: async () => lastValueFrom(this.leaderboardService.getLeaderboard(this.afterParam()!, this.beforeParam()!, this.teamParam() !== 'all' ? this.teamParam() : undefined))
+    queryKey: ['leaderboard', { after: this.afterParam(), before: this.beforeParam(), team: this.teamParam(), sort: this.sortParam() }],
+    queryFn: async () =>
+      lastValueFrom(this.leaderboardService.getLeaderboard(this.afterParam()!, this.beforeParam()!, this.teamParam() !== 'all' ? this.teamParam() : undefined, this.sortParam()))
   }));
 
   protected teams = computed(() => this.metaQuery.data()?.teams?.map((team) => team.name) ?? []);
