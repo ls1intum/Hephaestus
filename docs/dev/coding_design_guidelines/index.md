@@ -1,143 +1,47 @@
 # Coding and Design Guidelines
 
-These guidelines are intended to help maintain a consistent coding style and design across the Hephaestus codebase. We distinguish between these main areas:
+These guidelines are intended to help maintain a consistent coding style and architectural design across the Hephaestus codebase. We distinguish between these main areas:
 
--   Performance Optimizations
--   Database Design
--   Server / API Design
--   Client Design
+```{toctree}
+:includehidden:
+:maxdepth: 1
 
-## Performance Optimization
+performance
+server
+client
+database
+```
 
-## Database Queries
 
-When dealing with the database, it is important to optimize the queries to minimize the number of database calls and the amount of data retrieved. Use the `@Query` annotation to write custom queries in the repository classes:
+## Overview
 
-1. **Only retrieve necessary data**: Filtering and smart data formatting as part of the query can help reduce the amount of data retrieved from the database.
-2. **Use pagination**: When retrieving a large number of records, use pagination to limit the number of records retrieved in a single query.
+This document provides an overview of the coding and design guidelines for the Hephaestus project. For detailed guidelines on specific areas, please refer to the linked documents above.
 
-## Database Design
+### Purpose
 
-This section contains guidelines to optimize the database schema and queries for performance and maintainability. Hephaestus uses a PostgreSQL database, which is accessed through the JPA (Java Persistence API) with Hibernate.
+The purpose of these guidelines is to:
 
-### Entity Design
+1. Ensure consistency across the codebase
+2. Improve code quality and maintainability
+3. Facilitate collaboration between team members
+4. Reduce the learning curve for new developers
+5. Optimize performance and user experience
 
-To define a new entity, create a new class with the `@Entity` annotation. The class should have a no-argument constructor and a primary key field annotated with `@Id`. The primary key field should be of type `Long` and should be auto-generated. For example:
+### How to Use These Guidelines
 
-.. code-block:: java
+These guidelines should be used as a reference when developing new features or modifying existing code. They are not meant to be strict rules but rather best practices that should be followed whenever possible.
 
-    @Entity
-    @Table(name = "example")
-    public class ExampleClass {
+If you find that a guideline is not applicable in a specific situation, you can deviate from it, but you should document the reason for doing so in the code or in the pull request description.
 
-        @Id
-        @GeneratedValue(strategy = GenerationType.IDENTITY)
-        private Long id;
+### Contributing to the Guidelines
 
-        // Other fields and methods
-    }
+These guidelines are not set in stone and can be improved over time. If you have suggestions for improving the guidelines, please open a pull request with your proposed changes.
 
-## Server / API Design
+When proposing changes to the guidelines, please consider the following:
 
-This section contains guidelines for designing the server and API endpoints. Hephaestus uses Spring Boot to create a RESTful API, which is secured using JSON Web Tokens (JWT).
+1. The impact on existing code
+2. The benefits of the proposed change
+3. The ease of adoption
+4. The alignment with industry best practices
 
-### Optionals
 
-Throughout the JAVA codebase, use `Optionals` instead of `null` to represent values that may be absent. This helps to avoid `NullPointerExceptions` and makes the code more readable. For example:
-
-.. code-block:: java
-
-    // Getting an entity in a repository class
-    @Repository
-    public interface ExampleRepository extends JpaRepository<ExampleClass, Long> {
-
-        Optional<ExampleClass> findByName(String name);
-
-        // ...
-    }
-
-    // Returning optional values in a service class
-    @Service
-    public class ExampleService {
-
-        public Optional<ExampleClass> getExampleByName(String name) {
-            Optional<ExampleClass> example = exampleRepository.findByName(name);
-            if (example.isEmpty()) {
-                return Optional.empty();
-            }
-            ExampleClass exampleClass = example.get();
-            // Perform some operations...
-            return exampleClass;
-        }
-    }
-
-### Data Transfer Objects (DTOs)
-
-When designing API endpoints, use Data Transfer Objects (DTOs) to define the structure of the data exchanged between the client and the server. DTOs help to decouple the internal entity structure from the external API structure and provide a clear contract for the data exchanged.
-
-The client should receive data in the form of DTOs, which should be typed via the generated OpenAPI specification and modules.
-
-Example (Server):
-
-.. code-block:: java
-
-    public record ExampleDTO(String name) {
-        public static ExampleDTO fromEntity(ExampleClass example) {
-            return new ExampleDTO(example.getName());
-        }
-    }
-
-    @RestController
-    @RequestMapping("/api/example")
-    public class ExampleController {
-
-        @GetMapping("/{id}")
-        public ResponseEntity<ExampleDTO> getExampleByName(@PathVariable String name) {
-            Optional<ExampleClass> example = exampleService.getExampleByName(name);
-            if (example.isEmpty()) {
-                return ResponseEntity.notFound().build();
-            }
-            ExampleDTO exampleDTO = ExampleDTO.fromEntity(example.get());
-            return ResponseEntity.ok(exampleDTO);
-        }
-
-    }
-
-    // Alternatively you can return DTOs directly from the repository. This is generally only useful for extremely specific requests.
-    @Repository
-    public interface ExampleRepository extends JpaRepository<ExampleClass, Long> {
-
-        @Query("""
-            SELECT new com.example.ExampleDTO(e.name) FROM ExampleClass e WHERE e.name = :name
-            """)
-        Optional<ExampleDTO> findByName(String name);
-
-        // ...
-    }
-
-Example (Client):
-
-.. code-block:: typescript
-
-    // This is auto-generated from the OpenAPI specification
-    export interface ExampleDTO {
-        name: string;
-    }
-
-    // In an Angular Component
-    @Component({
-        selector: 'app-example',
-        templateUrl: './example.component.html',
-        styleUrls: ['./example.component.css']
-    })
-    export class ExampleComponent {
-        // type-safe access to the server
-        exampleService = inject(ExampleService);
-
-        // Use Tanstack Query to fetch the actual data
-        // The data now inherits the DTO structure and can be accessed in a type-safe manner
-        example = injectQuery(() => ({
-            queryKey: ['example'],
-            queryFn: async () => lastValueFrom(this.exampleService.getExampleByName('example')),
-        }));
-    }
