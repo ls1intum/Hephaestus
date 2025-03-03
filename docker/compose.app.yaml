@@ -80,6 +80,8 @@ services:
       LEADERBOARD_SCHEDULE_DAY: ${LEADERBOARD_SCHEDULE_DAY}
       LEADERBOARD_SCHEDULE_TIME: ${LEADERBOARD_SCHEDULE_TIME}
       SENTRY_DSN: ${SENTRY_DSN}
+      POSTFIX_HOST: postfix
+      POSTFIX_PORT: 25
     depends_on:
       - postgres
     restart: unless-stopped
