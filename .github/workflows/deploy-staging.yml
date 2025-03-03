@@ -22,7 +22,7 @@ on:
 jobs:  
   deploy-app:
     if: ${{ inputs.deploy-app }}
-    uses: ls1intum/.github/.github/workflows/deploy-docker-compose.yml@chore/debug-pr-deployments
+    uses: ls1intum/.github/.github/workflows/deploy-docker-compose.yml@main
     with:
       environment: Staging
       docker-compose-file: "./docker/compose.app.yaml"
@@ -33,7 +33,7 @@ jobs:
 
   deploy-core:
     if: ${{ inputs.deploy-core }}
-    uses: ls1intum/.github/.github/workflows/deploy-docker-compose.yml@chore/debug-pr-deployments
+    uses: ls1intum/.github/.github/workflows/deploy-docker-compose.yml@main
     with:
       environment: Staging
       docker-compose-file: "./docker/compose.core.yaml"
@@ -44,7 +44,7 @@ jobs:
 
   deploy-proxy:
     if: ${{ inputs.deploy-proxy }}
-    uses: ls1intum/.github/.github/workflows/deploy-docker-compose.yml@chore/debug-pr-deployments
+    uses: ls1intum/.github/.github/workflows/deploy-docker-compose.yml@main
     with:
       environment: Staging
       docker-compose-file: "./docker/compose.proxy.yaml"
