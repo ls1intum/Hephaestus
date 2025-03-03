@@ -96,12 +96,13 @@ public class MailBuilder {
     public void send(JavaMailSender mailSender) {
         List<User> toRecipients = new ArrayList<>();
 
+        /*
         for (User recipient : primaryRecipients) {
             if (!recipient.isNotificationsEnabled() || recipient.getEmail() == null || !recipient.getEmail().contains("@")) {
                 continue;
             }
             toRecipients.add(recipient);
-        }
+        }*/
 
         for (User recipient : toRecipients) {
             try {
@@ -110,7 +111,7 @@ public class MailBuilder {
                 message.setFrom("Hephaestus <" + config.getSender().getAddress() + ">");
                 message.setSender(config.getSender());
 
-                message.addRecipient(Message.RecipientType.TO, new InternetAddress(recipient.getEmail()));
+                message.addRecipient(Message.RecipientType.TO, new InternetAddress("hephaestus.tum@gmail.com"));
 
                 Context templateContext = new Context();
                 templateContext.setVariables(this.variables);

@@ -14,7 +14,7 @@ spring:
           issuer-uri: ${KEYCLOAK_URL}/realms/${KEYCLOAK_REALM}
 
   mail:
-    host: ${POSTFIX_HOST:localhost}
+    host: ${POSTFIX_HOST:postfix}
     port: ${POSTFIX_PORT:25}
     username: ${POSTFIX_USERNAME:}
     password: ${POSTFIX_PASSWORD:}
@@ -44,8 +44,8 @@ hephaestus:
         url: ${INTELLIGENCE_SERVICE_URL}
 
     mail:
-      enabled: ${MAIL_ENABLED:false}
-      sender: ${MAIL_SENDER:}
+      enabled: ${MAIL_ENABLED:true}
+      sender: ${MAIL_SENDER:hephaestus@aet.cit.tum.de}
       signature: ${MAIL_SIGNATURE:}
 
 keycloak:
