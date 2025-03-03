@@ -7,6 +7,7 @@ import de.tum.in.www1.hephaestus.gitprovider.pullrequest.PullRequest;
 import de.tum.in.www1.hephaestus.gitprovider.pullrequest.PullRequestRepository;
 import de.tum.in.www1.hephaestus.gitprovider.user.UserRepository;
 import jakarta.transaction.Transactional;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -33,7 +34,6 @@ public class ActivityService {
     @Autowired
     private UserRepository userRepository;
 
-    @Transactional
     public ActivityDTO getActivity(String login) {
         logger.info("Getting activity for user with login: {}", login);
 
@@ -61,12 +61,7 @@ public class ActivityService {
             .map(pullRequest ->
                 PullRequestWithBadPracticesDTO.fromPullRequest(
                     pullRequest,
-                    pullRequestBadPracticesMap.getOrDefault(
-                        pullRequest,
-                        List.of(
-                            new PullRequestBadPracticeDTO("Unchecked checkbox.", "The checkbox is not checked.", false)
-                        )
-                    )
+                    pullRequestBadPracticesMap.getOrDefault(pullRequest, List.of())
                 )
             )
             .collect(Collectors.toList());
@@ -74,22 +69,32 @@ public class ActivityService {
         return new ActivityDTO(openPullRequestsWithBadPractices);
     }
 
-    @Transactional
-    public List<PullRequestBadPracticeDTO> detectBadPractices(String login) {
+    public List<PullRequestBadPracticeDTO> detectBadPracticesForUser(String login) {
         logger.info("Detecting bad practices for user with login: {}", login);
-
-        userRepository.findByLogin(login).orElseThrow(() -> new IllegalArgumentException("User not found"));
 
         List<PullRequest> pullRequests = pullRequestRepository.findAssignedByLoginAndStates(
             login,
             Set.of(Issue.State.OPEN)
         );
 
-        return pullRequests
-            .stream()
-            .map(pullRequestBadPracticeDetector::detectAndSyncBadPractices)
-            .flatMap(List::stream)
-            .map(PullRequestBadPracticeDTO::fromPullRequestBadPractice)
-            .collect(Collectors.toList());
+        List<PullRequestBadPractice> detectedBadPractices = new ArrayList<>();
+        for (PullRequest pullRequest : pullRequests) {
+            detectedBadPractices.addAll(pullRequestBadPracticeDetector.detectAndSyncBadPractices(pullRequest));
+        }
+        return detectedBadPractices.stream().map(PullRequestBadPracticeDTO::fromPullRequestBadPractice).toList();
+    }
+
+    public List<PullRequestBadPracticeDTO> detectBadPracticesForPullRequest(Long pullRequestId) {
+        logger.info("Detecting bad practices for PR: {}", pullRequestId);
+
+        PullRequest pullRequest = pullRequestRepository.findById(pullRequestId).orElse(null);
+        if (pullRequest == null) {
+            throw new IllegalArgumentException("Pull request " + pullRequestId + " not found");
+        }
+
+        List<PullRequestBadPractice> detectedBadPractices = pullRequestBadPracticeDetector.detectAndSyncBadPractices(
+            pullRequest
+        );
+        return detectedBadPractices.stream().map(PullRequestBadPracticeDTO::fromPullRequestBadPractice).toList();
     }
 }

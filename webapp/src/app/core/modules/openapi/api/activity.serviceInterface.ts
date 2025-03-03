@@ -35,6 +35,13 @@ export interface ActivityServiceInterface {
     /**
      * 
      * 
+     * @param pullRequestId 
+     */
+    detectBadPracticesForPullRequest(pullRequestId: number, extraHttpRequestParams?: any): Observable<Array<PullRequestBadPractice>>;
+
+    /**
+     * 
+     * 
      * @param login 
      */
     getActivityByUser(login: string, extraHttpRequestParams?: any): Observable<Activity>;

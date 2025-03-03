@@ -11,7 +11,7 @@
             {{ repositoryName() }} #{{ number() }} on {{ displayCreated().format('MMM D') }}
           }
         </span>
-        <span class="font-medium flex justify-center items-center gap-1">
+        <span class="font-medium flex justify-center items-center gap-2">
           @if (isLoading()) {
             <hlm-skeleton class="h-4 w-16 lg:w-36"></hlm-skeleton>
             <hlm-skeleton class="size-5"></hlm-skeleton>
@@ -21,6 +21,14 @@
             } @else {
               <span> {{ badPractices()?.length }} bad practices detected </span>
             }
+            <button hlmBtn variant="outline" size="sm" class="gap-1" (click)="this.detectBadPracticesForPrMutation.mutate(id())">
+              @if (this.detectBadPracticesForPrMutation.isPending()) {
+                <hlm-spinner class="size-4" />
+              } @else {
+                <ng-icon [svg]="octSync" class="size-8" />
+              }
+              <span>Detect</span>
+            </button>
             <button brnCollapsibleTrigger hlmBtn variant="ghost">
               <ng-icon [svg]="octFold" size="18" class="text-github-muted-foreground"></ng-icon>
             </button>
@@ -58,7 +66,7 @@
         <brn-collapsible-content>
           @for (badpractice of badPractices(); track badpractice.title) {
             <brn-separator hlmSeparator />
-            <app-bad-practice-card [title]="badpractice.title" [description]="badpractice.description" [resolved]="false"></app-bad-practice-card>
+            <app-bad-practice-card [title]="badpractice.title" [description]="badpractice.description" [resolved]="badpractice.resolved"></app-bad-practice-card>
           }
         </brn-collapsible-content>
       </div>
