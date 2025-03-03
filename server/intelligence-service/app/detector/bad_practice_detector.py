@@ -3,8 +3,12 @@ from typing import List
 from langchain_core.prompts import ChatPromptTemplate
 from pydantic import BaseModel, Field
 
-from .prompts.pullrequest_badpractice_detector import BAD_PRACTICE_PROMPT_TEST
-from ..model import model
+from app.settings import settings
+from app.detector.prompts.pullrequest_badpractice_detector import BAD_PRACTICE_PROMPT_TEST
+from app.models import get_model
+
+ChatModel = get_model(settings.MODEL_NAME)
+model = ChatModel(temperature=0.0, max_tokens=4096)
 
 
 class BadPractice(BaseModel):
