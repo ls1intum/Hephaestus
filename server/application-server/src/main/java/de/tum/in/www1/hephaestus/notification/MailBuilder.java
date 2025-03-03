@@ -95,13 +95,13 @@ public class MailBuilder {
     public void send(JavaMailSender mailSender) {
         List<User> toRecipients = new ArrayList<>();
 
-        /*
+
         for (User recipient : primaryRecipients) {
-            if (!recipient.isNotificationsEnabled() || recipient.getEmail() == null || !recipient.getEmail().contains("@")) {
+            /*if (!recipient.isNotificationsEnabled() || recipient.getEmail() == null || !recipient.getEmail().contains("@")) {
                 continue;
-            }
+            }*/
             toRecipients.add(recipient);
-        }*/
+        }
 
         for (User recipient : toRecipients) {
             try {
