@@ -16,7 +16,6 @@ import { formatTitle } from '@app/utils';
 import { HlmSpinnerComponent } from '@spartan-ng/ui-spinner-helm';
 import { injectMutation, QueryClient } from '@tanstack/angular-query-experimental';
 import { lastValueFrom } from 'rxjs';
-import { hlm } from '@spartan-ng/brain/core';
 
 @Component({
   selector: 'app-pull-request-bad-practice-card',
@@ -65,7 +64,6 @@ export class PullRequestBadPracticeCardComponent {
 
   displayCreated = computed(() => dayjs(this.createdAt()));
   displayTitle = computed(() => formatTitle(this.title() ?? ''));
-  computedClass = computed(() => hlm('w-full', !this.isLoading() ? 'hover:bg-accent/50 cursor-pointer' : '', this.class()));
 
   issueIconAndColor = computed(() => {
     var icon: string;

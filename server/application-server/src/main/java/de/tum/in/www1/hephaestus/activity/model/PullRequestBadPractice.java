@@ -8,6 +8,7 @@ import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
+import jakarta.persistence.Lob;
 import lombok.*;
 
 @Entity
@@ -25,6 +26,7 @@ public class PullRequestBadPractice {
     @NonNull
     private String title;
 
+    @Lob
     @NonNull
     private String description;
 
