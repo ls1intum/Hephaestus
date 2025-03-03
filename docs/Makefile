@@ -5,16 +5,9 @@
 # from the environment for the first two.
 SPHINXAUTOBUILD = sphinx-autobuild
 
-# Detect OS and set host accordingly
-ifeq ($(OS),Windows_NT)
-    HOST = 127.0.0.1
-else
-    HOST = 0.0.0.0
-endif
-
 ALLSPHINXLIVEOPTS = $(ALLSPHINXOPTS) -q \
    --port 0 \
-   --host $(HOST) \
+   --host 127.0.0.1 \
    --open-browser \
    --delay 1 \
    --ignore "*.swp" \
