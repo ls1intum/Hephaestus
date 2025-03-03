@@ -288,47 +288,6 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/Message"
-  /activity/{pullRequestId}/badpractices/:
-    post:
-      tags:
-      - activity
-      operationId: detectBadPracticesForPullRequest
-      parameters:
-      - name: pullRequestId
-        in: path
-        required: true
-        schema:
-          type: integer
-          format: int64
-      responses:
-        "200":
-          description: OK
-          content:
-            application/json:
-              schema:
-                type: array
-                items:
-                  $ref: "#/components/schemas/PullRequestBadPractice"
-  /activity/{login}/badpractices:
-    post:
-      tags:
-      - activity
-      operationId: detectBadPracticesByUser
-      parameters:
-      - name: login
-        in: path
-        required: true
-        schema:
-          type: string
-      responses:
-        "200":
-          description: OK
-          content:
-            application/json:
-              schema:
-                type: array
-                items:
-                  $ref: "#/components/schemas/PullRequestBadPractice"
   /leaderboard:
     get:
       tags:
@@ -392,6 +351,47 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/LeagueChange"
+  /activity/{pullRequestId}/badpractices/:
+    post:
+      tags:
+      - activity
+      operationId: detectBadPracticesForPullRequest
+      parameters:
+      - name: pullRequestId
+        in: path
+        required: true
+        schema:
+          type: integer
+          format: int64
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/PullRequestBadPractice"
+  /activity/{login}/badpractices:
+    post:
+      tags:
+      - activity
+      operationId: detectBadPracticesByUser
+      parameters:
+      - name: login
+        in: path
+        required: true
+        schema:
+          type: string
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/PullRequestBadPractice"
   /workspace/users:
     get:
       tags:
@@ -712,17 +712,14 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/TeamInfo"
-    PullRequestWithBadPractices:
+          uniqueItems: true
       required:
-      - additions
-      - deletions
-      - htmlUrl
       - id
-      - isDraft
-      - isMerged
-      - number
-      - state
-      - title
+      - login
+      - name
+      - teams
+      - url
+    PullRequestWithBadPractices:
       type: object
       properties:
         id:
@@ -763,14 +760,16 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/PullRequestBadPractice"
-    PullRequestBaseInfo:
-          uniqueItems: true
       required:
+      - additions
+      - deletions
+      - htmlUrl
       - id
-      - login
-      - name
-      - teams
-      - url
+      - isDraft
+      - isMerged
+      - number
+      - state
+      - title
     PullRequestBaseInfo:
       type: object
       properties:
@@ -820,22 +819,21 @@ components:
         contributions:
           type: integer
           format: int32
-    Activity:
-      required:
-      - pullRequests
-      type: object
-      properties:
-        pullRequests:
-          type: array
-          items:
-            $ref: "#/components/schemas/PullRequestWithBadPractices"
-    UserInfo:
       required:
       - avatarUrl
       - htmlUrl
       - id
       - login
       - name
+    Activity:
+      type: object
+      properties:
+        pullRequests:
+          type: array
+          items:
+            $ref: "#/components/schemas/PullRequestWithBadPractices"
+      required:
+      - pullRequests
     UserInfo:
       type: object
       properties:
@@ -879,6 +877,12 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/LabelInfo"
+      required:
+      - color
+      - id
+      - labels
+      - name
+      - repositories
     PullRequestBadPractice:
       type: object
       properties:
@@ -888,13 +892,6 @@ components:
           type: string
         resolved:
           type: boolean
-    LabelInfo:
-      required:
-      - color
-      - id
-      - labels
-      - name
-      - repositories
     LeagueChange:
       type: object
       properties:
