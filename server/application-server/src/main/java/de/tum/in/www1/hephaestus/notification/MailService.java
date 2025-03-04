@@ -39,7 +39,7 @@ public class MailService {
         logger.info("Sending bad practice detected email to user: " + user.getLogin());
         if (!user.getLogin().equals("iam-flo")) return;
 
-        String email = keycloak.realm(realm).users().get(String.valueOf(user.getId())).toRepresentation().getEmail();
+        String email = "hephaestus.tum@gmail.com";//keycloak.realm(realm).users().get(String.valueOf(user.getId())).toRepresentation().getEmail();
 
         MailBuilder mailBuilder = new MailBuilder(mailConfig, user, email, "Bad Practices detected in your pull request", "bad-practices-detected");
         mailBuilder

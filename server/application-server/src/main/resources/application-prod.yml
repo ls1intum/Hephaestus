@@ -25,6 +25,7 @@ spring:
         smtp:
           starttls:
             enable: true
+        debug: false
 
 hephaestus:
     host-url: ${APPLICATION_HOST_URL}
