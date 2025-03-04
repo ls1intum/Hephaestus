@@ -40,6 +40,9 @@ autodoc_mock_imports = [
     'httpx',
 ]
 
+suppress_warnings = ["myst.header"]
+myst_heading_anchors = 4
+
 plantuml_output_format='svg'
 
 # java = 'JAVA_HOME' in os.environ and f"{os.environ['JAVA_HOME']}/bin/java" or 'java'

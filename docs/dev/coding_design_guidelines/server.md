@@ -1,8 +1,6 @@
-# Server
-
 This section contains guidelines for designing the server and API endpoints. Hephaestus uses Spring Boot to create a RESTful API, which is secured using JSON Web Tokens (JWT).
 
-## Folder Structure
+### Folder Structure
 
 The Java server (commonly referred to as `application-server`) can be found under `server/application-server`. This folder contains the following main folders in `src/main`:
 
@@ -20,7 +18,7 @@ The Java server (commonly referred to as `application-server`) can be found unde
   - **/syncing**: Logic related to the syncing of data between the server and the git providers.
   - **/workspaces**: Classes related to workspace access and management.
 
-## Optionals
+### Optionals
 
 Throughout the Java codebase, use `Optionals` instead of `null` to represent values that may be absent. This helps to avoid `NullPointerExceptions` and makes the code more readable. In many cases, Spring Boot returns them automatically. For example:
 
@@ -50,11 +48,11 @@ public class ExampleService {
 }
 ```
 
-## Data Transfer Objects (DTOs)
+### Data Transfer Objects (DTOs)
 
 When designing API endpoints, use Data Transfer Objects (DTOs) to define the structure of the data exchanged between the client and the server. DTOs help to decouple the internal entity structure from the external API structure and provide a clear contract for the data exchanged.
 
-The client should receive data in the form of DTOs, which should be typed via the generated OpenAPI specification and modules (see [Client](./client.md#client-side-data-handling) version). Example:
+The client should receive data in the form of DTOs, which should be typed via the generated OpenAPI specification and modules (see [Client](./index.md#client-side-data-handling) version). Example:
 
 ```java
 public record ExampleDTO(String name) {
@@ -103,12 +101,12 @@ public interface ExampleRepository extends JpaRepository<ExampleClass, Long> {
 - **Single responsibility principle**: Each DTO should be dedicated to a specific task or subset of data. Avoid the temptation to reuse DTOs across different data payloads unless the data is identical. This approach maintains clarity and purpose within the data transfer objects.
 - **Simplicity over complexity**: Refrain from embedding methods or business logic within DTOs. Their role is to serve as straightforward data carriers without additional functionalities that could complicate their structure or purpose.
 
-## Dependency Injection
+### Dependency Injection
 
 - We prefer field injection using `@Autowired` over constructor injection. This avoids bloated constructors with many parameters and makes dependency injection more explicit through method parameters.
 - This means that it is important to manually check for and resolve circular dependencies. In general, the less dependencies a class has, the easier it is to reason about its behavior and the more maintainable it is.
 
-## Logging
+### Logging
 
 - Initialize a new logger of type `Logger` for each class.
 - Prefer structured logging (e.g. using `{}` placeholders) over traditional logging.
@@ -142,7 +140,7 @@ logging:
     com.slack.api: ERROR
 ```
 
-## Environment Variables
+### Environment Variables
 
 In Spring Boot, environment variables are found in the `application-{env}.yml` files. Which files are loaded depends on the current environment, which can be set via the `SPRING_PROFILES_ACTIVE` execution parameter or via CLI arguments.
 
@@ -163,7 +161,7 @@ export SPRING_PROFILES_ACTIVE="local"
 export github.auth.token="..."
 ```
 
-## Best Practices
+### Best Practices
 
 - **Avoid Transactional**: Use the `@Transactional` annotation sparingly. It is useful for operations that span multiple database queries, but is very performance-intensive and generally can be solved differently. Good read: https://codete.com/blog/5-common-spring-transactional-pitfalls/
 - **Format using Prettier**: We use Prettier as code formatter. The npm setup of the main Hephaestus folder can be used to format the Java code. The commands `npm run format:java:check` and `npm run format:java:write` can be used to check and format the Java code, respectively. Make sure to run these scripts regularly to avoid formatting issues. 
