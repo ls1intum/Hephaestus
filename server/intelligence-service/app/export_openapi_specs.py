@@ -1,6 +1,8 @@
+from app.settings import settings
+settings.IS_GENERATING_OPENAPI = True
+
 import yaml
 from fastapi.openapi.utils import get_openapi
-
 from app import main
 
 
