@@ -4,7 +4,9 @@ from langchain_core.prompts import ChatPromptTemplate
 from pydantic import BaseModel, Field
 
 from app.settings import settings
-from app.detector.prompts.pullrequest_badpractice_detector import BAD_PRACTICE_PROMPT_TEST
+from app.detector.prompts.pullrequest_badpractice_detector import (
+    BAD_PRACTICE_PROMPT_TEST,
+)
 from app.models import get_model
 
 ChatModel = get_model(settings.MODEL_NAME)
