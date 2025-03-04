@@ -52,6 +52,9 @@ springdoc:
 
 hephaestus:
     host-url: https://hephaestus.ase.cit.tum.de/
+
+    webapp:
+        url: ${CLIENT_HOST:http://localhost:4200}
     
     leaderboard:
         schedule:
@@ -74,7 +77,7 @@ hephaestus:
             # Eviction rate in milliseconds (1 hour)
             evict-rate: 3600000
     mail:
-        enabled: false
+        enabled: ${MAIL_ENABLED:false}
         sender: ${MAIL_SENDER:}
         signature: ${MAIL_SIGNATURE:}
 

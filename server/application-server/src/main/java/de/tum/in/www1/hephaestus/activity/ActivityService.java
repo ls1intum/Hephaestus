@@ -6,6 +6,7 @@ import de.tum.in.www1.hephaestus.gitprovider.issue.Issue;
 import de.tum.in.www1.hephaestus.gitprovider.pullrequest.PullRequest;
 import de.tum.in.www1.hephaestus.gitprovider.pullrequest.PullRequestRepository;
 import de.tum.in.www1.hephaestus.gitprovider.user.UserRepository;
+import de.tum.in.www1.hephaestus.notification.MailService;
 import jakarta.transaction.Transactional;
 import java.util.ArrayList;
 import java.util.List;
@@ -33,6 +34,9 @@ public class ActivityService {
 
     @Autowired
     private UserRepository userRepository;
+
+    @Autowired
+    private MailService mailService;
 
     public ActivityDTO getActivity(String login) {
         logger.info("Getting activity for user with login: {}", login);
@@ -95,6 +99,9 @@ public class ActivityService {
         List<PullRequestBadPractice> detectedBadPractices = pullRequestBadPracticeDetector.detectAndSyncBadPractices(
             pullRequest
         );
+
+        mailService.sendBadPracticesDetectedInPullRequestEmail(pullRequest.getAuthor(), pullRequest, detectedBadPractices);
+
         return detectedBadPractices.stream().map(PullRequestBadPracticeDTO::fromPullRequestBadPractice).toList();
     }
 }

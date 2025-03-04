@@ -46,9 +46,6 @@ public class UserService {
     @Autowired
     private PullRequestReviewInfoDTOConverter pullRequestReviewInfoDTOConverter;
 
-    @Autowired
-    private MailService mailService;
-
     @Transactional
     public Optional<UserProfileDTO> getUserProfile(String login) {
         logger.info("Getting user profile with login: " + login);
@@ -57,10 +54,6 @@ public class UserService {
         if (optionalUser.isEmpty()) {
             return Optional.empty();
         }
-
-        userRepository.findByLogin(login).ifPresent(user -> {
-            mailService.sendBadPracticesDetectedEmail(user, "badPractice");
-        });
 
         UserInfoDTO user = optionalUser.get();
         OffsetDateTime firstContribution = pullRequestRepository.firstContributionByAuthorLogin(login).orElse(null);

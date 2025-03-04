@@ -21,6 +21,9 @@ public class MailConfig {
     private final String signature;
 
     @Getter
+    private final String clientHost;
+
+    @Getter
     private final TemplateEngine templateEngine;
 
     @Autowired
@@ -28,21 +31,17 @@ public class MailConfig {
         @Value("${hephaestus.mail.sender}") InternetAddress sender,
         @Value("${hephaestus.mail.enabled}") boolean enabled,
         @Value("${hephaestus.mail.signature}") String mailSignature,
+        @Value("${hephaestus.webapp.url}") String clientHost,
         TemplateEngine templateEngine
     ) {
         this.enabled = enabled;
         this.sender = sender;
         this.signature = mailSignature;
+        this.clientHost = clientHost;
         this.templateEngine = templateEngine;
     }
 
     public boolean isEnabled() {
         return enabled;
-    }
-
-    public record MailConfigDto(String signature) {}
-
-    public MailConfigDto getConfigDto() {
-        return new MailConfigDto(Objects.requireNonNullElse(signature, ""));
     }
 }
