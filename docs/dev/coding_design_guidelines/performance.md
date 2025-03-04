@@ -1,8 +1,6 @@
-# Performance Optimization
-
 This section contains guidelines for optimizing the performance of the Hephaestus application. Performance is a critical aspect of the user experience and should be considered at all stages of development.
 
-## General Performance Principles
+### General Performance Principles
 
 1. **Minimize network requests**: Reduce the number of HTTP requests by bundling resources, using caching, and optimizing API calls.
 2. **Optimize data transfer**: Only transfer the data that is needed for the current operation.
@@ -10,9 +8,9 @@ This section contains guidelines for optimizing the performance of the Hephaestu
 4. **Implement caching**: Use caching strategies to avoid redundant computations and data fetching.
 5. **Optimize database queries**: Write efficient database queries that retrieve only the necessary data and use appropriate indexes.
 
-## Specific Optimization Techniques
+### Specific Optimization Techniques
 
-### Frontend Optimizations
+#### Frontend Optimizations
 
 - Use lazy loading for components and modules that are not immediately needed
 - Implement virtual scrolling for large lists
@@ -20,7 +18,7 @@ This section contains guidelines for optimizing the performance of the Hephaestu
 - Use memoization for expensive computations
 - Implement proper state management to avoid unnecessary re-renders
 
-### Backend Optimizations
+#### Backend Optimizations
 
 - Use connection pooling for database connections
 - Implement caching for frequently accessed data
