@@ -1,0 +1,31 @@
+name: Deploy to Staging
+
+on:
+  workflow_dispatch:
+    inputs:
+      branch_name:
+        description: "Which branch to deploy"
+        required: false
+        type: string
+      commit_sha:
+        description: 'Commit SHA to deploy'
+        required: true
+      environment_name:
+        description: "Which environment to deploy (e.g. environment defined in GitHub)"
+        required: true
+        type: string
+      triggered_by:
+        description: "Username that triggered deployment (not required, shown if triggered via GitHub UI, logged if triggered via GitHub app)"
+        required: false
+        type: string
+
+jobs:  
+  deploy-app:
+    uses: ls1intum/.github/.github/workflows/deploy-docker-compose.yml@main
+    with:
+      environment: ${{ inputs.environment_name }}
+      docker-compose-file: "./docker/compose.app.yaml"
+      main-image-name: ls1intum/hephaestus/application-server
+      image-tag: ${{ inputs.commit_sha }}
+      deployment-base-path: "/opt/hephaestus/app"
+    secrets: inherit
