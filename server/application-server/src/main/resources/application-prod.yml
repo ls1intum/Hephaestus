@@ -28,7 +28,10 @@ spring:
 
 hephaestus:
     host-url: ${APPLICATION_HOST_URL}
-    
+
+    webapp:
+        url: ${APPLICATION_HOST_URL}
+
     leaderboard:
       schedule:
         day: ${LEADERBOARD_SCHEDULE_DAY:2}
