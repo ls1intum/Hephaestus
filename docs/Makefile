@@ -4,9 +4,10 @@
 # You can set these variables from the command line, and also
 # from the environment for the first two.
 SPHINXAUTOBUILD = sphinx-autobuild
+
 ALLSPHINXLIVEOPTS = $(ALLSPHINXOPTS) -q \
    --port 0 \
-   --host 0.0.0.0 \
+   --host 127.0.0.1 \
    --open-browser \
    --delay 1 \
    --ignore "*.swp" \

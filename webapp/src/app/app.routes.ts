@@ -13,6 +13,7 @@ import { PrivacyComponent } from '@app/legal/privacy.component';
 import { AdminGuard } from '@app/core/security/admin.guard';
 import { AuthGuard } from '@app/core/security/auth.guard';
 import { MentorGuard } from '@app/core/security/mentor.guard';
+import { ActivityDashboardComponent } from '@app/home/activity/activity-dashboard.component';
 
 export const routes: Routes = [
   // Public routes
@@ -46,5 +47,6 @@ export const routes: Routes = [
   { path: 'user/:id', component: UserProfileComponent, canActivate: [AuthGuard] },
   { path: 'settings', component: SettingsComponent, canActivate: [AuthGuard] },
   { path: 'mentor', component: MentorComponent, canActivate: [AuthGuard, MentorGuard] },
-  { path: 'workspace', component: WorkspaceComponent, canActivate: [AuthGuard, AdminGuard] }
+  { path: 'workspace', component: WorkspaceComponent, canActivate: [AuthGuard, AdminGuard] },
+  { path: 'user/:id/activity', component: ActivityDashboardComponent, canActivate: [AuthGuard, AdminGuard] }
 ];
