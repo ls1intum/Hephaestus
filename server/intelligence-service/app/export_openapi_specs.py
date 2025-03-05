@@ -1,4 +1,5 @@
 from app.settings import settings
+
 settings.IS_GENERATING_OPENAPI = True
 
 import yaml
