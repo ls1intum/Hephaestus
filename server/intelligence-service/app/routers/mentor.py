@@ -1,11 +1,20 @@
 from typing import List
 from fastapi import APIRouter
 from pydantic import BaseModel
+from langfuse.callback import CallbackHandler
 from langchain_core.runnables.config import RunnableConfig
-from ..mentor.run import run, start_session
 
+from app.settings import settings
+from app.mentor.run import run, start_session
 
 router = APIRouter(prefix="/mentor", tags=["mentor"])
+
+
+callbacks: List[CallbackHandler] = []
+if settings.langfuse_enabled:
+    langfuse_handler = CallbackHandler()
+    langfuse_handler.auth_check()
+    callbacks.append(langfuse_handler)
 
 
 class MentorStartRequest(BaseModel):
@@ -49,7 +58,9 @@ def start(request: MentorStartRequest):
     summary="Continue a chat session with an LLM.",
 )
 def generate(request: MentorRequest):
-    config = RunnableConfig({"configurable": {"thread_id": request.session_id}})
+    config = RunnableConfig(
+        configurable={"thread_id": request.session_id}, callbacks=callbacks
+    )
     response = run(request.content, config)
     response_message = response["messages"][-1].content
     return MentorResponse(content=response_message, closed=response["closed"])
