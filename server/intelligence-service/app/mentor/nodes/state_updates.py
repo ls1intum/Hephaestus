@@ -4,7 +4,8 @@ from ...model import model
 from ..prompt_loader import PromptLoader
 
 prompt_loader = PromptLoader()
-#TODO: delete prints
+# TODO: delete prints
+
 
 def check_state(state: State):
     print(
