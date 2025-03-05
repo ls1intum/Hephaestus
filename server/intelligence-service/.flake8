@@ -5,3 +5,6 @@ exclude =
     __pycache__,
     .idea
     .venv
+
+per-file-ignores =
+    app/export_openapi_specs.py: E402

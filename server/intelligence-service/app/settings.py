@@ -47,14 +47,17 @@ class Settings(BaseSettings):
     LANGFUSE_PUBLIC_KEY: str = ""
     LANGFUSE_SECRET_KEY: str = ""
     LANGFUSE_HOST: str = ""
-    
+
     # Add a flag for OpenAPI generation mode
     IS_GENERATING_OPENAPI: bool = False
 
     @property
     def langfuse_enabled(self):
         return bool(
-            self.LANGFUSE_PUBLIC_KEY and self.LANGFUSE_SECRET_KEY and self.LANGFUSE_HOST and not self.IS_GENERATING_OPENAPI
+            self.LANGFUSE_PUBLIC_KEY
+            and self.LANGFUSE_SECRET_KEY
+            and self.LANGFUSE_HOST
+            and not self.IS_GENERATING_OPENAPI
         )
 
 
