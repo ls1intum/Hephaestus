@@ -10,7 +10,7 @@ Before you can build Hephaestus, you must install and configure the following de
 2. [PostgreSQL 16](https://www.postgresql.org/): Hephaestus uses [Hibernate](https://hibernate.org/) to store entities in an SQL database and [Liquibase](https://www.liquibase.com/) to automatically apply schema transformations when updating the server. (No installation required since we use Docker)
 3. [Node.js](https://nodejs.org/en/download): We use Node LTS (>=22.10.0 < 23) to compile and run our Hephaestus Application Client based on [Angular](https://angular.dev/). Depending on your system, you can install Node either from source or as a pre-packaged bundle.
 4. [Npm](https://nodejs.org/en/download): We use Npm (>=10.8.0) to manage client side dependencies. Npm is typically bundled with Node.js, but can also be installed separately.
-5. [Python](https://www.python.org/downloads/): We use Python (>=3.12) to develop and run our Hephaestus Intelligence Service.
+5. [Python](https://www.python.org/downloads/): We use Python (>=3.13) to develop and run our Hephaestus Intelligence Service.
 6. [Docker Desktop](https://www.docker.com/products/docker-desktop): We use Docker to containerize our application and run it in a consistent environment across different machines as well as for spinning up a PostgreSQL database, [Keycloak](https://www.keycloak.org/), and [NATS](https://nats.io/) server for local development.
 7. (Optional) [NATS-cli](https://github.com/nats-io/natscli) for interacting with the [NATS](https://nats.io/) server. Comes in handy for debugging and testing when working with the NATS server.
 

@@ -9,7 +9,8 @@ Detect and identify any bad practices in the provided pull request title and des
 - For each detected bad practice, provide a title and a brief description of the issue.
 - Check the list of existing bad practices and add any new bad practices to the list.
 - If the same bad practice is detected multiple times, return it consistently in the same way.
-- Check each existing bad practice. If a bad practice was resolved, meaning it is no longer present in the title or description, mark it as resolved.
+- Check each existing bad practice. If a bad practice was resolved, meaning it is no longer present in the title or \
+description, mark it as resolved.
 - If a bad practice was marked as resolved, but is detected again, mark it as detected again.
 - Return a list of all detected and all resolved bad practices in the pull request.
 

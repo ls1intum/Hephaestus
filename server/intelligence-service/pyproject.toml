@@ -1,33 +1,43 @@
 [project]
 name = "intelligence-service"
-version = "0.2.0"
+version = "0.3.1"
 description = "A FastAPI service for interfacing with machine learning models."
 authors = [
     { name = "Felix T.J. Dietrich", email = "felixtj.dietrich@tum.de"},
     { name = "milenasrb", email = "mi.serbinova@gmail.com"}
 ]
 readme = "README.md"
-requires-python = ">=3.12,<4.0.0"
+requires-python = ">=3.13,<4.0.0"
 
 dependencies = [
-    "fastapi[standard] == 0.115.6",
-    "pydantic-settings == 2.6.1",
-    "langchain == 0.3.10",
-    "langchain-openai == 0.2.11",
-    "langgraph == 0.2.56",
-    "langchain-community == 0.3.10",
-    "langgraph-checkpoint-postgres (>=2.0.8,<3.0.0)",
-    "langchain-postgres (>=0.0.12,<0.1.0)",
-    "psycopg-pool (>=3.2.4,<4.0.0)",
-    "ipython (>=8.31.0,<9.0.0)",
-    "psycopg[binary,c] (>=3.2.4,<4.0.0)",
+    "fastapi[standard] == 0.115.9",
+    "pydantic-settings == 2.8.1",
+    "langchain == 0.3.19",
+    "langchain-core == 0.3.40",
+    "langchain-openai == 0.3.7",
+    "langchain-ollama == 0.2.3",
+    "langchain-community == 0.3.18",
+    "langchain-postgres == 0.0.12",
+    "langgraph == 0.3.2",
+    "langgraph-checkpoint-postgres == 2.0.8",
+    "langsmith == 0.3.11",
+    "langfuse == 2.59.6",
+    "psycopg-pool == 3.2.4",
+    "ipython == 8.31.0",
+    "psycopg[binary,c] == 3.2.4",
 ]
 
 [tool.poetry]
-package-mode = false
+packages = [
+    { include = "app" }
+]
+
+[tool.poetry.scripts]
+openapi = "app.export_openapi_specs:run"
 
 [tool.poetry.group.dev.dependencies]
-black = "24.10.0"
+black = "25.1.0"
+flake8 = "7.1.2"
 
 [virtualenvs]
 create = true

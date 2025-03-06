@@ -2,14 +2,9 @@
 
 These guidelines are intended to help maintain a consistent coding style and architectural design across the Hephaestus codebase. We distinguish between these main areas:
 
-```{toctree}
-:includehidden:
-:maxdepth: 1
-
-performance
-server
-client
-database
+```{contents}
+:local:
+:depth: 2
 ```
 
 
@@ -45,3 +40,21 @@ When proposing changes to the guidelines, please consider the following:
 4. The alignment with industry best practices
 
 
+## Performance
+
+```{include} performance.md
+```
+
+## Server
+
+```{include} server.md
+```
+
+## Client
+
+```{include} client.md
+```
+
+## Database
+
+```{include} database.md

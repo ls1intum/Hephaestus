@@ -4,8 +4,8 @@ from langgraph.checkpoint.postgres import PostgresSaver
 from langgraph.store.postgres import PostgresStore
 from langchain_core.messages import HumanMessage
 
-from .state import State
-from ..settings import settings
+from app.mentor.state import State
+from app.settings import settings
 
 from .conditions import (
     start_router,

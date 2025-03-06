@@ -8,7 +8,7 @@ A FastAPI service for interfacing with machine learning models.
 
 ### Prerequisites
 
-- **Python 3.12**
+- **Python 3.13**
 - **Poetry** for dependency management
 - **Docker** for containerization
 

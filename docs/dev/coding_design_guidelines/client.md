@@ -1,8 +1,6 @@
-# Client
-
 This section contains guidelines for designing the client-side of the application. The client is built using modern web technologies and follows best practices for performance, accessibility, and user experience.
 
-## Client-Side Data Handling
+### Client-Side Data Handling
 
 When working with data from the server, the client should use the auto-generated TypeScript interfaces from the OpenAPI specification. This ensures type safety and consistency between the client and server.
 

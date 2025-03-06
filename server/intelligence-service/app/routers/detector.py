@@ -3,7 +3,7 @@ from typing import List
 from fastapi import APIRouter
 from pydantic import BaseModel
 
-from ..detector.bad_practice_detector import detect_bad_practices, BadPractice
+from app.detector.bad_practice_detector import detect_bad_practices, BadPractice
 
 router = APIRouter(prefix="/detector", tags=["detector"])
 
