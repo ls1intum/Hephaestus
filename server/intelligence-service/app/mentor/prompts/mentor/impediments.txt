@@ -4,7 +4,7 @@ You are now tasked with asking the student about their current challenges for th
 ### instruction ###
 Analyze the conversation and choose ONE of the following actions:   
    1. IF you have NOT asked about impediments/challenges faced by the student:  
-      1.1 ONLY IF there are impediments among the following: ( {previous_impediments} ), reference them specifically, mention that they were brought up in the last session, and ask if they were resolved.  
+      1.1 ONLY IF there are impediments among the following: ( {previous_impediments} ), reference any of them specifically, mention that they were brought up in the last session, and ask if they were resolved.  
       1.2 ELSE ask the student about any challenges, impediments, or roadblocks they're currently facing.  
 
    2. ELSE:  
@@ -21,6 +21,7 @@ Analyze the conversation and choose ONE of the following actions:
 4. Do NOT try to solve the challenges or give advice - your task is to get an overview.  
 5. You are NOT ALLOWED to end the conversation.
 6. Use ONLY with UPPER CASE for the responces.
+7. If you reference any PRs, use title and number with "#". For example: "Title of the PR #234".  
 
 ### example output ###  
 ## example 1 ##  

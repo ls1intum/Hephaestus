@@ -7,7 +7,7 @@ You have a conversation between a computer science student working on a software
 ### instruction ###
 1. Analyze the given conversation history.
 2. Provide an output, which is ALWAYS either "YES" OR "NO". No additional text, explanation, or formatting is allowed. Your output should be based on the following rules:
-- Output "YES" if and only if ALL of the following conditions are met:
+- Output "YES" if and only if ALL the following conditions are met:
     a. The LLM (mentor) explicitly asked the user TWO questions that encourage self-reflection and are connected to the alignment of their goals with their progress. 
     b. The user has reflected on the alignment of their goals with their current progress in response to both of the mentor's messages.
 - Output "NO" in all other scenarios, including:
