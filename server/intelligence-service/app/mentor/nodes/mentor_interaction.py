@@ -1,9 +1,9 @@
 from ..state import State
 from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
-from ...model import get_model
+from app.models import get_model
 from langgraph.store.base import BaseStore
 from ..prompt_loader import PromptLoader
-from ..settings import settings
+from app.settings import settings
 
 prompt_loader = PromptLoader()
 persona_prompt = prompt_loader.get_prompt(type="mentor", name="persona")

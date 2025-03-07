@@ -1,5 +1,6 @@
 from ..state import State
-from ...model import model
+from app.models import get_model
+from app.settings import settings
 from ..prompt_loader import PromptLoader
 from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
 from uuid import uuid4
@@ -8,7 +9,8 @@ from langgraph.store.base import BaseStore
 
 
 prompt_loader = PromptLoader()
-
+ChatModel = get_model(settings.MODEL_NAME)
+model = ChatModel(temperature=0.7, max_tokens=4096)
 
 # updating the long-term session memory with the sprint progress: impediments and promises
 def update_memory(state: State, config: RunnableConfig, *, store: BaseStore):
@@ -29,7 +31,7 @@ def update_memory(state: State, config: RunnableConfig, *, store: BaseStore):
             ]
         )
 
-        chain = prompt | model
+        chain = prompt | get_model()
         response = chain.invoke({"messages": state["messages"]}).content
         store.put(namespace, key=str(uuid4()), value={step: response})
 

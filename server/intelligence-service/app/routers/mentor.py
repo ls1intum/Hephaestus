@@ -2,8 +2,8 @@ from fastapi import APIRouter
 from pydantic import BaseModel
 from langfuse.callback import CallbackHandler
 from langchain_core.runnables.config import RunnableConfig
-
 from app.settings import settings
+from typing import List
 from app.mentor.run import run, start_session
 
 router = APIRouter(prefix="/mentor", tags=["mentor"])
