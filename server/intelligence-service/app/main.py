@@ -3,6 +3,7 @@ from fastapi import FastAPI
 from app.routers.mentor import router as mentor_router
 from app.routers.health import router as health_router
 from app.routers.detector import router as detector_router
+from app.routers.analyzer import router as analyzer_router
 
 app = FastAPI(
     title="Hephaestus Intelligence Service API",
@@ -14,3 +15,4 @@ app = FastAPI(
 app.include_router(mentor_router)
 app.include_router(health_router)
 app.include_router(detector_router)
+app.include_router(analyzer_router)
