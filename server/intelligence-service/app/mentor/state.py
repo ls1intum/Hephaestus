@@ -1,11 +1,6 @@
 from langgraph.graph.message import add_messages
 from typing_extensions import Annotated, TypedDict
 
-"""
-    State is a dictionary that saves conversation-related information, which is used for step routing and response generation.
-    The state is updated as the conversation progresses.   
-"""
-
 
 class State(TypedDict):
     last_thread: str  # id of the last conversation to integrate long-term memory
