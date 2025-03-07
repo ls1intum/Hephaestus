@@ -8,21 +8,9 @@ prompt_loader = PromptLoader()
 
 ChatModel = get_model(settings.MODEL_NAME)
 model = ChatModel(temperature=0.7, max_tokens=4096)
-# TODO: delete prints
 
 
 def check_state(state: State):
-    print(
-        "State before the update: "
-        + ", ".join(
-            [
-                f"{k}: {v}"
-                for k, v in state.items()
-                if k != "messages" and k != "dev_progress"
-            ]
-        )
-        + "\n"
-    )
     if state["closed"] or state["finish"] or state["goal_reflection"]:
         # closed (finished) session state does not need to be updated
         # when goal reflection is active, state is updated in the check_goal_reflection node
@@ -36,10 +24,8 @@ def check_state(state: State):
     if state["development"] or state["goal_setting"]:
         # call dev_progress node only if there is development progress to show
         if state["dev_progress"] == "":
-            print("development: false, goal_setting: false, status: true")
             return {"goal_setting": False, "development": False, "status": True}
         else:
-            print("goal_setting: false, development: true")
             return {"goal_setting": False, "development": True}
 
     step_order = [
@@ -72,11 +58,9 @@ def check_state(state: State):
         step_index = step_order.index(step)
         if step_index < len(step_order) - 1:
             next_step = step_order[step_index + 1]
-            print(step + " -> " + next_step)
             return {step: False, next_step: True}
         else:
             # if on the last step, mark as closed
-            print("finish: false, closed: true")
             return {"finish": False, "closed": True}
 
     return

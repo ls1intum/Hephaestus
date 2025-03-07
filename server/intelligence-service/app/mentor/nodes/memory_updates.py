@@ -60,18 +60,16 @@ def set_goals(state: State, *, store: BaseStore):
 
 
 def adjust_goals(state: State, *, store: BaseStore):
-    print("i am in adjust goals")
     user_id = state["user_id"]
     namespace = (user_id, "goals")
-    # TODO: check the position of the goal in the list
     goals = store.search(namespace)
     if not goals:
         goals = ""
     else:
         for item in goals:
-            print(item)
             if "goal_list" in item.value:
                 goals = item.value["goal_list"]
+                break
 
     prompt = ChatPromptTemplate(
         [

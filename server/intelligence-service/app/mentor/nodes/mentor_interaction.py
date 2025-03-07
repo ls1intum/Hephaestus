@@ -172,7 +172,6 @@ def ask_goals(state: State):
 
 
 def reflect_goals(state: State, store: BaseStore):
-    print("I am in reflect_goals")
     user_id = state["user_id"]
     namespace = (user_id, "goals")
     goals = store.search(namespace)
