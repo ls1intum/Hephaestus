@@ -1,7 +1,7 @@
-<div hlmCard class="flex divide-y-[1px] gap-1 flex-col px-5 py-2 ">
+<div hlmCard class="flex divide-y-[1px] gap-1 flex-col px-5 py-2">
   @for (pr of pullRequests(); track pr.number) {
     <div class="flex gap-4 items-center py-1">
-      <a 
+      <a
         class="flex gap-2 items-center"
         [class.text-github-muted-foreground]="pr.isDraft"
         [class.text-github-done-foreground]="pr.isMerged"
