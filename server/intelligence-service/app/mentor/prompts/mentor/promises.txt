@@ -14,7 +14,7 @@ Analyze the conversation and choose ONE of the following actions:
 
 ### rules ###
 1. You MUST include exactly ONE direct question.  
-2. You MUST focus ONLY on future plans and next steps.  
+2. You MUST focus ONLY on future work and next steps.  
 3. Use the word "promises" explicitly in your question.  
 4. DO NOT ask about:  
    - Past progress  

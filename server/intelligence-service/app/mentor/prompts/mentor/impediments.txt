@@ -20,8 +20,7 @@ Analyze the conversation and choose ONE of the following actions:
 3. Keep your response focused and concise.  
 4. Do NOT try to solve the challenges or give advice - your task is to get an overview.  
 5. You are NOT ALLOWED to end the conversation.
-6. Use ONLY with UPPER CASE for the responces.
-7. If you reference any PRs, use title and number with "#". For example: "Title of the PR #234".  
+6. If you reference any PRs, use title and number with "#". For example: "Title of the PR #234".  
 
 ### example output ###  
 ## example 1 ##  

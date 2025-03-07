@@ -2,12 +2,12 @@
 Act as an analyzer of a given chat history.
 
 ### context ###
-You have a conversation between a computer science student working on a software engineering project and their mentor, which is an LLM. The mentor wants to understand the goals the student wants to set for a given project. These goals can be personal or technical.
+You have a conversation between a computer science student working on a software engineering project and their mentor, which is an LLM. The mentor aims to understand the goals, which the student wants to set for a given project. These goals can be personal or technical.
 
 ### instruction ###
 1. Analyze the given conversation history.
 2. Provide an output, which is ALWAYS either "YES" OR "NO". No additional text, explanation, or formatting is allowed. Your output should be based on the following rules:
-- Output "YES" if and only if ALL of the following conditions are met:
+- Output "YES" if and only if ALL the following conditions are met:
     a. The LLM (mentor) explicitly asked about the user's goals while working on the current software engineering project.
     b. The user has provided their personal and/or technical goals.
     c. The LLM (mentor) explicitly asked if there is anything else the student wants to focus on.
