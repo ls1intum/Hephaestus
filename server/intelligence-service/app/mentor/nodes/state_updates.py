@@ -16,10 +16,9 @@ def check_state(state: State):
         # when goal reflection is active, state is updated in the check_goal_reflection node
         return
 
-    if state["goal_setting"]:
-        if state["last_thread"] == "":
-            # first conversation with mentor, state is updated in the check_goals node
-            return
+    if state["goal_setting"] and state["last_thread"] == "":
+        # first conversation with mentor, state is updated in the check_goals node
+        return
 
     if state["development"] or state["goal_setting"]:
         # call dev_progress node only if there is development progress to show
@@ -66,7 +65,7 @@ def check_state(state: State):
     return
 
 
-# decides on wether the goal setting process is finished
+# decides on whether the goal setting process is finished
 def check_goals(state: State):
     prompt = ChatPromptTemplate(
         [
@@ -89,7 +88,7 @@ def check_goals(state: State):
     return
 
 
-# decides on wether the goal reflection process is finished
+# decides on whether the goal reflection process is finished
 def check_goal_reflection(state: State):
     prompt = ChatPromptTemplate(
         [
