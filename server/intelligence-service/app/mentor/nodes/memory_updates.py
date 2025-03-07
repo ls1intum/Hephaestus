@@ -12,6 +12,7 @@ prompt_loader = PromptLoader()
 ChatModel = get_model(settings.MODEL_NAME)
 model = ChatModel(temperature=0.7, max_tokens=4096)
 
+
 # updating the long-term session memory with the sprint progress: impediments and promises
 def update_memory(state: State, config: RunnableConfig, *, store: BaseStore):
     session_id = config["configurable"]["thread_id"]
