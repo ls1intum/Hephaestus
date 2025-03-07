@@ -32,7 +32,7 @@ def update_memory(state: State, config: RunnableConfig, *, store: BaseStore):
             ]
         )
 
-        chain = prompt | get_model()
+        chain = prompt | model
         response = chain.invoke({"messages": state["messages"]}).content
         store.put(namespace, key=str(uuid4()), value={step: response})
 

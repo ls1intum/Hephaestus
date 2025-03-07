@@ -115,9 +115,6 @@ export class MentorComponent {
         .pipe(take(1))
         .subscribe((session) => {
           this.lastSessionClosed.set(session.isClosed);
-          if (session.isClosed) {
-            this.selectedSessionClosed();
-          }
         });
     },
     onError: (err, newTodo, context) => {

@@ -83,7 +83,6 @@ def ask_status(state: State, store: BaseStore):
 
 
 def ask_impediments(state: State, store: BaseStore):
-    print("I am in ask_impediments")
     previous_session_id = state["last_thread"]
     progress = state["dev_progress"]
     previous_impediments = ""
