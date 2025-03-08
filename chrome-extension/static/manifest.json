@@ -11,10 +11,21 @@
         "default_popup": "index.html"
     },
     "permissions": [
+        "identity",
+        "tabs",
+        "activeTab",
         "scripting"
     ],
     "host_permissions": [
         "https://*/*",
         "http://*/*"
-    ]
+    ],
+    "web_accessible_resources": [{
+        "resources": ["silent-check-sso.html"],
+        "matches": ["*://*/*"]
+    }],
+    "oauth2": {
+        "client_id": "hephaestus",
+        "scopes": ["openid", "email"]
+    }
 }
