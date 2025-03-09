@@ -103,6 +103,15 @@
               "clientRole": false,
               "containerId": "69732d45-1431-4909-9335-9f39e304f823",
               "attributes": {}
+            },
+            {
+                "id": "af3b75a2-9733-44e5-bdc3-1e3e32459743",
+                "name": "notification_access",
+                "description": "",
+                "composite": false,
+                "clientRole": false,
+                "containerId": "69732d45-1431-4909-9335-9f39e304f823",
+                "attributes": {}
             }
         ],
         "client": {
@@ -457,6 +466,29 @@
     "webAuthnPolicyPasswordlessAcceptableAaguids": [],
     "webAuthnPolicyPasswordlessExtraOrigins": [],
     "users": [
+        {
+            "id": "d7b8cea0-f9f6-43df-8a27-eb9a18fb87cb",
+            "username": "service-account-hephaestus-confidential",
+            "emailVerified": false,
+            "createdTimestamp": 1741338840502,
+            "enabled": true,
+            "totp": false,
+            "serviceAccountClientId": "hephaestus-confidential",
+            "disableableCredentialTypes": [],
+            "requiredActions": [],
+            "realmRoles": [
+                "default-roles-hephaestus"
+            ],
+            "clientRoles": {
+                "realm-management": [
+                    "view-users",
+                    "query-users",
+                    "manage-users"
+                ]
+            },
+            "notBefore": 0,
+            "groups": []
+        },
         {
             "id": "9d394368-150d-4559-b005-758a50cbb353",
             "username": "admin",

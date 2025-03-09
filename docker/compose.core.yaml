@@ -372,7 +372,8 @@ configs:
               "description": "Administrator privileges",
               "composites": {
                 "realm": [
-                  "mentor_access"
+                  "mentor_access",
+                  "notification_access"
                 ]
               }
             },
@@ -380,6 +381,8 @@ configs:
               "name": "mentor_access",
               "description": "Access to AI Mentor"
             },
+            { "name": "notification_access",
+              "description": "Get notification emails"
             {
               "name": "offline_access",
               "description": "${role_offline-access}",
@@ -417,5 +420,29 @@ configs:
           "description": "${role_default-roles}",
           "composite": true,
           "clientRole": false
-        }
+        },
+        "users": [
+          {
+              "id": "d7b8cea0-f9f6-43df-8a27-eb9a18fb87cb",
+              "username": "service-account-hephaestus-confidential",
+              "emailVerified": false,
+              "createdTimestamp": 1741338840502,
+              "enabled": true,
+              "totp": false,
+              "serviceAccountClientId": "hephaestus-confidential",
+              "disableableCredentialTypes": [],
+              "requiredActions": [],
+              "realmRoles": [
+                  "default-roles-hephaestus"
+              ],
+              "clientRoles": {
+                  "realm-management": [
+                      "view-users",
+                      "query-users",
+                      "manage-users"
+                  ]
+              },
+              "notBefore": 0,
+              "groups": []
+          }]
       }

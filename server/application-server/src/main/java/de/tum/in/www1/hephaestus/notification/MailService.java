@@ -7,6 +7,7 @@ import de.tum.in.www1.hephaestus.gitprovider.user.UserService;
 import java.util.List;
 
 import org.keycloak.admin.client.Keycloak;
+import org.keycloak.representations.idm.UserRepresentation;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -39,7 +40,12 @@ public class MailService {
         logger.info("Sending bad practice detected email to user: " + user.getLogin());
         if (!user.getLogin().equals("iam-flo")) return;
 
-        String email = keycloak.realm(realm).users().searchByUsername(user.getLogin(), true).getFirst().getEmail();
+        UserRepresentation keyCloakUser = keycloak.realm(realm).users().searchByUsername(user.getLogin(), true).getFirst();
+        String email = keyCloakUser.getEmail();
+        if (!keyCloakUser.getRealmRoles().contains("notification_access")) {
+            logger.info("User {} does not have the notification_access role. Skipping email.", user.getLogin());
+            return;
+        }
 
         MailBuilder mailBuilder = new MailBuilder(mailConfig, user, email, "Bad Practices detected in your pull request", "bad-practices-detected");
         mailBuilder
