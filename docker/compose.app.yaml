@@ -61,7 +61,7 @@ services:
       DATABASE_PASSWORD: root
       INTELLIGENCE_SERVICE_URL: http://intelligence-service:5000
       NATS_SERVER: nats://nats-server:4222
-      KEYCLOAK_URL: http://keycloak:8080
+      KEYCLOAK_URL: https://${APP_HOSTNAME}/keycloak
       KEYCLOAK_REALM: hephaestus
       KEYCLOAK_CLIENT_ID: hephaestus-confidential
       KEYCLOAK_CLIENT_SECRET: ${KEYCLOAK_HEPHAESTUS_CONFIDENTIAL_CLIENT_SECRET}
