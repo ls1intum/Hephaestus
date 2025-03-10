@@ -383,6 +383,7 @@ configs:
             },
             { "name": "notification_access",
               "description": "Get notification emails"
+            },
             {
               "name": "offline_access",
               "description": "${role_offline-access}",
