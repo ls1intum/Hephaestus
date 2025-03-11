@@ -16,6 +16,8 @@ spring:
   mail:
     host: ${POSTFIX_HOST:localhost}
     port: ${POSTFIX_PORT:25}
+    username: ${POSTFIX_USERNAME:}
+    password: ${POSTFIX_PASSWORD:}
     properties:
       mail:
         transport:
