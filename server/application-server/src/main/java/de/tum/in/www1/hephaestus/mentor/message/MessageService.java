@@ -82,10 +82,8 @@ public class MessageService {
             mentorStartRequest.setSessionId(String.valueOf(session.getId()));
             mentorStartRequest.setDevProgress(devProgress);
             mentorStartRequest.setUserId(String.valueOf(session.getUser().getId()));
-            System.out.println("Sending first message for session " + session.getId());
             MentorResponse mentorMessage = intelligenceServiceApi.startMentorStartPost(mentorStartRequest);
             createMentorMessage(session, mentorMessage.getContent());
-            System.out.println("First message sent for session " + session.getId());
         } catch (Exception e) {
             logger.error("Failed to generate response during session start");
         }
@@ -96,11 +94,9 @@ public class MessageService {
         systemMessage.setSender(MessageSender.MENTOR);
         systemMessage.setContent(systemResponse);
         systemMessage.setSession(currentSession);
-        System.out.println("Creating mentor message for session " + currentSession.getId());
         Message savedSystemMessage = messageRepository.save(systemMessage);
         currentSession.getMessages().add(savedSystemMessage);
         sessionRepository.save(currentSession);
-        System.out.println("Mentor message created for session " + currentSession.getId());
         return savedSystemMessage;
     }
 }

@@ -59,7 +59,6 @@ public class SessionService {
         } catch (Exception e) {
             return null;
         }
-        System.out.println("Creating session for user " + user.getLogin());
 
         Session previousSession = sessionRepository.findFirstByUserOrderByCreatedAtDesc(user).orElse(null);
         // close the previous session if it exists to prevent multiple open sessions
@@ -68,8 +67,6 @@ public class SessionService {
             sessionRepository.save(previousSession);
         }
         String previousSessionId = previousSession != null ? previousSession.getId().toString() : "";
-
-        System.out.println("Previous session ID: " + previousSessionId);
 
         // get the last time interval's PRs
         List<PullRequestBaseInfoDTO> pullRequests = pullRequestRepository
@@ -83,14 +80,10 @@ public class SessionService {
             .toList();
         String devProgress = formatPullRequests(pullRequests);
 
-        System.out.println("Dev progress: " + devProgress);
-
         Session session = new Session();
         session.setUser(user);
         Session savedSession = sessionRepository.save(session);
         messageService.sendFirstMessage(session, previousSessionId, devProgress);
-
-        System.out.println("Session created with ID " + savedSession.getId());
 
         return SessionDTO.fromSession(savedSession);
     }

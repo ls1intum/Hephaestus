@@ -80,20 +80,11 @@ def start_session(last_thread: str, user_id: str, dev_progress: str, config):
         max_size=20,
         kwargs=connection_kwargs,
     ) as pool:
-        print("pool setup")
         checkpointer = PostgresSaver(pool)
-        print("checkpointer setup 1")
-        try:
-            checkpointer.setup()
-            print("checkpoint setup")
-        except Exception as e:
-            print(f"Error during checkpointer setup: {e}")
-        print("checkpoint setup 2")
+        checkpointer.setup()
         with PostgresStore.from_conn_string(
             settings.DATABASE_CONNECTION_STRING
         ) as store:
-            
-            print("store setup")
             store.setup()
             graph = graph_builder.compile(checkpointer=checkpointer, store=store)
 
@@ -127,23 +118,16 @@ def run(message: str, config):
         max_size=20,
         kwargs=connection_kwargs,
     ) as pool:
-        print("pool setup")
         checkpointer = PostgresSaver(pool)
-        print("checkpointer created")
         checkpointer.setup()
-        print("checkpoint setup")
 
         with PostgresStore.from_conn_string(
             settings.DATABASE_CONNECTION_STRING
         ) as store:
-            print("store setup")
             store.setup()
-            print("store setup 2")
             graph = graph_builder.compile(checkpointer=checkpointer, store=store)
-            print("graph setup")
             # update the state with the new message (the rest of the state is preserved by the checkpointer)
             result = graph.invoke({"messages": [HumanMessage(content=message)]}, config)
-            print("graph invoked")
 
         pool.close()
         return result
