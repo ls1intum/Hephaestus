@@ -25,22 +25,24 @@
           <span class="text-sm text-muted-foreground">Leaderboard ends in:</span>
         </div>
         <span class="text-xl font-medium">{{ leaderboardTimeUntilEnd() }}</span>
-        <div class="flex items-center gap-1 mt-1 text-sm">
+        <div class="flex flex-wrap items-center justify-center gap-1 mt-1 text-sm">
           <span class="text-muted-foreground">League points change:</span>
-          @if (leagueChangeQuery.isSuccess()) {
-            @let change = leagueChangeQuery.data();
-            <span class="font-medium">{{ change }}</span>
-            @if (change > 0) {
-              <ng-icon name="lucideTrendingUp" />
-            } @else if (change < 0) {
-              <ng-icon name="lucideTrendingDown" />
+          <div class="flex items-center gap-1">
+            @if (leagueChangeQuery.isSuccess()) {
+              @let change = leagueChangeQuery.data();
+              <span class="font-medium">{{ change }}</span>
+              @if (change > 0) {
+                <ng-icon name="lucideTrendingUp" />
+              } @else if (change < 0) {
+                <ng-icon name="lucideTrendingDown" />
+              } @else {
+                <ng-icon name="lucideMoveRight" />
+              }
             } @else {
+              <span class="font-medium">0</span>
               <ng-icon name="lucideMoveRight" />
             }
-          } @else {
-            <span class="font-medium">0</span>
-            <ng-icon name="lucideMoveRight" />
-          }
+          </div>
         </div>
       </div>
 
