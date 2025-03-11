@@ -1,8 +1,8 @@
-from ..state import State
+from app.mentor.state import State
 from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
 from app.models import get_model
 from app.settings import settings
-from ..prompt_loader import PromptLoader
+from app.mentor.prompt_loader import PromptLoader
 
 prompt_loader = PromptLoader()
 
