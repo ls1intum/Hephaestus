@@ -16,8 +16,6 @@ spring:
   mail:
     host: ${POSTFIX_HOST:localhost}
     port: ${POSTFIX_PORT:25}
-    username: ${POSTFIX_USERNAME:}
-    password: ${POSTFIX_PASSWORD:}
     properties:
       mail:
         transport:
@@ -50,7 +48,6 @@ hephaestus:
     mail:
       enabled: ${MAIL_ENABLED:true}
       sender: ${MAIL_SENDER:hephaestus@aet.cit.tum.de}
-      signature: ${MAIL_SIGNATURE:}
 
 keycloak:
     url: ${KEYCLOAK_URL}

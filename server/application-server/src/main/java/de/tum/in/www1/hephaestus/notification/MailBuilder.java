@@ -22,9 +22,9 @@ public class MailBuilder {
     private static final Logger log = LoggerFactory.getLogger(MailBuilder.class);
     private final MailConfig config;
 
-    private User primaryRecipient;
+    private final User primaryRecipient;
 
-    private String email;
+    private final String email;
 
     @Getter
     private final String subject;
@@ -51,24 +51,8 @@ public class MailBuilder {
         this.variables.put("config", config);
     }
 
-    public MailBuilder fillPlaceholder(String placeholder, Object value) {
+    public MailBuilder fillPlaceholder(Object value, String placeholder) {
         this.variables.put(placeholder, value);
-
-        return this;
-    }
-
-    public MailBuilder fillUserPlaceholders(User user, String placeholder) {
-        fillPlaceholder(placeholder, user);
-        return this;
-    }
-
-    public MailBuilder fillPullRequestPlaceholders(PullRequest pullRequest, String placeholder) {
-        fillPlaceholder(placeholder, pullRequest);
-        return this;
-    }
-
-    public MailBuilder fillBadPracticePlaceholders(List<PullRequestBadPractice> badPractices, String placeholder) {
-        fillPlaceholder(placeholder, badPractices);
         return this;
     }
 

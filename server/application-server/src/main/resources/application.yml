@@ -78,8 +78,7 @@ hephaestus:
             evict-rate: 3600000
     mail:
         enabled: ${MAIL_ENABLED:false}
-        sender: ${MAIL_SENDER:}
-        signature: ${MAIL_SIGNATURE:}
+        sender: ${MAIL_SENDER:hephaestus@gmail.com} # use gmail email address for local testing
 
 keycloak:
     url: http://localhost:8081

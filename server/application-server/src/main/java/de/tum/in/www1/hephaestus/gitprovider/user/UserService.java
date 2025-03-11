@@ -9,7 +9,6 @@ import de.tum.in.www1.hephaestus.gitprovider.pullrequestreview.PullRequestReview
 import de.tum.in.www1.hephaestus.gitprovider.pullrequestreview.PullRequestReviewRepository;
 import de.tum.in.www1.hephaestus.gitprovider.repository.RepositoryInfoDTO;
 import de.tum.in.www1.hephaestus.gitprovider.repository.RepositoryRepository;
-import de.tum.in.www1.hephaestus.notification.MailService;
 import jakarta.transaction.Transactional;
 import java.time.OffsetDateTime;
 import java.util.ArrayList;

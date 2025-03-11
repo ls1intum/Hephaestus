@@ -71,9 +71,9 @@ public class MailService {
             "bad-practices-detected"
         );
         mailBuilder
-            .fillUserPlaceholders(user, "user")
-            .fillPullRequestPlaceholders(pullRequest, "pullRequest")
-            .fillBadPracticePlaceholders(badPractices, "badPractices")
+            .fillPlaceholder(user, "user")
+            .fillPlaceholder(pullRequest, "pullRequest")
+            .fillPlaceholder(badPractices, "badPractices")
             .send(javaMailSender);
     }
 }
