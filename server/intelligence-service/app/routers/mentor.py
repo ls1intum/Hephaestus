@@ -47,6 +47,7 @@ def status():
 )
 def start(request: MentorStartRequest):
     config = RunnableConfig({"configurable": {"thread_id": request.session_id}})
+    print("starting session", request)
     response = start_session(
         request.previous_session_id, request.user_id, request.dev_progress, config
     )
