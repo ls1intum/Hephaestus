@@ -8,7 +8,7 @@ import { Message } from '@app/core/modules/openapi';
 import { HlmSkeletonComponent } from '@spartan-ng/ui-skeleton-helm';
 import { ChatSummaryComponent } from '../chat-summary/chat-summary.component';
 import { PrsOverviewComponent } from '../prs-overview/prs-overview.component';
-import { getSummary, getPullRequests, Summary } from './message-parser';
+import { getSummary, getPullRequests } from './message-parser';
 
 @Component({
   selector: 'app-messages',
@@ -20,7 +20,7 @@ export class MessagesComponent {
   protected Message = Message;
 
   securityStore = inject(SecurityStore);
-  messages = input<(Message | Summary)[]>([]);
+  messages = input<Message[]>([]);
   isLoading = input<boolean>(false);
 
   getSummary = getSummary;

@@ -6,5 +6,5 @@ import org.springframework.stereotype.Repository;
 
 @Repository
 public interface MessageRepository extends JpaRepository<Message, Long> {
-    List<Message> findBySessionId(Long sessionId);
+    List<Message> findBySessionIdOrderBySentAtAsc(Long sessionId);
 }

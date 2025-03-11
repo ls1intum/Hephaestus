@@ -80,7 +80,6 @@ public class SessionService {
             .toList();
         String devProgress = formatPullRequests(pullRequests);
 
-        // create a new session
         Session session = new Session();
         session.setUser(user);
         Session savedSession = sessionRepository.save(session);

@@ -1,30 +1,16 @@
-<div hlmCard class="flex space-x-4 px-5 py-4">
-  <div class="flex-1 basis-1/3">
-    <div class="font-bold">Status</div>
-    <ul hlmUl class="mt-1 mb-3">
-      @for (entry of status(); track entry) {
-        <li>{{ entry }}</li>
-      }
-    </ul>
-  </div>
-  <brn-separator class="h-16 self-center dark:bg-slate-50" decorative hlmSeparator orientation="vertical"></brn-separator>
+<div hlmCard class="flex space-x-4 px-6 py-4">
+  @for (section of sections; track section) {
+    <div class="flex-1 basis-1/3">
+      <div class="font-bold">{{ section.title }}</div>
+      <div class="flex flex-col gap-2 mt-2 mb-3">
+        @for (entry of section.data(); track entry) {
+          <p>{{ entry }}</p>
+        }
+      </div>
+    </div>
 
-  <div class="flex-1 basis-1/3">
-    <div class="font-bold">Impediments</div>
-    <ul hlmUl class="mt-1 mb-3">
-      @for (impediment of impediments(); track impediment) {
-        <li>{{ impediment }}</li>
-      }
-    </ul>
-  </div>
-  <brn-separator class="h-16 self-center dark:bg-slate-50" decorative hlmSeparator orientation="vertical"></brn-separator>
-
-  <div class="flex-1 basis-1/3">
-    <div class="font-bold">Promises</div>
-    <ul hlmUl class="mt-1 mb-3">
-      @for (promise of promises(); track promise) {
-        <li>{{ promise }}</li>
-      }
-    </ul>
-  </div>
+    @if (!section.isLast) {
+      <brn-separator class="h-32 self-center dark:bg-slate-50" decorative hlmSeparator orientation="vertical"> </brn-separator>
+    }
+  }
 </div>

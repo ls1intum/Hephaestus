@@ -20,20 +20,8 @@
     }
   } @else {
     @for (message of messages(); track message.id) {
-      <div
-        class="flex w-full"
-        [ngClass]="{
-          'justify-end': message.sender === Message.SenderEnum.User,
-          'justify-start': message.sender === Message.SenderEnum.Mentor
-        }"
-      >
-        <div
-          class="flex space-x-2"
-          [ngClass]="{
-            'flex-row-reverse': message.sender === Message.SenderEnum.User,
-            'md:max-w-[60%]': getSummary(message) == null
-          }"
-        >
+      <div class="flex w-full" [ngClass]="{ 'justify-end': message.sender === Message.SenderEnum.User, 'justify-start': message.sender === Message.SenderEnum.Mentor }">
+        <div class="flex space-x-2" [ngClass]="{ 'flex-row-reverse': message.sender === Message.SenderEnum.User, 'md:max-w-[60%]': getSummary(message) == null }">
           @if (message.sender === Message.SenderEnum.Mentor) {
             <div class="mr-2 flex flex-col">
               <div class="w-10 h-10 bg-transparent border-2 border-cyan-500 rounded-full flex items-center justify-center">
@@ -41,13 +29,7 @@
               </div>
             </div>
           }
-          <div
-            class="flex flex-col space-y-2"
-            [ngClass]="{
-              'items-end': message.sender === Message.SenderEnum.User,
-              'items-start': message.sender === Message.SenderEnum.Mentor
-            }"
-          >
+          <div class="flex flex-col space-y-2" [ngClass]="{ 'items-end': message.sender === Message.SenderEnum.User, 'items-start': message.sender === Message.SenderEnum.Mentor }">
             @if (getSummary(message) !== null) {
               <app-chat-summary
                 [status]="getSummary(message)?.status || []"

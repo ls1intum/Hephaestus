@@ -1,32 +1,20 @@
-<div hlmCard class="flex gap-2 divide-y-2 flex-col px-5 py-2">
+<div hlmCard class="flex divide-y-[1px] gap-1 flex-col px-5 py-2">
   @for (pr of pullRequests(); track pr.number) {
     <div class="flex gap-4 items-center py-1">
-      @if (pr.isDraft) {
-        <a class="flex gap-2 items-center text-github-muted-foreground" [href]="pr.url">
-          <span class="size-4 self-baseline mt-1">
-            <ng-icon name="octGitPullRequestDraft" size="18" />
-          </span>
-          {{ pr.title }} #{{ pr.number }}
-        </a>
-      } @else {
-        @if (pr.isMerged) {
-          <a class="flex gap-2 items-center text-github-done-foreground" [href]="pr.url">
-            <span class="size-4 self-baseline mt-1">
-              <ng-icon name="octGitMerge" size="18" />
-            </span>
-            {{ pr.title }} #{{ pr.number }}
-          </a>
-        } @else {
-          @if (pr.state == 'OPEN') {
-            <a class="flex gap-2 items-center text-github-success-foreground" [href]="pr.url">
-              <span class="size-4 self-baseline mt-1">
-                <ng-icon name="octGitPullRequest" size="18" />
-              </span>
-              {{ pr.title }} #{{ pr.number }}
-            </a>
-          }
-        }
-      }
+      <a
+        class="flex gap-2 items-center"
+        [class.text-github-muted-foreground]="pr.isDraft"
+        [class.text-github-done-foreground]="pr.isMerged"
+        [class.text-github-success-foreground]="pr.state === 'OPEN'"
+        [href]="pr.url"
+        target="_blank"
+      >
+        <span class="size-4 self-baseline mt-1">
+          <ng-icon [name]="getPrIcon(pr)" size="18"></ng-icon>
+        </span>
+        {{ pr.title }} #{{ pr.number }}
+        <ng-icon [name]="'lucideExternalLink'" size="16" class="text-gray-400"></ng-icon>
+      </a>
     </div>
   }
 </div>

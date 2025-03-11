@@ -30,7 +30,7 @@ public class MessageService {
 
     public List<MessageDTO> getMessagesBySessionId(Long sessionId) {
         return messageRepository
-            .findBySessionId(sessionId)
+            .findBySessionIdOrderBySentAtAsc(sessionId)
             .stream()
             .map(message -> MessageDTO.fromMessage(message))
             .toList();
@@ -81,6 +81,7 @@ public class MessageService {
             mentorStartRequest.setPreviousSessionId(previousSessionId);
             mentorStartRequest.setSessionId(String.valueOf(session.getId()));
             mentorStartRequest.setDevProgress(devProgress);
+            mentorStartRequest.setUserId(String.valueOf(session.getUser().getId()));
             MentorResponse mentorMessage = intelligenceServiceApi.startMentorStartPost(mentorStartRequest);
             createMentorMessage(session, mentorMessage.getContent());
         } catch (Exception e) {
@@ -88,16 +89,14 @@ public class MessageService {
         }
     }
 
-    private Message createMentorMessage(Session currentSession, String systemResponse) {
-        Message systemMessage = new Message();
-        systemMessage.setSender(MessageSender.MENTOR);
-        systemMessage.setContent(systemResponse);
-        systemMessage.setSession(currentSession);
-
-        Message savedSystemMessage = messageRepository.save(systemMessage);
-        currentSession.getMessages().add(savedSystemMessage);
+    private Message createMentorMessage(Session currentSession, String mentorResponse) {
+        Message mentorMessage = new Message();
+        mentorMessage.setSender(MessageSender.MENTOR);
+        mentorMessage.setContent(mentorResponse);
+        mentorMessage.setSession(currentSession);
+        Message savedMentorMessage = messageRepository.save(mentorMessage);
+        currentSession.getMessages().add(savedMentorMessage);
         sessionRepository.save(currentSession);
-
-        return savedSystemMessage;
+        return savedMentorMessage;
     }
 }
