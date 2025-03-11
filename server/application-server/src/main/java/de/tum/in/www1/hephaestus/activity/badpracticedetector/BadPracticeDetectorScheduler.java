@@ -3,6 +3,8 @@ package de.tum.in.www1.hephaestus.activity.badpracticedetector;
 import de.tum.in.www1.hephaestus.gitprovider.label.Label;
 import de.tum.in.www1.hephaestus.gitprovider.pullrequest.PullRequest;
 import java.util.Set;
+
+import de.tum.in.www1.hephaestus.notification.MailService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -21,6 +23,12 @@ public class BadPracticeDetectorScheduler {
     @Autowired
     TaskExecutor taskExecutor;
 
+    @Autowired
+    PullRequestBadPracticeDetector pullRequestBadPracticeDetector;
+
+    @Autowired
+    MailService mailService;
+
     public void detectBadPracticeForPrIfReadyToMerge(
         PullRequest pullRequest,
         Set<Label> oldLabels,
@@ -35,6 +43,8 @@ public class BadPracticeDetectorScheduler {
         ) {
             logger.info("Scheduling bad practice detection for pull request: {}", pullRequest.getId());
             BadPracticeDetectorTask badPracticeDetectorTask = new BadPracticeDetectorTask();
+            badPracticeDetectorTask.setPullRequestBadPracticeDetector(pullRequestBadPracticeDetector);
+            badPracticeDetectorTask.setMailService(mailService);
             badPracticeDetectorTask.setPullRequest(pullRequest);
             taskExecutor.execute(badPracticeDetectorTask);
         }

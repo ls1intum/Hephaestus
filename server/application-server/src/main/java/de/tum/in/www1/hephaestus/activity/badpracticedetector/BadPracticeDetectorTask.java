@@ -9,20 +9,15 @@ import lombok.Getter;
 import lombok.Setter;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.stereotype.Component;
 
-@Component
 @Getter
 @Setter
 public class BadPracticeDetectorTask implements Runnable {
 
     private static final Logger logger = LoggerFactory.getLogger(BadPracticeDetectorTask.class);
 
-    @Autowired
     private PullRequestBadPracticeDetector pullRequestBadPracticeDetector;
 
-    @Autowired
     private MailService mailService;
 
     private PullRequest pullRequest;
