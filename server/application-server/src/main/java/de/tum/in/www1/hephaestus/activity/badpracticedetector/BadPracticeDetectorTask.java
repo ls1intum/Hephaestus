@@ -24,9 +24,10 @@ public class BadPracticeDetectorTask implements Runnable {
             pullRequest
         );
 
-        List<PullRequestBadPractice> unResolvedBadPractices = badPractices.stream().filter(
-            badPractice -> !badPractice.isResolved()
-        ).toList();
+        List<PullRequestBadPractice> unResolvedBadPractices = badPractices
+            .stream()
+            .filter(badPractice -> !badPractice.isResolved())
+            .toList();
 
         if (!unResolvedBadPractices.isEmpty()) {
             for (User user : pullRequest.getAssignees()) {
