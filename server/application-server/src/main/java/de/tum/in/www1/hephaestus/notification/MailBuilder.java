@@ -86,7 +86,6 @@ public class MailBuilder {
             message.setContent(messageContent);
 
             if (config.isEnabled()) {
-                log.info("Sending Mail\n{}", messageBody.getContent());
                 mailSender.send(message);
             } else {
                 log.info("Sending Mail (postfix disabled)\n{}", messageBody.getContent());

@@ -60,7 +60,10 @@ export class SettingsComponent {
 
   settingsQuery = injectQuery(() => ({
     queryKey: ['settings'],
-    queryFn: async () => lastValueFrom(this.userService.getUserSettings()).then((settings) => this._newNotificationEnabled.setValue(settings.receiveNotifications ?? false))
+    queryFn: () => lastValueFrom(this.userService.getUserSettings()),
+    onSuccess: (settings: UserSettings) => {
+      this._newNotificationEnabled.setValue(settings.receiveNotifications ?? false);
+    }
   }));
 
   settingsMutation = injectMutation(() => ({
