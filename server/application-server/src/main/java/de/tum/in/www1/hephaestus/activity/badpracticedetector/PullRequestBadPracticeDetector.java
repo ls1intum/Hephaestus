@@ -9,8 +9,6 @@ import de.tum.in.www1.hephaestus.intelligenceservice.model.DetectorRequest;
 import de.tum.in.www1.hephaestus.intelligenceservice.model.DetectorResponse;
 import java.util.LinkedList;
 import java.util.List;
-
-import jakarta.transaction.Transactional;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -27,13 +25,11 @@ public class PullRequestBadPracticeDetector {
     @Autowired
     private BadPracticeDetectorService detectorApi;
 
-
     /**
      * Detects bad practices in the given pull request and syncs them with the database.
      * @param pullRequest The pull request to detect bad practices in.
      * @return The detected bad practices.
      */
-    @Transactional
     public List<PullRequestBadPractice> detectAndSyncBadPractices(PullRequest pullRequest) {
         logger.info("Detecting bad practices for pull request: {}", pullRequest.getId());
 
