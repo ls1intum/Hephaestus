@@ -31,5 +31,4 @@ public class MailConfig {
         this.clientHost = clientHost;
         this.templateEngine = templateEngine;
     }
-
 }
