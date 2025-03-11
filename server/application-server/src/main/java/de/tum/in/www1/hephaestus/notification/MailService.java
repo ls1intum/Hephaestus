@@ -7,6 +7,7 @@ import de.tum.in.www1.hephaestus.gitprovider.user.UserService;
 import java.util.List;
 
 import org.keycloak.admin.client.Keycloak;
+import org.keycloak.representations.idm.RoleRepresentation;
 import org.keycloak.representations.idm.UserRepresentation;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -38,11 +39,14 @@ public class MailService {
 
     public void sendBadPracticesDetectedInPullRequestEmail(User user, PullRequest pullRequest, List<PullRequestBadPractice> badPractices) {
         logger.info("Sending bad practice detected email to user: " + user.getLogin());
-        if (!user.getLogin().equals("iam-flo")) return;
 
         UserRepresentation keyCloakUser = keycloak.realm(realm).users().searchByUsername(user.getLogin(), true).getFirst();
         String email = keyCloakUser.getEmail();
-        if (!keyCloakUser.getRealmRoles().contains("notification_access")) {
+        List<RoleRepresentation> roles = keycloak.realm(realm).users().get(keyCloakUser.getId()).roles().realmLevel().listAll();
+        // Check if the user has the "notification_access" role
+        boolean hasNotificationAccess = roles.stream()
+                .anyMatch(role -> "notification_access".equals(role.getName()));
+        if (hasNotificationAccess) {
             logger.info("User {} does not have the notification_access role. Skipping email.", user.getLogin());
             return;
         }
