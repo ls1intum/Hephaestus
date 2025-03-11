@@ -46,7 +46,7 @@ public class MailService {
         // Check if the user has the "notification_access" role
         boolean hasNotificationAccess = roles.stream()
                 .anyMatch(role -> "notification_access".equals(role.getName()));
-        if (hasNotificationAccess) {
+        if (!hasNotificationAccess) {
             logger.info("User {} does not have the notification_access role. Skipping email.", user.getLogin());
             return;
         }
