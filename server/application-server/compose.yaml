@@ -32,17 +32,6 @@ services:
     networks:
       - app-network
 
-  postfix:
-    image: ghcr.io/ls1admin/postfix:latest
-    restart: unless-stopped
-    volumes:
-      - ./postfix-config:/config # See https://github.com/ls1admin/postfix-container-tum-mailrelay/tree/main for details
-    hostname: aet.cit.tum.de
-    ports:
-      - '25:25'
-    networks:
-      - app-network
-
 networks:
   app-network:
     driver: bridge
