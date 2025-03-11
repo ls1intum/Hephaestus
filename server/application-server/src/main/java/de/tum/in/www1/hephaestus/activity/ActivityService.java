@@ -7,7 +7,6 @@ import de.tum.in.www1.hephaestus.gitprovider.pullrequest.PullRequest;
 import de.tum.in.www1.hephaestus.gitprovider.pullrequest.PullRequestRepository;
 import de.tum.in.www1.hephaestus.gitprovider.user.UserRepository;
 import de.tum.in.www1.hephaestus.notification.MailService;
-import jakarta.transaction.Transactional;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -100,7 +99,11 @@ public class ActivityService {
             pullRequest
         );
 
-        mailService.sendBadPracticesDetectedInPullRequestEmail(pullRequest.getAuthor(), pullRequest, detectedBadPractices);
+        mailService.sendBadPracticesDetectedInPullRequestEmail(
+            pullRequest.getAuthor(),
+            pullRequest,
+            detectedBadPractices
+        );
 
         return detectedBadPractices.stream().map(PullRequestBadPracticeDTO::fromPullRequestBadPractice).toList();
     }

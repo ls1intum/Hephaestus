@@ -4,12 +4,11 @@ import de.tum.in.www1.hephaestus.activity.model.PullRequestBadPractice;
 import de.tum.in.www1.hephaestus.gitprovider.pullrequest.PullRequest;
 import de.tum.in.www1.hephaestus.gitprovider.user.User;
 import de.tum.in.www1.hephaestus.notification.MailService;
+import java.util.List;
 import lombok.Getter;
 import lombok.Setter;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
-
-import java.util.List;
 
 @Component
 @Getter
@@ -26,10 +25,12 @@ public class BadPracticeDetectorTask implements Runnable {
 
     @Override
     public void run() {
-        List<PullRequestBadPractice> badPractices = pullRequestBadPracticeDetector.detectAndSyncBadPractices(pullRequest);
+        List<PullRequestBadPractice> badPractices = pullRequestBadPracticeDetector.detectAndSyncBadPractices(
+            pullRequest
+        );
 
         if (!badPractices.isEmpty()) {
-            for (User user: pullRequest.getAssignees()) {
+            for (User user : pullRequest.getAssignees()) {
                 mailService.sendBadPracticesDetectedInPullRequestEmail(user, pullRequest, badPractices);
             }
         }
