@@ -89,14 +89,14 @@ public class MessageService {
         }
     }
 
-    private Message createMentorMessage(Session currentSession, String systemResponse) {
-        Message systemMessage = new Message();
-        systemMessage.setSender(MessageSender.MENTOR);
-        systemMessage.setContent(systemResponse);
-        systemMessage.setSession(currentSession);
-        Message savedSystemMessage = messageRepository.save(systemMessage);
-        currentSession.getMessages().add(savedSystemMessage);
+    private Message createMentorMessage(Session currentSession, String mentorResponse) {
+        Message mentorMessage = new Message();
+        mentorMessage.setSender(MessageSender.MENTOR);
+        mentorMessage.setContent(mentorResponse);
+        mentorMessage.setSession(currentSession);
+        Message savedMentorMessage = messageRepository.save(mentorMessage);
+        currentSession.getMessages().add(savedMentorMessage);
         sessionRepository.save(currentSession);
-        return savedSystemMessage;
+        return savedMentorMessage;
     }
 }
