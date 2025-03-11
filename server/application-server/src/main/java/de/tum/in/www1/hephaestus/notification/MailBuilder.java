@@ -1,7 +1,5 @@
 package de.tum.in.www1.hephaestus.notification;
 
-import de.tum.in.www1.hephaestus.activity.model.PullRequestBadPractice;
-import de.tum.in.www1.hephaestus.gitprovider.pullrequest.PullRequest;
 import de.tum.in.www1.hephaestus.gitprovider.user.User;
 import de.tum.in.www1.hephaestus.gitprovider.user.UserInfoDTO;
 import jakarta.mail.*;
@@ -13,7 +11,6 @@ import java.util.*;
 import lombok.Getter;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.mail.javamail.JavaMailSender;
 import org.thymeleaf.context.Context;
 
@@ -34,9 +31,6 @@ public class MailBuilder {
 
     @Getter
     private final Map<String, Object> variables;
-
-    @Value("${keycloak.realm}")
-    private String realm;
 
     public MailBuilder(MailConfig config, User primaryRecipient, String email, String subject, String template) {
         this.config = config;
