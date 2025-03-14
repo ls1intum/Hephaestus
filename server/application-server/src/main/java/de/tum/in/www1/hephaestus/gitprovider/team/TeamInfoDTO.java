@@ -3,6 +3,8 @@ package de.tum.in.www1.hephaestus.gitprovider.team;
 import de.tum.in.www1.hephaestus.gitprovider.label.LabelInfoDTO;
 import de.tum.in.www1.hephaestus.gitprovider.repository.RepositoryInfoDTO;
 import java.util.List;
+
+import de.tum.in.www1.hephaestus.gitprovider.user.UserInfoDTO;
 import org.springframework.lang.NonNull;
 
 public record TeamInfoDTO(
@@ -10,7 +12,8 @@ public record TeamInfoDTO(
     @NonNull String name,
     @NonNull String color,
     @NonNull List<RepositoryInfoDTO> repositories,
-    @NonNull List<LabelInfoDTO> labels
+    @NonNull List<LabelInfoDTO> labels,
+    @NonNull List<UserInfoDTO> members
 ) {
     public static TeamInfoDTO fromTeam(Team team) {
         return new TeamInfoDTO(
@@ -18,7 +21,8 @@ public record TeamInfoDTO(
             team.getName(),
             team.getColor(),
             team.getRepositories().stream().map(RepositoryInfoDTO::fromRepository).toList(),
-            team.getLabels().stream().map(LabelInfoDTO::fromLabel).toList()
+            team.getLabels().stream().map(LabelInfoDTO::fromLabel).toList(),
+            team.getMembers().stream().map(UserInfoDTO::fromUser).toList()
         );
     }
 }
