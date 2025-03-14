@@ -10,7 +10,7 @@ export const environment = {
     url: 'http://localhost:8081',
     realm: 'hephaestus',
     clientId: 'hephaestus',
-    skipLoginPage: false // If true, it will directly use github IDP for login
+    skipLoginPage: true // If true, it will directly use github IDP for login
   },
   posthog: {
     projectApiKey: '',
