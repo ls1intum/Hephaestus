@@ -11,6 +11,7 @@
       <a hlmBtn variant="link" routerLink="/workspace">Workspace</a>
       <a hlmBtn variant="link" [routerLink]="'/user/' + user()!.username + '/activity'">Activity</a>
     }
+    <a hlmBtn variant="link" routerLink="/teams">Teams</a>
   </div>
   @if (signedIn() && user()?.roles?.includes('mentor_access')) {
     <app-ai-mentor class="hidden sm:inline-block" />

@@ -32,14 +32,16 @@ const LOADING_TEAMS: TeamInfo[] = [
     name: 'Team A',
     color: '#FF0000',
     repositories: [],
-    labels: []
+    labels: [],
+    members: []
   },
   {
     id: 2,
     name: 'Team B',
     color: '#00FF00',
     repositories: [],
-    labels: []
+    labels: [],
+    members: []
   }
 ];
 

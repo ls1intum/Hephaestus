@@ -34,7 +34,8 @@ const LOADING_DATA: UserTeams[] = [
         name: 'Team A',
         color: '#FF0000',
         repositories: [],
-        labels: []
+        labels: [],
+        members: []
       }
     ])
   },
@@ -49,7 +50,8 @@ const LOADING_DATA: UserTeams[] = [
         name: 'Team B',
         color: '#00FF00',
         repositories: [],
-        labels: []
+        labels: [],
+        members: []
       }
     ])
   }
