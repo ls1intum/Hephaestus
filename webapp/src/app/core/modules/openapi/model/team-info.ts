@@ -21,5 +21,6 @@ export interface TeamInfo {
     repositories: Array<RepositoryInfo>;
     labels: Array<LabelInfo>;
     members: Array<UserInfo>;
+    hidden: boolean;
 }
 

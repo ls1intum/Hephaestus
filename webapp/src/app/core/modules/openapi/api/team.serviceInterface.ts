@@ -30,4 +30,12 @@ export interface TeamServiceInterface {
      */
     getTeams(extraHttpRequestParams?: any): Observable<Array<TeamInfo>>;
 
+    /**
+     * 
+     * 
+     * @param id 
+     * @param body 
+     */
+    hideTeam(id: number, body: boolean, extraHttpRequestParams?: any): Observable<TeamInfo>;
+
 }

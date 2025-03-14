@@ -392,6 +392,31 @@ paths:
                 type: array
                 items:
                   $ref: "#/components/schemas/PullRequestBadPractice"
+  /team/{id}/hide:
+    patch:
+      tags:
+      - team
+      operationId: hideTeam
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: integer
+          format: int64
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: boolean
+        required: true
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TeamInfo"
   /workspace/users:
     get:
       tags:
@@ -881,8 +906,11 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/UserInfo"
+        hidden:
+          type: boolean
       required:
       - color
+      - hidden
       - id
       - labels
       - members
