@@ -13,7 +13,8 @@ public record TeamInfoDTO(
     @NonNull String color,
     @NonNull List<RepositoryInfoDTO> repositories,
     @NonNull List<LabelInfoDTO> labels,
-    @NonNull List<UserInfoDTO> members
+    @NonNull List<UserInfoDTO> members,
+    @NonNull Boolean hidden
 ) {
     public static TeamInfoDTO fromTeam(Team team) {
         return new TeamInfoDTO(
@@ -22,7 +23,8 @@ public record TeamInfoDTO(
             team.getColor(),
             team.getRepositories().stream().map(RepositoryInfoDTO::fromRepository).toList(),
             team.getLabels().stream().map(LabelInfoDTO::fromLabel).toList(),
-            team.getMembers().stream().map(UserInfoDTO::fromUser).toList()
+            team.getMembers().stream().map(UserInfoDTO::fromUser).toList(),
+            team.isHidden()
         );
     }
 }
