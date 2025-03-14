@@ -877,10 +877,15 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/LabelInfo"
+        members:
+          type: array
+          items:
+            $ref: "#/components/schemas/UserInfo"
       required:
       - color
       - id
       - labels
+      - members
       - name
       - repositories
     PullRequestBadPractice:
