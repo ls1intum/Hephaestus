@@ -929,12 +929,21 @@ components:
     PullRequestBadPractice:
       type: object
       properties:
+        id:
+          type: integer
+          format: int64
         title:
           type: string
         description:
           type: string
         resolved:
           type: boolean
+        userResolved:
+          type: boolean
+      required:
+      - description
+      - id
+      - title
         state:
           type: string
           enum:
@@ -980,12 +989,11 @@ components:
       properties:
         type:
           type: string
-          enum:
-          - IRRELEVANT
-          - INCORRECT
-          - INCONCISE
         explanation:
           type: string
+      required:
+      - explanation
+      - type
     PullRequestReviewInfo:
       type: object
       properties:

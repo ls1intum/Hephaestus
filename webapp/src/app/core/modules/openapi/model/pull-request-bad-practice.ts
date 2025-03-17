@@ -12,6 +12,10 @@
 
 
 export interface PullRequestBadPractice {
+    id: number;
+    title: string;
+    description: string;
+export interface PullRequestBadPractice {
     title: string;
     description: string;
     state: PullRequestBadPractice.StateEnum;

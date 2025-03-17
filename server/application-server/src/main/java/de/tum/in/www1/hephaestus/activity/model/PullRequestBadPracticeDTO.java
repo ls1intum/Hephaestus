@@ -2,6 +2,12 @@ package de.tum.in.www1.hephaestus.activity.model;
 
 import org.springframework.lang.NonNull;
 
+public record PullRequestBadPracticeDTO(
+        @NonNull Long id,
+        @NonNull String title,
+        @NonNull String description,
+        boolean resolved,
+        boolean userResolved) {
 public record PullRequestBadPracticeDTO(@NonNull Long id, String title, String description, boolean resolved, boolean userResolved, @NonNull PullRequestBadPracticeState state) {
     public static PullRequestBadPracticeDTO fromPullRequestBadPractice(PullRequestBadPractice badPractice) {
         return new PullRequestBadPracticeDTO(
