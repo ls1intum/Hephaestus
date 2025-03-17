@@ -2,9 +2,8 @@ package de.tum.in.www1.hephaestus.gitprovider.team;
 
 import de.tum.in.www1.hephaestus.gitprovider.label.LabelInfoDTO;
 import de.tum.in.www1.hephaestus.gitprovider.repository.RepositoryInfoDTO;
-import java.util.List;
-
 import de.tum.in.www1.hephaestus.gitprovider.user.UserInfoDTO;
+import java.util.List;
 import org.springframework.lang.NonNull;
 
 public record TeamInfoDTO(

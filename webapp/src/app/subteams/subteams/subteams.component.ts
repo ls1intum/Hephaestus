@@ -3,12 +3,7 @@ import { TeamService } from '@app/core/modules/openapi';
 import { injectQuery } from '@tanstack/angular-query-experimental';
 import { lastValueFrom } from 'rxjs';
 import { HlmSkeletonComponent } from '@spartan-ng/ui-skeleton-helm';
-import {
-  HlmCardContentDirective,
-  HlmCardDirective,
-  HlmCardHeaderDirective,
-  HlmCardTitleDirective
-} from '@spartan-ng/ui-card-helm';
+import { HlmCardContentDirective, HlmCardDirective, HlmCardHeaderDirective, HlmCardTitleDirective } from '@spartan-ng/ui-card-helm';
 
 @Component({
   selector: 'app-subteams',

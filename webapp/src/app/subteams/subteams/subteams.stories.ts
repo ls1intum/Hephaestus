@@ -9,7 +9,8 @@ const meta: Meta<SubteamsComponent> = {
 export default meta;
 type Story = StoryObj<SubteamsComponent>;
 
-export const Default: Story = {/*
+export const Default: Story = {
+  /*
   args: {
     teamsQuery: {
       data: [
