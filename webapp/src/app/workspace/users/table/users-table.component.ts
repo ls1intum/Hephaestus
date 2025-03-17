@@ -35,7 +35,8 @@ const LOADING_DATA: UserTeams[] = [
         color: '#FF0000',
         repositories: [],
         labels: [],
-        members: []
+        members: [],
+        hidden: false
       }
     ])
   },
@@ -51,7 +52,8 @@ const LOADING_DATA: UserTeams[] = [
         color: '#00FF00',
         repositories: [],
         labels: [],
-        members: []
+        members: [],
+        hidden: false
       }
     ])
   }

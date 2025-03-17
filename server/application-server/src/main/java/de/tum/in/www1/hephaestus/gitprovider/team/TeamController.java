@@ -19,7 +19,7 @@ public class TeamController {
         return ResponseEntity.ok(teamService.getAllTeams());
     }
 
-    @PatchMapping("/{id}/hide")
+    @PostMapping("/{id}/hide")
     public ResponseEntity<TeamInfoDTO> hideTeam(@PathVariable Long id, @RequestBody Boolean hidden) {
         try {
             return ResponseEntity.ok(teamService.hideTeam(id, hidden));

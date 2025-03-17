@@ -217,7 +217,7 @@ export class TeamService implements TeamServiceInterface {
         }
 
         let localVarPath = `/team/${this.configuration.encodeParam({name: "id", value: id, in: "path", style: "simple", explode: false, dataType: "number", dataFormat: "int64"})}/hide`;
-        return this.httpClient.request<TeamInfo>('patch', `${this.configuration.basePath}${localVarPath}`,
+        return this.httpClient.request<TeamInfo>('post', `${this.configuration.basePath}${localVarPath}`,
             {
                 context: localVarHttpContext,
                 body: body,

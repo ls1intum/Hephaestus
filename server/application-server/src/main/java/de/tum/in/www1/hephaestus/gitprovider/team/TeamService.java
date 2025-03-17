@@ -30,6 +30,7 @@ public class TeamService {
     }
 
     public TeamInfoDTO hideTeam(Long id, Boolean hidden) {
+        logger.info("Hiding team with id: " + id + " and hidden: " + hidden);
         Team team = teamRepository.findById(id).orElseThrow();
         team.setHidden(hidden);
         teamRepository.saveAndFlush(team);
