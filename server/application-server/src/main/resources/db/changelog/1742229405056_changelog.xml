@@ -12,7 +12,7 @@
     </changeSet>
     <changeSet author="iam-flo" id="1742229405056-2">
         <addColumn tableName="pullrequestbadpractice">
-            <column name="user_resolved" type="boolean" defaultValueBoolean="false">
+            <column name="user_resolved" type="boolean">
                 <constraints nullable="false"/>
             </column>
         </addColumn>
