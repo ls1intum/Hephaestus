@@ -18,7 +18,7 @@ public class BadPracticeFeedback {
     private PullRequestBadPractice pullRequestBadPractice;
 
     @NonNull
-    BadPracticeFeedbackType type;
+    String type;
 
     @NonNull
     private String explanation;

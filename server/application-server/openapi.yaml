@@ -922,6 +922,9 @@ components:
     PullRequestBadPractice:
       type: object
       properties:
+        id:
+          type: integer
+          format: int64
         title:
           type: string
         description:
@@ -930,6 +933,10 @@ components:
           type: boolean
         userResolved:
           type: boolean
+      required:
+      - description
+      - id
+      - title
     LeagueChange:
       type: object
       properties:
@@ -962,12 +969,11 @@ components:
       properties:
         type:
           type: string
-          enum:
-          - IRRELEVANT
-          - INCORRECT
-          - INCONCISE
         explanation:
           type: string
+      required:
+      - explanation
+      - type
     PullRequestReviewInfo:
       type: object
       properties:

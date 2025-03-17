@@ -12,8 +12,9 @@
 
 
 export interface PullRequestBadPractice { 
-    title?: string;
-    description?: string;
+    id: number;
+    title: string;
+    description: string;
     resolved?: boolean;
     userResolved?: boolean;
 }

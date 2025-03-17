@@ -1,3 +1,5 @@
 package de.tum.in.www1.hephaestus.activity.model;
 
-public record BadPracticeFeedbackDTO(BadPracticeFeedbackType type, String explanation){}
+import org.springframework.lang.NonNull;
+
+public record BadPracticeFeedbackDTO(@NonNull String type, @NonNull String explanation){}

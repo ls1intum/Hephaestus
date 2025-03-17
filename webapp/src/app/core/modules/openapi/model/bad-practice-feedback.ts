@@ -12,16 +12,7 @@
 
 
 export interface BadPracticeFeedback { 
-    type?: BadPracticeFeedback.TypeEnum;
-    explanation?: string;
+    type: string;
+    explanation: string;
 }
-export namespace BadPracticeFeedback {
-    export type TypeEnum = 'IRRELEVANT' | 'INCORRECT' | 'INCONCISE';
-    export const TypeEnum = {
-        Irrelevant: 'IRRELEVANT' as TypeEnum,
-        Incorrect: 'INCORRECT' as TypeEnum,
-        Inconcise: 'INCONCISE' as TypeEnum
-    };
-}
-
 
