@@ -1,5 +1,6 @@
 package de.tum.in.www1.hephaestus.activity.model;
 
+public record PullRequestBadPracticeDTO(String title, String description, boolean resolved, boolean userResolved) {
 import org.springframework.lang.NonNull;
 
 public record PullRequestBadPracticeDTO(@NonNull String title, @NonNull String description, @NonNull PullRequestBadPracticeState state) {
@@ -7,6 +8,8 @@ public record PullRequestBadPracticeDTO(@NonNull String title, @NonNull String d
         return new PullRequestBadPracticeDTO(
             badPractice.getTitle(),
             badPractice.getDescription(),
+            badPractice.isResolved(),
+            badPractice.isUserResolved()
             badPractice.getState()
         );
     }
