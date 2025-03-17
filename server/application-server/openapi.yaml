@@ -392,6 +392,42 @@ paths:
                 type: array
                 items:
                   $ref: "#/components/schemas/PullRequestBadPractice"
+  /activity/badpractice/{badPracticeId}/resolve:
+    post:
+      tags:
+      - activity
+      operationId: resolveBadPractice
+      parameters:
+      - name: badPracticeId
+        in: path
+        required: true
+        schema:
+          type: integer
+          format: int64
+      responses:
+        "200":
+          description: OK
+  /activity/badpractice/{badPracticeId}/feedback:
+    post:
+      tags:
+      - activity
+      operationId: provideFeedbackForBadPractice
+      parameters:
+      - name: badPracticeId
+        in: path
+        required: true
+        schema:
+          type: integer
+          format: int64
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/BadPracticeFeedback"
+        required: true
+      responses:
+        "200":
+          description: OK
   /workspace/users:
     get:
       tags:
@@ -756,25 +792,18 @@ components:
         createdAt:
           type: string
           format: date-time
-        badPracticeSummary:
-          type: string
         badPractices:
           type: array
           items:
             $ref: "#/components/schemas/PullRequestBadPractice"
       required:
       - additions
-      - badPracticeSummary
-      - badPractices
-      - createdAt
       - deletions
       - htmlUrl
       - id
       - isDraft
       - isMerged
-      - labels
       - number
-      - repository
       - state
       - title
     PullRequestBaseInfo:
@@ -897,19 +926,10 @@ components:
           type: string
         description:
           type: string
-        state:
-          type: string
-          enum:
-          - GOOD_PRACTICE
-          - FIXED
-          - CRITICAL_ISSUE
-          - NORMAL_ISSUE
-          - MINOR_ISSUE
-          - WONT_FIX
-      required:
-      - description
-      - state
-      - title
+        resolved:
+          type: boolean
+        userResolved:
+          type: boolean
     LeagueChange:
       type: object
       properties:
@@ -937,6 +957,17 @@ components:
       - color
       - id
       - name
+    BadPracticeFeedback:
+      type: object
+      properties:
+        type:
+          type: string
+          enum:
+          - IRRELEVANT
+          - INCORRECT
+          - INCONCISE
+        explanation:
+          type: string
     PullRequestReviewInfo:
       type: object
       properties:
