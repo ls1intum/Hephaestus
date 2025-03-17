@@ -392,6 +392,42 @@ paths:
                 type: array
                 items:
                   $ref: "#/components/schemas/PullRequestBadPractice"
+  /activity/badpractice/{badPracticeId}/resolve:
+    post:
+      tags:
+      - activity
+      operationId: resolveBadPractice
+      parameters:
+      - name: badPracticeId
+        in: path
+        required: true
+        schema:
+          type: integer
+          format: int64
+      responses:
+        "200":
+          description: OK
+  /activity/badpractice/{badPracticeId}/feedback:
+    post:
+      tags:
+      - activity
+      operationId: provideFeedbackForBadPractice
+      parameters:
+      - name: badPracticeId
+        in: path
+        required: true
+        schema:
+          type: integer
+          format: int64
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/BadPracticeFeedback"
+        required: true
+      responses:
+        "200":
+          description: OK
   /workspace/users:
     get:
       tags:
@@ -897,6 +933,8 @@ components:
           type: string
         description:
           type: string
+        resolved:
+          type: boolean
         state:
           type: string
           enum:
@@ -937,6 +975,17 @@ components:
       - color
       - id
       - name
+    BadPracticeFeedback:
+      type: object
+      properties:
+        type:
+          type: string
+          enum:
+          - IRRELEVANT
+          - INCORRECT
+          - INCONCISE
+        explanation:
+          type: string
     PullRequestReviewInfo:
       type: object
       properties:

@@ -11,10 +11,11 @@
  */
 
 
-export interface PullRequestBadPractice { 
+export interface PullRequestBadPractice {
     title: string;
     description: string;
     state: PullRequestBadPractice.StateEnum;
+    resolved?: boolean;
 }
 export namespace PullRequestBadPractice {
     export type StateEnum = 'GOOD_PRACTICE' | 'FIXED' | 'CRITICAL_ISSUE' | 'NORMAL_ISSUE' | 'MINOR_ISSUE' | 'WONT_FIX';
