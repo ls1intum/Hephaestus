@@ -9,6 +9,7 @@ import lombok.*;
 @NoArgsConstructor
 @ToString
 public class BadPracticeFeedback {
+
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
