@@ -26,7 +26,6 @@ import { NgScrollbarModule } from 'ngx-scrollbar';
 import { HlmScrollAreaDirective } from '@spartan-ng/ui-scrollarea-helm';
 import { groupBy } from '@app/utils';
 import { HlmCheckboxComponent } from '@spartan-ng/ui-checkbox-helm';
-import { HlmSwitchComponent } from '@spartan-ng/ui-switch-helm';
 
 const LOADING_TEAMS: TeamInfo[] = [
   {
@@ -74,8 +73,7 @@ const LOADING_TEAMS: TeamInfo[] = [
     BrnPopoverTriggerDirective,
     GithubLabelComponent,
     GithubLabelComponent,
-    HlmCheckboxComponent,
-    HlmSwitchComponent
+    HlmCheckboxComponent
   ],
   providers: [provideIcons({ lucideChevronDown, lucideGripHorizontal, lucideArrowUpDown, lucideRotateCw, lucideOctagonX, lucidePlus, lucideCheck, lucideTrash2 })],
   templateUrl: './teams-table.component.html'

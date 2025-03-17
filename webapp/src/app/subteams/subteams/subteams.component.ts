@@ -1,5 +1,5 @@
-import { Component, inject } from '@angular/core';
-import { TeamService } from '@app/core/modules/openapi';
+import { Component, computed, inject } from '@angular/core';
+import { TeamInfo, TeamService } from '@app/core/modules/openapi';
 import { injectQuery } from '@tanstack/angular-query-experimental';
 import { lastValueFrom } from 'rxjs';
 import { HlmSkeletonComponent } from '@spartan-ng/ui-skeleton-helm';
@@ -13,6 +13,14 @@ import { HlmCardContentDirective, HlmCardDirective, HlmCardHeaderDirective, HlmC
 })
 export class SubteamsComponent {
   protected teamService = inject(TeamService);
+
+  sortedTeams = computed(() => {
+    return this.teamsQuery.data()?.sort((a, b) => a.name.localeCompare(b.name));
+  });
+
+  sortMembers = (team: TeamInfo) => {
+    return Array.from(team.members).sort((a, b) => a.name.localeCompare(b.name));
+  };
 
   teamsQuery = injectQuery(() => ({
     queryKey: ['workspace', 'teams'],
