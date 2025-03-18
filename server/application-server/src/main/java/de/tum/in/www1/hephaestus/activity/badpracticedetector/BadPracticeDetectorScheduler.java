@@ -17,6 +17,7 @@ public class BadPracticeDetectorScheduler {
 
     private static final Logger logger = LoggerFactory.getLogger(BadPracticeDetectorScheduler.class);
 
+    private static final String READY_TO_REVIEW = "ready to review";
     private static final String READY_TO_MERGE = "ready to merge";
 
     @Qualifier("applicationTaskExecutor")
@@ -38,6 +39,14 @@ public class BadPracticeDetectorScheduler {
         Set<Label> newLabels
     ) {
         if (
+                automaticDetectionEnabled &&
+            newLabels.stream().anyMatch(label -> READY_TO_REVIEW.equals(label.getName())) &&
+            oldLabels.stream().noneMatch(label -> READY_TO_REVIEW.equals(label.getName()))
+        ) {
+            BadPracticeDetectorTask badPracticeDetectorTask = new BadPracticeDetectorTask();
+            badPracticeDetectorTask.setPullRequest(pullRequest);
+            taskExecutor.execute(badPracticeDetectorTask);
+        } else if (
             automaticDetectionEnabled &&
             newLabels.stream().anyMatch(label -> READY_TO_MERGE.equals(label.getName())) &&
             oldLabels.stream().noneMatch(label -> READY_TO_MERGE.equals(label.getName()))
