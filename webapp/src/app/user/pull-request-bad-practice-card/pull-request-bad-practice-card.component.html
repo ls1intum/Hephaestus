@@ -64,6 +64,8 @@
     @if (!isLoading()) {
       <div class="gap-2 space-x-0 text-left px-6 pb-2">
         <brn-collapsible-content>
+          <brn-separator hlmSeparator />
+          <app-bad-practice-summary [summary]="badPracticeSummary()"></app-bad-practice-summary>
           @for (badpractice of badPractices(); track badpractice.title) {
             <brn-separator hlmSeparator />
             <app-bad-practice-card

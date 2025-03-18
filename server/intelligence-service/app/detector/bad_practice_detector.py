@@ -29,21 +29,20 @@ class BadPractice(BaseModel):
     status: BadPracticeStatus = Field(description="The status of the bad practice.")
 
 
-class BadPracticeResult(BaseModel):
+class BadPracticeList(BaseModel):
     """A list of bad practices detected in a pull request."""
 
-    bad_practice_summary: str = Field(description= "A summary of the bad practices detected in the pull request.")
     bad_practices: List[BadPractice] = Field(
         description="A list of bad practices detected in a pull request."
     )
 
 
-def detect_bad_practices(title, description, lifecycle_state, bad_practice_summary, bad_practices) -> BadPracticeResult:
+def detect_bad_practices(title, description, lifecycle_state, bad_practice_summary, bad_practices) -> BadPracticeList:
     prompt_text = BAD_PRACTICE_PROMPT_TEST
     prompt_template = ChatPromptTemplate.from_template(prompt_text)
     prompt = prompt_template.invoke(
         {"title": title, "description": description, "lifecycle_state": lifecycle_state, "bad_practice_summary": bad_practice_summary, "bad_practices": bad_practices}
     )
-    structured_llm = model.with_structured_output(BadPracticeResult)
+    structured_llm = model.with_structured_output(BadPracticeList)
     response = structured_llm.invoke(prompt)
     return response
