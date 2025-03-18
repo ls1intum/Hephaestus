@@ -13,7 +13,8 @@ The diagram shows the system divided into Hephaestus-internal and external compo
 Internally, Hephaestus is based on a client-server architecture with multiple server components. 
 We differentiate between the _Application Server_ and the _Intelligence Server_ as well as the smaller _Webhook Ingest_ and the _User Management System_.
 
-Externally, Hephaestus is connected to the _Code Review System_, the _Notification System_, and the _Analytics Platform_. The _Code Review System_ is an abstraction for the actual Git hosting platform, e.g. GitHub or GitLab. 
+Externally, Hephaestus is connected to the _Code Review System_, the _Notification System_, and the _Analytics Platform_. 
+The _Code Review System_ is an abstraction for the actual Git hosting platform, e.g. GitHub or GitLab. 
 The _Webhook Ingest_ provides an endpoint this platform can send webhooks to. 
 The _Application Server_ on the other hand utilizes the platform's API to supplement the webhook data with additional information or fill in missing data. 
 The _User Management System_ utilizes the _Code Review System_ as identity provider to create a direct dependency for the user login. 
@@ -35,7 +36,8 @@ Note that the model is simplified and some relationships are not shown for brevi
 +Github's webhook structure is more or less directly mapped to the _Review_, _PullRequest_ and _Developer_ classes. 
 The original events contain lots of irrelevant and duplicate information, which is why we added certain relationships to the classes to reduce redundancy.
 
-Around these core classes, we added additional classes to model the gamification features. Most importantly, the _Leaderboard_ and _Reward_ abstractions, which model the leaderboard and the rewards system respectively. 
+Around these core classes, we added additional classes to model the gamification features. 
+Most importantly, the _Leaderboard_ and _Reward_ abstractions, which model the leaderboard and the rewards system respectively. 
 All gamification related data is managed by the _GamificationDashboard_.
 
 ```{figure} ./analysis_object_model.svg
