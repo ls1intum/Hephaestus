@@ -11,18 +11,26 @@ import org.springframework.stereotype.Component;
 @Component
 public class BadPracticeDetectorScheduler {
 
+    private static final String READY_TO_REVIEW = "ready to review";
     private static final String READY_TO_MERGE = "ready to merge";
 
     @Qualifier("applicationTaskExecutor")
     @Autowired
     TaskExecutor taskExecutor;
 
-    public void detectBadPracticeForPrIfReadyToMerge(
+    public void detectBadPracticeForPrIfReady(
         PullRequest pullRequest,
         Set<Label> oldLabels,
         Set<Label> newLabels
     ) {
         if (
+            newLabels.stream().anyMatch(label -> READY_TO_REVIEW.equals(label.getName())) &&
+            oldLabels.stream().noneMatch(label -> READY_TO_REVIEW.equals(label.getName()))
+        ) {
+            BadPracticeDetectorTask badPracticeDetectorTask = new BadPracticeDetectorTask();
+            badPracticeDetectorTask.setPullRequest(pullRequest);
+            taskExecutor.execute(badPracticeDetectorTask);
+        } else if (
             newLabels.stream().anyMatch(label -> READY_TO_MERGE.equals(label.getName())) &&
             oldLabels.stream().noneMatch(label -> READY_TO_MERGE.equals(label.getName()))
         ) {
