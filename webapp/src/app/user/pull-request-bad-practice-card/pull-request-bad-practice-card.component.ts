@@ -16,6 +16,7 @@ import { formatTitle } from '@app/utils';
 import { HlmSpinnerComponent } from '@spartan-ng/ui-spinner-helm';
 import { injectMutation, QueryClient } from '@tanstack/angular-query-experimental';
 import { lastValueFrom } from 'rxjs';
+import { BadPracticeSummaryComponent } from '@app/user/bad-practice-summary/bad-practice-summary.component';
 
 @Component({
   selector: 'app-pull-request-bad-practice-card',
@@ -32,7 +33,8 @@ import { lastValueFrom } from 'rxjs';
     BrnCollapsibleTriggerDirective,
     HlmButtonDirective,
     GithubLabelComponent,
-    HlmSpinnerComponent
+    HlmSpinnerComponent,
+    BadPracticeSummaryComponent
   ],
   standalone: true
 })
@@ -61,6 +63,7 @@ export class PullRequestBadPracticeCardComponent {
   isMerged = input<boolean>();
   pullRequestLabels = input<Array<LabelInfo>>();
   badPractices = input<Array<PullRequestBadPractice>>();
+  badPracticeSummary = input<string>('');
 
   displayCreated = computed(() => dayjs(this.createdAt()));
   displayTitle = computed(() => formatTitle(this.title() ?? ''));
