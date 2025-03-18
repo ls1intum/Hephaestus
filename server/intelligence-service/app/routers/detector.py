@@ -11,10 +11,13 @@ router = APIRouter(prefix="/detector", tags=["detector"])
 class DetectorRequest(BaseModel):
     title: str
     description: str
+    lifecycle_state: str
+    bad_practice_summary: str
     bad_practices: List[BadPractice]
 
 
 class DetectorResponse(BaseModel):
+    bad_practice_summary: str
     bad_practices: List[BadPractice]
 
 

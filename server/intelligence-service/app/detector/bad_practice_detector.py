@@ -1,3 +1,4 @@
+from enum import Enum
 from typing import List
 
 from langchain_core.prompts import ChatPromptTemplate
@@ -12,13 +13,20 @@ from app.models import get_model
 ChatModel = get_model(settings.MODEL_NAME)
 model = ChatModel(temperature=0.0, max_tokens=4096)
 
+class BadPracticeStatus(str, Enum):
+    GOOD_PRACTICE = "Good Practice"
+    FIXED = "Fixed"
+    CRITICAL = "Critical Issue"
+    NORMAL = "Normal Issue"
+    MINOR = "Minor Issue"
+    WONT_FIX = "Won't Fix"
 
 class BadPractice(BaseModel):
     """A detected bad practice in a pull request."""
 
     title: str = Field(description="The title of the bad practice.")
     description: str = Field(description="The description of the bad practice.")
-    resolved: bool = Field(description="Whether the bad practice has been resolved.")
+    status: BadPracticeStatus = Field(description="The status of the bad practice.")
 
 
 class BadPracticeList(BaseModel):
@@ -29,11 +37,11 @@ class BadPracticeList(BaseModel):
     )
 
 
-def detect_bad_practices(title, description, bad_practices) -> BadPracticeList:
+def detect_bad_practices(title, description, lifecycle_state, bad_practice_summary, bad_practices) -> BadPracticeList:
     prompt_text = BAD_PRACTICE_PROMPT_TEST
     prompt_template = ChatPromptTemplate.from_template(prompt_text)
     prompt = prompt_template.invoke(
-        {"title": title, "description": description, "bad_practices": bad_practices}
+        {"title": title, "description": description, "lifecycle_state": lifecycle_state, "bad_practice_summary": bad_practice_summary, "bad_practices": bad_practices}
     )
     structured_llm = model.with_structured_output(BadPracticeList)
     response = structured_llm.invoke(prompt)
