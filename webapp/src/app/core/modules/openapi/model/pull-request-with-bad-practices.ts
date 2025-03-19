@@ -21,13 +21,14 @@ export interface PullRequestWithBadPractices {
     state: PullRequestWithBadPractices.StateEnum;
     isDraft: boolean;
     isMerged: boolean;
-    labels?: Array<LabelInfo>;
-    repository?: RepositoryInfo;
+    labels: Array<LabelInfo>;
+    repository: RepositoryInfo;
     additions: number;
     deletions: number;
     htmlUrl: string;
-    createdAt?: string;
-    badPractices?: Array<PullRequestBadPractice>;
+    createdAt: string;
+    badPracticeSummary: string;
+    badPractices: Array<PullRequestBadPractice>;
 }
 export namespace PullRequestWithBadPractices {
     export type StateEnum = 'OPEN' | 'CLOSED';
