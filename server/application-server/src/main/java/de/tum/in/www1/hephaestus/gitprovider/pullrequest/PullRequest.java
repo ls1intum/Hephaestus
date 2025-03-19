@@ -4,21 +4,13 @@ import de.tum.in.www1.hephaestus.gitprovider.issue.Issue;
 import de.tum.in.www1.hephaestus.gitprovider.pullrequestreview.PullRequestReview;
 import de.tum.in.www1.hephaestus.gitprovider.pullrequestreviewcomment.PullRequestReviewComment;
 import de.tum.in.www1.hephaestus.gitprovider.user.User;
-import jakarta.persistence.CascadeType;
-import jakarta.persistence.DiscriminatorValue;
-import jakarta.persistence.Entity;
-import jakarta.persistence.JoinColumn;
-import jakarta.persistence.JoinTable;
-import jakarta.persistence.ManyToMany;
-import jakarta.persistence.ManyToOne;
-import jakarta.persistence.OneToMany;
+import jakarta.persistence.*;
+
 import java.time.OffsetDateTime;
 import java.util.HashSet;
 import java.util.Set;
-import lombok.Getter;
-import lombok.NoArgsConstructor;
-import lombok.Setter;
-import lombok.ToString;
+
+import lombok.*;
 
 @Entity
 @DiscriminatorValue(value = "PULL_REQUEST")
@@ -72,6 +64,9 @@ public class PullRequest extends Issue {
     @OneToMany(mappedBy = "pullRequest", cascade = CascadeType.REMOVE, orphanRemoval = true)
     @ToString.Exclude
     private Set<PullRequestReviewComment> reviewComments = new HashSet<>();
+
+    @Lob
+    private String badPracticeSummary;
 
     @Override
     public boolean isPullRequest() {

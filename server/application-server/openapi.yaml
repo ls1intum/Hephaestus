@@ -815,18 +815,25 @@ components:
         createdAt:
           type: string
           format: date-time
+        badPracticeSummary:
+          type: string
         badPractices:
           type: array
           items:
             $ref: "#/components/schemas/PullRequestBadPractice"
       required:
       - additions
+      - badPracticeSummary
+      - badPractices
+      - createdAt
       - deletions
       - htmlUrl
       - id
       - isDraft
       - isMerged
+      - labels
       - number
+      - repository
       - state
       - title
     PullRequestBaseInfo:
@@ -957,8 +964,19 @@ components:
           type: string
         description:
           type: string
-        resolved:
-          type: boolean
+        state:
+          type: string
+          enum:
+          - GOOD_PRACTICE
+          - FIXED
+          - CRITICAL_ISSUE
+          - NORMAL_ISSUE
+          - MINOR_ISSUE
+          - WONT_FIX
+      required:
+      - description
+      - state
+      - title
     LeagueChange:
       type: object
       properties:

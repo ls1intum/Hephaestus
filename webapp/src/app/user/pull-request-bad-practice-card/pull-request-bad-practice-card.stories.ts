@@ -35,7 +35,8 @@ export const Default: Story = {
         title: 'Unchecked checkbox in description',
         description: 'Unchecked checkboxes in the description are not allowed.'
       }
-    ]
+    ],
+    badPracticeSummary: 'We found 2 bad practices in this pull request. Please fix them. Thank you!'
   }
 };
 

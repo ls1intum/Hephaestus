@@ -28,5 +28,5 @@ class DetectorResponse(BaseModel):
 )
 def detect(request: DetectorRequest):
     return detect_bad_practices(
-        request.title, request.description, request.bad_practices
+        request.title, request.description, request.lifecycle_state, request.bad_practice_summary, request.bad_practices
     )
