@@ -44,3 +44,13 @@ export const Leagues = [
 export function formatTitle(title: string): string {
   return title.replace(/`([^`]+)`/g, '<code class="textCode">$1</code>');
 }
+
+// Mapping states to emojis and Tailwind styles
+export const stateConfig = {
+  GOOD_PRACTICE: { emoji: '🚀', text: 'Good Practice' },
+  FIXED: { emoji: '✅', text: 'Fixed' },
+  CRITICAL_ISSUE: { emoji: '🔥', text: 'Critical Issue' },
+  NORMAL_ISSUE: { emoji: '⚠️', text: 'Normal Issue' },
+  MINOR_ISSUE: { emoji: '🟡', text: 'Minor Issue' },
+  WONT_FIX: { emoji: '🚫', text: "Won't Fix" }
+};
