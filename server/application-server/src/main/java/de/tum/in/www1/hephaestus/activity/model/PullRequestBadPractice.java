@@ -35,6 +35,8 @@ public class PullRequestBadPractice {
     @JoinColumn(name = "pullrequest_id")
     private PullRequest pullrequest;
 
+    private boolean resolved;
+
     @NonNull
     private PullRequestBadPracticeState state;
 }

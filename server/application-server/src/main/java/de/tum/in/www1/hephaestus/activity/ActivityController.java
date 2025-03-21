@@ -1,7 +1,9 @@
 package de.tum.in.www1.hephaestus.activity;
 
 import de.tum.in.www1.hephaestus.activity.model.ActivityDTO;
+import de.tum.in.www1.hephaestus.activity.model.BadPracticeFeedbackDTO;
 import de.tum.in.www1.hephaestus.activity.model.PullRequestBadPracticeDTO;
+import jakarta.ws.rs.NotFoundException;
 import java.util.List;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
@@ -32,5 +34,28 @@ public class ActivityController {
     ) {
         List<PullRequestBadPracticeDTO> badPractice = activityService.detectBadPracticesForPullRequest(pullRequestId);
         return ResponseEntity.ok(badPractice);
+    }
+
+    @PostMapping("/badpractice/{badPracticeId}/resolve")
+    public ResponseEntity<Void> resolveBadPractice(@PathVariable Long badPracticeId) {
+        try {
+            activityService.resolveBadPractice(badPracticeId);
+        } catch (NotFoundException e) {
+            return ResponseEntity.notFound().build();
+        }
+        return ResponseEntity.ok().build();
+    }
+
+    @PostMapping("/badpractice/{badPracticeId}/feedback")
+    public ResponseEntity<Void> provideFeedbackForBadPractice(
+        @PathVariable Long badPracticeId,
+        @RequestBody BadPracticeFeedbackDTO feedback
+    ) {
+        try {
+            activityService.provideFeedbackForBadPractice(badPracticeId, feedback);
+        } catch (NotFoundException e) {
+            return ResponseEntity.notFound().build();
+        }
+        return ResponseEntity.ok().build();
     }
 }
