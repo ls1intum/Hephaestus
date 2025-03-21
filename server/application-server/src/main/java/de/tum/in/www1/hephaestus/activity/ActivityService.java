@@ -107,7 +107,7 @@ public class ActivityService {
         PullRequestBadPractice badPractice = pullRequestBadPracticeRepository
             .findById(badPracticeId)
             .orElseThrow(NotFoundException::new);
-        badPractice.setUserResolved(true);
+        badPractice.setResolved(true);
         pullRequestBadPracticeRepository.save(badPractice);
     }
 

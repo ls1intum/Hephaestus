@@ -35,9 +35,9 @@ import { PullRequestBadPractice } from '@app/core/modules/openapi';
     BrnSelectImports,
     HlmInputDirective,
     ReactiveFormsModule,
-    FormsModule
+    FormsModule,
+    HlmCardModule
   ],
-  imports: [HlmCardModule],
   templateUrl: './bad-practice-card.component.html',
   styles: ``,
   providers: [provideIcons({ lucideEllipsis })]
@@ -52,6 +52,8 @@ export class BadPracticeCardComponent {
   title = input.required<string>();
   description = input.required<string>();
   state = input.required<PullRequestBadPractice.StateEnum>();
+  id = input.required<number>();
+  resolved = input<boolean>();
 
   // Mapping states to emojis and Tailwind styles
   stateConfig = {
@@ -66,11 +68,6 @@ export class BadPracticeCardComponent {
   getEmoji(): string {
     return this.state() ? this.stateConfig[this.state()].emoji : '❓';
   }
-  id = input.required<number>();
-  title = input.required<string>();
-  description = input.required<string>();
-  resolved = input<boolean>();
-  userResolved = input<boolean>();
 
   _newExplanation = new FormControl('');
   _selectedType = signal<string | undefined>(undefined);

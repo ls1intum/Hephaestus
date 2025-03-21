@@ -938,12 +938,6 @@ components:
           type: string
         resolved:
           type: boolean
-        userResolved:
-          type: boolean
-      required:
-      - description
-      - id
-      - title
         state:
           type: string
           enum:
@@ -955,6 +949,7 @@ components:
           - WONT_FIX
       required:
       - description
+      - id
       - state
       - title
     LeagueChange:

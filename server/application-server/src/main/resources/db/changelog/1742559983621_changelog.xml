@@ -1,23 +1,26 @@
 <?xml version="1.1" encoding="UTF-8" standalone="no"?>
 <databaseChangeLog xmlns="http://www.liquibase.org/xml/ns/dbchangelog" xmlns:ext="http://www.liquibase.org/xml/ns/dbchangelog-ext" xmlns:pro="http://www.liquibase.org/xml/ns/pro" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog-ext http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-ext.xsd http://www.liquibase.org/xml/ns/pro http://www.liquibase.org/xml/ns/pro/liquibase-pro-latest.xsd http://www.liquibase.org/xml/ns/dbchangelog http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
-    <changeSet author="iam-flo" id="1742229405056-1">
+    <changeSet author="iam-flo" id="1742559983621-1">
         <createTable tableName="bad_practice_feedback">
             <column autoIncrement="true" name="id" type="BIGINT">
                 <constraints nullable="false" primaryKey="true" primaryKeyName="bad_practice_feedbackPK"/>
             </column>
             <column name="explanation" type="VARCHAR(255)"/>
-            <column name="type" type="VARCHAR(255)"/>
+            <column name="type" type="oid"/>
             <column name="pull_request_bad_practice_id" type="BIGINT"/>
         </createTable>
     </changeSet>
-    <changeSet author="iam-flo" id="1742229405056-2">
-        <addColumn tableName="pullrequestbadpractice">
-            <column name="user_resolved" type="boolean">
-                <constraints nullable="false"/>
-            </column>
+    <changeSet author="iam-flo" id="1742559983621-2">
+        <addColumn tableName="issue">
+            <column name="bad_practice_summary" type="oid"/>
         </addColumn>
     </changeSet>
-    <changeSet author="iam-flo" id="1742229405056-3">
+    <changeSet author="iam-flo" id="1742559983621-3">
+        <addColumn tableName="pullrequestbadpractice">
+            <column name="state" type="smallint"/>
+        </addColumn>
+    </changeSet>
+    <changeSet author="iam-flo" id="1742559983621-4">
         <addForeignKeyConstraint baseColumnNames="pull_request_bad_practice_id" baseTableName="bad_practice_feedback" constraintName="FK34k5tg4qb6gy4g7tn9q8uhogl" deferrable="false" initiallyDeferred="false" referencedColumnNames="id" referencedTableName="pullrequestbadpractice" validate="true"/>
     </changeSet>
 </databaseChangeLog>

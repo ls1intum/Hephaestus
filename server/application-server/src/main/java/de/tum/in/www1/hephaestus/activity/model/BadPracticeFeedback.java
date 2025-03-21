@@ -22,5 +22,6 @@ public class BadPracticeFeedback {
     String type;
 
     @NonNull
+    @Lob
     private String explanation;
 }
