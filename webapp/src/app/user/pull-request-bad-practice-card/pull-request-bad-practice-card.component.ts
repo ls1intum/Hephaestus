@@ -16,7 +16,6 @@ import { formatTitle } from '@app/utils';
 import { HlmSpinnerComponent } from '@spartan-ng/ui-spinner-helm';
 import { injectMutation, QueryClient } from '@tanstack/angular-query-experimental';
 import { lastValueFrom } from 'rxjs';
-import { BadPracticeSummaryComponent } from '@app/user/bad-practice-summary/bad-practice-summary.component';
 
 @Component({
   selector: 'app-pull-request-bad-practice-card',
@@ -33,8 +32,7 @@ import { BadPracticeSummaryComponent } from '@app/user/bad-practice-summary/bad-
     BrnCollapsibleTriggerDirective,
     HlmButtonDirective,
     GithubLabelComponent,
-    HlmSpinnerComponent,
-    BadPracticeSummaryComponent
+    HlmSpinnerComponent
   ],
   standalone: true
 })

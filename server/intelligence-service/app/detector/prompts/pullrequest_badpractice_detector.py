@@ -40,16 +40,19 @@ LIFECYCLE OF PULL REQUEST:
 - Draft: The pull request is still in draft and changes are still expected. Only detect relevant issues.
 - Open: The pull request is open. Changes are still expected. Still detect all relevant issues that can be fixed before the pull request is reviewed.
 - Ready to review: The pull request is ready to be reviewed. Detect all issues that affect the review process.
-- Ready to merge: The pull request is ready to be merged. The pull request should be final and all issues be resolved. Detect all issues that affect the merge process. 
+- Ready to merge: The pull request is ready to be merged. The pull request should be final and all issues be resolved. Detect all issues that affect the merge process. All open issues are now critical.
 
 REQUIREMENTS:
 1. Identify and describe all bad practices in the pull request title and description.
-2. Provide a clear title and a concise description for each detected bad practice.
+2. Provide a clear title, a concise description, and an adequate status for each detected bad practice.
 3. Return a list of all detected bad practices in the pull request. Return multiple bad practices if necessary.
 4. Use clear and concise language to describe the bad practices.
 5. Keep titles consistent between detections so that the same bad practice is identified in the same way.
 6. Multiple runs on the same title and description should return the same results if nothing has changed.
 7. Provide a friendly and concise summary of all detected bad practices in the pull request encouraging the user to improve.
+
+RESTRICTIONS:
+- Ignore Code Rabbit summaries
 
 Pull Request Title: {title}
 Pull Request Description: {description}
