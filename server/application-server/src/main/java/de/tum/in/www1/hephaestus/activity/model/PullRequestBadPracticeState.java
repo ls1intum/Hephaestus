@@ -1,7 +1,5 @@
 package de.tum.in.www1.hephaestus.activity.model;
 
-import com.fasterxml.jackson.annotation.JsonCreator;
-import com.fasterxml.jackson.annotation.JsonValue;
 import de.tum.in.www1.hephaestus.intelligenceservice.model.BadPracticeStatus;
 
 public enum PullRequestBadPracticeState {
@@ -20,7 +18,6 @@ public enum PullRequestBadPracticeState {
             case NORMAL_ISSUE -> NORMAL_ISSUE;
             case MINOR_ISSUE -> MINOR_ISSUE;
             case WON_T_FIX -> WONT_FIX;
-            default -> throw new IllegalArgumentException("Unexpected value '" + status + "'");
         };
     }
 
