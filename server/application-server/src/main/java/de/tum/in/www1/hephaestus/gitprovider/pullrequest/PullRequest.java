@@ -5,11 +5,9 @@ import de.tum.in.www1.hephaestus.gitprovider.pullrequestreview.PullRequestReview
 import de.tum.in.www1.hephaestus.gitprovider.pullrequestreviewcomment.PullRequestReviewComment;
 import de.tum.in.www1.hephaestus.gitprovider.user.User;
 import jakarta.persistence.*;
-
 import java.time.OffsetDateTime;
 import java.util.HashSet;
 import java.util.Set;
-
 import lombok.*;
 
 @Entity

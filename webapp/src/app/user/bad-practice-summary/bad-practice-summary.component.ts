@@ -7,6 +7,5 @@ import { Component, input } from '@angular/core';
   styles: ``
 })
 export class BadPracticeSummaryComponent {
-
   summary = input<string>();
 }

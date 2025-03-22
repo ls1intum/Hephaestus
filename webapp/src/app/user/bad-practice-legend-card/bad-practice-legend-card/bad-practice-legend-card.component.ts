@@ -1,5 +1,5 @@
 import { Component, computed } from '@angular/core';
-import { stateConfig} from '@app/utils';
+import { stateConfig } from '@app/utils';
 import { HlmCardImports } from '@spartan-ng/ui-card-helm';
 
 @Component({

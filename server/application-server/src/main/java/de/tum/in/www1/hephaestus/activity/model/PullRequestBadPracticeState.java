@@ -5,7 +5,6 @@ import com.fasterxml.jackson.annotation.JsonValue;
 import de.tum.in.www1.hephaestus.intelligenceservice.model.BadPracticeStatus;
 
 public enum PullRequestBadPracticeState {
-
     GOOD_PRACTICE,
     FIXED,
     CRITICAL_ISSUE,

@@ -7,7 +7,6 @@ import de.tum.in.www1.hephaestus.config.IntelligenceServiceConfig.BadPracticeDet
 import de.tum.in.www1.hephaestus.gitprovider.pullrequest.PullRequest;
 import de.tum.in.www1.hephaestus.gitprovider.pullrequest.PullRequestRepository;
 import de.tum.in.www1.hephaestus.intelligenceservice.model.BadPractice;
-import de.tum.in.www1.hephaestus.intelligenceservice.model.BadPracticeStatus;
 import de.tum.in.www1.hephaestus.intelligenceservice.model.DetectorRequest;
 import de.tum.in.www1.hephaestus.intelligenceservice.model.DetectorResponse;
 import java.util.LinkedList;
@@ -71,7 +70,9 @@ public class PullRequestBadPracticeDetector {
             for (PullRequestBadPractice existingBadPractice : existingBadPractices) {
                 if (existingBadPractice.getTitle().equals(badPractice.getTitle())) {
                     existingBadPractice.setDescription(badPractice.getDescription());
-                    existingBadPractice.setState(PullRequestBadPracticeState.fromBadPracticeStatus(badPractice.getStatus()));
+                    existingBadPractice.setState(
+                        PullRequestBadPracticeState.fromBadPracticeStatus(badPractice.getStatus())
+                    );
                     detectedBadPractices.add(pullRequestBadPracticeRepository.save(existingBadPractice));
                     exists = true;
                     break;
@@ -106,9 +107,13 @@ public class PullRequestBadPracticeDetector {
     private String getLifecycleStateOfPullRequest(PullRequest pullRequest) {
         if (pullRequest.isDraft()) {
             return "Draft";
-        } else if (pullRequest.getLabels().stream().anyMatch(label -> label.getName().equalsIgnoreCase(READY_TO_MERGE))) {
+        } else if (
+            pullRequest.getLabels().stream().anyMatch(label -> label.getName().equalsIgnoreCase(READY_TO_MERGE))
+        ) {
             return "Ready to merge";
-        } else if (pullRequest.getLabels().stream().anyMatch(label -> label.getName().equalsIgnoreCase(READY_TO_REVIEW))) {
+        } else if (
+            pullRequest.getLabels().stream().anyMatch(label -> label.getName().equalsIgnoreCase(READY_TO_REVIEW))
+        ) {
             return "Ready to review";
         } else {
             return "Open";

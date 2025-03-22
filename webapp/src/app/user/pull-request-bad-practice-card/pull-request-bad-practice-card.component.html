@@ -67,14 +67,16 @@
           <brn-separator hlmSeparator />
           <app-bad-practice-summary [summary]="badPracticeSummary()"></app-bad-practice-summary>
           @for (badpractice of badPractices(); track badpractice.title) {
-            <brn-separator hlmSeparator />
-            <app-bad-practice-card
-              [id]="badpractice.id"
-              [title]="badpractice.title"
-              [description]="badpractice.description"
-              [resolved]="badpractice.resolved"
-              [state]="badpractice.state"
-            ></app-bad-practice-card>
+            @if (!badpractice.resolved) {
+              <brn-separator hlmSeparator />
+              <app-bad-practice-card
+                [id]="badpractice.id"
+                [title]="badpractice.title"
+                [description]="badpractice.description"
+                [resolved]="badpractice.resolved"
+                [state]="badpractice.state"
+              ></app-bad-practice-card>
+            }
           }
         </brn-collapsible-content>
       </div>
