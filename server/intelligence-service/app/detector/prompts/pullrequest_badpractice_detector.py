@@ -25,7 +25,7 @@ description, mark it as fixed.
 
 GUIDELINES:
 1. The title and description should be clear, concise, and descriptive.
-2. The title should be specific and summarize the changes made in the pull request.
+2. The title should be specific and summarize the changes described in the description of the pull request.
 3. The description should provide additional context and details about the changes.
 4. The title and description should be free of spelling and grammatical errors.
 5. The title and description should follow the project's guidelines and conventions.
@@ -34,6 +34,7 @@ GUIDELINES:
 8. The description should not include open TODOs
 9. In the description the motivation and description sections should be filled out.
 10. The description should not be empty.
+11. The title should include the name of the module where the changes are made.
 
 LIFECYCLE OF PULL REQUEST:
 - Draft: The pull request is still in draft and changes are still expected. Only detect relevant issues.
