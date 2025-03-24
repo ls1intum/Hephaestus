@@ -13,6 +13,7 @@ from app.models import get_model
 ChatModel = get_model(settings.MODEL_NAME)
 model = ChatModel(temperature=0.0, max_tokens=4096)
 
+
 class BadPracticeStatus(str, Enum):
     GOOD_PRACTICE = "Good Practice"
     FIXED = "Fixed"
@@ -20,6 +21,7 @@ class BadPracticeStatus(str, Enum):
     NORMAL = "Normal Issue"
     MINOR = "Minor Issue"
     WONT_FIX = "Won't Fix"
+
 
 class BadPractice(BaseModel):
     """A detected bad practice in a pull request."""
@@ -32,17 +34,27 @@ class BadPractice(BaseModel):
 class BadPracticeResult(BaseModel):
     """A list of bad practices detected in a pull request."""
 
-    bad_practice_summary: str = Field(description= "A summary of the bad practices detected in the pull request.")
+    bad_practice_summary: str = Field(
+        description="A summary of the bad practices detected in the pull request."
+    )
     bad_practices: List[BadPractice] = Field(
         description="A list of bad practices detected in a pull request."
     )
 
 
-def detect_bad_practices(title, description, lifecycle_state, bad_practice_summary, bad_practices) -> BadPracticeResult:
+def detect_bad_practices(
+    title, description, lifecycle_state, bad_practice_summary, bad_practices
+) -> BadPracticeResult:
     prompt_text = BAD_PRACTICE_PROMPT_TEST
     prompt_template = ChatPromptTemplate.from_template(prompt_text)
     prompt = prompt_template.invoke(
-        {"title": title, "description": description, "lifecycle_state": lifecycle_state, "bad_practice_summary": bad_practice_summary, "bad_practices": bad_practices}
+        {
+            "title": title,
+            "description": description,
+            "lifecycle_state": lifecycle_state,
+            "bad_practice_summary": bad_practice_summary,
+            "bad_practices": bad_practices,
+        }
     )
     structured_llm = model.with_structured_output(BadPracticeResult)
     response = structured_llm.invoke(prompt)
