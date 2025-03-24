@@ -39,29 +39,35 @@ GUIDELINES:
 
 BAD PRACTICE SEVERITY LEVELS:
 Each bad practice should be categorized into one of the following criticality levels:
-- Critical: This issue must be addressed before the PR can move forward. It severely impacts the review or merge process.
+- Critical: This issue must be addressed before the PR can move forward. \
+    It severely impacts the review or merge process.
 - Normal: A issue that could cause confusion or process inefficiencies. Should be fixed before merging.
-- Low: A minor issue that does not impact functionality but should be improved for better clarity or adherence to best practices.
+- Low: A minor issue that does not impact functionality but should be improved for better clarity \
+    or adherence to best practices.
 - Fixed: A previously detected issue that has been resolved.
 - Won't Fix: An issue that is acknowledged but will not be addressed. Can be ignored moving forward.
 - Good Practice: A positive practice that should be maintained or encouraged.
 
 LIFECYCLE OF PULL REQUEST & ISSUE PRIORITIZATION:
 Adjust feedback based on the PR state. The severity level should be adjusted based on the PR lifecycle state.:
-- Draft: The pull request is still in progress. Focus on structural issues but avoid flagging minor details that will likely change. \
-    Only check the title according to the guidelines. Only check that the description includes a short summary or explanation of the purpose.
-- Open: The PR is still being worked on, but feedback is needed. Identify all relevant issues. The title should be correct. \
-    The description should be filled out with motivation and description sections.
+- Draft: The pull request is still in progress. Focus on structural issues but avoid flagging minor details \
+    that will likely change. Only check the title according to the guidelines. \
+    Only check that the description includes a short summary or explanation of the purpose.
+- Open: The PR is still being worked on, but feedback is needed. Identify all relevant issues. \
+    The title should be correct. The description should be filled out with motivation and description sections.
 - Ready to review: The PR is now in the review stage. All issues that impact the review process should be highlighted. \
-    Title and description should be clear and concise. All sections should be filled out. All guidelines should be followed.
-- Ready to merge: The PR should be in final shape. Any remaining issues are now Critical. All flagged issues should have been resolved by this point.
+    Title and description should be clear and concise. All sections should be filled out. \
+    All guidelines should be followed.
+- Ready to merge: The PR should be in final shape. Any remaining issues are now Critical. \
+    All flagged issues should have been resolved by this point.
 
 REQUIREMENTS:
 1. Identify and describe all bad practices in the pull request title and description.
 2. Provide a clear title, a concise description, and a severity level for each detected bad practice.
 3. Suggest actionable solutions for fixing bad practices where possible.
 4. Ensure that detected issues remain consistent across multiple runs if nothing has changed.
-5. Provide a friendly and concise summary of all detected bad practices in the pull request, encouraging the user to improve.
+5. Provide a friendly and concise summary of all detected bad practices in the pull request, \
+    encouraging the user to improve.
 6. Highlight and acknowledge good practices when present.
 7. Track previously detected bad practices, marking them as "fixed" when they are resolved.
 
