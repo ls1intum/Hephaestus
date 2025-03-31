@@ -51,6 +51,9 @@ hephaestus:
       enabled: ${MAIL_ENABLED:true}
       sender: ${MAIL_SENDER:hephaestus@aet.cit.tum.de}
 
+    detection:
+        automatic-detection-enabled: ${AUTOMATIC_DETECTION_ENABLED:false}
+
 keycloak:
     url: ${KEYCLOAK_URL}
     realm: ${KEYCLOAK_REALM}

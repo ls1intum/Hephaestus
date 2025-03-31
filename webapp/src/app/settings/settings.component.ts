@@ -17,7 +17,6 @@ import {
 } from '@spartan-ng/ui-alertdialog-helm';
 import { HlmButtonDirective } from '@spartan-ng/ui-button-helm';
 import { HlmLabelDirective } from '@spartan-ng/ui-label-helm';
-import { FormControl, ReactiveFormsModule } from '@angular/forms';
 import { HlmSwitchComponent } from '@spartan-ng/ui-switch-helm';
 
 @Component({
@@ -35,8 +34,7 @@ import { HlmSwitchComponent } from '@spartan-ng/ui-switch-helm';
     HlmAlertDialogContentComponent,
     HlmButtonDirective,
     HlmLabelDirective,
-    HlmSwitchComponent,
-    ReactiveFormsModule
+    HlmSwitchComponent
   ],
   templateUrl: './settings.component.html'
 })
@@ -44,9 +42,17 @@ export class SettingsComponent {
   router = inject(Router);
   securityStore = inject(SecurityStore);
   userService = inject(UserService);
-  _newNotificationEnabled = new FormControl(false);
 
-  mutation = injectMutation(() => ({
+  settingsQuery = injectQuery(() => ({
+    queryKey: ['settings'],
+    queryFn: async () => lastValueFrom(this.userService.getUserSettings())
+  }));
+
+  settingsMutation = injectMutation(() => ({
+    mutationFn: (settings: UserSettings) => lastValueFrom(this.userService.updateUserSettings(settings))
+  }));
+
+  deleteMutation = injectMutation(() => ({
     mutationFn: () => lastValueFrom(this.userService.deleteUser()),
     onSuccess: () => {
       this.securityStore.signOut();
@@ -54,20 +60,11 @@ export class SettingsComponent {
     }
   }));
 
-  deleteAccount() {
-    this.mutation.mutate();
+  updateSettings(event: boolean) {
+    this.settingsMutation.mutate({ receiveNotifications: event });
   }
 
-  settingsQuery = injectQuery(() => ({
-    queryKey: ['settings'],
-    queryFn: async () => lastValueFrom(this.userService.getUserSettings()).then((settings) => this._newNotificationEnabled.setValue(settings.receiveNotifications ?? false))
-  }));
-
-  settingsMutation = injectMutation(() => ({
-    mutationFn: (settings: UserSettings) => lastValueFrom(this.userService.updateUserSettings(settings))
-  }));
-
-  saveSettings() {
-    this.settingsMutation.mutate({ receiveNotifications: this._newNotificationEnabled.value ?? false });
+  deleteAccount() {
+    this.deleteMutation.mutate();
   }
 }
