@@ -100,7 +100,7 @@ public class User extends BaseGitServiceEntity {
     private Set<PullRequestReviewComment> reviewComments = new HashSet<>();
 
     @NonNull
-    private boolean notificationsEnabled = false;
+    private boolean notificationsEnabled = true;
 
     // Current ranking points for the leaderboard leagues
     private int leaguePoints;
