@@ -19,7 +19,7 @@ export class SubteamsComponent {
   });
 
   sortMembers = (team: TeamInfo) => {
-    return Array.from(team.members).sort((a, b) => a.name.localeCompare(b.name));
+    return team.members.sort((a, b) => a.name.localeCompare(b.name));
   };
 
   teamsQuery = injectQuery(() => ({
