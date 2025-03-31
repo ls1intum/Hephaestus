@@ -38,7 +38,7 @@
   <brn-column-def name="hidden" class="w-20">
     <hlm-th *brnHeaderDef>Hidden</hlm-th>
     <hlm-td *brnCellDef="let element">
-      <hlm-checkbox [checked]="element.hidden" (changed)="mutateHideTeam(element, !element.hidden)" />
+      <hlm-checkbox [checked]="element.hidden" (checkedChange)="mutateHideTeam(element, $event)" />
     </hlm-td>
   </brn-column-def>
   <brn-column-def name="color" class="w-28">

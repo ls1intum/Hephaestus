@@ -244,12 +244,13 @@ export class WorkspaceTeamsTableComponent {
 
   hideTeam = injectMutation(() => ({
     mutationFn: ({ teamId, hidden }: { teamId: number; hidden: boolean }) => lastValueFrom(this.teamService.hideTeam(teamId, hidden)),
-    queryKey: ['workspace', 'team', 'hide'],
-    onSettled: () => this.invalidateTeams()
+    queryKey: ['workspace', 'team', 'hide']
   }));
 
-  protected mutateHideTeam(team: TeamInfo, hidden: boolean) {
-    this.hideTeam.mutate({ teamId: team.id, hidden });
+  protected mutateHideTeam(team: TeamInfo, hidden: boolean | 'indeterminate') {
+    if (hidden !== 'indeterminate') {
+      this.hideTeam.mutate({ teamId: team.id, hidden });
+    }
   }
 
   protected copyName(element: TeamInfo) {
