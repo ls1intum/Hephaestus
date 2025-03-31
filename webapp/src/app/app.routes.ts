@@ -14,7 +14,7 @@ import { AdminGuard } from '@app/core/security/admin.guard';
 import { AuthGuard } from '@app/core/security/auth.guard';
 import { MentorGuard } from '@app/core/security/mentor.guard';
 import { ActivityDashboardComponent } from '@app/home/activity/activity-dashboard.component';
-import { SubteamsComponent } from '@app/subteams/subteams/subteams.component';
+import { SubteamsComponent } from '@app/subteams/subteams.component';
 
 export const routes: Routes = [
   // Public routes
