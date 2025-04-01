@@ -9,7 +9,6 @@ import de.tum.in.www1.hephaestus.gitprovider.pullrequest.PullRequestRepository;
 import de.tum.in.www1.hephaestus.intelligenceservice.model.BadPractice;
 import de.tum.in.www1.hephaestus.intelligenceservice.model.DetectorRequest;
 import de.tum.in.www1.hephaestus.intelligenceservice.model.DetectorResponse;
-
 import java.time.OffsetDateTime;
 import java.util.LinkedList;
 import java.util.List;
@@ -47,9 +46,11 @@ public class PullRequestBadPracticeDetector {
             pullRequest.getId()
         );
 
-        if (pullRequest.getUpdatedAt() != null &&
-                pullRequest.getLastDetectionTime() != null &&
-                pullRequest.getUpdatedAt().isBefore(pullRequest.getLastDetectionTime())) {
+        if (
+            pullRequest.getUpdatedAt() != null &&
+            pullRequest.getLastDetectionTime() != null &&
+            pullRequest.getUpdatedAt().isBefore(pullRequest.getLastDetectionTime())
+        ) {
             logger.info("Pull request has not been updated since last detection. Skipping detection.");
             return existingBadPractices;
         }

@@ -4,9 +4,8 @@ import de.tum.in.www1.hephaestus.activity.model.*;
 import de.tum.in.www1.hephaestus.gitprovider.pullrequest.PullRequest;
 import de.tum.in.www1.hephaestus.gitprovider.pullrequest.PullRequestRepository;
 import de.tum.in.www1.hephaestus.gitprovider.user.UserRepository;
-import java.util.List;
-
 import jakarta.ws.rs.QueryParam;
+import java.util.List;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -48,7 +47,9 @@ public class ActivityController {
     }
 
     @PostMapping("/pullrequest/{pullRequestId}/badpractices")
-    public ResponseEntity<List<PullRequestBadPracticeDTO>> detectBadPracticesForPullRequest(@PathVariable Long pullRequestId) {
+    public ResponseEntity<List<PullRequestBadPracticeDTO>> detectBadPracticesForPullRequest(
+        @PathVariable Long pullRequestId
+    ) {
         var user = userRepository.getCurrentUser();
         PullRequest pullRequest = pullRequestRepository.findById(pullRequestId).orElse(null);
 
@@ -65,7 +66,10 @@ public class ActivityController {
     }
 
     @PostMapping("/badpractice/{badPracticeId}/resolve")
-    public ResponseEntity<Void> resolveBadPractice(@PathVariable Long badPracticeId, @QueryParam("state") PullRequestBadPracticeState state) {
+    public ResponseEntity<Void> resolveBadPractice(
+        @PathVariable Long badPracticeId,
+        @QueryParam("state") PullRequestBadPracticeState state
+    ) {
         var user = userRepository.getCurrentUser();
         var badPractice = pullRequestBadPracticeRepository.findById(badPracticeId);
 
