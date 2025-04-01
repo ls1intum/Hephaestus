@@ -45,12 +45,13 @@ export function formatTitle(title: string): string {
   return title.replace(/`([^`]+)`/g, '<code class="textCode">$1</code>');
 }
 
-// Mapping states to emojis and Tailwind styles
+// Mapping states to icons and text
 export const stateConfig = {
-  GOOD_PRACTICE: { emoji: '🚀', text: 'Good Practice' },
-  FIXED: { emoji: '✅', text: 'Fixed' },
-  CRITICAL_ISSUE: { emoji: '🔥', text: 'Critical Issue' },
-  NORMAL_ISSUE: { emoji: '⚠️', text: 'Normal Issue' },
-  MINOR_ISSUE: { emoji: '🟡', text: 'Minor Issue' },
-  WONT_FIX: { emoji: '🚫', text: "Won't Fix" }
+  GOOD_PRACTICE: { icon: 'lucideRocket', text: 'Good Practice' },
+  FIXED: { icon: 'lucideCheck', text: 'Fixed' },
+  CRITICAL_ISSUE: { icon: 'lucideFlame', text: 'Critical Issue' },
+  NORMAL_ISSUE: { icon: 'lucideTriangleAlert', text: 'Normal Issue' },
+  MINOR_ISSUE: { icon: 'lucideBug', text: 'Minor Issue' },
+  WONT_FIX: { icon: 'lucideBan', text: "Won't Fix" },
+  WRONG: { icon: 'lucideOctagonX', text: 'Wrong' }
 };

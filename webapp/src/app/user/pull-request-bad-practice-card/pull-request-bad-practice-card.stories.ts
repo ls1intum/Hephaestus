@@ -31,14 +31,12 @@ export const Default: Story = {
         id: 1,
         title: 'Avoid using any type',
         description: 'Using the any type defeats the purpose of TypeScript.',
-        resolved: false,
         state: 'CRITICAL_ISSUE'
       },
       {
         id: 2,
         title: 'Unchecked checkbox in description',
         description: 'Unchecked checkboxes in the description are not allowed.',
-        resolved: false,
         state: 'MINOR_ISSUE'
       }
     ],
@@ -67,14 +65,12 @@ export const isLoading: Story = {
         id: 1,
         title: 'Avoid using any type',
         description: 'Using the any type defeats the purpose of TypeScript.',
-        resolved: false,
         state: 'CRITICAL_ISSUE'
       },
       {
         id: 2,
         title: 'Unchecked checkbox in description',
         description: 'Unchecked checkboxes in the description are not allowed.',
-        resolved: false,
         state: 'MINOR_ISSUE'
       }
     ],

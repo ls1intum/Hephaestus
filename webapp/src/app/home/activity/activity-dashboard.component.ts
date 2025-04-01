@@ -8,7 +8,7 @@ import { lucideRefreshCcw } from '@ng-icons/lucide';
 import { HlmButtonDirective } from '@spartan-ng/ui-button-helm';
 import { HlmSpinnerComponent } from '@spartan-ng/ui-spinner-helm';
 import { NgIcon, provideIcons } from '@ng-icons/core';
-import { BadPracticeLegendCardComponent } from '@app/user/bad-practice-legend-card/bad-practice-legend-card/bad-practice-legend-card.component';
+import { BadPracticeLegendCardComponent } from '@app/user/bad-practice-legend-card/bad-practice-legend-card.component';
 
 @Component({
   selector: 'app-activity-dashboard',
