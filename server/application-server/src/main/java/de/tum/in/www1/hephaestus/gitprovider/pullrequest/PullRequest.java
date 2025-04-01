@@ -66,6 +66,8 @@ public class PullRequest extends Issue {
     @Lob
     private String badPracticeSummary;
 
+    protected OffsetDateTime lastDetectionTime;
+
     @Override
     public boolean isPullRequest() {
         return true;

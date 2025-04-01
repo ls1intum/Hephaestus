@@ -9,6 +9,8 @@ import de.tum.in.www1.hephaestus.gitprovider.pullrequest.PullRequestRepository;
 import de.tum.in.www1.hephaestus.intelligenceservice.model.BadPractice;
 import de.tum.in.www1.hephaestus.intelligenceservice.model.DetectorRequest;
 import de.tum.in.www1.hephaestus.intelligenceservice.model.DetectorResponse;
+
+import java.time.OffsetDateTime;
 import java.util.LinkedList;
 import java.util.List;
 import org.slf4j.Logger;
@@ -45,6 +47,13 @@ public class PullRequestBadPracticeDetector {
             pullRequest.getId()
         );
 
+        if (pullRequest.getUpdatedAt() != null &&
+                pullRequest.getLastDetectionTime() != null &&
+                pullRequest.getUpdatedAt().isBefore(pullRequest.getLastDetectionTime())) {
+            logger.info("Pull request has not been updated since last detection. Skipping detection.");
+            return existingBadPractices;
+        }
+
         DetectorRequest detectorRequest = new DetectorRequest();
         detectorRequest.setDescription(pullRequest.getBody());
         detectorRequest.setTitle(pullRequest.getTitle());
@@ -59,6 +68,7 @@ public class PullRequestBadPracticeDetector {
         );
         DetectorResponse detectorResponse = detectorApi.detectDetectorPost(detectorRequest);
 
+        pullRequest.setLastDetectionTime(OffsetDateTime.now());
         pullRequest.setBadPracticeSummary(detectorResponse.getBadPracticeSummary());
         pullRequestRepository.save(pullRequest);
 

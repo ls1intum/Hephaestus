@@ -84,13 +84,8 @@ public class ActivityService {
         return detectedBadPractices.stream().map(PullRequestBadPracticeDTO::fromPullRequestBadPractice).toList();
     }
 
-    public List<PullRequestBadPracticeDTO> detectBadPracticesForPullRequest(Long pullRequestId) {
-        logger.info("Detecting bad practices for PR: {}", pullRequestId);
-
-        PullRequest pullRequest = pullRequestRepository.findById(pullRequestId).orElse(null);
-        if (pullRequest == null) {
-            throw new IllegalArgumentException("Pull request " + pullRequestId + " not found");
-        }
+    public List<PullRequestBadPracticeDTO> detectBadPracticesForPullRequest(PullRequest pullRequest) {
+        logger.info("Detecting bad practices for PR: {}", pullRequest.getId());
 
         List<PullRequestBadPractice> detectedBadPractices = pullRequestBadPracticeDetector.detectAndSyncBadPractices(
             pullRequest
@@ -99,22 +94,15 @@ public class ActivityService {
         return detectedBadPractices.stream().map(PullRequestBadPracticeDTO::fromPullRequestBadPractice).toList();
     }
 
-    public void resolveBadPractice(Long badPracticeId) {
-        logger.info("Resolving bad practice with id: {}", badPracticeId);
+    public void resolveBadPractice(PullRequestBadPractice badPractice, PullRequestBadPracticeState state) {
+        logger.info("Resolving bad practice {} with state {}", badPractice.getId(), state);
 
-        PullRequestBadPractice badPractice = pullRequestBadPracticeRepository
-            .findById(badPracticeId)
-            .orElseThrow(NotFoundException::new);
-        badPractice.setResolved(true);
+        badPractice.setState(state);
         pullRequestBadPracticeRepository.save(badPractice);
     }
 
-    public void provideFeedbackForBadPractice(Long badPracticeId, BadPracticeFeedbackDTO feedback) {
-        logger.info("Marking bad practice with id: {}", badPracticeId);
-
-        PullRequestBadPractice badPractice = pullRequestBadPracticeRepository
-            .findById(badPracticeId)
-            .orElseThrow(NotFoundException::new);
+    public void provideFeedbackForBadPractice(PullRequestBadPractice badPractice, BadPracticeFeedbackDTO feedback) {
+        logger.info("Marking bad practice with id: {}", badPractice.getId());
 
         BadPracticeFeedback badPracticeFeedback = new BadPracticeFeedback();
         badPracticeFeedback.setPullRequestBadPractice(badPractice);

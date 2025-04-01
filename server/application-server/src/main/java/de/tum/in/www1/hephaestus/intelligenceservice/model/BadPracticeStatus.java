@@ -37,7 +37,9 @@ public enum BadPracticeStatus {
   
   MINOR_ISSUE("Minor Issue"),
   
-  WON_T_FIX("Won't Fix");
+  WON_T_FIX("Won't Fix"),
+
+  WRONG("Wrong");
 
   private String value;
 

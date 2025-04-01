@@ -21,6 +21,7 @@ class BadPracticeStatus(str, Enum):
     NORMAL = "Normal Issue"
     MINOR = "Minor Issue"
     WONT_FIX = "Won't Fix"
+    WRONG = "Wrong"
 
 
 class BadPractice(BaseModel):

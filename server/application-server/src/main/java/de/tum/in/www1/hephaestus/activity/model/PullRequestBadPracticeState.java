@@ -8,7 +8,8 @@ public enum PullRequestBadPracticeState {
     CRITICAL_ISSUE,
     NORMAL_ISSUE,
     MINOR_ISSUE,
-    WONT_FIX;
+    WONT_FIX,
+    WRONG;
 
     public static PullRequestBadPracticeState fromBadPracticeStatus(BadPracticeStatus status) {
         return switch (status) {
@@ -18,6 +19,7 @@ public enum PullRequestBadPracticeState {
             case NORMAL_ISSUE -> NORMAL_ISSUE;
             case MINOR_ISSUE -> MINOR_ISSUE;
             case WON_T_FIX -> WONT_FIX;
+            case WRONG -> WRONG;
         };
     }
 
@@ -29,6 +31,7 @@ public enum PullRequestBadPracticeState {
             case NORMAL_ISSUE -> BadPracticeStatus.NORMAL_ISSUE;
             case MINOR_ISSUE -> BadPracticeStatus.MINOR_ISSUE;
             case WONT_FIX -> BadPracticeStatus.WON_T_FIX;
+            case WRONG -> BadPracticeStatus.WRONG;
         };
     }
 }
