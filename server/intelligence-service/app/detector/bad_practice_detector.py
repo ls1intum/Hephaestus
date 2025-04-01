@@ -17,7 +17,7 @@ model = ChatModel(temperature=0.0, max_tokens=4096)
 class BadPracticeStatus(str, Enum):
     GOOD_PRACTICE = "Good Practice"
     FIXED = "Fixed"
-    CRITICAL = "Critical Issue"
+    CRITICAL_ISSUE = "Critical Issue"
     NORMAL = "Normal Issue"
     MINOR = "Minor Issue"
     WONT_FIX = "Won't Fix"

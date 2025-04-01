@@ -6,7 +6,6 @@ public record PullRequestBadPracticeDTO(
     @NonNull Long id,
     @NonNull String title,
     @NonNull String description,
-    boolean resolved,
     @NonNull PullRequestBadPracticeState state
 ) {
     public static PullRequestBadPracticeDTO fromPullRequestBadPractice(PullRequestBadPractice badPractice) {
@@ -14,7 +13,6 @@ public record PullRequestBadPracticeDTO(
             badPractice.getId(),
             badPractice.getTitle(),
             badPractice.getDescription(),
-            badPractice.isResolved(),
             badPractice.getState()
         );
     }

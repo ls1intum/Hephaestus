@@ -28,6 +28,7 @@ components:
       - Normal Issue
       - Minor Issue
       - Won't Fix
+      - Wrong
       title: BadPracticeStatus
       type: string
     DetectorRequest:

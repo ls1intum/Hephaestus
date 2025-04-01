@@ -59,7 +59,8 @@ export interface ActivityServiceInterface {
      * 
      * 
      * @param badPracticeId 
+     * @param state 
      */
-    resolveBadPractice(badPracticeId: number, extraHttpRequestParams?: any): Observable<{}>;
+    resolveBadPractice(badPracticeId: number, state: 'GOOD_PRACTICE' | 'FIXED' | 'CRITICAL_ISSUE' | 'NORMAL_ISSUE' | 'MINOR_ISSUE' | 'WONT_FIX' | 'WRONG', extraHttpRequestParams?: any): Observable<{}>;
 
 }

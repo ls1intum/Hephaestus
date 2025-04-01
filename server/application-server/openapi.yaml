@@ -458,6 +458,19 @@ paths:
         schema:
           type: integer
           format: int64
+      - name: state
+        in: query
+        required: true
+        schema:
+          type: string
+          enum:
+          - GOOD_PRACTICE
+          - FIXED
+          - CRITICAL_ISSUE
+          - NORMAL_ISSUE
+          - MINOR_ISSUE
+          - WONT_FIX
+          - WRONG
       responses:
         "200":
           description: OK
@@ -1003,8 +1016,6 @@ components:
           type: string
         description:
           type: string
-        resolved:
-          type: boolean
         state:
           type: string
           enum:
@@ -1014,6 +1025,7 @@ components:
           - NORMAL_ISSUE
           - MINOR_ISSUE
           - WONT_FIX
+          - WRONG
       required:
       - description
       - id
