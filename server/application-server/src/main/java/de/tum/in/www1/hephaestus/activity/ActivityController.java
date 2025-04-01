@@ -4,7 +4,6 @@ import de.tum.in.www1.hephaestus.activity.model.*;
 import de.tum.in.www1.hephaestus.gitprovider.pullrequest.PullRequest;
 import de.tum.in.www1.hephaestus.gitprovider.pullrequest.PullRequestRepository;
 import de.tum.in.www1.hephaestus.gitprovider.user.UserRepository;
-import jakarta.ws.rs.QueryParam;
 import java.util.List;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
@@ -68,7 +67,7 @@ public class ActivityController {
     @PostMapping("/badpractice/{badPracticeId}/resolve")
     public ResponseEntity<Void> resolveBadPractice(
         @PathVariable Long badPracticeId,
-        @QueryParam("state") PullRequestBadPracticeState state
+        @RequestParam("state") PullRequestBadPracticeState state
     ) {
         var user = userRepository.getCurrentUser();
         var badPractice = pullRequestBadPracticeRepository.findById(badPracticeId);
