@@ -67,7 +67,7 @@ hephaestus:
     workspace:
         init-default: true
         default:
-            repositories-to-monitor: ls1intum/Artemis,ls1intum/Hephaestus
+            repositories-to-monitor: ls1intum/Hephaestus
     
     intelligence-service:
         url: http://localhost:8000

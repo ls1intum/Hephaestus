@@ -102,6 +102,9 @@ public class ActivityService {
     public void provideFeedbackForBadPractice(PullRequestBadPractice badPractice, BadPracticeFeedbackDTO feedback) {
         logger.info("Marking bad practice with id: {}", badPractice.getId());
 
+        badPractice.setState(PullRequestBadPracticeState.WRONG);
+        pullRequestBadPracticeRepository.save(badPractice);
+
         BadPracticeFeedback badPracticeFeedback = new BadPracticeFeedback();
         badPracticeFeedback.setPullRequestBadPractice(badPractice);
         badPracticeFeedback.setExplanation(feedback.explanation());

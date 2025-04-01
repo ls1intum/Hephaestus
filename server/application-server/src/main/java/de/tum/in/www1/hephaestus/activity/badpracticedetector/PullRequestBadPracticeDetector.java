@@ -45,7 +45,7 @@ public class PullRequestBadPracticeDetector {
         List<PullRequestBadPractice> existingBadPractices = pullRequestBadPracticeRepository.findByPullRequestId(
             pullRequest.getId()
         );
-
+        /*
         if (
             pullRequest.getUpdatedAt() != null &&
             pullRequest.getLastDetectionTime() != null &&
@@ -53,7 +53,7 @@ public class PullRequestBadPracticeDetector {
         ) {
             logger.info("Pull request has not been updated since last detection. Skipping detection.");
             return existingBadPractices;
-        }
+        } */
 
         DetectorRequest detectorRequest = new DetectorRequest();
         detectorRequest.setDescription(pullRequest.getBody());

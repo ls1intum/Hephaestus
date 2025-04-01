@@ -23,4 +23,12 @@
     <changeSet author="iam-flo" id="1742635249489-4">
         <addForeignKeyConstraint baseColumnNames="pull_request_bad_practice_id" baseTableName="bad_practice_feedback" constraintName="FK34k5tg4qb6gy4g7tn9q8uhogl" deferrable="false" initiallyDeferred="false" referencedColumnNames="id" referencedTableName="pullrequestbadpractice" validate="true"/>
     </changeSet>
+    <changeSet author="iam-flo" id="1742635249489-5">
+        <addColumn tableName="issue">
+            <column name="last_detection_time" type="timestamp with timezone(6)"/>
+        </addColumn>
+    </changeSet>
+    <changeSet author="iam-flo" id="1742635249489-6">
+        <dropColumn tableName="pullrequestbadpractice" columnName="resolved"/>
+    </changeSet>
 </databaseChangeLog>

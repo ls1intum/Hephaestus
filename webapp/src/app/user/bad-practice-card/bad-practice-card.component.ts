@@ -86,7 +86,10 @@ export class BadPracticeCardComponent {
 
   feedbackForBadPracticeMutation = injectMutation(() => ({
     mutationFn: ({ badPracticeId, feedBack }: { badPracticeId: number; feedBack: BadPracticeFeedback }) =>
-      lastValueFrom(this.activityService.provideFeedbackForBadPractice(badPracticeId, feedBack))
+      lastValueFrom(this.activityService.provideFeedbackForBadPractice(badPracticeId, feedBack)),
+    onSuccess: () => {
+      this.queryClient.invalidateQueries({ queryKey: ['activity'] });
+    }
   }));
 
   provideFeedbackForBadPractice(): void {

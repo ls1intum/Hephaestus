@@ -10,8 +10,8 @@ from app.detector.prompts.pullrequest_badpractice_detector import (
 )
 from app.models import get_model
 
-ChatModel = get_model(settings.MODEL_NAME)
-model = ChatModel(temperature=0.0, max_tokens=4096)
+ChatModel = get_model(settings.DETECTION_MODEL_NAME)
+model = ChatModel()
 
 
 class BadPracticeStatus(str, Enum):
