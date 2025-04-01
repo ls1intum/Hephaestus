@@ -1,6 +1,6 @@
 import { Component, computed, inject, input } from '@angular/core';
 import { PullRequestInfo, LabelInfo, PullRequestBadPractice, ActivityService } from '@app/core/modules/openapi';
-import { NgIcon } from '@ng-icons/core';
+import { NgIcon, provideIcons } from '@ng-icons/core';
 import { octCheck, octComment, octFileDiff, octGitPullRequest, octGitPullRequestClosed, octGitPullRequestDraft, octGitMerge, octX, octFold, octSync } from '@ng-icons/octicons';
 import { HlmCardModule } from '@spartan-ng/ui-card-helm';
 import { HlmSkeletonComponent } from '@spartan-ng/ui-skeleton-helm';
@@ -34,17 +34,11 @@ import { lastValueFrom } from 'rxjs';
     GithubLabelComponent,
     HlmSpinnerComponent
   ],
-  standalone: true
+  providers: [provideIcons({ octCheck, octX, octComment, octFileDiff, octGitPullRequest, octGitPullRequestClosed, octGitPullRequestDraft, octGitMerge, octFold, octSync })]
 })
 export class PullRequestBadPracticeCardComponent {
   activityService = inject(ActivityService);
   queryClient = inject(QueryClient);
-
-  protected readonly octCheck = octCheck;
-  protected readonly octX = octX;
-  protected readonly octComment = octComment;
-  protected readonly octFileDiff = octFileDiff;
-  protected readonly octFold = octFold;
 
   isLoading = input(false);
   class = input('');
@@ -72,18 +66,18 @@ export class PullRequestBadPracticeCardComponent {
 
     if (this.state() === PullRequestInfo.StateEnum.Open) {
       if (this.isDraft()) {
-        icon = octGitPullRequestDraft;
+        icon = 'octGitPullRequestDraft';
         color = 'text-github-muted-foreground';
       } else {
-        icon = octGitPullRequest;
+        icon = 'octGitPullRequest';
         color = 'text-github-open-foreground';
       }
     } else {
       if (this.isMerged()) {
-        icon = octGitMerge;
+        icon = 'octGitMerge';
         color = 'text-github-done-foreground';
       } else {
-        icon = octGitPullRequestClosed;
+        icon = 'octGitPullRequestClosed';
         color = 'text-github-closed-foreground';
       }
     }
