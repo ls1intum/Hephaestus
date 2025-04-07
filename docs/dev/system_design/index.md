@@ -37,7 +37,7 @@ Note that the model is simplified and some relationships are not shown for brevi
 The original events contain lots of irrelevant and duplicate information, which is why we added certain relationships to the classes to reduce redundancy.
 
 Around these core classes, we added additional classes to model the gamification features. 
-Most importantly, the _Leaderboard_ and _Reward_ abstractions, which model the leaderboard and the rewards system respectively. 
+Most importantly, we introduced the _Leaderboard_ and _Reward_ abstractions to model the leaderboard and rewards system, respectively.
 All gamification related data is managed by the _GamificationDashboard_.
 
 ```{figure} ./gamification_analysis_object_model.svg
