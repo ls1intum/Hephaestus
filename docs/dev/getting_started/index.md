@@ -147,9 +147,9 @@ By leveraging OpenAPI, we enhance the reliability, maintainability, and efficien
 - [Swagger UI](https://swagger.io/tools/swagger-ui/)
 
 
-## Intelligent Service Development
+## Intelligence Service Development
 
-### FastAPI: Intelligent Service Interaction 
+### FastAPI: Intelligence Service Interaction 
 
 FastAPI is providing the **API layer that connects the AI tools and core logic to the client-server**.
 
