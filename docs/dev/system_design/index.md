@@ -11,7 +11,7 @@ The top-level architecture diagram illustrates Hephaestus as a layered system wi
 The diagram shows the system divided into Hephaestus-internal and external components.
 
 Internally, Hephaestus is based on a client-server architecture with multiple server components. 
-We differentiate between the _Application Server_ and the _Intelligence Server_ as well as the smaller _Webhook Ingest_ and the _User Management System_.
+We differentiate between the _Application Server_ and the _Intelligence Service_ as well as the smaller _Webhook Ingest_ and the _User Management System_.
 
 Externally, Hephaestus is connected to the _Code Review System_, the _Notification System_, and the _Analytics Platform_. 
 The _Code Review System_ is an abstraction for the actual Git hosting platform, e.g. GitHub or GitLab. 
