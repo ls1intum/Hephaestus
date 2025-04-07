@@ -145,3 +145,22 @@ By leveraging OpenAPI, we enhance the reliability, maintainability, and efficien
 - [OpenAPI Specification](https://swagger.io/specification/)
 - [OpenAPI Generator](https://openapi-generator.tech/)
 - [Swagger UI](https://swagger.io/tools/swagger-ui/)
+
+
+## Intelligent Service Development
+
+### FastAPI: Intelligent Service Interaction 
+
+FastAPI is providing the **API layer that connects the AI tools and core logic to the client-server**.
+
+```{figure} ./fastapi.png
+:width: 200px
+:alt: FastAPI Logo
+```
+FastAPI is a modern, fast (high-performance) web framework for building APIs with Python 3.7+ based on standard Python type hints. It enables rapid development of robust, production-ready web services and APIs with minimal boilerplate.
+
+#### Benefits
+- **Automatic Docs**: FastAPI automatically generates interactive API documentation with Swagger UI and ReDoc, improving development speed and client onboarding.
+- **Type Safety**: Leverages Python type hints to validate input and output data, catching bugs early and improving code quality.
+- **Dependency Injection System**: Clean architecture is encouraged by FastAPI's built-in DI system, making it easier to test and extend.
+- **Validation and Serialization**: Uses Pydantic for easy request validation and response serialization, reducing boilerplate and improving clarity.
