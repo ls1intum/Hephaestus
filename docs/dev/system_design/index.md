@@ -40,10 +40,10 @@ Around these core classes, we added additional classes to model the gamification
 Most importantly, the _Leaderboard_ and _Reward_ abstractions, which model the leaderboard and the rewards system respectively. 
 All gamification related data is managed by the _GamificationDashboard_.
 
-```{figure} ./analysis_object_model.svg
-:alt: Hephaestus Analysis Object Model
+```{figure} ./gamification_analysis_object_model.svg
+:alt: Gamification Analysis Object Model
 
-Hephaestus Analysis Object Model (UML Class Diagram)
+Gamification Analysis Object Model (UML Class Diagram)
 ```
 
 ## User Interaction
