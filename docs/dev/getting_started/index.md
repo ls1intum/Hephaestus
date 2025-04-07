@@ -151,8 +151,7 @@ By leveraging OpenAPI, we enhance the reliability, maintainability, and efficien
 
 ### FastAPI: Intelligence Service Interaction 
 
-FastAPI is providing the **API layer that connects the AI tools and core logic to the client-server**.
-
+FastAPI provides the **API layer that connects the AI tools and core logic to the client-server**.
 ```{figure} ./fastapi.png
 :width: 200px
 :alt: FastAPI Logo
