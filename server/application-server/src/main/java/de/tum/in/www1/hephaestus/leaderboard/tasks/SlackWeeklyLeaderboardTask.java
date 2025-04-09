@@ -99,8 +99,8 @@ public class SlackWeeklyLeaderboardTask implements Runnable {
                     String bName = b.getRealName() != null ? b.getRealName() : b.getName();
 
                     return Integer.compare(
-                            LevenshteinDistance.getDefaultInstance().apply(entry.user().name(), aName),
-                            LevenshteinDistance.getDefaultInstance().apply(entry.user().name(), bName)
+                        LevenshteinDistance.getDefaultInstance().apply(entry.user().name(), aName),
+                        LevenshteinDistance.getDefaultInstance().apply(entry.user().name(), bName)
                     );
                 })
                 .orElse(null);
