@@ -82,9 +82,9 @@ public class SlackWeeklyLeaderboardTask implements Runnable {
                 .stream()
                 .filter(
                     user ->
-                        user.getName().equals(entry.user().name()) ||
+                        user.getName().equalsIgnoreCase(entry.user().name()) ||
                         (user.getProfile().getEmail() != null &&
-                            user.getProfile().getEmail().equals(entry.user().email()))
+                            user.getProfile().getEmail().equalsIgnoreCase(entry.user().email()))
                 )
                 .findFirst();
             if (exactUser.isPresent()) {
@@ -94,12 +94,15 @@ public class SlackWeeklyLeaderboardTask implements Runnable {
             // find through String edit distance
             return allSlackUsers
                 .stream()
-                .min((a, b) ->
-                    Integer.compare(
-                        LevenshteinDistance.getDefaultInstance().apply(entry.user().name(), a.getName()),
-                        LevenshteinDistance.getDefaultInstance().apply(entry.user().name(), b.getName())
-                    )
-                )
+                .min((a, b) -> {
+                    String aName = a.getRealName() != null ? a.getRealName() : a.getName();
+                    String bName = b.getRealName() != null ? b.getRealName() : b.getName();
+
+                    return Integer.compare(
+                            LevenshteinDistance.getDefaultInstance().apply(entry.user().name(), aName),
+                            LevenshteinDistance.getDefaultInstance().apply(entry.user().name(), bName)
+                    );
+                })
                 .orElse(null);
         };
     }
