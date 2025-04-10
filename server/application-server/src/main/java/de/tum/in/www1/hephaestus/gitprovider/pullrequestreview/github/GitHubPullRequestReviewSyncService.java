@@ -94,10 +94,15 @@ public class GitHubPullRequestReviewSyncService {
         // Link author
         try {
             GHUser user = ghPullRequestReview.getUser();
-            var resultAuthor = userRepository
-                .findById(user.getId())
-                .orElseGet(() -> userRepository.save(userConverter.convert(user)));
-            result.setAuthor(resultAuthor);
+            if (user != null) {
+                var resultAuthor = userRepository
+                    .findById(user.getId())
+                    .orElseGet(() -> userRepository.save(userConverter.convert(user)));
+                result.setAuthor(resultAuthor);
+            } else {
+                // Log that we found a review without a user
+                logger.warn("Pull request review {} has no associated user", ghPullRequestReview.getId());
+            }
         } catch (IOException e) {
             logger.error(
                 "Failed to link author for pull request review {}: {}",
