@@ -97,26 +97,25 @@ public class WorkspaceService {
 
         if (runMonitoringOnStartup) {
             logger.info("Running monitoring on startup");
-            
+
             // Run all repository syncs asynchronously
-            CompletableFuture<?>[] futures = repositoriesToMonitor.stream()
-                .map(repo -> CompletableFuture.runAsync(() -> 
-                    gitHubDataSyncService.syncRepositoryToMonitor(repo)))
+            CompletableFuture<?>[] futures = repositoriesToMonitor
+                .stream()
+                .map(repo -> CompletableFuture.runAsync(() -> gitHubDataSyncService.syncRepositoryToMonitor(repo)))
                 .toArray(CompletableFuture[]::new);
-            
+
             // When all repository syncs complete, then sync users
-            CompletableFuture.allOf(futures)
-                .thenRun(() -> {
-                    logger.info("All repositories synced, now syncing users");
-                    gitHubDataSyncService.syncUsers(workspace);
-                    logger.info("Finished running monitoring on startup");
-                    
-                    if (initDefaultWorkspace) {
-                        // Setup default teams
-                        logger.info("Setting up default teams");
-                        teamService.setupDefaultTeams();
-                    }
-                });
+            CompletableFuture.allOf(futures).thenRun(() -> {
+                logger.info("All repositories synced, now syncing users");
+                gitHubDataSyncService.syncUsers(workspace);
+                logger.info("Finished running monitoring on startup");
+
+                if (initDefaultWorkspace) {
+                    // Setup default teams
+                    logger.info("Setting up default teams");
+                    teamService.setupDefaultTeams();
+                }
+            });
         }
     }
 
