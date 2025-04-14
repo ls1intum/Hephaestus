@@ -1,12 +1,9 @@
 ---
 name: Thesis Epic
-about: >
-  This epic captures a core thesis objective, guiding you from identifying the problem 
-  through requirements into an architecture.
-  Leverage this template as a living document to iteratively refine your thesis work.
-title: '[Imperative Verb Phrase]: [Short Description]'
+about: This epic captures a core thesis objective, guiding you from identifying the problem through requirements into an architecture. Leverage this template as a living document to iteratively refine your thesis work.
+title: "[Imperative Verb Phrase]: [Short Description]"
 labels: epic
-assignees: ''
+assignees: 
 ---
 
 <!--
