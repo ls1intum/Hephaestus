@@ -1,6 +1,6 @@
 ---
 name: Thesis Epic
-about: This epic captures a core thesis objective, guiding you from identifying the problem through requirements into an architecture.
+about: Captures a core thesis objective, guiding you from identifying the problem through requirements into an architecture.
 title: "[Imperative Verb Phrase]: [Short Description]"
 labels: epic
 assignees: 
