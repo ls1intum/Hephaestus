@@ -98,7 +98,7 @@ public class GitHubPullRequestReviewSyncService {
                 .findById(user.getId())
                 .orElseGet(() -> userRepository.save(userConverter.convert(user)));
             result.setAuthor(resultAuthor);
-        } catch (IOException e) {
+        } catch (IOException | NullPointerException e) {
             logger.error(
                 "Failed to link author for pull request review {}: {}",
                 ghPullRequestReview.getId(),
