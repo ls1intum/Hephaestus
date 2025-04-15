@@ -11,6 +11,7 @@
  */
 import { LabelInfo } from './label-info';
 import { RepositoryInfo } from './repository-info';
+import { UserInfo } from './user-info';
 
 
 export interface TeamInfo { 
@@ -19,5 +20,7 @@ export interface TeamInfo {
     color: string;
     repositories: Array<RepositoryInfo>;
     labels: Array<LabelInfo>;
+    members: Array<UserInfo>;
+    hidden: boolean;
 }
 
