@@ -20,6 +20,13 @@ export const routes: Routes = [
   // Public routes
   { path: '', component: RootContainerComponent }, // Landing page if not logged in, otherwise home
   { path: 'about', component: AboutComponent },
+  { path: 'imprint', component: ImprintComponent },
+  { path: 'privacy', component: PrivacyComponent },
+
+  // Protected routes
+  { path: 'user/:id', component: UserProfileComponent, canActivate: [AuthGuard] },
+  { path: 'settings', component: SettingsComponent, canActivate: [AuthGuard] },
+  { path: 'mentor', component: MentorComponent, canActivate: [AuthGuard, MentorGuard] },
   {
     path: 'workspace',
     component: WorkspaceLayoutComponent,
@@ -39,16 +46,6 @@ export const routes: Routes = [
       }
     ]
   },
-  { path: 'user/:id', component: UserProfileComponent },
-  { path: 'settings', component: SettingsComponent },
-  { path: 'imprint', component: ImprintComponent },
-  { path: 'privacy', component: PrivacyComponent },
-
-  // Protected routes
-  { path: 'user/:id', component: UserProfileComponent, canActivate: [AuthGuard] },
-  { path: 'settings', component: SettingsComponent, canActivate: [AuthGuard] },
-  { path: 'mentor', component: MentorComponent, canActivate: [AuthGuard, MentorGuard] },
-  { path: 'workspace', component: WorkspaceComponent, canActivate: [AuthGuard, AdminGuard] },
   { path: 'teams', component: SubteamsComponent, canActivate: [AuthGuard] },
   { path: 'user/:id/activity', component: ActivityDashboardComponent, canActivate: [AuthGuard, AdminGuard] }
 ];
