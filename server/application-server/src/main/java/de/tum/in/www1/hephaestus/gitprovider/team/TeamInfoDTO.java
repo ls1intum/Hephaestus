@@ -2,6 +2,7 @@ package de.tum.in.www1.hephaestus.gitprovider.team;
 
 import de.tum.in.www1.hephaestus.gitprovider.label.LabelInfoDTO;
 import de.tum.in.www1.hephaestus.gitprovider.repository.RepositoryInfoDTO;
+import de.tum.in.www1.hephaestus.gitprovider.user.User;
 import de.tum.in.www1.hephaestus.gitprovider.user.UserInfoDTO;
 import java.util.List;
 import org.springframework.lang.NonNull;
@@ -22,7 +23,10 @@ public record TeamInfoDTO(
             team.getColor(),
             team.getRepositories().stream().map(RepositoryInfoDTO::fromRepository).toList(),
             team.getLabels().stream().map(LabelInfoDTO::fromLabel).toList(),
-            team.getMembers().stream().map(UserInfoDTO::fromUser).toList(),
+            team.getMembers().stream()
+                .filter(user -> !user.getType().equals(User.Type.BOT))
+                .map(UserInfoDTO::fromUser)
+                .toList(),
             team.isHidden()
         );
     }
