@@ -34,4 +34,7 @@ def detect(request: DetectorRequest):
         request.bad_practice_summary,
         request.bad_practices,
     )
-    return DetectorResponse(bad_practice_summary=result.bad_practice_summary, bad_practices=result.bad_practices)
+    return DetectorResponse(
+        bad_practice_summary=result.bad_practice_summary,
+        bad_practices=result.bad_practices,
+    )
