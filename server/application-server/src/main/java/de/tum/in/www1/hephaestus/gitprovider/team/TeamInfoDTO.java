@@ -23,7 +23,9 @@ public record TeamInfoDTO(
             team.getColor(),
             team.getRepositories().stream().map(RepositoryInfoDTO::fromRepository).toList(),
             team.getLabels().stream().map(LabelInfoDTO::fromLabel).toList(),
-            team.getMembers().stream()
+            team
+                .getMembers()
+                .stream()
                 .filter(user -> !user.getType().equals(User.Type.BOT))
                 .map(UserInfoDTO::fromUser)
                 .toList(),

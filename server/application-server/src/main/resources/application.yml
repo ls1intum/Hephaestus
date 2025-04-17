@@ -29,11 +29,32 @@ spring:
                 jwt:
                     issuer-uri: http://localhost:8081/realms/hephaestus
 
+    thymeleaf:
+        prefix: ${MAIL_TEMPLATE_FOLDER:classpath:/mail-templates/}
+        suffix: .html
+
+    mail:
+        host: ${MAIL_HOST:smtp.gmail.com}
+        port: ${MAIL_PORT:587}
+        username: ${POSTFIX_USERNAME:} # gmail email address e.g hephaestus@gmail.com
+        password: ${POSTFIX_PASSWORD:} # app code password from gmail. how to: https://support.google.com/mail/answer/185833?hl=en
+        properties:
+            mail:
+                transport:
+                    protocol: smtp
+                smtp:
+                    starttls:
+                        enable: true
+                debug: ${MAIL_DEBUG:false}
+
 springdoc:
     default-produces-media-type: application/json
 
 hephaestus:
     host-url: https://hephaestus.ase.cit.tum.de/
+
+    webapp:
+        url: ${CLIENT_HOST:http://localhost:4200}
     
     leaderboard:
         schedule:
@@ -55,6 +76,12 @@ hephaestus:
         contributors:
             # Eviction rate in milliseconds (1 hour)
             evict-rate: 3600000
+    mail:
+        enabled: ${MAIL_ENABLED:false}
+        sender: ${MAIL_SENDER:hephaestus@gmail.com} # use gmail email address for local testing
+
+    detection:
+        automatic-detection-enabled: false
 
 keycloak:
     url: http://localhost:8081
