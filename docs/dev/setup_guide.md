@@ -11,8 +11,9 @@ Before you can build Hephaestus, you must install and configure the following de
 3. [Node.js](https://nodejs.org/en/download): We use Node LTS (>=22.10.0 < 23) to compile and run our Hephaestus Application Client based on [Angular](https://angular.dev/). Depending on your system, you can install Node either from source or as a pre-packaged bundle.
 4. [Npm](https://nodejs.org/en/download): We use Npm (>=10.8.0) to manage client side dependencies. Npm is typically bundled with Node.js, but can also be installed separately.
 5. [Python](https://www.python.org/downloads/): We use Python (>=3.13) to develop and run our Hephaestus Intelligence Service.
-6. [Docker Desktop](https://www.docker.com/products/docker-desktop): We use Docker to containerize our application and run it in a consistent environment across different machines as well as for spinning up a PostgreSQL database, [Keycloak](https://www.keycloak.org/), and [NATS](https://nats.io/) server for local development.
-7. (Optional) [NATS-cli](https://github.com/nats-io/natscli) for interacting with the [NATS](https://nats.io/) server. Comes in handy for debugging and testing when working with the NATS server.
+6. [Poetry](https://python-poetry.org/): We use Poetry (>=2.0.0) to manage dependencies and virtual environments for the Hephaestus Intelligence Service. It simplifies packaging and ensures a consistent and reproducible development environment.
+7. [Docker Desktop](https://www.docker.com/products/docker-desktop): We use Docker to containerize our application and run it in a consistent environment across different machines as well as for spinning up a PostgreSQL database, [Keycloak](https://www.keycloak.org/), and [NATS](https://nats.io/) server for local development.
+8. (Optional) [NATS-cli](https://github.com/nats-io/natscli) for interacting with the [NATS](https://nats.io/) server. Comes in handy for debugging and testing when working with the NATS server.
 
 ## IDE Setup
 
@@ -119,4 +120,43 @@ npm start
 
 ## Intelligence Service Setup
 
-TODO Setup Intelligence Service
+### Server Setup 
+To set up the Intelligence Service locally:
+
+1. **Install Dependencies**: Open a terminal in the `server/intelligence-service` directory. Create a virtual environment:
+
+```bash
+python3 -m venv venv
+```
+
+Activate the virtual environment:
+
+```bash
+# Unix:
+source venv/bin/activate
+
+# Windows:
+.\venv\Scripts\activate
+```
+
+2. **Install Dependencies**: We use [Poetry](https://python-poetry.org/) to manage dependencies and virtual environments. Run the following to install all required packages:
+```bash
+poetry install
+```
+
+3. **Run the Intelligence Service**: Use FastAPI's development server to start the service. From within the `server/intelligence-service` directory, run:
+
+```bash
+fastapi dev
+```
+
+This will start the server on [http://127.0.0.1:8000](http://127.0.0.1:8000). You can interact with the app using the OpenAPI Swagger UI at [http://127.0.0.1:8000/docs](http://127.0.0.1:8000/docs), which allows you to explore available endpoints, send requests, and view responses directly from your browser.
+
+### Accessing GenAI Tools 
+The Intelligence Service integrates GenAI models (e.g. Ollama, GPT). To enable access to these models, you must configure environment variables. Create a `.env` file in the `server/intelligence-service` directory by copying the provided `.env.example`:
+
+```bash
+cp .env.example .env
+```
+
+Then, open the newly created `.env` file and add the necessary credentials and configuration details required to access the models and optionally configure LangSmith and Langfuse.
