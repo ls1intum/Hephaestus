@@ -65,6 +65,8 @@ public class Team {
     @ToString.Exclude
     private Set<User> members = new HashSet<>();
 
+    private boolean hidden = false;
+
     public void addMember(User user) {
         members.add(user);
         user.addTeam(this);

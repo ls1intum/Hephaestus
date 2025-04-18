@@ -15,4 +15,5 @@ export * from './session';
 export * from './team-info';
 export * from './user-info';
 export * from './user-profile';
+export * from './user-settings';
 export * from './user-teams';

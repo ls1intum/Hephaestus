@@ -29,6 +29,14 @@ public class TeamService {
         return teams;
     }
 
+    public TeamInfoDTO hideTeam(Long id, Boolean hidden) {
+        logger.info("Hiding team with id: " + id + " and hidden: " + hidden);
+        Team team = teamRepository.findById(id).orElseThrow();
+        team.setHidden(hidden);
+        teamRepository.saveAndFlush(team);
+        return TeamInfoDTO.fromTeam(team);
+    }
+
     public Team createTeam(String name, String color) {
         logger.info("Creating team with name: " + name + " and color: " + color);
         Team team = new Team();
