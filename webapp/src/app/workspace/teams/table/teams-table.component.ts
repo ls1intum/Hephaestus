@@ -16,7 +16,7 @@ import { HlmSelectModule } from '@spartan-ng/ui-select-helm';
 import { HlmSkeletonModule } from '@spartan-ng/ui-skeleton-helm';
 import { HlmCardModule } from '@spartan-ng/ui-card-helm';
 import { debounceTime, lastValueFrom, map } from 'rxjs';
-import { WorkspaceService, TeamInfo } from '@app/core/modules/openapi';
+import { WorkspaceService, TeamInfo, TeamService } from '@app/core/modules/openapi';
 import { injectMutation, QueryClient } from '@tanstack/angular-query-experimental';
 import { octNoEntry } from '@ng-icons/octicons';
 import { HlmPopoverModule } from '@spartan-ng/ui-popover-helm';
@@ -25,6 +25,7 @@ import { GithubLabelComponent } from '@app/ui/github-label/github-label.componen
 import { NgScrollbarModule } from 'ngx-scrollbar';
 import { HlmScrollAreaDirective } from '@spartan-ng/ui-scrollarea-helm';
 import { groupBy } from '@app/utils';
+import { HlmCheckboxComponent } from '@spartan-ng/ui-checkbox-helm';
 
 const LOADING_TEAMS: TeamInfo[] = [
   {
@@ -32,14 +33,18 @@ const LOADING_TEAMS: TeamInfo[] = [
     name: 'Team A',
     color: '#FF0000',
     repositories: [],
-    labels: []
+    labels: [],
+    members: [],
+    hidden: false
   },
   {
     id: 2,
     name: 'Team B',
     color: '#00FF00',
     repositories: [],
-    labels: []
+    labels: [],
+    members: [],
+    hidden: false
   }
 ];
 
@@ -67,13 +72,15 @@ const LOADING_TEAMS: TeamInfo[] = [
     BrnPopoverContentDirective,
     BrnPopoverTriggerDirective,
     GithubLabelComponent,
-    GithubLabelComponent
+    GithubLabelComponent,
+    HlmCheckboxComponent
   ],
   providers: [provideIcons({ lucideChevronDown, lucideGripHorizontal, lucideArrowUpDown, lucideRotateCw, lucideOctagonX, lucidePlus, lucideCheck, lucideTrash2 })],
   templateUrl: './teams-table.component.html'
 })
 export class WorkspaceTeamsTableComponent {
   protected workspaceService = inject(WorkspaceService);
+  protected teamService = inject(TeamService);
   protected queryClient = inject(QueryClient);
   protected octNoEntry = octNoEntry;
 
@@ -104,7 +111,7 @@ export class WorkspaceTeamsTableComponent {
     initialValue: []
   });
 
-  protected readonly _allDisplayedColumns = ['name', 'color', 'repositories', 'actions'];
+  protected readonly _allDisplayedColumns = ['name', 'color', 'hidden', 'repositories', 'actions'];
 
   // Table state logic properties
   private readonly _filteredNames = computed(() => {
@@ -234,6 +241,17 @@ export class WorkspaceTeamsTableComponent {
     queryKey: ['workspace', 'team', 'repository', 'add'],
     onSettled: () => this.invalidateTeams()
   }));
+
+  hideTeam = injectMutation(() => ({
+    mutationFn: ({ teamId, hidden }: { teamId: number; hidden: boolean }) => lastValueFrom(this.teamService.hideTeam(teamId, hidden)),
+    queryKey: ['workspace', 'team', 'hide']
+  }));
+
+  protected mutateHideTeam(team: TeamInfo, hidden: boolean | 'indeterminate') {
+    if (hidden !== 'indeterminate') {
+      this.hideTeam.mutate({ teamId: team.id, hidden });
+    }
+  }
 
   protected copyName(element: TeamInfo) {
     console.log('Copying name', element);

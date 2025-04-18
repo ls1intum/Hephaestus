@@ -1,0 +1,18 @@
+<p th:inline="text">
+    Hi [[${user.name}]],
+    <br>
+    <br>
+    Hephaestus has detected bad practices in your pull request <a target="_blank" rel="noopener noreferrer nofollow" th:href="${pullRequest.htmlUrl}">#[[${pullRequest.number}]]</a>:
+    <ul>
+        <li th:each="badPractice : ${badPractices}">
+            <strong th:text="${badPractice.title}">Bad Practice Title</strong>:
+            <span th:text="${badPractice.description}">Bad Practice Description</span>
+        </li>
+    </ul>
+    You can review the bad practices on <a target="_blank" rel="noopener noreferrer nofollow" th:href="${config.clientHost + '/' + user.login + '/activity'}">Hephaestus</a>.
+    <br>
+    <hr />
+    <div style="text-align: center;font-size: 10px">
+        Manage your notification settings <a th:href="${config.clientHost + '/settings'}">here</a>
+    </div>
+</p>

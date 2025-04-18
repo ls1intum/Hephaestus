@@ -87,4 +87,16 @@ public class UserService {
             new UserProfileDTO(user, firstContribution, contributedRepositories, reviewActivity, openPullRequests)
         );
     }
+
+    public UserSettingsDTO getUserSettings(User user) {
+        logger.info("Getting user settings with userId: " + user);
+        return new UserSettingsDTO(user.isNotificationsEnabled());
+    }
+
+    public UserSettingsDTO updateUserSettings(User user, UserSettingsDTO userSettings) {
+        logger.info("Updating user settings with userId: " + user);
+        user.setNotificationsEnabled(userSettings.receiveNotifications());
+        userRepository.save(user);
+        return new UserSettingsDTO(user.isNotificationsEnabled());
+    }
 }
