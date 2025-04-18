@@ -8,7 +8,7 @@ info:
   license:
     name: MIT License
     url: https://github.com/ls1intum/Hephaestus/blob/develop/LICENSE
-  version: 0.3.2
+  version: 0.5.2
 servers:
 - url: /
   description: Default Server URL
@@ -218,6 +218,60 @@ paths:
       responses:
         "200":
           description: OK
+  /user/settings:
+    get:
+      tags:
+      - user
+      operationId: getUserSettings
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UserSettings"
+    post:
+      tags:
+      - user
+      operationId: updateUserSettings
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UserSettings"
+        required: true
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UserSettings"
+  /team/{id}/hide:
+    post:
+      tags:
+      - team
+      operationId: hideTeam
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: integer
+          format: int64
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: boolean
+        required: true
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TeamInfo"
   /mentor/sessions:
     get:
       tags:
@@ -696,6 +750,11 @@ components:
       - id
       - name
       - nameWithOwner
+    UserSettings:
+      type: object
+      properties:
+        receiveNotifications:
+          type: boolean
     UserTeams:
       type: object
       properties:
@@ -877,10 +936,18 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/LabelInfo"
+        members:
+          type: array
+          items:
+            $ref: "#/components/schemas/UserInfo"
+        hidden:
+          type: boolean
       required:
       - color
+      - hidden
       - id
       - labels
+      - members
       - name
       - repositories
     PullRequestBadPractice:

@@ -14,11 +14,19 @@ import { AdminGuard } from '@app/core/security/admin.guard';
 import { AuthGuard } from '@app/core/security/auth.guard';
 import { MentorGuard } from '@app/core/security/mentor.guard';
 import { ActivityDashboardComponent } from '@app/home/activity/activity-dashboard.component';
+import { SubteamsComponent } from '@app/subteams/subteams.component';
 
 export const routes: Routes = [
   // Public routes
   { path: '', component: RootContainerComponent }, // Landing page if not logged in, otherwise home
   { path: 'about', component: AboutComponent },
+  { path: 'imprint', component: ImprintComponent },
+  { path: 'privacy', component: PrivacyComponent },
+
+  // Protected routes
+  { path: 'user/:id', component: UserProfileComponent, canActivate: [AuthGuard] },
+  { path: 'settings', component: SettingsComponent, canActivate: [AuthGuard] },
+  { path: 'mentor', component: MentorComponent, canActivate: [AuthGuard, MentorGuard] },
   {
     path: 'workspace',
     component: WorkspaceLayoutComponent,
@@ -38,15 +46,6 @@ export const routes: Routes = [
       }
     ]
   },
-  { path: 'user/:id', component: UserProfileComponent },
-  { path: 'settings', component: SettingsComponent },
-  { path: 'imprint', component: ImprintComponent },
-  { path: 'privacy', component: PrivacyComponent },
-
-  // Protected routes
-  { path: 'user/:id', component: UserProfileComponent, canActivate: [AuthGuard] },
-  { path: 'settings', component: SettingsComponent, canActivate: [AuthGuard] },
-  { path: 'mentor', component: MentorComponent, canActivate: [AuthGuard, MentorGuard] },
-  { path: 'workspace', component: WorkspaceComponent, canActivate: [AuthGuard, AdminGuard] },
+  { path: 'teams', component: SubteamsComponent, canActivate: [AuthGuard] },
   { path: 'user/:id/activity', component: ActivityDashboardComponent, canActivate: [AuthGuard, AdminGuard] }
 ];
