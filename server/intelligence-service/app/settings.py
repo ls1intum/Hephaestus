@@ -11,7 +11,7 @@ class Settings(BaseSettings):
 
     # Model to use prefixed by provider, i.e. "openai:gpt-4o"
     MODEL_NAME: str = ""
-    DETECTION_MODEL_NAME: str = ""
+    DETECTION_MODEL_NAME: str = "azure_openai:o3-mini"
 
     # Non-Azure OpenAI
     OPENAI_API_KEY: str = ""
