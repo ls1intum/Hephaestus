@@ -81,7 +81,7 @@ hephaestus:
         sender: ${MAIL_SENDER:hephaestus@gmail.com} # use gmail email address for local testing
 
     detection:
-        automatic-detection-enabled: "false"
+        automatic-detection-enabled: false
 
 keycloak:
     url: http://localhost:8081
