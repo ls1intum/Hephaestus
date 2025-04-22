@@ -27,6 +27,9 @@ public class ActivityService {
     private PullRequestBadPracticeRepository pullRequestBadPracticeRepository;
 
     @Autowired
+    private BadPracticeFeedbackRepository badPracticeFeedbackRepository;
+
+    @Autowired
     private PullRequestBadPracticeDetector pullRequestBadPracticeDetector;
 
     public ActivityDTO getActivity(String login) {
@@ -79,18 +82,33 @@ public class ActivityService {
         return detectedBadPractices.stream().map(PullRequestBadPracticeDTO::fromPullRequestBadPractice).toList();
     }
 
-    public List<PullRequestBadPracticeDTO> detectBadPracticesForPullRequest(Long pullRequestId) {
-        logger.info("Detecting bad practices for PR: {}", pullRequestId);
-
-        PullRequest pullRequest = pullRequestRepository.findById(pullRequestId).orElse(null);
-        if (pullRequest == null) {
-            throw new IllegalArgumentException("Pull request " + pullRequestId + " not found");
-        }
+    public List<PullRequestBadPracticeDTO> detectBadPracticesForPullRequest(PullRequest pullRequest) {
+        logger.info("Detecting bad practices for PR: {}", pullRequest.getId());
 
         List<PullRequestBadPractice> detectedBadPractices = pullRequestBadPracticeDetector.detectAndSyncBadPractices(
             pullRequest
         );
 
         return detectedBadPractices.stream().map(PullRequestBadPracticeDTO::fromPullRequestBadPractice).toList();
+    }
+
+    public void resolveBadPractice(PullRequestBadPractice badPractice, PullRequestBadPracticeState state) {
+        logger.info("Resolving bad practice {} with state {}", badPractice.getId(), state);
+
+        badPractice.setState(state);
+        pullRequestBadPracticeRepository.save(badPractice);
+    }
+
+    public void provideFeedbackForBadPractice(PullRequestBadPractice badPractice, BadPracticeFeedbackDTO feedback) {
+        logger.info("Marking bad practice with id: {}", badPractice.getId());
+
+        badPractice.setState(PullRequestBadPracticeState.WRONG);
+        pullRequestBadPracticeRepository.save(badPractice);
+
+        BadPracticeFeedback badPracticeFeedback = new BadPracticeFeedback();
+        badPracticeFeedback.setPullRequestBadPractice(badPractice);
+        badPracticeFeedback.setExplanation(feedback.explanation());
+        badPracticeFeedback.setType(feedback.type());
+        badPracticeFeedbackRepository.save(badPracticeFeedback);
     }
 }

@@ -28,14 +28,19 @@ export const Default: Story = {
     ],
     badPractices: [
       {
+        id: 1,
         title: 'Avoid using any type',
-        description: 'Using the any type defeats the purpose of TypeScript.'
+        description: 'Using the any type defeats the purpose of TypeScript.',
+        state: 'CRITICAL_ISSUE'
       },
       {
+        id: 2,
         title: 'Unchecked checkbox in description',
-        description: 'Unchecked checkboxes in the description are not allowed.'
+        description: 'Unchecked checkboxes in the description are not allowed.',
+        state: 'MINOR_ISSUE'
       }
-    ]
+    ],
+    badPracticeSummary: 'We found 2 bad practices in this pull request. Please fix them. Thank you!'
   }
 };
 
@@ -57,12 +62,16 @@ export const isLoading: Story = {
     ],
     badPractices: [
       {
+        id: 1,
         title: 'Avoid using any type',
-        description: 'Using the any type defeats the purpose of TypeScript.'
+        description: 'Using the any type defeats the purpose of TypeScript.',
+        state: 'CRITICAL_ISSUE'
       },
       {
+        id: 2,
         title: 'Unchecked checkbox in description',
-        description: 'Unchecked checkboxes in the description are not allowed.'
+        description: 'Unchecked checkboxes in the description are not allowed.',
+        state: 'MINOR_ISSUE'
       }
     ],
     isLoading: true
