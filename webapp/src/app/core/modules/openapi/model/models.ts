@@ -1,4 +1,5 @@
 export * from './activity';
+export * from './bad-practice-feedback';
 export * from './contributor';
 export * from './label-info';
 export * from './leaderboard-entry';
@@ -15,4 +16,5 @@ export * from './session';
 export * from './team-info';
 export * from './user-info';
 export * from './user-profile';
+export * from './user-settings';
 export * from './user-teams';

@@ -6,12 +6,22 @@ from pydantic import BaseModel
 from nats.js.api import StreamConfig
 from app.config import settings
 from app.nats_client import nats_client
+from app.logger import logger
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     await nats_client.connect()
-    await nats_client.js.add_stream(name="github", subjects=["github.>"], config=StreamConfig(storage="file"))
+    
+    # Check if stream exists before creating it
+    try:
+        stream_info = await nats_client.js.stream_info("github")
+        logger.info(f"Stream 'github' already exists")
+    except Exception as e:
+        # Only create stream if it doesn't exist
+        logger.info(f"Creating 'github' stream")
+        await nats_client.js.add_stream(name="github", subjects=["github.>"], config=StreamConfig(storage="file"))
+    
     yield
     await nats_client.close()
 

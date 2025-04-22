@@ -5,8 +5,6 @@ import de.tum.in.www1.hephaestus.activity.model.*;
 import de.tum.in.www1.hephaestus.gitprovider.issue.Issue;
 import de.tum.in.www1.hephaestus.gitprovider.pullrequest.PullRequest;
 import de.tum.in.www1.hephaestus.gitprovider.pullrequest.PullRequestRepository;
-import de.tum.in.www1.hephaestus.gitprovider.user.UserRepository;
-import jakarta.transaction.Transactional;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -29,10 +27,10 @@ public class ActivityService {
     private PullRequestBadPracticeRepository pullRequestBadPracticeRepository;
 
     @Autowired
-    private PullRequestBadPracticeDetector pullRequestBadPracticeDetector;
+    private BadPracticeFeedbackRepository badPracticeFeedbackRepository;
 
     @Autowired
-    private UserRepository userRepository;
+    private PullRequestBadPracticeDetector pullRequestBadPracticeDetector;
 
     public ActivityDTO getActivity(String login) {
         logger.info("Getting activity for user with login: {}", login);
@@ -84,17 +82,33 @@ public class ActivityService {
         return detectedBadPractices.stream().map(PullRequestBadPracticeDTO::fromPullRequestBadPractice).toList();
     }
 
-    public List<PullRequestBadPracticeDTO> detectBadPracticesForPullRequest(Long pullRequestId) {
-        logger.info("Detecting bad practices for PR: {}", pullRequestId);
-
-        PullRequest pullRequest = pullRequestRepository.findById(pullRequestId).orElse(null);
-        if (pullRequest == null) {
-            throw new IllegalArgumentException("Pull request " + pullRequestId + " not found");
-        }
+    public List<PullRequestBadPracticeDTO> detectBadPracticesForPullRequest(PullRequest pullRequest) {
+        logger.info("Detecting bad practices for PR: {}", pullRequest.getId());
 
         List<PullRequestBadPractice> detectedBadPractices = pullRequestBadPracticeDetector.detectAndSyncBadPractices(
             pullRequest
         );
+
         return detectedBadPractices.stream().map(PullRequestBadPracticeDTO::fromPullRequestBadPractice).toList();
+    }
+
+    public void resolveBadPractice(PullRequestBadPractice badPractice, PullRequestBadPracticeState state) {
+        logger.info("Resolving bad practice {} with state {}", badPractice.getId(), state);
+
+        badPractice.setState(state);
+        pullRequestBadPracticeRepository.save(badPractice);
+    }
+
+    public void provideFeedbackForBadPractice(PullRequestBadPractice badPractice, BadPracticeFeedbackDTO feedback) {
+        logger.info("Marking bad practice with id: {}", badPractice.getId());
+
+        badPractice.setState(PullRequestBadPracticeState.WRONG);
+        pullRequestBadPracticeRepository.save(badPractice);
+
+        BadPracticeFeedback badPracticeFeedback = new BadPracticeFeedback();
+        badPracticeFeedback.setPullRequestBadPractice(badPractice);
+        badPracticeFeedback.setExplanation(feedback.explanation());
+        badPracticeFeedback.setType(feedback.type());
+        badPracticeFeedbackRepository.save(badPracticeFeedback);
     }
 }

@@ -32,19 +32,23 @@
                 [additions]="pullRequest.additions"
                 [deletions]="pullRequest.deletions"
                 [htmlUrl]="pullRequest.htmlUrl"
-                [repositoryName]="pullRequest.repository?.name"
+                [repositoryName]="pullRequest.repository.name"
                 [createdAt]="pullRequest.createdAt"
                 [state]="pullRequest.state"
                 [isDraft]="pullRequest.isDraft"
                 [isMerged]="pullRequest.isMerged"
                 [pullRequestLabels]="pullRequest.labels"
                 [badPractices]="pullRequest.badPractices"
+                [badPracticeSummary]="pullRequest.badPracticeSummary"
               >
               </app-pull-request-bad-practice-card>
             }
           }
         </div>
       </div>
+    </div>
+    <div class="col-span-1">
+      <app-bad-practice-legend-card></app-bad-practice-legend-card>
     </div>
   </div>
 </div>

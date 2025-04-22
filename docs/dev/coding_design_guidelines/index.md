@@ -50,6 +50,11 @@ When proposing changes to the guidelines, please consider the following:
 ```{include} server.md
 ```
 
+## Intelligent Service
+
+```{include} intelligence_service.md
+```
+
 ## Client
 
 ```{include} client.md
