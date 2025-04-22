@@ -10,7 +10,7 @@ from app.detector.prompts.pullrequest_badpractice_detector import (
 )
 from app.models import get_model
 
-ChatModel = get_model(settings.DETECTION_MODEL_NAME)
+ChatModel = get_model("azure_openai:o3-mini")
 model = ChatModel()
 
 

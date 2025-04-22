@@ -33,11 +33,7 @@ public class BadPracticeDetectorScheduler {
     @Value("${hephaestus.detection.automatic-detection-enabled}")
     private boolean automaticDetectionEnabled;
 
-    public void detectBadPracticeForPrIfReady(
-        PullRequest pullRequest,
-        Set<Label> oldLabels,
-        Set<Label> newLabels
-    ) {
+    public void detectBadPracticeForPrIfReady(PullRequest pullRequest, Set<Label> oldLabels, Set<Label> newLabels) {
         if (
             automaticDetectionEnabled &&
             newLabels.stream().anyMatch(label -> READY_TO_REVIEW.equals(label.getName())) &&
