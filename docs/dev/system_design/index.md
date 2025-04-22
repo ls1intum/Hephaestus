@@ -3,7 +3,7 @@
 ## Overview
 
 Hephaestus is designed using an architecture-first approach. To develop and visualize our system design, we use [StarUML](https://staruml.io/), a professional UML modeling software that allows for comprehensive representation of system components, relationships, and behaviors.
-The source file for all models displayed in this documentation can be found on Github and [here](./hephaestus.mdj).
+The source file for all models and diagrams displayed in this documentation can be found on Github and [here](./hephaestus.mdj).
 
 ## Top-Level Design
 
@@ -46,15 +46,41 @@ All gamification related data is managed by the _GamificationDashboard_.
 Gamification Analysis Object Model (UML Class Diagram)
 ```
 
+## AI Mentor
+
+To implement AI mentor features for self-reflective practices we utilize LangGraph, a library built by LangChain that allows users to create complex, stateful, multi-agent applications using graph-based architectures. 
+
+The system maintains a state, which represents a current snapshot of the application. Each call to the AI Mentor triggers a run of the graph, which consists of nodes and edges. Nodes receive the current state as input, perform specific operations — such as updating state parameters or generating responses — and return an updated state. Edges determine the next node to execute based on the current state, functioning as either conditional branches or fixed transitions.
+
+There are four main elements of the graph:
+- Storage update nodes: Functions that update data saved in storage, maintaining long-term memory across all interactions with the AI Mentor.
+- Response generation nodes: Functions responsible for generating responses that users receive in the chat interface.
+- State update nodes: Functions that update the current state of the graph (a TypedDict containing information about the current chat).
+- Conditions, or conditional edges: Edges that evaluate the current state and determine which node to execute next.
+
+```{figure} ./langgraph.png
+:alt: LangGraph Graph Structure Used for Each of the Response Generation Calls
+:width: 850px
+LangGraph Graph Structure Used for Each of the Response Generation Calls
+```
+
 ## User Interaction
 
 As web applications are highly interactive, we want to model the basic interactions between the user and the system, giving a high-level overview of the possible user journeys. 
 For that reason, we focus on a _Developer_ as the primary actor of the system and model their interactions with the system.
 
-```{figure} ./all_use_cases.svg
-:alt: Hephaestus Use Case Diagram
+```{figure} ./gamification_use_cases.svg
+:width: 700px
+:alt: Hephaestus Gamification Use Case Diagram
 
 Hephaestus Gamification Use Cases (UML Use Case Diagram)
+```
+
+```{figure} ./mentor_use_cases.svg
+:width: 850px
+:alt: Hephaestus AI Mentor Use Case Diagram
+
+Hephaestus AI Mentor Use Cases (UML Use Case Diagram)
 ```
 
 ## Core Workflows
