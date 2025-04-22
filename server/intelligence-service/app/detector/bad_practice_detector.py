@@ -4,7 +4,6 @@ from typing import List
 from langchain_core.prompts import ChatPromptTemplate
 from pydantic import BaseModel, Field
 
-from app.settings import settings
 from app.detector.prompts.pullrequest_badpractice_detector import (
     BAD_PRACTICE_PROMPT_TEST,
 )
