@@ -82,6 +82,7 @@ services:
       SENTRY_DSN: ${SENTRY_DSN}
       POSTFIX_HOST: postfix
       POSTFIX_PORT: 25
+      AUTOMATIC_DETECTION_ENABLED: ${AUTOMATIC_DETECTION_ENABLED}
     depends_on:
       - postgres
     restart: unless-stopped
