@@ -128,6 +128,7 @@ services:
       OLLAMA_BASIC_AUTH_USERNAME: ${OLLAMA_BASIC_AUTH_USERNAME}
       OLLAMA_BASIC_AUTH_PASSWORD: ${OLLAMA_BASIC_AUTH_PASSWORD}
       OLLAMA_HOST: ${OLLAMA_HOST}
+      DETECTION_MODEL_NAME: ${DETECTION_MODEL_NAME}
     depends_on:
       - postgres
     restart: unless-stopped

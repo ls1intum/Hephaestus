@@ -26,7 +26,7 @@ class Settings(BaseSettings):
     OLLAMA_BASIC_AUTH_PASSWORD: str = ""
     OLLAMA_HOST: str = ""
 
-    @field_validator("MODEL_NAME", mode="before")
+    @field_validator("MODEL_NAME", "DETECTION_MODEL_NAME", mode="before")
     @classmethod
     def override_model_name(cls, value):
         if os.getenv("GITHUB_ACTIONS", "").lower() == "true":
