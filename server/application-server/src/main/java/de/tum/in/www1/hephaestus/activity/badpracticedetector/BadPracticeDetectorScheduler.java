@@ -17,6 +17,7 @@ public class BadPracticeDetectorScheduler {
 
     private static final Logger logger = LoggerFactory.getLogger(BadPracticeDetectorScheduler.class);
 
+    private static final String READY_TO_REVIEW = "ready to review";
     private static final String READY_TO_MERGE = "ready to merge";
 
     @Qualifier("applicationTaskExecutor")
@@ -32,20 +33,15 @@ public class BadPracticeDetectorScheduler {
     @Value("${hephaestus.detection.automatic-detection-enabled}")
     private boolean automaticDetectionEnabled;
 
-    public void detectBadPracticeForPrIfReadyToMerge(
-        PullRequest pullRequest,
-        Set<Label> oldLabels,
-        Set<Label> newLabels
-    ) {
+    public void detectBadPracticeForPrIfReady(PullRequest pullRequest, Set<Label> oldLabels, Set<Label> newLabels) {
         if (
             automaticDetectionEnabled &&
-            newLabels.stream().anyMatch(label -> READY_TO_MERGE.equals(label.getName())) &&
-            oldLabels.stream().noneMatch(label -> READY_TO_MERGE.equals(label.getName()))
+            ((newLabels.stream().anyMatch(label -> READY_TO_REVIEW.equals(label.getName())) &&
+                    oldLabels.stream().noneMatch(label -> READY_TO_REVIEW.equals(label.getName()))) ||
+                (newLabels.stream().anyMatch(label -> READY_TO_MERGE.equals(label.getName())) &&
+                    oldLabels.stream().anyMatch(label -> READY_TO_MERGE.equals(label.getName()))))
         ) {
-            logger.info(
-                "Scheduling bad practice detection for pull request because it is ready to merge: {}",
-                pullRequest.getId()
-            );
+            logger.info("Scheduling bad practice detection for pull request: {}", pullRequest.getId());
             BadPracticeDetectorTask badPracticeDetectorTask = new BadPracticeDetectorTask();
             badPracticeDetectorTask.setPullRequestBadPracticeDetector(pullRequestBadPracticeDetector);
             badPracticeDetectorTask.setMailService(mailService);

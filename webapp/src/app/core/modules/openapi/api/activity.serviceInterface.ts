@@ -14,6 +14,7 @@ import { HttpHeaders }                                       from '@angular/comm
 import { Observable }                                        from 'rxjs';
 
 import { Activity } from '../model/models';
+import { BadPracticeFeedback } from '../model/models';
 import { PullRequestBadPractice } from '../model/models';
 
 
@@ -45,5 +46,21 @@ export interface ActivityServiceInterface {
      * @param login 
      */
     getActivityByUser(login: string, extraHttpRequestParams?: any): Observable<Activity>;
+
+    /**
+     * 
+     * 
+     * @param badPracticeId 
+     * @param badPracticeFeedback 
+     */
+    provideFeedbackForBadPractice(badPracticeId: number, badPracticeFeedback: BadPracticeFeedback, extraHttpRequestParams?: any): Observable<{}>;
+
+    /**
+     * 
+     * 
+     * @param badPracticeId 
+     * @param state 
+     */
+    resolveBadPractice(badPracticeId: number, state: 'GOOD_PRACTICE' | 'FIXED' | 'CRITICAL_ISSUE' | 'NORMAL_ISSUE' | 'MINOR_ISSUE' | 'WONT_FIX' | 'WRONG', extraHttpRequestParams?: any): Observable<{}>;
 
 }

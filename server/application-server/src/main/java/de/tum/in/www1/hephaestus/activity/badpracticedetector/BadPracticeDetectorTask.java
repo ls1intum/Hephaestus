@@ -1,6 +1,7 @@
 package de.tum.in.www1.hephaestus.activity.badpracticedetector;
 
 import de.tum.in.www1.hephaestus.activity.model.PullRequestBadPractice;
+import de.tum.in.www1.hephaestus.activity.model.PullRequestBadPracticeState;
 import de.tum.in.www1.hephaestus.gitprovider.pullrequest.PullRequest;
 import de.tum.in.www1.hephaestus.gitprovider.user.User;
 import de.tum.in.www1.hephaestus.notification.MailService;
@@ -26,7 +27,9 @@ public class BadPracticeDetectorTask implements Runnable {
 
         List<PullRequestBadPractice> unResolvedBadPractices = badPractices
             .stream()
-            .filter(badPractice -> !badPractice.isResolved())
+            .filter(badPractice -> !(badPractice.getState() == PullRequestBadPracticeState.FIXED))
+            .filter(badPractice -> !(badPractice.getState() == PullRequestBadPracticeState.WONT_FIX))
+            .filter(badPractice -> !(badPractice.getState() == PullRequestBadPracticeState.WRONG))
             .toList();
 
         if (!unResolvedBadPractices.isEmpty()) {

@@ -7,7 +7,7 @@
             <hlm-skeleton class="size-5 bg-green-500/30"></hlm-skeleton>
             <hlm-skeleton class="h-4 w-16 lg:w-36"></hlm-skeleton>
           } @else {
-            <ng-icon [svg]="issueIconAndColor().icon" size="18" [class]="'mr-1 ' + issueIconAndColor().color"></ng-icon>
+            <ng-icon [name]="issueIconAndColor().icon" size="18" [class]="'mr-1 ' + issueIconAndColor().color"></ng-icon>
             {{ repositoryName() }} #{{ number() }} on {{ displayCreated().format('MMM D') }}
           }
         </span>
@@ -25,12 +25,12 @@
               @if (this.detectBadPracticesForPrMutation.isPending()) {
                 <hlm-spinner class="size-4" />
               } @else {
-                <ng-icon [svg]="octSync" class="size-8" />
+                <ng-icon name="octSync" class="size-8" />
               }
               <span>Detect</span>
             </button>
             <button brnCollapsibleTrigger hlmBtn variant="ghost">
-              <ng-icon [svg]="octFold" size="18" class="text-github-muted-foreground"></ng-icon>
+              <ng-icon name="octFold" size="18" class="text-github-muted-foreground"></ng-icon>
             </button>
           }
         </span>
@@ -64,9 +64,11 @@
     @if (!isLoading()) {
       <div class="gap-2 space-x-0 text-left px-6 pb-2">
         <brn-collapsible-content>
+          <brn-separator hlmSeparator />
+          <p class="text-sm text-pretty">{{ badPracticeSummary() }}</p>
           @for (badpractice of badPractices(); track badpractice.title) {
             <brn-separator hlmSeparator />
-            <app-bad-practice-card [title]="badpractice.title" [description]="badpractice.description" [resolved]="badpractice.resolved"></app-bad-practice-card>
+            <app-bad-practice-card [id]="badpractice.id" [title]="badpractice.title" [description]="badpractice.description" [state]="badpractice.state"></app-bad-practice-card>
           }
         </brn-collapsible-content>
       </div>

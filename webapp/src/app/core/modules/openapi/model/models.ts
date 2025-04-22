@@ -1,4 +1,5 @@
 export * from './activity';
+export * from './bad-practice-feedback';
 export * from './contributor';
 export * from './label-info';
 export * from './leaderboard-entry';

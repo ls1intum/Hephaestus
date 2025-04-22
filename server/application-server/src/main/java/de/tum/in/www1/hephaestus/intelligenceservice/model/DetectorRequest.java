@@ -32,22 +32,55 @@ import org.hibernate.validator.constraints.*;
  * DetectorRequest
  */
 @JsonPropertyOrder({
+  DetectorRequest.JSON_PROPERTY_BAD_PRACTICE_SUMMARY,
   DetectorRequest.JSON_PROPERTY_BAD_PRACTICES,
   DetectorRequest.JSON_PROPERTY_DESCRIPTION,
+  DetectorRequest.JSON_PROPERTY_LIFECYCLE_STATE,
   DetectorRequest.JSON_PROPERTY_TITLE
 })
 @jakarta.annotation.Generated(value = "org.openapitools.codegen.languages.JavaClientCodegen", comments = "Generator version: 7.7.0")
 public class DetectorRequest {
+  public static final String JSON_PROPERTY_BAD_PRACTICE_SUMMARY = "bad_practice_summary";
+  private String badPracticeSummary;
+
   public static final String JSON_PROPERTY_BAD_PRACTICES = "bad_practices";
   private List<BadPractice> badPractices = new ArrayList<>();
 
   public static final String JSON_PROPERTY_DESCRIPTION = "description";
   private String description;
 
+  public static final String JSON_PROPERTY_LIFECYCLE_STATE = "lifecycle_state";
+  private String lifecycleState;
+
   public static final String JSON_PROPERTY_TITLE = "title";
   private String title;
 
   public DetectorRequest() {
+  }
+
+  public DetectorRequest badPracticeSummary(String badPracticeSummary) {
+    
+    this.badPracticeSummary = badPracticeSummary;
+    return this;
+  }
+
+  /**
+   * Get badPracticeSummary
+   * @return badPracticeSummary
+   */
+  @jakarta.annotation.Nonnull
+  @JsonProperty(JSON_PROPERTY_BAD_PRACTICE_SUMMARY)
+  @JsonInclude(value = JsonInclude.Include.ALWAYS)
+
+  public String getBadPracticeSummary() {
+    return badPracticeSummary;
+  }
+
+
+  @JsonProperty(JSON_PROPERTY_BAD_PRACTICE_SUMMARY)
+  @JsonInclude(value = JsonInclude.Include.ALWAYS)
+  public void setBadPracticeSummary(String badPracticeSummary) {
+    this.badPracticeSummary = badPracticeSummary;
   }
 
   public DetectorRequest badPractices(List<BadPractice> badPractices) {
@@ -108,6 +141,31 @@ public class DetectorRequest {
     this.description = description;
   }
 
+  public DetectorRequest lifecycleState(String lifecycleState) {
+    
+    this.lifecycleState = lifecycleState;
+    return this;
+  }
+
+  /**
+   * Get lifecycleState
+   * @return lifecycleState
+   */
+  @jakarta.annotation.Nonnull
+  @JsonProperty(JSON_PROPERTY_LIFECYCLE_STATE)
+  @JsonInclude(value = JsonInclude.Include.ALWAYS)
+
+  public String getLifecycleState() {
+    return lifecycleState;
+  }
+
+
+  @JsonProperty(JSON_PROPERTY_LIFECYCLE_STATE)
+  @JsonInclude(value = JsonInclude.Include.ALWAYS)
+  public void setLifecycleState(String lifecycleState) {
+    this.lifecycleState = lifecycleState;
+  }
+
   public DetectorRequest title(String title) {
     
     this.title = title;
@@ -142,22 +200,26 @@ public class DetectorRequest {
       return false;
     }
     DetectorRequest detectorRequest = (DetectorRequest) o;
-    return Objects.equals(this.badPractices, detectorRequest.badPractices) &&
+    return Objects.equals(this.badPracticeSummary, detectorRequest.badPracticeSummary) &&
+        Objects.equals(this.badPractices, detectorRequest.badPractices) &&
         Objects.equals(this.description, detectorRequest.description) &&
+        Objects.equals(this.lifecycleState, detectorRequest.lifecycleState) &&
         Objects.equals(this.title, detectorRequest.title);
   }
 
   @Override
   public int hashCode() {
-    return Objects.hash(badPractices, description, title);
+    return Objects.hash(badPracticeSummary, badPractices, description, lifecycleState, title);
   }
 
   @Override
   public String toString() {
     StringBuilder sb = new StringBuilder();
     sb.append("class DetectorRequest {\n");
+    sb.append("    badPracticeSummary: ").append(toIndentedString(badPracticeSummary)).append("\n");
     sb.append("    badPractices: ").append(toIndentedString(badPractices)).append("\n");
     sb.append("    description: ").append(toIndentedString(description)).append("\n");
+    sb.append("    lifecycleState: ").append(toIndentedString(lifecycleState)).append("\n");
     sb.append("    title: ").append(toIndentedString(title)).append("\n");
     sb.append("}");
     return sb.toString();
