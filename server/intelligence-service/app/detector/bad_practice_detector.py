@@ -13,6 +13,7 @@ from app.settings import settings
 ChatModel = get_model(settings.DETECTION_MODEL_NAME)
 model = ChatModel()
 
+
 class BadPracticeStatus(str, Enum):
     GOOD_PRACTICE = "Good Practice"
     FIXED = "Fixed"
