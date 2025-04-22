@@ -8,10 +8,10 @@ from app.detector.prompts.pullrequest_badpractice_detector import (
     BAD_PRACTICE_PROMPT_TEST,
 )
 from app.models import get_model
+from app.settings import settings
 
-ChatModel = get_model("azure_openai:o3-mini")
+ChatModel = get_model(settings.DETECTION_MODEL_NAME)
 model = ChatModel()
-
 
 class BadPracticeStatus(str, Enum):
     GOOD_PRACTICE = "Good Practice"

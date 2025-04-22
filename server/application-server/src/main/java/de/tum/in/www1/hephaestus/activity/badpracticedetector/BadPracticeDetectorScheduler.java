@@ -36,21 +36,12 @@ public class BadPracticeDetectorScheduler {
     public void detectBadPracticeForPrIfReady(PullRequest pullRequest, Set<Label> oldLabels, Set<Label> newLabels) {
         if (
             automaticDetectionEnabled &&
-            newLabels.stream().anyMatch(label -> READY_TO_REVIEW.equals(label.getName())) &&
-            oldLabels.stream().noneMatch(label -> READY_TO_REVIEW.equals(label.getName()))
+            ((newLabels.stream().anyMatch(label -> READY_TO_REVIEW.equals(label.getName())) &&
+                    oldLabels.stream().noneMatch(label -> READY_TO_REVIEW.equals(label.getName()))) ||
+                (newLabels.stream().anyMatch(label -> READY_TO_MERGE.equals(label.getName())) &&
+                    oldLabels.stream().anyMatch(label -> READY_TO_MERGE.equals(label.getName()))))
         ) {
-            BadPracticeDetectorTask badPracticeDetectorTask = new BadPracticeDetectorTask();
-            badPracticeDetectorTask.setPullRequest(pullRequest);
-            taskExecutor.execute(badPracticeDetectorTask);
-        } else if (
-            automaticDetectionEnabled &&
-            newLabels.stream().anyMatch(label -> READY_TO_MERGE.equals(label.getName())) &&
-            oldLabels.stream().noneMatch(label -> READY_TO_MERGE.equals(label.getName()))
-        ) {
-            logger.info(
-                "Scheduling bad practice detection for pull request because it is ready to merge: {}",
-                pullRequest.getId()
-            );
+            logger.info("Scheduling bad practice detection for pull request: {}", pullRequest.getId());
             BadPracticeDetectorTask badPracticeDetectorTask = new BadPracticeDetectorTask();
             badPracticeDetectorTask.setPullRequestBadPracticeDetector(pullRequestBadPracticeDetector);
             badPracticeDetectorTask.setMailService(mailService);
