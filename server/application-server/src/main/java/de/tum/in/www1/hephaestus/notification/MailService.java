@@ -44,10 +44,10 @@ public class MailService {
 
         try {
             UserRepresentation keyCloakUser = keycloak
-                    .realm(realm)
-                    .users()
-                    .searchByUsername(user.getLogin(), true)
-                    .getFirst();
+                .realm(realm)
+                .users()
+                .searchByUsername(user.getLogin(), true)
+                .getFirst();
 
             email = keyCloakUser.getEmail();
         } catch (Exception e) {
@@ -57,13 +57,7 @@ public class MailService {
 
         String subject = "Hephaestus has detected bad practices in your pull request #" + pullRequest.getNumber();
 
-        MailBuilder mailBuilder = new MailBuilder(
-            mailConfig,
-            user,
-            email,
-            subject,
-            "bad-practices-detected"
-        );
+        MailBuilder mailBuilder = new MailBuilder(mailConfig, user, email, subject, "bad-practices-detected");
         mailBuilder
             .fillPlaceholder(user, "user")
             .fillPlaceholder(pullRequest, "pullRequest")
