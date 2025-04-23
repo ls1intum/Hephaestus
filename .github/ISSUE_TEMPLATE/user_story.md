@@ -53,27 +53,4 @@ Keep it low-fidelity as minimal requirement. If you need more than 2 screens to 
 consider breaking it down into smaller user stories.
 -->
 
-[Attach or link mockups here]
-
-## Definition of Done
-
-- [ ] All acceptance criteria are met.
-- [ ] Code reviewed and approved.
-- [ ] All CI checks passed (except Mend, it helps to identify security vulnerabilities).
-- [ ] Deployed to staging environment and functionality verified.
-- [ ] Documentation updated with information on how to use the implemented functionality.
-- [ ] Merged to `develop` branch.
-
-<!-- 
-## Technical Notes
-[Add technical implementation details or considerations]
-
-## Dependencies
-[Add any dependencies or blockers that need to be resolved]
-
-## Related Issues
-[Link to related issues or epics]
-
-## Testing Scenarios
-Detailed test cases:
--->
+[Required: Attach or link mockups here, if not possible it is not a `user story` -> `task`]
