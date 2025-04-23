@@ -78,7 +78,7 @@ public class BadPracticeDetectorScheduler {
                     return;
                 }
             } catch (Exception e) {
-                logger.error("Failed to find user in Keycloak: {}", assignee.getLogin(), e);
+                logger.error("Failed to find user in Keycloak: {}", assignee.getLogin());
                 return;
             }
         }
