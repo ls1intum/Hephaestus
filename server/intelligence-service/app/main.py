@@ -1,4 +1,5 @@
 from fastapi import FastAPI
+from chainlit.utils import mount_chainlit
 
 from app.routers.mentor import router as mentor_router
 from app.routers.health import router as health_router
@@ -14,3 +15,5 @@ app = FastAPI(
 app.include_router(mentor_router)
 app.include_router(health_router)
 app.include_router(detector_router)
+
+mount_chainlit(app=app, target="app/chainlit.py", path="/chainlit")

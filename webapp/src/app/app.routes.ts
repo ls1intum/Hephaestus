@@ -15,6 +15,7 @@ import { AuthGuard } from '@app/core/security/auth.guard';
 import { MentorGuard } from '@app/core/security/mentor.guard';
 import { ActivityDashboardComponent } from '@app/home/activity/activity-dashboard.component';
 import { SubteamsComponent } from '@app/subteams/subteams.component';
+import { ChainlitComponent } from './chainlit/chainlit.component';
 
 export const routes: Routes = [
   // Public routes
@@ -47,5 +48,6 @@ export const routes: Routes = [
     ]
   },
   { path: 'teams', component: SubteamsComponent, canActivate: [AuthGuard] },
-  { path: 'user/:id/activity', component: ActivityDashboardComponent, canActivate: [AuthGuard, AdminGuard] }
+  { path: 'user/:id/activity', component: ActivityDashboardComponent, canActivate: [AuthGuard, AdminGuard] },
+  { path: 'chainlit', component: ChainlitComponent, canActivate: [AuthGuard] }
 ];

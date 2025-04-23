@@ -25,6 +25,8 @@ dependencies = [
     "psycopg-pool == 3.2.4",
     "ipython == 8.31.0",
     "psycopg[binary,c] == 3.2.4",
+    "chainlit ==2.5.5",
+    "pyjwt (>=2.10.1,<3.0.0)",
 ]
 
 [tool.poetry]

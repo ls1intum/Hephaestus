@@ -46,6 +46,8 @@ export class KeycloakService {
     this.profile.token = this.keycloak.token || '';
     this.profile.roles = this.keycloak.realmAccess?.roles || [];
 
+    console.log('token', this.keycloak.token);
+
     return true;
   }
 

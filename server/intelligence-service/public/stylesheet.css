@@ -1,0 +1,11 @@
+.watermark {
+  display: none !important;
+}
+
+#theme-toggle {
+  display: none !important; 
+}
+
+#user-nav-button {
+  display: none !important; 
+}
