@@ -45,21 +45,44 @@ public class BadPracticeDetectorScheduler {
     private String realm;
 
     public void detectBadPracticeForPrIfReady(PullRequest pullRequest, Set<Label> oldLabels, Set<Label> newLabels) {
-        if (!runAutomaticDetectionForAll) {
-            User assignee = pullRequest.getAssignees().stream().findFirst().orElse(null);
-
-            if (assignee == null) {
-                return;
+        if (
+                (newLabels.stream().anyMatch(label -> READY_TO_REVIEW.equals(label.getName())) &&
+                        oldLabels.stream().noneMatch(label -> READY_TO_REVIEW.equals(label.getName()))) ||
+                        (newLabels.stream().anyMatch(label -> READY_TO_MERGE.equals(label.getName())) &&
+                                oldLabels.stream().noneMatch(label -> READY_TO_MERGE.equals(label.getName())))
+        ) {
+            if (runAutomaticDetectionForAll) {
+                scheduleDetection(pullRequest);
+            } else {
+                checkUserRoleAndScheduleDetection(pullRequest);
             }
+        }
+    }
 
-            try {
-                UserRepresentation keyCloakUser = keycloak
+    public void scheduleDetection(PullRequest pullRequest) {
+        logger.info("Scheduling bad practice detection for pull request: {}", pullRequest.getId());
+        BadPracticeDetectorTask badPracticeDetectorTask = new BadPracticeDetectorTask();
+        badPracticeDetectorTask.setPullRequestBadPracticeDetector(pullRequestBadPracticeDetector);
+        badPracticeDetectorTask.setMailService(mailService);
+        badPracticeDetectorTask.setPullRequest(pullRequest);
+        taskExecutor.execute(badPracticeDetectorTask);
+    }
+
+    public void checkUserRoleAndScheduleDetection(PullRequest pullRequest) {
+        User assignee = pullRequest.getAssignees().stream().findFirst().orElse(null);
+
+        if (assignee == null) {
+            return;
+        }
+
+        try {
+            UserRepresentation keyCloakUser = keycloak
                     .realm(realm)
                     .users()
                     .searchByUsername(assignee.getLogin(), true)
                     .getFirst();
 
-                List<RoleRepresentation> roles = keycloak
+            List<RoleRepresentation> roles = keycloak
                     .realm(realm)
                     .users()
                     .get(keyCloakUser.getId())
@@ -67,34 +90,20 @@ public class BadPracticeDetectorScheduler {
                     .realmLevel()
                     .listAll();
 
-                boolean hasRunAutomaticDetection = roles
+            boolean hasRunAutomaticDetection = roles
                     .stream()
                     .anyMatch(role -> "run_automatic_detection".equals(role.getName()));
-                if (!hasRunAutomaticDetection) {
-                    logger.info(
+            if (!hasRunAutomaticDetection) {
+                logger.info(
                         "User {} does not have the run_automatic_detection role. Skipping email.",
                         assignee.getLogin()
-                    );
-                    return;
-                }
-            } catch (Exception e) {
-                logger.error("Failed to find user in Keycloak: {}", assignee.getLogin());
-                return;
+                );
+            } else {
+                logger.info("User {} has the run_automatic_detection role. Scheduling detection.", assignee.getLogin());
+                scheduleDetection(pullRequest);
             }
-        }
-
-        if (
-            (newLabels.stream().anyMatch(label -> READY_TO_REVIEW.equals(label.getName())) &&
-                oldLabels.stream().noneMatch(label -> READY_TO_REVIEW.equals(label.getName()))) ||
-            (newLabels.stream().anyMatch(label -> READY_TO_MERGE.equals(label.getName())) &&
-                oldLabels.stream().noneMatch(label -> READY_TO_MERGE.equals(label.getName())))
-        ) {
-            logger.info("Scheduling bad practice detection for pull request: {}", pullRequest.getId());
-            BadPracticeDetectorTask badPracticeDetectorTask = new BadPracticeDetectorTask();
-            badPracticeDetectorTask.setPullRequestBadPracticeDetector(pullRequestBadPracticeDetector);
-            badPracticeDetectorTask.setMailService(mailService);
-            badPracticeDetectorTask.setPullRequest(pullRequest);
-            taskExecutor.execute(badPracticeDetectorTask);
+        } catch (Exception e) {
+            logger.error("Failed to find user in Keycloak: {}", assignee.getLogin());
         }
     }
 }
