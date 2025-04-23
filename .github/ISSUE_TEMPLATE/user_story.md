@@ -61,7 +61,7 @@ consider breaking it down into smaller user stories.
 - [ ] Code reviewed and approved.
 - [ ] All CI checks passed (except Mend, it helps to identify security vulnerabilities).
 - [ ] Deployed to staging environment and functionality verified.
-- [ ] Documentation updated with information on how to use the wishlist feature.
+- [ ] Documentation updated with information on how to use the implemented functionality.
 - [ ] Merged to `develop` branch.
 
 <!-- 
