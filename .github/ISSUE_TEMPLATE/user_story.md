@@ -35,7 +35,7 @@ consider breaking it down into smaller user stories.
 
 - [ ] All acceptance criteria are met.
 - [ ] Code reviewed and approved.
-- [ ] All CI checks passed.
+- [ ] All CI checks passed (except Mend, it helps to identify security vulnerabilities).
 - [ ] Deployed to staging environment and functionality verified.
 - [ ] Documentation updated with information on how to use the wishlist feature.
 - [ ] Merged to development branch
