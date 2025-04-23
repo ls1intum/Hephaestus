@@ -1,7 +1,7 @@
 ---
 name: User Story
 about: Create a user story to capture functionality from an end user's perspective
-title: "<Imperative Verb Phrase>: <Short Description>"
+title: "[Imperative Verb Phrase]: [Short Description]"
 labels: "user story"
 assignees: 
 ---
