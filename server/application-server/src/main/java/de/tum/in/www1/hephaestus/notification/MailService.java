@@ -5,7 +5,6 @@ import de.tum.in.www1.hephaestus.gitprovider.pullrequest.PullRequest;
 import de.tum.in.www1.hephaestus.gitprovider.user.User;
 import java.util.List;
 import org.keycloak.admin.client.Keycloak;
-import org.keycloak.representations.idm.RoleRepresentation;
 import org.keycloak.representations.idm.UserRepresentation;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -41,13 +40,20 @@ public class MailService {
         List<PullRequestBadPractice> badPractices
     ) {
         logger.info("Sending bad practice detected email to user: {}", user.getLogin());
+        String email;
 
-        UserRepresentation keyCloakUser = keycloak
-            .realm(realm)
-            .users()
-            .searchByUsername(user.getLogin(), true)
-            .getFirst();
-        String email = keyCloakUser.getEmail();
+        try {
+            UserRepresentation keyCloakUser = keycloak
+                    .realm(realm)
+                    .users()
+                    .searchByUsername(user.getLogin(), true)
+                    .getFirst();
+
+            email = keyCloakUser.getEmail();
+        } catch (Exception e) {
+            logger.error("Failed to find user in Keycloak: {}", user.getLogin(), e);
+            return;
+        }
 
         String subject = "Hephaestus has detected bad practices in your pull request #" + pullRequest.getNumber();
 

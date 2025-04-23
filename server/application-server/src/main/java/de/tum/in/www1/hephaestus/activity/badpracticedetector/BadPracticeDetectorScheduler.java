@@ -54,23 +54,28 @@ public class BadPracticeDetectorScheduler {
                 return;
             }
 
-            UserRepresentation keyCloakUser = keycloak
-                    .realm(realm)
-                    .users()
-                    .searchByUsername(assignee.getLogin(), true)
-                    .getFirst();
+            try {
+                UserRepresentation keyCloakUser = keycloak
+                        .realm(realm)
+                        .users()
+                        .searchByUsername(assignee.getLogin(), true)
+                        .getFirst();
 
-            List<RoleRepresentation> roles = keycloak
-                    .realm(realm)
-                    .users()
-                    .get(keyCloakUser.getId())
-                    .roles()
-                    .realmLevel()
-                    .listAll();
+                List<RoleRepresentation> roles = keycloak
+                        .realm(realm)
+                        .users()
+                        .get(keyCloakUser.getId())
+                        .roles()
+                        .realmLevel()
+                        .listAll();
 
-            boolean hasRunAutomaticDetection = roles.stream().anyMatch(role -> "run_automatic_detection".equals(role.getName()));
-            if (!hasRunAutomaticDetection) {
-                logger.info("User {} does not have the run_automatic_detection role. Skipping email.", assignee.getLogin());
+                boolean hasRunAutomaticDetection = roles.stream().anyMatch(role -> "run_automatic_detection".equals(role.getName()));
+                if (!hasRunAutomaticDetection) {
+                    logger.info("User {} does not have the run_automatic_detection role. Skipping email.", assignee.getLogin());
+                    return;
+                }
+            } catch (Exception e) {
+                logger.error("Failed to find user in Keycloak: {}", assignee.getLogin(), e);
                 return;
             }
         }
