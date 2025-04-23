@@ -40,7 +40,7 @@ public class MailService {
         PullRequest pullRequest,
         List<PullRequestBadPractice> badPractices
     ) {
-        logger.info("Sending bad practice detected email to user: " + user.getLogin());
+        logger.info("Sending bad practice detected email to user: {}", user.getLogin());
 
         UserRepresentation keyCloakUser = keycloak
             .realm(realm)
@@ -48,25 +48,14 @@ public class MailService {
             .searchByUsername(user.getLogin(), true)
             .getFirst();
         String email = keyCloakUser.getEmail();
-        List<RoleRepresentation> roles = keycloak
-            .realm(realm)
-            .users()
-            .get(keyCloakUser.getId())
-            .roles()
-            .realmLevel()
-            .listAll();
-        // Check if the user has the "notification_access" role
-        boolean hasNotificationAccess = roles.stream().anyMatch(role -> "notification_access".equals(role.getName()));
-        if (!hasNotificationAccess) {
-            logger.info("User {} does not have the notification_access role. Skipping email.", user.getLogin());
-            return;
-        }
+
+        String subject = "Hephaestus has detected bad practices in your pull request #" + pullRequest.getNumber();
 
         MailBuilder mailBuilder = new MailBuilder(
             mailConfig,
             user,
             email,
-            "Bad Practices detected in your pull request",
+            subject,
             "bad-practices-detected"
         );
         mailBuilder
