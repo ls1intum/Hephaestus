@@ -54,3 +54,6 @@ consider breaking it down into smaller user stories.
 -->
 
 [Required: Attach or link mockups here, if not possible it is not a `user story` -> `task`]
+
+<!-- Note: 
+A user story is considered complete when all acceptance criteria are met AND the implementation satisfies the project's quality standards (as defined in the PR template) -->

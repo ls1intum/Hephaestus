@@ -17,6 +17,7 @@
 
 - [ ] PR title is clear and descriptive
 - [ ] PR description explains the purpose and changes
+- [ ] PR description clearly indicates which acceptance criteria or requirements are implemented
 - [ ] Code follows project coding standards
 - [ ] Self-review of the code has been done
 - [ ] Changes have been tested locally or in the staging environment
