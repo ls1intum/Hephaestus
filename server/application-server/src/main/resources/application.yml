@@ -62,6 +62,7 @@ hephaestus:
             time: "9:00"
         notification:
             enabled: false
+            team: "all"
             channel-id: ""
     
     workspace:
