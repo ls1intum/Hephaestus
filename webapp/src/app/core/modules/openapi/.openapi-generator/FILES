@@ -24,6 +24,7 @@ encoder.ts
 git_push.sh
 index.ts
 model/activity.ts
+model/bad-practice-feedback.ts
 model/contributor.ts
 model/label-info.ts
 model/leaderboard-entry.ts
@@ -41,6 +42,7 @@ model/session.ts
 model/team-info.ts
 model/user-info.ts
 model/user-profile.ts
+model/user-settings.ts
 model/user-teams.ts
 param.ts
 variables.ts

@@ -7,10 +7,9 @@ components:
           description: The description of the bad practice.
           title: Description
           type: string
-        resolved:
-          description: Whether the bad practice has been resolved.
-          title: Resolved
-          type: boolean
+        status:
+          $ref: '#/components/schemas/BadPracticeStatus'
+          description: The status of the bad practice.
         title:
           description: The title of the bad practice.
           title: Title
@@ -18,11 +17,25 @@ components:
       required:
       - title
       - description
-      - resolved
+      - status
       title: BadPractice
       type: object
+    BadPracticeStatus:
+      enum:
+      - Good Practice
+      - Fixed
+      - Critical Issue
+      - Normal Issue
+      - Minor Issue
+      - Won't Fix
+      - Wrong
+      title: BadPracticeStatus
+      type: string
     DetectorRequest:
       properties:
+        bad_practice_summary:
+          title: Bad Practice Summary
+          type: string
         bad_practices:
           items:
             $ref: '#/components/schemas/BadPractice'
@@ -31,23 +44,32 @@ components:
         description:
           title: Description
           type: string
+        lifecycle_state:
+          title: Lifecycle State
+          type: string
         title:
           title: Title
           type: string
       required:
       - title
       - description
+      - lifecycle_state
+      - bad_practice_summary
       - bad_practices
       title: DetectorRequest
       type: object
     DetectorResponse:
       properties:
+        bad_practice_summary:
+          title: Bad Practice Summary
+          type: string
         bad_practices:
           items:
             $ref: '#/components/schemas/BadPractice'
           title: Bad Practices
           type: array
       required:
+      - bad_practice_summary
       - bad_practices
       title: DetectorResponse
       type: object
@@ -107,8 +129,12 @@ components:
         session_id:
           title: Session Id
           type: string
+        user_id:
+          title: User Id
+          type: string
       required:
       - session_id
+      - user_id
       - previous_session_id
       - dev_progress
       title: MentorStartRequest
@@ -140,7 +166,7 @@ info:
     name: Felix T.J. Dietrich
   description: API documentation for the Hephaestus Intelligence Service.
   title: Hephaestus Intelligence Service API
-  version: 0.2.0
+  version: 0.5.2
 openapi: 3.1.0
 paths:
   /detector/:

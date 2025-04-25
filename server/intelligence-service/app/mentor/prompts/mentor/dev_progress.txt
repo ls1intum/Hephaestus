@@ -1,13 +1,20 @@
-Ask the user if they want to add their progress to the status update. The user can reference the PRs by the number. 
+### instruction ###
+1. Ask the user if they want to add their development progress to the status update. The user can reference the PRs by number. 
 
-FORMAT:
-Start with word "DEVELOPMENT", then put {progress} without any changes, on the next line add "RESPONSE" and then ask for confirmation to add the progres you have found to status update.
+### desired output formatting ###  
+1. Start with the word "DEVELOPMENT".  
+2. Put {progress} without any changes.  
+3. On the next line, add "RESPONSE".  
+4. Conclude by asking for confirmation to add the progress you have found to the status update.  
 
-Examples for the RESPONSE part you need to generate: 
-- I have found you worked on these PRs during the last spring. Do you want me to add them to you status update? 
+### rules ###
+1. Always keep the same structure!  
 
-Examaple of the whole message you are to provide:
-DEVELOPMENT
+### example RESPONSE ###
+- I have found that you worked on these PRs during the last sprint. Do you want me to add them to your status update?  
+
+### example output ###
+DEVELOPMENT  
 
 PR  
 Number: 230  
@@ -27,6 +34,6 @@ Draft: false
 Merged: false  
 URL: https://github.com/ls1intum/Hephaestus/pull/220  
 
-RESPONSE
+RESPONSE  
 
-I have found you worked on these PRs during the last spring. Do you want me to add them to your status update? You can reference the PRs by number.
+I have found that you worked on these PRs during the last sprint. Do you want me to add them to your status update? You can reference the PRs by number.  

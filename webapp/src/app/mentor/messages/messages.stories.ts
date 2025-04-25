@@ -40,10 +40,7 @@ const meta: Meta<MessagesComponent> = {
         sentAt: '2024-12-05T10:16:30Z',
         sender: Message.SenderEnum.Mentor,
         content: 'Keep up the good work!',
-        sessionId: 101,
-        status: ['Database schema completed', 'API design started'],
-        impediments: [],
-        promises: []
+        sessionId: 101
       }
     ]
   }
@@ -68,7 +65,7 @@ export const WithSummary: Story = {
         sentAt: '2024-12-05T10:17:00Z',
         sender: Message.SenderEnum.Mentor,
         content:
-          "SUMMARY\nSTATUS\n✅ Focused on refining chatbot's NLP responses and adding user authentication features.\nIMPEDIMENTS\n⚠️ Handling ambiguous user inputs causing challenges for Dialogflow in determining correct intents due to variations in phrasing and context.\nPROMISES\n🏁 Continuation of testing and refining chatbot's response flow to address ambiguity in user inputs.\nTEXT\nGreat progress on multiple fronts with the chatbot development! If there's anything else you'd like to add or discuss further, feel free to share.",
+          "SUMMARY\nSTATUS\n✅ Focused on refining chatbot's NLP responses and adding user authentication features.\nIMPEDIMENTS\n⚠️ Handling ambiguous user inputs causing challenges for Dialogflow in determining correct intents due to variations in phrasing and context.\nPROMISES\n🏁 Continuation of testing and refining chatbot's response flow to address ambiguity in user inputs.\nRESPONSE\nGreat progress on multiple fronts with the chatbot development! If there's anything else you'd like to add or discuss further, feel free to share.",
         sessionId: 101
       }
     ]

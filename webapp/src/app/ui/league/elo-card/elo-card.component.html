@@ -1,30 +1,30 @@
-<div class="flex items-center gap-4">
+<div class="flex items-center gap-2 2xl:gap-4">
   <app-icon-league [leaguePoints]="leaguePoints()" size="lg" />
   @if (currentLeague(); as currentLeague) {
-    <div class="flex flex-col">
+    <div class="flex flex-col min-w-[140px]">
       <div class="flex items-center gap-2">
         <div>
           <span class="text-sm font-semibold text-github-muted-foreground">{{ currentLeague.name }}</span>
           <!-- Points display -->
-          <div class="flex justify-between text-sm text-github-muted-foreground">
-            <div class="flex items-center gap-2">
+          <div class="w-full flex items-center justify-center gap-1 text-sm text-github-muted-foreground">
+            <span class="whitespace-nowrap">
               @if (currentLeague.maxPoints === Infinity) {
-                <span>{{ leaguePoints() }}</span>
+                {{ leaguePoints() }}
               } @else {
-                <span>{{ leaguePoints() }} / {{ currentLeague.maxPoints }}</span>
+                {{ leaguePoints() }} / {{ currentLeague.maxPoints }}
               }
-              <ng-icon name="lucideStar" class="text-base" />
-            </div>
+            </span>
+            <ng-icon name="lucideStar" class="text-base flex-shrink-0" />
           </div>
         </div>
-        <app-league-info-modal />
+        <app-league-info-modal class="flex-shrink-0" />
       </div>
       <!-- Progress bar container -->
-      <div class="flex justify-center items-center gap-2">
-        <brn-progress class="w-24 bg-secondary h-2 inline-flex overflow-hidden relative rounded-md" aria-labelledby="loading" [value]="progressValue()">
+      <div class="flex items-center gap-2 mt-1">
+        <brn-progress class="w-full bg-secondary h-2 inline-flex overflow-hidden relative rounded-md" aria-labelledby="loading" [value]="progressValue()">
           <brn-progress-indicator hlm [style.backgroundColor]="'hsl(var(--league-' + currentLeague.name.toLowerCase() + '))'" />
         </brn-progress>
-        <app-icon-league [leaguePoints]="currentLeague.maxPoints + 1" size="sm" />
+        <app-icon-league [leaguePoints]="currentLeague.maxPoints + 1" size="sm" class="flex-shrink-0" />
       </div>
     </div>
   }

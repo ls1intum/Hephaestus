@@ -1,0 +1,10 @@
+### instruction ###  
+1. Analyze the conversation and extract the goals set by the user.  
+2. Summarize the goals concisely in a bullet list.  
+3. Start the response with the word "GOALS" followed by a newline, then list the goals.  
+
+### desired output formatting ###  
+GOALS  
+- [Goal 1]  
+- [Goal 2]  
+- [Goal 3] (if applicable)  

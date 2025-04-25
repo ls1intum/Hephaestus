@@ -16,13 +16,14 @@ public record PullRequestWithBadPracticesDTO(
     @NonNull Issue.State state,
     @NonNull Boolean isDraft,
     @NonNull Boolean isMerged,
-    List<LabelInfoDTO> labels,
-    RepositoryInfoDTO repository,
+    @NonNull List<LabelInfoDTO> labels,
+    @NonNull RepositoryInfoDTO repository,
     @NonNull Integer additions,
     @NonNull Integer deletions,
     @NonNull String htmlUrl,
-    OffsetDateTime createdAt,
-    List<PullRequestBadPracticeDTO> badPractices
+    @NonNull OffsetDateTime createdAt,
+    @NonNull String badPracticeSummary,
+    @NonNull List<PullRequestBadPracticeDTO> badPractices
 ) {
     public static PullRequestWithBadPracticesDTO fromPullRequest(
         PullRequest pullRequest,
@@ -46,6 +47,7 @@ public record PullRequestWithBadPracticesDTO(
             pullRequest.getDeletions(),
             pullRequest.getHtmlUrl(),
             pullRequest.getCreatedAt(),
+            pullRequest.getBadPracticeSummary(),
             badPractices
         );
     }

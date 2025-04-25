@@ -13,15 +13,33 @@ spring:
         jwt:
           issuer-uri: ${KEYCLOAK_URL}/realms/${KEYCLOAK_REALM}
 
+  mail:
+    host: ${POSTFIX_HOST:localhost}
+    port: ${POSTFIX_PORT:25}
+    username: ${POSTFIX_USERNAME:}
+    password: ${POSTFIX_PASSWORD:}
+    properties:
+      mail:
+        transport:
+          protocol: smtp
+        smtp:
+          starttls:
+            enable: true
+        debug: false
+
 hephaestus:
     host-url: ${APPLICATION_HOST_URL}
-    
+
+    webapp:
+        url: ${APPLICATION_HOST_URL}
+
     leaderboard:
       schedule:
         day: ${LEADERBOARD_SCHEDULE_DAY:2}
         time: ${LEADERBOARD_SCHEDULE_TIME:9}
       notification:
         enabled: ${LEADERBOARD_NOTIFICATION_ENABLED:true}
+        team: ${LEADERBOARD_NOTIFICATION_TEAM:all}
         channel-id: ${LEADERBOARD_NOTIFICATION_CHANNEL_ID:G6TCVL6HL}
     
     workspace:
@@ -29,6 +47,13 @@ hephaestus:
 
     intelligence-service:
         url: ${INTELLIGENCE_SERVICE_URL}
+
+    mail:
+      enabled: ${MAIL_ENABLED:true}
+      sender: ${MAIL_SENDER:hephaestus@aet.cit.tum.de}
+
+    detection:
+        automatic-detection-enabled: ${AUTOMATIC_DETECTION_ENABLED:false}
 
 keycloak:
     url: ${KEYCLOAK_URL}
@@ -59,3 +84,7 @@ slack:
 
 sentry:
   dsn: ${SENTRY_DSN}
+
+logging:
+    level:
+        org.kohsuke.github.GitHubClient: DEBUG

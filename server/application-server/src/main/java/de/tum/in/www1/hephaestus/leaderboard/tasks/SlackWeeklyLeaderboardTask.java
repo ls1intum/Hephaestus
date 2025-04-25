@@ -33,6 +33,9 @@ public class SlackWeeklyLeaderboardTask implements Runnable {
 
     private static final Logger logger = LoggerFactory.getLogger(SlackWeeklyLeaderboardTask.class);
 
+    @Value("${hephaestus.leaderboard.notification.team}")
+    private String team;
+
     @Value("${hephaestus.leaderboard.notification.channel-id}")
     private String channelId;
 
@@ -66,8 +69,8 @@ public class SlackWeeklyLeaderboardTask implements Runnable {
      * Gets the Slack handles of the top 3 reviewers in the given time frame.
      * @return
      */
-    private List<User> getTop3SlackReviewers(OffsetDateTime after, OffsetDateTime before) {
-        var leaderboard = leaderboardService.createLeaderboard(after, before, Optional.empty(), Optional.empty());
+    private List<User> getTop3SlackReviewers(OffsetDateTime after, OffsetDateTime before, Optional<String> team) {
+        var leaderboard = leaderboardService.createLeaderboard(after, before, team, Optional.empty());
         var top3 = leaderboard.subList(0, Math.min(3, leaderboard.size()));
         logger.debug("Top 3 Users of the last week: " + top3.stream().map(e -> e.user().name()).toList());
 
@@ -82,9 +85,9 @@ public class SlackWeeklyLeaderboardTask implements Runnable {
                 .stream()
                 .filter(
                     user ->
-                        user.getName().equals(entry.user().name()) ||
+                        user.getName().equalsIgnoreCase(entry.user().name()) ||
                         (user.getProfile().getEmail() != null &&
-                            user.getProfile().getEmail().equals(entry.user().email()))
+                            user.getProfile().getEmail().equalsIgnoreCase(entry.user().email()))
                 )
                 .findFirst();
             if (exactUser.isPresent()) {
@@ -94,12 +97,15 @@ public class SlackWeeklyLeaderboardTask implements Runnable {
             // find through String edit distance
             return allSlackUsers
                 .stream()
-                .min((a, b) ->
-                    Integer.compare(
-                        LevenshteinDistance.getDefaultInstance().apply(entry.user().name(), a.getName()),
-                        LevenshteinDistance.getDefaultInstance().apply(entry.user().name(), b.getName())
-                    )
-                )
+                .min((a, b) -> {
+                    String aName = a.getRealName() != null ? a.getRealName() : a.getName();
+                    String bName = b.getRealName() != null ? b.getRealName() : b.getName();
+
+                    return Integer.compare(
+                        LevenshteinDistance.getDefaultInstance().apply(entry.user().name(), aName),
+                        LevenshteinDistance.getDefaultInstance().apply(entry.user().name(), bName)
+                    );
+                })
                 .orElse(null);
         };
     }
@@ -122,7 +128,7 @@ public class SlackWeeklyLeaderboardTask implements Runnable {
             .withNano(0);
         OffsetDateTime after = before.minusWeeks(1);
 
-        var top3reviewers = getTop3SlackReviewers(after, before);
+        var top3reviewers = getTop3SlackReviewers(after, before, Optional.of(team));
 
         logger.info("Sending scheduled message to Slack channel...");
 

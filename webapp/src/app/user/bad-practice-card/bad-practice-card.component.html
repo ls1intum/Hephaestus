@@ -1,13 +1,62 @@
-<div class="flex flex-row justify-start items-center gap-2">
-  <div>
-    @if (resolved()) {
-      <ng-icon [svg]="octCheck" size="24" class="text-github-success-foreground" />
-    } @else {
-      <ng-icon [svg]="octX" size="24" class="text-github-danger-foreground" />
-    }
+<div class="flex flex-row justify-between items-center gap-2">
+  <div class="flex flex-row justify-start items-center gap-4">
+    <div>
+      <hlm-tooltip>
+        <ng-icon hlmTooltipTrigger [name]="icon()" size="24"></ng-icon>
+        <span *brnTooltipContent>{{ text() }}</span>
+      </hlm-tooltip>
+    </div>
+    <div class="flex flex-col">
+      <h3 class="text-md font-semibold">{{ title() }}</h3>
+      <p class="text-sm text-pretty">{{ description() }}</p>
+    </div>
   </div>
-  <div class="flex flex-col">
-    <h1 class="text-lg font-semibold">{{ title() }}</h1>
-    <p class="text-sm">{{ description() }}</p>
+  <div class="justify-self-end">
+    <hlm-dialog>
+      <button hlmBtn variant="outline" [brnMenuTriggerFor]="menu">Resolve</button>
+      <ng-template #menu>
+        <hlm-menu>
+          <hlm-menu-group>
+            <button hlmMenuItem (click)="resolveBadPracticeAsFixed(id())">Resolve as fixed</button>
+          </hlm-menu-group>
+          <hlm-menu-separator />
+          <hlm-menu-group>
+            <button hlmMenuItem (click)="resolveBadPracticeAsWontFixed(id())">Resolve as won't fix</button>
+          </hlm-menu-group>
+          <hlm-menu-separator />
+          <hlm-menu-group>
+            <button hlmMenuItem brnDialogTrigger>Mark as wrong</button>
+          </hlm-menu-group>
+        </hlm-menu>
+      </ng-template>
+      <hlm-dialog-content *brnDialogContent="let ctx">
+        <hlm-dialog-header>
+          <h3 hlmDialogTitle>Provide feedback</h3>
+          <p hlmDialogDescription>Mark this bad practice with feedback that helps us improve the bad practice detection.</p>
+        </hlm-dialog-header>
+        <div class="py-4 grid gap-4">
+          <div class="items-center grid grid-cols-4 gap-4">
+            <label hlmLabel class="text-right">Feedback</label>
+            <brn-select class="inline-block" placeholder="Select the type of feedback" [(ngModel)]="_selectedType">
+              <hlm-select-trigger class="col-span-3">
+                <hlm-select-value />
+              </hlm-select-trigger>
+              <hlm-select-content>
+                @for (type of allFeedbackTypes(); track type) {
+                  <hlm-option [value]="type">{{ type }}</hlm-option>
+                }
+              </hlm-select-content>
+            </brn-select>
+          </div>
+          <div class="items-start grid grid-cols-4 gap-4 h-40">
+            <label hlmLabel for="explanation" class="text-right">Explanation</label>
+            <textarea hlmInput id="explanation" class="col-span-3 h-full" [formControl]="_newExplanation"></textarea>
+          </div>
+        </div>
+        <hlm-dialog-footer>
+          <button hlmBtn brnDialogClose type="submit" (click)="this.provideFeedbackForBadPractice()">Submit feedback</button>
+        </hlm-dialog-footer>
+      </hlm-dialog-content>
+    </hlm-dialog>
   </div>
 </div>

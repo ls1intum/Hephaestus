@@ -1,0 +1,35 @@
+<div class="flex flex-col gap-4">
+  <h1 class="text-3xl font-bold">Settings</h1>
+  <div class="sm:w-2/3 w-full flex flex-col gap-3">
+    <h2 class="text-lg font-semibold">Notifications</h2>
+    <div class="flex flex-row items-center justify-between">
+      <span class="flex-col items-center">
+        <h3>Email notifications</h3>
+        <label hlmLabel class="font-light"> Receive email notifications for newly detected bad practices and reminders. </label>
+      </span>
+      <hlm-switch class="mr-2" (checkedChange)="updateSettings($event)" [checked]="settingsQuery.data()?.receiveNotifications ?? false" />
+    </div>
+  </div>
+  <div class="sm:w-2/3 w-full flex flex-col gap-3">
+    <h2 class="text-lg font-semibold">Account</h2>
+    <div class="flex flex-row items-center justify-between">
+      <span class="flex-col items-center">
+        <h3>Delete account</h3>
+        <label hlmLabel class="font-light"> Permanently delete your account and remove your data from our servers. </label>
+      </span>
+      <hlm-alert-dialog>
+        <button id="edit-profile" variant="outline" brnAlertDialogTrigger hlmBtn>Delete</button>
+        <hlm-alert-dialog-content *brnAlertDialogContent="let ctx">
+          <hlm-alert-dialog-header>
+            <h3 hlmAlertDialogTitle>Are you absolutely sure?</h3>
+            <p hlmAlertDialogDescription>This action cannot be undone. This will permanently delete your account and remove your data from our servers.</p>
+          </hlm-alert-dialog-header>
+          <hlm-alert-dialog-footer>
+            <button hlmAlertDialogCancel (click)="ctx.close()">Cancel</button>
+            <button hlmAlertDialogAction (click)="deleteAccount()">Delete account</button>
+          </hlm-alert-dialog-footer>
+        </hlm-alert-dialog-content>
+      </hlm-alert-dialog>
+    </div>
+  </div>
+</div>
