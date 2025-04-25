@@ -84,6 +84,7 @@ public class PullRequestBadPracticeDetector {
                     existingBadPractice.setState(
                         PullRequestBadPracticeState.fromBadPracticeStatus(badPractice.getStatus())
                     );
+                    existingBadPractice.setLastUpdateTime(OffsetDateTime.now());
                     detectedBadPractices.add(pullRequestBadPracticeRepository.save(existingBadPractice));
                     exists = true;
                     break;
@@ -104,6 +105,8 @@ public class PullRequestBadPracticeDetector {
         pullRequestBadPractice.setDescription(badPractice.getDescription());
         pullRequestBadPractice.setPullrequest(pullRequest);
         pullRequestBadPractice.setState(PullRequestBadPracticeState.fromBadPracticeStatus(badPractice.getStatus()));
+        pullRequestBadPractice.setDetectionTime(OffsetDateTime.now());
+        pullRequestBadPractice.setLastUpdateTime(OffsetDateTime.now());
         return pullRequestBadPracticeRepository.save(pullRequestBadPractice);
     }
 

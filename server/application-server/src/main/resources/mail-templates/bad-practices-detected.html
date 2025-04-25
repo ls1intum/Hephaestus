@@ -2,14 +2,11 @@
     Hi [[${user.name}]],
     <br>
     <br>
-    Hephaestus has detected bad practices in your pull request '[[${pullRequest.title}]]' <a target="_blank" rel="noopener noreferrer nofollow" th:href="${pullRequest.htmlUrl}">#[[${pullRequest.number}]]</a>:
-    <br>
-    <br>
-    [[${pullRequest.badPracticeSummary}]]
+    Hephaestus has detected [[$badPracticeString]] in your pull request '[[${pullRequest.title}]]' <a target="_blank" rel="noopener noreferrer nofollow" th:href="${pullRequest.htmlUrl}">#[[${pullRequest.number}]]</a>:
     <br>
     <ul>
         <li th:each="badPractice : ${badPractices}">
-            <strong th:text="${badPractice.title}">Bad Practice Title</strong>:
+            <strong th:text="${badPractice.title}">Bad Practice Title</strong>: [[${badPractice.state}]]]
             <span th:text="${badPractice.description}">Bad Practice Description</span>
         </li>
     </ul>

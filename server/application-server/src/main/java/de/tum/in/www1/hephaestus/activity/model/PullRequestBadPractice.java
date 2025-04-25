@@ -11,6 +11,8 @@ import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
 import lombok.*;
 
+import java.time.OffsetDateTime;
+
 @Entity
 @Getter
 @Setter
@@ -37,4 +39,10 @@ public class PullRequestBadPractice {
 
     @NonNull
     private PullRequestBadPracticeState state;
+
+    private PullRequestBadPracticeState userState;
+
+    private OffsetDateTime detectionTime;
+
+    private OffsetDateTime lastUpdateTime;
 }

@@ -55,13 +55,25 @@ public class MailService {
             return;
         }
 
-        String subject = "Hephaestus has detected bad practices in your pull request #" + pullRequest.getNumber();
+        String subject = "Hephaestus: " + getBadPracticeString(badPractices) +
+                " detected in your pull request #" + pullRequest.getNumber();
 
         MailBuilder mailBuilder = new MailBuilder(mailConfig, user, email, subject, "bad-practices-detected");
         mailBuilder
             .fillPlaceholder(user, "user")
             .fillPlaceholder(pullRequest, "pullRequest")
             .fillPlaceholder(badPractices, "badPractices")
+            .fillPlaceholder(getBadPracticeString(badPractices), "badPracticeString")
             .send(javaMailSender);
+    }
+
+    private String getBadPracticeString(List<PullRequestBadPractice> badPractices) {
+        if (badPractices.size() == 1) {
+            return "1 bad practice";
+        } else if (badPractices.size() > 1) {
+            return badPractices.size() + " bad practices";
+        } else {
+            return "no bad practices";
+        }
     }
 }
