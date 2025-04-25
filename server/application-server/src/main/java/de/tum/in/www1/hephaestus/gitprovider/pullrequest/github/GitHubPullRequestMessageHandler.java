@@ -54,6 +54,8 @@ public class GitHubPullRequestMessageHandler extends GitHubMessageHandler<GHEven
     private void scheduleBadPracticeDetectionOnEvent(GHEventPayload.PullRequest eventPayload, PullRequest pullRequest) {
         if (eventPayload.getAction().equals("opened")) {
             badPracticeDetectorScheduler.detectBadPracticeForPrWhenOpenedOrReadyForReviewEvent(pullRequest);
+        } else if (eventPayload.getAction().equals("reopened")) {
+            badPracticeDetectorScheduler.detectBadPracticeForPrWhenOpenedOrReadyForReviewEvent(pullRequest);
         } else if (eventPayload.getAction().equals("ready_for_review")) {
             badPracticeDetectorScheduler.detectBadPracticeForPrWhenOpenedOrReadyForReviewEvent(pullRequest);
         }

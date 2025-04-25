@@ -1,15 +1,23 @@
 package de.tum.in.www1.hephaestus.activity.model;
 
 import de.tum.in.www1.hephaestus.intelligenceservice.model.BadPracticeStatus;
+import lombok.Getter;
 
+@Getter
 public enum PullRequestBadPracticeState {
-    GOOD_PRACTICE,
-    FIXED,
-    CRITICAL_ISSUE,
-    NORMAL_ISSUE,
-    MINOR_ISSUE,
-    WONT_FIX,
-    WRONG;
+    GOOD_PRACTICE("Good Practice"),
+    FIXED("Fixed"),
+    CRITICAL_ISSUE("Critical Issue"),
+    NORMAL_ISSUE("Normal Issue"),
+    MINOR_ISSUE("Minor Issue"),
+    WONT_FIX("Won't Fix"),
+    WRONG("Wrong");
+
+    private final String value;
+
+    PullRequestBadPracticeState(String value) {
+        this.value = value;
+    }
 
     public static PullRequestBadPracticeState fromBadPracticeStatus(BadPracticeStatus status) {
         return switch (status) {

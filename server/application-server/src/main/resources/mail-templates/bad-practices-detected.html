@@ -1,21 +1,21 @@
 <p th:inline="text">
     Hi [[${user.name}]],
-    <br>
-    <br>
-    Hephaestus has detected [[${badPracticeString}]] in your pull request '[[${pullRequest.title}]]' <a target="_blank" rel="noopener noreferrer nofollow" th:href="${pullRequest.htmlUrl}">#[[${pullRequest.number}]]</a>:
-    <br>
-    <ul>
-        <li th:each="badPractice : ${badPractices}">
-            <strong th:text="${badPractice.title}">Bad Practice Title</strong>: [[[${badPractice.state}]]]
-            <span th:text="${badPractice.description}">Bad Practice Description</span>
-        </li>
-    </ul>
-    You can review the bad practices on <a target="_blank" rel="noopener noreferrer nofollow" th:href="${config.clientHost + '/user/' + user.login + '/activity?pullRequest=' + pullRequest.id}">Hephaestus</a>.
-    <br>
-    <br>
-    When you have resolved the bad practices, you can re-run the detection by clicking on the <strong>Detect bad practices</strong> button in the <a target="_blank" rel="noopener noreferrer nofollow" th:href="${config.clientHost + '/user/' + user.login + '/activity?pullRequest=' + pullRequest.id}">Activity</a> dashboard.
-    <hr />
-    <div style="text-align: center;font-size: 10px">
-        Manage your notification settings <a th:href="${config.clientHost + '/settings'}">here</a>
-    </div>
 </p>
+<br>
+<br>
+Hephaestus has detected [[${badPracticeString}]] in your pull request '[[${pullRequest.title}]]' <a target="_blank" rel="noopener noreferrer nofollow" th:href="${pullRequest.htmlUrl}">#[[${pullRequest.number}]]</a>:
+<br>
+<ul>
+    <li th:each="badPractice : ${badPractices}">
+        <strong th:text="${badPractice.title}">Bad Practice Title</strong>: [[${badPractice.state.getValue()}]]<br />
+        <span th:text="${badPractice.description}">Bad Practice Description</span>
+    </li>
+</ul>
+You can review the bad practices on <a target="_blank" rel="noopener noreferrer nofollow" th:href="${config.clientHost + '/user/' + user.login + '/activity?pullRequest=' + pullRequest.id}">Hephaestus</a>.
+<br>
+<br>
+When you have resolved the bad practices, you can re-run the detection by clicking on the <strong>Detect bad practices</strong> button in the <a target="_blank" rel="noopener noreferrer nofollow" th:href="${config.clientHost + '/user/' + user.login + '/activity?pullRequest=' + pullRequest.id}">Activity</a> dashboard.
+<hr />
+<div style="text-align: center;font-size: 10px">
+    Manage your notification settings <a th:href="${config.clientHost + '/settings'}">here</a>
+</div>
