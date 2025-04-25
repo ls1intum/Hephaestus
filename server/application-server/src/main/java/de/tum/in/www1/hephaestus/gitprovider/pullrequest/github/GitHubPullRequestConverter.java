@@ -1,6 +1,5 @@
 package de.tum.in.www1.hephaestus.gitprovider.pullrequest.github;
 
-import de.tum.in.www1.hephaestus.activity.badpracticedetector.BadPracticeDetectorScheduler;
 import de.tum.in.www1.hephaestus.gitprovider.common.BaseGitServiceEntityConverter;
 import de.tum.in.www1.hephaestus.gitprovider.common.DateUtil;
 import de.tum.in.www1.hephaestus.gitprovider.issue.github.GitHubIssueConverter;
@@ -9,7 +8,6 @@ import java.io.IOException;
 import org.kohsuke.github.GHPullRequest;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.lang.NonNull;
 import org.springframework.stereotype.Component;
 
@@ -20,18 +18,13 @@ public class GitHubPullRequestConverter extends BaseGitServiceEntityConverter<GH
 
     private final GitHubIssueConverter issueConverter;
 
-    @Autowired
-    private BadPracticeDetectorScheduler badPracticeDetectorScheduler;
-
     public GitHubPullRequestConverter(GitHubIssueConverter issueConverter) {
         this.issueConverter = issueConverter;
     }
 
     @Override
     public PullRequest convert(@NonNull GHPullRequest source) {
-        PullRequest pullRequest = update(source, new PullRequest());
-        badPracticeDetectorScheduler.detectBadPracticeForPrWhenCreated(pullRequest);
-        return pullRequest;
+        return update(source, new PullRequest());
     }
 
     @Override
@@ -45,11 +38,6 @@ public class GitHubPullRequestConverter extends BaseGitServiceEntityConverter<GH
             logger.error("Failed to convert mergeCommitSha field for source {}: {}", source.getId(), e.getMessage());
         }
         try {
-            badPracticeDetectorScheduler.detectBadPracticeForPrWhenDraftToOpen(
-                pullRequest,
-                source.isDraft(),
-                pullRequest.isDraft()
-            );
             pullRequest.setDraft(source.isDraft());
         } catch (IOException e) {
             logger.error("Failed to convert draft field for source {}: {}", source.getId(), e.getMessage());

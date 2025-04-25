@@ -1,6 +1,8 @@
 package de.tum.in.www1.hephaestus.gitprovider.pullrequest.github;
 
+import de.tum.in.www1.hephaestus.activity.badpracticedetector.BadPracticeDetectorScheduler;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubMessageHandler;
+import de.tum.in.www1.hephaestus.gitprovider.pullrequest.PullRequest;
 import de.tum.in.www1.hephaestus.gitprovider.repository.github.GitHubRepositorySyncService;
 import org.kohsuke.github.GHEvent;
 import org.kohsuke.github.GHEventPayload;
@@ -16,13 +18,17 @@ public class GitHubPullRequestMessageHandler extends GitHubMessageHandler<GHEven
     private final GitHubPullRequestSyncService pullRequestSyncService;
     private final GitHubRepositorySyncService repositorySyncService;
 
+    private final BadPracticeDetectorScheduler badPracticeDetectorScheduler;
+
     private GitHubPullRequestMessageHandler(
         GitHubPullRequestSyncService pullRequestSyncService,
-        GitHubRepositorySyncService repositorySyncService
+        GitHubRepositorySyncService repositorySyncService,
+        BadPracticeDetectorScheduler badPracticeDetectorScheduler
     ) {
         super(GHEventPayload.PullRequest.class);
         this.pullRequestSyncService = pullRequestSyncService;
         this.repositorySyncService = repositorySyncService;
+        this.badPracticeDetectorScheduler = badPracticeDetectorScheduler;
     }
 
     @Override
@@ -35,11 +41,21 @@ public class GitHubPullRequestMessageHandler extends GitHubMessageHandler<GHEven
         );
         repositorySyncService.processRepository(eventPayload.getRepository());
         // We don't need to handle the deleted action here, as pull requests are not deleted
-        pullRequestSyncService.processPullRequest(eventPayload.getPullRequest());
+        PullRequest pullRequest = pullRequestSyncService.processPullRequest(eventPayload.getPullRequest());
+
+        scheduleBadPracticeDetectionOnEvent(eventPayload, pullRequest);
     }
 
     @Override
     protected GHEvent getHandlerEvent() {
         return GHEvent.PULL_REQUEST;
+    }
+
+    private void scheduleBadPracticeDetectionOnEvent(GHEventPayload.PullRequest eventPayload, PullRequest pullRequest) {
+        if (eventPayload.getAction().equals("opened")) {
+            badPracticeDetectorScheduler.detectBadPracticeForPrWhenOpenedOrReadyForReviewEvent(pullRequest);
+        } else if (eventPayload.getAction().equals("ready_for_review")) {
+            badPracticeDetectorScheduler.detectBadPracticeForPrWhenOpenedOrReadyForReviewEvent(pullRequest);
+        }
     }
 }
