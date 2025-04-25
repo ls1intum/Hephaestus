@@ -6,7 +6,7 @@
     <br>
     <ul>
         <li th:each="badPractice : ${badPractices}">
-            <strong th:text="${badPractice.title}">Bad Practice Title</strong>: [[${badPractice.state}]]]
+            <strong th:text="${badPractice.title}">Bad Practice Title</strong>: [[[${badPractice.state}]]]
             <span th:text="${badPractice.description}">Bad Practice Description</span>
         </li>
     </ul>
