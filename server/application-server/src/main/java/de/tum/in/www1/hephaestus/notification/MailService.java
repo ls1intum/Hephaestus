@@ -55,8 +55,11 @@ public class MailService {
             return;
         }
 
-        String subject = "Hephaestus: " + getBadPracticeString(badPractices) +
-                " detected in your pull request #" + pullRequest.getNumber();
+        String subject =
+            "Hephaestus: " +
+            getBadPracticeString(badPractices) +
+            " detected in your pull request #" +
+            pullRequest.getNumber();
 
         MailBuilder mailBuilder = new MailBuilder(mailConfig, user, email, subject, "bad-practices-detected");
         mailBuilder

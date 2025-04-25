@@ -4,7 +4,6 @@ import de.tum.in.www1.hephaestus.gitprovider.label.Label;
 import de.tum.in.www1.hephaestus.gitprovider.pullrequest.PullRequest;
 import de.tum.in.www1.hephaestus.gitprovider.user.User;
 import de.tum.in.www1.hephaestus.notification.MailService;
-
 import java.time.Instant;
 import java.util.List;
 import java.util.Set;
@@ -60,10 +59,10 @@ public class BadPracticeDetectorScheduler {
 
     public void detectBadPracticeForPrIfReady(PullRequest pullRequest, Set<Label> oldLabels, Set<Label> newLabels) {
         if (
-                (newLabels.stream().anyMatch(label -> READY_TO_REVIEW.equals(label.getName())) &&
-                        oldLabels.stream().noneMatch(label -> READY_TO_REVIEW.equals(label.getName()))) ||
-                        (newLabels.stream().anyMatch(label -> READY_TO_MERGE.equals(label.getName())) &&
-                                oldLabels.stream().noneMatch(label -> READY_TO_MERGE.equals(label.getName())))
+            (newLabels.stream().anyMatch(label -> READY_TO_REVIEW.equals(label.getName())) &&
+                oldLabels.stream().noneMatch(label -> READY_TO_REVIEW.equals(label.getName()))) ||
+            (newLabels.stream().anyMatch(label -> READY_TO_MERGE.equals(label.getName())) &&
+                oldLabels.stream().noneMatch(label -> READY_TO_MERGE.equals(label.getName())))
         ) {
             runAutomaticDetectionForAllIfEnabled(pullRequest, Instant.now());
         }
@@ -86,26 +85,26 @@ public class BadPracticeDetectorScheduler {
 
         try {
             UserRepresentation keyCloakUser = keycloak
-                    .realm(realm)
-                    .users()
-                    .searchByUsername(assignee.getLogin(), true)
-                    .getFirst();
+                .realm(realm)
+                .users()
+                .searchByUsername(assignee.getLogin(), true)
+                .getFirst();
 
             List<RoleRepresentation> roles = keycloak
-                    .realm(realm)
-                    .users()
-                    .get(keyCloakUser.getId())
-                    .roles()
-                    .realmLevel()
-                    .listAll();
+                .realm(realm)
+                .users()
+                .get(keyCloakUser.getId())
+                .roles()
+                .realmLevel()
+                .listAll();
 
             boolean hasRunAutomaticDetection = roles
-                    .stream()
-                    .anyMatch(role -> "run_automatic_detection".equals(role.getName()));
+                .stream()
+                .anyMatch(role -> "run_automatic_detection".equals(role.getName()));
             if (!hasRunAutomaticDetection) {
                 logger.info(
-                        "User {} does not have the run_automatic_detection role. Skipping email.",
-                        assignee.getLogin()
+                    "User {} does not have the run_automatic_detection role. Skipping email.",
+                    assignee.getLogin()
                 );
             } else {
                 logger.info("User {} has the run_automatic_detection role. Scheduling detection.", assignee.getLogin());

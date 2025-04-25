@@ -1,9 +1,8 @@
 package de.tum.in.www1.hephaestus.activity.model;
 
 import jakarta.persistence.*;
-import lombok.*;
-
 import java.time.OffsetDateTime;
+import lombok.*;
 
 @Entity
 @Getter
