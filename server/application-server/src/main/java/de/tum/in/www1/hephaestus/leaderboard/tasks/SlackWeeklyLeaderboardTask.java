@@ -153,6 +153,8 @@ public class SlackWeeklyLeaderboardTask implements Runnable {
                         formatDateForURL(after) +
                         "&before=" +
                         formatDateForURL(before) +
+                        "&team=" +
+                        team +
                         "|here>."
                     )
                 )
