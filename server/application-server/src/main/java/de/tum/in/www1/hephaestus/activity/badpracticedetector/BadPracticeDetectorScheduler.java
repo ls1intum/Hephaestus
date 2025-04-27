@@ -46,12 +46,15 @@ public class BadPracticeDetectorScheduler {
     private String realm;
 
     public void detectBadPracticeForPrWhenOpenedOrReadyForReviewEvent(PullRequest pullRequest) {
-        // TODO
-        Instant timeInOneHour = Instant.now().plusSeconds(60);
+        Instant timeInOneHour = Instant.now().plusSeconds(3600);
         runAutomaticDetectionForAllIfEnabled(pullRequest, timeInOneHour);
     }
 
-    public void detectBadPracticeForPrIfReadyLabels(PullRequest pullRequest, Set<Label> oldLabels, Set<Label> newLabels) {
+    public void detectBadPracticeForPrIfReadyLabels(
+        PullRequest pullRequest,
+        Set<Label> oldLabels,
+        Set<Label> newLabels
+    ) {
         if (
             (newLabels.stream().anyMatch(label -> READY_TO_REVIEW.equals(label.getName())) &&
                 oldLabels.stream().noneMatch(label -> READY_TO_REVIEW.equals(label.getName()))) ||
@@ -110,7 +113,11 @@ public class BadPracticeDetectorScheduler {
     }
 
     private void scheduleDetectionAtTime(PullRequest pullRequest, Instant scheduledTime) {
-        logger.info("Scheduling bad practice detection for pull request: {} at time {}", pullRequest.getId(), scheduledTime);
+        logger.info(
+            "Scheduling bad practice detection for pull request: {} at time {}",
+            pullRequest.getId(),
+            scheduledTime
+        );
         BadPracticeDetectorTask badPracticeDetectorTask = new BadPracticeDetectorTask();
         badPracticeDetectorTask.setPullRequestBadPracticeDetector(pullRequestBadPracticeDetector);
         badPracticeDetectorTask.setMailService(mailService);

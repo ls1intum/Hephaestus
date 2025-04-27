@@ -16,7 +16,6 @@ export interface PullRequestBadPractice {
     title: string;
     description: string;
     state: PullRequestBadPractice.StateEnum;
-    userState?: PullRequestBadPractice.UserStateEnum;
 }
 export namespace PullRequestBadPractice {
     export type StateEnum = 'GOOD_PRACTICE' | 'FIXED' | 'CRITICAL_ISSUE' | 'NORMAL_ISSUE' | 'MINOR_ISSUE' | 'WONT_FIX' | 'WRONG';
@@ -28,16 +27,6 @@ export namespace PullRequestBadPractice {
         MinorIssue: 'MINOR_ISSUE' as StateEnum,
         WontFix: 'WONT_FIX' as StateEnum,
         Wrong: 'WRONG' as StateEnum
-    };
-    export type UserStateEnum = 'GOOD_PRACTICE' | 'FIXED' | 'CRITICAL_ISSUE' | 'NORMAL_ISSUE' | 'MINOR_ISSUE' | 'WONT_FIX' | 'WRONG';
-    export const UserStateEnum = {
-        GoodPractice: 'GOOD_PRACTICE' as UserStateEnum,
-        Fixed: 'FIXED' as UserStateEnum,
-        CriticalIssue: 'CRITICAL_ISSUE' as UserStateEnum,
-        NormalIssue: 'NORMAL_ISSUE' as UserStateEnum,
-        MinorIssue: 'MINOR_ISSUE' as UserStateEnum,
-        WontFix: 'WONT_FIX' as UserStateEnum,
-        Wrong: 'WRONG' as UserStateEnum
     };
 }
 

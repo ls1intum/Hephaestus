@@ -1026,16 +1026,6 @@ components:
           - MINOR_ISSUE
           - WONT_FIX
           - WRONG
-        userState:
-          type: string
-          enum:
-          - GOOD_PRACTICE
-          - FIXED
-          - CRITICAL_ISSUE
-          - NORMAL_ISSUE
-          - MINOR_ISSUE
-          - WONT_FIX
-          - WRONG
       required:
       - description
       - id

@@ -7,15 +7,14 @@ public record PullRequestBadPracticeDTO(
     @NonNull Long id,
     @NonNull String title,
     @NonNull String description,
-    @NonNull PullRequestBadPracticeState state) {
+    @NonNull PullRequestBadPracticeState state
+) {
     public static PullRequestBadPracticeDTO fromPullRequestBadPractice(PullRequestBadPractice badPractice) {
         return new PullRequestBadPracticeDTO(
             badPractice.getId(),
             badPractice.getTitle(),
             badPractice.getDescription(),
-            badPractice.getUserState() != null
-                ? badPractice.getUserState()
-                : badPractice.getState()
+            badPractice.getUserState() != null ? badPractice.getUserState() : badPractice.getState()
         );
     }
 }
