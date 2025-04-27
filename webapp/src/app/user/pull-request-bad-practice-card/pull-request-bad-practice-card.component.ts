@@ -1,4 +1,4 @@
-import { Component, computed, inject, input } from '@angular/core';
+import { AfterViewInit, Component, computed, inject, input, ViewChild } from '@angular/core';
 import { PullRequestInfo, LabelInfo, PullRequestBadPractice, ActivityService } from '@app/core/modules/openapi';
 import { NgIcon, provideIcons } from '@ng-icons/core';
 import { octCheck, octComment, octFileDiff, octGitPullRequest, octGitPullRequestClosed, octGitPullRequestDraft, octGitMerge, octX, octFold, octSync } from '@ng-icons/octicons';
@@ -36,7 +36,7 @@ import { lastValueFrom } from 'rxjs';
   ],
   providers: [provideIcons({ octCheck, octX, octComment, octFileDiff, octGitPullRequest, octGitPullRequestClosed, octGitPullRequestDraft, octGitMerge, octFold, octSync })]
 })
-export class PullRequestBadPracticeCardComponent {
+export class PullRequestBadPracticeCardComponent implements AfterViewInit {
   activityService = inject(ActivityService);
   queryClient = inject(QueryClient);
 
@@ -56,9 +56,18 @@ export class PullRequestBadPracticeCardComponent {
   pullRequestLabels = input<Array<LabelInfo>>();
   badPractices = input<Array<PullRequestBadPractice>>();
   badPracticeSummary = input<string>('');
+  openCard = input<boolean>(false);
 
   displayCreated = computed(() => dayjs(this.createdAt()));
   displayTitle = computed(() => formatTitle(this.title() ?? ''));
+
+  @ViewChild(BrnCollapsibleTriggerDirective) collapsibleTrigger!: BrnCollapsibleTriggerDirective;
+
+  ngAfterViewInit() {
+    if (this.openCard()) {
+      this.collapsibleTrigger.toggleCollapsible();
+    }
+  }
 
   issueIconAndColor = computed(() => {
     let icon: string;
@@ -84,7 +93,6 @@ export class PullRequestBadPracticeCardComponent {
 
     return { icon, color };
   });
-  protected readonly octSync = octSync;
 
   detectBadPracticesForPrMutation = injectMutation(() => ({
     mutationFn: (prId: number) => lastValueFrom(this.activityService.detectBadPracticesForPullRequest(prId)),
