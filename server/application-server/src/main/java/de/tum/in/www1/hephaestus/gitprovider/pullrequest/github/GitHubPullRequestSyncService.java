@@ -237,7 +237,7 @@ public class GitHubPullRequestSyncService {
                 });
             resultLabels.add(resultLabel);
         });
-        badPracticeDetectorScheduler.detectBadPracticeForPrIfReady(result, result.getLabels(), resultLabels);
+        badPracticeDetectorScheduler.detectBadPracticeForPrIfReadyLabels(result, result.getLabels(), resultLabels);
         result.getLabels().clear();
         result.getLabels().addAll(resultLabels);
 

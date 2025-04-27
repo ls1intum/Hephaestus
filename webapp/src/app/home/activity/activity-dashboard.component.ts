@@ -23,11 +23,13 @@ export class ActivityDashboardComponent {
   queryClient = inject(QueryClient);
 
   protected userLogin: string | null = null;
+  protected openedPullRequestId: number | undefined = undefined;
   protected numberOfPullRequests = computed(() => this.query.data()?.pullRequests?.length ?? 0);
   protected numberOfBadPractices = computed(() => this.query.data()?.pullRequests?.reduce((acc, pr) => acc + (pr.badPractices?.length ?? 0), 0) ?? 0);
 
   constructor(private route: ActivatedRoute) {
     this.userLogin = this.route.snapshot.paramMap.get('id');
+    this.openedPullRequestId = this.route.snapshot.queryParams['pullRequest'];
   }
 
   query = injectQuery(() => ({

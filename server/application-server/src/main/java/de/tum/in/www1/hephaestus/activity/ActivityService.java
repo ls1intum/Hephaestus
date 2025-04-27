@@ -5,6 +5,7 @@ import de.tum.in.www1.hephaestus.activity.model.*;
 import de.tum.in.www1.hephaestus.gitprovider.issue.Issue;
 import de.tum.in.www1.hephaestus.gitprovider.pullrequest.PullRequest;
 import de.tum.in.www1.hephaestus.gitprovider.pullrequest.PullRequestRepository;
+import java.time.OffsetDateTime;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -95,20 +96,21 @@ public class ActivityService {
     public void resolveBadPractice(PullRequestBadPractice badPractice, PullRequestBadPracticeState state) {
         logger.info("Resolving bad practice {} with state {}", badPractice.getId(), state);
 
-        badPractice.setState(state);
+        badPractice.setUserState(state);
         pullRequestBadPracticeRepository.save(badPractice);
     }
 
     public void provideFeedbackForBadPractice(PullRequestBadPractice badPractice, BadPracticeFeedbackDTO feedback) {
         logger.info("Marking bad practice with id: {}", badPractice.getId());
 
-        badPractice.setState(PullRequestBadPracticeState.WRONG);
+        badPractice.setUserState(PullRequestBadPracticeState.WRONG);
         pullRequestBadPracticeRepository.save(badPractice);
 
         BadPracticeFeedback badPracticeFeedback = new BadPracticeFeedback();
         badPracticeFeedback.setPullRequestBadPractice(badPractice);
         badPracticeFeedback.setExplanation(feedback.explanation());
         badPracticeFeedback.setType(feedback.type());
+        badPracticeFeedback.setCreationTime(OffsetDateTime.now());
         badPracticeFeedbackRepository.save(badPracticeFeedback);
     }
 }
