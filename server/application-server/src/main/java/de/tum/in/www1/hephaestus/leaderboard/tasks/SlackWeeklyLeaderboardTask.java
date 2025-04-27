@@ -33,6 +33,9 @@ public class SlackWeeklyLeaderboardTask implements Runnable {
 
     private static final Logger logger = LoggerFactory.getLogger(SlackWeeklyLeaderboardTask.class);
 
+    @Value("${hephaestus.leaderboard.notification.team}")
+    private String team;
+
     @Value("${hephaestus.leaderboard.notification.channel-id}")
     private String channelId;
 
@@ -66,8 +69,8 @@ public class SlackWeeklyLeaderboardTask implements Runnable {
      * Gets the Slack handles of the top 3 reviewers in the given time frame.
      * @return
      */
-    private List<User> getTop3SlackReviewers(OffsetDateTime after, OffsetDateTime before) {
-        var leaderboard = leaderboardService.createLeaderboard(after, before, Optional.empty(), Optional.empty());
+    private List<User> getTop3SlackReviewers(OffsetDateTime after, OffsetDateTime before, Optional<String> team) {
+        var leaderboard = leaderboardService.createLeaderboard(after, before, team, Optional.empty());
         var top3 = leaderboard.subList(0, Math.min(3, leaderboard.size()));
         logger.debug("Top 3 Users of the last week: " + top3.stream().map(e -> e.user().name()).toList());
 
@@ -125,7 +128,7 @@ public class SlackWeeklyLeaderboardTask implements Runnable {
             .withNano(0);
         OffsetDateTime after = before.minusWeeks(1);
 
-        var top3reviewers = getTop3SlackReviewers(after, before);
+        var top3reviewers = getTop3SlackReviewers(after, before, Optional.of(team));
 
         logger.info("Sending scheduled message to Slack channel...");
 
