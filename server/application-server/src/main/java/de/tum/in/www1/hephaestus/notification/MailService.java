@@ -67,6 +67,7 @@ public class MailService {
             .fillPlaceholder(pullRequest, "pullRequest")
             .fillPlaceholder(badPractices, "badPractices")
             .fillPlaceholder(getBadPracticeString(badPractices), "badPracticeString")
+            .fillPlaceholder(pullRequest.getRepository().getName(), "repository")
             .send(javaMailSender);
     }
 

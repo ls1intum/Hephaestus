@@ -4,7 +4,7 @@
       <h4 class="mb-2 text-lg font-semibold leading-none tracking-tight">Icons</h4>
       @for (state of stateList(); track state.text) {
         <div class="flex flex-row items-center text-center gap-2">
-          <ng-icon [name]="state.icon" size="20"></ng-icon>
+          <ng-icon [name]="state.icon" class="{{ state.color }}" size="20"></ng-icon>
           <span class="text-github-muted-foreground">{{ state.text }}</span>
         </div>
       }

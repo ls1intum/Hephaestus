@@ -47,5 +47,5 @@ export const routes: Routes = [
     ]
   },
   { path: 'teams', component: SubteamsComponent, canActivate: [AuthGuard] },
-  { path: 'user/:id/activity', component: ActivityDashboardComponent, canActivate: [AuthGuard, AdminGuard] }
+  { path: 'user/:id/activity', component: ActivityDashboardComponent, canActivate: [AuthGuard] }
 ];

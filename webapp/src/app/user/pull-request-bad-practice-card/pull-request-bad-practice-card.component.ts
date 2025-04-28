@@ -57,9 +57,11 @@ export class PullRequestBadPracticeCardComponent implements AfterViewInit {
   badPractices = input<Array<PullRequestBadPractice>>();
   badPracticeSummary = input<string>('');
   openCard = input<boolean>(false);
+  currUserIsDashboardUser = input<boolean>(false);
 
   displayCreated = computed(() => dayjs(this.createdAt()));
   displayTitle = computed(() => formatTitle(this.title() ?? ''));
+  expandEnabled = computed(() => this.badPractices()?.length !== 0);
 
   @ViewChild(BrnCollapsibleTriggerDirective) collapsibleTrigger!: BrnCollapsibleTriggerDirective;
 
@@ -94,10 +96,17 @@ export class PullRequestBadPracticeCardComponent implements AfterViewInit {
     return { icon, color };
   });
 
+  detectBadPracticesForPr = (prId: number) => {
+    this.detectBadPracticesForPrMutation.mutate(prId);
+  };
+
   detectBadPracticesForPrMutation = injectMutation(() => ({
     mutationFn: (prId: number) => lastValueFrom(this.activityService.detectBadPracticesForPullRequest(prId)),
     onSuccess: () => {
       this.queryClient.invalidateQueries({ queryKey: ['activity'] });
+      if (this.collapsibleTrigger.state() === 'closed') {
+        this.collapsibleTrigger.toggleCollapsible();
+      }
     }
   }));
 }

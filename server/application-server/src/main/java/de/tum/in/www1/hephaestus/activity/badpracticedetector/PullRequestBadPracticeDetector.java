@@ -3,7 +3,9 @@ package de.tum.in.www1.hephaestus.activity.badpracticedetector;
 import de.tum.in.www1.hephaestus.activity.PullRequestBadPracticeRepository;
 import de.tum.in.www1.hephaestus.activity.model.PullRequestBadPractice;
 import de.tum.in.www1.hephaestus.activity.model.PullRequestBadPracticeState;
+import de.tum.in.www1.hephaestus.activity.model.PullRequestLifecycleState;
 import de.tum.in.www1.hephaestus.config.IntelligenceServiceConfig.BadPracticeDetectorService;
+import de.tum.in.www1.hephaestus.gitprovider.issue.Issue;
 import de.tum.in.www1.hephaestus.gitprovider.pullrequest.PullRequest;
 import de.tum.in.www1.hephaestus.gitprovider.pullrequest.PullRequestRepository;
 import de.tum.in.www1.hephaestus.intelligenceservice.model.BadPractice;
@@ -55,10 +57,12 @@ public class PullRequestBadPracticeDetector {
             return existingBadPractices;
         }
 
+        PullRequestLifecycleState lifecycleState = this.getLifecycleStateOfPullRequest(pullRequest);
+
         DetectorRequest detectorRequest = new DetectorRequest();
         detectorRequest.setDescription(pullRequest.getBody());
         detectorRequest.setTitle(pullRequest.getTitle());
-        detectorRequest.setLifecycleState(this.getLifecycleStateOfPullRequest(pullRequest));
+        detectorRequest.setLifecycleState(lifecycleState.getState());
         if (pullRequest.getBadPracticeSummary() != null) {
             detectorRequest.setBadPracticeSummary(pullRequest.getBadPracticeSummary());
         } else {
@@ -73,33 +77,17 @@ public class PullRequestBadPracticeDetector {
         pullRequest.setBadPracticeSummary(detectorResponse.getBadPracticeSummary());
         pullRequestRepository.save(pullRequest);
 
-        List<PullRequestBadPractice> detectedBadPractices = new LinkedList<>();
-
-        // Check if there are returned bad practices in the response with the same title as an existing bad practice
-        for (BadPractice badPractice : detectorResponse.getBadPractices()) {
-            boolean exists = false;
-            for (PullRequestBadPractice existingBadPractice : existingBadPractices) {
-                if (existingBadPractice.getTitle().equals(badPractice.getTitle())) {
-                    existingBadPractice.setDescription(badPractice.getDescription());
-                    existingBadPractice.setState(
-                        PullRequestBadPracticeState.fromBadPracticeStatus(badPractice.getStatus())
-                    );
-                    existingBadPractice.setLastUpdateTime(OffsetDateTime.now());
-                    detectedBadPractices.add(pullRequestBadPracticeRepository.save(existingBadPractice));
-                    exists = true;
-                    break;
-                }
-            }
-            if (!exists) {
-                detectedBadPractices.add(saveDetectedBadPractices(pullRequest, badPractice));
-            }
-        }
+        List<PullRequestBadPractice> detectedBadPractices = detectorResponse.getBadPractices()
+                .stream()
+                .map(badPractice -> {
+                    return saveNewDetectedBadPractice(pullRequest, badPractice, lifecycleState);
+                }).toList();
 
         logger.info("Detected {} bad practices for pull request: {}", detectedBadPractices.size(), pullRequest.getId());
         return detectedBadPractices;
     }
 
-    protected PullRequestBadPractice saveDetectedBadPractices(PullRequest pullRequest, BadPractice badPractice) {
+    protected PullRequestBadPractice saveNewDetectedBadPractice(PullRequest pullRequest, BadPractice badPractice, PullRequestLifecycleState lifecycleState) {
         PullRequestBadPractice pullRequestBadPractice = new PullRequestBadPractice();
         pullRequestBadPractice.setTitle(badPractice.getTitle());
         pullRequestBadPractice.setDescription(badPractice.getDescription());
@@ -107,6 +95,7 @@ public class PullRequestBadPracticeDetector {
         pullRequestBadPractice.setState(PullRequestBadPracticeState.fromBadPracticeStatus(badPractice.getStatus()));
         pullRequestBadPractice.setDetectionTime(OffsetDateTime.now());
         pullRequestBadPractice.setLastUpdateTime(OffsetDateTime.now());
+        pullRequestBadPractice.setDetectionPullrequestLifecycleState(lifecycleState);
         return pullRequestBadPracticeRepository.save(pullRequestBadPractice);
     }
 
@@ -118,19 +107,23 @@ public class PullRequestBadPracticeDetector {
         return badPractice;
     }
 
-    private String getLifecycleStateOfPullRequest(PullRequest pullRequest) {
-        if (pullRequest.isDraft()) {
-            return "Draft";
+    private PullRequestLifecycleState getLifecycleStateOfPullRequest(PullRequest pullRequest) {
+        if (pullRequest.isMerged()) {
+            return PullRequestLifecycleState.MERGED;
+        } else if (pullRequest.getState() == Issue.State.CLOSED) {
+            return PullRequestLifecycleState.CLOSED;
+        } else if (pullRequest.isDraft()) {
+            return PullRequestLifecycleState.DRAFT;
         } else if (
             pullRequest.getLabels().stream().anyMatch(label -> label.getName().equalsIgnoreCase(READY_TO_MERGE))
         ) {
-            return "Ready to merge";
+            return PullRequestLifecycleState.READY_TO_MERGE;
         } else if (
             pullRequest.getLabels().stream().anyMatch(label -> label.getName().equalsIgnoreCase(READY_TO_REVIEW))
         ) {
-            return "Ready to review";
+            return PullRequestLifecycleState.READY_TO_REVIEW;
         } else {
-            return "Open";
+            return PullRequestLifecycleState.OPEN;
         }
     }
 }

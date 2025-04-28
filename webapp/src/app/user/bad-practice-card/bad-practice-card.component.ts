@@ -51,16 +51,15 @@ export class BadPracticeCardComponent {
   activityService = inject(ActivityService);
   queryClient = inject(QueryClient);
 
-  protected readonly octCheck = octCheck;
-  protected readonly octX = octX;
-
   title = input.required<string>();
   description = input.required<string>();
   state = input.required<PullRequestBadPractice.StateEnum>();
   id = input.required<number>();
+  currUserIsDashboardUser = input<boolean>(false);
 
   icon = computed(() => stateConfig[this.state()].icon);
   text = computed(() => stateConfig[this.state()].text);
+  color = computed(() => stateConfig[this.state()].color);
 
   _newExplanation = new FormControl('');
   _selectedType = signal<string | undefined>(undefined);

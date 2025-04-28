@@ -9,6 +9,7 @@ import { HlmButtonDirective } from '@spartan-ng/ui-button-helm';
 import { HlmSpinnerComponent } from '@spartan-ng/ui-spinner-helm';
 import { NgIcon, provideIcons } from '@ng-icons/core';
 import { BadPracticeLegendCardComponent } from '@app/user/bad-practice-legend-card/bad-practice-legend-card.component';
+import { SecurityStore } from '@app/core/security/security-store.service';
 
 @Component({
   selector: 'app-activity-dashboard',
@@ -21,11 +22,16 @@ import { BadPracticeLegendCardComponent } from '@app/user/bad-practice-legend-ca
 export class ActivityDashboardComponent {
   activityService = inject(ActivityService);
   queryClient = inject(QueryClient);
+  securityStore = inject(SecurityStore);
+
+  user = this.securityStore.loadedUser;
 
   protected userLogin: string | null = null;
   protected openedPullRequestId: number | undefined = undefined;
+
   protected numberOfPullRequests = computed(() => this.query.data()?.pullRequests?.length ?? 0);
   protected numberOfBadPractices = computed(() => this.query.data()?.pullRequests?.reduce((acc, pr) => acc + (pr.badPractices?.length ?? 0), 0) ?? 0);
+  protected currUserIsDashboardUser = computed(() => this.user()?.username === this.userLogin);
 
   constructor(private route: ActivatedRoute) {
     this.userLogin = this.route.snapshot.paramMap.get('id');
