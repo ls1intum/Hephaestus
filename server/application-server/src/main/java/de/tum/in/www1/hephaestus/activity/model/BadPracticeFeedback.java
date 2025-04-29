@@ -1,6 +1,7 @@
 package de.tum.in.www1.hephaestus.activity.model;
 
 import jakarta.persistence.*;
+import java.time.OffsetDateTime;
 import lombok.*;
 
 @Entity
@@ -24,4 +25,6 @@ public class BadPracticeFeedback {
     @NonNull
     @Lob
     private String explanation;
+
+    private OffsetDateTime creationTime;
 }

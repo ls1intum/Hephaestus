@@ -53,7 +53,7 @@ hephaestus:
       sender: ${MAIL_SENDER:hephaestus@aet.cit.tum.de}
 
     detection:
-        automatic-detection-enabled: ${AUTOMATIC_DETECTION_ENABLED:false}
+      run-automatic-detection-for-all: ${RUN_AUTOMATIC_DETECTION_FOR_ALL:false}
 
 keycloak:
     url: ${KEYCLOAK_URL}

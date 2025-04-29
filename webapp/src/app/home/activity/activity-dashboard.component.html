@@ -40,6 +40,7 @@
                 [pullRequestLabels]="pullRequest.labels"
                 [badPractices]="pullRequest.badPractices"
                 [badPracticeSummary]="pullRequest.badPracticeSummary"
+                [openCard]="this.openedPullRequestId == pullRequest.id"
               >
               </app-pull-request-bad-practice-card>
             }

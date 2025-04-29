@@ -1,6 +1,7 @@
 package de.tum.in.www1.hephaestus.activity.model;
 
 import org.springframework.lang.NonNull;
+import org.springframework.lang.Nullable;
 
 public record PullRequestBadPracticeDTO(
     @NonNull Long id,
@@ -13,7 +14,7 @@ public record PullRequestBadPracticeDTO(
             badPractice.getId(),
             badPractice.getTitle(),
             badPractice.getDescription(),
-            badPractice.getState()
+            badPractice.getUserState() != null ? badPractice.getUserState() : badPractice.getState()
         );
     }
 }

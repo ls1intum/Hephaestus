@@ -83,7 +83,7 @@
             },
             {
                 "id": "af3b75a2-9733-44e5-bdc3-1e3e32459743",
-                "name": "notification_access",
+                "name": "run_automatic_detection",
                 "description": "",
                 "composite": false,
                 "clientRole": false,
@@ -106,8 +106,7 @@
               "composite": true,
               "composites": {
                 "realm": [
-                  "mentor_access",
-                  "notification_access"
+                  "mentor_access"
                 ]
               },
               "clientRole": false,

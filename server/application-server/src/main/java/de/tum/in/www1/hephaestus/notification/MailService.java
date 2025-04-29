@@ -5,7 +5,6 @@ import de.tum.in.www1.hephaestus.gitprovider.pullrequest.PullRequest;
 import de.tum.in.www1.hephaestus.gitprovider.user.User;
 import java.util.List;
 import org.keycloak.admin.client.Keycloak;
-import org.keycloak.representations.idm.RoleRepresentation;
 import org.keycloak.representations.idm.UserRepresentation;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -40,39 +39,44 @@ public class MailService {
         PullRequest pullRequest,
         List<PullRequestBadPractice> badPractices
     ) {
-        logger.info("Sending bad practice detected email to user: " + user.getLogin());
+        logger.info("Sending bad practice detected email to user: {}", user.getLogin());
+        String email;
 
-        UserRepresentation keyCloakUser = keycloak
-            .realm(realm)
-            .users()
-            .searchByUsername(user.getLogin(), true)
-            .getFirst();
-        String email = keyCloakUser.getEmail();
-        List<RoleRepresentation> roles = keycloak
-            .realm(realm)
-            .users()
-            .get(keyCloakUser.getId())
-            .roles()
-            .realmLevel()
-            .listAll();
-        // Check if the user has the "notification_access" role
-        boolean hasNotificationAccess = roles.stream().anyMatch(role -> "notification_access".equals(role.getName()));
-        if (!hasNotificationAccess) {
-            logger.info("User {} does not have the notification_access role. Skipping email.", user.getLogin());
+        try {
+            UserRepresentation keyCloakUser = keycloak
+                .realm(realm)
+                .users()
+                .searchByUsername(user.getLogin(), true)
+                .getFirst();
+
+            email = keyCloakUser.getEmail();
+        } catch (Exception e) {
+            logger.error("Failed to find user in Keycloak: {}", user.getLogin(), e);
             return;
         }
 
-        MailBuilder mailBuilder = new MailBuilder(
-            mailConfig,
-            user,
-            email,
-            "Bad Practices detected in your pull request",
-            "bad-practices-detected"
-        );
+        String subject =
+            "Hephaestus: " +
+            getBadPracticeString(badPractices) +
+            " detected in your pull request #" +
+            pullRequest.getNumber();
+
+        MailBuilder mailBuilder = new MailBuilder(mailConfig, user, email, subject, "bad-practices-detected");
         mailBuilder
             .fillPlaceholder(user, "user")
             .fillPlaceholder(pullRequest, "pullRequest")
             .fillPlaceholder(badPractices, "badPractices")
+            .fillPlaceholder(getBadPracticeString(badPractices), "badPracticeString")
             .send(javaMailSender);
+    }
+
+    private String getBadPracticeString(List<PullRequestBadPractice> badPractices) {
+        if (badPractices.size() == 1) {
+            return "1 bad practice";
+        } else if (badPractices.size() > 1) {
+            return badPractices.size() + " bad practices";
+        } else {
+            return "no bad practices";
+        }
     }
 }

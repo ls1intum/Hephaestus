@@ -34,7 +34,7 @@ public class BadPracticeDetectorTask implements Runnable {
 
         if (!unResolvedBadPractices.isEmpty()) {
             for (User user : pullRequest.getAssignees()) {
-                mailService.sendBadPracticesDetectedInPullRequestEmail(user, pullRequest, badPractices);
+                mailService.sendBadPracticesDetectedInPullRequestEmail(user, pullRequest, unResolvedBadPractices);
             }
         }
     }
