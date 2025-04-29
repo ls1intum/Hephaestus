@@ -19,6 +19,7 @@ class DetectorRequest(BaseModel):
 class DetectorResponse(BaseModel):
     bad_practice_summary: str
     bad_practices: List[BadPractice]
+    trace_id: str
 
 
 @router.post(
@@ -37,4 +38,5 @@ def detect(request: DetectorRequest):
     return DetectorResponse(
         bad_practice_summary=result.bad_practice_summary,
         bad_practices=result.bad_practices,
+        trace_id=result.trace_id,
     )

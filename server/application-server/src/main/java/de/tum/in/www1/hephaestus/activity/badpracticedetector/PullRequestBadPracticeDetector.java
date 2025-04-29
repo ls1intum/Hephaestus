@@ -1,6 +1,7 @@
 package de.tum.in.www1.hephaestus.activity.badpracticedetector;
 
 import de.tum.in.www1.hephaestus.activity.PullRequestBadPracticeRepository;
+import de.tum.in.www1.hephaestus.activity.model.DetectionResult;
 import de.tum.in.www1.hephaestus.activity.model.PullRequestBadPractice;
 import de.tum.in.www1.hephaestus.activity.model.PullRequestBadPracticeState;
 import de.tum.in.www1.hephaestus.activity.model.PullRequestLifecycleState;
@@ -12,7 +13,6 @@ import de.tum.in.www1.hephaestus.intelligenceservice.model.BadPractice;
 import de.tum.in.www1.hephaestus.intelligenceservice.model.DetectorRequest;
 import de.tum.in.www1.hephaestus.intelligenceservice.model.DetectorResponse;
 import java.time.OffsetDateTime;
-import java.util.LinkedList;
 import java.util.List;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -41,7 +41,7 @@ public class PullRequestBadPracticeDetector {
      * @param pullRequest The pull request to detect bad practices in.
      * @return The detected bad practices.
      */
-    public List<PullRequestBadPractice> detectAndSyncBadPractices(PullRequest pullRequest) {
+    public DetectionResult detectAndSyncBadPractices(PullRequest pullRequest) {
         logger.info("Detecting bad practices for pull request: {}", pullRequest.getId());
 
         List<PullRequestBadPractice> existingBadPractices = pullRequestBadPracticeRepository.findByPullRequestId(
@@ -54,7 +54,7 @@ public class PullRequestBadPracticeDetector {
             pullRequest.getUpdatedAt().isBefore(pullRequest.getLastDetectionTime())
         ) {
             logger.info("Pull request has not been updated since last detection. Skipping detection.");
-            return existingBadPractices;
+            return DetectionResult.ERROR_NO_UPDATE_ON_PULLREQUEST;
         }
 
         PullRequestLifecycleState lifecycleState = this.getLifecycleStateOfPullRequest(pullRequest);
@@ -77,18 +77,40 @@ public class PullRequestBadPracticeDetector {
         pullRequest.setBadPracticeSummary(detectorResponse.getBadPracticeSummary());
         pullRequestRepository.save(pullRequest);
 
-        List<PullRequestBadPractice> detectedBadPractices = detectorResponse.getBadPractices()
-                .stream()
-                .map(badPractice -> {
-                    return saveNewDetectedBadPractice(pullRequest, badPractice, lifecycleState);
-                }).toList();
+        List<PullRequestBadPractice> detectedBadPractices = detectorResponse
+            .getBadPractices()
+            .stream()
+            .map(badPractice -> saveNewDetectedBadPractice(
+                pullRequest,
+                badPractice,
+                lifecycleState,
+                detectorResponse.getTraceId(),
+                existingBadPractices
+            ))
+            .toList();
 
         logger.info("Detected {} bad practices for pull request: {}", detectedBadPractices.size(), pullRequest.getId());
-        return detectedBadPractices;
+        if (detectedBadPractices.isEmpty()) {
+            return DetectionResult.NO_BAD_PRACTICES_DETECTED;
+        } else {
+            return DetectionResult.BAD_PRACTICES_DETECTED;
+        }
     }
 
-    protected PullRequestBadPractice saveNewDetectedBadPractice(PullRequest pullRequest, BadPractice badPractice, PullRequestLifecycleState lifecycleState) {
+    protected PullRequestBadPractice saveNewDetectedBadPractice(
+        PullRequest pullRequest,
+        BadPractice badPractice,
+        PullRequestLifecycleState lifecycleState,
+        String traceId,
+        List<PullRequestBadPractice> existingBadPractices
+    ) {
         PullRequestBadPractice pullRequestBadPractice = new PullRequestBadPractice();
+
+        existingBadPractices
+                .stream()
+                .filter(existing -> existing.getTitle().equals(badPractice.getTitle()))
+                .findFirst().ifPresent(existingBadPractice -> pullRequestBadPractice.setUserState(existingBadPractice.getUserState()));
+
         pullRequestBadPractice.setTitle(badPractice.getTitle());
         pullRequestBadPractice.setDescription(badPractice.getDescription());
         pullRequestBadPractice.setPullrequest(pullRequest);
@@ -96,6 +118,7 @@ public class PullRequestBadPracticeDetector {
         pullRequestBadPractice.setDetectionTime(OffsetDateTime.now());
         pullRequestBadPractice.setLastUpdateTime(OffsetDateTime.now());
         pullRequestBadPractice.setDetectionPullrequestLifecycleState(lifecycleState);
+        pullRequestBadPractice.setDetectionTraceId(traceId);
         return pullRequestBadPracticeRepository.save(pullRequestBadPractice);
     }
 

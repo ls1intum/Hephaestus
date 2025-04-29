@@ -74,7 +74,13 @@
           <p class="text-sm text-pretty">{{ badPracticeSummary() }}</p>
           @for (badpractice of badPractices(); track badpractice.title) {
             <brn-separator hlmSeparator />
-            <app-bad-practice-card [id]="badpractice.id" [title]="badpractice.title" [description]="badpractice.description" [state]="badpractice.state"></app-bad-practice-card>
+            <app-bad-practice-card
+              [id]="badpractice.id"
+              [title]="badpractice.title"
+              [description]="badpractice.description"
+              [state]="badpractice.state"
+              [currUserIsDashboardUser]="currUserIsDashboardUser()"
+            ></app-bad-practice-card>
           }
         </brn-collapsible-content>
       </div>

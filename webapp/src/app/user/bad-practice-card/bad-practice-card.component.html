@@ -20,13 +20,15 @@
             <hlm-menu-group>
               <button hlmMenuItem (click)="resolveBadPracticeAsFixed(id())">Resolve as fixed</button>
             </hlm-menu-group>
-            <hlm-menu-separator />
             <hlm-menu-group>
               <button hlmMenuItem (click)="resolveBadPracticeAsWontFixed(id())">Resolve as won't fix</button>
             </hlm-menu-group>
+            <hlm-menu-group>
+              <button hlmMenuItem brnDialogTrigger (click)="resolveBadPracticeAsWrong(id())">Resolve as wrong</button>
+            </hlm-menu-group>
             <hlm-menu-separator />
             <hlm-menu-group>
-              <button hlmMenuItem brnDialogTrigger>Mark as wrong</button>
+              <button hlmMenuItem brnDialogTrigger>Provide feedback</button>
             </hlm-menu-group>
           </hlm-menu>
         </ng-template>

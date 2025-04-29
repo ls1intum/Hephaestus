@@ -10,6 +10,7 @@ import { HlmSpinnerComponent } from '@spartan-ng/ui-spinner-helm';
 import { NgIcon, provideIcons } from '@ng-icons/core';
 import { BadPracticeLegendCardComponent } from '@app/user/bad-practice-legend-card/bad-practice-legend-card.component';
 import { SecurityStore } from '@app/core/security/security-store.service';
+import { toast } from 'ngx-sonner';
 
 @Component({
   selector: 'app-activity-dashboard',
@@ -48,6 +49,15 @@ export class ActivityDashboardComponent {
     mutationFn: () => lastValueFrom(this.activityService.detectBadPracticesByUser(this.userLogin!)),
     onSuccess: () => {
       this.queryClient.invalidateQueries({ queryKey: ['activity', { id: this.userLogin }] });
+    },
+    onError: () => {
+      this.showToast();
     }
   }));
+
+  showToast() {
+    toast('Something went wrong...', {
+      description: 'Your pull requests have not changed since the last detection. Try changing status or description, then run the detection again.'
+    });
+  }
 }

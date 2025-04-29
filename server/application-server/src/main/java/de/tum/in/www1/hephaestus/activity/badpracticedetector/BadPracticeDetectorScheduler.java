@@ -5,8 +5,11 @@ import de.tum.in.www1.hephaestus.gitprovider.pullrequest.PullRequest;
 import de.tum.in.www1.hephaestus.gitprovider.user.User;
 import de.tum.in.www1.hephaestus.notification.MailService;
 import java.time.Instant;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.ScheduledFuture;
 import org.keycloak.admin.client.Keycloak;
 import org.keycloak.representations.idm.RoleRepresentation;
 import org.keycloak.representations.idm.UserRepresentation;
@@ -44,6 +47,8 @@ public class BadPracticeDetectorScheduler {
 
     @Value("${keycloak.realm}")
     private String realm;
+
+    private final Map<PullRequest, ScheduledFuture<?>> scheduledTasks = new HashMap<>();
 
     public void detectBadPracticeForPrWhenOpenedOrReadyForReviewEvent(PullRequest pullRequest) {
         Instant timeInOneHour = Instant.now().plusSeconds(3600);
@@ -122,6 +127,17 @@ public class BadPracticeDetectorScheduler {
         badPracticeDetectorTask.setPullRequestBadPracticeDetector(pullRequestBadPracticeDetector);
         badPracticeDetectorTask.setMailService(mailService);
         badPracticeDetectorTask.setPullRequest(pullRequest);
-        taskScheduler.schedule(badPracticeDetectorTask, scheduledTime);
+
+        if (scheduledTasks.containsKey(pullRequest)) {
+            ScheduledFuture<?> scheduledTask = scheduledTasks.get(pullRequest);
+            if (!scheduledTask.isDone() || !scheduledTask.isCancelled()) {
+                logger.info("Cancelling previous scheduled task for pull request: {}", pullRequest.getId());
+                scheduledTask.cancel(false);
+            }
+            scheduledTasks.remove(pullRequest);
+        }
+
+        ScheduledFuture<?> scheduledTask = taskScheduler.schedule(badPracticeDetectorTask, scheduledTime);
+        scheduledTasks.put(pullRequest, scheduledTask);
     }
 }

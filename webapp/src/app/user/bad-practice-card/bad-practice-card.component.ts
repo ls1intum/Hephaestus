@@ -1,7 +1,6 @@
 import { Component, computed, inject, input, signal } from '@angular/core';
 import { HlmCardModule } from '@spartan-ng/ui-card-helm';
 import { NgIconComponent, provideIcons } from '@ng-icons/core';
-import { octCheck, octX } from '@ng-icons/octicons';
 import { ActivityService, BadPracticeFeedback } from '@app/core/modules/openapi';
 import { injectMutation, QueryClient } from '@tanstack/angular-query-experimental';
 import { FormControl, FormsModule, ReactiveFormsModule } from '@angular/forms';
@@ -80,6 +79,11 @@ export class BadPracticeCardComponent {
 
   resolveBadPracticeAsWontFixed(badPracticeId: number): void {
     const state = PullRequestBadPractice.StateEnum.WontFix;
+    this.resolveBadPracticeMutation.mutate({ badPracticeId, state });
+  }
+
+  resolveBadPracticeAsWrong(badPracticeId: number): void {
+    const state = PullRequestBadPractice.StateEnum.Wrong;
     this.resolveBadPracticeMutation.mutate({ badPracticeId, state });
   }
 

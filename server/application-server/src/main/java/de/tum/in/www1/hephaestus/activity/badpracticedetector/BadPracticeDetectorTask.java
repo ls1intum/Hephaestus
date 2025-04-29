@@ -1,5 +1,7 @@
 package de.tum.in.www1.hephaestus.activity.badpracticedetector;
 
+import de.tum.in.www1.hephaestus.activity.PullRequestBadPracticeRepository;
+import de.tum.in.www1.hephaestus.activity.model.DetectionResult;
 import de.tum.in.www1.hephaestus.activity.model.PullRequestBadPractice;
 import de.tum.in.www1.hephaestus.activity.model.PullRequestBadPracticeState;
 import de.tum.in.www1.hephaestus.gitprovider.pullrequest.PullRequest;
@@ -17,12 +19,20 @@ public class BadPracticeDetectorTask implements Runnable {
 
     private MailService mailService;
 
+    private PullRequestBadPracticeRepository pullRequestBadPracticeRepository;
+
     private PullRequest pullRequest;
 
     @Override
     public void run() {
-        List<PullRequestBadPractice> badPractices = pullRequestBadPracticeDetector.detectAndSyncBadPractices(
-            pullRequest
+        DetectionResult detectionResult = pullRequestBadPracticeDetector.detectAndSyncBadPractices(pullRequest);
+
+        if (detectionResult == DetectionResult.NO_BAD_PRACTICES_DETECTED) {
+            return;
+        }
+
+        List<PullRequestBadPractice> badPractices = pullRequestBadPracticeRepository.findByPullRequestId(
+            pullRequest.getId()
         );
 
         List<PullRequestBadPractice> unResolvedBadPractices = badPractices

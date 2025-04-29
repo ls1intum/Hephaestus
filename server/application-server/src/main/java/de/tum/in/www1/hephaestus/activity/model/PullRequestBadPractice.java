@@ -10,8 +10,6 @@ import jakarta.persistence.Lob;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
 import java.time.OffsetDateTime;
-import java.util.UUID;
-
 import lombok.*;
 
 @Entity
@@ -49,5 +47,5 @@ public class PullRequestBadPractice {
 
     private PullRequestLifecycleState detectionPullrequestLifecycleState;
 
-    private UUID detectionTraceId;
+    private String detectionTraceId;
 }

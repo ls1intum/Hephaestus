@@ -15,7 +15,6 @@ import { Observable }                                        from 'rxjs';
 
 import { Activity } from '../model/models';
 import { BadPracticeFeedback } from '../model/models';
-import { PullRequestBadPractice } from '../model/models';
 
 
 import { Configuration }                                     from '../configuration';
@@ -31,14 +30,14 @@ export interface ActivityServiceInterface {
      * 
      * @param login 
      */
-    detectBadPracticesByUser(login: string, extraHttpRequestParams?: any): Observable<Array<PullRequestBadPractice>>;
+    detectBadPracticesByUser(login: string, extraHttpRequestParams?: any): Observable<{}>;
 
     /**
      * 
      * 
      * @param pullRequestId 
      */
-    detectBadPracticesForPullRequest(pullRequestId: number, extraHttpRequestParams?: any): Observable<Array<PullRequestBadPractice>>;
+    detectBadPracticesForPullRequest(pullRequestId: number, extraHttpRequestParams?: any): Observable<{}>;
 
     /**
      * 
