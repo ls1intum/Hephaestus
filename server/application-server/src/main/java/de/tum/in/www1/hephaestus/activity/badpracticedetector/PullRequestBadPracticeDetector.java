@@ -80,13 +80,15 @@ public class PullRequestBadPracticeDetector {
         List<PullRequestBadPractice> detectedBadPractices = detectorResponse
             .getBadPractices()
             .stream()
-            .map(badPractice -> saveNewDetectedBadPractice(
-                pullRequest,
-                badPractice,
-                lifecycleState,
-                detectorResponse.getTraceId(),
-                existingBadPractices
-            ))
+            .map(badPractice ->
+                saveNewDetectedBadPractice(
+                    pullRequest,
+                    badPractice,
+                    lifecycleState,
+                    detectorResponse.getTraceId(),
+                    existingBadPractices
+                )
+            )
             .toList();
 
         logger.info("Detected {} bad practices for pull request: {}", detectedBadPractices.size(), pullRequest.getId());
@@ -107,9 +109,10 @@ public class PullRequestBadPracticeDetector {
         PullRequestBadPractice pullRequestBadPractice = new PullRequestBadPractice();
 
         existingBadPractices
-                .stream()
-                .filter(existing -> existing.getTitle().equals(badPractice.getTitle()))
-                .findFirst().ifPresent(existingBadPractice -> pullRequestBadPractice.setUserState(existingBadPractice.getUserState()));
+            .stream()
+            .filter(existing -> existing.getTitle().equals(badPractice.getTitle()))
+            .findFirst()
+            .ifPresent(existingBadPractice -> pullRequestBadPractice.setUserState(existingBadPractice.getUserState()));
 
         pullRequestBadPractice.setTitle(badPractice.getTitle());
         pullRequestBadPractice.setDescription(badPractice.getDescription());

@@ -97,9 +97,11 @@ public class ActivityService {
         for (PullRequest pullRequest : pullRequests) {
             detectedBadPractices.add(pullRequestBadPracticeDetector.detectAndSyncBadPractices(pullRequest));
         }
-        if (detectedBadPractices.contains(DetectionResult.BAD_PRACTICES_DETECTED)) {
+        if (detectedBadPractices.stream().anyMatch(result -> result == DetectionResult.BAD_PRACTICES_DETECTED)) {
             return DetectionResult.BAD_PRACTICES_DETECTED;
-        } else if (detectedBadPractices.contains(DetectionResult.NO_BAD_PRACTICES_DETECTED)) {
+        } else if (
+            detectedBadPractices.stream().anyMatch(result -> result == DetectionResult.NO_BAD_PRACTICES_DETECTED)
+        ) {
             return DetectionResult.NO_BAD_PRACTICES_DETECTED;
         } else {
             return DetectionResult.ERROR_NO_UPDATE_ON_PULLREQUEST;
