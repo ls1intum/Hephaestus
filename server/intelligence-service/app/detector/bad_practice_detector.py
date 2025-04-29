@@ -49,7 +49,7 @@ class BadPracticeResult(BaseModel):
 class DetectionResult(BaseModel):
     bad_practice_summary: str
     bad_practices: List[BadPractice]
-    trace_id: str
+    trace_id: str = ""
 
 
 @observe()
@@ -77,7 +77,7 @@ def detect_bad_practices(
     )
     structured_llm = model.with_structured_output(BadPracticeResult)
     response = structured_llm.invoke(prompt, config)
-    trace_id = langfuse_context.get_current_trace_id()
+    trace_id = langfuse_context.get_current_trace_id() or ""
     return DetectionResult(
         bad_practice_summary=response.bad_practice_summary,
         bad_practices=response.bad_practices,

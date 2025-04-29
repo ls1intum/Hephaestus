@@ -1,5 +1,6 @@
 package de.tum.in.www1.hephaestus.activity.badpracticedetector;
 
+import de.tum.in.www1.hephaestus.activity.PullRequestBadPracticeRepository;
 import de.tum.in.www1.hephaestus.gitprovider.label.Label;
 import de.tum.in.www1.hephaestus.gitprovider.pullrequest.PullRequest;
 import de.tum.in.www1.hephaestus.gitprovider.user.User;
@@ -41,6 +42,9 @@ public class BadPracticeDetectorScheduler {
 
     @Autowired
     Keycloak keycloak;
+
+    @Autowired
+    PullRequestBadPracticeRepository pullRequestBadPracticeRepository;
 
     @Value("${hephaestus.detection.run-automatic-detection-for-all}")
     private boolean runAutomaticDetectionForAll;
@@ -127,6 +131,7 @@ public class BadPracticeDetectorScheduler {
         badPracticeDetectorTask.setPullRequestBadPracticeDetector(pullRequestBadPracticeDetector);
         badPracticeDetectorTask.setMailService(mailService);
         badPracticeDetectorTask.setPullRequest(pullRequest);
+        badPracticeDetectorTask.setPullRequestBadPracticeRepository(pullRequestBadPracticeRepository);
 
         if (scheduledTasks.containsKey(pullRequest)) {
             ScheduledFuture<?> scheduledTask = scheduledTasks.get(pullRequest);
