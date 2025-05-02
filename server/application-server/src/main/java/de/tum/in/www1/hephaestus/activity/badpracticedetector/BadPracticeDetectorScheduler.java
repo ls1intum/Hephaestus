@@ -8,6 +8,8 @@ import de.tum.in.www1.hephaestus.notification.MailService;
 import java.time.Instant;
 import java.util.*;
 import java.util.concurrent.ScheduledFuture;
+
+import org.jetbrains.annotations.NotNull;
 import org.keycloak.admin.client.Keycloak;
 import org.keycloak.representations.idm.RoleRepresentation;
 import org.keycloak.representations.idm.UserRepresentation;
@@ -54,7 +56,7 @@ public class BadPracticeDetectorScheduler {
 
     public void detectBadPracticeForPrWhenOpenedOrReadyForReviewEvent(PullRequest pullRequest) {
         Instant timeInOneHour = Instant.now().plusSeconds(3600);
-        runAutomaticDetectionForAllIfEnabled(pullRequest, timeInOneHour);
+        runAutomaticDetectionForAllIfEnabled(pullRequest, timeInOneHour, true);
     }
 
     public void detectBadPracticeForPrIfReadyLabels(
@@ -68,19 +70,23 @@ public class BadPracticeDetectorScheduler {
             (newLabels.stream().anyMatch(label -> READY_TO_MERGE.equals(label.getName())) &&
                 oldLabels.stream().noneMatch(label -> READY_TO_MERGE.equals(label.getName())))
         ) {
-            runAutomaticDetectionForAllIfEnabled(pullRequest, Instant.now());
+            runAutomaticDetectionForAllIfEnabled(pullRequest, Instant.now(), true);
         }
     }
 
-    private void runAutomaticDetectionForAllIfEnabled(PullRequest pullRequest, Instant scheduledTime) {
+    public void detectBadPracticeForPrIfClosedEvent(PullRequest pullRequest) {
+        runAutomaticDetectionForAllIfEnabled(pullRequest, Instant.now(), false);
+    }
+
+    private void runAutomaticDetectionForAllIfEnabled(PullRequest pullRequest, Instant scheduledTime, boolean sendBadPracticeDetectionEmail) {
         if (runAutomaticDetectionForAll) {
-            scheduleDetectionAtTime(pullRequest, scheduledTime);
+            scheduleDetectionAtTime(pullRequest, scheduledTime, sendBadPracticeDetectionEmail);
         } else {
-            checkUserRoleAndScheduleDetectionAtTime(pullRequest, scheduledTime);
+            checkUserRoleAndScheduleDetectionAtTime(pullRequest, scheduledTime, sendBadPracticeDetectionEmail);
         }
     }
 
-    private void checkUserRoleAndScheduleDetectionAtTime(PullRequest pullRequest, Instant scheduledTime) {
+    private void checkUserRoleAndScheduleDetectionAtTime(PullRequest pullRequest, Instant scheduledTime, boolean sendBadPracticeDetectionEmail) {
         User assignee = pullRequest.getAssignees().stream().findFirst().orElse(null);
 
         if (assignee == null) {
@@ -112,24 +118,20 @@ public class BadPracticeDetectorScheduler {
                 );
             } else {
                 logger.info("User {} has the run_automatic_detection role. Scheduling detection.", assignee.getLogin());
-                scheduleDetectionAtTime(pullRequest, scheduledTime);
+                scheduleDetectionAtTime(pullRequest, scheduledTime, sendBadPracticeDetectionEmail);
             }
         } catch (Exception e) {
             logger.error("Error while checking user role: {}", e.getMessage());
         }
     }
 
-    private void scheduleDetectionAtTime(PullRequest pullRequest, Instant scheduledTime) {
+    private void scheduleDetectionAtTime(PullRequest pullRequest, Instant scheduledTime, boolean sendBadPracticeDetectionEmail) {
         logger.info(
             "Scheduling bad practice detection for pull request: {} at time {}",
             pullRequest.getId(),
             scheduledTime
         );
-        BadPracticeDetectorTask badPracticeDetectorTask = new BadPracticeDetectorTask();
-        badPracticeDetectorTask.setPullRequestBadPracticeDetector(pullRequestBadPracticeDetector);
-        badPracticeDetectorTask.setMailService(mailService);
-        badPracticeDetectorTask.setPullRequest(pullRequest);
-        badPracticeDetectorTask.setPullRequestBadPracticeRepository(pullRequestBadPracticeRepository);
+        BadPracticeDetectorTask badPracticeDetectorTask = createBadPracticeDetectorTask(pullRequest, sendBadPracticeDetectionEmail);
 
         if (scheduledTasks.containsKey(pullRequest.getId())) {
             List<ScheduledFuture<?>> scheduledTasksList = scheduledTasks.get(pullRequest.getId());
@@ -146,6 +148,16 @@ public class BadPracticeDetectorScheduler {
 
         ScheduledFuture<?> scheduledTask = taskScheduler.schedule(badPracticeDetectorTask, scheduledTime);
         scheduledTasks.get(pullRequest.getId()).add(scheduledTask);
+    }
+
+    private BadPracticeDetectorTask createBadPracticeDetectorTask(PullRequest pullRequest, boolean sendBadPracticeDetectionEmail) {
+        BadPracticeDetectorTask badPracticeDetectorTask = new BadPracticeDetectorTask();
+        badPracticeDetectorTask.setPullRequestBadPracticeDetector(pullRequestBadPracticeDetector);
+        badPracticeDetectorTask.setMailService(mailService);
+        badPracticeDetectorTask.setPullRequest(pullRequest);
+        badPracticeDetectorTask.setPullRequestBadPracticeRepository(pullRequestBadPracticeRepository);
+        badPracticeDetectorTask.setSendBadPracticeDetectionEmail(sendBadPracticeDetectionEmail);
+        return badPracticeDetectorTask;
     }
 
     @Scheduled(cron = "0 0 */12 * * *")
