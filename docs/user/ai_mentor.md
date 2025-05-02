@@ -11,7 +11,7 @@ Hephaestus AI Mentor is a tool that supports students during software engineerin
 
 ## Chat Flow 
 ### Getting Started
-You can open the AI Mentor from the top bar of the Hephaestus platform. Just click the button to begin a chat.
+You can open the AI Mentor from the top bar of the Hephaestus platform. Click the button to open the chat interface.
 ```{figure} ./mentor_button.png
 :alt: AI Mentor Button
 ```
