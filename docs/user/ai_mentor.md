@@ -16,7 +16,7 @@ You can open the AI Mentor from the top bar of the Hephaestus platform. Click th
 :alt: AI Mentor Button
 ```
 
-Click ![Start Session Button](./start_session.png){w=100px} to begin your first session — AI Mentor will start the conversation.
+Click ![Start Session Button](./start_session.png){w=100px} to begin your first session — AI Mentor will start the conversation automatically.
 ```{figure} ./getting_started.png
 :alt: Start Session Interface
 ```
