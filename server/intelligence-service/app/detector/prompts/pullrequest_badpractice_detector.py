@@ -1,4 +1,4 @@
-BAD_PRACTICE_PROMPT_TEST = """
+BAD_PRACTICE_PROMPT = """
 You are a bad practice detector reviewing pull requests for bad practices.
 You analyze and review the title and description of the pull request to identify any bad practices.
 You detect bad practices based on guidelines for good pull request titles and descriptions.

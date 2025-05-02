@@ -7,8 +7,10 @@
             <hlm-skeleton class="size-5 bg-green-500/30"></hlm-skeleton>
             <hlm-skeleton class="h-4 w-16 lg:w-36"></hlm-skeleton>
           } @else {
-            <ng-icon [name]="issueIconAndColor().icon" size="18" [class]="'mr-1 ' + issueIconAndColor().color"></ng-icon>
-            {{ repositoryName() }} #{{ number() }} on {{ displayCreated().format('MMM D') }}
+            <a [href]="htmlUrl()">
+              <ng-icon [name]="issueIconAndColor().icon" size="18" [class]="'mr-1 ' + issueIconAndColor().color"></ng-icon>
+              {{ repositoryName() }} #{{ number() }} on {{ displayCreated().format('MMM D') }}
+            </a>
           }
         </span>
         <span class="font-medium flex justify-center items-center gap-2">
@@ -21,17 +23,21 @@
             } @else {
               <span> {{ badPractices()?.length }} bad practices detected </span>
             }
-            <button hlmBtn variant="outline" size="sm" class="gap-1" (click)="this.detectBadPracticesForPrMutation.mutate(id())">
-              @if (this.detectBadPracticesForPrMutation.isPending()) {
-                <hlm-spinner class="size-4" />
-              } @else {
-                <ng-icon name="octSync" class="size-8" />
-              }
-              <span>Detect</span>
-            </button>
-            <button brnCollapsibleTrigger hlmBtn variant="ghost">
-              <ng-icon name="octFold" size="18" class="text-github-muted-foreground"></ng-icon>
-            </button>
+            @if (currUserIsDashboardUser()) {
+              <button hlmBtn variant="outline" size="sm" class="gap-1" (click)="this.detectBadPracticesForPr(id())">
+                @if (this.detectBadPracticesForPrMutation.isPending()) {
+                  <hlm-spinner class="size-4" />
+                } @else {
+                  <ng-icon name="octSync" class="size-8" />
+                }
+                <span>Detect</span>
+              </button>
+            }
+            @if (expandEnabled()) {
+              <button brnCollapsibleTrigger hlmBtn variant="ghost">
+                <ng-icon name="octFold" size="18" class="text-github-muted-foreground"></ng-icon>
+              </button>
+            }
           }
         </span>
       </div>
@@ -68,7 +74,13 @@
           <p class="text-sm text-pretty">{{ badPracticeSummary() }}</p>
           @for (badpractice of badPractices(); track badpractice.title) {
             <brn-separator hlmSeparator />
-            <app-bad-practice-card [id]="badpractice.id" [title]="badpractice.title" [description]="badpractice.description" [state]="badpractice.state"></app-bad-practice-card>
+            <app-bad-practice-card
+              [id]="badpractice.id"
+              [title]="badpractice.title"
+              [description]="badpractice.description"
+              [state]="badpractice.state"
+              [currUserIsDashboardUser]="currUserIsDashboardUser()"
+            ></app-bad-practice-card>
           }
         </brn-collapsible-content>
       </div>

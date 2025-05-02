@@ -1,11 +1,14 @@
 from enum import Enum
 from typing import List
 
+from langchain_core.runnables import RunnableConfig
+from langfuse.callback import CallbackHandler
 from langchain_core.prompts import ChatPromptTemplate
+from langfuse.decorators import observe, langfuse_context
 from pydantic import BaseModel, Field
 
 from app.detector.prompts.pullrequest_badpractice_detector import (
-    BAD_PRACTICE_PROMPT_TEST,
+    BAD_PRACTICE_PROMPT,
 )
 from app.models import get_model
 from app.settings import settings
@@ -43,10 +46,25 @@ class BadPracticeResult(BaseModel):
     )
 
 
+class DetectionResult(BaseModel):
+    bad_practice_summary: str
+    bad_practices: List[BadPractice]
+    trace_id: str = ""
+
+
+@observe()
 def detect_bad_practices(
     title, description, lifecycle_state, bad_practice_summary, bad_practices
-) -> BadPracticeResult:
-    prompt_text = BAD_PRACTICE_PROMPT_TEST
+) -> DetectionResult:
+
+    callbacks: List[CallbackHandler] = []
+    if settings.langfuse_enabled:
+        langfuse_handler = langfuse_context.get_current_langchain_handler()
+        langfuse_handler.auth_check()
+        callbacks.append(langfuse_handler)
+
+    config = RunnableConfig(callbacks=callbacks)
+    prompt_text = BAD_PRACTICE_PROMPT
     prompt_template = ChatPromptTemplate.from_template(prompt_text)
     prompt = prompt_template.invoke(
         {
@@ -58,5 +76,10 @@ def detect_bad_practices(
         }
     )
     structured_llm = model.with_structured_output(BadPracticeResult)
-    response = structured_llm.invoke(prompt)
-    return response
+    response = structured_llm.invoke(prompt, config)
+    trace_id = langfuse_context.get_current_trace_id() or ""
+    return DetectionResult(
+        bad_practice_summary=response.bad_practice_summary,
+        bad_practices=response.bad_practices,
+        trace_id=trace_id,
+    )

@@ -419,12 +419,6 @@ paths:
       responses:
         "200":
           description: OK
-          content:
-            application/json:
-              schema:
-                type: array
-                items:
-                  $ref: "#/components/schemas/PullRequestBadPractice"
   /activity/pullrequest/{pullRequestId}/badpractices:
     post:
       tags:
@@ -440,12 +434,6 @@ paths:
       responses:
         "200":
           description: OK
-          content:
-            application/json:
-              schema:
-                type: array
-                items:
-                  $ref: "#/components/schemas/PullRequestBadPractice"
   /activity/badpractice/{badPracticeId}/resolve:
     post:
       tags:

@@ -47,11 +47,11 @@ export function formatTitle(title: string): string {
 
 // Mapping states to icons and text
 export const stateConfig = {
-  GOOD_PRACTICE: { icon: 'lucideRocket', text: 'Good Practice' },
-  FIXED: { icon: 'lucideCheck', text: 'Fixed' },
-  CRITICAL_ISSUE: { icon: 'lucideFlame', text: 'Critical Issue' },
-  NORMAL_ISSUE: { icon: 'lucideTriangleAlert', text: 'Normal Issue' },
-  MINOR_ISSUE: { icon: 'lucideBug', text: 'Minor Issue' },
-  WONT_FIX: { icon: 'lucideBan', text: "Won't Fix" },
-  WRONG: { icon: 'lucideOctagonX', text: 'Wrong' }
+  GOOD_PRACTICE: { icon: 'lucideRocket', text: 'Good Practice', color: 'text-github-success-foreground' },
+  FIXED: { icon: 'lucideCheck', text: 'Fixed', color: 'text-github-done-foreground' },
+  CRITICAL_ISSUE: { icon: 'lucideFlame', text: 'Critical Issue', color: 'text-github-danger-foreground' },
+  NORMAL_ISSUE: { icon: 'lucideTriangleAlert', text: 'Normal Issue', color: 'text-github-severe-foreground' },
+  MINOR_ISSUE: { icon: 'lucideBug', text: 'Minor Issue', color: 'text-github-attention-foreground' },
+  WONT_FIX: { icon: 'lucideBan', text: "Won't Fix", color: 'text-github-muted-foreground' },
+  WRONG: { icon: 'lucideOctagonX', text: 'Wrong', color: 'text-github-muted-foreground' }
 };

@@ -44,4 +44,8 @@ public class PullRequestBadPractice {
     private OffsetDateTime detectionTime;
 
     private OffsetDateTime lastUpdateTime;
+
+    private PullRequestLifecycleState detectionPullrequestLifecycleState;
+
+    private String detectionTraceId;
 }

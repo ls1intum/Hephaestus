@@ -68,9 +68,13 @@ components:
             $ref: '#/components/schemas/BadPractice'
           title: Bad Practices
           type: array
+        trace_id:
+          title: Trace Id
+          type: string
       required:
       - bad_practice_summary
       - bad_practices
+      - trace_id
       title: DetectorResponse
       type: object
     HTTPValidationError:

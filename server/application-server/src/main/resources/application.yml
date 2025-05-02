@@ -83,6 +83,16 @@ hephaestus:
 
     detection:
         run-automatic-detection-for-all: false
+        tracing:
+            enabled: false
+            # The host of the langfuse server
+            host: ${LANGFUSE_HOST:}
+            # The public key of the langfuse server
+            public-key: ${LANGFUSE_PUBLIC_KEY:}
+            # The secret key of the langfuse server
+            secret-key: ${LANGFUSE_SECRET_KEY:}
+
+
 
 keycloak:
     url: http://localhost:8081

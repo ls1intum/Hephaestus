@@ -16,6 +16,7 @@ import { formatTitle } from '@app/utils';
 import { HlmSpinnerComponent } from '@spartan-ng/ui-spinner-helm';
 import { injectMutation, QueryClient } from '@tanstack/angular-query-experimental';
 import { lastValueFrom } from 'rxjs';
+import { toast } from 'ngx-sonner';
 
 @Component({
   selector: 'app-pull-request-bad-practice-card',
@@ -57,9 +58,11 @@ export class PullRequestBadPracticeCardComponent implements AfterViewInit {
   badPractices = input<Array<PullRequestBadPractice>>();
   badPracticeSummary = input<string>('');
   openCard = input<boolean>(false);
+  currUserIsDashboardUser = input<boolean>(false);
 
   displayCreated = computed(() => dayjs(this.createdAt()));
   displayTitle = computed(() => formatTitle(this.title() ?? ''));
+  expandEnabled = computed(() => this.badPractices()?.length !== 0);
 
   @ViewChild(BrnCollapsibleTriggerDirective) collapsibleTrigger!: BrnCollapsibleTriggerDirective;
 
@@ -94,10 +97,26 @@ export class PullRequestBadPracticeCardComponent implements AfterViewInit {
     return { icon, color };
   });
 
+  detectBadPracticesForPr = (prId: number) => {
+    this.detectBadPracticesForPrMutation.mutate(prId);
+  };
+
   detectBadPracticesForPrMutation = injectMutation(() => ({
     mutationFn: (prId: number) => lastValueFrom(this.activityService.detectBadPracticesForPullRequest(prId)),
     onSuccess: () => {
       this.queryClient.invalidateQueries({ queryKey: ['activity'] });
+      if (this.collapsibleTrigger.state() === 'closed') {
+        this.collapsibleTrigger.toggleCollapsible();
+      }
+    },
+    onError: () => {
+      this.showToast();
     }
   }));
+
+  showToast() {
+    toast('Something went wrong...', {
+      description: 'This pull request has not changed since the last detection. Try changing status or description, then run the detection again.'
+    });
+  }
 }
