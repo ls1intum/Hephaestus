@@ -1,12 +1,11 @@
 # AI Mentor
-Content of this document
 - [Overview](#overview)
 - [Chat Flow](#chat-flow)
-    - [Getting Started](#getting-started)
-    - [PR Overview](#pr-overview)
-    - [Status Updates](#status-updates)
-    - [Session Summary](#session-summary)
-    - [Goal Setting and Alignment](#goal-setting-and-alignment)
+  - [Getting Started](#getting-started)
+  - [PR Overview](#pr-overview)
+  - [Status Updates](#status-updates)
+  - [Session Summary](#session-summary)
+  - [Goal Setting and Alignment](#goal-setting-and-alignment)
 ## Overview 
 Hephaestus AI Mentor is a tool that supports students during software engineering projects. It’s designed to make self-reflection easier, help track development progress, and keep developers focused on their goals. Many students run into issues like poor planning or feeling rushed - AI Mentor helps by guiding regular check-ins and keeping things organized throughout the project.
 
@@ -34,7 +33,7 @@ You can start a new session at any time by clicking ![New Session Button](./new_
 ### PR Overview
 AI Mentor uses information from the GitHub repositories you’ve been working on. It reviews all pull requests (PRs) that were active in the last week and displays them in an interactive interface linked directly to GitHub.
 
-You can mark which PRs are relevant for your current week’s progress summary. AI Mentor will use this information in later parts of the session to support your reflection.
+You can mark which PRs are relevant for the current week’s progress summary. AI Mentor will use this information in later parts of the session to support your reflection.
 ```{figure} ./pr_overview.png
 :alt: Overview of the Last Week's PRs
 :width: 450px
