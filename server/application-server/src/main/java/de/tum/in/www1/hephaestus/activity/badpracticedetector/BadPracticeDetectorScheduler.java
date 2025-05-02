@@ -5,6 +5,9 @@ import de.tum.in.www1.hephaestus.gitprovider.label.Label;
 import de.tum.in.www1.hephaestus.gitprovider.pullrequest.PullRequest;
 import de.tum.in.www1.hephaestus.gitprovider.user.User;
 import de.tum.in.www1.hephaestus.notification.MailService;
+import java.time.Instant;
+import java.util.*;
+import java.util.concurrent.ScheduledFuture;
 import org.keycloak.admin.client.Keycloak;
 import org.keycloak.representations.idm.RoleRepresentation;
 import org.keycloak.representations.idm.UserRepresentation;
@@ -16,10 +19,6 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.scheduling.TaskScheduler;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
-
-import java.time.Instant;
-import java.util.*;
-import java.util.concurrent.ScheduledFuture;
 
 @Component
 public class BadPracticeDetectorScheduler {
@@ -78,9 +77,9 @@ public class BadPracticeDetectorScheduler {
     }
 
     private void runAutomaticDetectionForAllIfEnabled(
-            PullRequest pullRequest,
-            Instant scheduledTime,
-            boolean sendBadPracticeDetectionEmail
+        PullRequest pullRequest,
+        Instant scheduledTime,
+        boolean sendBadPracticeDetectionEmail
     ) {
         if (runAutomaticDetectionForAll) {
             scheduleDetectionAtTime(pullRequest, scheduledTime, sendBadPracticeDetectionEmail);
@@ -90,9 +89,9 @@ public class BadPracticeDetectorScheduler {
     }
 
     private void checkUserRoleAndScheduleDetectionAtTime(
-            PullRequest pullRequest,
-            Instant scheduledTime,
-            boolean sendBadPracticeDetectionEmail
+        PullRequest pullRequest,
+        Instant scheduledTime,
+        boolean sendBadPracticeDetectionEmail
     ) {
         User assignee = pullRequest.getAssignees().stream().findFirst().orElse(null);
 
@@ -133,9 +132,9 @@ public class BadPracticeDetectorScheduler {
     }
 
     private void scheduleDetectionAtTime(
-            PullRequest pullRequest,
-            Instant scheduledTime,
-            boolean sendBadPracticeDetectionEmail
+        PullRequest pullRequest,
+        Instant scheduledTime,
+        boolean sendBadPracticeDetectionEmail
     ) {
         logger.info(
             "Scheduling bad practice detection for pull request: {} at time {}",
@@ -143,8 +142,8 @@ public class BadPracticeDetectorScheduler {
             scheduledTime
         );
         BadPracticeDetectorTask badPracticeDetectorTask = createBadPracticeDetectorTask(
-                pullRequest,
-                sendBadPracticeDetectionEmail
+            pullRequest,
+            sendBadPracticeDetectionEmail
         );
 
         if (scheduledTasks.containsKey(pullRequest.getId())) {
@@ -165,8 +164,8 @@ public class BadPracticeDetectorScheduler {
     }
 
     private BadPracticeDetectorTask createBadPracticeDetectorTask(
-            PullRequest pullRequest,
-            boolean sendBadPracticeDetectionEmail
+        PullRequest pullRequest,
+        boolean sendBadPracticeDetectionEmail
     ) {
         BadPracticeDetectorTask badPracticeDetectorTask = new BadPracticeDetectorTask();
         badPracticeDetectorTask.setPullRequestBadPracticeDetector(pullRequestBadPracticeDetector);
