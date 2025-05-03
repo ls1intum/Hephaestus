@@ -7,8 +7,10 @@
       </a>
       <span class="text-xs font-semibold mt-1 text-muted-foreground">{{ version }}</span>
     </div>
-    @if (signedIn() && user()?.roles?.includes('admin')) {
-      <a hlmBtn variant="link" routerLink="/workspace">Workspace</a>
+    @if (signedIn()) {
+      @if (user()?.roles?.includes('admin')) {
+        <a hlmBtn variant="link" routerLink="/workspace">Workspace</a>
+      }
       <a hlmBtn variant="link" [routerLink]="'/user/' + user()!.username + '/activity'">Activity</a>
       <a hlmBtn variant="link" routerLink="/teams">Teams</a>
     }
