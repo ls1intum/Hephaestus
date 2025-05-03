@@ -105,7 +105,7 @@ export class PullRequestBadPracticeCardComponent implements AfterViewInit {
     mutationFn: (prId: number) => lastValueFrom(this.activityService.detectBadPracticesForPullRequest(prId)),
     onSuccess: () => {
       this.queryClient.invalidateQueries({ queryKey: ['activity'] });
-      if (this.collapsibleTrigger.state() === 'closed') {
+      if (this.collapsibleTrigger != undefined && this.collapsibleTrigger.state() === 'closed') {
         this.collapsibleTrigger.toggleCollapsible();
       }
     },
