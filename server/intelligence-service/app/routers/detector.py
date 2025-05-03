@@ -12,6 +12,8 @@ class DetectorRequest(BaseModel):
     title: str
     description: str
     lifecycle_state: str
+    repository_name: str
+    pull_request_number: int
     bad_practice_summary: str
     bad_practices: List[BadPractice]
 
@@ -32,6 +34,8 @@ def detect(request: DetectorRequest):
         request.title,
         request.description,
         request.lifecycle_state,
+        request.repository_name,
+        request.pull_request_number,
         request.bad_practice_summary,
         request.bad_practices,
     )

@@ -27,7 +27,7 @@ export class ActivityDashboardComponent {
 
   user = this.securityStore.loadedUser;
 
-  protected userLogin: string | null = null;
+  protected userLogin: string | undefined = undefined;
   protected openedPullRequestId: number | undefined = undefined;
 
   protected numberOfPullRequests = computed(() => this.query.data()?.pullRequests?.length ?? 0);
@@ -35,7 +35,7 @@ export class ActivityDashboardComponent {
   protected currUserIsDashboardUser = computed(() => this.user()?.username === this.userLogin);
 
   constructor(private route: ActivatedRoute) {
-    this.userLogin = this.route.snapshot.paramMap.get('id');
+    this.userLogin = this.route.snapshot.paramMap.get('id') ?? this.user()?.username;
     this.openedPullRequestId = this.route.snapshot.queryParams['pullRequest'];
   }
 

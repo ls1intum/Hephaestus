@@ -54,7 +54,7 @@ class DetectionResult(BaseModel):
 
 @observe()
 def detect_bad_practices(
-    title, description, lifecycle_state, bad_practice_summary, bad_practices
+    title, description, lifecycle_state, repository_name, pull_request_number, bad_practice_summary, bad_practices
 ) -> DetectionResult:
 
     callbacks: List[CallbackHandler] = []
@@ -78,6 +78,9 @@ def detect_bad_practices(
     structured_llm = model.with_structured_output(BadPracticeResult)
     response = structured_llm.invoke(prompt, config)
     trace_id = langfuse_context.get_current_trace_id() or ""
+    langfuse_context.update_current_trace(
+        tags=[repository_name, str(pull_request_number)]
+    )
     return DetectionResult(
         bad_practice_summary=response.bad_practice_summary,
         bad_practices=response.bad_practices,

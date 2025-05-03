@@ -63,6 +63,8 @@ public class PullRequestBadPracticeDetector {
         detectorRequest.setDescription(pullRequest.getBody());
         detectorRequest.setTitle(pullRequest.getTitle());
         detectorRequest.setLifecycleState(lifecycleState.getState());
+        detectorRequest.setRepositoryName(pullRequest.getRepository().getName());
+        detectorRequest.setPullRequestNumber(pullRequest.getNumber());
         if (pullRequest.getBadPracticeSummary() != null) {
             detectorRequest.setBadPracticeSummary(pullRequest.getBadPracticeSummary());
         } else {

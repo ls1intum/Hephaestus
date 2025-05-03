@@ -47,6 +47,12 @@ components:
         lifecycle_state:
           title: Lifecycle State
           type: string
+        pull_request_number:
+          title: Pull Request Number
+          type: integer
+        repository_name:
+          title: Repository Name
+          type: string
         title:
           title: Title
           type: string
@@ -54,6 +60,8 @@ components:
       - title
       - description
       - lifecycle_state
+      - repository_name
+      - pull_request_number
       - bad_practice_summary
       - bad_practices
       title: DetectorRequest
