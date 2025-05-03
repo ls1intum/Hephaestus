@@ -54,7 +54,13 @@ class DetectionResult(BaseModel):
 
 @observe()
 def detect_bad_practices(
-    title, description, lifecycle_state, repository_name, pull_request_number, bad_practice_summary, bad_practices
+    title,
+    description,
+    lifecycle_state,
+    repository_name,
+    pull_request_number,
+    bad_practice_summary,
+    bad_practices,
 ) -> DetectionResult:
 
     callbacks: List[CallbackHandler] = []
