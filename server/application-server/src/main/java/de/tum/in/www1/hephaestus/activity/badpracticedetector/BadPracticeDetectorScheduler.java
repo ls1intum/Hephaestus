@@ -127,7 +127,7 @@ public class BadPracticeDetectorScheduler {
                 scheduleDetectionAtTime(pullRequest, scheduledTime, sendBadPracticeDetectionEmail);
             }
         } catch (Exception e) {
-            logger.error("Error while checking user role: {}", e.getMessage());
+            logger.error("Error while checking user role: {}", e.toString());
         }
     }
 
@@ -148,13 +148,16 @@ public class BadPracticeDetectorScheduler {
 
         if (scheduledTasks.containsKey(pullRequest.getId())) {
             List<ScheduledFuture<?>> scheduledTasksList = scheduledTasks.get(pullRequest.getId());
+            List<ScheduledFuture<?>> tasksToRemove = new ArrayList<>();
             scheduledTasksList.forEach(task -> {
                 if (!task.isDone() && !task.isCancelled()) {
+                    logger.info("Cancelling previous task for pull request: {}", pullRequest.getId());
                     task.cancel(false);
                 } else {
-                    scheduledTasks.get(pullRequest.getId()).remove(task);
+                    tasksToRemove.add(task);
                 }
             });
+            scheduledTasksList.removeAll(tasksToRemove);
         } else {
             scheduledTasks.put(pullRequest.getId(), new ArrayList<>());
         }
