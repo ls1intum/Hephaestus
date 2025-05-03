@@ -127,7 +127,7 @@ public class BadPracticeDetectorScheduler {
                 scheduleDetectionAtTime(pullRequest, scheduledTime, sendBadPracticeDetectionEmail);
             }
         } catch (Exception e) {
-            logger.error("Error while checking user role: {}", e.getMessage());
+            logger.error("Error while checking user role: {}", e.toString());
         }
     }
 
