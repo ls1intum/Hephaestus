@@ -150,6 +150,7 @@ public class BadPracticeDetectorScheduler {
             List<ScheduledFuture<?>> scheduledTasksList = scheduledTasks.get(pullRequest.getId());
             scheduledTasksList.forEach(task -> {
                 if (!task.isDone() && !task.isCancelled()) {
+                    logger.info("Cancelling previous task for pull request: {}", pullRequest.getId());
                     task.cancel(false);
                 } else {
                     scheduledTasks.get(pullRequest.getId()).remove(task);
