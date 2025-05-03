@@ -18,10 +18,10 @@
             <hlm-skeleton class="h-4 w-16 lg:w-36"></hlm-skeleton>
             <hlm-skeleton class="size-5"></hlm-skeleton>
           } @else {
-            @if (badPractices()?.length == 1) {
-              <span> {{ badPractices()?.length }} bad practice detected </span>
+            @if (openBadPractices.length == 1) {
+              <span> {{ openBadPractices.length }} bad practice detected </span>
             } @else {
-              <span> {{ badPractices()?.length }} bad practices detected </span>
+              <span> {{ openBadPractices.length }} bad practices detected </span>
             }
             @if (currUserIsDashboardUser()) {
               <button hlmBtn variant="outline" size="sm" class="gap-1" (click)="this.detectBadPracticesForPr(id())">

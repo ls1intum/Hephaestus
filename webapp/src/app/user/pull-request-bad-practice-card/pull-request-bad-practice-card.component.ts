@@ -97,6 +97,13 @@ export class PullRequestBadPracticeCardComponent implements AfterViewInit {
     return { icon, color };
   });
 
+  openBadPractices = computed(() => {
+    if (this.badPractices() == undefined) return [];
+    return this.badPractices()?.filter(
+      (badPractice) => badPractice.state != PullRequestBadPractice.StateEnum.GoodPractice && badPractice.state != PullRequestBadPractice.StateEnum.Fixed
+    );
+  });
+
   detectBadPracticesForPr = (prId: number) => {
     this.detectBadPracticesForPrMutation.mutate(prId);
   };

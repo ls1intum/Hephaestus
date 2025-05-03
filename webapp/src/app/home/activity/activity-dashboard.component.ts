@@ -1,5 +1,5 @@
 import { Component, computed, inject } from '@angular/core';
-import { ActivityService } from '@app/core/modules/openapi';
+import { ActivityService, PullRequestBadPractice, PullRequestWithBadPractices } from '@app/core/modules/openapi';
 import { injectMutation, injectQuery, QueryClient } from '@tanstack/angular-query-experimental';
 import { combineLatest, lastValueFrom, map, timer } from 'rxjs';
 import { ActivatedRoute } from '@angular/router';
@@ -31,13 +31,22 @@ export class ActivityDashboardComponent {
   protected openedPullRequestId: number | undefined = undefined;
 
   protected numberOfPullRequests = computed(() => this.query.data()?.pullRequests?.length ?? 0);
-  protected numberOfBadPractices = computed(() => this.query.data()?.pullRequests?.reduce((acc, pr) => acc + (pr.badPractices?.length ?? 0), 0) ?? 0);
+  protected numberOfBadPractices = computed(() => this.query.data()?.pullRequests?.reduce((acc, pr) => acc + (this.filterOpenBadPractices(pr).length ?? 0), 0) ?? 0);
   protected currUserIsDashboardUser = computed(() => this.user()?.username === this.userLogin);
 
   constructor(private route: ActivatedRoute) {
     this.userLogin = this.route.snapshot.paramMap.get('id') ?? this.user()?.username;
     this.openedPullRequestId = this.route.snapshot.queryParams['pullRequest'];
   }
+
+  filterOpenBadPractices = function (pullRequest: PullRequestWithBadPractices) {
+    if (pullRequest.badPractices === undefined) return [];
+    return (
+      pullRequest.badPractices?.filter(
+        (badPractice) => badPractice.state != PullRequestBadPractice.StateEnum.GoodPractice && badPractice.state != PullRequestBadPractice.StateEnum.Fixed
+      ) ?? []
+    );
+  };
 
   query = injectQuery(() => ({
     queryKey: ['activity', { id: this.userLogin }],
