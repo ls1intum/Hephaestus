@@ -35,8 +35,17 @@ Your past sessions are listed in the session history on the left bar. Click any 
 ```
 
 ```{note}
-  You can start a new session at any time by clicking ![New Session Button](./new_session.png){width="100px"}. Just note that if the previous session isn’t complete, AI Mentor will not have full context of your progress.
+  You can start a new session at any time by clicking ![New Session Button](./new_session.png){width="100px"}. Keep in mind that if the previous session isn’t complete, AI Mentor will not have full context of your progress and may not be as supportive.
 ```
+
+For a visual walkthrough of how start your first chat with the AI Mentor, check out this demonstration video:
+<iframe src="https://live.rbg.tum.de/w/artemisintro/59978?video_only=1&t=0" allowfullscreen="1" frameborder="0" width="600" height="350" style="margin-bottom: 25px">
+        A tutorial video demonstrating the initial interaction with the AI Mentor (TUM-Live).  
+</iframe>
+
+### Goal Setting and Alignment
+
+During your first session, AI Mentor will help you define your goals and outline your current project objectives. In later sessions, the mentor will return to these goals, offering helpful insights, suggesting possible adjustments, and asking questions that support self-reflection. The goal of the mentor is to help you reflect on your objectives, stay aligned with them, and reduce stress throughout the project.
 
 ### PR Overview
 
@@ -61,7 +70,7 @@ After the status update, AI Mentor will generate a summary of your stand-up. You
   :alt: Summary of the Progress
   :width: 700px
 ```
-
-### Goal Setting and Alignment
-
-During your first session, AI Mentor will help you define your goals and outline your current project objectives. In later sessions, the mentor will return to these goals, offering helpful insights, suggesting possible adjustments, and asking questions that support self-reflection. The goal of the mentor is to help you reflect on your objectives, stay aligned with them, and reduce stress throughout the project.
+To see the AI Mentor in action, watch this video tutorial:
+<iframe src="https://live.rbg.tum.de/w/artemisintro/59979?video_only=1&t=0" allowfullscreen="1" frameborder="0" width="600" height="350" style="margin-bottom: 25px">
+        A tutorial video demonstrating the initial interaction with the AI Mentor (TUM-Live).  
+</iframe>
