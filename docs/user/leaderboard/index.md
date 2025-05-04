@@ -30,7 +30,6 @@ Clicking your rank scrolls the leaderboard to your entry.
 
 ```{figure} leaderboard-overview.png
 :alt: Screenshot of the Leaderboard Overview Card
-:width: 100%
 
 Screenshot of the Leaderboard Overview Card
 ```
@@ -44,6 +43,12 @@ The leaderboard table includes the following columns:
 Selecting a contributor's row opens their profile page, offering a detailed view of their activity and contributions.
 
 To view the Pull Requests reviewed by a specific contributor, click the button in their `Activity` column. A modal will appear listing these Pull Requests. Clicking on a Pull Request title navigates you directly to it on GitHub. The modal includes a "Copy" button in the top-right corner, allowing you to copy a formatted list of the reviewed Pull Requests to your clipboard. This feature simplifies sharing activity summaries with your team, for instance, during regular meetings or for documentation purposes.
+
+```{figure} leaderboard-pr-overview.png
+:alt: Screenshot of the Leaderboard PR Overview Modal
+
+Screenshot of the Leaderboard PR Overview Modal
+```
 
 ## Customizing the Leaderboard
 
