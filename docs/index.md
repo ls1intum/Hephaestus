@@ -26,9 +26,9 @@ Hephaestus /hɪˈfɛstəs/ is the Greek god of blacksmiths, craftsmen, and artis
 :includehidden:
 :maxdepth: 2
 
-user/getting_started
-user/leaderboard/index.md
-user/workspace/index.md
+user/leaderboard/index
+user/workspace/index
+user/ai_mentor
 
 ```
 
