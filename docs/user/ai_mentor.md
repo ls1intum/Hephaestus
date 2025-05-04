@@ -3,10 +3,10 @@
 - [Overview](#overview)
 - [Chat Flow](#chat-flow)
   - [Getting Started](#getting-started)
+  - [Goal Setting and Alignment](#goal-setting-and-alignment)
   - [PR Overview](#pr-overview)
   - [Status Updates](#status-updates)
   - [Session Summary](#session-summary)
-  - [Goal Setting and Alignment](#goal-setting-and-alignment)
 
 ## Overview
 
