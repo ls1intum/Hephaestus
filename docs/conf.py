@@ -24,6 +24,10 @@ extensions = [
     'sphinxcontrib.plantuml',
 ]
 
+myst_enable_extensions = [
+    "attrs_inline"
+]
+
 exclude_patterns = ['_build', 'Thumbs.db', '.DS_Store', 'venv', '.venv', 'README.md']
 
 source_suffix = {
