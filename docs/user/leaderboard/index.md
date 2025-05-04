@@ -7,25 +7,25 @@
 
 ## Overview
 
-Hephaestus features weekly leaderboards of all contributors to selected repositories of the chosen organization. Each leaderboard tracks and ranks contributors based on their code review activities using a scoring system.
+Hephaestus provides weekly leaderboards that track and rank contributors based on their code review activities within selected repositories of your organization.
+A scoring system is used to evaluate contributions. The leaderboards are calculated in real-time and typically last for one week.
 
 ## Accessing the Leaderboard
 
-To access the leaderboard, first login to Hephaestus using your GitHub account. On successful login, you will be redirected to the leaderboard landing page. When logged in, you can always get back to the leaderboard by clicking the Hephaestus logo in the top left corner.
+To access the leaderboard, log in to Hephaestus using your GitHub account. Upon successful login, you will be directed to the leaderboard landing page. You can return to the leaderboard at any time by clicking the Hephaestus logo in the top-left corner.
 
-<!-- TODO: add example login + navigate to profile workflow here -->
 <iframe height="450px" width="600px" src="https://live.rbg.tum.de/w/artemisintro/59981?video_only=1&t=0" title="Embedded Video" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" allowfullscreen></iframe>
 
 ## Understanding the Leaderboard
 
-The main page features an overview card with your current rank and league details. In particular, you can see:
+The main page displays an overview card summarizing your current rank and league details, including:
 - Your rank in the currently selected leaderboard
-- The time until the current leaderboard ends
-- Your change in league points given the current leaderboard score and position
-- Your current league and the league points required to advance to the next league via a progress bar
+- The time remaining until the current leaderboard ends
+- Your potential change in league points based on the current score and position
+- Your current league and progress towards the next league
 
 ```{tip}
-Clicking on your current rank will automatically scroll you to the your position in the leaderboard.
+Clicking your rank scrolls the leaderboard to your entry.
 ```
 
 ```{figure} leaderboard-overview.png
@@ -35,29 +35,27 @@ Clicking on your current rank will automatically scroll you to the your position
 Screenshot of the Leaderboard Overview Card
 ```
 
-The leaderboard itself consists of a table with the following columns:
+The leaderboard table includes the following columns:
 - Rank
 - Contributor
 - Leaderboard Score
 - Activity
 
-Clicking on a row will open the contributor's profile page. It provides a more detailed view of the contributor's activity and contributions.
+Selecting a contributor's row opens their profile page, offering a detailed view of their activity and contributions.
 
-To get an overview of the Pull Requests a contributor has reviewed, click on the button in the `Activity` column. This will open a modal with a list of all Pull Requests the contributor has reviewed. You can further click on each Pull Request to get redirected directly to the Pull Request on GitHub. The modal also contains a "Copy"-button in the top right corner to copy all reviewed Pull Requests to your clipboard. This can be useful to quickly share a formatted summary with your team, for example for the Confluence page of your regular team meetings.
-
-<!-- TODO: add example copy workflow here -->
+To view the Pull Requests reviewed by a specific contributor, click the button in their `Activity` column. A modal will appear listing these Pull Requests. Clicking on a Pull Request title navigates you directly to it on GitHub. The modal includes a "Copy" button in the top-right corner, allowing you to copy a formatted list of the reviewed Pull Requests to your clipboard. This feature simplifies sharing activity summaries with your team, for instance, during regular meetings or for documentation purposes.
 
 ## Customizing the Leaderboard
 
-Aside from the current leaderboard, you can also review the leaderboard for previous weeks. To do so, use the dropdown menu to select a different time period. Typically, the past 4 weeks are available. The concrete time period of the currently selected leaderboard is displayed below the dropdown menu.
+You can review leaderboards from previous weeks in addition to the current one. Select a past time period using the dropdown menu; typically, the last four weeks are accessible. The exact time frame for the selected leaderboard is shown beneath the dropdown.
 
-Additionally, the second filter option allows you to select a specific team from the chosen organization. Use this option to focus on a single team's performance and check your placement within your team.
+Additionally, a second filter allows you to select specific teams within your organization, enabling you to focus on team performance or view your ranking within your team.
 
 ```{note}
-Please be aware that your individual ranking will only be displayed when viewing the leaderboard for a team of which you are a member. If you select a team you are not part of, your position will not appear in the rankings.
+Please be aware that your individual rank is only displayed when viewing the leaderboard for a team you belong to. If you select a team you are not a member of, your ranking will not be shown.
 ```
 
-Lastly, it is also possible to sort the leaderboard by different criteria. The default sorting is by leaderboard score. However, you can also sort by league points, giving you a more detailed view of your progress within across the different leagues.
+Finally, you can sort the leaderboard by different criteria. While the default sorting is by leaderboard score, you can also sort by league points to better understand overall progress across leagues.
 
 ```{figure} leaderboard-filter.png
 :alt: Screenshot of the Leaderboard Filter Options
