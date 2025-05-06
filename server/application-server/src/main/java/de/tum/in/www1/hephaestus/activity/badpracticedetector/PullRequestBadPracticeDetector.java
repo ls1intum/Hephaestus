@@ -25,6 +25,7 @@ public class PullRequestBadPracticeDetector {
     private static final Logger logger = LoggerFactory.getLogger(PullRequestBadPracticeDetector.class);
 
     private static final String READY_TO_REVIEW = "ready to review";
+    private static final String READY_FOR_REVIEW = "ready for review";
     private static final String READY_TO_MERGE = "ready to merge";
 
     @Autowired
@@ -147,9 +148,10 @@ public class PullRequestBadPracticeDetector {
         ) {
             return PullRequestLifecycleState.READY_TO_MERGE;
         } else if (
-            pullRequest.getLabels().stream().anyMatch(label -> label.getName().equalsIgnoreCase(READY_TO_REVIEW))
+            pullRequest.getLabels().stream().anyMatch(label -> label.getName().equalsIgnoreCase(READY_TO_REVIEW)) ||
+            pullRequest.getLabels().stream().anyMatch(label -> label.getName().equalsIgnoreCase(READY_FOR_REVIEW))
         ) {
-            return PullRequestLifecycleState.READY_TO_REVIEW;
+            return PullRequestLifecycleState.READY_FOR_REVIEW;
         } else {
             return PullRequestLifecycleState.OPEN;
         }

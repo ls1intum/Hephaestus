@@ -1,5 +1,5 @@
 import { Component, computed, inject } from '@angular/core';
-import { ActivityService } from '@app/core/modules/openapi';
+import { ActivityService, PullRequestBadPractice } from '@app/core/modules/openapi';
 import { injectMutation, injectQuery, QueryClient } from '@tanstack/angular-query-experimental';
 import { combineLatest, lastValueFrom, map, timer } from 'rxjs';
 import { ActivatedRoute } from '@angular/router';
@@ -10,7 +10,8 @@ import { HlmSpinnerComponent } from '@spartan-ng/ui-spinner-helm';
 import { NgIcon, provideIcons } from '@ng-icons/core';
 import { BadPracticeLegendCardComponent } from '@app/user/bad-practice-legend-card/bad-practice-legend-card.component';
 import { SecurityStore } from '@app/core/security/security-store.service';
-import { toast } from 'ngx-sonner';
+import { HttpResponse } from '@angular/common/http';
+import { doubleDetectionString, filterGoodAndBadPractices, serverErrorString, showToast } from '@app/utils';
 
 @Component({
   selector: 'app-activity-dashboard',
@@ -30,8 +31,11 @@ export class ActivityDashboardComponent {
   protected userLogin: string | undefined = undefined;
   protected openedPullRequestId: number | undefined = undefined;
 
+  protected allBadPractices = computed(() => this.query.data()?.pullRequests?.reduce((acc, pr) => acc.concat(pr.badPractices), [] as PullRequestBadPractice[]) ?? []);
   protected numberOfPullRequests = computed(() => this.query.data()?.pullRequests?.length ?? 0);
-  protected numberOfBadPractices = computed(() => this.query.data()?.pullRequests?.reduce((acc, pr) => acc + (pr.badPractices?.length ?? 0), 0) ?? 0);
+  protected goodAndBadPractices = computed(() => filterGoodAndBadPractices(this.allBadPractices()));
+  protected numberOfGoodPractices = computed(() => this.goodAndBadPractices().goodPractices.length);
+  protected numberOfBadPractices = computed(() => this.goodAndBadPractices().badPractices.length);
   protected currUserIsDashboardUser = computed(() => this.user()?.username === this.userLogin);
 
   constructor(private route: ActivatedRoute) {
@@ -46,18 +50,16 @@ export class ActivityDashboardComponent {
   }));
 
   detectBadPracticesMutation = injectMutation(() => ({
-    mutationFn: () => lastValueFrom(this.activityService.detectBadPracticesByUser(this.userLogin!)),
+    mutationFn: () => lastValueFrom(this.activityService.detectBadPracticesByUser(this.userLogin!, 'response')),
     onSuccess: () => {
       this.queryClient.invalidateQueries({ queryKey: ['activity', { id: this.userLogin }] });
     },
-    onError: () => {
-      this.showToast();
+    onError: (error: HttpResponse<never>) => {
+      if (error.status === 400) {
+        showToast(doubleDetectionString);
+      } else {
+        showToast(serverErrorString);
+      }
     }
   }));
-
-  showToast() {
-    toast('Something went wrong...', {
-      description: 'Your pull requests have not changed since the last detection. Try changing status or description, then run the detection again.'
-    });
-  }
 }

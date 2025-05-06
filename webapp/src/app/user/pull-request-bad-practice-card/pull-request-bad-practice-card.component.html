@@ -1,15 +1,15 @@
 <brn-collapsible>
   <section hlmCard>
-    <div class="pt-2 pl-6 pr-2">
-      <div class="flex justify-between items-center text-sm text-github-muted-foreground">
-        <span class="font-medium flex justify-center items-center space-x-1">
+    <div class="flex flex-col gap-1 pt-2 pl-6 pr-2">
+      <div class="flex justify-between items-center text-sm text-github-muted-foreground h-10">
+        <span>
           @if (isLoading()) {
             <hlm-skeleton class="size-5 bg-green-500/30"></hlm-skeleton>
             <hlm-skeleton class="h-4 w-16 lg:w-36"></hlm-skeleton>
           } @else {
-            <a [href]="htmlUrl()">
+            <a [href]="htmlUrl()" class="font-medium flex justify-center items-center space-x-1">
               <ng-icon [name]="issueIconAndColor().icon" size="18" [class]="'mr-1 ' + issueIconAndColor().color"></ng-icon>
-              {{ repositoryName() }} #{{ number() }} on {{ displayCreated().format('MMM D') }}
+              {{ repositoryName() }} #{{ number() }} on {{ displayCreated().format('MMM D') }}. Updated on {{ displayUpdated().format('MMM D, HH:mm') }}
             </a>
           }
         </span>
@@ -18,11 +18,7 @@
             <hlm-skeleton class="h-4 w-16 lg:w-36"></hlm-skeleton>
             <hlm-skeleton class="size-5"></hlm-skeleton>
           } @else {
-            @if (badPractices()?.length == 1) {
-              <span> {{ badPractices()?.length }} bad practice detected </span>
-            } @else {
-              <span> {{ badPractices()?.length }} bad practices detected </span>
-            }
+            <span class="pr-2"> {{ detectedString() }} </span>
             @if (currUserIsDashboardUser()) {
               <button hlmBtn variant="outline" size="sm" class="gap-1" (click)="this.detectBadPracticesForPr(id())">
                 @if (this.detectBadPracticesForPrMutation.isPending()) {
@@ -41,12 +37,12 @@
           }
         </span>
       </div>
-      <div class="flex justify-between font-medium">
+      <div class="flex justify-between font-medium contain-inline-size gap-2">
         <span>
           @if (isLoading()) {
             <hlm-skeleton class="h-6 w-3/4"></hlm-skeleton>
           } @else {
-            <div [innerHTML]="displayTitle()" class="truncate"></div>
+            <div [innerHTML]="displayTitle()" class=""></div>
           }
         </span>
         <span class="flex items-center space-x-2 pr-4">

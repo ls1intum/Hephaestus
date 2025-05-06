@@ -6,7 +6,7 @@ import lombok.Getter;
 public enum PullRequestLifecycleState {
     DRAFT("Draft"),
     OPEN("Open"),
-    READY_TO_REVIEW("Ready to review"),
+    READY_FOR_REVIEW("Ready for review"),
     READY_TO_MERGE("Ready to merge"),
     MERGED("Merged"),
     CLOSED("Closed");
