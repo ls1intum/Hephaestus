@@ -1,13 +1,13 @@
 import type { LeaderboardEntry, PullRequestInfo } from '@/lib/api/models';
 import { 
-  Award,
-  CheckCircle2,
-  FileCode,
-  GitPullRequest,
-  MessageSquare,
-  ChevronLeft,
-  FileDiff
-} from "lucide-react";
+  TrophyIcon,
+  CheckCircleIcon,
+  CodeIcon,
+  GitPullRequestIcon,
+  CommentIcon,
+  ChevronLeftIcon,
+  DiffIcon
+} from "@primer/octicons-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
   Tooltip,
@@ -39,7 +39,7 @@ export default function Leaderboard({ leaderboard, isLoading = false }: Leaderbo
           <th className="text-center p-2 px-0.5">League</th>
           <th className="text-left p-2">Contributor</th>
           <th className="flex justify-center items-center gap-1 text-amber-600 p-2">
-            <Award className="w-4 h-4" />
+            <TrophyIcon className="w-4 h-4" />
             Score
           </th>
           <th className="text-left p-2">Activity</th>
@@ -50,7 +50,7 @@ export default function Leaderboard({ leaderboard, isLoading = false }: Leaderbo
           <tr className="border-b">
             <td colSpan={5}>
               <div className="flex flex-col items-center justify-center gap-2 mt-1 py-6">
-                <FileCode className="w-8 h-8 text-destructive" strokeWidth={1.5} />
+                <CodeIcon className="w-8 h-8 text-destructive" />
                 <span className="font-semibold text-muted-foreground">No entries found</span>
               </div>
             </td>
@@ -85,7 +85,7 @@ export default function Leaderboard({ leaderboard, isLoading = false }: Leaderbo
                     <>
                       <ReviewsPopover reviewedPRs={entry.reviewedPullRequests} />
                       <div className="flex items-center text-github-muted-foreground">
-                        <ChevronLeft className="w-4 h-4" />
+                        <ChevronLeftIcon className="w-4 h-4" />
                       </div>
                     </>
                   )}
@@ -95,7 +95,7 @@ export default function Leaderboard({ leaderboard, isLoading = false }: Leaderbo
                         <Tooltip>
                           <TooltipTrigger asChild>
                             <div className="flex items-center gap-1 text-github-danger-foreground">
-                              <FileDiff className="w-4 h-4" />
+                              <DiffIcon className="w-4 h-4" />
                               {entry.numberOfChangeRequests}
                             </div>
                           </TooltipTrigger>
@@ -110,7 +110,7 @@ export default function Leaderboard({ leaderboard, isLoading = false }: Leaderbo
                         <Tooltip>
                           <TooltipTrigger asChild>
                             <div className="flex items-center gap-1 text-github-success-foreground">
-                              <CheckCircle2 className="w-4 h-4" />
+                              <CheckCircleIcon className="w-4 h-4" />
                               {entry.numberOfApprovals}
                             </div>
                           </TooltipTrigger>
@@ -125,7 +125,7 @@ export default function Leaderboard({ leaderboard, isLoading = false }: Leaderbo
                         <Tooltip>
                           <TooltipTrigger asChild>
                             <div className="flex items-center gap-1 text-github-muted-foreground">
-                              <MessageSquare className="w-4 h-4" />
+                              <CommentIcon className="w-4 h-4" />
                               {entry.numberOfComments + entry.numberOfUnknowns}
                             </div>
                           </TooltipTrigger>
@@ -140,7 +140,7 @@ export default function Leaderboard({ leaderboard, isLoading = false }: Leaderbo
                         <Tooltip>
                           <TooltipTrigger asChild>
                             <div className="flex items-center gap-1 text-github-muted-foreground">
-                              <FileCode className="w-4 h-4" />
+                              <CodeIcon className="w-4 h-4" />
                               {entry.numberOfCodeComments}
                             </div>
                           </TooltipTrigger>
@@ -169,7 +169,7 @@ function ReviewsPopover({ reviewedPRs }: { reviewedPRs: PullRequestInfo[] }) {
     <Popover>
       <PopoverTrigger asChild>
         <div className="flex items-center gap-1 text-github-muted-foreground cursor-pointer hover:text-foreground">
-          <GitPullRequest className="w-4 h-4" />
+          <GitPullRequestIcon className="w-4 h-4" />
           {reviewedPRs.length}
         </div>
       </PopoverTrigger>
@@ -181,7 +181,7 @@ function ReviewsPopover({ reviewedPRs }: { reviewedPRs: PullRequestInfo[] }) {
           {limitedPRs.map((pr) => (
             <div key={pr.id} className="px-3 py-2 flex items-start gap-2 hover:bg-muted text-sm border-b last:border-0">
               <div className="pt-0.5">
-                <GitPullRequest className={`w-4 h-4 ${getPrStateColor(pr)}`} />
+                <GitPullRequestIcon className={`w-4 h-4 ${getPrStateColor(pr)}`} />
               </div>
               <div className="flex-1 flex flex-col">
                 <a 
@@ -218,7 +218,7 @@ function getPrStateColor(pr: PullRequestInfo): string {
 }
 
 // League icon based on points
-function LeagueIcon({ leaguePoints }: { leaguePoints: number }) {
+function LeagueIcon({ leaguePoints = 0 }: { leaguePoints?: number }) {
   let color = "text-zinc-500"; // Default
   
   if (leaguePoints >= 2000) {
@@ -231,7 +231,7 @@ function LeagueIcon({ leaguePoints }: { leaguePoints: number }) {
     color = "text-green-500"; // Silver
   }
   
-  return <Award className={`w-5 h-5 ${color}`} />;
+  return <TrophyIcon className={`w-5 h-5 ${color}`} />;
 }
 
 // Skeleton loading state for the leaderboard
