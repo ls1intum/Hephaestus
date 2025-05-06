@@ -5,5 +5,3 @@ dist-ssr
 *.local
 
 *storybook.log
-
-lib/api
