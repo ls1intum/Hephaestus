@@ -1,13 +1,13 @@
 <brn-collapsible>
   <section hlmCard>
     <div class="flex flex-col gap-1 pt-2 pl-6 pr-2">
-      <div class="flex justify-between items-center text-sm text-github-muted-foreground">
-        <span class="font-medium flex justify-center items-center space-x-1">
+      <div class="flex justify-between items-center text-sm text-github-muted-foreground h-10">
+        <span>
           @if (isLoading()) {
             <hlm-skeleton class="size-5 bg-green-500/30"></hlm-skeleton>
             <hlm-skeleton class="h-4 w-16 lg:w-36"></hlm-skeleton>
           } @else {
-            <a [href]="htmlUrl()">
+            <a [href]="htmlUrl()" class="font-medium flex justify-center items-center space-x-1">
               <ng-icon [name]="issueIconAndColor().icon" size="18" [class]="'mr-1 ' + issueIconAndColor().color"></ng-icon>
               {{ repositoryName() }} #{{ number() }} on {{ displayCreated().format('MMM D, HH:mm') }}
             </a>
@@ -18,7 +18,7 @@
             <hlm-skeleton class="h-4 w-16 lg:w-36"></hlm-skeleton>
             <hlm-skeleton class="size-5"></hlm-skeleton>
           } @else {
-            <span> {{ detectedString() }} </span>
+            <span class="pr-2"> {{ detectedString() }} </span>
             @if (currUserIsDashboardUser()) {
               <button hlmBtn variant="outline" size="sm" class="gap-1" (click)="this.detectBadPracticesForPr(id())">
                 @if (this.detectBadPracticesForPrMutation.isPending()) {

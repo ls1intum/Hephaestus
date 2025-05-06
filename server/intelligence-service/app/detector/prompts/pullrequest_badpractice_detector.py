@@ -47,7 +47,7 @@ GUIDELINES:
     Its important that you use backticks and not quotation marks. This rule is only used in 'Artemis' repository.
     For all other repositories this guideline should be ignored.
 12. Checkboxes under the section 'Review Progress' should be ignored until the pull request is ready to merge.
-13. If a checkbox is unchecked, please check if a justification is included afterwards. If there is one, 
+13. If a checkbox is unchecked, please check if a justification is included afterwards. If there is one,
     ignore the checkbox.
 
 BAD PRACTICE SEVERITY LEVELS:
@@ -70,7 +70,7 @@ Adjust feedback based on the PR state. The severity level should be adjusted bas
 - Open: The PR is still being worked on, but feedback is needed. Identify all relevant issues. \
     The title should be correct. The description should be filled out with motivation and description sections.
     Being Open is a bad practice, since a pull request should be in Draft or Ready for review.
-- Ready for review: The PR is now in the review stage. All issues that impact the review process should be highlighted. \
+- Ready for review: The PR is now in the review stage. All issues that impact the review process should be highlighted.\
     Title and description should be clear and concise. All sections should be filled out. \
     All guidelines should be followed.
 - Ready to merge: The PR should be in final shape. Any remaining issues are now Critical. \

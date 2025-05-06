@@ -1,5 +1,5 @@
 import { Component, computed, inject } from '@angular/core';
-import { ActivityService, PullRequestBadPractice, PullRequestWithBadPractices } from '@app/core/modules/openapi';
+import { ActivityService, PullRequestBadPractice } from '@app/core/modules/openapi';
 import { injectMutation, injectQuery, QueryClient } from '@tanstack/angular-query-experimental';
 import { combineLatest, lastValueFrom, map, timer } from 'rxjs';
 import { ActivatedRoute } from '@angular/router';
@@ -50,7 +50,7 @@ export class ActivityDashboardComponent {
   }));
 
   detectBadPracticesMutation = injectMutation(() => ({
-    mutationFn: () => lastValueFrom(this.activityService.detectBadPracticesByUser(this.userLogin!, "response")),
+    mutationFn: () => lastValueFrom(this.activityService.detectBadPracticesByUser(this.userLogin!, 'response')),
     onSuccess: () => {
       this.queryClient.invalidateQueries({ queryKey: ['activity', { id: this.userLogin }] });
     },
