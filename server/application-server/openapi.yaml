@@ -852,6 +852,9 @@ components:
         createdAt:
           type: string
           format: date-time
+        updatedAt:
+          type: string
+          format: date-time
         badPracticeSummary:
           type: string
         badPractices:
@@ -873,6 +876,7 @@ components:
       - repository
       - state
       - title
+      - updatedAt
     PullRequestBaseInfo:
       type: object
       properties:

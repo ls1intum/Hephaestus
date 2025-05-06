@@ -51,6 +51,7 @@ export class PullRequestBadPracticeCardComponent implements AfterViewInit {
   htmlUrl = input<string>();
   repositoryName = input<string>();
   createdAt = input<string>();
+  updatedAt = input<string>();
   state = input<PullRequestInfo.StateEnum>();
   isDraft = input<boolean>();
   isMerged = input<boolean>();
@@ -61,6 +62,7 @@ export class PullRequestBadPracticeCardComponent implements AfterViewInit {
   currUserIsDashboardUser = input<boolean>(false);
 
   displayCreated = computed(() => dayjs(this.createdAt()));
+  displayUpdated = computed(() => dayjs(this.updatedAt()));
   displayTitle = computed(() => formatTitle(this.title() ?? ''));
   expandEnabled = computed(() => this.badPractices()?.length !== 0);
 

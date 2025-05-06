@@ -27,6 +27,7 @@ export interface PullRequestWithBadPractices {
     deletions: number;
     htmlUrl: string;
     createdAt: string;
+    updatedAt: string;
     badPracticeSummary: string;
     badPractices: Array<PullRequestBadPractice>;
 }
