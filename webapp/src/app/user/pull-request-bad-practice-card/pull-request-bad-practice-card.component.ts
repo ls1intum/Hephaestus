@@ -12,11 +12,11 @@ import { HlmSeparatorDirective } from '@spartan-ng/ui-separator-helm';
 import { BrnCollapsibleComponent, BrnCollapsibleContentComponent, BrnCollapsibleTriggerDirective } from '@spartan-ng/brain/collapsible';
 import { HlmButtonDirective } from '@spartan-ng/ui-button-helm';
 import { GithubLabelComponent } from '@app/ui/github-label/github-label.component';
-import { formatTitle } from '@app/utils';
+import { doubleDetectionString, filterGoodAndBadPractices, formatTitle, serverErrorString, showToast } from '@app/utils';
 import { HlmSpinnerComponent } from '@spartan-ng/ui-spinner-helm';
 import { injectMutation, QueryClient } from '@tanstack/angular-query-experimental';
 import { lastValueFrom } from 'rxjs';
-import { toast } from 'ngx-sonner';
+import { HttpResponse } from '@angular/common/http';
 
 @Component({
   selector: 'app-pull-request-bad-practice-card',
@@ -64,6 +64,29 @@ export class PullRequestBadPracticeCardComponent implements AfterViewInit {
   displayTitle = computed(() => formatTitle(this.title() ?? ''));
   expandEnabled = computed(() => this.badPractices()?.length !== 0);
 
+  protected goodAndBadPractices = computed(() => filterGoodAndBadPractices(this.badPractices() ?? []));
+  protected numberOfGoodPractices = computed(() => this.goodAndBadPractices().goodPractices.length);
+  protected numberOfBadPractices = computed(() => this.goodAndBadPractices().badPractices.length);
+  protected numberOfResolvedPractices = computed(() => this.goodAndBadPractices().resolvedPractices.length);
+  protected detectedString = computed(() => {
+    if (this.numberOfBadPractices() === 0) {
+      if (this.numberOfGoodPractices() === 0) {
+        if (this.numberOfResolvedPractices() === 0) {
+          return 'Nothing detected yet';
+        }
+        return 'All bad practices resolved';
+      } else if (this.numberOfGoodPractices() === 1) {
+        return '1 good practice detected';
+      } else {
+        return `${this.numberOfGoodPractices()} good practices detected`;
+      }
+    } else if (this.numberOfBadPractices() === 1) {
+      return '1 bad practice detected';
+    } else {
+      return `${this.numberOfBadPractices()} bad practices detected`;
+    }
+  });
+
   @ViewChild(BrnCollapsibleTriggerDirective) collapsibleTrigger!: BrnCollapsibleTriggerDirective;
 
   ngAfterViewInit() {
@@ -97,33 +120,24 @@ export class PullRequestBadPracticeCardComponent implements AfterViewInit {
     return { icon, color };
   });
 
-  openBadPractices = computed(() => {
-    if (this.badPractices() == undefined) return [];
-    return this.badPractices()?.filter(
-      (badPractice) => badPractice.state != PullRequestBadPractice.StateEnum.GoodPractice && badPractice.state != PullRequestBadPractice.StateEnum.Fixed
-    );
-  });
-
   detectBadPracticesForPr = (prId: number) => {
     this.detectBadPracticesForPrMutation.mutate(prId);
   };
 
   detectBadPracticesForPrMutation = injectMutation(() => ({
-    mutationFn: (prId: number) => lastValueFrom(this.activityService.detectBadPracticesForPullRequest(prId)),
+    mutationFn: (prId: number) => lastValueFrom(this.activityService.detectBadPracticesForPullRequest(prId, 'response')),
     onSuccess: () => {
       this.queryClient.invalidateQueries({ queryKey: ['activity'] });
       if (this.collapsibleTrigger != undefined && this.collapsibleTrigger.state() === 'closed') {
         this.collapsibleTrigger.toggleCollapsible();
       }
     },
-    onError: () => {
-      this.showToast();
+    onError: (error: HttpResponse<never>) => {
+      if (error.status === 400) {
+        showToast(doubleDetectionString);
+      } else {
+        showToast(serverErrorString);
+      }
     }
   }));
-
-  showToast() {
-    toast('Something went wrong...', {
-      description: 'This pull request has not changed since the last detection. Try changing status or description, then run the detection again.'
-    });
-  }
 }

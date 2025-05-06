@@ -77,6 +77,7 @@ def detect_bad_practices(
             "title": title,
             "description": description,
             "lifecycle_state": lifecycle_state,
+            "repository_name": repository_name,
             "bad_practice_summary": bad_practice_summary,
             "bad_practices": bad_practices,
         }

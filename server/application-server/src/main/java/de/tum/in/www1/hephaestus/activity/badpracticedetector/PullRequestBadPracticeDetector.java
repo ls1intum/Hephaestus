@@ -55,7 +55,7 @@ public class PullRequestBadPracticeDetector {
             pullRequest.getUpdatedAt().isBefore(pullRequest.getLastDetectionTime())
         ) {
             logger.info("Pull request has not been updated since last detection. Skipping detection.");
-            return DetectionResult.ERROR_NO_UPDATE_ON_PULLREQUEST;
+            //return DetectionResult.ERROR_NO_UPDATE_ON_PULLREQUEST;
         }
 
         PullRequestLifecycleState lifecycleState = this.getLifecycleStateOfPullRequest(pullRequest);

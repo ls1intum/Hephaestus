@@ -44,7 +44,11 @@ GUIDELINES:
 11. The title should include the name of the module in backticks(`Module-Name`) at the start of the title.
     The Format is the following: `Module`: Title \
     Please provide only the module name in backticks and then the title of the changes in the suggestions.
-    Its important that you use backticks and not quotation marks. This rule is only used in Artemis repository.
+    Its important that you use backticks and not quotation marks. This rule is only used in 'Artemis' repository.
+    For all other repositories this guideline should be ignored.
+12. Checkboxes under the section 'Review Progress' should be ignored until the pull request is ready to merge.
+13. If a checkbox is unchecked, please check if a justification is included afterwards. If there is one, 
+    ignore the checkbox.
 
 BAD PRACTICE SEVERITY LEVELS:
 Each bad practice should be categorized into one of the following criticality levels:

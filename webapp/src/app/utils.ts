@@ -1,4 +1,7 @@
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
+import { toast } from 'ngx-sonner';
+import { PullRequestBadPractice } from '@app/core/modules/openapi';
+
 export function groupBy<T, K extends keyof any>(arr: T[], key: (i: T) => K) {
   return arr.reduce(
     (groups, item) => {
@@ -55,3 +58,35 @@ export const stateConfig = {
   WONT_FIX: { icon: 'lucideBan', text: "Won't Fix", color: 'text-github-muted-foreground' },
   WRONG: { icon: 'lucideOctagonX', text: 'Wrong', color: 'text-github-muted-foreground' }
 };
+
+export const doubleDetectionString = 'This pull request has not changed since the last detection. Try changing status or description, then run the detection again.';
+
+export const serverErrorString = 'We encountered an error while trying to detect bad practices. Please try again later.';
+
+export function showToast(message: string) {
+  toast('Something went wrong...', {
+    description: message
+  });
+}
+
+export function filterGoodAndBadPractices(allBadPractices: PullRequestBadPractice[]): {
+  goodPractices: PullRequestBadPractice[];
+  badPractices: PullRequestBadPractice[];
+  resolvedPractices: PullRequestBadPractice[];
+} {
+  const goodPractices = allBadPractices.filter((badPractice) => badPractice.state === PullRequestBadPractice.StateEnum.GoodPractice);
+  const badPractices = allBadPractices.filter(
+    (badPractice) =>
+      badPractice.state === PullRequestBadPractice.StateEnum.CriticalIssue ||
+      badPractice.state === PullRequestBadPractice.StateEnum.NormalIssue ||
+      badPractice.state === PullRequestBadPractice.StateEnum.MinorIssue
+  );
+  const resolvedPractices = allBadPractices.filter(
+    (badPractice) =>
+      badPractice.state === PullRequestBadPractice.StateEnum.Fixed ||
+      badPractice.state === PullRequestBadPractice.StateEnum.WontFix ||
+      badPractice.state === PullRequestBadPractice.StateEnum.Wrong
+  );
+
+  return { goodPractices, badPractices, resolvedPractices };
+}

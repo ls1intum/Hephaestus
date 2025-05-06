@@ -25,7 +25,7 @@ public class BadPracticeDetectorScheduler {
 
     private static final Logger logger = LoggerFactory.getLogger(BadPracticeDetectorScheduler.class);
 
-    private static final String READY_TO_REVIEW = "ready for review";
+    private static final String READY_TO_REVIEW = "ready to review";
     private static final String READY_FOR_REVIEW = "ready for review";
     private static final String READY_TO_MERGE = "ready to merge";
 
