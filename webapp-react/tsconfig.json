@@ -24,5 +24,6 @@
     "paths": {
       "@/*": ["./src/*"],
     }
-  }
+  },
+  "exclude": ["src/lib/api/**/*.ts"]
 }
