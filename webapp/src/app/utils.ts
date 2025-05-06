@@ -1,7 +1,7 @@
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 import { toast } from 'ngx-sonner';
 import { PullRequestBadPractice } from '@app/core/modules/openapi';
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 export function groupBy<T, K extends keyof any>(arr: T[], key: (i: T) => K) {
   return arr.reduce(
     (groups, item) => {
