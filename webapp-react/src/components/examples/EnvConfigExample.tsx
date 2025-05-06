@@ -1,4 +1,4 @@
-import env from "@/environment";
+import env from "@/lib/environment";
 
 /**
  * Example component showing how to use environment configuration in components

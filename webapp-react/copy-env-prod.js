@@ -4,7 +4,7 @@ import path from 'node:path';
 // Simple script to copy environment.prod.ts to environment.ts before build
 console.log('Copying environment.prod.ts to environment.ts for production build...');
 
-const srcDir = path.resolve(process.cwd(), 'src/environment');
+const srcDir = path.resolve(process.cwd(), 'src/lib/environment');
 const sourcePath = path.resolve(srcDir, 'index.prod.ts');
 const destPath = path.resolve(srcDir, 'index.ts');
 

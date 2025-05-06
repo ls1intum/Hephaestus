@@ -15,15 +15,17 @@ Our application uses a simple and direct environment configuration system that:
 ### Development Mode
 
 During development:
-- The application uses settings from `src/environments/environment.ts`
+
+- The application uses settings from `src/lib/environment/index.ts`
 - These values are suited for local development
 - No additional configuration is needed
 
 ### Production Mode
 
 In production:
-1. During build, we run `copy-env-prod.js` which copies `environment.prod.ts` to `environment.ts`
-2. The `environment.prod.ts` file contains placeholders like `WEB_ENV_APPLICATION_CLIENT_URL`
+
+1. During build, we run `copy-env-prod.js` which copies `lib/environment/index.prod.ts` to `lib/environment/index.ts`
+2. The `index.prod.ts` file contains placeholders like `WEB_ENV_APPLICATION_CLIENT_URL`
 3. At container startup, `substitute_env_variables.sh` finds and replaces all placeholders in the bundled JS files
 4. This allows us to deploy the same Docker image to different environments
 
@@ -50,7 +52,7 @@ The recommended way to use environment values is to import them directly:
 
 ```tsx
 // Import the environment directly
-import env from '@/environments/environment';
+import env from '@/lib/environment';
 
 function MyComponent() {
   // Use environment variables directly

@@ -1,4 +1,4 @@
-import { version } from '../../package.json';
+import { version } from '@/../package.json';
 // WEB_ENV_<VARIABLE_NAME> will be substituted with `substitute_env_variables.sh` on docker container start
 
 export default {
