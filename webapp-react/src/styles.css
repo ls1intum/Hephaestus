@@ -1,3 +1,7 @@
+/* GitHub Primer CSS */
+@import '@primer/primitives/dist/css/functional/themes/light.css';
+@import '@primer/primitives/dist/css/functional/themes/dark.css';
+
 @import "tailwindcss";
 
 @plugin "tailwindcss-animate";
@@ -52,6 +56,13 @@ code {
 	--sidebar-accent-foreground: oklch(0.21 0.006 285.885);
 	--sidebar-border: oklch(0.92 0.004 286.32);
 	--sidebar-ring: oklch(0.871 0.006 286.286);
+	
+	/* League colors */
+	--league-bronze: 30 58% 54%;
+	--league-silver: 0 0% 75%;
+	--league-gold: 48 97% 48%;
+	--league-diamond: 225 73% 53%;
+	--league-master: 330 100% 71;
 }
 
 .dark {
@@ -87,6 +98,13 @@ code {
 	--sidebar-accent-foreground: oklch(0.985 0 0);
 	--sidebar-border: oklch(0.274 0.006 286.033);
 	--sidebar-ring: oklch(0.442 0.017 285.786);
+	
+	/* League colors */
+	--league-bronze: 30 58% 54%;
+	--league-silver: 0 0% 75%;
+	--league-gold: 48 97% 48%;
+	--league-diamond: 225 73% 53%;
+	--league-master: 330 100% 71;
 }
 
 @theme inline {
@@ -126,6 +144,53 @@ code {
 	--color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
 	--color-sidebar-border: var(--sidebar-border);
 	--color-sidebar-ring: var(--sidebar-ring);
+	
+	/* GitHub specific colors from tailwind config */
+	--color-github-foreground: var(--fgColor-default);
+	--color-github-background: var(--bgColor-default);
+	--color-github-muted: var(--bgColor-muted);
+	--color-github-muted-foreground: var(--fgColor-muted);
+	--color-github-onemphasis: var(--bgColor-emphasis);
+	--color-github-onemphasis-foreground: var(--fgColor-onEmphasis);
+	--color-github-oninverse: var(--bgColor-inverse);
+	--color-github-oninverse-foreground: var(--fgColor-onInverse);
+	--color-github-white: var(--bgColor-white);
+	--color-github-white-foreground: var(--fgColor-white);
+	--color-github-black: var(--bgColor-black);
+	--color-github-black-foreground: var(--fgColor-black);
+	--color-github-disabled: var(--bgColor-disabled);
+	--color-github-disabled-foreground: var(--fgColor-disabled);
+	--color-github-link: var(--bgColor-link);
+	--color-github-link-foreground: var(--fgColor-link);
+	--color-github-neutral: var(--bgColor-neutral);
+	--color-github-neutral-foreground: var(--fgColor-neutral);
+	--color-github-accent: var(--bgColor-accent);
+	--color-github-accent-foreground: var(--fgColor-accent);
+	--color-github-success: var(--bgColor-success);
+	--color-github-success-foreground: var(--fgColor-success);
+	--color-github-open: var(--bgColor-open);
+	--color-github-open-foreground: var(--fgColor-open);
+	--color-github-attention: var(--bgColor-attention);
+	--color-github-attention-foreground: var(--fgColor-attention);
+	--color-github-severe: var(--bgColor-severe);
+	--color-github-severe-foreground: var(--fgColor-severe);
+	--color-github-danger: var(--bgColor-danger);
+	--color-github-danger-foreground: var(--fgColor-danger);
+	--color-github-closed: var(--bgColor-closed);
+	--color-github-closed-foreground: var(--fgColor-closed);
+	--color-github-done: var(--bgColor-done);
+	--color-github-done-foreground: var(--fgColor-done);
+	--color-github-upsell: var(--bgColor-upsell);
+	--color-github-upsell-foreground: var(--fgColor-upsell);
+	--color-github-sponsors: var(--bgColor-sponsors);
+	--color-github-sponsors-foreground: var(--fgColor-sponsors);
+	
+	/* League colors */
+	--color-league-bronze: hsl(var(--league-bronze));
+	--color-league-silver: hsl(var(--league-silver));
+	--color-league-gold: hsl(var(--league-gold));
+	--color-league-diamond: hsl(var(--league-diamond));
+	--color-league-master: hsl(var(--league-master));
 }
 
 @layer base {
@@ -135,4 +200,42 @@ code {
 	body {
 		@apply bg-background text-foreground;
 	}
+
+	code.textCode {
+		@apply bg-[color:var(--color-canvas-subtle)] tracking-tight rounded px-1 py-0.5;
+	}
+}
+
+/* Animation classes */
+.accordion-down {
+	animation: accordion-down 0.2s ease-out;
+}
+
+.accordion-up {
+	animation: accordion-up 0.2s ease-out;
+}
+
+@keyframes accordion-down {
+	from {
+		height: 0;
+	}
+	to {
+		height: var(--radix-accordion-content-height);
+	}
+}
+
+@keyframes accordion-up {
+	from {
+		height: var(--radix-accordion-content-height);
+	}
+	to {
+		height: 0;
+	}
+}
+
+/* Leaderboard fade out effect */
+.leaderboard-fade-out {
+	position: relative;
+	mask-image: linear-gradient(to bottom, rgba(0, 0, 0, 1) 60%, rgba(0, 0, 0, 0));
+	-webkit-mask-image: linear-gradient(to bottom, rgba(0, 0, 0, 1) 60%, rgba(0, 0, 0, 0));
 }

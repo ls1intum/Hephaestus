@@ -3,5 +3,7 @@
 Use the latest version of Shadcn to install new components, like this command to add a button component:
 
 ```bash
-pnpx shadcn@latest add button
+npx shadcn@latest add button
 ```
+
+Check `src/components/ui` for existing components.
