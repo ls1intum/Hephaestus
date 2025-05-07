@@ -11,10 +11,47 @@
 // Import Routes
 
 import { Route as rootRoute } from './routes/__root'
+import { Route as WorkspaceImport } from './routes/workspace'
+import { Route as TeamsImport } from './routes/teams'
+import { Route as PrivacyImport } from './routes/privacy'
+import { Route as ImprintImport } from './routes/imprint'
+import { Route as AboutImport } from './routes/about'
 import { Route as IndexImport } from './routes/index'
 import { Route as DemoTanstackQueryImport } from './routes/demo.tanstack-query'
+import { Route as UserUsernameIndexImport } from './routes/user/$username/index'
+import { Route as UserUsernameActivityImport } from './routes/user/$username/activity'
 
 // Create/Update Routes
+
+const WorkspaceRoute = WorkspaceImport.update({
+  id: '/workspace',
+  path: '/workspace',
+  getParentRoute: () => rootRoute,
+} as any)
+
+const TeamsRoute = TeamsImport.update({
+  id: '/teams',
+  path: '/teams',
+  getParentRoute: () => rootRoute,
+} as any)
+
+const PrivacyRoute = PrivacyImport.update({
+  id: '/privacy',
+  path: '/privacy',
+  getParentRoute: () => rootRoute,
+} as any)
+
+const ImprintRoute = ImprintImport.update({
+  id: '/imprint',
+  path: '/imprint',
+  getParentRoute: () => rootRoute,
+} as any)
+
+const AboutRoute = AboutImport.update({
+  id: '/about',
+  path: '/about',
+  getParentRoute: () => rootRoute,
+} as any)
 
 const IndexRoute = IndexImport.update({
   id: '/',
@@ -25,6 +62,18 @@ const IndexRoute = IndexImport.update({
 const DemoTanstackQueryRoute = DemoTanstackQueryImport.update({
   id: '/demo/tanstack-query',
   path: '/demo/tanstack-query',
+  getParentRoute: () => rootRoute,
+} as any)
+
+const UserUsernameIndexRoute = UserUsernameIndexImport.update({
+  id: '/user/$username/',
+  path: '/user/$username/',
+  getParentRoute: () => rootRoute,
+} as any)
+
+const UserUsernameActivityRoute = UserUsernameActivityImport.update({
+  id: '/user/$username/activity',
+  path: '/user/$username/activity',
   getParentRoute: () => rootRoute,
 } as any)
 
@@ -39,11 +88,60 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexImport
       parentRoute: typeof rootRoute
     }
+    '/about': {
+      id: '/about'
+      path: '/about'
+      fullPath: '/about'
+      preLoaderRoute: typeof AboutImport
+      parentRoute: typeof rootRoute
+    }
+    '/imprint': {
+      id: '/imprint'
+      path: '/imprint'
+      fullPath: '/imprint'
+      preLoaderRoute: typeof ImprintImport
+      parentRoute: typeof rootRoute
+    }
+    '/privacy': {
+      id: '/privacy'
+      path: '/privacy'
+      fullPath: '/privacy'
+      preLoaderRoute: typeof PrivacyImport
+      parentRoute: typeof rootRoute
+    }
+    '/teams': {
+      id: '/teams'
+      path: '/teams'
+      fullPath: '/teams'
+      preLoaderRoute: typeof TeamsImport
+      parentRoute: typeof rootRoute
+    }
+    '/workspace': {
+      id: '/workspace'
+      path: '/workspace'
+      fullPath: '/workspace'
+      preLoaderRoute: typeof WorkspaceImport
+      parentRoute: typeof rootRoute
+    }
     '/demo/tanstack-query': {
       id: '/demo/tanstack-query'
       path: '/demo/tanstack-query'
       fullPath: '/demo/tanstack-query'
       preLoaderRoute: typeof DemoTanstackQueryImport
+      parentRoute: typeof rootRoute
+    }
+    '/user/$username/activity': {
+      id: '/user/$username/activity'
+      path: '/user/$username/activity'
+      fullPath: '/user/$username/activity'
+      preLoaderRoute: typeof UserUsernameActivityImport
+      parentRoute: typeof rootRoute
+    }
+    '/user/$username/': {
+      id: '/user/$username/'
+      path: '/user/$username'
+      fullPath: '/user/$username'
+      preLoaderRoute: typeof UserUsernameIndexImport
       parentRoute: typeof rootRoute
     }
   }
@@ -53,37 +151,100 @@ declare module '@tanstack/react-router' {
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/about': typeof AboutRoute
+  '/imprint': typeof ImprintRoute
+  '/privacy': typeof PrivacyRoute
+  '/teams': typeof TeamsRoute
+  '/workspace': typeof WorkspaceRoute
   '/demo/tanstack-query': typeof DemoTanstackQueryRoute
+  '/user/$username/activity': typeof UserUsernameActivityRoute
+  '/user/$username': typeof UserUsernameIndexRoute
 }
 
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/about': typeof AboutRoute
+  '/imprint': typeof ImprintRoute
+  '/privacy': typeof PrivacyRoute
+  '/teams': typeof TeamsRoute
+  '/workspace': typeof WorkspaceRoute
   '/demo/tanstack-query': typeof DemoTanstackQueryRoute
+  '/user/$username/activity': typeof UserUsernameActivityRoute
+  '/user/$username': typeof UserUsernameIndexRoute
 }
 
 export interface FileRoutesById {
   __root__: typeof rootRoute
   '/': typeof IndexRoute
+  '/about': typeof AboutRoute
+  '/imprint': typeof ImprintRoute
+  '/privacy': typeof PrivacyRoute
+  '/teams': typeof TeamsRoute
+  '/workspace': typeof WorkspaceRoute
   '/demo/tanstack-query': typeof DemoTanstackQueryRoute
+  '/user/$username/activity': typeof UserUsernameActivityRoute
+  '/user/$username/': typeof UserUsernameIndexRoute
 }
 
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/demo/tanstack-query'
+  fullPaths:
+    | '/'
+    | '/about'
+    | '/imprint'
+    | '/privacy'
+    | '/teams'
+    | '/workspace'
+    | '/demo/tanstack-query'
+    | '/user/$username/activity'
+    | '/user/$username'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/demo/tanstack-query'
-  id: '__root__' | '/' | '/demo/tanstack-query'
+  to:
+    | '/'
+    | '/about'
+    | '/imprint'
+    | '/privacy'
+    | '/teams'
+    | '/workspace'
+    | '/demo/tanstack-query'
+    | '/user/$username/activity'
+    | '/user/$username'
+  id:
+    | '__root__'
+    | '/'
+    | '/about'
+    | '/imprint'
+    | '/privacy'
+    | '/teams'
+    | '/workspace'
+    | '/demo/tanstack-query'
+    | '/user/$username/activity'
+    | '/user/$username/'
   fileRoutesById: FileRoutesById
 }
 
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  AboutRoute: typeof AboutRoute
+  ImprintRoute: typeof ImprintRoute
+  PrivacyRoute: typeof PrivacyRoute
+  TeamsRoute: typeof TeamsRoute
+  WorkspaceRoute: typeof WorkspaceRoute
   DemoTanstackQueryRoute: typeof DemoTanstackQueryRoute
+  UserUsernameActivityRoute: typeof UserUsernameActivityRoute
+  UserUsernameIndexRoute: typeof UserUsernameIndexRoute
 }
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  AboutRoute: AboutRoute,
+  ImprintRoute: ImprintRoute,
+  PrivacyRoute: PrivacyRoute,
+  TeamsRoute: TeamsRoute,
+  WorkspaceRoute: WorkspaceRoute,
   DemoTanstackQueryRoute: DemoTanstackQueryRoute,
+  UserUsernameActivityRoute: UserUsernameActivityRoute,
+  UserUsernameIndexRoute: UserUsernameIndexRoute,
 }
 
 export const routeTree = rootRoute
@@ -97,14 +258,42 @@ export const routeTree = rootRoute
       "filePath": "__root.tsx",
       "children": [
         "/",
-        "/demo/tanstack-query"
+        "/about",
+        "/imprint",
+        "/privacy",
+        "/teams",
+        "/workspace",
+        "/demo/tanstack-query",
+        "/user/$username/activity",
+        "/user/$username/"
       ]
     },
     "/": {
       "filePath": "index.tsx"
     },
+    "/about": {
+      "filePath": "about.tsx"
+    },
+    "/imprint": {
+      "filePath": "imprint.tsx"
+    },
+    "/privacy": {
+      "filePath": "privacy.tsx"
+    },
+    "/teams": {
+      "filePath": "teams.tsx"
+    },
+    "/workspace": {
+      "filePath": "workspace.tsx"
+    },
     "/demo/tanstack-query": {
       "filePath": "demo.tanstack-query.tsx"
+    },
+    "/user/$username/activity": {
+      "filePath": "user/$username/activity.tsx"
+    },
+    "/user/$username/": {
+      "filePath": "user/$username/index.tsx"
     }
   }
 }
