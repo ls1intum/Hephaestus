@@ -30,6 +30,7 @@ export interface PullRequestWithBadPractices {
     updatedAt: string;
     badPracticeSummary: string;
     badPractices: Array<PullRequestBadPractice>;
+    oldBadPractices: Array<PullRequestBadPractice>;
 }
 export namespace PullRequestWithBadPractices {
     export type StateEnum = 'OPEN' | 'CLOSED';

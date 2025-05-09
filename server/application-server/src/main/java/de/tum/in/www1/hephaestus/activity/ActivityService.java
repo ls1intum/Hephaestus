@@ -12,7 +12,6 @@ import de.tum.in.www1.hephaestus.gitprovider.pullrequest.PullRequestRepository;
 import java.time.OffsetDateTime;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
 import org.slf4j.Logger;
@@ -37,6 +36,9 @@ public class ActivityService {
     private BadPracticeFeedbackRepository badPracticeFeedbackRepository;
 
     @Autowired
+    private BadPracticeDetectionRepository badPracticeDetectionRepository;
+
+    @Autowired
     private PullRequestBadPracticeDetector pullRequestBadPracticeDetector;
 
     @Value("${hephaestus.detection.tracing.enabled}")
@@ -59,28 +61,27 @@ public class ActivityService {
             Set.of(Issue.State.OPEN)
         );
 
-        List<PullRequestBadPractice> openPulLRequestBadPractices =
-            pullRequestBadPracticeRepository.findAssignedByLoginAndOpen(login);
-
-        Map<PullRequest, List<PullRequestBadPracticeDTO>> pullRequestBadPracticesMap = openPulLRequestBadPractices
-            .stream()
-            .collect(
-                Collectors.groupingBy(
-                    PullRequestBadPractice::getPullrequest,
-                    Collectors.collectingAndThen(Collectors.toList(), list ->
-                        list.stream().map(PullRequestBadPracticeDTO::fromPullRequestBadPractice).toList()
-                    )
-                )
-            );
-
         List<PullRequestWithBadPracticesDTO> openPullRequestsWithBadPractices = pullRequests
             .stream()
-            .map(pullRequest ->
-                PullRequestWithBadPracticesDTO.fromPullRequest(
-                    pullRequest,
-                    pullRequestBadPracticesMap.getOrDefault(pullRequest, List.of())
-                )
-            )
+            .map(pullRequest -> {
+                List<PullRequestBadPracticeDTO> badPractices = badPracticeDetectionRepository
+                    .findMostRecentByPullRequestId(pullRequest.getId())
+                    .getBadPractices()
+                    .stream()
+                    .map(PullRequestBadPracticeDTO::fromPullRequestBadPractice)
+                    .toList();
+
+                List<String> badPracticeTitles = badPractices.stream().map(PullRequestBadPracticeDTO::title).toList();
+
+                List<PullRequestBadPracticeDTO> oldBadPractices = pullRequestBadPracticeRepository
+                    .findByPullRequestId(pullRequest.getId())
+                    .stream()
+                    .filter(badPractice -> !badPracticeTitles.contains(badPractice.getTitle()))
+                    .map(PullRequestBadPracticeDTO::fromPullRequestBadPractice)
+                    .toList();
+
+                return PullRequestWithBadPracticesDTO.fromPullRequest(pullRequest, badPractices, oldBadPractices);
+            })
             .collect(Collectors.toList());
 
         return new ActivityDTO(openPullRequestsWithBadPractices);
