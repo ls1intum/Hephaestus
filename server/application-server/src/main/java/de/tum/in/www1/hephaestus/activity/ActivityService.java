@@ -9,6 +9,7 @@ import de.tum.in.www1.hephaestus.activity.model.*;
 import de.tum.in.www1.hephaestus.gitprovider.issue.Issue;
 import de.tum.in.www1.hephaestus.gitprovider.pullrequest.PullRequest;
 import de.tum.in.www1.hephaestus.gitprovider.pullrequest.PullRequestRepository;
+import jakarta.transaction.Transactional;
 import java.time.OffsetDateTime;
 import java.util.ArrayList;
 import java.util.List;
@@ -53,6 +54,7 @@ public class ActivityService {
     @Value("${hephaestus.detection.tracing.secret-key}")
     private String tracingSecretKey;
 
+    @Transactional
     public ActivityDTO getActivity(String login) {
         logger.info("Getting activity for user with login: {}", login);
 
@@ -64,12 +66,17 @@ public class ActivityService {
         List<PullRequestWithBadPracticesDTO> openPullRequestsWithBadPractices = pullRequests
             .stream()
             .map(pullRequest -> {
-                List<PullRequestBadPracticeDTO> badPractices = badPracticeDetectionRepository
-                    .findMostRecentByPullRequestId(pullRequest.getId())
-                    .getBadPractices()
-                    .stream()
-                    .map(PullRequestBadPracticeDTO::fromPullRequestBadPractice)
-                    .toList();
+                BadPracticeDetection lastDetection = badPracticeDetectionRepository.findMostRecentByPullRequestId(
+                    pullRequest.getId()
+                );
+
+                List<PullRequestBadPracticeDTO> badPractices = lastDetection == null
+                    ? List.of()
+                    : lastDetection
+                        .getBadPractices()
+                        .stream()
+                        .map(PullRequestBadPracticeDTO::fromPullRequestBadPractice)
+                        .toList();
 
                 List<String> badPracticeTitles = badPractices.stream().map(PullRequestBadPracticeDTO::title).toList();
 
@@ -87,6 +94,7 @@ public class ActivityService {
         return new ActivityDTO(openPullRequestsWithBadPractices);
     }
 
+    @Transactional
     public DetectionResult detectBadPracticesForUser(String login) {
         logger.info("Detecting bad practices for user with login: {}", login);
 
@@ -110,6 +118,7 @@ public class ActivityService {
         }
     }
 
+    @Transactional
     public DetectionResult detectBadPracticesForPullRequest(PullRequest pullRequest) {
         logger.info("Detecting bad practices for PR: {}", pullRequest.getId());
 
@@ -150,7 +159,10 @@ public class ActivityService {
             CreateScoreRequest request = CreateScoreRequest.builder()
                 .traceId(badPractice.getDetectionTraceId())
                 .name("user_feedback")
-                .value(CreateScoreValue.of(feedback.explanation()))
+                .value(CreateScoreValue.of(feedback.type()))
+                .comment(
+                    String.format("Bad practice: %s - Feedback: %s", badPractice.getTitle(), feedback.explanation())
+                )
                 .build();
 
             CreateScoreResponse response = client.score().create(request);

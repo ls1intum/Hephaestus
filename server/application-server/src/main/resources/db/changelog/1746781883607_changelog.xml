@@ -6,7 +6,7 @@
                 <constraints nullable="false" primaryKey="true" primaryKeyName="bad_practice_detectionPK"/>
             </column>
             <column name="detection_time" type="TIMESTAMP(6) WITH TIME ZONE"/>
-            <column name="summary" type="VARCHAR(255)"/>
+            <column name="summary" type="oid"/>
             <column name="trace_id" type="VARCHAR(255)"/>
             <column name="pullrequest_id" type="BIGINT"/>
         </createTable>

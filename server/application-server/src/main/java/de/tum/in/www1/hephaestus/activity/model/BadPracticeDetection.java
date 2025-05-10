@@ -24,6 +24,7 @@ public class BadPracticeDetection {
     private PullRequest pullRequest;
 
     @NonNull
+    @Lob
     private String summary;
 
     @NonNull
