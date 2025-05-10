@@ -1,6 +1,6 @@
 import type { Meta, StoryObj } from "@storybook/react";
 import Leaderboard from "./Leaderboard";
-import { type PullRequestInfo } from '@/lib/api/models';
+import { type PullRequestInfo } from '../api/types.gen';
 
 // Helper function to create sample pull requests
 const samplePullRequests = (count: number): PullRequestInfo[] => {

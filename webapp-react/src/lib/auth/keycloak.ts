@@ -1,5 +1,4 @@
 import Keycloak from 'keycloak-js';
-import type { KeycloakLoginOptions } from 'keycloak-js';
 import environment from '../environment';
 
 export interface UserProfile {
@@ -16,7 +15,7 @@ export interface UserProfile {
 }
 
 class KeycloakService {
-  private _keycloak: Keycloak | undefined;
+  _keycloak: Keycloak | undefined;
   profile: UserProfile | undefined;
   
   get keycloak(): Keycloak {
@@ -24,7 +23,7 @@ class KeycloakService {
       this._keycloak = new Keycloak({
         url: environment.keycloak.url,
         realm: environment.keycloak.realm,
-        clientId: environment.keycloak.clientId,
+        clientId: environment.keycloak.clientId
       });
     }
     return this._keycloak;
@@ -32,41 +31,34 @@ class KeycloakService {
 
   async init(): Promise<boolean> {
     try {
-      // Match exactly the Angular implementation's init options
+      console.log('Initializing Keycloak...');
+      // Using exact configuration from Angular implementation
       const authenticated = await this.keycloak.init({
         onLoad: 'check-sso',
         silentCheckSsoRedirectUri: window.location.origin + '/silent-check-sso.html',
-        silentCheckSsoFallback: false,
-        checkLoginIframe: false // Disable login iframe check to avoid CORS issues
+        silentCheckSsoFallback: false
       });
 
+      console.log('Keycloak initialization result:', authenticated);
+
       if (!authenticated) {
+        console.log('User is not authenticated');
         return authenticated;
       }
       
-      try {
-        // Load user profile similar to Angular implementation
-        this.profile = await this.keycloak.loadUserInfo() as unknown as UserProfile;
-        if (this.profile) {
-          this.profile.token = this.keycloak.token || '';
-          this.profile.roles = this.keycloak.realmAccess?.roles || [];
-        }
-      } catch (error) {
-        console.warn('Failed to load user info, but continuing', error);
-        // Create a minimal profile if loadUserInfo fails
-        this.profile = {
-          email: '',
-          email_verified: false,
-          given_name: '',
-          family_name: '',
-          name: '',
-          preferred_username: this.keycloak.tokenParsed?.preferred_username || '',
-          realmAccess: { roles: this.keycloak.realmAccess?.roles || [] },
-          roles: this.keycloak.realmAccess?.roles || [],
-          sub: this.keycloak.tokenParsed?.sub || '',
-          token: this.keycloak.token || ''
-        };
-      }
+      console.log('User is authenticated. Loading profile...');
+      // Load user profile - exactly like Angular
+      this.profile = await this.keycloak.loadUserInfo() as unknown as UserProfile;
+      this.profile.token = this.keycloak.token || '';
+      this.profile.roles = this.keycloak.realmAccess?.roles || [];
+      
+      console.log('User profile loaded:', {
+        username: this.profile.preferred_username,
+        roles: this.profile.roles,
+        tokenExpiry: this.keycloak.tokenParsed?.exp 
+          ? new Date(this.keycloak.tokenParsed.exp * 1000).toISOString()
+          : 'unknown'
+      });
 
       return true;
     } catch (error) {
@@ -75,45 +67,40 @@ class KeycloakService {
     }
   }
 
-  async updateToken(minValidity = 60): Promise<boolean> {
+  async updateToken(): Promise<boolean> {
+    if (!this.keycloak.isTokenExpired(60)) {
+      return false;
+    }
+    
     try {
-      if (!this.keycloak.isTokenExpired(minValidity)) {
-        return false;
-      }
-      
-      // Try to refresh token
-      const refreshed = await this.keycloak.updateToken(minValidity);
+      // Try to refresh token - exactly like Angular
+      const refreshed = await this.keycloak.updateToken(60);
       if (refreshed && this.profile) {
         this.profile.token = this.keycloak.token || '';
       }
       return refreshed;
     } catch (error) {
       console.error('Failed to refresh token:', error);
+      // Redirect to login if refresh fails
+      await this.keycloak.login();
       return false;
     }
   }
 
-  login(options?: KeycloakLoginOptions): Promise<void> {
-    // Ensure redirectUri is explicitly set to match what's registered in Keycloak
-    const loginOptions: KeycloakLoginOptions = {
-      redirectUri: environment.clientUrl,
-      ...options
-    };
-    
-    // Add idpHint if skipLoginPage is enabled
-    if (environment.keycloak.skipLoginPage) {
-      loginOptions.idpHint = 'github';
-    }
-      
-    return this.keycloak.login(loginOptions);
+  login(): Promise<void> {
+    // Using exact implementation from Angular
+    return this.keycloak.login();
   }
 
   logout(): Promise<void> {
+    // Using exact implementation from Angular
     return this.keycloak.logout({ redirectUri: environment.clientUrl });
   }
 
   isAuthenticated(): boolean {
-    return !!this.keycloak.authenticated;
+    const authenticated = !!this.keycloak.authenticated;
+    console.log('isAuthenticated check:', authenticated, 'Token exists:', !!this.keycloak.token);
+    return authenticated;
   }
 
   getToken(): string | undefined {
@@ -121,11 +108,11 @@ class KeycloakService {
   }
 
   getUsername(): string | undefined {
-    return this.profile?.preferred_username ?? this.keycloak.tokenParsed?.preferred_username;
+    return this.profile?.preferred_username;
   }
   
   getUserRoles(): string[] {
-    return this.profile?.roles || this.keycloak.realmAccess?.roles || [];
+    return this.profile?.roles || [];
   }
 
   hasRole(role: string): boolean {

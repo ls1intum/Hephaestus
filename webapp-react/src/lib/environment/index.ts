@@ -1,6 +1,6 @@
 export default {
   version: 'DEV',
-  clientUrl: 'http://localhost:3000',
+  clientUrl: 'http://localhost:4200',
   serverUrl: 'http://localhost:8080',
   sentry: {
     environment: 'local',
@@ -9,7 +9,7 @@ export default {
   keycloak: {
     url: 'http://localhost:8081',
     realm: 'hephaestus',
-    clientId: 'hephaestus-react',
+    clientId: 'hephaestus',
     skipLoginPage: true // If true, it will directly use github IDP for login
   },
   posthog: {

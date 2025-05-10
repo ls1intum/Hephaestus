@@ -1,4 +1,4 @@
-import type { LeaderboardEntry, PullRequestInfo } from '@/lib/api/models';
+import type { LeaderboardEntry, PullRequestInfo } from '../api/types.gen';
 import { 
   TrophyIcon,
   CheckCircleIcon,

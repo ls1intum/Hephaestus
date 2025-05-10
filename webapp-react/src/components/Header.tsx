@@ -1,7 +1,8 @@
 import { Link, useNavigate } from "@tanstack/react-router";
 import { Button } from "@/components/ui/button";
-import { Hammer } from "lucide-react";
+import { Hammer, RefreshCw } from "lucide-react";
 import { useAuth } from "../lib/auth/AuthContext";
+import { useEffect } from "react";
 
 // We'll remove the User interface from here since we don't use it in this component
 // and instead use the one from AuthContext if needed in the future
@@ -14,7 +15,20 @@ export default function Header({
   version = "v0.6.1",
 }: HeaderProps = {}) {
   const navigate = useNavigate();
-  const { isAuthenticated, isLoading, username, login, logout } = useAuth();
+  const { isAuthenticated, isLoading, username, login, logout, checkAuthState } = useAuth();
+
+  // Check auth state on component mount
+  useEffect(() => {
+    const handleAuthCallback = () => {
+      // Check if we're returning from Keycloak auth
+      if (window.location.hash?.includes('state=')) {
+        console.log('Header: Detected auth callback, checking state');
+        setTimeout(checkAuthState, 500);
+      }
+    };
+    
+    handleAuthCallback();
+  }, [checkAuthState]);
 
   const navigateToUserActivity = (username: string) => {
     navigate({ to: '/user/$username/activity', params: { username } });
@@ -56,6 +70,16 @@ export default function Header({
       </div>
       
       <div className="flex items-center gap-2">
+        <Button 
+          variant="ghost" 
+          size="icon"
+          onClick={checkAuthState}
+          title="Sync auth state"
+          className="text-muted-foreground"
+        >
+          <RefreshCw size={16} />
+        </Button>
+
         {!isAuthenticated ? (
           <Button onClick={() => login()} disabled={isLoading}>
             {isLoading ? "Loading..." : "Sign In"}

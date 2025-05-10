@@ -1,31 +1,35 @@
-import { Configuration } from '../../api/runtime';
-import environment from '../environment';
-import { authMiddleware } from './apiAuthMiddleware';
+import { client } from '../../api/client.gen';
+import keycloakService from './keycloak';
 
 /**
- * Creates a configuration object for API clients that includes authentication
- * middleware and other necessary settings
+ * Adds authentication headers to the API client
+ * 
+ * @returns A function that returns the authorization header with the current token
  */
-export function configureApi(): Configuration {
-  return new Configuration({
-    basePath: environment.serverUrl,
-    middleware: [authMiddleware],
-  });
+export function getAuthHeader(): () => string {
+  return () => {
+    const token = keycloakService.getToken();
+    return token ? `Bearer ${token}` : '';
+  };
 }
 
 /**
- * Use this function to configure any API client with authentication
- * This allows you to use the generated API clients with authentication
- * without modifying the generated code
+ * Creates a configured client with auth headers
  * 
- * Example:
- * ```
- * import { UsersApi } from '../api/apis';
- * import { withAuth } from './configureApi';
- * 
- * const usersApi = withAuth(new UsersApi());
- * ```
+ * This is a wrapper for the Hey API client to use in components
  */
-export function withAuth<T extends { withMiddleware: Function }>(apiClient: T): T {
-  return apiClient.withMiddleware(authMiddleware) as T;
+export function createAuthenticatedClient() {
+  // Configure the authorization header function
+  client.setConfig({
+    auth: getAuthHeader()
+  });
+  
+  return client;
+}
+
+/**
+ * Helper function to get a client that will automatically include auth tokens
+ */
+export function useApiClient() {
+  return client;
 }

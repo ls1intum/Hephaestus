@@ -10,6 +10,16 @@ import { routeTree } from "./routeTree.gen";
 import "./styles.css";
 import reportWebVitals from "./reportWebVitals.ts";
 
+// Import authentication provider
+import { AuthProvider } from "./lib/auth/AuthContext";
+
+// Import API client initialization
+import { initializeApiClient } from "./api/init";
+
+// Initialize the API client with base URL only
+// Auth setup will happen in the AuthProvider
+initializeApiClient();
+
 // Create a new router instance
 const router = createRouter({
 	routeTree,
@@ -36,7 +46,9 @@ if (rootElement && !rootElement.innerHTML) {
 	root.render(
 		<StrictMode>
 			<TanstackQuery.Provider>
-				<RouterProvider router={router} />
+				<AuthProvider>
+					<RouterProvider router={router} />
+				</AuthProvider>
 			</TanstackQuery.Provider>
 		</StrictMode>,
 	);

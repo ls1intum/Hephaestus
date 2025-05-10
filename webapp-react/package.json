@@ -4,8 +4,8 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "vite --port 3000",
-    "start": "vite --port 3000",
+    "dev": "vite --port 4200",
+    "start": "vite --port 4200",
     "build": "vite build && tsc",
     "build:prod": "node copy-env-prod.js && vite build && tsc",
     "serve": "vite preview",

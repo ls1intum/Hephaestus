@@ -15,7 +15,7 @@ import {
   AccordionItem,
   AccordionTrigger,
 } from "@/components/ui/accordion";
-import type { LeaderboardEntry, PullRequestInfo } from '@/lib/api/models';
+import type { LeaderboardEntry, PullRequestInfo } from '../api/types.gen';
 import Leaderboard from '@/components/Leaderboard';
 
 export const Route = createFileRoute("/")({
