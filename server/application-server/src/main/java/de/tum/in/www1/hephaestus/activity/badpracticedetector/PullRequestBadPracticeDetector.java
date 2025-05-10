@@ -9,7 +9,6 @@ import de.tum.in.www1.hephaestus.gitprovider.pullrequest.PullRequestRepository;
 import de.tum.in.www1.hephaestus.intelligenceservice.model.BadPractice;
 import de.tum.in.www1.hephaestus.intelligenceservice.model.DetectorRequest;
 import de.tum.in.www1.hephaestus.intelligenceservice.model.DetectorResponse;
-
 import java.time.OffsetDateTime;
 import java.util.List;
 import org.slf4j.Logger;
@@ -134,10 +133,9 @@ public class PullRequestBadPracticeDetector {
         badPracticeDetection.setDetectionTime(OffsetDateTime.now());
         badPracticeDetection.setTraceId(detectorResponse.getTraceId());
 
-        detectedBadPractices
-            .forEach(badPractice -> {
-                badPractice.setBadPracticeDetection(badPracticeDetection);
-            });
+        detectedBadPractices.forEach(badPractice -> {
+            badPractice.setBadPracticeDetection(badPracticeDetection);
+        });
 
         return badPracticeDetectionRepository.save(badPracticeDetection);
     }
