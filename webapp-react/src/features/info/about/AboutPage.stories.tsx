@@ -1,7 +1,7 @@
 import type { Meta, StoryObj } from '@storybook/react';
 import { AboutPage } from './AboutPage';
 
-// Mock data for the story
+// Mock data for the stories
 const mockContributors = [
   {
     id: 1,
@@ -23,13 +23,6 @@ const mockContributors = [
   }
 ];
 
-const mockProjectManager = {
-  id: 5898705,
-  login: 'felixdietrich',
-  avatarUrl: 'https://i.pravatar.cc/150?img=4',
-  htmlUrl: 'https://github.com/felixdietrich'
-};
-
 const meta: Meta<typeof AboutPage> = {
   title: 'Info/AboutPage',
   component: AboutPage,
@@ -42,25 +35,22 @@ export const Default: Story = {
   args: {
     isPending: false,
     isError: false,
-    projectManager: mockProjectManager,
-    otherContributors: mockContributors
+    otherContributors: mockContributors,
   }
 };
 
-export const Loading: Story = {
+export const IsLoading: Story = {
   args: {
     isPending: true,
     isError: false,
-    projectManager: undefined,
-    otherContributors: []
-  }
+    otherContributors: [],
+  },
 };
 
-export const Error: Story = {
+export const IsError: Story = {
   args: {
     isPending: false,
     isError: true,
-    projectManager: undefined,
-    otherContributors: []
-  }
+    otherContributors: [],
+  },
 };
