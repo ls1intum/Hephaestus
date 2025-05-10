@@ -1,5 +1,4 @@
 import { RouterProvider, createRouter } from "@tanstack/react-router";
-import { StrictMode } from "react";
 import ReactDOM from "react-dom/client";
 
 import * as TanstackQuery from "./integrations/tanstack-query/root-provider";
@@ -44,13 +43,12 @@ const rootElement = document.getElementById("app");
 if (rootElement && !rootElement.innerHTML) {
 	const root = ReactDOM.createRoot(rootElement);
 	root.render(
-		<StrictMode>
-			<TanstackQuery.Provider>
-				<AuthProvider>
-					<RouterProvider router={router} />
-				</AuthProvider>
-			</TanstackQuery.Provider>
-		</StrictMode>,
+		// Removed StrictMode wrapper to prevent double rendering in development
+		<TanstackQuery.Provider>
+			<AuthProvider>
+				<RouterProvider router={router} />
+			</AuthProvider>
+		</TanstackQuery.Provider>
 	);
 }
 

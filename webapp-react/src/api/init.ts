@@ -1,39 +1,34 @@
 import { client } from './client.gen';
 import environment from '../lib/environment';
-import keycloakService from '../lib/auth/keycloak';
+import { setupAuthFunction, setupTokenRefresh } from '../lib/auth/hey-api-auth';
 
 /**
- * Initializes the Hey API client with base URL and authentication
+ * Initialize the API client with base configuration
+ * Note: Authentication is handled separately in lib/auth/hey-api-auth.ts
  */
-export function initializeApiClient() {
-  // Configure the client with the base URL
-  client.setConfig({
-    baseUrl: environment.serverUrl,
-    // Add authentication through config instead of interceptors
-    auth: () => {
-      const token = keycloakService.getToken();
-      return token ? `Bearer ${token}` : '';
-    }
-  });
+export function initApiClient() {
+  console.log('Initializing API client with base URL:', environment.serverUrl);
   
+  // Set base URL for API requests
+  client.setConfig({
+    baseUrl: environment.serverUrl
+  });
+
+  // Add custom request interceptors
+  client.interceptors.request.use(request => {
+    console.log(`API request to ${request.url}`);
+    return request;
+  });
+
+  // Initialize auth functions
+  setupAuthFunction();
+  setupTokenRefresh();
+
   return client;
 }
 
-/**
- * Setup a pre-request handler that refreshes the token if needed
- */
-export function setupTokenRefresh() {
-  client.interceptors.request.use(async (request) => {
-    try {
-      // Only try to refresh if we're authenticated
-      if (keycloakService.isAuthenticated()) {
-        await keycloakService.updateToken();
-      }
-    } catch (error) {
-      console.error('Token refresh error:', error);
-    }
-    
-    // Return the unchanged request - authentication headers will be added by config.auth
-    return request;
-  });
-}
+// Add alias export to match the import in main.tsx
+export const initializeApiClient = initApiClient;
+
+// Remove automatic initialization
+// initApiClient(); - This was causing double initialization
