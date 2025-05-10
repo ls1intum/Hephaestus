@@ -11,6 +11,8 @@ import de.tum.in.www1.hephaestus.intelligenceservice.model.DetectorRequest;
 import de.tum.in.www1.hephaestus.intelligenceservice.model.DetectorResponse;
 import java.time.OffsetDateTime;
 import java.util.List;
+
+import jakarta.transaction.Transactional;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -44,6 +46,7 @@ public class PullRequestBadPracticeDetector {
      * @param pullRequest The pull request to detect bad practices for.
      * @return The detection result.
      */
+    @Transactional
     public DetectionResult detectAndSyncBadPractices(PullRequest pullRequest) {
         logger.info("Detecting bad practices for pull request: {}", pullRequest.getId());
 
@@ -53,7 +56,7 @@ public class PullRequestBadPracticeDetector {
             pullRequest.getUpdatedAt().isBefore(pullRequest.getLastDetectionTime())
         ) {
             logger.info("Pull request has not been updated since last detection. Skipping detection.");
-            //return DetectionResult.ERROR_NO_UPDATE_ON_PULLREQUEST;
+            return DetectionResult.ERROR_NO_UPDATE_ON_PULLREQUEST;
         }
 
         BadPracticeDetection detection = detectBadPracticesForPullRequest(pullRequest);
@@ -71,6 +74,7 @@ public class PullRequestBadPracticeDetector {
      * @param pullRequest The pull request to detect bad practices for.
      * @return The detection result.
      */
+    @Transactional
     public BadPracticeDetection detectBadPracticesForPullRequest(PullRequest pullRequest) {
         BadPracticeDetection lastDetection = badPracticeDetectionRepository.findMostRecentByPullRequestId(
             pullRequest.getId()
