@@ -14,9 +14,11 @@
     "lint": "biome lint",
     "check": "biome check",
     "storybook": "storybook dev -p 6006",
-    "build-storybook": "storybook build"
+    "build-storybook": "storybook build",
+    "openapi-ts": "openapi-ts"
   },
   "dependencies": {
+    "@hey-api/client-fetch": "^0.10.0",
     "@primer/octicons-react": "^19.15.1",
     "@primer/primitives": "^10.6.0",
     "@radix-ui/react-accordion": "^1.2.10",
@@ -56,6 +58,7 @@
   "devDependencies": {
     "@biomejs/biome": "1.9.4",
     "@chromatic-com/storybook": "^3.2.6",
+    "@hey-api/openapi-ts": "^0.67.3",
     "@storybook/addon-essentials": "^8.6.12",
     "@storybook/addon-onboarding": "^8.6.12",
     "@storybook/addon-themes": "^8.6.12",
