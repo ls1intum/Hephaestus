@@ -1,7 +1,7 @@
 import { createFileRoute, Outlet } from '@tanstack/react-router';
 import { useAuth } from '@/lib/auth/AuthContext';
-import { LandingPage } from '@/features/landing/LandingPage';
 import { Spinner } from '@/components/ui/spinner';
+import { LandingPageContainer } from '@/features/landing/LandingPageContainer';
 
 // This route will be a parent for all routes that require authentication
 export const Route = createFileRoute('/_authenticated')({
@@ -9,7 +9,7 @@ export const Route = createFileRoute('/_authenticated')({
 });
 
 function AuthenticatedLayout() {
-  const { isAuthenticated, isLoading, login } = useAuth();
+  const { isAuthenticated, isLoading } = useAuth();
 
   // Show loading state if still initializing authentication
   if (isLoading) {
@@ -22,7 +22,7 @@ function AuthenticatedLayout() {
 
   // Show landing page instead of login for unauthenticated users
   if (!isAuthenticated) {
-    return <LandingPage onSignIn={() => login()} />;
+    return <LandingPageContainer />;
   }
 
   // User is authenticated, render the child routes
