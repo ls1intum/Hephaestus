@@ -3,21 +3,24 @@ import ReactDOM from "react-dom/client";
 
 import * as TanstackQuery from "./integrations/tanstack-query/root-provider";
 
-// Import the generated route tree
 import { routeTree } from "./routeTree.gen";
+import { client } from '@/api/client.gen';
 
 import "./styles.css";
 import reportWebVitals from "./reportWebVitals.ts";
 
-// Import authentication provider
 import { AuthProvider } from "./lib/auth/AuthContext";
+import environment from "./lib/environment/index.ts";
+import keycloakService from "./lib/auth/keycloak.ts";
 
-// Import API client initialization
-import { initializeApiClient } from "./api/init";
+client.setConfig({
+  baseUrl: environment.serverUrl,
+});
 
-// Initialize the API client with base URL only
-// Auth setup will happen in the AuthProvider
-initializeApiClient();
+client.interceptors.request.use((request) => {
+  request.headers.set('Authorization', `Bearer ${keycloakService.getToken()}`); 
+  return request;
+});
 
 // Create a new router instance
 const router = createRouter({

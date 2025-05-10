@@ -1,7 +1,7 @@
 import { createContext, useContext, useEffect, useState, useCallback, useRef } from 'react';
 import type { ReactNode } from 'react';
 import keycloakService from './keycloak';
-import { setupAuthFunction, setupTokenRefresh, resetAuthConfig } from './hey-api-auth';
+import type { UserProfile } from './keycloak';
 
 // Create a global state to prevent multiple initializations across remounts
 // This helps with React StrictMode double-rendering and hot module reloading
@@ -15,10 +15,16 @@ interface AuthContextType {
   isLoading: boolean;
   username: string | undefined;
   userRoles: string[];
+  userProfile: UserProfile | undefined;
   login: () => Promise<void>;
   logout: () => Promise<void>;
   hasRole: (role: string) => boolean;
   checkAuthState: () => void;
+  isCurrentUser: (login?: string) => boolean;
+  getUserId: () => string | undefined;
+  getUserGithubId: () => string | undefined;
+  getUserGithubProfilePictureUrl: () => string;
+  getUserGithubProfileUrl: () => string;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -40,6 +46,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
   const [isLoading, setIsLoading] = useState(true);
   const [username, setUsername] = useState<string | undefined>(undefined);
   const [userRoles, setUserRoles] = useState<string[]>([]);
+  const [userProfile, setUserProfile] = useState<UserProfile | undefined>(undefined);
   const initRef = useRef(globalState.initialized);
   const authCallbackRef = useRef(globalState.authCallbackProcessed);
   
@@ -56,12 +63,18 @@ export function AuthProvider({ children }: AuthProviderProps) {
     if (authenticated) {
       const userName = keycloakService.getUsername();
       const roles = keycloakService.getUserRoles();
+      const profile = keycloakService.getUserProfile();
+      
+      console.log('Setting username:', userName);
+      console.log('Setting roles:', roles);
       
       setUsername(userName);
       setUserRoles(roles);
+      setUserProfile(profile);
     } else {
       setUsername(undefined);
       setUserRoles([]);
+      setUserProfile(undefined);
     }
   }, [isLoading]);
 
@@ -99,25 +112,20 @@ export function AuthProvider({ children }: AuthProviderProps) {
         // First, clean URL from any potential auth parameters to prevent loops
         cleanUrlFromAuthParams();
         
-        console.log('AuthProvider: Setting up API auth...');
-        // Set up API client authentication first
-        setupAuthFunction();
-        
         console.log('AuthProvider: Initializing Keycloak...');
         // Initialize Keycloak
         const authenticated = await keycloakService.init();
         console.log('AuthProvider: Keycloak init result:', authenticated);
         
-        // Only setup token refresh after successful initialization
         if (authenticated) {
-          setupTokenRefresh();
-          
           const userName = keycloakService.getUsername();
           const roles = keycloakService.getUserRoles();
+          const profile = keycloakService.getUserProfile();
           
           console.log('AuthProvider: Setting authenticated user:', userName);
           setUsername(userName);
           setUserRoles(roles);
+          setUserProfile(profile);
         }
         
         setIsAuthenticated(authenticated);
@@ -190,9 +198,6 @@ export function AuthProvider({ children }: AuthProviderProps) {
     authCallbackRef.current = false;
     globalState.authCallbackProcessed = false;
     
-    // Reset API auth configuration
-    resetAuthConfig();
-    
     await keycloakService.logout();
   };
 
@@ -200,15 +205,41 @@ export function AuthProvider({ children }: AuthProviderProps) {
     return keycloakService.hasRole(role);
   };
 
+  const isCurrentUser = (login?: string) => {
+    return keycloakService.isCurrentUser(login);
+  };
+
+  const getUserId = () => {
+    return keycloakService.getUserId();
+  };
+
+  const getUserGithubId = () => {
+    return keycloakService.getUserGithubId();
+  };
+
+  const getUserGithubProfilePictureUrl = () => {
+    return keycloakService.getUserGithubProfilePictureUrl();
+  };
+
+  const getUserGithubProfileUrl = () => {
+    return keycloakService.getUserGithubProfileUrl();
+  };
+
   const value = {
     isAuthenticated,
     isLoading,
     username,
     userRoles,
+    userProfile,
     login,
     logout,
     hasRole,
-    checkAuthState
+    checkAuthState,
+    isCurrentUser,
+    getUserId,
+    getUserGithubId,
+    getUserGithubProfilePictureUrl,
+    getUserGithubProfileUrl
   };
 
   return (

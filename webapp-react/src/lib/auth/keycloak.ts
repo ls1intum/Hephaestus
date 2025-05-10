@@ -12,11 +12,14 @@ export interface UserProfile {
   roles: string[];
   sub: string;
   token: string;
+  github_id?: string; // Optional GitHub ID from token
 }
 
 class KeycloakService {
   private keycloak: Keycloak | null = null;
   private initialized = false;
+  private profile: UserProfile | undefined;
+  private tokenRefreshInterval: number | undefined;
   
   /**
    * Initialize the Keycloak instance
@@ -41,6 +44,20 @@ class KeycloakService {
       
       this.initialized = true;
       console.log('Keycloak initialized, authenticated:', authenticated);
+
+      if (authenticated) {
+        // Setup token refresh mechanism
+        this.setupTokenRefresh();
+        
+        // Load user profile
+        try {
+          this.profile = (await this.keycloak.loadUserProfile()) as UserProfile;
+          this.profile.token = this.keycloak.token || '';
+          this.profile.roles = this.keycloak.realmAccess?.roles || [];
+        } catch (error) {
+          console.error('Failed to load user profile:', error);
+        }
+      }
       
       return authenticated;
     } catch (error) {
@@ -48,7 +65,36 @@ class KeycloakService {
       return false;
     }
   }
+
+  /**
+   * Setup a timer to periodically refresh the token
+   */
+  private setupTokenRefresh(): void {
+    // Clear any existing interval first
+    this.clearTokenRefresh();
+    
+    // Check every minute if the token needs refreshing
+    this.tokenRefreshInterval = window.setInterval(() => {
+      if (this.isAuthenticated()) {
+        this.updateToken(300) // Update when token will expire in less than 5 minutes
+          .catch(error => console.warn('Token refresh failed:', error));
+      }
+    }, 60000); // Check every minute
+    
+    // Clean up on window unload
+    window.addEventListener('unload', this.clearTokenRefresh);
+  }
   
+  /**
+   * Clear the token refresh interval
+   */
+  private clearTokenRefresh = (): void => {
+    if (this.tokenRefreshInterval !== undefined) {
+      clearInterval(this.tokenRefreshInterval);
+      this.tokenRefreshInterval = undefined;
+    }
+  };
+
   /**
    * Check if the user is authenticated
    */
@@ -64,16 +110,11 @@ class KeycloakService {
       return true;
     }
     
-    // Check if the token has an expiration time
     if (!this.keycloak.tokenParsed.exp) {
       return true;
     }
     
-    // Get current time in seconds
-    const currentTime = Math.floor(Date.now() / 1000);
-    
-    // Return true if token is expired
-    return this.keycloak.tokenParsed.exp <= currentTime;
+    return this.keycloak.tokenParsed.exp <= Math.floor(Date.now() / 1000);
   }
   
   /**
@@ -81,15 +122,23 @@ class KeycloakService {
    */
   public async updateToken(minValidity = 60): Promise<boolean> {
     if (!this.keycloak) {
-      console.warn('Keycloak not initialized when updateToken called');
+      return false;
+    }
+    
+    // Don't refresh if token is still valid for the required time
+    if (!this.keycloak.isTokenExpired(minValidity)) {
       return false;
     }
     
     try {
-      return await this.keycloak.updateToken(minValidity);
+      const refreshed = await this.keycloak.updateToken(minValidity);
+      if (refreshed && this.profile) {
+        this.profile.token = this.keycloak.token || '';
+      }
+      return refreshed;
     } catch (error) {
       console.error('Failed to refresh token:', error);
-      throw error; // Re-throw to allow better error handling by callers
+      throw error;
     }
   }
   
@@ -108,10 +157,53 @@ class KeycloakService {
   }
   
   /**
+   * Get the current user's ID
+   */
+  public getUserId(): string | undefined {
+    return this.keycloak?.tokenParsed?.sub;
+  }
+  
+  /**
+   * Get the user's GitHub ID if available
+   */
+  public getUserGithubId(): string | undefined {
+    return this.keycloak?.tokenParsed?.github_id;
+  }
+  
+  /**
    * Get user roles from the token
    */
   public getUserRoles(): string[] {
     return this.keycloak?.realmAccess?.roles || [];
+  }
+  
+  /**
+   * Get user profile
+   */
+  public getUserProfile(): UserProfile | undefined {
+    return this.profile;
+  }
+  
+  /**
+   * Get the user's GitHub profile picture URL
+   */
+  public getUserGithubProfilePictureUrl(): string {
+    const githubId = this.getUserGithubId();
+    if (githubId) {
+      return `https://avatars.githubusercontent.com/u/${githubId}`;
+    }
+    return '';
+  }
+  
+  /**
+   * Get the user's GitHub profile URL
+   */
+  public getUserGithubProfileUrl(): string {
+    const username = this.getUsername();
+    if (username) {
+      return `https://github.com/${username}`;
+    }
+    return '';
   }
   
   /**
@@ -125,6 +217,9 @@ class KeycloakService {
    * Logout the current user
    */
   public logout(): Promise<void> {
+    this.clearTokenRefresh();
+    this.initialized = false;
+    
     return this.keycloak?.logout({
       redirectUri: window.location.origin
     }) || Promise.resolve();
@@ -135,6 +230,15 @@ class KeycloakService {
    */
   public hasRole(role: string): boolean {
     return this.keycloak?.hasRealmRole(role) || false;
+  }
+  
+  /**
+   * Check if the current user matches the given login
+   */
+  public isCurrentUser(login?: string): boolean {
+    if (!login) return false;
+    const username = this.keycloak?.tokenParsed?.preferred_username;
+    return username?.toLowerCase() === login.toLowerCase();
   }
 }
 
