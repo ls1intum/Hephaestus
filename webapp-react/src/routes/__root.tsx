@@ -17,7 +17,7 @@ export const Route = createRootRouteWithContext<MyRouterContext>()({
 		<>
 			<div className="flex flex-col min-h-screen">
 				<Header />
-				<main className="flex-1">
+				<main className="container flex-grow pt-4 pb-8">
 					<Outlet />
 				</main>
 				<Footer />

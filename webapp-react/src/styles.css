@@ -206,6 +206,15 @@ code {
 	}
 }
 
+@utility container {
+  margin-inline: auto;
+	@apply p-8;
+
+  @variant 2xl {
+		max-width: 1400px;
+  }
+}
+
 /* Animation classes */
 .accordion-down {
 	animation: accordion-down 0.2s ease-out;

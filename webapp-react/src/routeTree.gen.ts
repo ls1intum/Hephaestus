@@ -12,6 +12,7 @@
 
 import { Route as rootRoute } from './routes/__root'
 import { Route as PrivacyImport } from './routes/privacy'
+import { Route as LandingImport } from './routes/landing'
 import { Route as ImprintImport } from './routes/imprint'
 import { Route as AboutImport } from './routes/about'
 import { Route as AuthenticatedImport } from './routes/_authenticated'
@@ -30,6 +31,12 @@ import { Route as AuthenticatedUserUsernameActivityImport } from './routes/_auth
 const PrivacyRoute = PrivacyImport.update({
   id: '/privacy',
   path: '/privacy',
+  getParentRoute: () => rootRoute,
+} as any)
+
+const LandingRoute = LandingImport.update({
+  id: '/landing',
+  path: '/landing',
   getParentRoute: () => rootRoute,
 } as any)
 
@@ -132,6 +139,13 @@ declare module '@tanstack/react-router' {
       path: '/imprint'
       fullPath: '/imprint'
       preLoaderRoute: typeof ImprintImport
+      parentRoute: typeof rootRoute
+    }
+    '/landing': {
+      id: '/landing'
+      path: '/landing'
+      fullPath: '/landing'
+      preLoaderRoute: typeof LandingImport
       parentRoute: typeof rootRoute
     }
     '/privacy': {
@@ -242,6 +256,7 @@ export interface FileRoutesByFullPath {
   '': typeof AuthenticatedRouteWithChildren
   '/about': typeof AboutRoute
   '/imprint': typeof ImprintRoute
+  '/landing': typeof LandingRoute
   '/privacy': typeof PrivacyRoute
   '/mentor': typeof AuthenticatedMentorRoute
   '/settings': typeof AuthenticatedSettingsRoute
@@ -257,6 +272,7 @@ export interface FileRoutesByFullPath {
 export interface FileRoutesByTo {
   '/about': typeof AboutRoute
   '/imprint': typeof ImprintRoute
+  '/landing': typeof LandingRoute
   '/privacy': typeof PrivacyRoute
   '/mentor': typeof AuthenticatedMentorRoute
   '/settings': typeof AuthenticatedSettingsRoute
@@ -274,6 +290,7 @@ export interface FileRoutesById {
   '/_authenticated': typeof AuthenticatedRouteWithChildren
   '/about': typeof AboutRoute
   '/imprint': typeof ImprintRoute
+  '/landing': typeof LandingRoute
   '/privacy': typeof PrivacyRoute
   '/_authenticated/mentor': typeof AuthenticatedMentorRoute
   '/_authenticated/settings': typeof AuthenticatedSettingsRoute
@@ -292,6 +309,7 @@ export interface FileRouteTypes {
     | ''
     | '/about'
     | '/imprint'
+    | '/landing'
     | '/privacy'
     | '/mentor'
     | '/settings'
@@ -306,6 +324,7 @@ export interface FileRouteTypes {
   to:
     | '/about'
     | '/imprint'
+    | '/landing'
     | '/privacy'
     | '/mentor'
     | '/settings'
@@ -321,6 +340,7 @@ export interface FileRouteTypes {
     | '/_authenticated'
     | '/about'
     | '/imprint'
+    | '/landing'
     | '/privacy'
     | '/_authenticated/mentor'
     | '/_authenticated/settings'
@@ -338,6 +358,7 @@ export interface RootRouteChildren {
   AuthenticatedRoute: typeof AuthenticatedRouteWithChildren
   AboutRoute: typeof AboutRoute
   ImprintRoute: typeof ImprintRoute
+  LandingRoute: typeof LandingRoute
   PrivacyRoute: typeof PrivacyRoute
 }
 
@@ -345,6 +366,7 @@ const rootRouteChildren: RootRouteChildren = {
   AuthenticatedRoute: AuthenticatedRouteWithChildren,
   AboutRoute: AboutRoute,
   ImprintRoute: ImprintRoute,
+  LandingRoute: LandingRoute,
   PrivacyRoute: PrivacyRoute,
 }
 
@@ -361,6 +383,7 @@ export const routeTree = rootRoute
         "/_authenticated",
         "/about",
         "/imprint",
+        "/landing",
         "/privacy"
       ]
     },
@@ -383,6 +406,9 @@ export const routeTree = rootRoute
     },
     "/imprint": {
       "filePath": "imprint.tsx"
+    },
+    "/landing": {
+      "filePath": "landing.tsx"
     },
     "/privacy": {
       "filePath": "privacy.tsx"
