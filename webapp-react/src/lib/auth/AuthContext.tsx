@@ -22,9 +22,6 @@ interface AuthContextType {
   checkAuthState: () => void;
   isCurrentUser: (login?: string) => boolean;
   getUserId: () => string | undefined;
-  getUserGithubId: () => string | undefined;
-  getUserGithubProfilePictureUrl: () => string;
-  getUserGithubProfileUrl: () => string;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -213,18 +210,6 @@ export function AuthProvider({ children }: AuthProviderProps) {
     return keycloakService.getUserId();
   };
 
-  const getUserGithubId = () => {
-    return keycloakService.getUserGithubId();
-  };
-
-  const getUserGithubProfilePictureUrl = () => {
-    return keycloakService.getUserGithubProfilePictureUrl();
-  };
-
-  const getUserGithubProfileUrl = () => {
-    return keycloakService.getUserGithubProfileUrl();
-  };
-
   const value = {
     isAuthenticated,
     isLoading,
@@ -236,10 +221,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
     hasRole,
     checkAuthState,
     isCurrentUser,
-    getUserId,
-    getUserGithubId,
-    getUserGithubProfilePictureUrl,
-    getUserGithubProfileUrl
+    getUserId
   };
 
   return (

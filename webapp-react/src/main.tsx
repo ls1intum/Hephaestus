@@ -10,7 +10,7 @@ import "./styles.css";
 import reportWebVitals from "./reportWebVitals.ts";
 
 import { AuthProvider } from "./lib/auth/AuthContext";
-import environment from "./lib/environment/index.ts";
+import environment from "./environment/index.ts";
 import keycloakService from "./lib/auth/keycloak.ts";
 
 client.setConfig({

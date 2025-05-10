@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import environment from "@/lib/environment";
+import environment from "@/environment";
 
 export const Route = createFileRoute("/imprint")({
   component: Imprint,

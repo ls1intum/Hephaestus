@@ -1,5 +1,5 @@
 import Keycloak from 'keycloak-js';
-import environment from '../environment';
+import environment from '@/environment';
 
 export interface UserProfile {
   email: string;
@@ -12,7 +12,6 @@ export interface UserProfile {
   roles: string[];
   sub: string;
   token: string;
-  github_id?: string; // Optional GitHub ID from token
 }
 
 class KeycloakService {
@@ -164,13 +163,6 @@ class KeycloakService {
   }
   
   /**
-   * Get the user's GitHub ID if available
-   */
-  public getUserGithubId(): string | undefined {
-    return this.keycloak?.tokenParsed?.github_id;
-  }
-  
-  /**
    * Get user roles from the token
    */
   public getUserRoles(): string[] {
@@ -183,29 +175,7 @@ class KeycloakService {
   public getUserProfile(): UserProfile | undefined {
     return this.profile;
   }
-  
-  /**
-   * Get the user's GitHub profile picture URL
-   */
-  public getUserGithubProfilePictureUrl(): string {
-    const githubId = this.getUserGithubId();
-    if (githubId) {
-      return `https://avatars.githubusercontent.com/u/${githubId}`;
-    }
-    return '';
-  }
-  
-  /**
-   * Get the user's GitHub profile URL
-   */
-  public getUserGithubProfileUrl(): string {
-    const username = this.getUsername();
-    if (username) {
-      return `https://github.com/${username}`;
-    }
-    return '';
-  }
-  
+
   /**
    * Redirect to the login page
    */
