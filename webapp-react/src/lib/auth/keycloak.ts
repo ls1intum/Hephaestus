@@ -12,13 +12,13 @@ export interface UserProfile {
   roles: string[];
   sub: string;
   token: string;
+  github_id?: string; // Optional GitHub ID from token
 }
 
 class KeycloakService {
   private keycloak: Keycloak | null = null;
   private initialized = false;
   private profile: UserProfile | undefined;
-  private tokenRefreshInterval: number | undefined;
   
   /**
    * Initialize the Keycloak instance
@@ -45,9 +45,6 @@ class KeycloakService {
       console.log('Keycloak initialized, authenticated:', authenticated);
 
       if (authenticated) {
-        // Setup token refresh mechanism
-        this.setupTokenRefresh();
-        
         // Load user profile
         try {
           this.profile = (await this.keycloak.loadUserProfile()) as UserProfile;
@@ -64,35 +61,6 @@ class KeycloakService {
       return false;
     }
   }
-
-  /**
-   * Setup a timer to periodically refresh the token
-   */
-  private setupTokenRefresh(): void {
-    // Clear any existing interval first
-    this.clearTokenRefresh();
-    
-    // Check every minute if the token needs refreshing
-    this.tokenRefreshInterval = window.setInterval(() => {
-      if (this.isAuthenticated()) {
-        this.updateToken(300) // Update when token will expire in less than 5 minutes
-          .catch(error => console.warn('Token refresh failed:', error));
-      }
-    }, 60000); // Check every minute
-    
-    // Clean up on window unload
-    window.addEventListener('unload', this.clearTokenRefresh);
-  }
-  
-  /**
-   * Clear the token refresh interval
-   */
-  private clearTokenRefresh = (): void => {
-    if (this.tokenRefreshInterval !== undefined) {
-      clearInterval(this.tokenRefreshInterval);
-      this.tokenRefreshInterval = undefined;
-    }
-  };
 
   /**
    * Check if the user is authenticated
@@ -117,14 +85,13 @@ class KeycloakService {
   }
   
   /**
-   * Update token if it's about to expire
+   * Update token if it's about to expire (used by interceptors)
    */
   public async updateToken(minValidity = 60): Promise<boolean> {
     if (!this.keycloak) {
       return false;
     }
-    
-    // Don't refresh if token is still valid for the required time
+    // Only refresh if token is about to expire
     if (!this.keycloak.isTokenExpired(minValidity)) {
       return false;
     }
@@ -137,7 +104,7 @@ class KeycloakService {
       return refreshed;
     } catch (error) {
       console.error('Failed to refresh token:', error);
-      throw error;
+      return false;
     }
   }
   
@@ -163,6 +130,13 @@ class KeycloakService {
   }
   
   /**
+   * Get the user's GitHub ID if available
+   */
+  public getUserGithubId(): string | undefined {
+    return this.keycloak?.tokenParsed?.github_id;
+  }
+  
+  /**
    * Get user roles from the token
    */
   public getUserRoles(): string[] {
@@ -175,7 +149,29 @@ class KeycloakService {
   public getUserProfile(): UserProfile | undefined {
     return this.profile;
   }
-
+  
+  /**
+   * Get the user's GitHub profile picture URL
+   */
+  public getUserGithubProfilePictureUrl(): string {
+    const githubId = this.getUserGithubId();
+    if (githubId) {
+      return `https://avatars.githubusercontent.com/u/${githubId}`;
+    }
+    return '';
+  }
+  
+  /**
+   * Get the user's GitHub profile URL
+   */
+  public getUserGithubProfileUrl(): string {
+    const username = this.getUsername();
+    if (username) {
+      return `https://github.com/${username}`;
+    }
+    return '';
+  }
+  
   /**
    * Redirect to the login page
    */
@@ -187,7 +183,6 @@ class KeycloakService {
    * Logout the current user
    */
   public logout(): Promise<void> {
-    this.clearTokenRefresh();
     this.initialized = false;
     
     return this.keycloak?.logout({

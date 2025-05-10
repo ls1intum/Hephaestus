@@ -1,10 +1,7 @@
 import { Link, useNavigate } from "@tanstack/react-router";
 import { Button } from "@/components/ui/button";
-import { Hammer, RefreshCw } from "lucide-react";
+import { Hammer } from "lucide-react";
 import { useAuth } from "../lib/auth/AuthContext";
-
-// We'll remove the User interface from here since we don't use it in this component
-// and instead use the one from AuthContext if needed in the future
 
 interface HeaderProps {
   version?: string;
@@ -14,10 +11,7 @@ export default function Header({
   version = "v0.6.1",
 }: HeaderProps = {}) {
   const navigate = useNavigate();
-  const { isAuthenticated, isLoading, username, login, logout, checkAuthState } = useAuth();
-
-  // Remove the duplicate auth callback check that was causing infinite loops
-  // The AuthContext component already handles this
+  const { isAuthenticated, isLoading, username, login, logout } = useAuth();
 
   const navigateToUserActivity = (username: string) => {
     navigate({ to: '/user/$username/activity', params: { username } });
@@ -59,16 +53,6 @@ export default function Header({
       </div>
       
       <div className="flex items-center gap-2">
-        <Button 
-          variant="ghost" 
-          size="icon"
-          onClick={checkAuthState}
-          title="Sync auth state"
-          className="text-muted-foreground"
-        >
-          <RefreshCw size={16} />
-        </Button>
-
         {!isAuthenticated ? (
           <Button onClick={() => login()} disabled={isLoading}>
             {isLoading ? "Loading..." : "Sign In"}

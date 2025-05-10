@@ -17,8 +17,29 @@ client.setConfig({
   baseUrl: environment.serverUrl,
 });
 
-client.interceptors.request.use((request) => {
-  request.headers.set('Authorization', `Bearer ${keycloakService.getToken()}`); 
+// Add request interceptor to handle authentication
+client.interceptors.request.use(async (request) => {
+  // Skip authentication for public endpoints
+  if (request.url?.includes('/public/')) {
+    return request;
+  }
+  
+  // Only try to update token if authenticated
+  if (keycloakService.isAuthenticated()) {
+    try {
+			// Check if token needs to be refreshed (within 60 seconds of expiration)
+      await keycloakService.updateToken(60);
+    } catch (error) {
+      console.error('Token refresh failed in interceptor:', error);
+    }
+  }
+  
+  // Add token to request header if available
+  const token = keycloakService.getToken();
+  if (token) {
+    request.headers.set('Authorization', `Bearer ${token}`);
+  }
+  
   return request;
 });
 
