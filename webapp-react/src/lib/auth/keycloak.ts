@@ -57,6 +57,26 @@ class KeycloakService {
   }
   
   /**
+   * Check if the token is expired
+   */
+  public isTokenExpired(): boolean {
+    if (!this.keycloak || !this.keycloak.tokenParsed) {
+      return true;
+    }
+    
+    // Check if the token has an expiration time
+    if (!this.keycloak.tokenParsed.exp) {
+      return true;
+    }
+    
+    // Get current time in seconds
+    const currentTime = Math.floor(Date.now() / 1000);
+    
+    // Return true if token is expired
+    return this.keycloak.tokenParsed.exp <= currentTime;
+  }
+  
+  /**
    * Update token if it's about to expire
    */
   public async updateToken(minValidity = 60): Promise<boolean> {
@@ -69,7 +89,7 @@ class KeycloakService {
       return await this.keycloak.updateToken(minValidity);
     } catch (error) {
       console.error('Failed to refresh token:', error);
-      return false;
+      throw error; // Re-throw to allow better error handling by callers
     }
   }
   

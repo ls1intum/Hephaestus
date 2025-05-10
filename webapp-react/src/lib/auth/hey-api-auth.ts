@@ -21,31 +21,38 @@ export function setupAuthFunction() {
   // Add request interceptor to inject auth token
   client.interceptors.request.use(async (request) => {
     try {
-      // Always try to update the token before sending a request
-      await keycloakService.updateToken();
-      
-      // Get the current token
-      const token = keycloakService.getToken();
-      
-      if (token) {
-        // Instead of modifying headers directly, create a new headers object
-        // and assign it back to the request in a way that respects readonly properties
-        const newHeaders = {
-          ...request.headers,
-          Authorization: `Bearer ${token}`
-        };
+      if (keycloakService.isAuthenticated()) {
+        // Try to update the token before sending a request
+        try {
+          await keycloakService.updateToken(60);
+        } catch (refreshError) {
+          console.warn('Token refresh failed, will try with existing token:', refreshError);
+        }
         
-        // Replace the entire request object with a new one containing updated headers
-        Object.assign(request, {
-          headers: newHeaders
-        });
+        // Get the current token - even if refresh failed, we might still have a valid token
+        const token = keycloakService.getToken();
         
-        console.log('Added auth token to request');
+        if (token) {
+          // Instead of modifying headers directly, create a new headers object
+          const newHeaders = {
+            ...request.headers,
+            Authorization: `Bearer ${token}`
+          };
+          
+          // Replace the entire request object with a new one containing updated headers
+          Object.assign(request, {
+            headers: newHeaders
+          });
+          
+          console.log('Added auth token to request');
+        } else {
+          console.warn('No auth token available for request despite being authenticated');
+        }
       } else {
-        console.warn('No auth token available for request');
+        console.warn('User is not authenticated, not adding token to request');
       }
     } catch (error) {
-      console.error('Failed to update token for request:', error);
+      console.error('Error in auth interceptor:', error);
     }
     
     return request;
@@ -71,13 +78,20 @@ export function setupTokenRefresh() {
   tokenRefreshIntervalId = window.setInterval(async () => {
     try {
       if (keycloakService.isAuthenticated()) {
-        const refreshed = await keycloakService.updateToken();
+        // Use a shorter minimum validity time for background refreshes
+        const refreshed = await keycloakService.updateToken(120);
         if (refreshed) {
           console.log('Token refreshed in background');
         }
       }
     } catch (error) {
       console.error('Background token refresh failed:', error);
+      
+      // If there's a serious authentication error, we might need to handle it
+      // For example, force a re-authentication if the refresh token is expired
+      if (keycloakService.isTokenExpired()) {
+        console.warn('Token is expired and refresh failed, user may need to re-authenticate');
+      }
     }
   }, 30000);
   
