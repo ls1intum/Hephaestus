@@ -5,7 +5,6 @@ import Header from "../components/Header";
 import Footer from "../components/Footer";
 
 import TanstackQueryLayout from "../integrations/tanstack-query/layout";
-import { AuthProvider } from "../lib/auth/AuthContext";
 
 import type { QueryClient } from "@tanstack/react-query";
 
@@ -16,17 +15,27 @@ interface MyRouterContext {
 export const Route = createRootRouteWithContext<MyRouterContext>()({
 	component: () => (
 		<>
-			<AuthProvider>
-				<div className="flex flex-col min-h-screen">
-					<Header />
-					<main className="flex-1">
-						<Outlet />
-					</main>
-					<Footer />
-				</div>
-				<TanStackRouterDevtools />
-				<TanstackQueryLayout />
-			</AuthProvider>
+			<div className="flex flex-col min-h-screen">
+				<Header />
+				<main className="flex-1">
+					<Outlet />
+				</main>
+				<Footer />
+			</div>
+			<TanStackRouterDevtools />
+			<TanstackQueryLayout />
 		</>
 	),
+	// Add notFoundComponent to handle route not found errors
+	notFoundComponent: () => (
+		<div className="container py-16 flex flex-col items-center justify-center text-center">
+			<h2 className="text-3xl font-bold mb-4">Page Not Found</h2>
+			<p className="text-muted-foreground mb-8">
+				The page you're looking for doesn't exist or you don't have permission to view it.
+			</p>
+			<a href="/" className="text-blue-500 hover:underline font-medium">
+				Return to Home
+			</a>
+		</div>
+	)
 });

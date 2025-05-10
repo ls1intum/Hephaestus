@@ -8,7 +8,7 @@ import {
 } from "@/api/@tanstack/react-query.gen";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { PlusIcon, TrashIcon, RefreshCw, Github } from "lucide-react";
 import { 
   Card, 
@@ -30,6 +30,7 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import { toast, Toaster } from "sonner";
+import { useAuth } from "@/lib/auth/AuthContext";
 
 export const Route = createFileRoute("/_authenticated/workspace")({
   component: Workspace,
@@ -44,9 +45,28 @@ function Workspace() {
   const queryClient = useQueryClient();
   const [newRepository, setNewRepository] = useState("");
   const [repositoryToDelete, setRepositoryToDelete] = useState<Repository | null>(null);
+  const { isAuthenticated, isLoading: authLoading } = useAuth();
+
+  // Clean URL from auth parameters if present on component mount
+  useEffect(() => {
+    // This additional cleanup helps with direct navigation to the workspace route
+    if (window.location.hash && 
+       (window.location.hash.includes('state=') || 
+        window.location.hash.includes('session_state=') || 
+        window.location.hash.includes('code='))) {
+      // Use history API to replace the current URL without auth parameters
+      if (window.history && window.history.replaceState) {
+        window.history.replaceState(null, '', window.location.pathname);
+      }
+    }
+  }, []);
 
   // Fetch repositories to monitor
-  const { data: repositories = [], isLoading, error, refetch } = useQuery(getRepositoriesToMonitorOptions({}));
+  const { data: repositories = [], isLoading, error, refetch } = useQuery({
+    ...getRepositoriesToMonitorOptions({}),
+    // Only fetch data when authenticated
+    enabled: isAuthenticated && !authLoading
+  });
   
   // Add repository mutation
   const addRepositoryMutation = useMutation({
@@ -109,6 +129,14 @@ function Workspace() {
     
     setRepositoryToDelete(null);
   };
+
+  if (authLoading) {
+    return (
+      <div className="container py-6 flex justify-center items-center min-h-[50vh]">
+        <RefreshCw className="h-8 w-8 animate-spin text-primary" />
+      </div>
+    );
+  }
 
   return (
     <div className="container py-6">

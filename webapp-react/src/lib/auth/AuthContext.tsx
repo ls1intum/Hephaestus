@@ -65,6 +65,27 @@ export function AuthProvider({ children }: AuthProviderProps) {
     }
   }, [isLoading]);
 
+  // Clean the URL from authentication parameters
+  // This is crucial to prevent infinite loops with router navigation
+  const cleanUrlFromAuthParams = useCallback(() => {
+    if (window.location.hash && 
+       (window.location.hash.includes('state=') || 
+        window.location.hash.includes('session_state=') || 
+        window.location.hash.includes('code='))
+    ) {
+      // Get the base route without the hash and authentication parameters
+      const baseUrl = window.location.pathname;
+      console.log('Cleaning URL from auth params, redirecting to:', baseUrl);
+      
+      // Use history API to replace the current URL without auth parameters
+      if (window.history && window.history.replaceState) {
+        window.history.replaceState(null, '', baseUrl);
+        return true;
+      }
+    }
+    return false;
+  }, []);
+
   useEffect(() => {
     // Skip initialization if already done (prevents duplicate init in StrictMode)
     if (initRef.current) {
@@ -75,6 +96,9 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
     const initKeycloak = async () => {
       try {
+        // First, clean URL from any potential auth parameters to prevent loops
+        cleanUrlFromAuthParams();
+        
         console.log('AuthProvider: Setting up API auth...');
         // Set up API client authentication first
         setupAuthFunction();
@@ -110,7 +134,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
     };
 
     initKeycloak();
-  }, []);
+  }, [cleanUrlFromAuthParams]);
 
   // Add an effect to handle Keycloak token changes - run only once after initialization
   useEffect(() => {
@@ -133,24 +157,25 @@ export function AuthProvider({ children }: AuthProviderProps) {
     // Skip if still loading or already processed
     if (isLoading || authCallbackRef.current) return;
     
-    // Handle possible callback from Keycloak login only once
-    if (window.location.hash?.includes('state=') && !authCallbackRef.current) {
+    // Check for authentication callback parameters in URL
+    const hasAuthParams = 
+      window.location.hash?.includes('state=') || 
+      window.location.search?.includes('code=');
+    
+    if (hasAuthParams && !authCallbackRef.current) {
       console.log('AuthProvider: Detected auth callback, processing once');
       
       // Mark as processed both locally and globally
       authCallbackRef.current = true;
       globalState.authCallbackProcessed = true;
       
-      // Replace the URL to remove the fragment to prevent further callback processing
-      if (window.history && window.history.replaceState) {
-        const cleanUrl = window.location.href.split('#')[0];
-        window.history.replaceState(null, '', cleanUrl);
-      }
+      // Clean the URL from auth parameters
+      cleanUrlFromAuthParams();
       
-      // Check auth state once
-      setTimeout(checkAuthState, 500);
+      // Check auth state once after cleanup
+      setTimeout(checkAuthState, 300);
     }
-  }, [checkAuthState, isLoading]);
+  }, [checkAuthState, isLoading, cleanUrlFromAuthParams]);
 
   const login = async () => {
     console.log('AuthProvider: Login requested');
@@ -185,12 +210,6 @@ export function AuthProvider({ children }: AuthProviderProps) {
     hasRole,
     checkAuthState
   };
-
-  console.log('AuthProvider: Current state:', { 
-    isAuthenticated, 
-    isLoading, 
-    userRoles: userRoles.length
-  });
 
   return (
     <AuthContext.Provider value={value}>
