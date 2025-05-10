@@ -14,8 +14,8 @@ const preview: Preview = {
   decorators: [
     withThemeByClassName({
       themes: {
-        light: '',
-        dark: 'dark bg-background'
+        light: 'scroll-smooth',
+        dark: 'dark bg-background scroll-smooth'
       },
       defaultTheme: 'light'
     }),

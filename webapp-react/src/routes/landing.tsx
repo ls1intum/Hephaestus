@@ -1,9 +1,13 @@
 import { createFileRoute } from '@tanstack/react-router'
+import { LandingPage } from '../features/landing/LandingPage'
+import { useAuth } from '../lib/auth/AuthContext'
 
 export const Route = createFileRoute('/landing')({
-  component: RouteComponent,
+  component: LandingRoute,
 })
 
-function RouteComponent() {
-  return <div>Hello "/landing"!</div>
+function LandingRoute() {
+  const { login } = useAuth();
+  
+  return <LandingPage onSignIn={() => login()} />;
 }
