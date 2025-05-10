@@ -2,7 +2,7 @@ import type { Meta, StoryObj } from '@storybook/react';
 import { LegalPage } from './LegalPage';
 
 const meta: Meta<typeof LegalPage> = {
-  title: 'Features/Info/Legal/LegalPage',
+  title: 'Info/LegalPage',
   component: LegalPage,
 };
 

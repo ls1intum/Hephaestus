@@ -1,25 +1,11 @@
 import { useQuery } from "@tanstack/react-query";
 import { AboutPage } from "./AboutPage";
+import { getContributorsOptions } from "@/api/@tanstack/react-query.gen";
 
-// Interface for our contributors data
-interface Contributor {
-  id: number;
-  login: string;
-  avatarUrl: string;
-  htmlUrl: string;
-}
 
 export function AboutContainer() {
-  // Query to fetch contributors (similar to what's done in the workspace component)
-  const { data: contributors, isPending, isError } = useQuery({
-    queryKey: ['contributors'],
-    queryFn: async () => {
-      const response = await fetch('/api/v1/meta/contributors');
-      if (!response.ok) {
-        throw new Error('Failed to fetch contributors');
-      }
-      return response.json() as Promise<Contributor[]>;
-    },
+  const { data: contributors = [], isPending, isError } = useQuery({
+    ...getContributorsOptions({}),
     gcTime: Infinity,
   });
 
@@ -36,7 +22,7 @@ export function AboutContainer() {
       isPending={isPending}
       isError={isError}
       projectManager={projectManager}
-      otherContributors={otherContributors || []}
+      otherContributors={otherContributors}
     />
   );
 }

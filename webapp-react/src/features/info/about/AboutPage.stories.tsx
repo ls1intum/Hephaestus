@@ -31,11 +31,8 @@ const mockProjectManager = {
 };
 
 const meta: Meta<typeof AboutPage> = {
-  title: 'Features/Info/About/AboutPage',
+  title: 'Info/AboutPage',
   component: AboutPage,
-  parameters: {
-    layout: 'fullscreen',
-  },
 };
 
 export default meta;
