@@ -28,7 +28,7 @@ public class BadPracticeDetection {
     private String summary;
 
     @NonNull
-    @OneToMany
+    @OneToMany(mappedBy = "badPracticeDetection", cascade = CascadeType.ALL)
     @ToString.Exclude
     private List<PullRequestBadPractice> badPractices;
 

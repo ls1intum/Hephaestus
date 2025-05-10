@@ -9,7 +9,8 @@
           } @else {
             <span class="font-medium flex justify-center items-center space-x-1">
               <ng-icon [name]="issueIconAndColor().icon" size="18" [class]="'mr-1 ' + issueIconAndColor().color"></ng-icon>
-              <a [href]="htmlUrl()">{{ repositoryName() }} #{{ number() }} </a> on {{ displayCreated().format('MMM D') }}. Updated on {{ displayUpdated().format('MMM D, HH:mm') }}
+              <a [href]="htmlUrl()">{{ repositoryName() }} #{{ number() }} </a>
+              <span> on {{ displayCreated().format('MMM D') }}. Updated on {{ displayUpdated().format('MMM D, HH:mm') }} </span>
             </span>
           }
         </span>

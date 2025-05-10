@@ -1,6 +1,5 @@
 package de.tum.in.www1.hephaestus.activity.badpracticedetector;
 
-import java.util.concurrent.ConcurrentHashMap;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.cache.annotation.CacheEvict;
@@ -25,7 +24,7 @@ public class PullRequestTemplateGetter {
         try {
             return restTemplate.getForObject(url, String.class);
         } catch (Exception e) {
-            logger.info("Error getting pull request template: {}", e.getMessage());
+            logger.warn("Error getting pull request template: {}", e.getMessage());
             return "";
         }
     }
