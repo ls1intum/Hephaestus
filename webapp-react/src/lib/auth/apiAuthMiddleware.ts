@@ -1,4 +1,4 @@
-import type { Middleware, RequestContext, ResponseContext } from '../api/runtime';
+import type { Middleware, RequestContext, ResponseContext } from '../../api/runtime';
 import keycloakService from './keycloak';
 
 /**

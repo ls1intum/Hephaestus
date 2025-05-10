@@ -1,7 +1,7 @@
-import { Configuration } from '../api/runtime';
+import { Configuration } from '../../api/runtime';
 import environment from '../environment';
 import { authMiddleware } from './apiAuthMiddleware';
-import { SessionApi } from '../api/apis/session-api';
+import { SessionApi } from '../../api/apis/session-api';
 
 /**
  * Creates an API configuration with authentication middleware

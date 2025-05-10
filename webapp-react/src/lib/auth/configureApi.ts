@@ -1,4 +1,4 @@
-import { Configuration } from '../api/runtime';
+import { Configuration } from '../../api/runtime';
 import environment from '../environment';
 import { authMiddleware } from './apiAuthMiddleware';
 
