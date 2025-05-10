@@ -31,7 +31,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { toast, Toaster } from "sonner";
 
-export const Route = createFileRoute("/_authenticated/workspace")({
+export const Route = createFileRoute("/_authenticated/workspace/")({
   component: Workspace,
 });
 

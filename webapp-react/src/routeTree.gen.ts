@@ -11,24 +11,21 @@
 // Import Routes
 
 import { Route as rootRoute } from './routes/__root'
-import { Route as TeamsImport } from './routes/teams'
 import { Route as PrivacyImport } from './routes/privacy'
 import { Route as ImprintImport } from './routes/imprint'
 import { Route as AboutImport } from './routes/about'
 import { Route as AuthenticatedImport } from './routes/_authenticated'
-import { Route as IndexImport } from './routes/index'
-import { Route as DemoTanstackQueryImport } from './routes/demo.tanstack-query'
-import { Route as AuthenticatedWorkspaceImport } from './routes/_authenticated/workspace'
-import { Route as UserUsernameIndexImport } from './routes/user/$username/index'
-import { Route as UserUsernameActivityImport } from './routes/user/$username/activity'
+import { Route as AuthenticatedIndexImport } from './routes/_authenticated/index'
+import { Route as AuthenticatedTeamsImport } from './routes/_authenticated/teams'
+import { Route as AuthenticatedSettingsImport } from './routes/_authenticated/settings'
+import { Route as AuthenticatedMentorImport } from './routes/_authenticated/mentor'
+import { Route as AuthenticatedWorkspaceIndexImport } from './routes/_authenticated/workspace/index'
+import { Route as AuthenticatedWorkspaceUsersImport } from './routes/_authenticated/workspace/users'
+import { Route as AuthenticatedWorkspaceTeamsImport } from './routes/_authenticated/workspace/teams'
+import { Route as AuthenticatedUserUsernameIndexImport } from './routes/_authenticated/user/$username/index'
+import { Route as AuthenticatedUserUsernameActivityImport } from './routes/_authenticated/user/$username/activity'
 
 // Create/Update Routes
-
-const TeamsRoute = TeamsImport.update({
-  id: '/teams',
-  path: '/teams',
-  getParentRoute: () => rootRoute,
-} as any)
 
 const PrivacyRoute = PrivacyImport.update({
   id: '/privacy',
@@ -53,47 +50,69 @@ const AuthenticatedRoute = AuthenticatedImport.update({
   getParentRoute: () => rootRoute,
 } as any)
 
-const IndexRoute = IndexImport.update({
+const AuthenticatedIndexRoute = AuthenticatedIndexImport.update({
   id: '/',
   path: '/',
-  getParentRoute: () => rootRoute,
-} as any)
-
-const DemoTanstackQueryRoute = DemoTanstackQueryImport.update({
-  id: '/demo/tanstack-query',
-  path: '/demo/tanstack-query',
-  getParentRoute: () => rootRoute,
-} as any)
-
-const AuthenticatedWorkspaceRoute = AuthenticatedWorkspaceImport.update({
-  id: '/workspace',
-  path: '/workspace',
   getParentRoute: () => AuthenticatedRoute,
 } as any)
 
-const UserUsernameIndexRoute = UserUsernameIndexImport.update({
-  id: '/user/$username/',
-  path: '/user/$username/',
-  getParentRoute: () => rootRoute,
+const AuthenticatedTeamsRoute = AuthenticatedTeamsImport.update({
+  id: '/teams',
+  path: '/teams',
+  getParentRoute: () => AuthenticatedRoute,
 } as any)
 
-const UserUsernameActivityRoute = UserUsernameActivityImport.update({
-  id: '/user/$username/activity',
-  path: '/user/$username/activity',
-  getParentRoute: () => rootRoute,
+const AuthenticatedSettingsRoute = AuthenticatedSettingsImport.update({
+  id: '/settings',
+  path: '/settings',
+  getParentRoute: () => AuthenticatedRoute,
 } as any)
+
+const AuthenticatedMentorRoute = AuthenticatedMentorImport.update({
+  id: '/mentor',
+  path: '/mentor',
+  getParentRoute: () => AuthenticatedRoute,
+} as any)
+
+const AuthenticatedWorkspaceIndexRoute =
+  AuthenticatedWorkspaceIndexImport.update({
+    id: '/workspace/',
+    path: '/workspace/',
+    getParentRoute: () => AuthenticatedRoute,
+  } as any)
+
+const AuthenticatedWorkspaceUsersRoute =
+  AuthenticatedWorkspaceUsersImport.update({
+    id: '/workspace/users',
+    path: '/workspace/users',
+    getParentRoute: () => AuthenticatedRoute,
+  } as any)
+
+const AuthenticatedWorkspaceTeamsRoute =
+  AuthenticatedWorkspaceTeamsImport.update({
+    id: '/workspace/teams',
+    path: '/workspace/teams',
+    getParentRoute: () => AuthenticatedRoute,
+  } as any)
+
+const AuthenticatedUserUsernameIndexRoute =
+  AuthenticatedUserUsernameIndexImport.update({
+    id: '/user/$username/',
+    path: '/user/$username/',
+    getParentRoute: () => AuthenticatedRoute,
+  } as any)
+
+const AuthenticatedUserUsernameActivityRoute =
+  AuthenticatedUserUsernameActivityImport.update({
+    id: '/user/$username/activity',
+    path: '/user/$username/activity',
+    getParentRoute: () => AuthenticatedRoute,
+  } as any)
 
 // Populate the FileRoutesByPath interface
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
-    '/': {
-      id: '/'
-      path: '/'
-      fullPath: '/'
-      preLoaderRoute: typeof IndexImport
-      parentRoute: typeof rootRoute
-    }
     '/_authenticated': {
       id: '/_authenticated'
       path: ''
@@ -122,40 +141,68 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof PrivacyImport
       parentRoute: typeof rootRoute
     }
-    '/teams': {
-      id: '/teams'
-      path: '/teams'
-      fullPath: '/teams'
-      preLoaderRoute: typeof TeamsImport
-      parentRoute: typeof rootRoute
-    }
-    '/_authenticated/workspace': {
-      id: '/_authenticated/workspace'
-      path: '/workspace'
-      fullPath: '/workspace'
-      preLoaderRoute: typeof AuthenticatedWorkspaceImport
+    '/_authenticated/mentor': {
+      id: '/_authenticated/mentor'
+      path: '/mentor'
+      fullPath: '/mentor'
+      preLoaderRoute: typeof AuthenticatedMentorImport
       parentRoute: typeof AuthenticatedImport
     }
-    '/demo/tanstack-query': {
-      id: '/demo/tanstack-query'
-      path: '/demo/tanstack-query'
-      fullPath: '/demo/tanstack-query'
-      preLoaderRoute: typeof DemoTanstackQueryImport
-      parentRoute: typeof rootRoute
+    '/_authenticated/settings': {
+      id: '/_authenticated/settings'
+      path: '/settings'
+      fullPath: '/settings'
+      preLoaderRoute: typeof AuthenticatedSettingsImport
+      parentRoute: typeof AuthenticatedImport
     }
-    '/user/$username/activity': {
-      id: '/user/$username/activity'
+    '/_authenticated/teams': {
+      id: '/_authenticated/teams'
+      path: '/teams'
+      fullPath: '/teams'
+      preLoaderRoute: typeof AuthenticatedTeamsImport
+      parentRoute: typeof AuthenticatedImport
+    }
+    '/_authenticated/': {
+      id: '/_authenticated/'
+      path: '/'
+      fullPath: '/'
+      preLoaderRoute: typeof AuthenticatedIndexImport
+      parentRoute: typeof AuthenticatedImport
+    }
+    '/_authenticated/workspace/teams': {
+      id: '/_authenticated/workspace/teams'
+      path: '/workspace/teams'
+      fullPath: '/workspace/teams'
+      preLoaderRoute: typeof AuthenticatedWorkspaceTeamsImport
+      parentRoute: typeof AuthenticatedImport
+    }
+    '/_authenticated/workspace/users': {
+      id: '/_authenticated/workspace/users'
+      path: '/workspace/users'
+      fullPath: '/workspace/users'
+      preLoaderRoute: typeof AuthenticatedWorkspaceUsersImport
+      parentRoute: typeof AuthenticatedImport
+    }
+    '/_authenticated/workspace/': {
+      id: '/_authenticated/workspace/'
+      path: '/workspace'
+      fullPath: '/workspace'
+      preLoaderRoute: typeof AuthenticatedWorkspaceIndexImport
+      parentRoute: typeof AuthenticatedImport
+    }
+    '/_authenticated/user/$username/activity': {
+      id: '/_authenticated/user/$username/activity'
       path: '/user/$username/activity'
       fullPath: '/user/$username/activity'
-      preLoaderRoute: typeof UserUsernameActivityImport
-      parentRoute: typeof rootRoute
+      preLoaderRoute: typeof AuthenticatedUserUsernameActivityImport
+      parentRoute: typeof AuthenticatedImport
     }
-    '/user/$username/': {
-      id: '/user/$username/'
+    '/_authenticated/user/$username/': {
+      id: '/_authenticated/user/$username/'
       path: '/user/$username'
       fullPath: '/user/$username'
-      preLoaderRoute: typeof UserUsernameIndexImport
-      parentRoute: typeof rootRoute
+      preLoaderRoute: typeof AuthenticatedUserUsernameIndexImport
+      parentRoute: typeof AuthenticatedImport
     }
   }
 }
@@ -163,11 +210,28 @@ declare module '@tanstack/react-router' {
 // Create and export the route tree
 
 interface AuthenticatedRouteChildren {
-  AuthenticatedWorkspaceRoute: typeof AuthenticatedWorkspaceRoute
+  AuthenticatedMentorRoute: typeof AuthenticatedMentorRoute
+  AuthenticatedSettingsRoute: typeof AuthenticatedSettingsRoute
+  AuthenticatedTeamsRoute: typeof AuthenticatedTeamsRoute
+  AuthenticatedIndexRoute: typeof AuthenticatedIndexRoute
+  AuthenticatedWorkspaceTeamsRoute: typeof AuthenticatedWorkspaceTeamsRoute
+  AuthenticatedWorkspaceUsersRoute: typeof AuthenticatedWorkspaceUsersRoute
+  AuthenticatedWorkspaceIndexRoute: typeof AuthenticatedWorkspaceIndexRoute
+  AuthenticatedUserUsernameActivityRoute: typeof AuthenticatedUserUsernameActivityRoute
+  AuthenticatedUserUsernameIndexRoute: typeof AuthenticatedUserUsernameIndexRoute
 }
 
 const AuthenticatedRouteChildren: AuthenticatedRouteChildren = {
-  AuthenticatedWorkspaceRoute: AuthenticatedWorkspaceRoute,
+  AuthenticatedMentorRoute: AuthenticatedMentorRoute,
+  AuthenticatedSettingsRoute: AuthenticatedSettingsRoute,
+  AuthenticatedTeamsRoute: AuthenticatedTeamsRoute,
+  AuthenticatedIndexRoute: AuthenticatedIndexRoute,
+  AuthenticatedWorkspaceTeamsRoute: AuthenticatedWorkspaceTeamsRoute,
+  AuthenticatedWorkspaceUsersRoute: AuthenticatedWorkspaceUsersRoute,
+  AuthenticatedWorkspaceIndexRoute: AuthenticatedWorkspaceIndexRoute,
+  AuthenticatedUserUsernameActivityRoute:
+    AuthenticatedUserUsernameActivityRoute,
+  AuthenticatedUserUsernameIndexRoute: AuthenticatedUserUsernameIndexRoute,
 }
 
 const AuthenticatedRouteWithChildren = AuthenticatedRoute._addFileChildren(
@@ -175,107 +239,113 @@ const AuthenticatedRouteWithChildren = AuthenticatedRoute._addFileChildren(
 )
 
 export interface FileRoutesByFullPath {
-  '/': typeof IndexRoute
   '': typeof AuthenticatedRouteWithChildren
   '/about': typeof AboutRoute
   '/imprint': typeof ImprintRoute
   '/privacy': typeof PrivacyRoute
-  '/teams': typeof TeamsRoute
-  '/workspace': typeof AuthenticatedWorkspaceRoute
-  '/demo/tanstack-query': typeof DemoTanstackQueryRoute
-  '/user/$username/activity': typeof UserUsernameActivityRoute
-  '/user/$username': typeof UserUsernameIndexRoute
+  '/mentor': typeof AuthenticatedMentorRoute
+  '/settings': typeof AuthenticatedSettingsRoute
+  '/teams': typeof AuthenticatedTeamsRoute
+  '/': typeof AuthenticatedIndexRoute
+  '/workspace/teams': typeof AuthenticatedWorkspaceTeamsRoute
+  '/workspace/users': typeof AuthenticatedWorkspaceUsersRoute
+  '/workspace': typeof AuthenticatedWorkspaceIndexRoute
+  '/user/$username/activity': typeof AuthenticatedUserUsernameActivityRoute
+  '/user/$username': typeof AuthenticatedUserUsernameIndexRoute
 }
 
 export interface FileRoutesByTo {
-  '/': typeof IndexRoute
-  '': typeof AuthenticatedRouteWithChildren
   '/about': typeof AboutRoute
   '/imprint': typeof ImprintRoute
   '/privacy': typeof PrivacyRoute
-  '/teams': typeof TeamsRoute
-  '/workspace': typeof AuthenticatedWorkspaceRoute
-  '/demo/tanstack-query': typeof DemoTanstackQueryRoute
-  '/user/$username/activity': typeof UserUsernameActivityRoute
-  '/user/$username': typeof UserUsernameIndexRoute
+  '/mentor': typeof AuthenticatedMentorRoute
+  '/settings': typeof AuthenticatedSettingsRoute
+  '/teams': typeof AuthenticatedTeamsRoute
+  '/': typeof AuthenticatedIndexRoute
+  '/workspace/teams': typeof AuthenticatedWorkspaceTeamsRoute
+  '/workspace/users': typeof AuthenticatedWorkspaceUsersRoute
+  '/workspace': typeof AuthenticatedWorkspaceIndexRoute
+  '/user/$username/activity': typeof AuthenticatedUserUsernameActivityRoute
+  '/user/$username': typeof AuthenticatedUserUsernameIndexRoute
 }
 
 export interface FileRoutesById {
   __root__: typeof rootRoute
-  '/': typeof IndexRoute
   '/_authenticated': typeof AuthenticatedRouteWithChildren
   '/about': typeof AboutRoute
   '/imprint': typeof ImprintRoute
   '/privacy': typeof PrivacyRoute
-  '/teams': typeof TeamsRoute
-  '/_authenticated/workspace': typeof AuthenticatedWorkspaceRoute
-  '/demo/tanstack-query': typeof DemoTanstackQueryRoute
-  '/user/$username/activity': typeof UserUsernameActivityRoute
-  '/user/$username/': typeof UserUsernameIndexRoute
+  '/_authenticated/mentor': typeof AuthenticatedMentorRoute
+  '/_authenticated/settings': typeof AuthenticatedSettingsRoute
+  '/_authenticated/teams': typeof AuthenticatedTeamsRoute
+  '/_authenticated/': typeof AuthenticatedIndexRoute
+  '/_authenticated/workspace/teams': typeof AuthenticatedWorkspaceTeamsRoute
+  '/_authenticated/workspace/users': typeof AuthenticatedWorkspaceUsersRoute
+  '/_authenticated/workspace/': typeof AuthenticatedWorkspaceIndexRoute
+  '/_authenticated/user/$username/activity': typeof AuthenticatedUserUsernameActivityRoute
+  '/_authenticated/user/$username/': typeof AuthenticatedUserUsernameIndexRoute
 }
 
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
-    | '/'
     | ''
     | '/about'
     | '/imprint'
     | '/privacy'
+    | '/mentor'
+    | '/settings'
     | '/teams'
+    | '/'
+    | '/workspace/teams'
+    | '/workspace/users'
     | '/workspace'
-    | '/demo/tanstack-query'
     | '/user/$username/activity'
     | '/user/$username'
   fileRoutesByTo: FileRoutesByTo
   to:
-    | '/'
-    | ''
     | '/about'
     | '/imprint'
     | '/privacy'
+    | '/mentor'
+    | '/settings'
     | '/teams'
+    | '/'
+    | '/workspace/teams'
+    | '/workspace/users'
     | '/workspace'
-    | '/demo/tanstack-query'
     | '/user/$username/activity'
     | '/user/$username'
   id:
     | '__root__'
-    | '/'
     | '/_authenticated'
     | '/about'
     | '/imprint'
     | '/privacy'
-    | '/teams'
-    | '/_authenticated/workspace'
-    | '/demo/tanstack-query'
-    | '/user/$username/activity'
-    | '/user/$username/'
+    | '/_authenticated/mentor'
+    | '/_authenticated/settings'
+    | '/_authenticated/teams'
+    | '/_authenticated/'
+    | '/_authenticated/workspace/teams'
+    | '/_authenticated/workspace/users'
+    | '/_authenticated/workspace/'
+    | '/_authenticated/user/$username/activity'
+    | '/_authenticated/user/$username/'
   fileRoutesById: FileRoutesById
 }
 
 export interface RootRouteChildren {
-  IndexRoute: typeof IndexRoute
   AuthenticatedRoute: typeof AuthenticatedRouteWithChildren
   AboutRoute: typeof AboutRoute
   ImprintRoute: typeof ImprintRoute
   PrivacyRoute: typeof PrivacyRoute
-  TeamsRoute: typeof TeamsRoute
-  DemoTanstackQueryRoute: typeof DemoTanstackQueryRoute
-  UserUsernameActivityRoute: typeof UserUsernameActivityRoute
-  UserUsernameIndexRoute: typeof UserUsernameIndexRoute
 }
 
 const rootRouteChildren: RootRouteChildren = {
-  IndexRoute: IndexRoute,
   AuthenticatedRoute: AuthenticatedRouteWithChildren,
   AboutRoute: AboutRoute,
   ImprintRoute: ImprintRoute,
   PrivacyRoute: PrivacyRoute,
-  TeamsRoute: TeamsRoute,
-  DemoTanstackQueryRoute: DemoTanstackQueryRoute,
-  UserUsernameActivityRoute: UserUsernameActivityRoute,
-  UserUsernameIndexRoute: UserUsernameIndexRoute,
 }
 
 export const routeTree = rootRoute
@@ -288,24 +358,24 @@ export const routeTree = rootRoute
     "__root__": {
       "filePath": "__root.tsx",
       "children": [
-        "/",
         "/_authenticated",
         "/about",
         "/imprint",
-        "/privacy",
-        "/teams",
-        "/demo/tanstack-query",
-        "/user/$username/activity",
-        "/user/$username/"
+        "/privacy"
       ]
-    },
-    "/": {
-      "filePath": "index.tsx"
     },
     "/_authenticated": {
       "filePath": "_authenticated.tsx",
       "children": [
-        "/_authenticated/workspace"
+        "/_authenticated/mentor",
+        "/_authenticated/settings",
+        "/_authenticated/teams",
+        "/_authenticated/",
+        "/_authenticated/workspace/teams",
+        "/_authenticated/workspace/users",
+        "/_authenticated/workspace/",
+        "/_authenticated/user/$username/activity",
+        "/_authenticated/user/$username/"
       ]
     },
     "/about": {
@@ -317,21 +387,41 @@ export const routeTree = rootRoute
     "/privacy": {
       "filePath": "privacy.tsx"
     },
-    "/teams": {
-      "filePath": "teams.tsx"
-    },
-    "/_authenticated/workspace": {
-      "filePath": "_authenticated/workspace.tsx",
+    "/_authenticated/mentor": {
+      "filePath": "_authenticated/mentor.tsx",
       "parent": "/_authenticated"
     },
-    "/demo/tanstack-query": {
-      "filePath": "demo.tanstack-query.tsx"
+    "/_authenticated/settings": {
+      "filePath": "_authenticated/settings.tsx",
+      "parent": "/_authenticated"
     },
-    "/user/$username/activity": {
-      "filePath": "user/$username/activity.tsx"
+    "/_authenticated/teams": {
+      "filePath": "_authenticated/teams.tsx",
+      "parent": "/_authenticated"
     },
-    "/user/$username/": {
-      "filePath": "user/$username/index.tsx"
+    "/_authenticated/": {
+      "filePath": "_authenticated/index.tsx",
+      "parent": "/_authenticated"
+    },
+    "/_authenticated/workspace/teams": {
+      "filePath": "_authenticated/workspace/teams.tsx",
+      "parent": "/_authenticated"
+    },
+    "/_authenticated/workspace/users": {
+      "filePath": "_authenticated/workspace/users.tsx",
+      "parent": "/_authenticated"
+    },
+    "/_authenticated/workspace/": {
+      "filePath": "_authenticated/workspace/index.tsx",
+      "parent": "/_authenticated"
+    },
+    "/_authenticated/user/$username/activity": {
+      "filePath": "_authenticated/user/$username/activity.tsx",
+      "parent": "/_authenticated"
+    },
+    "/_authenticated/user/$username/": {
+      "filePath": "_authenticated/user/$username/index.tsx",
+      "parent": "/_authenticated"
     }
   }
 }
