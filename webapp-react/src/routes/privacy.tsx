@@ -1,18 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
-import environment from "@/environment";
+import { PrivacyContainer } from "@/features/info/legal/PrivacyContainer";
 
 export const Route = createFileRoute("/privacy")({
-  component: Privacy,
+  component: PrivacyContainer,
 });
-
-function Privacy() {
-  return (
-    <div className="flex flex-col gap-4">
-      <h1 className="text-3xl font-bold">Privacy Policy</h1>
-      <div 
-        className="prose dark:prose-invert max-w-none" 
-        dangerouslySetInnerHTML={{ __html: environment.legal.privacyHtml }}
-      />
-    </div>
-  );
-}
