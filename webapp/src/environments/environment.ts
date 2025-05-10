@@ -9,8 +9,7 @@ export const environment = {
   keycloak: {
     url: 'http://localhost:8081',
     realm: 'hephaestus',
-    clientId: 'hephaestus',
-    skipLoginPage: true // If true, it will directly use github IDP for login
+    clientId: 'hephaestus'
   },
   posthog: {
     projectApiKey: '',

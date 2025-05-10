@@ -1,38 +1,29 @@
 import { Link, useNavigate } from "@tanstack/react-router";
 import { Button } from "@/components/ui/button";
 import { Hammer } from "lucide-react";
+import { useAuth } from "../lib/auth/AuthContext";
 
-// Define a proper type for the user
-interface User {
-  username: string;
-  name: string;
-  roles?: string[];
-}
+// We'll remove the User interface from here since we don't use it in this component
+// and instead use the one from AuthContext if needed in the future
 
 interface HeaderProps {
-  onSignIn?: () => void;
-  isSigningIn?: boolean;
   version?: string;
-  // Add proper props for user data instead of using internal state
-  isSignedIn?: boolean;
-  user?: User | null;
 }
 
 export default function Header({ 
-  onSignIn, 
-  isSigningIn = false, 
   version = "v0.6.1",
-  isSignedIn = false,
-  user = null 
 }: HeaderProps = {}) {
   const navigate = useNavigate();
-  const handleSignIn = onSignIn || (() => {
-    const authUrl = `https://github.com/login/oauth/authorize?client_id=your_client_id&redirect_uri=${encodeURIComponent(window.location.origin)}`;
-    window.location.href = authUrl;
-  });
+  const { isAuthenticated, isLoading, username, login, logout } = useAuth();
 
   const navigateToUserActivity = (username: string) => {
     navigate({ to: '/user/$username/activity', params: { username } });
+  };
+  
+  // Handle navigation to workspace in a way compatible with TanStack Router
+  const navigateToWorkspace = () => {
+    // Use window.location for routes that aren't registered yet
+    window.location.href = '/_authenticated/workspace';
   };
 
   return (
@@ -46,12 +37,15 @@ export default function Header({
           <span className="text-xs font-semibold mt-1 text-muted-foreground">{version}</span>
         </div>
         
-        {isSignedIn && user && (
+        {isAuthenticated && username && (
           <div className="hidden md:flex gap-2">
-            <Button variant="link" asChild>
-              <Link to="/workspace">Workspace</Link>
+            <Button 
+              variant="link" 
+              onClick={navigateToWorkspace}
+            >
+              Workspace
             </Button>
-            <Button variant="link" onClick={() => navigateToUserActivity(user.username)}>
+            <Button variant="link" onClick={() => navigateToUserActivity(username)}>
               Activity
             </Button>
             <Button variant="link" asChild>
@@ -62,10 +56,17 @@ export default function Header({
       </div>
       
       <div className="flex items-center gap-2">
-        {!isSignedIn && (
-          <Button onClick={handleSignIn} disabled={isSigningIn}>
-            {isSigningIn ? "Signing in..." : "Sign In"}
+        {!isAuthenticated ? (
+          <Button onClick={() => login()} disabled={isLoading}>
+            {isLoading ? "Loading..." : "Sign In"}
           </Button>
+        ) : (
+          <div className="flex items-center gap-2">
+            <span className="text-sm text-muted-foreground">{username}</span>
+            <Button variant="outline" onClick={() => logout()}>
+              Sign Out
+            </Button>
+          </div>
         )}
       </div>
     </header>

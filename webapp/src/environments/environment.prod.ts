@@ -12,8 +12,7 @@ export const environment = {
   keycloak: {
     url: 'WEB_ENV_KEYCLOAK_URL',
     realm: 'WEB_ENV_KEYCLOAK_REALM',
-    clientId: 'WEB_ENV_KEYCLOAK_CLIENT_ID',
-    skipLoginPage: 'WEB_ENV_KEYCLOAK_SKIP_LOGIN'
+    clientId: 'WEB_ENV_KEYCLOAK_CLIENT_ID'
   },
   posthog: {
     projectApiKey: 'WEB_ENV_POSTHOG_PROJECT_API_KEY',
