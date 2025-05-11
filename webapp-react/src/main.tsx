@@ -9,9 +9,10 @@ import { client } from '@/api/client.gen';
 import "./styles.css";
 import reportWebVitals from "./reportWebVitals.ts";
 
-import { AuthProvider } from "./lib/auth/AuthContext";
-import environment from "./environment/index.ts";
-import keycloakService from "./lib/auth/keycloak.ts";
+import { AuthProvider } from "@/lib/auth/AuthContext";
+import { ThemeProvider } from "@/lib/theme/ThemeContext";
+import environment from "@/environment";
+import keycloakService from "@/lib/auth/keycloak";
 
 client.setConfig({
   baseUrl: environment.serverUrl,
@@ -70,7 +71,9 @@ if (rootElement && !rootElement.innerHTML) {
 		// Removed StrictMode wrapper to prevent double rendering in development
 		<TanstackQuery.Provider>
 			<AuthProvider>
-				<RouterProvider router={router} />
+				<ThemeProvider defaultTheme="dark" storageKey="vite-ui-theme">
+					<RouterProvider router={router} />
+				</ThemeProvider>
 			</AuthProvider>
 		</TanstackQuery.Provider>
 	);

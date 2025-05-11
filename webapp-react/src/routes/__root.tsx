@@ -1,8 +1,8 @@
 import { Outlet, createRootRouteWithContext } from "@tanstack/react-router";
 import { TanStackRouterDevtools } from "@tanstack/react-router-devtools";
 
-import Header from "../components/Header";
-import Footer from "../components/Footer";
+import Header from "@/components/header/Header";
+import Footer from "@/components/footer/Footer";
 
 import TanstackQueryLayout from "../integrations/tanstack-query/layout";
 
