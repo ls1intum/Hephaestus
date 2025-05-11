@@ -24,7 +24,6 @@ interface LeaderboardPageProps {
     day: number;
     hour: number;
     minute: number;
-    formatted: string;
   };
 }
 

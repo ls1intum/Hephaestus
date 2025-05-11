@@ -1,5 +1,4 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Separator } from "@/components/ui/separator";
 import type { LeaderboardFilterProps } from "./types";
 import { TeamFilter } from "./filters/TeamFilter";
 import { SortFilter } from "./filters/SortFilter";
@@ -23,7 +22,6 @@ export function LeaderboardFilter({
     day: number;
     hour: number;
     minute: number;
-    formatted: string;
   };
 }) {
   return (
@@ -35,7 +33,7 @@ export function LeaderboardFilter({
         </CardDescription>
       </CardHeader>
       <CardContent>
-        <div className="flex flex-col gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 xl:grid-cols-1">
           <TeamFilter 
             teams={teams}
             onTeamChange={onTeamChange}

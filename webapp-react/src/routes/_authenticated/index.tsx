@@ -90,7 +90,6 @@ function LeaderboardContainer() {
     day: 1, // Monday
     hour: 9,
     minute: 0,
-    formatted: 'Mondays at 09:00'
   };
 
   // Handle team filter changes
