@@ -1,9 +1,9 @@
 import type { Decorator, Preview } from '@storybook/react'
 import { withThemeByClassName, withThemeByDataAttribute } from '@storybook/addon-themes';
-import '../src/styles.css'
 import { createRootRoute, createRouter, RouterProvider } from "@tanstack/react-router";
 import React from "react";
 import { ThemeProvider } from "../src/lib/theme/ThemeContext";
+import '../src/styles.css'
 
 // Create a Tanstack Router decorator
 const RouterDecorator: Decorator = (Story) => {
