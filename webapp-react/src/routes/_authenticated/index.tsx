@@ -2,7 +2,7 @@ import { createFileRoute, retainSearchParams } from '@tanstack/react-router'
 import { useQuery } from "@tanstack/react-query";
 import { useNavigate } from "@tanstack/react-router";
 import { z } from 'zod';
-import { zodValidator, fallback } from '@tanstack/zod-adapter';
+import { zodValidator } from '@tanstack/zod-adapter';
 import dayjs from "dayjs";
 import isoWeek from "dayjs/plugin/isoWeek";
 import { useAuth } from "@/lib/auth/AuthContext";
@@ -13,17 +13,17 @@ import type { LeaderboardSortType } from '@/features/leaderboard/types';
 // Extend dayjs with the isoWeek plugin
 dayjs.extend(isoWeek);
 
-// Calculate default date range
+// Calculate default date range with ISO 8601 format including timezone
 const today = dayjs();
-const startOfLastWeek = today.subtract(1, 'week').startOf('isoWeek').format('YYYY-MM-DD');
-const endOfLastWeek = today.subtract(1, 'week').endOf('isoWeek').format('YYYY-MM-DD');
+const startOfLastWeek = today.subtract(1, 'week').startOf('isoWeek').format('YYYY-MM-DDTHH:mm:ss+00:00');
+const endOfLastWeek = today.subtract(1, 'week').endOf('isoWeek').format('YYYY-MM-DDTHH:mm:ss+00:00');
 
 // Define search params schema for validation and types
 const leaderboardSearchSchema = z.object({
-  team: fallback(z.string(), 'all'),
-  sort: fallback(z.enum(['SCORE', 'LEAGUE_POINTS']), 'SCORE'),
-  after: fallback(z.string(), startOfLastWeek),
-  before: fallback(z.string(), endOfLastWeek),
+  team: z.string().default('all'),
+  sort: z.enum(['SCORE', 'LEAGUE_POINTS']).default('SCORE'),
+  after: z.string().optional().default(startOfLastWeek),
+  before: z.string().optional().default(endOfLastWeek),
 });
 
 // Export route with search param validation
@@ -55,8 +55,8 @@ function LeaderboardContainer() {
       query: {
         after,
         before,
-        team: team !== 'all' ? team : undefined,
-        sort: sort === "SCORE" ? sort : "SCORE" // Ensure API compatibility
+        team,
+        sort,
       }
     }),
     enabled: Boolean(after && before && metaQuery.data),

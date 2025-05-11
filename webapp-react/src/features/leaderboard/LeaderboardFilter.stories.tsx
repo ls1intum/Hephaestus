@@ -22,6 +22,6 @@ export const WithSelectedFilters: Story = {
   args: {
     teams: ['Frontend', 'Backend', 'DevOps', 'QA', 'Design'],
     selectedTeam: 'Frontend',
-    selectedSort: 'APPROVALS',
+    selectedSort: 'LEAGUE_POINTS',
   },
 };

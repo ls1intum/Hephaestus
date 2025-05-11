@@ -73,9 +73,10 @@ export function TimeframeFilter({ onTimeframeChange, leaderboardSchedule }: Time
       }
     }
     
+    // Format dates in ISO 8601 format with timezone offset
     return {
-      afterDate: afterDate.format('YYYY-MM-DD'),
-      beforeDate: beforeDate.format('YYYY-MM-DD'),
+      afterDate: afterDate.format('YYYY-MM-DDTHH:mm:ss+00:00'),
+      beforeDate: beforeDate.format('YYYY-MM-DDTHH:mm:ss+00:00'),
     };
   };
   
