@@ -2,17 +2,35 @@ import Keycloak from 'keycloak-js';
 import environment from '@/environment';
 
 export interface UserProfile {
+  id: string;
+  username: string;
+  firstName: string;
+  lastName: string;
   email: string;
-  email_verified: boolean;
-  given_name: string;
-  family_name: string;
+  emailVerified: boolean;
   name: string;
   preferred_username: string;
-  realmAccess: { roles: string[] };
+  userProfileMetadata?: {
+    attributes: Array<{
+      name: string;
+      displayName: string;
+      required: boolean;
+      readOnly: boolean;
+      validators: Record<string, any>;
+      multivalued: boolean;
+    }>;
+    groups: Array<{
+      name: string;
+      displayHeader: string;
+      displayDescription: string;
+    }>;
+  };
+  realmAccess?: { roles: string[] };
+  resourceAccess?: Record<string, { roles: string[] }>;
   roles: string[];
   sub: string;
   token: string;
-  github_id?: string; // Optional GitHub ID from token
+  githubId?: string; // Optional GitHub ID from token
 }
 
 class KeycloakService {

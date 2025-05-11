@@ -9,7 +9,7 @@ export default function HeaderContainer() {
       version={environment.version}
       isAuthenticated={isAuthenticated}
       isLoading={isLoading}
-      name={userProfile?.name}
+      name={userProfile && `${userProfile.firstName} ${userProfile.lastName}`}
       username={username}
       showAdmin={hasRole('admin')}
       showMentor={hasRole('mentor_access')}
