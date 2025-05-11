@@ -1,5 +1,9 @@
 package de.tum.in.www1.hephaestus.activity;
 
+import com.langfuse.client.LangfuseClient;
+import com.langfuse.client.resources.commons.types.CreateScoreValue;
+import com.langfuse.client.resources.score.types.CreateScoreRequest;
+import com.langfuse.client.resources.score.types.CreateScoreResponse;
 import de.tum.in.www1.hephaestus.activity.badpracticedetector.PullRequestBadPracticeDetector;
 import de.tum.in.www1.hephaestus.activity.model.*;
 import de.tum.in.www1.hephaestus.gitprovider.issue.Issue;
@@ -14,6 +18,8 @@ import java.util.stream.Collectors;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 
 @Service
@@ -32,6 +38,18 @@ public class ActivityService {
 
     @Autowired
     private PullRequestBadPracticeDetector pullRequestBadPracticeDetector;
+
+    @Value("${hephaestus.detection.tracing.enabled}")
+    private boolean tracingEnabled;
+
+    @Value("${hephaestus.detection.tracing.host}")
+    private String tracingHost;
+
+    @Value("${hephaestus.detection.tracing.public-key}")
+    private String tracingPublicKey;
+
+    @Value("${hephaestus.detection.tracing.secret-key}")
+    private String tracingSecretKey;
 
     public ActivityDTO getActivity(String login) {
         logger.info("Getting activity for user with login: {}", login);
@@ -68,7 +86,7 @@ public class ActivityService {
         return new ActivityDTO(openPullRequestsWithBadPractices);
     }
 
-    public List<PullRequestBadPracticeDTO> detectBadPracticesForUser(String login) {
+    public DetectionResult detectBadPracticesForUser(String login) {
         logger.info("Detecting bad practices for user with login: {}", login);
 
         List<PullRequest> pullRequests = pullRequestRepository.findAssignedByLoginAndStates(
@@ -76,21 +94,25 @@ public class ActivityService {
             Set.of(Issue.State.OPEN)
         );
 
-        List<PullRequestBadPractice> detectedBadPractices = new ArrayList<>();
+        List<DetectionResult> detectedBadPractices = new ArrayList<>();
         for (PullRequest pullRequest : pullRequests) {
-            detectedBadPractices.addAll(pullRequestBadPracticeDetector.detectAndSyncBadPractices(pullRequest));
+            detectedBadPractices.add(pullRequestBadPracticeDetector.detectAndSyncBadPractices(pullRequest));
         }
-        return detectedBadPractices.stream().map(PullRequestBadPracticeDTO::fromPullRequestBadPractice).toList();
+        if (detectedBadPractices.stream().anyMatch(result -> result == DetectionResult.BAD_PRACTICES_DETECTED)) {
+            return DetectionResult.BAD_PRACTICES_DETECTED;
+        } else if (
+            detectedBadPractices.stream().anyMatch(result -> result == DetectionResult.NO_BAD_PRACTICES_DETECTED)
+        ) {
+            return DetectionResult.NO_BAD_PRACTICES_DETECTED;
+        } else {
+            return DetectionResult.ERROR_NO_UPDATE_ON_PULLREQUEST;
+        }
     }
 
-    public List<PullRequestBadPracticeDTO> detectBadPracticesForPullRequest(PullRequest pullRequest) {
+    public DetectionResult detectBadPracticesForPullRequest(PullRequest pullRequest) {
         logger.info("Detecting bad practices for PR: {}", pullRequest.getId());
 
-        List<PullRequestBadPractice> detectedBadPractices = pullRequestBadPracticeDetector.detectAndSyncBadPractices(
-            pullRequest
-        );
-
-        return detectedBadPractices.stream().map(PullRequestBadPracticeDTO::fromPullRequestBadPractice).toList();
+        return pullRequestBadPracticeDetector.detectAndSyncBadPractices(pullRequest);
     }
 
     public void resolveBadPractice(PullRequestBadPractice badPractice, PullRequestBadPracticeState state) {
@@ -103,14 +125,37 @@ public class ActivityService {
     public void provideFeedbackForBadPractice(PullRequestBadPractice badPractice, BadPracticeFeedbackDTO feedback) {
         logger.info("Marking bad practice with id: {}", badPractice.getId());
 
-        badPractice.setUserState(PullRequestBadPracticeState.WRONG);
-        pullRequestBadPracticeRepository.save(badPractice);
-
         BadPracticeFeedback badPracticeFeedback = new BadPracticeFeedback();
         badPracticeFeedback.setPullRequestBadPractice(badPractice);
         badPracticeFeedback.setExplanation(feedback.explanation());
         badPracticeFeedback.setType(feedback.type());
         badPracticeFeedback.setCreationTime(OffsetDateTime.now());
         badPracticeFeedbackRepository.save(badPracticeFeedback);
+
+        if (tracingEnabled && badPractice.getDetectionTraceId() != null) {
+            sendFeedbackToLangfuse(badPractice, feedback);
+        }
+    }
+
+    @Async
+    protected void sendFeedbackToLangfuse(PullRequestBadPractice badPractice, BadPracticeFeedbackDTO feedback) {
+        logger.info("Sending feedback to Langfuse for bad practice: {}", badPractice.getId());
+        try {
+            LangfuseClient client = LangfuseClient.builder()
+                .url(tracingHost)
+                .credentials(tracingPublicKey, tracingSecretKey)
+                .build();
+
+            CreateScoreRequest request = CreateScoreRequest.builder()
+                .traceId(badPractice.getDetectionTraceId())
+                .name("user_feedback")
+                .value(CreateScoreValue.of(feedback.explanation()))
+                .build();
+
+            CreateScoreResponse response = client.score().create(request);
+            logger.info("Feedback sent to Langfuse: {}", response.toString());
+        } catch (Exception e) {
+            logger.error("Failed to send feedback to Langfuse: {}", e.getMessage());
+        }
     }
 }

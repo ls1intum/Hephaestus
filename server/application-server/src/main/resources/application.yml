@@ -1,7 +1,7 @@
 spring:
     application:
         name: Hephaestus
-        version: "0.6.1"
+        version: "0.7.1"
 
     datasource:
         url: jdbc:postgresql://localhost:5432/hephaestus
@@ -83,6 +83,16 @@ hephaestus:
 
     detection:
         run-automatic-detection-for-all: false
+        tracing:
+            enabled: false
+            # The host of the langfuse server
+            host: ${LANGFUSE_HOST:}
+            # The public key of the langfuse server
+            public-key: ${LANGFUSE_PUBLIC_KEY:}
+            # The secret key of the langfuse server
+            secret-key: ${LANGFUSE_SECRET_KEY:}
+
+
 
 keycloak:
     url: http://localhost:8081

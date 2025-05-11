@@ -4,7 +4,7 @@ import de.tum.in.www1.hephaestus.activity.model.*;
 import de.tum.in.www1.hephaestus.gitprovider.pullrequest.PullRequest;
 import de.tum.in.www1.hephaestus.gitprovider.pullrequest.PullRequestRepository;
 import de.tum.in.www1.hephaestus.gitprovider.user.UserRepository;
-import java.util.List;
+import java.util.Optional;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -32,36 +32,40 @@ public class ActivityController {
     }
 
     @PostMapping("/user/{login}/badpractices")
-    public ResponseEntity<List<PullRequestBadPracticeDTO>> detectBadPracticesByUser(@PathVariable String login) {
+    public ResponseEntity<Void> detectBadPracticesByUser(@PathVariable String login) {
         var user = userRepository.getCurrentUser();
 
         if (user.isEmpty()) {
-            return ResponseEntity.notFound().build();
+            return ResponseEntity.status(401).build();
         } else if (!user.get().getLogin().equals(login)) {
-            return ResponseEntity.badRequest().build();
+            return ResponseEntity.status(403).build();
         }
 
-        List<PullRequestBadPracticeDTO> badPractices = activityService.detectBadPracticesForUser(login);
-        return ResponseEntity.ok(badPractices);
+        DetectionResult detectionResult = activityService.detectBadPracticesForUser(login);
+        if (detectionResult == DetectionResult.ERROR_NO_UPDATE_ON_PULLREQUEST) {
+            return ResponseEntity.badRequest().build();
+        }
+        return ResponseEntity.ok().build();
     }
 
     @PostMapping("/pullrequest/{pullRequestId}/badpractices")
-    public ResponseEntity<List<PullRequestBadPracticeDTO>> detectBadPracticesForPullRequest(
-        @PathVariable Long pullRequestId
-    ) {
+    public ResponseEntity<Void> detectBadPracticesForPullRequest(@PathVariable Long pullRequestId) {
         var user = userRepository.getCurrentUser();
         PullRequest pullRequest = pullRequestRepository.findById(pullRequestId).orElse(null);
 
         if (pullRequest == null) {
             return ResponseEntity.notFound().build();
         } else if (user.isEmpty()) {
-            return ResponseEntity.notFound().build();
+            return ResponseEntity.status(401).build();
         } else if (!pullRequest.getAssignees().contains(user.get())) {
-            return ResponseEntity.badRequest().build();
+            return ResponseEntity.status(403).build();
         }
 
-        List<PullRequestBadPracticeDTO> badPractice = activityService.detectBadPracticesForPullRequest(pullRequest);
-        return ResponseEntity.ok(badPractice);
+        DetectionResult detectionResult = activityService.detectBadPracticesForPullRequest(pullRequest);
+        if (detectionResult == DetectionResult.ERROR_NO_UPDATE_ON_PULLREQUEST) {
+            return ResponseEntity.badRequest().build();
+        }
+        return ResponseEntity.ok().build();
     }
 
     @PostMapping("/badpractice/{badPracticeId}/resolve")
@@ -75,10 +79,14 @@ public class ActivityController {
         if (badPractice.isEmpty()) {
             return ResponseEntity.notFound().build();
         } else if (user.isEmpty()) {
-            return ResponseEntity.notFound().build();
+            return ResponseEntity.status(401).build();
         } else if (!badPractice.get().getPullrequest().getAssignees().contains(user.get())) {
-            return ResponseEntity.badRequest().build();
-        } else if (state != PullRequestBadPracticeState.FIXED && state != PullRequestBadPracticeState.WONT_FIX) {
+            return ResponseEntity.status(403).build();
+        } else if (
+            state != PullRequestBadPracticeState.FIXED &&
+            state != PullRequestBadPracticeState.WONT_FIX &&
+            state != PullRequestBadPracticeState.WRONG
+        ) {
             return ResponseEntity.badRequest().build();
         }
 
@@ -91,7 +99,7 @@ public class ActivityController {
         @PathVariable Long badPracticeId,
         @RequestBody BadPracticeFeedbackDTO feedback
     ) {
-        var badPractice = pullRequestBadPracticeRepository.findById(badPracticeId);
+        Optional<PullRequestBadPractice> badPractice = pullRequestBadPracticeRepository.findById(badPracticeId);
 
         if (badPractice.isEmpty()) {
             return ResponseEntity.notFound().build();

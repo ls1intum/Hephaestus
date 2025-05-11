@@ -2,7 +2,7 @@ import { Component, inject, signal } from '@angular/core';
 import { PullRequestInfo, PullRequestReviewInfo, UserService } from 'app/core/modules/openapi';
 import { HlmAvatarModule } from '@spartan-ng/ui-avatar-helm';
 import { HlmSkeletonModule } from '@spartan-ng/ui-skeleton-helm';
-import { ActivatedRoute } from '@angular/router';
+import { ActivatedRoute, RouterLink } from '@angular/router';
 import { injectQuery } from '@tanstack/angular-query-experimental';
 import { HlmIconModule } from 'libs/ui/ui-icon-helm/src/index';
 import { HlmButtonModule } from '@spartan-ng/ui-button-helm';
@@ -30,7 +30,8 @@ import { HlmScrollAreaDirective } from '@spartan-ng/ui-scrollarea-helm';
     NgScrollbarModule,
     HlmScrollAreaDirective,
     HlmAlertModule,
-    HlmScrollAreaDirective
+    HlmScrollAreaDirective,
+    RouterLink
   ],
   providers: [provideIcons({ lucideCircleX, lucideInfo })],
   templateUrl: './user-profile.component.html'

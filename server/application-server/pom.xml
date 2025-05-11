@@ -11,7 +11,7 @@
 	</parent>
 	<groupId>de.tum.in.www1</groupId>
 	<artifactId>hephaestus</artifactId>
-	<version>0.6.1-SNAPSHOT</version>
+	<version>0.7.1-SNAPSHOT</version>
 	<name>Hephaestus</name>
 	<description>AI-driven learning for better software development</description>
 	<url />
@@ -164,7 +164,7 @@
 		<dependency>
 			<groupId>com.squareup.okhttp3</groupId>
 			<artifactId>okhttp</artifactId>
-			<version>3.5.0</version>
+			<version>4.12.0</version>
 		</dependency>
 		<dependency>
 			<groupId>com.squareup.okhttp3</groupId>
@@ -210,6 +210,11 @@
 			<groupId>io.sentry</groupId>
 			<artifactId>sentry-spring-boot-starter-jakarta</artifactId>
 			<version>8.2.0</version>
+		</dependency>
+		<dependency>
+			<groupId>com.langfuse</groupId>
+			<artifactId>langfuse-java</artifactId>
+			<version>0.0.6</version>
 		</dependency>
 	</dependencies>
 	<dependencyManagement>

@@ -22,6 +22,7 @@ public record PullRequestWithBadPracticesDTO(
     @NonNull Integer deletions,
     @NonNull String htmlUrl,
     @NonNull OffsetDateTime createdAt,
+    @NonNull OffsetDateTime updatedAt,
     @NonNull String badPracticeSummary,
     @NonNull List<PullRequestBadPracticeDTO> badPractices
 ) {
@@ -47,6 +48,7 @@ public record PullRequestWithBadPracticesDTO(
             pullRequest.getDeletions(),
             pullRequest.getHtmlUrl(),
             pullRequest.getCreatedAt(),
+            pullRequest.getUpdatedAt(),
             pullRequest.getBadPracticeSummary(),
             badPractices
         );
