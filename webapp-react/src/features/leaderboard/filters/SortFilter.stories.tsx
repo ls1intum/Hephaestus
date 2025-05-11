@@ -21,6 +21,6 @@ export const Default: Story = {
 
 export const SortByApprovals: Story = {
   args: {
-    selectedSort: 'APPROVALS',
+    selectedSort: 'LEAGUE_POINTS',
   },
 };
