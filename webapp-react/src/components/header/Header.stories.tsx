@@ -40,12 +40,23 @@ export const LoggedInAdmin: Story = {
   },
 };
 
-export const LoggedInNonAdmin: Story = {
+
+
+export const LoggedInNonAdminWithMentor: Story = {
   args: {
     isAuthenticated: true,
     isLoading: false,
     showAdmin: false,
     showMentor: true,
+  },
+};
+
+export const LoggedInNonAdmin: Story = {
+  args: {
+    isAuthenticated: true,
+    isLoading: false,
+    showAdmin: false,
+    showMentor: false,
   },
 };
 

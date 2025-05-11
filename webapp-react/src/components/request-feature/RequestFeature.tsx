@@ -6,7 +6,6 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { Sparkles } from "lucide-react";
-import { cn } from "@/lib/utils";
 
 interface RequestFeatureProps {
   /** Whether to show only the icon without text */

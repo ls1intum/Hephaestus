@@ -1,6 +1,6 @@
 import { Link } from "@tanstack/react-router";
 import { Button } from "@/components/ui/button";
-import { Hammer, User, LogOut, Settings, MessageSquarePlus } from "lucide-react";
+import { Hammer, User, LogOut, Settings } from "lucide-react";
 import { 
   Avatar, 
   AvatarFallback, 
@@ -17,6 +17,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { ModeToggle } from "@/components/mode-toggle/ModeToggle";
 import RequestFeature from "@/components/request-feature/RequestFeature";
+import AIMentor from "@/features/mentor/AIMentor";
 
 export interface HeaderProps {
   /** Application version displayed beside logo */
@@ -78,13 +79,15 @@ export default function Header({
       
       {showMentor && (
         <>
-          <Button variant="ghost" size="icon" className="hidden sm:inline-flex">
-            <MessageSquarePlus className="h-5 w-5" />
-            <span className="ml-2">AI Mentor</span>
-          </Button>
-          <Button variant="ghost" size="icon" className="sm:hidden">
-            <MessageSquarePlus className="h-5 w-5" />
-          </Button>
+          {/* Desktop AI Mentor component */}
+          <div className="hidden sm:block">
+            <AIMentor iconOnly={false} />
+          </div>
+          
+          {/* Mobile AI Mentor component */}
+          <div className="sm:hidden">
+            <AIMentor iconOnly={true} />
+          </div>
         </>
       )}
       
