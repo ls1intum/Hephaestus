@@ -1,6 +1,6 @@
 import { Link } from "@tanstack/react-router";
 import { Button } from "@/components/ui/button";
-import { Hammer, User, LogOut, Settings } from "lucide-react";
+import { Hammer, User, LogOut, Settings, Menu } from "lucide-react";
 import { 
   Avatar, 
   AvatarFallback, 
@@ -62,6 +62,7 @@ export default function Header({
           <span className="text-xs font-semibold mt-1 text-muted-foreground">{version}</span>
         </div>
         
+        {/* Desktop navigation links */}
         {showAdmin && (
           <div className="hidden md:flex gap-2">
             <Button asChild variant="link">
@@ -73,6 +74,33 @@ export default function Header({
             <Button asChild variant="link">
               <Link to="/teams">Teams</Link>
             </Button>
+          </div>
+        )}
+        
+        {/* Mobile navigation menu */}
+        {showAdmin && isAuthenticated && (
+          <div className="md:hidden">
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="outline" size="icon" className="h-8 w-8">
+                  <Menu className="h-5 w-5" />
+                  <span className="sr-only">Navigation Menu</span>
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="start">
+                <DropdownMenuLabel>Navigation</DropdownMenuLabel>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem asChild>
+                  <Link to="/workspace" className="w-full">Workspace</Link>
+                </DropdownMenuItem>
+                <DropdownMenuItem asChild>
+                  <Link to="/user/$username/activity" params={{ username: username ?? '' }} className="w-full">Activity</Link>
+                </DropdownMenuItem>
+                <DropdownMenuItem asChild>
+                  <Link to="/teams" className="w-full">Teams</Link>
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
           </div>
         )}
       </div>
