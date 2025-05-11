@@ -63,13 +63,15 @@ export default function Header({
         </div>
         
         {/* Desktop navigation links */}
-        {showAdmin && (
+        {isAuthenticated && (
           <div className="hidden md:flex gap-2">
+            {showAdmin && (
+              <Button asChild variant="link">
+                <Link to="/workspace">Workspace</Link>
+              </Button>
+            )}
             <Button asChild variant="link">
-              <Link to="/workspace">Workspace</Link>
-            </Button>
-            <Button asChild variant="link">
-              <Link to="/user/$username/activity" params={{ username: username ?? '' }}>Activity</Link>
+              <Link to="/best-practices">Best practices</Link>
             </Button>
             <Button asChild variant="link">
               <Link to="/teams">Teams</Link>
@@ -78,7 +80,7 @@ export default function Header({
         )}
         
         {/* Mobile navigation menu */}
-        {showAdmin && isAuthenticated && (
+        {isAuthenticated && (
           <div className="md:hidden">
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
@@ -90,11 +92,13 @@ export default function Header({
               <DropdownMenuContent align="start">
                 <DropdownMenuLabel>Navigation</DropdownMenuLabel>
                 <DropdownMenuSeparator />
+                {showAdmin && (
+                  <DropdownMenuItem asChild>
+                    <Link to="/workspace" className="w-full">Workspace</Link>
+                  </DropdownMenuItem>
+                )}
                 <DropdownMenuItem asChild>
-                  <Link to="/workspace" className="w-full">Workspace</Link>
-                </DropdownMenuItem>
-                <DropdownMenuItem asChild>
-                  <Link to="/user/$username/activity" params={{ username: username ?? '' }} className="w-full">Activity</Link>
+                  <Link to="/best-practices" className="w-full">Best practices</Link>
                 </DropdownMenuItem>
                 <DropdownMenuItem asChild>
                   <Link to="/teams" className="w-full">Teams</Link>
