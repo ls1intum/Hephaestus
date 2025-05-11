@@ -1,7 +1,7 @@
 import { Outlet, createRootRouteWithContext } from "@tanstack/react-router";
 import { TanStackRouterDevtools } from "@tanstack/react-router-devtools";
 
-import Header from "@/components/header/Header";
+import HeaderContainer from "@/components/header/HeaderContainer";
 import Footer from "@/components/footer/Footer";
 
 import TanstackQueryLayout from "../integrations/tanstack-query/layout";
@@ -16,7 +16,7 @@ export const Route = createRootRouteWithContext<MyRouterContext>()({
 	component: () => (
 		<>
 			<div className="flex flex-col min-h-screen">
-				<Header />
+				<HeaderContainer />
 				<main className="container flex-grow pt-4 pb-8">
 					<Outlet />
 				</main>

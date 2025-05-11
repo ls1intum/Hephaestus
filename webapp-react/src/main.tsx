@@ -71,7 +71,7 @@ if (rootElement && !rootElement.innerHTML) {
 		// Removed StrictMode wrapper to prevent double rendering in development
 		<TanstackQuery.Provider>
 			<AuthProvider>
-				<ThemeProvider defaultTheme="dark" storageKey="vite-ui-theme">
+				<ThemeProvider defaultTheme="dark" storageKey="theme">
 					<RouterProvider router={router} />
 				</ThemeProvider>
 			</AuthProvider>

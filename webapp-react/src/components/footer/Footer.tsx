@@ -1,42 +1,31 @@
 import { Link } from "@tanstack/react-router";
-import { Github } from "lucide-react";
-import environment from "@/environment";
 
 export default function Footer() {
-  const currentYear = new Date().getFullYear();
-
   return (
-    <footer className="container mx-auto py-6 mt-auto">
-      <div className="border-t pt-6">
-        <div className="flex flex-col md:flex-row justify-between items-center gap-4">
-          <div className="flex items-center gap-4">
-            <Link to="/" className="text-sm font-medium text-muted-foreground hover:text-foreground">
-              Home
-            </Link>
-            <Link to="/about" className="text-sm font-medium text-muted-foreground hover:text-foreground">
-              About
-            </Link>
-            <a 
-              href="https://github.com/hephaestus-repo/hephaestus" 
-              target="_blank" 
-              rel="noopener noreferrer"
-              className="text-sm font-medium text-muted-foreground hover:text-foreground inline-flex items-center gap-1"
-            >
-              <Github className="h-4 w-4" />
-              <span>GitHub</span>
-            </a>
-          </div>
-          
-          <div className="flex flex-col md:flex-row items-center gap-2">
-            <p className="text-sm text-muted-foreground">
-              © {currentYear} Hephaestus Project
-            </p>
-            <span className="hidden md:inline text-muted-foreground">•</span>
-            <p className="text-xs text-muted-foreground">
-              Version {environment.version}
-            </p>
-          </div>
-        </div>
+    <footer className="py-6 md:px-8 md:py-0 border-t">
+      <div className="container flex flex-col items-center justify-between gap-2 md:gap-4 md:h-24 md:flex-row">
+        <p className="text-balance text-center text-sm leading-loose text-muted-foreground md:text-left">
+          <Link to="/about" className="font-medium underline underline-offset-4">About</Link>
+        </p>
+        <p className="text-balance text-center text-sm leading-loose text-muted-foreground md:text-left">
+          <a href="https://github.com/ls1intum/Hephaestus/releases" target="_blank" rel="noopener noreferrer" className="font-medium underline underline-offset-4">Releases</a>
+        </p>
+        <p className="text-balance text-center text-sm leading-loose text-muted-foreground md:text-left">
+          <a data-canny-link href="https://hephaestus.canny.io/feature-requests" className="font-medium underline underline-offset-4">Feature requests</a>
+        </p>
+        <p className="text-balance text-center text-sm leading-loose text-muted-foreground md:text-left">
+          <Link to="/privacy" className="font-medium underline underline-offset-4">Privacy</Link>
+        </p>
+        <p className="text-balance text-center text-sm leading-loose text-muted-foreground md:text-left">
+          <Link to="/imprint" className="font-medium underline underline-offset-4">Imprint</Link>
+        </p>
+        <p className="text-balance text-center text-sm leading-loose text-muted-foreground md:text-right flex-1">
+          Built by{" "}
+          <a href="https://github.com/ls1intum" target="_blank" rel="noopener noreferrer" className="font-medium underline underline-offset-4">AET Team</a>
+          {" "}at{" "}
+          <a href="https://www.tum.de/en/" target="_blank" rel="noopener noreferrer" className="font-medium underline underline-offset-4">TUM</a>. The source code is available on{" "}
+          <a href="https://github.com/ls1intum/hephaestus" target="_blank" rel="noopener noreferrer" className="font-medium underline underline-offset-4">GitHub</a>.
+        </p>
       </div>
     </footer>
   );

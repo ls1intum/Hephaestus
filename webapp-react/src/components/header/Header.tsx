@@ -1,8 +1,6 @@
 import { Link } from "@tanstack/react-router";
 import { Button } from "@/components/ui/button";
 import { Hammer, User, LogOut, Settings, MessageSquarePlus } from "lucide-react";
-import { useAuth } from "@/lib/auth/AuthContext";
-import environment from "@/environment";
 import { 
   Avatar, 
   AvatarFallback, 
@@ -18,13 +16,40 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { ModeToggle } from "@/components/mode-toggle/ModeToggle";
+import RequestFeature from "@/components/request-feature/RequestFeature";
 
-export default function Header() {
-  const { isAuthenticated, isLoading, username, login, logout, hasRole } = useAuth();
+export interface HeaderProps {
+  /** Application version displayed beside logo */
+  version: string;
+  /** User authentication state */
+  isAuthenticated: boolean;
+  /** Whether the authentication is currently loading */
+  isLoading: boolean;
+  /** Name of the authenticated user */
+  name?: string;
+  /** Username of the authenticated user */
+  username?: string;
+  /** Whether user has admin access */
+  showAdmin: boolean;
+  /** Whether user has mentor access */
+  showMentor: boolean;
+  /** Function to call on login button click */
+  onLogin: () => void;
+  /** Function to call on logout button click */
+  onLogout: () => void;
+}
 
-  const showAdmin = isAuthenticated && hasRole('admin');
-  const showMentor = isAuthenticated && hasRole('mentor_access');
-
+export default function Header({
+  version,
+  isAuthenticated,
+  isLoading,
+  name,
+  username,
+  showAdmin,
+  showMentor,
+  onLogin,
+  onLogout
+}: HeaderProps) {
   return (
     <header className="container flex items-center justify-between pt-4 gap-2">
       <div className="flex gap-4 items-center flex-1">
@@ -33,7 +58,7 @@ export default function Header() {
             <Hammer className="text-2xl sm:text-3xl" />
             <span className="hidden sm:inline-block text-xl font-semibold">Hephaestus</span>
           </Link>
-          <span className="text-xs font-semibold mt-1 text-muted-foreground">{environment.version}</span>
+          <span className="text-xs font-semibold mt-1 text-muted-foreground">{version}</span>
         </div>
         
         {showAdmin && (
@@ -63,20 +88,21 @@ export default function Header() {
         </>
       )}
       
-      <Button variant="ghost" size="icon" className="hidden sm:inline-flex">
-        <MessageSquarePlus className="h-5 w-5" />
-        <span className="ml-2">Request Feature</span>
-      </Button>
+      {/* Desktop RequestFeature component */}
+      <div className="hidden sm:block">
+        <RequestFeature iconOnly={false} />
+      </div>
       
-      <Button variant="ghost" size="icon" className="sm:hidden">
-        <MessageSquarePlus className="h-5 w-5" />
-      </Button>
+      {/* Mobile RequestFeature component */}
+      <div className="sm:hidden">
+        <RequestFeature iconOnly={true} />
+      </div>
       
       <ModeToggle />
       
       <div className="flex items-center gap-2">
         {!isAuthenticated ? (
-          <Button onClick={() => login()} disabled={isLoading}>
+          <Button onClick={onLogin} disabled={isLoading}>
             {isLoading ? "Loading..." : "Sign In"}
           </Button>
         ) : (
@@ -93,7 +119,7 @@ export default function Header() {
               <DropdownMenuContent className="w-56" align="end" forceMount>
                 <DropdownMenuLabel className="font-normal">
                   <div className="flex flex-col space-y-1">
-                    <p className="text-sm font-medium leading-none">{username}</p>
+                    <p className="text-sm font-medium leading-none">{name}</p>
                   </div>
                 </DropdownMenuLabel>
                 <DropdownMenuSeparator />
@@ -112,7 +138,7 @@ export default function Header() {
                   </DropdownMenuItem>
                 </DropdownMenuGroup>
                 <DropdownMenuSeparator />
-                <DropdownMenuItem onClick={() => logout()}>
+                <DropdownMenuItem onClick={onLogout}>
                   <LogOut className="mr-2 h-4 w-4" />
                   <span>Sign Out</span>
                 </DropdownMenuItem>

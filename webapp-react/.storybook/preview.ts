@@ -1,6 +1,29 @@
-import type { Preview } from '@storybook/react'
+import type { Decorator, Preview } from '@storybook/react'
 import { withThemeByClassName, withThemeByDataAttribute } from '@storybook/addon-themes';
 import '../src/styles.css'
+import { createRootRoute, createRouter, RouterProvider } from "@tanstack/react-router";
+import React from "react";
+import { ThemeProvider } from "../src/lib/theme/ThemeContext";
+
+// Create a Tanstack Router decorator
+const RouterDecorator: Decorator = (Story) => {
+  const rootRoute = createRootRoute({ component: () => React.createElement(Story) });
+  const routeTree = rootRoute;
+  const router = createRouter({ routeTree });
+  return React.createElement(RouterProvider, { router });
+};
+
+// Create a Theme Provider decorator - fixed to properly include children prop
+const ThemeDecorator: Decorator = (Story, context) => {
+  return React.createElement(
+    ThemeProvider,
+    { 
+      defaultTheme: "light", 
+      storageKey: "theme", 
+      children: React.createElement(Story, context.args) 
+    }
+  );
+};
 
 const preview: Preview = {
   parameters: {
@@ -12,6 +35,8 @@ const preview: Preview = {
     },
   },
   decorators: [
+    RouterDecorator,
+    ThemeDecorator,
     withThemeByClassName({
       themes: {
         light: 'scroll-smooth',
