@@ -20,11 +20,11 @@ export default function Footer() {
           <Link to="/imprint" className="font-medium underline underline-offset-4">Imprint</Link>
         </p>
         <p className="text-balance text-center text-sm leading-loose text-muted-foreground md:text-right flex-1">
-          Built by
-          <a href="https://github.com/ls1intum" target="_blank" rel="noopener noreferrer" className="font-medium underline underline-offset-4"> AET Team</a>
-          {" "}at
-          <a href="https://www.tum.de/en/" target="_blank" rel="noopener noreferrer" className="font-medium underline underline-offset-4"> TUM</a>. The source code is available on
-          <a href="https://github.com/ls1intum/hephaestus" target="_blank" rel="noopener noreferrer" className="font-medium underline underline-offset-4"> GitHub</a>.
+          Built by{" "}
+          <a href="https://github.com/ls1intum" target="_blank" rel="noopener noreferrer" className="font-medium underline underline-offset-4">AET Team</a>
+          {" "}at{" "}
+          <a href="https://www.tum.de/en/" target="_blank" rel="noopener noreferrer" className="font-medium underline underline-offset-4">TUM</a>. The source code is available on{" "}
+          <a href="https://github.com/ls1intum/hephaestus" target="_blank" rel="noopener noreferrer" className="font-medium underline underline-offset-4">GitHub</a>.
         </p>
       </div>
     </footer>
