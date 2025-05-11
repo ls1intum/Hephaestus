@@ -34,8 +34,8 @@ export default function AIMentor({ iconOnly = false }: AIMentorProps) {
           </Button>
         </TooltipTrigger>
         {iconOnly && (
-          <TooltipContent className="bg-cyan-50 dark:bg-cyan-800 dark:border-cyan-500 border-cyan-300 text-cyan-500 dark:text-cyan-200">
-            <span className="flex items-center">AI&nbsp;Mentor</span>
+          <TooltipContent>
+            AI&nbsp;Mentor
           </TooltipContent>
         )}
       </Tooltip>

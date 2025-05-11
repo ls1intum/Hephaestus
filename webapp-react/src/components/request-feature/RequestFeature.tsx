@@ -34,8 +34,8 @@ export default function RequestFeature({ iconOnly = false }: RequestFeatureProps
           </Button>
         </TooltipTrigger>
         {iconOnly && (
-          <TooltipContent className="bg-purple-100 dark:bg-purple-800 dark:border-purple-500 border-purple-300">
-            <span className="flex items-center">Request a feature</span>
+          <TooltipContent>
+            Request&nbsp;a&nbsp;feature
           </TooltipContent>
         )}
       </Tooltip>
