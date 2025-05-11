@@ -1,6 +1,6 @@
 import { Card, CardContent } from "@/components/ui/card";
 import type { LeaderboardOverviewProps } from "./types";
-import { LeagueIcon } from "./LeagueIcon";
+import { LeagueIcon } from "./league/LeagueIcon";
 import { Award, CalendarClock, Trophy } from "lucide-react";
 
 export function LeaderboardOverview({ 

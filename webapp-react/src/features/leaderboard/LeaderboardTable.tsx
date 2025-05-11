@@ -9,7 +9,7 @@ import {
 } from "@/components/ui/table";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Skeleton } from "@/components/ui/skeleton";
-import { LeagueIcon } from "./LeagueIcon";
+import { LeagueIcon } from "./league/LeagueIcon";
 import { ReviewsPopover } from "./ReviewsPopover";
 import { Award, CheckCircle, ChevronLeft, FileText, GitPullRequest, MessageSquare, XCircle } from "lucide-react";
 import { cn } from "@/lib/utils";

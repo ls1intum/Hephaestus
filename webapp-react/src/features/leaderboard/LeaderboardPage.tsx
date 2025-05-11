@@ -44,6 +44,14 @@ export function LeaderboardPage({
   leaderboardEnd,
   leaderboardSchedule
 }: LeaderboardPageProps) {
+  // Add formatted property to the leaderboardSchedule object if it exists
+  const formattedSchedule = leaderboardSchedule 
+    ? {
+        ...leaderboardSchedule,
+        formatted: `${String(leaderboardSchedule.hour).padStart(2, '0')}:${String(leaderboardSchedule.minute).padStart(2, '0')} on day ${leaderboardSchedule.day}`
+      }
+    : undefined;
+    
   return (
     <div className="flex flex-col items-center">
       <div className="w-full max-w-[1400px]">
@@ -67,7 +75,7 @@ export function LeaderboardPage({
               selectedSort={selectedSort}
               initialAfterDate={initialAfterDate}
               initialBeforeDate={initialBeforeDate}
-              leaderboardSchedule={leaderboardSchedule}
+              leaderboardSchedule={formattedSchedule}
             />
           </div>
           

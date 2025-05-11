@@ -4,7 +4,7 @@ export type LeaderboardSortType = 'SCORE' | 'LEAGUE_POINTS';
 
 export interface LeagueIconProps {
   leaguePoints?: number;
-  size?: 'sm' | 'md' | 'lg';
+  size?: 'sm' | 'default' | 'lg' | 'max' | 'full';
   showPoints?: boolean;
 }
 
