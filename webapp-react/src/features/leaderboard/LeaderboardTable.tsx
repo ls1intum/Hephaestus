@@ -69,7 +69,6 @@ export function LeaderboardTable({
                 <div className="flex flex-col justify-center items-center">
                   <LeagueIcon 
                     leaguePoints={entry.user.leaguePoints} 
-                    size="sm"
                     showPoints 
                   />
                 </div>

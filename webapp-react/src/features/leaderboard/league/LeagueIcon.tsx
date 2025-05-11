@@ -7,6 +7,11 @@ import {
   LeagueDiamondIcon, 
   LeagueMasterIcon 
 } from "@/features/leaderboard/league/LeagueIcons";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 
 export function LeagueIcon({ leaguePoints, size = "default", showPoints = false }: LeagueIconProps) {
   // Default to bronze tier if no league points provided
@@ -50,14 +55,21 @@ export function LeagueIcon({ leaguePoints, size = "default", showPoints = false 
   }[tier];
   
   return (
-    <div className="flex flex-col items-center justify-center">
-      <IconComponent 
-        size={size}
-        aria-label={`${label} tier`}
-      />
-      {showPoints && (
-        <span className="text-xs font-semibold text-muted-foreground">{points}</span>
-      )}
-    </div>
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <div className="flex flex-col items-center justify-center">
+          <IconComponent 
+            size={size}
+            aria-label={`${label} tier`}
+          />
+          {showPoints && (
+            <span className="text-xs font-semibold text-muted-foreground">{points}</span>
+          )}
+        </div>
+      </TooltipTrigger>
+      <TooltipContent>
+        <p>{label}</p>
+      </TooltipContent>
+    </Tooltip>
   );
 }
