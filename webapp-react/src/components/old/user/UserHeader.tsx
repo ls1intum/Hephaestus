@@ -3,7 +3,7 @@ import { Button } from '@/components/ui/button';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Skeleton } from '@/components/ui/skeleton';
-import { LeagueIcon } from '@/components/league/LeagueIcon';
+import { LeagueIcon } from '@/components/old/league/LeagueIcon';
 import type { UserInfo, RepositoryInfo } from './utils';
 import { formatFirstContribution, getRepositoryImage } from './utils';
 
