@@ -1,12 +1,13 @@
 import { Outlet, createRootRouteWithContext } from "@tanstack/react-router";
 import { TanStackRouterDevtools } from "@tanstack/react-router-devtools";
-
-import HeaderContainer from "@/components/header/HeaderContainer";
-import Footer from "@/components/footer/Footer";
+import type { QueryClient } from "@tanstack/react-query";
 
 import TanstackQueryLayout from "../integrations/tanstack-query/layout";
 
-import type { QueryClient } from "@tanstack/react-query";
+import environment from "@/environment";
+import { useAuth } from "@/lib/auth/AuthContext";
+import Footer from "@/components/footer/Footer";
+import Header from "@/components/header/Header";
 
 interface MyRouterContext {
 	queryClient: QueryClient;
@@ -39,3 +40,20 @@ export const Route = createRootRouteWithContext<MyRouterContext>()({
 		</div>
 	)
 });
+
+function HeaderContainer() {
+  const { isAuthenticated, isLoading, username, userProfile, login, logout, hasRole } = useAuth();
+  return (
+    <Header 
+      version={environment.version}
+      isAuthenticated={isAuthenticated}
+      isLoading={isLoading}
+      name={userProfile && `${userProfile.firstName} ${userProfile.lastName}`}
+      username={username}
+      showAdmin={hasRole('admin')}
+      showMentor={hasRole('mentor_access')}
+      onLogin={login}
+      onLogout={logout}
+    />
+  );
+}

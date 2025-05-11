@@ -17,3 +17,9 @@ After being done with implementation, make sure to run the build command to chec
 ```bash
 npm run build
 ```
+
+Ensure that Typescript throws no errors:
+
+```bash
+npx tsc
+```

@@ -55,7 +55,7 @@ export default function Header({
     <header className="container flex items-center justify-between pt-4 gap-2">
       <div className="flex gap-4 items-center flex-1">
         <div className="flex items-center gap-2">
-          <Link to="/" className="flex gap-2 items-center hover:text-muted-foreground">
+          <Link to="/" search={{}} className="flex gap-2 items-center hover:text-muted-foreground">
             <Hammer className="text-2xl sm:text-3xl" />
             <span className="hidden sm:inline-block text-xl font-semibold">Hephaestus</span>
           </Link>
@@ -67,14 +67,14 @@ export default function Header({
           <div className="hidden md:flex gap-2">
             {showAdmin && (
               <Button asChild variant="link">
-                <Link to="/workspace">Workspace</Link>
+                <Link to="/workspace" search={{}}>Workspace</Link>
               </Button>
             )}
             <Button asChild variant="link">
-              <Link to="/best-practices">Best practices</Link>
+              <Link to="/best-practices" search={{}}>Best practices</Link>
             </Button>
             <Button asChild variant="link">
-              <Link to="/teams">Teams</Link>
+              <Link to="/teams" search={{}}>Teams</Link>
             </Button>
           </div>
         )}
@@ -94,14 +94,14 @@ export default function Header({
                 <DropdownMenuSeparator />
                 {showAdmin && (
                   <DropdownMenuItem asChild>
-                    <Link to="/workspace" className="w-full">Workspace</Link>
+                    <Link to="/workspace" search={{}} className="w-full">Workspace</Link>
                   </DropdownMenuItem>
                 )}
                 <DropdownMenuItem asChild>
-                  <Link to="/best-practices" className="w-full">Best practices</Link>
+                  <Link to="/best-practices" search={{}} className="w-full">Best practices</Link>
                 </DropdownMenuItem>
                 <DropdownMenuItem asChild>
-                  <Link to="/teams" className="w-full">Teams</Link>
+                  <Link to="/teams" search={{}} className="w-full">Teams</Link>
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
@@ -160,13 +160,13 @@ export default function Header({
                 <DropdownMenuSeparator />
                 <DropdownMenuGroup>
                   <DropdownMenuItem asChild>
-                    <Link to="/user/$username" params={{ username: username ?? '' }}> 
+                    <Link to="/user/$username" search={{}} params={{ username: username ?? '' }}> 
                       <User className="mr-2 h-4 w-4" />
                       <span>My Profile</span>
                     </Link>
                   </DropdownMenuItem>
                   <DropdownMenuItem asChild>
-                    <Link to="/settings">
+                    <Link to="/settings" search={{}}>
                       <Settings className="mr-2 h-4 w-4" />
                       <span>Settings</span>
                     </Link>

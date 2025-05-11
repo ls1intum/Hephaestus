@@ -1,6 +1,6 @@
 import { createFileRoute, Outlet } from '@tanstack/react-router';
 import { useAuth } from '@/lib/auth/AuthContext';
-import { LandingContainer } from '@/features/info/landing/LandingContainer';
+import { LandingContainer } from './landing';
 
 // This route will be a parent for all routes that require authentication
 export const Route = createFileRoute('/_authenticated')({
