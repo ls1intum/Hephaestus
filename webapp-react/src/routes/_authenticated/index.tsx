@@ -3,20 +3,24 @@ import { useQuery } from "@tanstack/react-query";
 import { useNavigate } from "@tanstack/react-router";
 import { z } from 'zod';
 import { zodValidator } from '@tanstack/zod-adapter';
-import dayjs from "dayjs";
-import isoWeek from "dayjs/plugin/isoWeek";
+import { 
+  format, 
+  subWeeks, 
+  startOfISOWeek, 
+  endOfISOWeek, 
+  formatISO 
+} from "date-fns";
 import { useAuth } from "@/lib/auth/AuthContext";
 import { getLeaderboardOptions, getMetaDataOptions, getUserProfileOptions } from "@/api/@tanstack/react-query.gen";
 import { LeaderboardPage } from '@/features/leaderboard/LeaderboardPage';
 import type { LeaderboardSortType } from '@/features/leaderboard/types';
 
-// Extend dayjs with the isoWeek plugin
-dayjs.extend(isoWeek);
-
 // Calculate default date range with ISO 8601 format including timezone
-const today = dayjs();
-const startOfLastWeek = today.subtract(1, 'week').startOf('isoWeek').format('YYYY-MM-DDTHH:mm:ss+00:00');
-const endOfLastWeek = today.subtract(1, 'week').endOf('isoWeek').format('YYYY-MM-DDTHH:mm:ss+00:00');
+const today = new Date();
+const startOfLastWeekDate = startOfISOWeek(subWeeks(today, 1));
+const endOfLastWeekDate = endOfISOWeek(subWeeks(today, 1));
+const startOfLastWeek = formatISO(startOfLastWeekDate);
+const endOfLastWeek = formatISO(endOfLastWeekDate);
 
 // Define search params schema for validation and types
 const leaderboardSearchSchema = z.object({
@@ -78,7 +82,16 @@ function LeaderboardContainer() {
     : undefined;
   
   // Format leaderboard end date (using the beforeParam as the end date)
-  const leaderboardEnd = dayjs(before).format("dddd, MMMM D, YYYY");
+  const leaderboardEnd = format(new Date(before), "EEEE, MMMM d, yyyy");
+
+  // Use a fixed leaderboard schedule since it seems the metadata doesn't provide this
+  // Mondays at 9:00 AM is the default schedule
+  const leaderboardSchedule = {
+    day: 1, // Monday
+    hour: 9,
+    minute: 0,
+    formatted: 'Mondays at 09:00'
+  };
 
   // Handle team filter changes
   const handleTeamChange = (team: string) => {
@@ -100,13 +113,13 @@ function LeaderboardContainer() {
     });
   };
 
-  // Handle timeframe changes
-  const handleTimeframeChange = (after: string, before: string) => {
+  // Handle timeframe changes - note we're not passing timeframe in URL anymore
+  const handleTimeframeChange = (afterDate: string, beforeDate: string) => {
     navigate({
       search: (prev) => ({
         ...prev,
-        after,
-        before
+        after: afterDate,
+        before: beforeDate
       }),
     });
   };
@@ -121,7 +134,10 @@ function LeaderboardContainer() {
       teams={metaQuery.data?.teams.map(team => team.name) || []}
       selectedTeam={team}
       selectedSort={sort}
+      initialAfterDate={after}
+      initialBeforeDate={before}
       leaderboardEnd={leaderboardEnd}
+      leaderboardSchedule={leaderboardSchedule}
       onTeamChange={handleTeamChange}
       onSortChange={handleSortChange}
       onTimeframeChange={handleTimeframeChange}

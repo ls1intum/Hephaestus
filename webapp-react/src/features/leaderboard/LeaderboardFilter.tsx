@@ -1,9 +1,10 @@
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import type { LeaderboardFilterProps } from "./types";
 import { TeamFilter } from "./filters/TeamFilter";
 import { SortFilter } from "./filters/SortFilter";
 import { TimeframeFilter } from "./filters/TimeframeFilter";
+import { SlidersHorizontal } from "lucide-react";
 
 export function LeaderboardFilter({ 
   teams, 
@@ -12,34 +13,45 @@ export function LeaderboardFilter({
   onTimeframeChange, 
   selectedTeam,
   selectedSort,
-}: LeaderboardFilterProps) {
+  initialAfterDate,
+  initialBeforeDate,
+  leaderboardSchedule
+}: LeaderboardFilterProps & { 
+  initialAfterDate?: string;
+  initialBeforeDate?: string;
+  leaderboardSchedule?: {
+    day: number;
+    hour: number;
+    minute: number;
+    formatted: string;
+  };
+}) {
   return (
     <Card>
-      <CardHeader className="pb-3">
-        <CardTitle className="text-lg">Filter</CardTitle>
+      <CardHeader>
+        <CardTitle><SlidersHorizontal className="inline mr-2 h-4 w-4" /> Leaderboard Options</CardTitle>
+        <CardDescription>
+          Customize the leaderboard view by filtering and sorting the data.
+        </CardDescription>
       </CardHeader>
-      <CardContent className="space-y-6 pt-0">
-        <TeamFilter 
-          teams={teams}
-          onTeamChange={onTeamChange}
-          selectedTeam={selectedTeam}
-        />
-
-        <Separator />
-        
-        <SortFilter 
-          onSortChange={onSortChange}
-          selectedSort={selectedSort}
-        />
-
-        <Separator />
-        
-        <TimeframeFilter 
-          onTimeframeChange={onTimeframeChange}
-          leaderboardSchedule={
-            { day: 1, hour: 9, minute: 0, formatted: 'Mondays at 09:00' }
-          }
-        />
+      <CardContent>
+        <div className="flex flex-col gap-4">
+          <TeamFilter 
+            teams={teams}
+            onTeamChange={onTeamChange}
+            selectedTeam={selectedTeam}
+          />
+          <SortFilter 
+            onSortChange={onSortChange}
+            selectedSort={selectedSort}
+          />
+          <TimeframeFilter 
+            onTimeframeChange={onTimeframeChange}
+            initialAfterDate={initialAfterDate}
+            initialBeforeDate={initialBeforeDate}
+            leaderboardSchedule={leaderboardSchedule}
+          />
+        </div>
       </CardContent>
     </Card>
   );

@@ -23,3 +23,15 @@ Ensure that Typescript throws no errors:
 ```bash
 npx tsc
 ```
+
+## Storybook
+
+Our components are purely presentational and documented using Storybook. Strive for simple, reusable components with thoughtful props and naming.
+
+## UX Writing
+
+Think of our platform’s voice as that of a friendly, knowledgeable senior engineer: clear and supportive in guidance, encouraging and playful in celebrating progress, and always approachable to make learning fun.
+
+## Quality Attributes
+
+Strive for simplicity and clarity in your code. Avoid unnecessary complexity and aim for a clean, maintainable codebase. Use descriptive variable and function names, and keep your code organized and well-structured.

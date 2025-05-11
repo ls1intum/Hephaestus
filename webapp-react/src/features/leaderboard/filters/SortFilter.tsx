@@ -1,4 +1,5 @@
 import { SelectValue, SelectTrigger, SelectItem, SelectContent, Select } from "@/components/ui/select";
+import { Label } from "@/components/ui/label";
 import type { SortFilterProps, LeaderboardSortType } from "../types";
 
 const SORT_OPTIONS: Array<{ value: LeaderboardSortType; label: string }> = [
@@ -8,13 +9,13 @@ const SORT_OPTIONS: Array<{ value: LeaderboardSortType; label: string }> = [
 
 export function SortFilter({ onSortChange, selectedSort = "SCORE" }: SortFilterProps) {
   return (
-    <div className="space-y-2">
-      <label className="text-sm font-medium">Sort by</label>
+    <div className="space-y-1.5">
+      <Label htmlFor="sort">Sort by</Label>
       <Select
         value={selectedSort}
         onValueChange={(value) => onSortChange?.(value as LeaderboardSortType)}
       >
-        <SelectTrigger className="w-full">
+        <SelectTrigger id="sort" className="w-full">
           <SelectValue placeholder="Sort by" />
         </SelectTrigger>
         <SelectContent>

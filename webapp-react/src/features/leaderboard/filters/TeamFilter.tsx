@@ -1,24 +1,29 @@
-import { SelectValue, SelectTrigger, SelectItem, SelectContent, Select } from "@/components/ui/select";
+import { SelectValue, SelectTrigger, SelectItem, SelectContent, Select, SelectGroup } from "@/components/ui/select";
+import { Label } from "@/components/ui/label";
+import { DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
 import type { TeamFilterProps } from "../types";
 
 export function TeamFilter({ teams = [], onTeamChange, selectedTeam = "all" }: TeamFilterProps) {
   return (
-    <div className="space-y-2">
-      <label className="text-sm font-medium">Team</label>
+    <div className="space-y-1.5">
+      <Label htmlFor="team">Team</Label>
       <Select
         value={selectedTeam}
         onValueChange={(value) => onTeamChange?.(value)}
       >
-        <SelectTrigger className="w-full">
+        <SelectTrigger id="team" className="w-full">
           <SelectValue placeholder="Select Team" />
         </SelectTrigger>
         <SelectContent>
           <SelectItem value="all">All Teams</SelectItem>
-          {teams.map((team) => (
-            <SelectItem key={team} value={team}>
-              {team}
-            </SelectItem>
-          ))}
+          <DropdownMenuSeparator />
+          <SelectGroup>
+            {teams.map((team) => (
+              <SelectItem key={team} value={team}>
+                {team}
+              </SelectItem>
+            ))}
+          </SelectGroup>
         </SelectContent>
       </Select>
     </div>

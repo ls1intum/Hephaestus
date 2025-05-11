@@ -33,13 +33,23 @@ export interface LeaderboardFilterProps {
   teams: string[];
   onTeamChange?: (team: string) => void;
   onSortChange?: (sort: LeaderboardSortType) => void;
-  onTimeframeChange?: (afterDate: string, beforeDate: string) => void;
+  onTimeframeChange?: (afterDate: string, beforeDate: string, timeframe?: string) => void;
   selectedTeam?: string;
   selectedSort?: LeaderboardSortType;
+  initialAfterDate?: string;
+  initialBeforeDate?: string;
+  leaderboardSchedule?: {
+    day: number;
+    hour: number;
+    minute: number;
+    formatted: string;
+  };
 }
 
 export interface TimeframeFilterProps {
-  onTimeframeChange?: (afterDate: string, beforeDate: string) => void;
+  onTimeframeChange?: (afterDate: string, beforeDate: string, timeframe?: string) => void;
+  initialAfterDate?: string;
+  initialBeforeDate?: string;
   leaderboardSchedule?: {
     day: number;
     hour: number;

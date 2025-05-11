@@ -14,10 +14,18 @@ interface LeaderboardPageProps {
   teams: string[];
   onTeamChange?: (team: string) => void;
   onSortChange?: (sort: LeaderboardSortType) => void;
-  onTimeframeChange?: (afterDate: string, beforeDate: string) => void;
+  onTimeframeChange?: (afterDate: string, beforeDate: string, timeframe?: string) => void;
   selectedTeam?: string;
   selectedSort?: LeaderboardSortType;
+  initialAfterDate?: string;
+  initialBeforeDate?: string;
   leaderboardEnd?: string;
+  leaderboardSchedule?: {
+    day: number;
+    hour: number;
+    minute: number;
+    formatted: string;
+  };
 }
 
 export function LeaderboardPage({
@@ -32,7 +40,10 @@ export function LeaderboardPage({
   onTimeframeChange,
   selectedTeam,
   selectedSort,
+  initialAfterDate,
+  initialBeforeDate,
   leaderboardEnd,
+  leaderboardSchedule
 }: LeaderboardPageProps) {
   return (
     <div className="flex flex-col items-center">
@@ -55,6 +66,9 @@ export function LeaderboardPage({
               onTimeframeChange={onTimeframeChange}
               selectedTeam={selectedTeam}
               selectedSort={selectedSort}
+              initialAfterDate={initialAfterDate}
+              initialBeforeDate={initialBeforeDate}
+              leaderboardSchedule={leaderboardSchedule}
             />
           </div>
           

@@ -1,7 +1,7 @@
 export const environment = {
   version: 'DEV',
   clientUrl: 'http://localhost:4200',
-  serverUrl: 'http://localhost:8080',
+  serverUrl: 'https://hephaestus.aet.in.tum.de/api',
   sentry: {
     environment: 'local',
     dsn: 'https://289f1f62feeb4f70a8878dc0101825cd@sentry.ase.in.tum.de/3'
