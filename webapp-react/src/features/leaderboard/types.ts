@@ -6,6 +6,7 @@ export interface LeagueIconProps {
   leaguePoints?: number;
   size?: 'sm' | 'default' | 'lg' | 'max' | 'full';
   showPoints?: boolean;
+  className?: string;
 }
 
 export interface ReviewsPopoverProps {
@@ -23,6 +24,7 @@ export interface LeaderboardOverviewProps {
   leaderboardEntry: LeaderboardEntry;
   leaguePoints: number;
   leaderboardEnd?: string;
+  leaguePointsChange?: number;
 }
 
 export interface LeaderboardLegendProps {

@@ -11,6 +11,7 @@ interface LeaderboardPageProps {
   currentUser?: UserInfo;
   currentUserEntry?: LeaderboardEntry;
   leaguePoints?: number;
+  leaguePointsChange?: number;
   teams: string[];
   onTeamChange?: (team: string) => void;
   onSortChange?: (sort: LeaderboardSortType) => void;
@@ -33,6 +34,7 @@ export function LeaderboardPage({
   currentUser,
   currentUserEntry,
   leaguePoints = 0,
+  leaguePointsChange = 0,
   teams,
   onTeamChange,
   onSortChange,
@@ -65,18 +67,19 @@ export function LeaderboardPage({
                 </h2>
               )}
             </div>
-            
-            <LeaderboardFilter
-              teams={teams}
-              onTeamChange={onTeamChange}
-              onSortChange={onSortChange}
-              onTimeframeChange={onTimeframeChange}
-              selectedTeam={selectedTeam}
-              selectedSort={selectedSort}
-              initialAfterDate={initialAfterDate}
-              initialBeforeDate={initialBeforeDate}
-              leaderboardSchedule={formattedSchedule}
-            />
+            <div className="xl:sticky xl:top-4 xl:self-start xl:max-h-[calc(100vh-2rem)] xl:overflow-auto">
+              <LeaderboardFilter
+                teams={teams}
+                onTeamChange={onTeamChange}
+                onSortChange={onSortChange}
+                onTimeframeChange={onTimeframeChange}
+                selectedTeam={selectedTeam}
+                selectedSort={selectedSort}
+                initialAfterDate={initialAfterDate}
+                initialBeforeDate={initialBeforeDate}
+                leaderboardSchedule={formattedSchedule}
+              />
+            </div>
           </div>
           
           <div className="col-span-2 space-y-4">
@@ -85,6 +88,7 @@ export function LeaderboardPage({
                 leaderboardEntry={currentUserEntry}
                 leaguePoints={leaguePoints}
                 leaderboardEnd={leaderboardEnd}
+                leaguePointsChange={leaguePointsChange}
               />
             )}
             
@@ -97,7 +101,7 @@ export function LeaderboardPage({
             </div>
           </div>
           
-          <div className="col-span-1">
+          <div className="col-span-1 xl:sticky xl:top-4 xl:self-start xl:max-h-[calc(100vh-2rem)] xl:overflow-auto">
             <LeaderboardLegend />
           </div>
         </div>

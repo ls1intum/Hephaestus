@@ -64,6 +64,7 @@ export function LeaderboardTable({
           return (
             <TableRow
               key={entry.user.login}
+              id={`rank-${entry.rank}`}
               className={cn(
                 "cursor-pointer", 
                 isCurrentUser && "bg-accent dark:bg-accent/30 dark:hover:bg-accent/50"

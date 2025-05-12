@@ -11,7 +11,12 @@ import {
   formatISO 
 } from "date-fns";
 import { useAuth } from "@/lib/auth/AuthContext";
-import { getLeaderboardOptions, getMetaDataOptions, getUserProfileOptions } from "@/api/@tanstack/react-query.gen";
+import { 
+  getLeaderboardOptions, 
+  getMetaDataOptions, 
+  getUserLeagueStatsOptions, 
+  getUserProfileOptions 
+} from "@/api/@tanstack/react-query.gen";
 import { LeaderboardPage } from '@/features/leaderboard/LeaderboardPage';
 import type { LeaderboardSortType } from '@/features/leaderboard/types';
 
@@ -84,6 +89,34 @@ function LeaderboardContainer() {
   // Format leaderboard end date (using the beforeParam as the end date)
   const leaderboardEnd = format(new Date(before), "EEEE, MMMM d, yyyy");
 
+  // Query for league points change data if we have a current user entry
+  const leagueStatsQuery = useQuery({
+    ...getUserLeagueStatsOptions({
+      query: {
+        login: username || ''
+      },
+      body: currentUserEntry || { 
+        rank: 0,
+        score: 0,
+        user: {
+          id: 0,
+          name: '',
+          login: username || '',
+          avatarUrl: '',
+          htmlUrl: ''
+        },
+        reviewedPullRequests: [],
+        numberOfReviewedPRs: 0,
+        numberOfApprovals: 0, 
+        numberOfChangeRequests: 0,
+        numberOfComments: 0,
+        numberOfUnknowns: 0,
+        numberOfCodeComments: 0
+      }
+    }),
+    enabled: Boolean(username && currentUserEntry),
+  });
+
   // Use a fixed leaderboard schedule since it seems the metadata doesn't provide this
   // Mondays at 9:00 AM is the default schedule
   const leaderboardSchedule = {
@@ -130,6 +163,7 @@ function LeaderboardContainer() {
       currentUser={userProfileQuery.data?.userInfo}
       currentUserEntry={currentUserEntry}
       leaguePoints={userProfileQuery.data?.userInfo?.leaguePoints}
+      leaguePointsChange={leagueStatsQuery.data?.leaguePointsChange}
       teams={metaQuery.data?.teams.map(team => team.name) || []}
       selectedTeam={team}
       selectedSort={sort}

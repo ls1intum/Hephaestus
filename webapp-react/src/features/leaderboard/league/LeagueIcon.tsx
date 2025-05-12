@@ -12,38 +12,19 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
+import { cn } from "@/lib/utils";
+import { getLeagueTier, getLeagueLabel } from "./utils";
 
-export function LeagueIcon({ leaguePoints, size = "default", showPoints = false }: LeagueIconProps) {
-  // Default to bronze tier if no league points provided
-  const points = leaguePoints ?? 0;
+export function LeagueIcon({ 
+  leaguePoints, 
+  size = "default", 
+  showPoints = false,
+  className 
+}: LeagueIconProps) {
+  // Get tier and label based on league points
+  const tier = getLeagueTier(leaguePoints);
+  const label = getLeagueLabel(tier);
   
-  let tier: "bronze" | "silver" | "gold" | "diamond" | "master" | "none";
-  let label: string;
-  
-  // Determine tier based on league points
-  if (points < 500) {
-    tier = "bronze";
-    label = "Bronze";
-  } else if (points < 1000) {
-    tier = "silver";
-    label = "Silver";
-  } else if (points < 1500) {
-    tier = "gold";
-    label = "Gold";
-  } else if (points < 2000) {
-    tier = "diamond";
-    label = "Diamond";
-  } else {
-    tier = "master";
-    label = "Master";
-  }
-
-  // If no league points provided, use the none tier
-  if (leaguePoints === undefined) {
-    tier = "none";
-    label = "Not Ranked";
-  }
-
   // Get the appropriate icon component based on the tier
   const IconComponent = {
     none: LeagueNoneIcon,
@@ -57,13 +38,13 @@ export function LeagueIcon({ leaguePoints, size = "default", showPoints = false 
   return (
     <Tooltip>
       <TooltipTrigger asChild>
-        <div className="flex flex-col items-center justify-center">
+        <div className={cn("flex flex-col items-center justify-center", className)}>
           <IconComponent 
             size={size}
             aria-label={`${label} tier`}
           />
           {showPoints && (
-            <span className="text-xs font-semibold text-muted-foreground">{points}</span>
+            <span className="text-xs font-semibold text-muted-foreground">{leaguePoints}</span>
           )}
         </div>
       </TooltipTrigger>
