@@ -68,7 +68,7 @@ export function LeagueIcon({ leaguePoints, size = "default", showPoints = false 
         </div>
       </TooltipTrigger>
       <TooltipContent>
-        <p>{label}</p>
+        <p>{label} League</p>
       </TooltipContent>
     </Tooltip>
   );

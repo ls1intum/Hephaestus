@@ -11,7 +11,14 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Skeleton } from "@/components/ui/skeleton";
 import { LeagueIcon } from "./league/LeagueIcon";
 import { ReviewsPopover } from "./ReviewsPopover";
-import { Award, CheckCircle, ChevronLeft, FileText, GitPullRequest, MessageSquare, XCircle } from "lucide-react";
+import { 
+  CheckIcon, 
+  ChevronLeftIcon,
+  CommentDiscussionIcon,
+  CommentIcon,
+  FileDiffIcon,
+  NoEntryIcon 
+} from "@primer/octicons-react";
 import { cn } from "@/lib/utils";
 
 export function LeaderboardTable({
@@ -26,7 +33,7 @@ export function LeaderboardTable({
   if (!leaderboard.length) {
     return (
       <div className="flex flex-col items-center justify-center p-8 text-center">
-        <XCircle className="h-12 w-12 text-destructive mb-2" />
+        <NoEntryIcon className="h-12 w-12 text-github-danger-foreground mb-2" />
         <h3 className="text-lg font-medium">No entries found</h3>
         <p className="text-muted-foreground">
           There are no leaderboard entries available.
@@ -43,8 +50,7 @@ export function LeaderboardTable({
           <TableHead className="text-center w-20">League</TableHead>
           <TableHead>Contributor</TableHead>
           <TableHead className="text-center">
-            <div className="flex justify-center items-center gap-1 text-primary">
-              <Award className="h-4 w-4" />
+            <div className="flex justify-center items-center gap-1 text-github-done-foreground">
               <span>Score</span>
             </div>
           </TableHead>
@@ -100,35 +106,35 @@ export function LeaderboardTable({
                         reviewedPRs={entry.reviewedPullRequests} 
                         highlight={isCurrentUser}
                       />
-                      <div className="flex items-center text-muted-foreground">
-                        <ChevronLeft className="h-4 w-4" />
+                      <div className="flex items-center text-github-muted-foreground">
+                        <ChevronLeftIcon className="h-4 w-4" />
                       </div>
                     </>
                   )}
                   {entry.numberOfChangeRequests > 0 && (
                     <div 
-                      className="flex items-center gap-1 text-destructive" 
+                      className="flex items-center gap-1 text-github-danger-foreground" 
                       title="Changes Requested"
                     >
-                      <FileText className="h-4 w-4" />
+                      <FileDiffIcon className="h-4 w-4" />
                       <span>{entry.numberOfChangeRequests}</span>
                     </div>
                   )}
                   {entry.numberOfApprovals > 0 && (
                     <div 
-                      className="flex items-center gap-1 text-success" 
+                      className="flex items-center gap-1 text-github-success-foreground" 
                       title="Approvals"
                     >
-                      <CheckCircle className="h-4 w-4" />
+                      <CheckIcon className="h-4 w-4" />
                       <span>{entry.numberOfApprovals}</span>
                     </div>
                   )}
                   {entry.numberOfComments + (entry.numberOfUnknowns || 0) > 0 && (
                     <div 
-                      className="flex items-center gap-1 text-muted-foreground" 
+                      className="flex items-center gap-1 text-github-muted-foreground" 
                       title="Comments"
                     >
-                      <MessageSquare className="h-4 w-4" />
+                      <CommentIcon className="h-4 w-4" />
                       <span>
                         {entry.numberOfComments + (entry.numberOfUnknowns || 0)}
                       </span>
@@ -136,10 +142,10 @@ export function LeaderboardTable({
                   )}
                   {entry.numberOfCodeComments > 0 && (
                     <div 
-                      className="flex items-center gap-1 text-muted-foreground" 
+                      className="flex items-center gap-1 text-github-muted-foreground" 
                       title="Code comments"
                     >
-                      <GitPullRequest className="h-4 w-4" />
+                      <CommentDiscussionIcon className="h-4 w-4" />
                       <span>{entry.numberOfCodeComments}</span>
                     </div>
                   )}
