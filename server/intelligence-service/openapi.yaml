@@ -50,6 +50,9 @@ components:
         pull_request_number:
           title: Pull Request Number
           type: integer
+        pull_request_template:
+          title: Pull Request Template
+          type: string
         repository_name:
           title: Repository Name
           type: string
@@ -64,6 +67,7 @@ components:
       - pull_request_number
       - bad_practice_summary
       - bad_practices
+      - pull_request_template
       title: DetectorRequest
       type: object
     DetectorResponse:

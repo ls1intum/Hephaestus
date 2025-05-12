@@ -17,6 +17,7 @@ import { HlmSpinnerComponent } from '@spartan-ng/ui-spinner-helm';
 import { injectMutation, QueryClient } from '@tanstack/angular-query-experimental';
 import { lastValueFrom } from 'rxjs';
 import { HttpResponse } from '@angular/common/http';
+import { HlmAccordionImports } from '@spartan-ng/ui-accordion-helm';
 
 @Component({
   selector: 'app-pull-request-bad-practice-card',
@@ -33,7 +34,8 @@ import { HttpResponse } from '@angular/common/http';
     BrnCollapsibleTriggerDirective,
     HlmButtonDirective,
     GithubLabelComponent,
-    HlmSpinnerComponent
+    HlmSpinnerComponent,
+    HlmAccordionImports
   ],
   providers: [provideIcons({ octCheck, octX, octComment, octFileDiff, octGitPullRequest, octGitPullRequestClosed, octGitPullRequestDraft, octGitMerge, octFold, octSync })]
 })
@@ -57,6 +59,7 @@ export class PullRequestBadPracticeCardComponent implements AfterViewInit {
   isMerged = input<boolean>();
   pullRequestLabels = input<Array<LabelInfo>>();
   badPractices = input<Array<PullRequestBadPractice>>();
+  oldBadPractices = input<Array<PullRequestBadPractice>>();
   badPracticeSummary = input<string>('');
   openCard = input<boolean>(false);
   currUserIsDashboardUser = input<boolean>(false);
@@ -88,6 +91,22 @@ export class PullRequestBadPracticeCardComponent implements AfterViewInit {
       return `${this.numberOfBadPractices()} bad practices detected`;
     }
   });
+  protected orderedBadPractices = computed(() => this.orderBadPractices(this.badPractices() ?? []));
+  protected orderedOldBadPractices = computed(() => this.orderBadPractices(this.oldBadPractices() ?? []));
+
+  orderBadPractices(badPractices: Array<PullRequestBadPractice>): Array<PullRequestBadPractice> {
+    const stateOrder = [
+      PullRequestBadPractice.StateEnum.CriticalIssue,
+      PullRequestBadPractice.StateEnum.NormalIssue,
+      PullRequestBadPractice.StateEnum.MinorIssue,
+      PullRequestBadPractice.StateEnum.GoodPractice,
+      PullRequestBadPractice.StateEnum.Fixed,
+      PullRequestBadPractice.StateEnum.WontFix,
+      PullRequestBadPractice.StateEnum.Wrong
+    ];
+
+    return [...(badPractices ?? [])].sort((a, b) => stateOrder.indexOf(a.state) - stateOrder.indexOf(b.state));
+  }
 
   @ViewChild(BrnCollapsibleTriggerDirective) collapsibleTrigger!: BrnCollapsibleTriggerDirective;
 
