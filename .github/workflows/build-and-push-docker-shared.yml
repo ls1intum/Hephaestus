@@ -1,4 +1,5 @@
 name: Build and Push Docker Image natively
+run-name: Build and Push Docker Image natively
 
 on:
   workflow_call:
@@ -46,6 +47,11 @@ on:
       registry-password:
         required: false
 
+# Hide this workflow from the list of workflows in the Actions tab
+concurrency: 
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: false
+
 jobs:
   build:
     name: Build ${{ matrix.platform }} Docker Image for ${{ inputs.image-name }}
@@ -54,9 +60,9 @@ jobs:
       matrix:
         include:
           - platform: linux/amd64
-            runner: blacksmith-2vcpu-ubuntu-2204
+            runner: ubuntu-24.04
           - platform: linux/arm64
-            runner: blacksmith-2vcpu-ubuntu-2204-arm64
+            runner: ubuntu-24.04-arm
     runs-on: ${{ matrix.runner || 'ubuntu-latest' }}
     steps:
       - name: Checkout
@@ -92,7 +98,7 @@ jobs:
 
       - name: Build and push Docker Image
         id: build
-        uses: useblacksmith/build-push-action@v1
+        uses: docker/build-push-action@v6
         with:
           context: ${{ inputs.docker-context }}
           file: ${{ inputs.docker-file }}
@@ -101,8 +107,8 @@ jobs:
           build-args: ${{ inputs.build-args }}
           network: ${{ inputs.network }}
           outputs: type=image,"name=${{ inputs.registry }}/${{ inputs.image-name }}",push-by-digest=true,name-canonical=true,push=true
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+          cache-from: type=registry,ref=${{ inputs.registry }}/${{ inputs.image-name }}:buildcache
+          cache-to: type=registry,ref=${{ inputs.registry }}/${{ inputs.image-name }}:buildcache,mode=max
 
       - name: Prepare
         run: |
