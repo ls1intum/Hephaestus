@@ -31,10 +31,10 @@ export function LeagueInfoDialog({
           </DialogDescription>
         </DialogHeader>
 
-        <div className="flex flex-col gap-4">
+        <div className="flex flex-col gap-2">
           {Leagues.map((league) => (
             <div key={league.name} className="flex items-center gap-4">
-              <LeagueIcon leaguePoints={league.minPoints + 1} size="lg" />
+              <LeagueIcon leaguePoints={league.minPoints + 1} size="default" />
               <span className="font-semibold">{league.name}</span>
               <div className="flex items-center text-sm text-muted-foreground gap-1">
                 <Star className="h-4 w-4" />
@@ -48,7 +48,7 @@ export function LeagueInfoDialog({
           ))}
         </div>
 
-        <div className="mt-6 border-t pt-4">
+        <div className="border-t pt-4">
           <h4 className="text-sm font-semibold mb-2">League Points Calculation</h4>
           <div className="text-sm text-muted-foreground">
             <p className="mb-2">Your league points are updated weekly using the following formula:</p>
