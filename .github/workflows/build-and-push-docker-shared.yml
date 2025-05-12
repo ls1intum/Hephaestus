@@ -60,9 +60,9 @@ jobs:
       matrix:
         include:
           - platform: linux/amd64
-            runner: blacksmith-8vcpu-ubuntu-2204
+            runner: ubuntu-24.04
           - platform: linux/arm64
-            runner: blacksmith-8vcpu-ubuntu-2204-arm
+            runner: ubuntu-24.04-arm
     runs-on: ${{ matrix.runner || 'ubuntu-latest' }}
     steps:
       - name: Checkout
@@ -98,15 +98,17 @@ jobs:
 
       - name: Build and push Docker Image
         id: build
-        uses: useblacksmith/build-push-action@v1
+        uses: docker/build-push-action@v6
         with:
           context: ${{ inputs.docker-context }}
           file: ${{ inputs.docker-file }}
           tags: ${{ inputs.registry }}/${{ inputs.image-name }}
           labels: ${{ steps.meta.outputs.labels }}
           build-args: ${{ inputs.build-args }}
-          push: true
           network: ${{ inputs.network }}
+          outputs: type=image,"name=${{ inputs.registry }}/${{ inputs.image-name }}",push-by-digest=true,name-canonical=true,push=true
+          cache-from: type=registry,ref=${{ inputs.registry }}/${{ inputs.image-name }}:buildcache
+          cache-to: type=registry,ref=${{ inputs.registry }}/${{ inputs.image-name }}:buildcache,mode=max
 
       - name: Prepare
         run: |
@@ -114,6 +116,20 @@ jobs:
           echo "PLATFORM_PAIR=${platform//\//-}" >> $GITHUB_ENV
           image="${{ inputs.image-name }}"
           echo "IMAGE_NAME=${image//\//-}" >> $GITHUB_ENV
+
+      - name: Export digest
+        run: |
+          mkdir -p ${{ runner.temp }}/digests
+          digest="${{ steps.build.outputs.digest }}"
+          touch "${{ runner.temp }}/digests/${digest#sha256:}"          
+  
+      - name: Upload digest
+        uses: actions/upload-artifact@v4
+        with:
+          name: digests-${{ env.IMAGE_NAME }}-${{ env.PLATFORM_PAIR }}
+          path: ${{ runner.temp }}/digests/*
+          if-no-files-found: error
+          retention-days: 1
 
   merge:
     name: Create and Push Multi-Arch Manifest
@@ -127,6 +143,13 @@ jobs:
         run: |
           image="${{ inputs.image-name }}"
           echo "IMAGE_NAME=${image//\//-}" >> $GITHUB_ENV
+
+      - name: Download digests
+        uses: actions/download-artifact@v4
+        with:
+          path: ${{ runner.temp }}/digests
+          pattern: digests-${{ env.IMAGE_NAME }}-*
+          merge-multiple: true
 
       - name: Login to GHCR
         uses: docker/login-action@v3
@@ -152,6 +175,16 @@ jobs:
             type=sha,prefix=,format=long
           labels: |
             ${{ inputs.labels }}        
+
+      - name: Create manifest list and push
+        working-directory: ${{ runner.temp }}/digests
+        run: |
+          docker buildx imagetools create $(jq -cr '.tags | map("-t " + .) | join(" ")' <<< "$DOCKER_METADATA_OUTPUT_JSON") \
+            $(printf '${{ inputs.registry }}/${{ inputs.image-name }}@sha256:%s ' *)          
+
+      - name: Inspect image
+        run: |
+          docker buildx imagetools inspect ${{ inputs.registry }}/${{ inputs.image-name }}:${{ steps.meta.outputs.version }}
           
       - id: output-image-tag
         run: |
