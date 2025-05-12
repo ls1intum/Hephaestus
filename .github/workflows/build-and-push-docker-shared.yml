@@ -91,7 +91,7 @@ jobs:
         id: meta
         uses: docker/metadata-action@v5
         with:
-          images: ${{ inputs.image-name }}
+          images: ${{ inputs.registry }}/${{ inputs.image-name }}
           tags: |
             type=raw,value=latest,enable={{is_default_branch}}
             type=raw,value=${{ inputs.tags }}
@@ -99,20 +99,18 @@ jobs:
             type=ref,event=pr
             type=semver,pattern={{version}}
             type=sha,prefix=,format=long
-
       - name: Build and push Docker Image
         id: build
         uses: useblacksmith/build-push-action@v1
         with:
           context: ${{ inputs.docker-context }}
           file: ${{ inputs.docker-file }}
-          tags: ${{ steps.meta.outputs.tags }}
+          tags: ${{ steps.meta.outputs.tags || inputs.registry }}/${{ inputs.image-name }}
           labels: ${{ steps.meta.outputs.labels }}
           build-args: ${{ inputs.build-args }}
           platforms: ${{ matrix.platform }}
           push: true
           network: ${{ inputs.network }}
-
       - name: Prepare
         run: |
           platform=${{ matrix.platform }}
@@ -162,37 +160,19 @@ jobs:
       
       - name: Create multi-arch manifest
         run: |
-          # Get branch or tag name for the manifest
-          BRANCH_OR_TAG=${GITHUB_REF#refs/*/}
-          echo "Creating manifest for branch/tag: $BRANCH_OR_TAG"
-          
-          # Create the manifest with latest tag
-          docker manifest create ${{ inputs.image-name }}:latest \
-            ${{ inputs.image-name }}:linux-amd64 \
-            ${{ inputs.image-name }}:linux-arm64
+          # Create the manifest
+          docker manifest create ${{ inputs.registry }}/${{ inputs.image-name }}:latest \
+            ${{ inputs.registry }}/${{ inputs.image-name }}:linux-amd64 \
+            ${{ inputs.registry }}/${{ inputs.image-name }}:linux-arm64
             
           # Annotate with platform information
-          docker manifest annotate ${{ inputs.image-name }}:latest \
-            ${{ inputs.image-name }}:linux-amd64 --os linux --arch amd64
-          docker manifest annotate ${{ inputs.image-name }}:latest \
-            ${{ inputs.image-name }}:linux-arm64 --os linux --arch arm64
-          
+          docker manifest annotate ${{ inputs.registry }}/${{ inputs.image-name }}:latest \
+            ${{ inputs.registry }}/${{ inputs.image-name }}:linux-amd64 --os linux --arch amd64
+          docker manifest annotate ${{ inputs.registry }}/${{ inputs.image-name }}:latest \
+            ${{ inputs.registry }}/${{ inputs.image-name }}:linux-arm64 --os linux --arch arm64
+            
           # Push the manifest
-          docker manifest push ${{ inputs.image-name }}:latest
-          
-          # Create the manifest with branch name
-          if [[ "$BRANCH_OR_TAG" != "main" && "$BRANCH_OR_TAG" != "master" ]]; then
-            docker manifest create ${{ inputs.image-name }}:$BRANCH_OR_TAG \
-              ${{ inputs.image-name }}:linux-amd64 \
-              ${{ inputs.image-name }}:linux-arm64
-              
-            docker manifest annotate ${{ inputs.image-name }}:$BRANCH_OR_TAG \
-              ${{ inputs.image-name }}:linux-amd64 --os linux --arch amd64
-            docker manifest annotate ${{ inputs.image-name }}:$BRANCH_OR_TAG \
-              ${{ inputs.image-name }}:linux-arm64 --os linux --arch arm64
-              
-            docker manifest push ${{ inputs.image-name }}:$BRANCH_OR_TAG
-          fi
+          docker manifest push ${{ inputs.registry }}/${{ inputs.image-name }}:latest
           
       - id: output-image-tag
         run: |
