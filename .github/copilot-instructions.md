@@ -27,6 +27,7 @@ npx tsc
 ## Storybook
 
 Our components are purely presentational and documented using Storybook. Strive for simple, reusable components with thoughtful props and naming.
+Colocate your stories with the component files.
 
 ## UX Writing
 
