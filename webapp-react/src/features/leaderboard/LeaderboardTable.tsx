@@ -82,7 +82,7 @@ export function LeaderboardTable({
               </TableCell>
               <TableCell>
                 <div className="flex items-center gap-2 font-medium">
-                  <Avatar>
+                  <Avatar className="size-9">
                     <AvatarImage 
                       src={entry.user.avatarUrl} 
                       alt={`${entry.user.name}'s avatar`} 

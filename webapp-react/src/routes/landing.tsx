@@ -7,6 +7,6 @@ export const Route = createFileRoute('/landing')({
 })
 
 export function LandingContainer() {
-  const { login } = useAuth();
-  return <LandingPage onSignIn={() => login()} />
+  const { login, isAuthenticated } = useAuth();
+  return <LandingPage onSignIn={() => login()} isSignedIn={isAuthenticated} />
 }

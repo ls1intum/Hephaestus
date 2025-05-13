@@ -7,19 +7,29 @@ import {
   AccordionItem,
   AccordionTrigger,
 } from "@/components/ui/accordion";
-import { LucideBotMessageSquare, LucideHammer, LucideTrophy, LucideUsers } from 'lucide-react';
+import { 
+  BotMessageSquare, 
+  Hammer, 
+  Trophy, 
+  Users 
+} from 'lucide-react';
+
+import { LeaderboardTable } from '@/features/leaderboard/LeaderboardTable';
+import type { LeaderboardEntry } from '@/api/types.gen';
 
 import agileHephaestus from "@/assets/agile_hephaestus.png";
 import aliceAvatar from "@/assets/alice_developer.jpg";
 import bobAvatar from "@/assets/bob_builder.jpg";
 import charlieAvatar from "@/assets/charlie_coder.jpg";
+import { useNavigate } from '@tanstack/react-router';
 
 interface LandingPageProps {
   onSignIn: () => void;
+  isSignedIn?: boolean;
 }
 
 // Sample data for the leaderboard preview
-const sampleLeaderboardEntries = [
+const sampleLeaderboardEntries: LeaderboardEntry[] = [
   {
     rank: 1,
     score: 520,
@@ -30,7 +40,14 @@ const sampleLeaderboardEntries = [
       avatarUrl: aliceAvatar,
       name: 'Alice Developer',
       htmlUrl: 'https://example.com/alice'
-    }
+    },
+    numberOfReviewedPRs: 15,
+    numberOfApprovals: 8,
+    numberOfChangeRequests: 3,
+    numberOfComments: 4,
+    numberOfCodeComments: 6,
+    numberOfUnknowns: 0,
+    reviewedPullRequests: []
   },
   {
     rank: 2,
@@ -42,7 +59,14 @@ const sampleLeaderboardEntries = [
       avatarUrl: bobAvatar,
       name: 'Bob Builder',
       htmlUrl: 'https://example.com/bob'
-    }
+    },
+    numberOfReviewedPRs: 12,
+    numberOfApprovals: 5,
+    numberOfChangeRequests: 2,
+    numberOfComments: 5,
+    numberOfCodeComments: 3,
+    numberOfUnknowns: 0,
+    reviewedPullRequests: []
   },
   {
     rank: 3,
@@ -54,7 +78,14 @@ const sampleLeaderboardEntries = [
       avatarUrl: charlieAvatar,
       name: 'Charlie Coder',
       htmlUrl: 'https://example.com/charlie'
-    }
+    },
+    numberOfReviewedPRs: 9,
+    numberOfApprovals: 4,
+    numberOfChangeRequests: 1,
+    numberOfComments: 4,
+    numberOfCodeComments: 2,
+    numberOfUnknowns: 0,
+    reviewedPullRequests: []
   }
 ];
 
@@ -74,8 +105,18 @@ const faqItems = [
   }
 ];
 
-export function LandingPage({ onSignIn }: LandingPageProps) {
+export function LandingPage({ onSignIn, isSignedIn = false }: LandingPageProps) {
   const learnMoreRef = useRef<HTMLDivElement>(null);
+  const navigate = useNavigate();
+  // Determine the action for CTA buttons based on sign-in status
+  const handleCTAClick = () => {
+    if (isSignedIn) {
+      navigate({ to: '/' });
+    } else {
+      // Trigger sign-in process
+      onSignIn();
+    }
+  };
 
   return (
     <div className="flex flex-col min-h-screen -mx-8 -mb-8">
@@ -91,7 +132,9 @@ export function LandingPage({ onSignIn }: LandingPageProps) {
               </p>
             </div>
             <div className="space-x-4">
-              <Button onClick={onSignIn}>Get Started</Button>
+              <Button onClick={handleCTAClick}>
+                {isSignedIn ? 'Go to Dashboard' : 'Get Started'}
+              </Button>
               <Button variant="outline" onClick={() => learnMoreRef.current && learnMoreRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' })}>
                 Learn More
               </Button>
@@ -102,28 +145,10 @@ export function LandingPage({ onSignIn }: LandingPageProps) {
           <div className="shadow-2xl mt-24 max-w-4xl mx-auto">
             <div className="border border-b-0 rounded-bl-none rounded-br-none rounded-md border-input overflow-auto pointer-events-none" 
                  style={{ maskImage: "linear-gradient(to bottom, rgba(0, 0, 0, 1) 60%, rgba(0, 0, 0, 0))" }}>
-              {/* Simplified leaderboard preview */}
-              <table className="w-full border-collapse">
-                <thead>
-                  <tr className="bg-muted">
-                    <th className="p-2 text-left">Rank</th>
-                    <th className="p-2 text-left">User</th>
-                    <th className="p-2 text-right">Score</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {sampleLeaderboardEntries.map((entry) => (
-                    <tr key={entry.rank} className="border-t border-input">
-                      <td className="p-2">{entry.rank}</td>
-                      <td className="p-2 flex items-center gap-2">
-                        <div className="w-8 h-8 rounded-full bg-muted flex-shrink-0"></div>
-                        {entry.user.name}
-                      </td>
-                      <td className="p-2 text-right">{entry.score}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+              <LeaderboardTable 
+                leaderboard={sampleLeaderboardEntries}
+                isLoading={false}
+              />
             </div>
           </div>
         </div>
@@ -137,7 +162,7 @@ export function LandingPage({ onSignIn }: LandingPageProps) {
           <div className="grid gap-6 lg:grid-cols-2">
             <Card>
               <CardHeader>
-                <LucideTrophy className="text-3xl mb-2 text-yellow-500" />
+                <Trophy className="text-3xl mb-2 text-yellow-500" />
                 <CardTitle>Code Review Gamification</CardTitle>
                 <CardDescription>Transform code reviews into an engaging, competitive experience</CardDescription>
               </CardHeader>
@@ -153,7 +178,7 @@ export function LandingPage({ onSignIn }: LandingPageProps) {
             
             <Card>
               <CardHeader>
-                <LucideBotMessageSquare className="text-3xl mb-2 text-cyan-500" />
+                <BotMessageSquare className="text-3xl mb-2 text-cyan-500" />
                 <CardTitle>AI Mentor</CardTitle>
                 <CardDescription>Personalized guidance for continuous improvement</CardDescription>
               </CardHeader>
@@ -182,19 +207,19 @@ export function LandingPage({ onSignIn }: LandingPageProps) {
               </p>
               <ul className="grid gap-6 mt-6">
                 <li className="flex items-center gap-2">
-                  <LucideHammer className="text-2xl text-primary" />
+                  <Hammer className="text-2xl text-primary" />
                   <span>Empower novice engineers with actionable tools</span>
                 </li>
                 <li className="flex items-center gap-2">
-                  <LucideUsers className="text-2xl text-primary" />
+                  <Users className="text-2xl text-primary" />
                   <span>Foster sustainable, collaborative practices</span>
                 </li>
                 <li className="flex items-center gap-2">
-                  <LucideTrophy className="text-2xl text-primary" />
+                  <Trophy className="text-2xl text-primary" />
                   <span>Gamify code reviews for increased engagement</span>
                 </li>
                 <li className="flex items-center gap-2">
-                  <LucideBotMessageSquare className="text-2xl text-primary" />
+                  <BotMessageSquare className="text-2xl text-primary" />
                   <span>Leverage AI for personalized team growth</span>
                 </li>
               </ul>
@@ -246,10 +271,12 @@ export function LandingPage({ onSignIn }: LandingPageProps) {
               </p>
             </div>
             <div className="w-full max-w-sm space-y-2">
-              <Button className="w-full bg-background text-foreground hover:bg-background/90" onClick={onSignIn}>
-                Get Started Now
+              <Button className="w-full bg-background text-foreground hover:bg-background/90" onClick={handleCTAClick}>
+                {isSignedIn ? 'Go to Dashboard' : 'Get Started Now'}
               </Button>
-              <p className="text-xs text-secondary">No credit card required. Start for free today.</p>
+              {!isSignedIn && (
+                <p className="text-xs text-secondary">No credit card required. Start for free today.</p>
+              )}
             </div>
           </div>
         </div>
