@@ -1,10 +1,7 @@
 package de.tum.in.www1.hephaestus.activity.badpracticedetector;
 
-import de.tum.in.www1.hephaestus.activity.PullRequestBadPracticeRepository;
-import de.tum.in.www1.hephaestus.activity.model.DetectionResult;
-import de.tum.in.www1.hephaestus.activity.model.PullRequestBadPractice;
-import de.tum.in.www1.hephaestus.activity.model.PullRequestBadPracticeState;
-import de.tum.in.www1.hephaestus.activity.model.PullRequestLifecycleState;
+import de.tum.in.www1.hephaestus.activity.BadPracticeDetectionRepository;
+import de.tum.in.www1.hephaestus.activity.model.*;
 import de.tum.in.www1.hephaestus.config.IntelligenceServiceConfig.BadPracticeDetectorService;
 import de.tum.in.www1.hephaestus.gitprovider.issue.Issue;
 import de.tum.in.www1.hephaestus.gitprovider.pullrequest.PullRequest;
@@ -12,6 +9,7 @@ import de.tum.in.www1.hephaestus.gitprovider.pullrequest.PullRequestRepository;
 import de.tum.in.www1.hephaestus.intelligenceservice.model.BadPractice;
 import de.tum.in.www1.hephaestus.intelligenceservice.model.DetectorRequest;
 import de.tum.in.www1.hephaestus.intelligenceservice.model.DetectorResponse;
+import jakarta.transaction.Transactional;
 import java.time.OffsetDateTime;
 import java.util.List;
 import org.slf4j.Logger;
@@ -32,22 +30,24 @@ public class PullRequestBadPracticeDetector {
     private PullRequestRepository pullRequestRepository;
 
     @Autowired
-    private PullRequestBadPracticeRepository pullRequestBadPracticeRepository;
+    private BadPracticeDetectionRepository badPracticeDetectionRepository;
+
+    @Autowired
+    private PullRequestTemplateGetter pullRequestTemplateGetter;
 
     @Autowired
     private BadPracticeDetectorService detectorApi;
 
     /**
-     * Detects bad practices in the given pull request and syncs them with the database.
-     * @param pullRequest The pull request to detect bad practices in.
-     * @return The detected bad practices.
+     * Detects bad practices for a given pull request and syncs the results with the
+     * database.
+     *
+     * @param pullRequest The pull request to detect bad practices for.
+     * @return The detection result.
      */
+    @Transactional
     public DetectionResult detectAndSyncBadPractices(PullRequest pullRequest) {
         logger.info("Detecting bad practices for pull request: {}", pullRequest.getId());
-
-        List<PullRequestBadPractice> existingBadPractices = pullRequestBadPracticeRepository.findByPullRequestId(
-            pullRequest.getId()
-        );
 
         if (
             pullRequest.getUpdatedAt() != null &&
@@ -58,7 +58,42 @@ public class PullRequestBadPracticeDetector {
             return DetectionResult.ERROR_NO_UPDATE_ON_PULLREQUEST;
         }
 
+        BadPracticeDetection detection = detectBadPracticesForPullRequest(pullRequest);
+
+        if (detection.getBadPractices().isEmpty()) {
+            return DetectionResult.NO_BAD_PRACTICES_DETECTED;
+        } else {
+            return DetectionResult.BAD_PRACTICES_DETECTED;
+        }
+    }
+
+    /**
+     * Detects bad practices for a given pull request.
+     *
+     * @param pullRequest The pull request to detect bad practices for.
+     * @return The detection result.
+     */
+    @Transactional
+    public BadPracticeDetection detectBadPracticesForPullRequest(PullRequest pullRequest) {
+        BadPracticeDetection lastDetection = badPracticeDetectionRepository.findMostRecentByPullRequestId(
+            pullRequest.getId()
+        );
+
+        String summary;
+        List<PullRequestBadPractice> existingBadPractices;
+
+        if (lastDetection == null) {
+            summary = "";
+            existingBadPractices = List.of();
+        } else {
+            summary = lastDetection.getSummary();
+            existingBadPractices = lastDetection.getBadPractices();
+        }
+
         PullRequestLifecycleState lifecycleState = this.getLifecycleStateOfPullRequest(pullRequest);
+        String template = pullRequestTemplateGetter.getPullRequestTemplate(
+            pullRequest.getRepository().getNameWithOwner()
+        );
 
         DetectorRequest detectorRequest = new DetectorRequest();
         detectorRequest.setDescription(pullRequest.getBody());
@@ -66,14 +101,12 @@ public class PullRequestBadPracticeDetector {
         detectorRequest.setLifecycleState(lifecycleState.getState());
         detectorRequest.setRepositoryName(pullRequest.getRepository().getName());
         detectorRequest.setPullRequestNumber(pullRequest.getNumber());
-        if (pullRequest.getBadPracticeSummary() != null) {
-            detectorRequest.setBadPracticeSummary(pullRequest.getBadPracticeSummary());
-        } else {
-            detectorRequest.setBadPracticeSummary("");
-        }
+        detectorRequest.setBadPracticeSummary(summary);
         detectorRequest.setBadPractices(
             existingBadPractices.stream().map(this::convertToIntelligenceBadPractice).toList()
         );
+        detectorRequest.setPullRequestTemplate(template);
+
         DetectorResponse detectorResponse = detectorApi.detectDetectorPost(detectorRequest);
 
         pullRequest.setLastDetectionTime(OffsetDateTime.now());
@@ -84,7 +117,7 @@ public class PullRequestBadPracticeDetector {
             .getBadPractices()
             .stream()
             .map(badPractice ->
-                saveNewDetectedBadPractice(
+                newDetectedBadPractice(
                     pullRequest,
                     badPractice,
                     lifecycleState,
@@ -95,14 +128,22 @@ public class PullRequestBadPracticeDetector {
             .toList();
 
         logger.info("Detected {} bad practices for pull request: {}", detectedBadPractices.size(), pullRequest.getId());
-        if (detectedBadPractices.isEmpty()) {
-            return DetectionResult.NO_BAD_PRACTICES_DETECTED;
-        } else {
-            return DetectionResult.BAD_PRACTICES_DETECTED;
-        }
+
+        BadPracticeDetection badPracticeDetection = new BadPracticeDetection();
+        badPracticeDetection.setPullRequest(pullRequest);
+        badPracticeDetection.setBadPractices(detectedBadPractices);
+        badPracticeDetection.setSummary(detectorResponse.getBadPracticeSummary());
+        badPracticeDetection.setDetectionTime(OffsetDateTime.now());
+        badPracticeDetection.setTraceId(detectorResponse.getTraceId());
+
+        detectedBadPractices.forEach(badPractice -> {
+            badPractice.setBadPracticeDetection(badPracticeDetection);
+        });
+
+        return badPracticeDetectionRepository.save(badPracticeDetection);
     }
 
-    protected PullRequestBadPractice saveNewDetectedBadPractice(
+    protected PullRequestBadPractice newDetectedBadPractice(
         PullRequest pullRequest,
         BadPractice badPractice,
         PullRequestLifecycleState lifecycleState,
@@ -125,7 +166,7 @@ public class PullRequestBadPracticeDetector {
         pullRequestBadPractice.setLastUpdateTime(OffsetDateTime.now());
         pullRequestBadPractice.setDetectionPullrequestLifecycleState(lifecycleState);
         pullRequestBadPractice.setDetectionTraceId(traceId);
-        return pullRequestBadPracticeRepository.save(pullRequestBadPractice);
+        return pullRequestBadPractice;
     }
 
     private BadPractice convertToIntelligenceBadPractice(PullRequestBadPractice pullRequestBadPractice) {

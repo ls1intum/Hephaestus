@@ -7,10 +7,11 @@
             <hlm-skeleton class="size-5 bg-green-500/30"></hlm-skeleton>
             <hlm-skeleton class="h-4 w-16 lg:w-36"></hlm-skeleton>
           } @else {
-            <a [href]="htmlUrl()" class="font-medium flex justify-center items-center space-x-1">
+            <span class="font-medium flex justify-center items-center space-x-1">
               <ng-icon [name]="issueIconAndColor().icon" size="18" [class]="'mr-1 ' + issueIconAndColor().color"></ng-icon>
-              {{ repositoryName() }} #{{ number() }} on {{ displayCreated().format('MMM D') }}. Updated on {{ displayUpdated().format('MMM D, HH:mm') }}
-            </a>
+              <a [href]="htmlUrl()">{{ repositoryName() }} #{{ number() }} </a>
+              <span> on {{ displayCreated().format('MMM D') }}. Updated on {{ displayUpdated().format('MMM D, HH:mm') }} </span>
+            </span>
           }
         </span>
         <span class="font-medium flex justify-center items-center gap-2">
@@ -42,7 +43,7 @@
           @if (isLoading()) {
             <hlm-skeleton class="h-6 w-3/4"></hlm-skeleton>
           } @else {
-            <div [innerHTML]="displayTitle()" class=""></div>
+            <a [href]="htmlUrl()" [innerHTML]="displayTitle()" class=""></a>
           }
         </span>
         <span class="flex items-center space-x-2 pr-4">
@@ -68,7 +69,7 @@
         <brn-collapsible-content>
           <brn-separator hlmSeparator />
           <p class="text-sm text-pretty">{{ badPracticeSummary() }}</p>
-          @for (badpractice of badPractices(); track badpractice.title) {
+          @for (badpractice of orderedBadPractices(); track badpractice.title) {
             <brn-separator hlmSeparator />
             <app-bad-practice-card
               [id]="badpractice.id"
@@ -77,6 +78,29 @@
               [state]="badpractice.state"
               [currUserIsDashboardUser]="currUserIsDashboardUser()"
             ></app-bad-practice-card>
+          }
+          @if (orderedOldBadPractices().length > 0) {
+            <brn-separator hlmSeparator />
+            <div hlmAccordion>
+              <div hlmAccordionItem>
+                <button hlmAccordionTrigger>
+                  Old good and bad practices
+                  <ng-icon name="lucideChevronDown" hlm hlmAccIcon />
+                </button>
+                <hlm-accordion-content>
+                  @for (badpractice of orderedOldBadPractices(); track badpractice.title) {
+                    <brn-separator hlmSeparator />
+                    <app-bad-practice-card
+                      [id]="badpractice.id"
+                      [title]="badpractice.title"
+                      [description]="badpractice.description"
+                      [state]="badpractice.state"
+                      [currUserIsDashboardUser]="currUserIsDashboardUser()"
+                    ></app-bad-practice-card>
+                  }
+                </hlm-accordion-content>
+              </div>
+            </div>
           }
         </brn-collapsible-content>
       </div>

@@ -16,6 +16,7 @@ class DetectorRequest(BaseModel):
     pull_request_number: int
     bad_practice_summary: str
     bad_practices: List[BadPractice]
+    pull_request_template: str
 
 
 class DetectorResponse(BaseModel):
@@ -38,6 +39,7 @@ def detect(request: DetectorRequest):
         request.pull_request_number,
         request.bad_practice_summary,
         request.bad_practices,
+        request.pull_request_template,
     )
     return DetectorResponse(
         bad_practice_summary=result.bad_practice_summary,

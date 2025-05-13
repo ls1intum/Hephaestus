@@ -12,7 +12,7 @@ public class CacheConfig {
     @Bean
     public CacheManager cacheManager() {
         ConcurrentMapCacheManager cacheManager = new ConcurrentMapCacheManager();
-        cacheManager.setCacheNames(Arrays.asList("contributors"));
+        cacheManager.setCacheNames(Arrays.asList("contributors", "pullRequestTemplates"));
         return cacheManager;
     }
 }
