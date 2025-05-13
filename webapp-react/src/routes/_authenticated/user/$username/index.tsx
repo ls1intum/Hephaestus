@@ -1,4 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
+import { useQuery } from "@tanstack/react-query";
+import { getUserProfileOptions } from "@/api/@tanstack/react-query.gen";
+import { ProfilePage } from "@/features/profile";
 
 export const Route = createFileRoute("/_authenticated/user/$username/")({
   component: UserProfile,
@@ -7,13 +10,20 @@ export const Route = createFileRoute("/_authenticated/user/$username/")({
 function UserProfile() {
   const { username } = Route.useParams();
   
+  // Query for user profile data
+  const profileQuery = useQuery({
+    ...getUserProfileOptions({
+      path: { login: username }
+    }),
+    enabled: Boolean(username),
+  });
+  
   return (
-    <div className="flex flex-col gap-4">
-      <h1 className="text-3xl font-bold">User Profile: {username}</h1>
-      <p className="mb-4">
-        View user profile information and activity.
-      </p>
-      {/* User profile content would go here */}
-    </div>
+    <ProfilePage 
+      profileData={profileQuery.data}
+      isLoading={profileQuery.isLoading || profileQuery.isFetching}
+      error={profileQuery.isError}
+      username={username}
+    />
   );
 }
