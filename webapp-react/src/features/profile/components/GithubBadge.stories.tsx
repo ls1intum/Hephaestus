@@ -1,8 +1,8 @@
 import type { Meta, StoryObj } from "@storybook/react";
-import { GithubBadge } from "../../../components/ui/github-badge";
+import { GithubBadge } from "./GithubBadge";
 
 const meta = {
-  title: "UI/GithubBadge",
+  title: "Profile/GithubBadge",
   component: GithubBadge,
   parameters: {
     layout: "centered",
