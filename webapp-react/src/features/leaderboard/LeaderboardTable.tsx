@@ -25,6 +25,7 @@ import {
   NoEntryIcon 
 } from "@primer/octicons-react";
 import { cn } from "@/lib/utils";
+import { AwardIcon } from "lucide-react";
 
 export function LeaderboardTable({
   leaderboard = [],
@@ -56,7 +57,7 @@ export function LeaderboardTable({
           <TableHead>Contributor</TableHead>
           <TableHead className="text-center">
             <div className="flex justify-center items-center gap-1 text-github-done-foreground">
-              <span>Score</span>
+              <span className="flex items-center pr-4"><AwardIcon className="size-4"/> Score</span>
             </div>
           </TableHead>
           <TableHead>Activity</TableHead>

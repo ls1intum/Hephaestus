@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ClockIcon } from "@primer/octicons-react";
 import { format, parseISO } from "date-fns";
+import { LeagueIcon } from "@/features/leaderboard/league/LeagueIcon";
 import type { ProfileHeaderProps } from "../types";
 
 // Repository images for known repositories
@@ -17,6 +18,7 @@ export function ProfileHeader({
   user,
   firstContribution,
   contributedRepositories = [],
+  leaguePoints = 0,
   isLoading
 }: ProfileHeaderProps) {
   // Format the first contribution date if available
@@ -28,9 +30,7 @@ export function ProfileHeader({
   const getRepositoryImage = (nameWithOwner: string) => {
     return REPO_IMAGES[nameWithOwner] || 
       `https://github.com/${nameWithOwner.split('/')[0]}.png`;
-  };
-
-  return (
+  };  return (
     <div className="flex items-center justify-between mx-8">
       <div className="flex gap-8 items-center">
         {/* Avatar with loading skeleton */}
@@ -98,7 +98,7 @@ export function ProfileHeader({
                         className="size-10 p-1"
                         asChild
                       >
-                        <a 
+                        <a
                           href={repository.htmlUrl}
                           target="_blank"
                           rel="noopener noreferrer"
@@ -120,6 +120,21 @@ export function ProfileHeader({
             )}
           </div>
         ) : null}
+      </div>
+
+      {/* League information */}
+      <div className="flex flex-col justify-center items-center gap-2">
+        {isLoading ? (
+          <>
+            <Skeleton className="size-28 rounded-full" />
+            <Skeleton className="h-8 w-16" />
+          </>
+        ) : (
+          <>
+            <LeagueIcon leaguePoints={leaguePoints} size="max" />
+            <span className="text-muted-foreground text-xl md:text-2xl font-bold leading-6">{leaguePoints}</span>
+          </>
+        )}
       </div>
     </div>
   );

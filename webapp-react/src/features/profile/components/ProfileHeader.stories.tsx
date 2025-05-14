@@ -22,8 +22,8 @@ export const Default: Story = {
       name: "John Doe",
       avatarUrl: "https://github.com/github.png",
       htmlUrl: "https://github.com/johndoe",
-      leaguePoints: 150,
     },
+    leaguePoints: 1450,
     firstContribution: "2022-05-15T00:00:00Z",
     contributedRepositories: [
       {
@@ -47,6 +47,7 @@ export const Default: Story = {
 export const Loading: Story = {
   args: {
     isLoading: true,
+    leaguePoints: 0,
   },
 };
 
@@ -59,9 +60,89 @@ export const NoRepositories: Story = {
       name: "Jane Doe",
       avatarUrl: "https://github.com/octocat.png",
       htmlUrl: "https://github.com/janedoe",
-      leaguePoints: 75,
     },
+    leaguePoints: 750,
     firstContribution: "2023-01-10T00:00:00Z",
+    contributedRepositories: [],
+  },
+};
+
+export const BronzeLeague: Story = {
+  args: {
+    isLoading: false,
+    user: {
+      id: 2,
+      login: "bronzeUser",
+      name: "Bronze User",
+      avatarUrl: "https://github.com/github.png",
+      htmlUrl: "https://github.com/bronzeUser",
+    },
+    leaguePoints: 1000,
+    firstContribution: "2023-03-15T00:00:00Z",
+    contributedRepositories: [],
+  },
+};
+
+export const SilverLeague: Story = {
+  args: {
+    isLoading: false,
+    user: {
+      id: 3,
+      login: "silverUser",
+      name: "Silver User",
+      avatarUrl: "https://github.com/github.png",
+      htmlUrl: "https://github.com/silverUser",
+    },
+    leaguePoints: 1400,
+    firstContribution: "2022-10-10T00:00:00Z",
+    contributedRepositories: [],
+  },
+};
+
+export const GoldLeague: Story = {
+  args: {
+    isLoading: false,
+    user: {
+      id: 4,
+      login: "goldUser",
+      name: "Gold User",
+      avatarUrl: "https://github.com/github.png",
+      htmlUrl: "https://github.com/goldUser",
+    },
+    leaguePoints: 1650,
+    firstContribution: "2022-07-22T00:00:00Z",
+    contributedRepositories: [],
+  },
+};
+
+export const DiamondLeague: Story = {
+  args: {
+    isLoading: false,
+    user: {
+      id: 5,
+      login: "diamondUser",
+      name: "Diamond User",
+      avatarUrl: "https://github.com/github.png",
+      htmlUrl: "https://github.com/diamondUser",
+    },
+    leaguePoints: 1900,
+    firstContribution: "2021-12-05T00:00:00Z",
+    contributedRepositories: [],
+  },
+};
+
+export const MasterLeague: Story = {
+  args: {
+    isLoading: false,
+    user: {
+      id: 6,
+      login: "masterUser",
+      name: "Master User",
+      avatarUrl: "https://github.com/github.png",
+      htmlUrl: "https://github.com/masterUser",
+    },
+    leaguePoints: 2200,
+    firstContribution: "2020-05-01T00:00:00Z",
     contributedRepositories: [],
   },
 };
