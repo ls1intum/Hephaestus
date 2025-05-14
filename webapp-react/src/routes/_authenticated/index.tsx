@@ -5,7 +5,6 @@ import { z } from 'zod';
 import { zodValidator } from '@tanstack/zod-adapter';
 import { 
   format, 
-  subWeeks, 
   startOfISOWeek, 
   endOfISOWeek, 
   formatISO 
@@ -22,17 +21,17 @@ import type { LeaderboardSortType } from '@/features/leaderboard/types';
 
 // Calculate default date range with ISO 8601 format including timezone
 const today = new Date();
-const startOfLastWeekDate = startOfISOWeek(subWeeks(today, 1));
-const endOfLastWeekDate = endOfISOWeek(subWeeks(today, 1));
-const startOfLastWeek = formatISO(startOfLastWeekDate);
-const endOfLastWeek = formatISO(endOfLastWeekDate);
+const startOfCurrentWeekDate = startOfISOWeek(today);
+const endOfCurrentWeekDate = endOfISOWeek(today);
+const startOfCurrentWeek = formatISO(startOfCurrentWeekDate);
+const endOfCurrentWeek = formatISO(endOfCurrentWeekDate);
 
 // Define search params schema for validation and types
 const leaderboardSearchSchema = z.object({
   team: z.string().default('all'),
   sort: z.enum(['SCORE', 'LEAGUE_POINTS']).default('SCORE'),
-  after: z.string().optional().default(startOfLastWeek),
-  before: z.string().optional().default(endOfLastWeek),
+  after: z.string().optional().default(startOfCurrentWeek),
+  before: z.string().optional().default(endOfCurrentWeek),
 });
 
 // Export route with search param validation
