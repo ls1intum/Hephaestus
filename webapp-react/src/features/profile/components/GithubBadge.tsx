@@ -5,15 +5,11 @@ import { cn } from "@/lib/utils";
 interface GithubBadgeProps extends React.ComponentPropsWithoutRef<typeof Badge> {
   label: string;
   color?: string;  // Hex color without #
-  href?: string;
-  tooltipText?: string;
 }
 
 export function GithubBadge({
   label,
   color,
-  href,
-  tooltipText,
   className,
   ...props
 }: GithubBadgeProps) {
@@ -167,13 +163,12 @@ export function GithubBadge({
     } as React.CSSProperties;
   }
 
-  const badgeContent = (
+  return (
     <>
       <Badge
         variant="outline"
         className={cn(
           "hidden dark:inline-flex items-center border-solid transition-colors hover:no-underline",
-          color ? "hover:opacity-90" : "",
           className
         )}
         style={style}
@@ -185,7 +180,6 @@ export function GithubBadge({
         variant="outline"
         className={cn(
           "dark:hidden inline-flex items-center border-solid transition-colors hover:no-underline",
-          color ? "hover:opacity-90" : "",
           className
         )}
         style={lightModeStyle}
@@ -194,29 +188,5 @@ export function GithubBadge({
         {label}
       </Badge>
     </>
-  );
-
-  // If href is provided, wrap the badge in an anchor tag
-  if (href) {
-    return (
-      <a 
-        href={href}
-        className="inline-block"
-        target="_blank"
-        rel="noopener noreferrer"
-        title={tooltipText}
-        aria-label={tooltipText}
-      >
-        {badgeContent}
-      </a>
-    );
-  }
-
-  return tooltipText ? (
-    <span title={tooltipText}>
-      {badgeContent}
-    </span>
-  ) : (
-    badgeContent
   );
 }

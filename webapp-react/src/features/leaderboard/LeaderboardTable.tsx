@@ -9,6 +9,11 @@ import {
 } from "@/components/ui/table";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Skeleton } from "@/components/ui/skeleton";
+import { 
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger 
+} from "@/components/ui/tooltip";
 import { LeagueIcon } from "./league/LeagueIcon";
 import { ReviewsPopover } from "./ReviewsPopover";
 import { 
@@ -113,42 +118,50 @@ export function LeaderboardTable({
                     </>
                   )}
                   {entry.numberOfChangeRequests > 0 && (
-                    <div 
-                      className="flex items-center gap-1 text-github-danger-foreground" 
-                      title="Changes Requested"
-                    >
-                      <FileDiffIcon className="h-4 w-4" />
-                      <span>{entry.numberOfChangeRequests}</span>
-                    </div>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <div className="flex items-center gap-1 text-github-danger-foreground">
+                          <FileDiffIcon className="h-4 w-4" />
+                          <span>{entry.numberOfChangeRequests}</span>
+                        </div>
+                      </TooltipTrigger>
+                      <TooltipContent>Changes Requested</TooltipContent>
+                    </Tooltip>
                   )}
                   {entry.numberOfApprovals > 0 && (
-                    <div 
-                      className="flex items-center gap-1 text-github-success-foreground" 
-                      title="Approvals"
-                    >
-                      <CheckIcon className="h-4 w-4" />
-                      <span>{entry.numberOfApprovals}</span>
-                    </div>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <div className="flex items-center gap-1 text-github-success-foreground">
+                          <CheckIcon className="h-4 w-4" />
+                          <span>{entry.numberOfApprovals}</span>
+                        </div>
+                      </TooltipTrigger>
+                      <TooltipContent>Approvals</TooltipContent>
+                    </Tooltip>
                   )}
                   {entry.numberOfComments + (entry.numberOfUnknowns || 0) > 0 && (
-                    <div 
-                      className="flex items-center gap-1 text-github-muted-foreground" 
-                      title="Comments"
-                    >
-                      <CommentIcon className="h-4 w-4" />
-                      <span>
-                        {entry.numberOfComments + (entry.numberOfUnknowns || 0)}
-                      </span>
-                    </div>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <div className="flex items-center gap-1 text-github-muted-foreground">
+                          <CommentIcon className="h-4 w-4" />
+                          <span>
+                            {entry.numberOfComments + (entry.numberOfUnknowns || 0)}
+                          </span>
+                        </div>
+                      </TooltipTrigger>
+                      <TooltipContent>Comments</TooltipContent>
+                    </Tooltip>
                   )}
                   {entry.numberOfCodeComments > 0 && (
-                    <div 
-                      className="flex items-center gap-1 text-github-muted-foreground" 
-                      title="Code comments"
-                    >
-                      <CommentDiscussionIcon className="h-4 w-4" />
-                      <span>{entry.numberOfCodeComments}</span>
-                    </div>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <div className="flex items-center gap-1 text-github-muted-foreground">
+                          <CommentDiscussionIcon className="h-4 w-4" />
+                          <span>{entry.numberOfCodeComments}</span>
+                        </div>
+                      </TooltipTrigger>
+                      <TooltipContent>Code comments</TooltipContent>
+                    </Tooltip>
                   )}
                 </div>
               </TableCell>

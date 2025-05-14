@@ -73,8 +73,8 @@ export function IssueCard({
                 </>
               ) : (
                 <>
-                  <StateIcon className={`mr-1 ${color}`} size={18} />
-                  <span className="whitespace-nowrap">{repositoryName} #{number} on {formattedDate}</span>
+                  <StateIcon className={`mr-2 ${color}`} size={18} />
+                  <span className="whitespace-nowrap"><span className="font-semibold">{repositoryName} #{number}</span> on {formattedDate}</span>
                 </>
               )}
             </span>
@@ -113,8 +113,6 @@ export function IssueCard({
                 key={label.id}
                 label={label.name}
                 color={label.color}
-                tooltipText={`Label: ${label.name}`}
-                href={htmlUrl ? `${htmlUrl.split('/pull/')[0]}/issues?q=is%3Aissue+label%3A${label.name}` : undefined}
               />
             ))}
           </div>
