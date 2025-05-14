@@ -51,7 +51,7 @@ export function IssueCard({
 
   // Format the title, replacing code blocks with styled code
   const formattedTitle = title
-    ? title.replace(/`([^`]+)`/g, '<code class="bg-accent/50 px-1 py-0.5 rounded text-xs font-mono">$1</code>')
+    ? title.replace(/`([^`]+)`/g, '<code class="bg-accent/50 px-1 py-0.5 rounded font-mono">$1</code>')
     : "";
 
   // Use CSS to style the card as a clickable link with hover effects
@@ -74,7 +74,7 @@ export function IssueCard({
               ) : (
                 <>
                   <StateIcon className={`mr-2 ${color}`} size={18} />
-                  <span className="whitespace-nowrap"><span className="font-semibold">{repositoryName} #{number}</span> on {formattedDate}</span>
+                  <span className="whitespace-nowrap">{repositoryName} #{number} on {formattedDate}</span>
                 </>
               )}
             </span>
@@ -101,7 +101,7 @@ export function IssueCard({
             {isLoading ? (
               <Skeleton className="h-6 w-3/4 mb-6" />
             ) : (
-              <div className="text-sm leading-normal" dangerouslySetInnerHTML={{ __html: formattedTitle }} />
+              <div className="leading-normal" dangerouslySetInnerHTML={{ __html: formattedTitle }} />
             )}
           </span>
         </div>

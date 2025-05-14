@@ -90,3 +90,21 @@ export const Loading: Story = {
     isLoading: true,
   },
 };
+
+export const WithCodeInTitle: Story = {
+  args: {
+    isLoading: false,
+    state: "APPROVED",
+    submittedAt: new Date().toISOString(),
+    htmlUrl: "https://github.com/ls1intum/Hephaestus/pull/42",
+    pullRequest: {
+      title: "Update `LeaderboardTable` component and fix `ProfileContent` layout",
+      number: 42,
+      repository: {
+        name: "Hephaestus",
+      },
+    },
+    repositoryName: "Hephaestus",
+    score: 5,
+  },
+};

@@ -1,5 +1,5 @@
 import { formatDistanceToNow, parseISO } from "date-fns";
-import { Card, CardContent } from "@/components/ui/card";
+import { Card } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import {
@@ -8,6 +8,7 @@ import {
   FileDiffIcon,
   GitPullRequestIcon,
 } from "@primer/octicons-react";
+import { AwardIcon } from "lucide-react";
 import type { ReviewActivityCardProps } from "../types";
 import { cn } from "@/lib/utils";
 
@@ -58,79 +59,63 @@ export function ReviewActivityCard({
     ? formatDistanceToNow(parseISO(submittedAt), { addSuffix: true })
     : undefined;
 
+  // Format PR title to handle code backticks similar to how IssueCard does
+  const formatPRTitle = (title?: string): string => {
+    if (!title) return '';
+    return title.replace(/`([^`]+)`/g, '<code class="bg-accent/50 px-1 py-0.5 rounded font-mono">$1</code>');
+  };
+
+  // Use CSS to style the card as a clickable link with hover effects
   return (
-    <Card
-      className={cn(
-        "overflow-hidden transition-colors border-l-4",
-        isLoading
-          ? `border-l-${stateStyle.skeletonColor}`
-          : `border-l-${stateStyle.color.replace("text-", "")}`
-      )}
+    <a 
+      href={htmlUrl} 
+      target="_blank" 
+      rel="noopener noreferrer"
+      className="block w-full"
     >
-      <CardContent className="p-4">
-        {isLoading ? (
-          <div className="flex flex-col gap-2">
-            <div className="flex justify-between items-center">
-              <Skeleton className="h-6 w-40" />
-              <Skeleton className="h-6 w-20" />
-            </div>
-            <Skeleton className="h-4 w-full" />
-            <div className="flex justify-between items-center mt-1">
-              <Skeleton className="h-5 w-32" />
-              <Skeleton className="h-5 w-16" />
-            </div>
-          </div>
-        ) : (
-          <div className="flex flex-col gap-1">
-            {/* Repository and PR number */}
-            <div className="flex justify-between items-center">
-              <div className="flex items-center gap-2">
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <div className={cn("flex items-center", stateStyle.color)}>
-                      <stateStyle.icon size={18} />
-                    </div>
-                  </TooltipTrigger>
-                  <TooltipContent side="top">{stateStyle.tooltip}</TooltipContent>
-                </Tooltip>
-                <a
-                  href={htmlUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="font-medium hover:underline"
-                >
-                  {pullRequest?.repository?.name} #{pullRequest?.number}
-                </a>
-              </div>
-              {score !== undefined && score > 0 && (
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <div className="flex items-center gap-1 text-github-accent-foreground font-semibold">
-                      +{score}
-                    </div>
-                  </TooltipTrigger>
-                  <TooltipContent side="top">Points earned for this review</TooltipContent>
-                </Tooltip>
+      <Card className="rounded-lg border border-border bg-card text-card-foreground shadow-sm hover:bg-accent/50 cursor-pointer">
+        <div className="flex flex-col gap-1 px-6">
+          {/* Repository, PR number and points */}
+          <div className="flex justify-between gap-2 items-center text-sm text-github-muted-foreground">
+            <span className="font-medium flex justify-center items-center space-x-1">
+              {isLoading ? (
+                <>
+                  <Skeleton className={cn("size-5", stateStyle.skeletonColor)} />
+                  <Skeleton className="h-4 w-16 lg:w-36" />
+                </>
+              ) : (
+                <>
+                  <div className={stateStyle.color}>
+                    <stateStyle.icon className="mr-1" size={18} />
+                  </div>
+                  <span className="whitespace-nowrap">{pullRequest?.repository?.name} #{pullRequest?.number} {relativeTime}</span>
+                </>
               )}
-            </div>
-
-            {/* PR title */}
-            <a
-              href={htmlUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="text-sm text-muted-foreground hover:text-foreground transition-colors"
-            >
-              {pullRequest?.title}
-            </a>
-
-            {/* Relative time */}
-            <div className="flex justify-between items-center mt-1">
-              <span className="text-xs text-muted-foreground">{relativeTime}</span>
-            </div>
+            </span>
+                        
+            {!isLoading && score !== undefined && score > 0 && (
+              <span className="flex items-center gap-1 text-github-done-foreground font-semibold">
+                <Tooltip>
+                  <TooltipTrigger className="flex items-center gap-1">
+                    <AwardIcon size={16} />
+                    <span>+{score}</span>
+                  </TooltipTrigger>
+                  <TooltipContent side="top">Points awarded for this activity</TooltipContent>
+                </Tooltip>
+              </span>
+            )}
           </div>
-        )}
-      </CardContent>
-    </Card>
+          
+          {/* PR title */}
+          <span className="flex justify-between font-medium contain-inline-size">
+            {isLoading ? (
+              <Skeleton className="h-6 w-3/4" />
+            ) : (
+              <div className="leading-normal" dangerouslySetInnerHTML={{ __html: formatPRTitle(pullRequest?.title) }} />
+            )}
+          </span>
+        </div>
+      </Card>
+    </a>
   );
 }
