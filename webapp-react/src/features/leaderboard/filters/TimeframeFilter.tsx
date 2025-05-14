@@ -231,9 +231,89 @@ export function TimeframeFilter({
   // Handle timeframe selection change
   const handleTimeframeChange = useCallback((value: string) => {
     const timeframeOption = value as TimeframeOption;
+    
+    // If changing to custom, update the date range to match the current timeframe's date range
+    if (timeframeOption === 'custom' && selectedTimeframe !== 'custom') {
+      try {
+        // Use a stable date reference
+        const now = new Date();
+        // Reset seconds and milliseconds
+        now.setSeconds(0, 0);
+        
+        // Extract leaderboard schedule details or use defaults
+        const scheduledDay = leaderboardSchedule?.day ?? 1; // Default to Monday
+        const scheduledHour = leaderboardSchedule?.hour ?? 9; // Default to 9 AM
+        const scheduledMinute = leaderboardSchedule?.minute ?? 0; // Default to 0 minutes
+        
+        let startDate: Date;
+        let endDate: Date;
+        
+        switch (selectedTimeframe) {
+          case 'this-week': {
+            const currentISODay = getISODay(now);
+            
+            if (currentISODay >= scheduledDay) {
+              // We've passed the scheduled day, so this week's range starts from this week's scheduled day
+              startDate = setToScheduledTime(now, scheduledDay, scheduledHour, scheduledMinute);
+            } else {
+              // We haven't reached the scheduled day yet, so range starts from last week's scheduled day
+              startDate = setToScheduledTime(subWeeks(now, 1), scheduledDay, scheduledHour, scheduledMinute);
+            }
+            
+            // End date is the next scheduled day (next week or this coming one)
+            endDate = subDays(addWeeks(startDate, 1), 1); // Subtract 1 day for display purposes
+            break;
+          }
+          case 'last-week': {
+            const currentISODay = getISODay(now);
+            
+            if (currentISODay >= scheduledDay) {
+              // We've passed the scheduled day, use last week's scheduled day
+              startDate = setToScheduledTime(subWeeks(now, 1), scheduledDay, scheduledHour, scheduledMinute);
+            } else {
+              // We haven't reached the scheduled day, use scheduled day from 2 weeks ago
+              startDate = setToScheduledTime(subWeeks(now, 2), scheduledDay, scheduledHour, scheduledMinute);
+            }
+            
+            // Before date is this week's or last week's scheduled day
+            endDate = subDays(addWeeks(startDate, 1), 1); // Subtract 1 day for display purposes
+            break;
+          }
+          case 'this-month': {
+            // Start at the beginning of this month (midnight)
+            startDate = startOfMonth(now);
+            // End at the last day of this month
+            endDate = endOfMonth(now);
+            break;
+          }
+          case 'last-month': {
+            // Start at the beginning of last month (midnight)
+            startDate = startOfMonth(subMonths(now, 1));
+            // End at the last day of last month
+            endDate = endOfMonth(subMonths(now, 1));
+            break;
+          }
+          default: {
+            // Default to last 7 days
+            startDate = subDays(now, 7);
+            endDate = now;
+            break;
+          }
+        }
+        
+        // Update the dateRange state with the calculated dates
+        setDateRange({
+          from: startDate,
+          to: endDate
+        });
+      } catch (e) {
+        console.error('Error setting custom date range:', e);
+      }
+    }
+    
     setSelectedTimeframe(timeframeOption);
     setUserSelectedTimeframe(true);
-  }, []);
+  }, [selectedTimeframe, leaderboardSchedule, setToScheduledTime]);
   
   // Update timeframe if initialDates change, but only if user hasn't manually selected a timeframe
   useEffect(() => {
