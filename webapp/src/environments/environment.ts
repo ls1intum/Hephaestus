@@ -1,7 +1,7 @@
 export const environment = {
   version: 'DEV',
   clientUrl: 'http://localhost:4200',
-  serverUrl: 'https://hephaestus.aet.in.tum.de/api',
+  serverUrl: 'http://localhost:8080',
   sentry: {
     environment: 'local',
     dsn: 'https://289f1f62feeb4f70a8878dc0101825cd@sentry.ase.in.tum.de/3'
@@ -9,7 +9,8 @@ export const environment = {
   keycloak: {
     url: 'http://localhost:8081',
     realm: 'hephaestus',
-    clientId: 'hephaestus'
+    clientId: 'hephaestus',
+    skipLoginPage: false
   },
   posthog: {
     projectApiKey: '',

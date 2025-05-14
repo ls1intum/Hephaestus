@@ -1,17 +1,19 @@
 import { createFileRoute } from "@tanstack/react-router";
+import { useQuery } from "@tanstack/react-query";
+import { getTeamsOptions } from "@/api/@tanstack/react-query.gen";
+import { TeamsPage } from "@/features/teams/TeamsPage";
 
 export const Route = createFileRoute("/_authenticated/teams")({
-  component: Teams,
+  component: TeamsContainer,
 });
 
-function Teams() {
+function TeamsContainer() {
+  const teamsQuery = useQuery(getTeamsOptions({}));
+  
   return (
-    <div className="flex flex-col gap-4">
-      <h1 className="text-3xl font-bold">Teams</h1>
-      <p className="mb-4">
-        Manage your teams and team members here.
-      </p>
-      {/* Teams content would go here */}
-    </div>
+    <TeamsPage
+      teams={teamsQuery.data || []}
+      isLoading={teamsQuery.isLoading}
+    />
   );
 }
