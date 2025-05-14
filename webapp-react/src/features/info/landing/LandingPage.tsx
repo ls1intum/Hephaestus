@@ -15,7 +15,7 @@ import {
 } from 'lucide-react';
 
 import { LeaderboardTable } from '@/features/leaderboard/LeaderboardTable';
-import type { LeaderboardEntry } from '@/api/types.gen';
+import type { LeaderboardEntry, PullRequestInfo } from '@/api/types.gen';
 
 import agileHephaestus from "@/assets/agile_hephaestus.png";
 import aliceAvatar from "@/assets/alice_developer.jpg";
@@ -26,6 +26,29 @@ import { useNavigate } from '@tanstack/react-router';
 interface LandingPageProps {
   onSignIn: () => void;
   isSignedIn?: boolean;
+}
+
+function createMockReviewedPullRequest(amount: number) {
+  return Array.from({ length: amount }, () => ({
+        id: 1,
+        title: 'Fix bug in user authentication',
+        number: 42,
+        htmlUrl: 'https://example.com/pull/42',
+        state: 'CLOSED',
+        isDraft: false,
+        isMerged: true,
+        commentsCount: 5,
+        createdAt: '2023-01-01T00:00:00Z',
+        updatedAt: '2023-01-02T00:00:00Z',
+        additions: 10,
+        deletions: 2,
+        repository: {
+          id: 1,
+          name: 'example/repo',
+          nameWithOwner: 'example/repo',
+          htmlUrl: 'https://example.com/repo'
+        }
+      } satisfies PullRequestInfo));
 }
 
 // Sample data for the leaderboard preview
@@ -47,7 +70,7 @@ const sampleLeaderboardEntries: LeaderboardEntry[] = [
     numberOfComments: 4,
     numberOfCodeComments: 6,
     numberOfUnknowns: 0,
-    reviewedPullRequests: []
+    reviewedPullRequests: createMockReviewedPullRequest(12)
   },
   {
     rank: 2,
@@ -66,7 +89,7 @@ const sampleLeaderboardEntries: LeaderboardEntry[] = [
     numberOfComments: 5,
     numberOfCodeComments: 3,
     numberOfUnknowns: 0,
-    reviewedPullRequests: []
+    reviewedPullRequests: createMockReviewedPullRequest(5)
   },
   {
     rank: 3,
@@ -85,7 +108,7 @@ const sampleLeaderboardEntries: LeaderboardEntry[] = [
     numberOfComments: 4,
     numberOfCodeComments: 2,
     numberOfUnknowns: 0,
-    reviewedPullRequests: []
+    reviewedPullRequests: createMockReviewedPullRequest(2)
   }
 ];
 
