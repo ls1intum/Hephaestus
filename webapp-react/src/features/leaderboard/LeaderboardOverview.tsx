@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { LeagueInfoDialog } from "./LeagueInfoDialog";
 import { Progress } from "@/components/ui/progress";
 import { getLeagueFromPoints } from "./league/utils";
+import { differenceInHours, isPast } from "date-fns";
 
 export function LeaderboardOverview({ 
   leaderboardEntry, 
@@ -23,6 +24,27 @@ export function LeaderboardOverview({
   const progressValue = currentLeague ? 
     ((leaguePoints - currentLeague.minPoints) * 100) / (currentLeague.maxPoints - currentLeague.minPoints) : 0;
     
+  // Calculate relative time for leaderboard end
+  const getRelativeEndTime = () => {
+    if (!leaderboardEnd) return "N/A";
+    
+    const endDate = new Date(leaderboardEnd);
+    
+    if (isPast(endDate)) {
+      return "Ended";
+    }
+    
+    const diffHours = differenceInHours(endDate, new Date());
+    
+    if (diffHours > 24) {
+      const days = Math.floor(diffHours / 24);
+      const hours = diffHours % 24;
+      return `${days}d ${hours}h`;
+    }
+    
+    return `${diffHours}h`;
+  };
+    
   // Scroll to the user's rank in the leaderboard table
   const scrollToRank = (rank: number) => {
     const element = document.getElementById(`rank-${rank}`);
@@ -33,7 +55,7 @@ export function LeaderboardOverview({
 
   return (
     <Card>
-      <CardContent className="pt-6">
+      <CardContent>
         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 items-center justify-between gap-4">
           <Button 
             variant="ghost" 
@@ -65,7 +87,7 @@ export function LeaderboardOverview({
               <CalendarClock className="h-4 w-4 text-muted-foreground" />
               <span className="text-sm text-muted-foreground">Leaderboard ends in:</span>
             </div>
-            <span className="text-xl font-medium">{leaderboardEnd || "N/A"}</span>
+            <span className="text-xl font-medium">{getRelativeEndTime()}</span>
             <div className="flex flex-wrap items-center justify-center gap-1 mt-1 text-sm">
               <span className="text-muted-foreground">League points change:</span>
               <div className="flex items-center gap-1">
@@ -113,7 +135,7 @@ export function LeaderboardOverview({
                   <div className="flex items-center gap-2 mt-1">
                     <Progress 
                       value={progressValue} 
-                      className="w-full bg-secondary h-2"
+                      className="bg-secondary"
                       indicatorClassName={`bg-league-${currentLeague.name.toLowerCase()}`}
                     />
                     <LeagueIcon 

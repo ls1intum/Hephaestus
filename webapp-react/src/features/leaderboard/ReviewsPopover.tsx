@@ -112,7 +112,7 @@ export function ReviewsPopover({ reviewedPRs, highlight = false }: ReviewsPopove
         </div>
         {hasReviews && (
           <ScrollArea 
-            className="rounded-md" 
+            className="rounded-md -mr-2.5" 
             style={{ 
               height: `min(200px, ${36 * sortedReviewedPRs.length}px)` 
             }}
