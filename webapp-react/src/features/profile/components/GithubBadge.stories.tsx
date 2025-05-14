@@ -24,8 +24,6 @@ export const WithLink: Story = {
   args: {
     label: "bug",
     color: "d73a4a",
-    href: "https://github.com/ls1intum/Artemis/issues?q=is%3Aissue+label%3Abug",
-    tooltipText: "View all bug issues",
   },
 };
 
@@ -55,6 +53,5 @@ export const GithubTealLabel: Story = {
   args: {
     label: "teal label",
     color: "69feff", // This is the exact teal color from the example (r: 105, g: 254, b: 255)
-    tooltipText: "Example of GitHub's teal label style",
   },
 };

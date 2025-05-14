@@ -140,13 +140,13 @@ export function LeaderboardTable({
                       <TooltipContent>Approvals</TooltipContent>
                     </Tooltip>
                   )}
-                  {entry.numberOfComments + (entry.numberOfUnknowns || 0) > 0 && (
+                  {entry.numberOfComments + entry.numberOfUnknowns > 0 && (
                     <Tooltip>
                       <TooltipTrigger asChild>
                         <div className="flex items-center gap-1 text-github-muted-foreground">
                           <CommentIcon className="h-4 w-4" />
                           <span>
-                            {entry.numberOfComments + (entry.numberOfUnknowns || 0)}
+                            {entry.numberOfComments + entry.numberOfUnknowns}
                           </span>
                         </div>
                       </TooltipTrigger>

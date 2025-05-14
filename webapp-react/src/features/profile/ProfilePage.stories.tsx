@@ -47,12 +47,17 @@ export const Default: Story = {
       reviewActivity: [
         {
           id: 1,
-          state: "APPROVED",
+          state: "APPROVED" as const,
           submittedAt: new Date().toISOString(),
           htmlUrl: "https://github.com/ls1intum/Hephaestus/pull/42",
           pullRequest: {
+            id: 101,
             title: "Add new feature to dashboard",
             number: 42,
+            state: "OPEN" as const,
+            isDraft: false,
+            isMerged: false,
+            htmlUrl: "https://github.com/ls1intum/Hephaestus/pull/42",
             repository: {
               id: 1,
               name: "Hephaestus",
@@ -66,14 +71,22 @@ export const Default: Story = {
         },
         {
           id: 2,
-          state: "CHANGES_REQUESTED",
+          state: "CHANGES_REQUESTED" as const,
           submittedAt: new Date().toISOString(),
           htmlUrl: "https://github.com/ls1intum/Artemis/pull/123",
           pullRequest: {
+            id: 102,
             title: "Fix bug in submission process",
             number: 123,
+            state: "OPEN" as const,
+            isDraft: false,
+            isMerged: false,
+            htmlUrl: "https://github.com/ls1intum/Artemis/pull/123",
             repository: {
+              id: 2,
               name: "Artemis",
+              nameWithOwner: "ls1intum/Artemis",
+              htmlUrl: "https://github.com/ls1intum/Artemis",
             },
           },
           score: 3,
@@ -82,14 +95,22 @@ export const Default: Story = {
         },
         {
           id: 3,
-          state: "COMMENTED",
+          state: "COMMENTED" as const,
           submittedAt: new Date().toISOString(),
           htmlUrl: "https://github.com/ls1intum/Athena/pull/56",
           pullRequest: {
+            id: 103,
             title: "Update documentation for API endpoints",
             number: 56,
+            state: "OPEN" as const,
+            isDraft: false,
+            isMerged: false,
+            htmlUrl: "https://github.com/ls1intum/Athena/pull/56",
             repository: {
+              id: 3,
               name: "Athena",
+              nameWithOwner: "ls1intum/Athena",
+              htmlUrl: "https://github.com/ls1intum/Athena",
             },
           },
           score: 1,

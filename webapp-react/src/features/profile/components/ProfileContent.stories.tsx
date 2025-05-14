@@ -1,17 +1,22 @@
 import type { Meta, StoryObj } from "@storybook/react";
 import { ProfileContent } from "./ProfileContent";
-import { format, subDays } from "date-fns";
+import { subDays } from "date-fns";
 
 // Mock review activity data
 const mockReviewActivity = [
   {
     id: 1,
-    state: "APPROVED",
+    state: "APPROVED" as const,
     submittedAt: subDays(new Date(), 2).toISOString(),
     htmlUrl: "https://github.com/ls1intum/Hephaestus/pull/42",
     pullRequest: {
+      id: 101,
       title: "Add new feature to dashboard",
       number: 42,
+      state: "OPEN" as const,
+      isDraft: false,
+      isMerged: false,
+      htmlUrl: "https://github.com/ls1intum/Hephaestus/pull/42",
       repository: {
         id: 1,
         name: "Hephaestus",
@@ -20,15 +25,22 @@ const mockReviewActivity = [
       },
     },
     score: 80,
+    isDismissed: false,
+    codeComments: 3,
   },
   {
     id: 2,
-    state: "CHANGES_REQUESTED",
+    state: "CHANGES_REQUESTED" as const,
     submittedAt: subDays(new Date(), 5).toISOString(),
     htmlUrl: "https://github.com/ls1intum/Artemis/pull/123",
     pullRequest: {
+      id: 102,
       title: "Fix authentication bugs",
       number: 123,
+      state: "OPEN" as const,
+      isDraft: false,
+      isMerged: false,
+      htmlUrl: "https://github.com/ls1intum/Artemis/pull/123",
       repository: {
         id: 2,
         name: "Artemis",
@@ -37,15 +49,22 @@ const mockReviewActivity = [
       },
     },
     score: 65,
+    isDismissed: false,
+    codeComments: 2,
   },
   {
     id: 3,
-    state: "COMMENTED",
+    state: "COMMENTED" as const,
     submittedAt: subDays(new Date(), 7).toISOString(),
     htmlUrl: "https://github.com/ls1intum/Athena/pull/15",
     pullRequest: {
+      id: 103,
       title: "Update documentation",
       number: 15,
+      state: "OPEN" as const,
+      isDraft: false,
+      isMerged: false,
+      htmlUrl: "https://github.com/ls1intum/Athena/pull/15",
       repository: {
         id: 3,
         name: "Athena",
@@ -54,6 +73,8 @@ const mockReviewActivity = [
       },
     },
     score: 50,
+    isDismissed: false,
+    codeComments: 0,
   }
 ];
 
@@ -63,7 +84,7 @@ const mockOpenPullRequests = [
     id: 101,
     number: 42,
     title: "Add new analytics dashboard",
-    state: "OPEN",
+    state: "OPEN" as const,
     isDraft: false,
     isMerged: false,
     commentsCount: 5,
@@ -86,7 +107,7 @@ const mockOpenPullRequests = [
     id: 102,
     number: 87,
     title: "WIP: Refactor authentication module",
-    state: "OPEN",
+    state: "OPEN" as const,
     isDraft: true,
     isMerged: false,
     commentsCount: 0,
