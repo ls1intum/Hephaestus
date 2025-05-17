@@ -36,7 +36,7 @@ const config: StorybookConfig = {
         return index.map((item) => {
           return {
             ...item,
-            title: item.title?.replace(/^components\//, ""), 
+            // title: item.title?.replace(/^components\//, ""), 
           }
         });
       }
