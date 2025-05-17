@@ -26,7 +26,7 @@ export default function RequestFeature({ iconOnly = false }: RequestFeatureProps
             data-canny-link
             aria-describedby="Request a feature"
           >
-            <Sparkles className="h-4 w-4" />
+            <Sparkles />
             {!iconOnly && <span>Request&nbsp;a&nbsp;feature</span>}
           </a>
         </Button>

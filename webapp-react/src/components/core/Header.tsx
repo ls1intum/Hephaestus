@@ -64,16 +64,16 @@ export default function Header({
         
         {/* Desktop navigation links */}
         {isAuthenticated && (
-          <div className="hidden md:flex gap-2">
+          <div className="hidden md:flex gap-4">
             {showAdmin && (
-              <Button asChild variant="link">
+              <Button asChild variant="link" size="none">
                 <Link to="/workspace" search={{}}>Workspace</Link>
               </Button>
             )}
-            <Button asChild variant="link">
+            <Button asChild variant="link" size="none">
               <Link to="/best-practices" search={{}}>Best practices</Link>
             </Button>
-            <Button asChild variant="link">
+            <Button asChild variant="link" size="none">
               <Link to="/teams" search={{}}>Teams</Link>
             </Button>
           </div>
@@ -84,8 +84,8 @@ export default function Header({
           <div className="md:hidden">
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <Button variant="outline" size="icon" className="h-8 w-8">
-                  <Menu className="h-5 w-5" />
+                <Button variant="outline" size="icon">
+                  <Menu />
                   <span className="sr-only">Navigation Menu</span>
                 </Button>
               </DropdownMenuTrigger>
@@ -94,14 +94,14 @@ export default function Header({
                 <DropdownMenuSeparator />
                 {showAdmin && (
                   <DropdownMenuItem asChild>
-                    <Link to="/workspace" search={{}} className="w-full">Workspace</Link>
+                    <Link to="/workspace" search={{}}>Workspace</Link>
                   </DropdownMenuItem>
                 )}
                 <DropdownMenuItem asChild>
-                  <Link to="/best-practices" search={{}} className="w-full">Best practices</Link>
+                  <Link to="/best-practices" search={{}}>Best practices</Link>
                 </DropdownMenuItem>
                 <DropdownMenuItem asChild>
-                  <Link to="/teams" search={{}} className="w-full">Teams</Link>
+                  <Link to="/teams" search={{}}>Teams</Link>
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
@@ -144,8 +144,8 @@ export default function Header({
           <div className="flex items-center gap-2">
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <Button variant="ghost" className="relative h-8 w-8 rounded-full">
-                  <Avatar>
+                <Button variant="ghost" size="icon" className="rounded-full">
+                  <Avatar className="hover:brightness-90">
                     <AvatarImage src={`https://github.com/${username}.png`} alt={`${username}'s avatar`} />
                     <AvatarFallback>{username?.slice(0, 2)?.toUpperCase() || '?'}</AvatarFallback>
                   </Avatar>
@@ -161,20 +161,20 @@ export default function Header({
                 <DropdownMenuGroup>
                   <DropdownMenuItem asChild>
                     <Link to="/user/$username" search={{}} params={{ username: username ?? '' }}> 
-                      <User className="mr-2 h-4 w-4" />
+                      <User />
                       <span>My Profile</span>
                     </Link>
                   </DropdownMenuItem>
                   <DropdownMenuItem asChild>
                     <Link to="/settings" search={{}}>
-                      <Settings className="mr-2 h-4 w-4" />
+                      <Settings />
                       <span>Settings</span>
                     </Link>
                   </DropdownMenuItem>
                 </DropdownMenuGroup>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem onClick={onLogout}>
-                  <LogOut className="mr-2 h-4 w-4" />
+                  <LogOut />
                   <span>Sign Out</span>
                 </DropdownMenuItem>
               </DropdownMenuContent>
