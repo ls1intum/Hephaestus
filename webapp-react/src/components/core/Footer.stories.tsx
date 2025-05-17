@@ -9,6 +9,7 @@ const meta = {
   component: Footer,
   parameters: {
     layout: "fullscreen",
+    viewport: { defaultViewport: 'desktop' },
     docs: {
       description: {
         component: 'A responsive footer providing navigation and attribution information for the Hephaestus application.',

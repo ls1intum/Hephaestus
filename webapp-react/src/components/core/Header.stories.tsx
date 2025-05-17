@@ -1,6 +1,6 @@
 import type { Meta, StoryObj } from "@storybook/react";
-import { action } from "@storybook/addon-actions";
 import Header from "./Header";
+import { fn } from "@storybook/test";
 
 /**
  * Header component for the Hephaestus application that provides navigation, 
@@ -10,6 +10,7 @@ const meta = {
   component: Header,
   parameters: {
     layout: "fullscreen",
+    viewport: { defaultViewport: 'desktop' },
     docs: {
       description: {
         component: 'Main navigation component with adaptive layout and contextual controls based on user permissions.',
@@ -21,8 +22,8 @@ const meta = {
     version: "1.0.0",
     name: "John Doe",
     username: "johnDoe",
-    onLogin: action("login clicked"),
-    onLogout: action("logout clicked"),
+    onLogin: fn(),
+    onLogout: fn(),
   },
   argTypes: {
     showAdmin: { 

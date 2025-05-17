@@ -1,6 +1,6 @@
 import type { Meta, StoryObj } from "@storybook/react";
 import { LeagueProgressCard } from "./LeagueProgressCard";
-import { action } from "@storybook/addon-actions";
+import { fn } from "@storybook/test";
 
 const meta: Meta<typeof LeagueProgressCard> = {
   component: LeagueProgressCard,
@@ -67,7 +67,7 @@ type Story = StoryObj<typeof LeagueProgressCard>;
 export const BronzeStart: Story = {
   args: {
     leaguePoints: 100, // 8% progress in Bronze
-    onInfoClick: action("Info button clicked"),
+    onInfoClick: fn(),
   },
   parameters: {
     docs: {
