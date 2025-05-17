@@ -1,17 +1,32 @@
 import type { Meta, StoryObj } from '@storybook/react';
 import { LegalPage } from './LegalPage';
 
-const meta: Meta<typeof LegalPage> = {
+/**
+ * Legal page component for displaying Imprint and Privacy Policy information.
+ * Renders HTML content with proper styling.
+ */
+const meta = {
   component: LegalPage,
-};
+  tags: ['autodocs'],
+  argTypes: {
+    title: {
+      description: 'Title displayed at the top of the legal page',
+      control: 'text',
+    },
+    content: {
+      description: 'HTML content to be rendered on the page',
+      control: 'text',
+    },
+  },
+} satisfies Meta<typeof LegalPage>;
 
 export default meta;
-type Story = StoryObj<typeof LegalPage>;
+type Story = StoryObj<typeof meta>;
 
 // Example imprint content for the story
 const imprintContent = `
   <h2>Project Information</h2>
-  <p>Hephaestus PhD Project<br/>
+  <p>Hephaestus Project<br/>
   Technical University of Munich<br/>
   Department of Informatics<br/>
   Chair for Applied Software Engineering<br/>
@@ -34,7 +49,7 @@ const privacyContent = `
   <p>Last updated: May 10, 2025</p>
   
   <h3>1. Introduction</h3>
-  <p>This Privacy Policy explains how the Hephaestus PhD project ("we", "us", or "our") collects, uses, and shares your personal information when you use our services.</p>
+  <p>This Privacy Policy explains how the Hephaestus project ("we", "us", or "our") collects, uses, and shares your personal information when you use our services.</p>
   
   <h3>2. Information We Collect</h3>
   <p>We may collect the following types of information:</p>
@@ -59,6 +74,9 @@ const privacyContent = `
   <p>If you have any questions about this Privacy Policy, please contact us at privacy@example.com.</p>
 `;
 
+/**
+ * Imprint legal information showing project details, contacts, and data protection.
+ */
 export const Imprint: Story = {
   args: {
     title: 'Imprint',
@@ -66,6 +84,9 @@ export const Imprint: Story = {
   }
 };
 
+/**
+ * Privacy Policy detailing how user data is collected, used, and protected.
+ */
 export const Privacy: Story = {
   args: {
     title: 'Privacy Policy',

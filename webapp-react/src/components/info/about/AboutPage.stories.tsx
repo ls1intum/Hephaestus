@@ -23,13 +23,39 @@ const mockContributors = [
   }
 ];
 
-const meta: Meta<typeof AboutPage> = {
+/**
+ * About page component that displays project information, team lead, and contributors.
+ * Shows different states based on loading and error conditions.
+ */
+const meta = {
   component: AboutPage,
-};
+  tags: ['autodocs'],
+  argTypes: {
+    isPending: {
+      description: 'Indicates if contributors data is being loaded',
+      control: 'boolean',
+    },
+    isError: {
+      description: 'Indicates if there was an error loading contributors',
+      control: 'boolean',
+    },
+    error: {
+      description: 'Optional error object when loading fails',
+      control: 'object',
+    },
+    otherContributors: {
+      description: 'List of project contributors to display',
+      control: 'object',
+    },
+  },
+} satisfies Meta<typeof AboutPage>;
 
 export default meta;
-type Story = StoryObj<typeof AboutPage>;
+type Story = StoryObj<typeof meta>;
 
+/**
+ * Default view showing the project information and contributors list.
+ */
 export const Default: Story = {
   args: {
     isPending: false,
@@ -38,6 +64,9 @@ export const Default: Story = {
   }
 };
 
+/**
+ * Loading state when contributor data is being fetched.
+ */
 export const IsLoading: Story = {
   args: {
     isPending: true,
@@ -46,6 +75,9 @@ export const IsLoading: Story = {
   },
 };
 
+/**
+ * Error state when contributor data fetching fails.
+ */
 export const IsError: Story = {
   args: {
     isPending: false,
