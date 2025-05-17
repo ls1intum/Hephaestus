@@ -9,10 +9,10 @@ import { client } from '@/api/client.gen';
 import "./styles.css";
 import reportWebVitals from "./reportWebVitals.ts";
 
-import { AuthProvider } from "@/lib/auth/AuthContext";
-import { ThemeProvider } from "@/lib/theme/ThemeContext";
+import { AuthProvider } from "@/integrations/auth/AuthContext.tsx";
+import { ThemeProvider } from "@/integrations/theme/ThemeContext.tsx";
+import keycloakService from "@/integrations/auth/keycloak.ts";
 import environment from "@/environment";
-import keycloakService from "@/lib/auth/keycloak";
 
 client.setConfig({
   baseUrl: environment.serverUrl,
@@ -49,6 +49,7 @@ const router = createRouter({
 	routeTree,
 	context: {
 		...TanstackQuery.getContext(),
+		auth: undefined,
 	},
 	defaultPreload: "intent",
 	scrollRestoration: true,
@@ -63,20 +64,21 @@ declare module "@tanstack/react-router" {
 	}
 }
 
-// Render the app
-const rootElement = document.getElementById("app");
-if (rootElement && !rootElement.innerHTML) {
-	const root = ReactDOM.createRoot(rootElement);
-	root.render(
-		// Removed StrictMode wrapper to prevent double rendering in development
-		<TanstackQuery.Provider>
+function App() {
+	return <TanstackQuery.Provider>
 			<AuthProvider>
 				<ThemeProvider defaultTheme="dark" storageKey="theme">
 					<RouterProvider router={router} />
 				</ThemeProvider>
 			</AuthProvider>
 		</TanstackQuery.Provider>
-	);
+}
+
+// Render the app
+const rootElement = document.getElementById("app");
+if (rootElement && !rootElement.innerHTML) {
+	const root = ReactDOM.createRoot(rootElement);
+	root.render(<App />);
 }
 
 // If you want to start measuring performance in your app, pass a function

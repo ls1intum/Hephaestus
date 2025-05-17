@@ -9,15 +9,15 @@ import {
   endOfISOWeek, 
   formatISO 
 } from "date-fns";
-import { useAuth } from "@/lib/auth/AuthContext";
+import { useAuth } from "@/integrations/auth/AuthContext";
 import { 
   getLeaderboardOptions, 
   getMetaDataOptions, 
   getUserLeagueStatsOptions, 
   getUserProfileOptions 
 } from "@/api/@tanstack/react-query.gen";
-import { LeaderboardPage } from '@/features/leaderboard/LeaderboardPage';
-import type { LeaderboardSortType } from '@/features/leaderboard/types';
+import { LeaderboardPage } from '@/components/leaderboard/LeaderboardPage';
+import type { LeaderboardSortType } from '@/components/leaderboard/types';
 
 // Calculate default date range with ISO 8601 format including timezone
 const today = new Date();

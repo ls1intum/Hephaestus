@@ -5,12 +5,13 @@ import type { QueryClient } from "@tanstack/react-query";
 import TanstackQueryLayout from "../integrations/tanstack-query/layout";
 
 import environment from "@/environment";
-import { useAuth } from "@/lib/auth/AuthContext";
-import Footer from "@/components/footer/Footer";
-import Header from "@/components/header/Header";
+import { useAuth, type AuthContextType } from "@/integrations/auth/AuthContext";
+import Footer from "@/components/core/Footer";
+import Header from "@/components/core/Header";
 
 interface MyRouterContext {
 	queryClient: QueryClient;
+	auth: AuthContextType | undefined;
 }
 
 export const Route = createRootRouteWithContext<MyRouterContext>()({
