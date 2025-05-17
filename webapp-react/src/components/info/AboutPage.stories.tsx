@@ -20,16 +20,43 @@ const mockContributors = [
     login: 'contributor3',
     avatarUrl: 'https://i.pravatar.cc/150?img=3',
     htmlUrl: 'https://github.com/contributor3'
+  },
+  {
+    id: 4,
+    login: 'contributor4',
+    avatarUrl: 'https://i.pravatar.cc/150?img=4',
+    htmlUrl: 'https://github.com/contributor4'
+  },
+  {
+    id: 5,
+    login: 'contributor5',
+    avatarUrl: 'https://i.pravatar.cc/150?img=5',
+    htmlUrl: 'https://github.com/contributor5'
+  },
+  {
+    id: 6,
+    login: 'contributor6',
+    avatarUrl: 'https://i.pravatar.cc/150?img=6',
+    htmlUrl: 'https://github.com/contributor6'
+  },
+  {
+    id: 7,
+    login: 'contributor7',
+    avatarUrl: 'https://i.pravatar.cc/150?img=7',
+    htmlUrl: 'https://github.com/contributor7'
+  },
+  {
+    id: 8,
+    login: 'contributor8',
+    avatarUrl: 'https://i.pravatar.cc/150?img=8',
+    htmlUrl: 'https://github.com/contributor8'
   }
 ];
 
 /**
- * About page component that displays project information, team lead, and contributors.
- * Shows different states based on loading and error conditions.
- */
-/**
- * About page component that displays information about the project,
- * its purpose, and lists the contributors to the project.
+ * About page component that showcases the Hephaestus project, highlighting its mission and team.
+ * Features a clean hero section, focused feature cards, engaging testimonials, and team information.
+ * Gracefully handles loading and error states with appropriate visual feedback.
  */
 const meta = {
   title: "Info/AboutPage",
@@ -39,7 +66,7 @@ const meta = {
     layout: "padded",
     docs: {
       description: {
-        component: 'Informational page that explains the project and displays contributor information.',
+        component: 'A clean, focused page that highlights the Hephaestus project mission, its core features, and showcases the team behind it.',
       },
     },
   },
@@ -67,12 +94,10 @@ export default meta;
 type Story = StoryObj<typeof meta>;
 
 /**
- * Default view showing the project information and contributors list.
+ * The showcase view displays the full About page with mission statement, features, 
+ * testimonials, and a complete list of contributors.
  */
-/**
- * Standard view showing the about page with loaded contributor information.
- */
-export const Default: Story = {
+export const Showcase: Story = {
   args: {
     isPending: false,
     isError: false,
@@ -82,6 +107,7 @@ export const Default: Story = {
 
 /**
  * Loading state when contributor data is being fetched.
+ * Shows skeleton placeholders while the data loads.
  */
 export const IsLoading: Story = {
   args: {
@@ -93,11 +119,24 @@ export const IsLoading: Story = {
 
 /**
  * Error state when contributor data fetching fails.
+ * Displays a user-friendly error message with explanation.
  */
 export const IsError: Story = {
   args: {
     isPending: false,
     isError: true,
+    otherContributors: [],
+  },
+};
+
+/**
+ * View when there are no contributors yet.
+ * Shows an encouraging message to be the first contributor.
+ */
+export const NoContributors: Story = {
+  args: {
+    isPending: false,
+    isError: false,
     otherContributors: [],
   },
 };
