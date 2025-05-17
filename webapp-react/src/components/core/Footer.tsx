@@ -1,31 +1,81 @@
 import { Link } from "@tanstack/react-router";
+import { Button } from "@/components/ui/button";
 
 export default function Footer() {
   return (
-    <footer className="py-6 md:px-8 md:py-0 border-t">
-      <div className="container flex flex-col items-center justify-between gap-2 md:gap-4 md:h-24 md:flex-row">
-        <p className="text-balance text-center text-sm leading-loose text-muted-foreground md:text-left">
-          <Link to="/about" className="font-medium underline underline-offset-4">About</Link>
-        </p>
-        <p className="text-balance text-center text-sm leading-loose text-muted-foreground md:text-left">
-          <a href="https://github.com/ls1intum/Hephaestus/releases" target="_blank" rel="noopener noreferrer" className="font-medium underline underline-offset-4">Releases</a>
-        </p>
-        <p className="text-balance text-center text-sm leading-loose text-muted-foreground md:text-left">
-          <a data-canny-link href="https://hephaestus.canny.io/feature-requests" className="font-medium underline underline-offset-4">Feature requests</a>
-        </p>
-        <p className="text-balance text-center text-sm leading-loose text-muted-foreground md:text-left">
-          <Link to="/privacy" className="font-medium underline underline-offset-4">Privacy</Link>
-        </p>
-        <p className="text-balance text-center text-sm leading-loose text-muted-foreground md:text-left">
-          <Link to="/imprint" className="font-medium underline underline-offset-4">Imprint</Link>
-        </p>
-        <p className="text-balance text-center text-sm leading-loose text-muted-foreground md:text-right flex-1">
-          Built by{" "}
-          <a href="https://github.com/ls1intum" target="_blank" rel="noopener noreferrer" className="font-medium underline underline-offset-4">AET Team</a>
-          {" "}at{" "}
-          <a href="https://www.tum.de/en/" target="_blank" rel="noopener noreferrer" className="font-medium underline underline-offset-4">TUM</a>. The source code is available on{" "}
-          <a href="https://github.com/ls1intum/hephaestus" target="_blank" rel="noopener noreferrer" className="font-medium underline underline-offset-4">GitHub</a>.
-        </p>
+    <footer className="py-4 md:px-8 md:py-6 border-t">
+      <div className="container">
+        <div className="flex flex-wrap justify-between gap-y-4">
+          {/* Links Section */}
+          <div className="flex flex-wrap items-center justify-center sm:justify-start w-full md:w-auto">
+            <nav className="flex flex-wrap gap-x-6 gap-y-2 justify-center sm:justify-start">
+              <Button variant="link" size="none" asChild>
+                <Link to="/about">About</Link>
+              </Button>
+
+              <Button variant="link" size="none" asChild>
+                <a
+                  href="https://github.com/ls1intum/Hephaestus/releases"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                >
+                  Releases
+                </a>
+              </Button>
+              
+              <Button variant="link" size="none" asChild>
+                <a 
+                  data-canny-link 
+                  href="https://hephaestus.canny.io/feature-requests"
+                >
+                  Feature requests
+                </a>
+              </Button>
+
+              <Button variant="link" size="none" asChild>
+                <Link to="/privacy">Privacy</Link>
+              </Button>
+
+              <Button variant="link" size="none" asChild>
+                <Link to="/imprint">Imprint</Link>
+              </Button>
+            </nav>
+          </div>
+          
+          {/* Copyright/Credits Section */}
+          <div className="text-sm text-muted-foreground text-center sm:text-right w-full md:w-auto mt-2 md:mt-0">
+            <p className="text-balance">
+              Built by{" "}
+              <Button variant="link" size="none" asChild>
+                <a 
+                  href="https://github.com/ls1intum" 
+                  target="_blank" 
+                  rel="noopener noreferrer"
+                >
+                  AET Team
+                </a>
+              </Button>{" "}at{" "}
+              <Button variant="link" size="none" asChild>
+                <a 
+                  href="https://www.tum.de/en/" 
+                  target="_blank" 
+                  rel="noopener noreferrer"
+                >
+                  TUM
+                </a>
+              </Button>. The source code is available on{" "}
+              <Button variant="link" size="none" asChild>
+                <a 
+                  href="https://github.com/ls1intum/hephaestus" 
+                  target="_blank" 
+                  rel="noopener noreferrer"
+                >
+                  GitHub
+                </a>
+              </Button>.
+            </p>
+          </div>
+        </div>
       </div>
     </footer>
   );
