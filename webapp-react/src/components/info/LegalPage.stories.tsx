@@ -77,6 +77,9 @@ const privacyContent = `
 /**
  * Imprint legal information showing project details, contacts, and data protection.
  */
+/**
+ * Imprint page displaying legal contact and responsible entity information.
+ */
 export const Imprint: Story = {
   args: {
     title: 'Imprint',

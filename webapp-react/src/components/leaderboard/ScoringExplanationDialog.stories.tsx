@@ -1,14 +1,30 @@
+// filepath: /Users/felixdietrich/Documents/Hephaestus/webapp-react/src/components/leaderboard/ScoringExplanationDialog.stories.tsx
 import type { Meta, StoryObj } from '@storybook/react';
 import { ScoringExplanationDialog } from './ScoringExplanationDialog';
-import { useState } from 'react';
-import { Button } from '@/components/ui/button';
-import { GraphIcon } from '@primer/octicons-react';
+import { fn } from '@storybook/test';
 
+/**
+ * Dialog component that explains the leaderboard scoring system in detail.
+ * Provides transparency about how points are calculated from different activities.
+ */
 const meta: Meta<typeof ScoringExplanationDialog> = {
   component: ScoringExplanationDialog,
   tags: ['autodocs'],
   parameters: {
     layout: 'centered',
+  },
+  argTypes: {
+    open: {
+      control: 'boolean',
+      description: 'Controls whether the dialog is visible',
+    },
+    onOpenChange: {
+      description: 'Callback when dialog open state changes',
+      action: 'open state changed',
+    }
+  },
+  args: {
+    onOpenChange: fn(),
   },
   decorators: [
     (Story) => (
@@ -20,45 +36,23 @@ const meta: Meta<typeof ScoringExplanationDialog> = {
 };
 
 export default meta;
-type Story = StoryObj<typeof ScoringExplanationDialog>;
+type Story = StoryObj<typeof meta>;
 
-// Simple story variant that shows the dialog in open state
-export const Default: Story = {
+/**
+ * Default view showing the open dialog with scoring explanation content.
+ * Details how different contributions are weighted in the points system.
+ */
+export const Open: Story = {
   args: {
     open: true,
-    onOpenChange: () => {},
   },
 };
 
-// Interactive story variant with a button to open/close the dialog
-export const Interactive: Story = {
-  render: () => {
-    // eslint-disable-next-line react-hooks/rules-of-hooks
-    const [open, setOpen] = useState(false);
-
-    return (
-      <div className="flex flex-col items-center gap-4">
-        <Button 
-          variant="outline" 
-          onClick={() => setOpen(true)}
-          className="flex items-center gap-2"
-        >
-          <GraphIcon className="h-4 w-4" />
-          View Scoring Formula
-        </Button>
-        <ScoringExplanationDialog
-          open={open}
-          onOpenChange={setOpen}
-        />
-      </div>
-    );
-  },
-};
-
-// Story variant that shows the dialog in closed state
+/**
+ * Dialog in closed state (not visible).
+ */
 export const Closed: Story = {
   args: {
     open: false,
-    onOpenChange: () => {},
   },
 };

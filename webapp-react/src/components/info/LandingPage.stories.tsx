@@ -30,6 +30,9 @@ type Story = StoryObj<typeof meta>;
 /**
  * Default landing page view for anonymous users.
  */
+/**
+ * Default landing page view for non-authenticated visitors.
+ */
 export const Default: Story = {
   args: {
     isSignedIn: false,

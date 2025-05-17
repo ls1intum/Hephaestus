@@ -27,9 +27,22 @@ const mockContributors = [
  * About page component that displays project information, team lead, and contributors.
  * Shows different states based on loading and error conditions.
  */
+/**
+ * About page component that displays information about the project,
+ * its purpose, and lists the contributors to the project.
+ */
 const meta = {
+  title: "Info/AboutPage",
   component: AboutPage,
   tags: ['autodocs'],
+  parameters: {
+    layout: "padded",
+    docs: {
+      description: {
+        component: 'Informational page that explains the project and displays contributor information.',
+      },
+    },
+  },
   argTypes: {
     isPending: {
       description: 'Indicates if contributors data is being loaded',
@@ -55,6 +68,9 @@ type Story = StoryObj<typeof meta>;
 
 /**
  * Default view showing the project information and contributors list.
+ */
+/**
+ * Standard view showing the about page with loaded contributor information.
  */
 export const Default: Story = {
   args: {

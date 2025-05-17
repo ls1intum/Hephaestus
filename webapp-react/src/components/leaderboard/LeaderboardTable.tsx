@@ -14,7 +14,7 @@ import {
   TooltipContent,
   TooltipTrigger 
 } from "@/components/ui/tooltip";
-import { LeagueIcon } from "./league/LeagueIcon";
+import { LeagueIcon } from "./LeagueIcon";
 import { ReviewsPopover } from "./ReviewsPopover";
 import { 
   CheckIcon, 

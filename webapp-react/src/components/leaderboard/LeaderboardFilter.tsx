@@ -1,8 +1,8 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import type { LeaderboardFilterProps } from "./types";
-import { TeamFilter } from "./filters/TeamFilter";
-import { SortFilter } from "./filters/SortFilter";
-import { TimeframeFilter } from "./filters/TimeframeFilter";
+import { TeamFilter } from "./TeamFilter";
+import { SortFilter } from "./SortFilter";
+import { TimeframeFilter } from "./TimeframeFilter";
 import { SlidersHorizontal } from "lucide-react";
 
 export function LeaderboardFilter({ 

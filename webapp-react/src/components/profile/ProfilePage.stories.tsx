@@ -1,11 +1,53 @@
 import type { Meta, StoryObj } from "@storybook/react";
 import { ProfilePage } from "./ProfilePage";
 
+/**
+ * Complete user profile page that combines header and content sections.
+ * Displays a user's GitHub information, contributions, review activity,
+ * and open pull requests in a unified interface.
+ */
 const meta = {
   title: "Profile/ProfilePage",
   component: ProfilePage,
   parameters: {
     layout: "padded",
+    docs: {
+      description: {
+        component: 'The main profile page that integrates all profile components into a cohesive user profile view.',
+      },
+    },
+  },
+  argTypes: {
+    isLoading: {
+      description: 'Whether the page is in a loading state',
+      control: 'boolean',
+      table: {
+        type: { summary: 'boolean' },
+        defaultValue: { summary: 'false' },
+      },
+    },
+    error: {
+      description: 'Whether there was an error loading the profile data',
+      control: 'boolean',
+      table: {
+        type: { summary: 'boolean' },
+        defaultValue: { summary: 'false' },
+      },
+    },
+    username: {
+      description: 'GitHub username of the profile owner',
+      control: 'text',
+      table: {
+        type: { summary: 'string' },
+      },
+    },
+    profileData: {
+      description: 'Complete profile data object containing user info and activity',
+      control: 'object',
+      table: {
+        type: { summary: 'object' },
+      },
+    },
   },
   tags: ["autodocs"],
 } satisfies Meta<typeof ProfilePage>;
@@ -13,6 +55,9 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
+/**
+ * Standard profile view showing a user with activity across multiple repositories.
+ */
 export const Default: Story = {
   args: {
     isLoading: false,
@@ -170,6 +215,9 @@ export const Default: Story = {
   }
 };
 
+/**
+ * Loading state shown while profile data is being fetched.
+ */
 export const Loading: Story = {
   args: {
     isLoading: true,
@@ -179,6 +227,9 @@ export const Loading: Story = {
   }
 };
 
+/**
+ * Error state displayed when profile data could not be loaded.
+ */
 export const Error: Story = {
   args: {
     isLoading: false,
@@ -188,6 +239,9 @@ export const Error: Story = {
   }
 };
 
+/**
+ * Shows how the profile page appears for a new user with no activity.
+ */
 export const Empty: Story = {
   args: {
     isLoading: false,

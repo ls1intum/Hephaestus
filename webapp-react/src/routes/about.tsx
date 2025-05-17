@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { AboutPage } from "@/components/info/about/AboutPage";
+import { AboutPage } from "@/components/info/AboutPage";
 import { useQuery } from "@tanstack/react-query";
 import { getContributorsOptions } from "@/api/@tanstack/react-query.gen";
 

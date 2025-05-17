@@ -6,8 +6,8 @@ import {
   DialogDescription,
 } from "@/components/ui/dialog";
 import { Info, Star } from "lucide-react";
-import { LeagueIcon } from "./league/LeagueIcon";
-import { Leagues } from "./league/utils";
+import { LeagueIcon } from "./LeagueIcon";
+import { Leagues } from "./utils";
 
 interface LeagueInfoDialogProps {
   open: boolean;

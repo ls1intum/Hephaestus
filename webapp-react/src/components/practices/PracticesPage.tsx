@@ -1,6 +1,6 @@
 import type { Activity } from "@/api/types.gen";
-import { PullRequestBadPracticeCard } from "./components/PullRequestBadPracticeCard";
-import { BadPracticeLegendCard } from "./components/BadPracticeLegendCard";
+import { PullRequestBadPracticeCard } from "./PullRequestBadPracticeCard";
+import { BadPracticeLegendCard } from "./BadPracticeLegendCard";
 import { Button } from "@/components/ui/button";
 import { Spinner } from "@/components/ui/spinner";
 import { RefreshCcw } from "lucide-react";

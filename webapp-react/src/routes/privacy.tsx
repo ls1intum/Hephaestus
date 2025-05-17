@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import environment from "@/environment";
-import { LegalPage } from "@/components/info/legal/LegalPage";
+import { LegalPage } from "@/components/info/LegalPage";
 
 export const Route = createFileRoute("/privacy")({
   component: PrivacyContainer,

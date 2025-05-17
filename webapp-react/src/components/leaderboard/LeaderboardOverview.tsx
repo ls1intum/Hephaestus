@@ -5,7 +5,7 @@ import { CalendarClock, TrendingUp, TrendingDown, MoveRight } from "lucide-react
 import { Button } from "@/components/ui/button";
 import { LeagueInfoDialog } from "./LeagueInfoDialog";
 import { differenceInHours, isPast } from "date-fns";
-import { LeagueProgressCard } from "./league/LeagueProgressCard";
+import { LeagueProgressCard } from "./LeagueProgressCard";
 
 export function LeaderboardOverview({ 
   leaderboardEntry, 

@@ -1,5 +1,5 @@
-import { ProfileHeader } from "./components/ProfileHeader";
-import { ProfileContent } from "./components/ProfileContent";
+import { ProfileHeader } from "./ProfileHeader";
+import { ProfileContent } from "./ProfileContent";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { XCircleIcon } from "lucide-react";
 import type { UserProfile } from "@/api/types.gen";
@@ -44,7 +44,7 @@ export function ProfilePage({ profileData, isLoading, error, username }: Profile
 }
 
 // Export individual components for Storybook
-export { ProfileHeader } from "./components/ProfileHeader";
-export { ProfileContent } from "./components/ProfileContent";
-export { ReviewActivityCard } from "./components/ReviewActivityCard";
-export { IssueCard } from "./components/IssueCard";
+export { ProfileHeader } from "./ProfileHeader";
+export { ProfileContent } from "./ProfileContent";
+export { ReviewActivityCard } from "./ReviewActivityCard";
+export { IssueCard } from "./IssueCard";

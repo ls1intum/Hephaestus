@@ -1,14 +1,72 @@
 import type { Meta, StoryObj } from "@storybook/react";
 import { PracticesPage } from "./PracticesPage";
 import type { Activity } from "@/api/types.gen";
+import { fn } from "@storybook/test";
 
-const meta: Meta<typeof PracticesPage> = {
+/**
+ * The main page for viewing and managing coding practices.
+ * Displays pull requests that can be analyzed for good and bad coding practices.
+ */
+const meta = {
+  title: "Practices/PracticesPage",
   component: PracticesPage,
-  tags: ["autodocs"],
+  parameters: {
+    layout: "padded",
+    docs: {
+      description: {
+        component: 'Main page that shows pull requests and allows users to analyze them for coding practices.',
+      },
+    },
+  },
   argTypes: {
-    onDetectBadPractices: { action: "detect bad practices clicked" }
-  }
-};
+    activityData: {
+      description: 'Activity data containing pull requests and practices',
+      control: 'object',
+      table: {
+        type: { summary: 'Activity' },
+      },
+    },
+    isLoading: {
+      description: 'Whether the page is in a loading state',
+      control: 'boolean',
+      table: {
+        type: { summary: 'boolean' },
+        defaultValue: { summary: 'false' },
+      },
+    },
+    isDetectingBadPractices: {
+      description: 'Whether the system is currently detecting bad practices',
+      control: 'boolean',
+      table: {
+        type: { summary: 'boolean' },
+        defaultValue: { summary: 'false' },
+      },
+    },
+    username: {
+      description: 'Username of the dashboard owner',
+      control: 'text',
+      table: {
+        type: { summary: 'string' },
+      },
+    },
+    currUserIsDashboardUser: {
+      description: 'Whether the current user is viewing their own dashboard',
+      control: 'boolean',
+      table: {
+        type: { summary: 'boolean' },
+        defaultValue: { summary: 'true' },
+      },
+    },
+    onDetectBadPractices: { 
+      description: 'Callback when detect bad practices button is clicked',
+      action: "detect bad practices clicked" 
+    }
+  },
+  args: {
+    onDetectBadPractices: fn(),
+  },
+  tags: ["autodocs"],
+} satisfies Meta<typeof PracticesPage>;
 
 export default meta;
 
@@ -88,6 +146,9 @@ const mockActivityData: Activity = {
   ]
 };
 
+/**
+ * Default view showing pull requests with both good and bad practices for the dashboard owner.
+ */
 export const Default: Story = {
   args: {
     activityData: mockActivityData,
@@ -98,6 +159,9 @@ export const Default: Story = {
   }
 };
 
+/**
+ * Loading state shown while pull request data is being fetched.
+ */
 export const Loading: Story = {
   args: {
     isLoading: true,
@@ -107,6 +171,9 @@ export const Loading: Story = {
   }
 };
 
+/**
+ * State shown while the system is analyzing pull requests for bad practices.
+ */
 export const DetectingBadPractices: Story = {
   args: {
     activityData: mockActivityData,
@@ -117,6 +184,9 @@ export const DetectingBadPractices: Story = {
   }
 };
 
+/**
+ * Empty state when no pull requests are available for analysis.
+ */
 export const NoBadPractices: Story = {
   args: {
     activityData: {
@@ -129,6 +199,9 @@ export const NoBadPractices: Story = {
   }
 };
 
+/**
+ * View shown when a user is viewing someone else's practices page (limited interaction).
+ */
 export const OtherUserView: Story = {
   args: {
     activityData: mockActivityData,
