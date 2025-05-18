@@ -22,7 +22,7 @@ jobs:
                   node-version: "22"
             - name: Install dependencies
               working-directory: ./webapp-react
-              run: npm ci
+              run: npm ci --legacy-peer-deps
             - name: Run Biome
               working-directory: ./webapp-react
               run: npm run check
@@ -42,7 +42,7 @@ jobs:
                   node-version: "22"
             - name: Install dependencies
               working-directory: ./webapp-react
-              run: npm ci
+              run: npm ci --legacy-peer-deps
             - name: Build
               working-directory: ./webapp-react
               run: npm run build
