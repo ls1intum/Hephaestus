@@ -9,9 +9,8 @@ import { client } from '@/api/client.gen';
 import "./styles.css";
 import reportWebVitals from "./reportWebVitals.ts";
 
-import { AuthProvider } from "@/integrations/auth/AuthContext.tsx";
-import { ThemeProvider } from "@/integrations/theme/ThemeContext.tsx";
-import keycloakService from "@/integrations/auth/keycloak.ts";
+import { AuthProvider, useAuth, keycloakService } from "@/integrations/auth";
+import { ThemeProvider } from "@/integrations/theme";
 import environment from "@/environment";
 
 client.setConfig({
@@ -64,21 +63,24 @@ declare module "@tanstack/react-router" {
 	}
 }
 
-function App() {
-	return <TanstackQuery.Provider>
-			<AuthProvider>
-				<ThemeProvider defaultTheme="dark" storageKey="theme">
-					<RouterProvider router={router} />
-				</ThemeProvider>
-			</AuthProvider>
-		</TanstackQuery.Provider>
+function WrappedRouterProvider() {
+	const auth = useAuth();
+	return <RouterProvider router={router}  context={{ ...TanstackQuery.getContext(), auth }} />
 }
 
 // Render the app
 const rootElement = document.getElementById("app");
 if (rootElement && !rootElement.innerHTML) {
 	const root = ReactDOM.createRoot(rootElement);
-	root.render(<App />);
+	root.render(
+		<TanstackQuery.Provider>
+			<AuthProvider>
+				<ThemeProvider defaultTheme="dark" storageKey="theme">
+					<WrappedRouterProvider />
+				</ThemeProvider>
+			</AuthProvider>
+		</TanstackQuery.Provider>
+	);
 }
 
 // If you want to start measuring performance in your app, pass a function
