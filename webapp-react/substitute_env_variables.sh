@@ -87,9 +87,9 @@ main() {
       # For string values, escape for JavaScript and keep the quotes
       log "Replacing string '${placeholder}' with '${value}'"
       escaped_value=$(echo "${value}" | sed 's/\\/\\\\/g; s/"/\\"/g; s/'"'"'/\\'"'"'/g')
-      # Replace the placeholder with the value, preserving quotes
-      sed -i "s/\"${placeholder}\"/'${escaped_value}'/g" ${js_files}
-      sed -i "s/'${placeholder}'/'${escaped_value}'/g" ${js_files}
+      # Use # as delimiter for sed instead of / to avoid issues with URLs
+      sed -i "s#\"${placeholder}\"#\"${escaped_value}\"#g" ${js_files}
+      sed -i "s#'${placeholder}'#'${escaped_value}'#g" ${js_files}
     fi
     
     log "✅ Replaced all occurrences of '${placeholder}'"
