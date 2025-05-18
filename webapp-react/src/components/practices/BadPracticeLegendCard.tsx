@@ -29,14 +29,14 @@ export function BadPracticeLegendCard() {
               return (
                 <div key={state.text} className="flex items-center gap-2">
                   <Icon className={`${state.color} h-4 w-4`} />
-                  <span className="text-github-muted-foreground">{state.text}</span>
+                  <span className="text-muted-foreground">{state.text}</span>
                 </div>
               );
             })}
           </div>
           
           <div className="pt-2 border-t">
-            <p className="text-sm text-github-muted-foreground">
+            <p className="text-sm text-muted-foreground">
               We analyze your pull requests to identify good practices and potential areas for improvement,
               helping you enhance your code quality and development workflow.
             </p>

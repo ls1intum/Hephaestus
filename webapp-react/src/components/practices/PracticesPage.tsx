@@ -4,7 +4,7 @@ import { BadPracticeLegendCard } from "./BadPracticeLegendCard";
 import { Button } from "@/components/ui/button";
 import { Spinner } from "@/components/ui/spinner";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
-import { RefreshCcw } from "lucide-react";
+import { InfoIcon, RefreshCcw } from "lucide-react";
 import { filterGoodAndBadPractices } from "./utils";
 
 interface PracticesPageProps {
@@ -91,6 +91,12 @@ export function PracticesPage({
           {/* Center Column - Pull Requests List */}
           <div className="col-span-2 space-y-4">
             <h2 className="text-2xl font-semibold">Pull Requests</h2>
+            <div className="mt-3 pt-2 flex items-center gap-2 text-sm bg-muted/50 p-2.5 rounded-md">
+              <InfoIcon className="h-4 w-4 text-blue-500 flex-shrink-0" />
+              <p className="text-muted-foreground">
+                AI-powered insights. <Button variant="link" size="none">Help us improve</Button> by flagging any misdetections.
+              </p>
+            </div>
             <div className="flex flex-col gap-4">
               {isLoading ? (
                 // Loading states
