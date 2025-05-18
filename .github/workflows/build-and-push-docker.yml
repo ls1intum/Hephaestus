@@ -29,10 +29,14 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - name: Webapp
+          - name: Webapp (Angular)
             dockerfile: ./webapp/Dockerfile
             image: ghcr.io/ls1intum/hephaestus/webapp
             context: ./webapp
+          - name: Webapp (React)
+            dockerfile: ./webapp-react/Dockerfile
+            image: ghcr.io/ls1intum/hephaestus/webapp-react
+            context: ./webapp-react
           - name: Application Server
             dockerfile: ./server/application-server/Dockerfile
             image: ghcr.io/ls1intum/hephaestus/application-server

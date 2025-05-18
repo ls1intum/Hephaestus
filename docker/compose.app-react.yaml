@@ -1,0 +1,174 @@
+services:
+  webapp:
+    image: "ghcr.io/ls1intum/hephaestus/webapp-react:${IMAGE_TAG}"
+    environment:
+      APPLICATION_CLIENT_URL: https://${APP_HOSTNAME}
+      APPLICATION_SERVER_URL: https://${APP_HOSTNAME}/api
+      KEYCLOAK_URL: https://${APP_HOSTNAME}/keycloak
+      KEYCLOAK_REALM: hephaestus
+      KEYCLOAK_CLIENT_ID: hephaestus
+      KEYCLOAK_SKIP_LOGIN: ${KEYCLOAK_SKIP_LOGIN}
+      LEGAL_IMPRINT_HTML: ${LEGAL_IMPRINT_HTML}
+      LEGAL_PRIVACY_HTML: ${LEGAL_PRIVACY_HTML}
+      SENTRY_ENVIRONMENT: ${SENTRY_ENVIRONMENT}
+      SENTRY_DSN: ${SENTRY_DSN}
+      POSTHOG_PROJECT_API_KEY: ${POSTHOG_PROJECT_API_KEY}
+      POSTHOG_API_HOST: ${POSTHOG_API_HOST}
+    ports:
+      - '80'
+    depends_on:
+      - application-server
+    restart: unless-stopped
+    networks:
+      - shared-network
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.middlewares.redirect-to-https.redirectscheme.scheme=https"
+      - "traefik.http.routers.http-webapp.entryPoints=http"
+      - "traefik.http.routers.http-webapp.middlewares=redirect-to-https"
+      - "traefik.http.routers.http-webapp.rule=Host(`${APP_HOSTNAME}`) && PathPrefix(`/`)"
+      - "traefik.http.routers.http-webapp.service=http-webapp"
+      - "traefik.http.routers.https-webapp.entryPoints=https"
+      - "traefik.http.routers.https-webapp.rule=Host(`${APP_HOSTNAME}`) && PathPrefix(`/`)"
+      - "traefik.http.routers.https-webapp.service=https-webapp"
+      - "traefik.http.routers.https-webapp.tls.certresolver=letsencrypt"
+      - "traefik.http.routers.https-webapp.tls=true"
+      - "traefik.http.services.http-webapp.loadbalancer.server.port=80"
+      - "traefik.http.services.https-webapp.loadbalancer.server.port=80"
+      - "traefik.http.routers.http-webapp.priority=2"
+      - "traefik.http.routers.https-webapp.priority=3"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost"]
+      interval: 5s
+      timeout: 10s
+      retries: 10
+      start_period: 5s
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "50m"
+        max-file: "5"
+
+  application-server:
+    image: "ghcr.io/ls1intum/hephaestus/application-server:${IMAGE_TAG}"
+    ports:
+      - '8080'
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/postgres
+      SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER}
+      SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD}
+      JWK_KEYSTORE_PATH: ${JWK_KEYSTORE_PATH}
+      JWK_KEYSTORE_PASSWORD: ${JWK_KEYSTORE_PASSWORD}
+      JWK_KEY_ALIAS: ${JWK_KEY_ALIAS}
+      JWK_KEY_PASSWORD: ${JWK_KEY_PASSWORD}
+      ALLOWED_ORIGIN: https://${APP_HOSTNAME}
+      APP_HOSTNAME: ${APP_HOSTNAME}
+      KEYCLOAK_REALM: ${KEYCLOAK_REALM}
+      KEYCLOAK_HOST: ${KEYCLOAK_HOST}
+      KEYCLOAK_CLIENT_ID: ${KEYCLOAK_CLIENT_ID}
+      KEYCLOAK_CLIENT_SECRET: ${KEYCLOAK_CLIENT_SECRET}
+      KEYCLOAK_SKIP_LOGIN: ${KEYCLOAK_SKIP_LOGIN}
+      KEYCLOAK_SKIP_LOGIN_USER_ID: ${KEYCLOAK_SKIP_LOGIN_USER_ID}
+      KEYCLOAK_SKIP_LOGIN_USER_NAME: ${KEYCLOAK_SKIP_LOGIN_USER_NAME}
+      KEYCLOAK_SKIP_LOGIN_USER_EMAIL: ${KEYCLOAK_SKIP_LOGIN_USER_EMAIL}
+      LANGFUSE_PUBLIC_KEY: ${LANGFUSE_PUBLIC_KEY}
+      LANGFUSE_SECRET_KEY: ${LANGFUSE_SECRET_KEY}
+      LANGFUSE_HOST: ${LANGFUSE_HOST}
+      SENTRY_ENVIRONMENT: ${SENTRY_ENVIRONMENT}
+      SENTRY_DSN: ${SENTRY_DSN}
+    depends_on:
+      - postgres
+    restart: unless-stopped
+    networks:
+      - shared-network
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.http-application-server.entryPoints=http"
+      - "traefik.http.routers.http-application-server.rule=Host(`${APP_HOSTNAME}`) && PathPrefix(`/api`)"
+      - "traefik.http.routers.http-application-server.middlewares=redirect-to-https"
+      - "traefik.http.routers.http-application-server.service=http-application-server"
+      - "traefik.http.routers.https-application-server.entryPoints=https"
+      - "traefik.http.routers.https-application-server.rule=Host(`${APP_HOSTNAME}`) && PathPrefix(`/api`)"
+      - "traefik.http.routers.https-application-server.service=https-application-server"
+      - "traefik.http.routers.https-application-server.tls.certresolver=letsencrypt"
+      - "traefik.http.routers.https-application-server.tls=true"
+      - "traefik.http.services.http-application-server.loadbalancer.server.port=8080"
+      - "traefik.http.services.https-application-server.loadbalancer.server.port=8080"
+      - "traefik.http.routers.http-application-server.priority=9"
+      - "traefik.http.routers.https-application-server.priority=10"
+      - "traefik.http.routers.https-application-server.middlewares=application-server-strip-prefix"
+      - "traefik.http.middlewares.application-server-strip-prefix.stripprefix.prefixes=/api"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/actuator/health"]
+      interval: 5s
+      timeout: 10s
+      retries: 10
+      start_period: 10s
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "50m"
+        max-file: "5"
+
+  intelligence-service:
+    image: "ghcr.io/ls1intum/hephaestus/intelligence-service:${IMAGE_TAG}"
+    environment:
+      DATABASE_HOST: postgres
+      DATABASE_PORT: 5432
+      DATABASE_USERNAME: ${POSTGRES_USER}
+      DATABASE_PASSWORD: ${POSTGRES_PASSWORD}
+      DATABASE_NAME: postgres
+      ALLOWED_ORIGINS: https://${APP_HOSTNAME}
+      LANGFUSE_PUBLIC_KEY: ${LANGFUSE_PUBLIC_KEY}
+      LANGFUSE_SECRET_KEY: ${LANGFUSE_SECRET_KEY}
+      LANGFUSE_HOST: ${LANGFUSE_HOST}
+      OPENAI_API_KEY: ${OPENAI_API_KEY}
+      SENTRY_ENVIRONMENT: ${SENTRY_ENVIRONMENT}
+      SENTRY_DSN: ${SENTRY_DSN}
+    depends_on:
+      - postgres
+    restart: unless-stopped
+    ports:
+      - '5000'
+    networks:
+      - shared-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5000/health"]
+      interval: 5s
+      timeout: 10s
+      retries: 10
+      start_period: 5s
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "50m"
+        max-file: "5"
+
+  postgres:
+    image: 'postgres:16'
+    environment:
+      - POSTGRES_USER=${POSTGRES_USER}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+    ports:
+      - '5432'
+    volumes:
+      - postgresql-data:/var/lib/postgresql/data
+    networks:
+      - shared-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "50m"
+        max-file: "5"
+
+networks:
+  shared-network:
+
+volumes:
+  postgresql-data:
