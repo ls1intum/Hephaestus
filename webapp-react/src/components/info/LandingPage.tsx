@@ -14,7 +14,6 @@ import {
   Users,
   Github,
   ArrowRight,
-  BookOpen,
   ChevronDown,
   Code,
   CheckCheck
@@ -29,7 +28,6 @@ import agileHephaestus from "@/assets/agile_hephaestus.png";
 import aliceAvatar from "@/assets/alice_developer.jpg";
 import bobAvatar from "@/assets/bob_builder.jpg";
 import charlieAvatar from "@/assets/charlie_coder.jpg";
-import { ThemeProvider } from '@/integrations/theme';
 
 interface LandingPageProps {
   onSignIn: () => void;
