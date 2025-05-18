@@ -1,6 +1,6 @@
-import type { Decorator, Preview } from '@storybook/react'
 import { withThemeByClassName, withThemeByDataAttribute } from '@storybook/addon-themes';
-import { createRootRoute, createRouter, RouterProvider } from "@tanstack/react-router";
+import type { Decorator, Preview } from '@storybook/react'
+import { RouterProvider, createRootRoute, createRouter } from "@tanstack/react-router";
 import React from "react";
 import { ThemeProvider } from "../src/integrations/theme/ThemeContext";
 import '../src/styles.css'
@@ -20,6 +20,7 @@ const ThemeDecorator: Decorator = (Story, context) => {
     { 
       defaultTheme: "light", 
       storageKey: "theme", 
+      // biome-ignore lint/correctness/noChildrenProp: Fine to pass children here
       children: React.createElement(Story, context.args) 
     }
   );
@@ -33,6 +34,11 @@ const preview: Preview = {
         date: /Date$/
       }
     },
+    options: {
+      storySort: {
+        order: ['core', 'shared'],
+      },
+    }
   },
   decorators: [
     RouterDecorator,
