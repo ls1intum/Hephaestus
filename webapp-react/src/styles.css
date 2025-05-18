@@ -202,7 +202,7 @@ code {
 		@apply bg-background text-foreground;
 	}
 	code.textCode {
-		@apply bg-github-neutral tracking-tight rounded px-1 py-0.5;
+		@apply bg-github-muted tracking-tight rounded px-1 py-0.5;
 	}
 }
 
