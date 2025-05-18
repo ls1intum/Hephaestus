@@ -24,6 +24,12 @@ Ensure that Typescript throws no errors:
 npx tsc
 ```
 
+Ensure that the linter throws no errors:
+
+```bash
+npm run check
+```
+
 ## Storybook
 
 Our components are purely presentational and documented using Storybook. Strive for simple, reusable components with thoughtful props and naming.
