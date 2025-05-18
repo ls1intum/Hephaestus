@@ -1,4 +1,3 @@
-import * as React from "react";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 
@@ -7,6 +6,10 @@ interface GithubBadgeProps extends React.ComponentPropsWithoutRef<typeof Badge> 
   color?: string;  // Hex color without #
 }
 
+/**
+ * GithubBadge renders a badge with GitHub-like styling, supporting both light and dark themes.
+ * This component precisely replicates GitHub's label appearance.
+ */
 export function GithubBadge({
   label,
   color,

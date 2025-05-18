@@ -6,7 +6,7 @@ import {
 } from "@/api/@tanstack/react-query.gen";
 import { detectBadPracticesByUser } from "@/api/sdk.gen";
 import { useAuth } from "@/integrations/auth/AuthContext";
-import { PracticesPage } from "@/components/practices";
+import { PracticesPage } from "@/components/practices/PracticesPage";
 
 export const Route = createFileRoute("/_authenticated/user/$username/best-practices")({
   component: BestPracticesContainer,

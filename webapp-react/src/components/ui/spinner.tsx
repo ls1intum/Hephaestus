@@ -1,4 +1,3 @@
-import * as React from "react";
 import { cn } from "@/lib/utils";
 
 interface SpinnerProps extends React.HTMLAttributes<HTMLDivElement> {

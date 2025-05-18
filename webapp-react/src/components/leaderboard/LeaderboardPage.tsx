@@ -3,7 +3,7 @@ import { LeaderboardFilter } from "./LeaderboardFilter";
 import { LeaderboardLegend } from "./LeaderboardLegend";
 import { LeaderboardOverview } from "./LeaderboardOverview";
 import { LeaderboardTable } from "./LeaderboardTable";
-import type { LeaderboardSortType } from "./types";
+import type { LeaderboardSortType } from "./SortFilter";
 
 interface LeaderboardPageProps {
   leaderboard?: LeaderboardEntry[];

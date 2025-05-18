@@ -1,4 +1,3 @@
-import type { LeagueIconProps } from "./types";
 import { 
   LeagueBronzeIcon, 
   LeagueNoneIcon, 
@@ -14,6 +13,13 @@ import {
 } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 import { getLeagueTier, getLeagueLabel } from "./utils";
+
+export interface LeagueIconProps {
+  leaguePoints?: number;
+  size?: 'sm' | 'default' | 'lg' | 'max' | 'full';
+  showPoints?: boolean;
+  className?: string;
+}
 
 export function LeagueIcon({ 
   leaguePoints, 

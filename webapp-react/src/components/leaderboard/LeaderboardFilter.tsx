@@ -1,9 +1,26 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import type { LeaderboardFilterProps } from "./types";
 import { TeamFilter } from "./TeamFilter";
-import { SortFilter } from "./SortFilter";
+import { SortFilter, type LeaderboardSortType } from "./SortFilter";
 import { TimeframeFilter } from "./TimeframeFilter";
 import { SlidersHorizontal } from "lucide-react";
+
+export interface LeaderboardFilterProps {
+  teams: string[];
+  onTeamChange?: (team: string) => void;
+  onSortChange?: (sort: LeaderboardSortType) => void;
+  onTimeframeChange?: (afterDate: string, beforeDate: string, timeframe?: string) => void;
+  selectedTeam?: string;
+  selectedSort?: LeaderboardSortType;
+  initialAfterDate?: string;
+  initialBeforeDate?: string;
+  leaderboardSchedule?: {
+    day: number;
+    hour: number;
+    minute: number;
+    formatted: string;
+  };
+}
+
 
 export function LeaderboardFilter({ 
   teams, 

@@ -3,6 +3,7 @@ import { PullRequestBadPracticeCard } from "./PullRequestBadPracticeCard";
 import { BadPracticeLegendCard } from "./BadPracticeLegendCard";
 import { Button } from "@/components/ui/button";
 import { Spinner } from "@/components/ui/spinner";
+import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { RefreshCcw } from "lucide-react";
 import { filterGoodAndBadPractices } from "./utils";
 
@@ -34,37 +35,62 @@ export function PracticesPage({
 
   return (
     <div className="flex flex-col items-center">
-      <div className="grid grid-cols-1 xl:grid-cols-5 gap-y-4 xl:gap-8 w-full">
-        <div className="space-y-2 col-span-1">
-          <div className="flex flex-col gap-2 mb-4">
-            <h1 className="text-xl font-semibold">Activities</h1>
-            <p>
-              {username} currently has <span className="font-semibold">{numberOfPullRequests}</span> open pull requests,{" "}
-              <span className="font-semibold">{numberOfGoodPractices}</span> detected good practices, and{" "}
-              <span className="font-semibold">{numberOfBadPractices}</span> detected bad practices.
-            </p>
+      <div className="w-full max-w-[1400px]">
+        <div className="grid grid-cols-1 xl:grid-cols-4 gap-y-4 xl:gap-8">
+          {/* Left Column - Summary & Controls */}
+          <div className="space-y-4 col-span-1">
+            <div className="flex flex-col mb-4">
+              <h1 className="text-3xl font-bold">Code Quality</h1>
+              <h2 className="text-xl text-muted-foreground">
+                Hi {username} 👋
+              </h2>
+            </div>
+
+            <div className="xl:sticky xl:top-4 xl:self-start xl:max-h-[calc(100vh-2rem)] xl:overflow-auto">
+              {/* Activity Summary Card */}
+              <Card className="mb-4">
+                <CardHeader>
+                  <CardTitle>Activity Summary</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-2">
+                    <div className="flex justify-between">
+                      <span>Pull Requests</span>
+                      <span className="font-semibold">{numberOfPullRequests}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span>Good Practices</span>
+                      <span className="font-semibold text-github-success-foreground">{numberOfGoodPractices}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span>Areas for Improvement</span>
+                      <span className="font-semibold text-github-attention-foreground">{numberOfBadPractices}</span>
+                    </div>
+
+                    {currUserIsDashboardUser && (
+                      <Button 
+                        variant="outline" 
+                        className="w-full mt-4 gap-2" 
+                        onClick={onDetectBadPractices}
+                        disabled={isDetectingBadPractices}
+                      >
+                        {isDetectingBadPractices ? (
+                          <Spinner className="size-4" />
+                        ) : (
+                          <RefreshCcw className="size-4" />
+                        )}
+                        <span>Analyze Pull Requests</span>
+                      </Button>
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
           </div>
-        </div>
-        <div className="col-span-3">
-          <div className="flex flex-col justify-between gap-2">
-            <span className="flex flex-row justify-between items-center">
-              <h1 className="text-xl font-semibold">Open pull requests</h1>
-              {currUserIsDashboardUser && (
-                <Button 
-                  variant="outline" 
-                  className="gap-2" 
-                  onClick={onDetectBadPractices}
-                  disabled={isDetectingBadPractices}
-                >
-                  {isDetectingBadPractices ? (
-                    <Spinner className="size-4" />
-                  ) : (
-                    <RefreshCcw className="size-4" />
-                  )}
-                  <span>Detect bad practices</span>
-                </Button>
-              )}
-            </span>
+
+          {/* Center Column - Pull Requests List */}
+          <div className="col-span-2 space-y-4">
+            <h2 className="text-2xl font-semibold">Pull Requests</h2>
             <div className="flex flex-col gap-4">
               {isLoading ? (
                 // Loading states
@@ -101,9 +127,11 @@ export function PracticesPage({
               )}
             </div>
           </div>
-        </div>
-        <div className="col-span-1">
-          <BadPracticeLegendCard />
+
+          {/* Right Column - Legend */}
+          <div className="col-span-1 xl:sticky xl:top-4 xl:self-start xl:max-h-[calc(100vh-2rem)] xl:overflow-auto">
+            <BadPracticeLegendCard />
+          </div>
         </div>
       </div>
     </div>

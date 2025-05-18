@@ -1,23 +1,46 @@
+import { 
+  Card, 
+  CardContent, 
+  CardHeader, 
+  CardTitle,
+  CardDescription 
+} from "@/components/ui/card";
+import { InfoIcon } from "@primer/octicons-react";
 import { stateConfig } from "./utils";
-import { Card, CardContent } from "@/components/ui/card";
 
 export function BadPracticeLegendCard() {
   const stateList = Object.values(stateConfig);
 
   return (
     <Card>
-      <CardContent className="flex flex-col gap-y-4 py-4">
-        <div className="flex flex-col gap-2 sm:min-w-[250px]">
-          <h4 className="mb-2 text-lg font-semibold leading-none tracking-tight">Icons</h4>
-          {stateList.map((state) => {
-            const Icon = state.icon;
-            return (
-              <div key={state.text} className="flex flex-row items-center text-center gap-2">
-                <Icon className={`${state.color} size-5`} />
-                <span className="text-github-muted-foreground">{state.text}</span>
-              </div>
-            );
-          })}
+      <CardHeader>
+        <CardTitle>
+          <InfoIcon className="inline mr-2 h-4 w-4" /> Practice Legend
+        </CardTitle>
+        <CardDescription>
+          Understanding the pull request practice indicators
+        </CardDescription>
+      </CardHeader>
+      <CardContent>
+        <div className="space-y-3">
+          <div className="grid grid-cols-1 gap-2">
+            {stateList.map((state) => {
+              const Icon = state.icon;
+              return (
+                <div key={state.text} className="flex items-center gap-2">
+                  <Icon className={`${state.color} h-4 w-4`} />
+                  <span className="text-github-muted-foreground">{state.text}</span>
+                </div>
+              );
+            })}
+          </div>
+          
+          <div className="pt-2 border-t">
+            <p className="text-sm text-github-muted-foreground">
+              We analyze your pull requests to identify good practices and potential areas for improvement,
+              helping you enhance your code quality and development workflow.
+            </p>
+          </div>
         </div>
       </CardContent>
     </Card>

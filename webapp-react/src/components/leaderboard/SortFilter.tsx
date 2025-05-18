@@ -1,11 +1,17 @@
 import { SelectValue, SelectTrigger, SelectItem, SelectContent, Select } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
-import type { SortFilterProps, LeaderboardSortType } from "./types";
+
+export type LeaderboardSortType = 'SCORE' | 'LEAGUE_POINTS';
 
 const SORT_OPTIONS: Array<{ value: LeaderboardSortType; label: string }> = [
   { value: "SCORE", label: "Score" },
   { value: "LEAGUE_POINTS", label: "League Points" }
 ];
+
+export interface SortFilterProps {
+  onSortChange?: (sort: LeaderboardSortType) => void;
+  selectedSort?: LeaderboardSortType;
+}
 
 export function SortFilter({ onSortChange, selectedSort = "SCORE" }: SortFilterProps) {
   return (

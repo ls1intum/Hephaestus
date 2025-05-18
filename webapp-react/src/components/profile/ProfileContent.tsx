@@ -2,10 +2,18 @@ import { Button } from "@/components/ui/button";
 import { CodeReviewIcon, GitPullRequestIcon } from "@primer/octicons-react";
 import { ReviewActivityCard } from "./ReviewActivityCard";
 import { IssueCard } from "./IssueCard";
-import type { ProfileContentProps } from ".";
 import { Card, CardContent } from "@/components/ui/card";
 import { useMemo } from "react";
 import { Link } from "@tanstack/react-router";
+import type { PullRequestInfo, PullRequestReviewInfo } from "@/api/types.gen";
+
+export interface ProfileContentProps {
+  reviewActivity?: PullRequestReviewInfo[];
+  openPullRequests?: PullRequestInfo[];
+  isLoading: boolean;
+  username: string;
+}
+
 
 export function ProfileContent({
   reviewActivity = [],

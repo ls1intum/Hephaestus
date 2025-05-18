@@ -1,7 +1,12 @@
 import { SelectValue, SelectTrigger, SelectItem, SelectContent, Select, SelectGroup } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
 import { DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
-import type { TeamFilterProps } from "./types";
+
+export interface TeamFilterProps {
+  teams: string[];
+  onTeamChange?: (team: string) => void;
+  selectedTeam?: string;
+}
 
 export function TeamFilter({ teams = [], onTeamChange, selectedTeam = "all" }: TeamFilterProps) {
   return (

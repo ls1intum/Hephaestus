@@ -7,9 +7,24 @@ import {
   GitMergeIcon,
   GitPullRequestClosedIcon,
 } from "@primer/octicons-react";
-import type { IssueCardProps } from ".";
 import { cn } from "@/lib/utils";
-import { GithubBadge } from "@/components/profile/GithubBadge";
+import { GithubBadge } from "@/components/shared/GithubBadge";
+import type { LabelInfo } from "@/api/types.gen";
+
+export interface IssueCardProps {
+  isLoading: boolean;
+  title?: string;
+  number?: number;
+  additions?: number;
+  deletions?: number;
+  htmlUrl?: string;
+  repositoryName?: string;
+  createdAt?: string;
+  state?: 'OPEN' | 'CLOSED';
+  isDraft?: boolean;
+  isMerged?: boolean;
+  pullRequestLabels?: LabelInfo[];
+}
 
 export function IssueCard({
   isLoading,

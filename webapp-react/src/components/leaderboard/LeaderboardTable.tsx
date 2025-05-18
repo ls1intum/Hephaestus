@@ -1,4 +1,3 @@
-import type { LeaderboardTableProps } from "./types";
 import {
   Table,
   TableBody,
@@ -26,6 +25,13 @@ import {
 } from "@primer/octicons-react";
 import { cn } from "@/lib/utils";
 import { AwardIcon } from "lucide-react";
+import type { LeaderboardEntry, UserInfo } from "@/api/types.gen";
+
+export interface LeaderboardTableProps {
+  leaderboard?: LeaderboardEntry[];
+  isLoading: boolean;
+  currentUser?: UserInfo;
+}
 
 export function LeaderboardTable({
   leaderboard = [],

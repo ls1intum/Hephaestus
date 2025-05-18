@@ -13,12 +13,11 @@ import {
   GitPullRequestIcon,
   InfoIcon
 } from "@primer/octicons-react";
-import type { LeaderboardLegendProps } from "./types";
 import { Button } from "@/components/ui/button";
 import { ScoringExplanationDialog } from "./ScoringExplanationDialog";
 import { useState } from "react";
 
-export function LeaderboardLegend({}: LeaderboardLegendProps) {
+export function LeaderboardLegend() {
   const [showScoringModal, setShowScoringModal] = useState(false);
 
   return (

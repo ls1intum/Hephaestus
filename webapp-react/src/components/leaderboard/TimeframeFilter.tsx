@@ -2,7 +2,6 @@ import { useState, useEffect, useMemo, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import { SelectValue, SelectTrigger, SelectItem, SelectContent, Select } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
-import type { TimeframeFilterProps } from "./types";
 import { CalendarIcon } from "lucide-react";
 import { 
   format, 
@@ -34,6 +33,18 @@ import type { DateRange } from "react-day-picker";
 import { cn } from "@/lib/utils";
 
 type TimeframeOption = 'this-week' | 'last-week' | 'this-month' | 'last-month' | 'custom';
+
+export interface TimeframeFilterProps {
+  onTimeframeChange?: (afterDate: string, beforeDate: string, timeframe?: string) => void;
+  initialAfterDate?: string;
+  initialBeforeDate?: string;
+  leaderboardSchedule?: {
+    day: number;
+    hour: number;
+    minute: number;
+    formatted: string;
+  };
+}
 
 export function TimeframeFilter({ 
   onTimeframeChange, 

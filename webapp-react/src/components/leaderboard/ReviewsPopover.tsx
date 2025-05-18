@@ -7,9 +7,14 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 import { cn } from "@/lib/utils";
-import type { ReviewsPopoverProps } from "./types";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { CardTitle } from "@/components/ui/card";
+import type { LeaderboardEntry } from "@/api/types.gen";
+
+export interface ReviewsPopoverProps {
+  reviewedPRs: LeaderboardEntry['reviewedPullRequests'];
+  highlight?: boolean;
+}
 
 export function ReviewsPopover({ reviewedPRs, highlight = false }: ReviewsPopoverProps) {
   const [isOpen, setIsOpen] = useState(false);

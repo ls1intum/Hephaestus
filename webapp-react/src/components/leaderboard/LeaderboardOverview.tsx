@@ -1,11 +1,18 @@
 import { useState } from "react";
 import { Card, CardContent } from "@/components/ui/card";
-import type { LeaderboardOverviewProps } from "./types";
 import { CalendarClock, TrendingUp, TrendingDown, MoveRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { LeagueInfoDialog } from "./LeagueInfoDialog";
 import { differenceInHours, isPast } from "date-fns";
 import { LeagueProgressCard } from "./LeagueProgressCard";
+import type { LeaderboardEntry } from "@/api/types.gen";
+
+export interface LeaderboardOverviewProps {
+  leaderboardEntry: LeaderboardEntry;
+  leaguePoints: number;
+  leaderboardEnd?: string;
+  leaguePointsChange?: number;
+}
 
 export function LeaderboardOverview({ 
   leaderboardEntry, 

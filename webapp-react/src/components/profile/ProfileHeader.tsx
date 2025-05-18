@@ -5,7 +5,10 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { ClockIcon } from "@primer/octicons-react";
 import { format, parseISO } from "date-fns";
 import { LeagueIcon } from "@/components/leaderboard/LeagueIcon";
-import type { ProfileHeaderProps } from ".";
+import type { 
+  RepositoryInfo, 
+  UserInfo 
+} from "@/api/types.gen";
 
 // Repository images for known repositories
 const REPO_IMAGES: Record<string, string> = {
@@ -13,6 +16,14 @@ const REPO_IMAGES: Record<string, string> = {
   "ls1intum/Artemis": "https://artemis.tum.de/public/images/logo.png",
   "ls1intum/Athena": "https://raw.githubusercontent.com/ls1intum/Athena/develop/playground/public/logo.png"
 };
+
+export interface ProfileHeaderProps {
+  user?: UserInfo;
+  firstContribution?: string;
+  contributedRepositories?: RepositoryInfo[];
+  leaguePoints?: number;
+  isLoading: boolean;
+}
 
 export function ProfileHeader({
   user,

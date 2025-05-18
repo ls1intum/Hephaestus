@@ -9,7 +9,6 @@ import {
   GitPullRequestIcon,
 } from "@primer/octicons-react";
 import { AwardIcon } from "lucide-react";
-import type { ReviewActivityCardProps } from ".";
 import { cn } from "@/lib/utils";
 
 // Define the styling for different review states
@@ -42,6 +41,30 @@ const REVIEW_STATE_STYLES: Record<
     tooltip: "Reviewed",
   },
 };
+
+export interface ReviewActivityCardProps {
+  isLoading: boolean;
+  state?: 'COMMENTED' | 'APPROVED' | 'CHANGES_REQUESTED' | 'UNKNOWN';
+  submittedAt?: string;
+  htmlUrl?: string;
+  pullRequest?: {
+    id?: number;
+    title?: string;
+    number?: number;
+    state?: string;
+    isDraft?: boolean;
+    isMerged?: boolean;
+    htmlUrl?: string;
+    repository?: {
+      id?: number;
+      name?: string;
+      nameWithOwner?: string;
+      htmlUrl?: string;
+    };
+  };
+  repositoryName?: string;
+  score?: number;
+}
 
 export function ReviewActivityCard({
   isLoading,

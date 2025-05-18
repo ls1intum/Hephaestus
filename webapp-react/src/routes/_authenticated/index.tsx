@@ -17,7 +17,7 @@ import {
   getUserProfileOptions 
 } from "@/api/@tanstack/react-query.gen";
 import { LeaderboardPage } from '@/components/leaderboard/LeaderboardPage';
-import type { LeaderboardSortType } from '@/components/leaderboard/types';
+import type { LeaderboardSortType } from '@/components/leaderboard/SortFilter';
 
 // Calculate default date range with ISO 8601 format including timezone
 const today = new Date();
