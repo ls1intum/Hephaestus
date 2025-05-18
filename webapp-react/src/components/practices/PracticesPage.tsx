@@ -42,7 +42,6 @@ export function PracticesPage({
 					{currUserIsDashboardUser ? "Your" : `${displayName || username}'s`}{" "}
 					Practices Dashboard
 				</h1>
-				<h2 className="text-2xl font-semibold"></h2>
 				<div className="grid grid-cols-1 xl:grid-cols-4 gap-y-4 xl:gap-8">
 					{/* Left Column - Summary & Controls */}
 					<div className="space-y-4 col-span-1">
