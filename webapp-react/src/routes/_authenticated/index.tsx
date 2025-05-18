@@ -11,7 +11,8 @@ import { useQuery } from "@tanstack/react-query";
 import { createFileRoute, retainSearchParams } from "@tanstack/react-router";
 import { useNavigate } from "@tanstack/react-router";
 import { zodValidator } from "@tanstack/zod-adapter";
-import { endOfISOWeek, format, formatISO, startOfISOWeek } from "date-fns";
+import { endOfISOWeek, formatISO, startOfISOWeek } from "date-fns";
+import { useMemo } from "react";
 import { z } from "zod";
 
 // Calculate default date range with ISO 8601 format including timezone
@@ -72,7 +73,6 @@ function LeaderboardContainer() {
 		}),
 		enabled: Boolean(username),
 	});
-
 	// Find the current user's entry in the leaderboard
 	const currentUserEntry = username
 		? leaderboardQuery.data?.find(
@@ -80,8 +80,39 @@ function LeaderboardContainer() {
 			)
 		: undefined;
 
-	// Format leaderboard end date (using the beforeParam as the end date)
-	const leaderboardEnd = format(new Date(before), "EEEE, MMMM d, yyyy");
+	// Get the leaderboard schedule from the server's metadata
+	const leaderboardSchedule = useMemo(() => {
+		// Parse the scheduled time and day from the metadata
+		const scheduledTime = metaQuery.data?.scheduledTime || "9:00";
+		const scheduledDay = Number.parseInt(
+			metaQuery.data?.scheduledDay || "2",
+			10,
+		);
+		const [hours, minutes] = scheduledTime
+			.split(":")
+			.map((part) => Number.parseInt(part, 10));
+
+		return {
+			day: scheduledDay,
+			hour: hours || 9,
+			minute: minutes || 0,
+		};
+	}, [metaQuery.data]);
+
+	// Calculate leaderboard end date with the correct time
+	const leaderboardEnd = useMemo(() => {
+		const endDate = new Date(before);
+
+		// Adjust the end date to include the schedule time from server metadata
+		endDate.setHours(
+			leaderboardSchedule.hour,
+			leaderboardSchedule.minute,
+			0,
+			0,
+		);
+
+		return formatISO(endDate);
+	}, [before, leaderboardSchedule]);
 
 	// Query for league points change data if we have a current user entry
 	const leagueStatsQuery = useQuery({
@@ -110,14 +141,6 @@ function LeaderboardContainer() {
 		}),
 		enabled: Boolean(username && currentUserEntry),
 	});
-
-	// Use a fixed leaderboard schedule since it seems the metadata doesn't provide this
-	// Mondays at 9:00 AM is the default schedule
-	const leaderboardSchedule = {
-		day: 1, // Monday
-		hour: 9,
-		minute: 0,
-	};
 
 	// Handle team filter changes
 	const handleTeamChange = (team: string) => {

@@ -1,14 +1,19 @@
 import type { LeaderboardEntry } from "@/api/types.gen";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { differenceInHours, isPast } from "date-fns";
+import {
+	differenceInHours,
+	differenceInMinutes,
+	differenceInSeconds,
+	isPast,
+} from "date-fns";
 import {
 	CalendarClock,
 	MoveRight,
 	TrendingDown,
 	TrendingUp,
 } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { LeagueInfoDialog } from "./LeagueInfoDialog";
 import { LeagueProgressCard } from "./LeagueProgressCard";
 
@@ -26,27 +31,53 @@ export function LeaderboardOverview({
 	leaguePointsChange = 0,
 }: LeaderboardOverviewProps) {
 	const [leagueInfoOpen, setLeagueInfoOpen] = useState(false);
+	const [countdown, setCountdown] = useState<string>("Calculating...");
 
-	// Calculate relative time for leaderboard end
-	const getRelativeEndTime = () => {
-		if (!leaderboardEnd) return "N/A";
+	// Use an effect to update the countdown timer every second
+	useEffect(() => {
+		// Calculate countdown function that uses the current leaderboardEnd
+		const calculateCountdown = () => {
+			if (!leaderboardEnd) return "N/A";
 
-		const endDate = new Date(leaderboardEnd);
+			const endDate = new Date(leaderboardEnd);
 
-		if (isPast(endDate)) {
-			return "Ended";
-		}
+			if (isPast(endDate)) {
+				return "Ended";
+			}
 
-		const diffHours = differenceInHours(endDate, new Date());
+			const now = new Date();
+			const diffHours = differenceInHours(endDate, now);
+			const diffMinutes = differenceInMinutes(endDate, now) % 60;
+			const diffSeconds = differenceInSeconds(endDate, now) % 60;
 
-		if (diffHours > 24) {
-			const days = Math.floor(diffHours / 24);
-			const hours = diffHours % 24;
-			return `${days}d ${hours}h`;
-		}
+			if (diffHours > 24) {
+				const days = Math.floor(diffHours / 24);
+				const hours = diffHours % 24;
+				return `${days}d ${hours}h`;
+			}
 
-		return `${diffHours}h`;
-	};
+			if (diffHours > 0) {
+				return `${diffHours}h ${diffMinutes}m`;
+			}
+
+			if (diffMinutes > 0) {
+				return `${diffMinutes}m ${diffSeconds}s`;
+			}
+
+			return `${diffSeconds}s`;
+		};
+
+		// Initial calculation
+		setCountdown(calculateCountdown());
+
+		// Update the countdown every second
+		const timer = setInterval(() => {
+			setCountdown(calculateCountdown());
+		}, 1000);
+
+		// Cleanup interval on unmount
+		return () => clearInterval(timer);
+	}, [leaderboardEnd]);
 
 	// Scroll to the user's rank in the leaderboard table
 	const scrollToRank = (rank: number) => {
@@ -102,7 +133,7 @@ export function LeaderboardOverview({
 								Leaderboard ends in:
 							</span>
 						</div>
-						<span className="text-xl font-medium">{getRelativeEndTime()}</span>
+						<span className="text-xl font-medium">{countdown}</span>
 						<div className="flex flex-wrap items-center justify-center gap-1 mt-1 text-sm">
 							<span className="text-muted-foreground">
 								League points change:
