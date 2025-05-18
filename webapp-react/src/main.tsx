@@ -3,44 +3,44 @@ import ReactDOM from "react-dom/client";
 
 import * as TanstackQuery from "./integrations/tanstack-query/root-provider";
 
+import { client } from "@/api/client.gen";
 import { routeTree } from "./routeTree.gen";
-import { client } from '@/api/client.gen';
 
 import "./styles.css";
 import reportWebVitals from "./reportWebVitals.ts";
 
-import { AuthProvider, useAuth, keycloakService } from "@/integrations/auth";
-import { ThemeProvider } from "@/integrations/theme";
 import environment from "@/environment";
+import { AuthProvider, keycloakService, useAuth } from "@/integrations/auth";
+import { ThemeProvider } from "@/integrations/theme";
 
 client.setConfig({
-  baseUrl: environment.serverUrl,
+	baseUrl: environment.serverUrl,
 });
 
 // Add request interceptor to handle authentication
 client.interceptors.request.use(async (request) => {
-  // Skip authentication for public endpoints
-  if (request.url?.includes('/public/')) {
-    return request;
-  }
-  
-  // Only try to update token if authenticated
-  if (keycloakService.isAuthenticated()) {
-    try {
+	// Skip authentication for public endpoints
+	if (request.url?.includes("/public/")) {
+		return request;
+	}
+
+	// Only try to update token if authenticated
+	if (keycloakService.isAuthenticated()) {
+		try {
 			// Check if token needs to be refreshed (within 60 seconds of expiration)
-      await keycloakService.updateToken(60);
-    } catch (error) {
-      console.error('Token refresh failed in interceptor:', error);
-    }
-  }
-  
-  // Add token to request header if available
-  const token = keycloakService.getToken();
-  if (token) {
-    request.headers.set('Authorization', `Bearer ${token}`);
-  }
-  
-  return request;
+			await keycloakService.updateToken(60);
+		} catch (error) {
+			console.error("Token refresh failed in interceptor:", error);
+		}
+	}
+
+	// Add token to request header if available
+	const token = keycloakService.getToken();
+	if (token) {
+		request.headers.set("Authorization", `Bearer ${token}`);
+	}
+
+	return request;
 });
 
 // Create a new router instance
@@ -65,7 +65,12 @@ declare module "@tanstack/react-router" {
 
 function WrappedRouterProvider() {
 	const auth = useAuth();
-	return <RouterProvider router={router}  context={{ ...TanstackQuery.getContext(), auth }} />
+	return (
+		<RouterProvider
+			router={router}
+			context={{ ...TanstackQuery.getContext(), auth }}
+		/>
+	);
 }
 
 // Render the app
@@ -79,7 +84,7 @@ if (rootElement && !rootElement.innerHTML) {
 					<WrappedRouterProvider />
 				</ThemeProvider>
 			</AuthProvider>
-		</TanstackQuery.Provider>
+		</TanstackQuery.Provider>,
 	);
 }
 

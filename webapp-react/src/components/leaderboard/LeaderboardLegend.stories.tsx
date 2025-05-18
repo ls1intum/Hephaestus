@@ -1,19 +1,19 @@
-import type { Meta, StoryObj } from '@storybook/react';
-import { LeaderboardLegend } from './LeaderboardLegend';
+import type { Meta, StoryObj } from "@storybook/react";
+import { LeaderboardLegend } from "./LeaderboardLegend";
 
 /**
  * Legend component that explains the scoring system and activity icons used in the leaderboard.
  * Provides a quick reference for understanding pull request review activities and their impact.
  */
 const meta = {
-  component: LeaderboardLegend,
-  tags: ['autodocs'],
-  parameters: {
-    layout: 'centered',
-    backgrounds: {
-      default: 'light',
-    },
-  },
+	component: LeaderboardLegend,
+	tags: ["autodocs"],
+	parameters: {
+		layout: "centered",
+		backgrounds: {
+			default: "light",
+		},
+	},
 } satisfies Meta<typeof LeaderboardLegend>;
 
 export default meta;

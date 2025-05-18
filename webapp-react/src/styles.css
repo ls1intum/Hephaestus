@@ -1,6 +1,6 @@
 /* GitHub Primer CSS */
-@import '@primer/primitives/dist/css/functional/themes/light.css';
-@import '@primer/primitives/dist/css/functional/themes/dark.css';
+@import "@primer/primitives/dist/css/functional/themes/light.css";
+@import "@primer/primitives/dist/css/functional/themes/dark.css";
 
 @import "tailwindcss";
 
@@ -57,7 +57,7 @@ code {
 	--sidebar-accent-foreground: oklch(0.21 0.006 285.885);
 	--sidebar-border: oklch(0.92 0.004 286.32);
 	--sidebar-ring: oklch(0.871 0.006 286.286);
-	
+
 	/* League colors */
 	--league-bronze: oklch(0.69 0.1181 63.51);
 	--league-silver: oklch(0.81 0 0);
@@ -99,7 +99,7 @@ code {
 	--sidebar-accent-foreground: oklch(0.985 0 0);
 	--sidebar-border: oklch(0.274 0.006 286.033);
 	--sidebar-ring: oklch(0.442 0.017 285.786);
-	
+
 	/* League colors */
 	--league-bronze: oklch(0.69 0.1181 63.52);
 	--league-silver: oklch(0.81 0 0);
@@ -145,7 +145,7 @@ code {
 	--color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
 	--color-sidebar-border: var(--sidebar-border);
 	--color-sidebar-ring: var(--sidebar-ring);
-	
+
 	/* GitHub specific colors from tailwind config */
 	--color-github-foreground: var(--fgColor-default);
 	--color-github-background: var(--bgColor-default);
@@ -185,7 +185,7 @@ code {
 	--color-github-upsell-foreground: var(--fgColor-upsell);
 	--color-github-sponsors: var(--bgColor-sponsors);
 	--color-github-sponsors-foreground: var(--fgColor-sponsors);
-	
+
 	/* League colors */
 	--color-league-bronze: var(--league-bronze);
 	--color-league-silver: var(--league-silver);
@@ -208,12 +208,12 @@ code {
 }
 
 @utility container {
-  margin-inline: auto;
+	margin-inline: auto;
 	@apply p-8;
 
-  @variant 2xl {
+	@variant 2xl {
 		max-width: 1400px;
-  }
+	}
 }
 
 /* Animation classes */
@@ -247,5 +247,9 @@ code {
 .leaderboard-fade-out {
 	position: relative;
 	mask-image: linear-gradient(to bottom, rgba(0, 0, 0, 1) 60%, rgba(0, 0, 0, 0));
-	-webkit-mask-image: linear-gradient(to bottom, rgba(0, 0, 0, 1) 60%, rgba(0, 0, 0, 0));
+	-webkit-mask-image: linear-gradient(
+		to bottom,
+		rgba(0, 0, 0, 1) 60%,
+		rgba(0, 0, 0, 0)
+	);
 }

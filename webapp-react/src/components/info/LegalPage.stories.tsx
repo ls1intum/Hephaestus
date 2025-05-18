@@ -1,23 +1,23 @@
-import type { Meta, StoryObj } from '@storybook/react';
-import { LegalPage } from './LegalPage';
+import type { Meta, StoryObj } from "@storybook/react";
+import { LegalPage } from "./LegalPage";
 
 /**
  * Legal page component for displaying Imprint and Privacy Policy information.
  * Renders HTML content with proper styling.
  */
 const meta = {
-  component: LegalPage,
-  tags: ['autodocs'],
-  argTypes: {
-    title: {
-      description: 'Title displayed at the top of the legal page',
-      control: 'text',
-    },
-    content: {
-      description: 'HTML content to be rendered on the page',
-      control: 'text',
-    },
-  },
+	component: LegalPage,
+	tags: ["autodocs"],
+	argTypes: {
+		title: {
+			description: "Title displayed at the top of the legal page",
+			control: "text",
+		},
+		content: {
+			description: "HTML content to be rendered on the page",
+			control: "text",
+		},
+	},
 } satisfies Meta<typeof LegalPage>;
 
 export default meta;
@@ -81,18 +81,18 @@ const privacyContent = `
  * Imprint page displaying legal contact and responsible entity information.
  */
 export const Imprint: Story = {
-  args: {
-    title: 'Imprint',
-    content: imprintContent
-  }
+	args: {
+		title: "Imprint",
+		content: imprintContent,
+	},
 };
 
 /**
  * Privacy Policy detailing how user data is collected, used, and protected.
  */
 export const Privacy: Story = {
-  args: {
-    title: 'Privacy Policy',
-    content: privacyContent
-  }
+	args: {
+		title: "Privacy Policy",
+		content: privacyContent,
+	},
 };

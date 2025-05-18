@@ -1,13 +1,13 @@
+import type { QueryClient } from "@tanstack/react-query";
 import { Outlet, createRootRouteWithContext } from "@tanstack/react-router";
 import { TanStackRouterDevtools } from "@tanstack/react-router-devtools";
-import type { QueryClient } from "@tanstack/react-query";
 
 import TanstackQueryLayout from "../integrations/tanstack-query/layout";
 
-import environment from "@/environment";
-import { useAuth, type AuthContextType } from "@/integrations/auth/AuthContext";
 import Footer from "@/components/core/Footer";
 import Header from "@/components/core/Header";
+import environment from "@/environment";
+import { type AuthContextType, useAuth } from "@/integrations/auth/AuthContext";
 
 interface MyRouterContext {
 	queryClient: QueryClient;
@@ -33,28 +33,37 @@ export const Route = createRootRouteWithContext<MyRouterContext>()({
 		<div className="container py-16 flex flex-col items-center justify-center text-center">
 			<h2 className="text-3xl font-bold mb-4">Page Not Found</h2>
 			<p className="text-muted-foreground mb-8">
-				The page you're looking for doesn't exist or you don't have permission to view it.
+				The page you're looking for doesn't exist or you don't have permission
+				to view it.
 			</p>
 			<a href="/" className="text-blue-500 hover:underline font-medium">
 				Return to Home
 			</a>
 		</div>
-	)
+	),
 });
 
 function HeaderContainer() {
-  const { isAuthenticated, isLoading, username, userProfile, login, logout, hasRole } = useAuth();
-  return (
-    <Header 
-      version={environment.version}
-      isAuthenticated={isAuthenticated}
-      isLoading={isLoading}
-      name={userProfile && `${userProfile.firstName} ${userProfile.lastName}`}
-      username={username}
-      showAdmin={hasRole('admin')}
-      showMentor={hasRole('mentor_access')}
-      onLogin={login}
-      onLogout={logout}
-    />
-  );
+	const {
+		isAuthenticated,
+		isLoading,
+		username,
+		userProfile,
+		login,
+		logout,
+		hasRole,
+	} = useAuth();
+	return (
+		<Header
+			version={environment.version}
+			isAuthenticated={isAuthenticated}
+			isLoading={isLoading}
+			name={userProfile && `${userProfile.firstName} ${userProfile.lastName}`}
+			username={username}
+			showAdmin={hasRole("admin")}
+			showMentor={hasRole("mentor_access")}
+			onLogin={login}
+			onLogout={logout}
+		/>
+	);
 }

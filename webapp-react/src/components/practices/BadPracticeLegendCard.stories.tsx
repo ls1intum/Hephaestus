@@ -7,16 +7,17 @@ import { BadPracticeLegendCard } from "./BadPracticeLegendCard";
  * indicators and states.
  */
 const meta = {
-  component: BadPracticeLegendCard,
-  parameters: {
-    layout: "centered",
-    docs: {
-      description: {
-        component: 'A legend card that explains different types of practices and issues to help users understand the status indicators.',
-      },
-    },
-  },
-  tags: ["autodocs"],
+	component: BadPracticeLegendCard,
+	parameters: {
+		layout: "centered",
+		docs: {
+			description: {
+				component:
+					"A legend card that explains different types of practices and issues to help users understand the status indicators.",
+			},
+		},
+	},
+	tags: ["autodocs"],
 } satisfies Meta<typeof BadPracticeLegendCard>;
 
 export default meta;
@@ -28,5 +29,5 @@ type Story = StoryObj<typeof BadPracticeLegendCard>;
  * This component doesn't take any props as it's purely informational.
  */
 export const Default: Story = {
-  args: {}
+	args: {},
 };

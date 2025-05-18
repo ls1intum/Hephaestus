@@ -1,23 +1,18 @@
-import { createFileRoute, retainSearchParams } from '@tanstack/react-router'
-import { useQuery } from "@tanstack/react-query";
-import { useNavigate } from "@tanstack/react-router";
-import { z } from 'zod';
-import { zodValidator } from '@tanstack/zod-adapter';
-import { 
-  format, 
-  startOfISOWeek, 
-  endOfISOWeek, 
-  formatISO 
-} from "date-fns";
-import { useAuth } from "@/integrations/auth/AuthContext";
-import { 
-  getLeaderboardOptions, 
-  getMetaDataOptions, 
-  getUserLeagueStatsOptions, 
-  getUserProfileOptions 
+import {
+	getLeaderboardOptions,
+	getMetaDataOptions,
+	getUserLeagueStatsOptions,
+	getUserProfileOptions,
 } from "@/api/@tanstack/react-query.gen";
-import { LeaderboardPage } from '@/components/leaderboard/LeaderboardPage';
-import type { LeaderboardSortType } from '@/components/leaderboard/SortFilter';
+import { LeaderboardPage } from "@/components/leaderboard/LeaderboardPage";
+import type { LeaderboardSortType } from "@/components/leaderboard/SortFilter";
+import { useAuth } from "@/integrations/auth/AuthContext";
+import { useQuery } from "@tanstack/react-query";
+import { createFileRoute, retainSearchParams } from "@tanstack/react-router";
+import { useNavigate } from "@tanstack/react-router";
+import { zodValidator } from "@tanstack/zod-adapter";
+import { endOfISOWeek, format, formatISO, startOfISOWeek } from "date-fns";
+import { z } from "zod";
 
 // Calculate default date range with ISO 8601 format including timezone
 const today = new Date();
@@ -28,151 +23,151 @@ const endOfCurrentWeek = formatISO(endOfCurrentWeekDate);
 
 // Define search params schema for validation and types
 const leaderboardSearchSchema = z.object({
-  team: z.string().default('all'),
-  sort: z.enum(['SCORE', 'LEAGUE_POINTS']).default('SCORE'),
-  after: z.string().optional().default(startOfCurrentWeek),
-  before: z.string().optional().default(endOfCurrentWeek),
+	team: z.string().default("all"),
+	sort: z.enum(["SCORE", "LEAGUE_POINTS"]).default("SCORE"),
+	after: z.string().optional().default(startOfCurrentWeek),
+	before: z.string().optional().default(endOfCurrentWeek),
 });
 
 // Export route with search param validation
-export const Route = createFileRoute('/_authenticated/')({
-  component: LeaderboardContainer,
-  validateSearch: zodValidator(leaderboardSearchSchema),
-  // Configure search middleware to retain params when navigating
-  search: {
-    middlewares: [retainSearchParams(['team', 'sort', 'after', 'before'])],
-  }
-})
+export const Route = createFileRoute("/_authenticated/")({
+	component: LeaderboardContainer,
+	validateSearch: zodValidator(leaderboardSearchSchema),
+	// Configure search middleware to retain params when navigating
+	search: {
+		middlewares: [retainSearchParams(["team", "sort", "after", "before"])],
+	},
+});
 
 function LeaderboardContainer() {
-  // Get the current user from auth context
-  const { username } = useAuth();
-  
-  // Access properly validated search params with correct types
-  const { team, sort, after, before } = Route.useSearch();
-  const navigate = useNavigate({ from: Route.fullPath });
-  
-  // Query for metadata (teams, schedule info)
-  const metaQuery = useQuery({
-    ...getMetaDataOptions({}),
-  });
-  
-  // Query for leaderboard data based on filters
-  const leaderboardQuery = useQuery({
-    ...getLeaderboardOptions({
-      query: {
-        after,
-        before,
-        team,
-        sort,
-      }
-    }),
-    enabled: Boolean(after && before && metaQuery.data),
-  });
-  
-  // Query for user profile data
-  const userProfileQuery = useQuery({
-    ...getUserProfileOptions({ 
-      path: { login: username || '' } 
-    }),
-    enabled: Boolean(username),
-  });
-  
-  // Find the current user's entry in the leaderboard
-  const currentUserEntry = username 
-    ? leaderboardQuery.data?.find(entry => 
-        entry.user.login.toLowerCase() === username.toLowerCase()
-      )
-    : undefined;
-  
-  // Format leaderboard end date (using the beforeParam as the end date)
-  const leaderboardEnd = format(new Date(before), "EEEE, MMMM d, yyyy");
+	// Get the current user from auth context
+	const { username } = useAuth();
 
-  // Query for league points change data if we have a current user entry
-  const leagueStatsQuery = useQuery({
-    ...getUserLeagueStatsOptions({
-      query: {
-        login: username || ''
-      },
-      body: currentUserEntry || { 
-        rank: 0,
-        score: 0,
-        user: {
-          id: 0,
-          name: '',
-          login: username || '',
-          avatarUrl: '',
-          htmlUrl: ''
-        },
-        reviewedPullRequests: [],
-        numberOfReviewedPRs: 0,
-        numberOfApprovals: 0, 
-        numberOfChangeRequests: 0,
-        numberOfComments: 0,
-        numberOfUnknowns: 0,
-        numberOfCodeComments: 0
-      }
-    }),
-    enabled: Boolean(username && currentUserEntry),
-  });
+	// Access properly validated search params with correct types
+	const { team, sort, after, before } = Route.useSearch();
+	const navigate = useNavigate({ from: Route.fullPath });
 
-  // Use a fixed leaderboard schedule since it seems the metadata doesn't provide this
-  // Mondays at 9:00 AM is the default schedule
-  const leaderboardSchedule = {
-    day: 1, // Monday
-    hour: 9,
-    minute: 0,
-  };
+	// Query for metadata (teams, schedule info)
+	const metaQuery = useQuery({
+		...getMetaDataOptions({}),
+	});
 
-  // Handle team filter changes
-  const handleTeamChange = (team: string) => {
-    navigate({
-      search: (prev) => ({
-        ...prev, 
-        team
-      }),
-    });
-  };
+	// Query for leaderboard data based on filters
+	const leaderboardQuery = useQuery({
+		...getLeaderboardOptions({
+			query: {
+				after,
+				before,
+				team,
+				sort,
+			},
+		}),
+		enabled: Boolean(after && before && metaQuery.data),
+	});
 
-  // Handle sort changes with the correct type
-  const handleSortChange = (sort: LeaderboardSortType) => {
-    navigate({
-      search: (prev) => ({
-        ...prev,
-        sort
-      }),
-    });
-  };
+	// Query for user profile data
+	const userProfileQuery = useQuery({
+		...getUserProfileOptions({
+			path: { login: username || "" },
+		}),
+		enabled: Boolean(username),
+	});
 
-  // Handle timeframe changes - note we're not passing timeframe in URL anymore
-  const handleTimeframeChange = (afterDate: string, beforeDate: string) => {
-    navigate({
-      search: (prev) => ({
-        ...prev,
-        after: afterDate,
-        before: beforeDate
-      }),
-    });
-  };
+	// Find the current user's entry in the leaderboard
+	const currentUserEntry = username
+		? leaderboardQuery.data?.find(
+				(entry) => entry.user.login.toLowerCase() === username.toLowerCase(),
+			)
+		: undefined;
 
-  return (
-    <LeaderboardPage 
-      leaderboard={leaderboardQuery.data || []}
-      isLoading={leaderboardQuery.isPending || metaQuery.isPending}
-      currentUser={userProfileQuery.data?.userInfo}
-      currentUserEntry={currentUserEntry}
-      leaguePoints={userProfileQuery.data?.userInfo?.leaguePoints}
-      leaguePointsChange={leagueStatsQuery.data?.leaguePointsChange}
-      teams={metaQuery.data?.teams.map(team => team.name) || []}
-      selectedTeam={team}
-      selectedSort={sort}
-      initialAfterDate={after}
-      initialBeforeDate={before}
-      leaderboardEnd={leaderboardEnd}
-      leaderboardSchedule={leaderboardSchedule}
-      onTeamChange={handleTeamChange}
-      onSortChange={handleSortChange}
-      onTimeframeChange={handleTimeframeChange}
-    />
-  );
+	// Format leaderboard end date (using the beforeParam as the end date)
+	const leaderboardEnd = format(new Date(before), "EEEE, MMMM d, yyyy");
+
+	// Query for league points change data if we have a current user entry
+	const leagueStatsQuery = useQuery({
+		...getUserLeagueStatsOptions({
+			query: {
+				login: username || "",
+			},
+			body: currentUserEntry || {
+				rank: 0,
+				score: 0,
+				user: {
+					id: 0,
+					name: "",
+					login: username || "",
+					avatarUrl: "",
+					htmlUrl: "",
+				},
+				reviewedPullRequests: [],
+				numberOfReviewedPRs: 0,
+				numberOfApprovals: 0,
+				numberOfChangeRequests: 0,
+				numberOfComments: 0,
+				numberOfUnknowns: 0,
+				numberOfCodeComments: 0,
+			},
+		}),
+		enabled: Boolean(username && currentUserEntry),
+	});
+
+	// Use a fixed leaderboard schedule since it seems the metadata doesn't provide this
+	// Mondays at 9:00 AM is the default schedule
+	const leaderboardSchedule = {
+		day: 1, // Monday
+		hour: 9,
+		minute: 0,
+	};
+
+	// Handle team filter changes
+	const handleTeamChange = (team: string) => {
+		navigate({
+			search: (prev) => ({
+				...prev,
+				team,
+			}),
+		});
+	};
+
+	// Handle sort changes with the correct type
+	const handleSortChange = (sort: LeaderboardSortType) => {
+		navigate({
+			search: (prev) => ({
+				...prev,
+				sort,
+			}),
+		});
+	};
+
+	// Handle timeframe changes - note we're not passing timeframe in URL anymore
+	const handleTimeframeChange = (afterDate: string, beforeDate: string) => {
+		navigate({
+			search: (prev) => ({
+				...prev,
+				after: afterDate,
+				before: beforeDate,
+			}),
+		});
+	};
+
+	return (
+		<LeaderboardPage
+			leaderboard={leaderboardQuery.data || []}
+			isLoading={leaderboardQuery.isPending || metaQuery.isPending}
+			currentUser={userProfileQuery.data?.userInfo}
+			currentUserEntry={currentUserEntry}
+			leaguePoints={userProfileQuery.data?.userInfo?.leaguePoints}
+			leaguePointsChange={leagueStatsQuery.data?.leaguePointsChange}
+			teams={metaQuery.data?.teams.map((team) => team.name) || []}
+			selectedTeam={team}
+			selectedSort={sort}
+			initialAfterDate={after}
+			initialBeforeDate={before}
+			leaderboardEnd={leaderboardEnd}
+			leaderboardSchedule={leaderboardSchedule}
+			onTeamChange={handleTeamChange}
+			onSortChange={handleSortChange}
+			onTimeframeChange={handleTimeframeChange}
+		/>
+	);
 }

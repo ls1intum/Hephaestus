@@ -7,16 +7,17 @@ import { ModeToggle } from "./ModeToggle";
  * the appropriate sun/moon icon based on the current theme.
  */
 const meta = {
-  component: ModeToggle,
-  parameters: {
-    layout: "centered",
-    docs: {
-      description: {
-        component: 'A theme switcher button with dropdown options for light, dark, and system preferences.',
-      },
-    },
-  },
-  tags: ["autodocs"],
+	component: ModeToggle,
+	parameters: {
+		layout: "centered",
+		docs: {
+			description: {
+				component:
+					"A theme switcher button with dropdown options for light, dark, and system preferences.",
+			},
+		},
+	},
+	tags: ["autodocs"],
 } satisfies Meta<typeof ModeToggle>;
 
 export default meta;
