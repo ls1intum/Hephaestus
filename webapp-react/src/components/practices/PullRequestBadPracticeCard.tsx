@@ -1,7 +1,6 @@
 import type { LabelInfo, PullRequestBadPractice } from "@/api/types.gen";
 import { IssueCard } from "@/components/shared/IssueCard";
 import { Button } from "@/components/ui/button";
-import { Separator } from "@/components/ui/separator";
 import { RefreshCw } from "lucide-react";
 import type React from "react";
 import { useState } from "react";

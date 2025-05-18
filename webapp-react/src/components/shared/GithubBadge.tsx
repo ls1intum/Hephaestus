@@ -21,7 +21,6 @@ export function GithubBadge({
 	let style: React.CSSProperties = {
 		alignItems: "center",
 		borderRadius: "999px",
-		cursor: "pointer",
 		fontFamily: "inherit",
 		textDecoration: "none",
 		maxWidth: "100%",

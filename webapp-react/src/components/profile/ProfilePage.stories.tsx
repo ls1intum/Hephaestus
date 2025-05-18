@@ -64,6 +64,7 @@ export const Default: Story = {
 		isLoading: false,
 		error: false,
 		username: "johndoe",
+		currUserIsDashboardUser: true,
 		profileData: {
 			userInfo: {
 				id: 1,
@@ -225,6 +226,7 @@ export const Loading: Story = {
 		error: false,
 		username: "johndoe",
 		profileData: undefined,
+		currUserIsDashboardUser: true,
 	},
 };
 
@@ -237,6 +239,7 @@ export const ErrorState: Story = {
 		error: true,
 		username: "johndoe",
 		profileData: undefined,
+		currUserIsDashboardUser: true,
 	},
 };
 
@@ -248,6 +251,7 @@ export const Empty: Story = {
 		isLoading: false,
 		error: false,
 		username: "emptydoe",
+		currUserIsDashboardUser: true,
 		profileData: {
 			userInfo: {
 				id: 3,

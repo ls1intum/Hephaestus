@@ -9,6 +9,7 @@ interface ProfileProps {
 	isLoading: boolean;
 	error: boolean;
 	username: string;
+	currUserIsDashboardUser: boolean;
 }
 
 export function ProfilePage({
@@ -16,6 +17,7 @@ export function ProfilePage({
 	isLoading,
 	error,
 	username,
+	currUserIsDashboardUser,
 }: ProfileProps) {
 	if (error) {
 		return (
@@ -45,6 +47,8 @@ export function ProfilePage({
 				openPullRequests={profileData?.openPullRequests}
 				isLoading={isLoading}
 				username={username}
+				displayName={profileData?.userInfo?.name}
+				currUserIsDashboardUser={currUserIsDashboardUser}
 			/>
 		</div>
 	);

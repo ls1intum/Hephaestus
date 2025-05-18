@@ -1,6 +1,7 @@
 import type { Activity } from "@/api/types.gen";
+import { EmptyState } from "@/components/shared/EmptyState";
 import { Button } from "@/components/ui/button";
-import { InfoIcon } from "lucide-react";
+import { GitPullRequest, InfoIcon } from "lucide-react";
 import { ActivitySummaryCard } from "./ActivitySummaryCard";
 import { BadPracticeLegendCard } from "./BadPracticeLegendCard";
 import { PullRequestBadPracticeCard } from "./PullRequestBadPracticeCard";
@@ -104,7 +105,15 @@ export function PracticesPage({
 									/>
 								))
 							) : (
-								<p className="text-muted-foreground">No pull requests found.</p>
+								<EmptyState
+									icon={GitPullRequest}
+									title="No pull requests found"
+									description={
+										currUserIsDashboardUser
+											? "When you create pull requests, they will be analyzed and appear here."
+											: `${displayName || username} doesn't have any pull requests to analyze.`
+									}
+								/>
 							)}
 						</div>
 					</div>

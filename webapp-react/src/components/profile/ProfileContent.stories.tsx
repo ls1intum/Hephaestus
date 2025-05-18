@@ -176,6 +176,7 @@ export const Default: Story = {
 		openPullRequests: mockOpenPullRequests,
 		isLoading: false,
 		username: "johndoe",
+		currUserIsDashboardUser: true,
 	},
 };
 
@@ -186,6 +187,7 @@ export const Loading: Story = {
 	args: {
 		isLoading: true,
 		username: "johndoe",
+		currUserIsDashboardUser: true,
 	},
 };
 
@@ -198,6 +200,7 @@ export const EmptyReviews: Story = {
 		openPullRequests: mockOpenPullRequests,
 		isLoading: false,
 		username: "johndoe",
+		currUserIsDashboardUser: true,
 	},
 };
 
@@ -210,6 +213,7 @@ export const EmptyPullRequests: Story = {
 		openPullRequests: [],
 		isLoading: false,
 		username: "johndoe",
+		currUserIsDashboardUser: true,
 	},
 };
 
@@ -222,5 +226,6 @@ export const CompletelyEmpty: Story = {
 		openPullRequests: [],
 		isLoading: false,
 		username: "johndoe",
+		currUserIsDashboardUser: true,
 	},
 };

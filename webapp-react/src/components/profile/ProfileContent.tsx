@@ -1,9 +1,9 @@
 import type { PullRequestInfo, PullRequestReviewInfo } from "@/api/types.gen";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
 import { CodeReviewIcon, GitPullRequestIcon } from "@primer/octicons-react";
 import { Link } from "@tanstack/react-router";
 import { useMemo } from "react";
+import { EmptyState } from "../shared/EmptyState";
 import { IssueCard } from "../shared/IssueCard";
 import { ReviewActivityCard } from "./ReviewActivityCard";
 
@@ -12,6 +12,8 @@ export interface ProfileContentProps {
 	openPullRequests?: PullRequestInfo[];
 	isLoading: boolean;
 	username: string;
+	displayName?: string;
+	currUserIsDashboardUser: boolean;
 }
 
 export function ProfileContent({
@@ -19,6 +21,8 @@ export function ProfileContent({
 	openPullRequests = [],
 	isLoading,
 	username,
+	displayName,
+	currUserIsDashboardUser,
 }: ProfileContentProps) {
 	// Generate skeleton arrays for loading state
 	const skeletonReviews = useMemo(
@@ -62,20 +66,15 @@ export function ProfileContent({
 							/>
 						))
 					) : (
-						<Card className="border-dashed h-60">
-							<CardContent className="flex flex-col items-center justify-center py-8 px-4 text-center">
-								<div className="rounded-full bg-muted p-3 mb-3">
-									<CodeReviewIcon
-										className="h-6 w-6 text-muted-foreground"
-										size={24}
-									/>
-								</div>
-								<h3 className="font-medium text-lg mb-1">No review activity</h3>
-								<p className="text-muted-foreground text-sm mb-4 max-w-[18rem]">
-									When you review pull requests, they will appear here.
-								</p>
-							</CardContent>
-						</Card>
+						<EmptyState
+							icon={CodeReviewIcon}
+							title="No review activity"
+							description={
+								currUserIsDashboardUser
+									? "When you review pull requests, they will appear here."
+									: `${displayName || username} hasn't reviewed any pull requests yet.`
+							}
+						/>
 					)}
 				</div>
 			</div>
@@ -110,22 +109,15 @@ export function ProfileContent({
 							/>
 						))
 					) : (
-						<Card className="border-dashed h-60">
-							<CardContent className="flex flex-col items-center justify-center py-8 px-4 text-center">
-								<div className="rounded-full bg-muted p-3 mb-3">
-									<GitPullRequestIcon
-										className="h-6 w-6 text-muted-foreground"
-										size={24}
-									/>
-								</div>
-								<h3 className="font-medium text-lg mb-1">
-									No open pull requests
-								</h3>
-								<p className="text-muted-foreground text-sm mb-4 max-w-[18rem]">
-									Pull requests you create will appear here.
-								</p>
-							</CardContent>
-						</Card>
+						<EmptyState
+							icon={GitPullRequestIcon}
+							title="No open pull requests"
+							description={
+								currUserIsDashboardUser
+									? "Pull requests you create will appear here."
+									: `${displayName || username} doesn't have any open pull requests.`
+							}
+						/>
 					)}
 				</div>
 			</div>
