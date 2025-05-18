@@ -4,7 +4,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { CodeReviewIcon, GitPullRequestIcon } from "@primer/octicons-react";
 import { Link } from "@tanstack/react-router";
 import { useMemo } from "react";
-import { IssueCard } from "./IssueCard";
+import { IssueCard } from "../shared/IssueCard";
 import { ReviewActivityCard } from "./ReviewActivityCard";
 
 export interface ProfileContentProps {

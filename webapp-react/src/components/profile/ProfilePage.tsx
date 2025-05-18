@@ -49,9 +49,3 @@ export function ProfilePage({
 		</div>
 	);
 }
-
-// Export individual components for Storybook
-export { ProfileHeader } from "./ProfileHeader";
-export { ProfileContent } from "./ProfileContent";
-export { ReviewActivityCard } from "./ReviewActivityCard";
-export { IssueCard } from "./IssueCard";

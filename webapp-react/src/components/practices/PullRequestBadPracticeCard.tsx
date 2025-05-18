@@ -1,24 +1,10 @@
 import type { LabelInfo, PullRequestBadPractice } from "@/api/types.gen";
-import { FormattedTitle } from "@/components/shared/FormattedTitle";
-import { GithubBadge } from "@/components/shared/GithubBadge";
+import { IssueCard } from "@/components/shared/IssueCard";
 import { Button } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
-import {
-	Collapsible,
-	CollapsibleContent,
-	CollapsibleTrigger,
-} from "@/components/ui/collapsible";
 import { Separator } from "@/components/ui/separator";
-import { Skeleton } from "@/components/ui/skeleton";
-import { cn } from "@/lib/utils";
-import {
-	GitMergeIcon,
-	GitPullRequestClosedIcon,
-	GitPullRequestDraftIcon,
-	GitPullRequestIcon,
-} from "@primer/octicons-react";
-import { FoldVertical, RefreshCw } from "lucide-react";
-import React, { useState } from "react";
+import { RefreshCw } from "lucide-react";
+import type React from "react";
+import { useState } from "react";
 import { BadPracticeCard } from "./BadPracticeCard";
 import { filterGoodAndBadPractices } from "./utils";
 
@@ -28,7 +14,6 @@ import {
 	AccordionItem,
 	AccordionTrigger,
 } from "@/components/ui/accordion";
-import { format, parseISO } from "date-fns";
 
 /**
  * Feedback data for bad practices
@@ -145,32 +130,10 @@ export function PullRequestBadPracticeCard({
 	onResolveBadPracticeAsWrong,
 	onProvideBadPracticeFeedback,
 }: PullRequestBadPracticeCardProps) {
-	const [isOpen, setIsOpen] = useState(openCard);
-
-	const displayCreated = createdAt
-		? format(parseISO(createdAt), "MMM d")
-		: null;
-	const expandEnabled = badPractices.length > 0;
-
-	// Get the appropriate icon and color based on PR state
-	const getIssueIconAndColor = () => {
-		if (state === "OPEN") {
-			if (isDraft) {
-				return {
-					icon: GitPullRequestDraftIcon,
-					color: "text-github-muted-foreground",
-				};
-			}
-			return { icon: GitPullRequestIcon, color: "text-github-open-foreground" };
-		}
-		if (isMerged) {
-			return { icon: GitMergeIcon, color: "text-github-done-foreground" };
-		}
-		return {
-			icon: GitPullRequestClosedIcon,
-			color: "text-github-closed-foreground",
-		};
-	};
+	// Track which accordion(s) are open
+	const [openAccordions, setOpenAccordions] = useState<string[]>(
+		openCard ? ["current-analysis"] : [],
+	);
 
 	// Sort practices by severity
 	const orderedBadPractices = [...badPractices].sort((a, b) => {
@@ -212,192 +175,199 @@ export function PullRequestBadPracticeCard({
 		}
 	};
 
+	// Determine practice types - we need this information for UI display
 	const {
+		// These are used to decide what to show in the UI
 		goodPractices,
 		badPractices: issues,
 		resolvedPractices,
 	} = filterGoodAndBadPractices(badPractices);
 
-	const detectedString =
-		issues.length === 0
-			? goodPractices.length === 0
-				? resolvedPractices.length === 0
-					? "Nothing detected yet"
-					: "All bad practices resolved"
-				: goodPractices.length === 1
-					? "1 good practice detected"
-					: `${goodPractices.length} good practices detected`
-			: issues.length === 1
-				? "1 bad practice detected"
-				: `${issues.length} bad practices detected`;
+	// Count each type for informational purposes
+	const goodCount = goodPractices.length;
+	const issueCount = issues.length;
+	const resolvedCount = resolvedPractices.length;
 
-	// Destructure the icon and color from the getIssueIconAndColor function
-	const { icon: StateIcon, color } = getIssueIconAndColor();
+	// Determine if we have any content to show
+	const hasCurrentAnalysis = badPractices.length > 0;
+	const hasPreviousAnalysis = oldBadPractices && oldBadPractices.length > 0;
+
+	// Track accordion open state - for multiple type accordion
+	// Using multiple value type to have independent accordions
+	const handleAccordionValueChange = (value: string[]) => {
+		setOpenAccordions(value);
+	};
 
 	return (
-		<Collapsible open={isOpen} onOpenChange={setIsOpen}>
-			<Card className="rounded-lg border border-border bg-card text-card-foreground shadow-sm hover:bg-accent/50 cursor-pointer">
-				<div
-					className={cn("flex flex-col gap-1 p-6", {
-						"pb-3": isLoading || pullRequestLabels.length > 0,
-					})}
-				>
-					<div className="flex justify-between gap-2 items-center text-sm text-github-muted-foreground">
-						<span className="font-medium flex justify-center items-center">
-							{isLoading ? (
-								<>
-									<Skeleton className="size-5 bg-green-500/30" />
-									<Skeleton className="h-4 w-16 lg:w-36 ml-2" />
-								</>
-							) : (
-								<>
-									<StateIcon className={`mr-2 ${color}`} size={18} />
-									<a
-										href={htmlUrl}
-										className="hover:underline whitespace-nowrap"
-										onClick={(e) => e.stopPropagation()}
-									>
-										{repositoryName} #{number}
-									</a>
-									<span className="ml-1">on {displayCreated}</span>
-								</>
-							)}
-						</span>
-						<span className="flex items-center gap-2">
-							{isLoading ? (
-								<>
-									<Skeleton className="h-4 w-8 bg-green-500/30" />
-									<Skeleton className="h-4 w-8 bg-destructive/20" />
-								</>
-							) : (
-								<>
-									{additions !== undefined && (
-										<span className="text-github-success-foreground font-bold">
-											+{additions}
-										</span>
-									)}
-									{deletions !== undefined && (
-										<span className="text-github-danger-foreground font-bold">
-											-{deletions}
-										</span>
-									)}
-									<span className="text-xs ml-2">{detectedString}</span>
-									{currUserIsDashboardUser && (
-										<Button
-											variant="outline"
-											size="sm"
-											className="gap-1 ml-2"
-											onClick={handleDetectClick}
-										>
-											<RefreshCw className="size-3.5" />
-											<span className="text-xs">Analyze Changes</span>
-										</Button>
-									)}
-									{expandEnabled && (
-										<CollapsibleTrigger asChild>
-											<Button variant="ghost" size="icon" className="size-8">
-												<FoldVertical className="size-4 text-github-muted-foreground" />
-											</Button>
-										</CollapsibleTrigger>
-									)}
-								</>
-							)}
-						</span>
-					</div>
-
-					<div className="font-medium leading-normal">
-						{isLoading ? (
-							<Skeleton className="h-6 w-3/4 mb-2" />
-						) : (
-							<FormattedTitle title={title} />
-						)}
-					</div>
-
-					{!isLoading && pullRequestLabels.length > 0 && (
-						<div className="flex flex-wrap gap-2 mt-2">
-							{pullRequestLabels.map((label) => (
-								<GithubBadge
-									key={label.id}
-									label={label.name}
-									color={label.color}
-								/>
-							))}
+		<IssueCard
+			className="min-w-sm"
+			isLoading={isLoading}
+			title={title}
+			number={number}
+			additions={additions}
+			deletions={deletions}
+			htmlUrl={htmlUrl}
+			repositoryName={repositoryName}
+			createdAt={createdAt}
+			state={state as "OPEN" | "CLOSED"}
+			isDraft={isDraft}
+			isMerged={isMerged}
+			pullRequestLabels={pullRequestLabels}
+			noLinkWrapper
+			rightContent={
+				currUserIsDashboardUser && (
+					<Button
+						variant="outline"
+						size="sm"
+						className="gap-1"
+						onClick={handleDetectClick}
+						type="button"
+					>
+						<RefreshCw className="size-3.5" />
+						Analyze Changes
+					</Button>
+				)
+			}
+		>
+			{!isLoading && (
+				<div className="w-full">
+					{/* Show no content message if nothing to display */}
+					{!hasCurrentAnalysis && !hasPreviousAnalysis && (
+						<div className="flex items-center justify-center p-4 w-full">
+							<span className="text-sm text-github-muted-foreground">
+								No analysis available
+							</span>
 						</div>
 					)}
+					{badPracticeSummary && (
+						<p className="px-4 pb-2 text-sm text-pretty text-github-muted-foreground">
+							{badPracticeSummary}
+						</p>
+					)}
+
+					{/* Accordion for current analysis */}
+					{hasCurrentAnalysis && (
+						<Accordion
+							type="multiple"
+							value={openAccordions}
+							onValueChange={handleAccordionValueChange}
+							className="w-full"
+						>
+							<AccordionItem
+								value="current-analysis"
+								className="border-b-0 w-full"
+							>
+								<div className="w-full px-4 py-0">
+									<AccordionTrigger className="w-full">
+										<div className="flex w-full items-center justify-between gap-2">
+											<span className="font-medium">Current analysis</span>
+											<span className="text-github-muted-foreground">
+												{issueCount > 0 ? (
+													<span className="text-github-danger-foreground accent-github-danger-foreground font-medium">
+														{issueCount} issue{issueCount !== 1 ? "s" : ""}
+													</span>
+												) : goodCount > 0 ? (
+													<span className="text-github-success-foreground font-medium">
+														{goodCount} good practice
+														{goodCount !== 1 ? "s" : ""}
+													</span>
+												) : resolvedCount > 0 ? (
+													<span className="font-medium">All resolved</span>
+												) : (
+													<span>No issues</span>
+												)}
+											</span>
+										</div>
+									</AccordionTrigger>
+								</div>
+								<AccordionContent className="px-0 w-full">
+									<div className="px-4 space-y-2 divide-y w-full">
+										{orderedBadPractices.map((badpractice) => (
+											<div
+												key={`current-${badpractice.id}`}
+												className="w-full pb-2 last:pb-0"
+											>
+												<BadPracticeCard
+													id={badpractice.id}
+													title={badpractice.title}
+													description={badpractice.description}
+													state={badpractice.state}
+													currUserIsDashboardUser={currUserIsDashboardUser}
+													onResolveBadPracticeAsFixed={
+														onResolveBadPracticeAsFixed
+													}
+													onResolveBadPracticeAsWontFix={
+														onResolveBadPracticeAsWontFix
+													}
+													onResolveBadPracticeAsWrong={
+														onResolveBadPracticeAsWrong
+													}
+													onProvideFeedback={onProvideBadPracticeFeedback}
+												/>
+											</div>
+										))}
+									</div>
+								</AccordionContent>
+							</AccordionItem>
+						</Accordion>
+					)}
+
+					{/* Accordion for previous analysis */}
+					{hasPreviousAnalysis && (
+						<Accordion
+							type="multiple"
+							value={openAccordions}
+							onValueChange={handleAccordionValueChange}
+							className={`w-full ${hasCurrentAnalysis ? "border-t" : ""}`}
+						>
+							<AccordionItem
+								value="previous-analysis"
+								className="border-b-0 w-full"
+							>
+								<div className="w-full px-4 py-0">
+									<AccordionTrigger className="w-full">
+										<div className="flex w-full items-center justify-between gap-2">
+											<span className="font-medium">Previous analysis</span>
+											<span className="text-github-muted-foreground">
+												{orderedOldBadPractices.length} result
+												{orderedOldBadPractices.length !== 1 ? "s" : ""}
+											</span>
+										</div>
+									</AccordionTrigger>
+								</div>
+								<AccordionContent>
+									<div className="px-4 space-y-2 divide-y w-full">
+										{orderedOldBadPractices.map((badpractice) => (
+											<div
+												key={`old-${badpractice.id}`}
+												className="w-full pb-2 last:pb-0"
+											>
+												<BadPracticeCard
+													id={badpractice.id}
+													title={badpractice.title}
+													description={badpractice.description}
+													state={badpractice.state}
+													currUserIsDashboardUser={currUserIsDashboardUser}
+													onResolveBadPracticeAsFixed={
+														onResolveBadPracticeAsFixed
+													}
+													onResolveBadPracticeAsWontFix={
+														onResolveBadPracticeAsWontFix
+													}
+													onResolveBadPracticeAsWrong={
+														onResolveBadPracticeAsWrong
+													}
+													onProvideFeedback={onProvideBadPracticeFeedback}
+												/>
+											</div>
+										))}
+									</div>
+								</AccordionContent>
+							</AccordionItem>
+						</Accordion>
+					)}
 				</div>
-
-				{!isLoading && (
-					<CollapsibleContent>
-						<Separator />
-						<div className="p-4 space-y-2">
-							{badPracticeSummary && (
-								<p className="text-sm text-pretty text-github-muted-foreground">
-									{badPracticeSummary}
-								</p>
-							)}
-
-							{orderedBadPractices.map((badpractice) => (
-								<React.Fragment key={badpractice.id}>
-									<Separator className="my-3" />
-									<BadPracticeCard
-										id={badpractice.id}
-										title={badpractice.title}
-										description={badpractice.description}
-										state={badpractice.state}
-										currUserIsDashboardUser={currUserIsDashboardUser}
-										onResolveBadPracticeAsFixed={onResolveBadPracticeAsFixed}
-										onResolveBadPracticeAsWontFix={
-											onResolveBadPracticeAsWontFix
-										}
-										onResolveBadPracticeAsWrong={onResolveBadPracticeAsWrong}
-										onProvideFeedback={onProvideBadPracticeFeedback}
-									/>
-								</React.Fragment>
-							))}
-
-							{orderedOldBadPractices.length > 0 && (
-								<>
-									<Separator className="my-3" />
-									<Accordion type="single" collapsible className="w-full">
-										<AccordionItem
-											value="old-practices"
-											className="border-none"
-										>
-											<AccordionTrigger className="text-sm text-github-muted-foreground">
-												Previous analysis results
-											</AccordionTrigger>
-											<AccordionContent>
-												{orderedOldBadPractices.map((badpractice) => (
-													<React.Fragment key={`old-${badpractice.id}`}>
-														<Separator className="my-3" />
-														<BadPracticeCard
-															id={badpractice.id}
-															title={badpractice.title}
-															description={badpractice.description}
-															state={badpractice.state}
-															currUserIsDashboardUser={currUserIsDashboardUser}
-															onResolveBadPracticeAsFixed={
-																onResolveBadPracticeAsFixed
-															}
-															onResolveBadPracticeAsWontFix={
-																onResolveBadPracticeAsWontFix
-															}
-															onResolveBadPracticeAsWrong={
-																onResolveBadPracticeAsWrong
-															}
-															onProvideFeedback={onProvideBadPracticeFeedback}
-														/>
-													</React.Fragment>
-												))}
-											</AccordionContent>
-										</AccordionItem>
-									</Accordion>
-								</>
-							)}
-						</div>
-					</CollapsibleContent>
-				)}
-			</Card>
-		</Collapsible>
+			)}
+		</IssueCard>
 	);
 }

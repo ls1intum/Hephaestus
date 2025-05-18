@@ -1,4 +1,6 @@
+import { Button } from "@/components/ui/button";
 import type { Meta, StoryObj } from "@storybook/react";
+import { RefreshCw } from "lucide-react";
 import { IssueCard } from "./IssueCard";
 
 /**
@@ -66,6 +68,14 @@ const meta = {
 		pullRequestLabels: {
 			description: "Labels attached to the issue/PR",
 			control: "object",
+		},
+		noLinkWrapper: {
+			description: "If true, the card will not be wrapped in an <a> tag",
+			control: "boolean",
+		},
+		rightContent: {
+			description:
+				"Additional content to display in the right side of the card header",
 		},
 	},
 	tags: ["autodocs"],
@@ -166,8 +176,52 @@ export const ClosedPR: Story = {
 	},
 };
 
+/**
+ * Example of the card in a loading state, showing skeletons.
+ */
 export const Loading: Story = {
 	args: {
 		isLoading: true,
+	},
+};
+
+/**
+ * Example of a card with no wrapper link, making just the repository name and number clickable.
+ */
+export const WithNoLinkWrapper: Story = {
+	args: {
+		...OpenPR.args,
+		noLinkWrapper: true,
+	},
+};
+
+/**
+ * Example of a card with custom right content, such as an action button.
+ */
+export const WithRightContent: Story = {
+	args: {
+		...OpenPR.args,
+		rightContent: (
+			<Button variant="outline" size="sm" className="ml-4">
+				<RefreshCw className="size-3.5 mr-1" />
+				<span className="text-xs">Refresh</span>
+			</Button>
+		),
+	},
+};
+
+/**
+ * Example with both no link wrapper and custom right content.
+ */
+export const WithNoLinkWrapperAndRightContent: Story = {
+	args: {
+		...OpenPR.args,
+		noLinkWrapper: true,
+		rightContent: (
+			<Button variant="outline" size="sm" className="ml-4">
+				<RefreshCw className="size-3.5 mr-1" />
+				<span className="text-xs">Analyze</span>
+			</Button>
+		),
 	},
 };
