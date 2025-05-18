@@ -13,7 +13,6 @@ import {
  * Icons progress from None to Bronze, Silver, Gold, Diamond, and Master as users earn more points.
  */
 const meta = {
-  title: 'Leaderboard/League Icons',
   tags: ['autodocs'],
   parameters: {
     layout: 'centered',

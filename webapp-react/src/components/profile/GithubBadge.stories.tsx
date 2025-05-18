@@ -6,7 +6,6 @@ import { GithubBadge } from "./GithubBadge";
  * Used for showing repository and PR metadata in a visual format.
  */
 const meta = {
-  title: "Profile/Components/GithubBadge",
   component: GithubBadge,
   parameters: {
     layout: "centered",

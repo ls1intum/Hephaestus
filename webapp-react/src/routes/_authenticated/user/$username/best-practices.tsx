@@ -1,7 +1,8 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useQuery, useMutation } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { 
-  getActivityByUserOptions
+  getActivityByUserOptions,
+  getActivityByUserQueryKey
 } from "@/api/@tanstack/react-query.gen";
 import { detectBadPracticesByUser } from "@/api/sdk.gen";
 import { useAuth } from "@/integrations/auth/AuthContext";
@@ -14,6 +15,7 @@ export const Route = createFileRoute("/_authenticated/user/$username/best-practi
 export function BestPracticesContainer() {
   const { username } = Route.useParams();
   const { isCurrentUser } = useAuth();
+  const queryClient = useQueryClient();
   
   // Check if current user is the dashboard user
   const currUserIsDashboardUser = isCurrentUser(username);
@@ -32,14 +34,13 @@ export function BestPracticesContainer() {
       path: { login: username }
     }),
     onSuccess: () => {
-      // Refetch activity data after successful detection
-      activityQuery.refetch();
+      queryClient.invalidateQueries({
+        queryKey: getActivityByUserQueryKey({
+          path: { login: username }
+        }),
+      });
     },
   });
-  
-  const handleDetectBadPractices = () => {
-    detectMutation.mutate();
-  };
   
   return (
     <PracticesPage 
@@ -48,7 +49,7 @@ export function BestPracticesContainer() {
       isDetectingBadPractices={detectMutation.isPending}
       username={username}
       currUserIsDashboardUser={currUserIsDashboardUser}
-      onDetectBadPractices={handleDetectBadPractices}
+      onDetectBadPractices={detectMutation.mutate}
     />
   );
 }
