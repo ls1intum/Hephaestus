@@ -113,18 +113,18 @@ const meta = {
 	},
 	argTypes: {
 		leaderboard: {
-			description: 'Array of leaderboard entries to display',
+			description: "Array of leaderboard entries to display",
 		},
 		isLoading: {
-			description: 'Whether the leaderboard data is currently loading',
-			control: 'boolean',
+			description: "Whether the leaderboard data is currently loading",
+			control: "boolean",
 		},
 		currentUser: {
-			description: 'Currently logged in user info to highlight their row',
+			description: "Currently logged in user info to highlight their row",
 		},
 		onUserClick: {
-			description: 'Callback function when a user row is clicked',
-			action: 'clicked',
+			description: "Callback function when a user row is clicked",
+			action: "clicked",
 		},
 	},
 	args: {

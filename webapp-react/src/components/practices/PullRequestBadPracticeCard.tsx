@@ -20,6 +20,7 @@ import {
 import { FoldVertical, RefreshCw } from "lucide-react";
 import React, { useState } from "react";
 import { BadPracticeCard } from "./BadPracticeCard";
+import { filterGoodAndBadPractices } from "./utils";
 
 import {
 	Accordion,
@@ -29,27 +30,94 @@ import {
 } from "@/components/ui/accordion";
 import { format, parseISO } from "date-fns";
 
-interface PullRequestBadPracticeCardProps {
-	id: number;
-	title?: string;
-	number?: number;
-	additions?: number;
-	deletions?: number;
-	htmlUrl?: string;
-	repositoryName?: string;
-	createdAt?: string;
+/**
+ * Feedback data for bad practices
+ */
+export interface BadPracticeFeedback {
+	/** Type of feedback */
+	type: string;
+	/** Detailed explanation */
+	explanation: string;
+}
 
+/**
+ * Props for the PullRequestBadPracticeCard component
+ * @description Displays a GitHub pull request with its metadata and detected bad practices
+ */
+export interface PullRequestBadPracticeCardProps {
+	/** Unique identifier of the pull request */
+	id: number;
+	/** The title of the pull request */
+	title?: string;
+	/** The number of the pull request in the repository */
+	number?: number;
+	/** Number of line additions in the PR */
+	additions?: number;
+	/** Number of line deletions in the PR */
+	deletions?: number;
+	/** URL to the pull request on GitHub */
+	htmlUrl?: string;
+	/** Name of the repository containing the PR */
+	repositoryName?: string;
+	/** ISO timestamp when the PR was created */
+	createdAt?: string;
+	/** ISO timestamp when the PR was last updated */
+	updatedAt?: string;
+
+	/** Current state of the pull request (OPEN, CLOSED, etc.) */
 	state?: string;
+	/** Whether the PR is in draft state */
 	isDraft?: boolean;
+	/** Whether the PR has been merged */
 	isMerged?: boolean;
+	/** Labels applied to the pull request */
 	pullRequestLabels?: Array<LabelInfo>;
+	/** Currently detected bad practices */
 	badPractices?: Array<PullRequestBadPractice>;
+	/** Previously detected bad practices */
 	oldBadPractices?: Array<PullRequestBadPractice>;
+	/** Summary of the bad practice analysis */
 	badPracticeSummary?: string;
+	/** Whether the card is in a loading state */
 	isLoading?: boolean;
+	/** Whether the card should be expanded by default */
 	openCard?: boolean;
+	/** Whether the current user has permission to perform dashboard actions */
 	currUserIsDashboardUser?: boolean;
+
+	/**
+	 * Callback to trigger bad practice detection
+	 * @param id The ID of the pull request to analyze
+	 */
 	onDetectBadPractices?: (id: number) => void;
+
+	/**
+	 * Callback to resolve a bad practice as fixed
+	 * @param id The ID of the bad practice to resolve
+	 */
+	onResolveBadPracticeAsFixed?: (id: number) => void;
+
+	/**
+	 * Callback to resolve a bad practice as won't fix
+	 * @param id The ID of the bad practice to resolve
+	 */
+	onResolveBadPracticeAsWontFix?: (id: number) => void;
+
+	/**
+	 * Callback to resolve a bad practice as wrong
+	 * @param id The ID of the bad practice to resolve
+	 */
+	onResolveBadPracticeAsWrong?: (id: number) => void;
+
+	/**
+	 * Callback to provide feedback on a bad practice
+	 * @param id The ID of the bad practice
+	 * @param feedback The feedback data
+	 */
+	onProvideBadPracticeFeedback?: (
+		id: number,
+		feedback: BadPracticeFeedback,
+	) => void;
 }
 
 export function PullRequestBadPracticeCard({
@@ -72,6 +140,10 @@ export function PullRequestBadPracticeCard({
 	openCard = false,
 	currUserIsDashboardUser = false,
 	onDetectBadPractices,
+	onResolveBadPracticeAsFixed,
+	onResolveBadPracticeAsWontFix,
+	onResolveBadPracticeAsWrong,
+	onProvideBadPracticeFeedback,
 }: PullRequestBadPracticeCardProps) {
 	const [isOpen, setIsOpen] = useState(openCard);
 
@@ -140,10 +212,24 @@ export function PullRequestBadPracticeCard({
 		}
 	};
 
+	const {
+		goodPractices,
+		badPractices: issues,
+		resolvedPractices,
+	} = filterGoodAndBadPractices(badPractices);
+
 	const detectedString =
-		badPractices.length > 0
-			? `${badPractices.length} practice${badPractices.length !== 1 ? "s" : ""} detected`
-			: "No practices detected";
+		issues.length === 0
+			? goodPractices.length === 0
+				? resolvedPractices.length === 0
+					? "Nothing detected yet"
+					: "All bad practices resolved"
+				: goodPractices.length === 1
+					? "1 good practice detected"
+					: `${goodPractices.length} good practices detected`
+			: issues.length === 1
+				? "1 bad practice detected"
+				: `${issues.length} bad practices detected`;
 
 	// Destructure the icon and color from the getIssueIconAndColor function
 	const { icon: StateIcon, color } = getIssueIconAndColor();
@@ -259,6 +345,12 @@ export function PullRequestBadPracticeCard({
 										description={badpractice.description}
 										state={badpractice.state}
 										currUserIsDashboardUser={currUserIsDashboardUser}
+										onResolveBadPracticeAsFixed={onResolveBadPracticeAsFixed}
+										onResolveBadPracticeAsWontFix={
+											onResolveBadPracticeAsWontFix
+										}
+										onResolveBadPracticeAsWrong={onResolveBadPracticeAsWrong}
+										onProvideFeedback={onProvideBadPracticeFeedback}
 									/>
 								</React.Fragment>
 							))}
@@ -284,6 +376,16 @@ export function PullRequestBadPracticeCard({
 															description={badpractice.description}
 															state={badpractice.state}
 															currUserIsDashboardUser={currUserIsDashboardUser}
+															onResolveBadPracticeAsFixed={
+																onResolveBadPracticeAsFixed
+															}
+															onResolveBadPracticeAsWontFix={
+																onResolveBadPracticeAsWontFix
+															}
+															onResolveBadPracticeAsWrong={
+																onResolveBadPracticeAsWrong
+															}
+															onProvideFeedback={onProvideBadPracticeFeedback}
 														/>
 													</React.Fragment>
 												))}

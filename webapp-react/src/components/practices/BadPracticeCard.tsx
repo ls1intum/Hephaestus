@@ -32,6 +32,12 @@ interface BadPracticeCardProps {
 	state: PullRequestBadPractice["state"];
 	currUserIsDashboardUser?: boolean;
 	onResolveBadPracticeAsFixed?: (id: number) => void;
+	onResolveBadPracticeAsWontFix?: (id: number) => void;
+	onResolveBadPracticeAsWrong?: (id: number) => void;
+	onProvideFeedback?: (
+		id: number,
+		feedback: { type: string; explanation: string },
+	) => void;
 }
 
 export function BadPracticeCard({
@@ -41,18 +47,47 @@ export function BadPracticeCard({
 	state,
 	currUserIsDashboardUser = false,
 	onResolveBadPracticeAsFixed,
+	onResolveBadPracticeAsWontFix,
+	onResolveBadPracticeAsWrong,
+	onProvideFeedback,
 }: BadPracticeCardProps) {
 	const [dialogOpen, setDialogOpen] = useState(false);
 	const stateInfo = stateConfig[state];
 	const Icon = stateInfo.icon;
+	const [feedbackType, setFeedbackType] = useState<string | undefined>(
+		undefined,
+	);
+	const [feedbackExplanation, setFeedbackExplanation] = useState<string>("");
+	const feedbackTypes = [
+		"Not a bad practice",
+		"Irrelevant",
+		"Incorrect",
+		"Imprecise",
+		"Other",
+	];
 
 	const handleResolveAsFixed = () => {
 		onResolveBadPracticeAsFixed?.(id);
 	};
 
+	const handleResolveAsWontFix = () => {
+		onResolveBadPracticeAsWontFix?.(id);
+	};
+
+	const handleResolveAsWrong = () => {
+		onResolveBadPracticeAsWrong?.(id);
+	};
+
 	const handleProvideFeedback = () => {
+		if (onProvideFeedback && feedbackType) {
+			onProvideFeedback(id, {
+				type: feedbackType || "Other",
+				explanation: feedbackExplanation,
+			});
+		}
 		setDialogOpen(false);
-		// In the future, add implementation for feedback
+		setFeedbackType(undefined);
+		setFeedbackExplanation("");
 	};
 
 	return (
@@ -85,21 +120,23 @@ export function BadPracticeCard({
 							<DropdownMenuContent className="w-56">
 								<DropdownMenuGroup>
 									<DropdownMenuItem onClick={handleResolveAsFixed}>
-										I've fixed this ✓
+										Resolve as fixed ✓
 									</DropdownMenuItem>
 								</DropdownMenuGroup>
 								<DropdownMenuGroup>
-									<DropdownMenuItem>Won't fix right now</DropdownMenuItem>
+									<DropdownMenuItem onClick={handleResolveAsWontFix}>
+										Resolve as won't fix
+									</DropdownMenuItem>
 								</DropdownMenuGroup>
 								<DropdownMenuGroup>
-									<DropdownMenuItem onClick={() => setDialogOpen(true)}>
-										This isn't accurate
+									<DropdownMenuItem onClick={handleResolveAsWrong}>
+										Resolve as wrong
 									</DropdownMenuItem>
 								</DropdownMenuGroup>
 								<DropdownMenuSeparator />
 								<DropdownMenuGroup>
 									<DropdownMenuItem onClick={() => setDialogOpen(true)}>
-										Share your thoughts
+										Provide feedback
 									</DropdownMenuItem>
 								</DropdownMenuGroup>
 							</DropdownMenuContent>
@@ -107,36 +144,50 @@ export function BadPracticeCard({
 
 						<DialogContent>
 							<DialogHeader>
-								<DialogTitle>Help us get better</DialogTitle>
+								<DialogTitle>Provide feedback</DialogTitle>
 								<DialogDescription>
-									Your feedback helps us improve our analysis and provide more
-									accurate insights for everyone.
+									Mark this bad practice with feedback that helps us improve the
+									bad practice detection.
 								</DialogDescription>
 							</DialogHeader>
 							<div className="py-4 grid gap-4">
 								<div className="items-center grid grid-cols-4 gap-4">
-									{/* Feedback form controls would go here */}
+									<label htmlFor="feedback-type" className="text-right">
+										Feedback
+									</label>
+									<div className="col-span-3">
+										<select
+											id="feedback-type"
+											className="w-full px-3 py-2 border rounded"
+											onChange={(e) => setFeedbackType(e.target.value)}
+											value={feedbackType || ""}
+										>
+											<option value="" disabled>
+												Select the type of feedback
+											</option>
+											{feedbackTypes.map((type) => (
+												<option key={type} value={type}>
+													{type}
+												</option>
+											))}
+										</select>
+									</div>
 								</div>
 								<div className="items-start grid grid-cols-4 gap-4 h-40">
-									{/* Additional form controls would go here */}
+									<label htmlFor="explanation" className="text-right">
+										Explanation
+									</label>
+									<textarea
+										id="explanation"
+										className="col-span-3 h-full px-3 py-2 border rounded"
+										value={feedbackExplanation}
+										onChange={(e) => setFeedbackExplanation(e.target.value)}
+									/>
 								</div>
 							</div>
 							<DialogFooter>
 								<Button type="submit" onClick={handleProvideFeedback}>
-									Send feedback
-								</Button>
-							</DialogFooter>
-							<div className="py-4 grid gap-4">
-								<div className="items-center grid grid-cols-4 gap-4">
-									{/* Future form elements would go here */}
-								</div>
-								<div className="items-start grid grid-cols-4 gap-4 h-40">
-									{/* Future text area would go here */}
-								</div>
-							</div>
-							<DialogFooter>
-								<Button type="submit" onClick={handleProvideFeedback}>
-									Send feedback
+									Submit feedback
 								</Button>
 							</DialogFooter>
 						</DialogContent>

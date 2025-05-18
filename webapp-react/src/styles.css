@@ -201,9 +201,9 @@ code {
 	body {
 		@apply bg-background text-foreground;
 	}
-  code.textCode {
-    @apply bg-github-neutral tracking-tight rounded px-1 py-0.5;
-  }
+	code.textCode {
+		@apply bg-github-neutral tracking-tight rounded px-1 py-0.5;
+	}
 }
 
 @utility container {
