@@ -85,23 +85,23 @@ export function BadPracticeCard({
               <DropdownMenuContent className="w-56">
                 <DropdownMenuGroup>
                   <DropdownMenuItem onClick={handleResolveAsFixed}>
-                    Resolve as fixed
+                    I've fixed this ✓
                   </DropdownMenuItem>
                 </DropdownMenuGroup>
                 <DropdownMenuGroup>
                   <DropdownMenuItem>
-                    Resolve as won't fix
+                    Won't fix right now
                   </DropdownMenuItem>
                 </DropdownMenuGroup>
                 <DropdownMenuGroup>
                   <DropdownMenuItem onClick={() => setDialogOpen(true)}>
-                    Resolve as wrong
+                    This isn't accurate
                   </DropdownMenuItem>
                 </DropdownMenuGroup>
                 <DropdownMenuSeparator />
                 <DropdownMenuGroup>
                   <DropdownMenuItem onClick={() => setDialogOpen(true)}>
-                    Provide feedback
+                    Share your thoughts
                   </DropdownMenuItem>
                 </DropdownMenuGroup>
               </DropdownMenuContent>
@@ -109,9 +109,9 @@ export function BadPracticeCard({
 
             <DialogContent>
               <DialogHeader>
-                <DialogTitle>Provide feedback</DialogTitle>
+                <DialogTitle>Help us get better</DialogTitle>
                 <DialogDescription>
-                  Mark this bad practice with feedback that helps us improve the bad practice detection.
+                  Your feedback helps us improve our analysis and provide more accurate insights for everyone.
                 </DialogDescription>
               </DialogHeader>
               <div className="py-4 grid gap-4">
@@ -124,7 +124,7 @@ export function BadPracticeCard({
               </div>
               <DialogFooter>
                 <Button type="submit" onClick={handleProvideFeedback}>
-                  Submit feedback
+                  Send feedback
                 </Button>
               </DialogFooter>
               <div className="py-4 grid gap-4">
@@ -137,7 +137,7 @@ export function BadPracticeCard({
               </div>
               <DialogFooter>
                 <Button type="submit" onClick={handleProvideFeedback}>
-                  Submit feedback
+                  Send feedback
                 </Button>
               </DialogFooter>
             </DialogContent>

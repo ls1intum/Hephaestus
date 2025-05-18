@@ -2,7 +2,8 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { 
   getActivityByUserOptions,
-  getActivityByUserQueryKey
+  getActivityByUserQueryKey,
+  getUserProfileOptions
 } from "@/api/@tanstack/react-query.gen";
 import { detectBadPracticesByUser } from "@/api/sdk.gen";
 import { useAuth } from "@/integrations/auth/AuthContext";
@@ -28,6 +29,14 @@ export function BestPracticesContainer() {
     enabled: Boolean(username),
   });
   
+  // Query for user profile data to get display name
+  const profileQuery = useQuery({
+    ...getUserProfileOptions({
+      path: { login: username }
+    }),
+    enabled: Boolean(username),
+  });
+  
   // Mutation for detecting bad practices
   const detectMutation = useMutation({
     mutationFn: () => detectBadPracticesByUser({
@@ -42,12 +51,16 @@ export function BestPracticesContainer() {
     },
   });
   
+  // Get user's display name from profile data
+  const displayName = profileQuery.data?.userInfo?.name;
+  
   return (
     <PracticesPage 
       activityData={activityQuery.data}
       isLoading={activityQuery.isLoading || activityQuery.isFetching}
       isDetectingBadPractices={detectMutation.isPending}
       username={username}
+      displayName={displayName}
       currUserIsDashboardUser={currUserIsDashboardUser}
       onDetectBadPractices={detectMutation.mutate}
     />

@@ -175,7 +175,7 @@ export function PullRequestBadPracticeCard({
                       onClick={handleDetectClick}
                     >
                       <RefreshCw className="size-3.5" />
-                      <span className="text-xs">Analyze</span>
+                      <span className="text-xs">Analyze Changes</span>
                     </Button>
                   )}
                   {expandEnabled && (

@@ -37,8 +37,8 @@ export function BadPracticeLegendCard() {
           
           <div className="pt-2 border-t">
             <p className="text-sm text-muted-foreground">
-              We analyze your pull requests to identify good practices and potential areas for improvement,
-              helping you enhance your code quality and development workflow.
+              We analyze your pull requests to celebrate what you're doing well and suggest improvements,
+              helping you grow as a developer and level up your development workflow.
             </p>
           </div>
         </div>
