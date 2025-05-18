@@ -36,16 +36,10 @@ export function PracticesPage({
   return (
     <div className="flex flex-col items-center">
       <div className="w-full max-w-[1400px]">
+        <h1 className="text-3xl font-bold mb-4">Best Practices Dashboard</h1>
         <div className="grid grid-cols-1 xl:grid-cols-4 gap-y-4 xl:gap-8">
           {/* Left Column - Summary & Controls */}
           <div className="space-y-4 col-span-1">
-            <div className="flex flex-col mb-4">
-              <h1 className="text-3xl font-bold">Code Quality</h1>
-              <h2 className="text-xl text-muted-foreground">
-                Hi {username} 👋
-              </h2>
-            </div>
-
             <div className="xl:sticky xl:top-4 xl:self-start xl:max-h-[calc(100vh-2rem)] xl:overflow-auto">
               {/* Activity Summary Card */}
               <Card className="mb-4">
