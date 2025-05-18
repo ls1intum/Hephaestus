@@ -233,7 +233,7 @@ export function PullRequestBadPracticeCard({
 				<div className="w-full">
 					{/* Show no content message if nothing to display */}
 					{!hasCurrentAnalysis && !hasPreviousAnalysis && (
-						<div className="flex items-center justify-center p-4 w-full">
+						<div className="flex items-center justify-center px-4 pb-4 w-full">
 							<span className="text-sm text-github-muted-foreground">
 								No analysis available
 							</span>
