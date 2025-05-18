@@ -4,13 +4,16 @@
 # Treat unset variables as an error, and prevent errors in a pipeline from being masked.
 set -euo pipefail
 
-# Directory containing the build artifacts
+# Uncomment the following line to enable debug mode for troubleshooting
+# set -x
+
+# Directory containing the build artifacts (Angular's output directory)
 BUILD_DIR="/usr/share/nginx/html"
 
-# Prefix for environment variable placeholders
+# Prefix for environment variable placeholders in Angular code
 ENV_PREFIX="WEB_ENV_"
 
-# Regex pattern to match WEB_ENV_ variables
+# Regex pattern to match WEB_ENV_ variables (e.g., WEB_ENV_APPLICATION_CLIENT_URL)
 ENV_VAR_REGEX="${ENV_PREFIX}[A-Z0-9_]+"
 
 # Function to log messages with timestamps to stderr
@@ -18,85 +21,100 @@ log() {
   echo "[`date +'%Y-%m-%dT%H:%M:%S%z'`] $*" >&2
 }
 
-# Find all JS files that potentially contain environment placeholders
-# Vite creates hashed filenames for JS files, so we need to find them dynamically
-find_js_files() {
-  log "🔍 Finding JavaScript files in build directory..."
-  find "${BUILD_DIR}" -type f -name "*.js" | xargs grep -l "${ENV_PREFIX}" 2>/dev/null || echo ""
+# Function to find all unique WEB_ENV_ variables in the build artifacts
+find_env_vars() {
+  log "🔍 Scanning build artifacts for environment variables with prefix '${ENV_PREFIX}'..."
+
+  # Use grep to find all occurrences of WEB_ENV_* in text files within BUILD_DIR
+  # Exclude binary files to prevent corruption
+  grep -rhoE "${ENV_VAR_REGEX}" "${BUILD_DIR}" --binary-files=without-match | sort | uniq
 }
 
-# Main execution function
+# Function to validate that all required environment variables are set
+validate_env_vars() {
+  local missing_vars=()
+
+  for var in "$@"; do
+    if [[ -z "${!var:-}" ]]; then
+      missing_vars+=("$var")
+    fi
+  done
+
+  if [ ${#missing_vars[@]} -ne 0 ]; then
+    log "⚠️ Warning: The following environment variables are not set:"
+    for var in "${missing_vars[@]}"; do
+      echo "  - $var" >&2
+    done
+  fi
+}
+
+# Function to escape characters for safe JavaScript string insertion
+escape_js_string() {
+  local input="$1"
+  # Escape double quotes
+  input="${input//\"/\\\\\"}"
+  echo "$input"
+}
+
+# Function to replace placeholders with actual environment variable values
+replace_vars() {
+  local placeholder="$1"
+  local env_var="${placeholder#${ENV_PREFIX}}"
+  local value="${!env_var}"
+
+  # Log the substitution process
+  log "🔄 Replacing placeholder '${placeholder}' with environment variable '${env_var}' value..."
+
+  # Escape characters for safe JavaScript insertion
+  local escaped_value
+  escaped_value=$(escape_js_string "$value")
+
+  # Iterate over each relevant file and perform substitution with awk
+  find "${BUILD_DIR}" -type f \( -name "*.js" -o -name "*.html" -o -name "*.css" \) -exec grep -Il "${placeholder}" {} \; | while read -r file; do
+    awk -v placeholder="$placeholder" -v replacement="$escaped_value" '
+      {
+        gsub(placeholder, replacement)
+      }
+      { print }
+    ' "$file" > "${file}.tmp" && mv "${file}.tmp" "$file"
+    log "✅ Replaced '${placeholder}' in '${file}'"
+  done
+}
+
+# Main execution flow
 main() {
-  log "Starting environment variable substitution in ${BUILD_DIR}..."
-  
-  # Find all JS files that might contain environment placeholders
-  js_files=$(find_js_files)
-  
-  if [ -z "${js_files}" ]; then
-    log "⚠️ No JavaScript files found containing '${ENV_PREFIX}' placeholders."
-    return 0
-  fi
-  
-  log "Found JavaScript files with environment placeholders:"
-  echo "${js_files}" | while read -r file; do
-    log "  - ${file}"
-  done
-  
-  # Find all unique placeholder variables
-  log "🔍 Extracting environment variable placeholders..."
-  placeholders=$(grep -hoE "${ENV_VAR_REGEX}" ${js_files} 2>/dev/null | sort | uniq)
-  
+  # Step 1: Find all required environment variables
+  placeholders=$(find_env_vars)
+
   if [ -z "${placeholders}" ]; then
-    log "⚠️ No environment variable placeholders found."
-    return 0
+    log "ℹ️ No environment variables with prefix '${ENV_PREFIX}' found to replace."
+    exit 0
   fi
-  
-  log "Detected the following environment placeholders:"
-  echo "${placeholders}" | while read -r placeholder; do
+
+  # Convert placeholders string to an array without using mapfile
+  placeholders_array=()
+  while IFS= read -r placeholder; do
+      placeholders_array+=("$placeholder")
+  done <<< "$placeholders"
+
+  # Step 2: Map placeholders to environment variables and validate
+  # Collect corresponding environment variable names
+  env_vars=()
+  for placeholder in "${placeholders_array[@]}"; do
     env_var="${placeholder#${ENV_PREFIX}}"
-    log "  - ${placeholder} (mapped to ${env_var})"
+    env_vars+=("$env_var")
   done
-  
-  # Process each placeholder
-  echo "${placeholders}" | while IFS= read -r placeholder; do
-    env_var="${placeholder#${ENV_PREFIX}}"
-    log "🔄 Processing '${placeholder}' from environment variable '${env_var}'..."
-    
-    # Check if the environment variable is set
-    if [[ -z "${!env_var+x}" ]]; then
-      log "⚠️ Warning: Environment variable ${env_var} is not set. Using empty string."
-      value=""
-    else
-      value="${!env_var}"
-    fi
-    
-    # Special handling for boolean values
-    if [[ "${placeholder}" == *"KEYCLOAK_SKIP_LOGIN"* ]]; then
-      if [[ "${value}" == "true" || "${value}" == "1" || "${value}" == "yes" ]]; then
-        log "Replacing boolean '${placeholder}' with true value"
-        # For JS boolean values, we need to replace the string with an actual boolean
-        # This assumes the placeholder is surrounded by quotes in the JS file
-        sed -i "s/\"${placeholder}\"/true/g" ${js_files}
-        sed -i "s/'${placeholder}'/true/g" ${js_files}
-      else
-        log "Replacing boolean '${placeholder}' with false value"
-        sed -i "s/\"${placeholder}\"/false/g" ${js_files}
-        sed -i "s/'${placeholder}'/false/g" ${js_files}
-      fi
-    else
-      # For string values, escape for JavaScript and keep the quotes
-      log "Replacing string '${placeholder}' with '${value}'"
-      escaped_value=$(echo "${value}" | sed 's/\\/\\\\/g; s/"/\\"/g; s/'"'"'/\\'"'"'/g')
-      # Use # as delimiter for sed instead of / to avoid issues with URLs
-      sed -i "s#\"${placeholder}\"#\"${escaped_value}\"#g" ${js_files}
-      sed -i "s#'${placeholder}'#'${escaped_value}'#g" ${js_files}
-    fi
-    
-    log "✅ Replaced all occurrences of '${placeholder}'"
+
+  # Validate that all required environment variables are set
+  validate_env_vars "${env_vars[@]}"
+
+  # Step 3: Replace placeholders with actual values
+  for placeholder in "${placeholders_array[@]}"; do
+    replace_vars "$placeholder"
   done
-  
+
   log "🎉 Environment variable substitution completed successfully."
 }
 
-# Execute the main function
+# Invoke the main function
 main
