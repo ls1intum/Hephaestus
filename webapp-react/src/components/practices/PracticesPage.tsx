@@ -64,7 +64,7 @@ export function PracticesPage({
 						<div className="flex items-center gap-2 text-sm bg-muted/50 p-2.5 rounded-md">
 							<InfoIcon className="h-4 w-4 text-blue-500 flex-shrink-0" />
 							<p className="text-muted-foreground">
-								AI-powered insights.{" "}
+								Hephaestus can make mistakes.{" "}
 								<Button variant="link" size="none">
 									Help us improve
 								</Button>{" "}

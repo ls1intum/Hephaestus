@@ -325,7 +325,7 @@ export function LandingPage({
 							alt="Agile Hephaestus"
 							width="500"
 							height="350"
-							className="mx-auto rounded-lg border border-muted/50 aspect-auto object-cover lg:order-last"
+							className="mx-auto rounded-lg aspect-auto object-cover lg:order-last"
 						/>
 						<div className="flex flex-col justify-center space-y-5">
 							<Badge className="w-fit" variant="outline">
