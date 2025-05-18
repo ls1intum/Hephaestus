@@ -7,7 +7,6 @@ import { BadPracticeLegendCard } from "./BadPracticeLegendCard";
  * indicators and states.
  */
 const meta = {
-  title: "Practices/BadPracticeLegendCard",
   component: BadPracticeLegendCard,
   parameters: {
     layout: "centered",

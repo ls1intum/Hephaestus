@@ -7,7 +7,6 @@ import { IssueCard } from "./IssueCard";
  * Used primarily in user profile pages to display contribution activity.
  */
 const meta = {
-  title: "Profile/IssueCard",
   component: IssueCard,
   parameters: {
     layout: "centered",

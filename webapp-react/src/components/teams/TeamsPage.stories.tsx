@@ -73,7 +73,6 @@ const mockTeams: TeamInfo[] = [
 ];
 
 const meta: Meta<typeof TeamsPage> = {
-  title: "Teams/TeamsPage",
   component: TeamsPage,
   tags: ["autodocs"],
   parameters: {

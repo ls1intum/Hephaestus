@@ -7,7 +7,6 @@ import { GithubBadge } from "./GithubBadge";
  * for both light and dark themes.
  */
 const meta = {
-  title: "Shared/GithubBadge",
   component: GithubBadge,
   tags: ["autodocs"],
   parameters: {

@@ -67,7 +67,6 @@ const mockContributors = [
  * Gracefully handles loading and error states with appropriate visual feedback.
  */
 const meta = {
-  title: "Info/AboutPage",
   component: AboutPage,
   tags: ['autodocs'],
   parameters: {

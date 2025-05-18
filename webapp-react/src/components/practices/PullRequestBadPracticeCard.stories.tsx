@@ -7,7 +7,6 @@ import { fn } from "@storybook/test";
  * Allows users to trigger bad practice detection on specific pull requests.
  */
 const meta = {
-  title: "Practices/PullRequestBadPracticeCard",
   component: PullRequestBadPracticeCard,
   parameters: {
     layout: "centered",

@@ -7,7 +7,6 @@ import { ProfileHeader } from "./ProfileHeader";
  * and repositories they've contributed to.
  */
 const meta = {
-  title: "Profile/ProfileHeader",
   component: ProfileHeader,
   parameters: {
     layout: "centered",

@@ -51,6 +51,7 @@ import { Button } from './Button';
  * Button component for user interactions.
  */
 const meta = {
+  // No title needed, we should favor auto-generated titles
   component: Button,
   parameters: { layout: 'centered' },
   tags: ['autodocs'],

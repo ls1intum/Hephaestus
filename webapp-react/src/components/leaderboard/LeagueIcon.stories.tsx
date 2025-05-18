@@ -6,7 +6,6 @@ import { LeagueIcon } from './LeagueIcon';
  * Shows different tiers (None, Bronze, Silver, Gold, Diamond, Master) with optional point display.
  */
 const meta = {
-  title: 'Leaderboard/Components/LeagueIcon',
   component: LeagueIcon,
   tags: ['autodocs'],
   parameters: {

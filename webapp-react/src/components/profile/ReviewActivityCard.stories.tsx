@@ -6,7 +6,6 @@ import { ReviewActivityCard } from "./ReviewActivityCard";
  * Shows the review state, submission time, and score earned from the review.
  */
 const meta = {
-  title: "Profile/ReviewActivityCard",
   component: ReviewActivityCard,
   parameters: {
     layout: "centered",

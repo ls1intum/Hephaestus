@@ -133,7 +133,6 @@ const mockOpenPullRequests = [
  * Shows pull requests, review activity, and other contribution metrics.
  */
 const meta = {
-  title: "Profile/ProfileContent",
   component: ProfileContent,
   parameters: {
     layout: "padded",

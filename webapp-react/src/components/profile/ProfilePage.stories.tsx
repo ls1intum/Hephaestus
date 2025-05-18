@@ -7,7 +7,6 @@ import { ProfilePage } from "./ProfilePage";
  * and open pull requests in a unified interface.
  */
 const meta = {
-  title: "Profile/ProfilePage",
   component: ProfilePage,
   parameters: {
     layout: "padded",

@@ -8,7 +8,6 @@ import { fn } from "@storybook/test";
  * Displays pull requests that can be analyzed for good and bad coding practices.
  */
 const meta = {
-  title: "Practices/PracticesPage",
   component: PracticesPage,
   parameters: {
     layout: "padded",
