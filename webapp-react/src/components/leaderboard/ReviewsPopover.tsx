@@ -91,7 +91,7 @@ export function ReviewsPopover({
 				setShowCopySuccess(false);
 			}
 		};
-	}, []);
+	}, [showCopySuccess]);
 
 	return (
 		<Popover open={isOpen} onOpenChange={setIsOpen}>

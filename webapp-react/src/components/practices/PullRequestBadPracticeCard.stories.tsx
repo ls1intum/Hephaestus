@@ -88,7 +88,7 @@ type Story = StoryObj<typeof PullRequestBadPracticeCard>;
 export const Default: Story = {
 	args: {
 		id: 1,
-		title: "Add feature X",
+		title: "`General`: Add feature X",
 		number: 12,
 		additions: 10,
 		deletions: 5,

@@ -131,18 +131,22 @@ const sampleLeaderboardEntries: LeaderboardEntry[] = [
 // FAQ items with more honest and straightforward answers
 const faqItems = [
 	{
+		key: "faq-item-1",
 		q: "How does Hephaestus integrate with our existing workflow?",
 		a: "Hephaestus integrates with GitHub, providing insights without disrupting your current processes. Setup is simple with our guided configuration.",
 	},
 	{
+		key: "faq-item-2",
 		q: "Is Hephaestus suitable for small teams?",
 		a: "Yes! Hephaestus is built with flexibility in mind and works well for teams of any size, from small student projects to larger development teams.",
 	},
 	{
+		key: "faq-item-3",
 		q: "How does the AI Mentor work?",
 		a: "The AI Mentor analyzes your GitHub activity and reflection inputs to provide personalized guidance, helping team members set goals and track their progress.",
 	},
 	{
+		key: "faq-item-4",
 		q: "Do we need to change how we use GitHub?",
 		a: "No, Hephaestus works alongside your existing GitHub workflow without requiring any changes to how your team uses pull requests, reviews, or issues.",
 	},
@@ -443,7 +447,7 @@ export function LandingPage({
 						<Accordion type="single" collapsible className="w-full">
 							{faqItems.map((item, index) => (
 								<AccordionItem
-									key={index}
+									key={item.key}
 									value={`item-${index}`}
 									className="border-b border-muted"
 								>

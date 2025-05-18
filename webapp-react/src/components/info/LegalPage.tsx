@@ -9,6 +9,7 @@ export function LegalPage({ title, content }: LegalPageProps) {
 			<h1 className="text-3xl font-bold">{title}</h1>
 			<div
 				className="prose dark:prose-invert max-w-none"
+				/** biome-ignore lint/security/noDangerouslySetInnerHtml: HTML content comes from the environment */
 				dangerouslySetInnerHTML={{ __html: content }}
 			/>
 		</div>

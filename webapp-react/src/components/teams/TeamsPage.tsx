@@ -84,9 +84,10 @@ export function TeamsPage({ teams, isLoading }: TeamsPageProps) {
 			{isLoading &&
 				Array(3)
 					.fill(null)
-					.map((_, index) => (
+					.map((_, teamIndex) => (
 						<Card
-							key={`loading-team-${index}`}
+						// biome-ignore lint/suspicious/noArrayIndexKey: Static array 
+							key={`loading-team-${teamIndex}`}
 							className="flex flex-col mb-8 gap-3"
 						>
 							<CardHeader>
@@ -98,7 +99,8 @@ export function TeamsPage({ teams, isLoading }: TeamsPageProps) {
 										.fill(null)
 										.map((_, memberIndex) => (
 											<div
-												key={`loading-member-${memberIndex}`}
+											// biome-ignore lint/suspicious/noArrayIndexKey: Static arrays
+												key={`loading-team-${teamIndex}-member-${memberIndex}`}
 												className="flex flex-col items-center text-center"
 											>
 												<div className="w-20 h-20 rounded-full flex items-center justify-center overflow-hidden">

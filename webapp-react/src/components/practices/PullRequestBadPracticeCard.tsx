@@ -1,4 +1,5 @@
 import type { LabelInfo, PullRequestBadPractice } from "@/api/types.gen";
+import { FormattedTitle } from "@/components/shared/FormattedTitle";
 import { GithubBadge } from "@/components/shared/GithubBadge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -19,7 +20,6 @@ import {
 import { FoldVertical, RefreshCw } from "lucide-react";
 import React, { useState } from "react";
 import { BadPracticeCard } from "./BadPracticeCard";
-import { formatTitle } from "./utils";
 
 import {
 	Accordion,
@@ -78,7 +78,6 @@ export function PullRequestBadPracticeCard({
 	const displayCreated = createdAt
 		? format(parseISO(createdAt), "MMM d")
 		: null;
-	const formattedTitle = formatTitle(title);
 	const expandEnabled = badPractices.length > 0;
 
 	// Get the appropriate icon and color based on PR state
@@ -220,14 +219,11 @@ export function PullRequestBadPracticeCard({
 						</span>
 					</div>
 
-					<div className="font-medium">
+					<div className="font-medium leading-normal">
 						{isLoading ? (
 							<Skeleton className="h-6 w-3/4 mb-2" />
 						) : (
-							<div
-								className="leading-normal"
-								dangerouslySetInnerHTML={{ __html: formattedTitle }}
-							/>
+							<FormattedTitle title={title} />
 						)}
 					</div>
 

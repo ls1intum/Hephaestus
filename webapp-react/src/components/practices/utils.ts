@@ -51,17 +51,6 @@ export const stateConfig: {
 	},
 };
 
-// Format title with code highlighting
-export function formatTitle(title: string): string {
-	return title.replace(/`([^`]+)`/g, '<code class="textCode">$1</code>');
-}
-
-// Constants for error messages
-export const doubleDetectionString =
-	"This pull request has not changed since the last detection. Try changing status or description, then run the detection again.";
-export const serverErrorString =
-	"We encountered an error while trying to detect bad practices. Please try again later.";
-
 // Filter practices by category
 export function filterGoodAndBadPractices(
 	allBadPractices: PullRequestBadPractice[],

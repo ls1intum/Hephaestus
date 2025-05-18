@@ -202,6 +202,7 @@ export function AboutPage({
 					{isPending && (
 						<div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-5 gap-6">
 							{Array.from({ length: 10 }).map((_, index) => (
+								// biome-ignore lint/suspicious/noArrayIndexKey: Data is static and not user-generated
 								<div key={index} className="flex flex-col items-center gap-2">
 									<Skeleton className="h-20 w-20 rounded-full" />
 									<Skeleton className="h-4 w-24" />
@@ -229,9 +230,13 @@ export function AboutPage({
 						<div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-5 gap-x-6 gap-y-8">
 							{otherContributors.length > 0 ? (
 								otherContributors.map((contributor) => (
-									<Button variant="ghost" asChild className="h-auto">
+									<Button
+										key={contributor.id}
+										variant="ghost"
+										asChild
+										className="h-auto"
+									>
 										<a
-											key={contributor.id}
 											href={contributor.htmlUrl}
 											target="_blank"
 											rel="noopener noreferrer"

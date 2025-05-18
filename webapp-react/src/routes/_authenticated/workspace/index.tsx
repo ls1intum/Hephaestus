@@ -175,9 +175,11 @@ function Workspace() {
 								{repositories.map((repo, index) => {
 									// Split the repository string into owner and name
 									const [owner, name] = repo.split("/");
+									// Create a stable key using the repo name and index
+									const stableKey = `repo-${repo.replace("/", "-")}-${index}-${Date.now()}`;
 									return (
 										<div
-											key={index}
+											key={stableKey}
 											className="flex items-center justify-between p-2 bg-muted/50 rounded-md"
 										>
 											<div className="flex items-center">

@@ -1,4 +1,5 @@
 import type { LabelInfo } from "@/api/types.gen";
+import { FormattedTitle } from "@/components/shared/FormattedTitle";
 import { GithubBadge } from "@/components/shared/GithubBadge";
 import { Card } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -65,14 +66,6 @@ export function IssueCard({
 	// Format the date as MMM D (e.g., "Jan 15")
 	const formattedDate = createdAt ? format(parseISO(createdAt), "MMM d") : "";
 
-	// Format the title, replacing code blocks with styled code
-	const formattedTitle = title
-		? title.replace(
-				/`([^`]+)`/g,
-				'<code class="bg-accent/50 px-1 py-0.5 rounded font-mono">$1</code>',
-			)
-		: "";
-
 	// Use CSS to style the card as a clickable link with hover effects
 	return (
 		<a
@@ -126,16 +119,13 @@ export function IssueCard({
 						</span>
 					</div>
 
-					<span className="flex justify-between font-medium contain-inline-size">
+					<div className="flex justify-between font-medium contain-inline-size leading-normal">
 						{isLoading ? (
 							<Skeleton className="h-6 w-3/4 mb-6" />
 						) : (
-							<div
-								className="leading-normal"
-								dangerouslySetInnerHTML={{ __html: formattedTitle }}
-							/>
+							<FormattedTitle title={title ?? ""} />
 						)}
-					</span>
+					</div>
 				</div>
 
 				{pullRequestLabels.length > 0 && (

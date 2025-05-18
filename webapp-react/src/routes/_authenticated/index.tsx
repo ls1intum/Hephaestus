@@ -150,6 +150,11 @@ function LeaderboardContainer() {
 		});
 	};
 
+	// Handle user profile navigation
+	const handleUserClick = (username: string) => {
+		navigate({ to: "/user/$username", params: { username } });
+	};
+
 	return (
 		<LeaderboardPage
 			leaderboard={leaderboardQuery.data || []}
@@ -168,6 +173,7 @@ function LeaderboardContainer() {
 			onTeamChange={handleTeamChange}
 			onSortChange={handleSortChange}
 			onTimeframeChange={handleTimeframeChange}
+			onUserClick={handleUserClick}
 		/>
 	);
 }

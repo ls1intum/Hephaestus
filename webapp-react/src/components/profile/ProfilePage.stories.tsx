@@ -231,7 +231,7 @@ export const Loading: Story = {
 /**
  * Error state displayed when profile data could not be loaded.
  */
-export const Error: Story = {
+export const ErrorState: Story = {
 	args: {
 		isLoading: false,
 		error: true,

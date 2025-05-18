@@ -20,6 +20,7 @@ interface LeaderboardPageProps {
 		beforeDate: string,
 		timeframe?: string,
 	) => void;
+	onUserClick?: (username: string) => void;
 	selectedTeam?: string;
 	selectedSort?: LeaderboardSortType;
 	initialAfterDate?: string;
@@ -43,6 +44,7 @@ export function LeaderboardPage({
 	onTeamChange,
 	onSortChange,
 	onTimeframeChange,
+	onUserClick,
 	selectedTeam,
 	selectedSort,
 	initialAfterDate,
@@ -94,6 +96,7 @@ export function LeaderboardPage({
 								leaderboard={leaderboard}
 								isLoading={isLoading}
 								currentUser={currentUser}
+								onUserClick={onUserClick}
 							/>
 						</div>
 					</div>

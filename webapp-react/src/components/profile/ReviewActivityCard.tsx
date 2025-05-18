@@ -1,3 +1,4 @@
+import { FormattedTitle } from "@/components/shared/FormattedTitle";
 import { Card } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
@@ -91,15 +92,6 @@ export function ReviewActivityCard({
 		? formatDistanceToNow(parseISO(submittedAt), { addSuffix: true })
 		: undefined;
 
-	// Format PR title to handle code backticks similar to how IssueCard does
-	const formatPRTitle = (title?: string): string => {
-		if (!title) return "";
-		return title.replace(
-			/`([^`]+)`/g,
-			'<code class="bg-accent/50 px-1 py-0.5 rounded font-mono">$1</code>',
-		);
-	};
-
 	// Use CSS to style the card as a clickable link with hover effects
 	return (
 		<a
@@ -149,18 +141,13 @@ export function ReviewActivityCard({
 					</div>
 
 					{/* PR title */}
-					<span className="flex justify-between font-medium contain-inline-size">
+					<div className="flex justify-between font-medium contain-inline-size leading-normal">
 						{isLoading ? (
 							<Skeleton className="h-6 w-3/4" />
 						) : (
-							<div
-								className="leading-normal"
-								dangerouslySetInnerHTML={{
-									__html: formatPRTitle(pullRequest?.title),
-								}}
-							/>
+							<FormattedTitle title={pullRequest?.title ?? ""} />
 						)}
-					</span>
+					</div>
 				</div>
 			</Card>
 		</a>

@@ -19,7 +19,10 @@ const meta: Meta<typeof LeagueProgressCard> = {
 		},
 	},
 	decorators: [
-		(Story: any, context: any) => {
+		(
+			Story: React.ComponentType,
+			context: { args: { leaguePoints: number }; viewMode?: string },
+		) => {
 			// Get league info for the current story for debugging
 			const { leaguePoints } = context.args;
 			const leagues = [

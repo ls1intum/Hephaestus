@@ -34,8 +34,11 @@ export function LeagueBronzeIcon({
 			viewBox="0 0 24 24"
 			fill="none"
 			xmlns="http://www.w3.org/2000/svg"
+			role="img"
+			aria-label="Bronze League"
 			{...props}
 		>
+			<title>Bronze League</title>
 			<path
 				fillRule="evenodd"
 				clipRule="evenodd"
@@ -64,8 +67,11 @@ export function LeagueSilverIcon({
 			viewBox="0 0 24 24"
 			fill="none"
 			xmlns="http://www.w3.org/2000/svg"
+			role="img"
+			aria-label="Silver League"
 			{...props}
 		>
+			<title>Silver League</title>
 			<path
 				fillRule="evenodd"
 				clipRule="evenodd"
@@ -98,8 +104,11 @@ export function LeagueGoldIcon({
 			viewBox="0 0 24 24"
 			fill="none"
 			xmlns="http://www.w3.org/2000/svg"
+			role="img"
+			aria-label="Gold League"
 			{...props}
 		>
+			<title>Gold League</title>
 			<path
 				fillRule="evenodd"
 				clipRule="evenodd"
@@ -136,8 +145,11 @@ export function LeagueDiamondIcon({
 			viewBox="0 0 26 26"
 			fill="none"
 			xmlns="http://www.w3.org/2000/svg"
+			role="img"
+			aria-label="Diamond League"
 			{...props}
 		>
+			<title>Diamond League</title>
 			<path
 				fillRule="evenodd"
 				clipRule="evenodd"
@@ -186,8 +198,11 @@ export function LeagueMasterIcon({
 			viewBox="0 0 26 28"
 			fill="none"
 			xmlns="http://www.w3.org/2000/svg"
+			role="img"
+			aria-label="Master League"
 			{...props}
 		>
+			<title>Master League</title>
 			<path
 				fillRule="evenodd"
 				clipRule="evenodd"
@@ -248,8 +263,11 @@ export function LeagueNoneIcon({
 			viewBox="0 0 24 24"
 			fill="none"
 			xmlns="http://www.w3.org/2000/svg"
+			role="img"
+			aria-label="No League"
 			{...props}
 		>
+			<title>No League</title>
 			<path
 				fillRule="evenodd"
 				clipRule="evenodd"

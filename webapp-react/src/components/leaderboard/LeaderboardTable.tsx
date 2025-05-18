@@ -31,12 +31,14 @@ export interface LeaderboardTableProps {
 	leaderboard?: LeaderboardEntry[];
 	isLoading: boolean;
 	currentUser?: UserInfo;
+	onUserClick?: (username: string) => void;
 }
 
 export function LeaderboardTable({
 	leaderboard = [],
 	isLoading,
 	currentUser,
+	onUserClick,
 }: LeaderboardTableProps) {
 	if (isLoading) {
 		return <LeaderboardTableSkeleton />;
@@ -85,9 +87,9 @@ export function LeaderboardTable({
 								isCurrentUser &&
 									"bg-accent dark:bg-accent/30 dark:hover:bg-accent/50",
 							)}
-							onClick={() =>
-								(window.location.href = `/user/${entry.user.login}`)
-							}
+							onClick={() => {
+								onUserClick?.(entry.user.login);
+							}}
 						>
 							<TableCell className="text-center">{entry.rank}</TableCell>
 							<TableCell className="px-0">
@@ -200,7 +202,8 @@ function LeaderboardTableSkeleton() {
 			</TableHeader>
 			<TableBody>
 				{Array.from({ length: 10 }).map((_, idx) => (
-					<TableRow key={idx}>
+					// biome-ignore lint/suspicious/noArrayIndexKey: Data is static and not user-generated
+					<TableRow key={`skeleton-${idx}`}>
 						<TableCell>
 							<Skeleton
 								className="h-5 w-7"

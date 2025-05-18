@@ -49,7 +49,7 @@ export function ProfileContent({
 				<h2 className="text-xl font-semibold">Latest Review Activity</h2>
 				<div className="flex flex-col gap-2 m-1">
 					{displayReviews.length > 0 ? (
-						displayReviews.map((activity: any) => (
+						(displayReviews as PullRequestReviewInfo[]).map((activity) => (
 							<ReviewActivityCard
 								key={activity.id}
 								isLoading={isLoading}
@@ -92,7 +92,7 @@ export function ProfileContent({
 				</span>
 				<div className="flex flex-col gap-2 m-1">
 					{displayPullRequests.length > 0 ? (
-						displayPullRequests.map((pullRequest: any) => (
+						(displayPullRequests as PullRequestInfo[]).map((pullRequest) => (
 							<IssueCard
 								key={pullRequest.id}
 								isLoading={isLoading}

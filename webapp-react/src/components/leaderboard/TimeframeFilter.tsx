@@ -35,7 +35,7 @@ import {
 	subWeeks,
 } from "date-fns";
 import { CalendarIcon } from "lucide-react";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { DateRange } from "react-day-picker";
 
 type TimeframeOption =
@@ -557,11 +557,13 @@ export function TimeframeFilter({
 	]);
 
 	// Call onTimeframeChange when relevant values change
+	// Using useCallback to memoize the latest dates to avoid dependency issues
+	const latestDates = useRef({ afterDate, beforeDate });
+
 	useEffect(() => {
+		latestDates.current = { afterDate, beforeDate };
 		onTimeframeChange?.(afterDate, beforeDate);
-		// Don't include onTimeframeChange in dependencies to avoid excessive rerenders
-		// eslint-disable-next-line react-hooks/exhaustive-deps
-	}, [afterDate, beforeDate]);
+	}, [afterDate, beforeDate, onTimeframeChange]);
 
 	return (
 		<div className="space-y-1.5">

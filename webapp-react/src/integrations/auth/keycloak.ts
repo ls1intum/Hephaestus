@@ -16,7 +16,7 @@ export interface UserProfile {
 			displayName: string;
 			required: boolean;
 			readOnly: boolean;
-			validators: Record<string, any>;
+			validators: Record<string, unknown>;
 			multivalued: boolean;
 		}>;
 		groups: Array<{
