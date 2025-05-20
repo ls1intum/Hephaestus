@@ -34,6 +34,9 @@ public class Repository extends BaseGitServiceEntity {
 
     @NonNull
     private String nameWithOwner;
+    
+    @NonNull
+    private String test;
 
     // Whether the repository is private or public.
     private boolean isPrivate;
