@@ -99,22 +99,34 @@ public class WorkspaceService {
             logger.info("Running monitoring on startup");
 
             // Run all repository syncs asynchronously
-            CompletableFuture<?>[] futures = repositoriesToMonitor
+            CompletableFuture<?>[] repoFutures = repositoriesToMonitor
                 .stream()
                 .map(repo -> CompletableFuture.runAsync(() -> gitHubDataSyncService.syncRepositoryToMonitor(repo)))
                 .toArray(CompletableFuture[]::new);
+            CompletableFuture<Void> reposDone = CompletableFuture.allOf(repoFutures);
 
-            // When all repository syncs complete, then sync users
-            CompletableFuture.allOf(futures).thenRun(() -> {
-                logger.info("All repositories synced, now syncing users");
-                gitHubDataSyncService.syncUsers(workspace);
-                logger.info("Finished running monitoring on startup");
+            CompletableFuture<Void> usersFuture = reposDone.thenRunAsync(
+                    () -> {
+                        logger.info("All repositories synced, now syncing users");
+                        gitHubDataSyncService.syncUsers(workspace);
+                    }
+            );
+            CompletableFuture<Void> usersDone = CompletableFuture.allOf(usersFuture);
 
+            CompletableFuture<Void> teamsFuture = usersDone.thenRunAsync(
+                    () -> {
+                        logger.info("Syncing teams");
+                        gitHubDataSyncService.syncTeams(workspace);
+                    }
+            );
+
+            CompletableFuture.allOf(teamsFuture).thenRun(() -> {
+                //TODO: to be removed after teamV2 is released
                 if (initDefaultWorkspace) {
-                    // Setup default teams
                     logger.info("Setting up default teams");
                     teamService.setupDefaultTeams();
                 }
+                logger.info("Finished running monitoring on startup");
             });
         }
     }
@@ -206,7 +218,7 @@ public class WorkspaceService {
             return;
         }
 
-        repository.get().getLabels().forEach(label -> label.removeAllTeams());
+        repository.get().getLabels().forEach(Label::removeAllTeams);
         repository.get().removeAllTeams();
         repositoryRepository.delete(repository.get());
 
