@@ -15,17 +15,12 @@ public interface PullRequestBadPracticeRepository extends JpaRepository<PullRequ
         """
         SELECT prbp
         FROM PullRequestBadPractice prbp
-        WHERE LOWER(:assigneeLogin) IN (SELECT LOWER(u.login) FROM prbp.pullrequest.assignees u) AND prbp.pullrequest.state = 'OPEN'
-        """
-    )
-    List<PullRequestBadPractice> findAssignedByLoginAndOpen(@Param("assigneeLogin") String assigneeLogin);
-
-    @Transactional
-    @Query(
-        """
-        SELECT prbp
-        FROM PullRequestBadPractice prbp
         WHERE prbp.pullrequest.id = :pullRequestId
+          AND prbp.detectionTime = (
+            SELECT MAX(prbp2.detectionTime)
+            FROM PullRequestBadPractice prbp2
+            WHERE prbp2.title = prbp.title
+              AND prbp2.pullrequest.id = prbp.pullrequest.id)
         """
     )
     List<PullRequestBadPractice> findByPullRequestId(@Param("pullRequestId") long pullRequestId);

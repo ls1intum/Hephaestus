@@ -1,7 +1,6 @@
 import { Component, computed, inject, input, signal } from '@angular/core';
 import { HlmCardModule } from '@spartan-ng/ui-card-helm';
 import { NgIconComponent, provideIcons } from '@ng-icons/core';
-import { octCheck, octX } from '@ng-icons/octicons';
 import { ActivityService, BadPracticeFeedback } from '@app/core/modules/openapi';
 import { injectMutation, QueryClient } from '@tanstack/angular-query-experimental';
 import { FormControl, FormsModule, ReactiveFormsModule } from '@angular/forms';
@@ -51,16 +50,15 @@ export class BadPracticeCardComponent {
   activityService = inject(ActivityService);
   queryClient = inject(QueryClient);
 
-  protected readonly octCheck = octCheck;
-  protected readonly octX = octX;
-
   title = input.required<string>();
   description = input.required<string>();
   state = input.required<PullRequestBadPractice.StateEnum>();
   id = input.required<number>();
+  currUserIsDashboardUser = input<boolean>(false);
 
   icon = computed(() => stateConfig[this.state()].icon);
   text = computed(() => stateConfig[this.state()].text);
+  color = computed(() => stateConfig[this.state()].color);
 
   _newExplanation = new FormControl('');
   _selectedType = signal<string | undefined>(undefined);
@@ -81,6 +79,11 @@ export class BadPracticeCardComponent {
 
   resolveBadPracticeAsWontFixed(badPracticeId: number): void {
     const state = PullRequestBadPractice.StateEnum.WontFix;
+    this.resolveBadPracticeMutation.mutate({ badPracticeId, state });
+  }
+
+  resolveBadPracticeAsWrong(badPracticeId: number): void {
+    const state = PullRequestBadPractice.StateEnum.Wrong;
     this.resolveBadPracticeMutation.mutate({ badPracticeId, state });
   }
 
