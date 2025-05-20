@@ -43,28 +43,11 @@ jobs:
         with:
           distribution: 'temurin'
           java-version: '21'
-          cache: 'maven'
-          
-      - name: Install PostgreSQL client
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y postgresql-client
-      
-      - name: Build application
+          cache: 'maven'  
+    
+      - name: Build application (compile only)
         working-directory: server/application-server
-        run: mvn install -DskipTests
-
-      - name: Wait for PostgreSQL to be ready
-        run: |
-          echo "Waiting for PostgreSQL to be ready..."
-          for i in {1..30}; do
-            if pg_isready -h localhost -p 5432 -d hephaestus -U root; then
-              echo "PostgreSQL is ready!"
-              break
-            fi
-            echo "Waiting for PostgreSQL to start... ($i/30)"
-            sleep 1
-          done
+        run: mvn compile -DskipTests
 
       - name: Run Liquibase update
         working-directory: server/application-server
