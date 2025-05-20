@@ -1,20 +1,18 @@
 from enum import Enum
 from typing import List
 
+from langchain_core.prompts import PromptTemplate
 from langchain_core.runnables import RunnableConfig
+from langfuse import Langfuse
 from langfuse.callback import CallbackHandler
-from langchain_core.prompts import ChatPromptTemplate
 from langfuse.decorators import observe, langfuse_context
 from pydantic import BaseModel, Field
-
-from app.detector.prompts.pullrequest_badpractice_detector import (
-    BAD_PRACTICE_PROMPT,
-)
 from app.models import get_model
 from app.settings import settings
 
 ChatModel = get_model(settings.DETECTION_MODEL_NAME)
 model = ChatModel()
+langfuse = Langfuse()
 
 
 class BadPracticeStatus(str, Enum):
@@ -61,6 +59,7 @@ def detect_bad_practices(
     pull_request_number,
     bad_practice_summary,
     bad_practices,
+    pull_request_template,
 ) -> DetectionResult:
 
     callbacks: List[CallbackHandler] = []
@@ -68,24 +67,33 @@ def detect_bad_practices(
         langfuse_handler = langfuse_context.get_current_langchain_handler()
         langfuse_handler.auth_check()
         callbacks.append(langfuse_handler)
-
     config = RunnableConfig(callbacks=callbacks)
-    prompt_text = BAD_PRACTICE_PROMPT
-    prompt_template = ChatPromptTemplate.from_template(prompt_text)
-    prompt = prompt_template.invoke(
+    langfuse_prompt = langfuse.get_prompt("Bad-Practice-Detector")
+    langchain_prompt = PromptTemplate.from_template(
+        langfuse_prompt.get_langchain_prompt(),
+        metadata={"langfuse_prompt": langfuse_prompt},
+    )
+    structured_llm = model.with_structured_output(BadPracticeResult)
+    chain = langchain_prompt | structured_llm
+    response = chain.invoke(
         {
             "title": title,
             "description": description,
             "lifecycle_state": lifecycle_state,
+            "repository_name": repository_name,
             "bad_practice_summary": bad_practice_summary,
             "bad_practices": bad_practices,
-        }
+            "pull_request_template": pull_request_template,
+        },
+        config=config,
     )
-    structured_llm = model.with_structured_output(BadPracticeResult)
-    response = structured_llm.invoke(prompt, config)
     trace_id = langfuse_context.get_current_trace_id() or ""
+    session_id = repository_name + "#" + str(pull_request_number)
+    langfuse_context.update_current_observation(
+        prompt=langfuse_prompt,
+    )
     langfuse_context.update_current_trace(
-        tags=[repository_name, str(pull_request_number)]
+        tags=[repository_name, str(pull_request_number)], session_id=session_id
     )
     return DetectionResult(
         bad_practice_summary=response.bad_practice_summary,

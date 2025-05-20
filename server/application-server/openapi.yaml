@@ -8,7 +8,7 @@ info:
   license:
     name: MIT License
     url: https://github.com/ls1intum/Hephaestus/blob/develop/LICENSE
-  version: 0.7.0
+  version: 0.7.2
 servers:
 - url: /
   description: Default Server URL
@@ -852,9 +852,16 @@ components:
         createdAt:
           type: string
           format: date-time
+        updatedAt:
+          type: string
+          format: date-time
         badPracticeSummary:
           type: string
         badPractices:
+          type: array
+          items:
+            $ref: "#/components/schemas/PullRequestBadPractice"
+        oldBadPractices:
           type: array
           items:
             $ref: "#/components/schemas/PullRequestBadPractice"
@@ -870,9 +877,11 @@ components:
       - isMerged
       - labels
       - number
+      - oldBadPractices
       - repository
       - state
       - title
+      - updatedAt
     PullRequestBaseInfo:
       type: object
       properties:

@@ -1,6 +1,5 @@
 package de.tum.in.www1.hephaestus.activity.badpracticedetector;
 
-import de.tum.in.www1.hephaestus.activity.PullRequestBadPracticeRepository;
 import de.tum.in.www1.hephaestus.gitprovider.label.Label;
 import de.tum.in.www1.hephaestus.gitprovider.pullrequest.PullRequest;
 import de.tum.in.www1.hephaestus.gitprovider.user.User;
@@ -26,6 +25,7 @@ public class BadPracticeDetectorScheduler {
     private static final Logger logger = LoggerFactory.getLogger(BadPracticeDetectorScheduler.class);
 
     private static final String READY_TO_REVIEW = "ready to review";
+    private static final String READY_FOR_REVIEW = "ready for review";
     private static final String READY_TO_MERGE = "ready to merge";
 
     @Qualifier("taskScheduler")
@@ -40,9 +40,6 @@ public class BadPracticeDetectorScheduler {
 
     @Autowired
     Keycloak keycloak;
-
-    @Autowired
-    PullRequestBadPracticeRepository pullRequestBadPracticeRepository;
 
     @Value("${hephaestus.detection.run-automatic-detection-for-all}")
     private boolean runAutomaticDetectionForAll;
@@ -65,6 +62,8 @@ public class BadPracticeDetectorScheduler {
         if (
             (newLabels.stream().anyMatch(label -> READY_TO_REVIEW.equals(label.getName())) &&
                 oldLabels.stream().noneMatch(label -> READY_TO_REVIEW.equals(label.getName()))) ||
+            (newLabels.stream().anyMatch(label -> READY_FOR_REVIEW.equals(label.getName())) &&
+                oldLabels.stream().noneMatch(label -> READY_FOR_REVIEW.equals(label.getName()))) ||
             (newLabels.stream().anyMatch(label -> READY_TO_MERGE.equals(label.getName())) &&
                 oldLabels.stream().noneMatch(label -> READY_TO_MERGE.equals(label.getName())))
         ) {
@@ -174,7 +173,6 @@ public class BadPracticeDetectorScheduler {
         badPracticeDetectorTask.setPullRequestBadPracticeDetector(pullRequestBadPracticeDetector);
         badPracticeDetectorTask.setMailService(mailService);
         badPracticeDetectorTask.setPullRequest(pullRequest);
-        badPracticeDetectorTask.setPullRequestBadPracticeRepository(pullRequestBadPracticeRepository);
         badPracticeDetectorTask.setSendBadPracticeDetectionEmail(sendBadPracticeDetectionEmail);
         return badPracticeDetectorTask;
     }

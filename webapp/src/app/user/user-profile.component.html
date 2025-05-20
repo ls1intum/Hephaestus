@@ -43,7 +43,12 @@
         </ng-scrollbar>
       </div>
       <div class="flex flex-col flex-1 gap-4 ml-3">
-        <h2 class="text-xl font-semibold">Open Pull Requests</h2>
+        <span class="flex justify-between items-center pr-6">
+          <h2 class="text-xl font-semibold">Open Pull Requests</h2>
+          <a hlmBtn variant="secondary" [routerLink]="'/user/' + userLogin() + '/best-practices'" class="cursor-pointer">
+            <span>Best practices</span>
+          </a>
+        </span>
         @let userPullRequests = showSkeleton ? skeletonPullRequests : query.data()?.openPullRequests;
         <ng-scrollbar hlm [style]="'height : ' + calcScrollHeight(userPullRequests, 200)">
           <div class="flex flex-col gap-2 m-1 mr-3">

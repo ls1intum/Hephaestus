@@ -1,7 +1,6 @@
 package de.tum.in.www1.hephaestus.activity.badpracticedetector;
 
-import de.tum.in.www1.hephaestus.activity.PullRequestBadPracticeRepository;
-import de.tum.in.www1.hephaestus.activity.model.DetectionResult;
+import de.tum.in.www1.hephaestus.activity.model.BadPracticeDetection;
 import de.tum.in.www1.hephaestus.activity.model.PullRequestBadPractice;
 import de.tum.in.www1.hephaestus.activity.model.PullRequestBadPracticeState;
 import de.tum.in.www1.hephaestus.gitprovider.pullrequest.PullRequest;
@@ -19,29 +18,28 @@ public class BadPracticeDetectorTask implements Runnable {
 
     private MailService mailService;
 
-    private PullRequestBadPracticeRepository pullRequestBadPracticeRepository;
-
     private PullRequest pullRequest;
 
     private boolean sendBadPracticeDetectionEmail = true;
 
     @Override
     public void run() {
-        DetectionResult detectionResult = pullRequestBadPracticeDetector.detectAndSyncBadPractices(pullRequest);
+        BadPracticeDetection detectionResult = pullRequestBadPracticeDetector.detectBadPracticesForPullRequest(
+            pullRequest
+        );
 
-        if (detectionResult == DetectionResult.NO_BAD_PRACTICES_DETECTED) {
+        if (detectionResult.getBadPractices().isEmpty()) {
             return;
         }
 
-        List<PullRequestBadPractice> badPractices = pullRequestBadPracticeRepository.findByPullRequestId(
-            pullRequest.getId()
-        );
+        List<PullRequestBadPractice> badPractices = detectionResult.getBadPractices();
 
         List<PullRequestBadPractice> unResolvedBadPractices = badPractices
             .stream()
             .filter(badPractice -> !(badPractice.getState() == PullRequestBadPracticeState.FIXED))
             .filter(badPractice -> !(badPractice.getState() == PullRequestBadPracticeState.WONT_FIX))
             .filter(badPractice -> !(badPractice.getState() == PullRequestBadPracticeState.WRONG))
+            .filter(badPractice -> !(badPractice.getState() == PullRequestBadPracticeState.GOOD_PRACTICE))
             .toList();
 
         if (sendBadPracticeDetectionEmail && !unResolvedBadPractices.isEmpty()) {

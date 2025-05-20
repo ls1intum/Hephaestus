@@ -48,4 +48,8 @@ public class PullRequestBadPractice {
     private PullRequestLifecycleState detectionPullrequestLifecycleState;
 
     private String detectionTraceId;
+
+    @ManyToOne
+    @JoinColumn(name = "bad_practice_detection_id")
+    private BadPracticeDetection badPracticeDetection;
 }

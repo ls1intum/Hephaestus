@@ -22,12 +22,15 @@ public record PullRequestWithBadPracticesDTO(
     @NonNull Integer deletions,
     @NonNull String htmlUrl,
     @NonNull OffsetDateTime createdAt,
+    @NonNull OffsetDateTime updatedAt,
     @NonNull String badPracticeSummary,
-    @NonNull List<PullRequestBadPracticeDTO> badPractices
+    @NonNull List<PullRequestBadPracticeDTO> badPractices,
+    @NonNull List<PullRequestBadPracticeDTO> oldBadPractices
 ) {
     public static PullRequestWithBadPracticesDTO fromPullRequest(
         PullRequest pullRequest,
-        List<PullRequestBadPracticeDTO> badPractices
+        List<PullRequestBadPracticeDTO> badPractices,
+        List<PullRequestBadPracticeDTO> oldBadPractices
     ) {
         return new PullRequestWithBadPracticesDTO(
             pullRequest.getId(),
@@ -47,8 +50,10 @@ public record PullRequestWithBadPracticesDTO(
             pullRequest.getDeletions(),
             pullRequest.getHtmlUrl(),
             pullRequest.getCreatedAt(),
+            pullRequest.getUpdatedAt(),
             pullRequest.getBadPracticeSummary(),
-            badPractices
+            badPractices,
+            oldBadPractices
         );
     }
 }
