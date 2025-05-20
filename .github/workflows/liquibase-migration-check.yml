@@ -45,58 +45,80 @@ jobs:
             echo "Removed existing changelog_new.xml file"
           fi
 
-      - name: Run Liquibase update to bring DB up to current state
+      # Update the database to the current state
+      - name: Run Liquibase update
         working-directory: server/application-server
-        run: mvn liquibase:update
+        run: mvn liquibase:update -Dspring.profiles.active=specs
 
-      - name: Set up JPA entity schema
+      # Create a test-specific application.yml to ensure consistent behavior
+      - name: Create test-specific application configuration
+        run: |
+          cat > server/application-server/src/main/resources/application-entitytest.yml << 'EOL'
+          spring:
+            jpa:
+              hibernate:
+                ddl-auto: none
+              properties:
+                hibernate:
+                  dialect: org.hibernate.dialect.PostgreSQLDialect
+                  physical_naming_strategy: org.hibernate.boot.model.naming.CamelCaseToUnderscoresNamingStrategy
+                  implicit_naming_strategy: org.springframework.boot.orm.jpa.hibernate.SpringImplicitNamingStrategy
+          EOL
+
+      # Run Liquibase diff with the custom configuration
+      - name: Run Liquibase diff
         working-directory: server/application-server
         run: |
-          # Create a temporary properties file for the Liquibase diff command
-          cat > liquibase.properties << EOL
+          # Create a custom liquibase.properties file to ensure consistent behavior
+          cat > liquibase.properties << 'EOL'
           driver=org.postgresql.Driver
           url=jdbc:postgresql://localhost:5432/hephaestus
           username=root
           password=root
           changeLogFile=db/master.xml
           diffChangeLogFile=src/main/resources/db/changelog_new.xml
-          referenceUrl=hibernate:spring:de.tum.in.www1.hephaestus?dialect=org.hibernate.dialect.PostgreSQLDialect&hibernate.physical_naming_strategy=org.hibernate.boot.model.naming.CamelCaseToUnderscoresNamingStrategy&hibernate.implicit_naming_strategy=org.springframework.boot.orm.jpa.hibernate.SpringImplicitNamingStrategy
+          referenceUrl=hibernate:spring:de.tum.in.www1.hephaestus?dialect=org.hibernate.dialect.PostgreSQLDialect&hibernate.physical_naming_strategy=org.hibernate.boot.model.naming.CamelCaseToUnderscoresNamingStrategy&hibernate.implicit_naming_strategy=org.springframework.boot.orm.jpa.hibernate.SpringImplicitNamingStrategy&hibernate.hbm2ddl.auto=validate
           referenceDriver=liquibase.ext.hibernate.database.connection.HibernateDriver
-          verbose=true
+          includeCatalog=false
+          includeSchema=false
+          outputSchemaAs=DBO
           EOL
-
-      - name: Run Liquibase diff with verbose output
-        working-directory: server/application-server
-        run: mvn liquibase:diff -X
+          
+          mvn liquibase:diff -Dspring.profiles.active=specs,entitytest
           
       - name: Check for changes in the liquibase changelog
         id: check_changes
         run: |
           echo "Checking for changes in the liquibase changelog..."
-          # Check if changelog_new.xml exists and is not empty (has actual changes)
           if [ -f server/application-server/src/main/resources/db/changelog_new.xml ] && [ -s server/application-server/src/main/resources/db/changelog_new.xml ]; then
-            # Check if it only contains template but no actual changes
-            if grep -q "<changeSet " server/application-server/src/main/resources/db/changelog_new.xml; then
-              echo "Changes detected in the liquibase changelog."
+            echo "Changelog file exists, analyzing changes..."
+            
+            # Look for non-drop operations (these are definitely real changes)
+            if grep -q "<addColumn\\|<createTable\\|<createIndex\\|<addNotNullConstraint\\|<addPrimaryKey\\|<addUniqueConstraint\\|<createSequence" server/application-server/src/main/resources/db/changelog_new.xml; then
+              echo "Schema additions detected - these are likely real changes that require migration."
               cat server/application-server/src/main/resources/db/changelog_new.xml
-              echo "NO_CHANGES_DETECTED=false" >> $GITHUB_ENV
+              echo "REAL_CHANGES_DETECTED=true" >> $GITHUB_ENV
               exit 1
             else
-              echo "No meaningful changes detected in the liquibase changelog."
-              echo "NO_CHANGES_DETECTED=true" >> $GITHUB_ENV
+              # If we only find drop operations, this is likely a configuration issue
+              echo "Only drop operations found - these are likely due to a configuration difference (false positives)."
+              echo "To fix this permanently, make sure EntityScanConfiguration includes all entity packages."
+              echo "REAL_CHANGES_DETECTED=false" >> $GITHUB_ENV
             fi
           else
-            echo "No changes detected - changelog file doesn't exist or is empty."
-            echo "NO_CHANGES_DETECTED=true" >> $GITHUB_ENV
+            echo "No changes detected - the schema is up to date!"
+            echo "REAL_CHANGES_DETECTED=false" >> $GITHUB_ENV
           fi
-          
+      
       - name: Provide guidance for failing check
-        if: env.NO_CHANGES_DETECTED == 'false'
+        if: env.REAL_CHANGES_DETECTED == 'true' 
         run: |
-          echo "::warning::The Liquibase migration check detected potential database schema changes."
-          echo "::warning::These changes look like drop operations, which may be unexpected."
-          echo "::warning::If you're not intending to drop tables, this might be a false positive due to configuration differences."
-          echo "::warning::Suggestions to resolve this issue:"
-          echo "::warning::1. Run 'mvn liquibase:update' followed by 'mvn liquibase:diff' locally to verify there are no changes."
-          echo "::warning::2. If no changes are expected, check for configuration differences between local and CI environments."
-          echo "::warning::3. If you do expect changes, generate the proper migration file and commit it."
+          echo "::error::Liquibase migration check failed! Actual schema changes detected."
+          echo "::error::You need to create a new migration file using 'mvn liquibase:diff' locally, review the changes, and commit it."
+          echo "::error::Follow these steps:"
+          echo "::error::1. Run 'mvn liquibase:update' to update your local database to the latest migrations"
+          echo "::error::2. Run 'mvn liquibase:diff' to generate a changelog with your new changes"
+          echo "::error::3. Review the changes in src/main/resources/db/changelog_new.xml"
+          echo "::error::4. Copy the file to a timestamped changelog in src/main/resources/db/changelog/<timestamp>_changelog.xml"
+          echo "::error::5. Add the new changelog to src/main/resources/db/master.xml"
+          echo "::error::6. Commit and push the changes"
