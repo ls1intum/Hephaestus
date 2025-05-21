@@ -14,16 +14,16 @@ export type PullRequestInfo = {
     repository?: RepositoryInfo;
     additions: number;
     deletions: number;
-    mergedAt?: string;
-    closedAt?: string;
+    mergedAt?: Date;
+    closedAt?: Date;
     htmlUrl: string;
-    createdAt?: string;
-    updatedAt?: string;
+    createdAt?: Date;
+    updatedAt?: Date;
 };
 
 export type Message = {
     id: number;
-    sentAt: string;
+    sentAt: Date;
     sender: 'MENTOR' | 'USER';
     content: string;
     sessionId: number;
@@ -31,7 +31,7 @@ export type Message = {
 
 export type UserProfile = {
     userInfo: UserInfo;
-    firstContribution: string;
+    firstContribution: Date;
     contributedRepositories: Array<RepositoryInfo>;
     reviewActivity?: Array<PullRequestReviewInfo>;
     openPullRequests?: Array<PullRequestInfo>;
@@ -69,9 +69,11 @@ export type PullRequestWithBadPractices = {
     additions: number;
     deletions: number;
     htmlUrl: string;
-    createdAt: string;
+    createdAt: Date;
+    updatedAt: Date;
     badPracticeSummary: string;
     badPractices: Array<PullRequestBadPractice>;
+    oldBadPractices: Array<PullRequestBadPractice>;
 };
 
 export type PullRequestBaseInfo = {
@@ -151,7 +153,7 @@ export type PullRequestReviewInfo = {
     pullRequest?: PullRequestBaseInfo;
     htmlUrl: string;
     score: number;
-    submittedAt?: string;
+    submittedAt?: Date;
 };
 
 export type MetaData = {
@@ -175,7 +177,7 @@ export type LeaderboardEntry = {
 
 export type Session = {
     id: number;
-    createdAt: string;
+    createdAt: Date;
     isClosed: boolean;
 };
 
@@ -477,8 +479,8 @@ export type GetLeaderboardData = {
     body?: never;
     path?: never;
     query: {
-        after: string;
-        before: string;
+        after: Date;
+        before: Date;
         team?: string;
         sort?: 'SCORE' | 'LEAGUE_POINTS';
     };
@@ -525,10 +527,8 @@ export type DetectBadPracticesByUserResponses = {
     /**
      * OK
      */
-    200: Array<PullRequestBadPractice>;
+    200: unknown;
 };
-
-export type DetectBadPracticesByUserResponse = DetectBadPracticesByUserResponses[keyof DetectBadPracticesByUserResponses];
 
 export type DetectBadPracticesForPullRequestData = {
     body?: never;
@@ -543,10 +543,8 @@ export type DetectBadPracticesForPullRequestResponses = {
     /**
      * OK
      */
-    200: Array<PullRequestBadPractice>;
+    200: unknown;
 };
-
-export type DetectBadPracticesForPullRequestResponse = DetectBadPracticesForPullRequestResponses[keyof DetectBadPracticesForPullRequestResponses];
 
 export type ResolveBadPracticeData = {
     body?: never;

@@ -13,7 +13,7 @@ import {
 	FileDiffIcon,
 	GitPullRequestIcon,
 } from "@primer/octicons-react";
-import { formatDistanceToNow, parseISO } from "date-fns";
+import { formatDistanceToNow } from "date-fns";
 import { AwardIcon } from "lucide-react";
 
 // Define the styling for different review states
@@ -55,7 +55,7 @@ const REVIEW_STATE_STYLES: Record<
 export interface ReviewActivityCardProps {
 	isLoading: boolean;
 	state?: "COMMENTED" | "APPROVED" | "CHANGES_REQUESTED" | "UNKNOWN";
-	submittedAt?: string;
+	submittedAt?: Date;
 	htmlUrl?: string;
 	pullRequest?: {
 		id?: number;
@@ -89,7 +89,7 @@ export function ReviewActivityCard({
 
 	// Format relative time from submission date
 	const relativeTime = submittedAt
-		? formatDistanceToNow(parseISO(submittedAt), { addSuffix: true })
+		? formatDistanceToNow(submittedAt, { addSuffix: true })
 		: undefined;
 
 	// Use CSS to style the card as a clickable link with hover effects

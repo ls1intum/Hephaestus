@@ -53,8 +53,8 @@ function createMockReviewedPullRequest(amount: number) {
 				isDraft: false,
 				isMerged: true,
 				commentsCount: 5,
-				createdAt: "2023-01-01T00:00:00Z",
-				updatedAt: "2023-01-02T00:00:00Z",
+				createdAt: new Date("2023-01-01T00:00:00Z"),
+				updatedAt: new Date("2023-01-02T00:00:00Z"),
 				additions: 10,
 				deletions: 2,
 				repository: {

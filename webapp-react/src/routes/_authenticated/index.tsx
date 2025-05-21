@@ -57,8 +57,8 @@ function LeaderboardContainer() {
 	const leaderboardQuery = useQuery({
 		...getLeaderboardOptions({
 			query: {
-				after,
-				before,
+				after: new Date(after || startOfCurrentWeek),
+				before: new Date(before || endOfCurrentWeek),
 				team,
 				sort,
 			},

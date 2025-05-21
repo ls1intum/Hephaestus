@@ -31,8 +31,8 @@ const meta = {
 			control: "number",
 		},
 		firstContribution: {
-			description: "Date of the user's first contribution (ISO string)",
-			control: "text",
+			description: "Date of the user's first contribution (Date object)",
+			control: "date",
 		},
 		contributedRepositories: {
 			description: "List of repositories the user has contributed to",
@@ -60,7 +60,7 @@ export const Default: Story = {
 			htmlUrl: "https://github.com/johndoe",
 		},
 		leaguePoints: 1450,
-		firstContribution: "2022-05-15T00:00:00Z",
+		firstContribution: new Date("2022-05-15T00:00:00Z"),
 		contributedRepositories: [
 			{
 				id: 1,
@@ -101,7 +101,7 @@ export const NoRepositories: Story = {
 			htmlUrl: "https://github.com/janedoe",
 		},
 		leaguePoints: 750,
-		firstContribution: "2023-01-10T00:00:00Z",
+		firstContribution: new Date("2023-01-10T00:00:00Z"),
 		contributedRepositories: [],
 	},
 };
@@ -117,7 +117,7 @@ export const BronzeLeague: Story = {
 			htmlUrl: "https://github.com/bronzeUser",
 		},
 		leaguePoints: 1000,
-		firstContribution: "2023-03-15T00:00:00Z",
+		firstContribution: new Date("2023-03-15T00:00:00Z"),
 		contributedRepositories: [],
 	},
 };
@@ -133,7 +133,7 @@ export const SilverLeague: Story = {
 			htmlUrl: "https://github.com/silverUser",
 		},
 		leaguePoints: 1400,
-		firstContribution: "2022-10-10T00:00:00Z",
+		firstContribution: new Date("2022-10-10T00:00:00Z"),
 		contributedRepositories: [],
 	},
 };
@@ -149,7 +149,7 @@ export const GoldLeague: Story = {
 			htmlUrl: "https://github.com/goldUser",
 		},
 		leaguePoints: 1650,
-		firstContribution: "2022-07-22T00:00:00Z",
+		firstContribution: new Date("2022-07-22T00:00:00Z"),
 		contributedRepositories: [],
 	},
 };
@@ -165,7 +165,7 @@ export const DiamondLeague: Story = {
 			htmlUrl: "https://github.com/diamondUser",
 		},
 		leaguePoints: 1900,
-		firstContribution: "2021-12-05T00:00:00Z",
+		firstContribution: new Date("2021-12-05T00:00:00Z"),
 		contributedRepositories: [],
 	},
 };
@@ -181,7 +181,7 @@ export const MasterLeague: Story = {
 			htmlUrl: "https://github.com/masterUser",
 		},
 		leaguePoints: 2200,
-		firstContribution: "2020-05-01T00:00:00Z",
+		firstContribution: new Date("2020-05-01T00:00:00Z"),
 		contributedRepositories: [],
 	},
 };

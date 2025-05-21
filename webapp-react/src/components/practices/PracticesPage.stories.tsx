@@ -95,7 +95,8 @@ const mockActivityData: Activity = {
 			additions: 10,
 			deletions: 5,
 			htmlUrl: "http://example.com/pr/12",
-			createdAt: "2024-01-01",
+			createdAt: new Date("2024-01-01"),
+			updatedAt: new Date("2024-01-02"),
 			badPracticeSummary:
 				"We found 2 bad practices in this pull request. Please fix them.",
 			badPractices: [
@@ -113,6 +114,7 @@ const mockActivityData: Activity = {
 					state: "MINOR_ISSUE",
 				},
 			],
+			oldBadPractices: [],
 		},
 		{
 			id: 2,
@@ -132,7 +134,8 @@ const mockActivityData: Activity = {
 			additions: 5,
 			deletions: 2,
 			htmlUrl: "http://example.com/pr/13",
-			createdAt: "2024-01-02",
+			createdAt: new Date("2024-01-02"),
+			updatedAt: new Date("2024-01-03"),
 			badPracticeSummary: "Great work! We found 1 good practice in your code.",
 			badPractices: [
 				{
@@ -142,6 +145,7 @@ const mockActivityData: Activity = {
 					state: "GOOD_PRACTICE",
 				},
 			],
+			oldBadPractices: [],
 		},
 	],
 };

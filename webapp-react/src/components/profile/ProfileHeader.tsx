@@ -9,7 +9,7 @@ import {
 	TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { ClockIcon } from "@primer/octicons-react";
-import { format, parseISO } from "date-fns";
+import { format } from "date-fns";
 
 // Repository images for known repositories
 const REPO_IMAGES: Record<string, string> = {
@@ -22,7 +22,7 @@ const REPO_IMAGES: Record<string, string> = {
 
 export interface ProfileHeaderProps {
 	user?: UserInfo;
-	firstContribution?: string;
+	firstContribution?: Date;
 	contributedRepositories?: RepositoryInfo[];
 	leaguePoints?: number;
 	isLoading: boolean;
@@ -37,7 +37,7 @@ export function ProfileHeader({
 }: ProfileHeaderProps) {
 	// Format the first contribution date if available
 	const formattedFirstContribution = firstContribution
-		? format(parseISO(firstContribution), "MMMM do, yyyy")
+		? format(firstContribution, "MMMM do, yyyy")
 		: undefined;
 
 	// Function to get repository image based on nameWithOwner

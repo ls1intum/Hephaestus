@@ -7,7 +7,7 @@ const mockReviewActivity = [
 	{
 		id: 1,
 		state: "APPROVED" as const,
-		submittedAt: subDays(new Date(), 2).toISOString(),
+		submittedAt: subDays(new Date(), 2),
 		htmlUrl: "https://github.com/ls1intum/Hephaestus/pull/42",
 		pullRequest: {
 			id: 101,
@@ -31,7 +31,7 @@ const mockReviewActivity = [
 	{
 		id: 2,
 		state: "CHANGES_REQUESTED" as const,
-		submittedAt: subDays(new Date(), 5).toISOString(),
+		submittedAt: subDays(new Date(), 5),
 		htmlUrl: "https://github.com/ls1intum/Artemis/pull/123",
 		pullRequest: {
 			id: 102,
@@ -55,7 +55,7 @@ const mockReviewActivity = [
 	{
 		id: 3,
 		state: "COMMENTED" as const,
-		submittedAt: subDays(new Date(), 7).toISOString(),
+		submittedAt: subDays(new Date(), 7),
 		htmlUrl: "https://github.com/ls1intum/Athena/pull/15",
 		pullRequest: {
 			id: 103,
@@ -91,7 +91,7 @@ const mockOpenPullRequests = [
 		additions: 250,
 		deletions: 30,
 		htmlUrl: "https://github.com/ls1intum/Hephaestus/pull/42",
-		createdAt: subDays(new Date(), 3).toISOString(),
+		createdAt: subDays(new Date(), 3),
 		repository: {
 			id: 1,
 			name: "Hephaestus",
@@ -114,7 +114,7 @@ const mockOpenPullRequests = [
 		additions: 320,
 		deletions: 280,
 		htmlUrl: "https://github.com/ls1intum/Artemis/pull/87",
-		createdAt: subDays(new Date(), 1).toISOString(),
+		createdAt: subDays(new Date(), 1),
 		repository: {
 			id: 2,
 			name: "Artemis",

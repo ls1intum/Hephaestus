@@ -2,7 +2,7 @@
 
 import { type Options, removeUserFromTeam, addTeamToUser, createTeam, automaticallyAssignTeams, resetAndRecalculateLeagues, removeRepositoryFromTeam, addRepositoryToTeam, addLabelToTeam, removeRepositoryToMonitor, addRepositoryToMonitor, getUserSettings, updateUserSettings, hideTeam, getAllSessions, createNewSession, getMessages, createMessage, getLeaderboard, getUserLeagueStats, detectBadPracticesByUser, detectBadPracticesForPullRequest, resolveBadPractice, provideFeedbackForBadPractice, getUsersWithTeams, getRepositoriesToMonitor, getUserProfile, getTeams, getMetaData, getContributors, getLastSession, getActivityByUser, deleteTeam, removeLabelFromTeam, deleteUser } from '../sdk.gen';
 import { type UseMutationOptions, type DefaultError, queryOptions, infiniteQueryOptions, type InfiniteData } from '@tanstack/react-query';
-import type { RemoveUserFromTeamData, RemoveUserFromTeamResponse, AddTeamToUserData, AddTeamToUserResponse, CreateTeamData, CreateTeamResponse, AutomaticallyAssignTeamsData, ResetAndRecalculateLeaguesData, RemoveRepositoryFromTeamData, RemoveRepositoryFromTeamResponse, AddRepositoryToTeamData, AddRepositoryToTeamResponse, AddLabelToTeamData, AddLabelToTeamResponse, RemoveRepositoryToMonitorData, AddRepositoryToMonitorData, GetUserSettingsData, UpdateUserSettingsData, UpdateUserSettingsResponse, HideTeamData, HideTeamResponse, GetAllSessionsData, CreateNewSessionData, CreateNewSessionResponse, GetMessagesData, CreateMessageData, CreateMessageResponse, GetLeaderboardData, GetLeaderboardResponse, GetUserLeagueStatsData, GetUserLeagueStatsResponse, DetectBadPracticesByUserData, DetectBadPracticesByUserResponse, DetectBadPracticesForPullRequestData, DetectBadPracticesForPullRequestResponse, ResolveBadPracticeData, ProvideFeedbackForBadPracticeData, GetUsersWithTeamsData, GetRepositoriesToMonitorData, GetUserProfileData, GetTeamsData, GetMetaDataData, GetContributorsData, GetLastSessionData, GetActivityByUserData, DeleteTeamData, DeleteTeamResponse, RemoveLabelFromTeamData, RemoveLabelFromTeamResponse, DeleteUserData } from '../types.gen';
+import type { RemoveUserFromTeamData, RemoveUserFromTeamResponse, AddTeamToUserData, AddTeamToUserResponse, CreateTeamData, CreateTeamResponse, AutomaticallyAssignTeamsData, ResetAndRecalculateLeaguesData, RemoveRepositoryFromTeamData, RemoveRepositoryFromTeamResponse, AddRepositoryToTeamData, AddRepositoryToTeamResponse, AddLabelToTeamData, AddLabelToTeamResponse, RemoveRepositoryToMonitorData, AddRepositoryToMonitorData, GetUserSettingsData, UpdateUserSettingsData, UpdateUserSettingsResponse, HideTeamData, HideTeamResponse, GetAllSessionsData, CreateNewSessionData, CreateNewSessionResponse, GetMessagesData, CreateMessageData, CreateMessageResponse, GetLeaderboardData, GetLeaderboardResponse, GetUserLeagueStatsData, GetUserLeagueStatsResponse, DetectBadPracticesByUserData, DetectBadPracticesForPullRequestData, ResolveBadPracticeData, ProvideFeedbackForBadPracticeData, GetUsersWithTeamsData, GetRepositoriesToMonitorData, GetUserProfileData, GetTeamsData, GetMetaDataData, GetContributorsData, GetLastSessionData, GetActivityByUserData, DeleteTeamData, DeleteTeamResponse, RemoveLabelFromTeamData, RemoveLabelFromTeamResponse, DeleteUserData } from '../types.gen';
 import { client as _heyApiClient } from '../client.gen';
 
 export const removeUserFromTeamMutation = (options?: Partial<Options<RemoveUserFromTeamData>>): UseMutationOptions<RemoveUserFromTeamResponse, DefaultError, Options<RemoveUserFromTeamData>> => {
@@ -451,7 +451,7 @@ const createInfiniteParams = <K extends Pick<QueryKey<Options>[0], 'body' | 'hea
 export const getLeaderboardInfiniteQueryKey = (options: Options<GetLeaderboardData>): QueryKey<Options<GetLeaderboardData>> => createQueryKey('getLeaderboard', options, true);
 
 export const getLeaderboardInfiniteOptions = (options: Options<GetLeaderboardData>) => {
-    return infiniteQueryOptions<GetLeaderboardResponse, DefaultError, InfiniteData<GetLeaderboardResponse>, QueryKey<Options<GetLeaderboardData>>, string | Pick<QueryKey<Options<GetLeaderboardData>>[0], 'body' | 'headers' | 'path' | 'query'>>(
+    return infiniteQueryOptions<GetLeaderboardResponse, DefaultError, InfiniteData<GetLeaderboardResponse>, QueryKey<Options<GetLeaderboardData>>, Date | Pick<QueryKey<Options<GetLeaderboardData>>[0], 'body' | 'headers' | 'path' | 'query'>>(
     // @ts-ignore
     {
         queryFn: async ({ pageParam, queryKey, signal }) => {
@@ -522,8 +522,8 @@ export const detectBadPracticesByUserOptions = (options: Options<DetectBadPracti
     });
 };
 
-export const detectBadPracticesByUserMutation = (options?: Partial<Options<DetectBadPracticesByUserData>>): UseMutationOptions<DetectBadPracticesByUserResponse, DefaultError, Options<DetectBadPracticesByUserData>> => {
-    const mutationOptions: UseMutationOptions<DetectBadPracticesByUserResponse, DefaultError, Options<DetectBadPracticesByUserData>> = {
+export const detectBadPracticesByUserMutation = (options?: Partial<Options<DetectBadPracticesByUserData>>): UseMutationOptions<unknown, DefaultError, Options<DetectBadPracticesByUserData>> => {
+    const mutationOptions: UseMutationOptions<unknown, DefaultError, Options<DetectBadPracticesByUserData>> = {
         mutationFn: async (localOptions) => {
             const { data } = await detectBadPracticesByUser({
                 ...options,
@@ -553,8 +553,8 @@ export const detectBadPracticesForPullRequestOptions = (options: Options<DetectB
     });
 };
 
-export const detectBadPracticesForPullRequestMutation = (options?: Partial<Options<DetectBadPracticesForPullRequestData>>): UseMutationOptions<DetectBadPracticesForPullRequestResponse, DefaultError, Options<DetectBadPracticesForPullRequestData>> => {
-    const mutationOptions: UseMutationOptions<DetectBadPracticesForPullRequestResponse, DefaultError, Options<DetectBadPracticesForPullRequestData>> = {
+export const detectBadPracticesForPullRequestMutation = (options?: Partial<Options<DetectBadPracticesForPullRequestData>>): UseMutationOptions<unknown, DefaultError, Options<DetectBadPracticesForPullRequestData>> => {
+    const mutationOptions: UseMutationOptions<unknown, DefaultError, Options<DetectBadPracticesForPullRequestData>> = {
         mutationFn: async (localOptions) => {
             const { data } = await detectBadPracticesForPullRequest({
                 ...options,

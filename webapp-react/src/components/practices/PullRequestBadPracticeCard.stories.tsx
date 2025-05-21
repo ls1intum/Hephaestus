@@ -62,12 +62,12 @@ const meta = {
 			control: "text",
 		},
 		createdAt: {
-			description: "Creation date of the PR (ISO format)",
-			control: "text",
+			description: "Creation date of the PR (Date object)",
+			control: "date",
 		},
 		updatedAt: {
-			description: "Last update date of the PR (ISO format)",
-			control: "text",
+			description: "Last update date of the PR (Date object)",
+			control: "date",
 		},
 		pullRequestLabels: {
 			description: "Array of labels attached to the PR",
@@ -148,8 +148,8 @@ export const Default: Story = {
 		isDraft: false,
 		isMerged: false,
 		repositoryName: "Artemis",
-		createdAt: "2024-01-01T12:00:00Z",
-		updatedAt: "2024-01-05T14:30:00Z",
+		createdAt: new Date("2024-01-01T12:00:00Z"),
+		updatedAt: new Date("2024-01-05T14:30:00Z"),
 		pullRequestLabels: [
 			{ id: 1, name: "bug", color: "d73a4a" },
 			{ id: 2, name: "enhancement", color: "0e8a16" },
@@ -348,8 +348,8 @@ export const MergedPullRequest: Story = {
 		isDraft: false,
 		isMerged: true,
 		repositoryName: "Artemis",
-		createdAt: "2023-12-20T09:15:00Z",
-		updatedAt: "2024-01-02T16:45:00Z",
+		createdAt: new Date("2023-12-20T09:15:00Z"),
+		updatedAt: new Date("2024-01-02T16:45:00Z"),
 		pullRequestLabels: [
 			{ id: 1, name: "tests", color: "0075ca" },
 			{ id: 2, name: "approved", color: "0e8a16" },
@@ -398,7 +398,7 @@ export const DraftPullRequest: Story = {
 		isDraft: true,
 		isMerged: false,
 		repositoryName: "Artemis",
-		createdAt: "2024-02-05T10:30:00Z",
+		createdAt: new Date("2024-02-05T10:30:00Z"),
 		pullRequestLabels: [
 			{ id: 1, name: "WIP", color: "fbca04" },
 			{ id: 2, name: "api", color: "1d76db" },

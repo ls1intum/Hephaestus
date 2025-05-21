@@ -43,10 +43,10 @@ export interface PullRequestBadPracticeCardProps {
 	htmlUrl?: string;
 	/** Name of the repository containing the PR */
 	repositoryName?: string;
-	/** ISO timestamp when the PR was created */
-	createdAt?: string;
-	/** ISO timestamp when the PR was last updated */
-	updatedAt?: string;
+	/** Date when the PR was created */
+	createdAt?: Date;
+	/** Date when the PR was last updated */
+	updatedAt?: Date;
 
 	/** Current state of the pull request (OPEN, CLOSED, etc.) */
 	state?: string;
@@ -64,6 +64,8 @@ export interface PullRequestBadPracticeCardProps {
 	badPracticeSummary?: string;
 	/** Whether the card is in a loading state */
 	isLoading?: boolean;
+	/** Whether the card is in a detecting state */
+	isDetectingBadPractices?: boolean;
 	/** Whether the card should be expanded by default */
 	openCard?: boolean;
 	/** Whether the current user has permission to perform dashboard actions */
@@ -112,7 +114,7 @@ export function PullRequestBadPracticeCard({
 	deletions = 0,
 	htmlUrl = "",
 	repositoryName = "",
-	createdAt = "",
+	createdAt = undefined,
 	state = "OPEN",
 	isDraft = false,
 	isMerged = false,
@@ -121,6 +123,7 @@ export function PullRequestBadPracticeCard({
 	oldBadPractices = [],
 	badPracticeSummary = "",
 	isLoading = false,
+	isDetectingBadPractices = false,
 	openCard = false,
 	currUserIsDashboardUser = false,
 	onDetectBadPractices,
@@ -221,6 +224,7 @@ export function PullRequestBadPracticeCard({
 						className="gap-1"
 						onClick={handleDetectClick}
 						type="button"
+						disabled={isDetectingBadPractices}
 					>
 						<RefreshCw className="size-3.5" />
 						Analyze Changes
@@ -257,21 +261,23 @@ export function PullRequestBadPracticeCard({
 								className="border-b-0 w-full"
 							>
 								<div className="w-full px-4 py-0">
-									<AccordionTrigger className="w-full">
+									<AccordionTrigger className="w-full group">
 										<div className="flex w-full items-center justify-between gap-2">
 											<span className="font-medium">Current analysis</span>
 											<span className="text-github-muted-foreground">
 												{issueCount > 0 ? (
-													<span className="text-github-danger-foreground accent-github-danger-foreground font-medium">
+													<span className="text-github-danger-foreground accent-github-danger-foreground group-hover:underline decorator-github-danger-foreground font-medium">
 														{issueCount} issue{issueCount !== 1 ? "s" : ""}
 													</span>
 												) : goodCount > 0 ? (
-													<span className="text-github-success-foreground font-medium">
+													<span className="text-github-success-foreground group-hover:underline decorator-github-success-foreground font-medium">
 														{goodCount} good practice
 														{goodCount !== 1 ? "s" : ""}
 													</span>
 												) : resolvedCount > 0 ? (
-													<span className="font-medium">All resolved</span>
+													<span className="group-hover:underline decorator-github-muted-foreground font-medium">
+														All resolved
+													</span>
 												) : (
 													<span>No issues</span>
 												)}

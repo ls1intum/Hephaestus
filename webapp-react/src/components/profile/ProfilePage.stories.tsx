@@ -74,7 +74,7 @@ export const Default: Story = {
 				htmlUrl: "https://github.com/johndoe",
 				leaguePoints: 150,
 			},
-			firstContribution: "2022-05-15T00:00:00Z",
+			firstContribution: new Date("2022-05-15T00:00:00Z"),
 			contributedRepositories: [
 				{
 					id: 1,
@@ -95,7 +95,7 @@ export const Default: Story = {
 				{
 					id: 1,
 					state: "APPROVED" as const,
-					submittedAt: new Date().toISOString(),
+					submittedAt: new Date(),
 					htmlUrl: "https://github.com/ls1intum/Hephaestus/pull/42",
 					pullRequest: {
 						id: 101,
@@ -119,7 +119,7 @@ export const Default: Story = {
 				{
 					id: 2,
 					state: "CHANGES_REQUESTED" as const,
-					submittedAt: new Date().toISOString(),
+					submittedAt: new Date(),
 					htmlUrl: "https://github.com/ls1intum/Artemis/pull/123",
 					pullRequest: {
 						id: 102,
@@ -143,7 +143,7 @@ export const Default: Story = {
 				{
 					id: 3,
 					state: "COMMENTED" as const,
-					submittedAt: new Date().toISOString(),
+					submittedAt: new Date(),
 					htmlUrl: "https://github.com/ls1intum/Athena/pull/56",
 					pullRequest: {
 						id: 103,
@@ -177,7 +177,7 @@ export const Default: Story = {
 					additions: 150,
 					deletions: 50,
 					htmlUrl: "https://github.com/ls1intum/Hephaestus/pull/42",
-					createdAt: new Date().toISOString(),
+					createdAt: new Date(),
 					repository: {
 						id: 1,
 						name: "Hephaestus",
@@ -200,7 +200,7 @@ export const Default: Story = {
 					additions: 320,
 					deletions: 280,
 					htmlUrl: "https://github.com/ls1intum/Artemis/pull/87",
-					createdAt: new Date().toISOString(),
+					createdAt: new Date(),
 					repository: {
 						id: 2,
 						name: "Artemis",
@@ -261,7 +261,7 @@ export const Empty: Story = {
 				htmlUrl: "https://github.com/emptydoe",
 				leaguePoints: 0,
 			},
-			firstContribution: "2023-10-15T00:00:00Z",
+			firstContribution: new Date("2023-10-15T00:00:00Z"),
 			contributedRepositories: [],
 			reviewActivity: [],
 			openPullRequests: [],

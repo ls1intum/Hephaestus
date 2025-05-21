@@ -10,7 +10,7 @@ import {
 	GitPullRequestDraftIcon,
 	GitPullRequestIcon,
 } from "@primer/octicons-react";
-import { format, parseISO } from "date-fns";
+import { format } from "date-fns";
 
 export interface IssueCardProps {
 	isLoading: boolean;
@@ -20,7 +20,7 @@ export interface IssueCardProps {
 	deletions?: number;
 	htmlUrl?: string;
 	repositoryName?: string;
-	createdAt?: string;
+	createdAt?: Date;
 	state?: "OPEN" | "CLOSED";
 	isDraft?: boolean;
 	isMerged?: boolean;
@@ -78,7 +78,7 @@ export function IssueCard({
 	const { icon: StateIcon, color } = getIssueIconAndColor();
 
 	// Format the date as MMM D (e.g., "Jan 15")
-	const formattedDate = createdAt ? format(parseISO(createdAt), "MMM d") : "";
+	const formattedDate = createdAt ? format(createdAt, "MMM d") : "";
 
 	const cardContent = (
 		<Card

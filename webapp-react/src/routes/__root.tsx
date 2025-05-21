@@ -8,6 +8,8 @@ import Footer from "@/components/core/Footer";
 import Header from "@/components/core/Header";
 import environment from "@/environment";
 import { type AuthContextType, useAuth } from "@/integrations/auth/AuthContext";
+import { useTheme } from "@/integrations/theme";
+import { Toaster } from "sonner";
 
 interface MyRouterContext {
 	queryClient: QueryClient;
@@ -15,19 +17,23 @@ interface MyRouterContext {
 }
 
 export const Route = createRootRouteWithContext<MyRouterContext>()({
-	component: () => (
-		<>
-			<div className="flex flex-col min-h-screen">
-				<HeaderContainer />
-				<main className="container flex-grow pt-4 pb-8">
-					<Outlet />
-				</main>
-				<Footer />
-			</div>
-			<TanStackRouterDevtools />
-			<TanstackQueryLayout />
-		</>
-	),
+	component: () => {
+		const { theme } = useTheme();
+		return (
+			<>
+				<div className="flex flex-col min-h-screen">
+					<HeaderContainer />
+					<main className="container flex-grow pt-4 pb-8">
+						<Outlet />
+					</main>
+					<Toaster theme={theme} />
+					<Footer />
+				</div>
+				<TanStackRouterDevtools />
+				<TanstackQueryLayout />
+			</>
+		);
+	},
 	// Add notFoundComponent to handle route not found errors
 	notFoundComponent: () => (
 		<div className="container py-16 flex flex-col items-center justify-center text-center">

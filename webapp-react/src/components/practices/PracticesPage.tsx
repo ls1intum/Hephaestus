@@ -1,4 +1,4 @@
-import type { Activity } from "@/api/types.gen";
+import type { Activity, BadPracticeFeedback } from "@/api/types.gen";
 import { EmptyState } from "@/components/shared/EmptyState";
 import { Button } from "@/components/ui/button";
 import { GitPullRequest, InfoIcon } from "lucide-react";
@@ -15,6 +15,14 @@ interface PracticesPageProps {
 	displayName?: string; // User's display name
 	currUserIsDashboardUser: boolean;
 	onDetectBadPractices: () => void;
+	onDetectBadPracticesForPullRequest?: (pullRequestId: number) => void;
+	onResolveBadPracticeAsFixed?: (badPracticeId: number) => void;
+	onResolveBadPracticeAsWontFix?: (badPracticeId: number) => void;
+	onResolveBadPracticeAsWrong?: (badPracticeId: number) => void;
+	onProvideBadPracticeFeedback?: (
+		badPracticeId: number,
+		feedback: BadPracticeFeedback,
+	) => void;
 }
 
 export function PracticesPage({
@@ -25,6 +33,11 @@ export function PracticesPage({
 	displayName,
 	currUserIsDashboardUser,
 	onDetectBadPractices,
+	onDetectBadPracticesForPullRequest,
+	onResolveBadPracticeAsFixed,
+	onResolveBadPracticeAsWontFix,
+	onResolveBadPracticeAsWrong,
+	onProvideBadPracticeFeedback,
 }: PracticesPageProps) {
 	// Calculate statistics
 	const pullRequests = activityData?.pullRequests || [];
@@ -96,12 +109,20 @@ export function PracticesPage({
 										isMerged={pullRequest.isMerged}
 										additions={pullRequest.additions}
 										deletions={pullRequest.deletions}
+										isDetectingBadPractices={isDetectingBadPractices}
 										repositoryName={pullRequest.repository?.name}
 										createdAt={pullRequest.createdAt}
 										pullRequestLabels={pullRequest.labels}
 										badPractices={pullRequest.badPractices}
 										badPracticeSummary={pullRequest.badPracticeSummary}
 										currUserIsDashboardUser={currUserIsDashboardUser}
+										onDetectBadPractices={onDetectBadPracticesForPullRequest}
+										onResolveBadPracticeAsFixed={onResolveBadPracticeAsFixed}
+										onResolveBadPracticeAsWontFix={
+											onResolveBadPracticeAsWontFix
+										}
+										onResolveBadPracticeAsWrong={onResolveBadPracticeAsWrong}
+										onProvideBadPracticeFeedback={onProvideBadPracticeFeedback}
 									/>
 								))
 							) : (
