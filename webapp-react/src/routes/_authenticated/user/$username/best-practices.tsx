@@ -54,24 +54,11 @@ export function BestPracticesContainer() {
 				}),
 			});
 		},
-		onError: (error) => {
-			console.error(error);
+		onError: () => {
+			toast.error(
+				"Your pull requests have not changed since the last detection. Try changing status or description, then run the detection again.",
+			);
 		},
-		// onError: (error) => {
-		// 	console.error(error);
-		// 	console.error(error.message);
-		// 	console.error(error.name);
-		// 	console.error(error.cause);
-
-		// 	// Check if it's a 400 error (double detection)
-		// 	if (error instanceof Error && error.message.includes("400")) {
-		// 		toast.error(
-		// 			"User activity has not changed since the last detection."
-		// 		);
-		// 	} else {
-		// 		toast.error("A server error occurred");
-		// 	}
-		// },
 	});
 
 	// Mutation for resolving bad practices
@@ -84,8 +71,7 @@ export function BestPracticesContainer() {
 				}),
 			});
 		},
-		onError: (error) => {
-			console.error("Error resolving bad practice:", error);
+		onError: () => {
 			toast.error("Failed to update practice status");
 		},
 	});
@@ -101,8 +87,7 @@ export function BestPracticesContainer() {
 			});
 			toast.success("Feedback submitted successfully");
 		},
-		onError: (error) => {
-			console.error("Error providing feedback for bad practice:", error);
+		onError: () => {
 			toast.error("Failed to submit feedback");
 		},
 	});
@@ -117,17 +102,10 @@ export function BestPracticesContainer() {
 				}),
 			});
 		},
-		onError: (error) => {
-			console.error("Error detecting bad practices:", error);
-
-			// Check if it's a 400 error (double detection)
-			if (error instanceof Error && error.message.includes("400")) {
-				toast.error(
-					"This pull request has not changed since the last detection. Try changing status or description, then run the detection again.",
-				);
-			} else {
-				toast.error("A server error occurred");
-			}
+		onError: () => {
+			toast.error(
+				"This pull request has not changed since the last detection. Try changing status or description, then run the detection again.",
+			);
 		},
 	});
 

@@ -17,7 +17,7 @@ export default defineConfig(({ command, mode }) => {
 			// Only use the terminal plugin during development
 			isDevelopment &&
 				Terminal({
-					console: "terminal",
+					output: ['terminal', 'console']
 				}),
 		].filter(Boolean), // Filter out falsy values
 		test: {
