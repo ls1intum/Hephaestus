@@ -129,7 +129,10 @@ export function BadPracticeCard({
 									</DropdownMenuItem>
 								</DropdownMenuGroup>
 								<DropdownMenuGroup>
-									<DropdownMenuItem onClick={handleResolveAsWrong}>
+									<DropdownMenuItem onClick={() => {
+										handleResolveAsWrong();
+										setDialogOpen(true);
+									}}>
 										Resolve as wrong
 									</DropdownMenuItem>
 								</DropdownMenuGroup>
