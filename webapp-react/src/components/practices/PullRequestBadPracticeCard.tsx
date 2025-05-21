@@ -13,6 +13,7 @@ import {
 	AccordionItem,
 	AccordionTrigger,
 } from "@/components/ui/accordion";
+import { Spinner } from "@/components/ui/spinner";
 
 /**
  * Feedback data for bad practices
@@ -226,7 +227,11 @@ export function PullRequestBadPracticeCard({
 						type="button"
 						disabled={isDetectingBadPractices}
 					>
-						<RefreshCw className="size-3.5" />
+						{isDetectingBadPractices ? (
+							<Spinner className="size-3.5" />
+						) : (
+							<RefreshCw className="size-3.5" />
+						)}
 						Analyze Changes
 					</Button>
 				)

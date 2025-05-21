@@ -13,7 +13,7 @@ import {
 	TooltipProvider,
 	TooltipTrigger,
 } from "@/components/ui/tooltip";
-import { Activity, RefreshCcw } from "lucide-react";
+import { Activity, RefreshCw } from "lucide-react";
 
 interface ActivitySummaryCardProps {
 	username: string;
@@ -90,7 +90,7 @@ export function ActivitySummaryCard({
 									{isDetectingBadPractices ? (
 										<Spinner className="size-4" />
 									) : (
-										<RefreshCcw className="size-4" />
+										<RefreshCw className="size-4" />
 									)}
 									<span>Refresh Analysis</span>
 								</Button>
