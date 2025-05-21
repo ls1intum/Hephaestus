@@ -1,19 +1,10 @@
-import { Button } from "@/components/ui/button";
 import {
 	Card,
-	CardContent,
 	CardDescription,
 	CardHeader,
 	CardTitle,
 } from "@/components/ui/card";
-import { Spinner } from "@/components/ui/spinner";
-import {
-	Tooltip,
-	TooltipContent,
-	TooltipProvider,
-	TooltipTrigger,
-} from "@/components/ui/tooltip";
-import { Activity, RefreshCw } from "lucide-react";
+import { Activity } from "lucide-react";
 
 interface ActivitySummaryCardProps {
 	username: string;

@@ -16,6 +16,15 @@ import {
 	DropdownMenuSeparator,
 	DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { Label } from "@/components/ui/label";
+import {
+	Select,
+	SelectContent,
+	SelectItem,
+	SelectTrigger,
+	SelectValue,
+} from "@/components/ui/select";
+import { Textarea } from "@/components/ui/textarea";
 import {
 	Tooltip,
 	TooltipContent,
@@ -129,10 +138,12 @@ export function BadPracticeCard({
 									</DropdownMenuItem>
 								</DropdownMenuGroup>
 								<DropdownMenuGroup>
-									<DropdownMenuItem onClick={() => {
-										handleResolveAsWrong();
-										setDialogOpen(true);
-									}}>
+									<DropdownMenuItem
+										onClick={() => {
+											handleResolveAsWrong();
+											setDialogOpen(true);
+										}}
+									>
 										Resolve as wrong
 									</DropdownMenuItem>
 								</DropdownMenuGroup>
@@ -155,34 +166,34 @@ export function BadPracticeCard({
 							</DialogHeader>
 							<div className="py-4 grid gap-4">
 								<div className="items-center grid grid-cols-4 gap-4">
-									<label htmlFor="feedback-type" className="text-right">
+									<Label htmlFor="feedback-type" className="text-right">
 										Feedback
-									</label>
+									</Label>
 									<div className="col-span-3">
-										<select
-											id="feedback-type"
-											className="w-full px-3 py-2 border rounded"
-											onChange={(e) => setFeedbackType(e.target.value)}
-											value={feedbackType || ""}
+										<Select
+											onValueChange={(value) => setFeedbackType(value)}
+											value={feedbackType}
 										>
-											<option value="" disabled>
-												Select the type of feedback
-											</option>
-											{feedbackTypes.map((type) => (
-												<option key={type} value={type}>
-													{type}
-												</option>
-											))}
-										</select>
+											<SelectTrigger id="feedback-type" className="w-full">
+												<SelectValue placeholder="Select the type of feedback" />
+											</SelectTrigger>
+											<SelectContent>
+												{feedbackTypes.map((type) => (
+													<SelectItem key={type} value={type}>
+														{type}
+													</SelectItem>
+												))}
+											</SelectContent>
+										</Select>
 									</div>
 								</div>
 								<div className="items-start grid grid-cols-4 gap-4 h-40">
-									<label htmlFor="explanation" className="text-right">
+									<Label htmlFor="explanation" className="text-right">
 										Explanation
-									</label>
-									<textarea
+									</Label>
+									<Textarea
 										id="explanation"
-										className="col-span-3 h-full px-3 py-2 border rounded"
+										className="col-span-3 h-full"
 										value={feedbackExplanation}
 										onChange={(e) => setFeedbackExplanation(e.target.value)}
 									/>

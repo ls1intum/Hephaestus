@@ -27,7 +27,7 @@ npx tsc
 Ensure that the linter throws no errors:
 
 ```bash
-npm run check
+npm run check -- --fix
 ```
 
 ## Storybook
