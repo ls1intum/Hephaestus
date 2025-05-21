@@ -24,8 +24,6 @@ export function ActivitySummaryCard({
 	numberOfPullRequests,
 	numberOfGoodPractices,
 	numberOfBadPractices,
-	isDetectingBadPractices,
-	onDetectBadPractices,
 }: ActivitySummaryCardProps) {
 	// Use displayName if available, otherwise fall back to username
 	const userDisplayName = displayName || username;

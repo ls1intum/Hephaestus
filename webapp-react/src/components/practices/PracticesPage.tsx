@@ -1,6 +1,5 @@
 import type { Activity, BadPracticeFeedback } from "@/api/types.gen";
 import { EmptyState } from "@/components/shared/EmptyState";
-import { Button } from "@/components/ui/button";
 import { GitPullRequest, InfoIcon } from "lucide-react";
 import { ActivitySummaryCard } from "./ActivitySummaryCard";
 import { BadPracticeLegendCard } from "./BadPracticeLegendCard";
@@ -78,11 +77,8 @@ export function PracticesPage({
 						<div className="flex items-center gap-2 text-sm bg-muted/50 p-2.5 rounded-md">
 							<InfoIcon className="h-4 w-4 text-blue-500 flex-shrink-0" />
 							<p className="text-muted-foreground">
-								Hephaestus can make mistakes.{" "}
-								<Button variant="link" size="none">
-									Help us improve
-								</Button>{" "}
-								by flagging anything that doesn't look right!
+								Hephaestus can make mistakes.
+								Help us improve by flagging anything that doesn't look right!
 							</p>
 						</div>
 						<div className="flex flex-col gap-4">
