@@ -120,7 +120,7 @@ export function BadPracticeCard({
 							<DropdownMenuContent className="w-56">
 								<DropdownMenuGroup>
 									<DropdownMenuItem onClick={handleResolveAsFixed}>
-										Resolve as fixed ✓
+										Resolve as fixed
 									</DropdownMenuItem>
 								</DropdownMenuGroup>
 								<DropdownMenuGroup>
