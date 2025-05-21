@@ -76,7 +76,7 @@ export function ActivitySummaryCard({
 					</p>
 				</CardDescription>
 			</CardHeader>
-			{currUserIsDashboardUser && (
+			{/* {currUserIsDashboardUser && (
 				<CardContent>
 					<TooltipProvider>
 						<Tooltip>
@@ -101,7 +101,7 @@ export function ActivitySummaryCard({
 						</Tooltip>
 					</TooltipProvider>
 				</CardContent>
-			)}
+			)} */}
 		</Card>
 	);
 }
