@@ -73,7 +73,9 @@ def detect_bad_practices(
         langfuse_prompt.get_langchain_prompt(),
         metadata={"langfuse_prompt": langfuse_prompt},
     )
-    prompt = langchain_prompt.invoke(
+    structured_llm = model.with_structured_output(BadPracticeResult)
+    chain = langchain_prompt | structured_llm
+    response = chain.invoke(
         {
             "title": title,
             "description": description,
@@ -82,10 +84,9 @@ def detect_bad_practices(
             "bad_practice_summary": bad_practice_summary,
             "bad_practices": bad_practices,
             "pull_request_template": pull_request_template,
-        }
+        },
+        config=config,
     )
-    structured_llm = model.with_structured_output(BadPracticeResult)
-    response = structured_llm.invoke(prompt, config)
     trace_id = langfuse_context.get_current_trace_id() or ""
     session_id = repository_name + "#" + str(pull_request_number)
     langfuse_context.update_current_observation(

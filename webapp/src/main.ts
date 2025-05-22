@@ -8,7 +8,8 @@ if (environment.posthog.projectApiKey) {
   posthog.init(environment.posthog.projectApiKey, {
     api_host: environment.posthog.apiHost,
     capture_pageview: false,
-    capture_pageleave: true
+    capture_pageleave: true,
+    cross_subdomain_cookie: false
   });
 }
 
