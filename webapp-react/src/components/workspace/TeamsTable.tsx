@@ -75,10 +75,23 @@ interface TeamsTableProps {
 	onDeleteTeam: (teamId: string | number) => void;
 	onToggleTeamVisibility: (teamId: string | number, hidden: boolean) => void;
 	onUpdateTeam: (teamId: string | number, name: string, color: string) => void;
-	onAddRepositoryToTeam?: (teamId: string | number, repositoryNameWithOwner: string) => void;
-	onRemoveRepositoryFromTeam?: (teamId: string | number, repositoryNameWithOwner: string) => void;
-	onAddLabelToTeam?: (teamId: string | number, repositoryId: string | number, labelName: string) => void;
-	onRemoveLabelFromTeam?: (teamId: string | number, labelId: string | number) => void;
+	onAddRepositoryToTeam?: (
+		teamId: string | number,
+		repositoryNameWithOwner: string,
+	) => void;
+	onRemoveRepositoryFromTeam?: (
+		teamId: string | number,
+		repositoryNameWithOwner: string,
+	) => void;
+	onAddLabelToTeam?: (
+		teamId: string | number,
+		repositoryId: string | number,
+		labelName: string,
+	) => void;
+	onRemoveLabelFromTeam?: (
+		teamId: string | number,
+		labelId: string | number,
+	) => void;
 }
 
 const PRESET_COLORS = [
@@ -234,7 +247,11 @@ export function TeamsTable({
 					return (
 						<div className="flex flex-wrap gap-2">
 							{team.repositories.map((repo) => (
-								<Badge key={repo.id} variant="outline" className="flex items-center gap-1">
+								<Badge
+									key={repo.id}
+									variant="outline"
+									className="flex items-center gap-1"
+								>
 									{repo.nameWithOwner}
 									{onRemoveRepositoryFromTeam && (
 										<Button
@@ -260,12 +277,18 @@ export function TeamsTable({
 											<span className="sr-only">Add repository</span>
 										</Button>
 									</DropdownMenuTrigger>
-									<DropdownMenuContent align="start" className="w-56 max-h-80 overflow-auto">
+									<DropdownMenuContent
+										align="start"
+										className="w-56 max-h-80 overflow-auto"
+									>
 										<DropdownMenuLabel>Add Repository</DropdownMenuLabel>
 										<DropdownMenuSeparator />
 										{repositories
 											.filter(
-												(repo) => !team.repositories.some((r) => r.nameWithOwner === repo)
+												(repo) =>
+													!team.repositories.some(
+														(r) => r.nameWithOwner === repo,
+													),
 											)
 											.map((repo) => (
 												<DropdownMenuItem
@@ -287,25 +310,26 @@ export function TeamsTable({
 				header: "Labels",
 				cell: ({ row }) => {
 					const team = row.original;
-					
+
 					// Group labels by repository
-					const labelsByRepo = team.labels.reduce<Record<string, typeof team.labels>>(
-						(acc, label) => {
-							if (!label.repository) return acc;
-							const repoName = label.repository.nameWithOwner;
-							if (!acc[repoName]) acc[repoName] = [];
-							acc[repoName].push(label);
-							return acc;
-						},
-						{}
-					);
+					const labelsByRepo = team.labels.reduce<
+						Record<string, typeof team.labels>
+					>((acc, label) => {
+						if (!label.repository) return acc;
+						const repoName = label.repository.nameWithOwner;
+						if (!acc[repoName]) acc[repoName] = [];
+						acc[repoName].push(label);
+						return acc;
+					}, {});
 
 					return (
 						<div className="flex flex-col gap-2">
 							{Object.entries(labelsByRepo).map(([repoName, labels]) => {
-								const repo = team.repositories.find(r => r.nameWithOwner === repoName);
+								const repo = team.repositories.find(
+									(r) => r.nameWithOwner === repoName,
+								);
 								if (!repo) return null;
-								
+
 								return (
 									<div key={repoName} className="border rounded-md p-2">
 										<div className="text-xs font-medium mb-1">{repoName}</div>
@@ -340,7 +364,11 @@ export function TeamsTable({
 											{onAddLabelToTeam && repo && (
 												<Dialog>
 													<DialogTrigger asChild>
-														<Button variant="outline" size="icon" className="h-5 w-5 p-0">
+														<Button
+															variant="outline"
+															size="icon"
+															className="h-5 w-5 p-0"
+														>
 															<Plus className="h-3 w-3" />
 															<span className="sr-only">Add label</span>
 														</Button>
@@ -349,12 +377,16 @@ export function TeamsTable({
 														<DialogHeader>
 															<DialogTitle>Add Label to {repoName}</DialogTitle>
 															<DialogDescription>
-																Create a new label for this repository and add it to the team.
+																Create a new label for this repository and add
+																it to the team.
 															</DialogDescription>
 														</DialogHeader>
 														<div className="grid gap-4 py-4">
 															<div className="grid grid-cols-4 items-center gap-4">
-																<Label htmlFor="label-name" className="text-right">
+																<Label
+																	htmlFor="label-name"
+																	className="text-right"
+																>
 																	Name
 																</Label>
 																<Input
@@ -369,7 +401,9 @@ export function TeamsTable({
 																type="button"
 																onClick={(e) => {
 																	e.preventDefault();
-																	const input = document.getElementById("label-name") as HTMLInputElement;
+																	const input = document.getElementById(
+																		"label-name",
+																	) as HTMLInputElement;
 																	const value = input?.value?.trim();
 																	if (value) {
 																		onAddLabelToTeam(team.id, repo.id, value);
@@ -480,7 +514,15 @@ export function TeamsTable({
 				},
 			},
 		],
-		[getTeamMemberCount, onToggleTeamVisibility, repositories, onAddRepositoryToTeam, onRemoveRepositoryFromTeam, onAddLabelToTeam, onRemoveLabelFromTeam],
+		[
+			getTeamMemberCount,
+			onToggleTeamVisibility,
+			repositories,
+			onAddRepositoryToTeam,
+			onRemoveRepositoryFromTeam,
+			onAddLabelToTeam,
+			onRemoveLabelFromTeam,
+		],
 	);
 
 	const table = useReactTable({

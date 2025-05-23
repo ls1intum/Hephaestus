@@ -26,7 +26,9 @@ function RouteComponent() {
 
 	// Queries
 	const { data: teams = [], isLoading, error } = useQuery(getTeamsOptions());
-	const { data: repositories = [] } = useQuery(getRepositoriesToMonitorOptions());
+	const { data: repositories = [] } = useQuery(
+		getRepositoriesToMonitorOptions(),
+	);
 
 	// Mutations
 	const createTeam = useMutation({
@@ -186,15 +188,16 @@ function RouteComponent() {
 	) => {
 		try {
 			// Split the nameWithOwner into owner and name
-			const [repositoryOwner, repositoryName] = repositoryNameWithOwner.split("/");
-			
+			const [repositoryOwner, repositoryName] =
+				repositoryNameWithOwner.split("/");
+
 			if (!repositoryOwner || !repositoryName) {
 				toast.error("Invalid repository format. Expected 'owner/name'");
 				return;
 			}
 
 			await addRepositoryToTeam.mutateAsync({
-				path: { 
+				path: {
 					teamId: Number.parseInt(teamId.toString()),
 					repositoryOwner,
 					repositoryName,
@@ -211,15 +214,16 @@ function RouteComponent() {
 	) => {
 		try {
 			// Split the nameWithOwner into owner and name
-			const [repositoryOwner, repositoryName] = repositoryNameWithOwner.split("/");
-			
+			const [repositoryOwner, repositoryName] =
+				repositoryNameWithOwner.split("/");
+
 			if (!repositoryOwner || !repositoryName) {
 				toast.error("Invalid repository format. Expected 'owner/name'");
 				return;
 			}
 
 			await removeRepositoryFromTeam.mutateAsync({
-				path: { 
+				path: {
 					teamId: Number.parseInt(teamId.toString()),
 					repositoryOwner,
 					repositoryName,
