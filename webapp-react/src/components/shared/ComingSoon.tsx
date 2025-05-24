@@ -50,13 +50,13 @@ export function ComingSoon({
 			<div className="w-full max-w-2xl px-6 py-12 text-center">
 				<div className="relative mb-8 flex justify-center">
 					<div className="relative">
-            {/* Animated Construction Icon */}
+						{/* Animated Construction Icon */}
 						<div className="flex items-center justify-center building-impact size-16 rounded-full bg-primary/10">
-              <Construction
-                className="size-8 text-primary"
-                aria-label="Building under construction"
-              />
-            </div>
+							<Construction
+								className="size-8 text-primary"
+								aria-label="Building under construction"
+							/>
+						</div>
 						{/* Animated Hammer Icon */}
 						<div
 							className="hammer-swing absolute -top-5 -left-8 text-primary"

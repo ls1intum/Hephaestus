@@ -15,7 +15,7 @@ const meta: Meta<typeof ComingSoon> = {
 			description: "The main heading text",
 		},
 		description: {
-			control: "text", 
+			control: "text",
 			description: "The description text below the title",
 		},
 		attribution: {
@@ -35,7 +35,8 @@ export const Default: Story = {
 export const CustomContent: Story = {
 	args: {
 		title: "Feature in Development",
-		description: "Our team is crafting this feature with care. Check back soon for updates!",
+		description:
+			"Our team is crafting this feature with care. Check back soon for updates!",
 		attribution: "— Engineering Team",
 	},
 };
@@ -51,7 +52,8 @@ export const ShortMessage: Story = {
 export const LongMessage: Story = {
 	args: {
 		title: "Revolutionary AI Feature Coming Soon",
-		description: "We're building something that will transform how you interact with our platform. Our advanced AI mentor system is currently in the final stages of development and testing.",
+		description:
+			"We're building something that will transform how you interact with our platform. Our advanced AI mentor system is currently in the final stages of development and testing.",
 		attribution: "— The Innovation Squad",
 	},
 };

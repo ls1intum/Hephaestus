@@ -7,7 +7,9 @@ export const Route = createFileRoute("/_authenticated/mentor")({
 });
 
 function RouteComponent() {
-	return <div className="h-1/2 flex items-center justify-center">
-		<ComingSoon />
-	</div>
+	return (
+		<div className="h-1/2 flex items-center justify-center">
+			<ComingSoon />
+		</div>
+	);
 }
