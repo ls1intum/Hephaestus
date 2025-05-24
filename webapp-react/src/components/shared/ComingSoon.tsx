@@ -1,8 +1,6 @@
 import { Construction, Hammer } from "lucide-react";
 import type * as React from "react";
 
-import { cn } from "@/lib/utils";
-
 interface ComingSoonProps extends React.ComponentProps<"div"> {
 	title?: string;
 	description?: string;

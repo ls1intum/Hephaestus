@@ -1,6 +1,4 @@
 import { ModeToggle } from "@/components/core/ModeToggle";
-import RequestFeature from "@/components/core/RequestFeature";
-import AIMentor from "@/components/mentor/AIMentor";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import {
@@ -13,7 +11,7 @@ import {
 	DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Link } from "@tanstack/react-router";
-import { Hammer, LogOut, Menu, Settings, User } from "lucide-react";
+import { Hammer, LogOut, Settings, User } from "lucide-react";
 import { SidebarTrigger } from "../ui/sidebar";
 
 export interface HeaderProps {

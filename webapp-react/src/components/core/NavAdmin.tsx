@@ -1,10 +1,6 @@
 import {
 	BookUser,
-	CheckCheck,
-	Settings,
 	Settings2,
-	Trophy,
-	User,
 	Users,
 } from "lucide-react";
 
