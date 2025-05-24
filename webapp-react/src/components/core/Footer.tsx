@@ -5,7 +5,7 @@ export default function Footer() {
 	return (
 		<footer className="py-4 md:px-8 md:py-6 border-t">
 			<div className="container">
-				<div className="flex flex-wrap justify-between gap-y-4">
+				<div className="flex flex-wrap justify-between gap-4">
 					{/* Links Section */}
 					<div className="flex flex-wrap items-center justify-center sm:justify-start w-full md:w-auto">
 						<nav className="flex flex-wrap gap-x-6 gap-y-2 justify-center sm:justify-start">

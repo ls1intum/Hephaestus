@@ -47,7 +47,7 @@ export function ProfileContent({
 	);
 
 	return (
-		<div className="grid grid-cols-1 lg:grid-cols-2 gap-4 border-t border-border pt-6">
+		<div className="grid grid-cols-1 lg:grid-cols-2 gap-2 border-t border-border pt-6">
 			{/* Latest Review Activity */}
 			<div className="flex flex-col gap-4">
 				<h2 className="text-xl font-semibold">Latest Review Activity</h2>

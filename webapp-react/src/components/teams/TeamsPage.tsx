@@ -24,7 +24,7 @@ export function TeamsPage({ teams, isLoading }: TeamsPageProps) {
 	};
 
 	return (
-		<section className="max-w-4xl mx-auto p-5">
+		<>
 			<h2 className="text-2xl font-bold mb-2">Team Contributors</h2>
 			<p className="text-muted-foreground text-sm mb-4">
 				Overview of contributors across different teams
@@ -39,7 +39,7 @@ export function TeamsPage({ teams, isLoading }: TeamsPageProps) {
 							</CardHeader>
 							<CardContent>
 								{sortMembers(team).length > 0 ? (
-									<div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4 self-center">
+									<div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-7 xl:grid-cols-8 gap-4 self-center">
 										{sortMembers(team).map((member) => (
 											<a
 												key={member.id}
@@ -114,6 +114,6 @@ export function TeamsPage({ teams, isLoading }: TeamsPageProps) {
 							</CardContent>
 						</Card>
 					))}
-		</section>
+		</>
 	);
 }

@@ -32,11 +32,16 @@ const data = {
 		{
 			name: "AET",
 			logoUrl: "https://avatars.githubusercontent.com/u/11064260?s=200&v=4",
-		}
+		},
 	],
 };
 
-export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar> & { username: string, isAdmin: boolean }) {
+export function AppSidebar({
+	...props
+}: React.ComponentProps<typeof Sidebar> & {
+	username: string;
+	isAdmin: boolean;
+}) {
 	return (
 		<Sidebar collapsible="icon" {...props}>
 			<SidebarHeader>

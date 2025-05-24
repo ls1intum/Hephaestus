@@ -47,7 +47,7 @@ export default function Header({
 }: HeaderProps) {
 	return (
 		<header className="flex h-16 shrink-0 items-center gap-2 transition-[width,height] ease-linear group-has-[[data-collapsible=icon]]/sidebar-wrapper:h-12 justify-between">
-      <div className="flex items-center gap-2 px-4">
+			<div className="flex items-center gap-2 px-4">
 				{showSidebarTrigger && <SidebarTrigger className="-ml-1" />}
 				<div className="flex items-center gap-2">
 					<Link
@@ -66,65 +66,64 @@ export default function Header({
 				</div>
 			</div>
 			<div className="flex gap-2 px-4">
+				<ModeToggle />
 
-			<ModeToggle />
-
-			<div className="flex items-center gap-2">
-				{!isAuthenticated ? (
-					<Button onClick={onLogin} disabled={isLoading}>
-						{isLoading ? "Loading..." : "Sign In"}
-					</Button>
-				) : (
-					<div className="flex items-center gap-2">
-						<DropdownMenu>
-							<DropdownMenuTrigger asChild>
-								<Button variant="ghost" size="icon" className="rounded-full">
-									<Avatar className="hover:brightness-90">
-										<AvatarImage
-											src={`https://github.com/${username}.png`}
-											alt={`${username}'s avatar`}
-										/>
-										<AvatarFallback>
-											{username?.slice(0, 2)?.toUpperCase() || "?"}
-										</AvatarFallback>
-									</Avatar>
-								</Button>
-							</DropdownMenuTrigger>
-							<DropdownMenuContent className="w-56" align="end" forceMount>
-								<DropdownMenuLabel className="font-normal">
-									<div className="flex flex-col space-y-1">
-										<p className="text-sm font-medium leading-none">{name}</p>
-									</div>
-								</DropdownMenuLabel>
-								<DropdownMenuSeparator />
-								<DropdownMenuGroup>
-									<DropdownMenuItem asChild>
-										<Link
-											to="/user/$username"
-											search={{}}
-											params={{ username: username ?? "" }}
-										>
-											<User />
-											<span>My Profile</span>
-										</Link>
+				<div className="flex items-center gap-2">
+					{!isAuthenticated ? (
+						<Button onClick={onLogin} disabled={isLoading}>
+							{isLoading ? "Loading..." : "Sign In"}
+						</Button>
+					) : (
+						<div className="flex items-center gap-2">
+							<DropdownMenu>
+								<DropdownMenuTrigger asChild>
+									<Button variant="ghost" size="icon" className="rounded-full">
+										<Avatar className="hover:brightness-90">
+											<AvatarImage
+												src={`https://github.com/${username}.png`}
+												alt={`${username}'s avatar`}
+											/>
+											<AvatarFallback>
+												{username?.slice(0, 2)?.toUpperCase() || "?"}
+											</AvatarFallback>
+										</Avatar>
+									</Button>
+								</DropdownMenuTrigger>
+								<DropdownMenuContent className="w-56" align="end" forceMount>
+									<DropdownMenuLabel className="font-normal">
+										<div className="flex flex-col space-y-1">
+											<p className="text-sm font-medium leading-none">{name}</p>
+										</div>
+									</DropdownMenuLabel>
+									<DropdownMenuSeparator />
+									<DropdownMenuGroup>
+										<DropdownMenuItem asChild>
+											<Link
+												to="/user/$username"
+												search={{}}
+												params={{ username: username ?? "" }}
+											>
+												<User />
+												<span>My Profile</span>
+											</Link>
+										</DropdownMenuItem>
+										<DropdownMenuItem asChild>
+											<Link to="/settings" search={{}}>
+												<Settings />
+												<span>Settings</span>
+											</Link>
+										</DropdownMenuItem>
+									</DropdownMenuGroup>
+									<DropdownMenuSeparator />
+									<DropdownMenuItem onClick={onLogout}>
+										<LogOut />
+										<span>Sign Out</span>
 									</DropdownMenuItem>
-									<DropdownMenuItem asChild>
-										<Link to="/settings" search={{}}>
-											<Settings />
-											<span>Settings</span>
-										</Link>
-									</DropdownMenuItem>
-								</DropdownMenuGroup>
-								<DropdownMenuSeparator />
-								<DropdownMenuItem onClick={onLogout}>
-									<LogOut />
-									<span>Sign Out</span>
-								</DropdownMenuItem>
-							</DropdownMenuContent>
-						</DropdownMenu>
-					</div>
-				)}
-			</div>
+								</DropdownMenuContent>
+							</DropdownMenu>
+						</div>
+					)}
+				</div>
 			</div>
 		</header>
 	);

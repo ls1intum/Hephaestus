@@ -60,12 +60,12 @@ export function LeaderboardTable({
 		<Table>
 			<TableHeader>
 				<TableRow>
-					<TableHead className="text-center w-16">Rank</TableHead>
-					<TableHead className="text-center w-20">League</TableHead>
-					<TableHead>Contributor</TableHead>
+					<TableHead className="text-center">Rank</TableHead>
+					<TableHead className="text-center">League</TableHead>
+					<TableHead className="w-56">Contributor</TableHead>
 					<TableHead className="text-center">
 						<div className="flex justify-center items-center gap-1 text-github-done-foreground">
-							<span className="flex items-center pr-4">
+							<span className="flex items-center gap-0.5">
 								<AwardIcon className="size-4" /> Score
 							</span>
 						</div>
@@ -111,7 +111,7 @@ export function LeaderboardTable({
 											{entry.user.name.slice(0, 2).toUpperCase()}
 										</AvatarFallback>
 									</Avatar>
-									<span className="text-muted-foreground">
+									<span className="text-muted-foreground text-wrap">
 										{entry.user.name}
 									</span>
 								</div>

@@ -62,9 +62,9 @@ export function LeaderboardPage({
 
 	return (
 		<div className="flex flex-col items-center">
-			<div className="w-full max-w-[1400px]">
+			<div className="w-full">
 				<h1 className="text-3xl font-bold mb-4">Code Review Leaderboard</h1>
-				<div className="grid grid-cols-1 xl:grid-cols-4 gap-y-4 xl:gap-8">
+				<div className="grid grid-cols-1 xl:grid-cols-4 gap-y-4 xl:gap-4">
 					<div className="space-y-4 col-span-1">
 						<div className="xl:sticky xl:top-4 xl:self-start xl:max-h-[calc(100vh-2rem)] xl:overflow-auto">
 							<LeaderboardFilter

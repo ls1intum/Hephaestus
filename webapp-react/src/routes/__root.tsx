@@ -1,5 +1,10 @@
 import type { QueryClient } from "@tanstack/react-query";
-import { Link, Outlet, createRootRouteWithContext, useLocation } from "@tanstack/react-router";
+import {
+	Link,
+	Outlet,
+	createRootRouteWithContext,
+	useLocation,
+} from "@tanstack/react-router";
 import { TanStackRouterDevtools } from "@tanstack/react-router-devtools";
 
 import TanstackQueryLayout from "../integrations/tanstack-query/layout";
@@ -56,14 +61,8 @@ export const Route = createRootRouteWithContext<MyRouterContext>()({
 
 function HeaderContainer() {
 	const { pathname } = useLocation();
-	const {
-		isAuthenticated,
-		isLoading,
-		username,
-		userProfile,
-		login,
-		logout,
-	} = useAuth();
+	const { isAuthenticated, isLoading, username, userProfile, login, logout } =
+		useAuth();
 	return (
 		<Header
 			version={environment.version}
@@ -81,12 +80,10 @@ function HeaderContainer() {
 function AppSidebarContainer() {
 	const { pathname } = useLocation();
 	const { isAuthenticated, username, hasRole } = useAuth();
-	
+
 	if (pathname === "/landing" || !isAuthenticated || username === undefined) {
 		return null;
 	}
 
-	return (
-		<AppSidebar username={username} isAdmin={hasRole("admin")} />
-	);
+	return <AppSidebar username={username} isAdmin={hasRole("admin")} />;
 }
