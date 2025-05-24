@@ -1,8 +1,4 @@
-import {
-	BookUser,
-	Settings2,
-	Users,
-} from "lucide-react";
+import { BookUser, Settings2, Users } from "lucide-react";
 
 import {
 	SidebarGroup,

@@ -23,18 +23,11 @@ const meta = {
 		version: "1.0.0",
 		name: "John Doe",
 		username: "johnDoe",
+		showSidebarTrigger: true,
 		onLogin: fn(),
 		onLogout: fn(),
 	},
 	argTypes: {
-		showAdmin: {
-			control: "boolean",
-			description: "Whether user has admin access",
-		},
-		showMentor: {
-			control: "boolean",
-			description: "Whether user has mentor access",
-		},
 		isAuthenticated: {
 			control: "boolean",
 			description: "User authentication state",
@@ -69,8 +62,7 @@ export const LoggedInAdmin: Story = {
 	args: {
 		isAuthenticated: true,
 		isLoading: false,
-		showAdmin: true,
-		showMentor: true,
+		showSidebarTrigger: true,
 	},
 };
 
@@ -81,8 +73,7 @@ export const LoggedInNonAdminWithMentor: Story = {
 	args: {
 		isAuthenticated: true,
 		isLoading: false,
-		showAdmin: false,
-		showMentor: true,
+		showSidebarTrigger: true,
 	},
 };
 
@@ -93,8 +84,7 @@ export const LoggedInNonAdmin: Story = {
 	args: {
 		isAuthenticated: true,
 		isLoading: false,
-		showAdmin: false,
-		showMentor: false,
+		showSidebarTrigger: true,
 	},
 };
 
@@ -105,8 +95,7 @@ export const LoggedOut: Story = {
 	args: {
 		isAuthenticated: false,
 		isLoading: false,
-		showAdmin: false,
-		showMentor: false,
+		showSidebarTrigger: false,
 	},
 };
 
@@ -117,8 +106,7 @@ export const Loading: Story = {
 	args: {
 		isAuthenticated: false,
 		isLoading: true,
-		showAdmin: false,
-		showMentor: false,
+		showSidebarTrigger: false,
 	},
 };
 
@@ -130,8 +118,7 @@ export const MobileView: Story = {
 	args: {
 		isAuthenticated: true,
 		isLoading: false,
-		showAdmin: true,
-		showMentor: true,
+		showSidebarTrigger: true,
 	},
 	parameters: {
 		viewport: { defaultViewport: "mobile1" },
@@ -151,8 +138,7 @@ export const DesktopView: Story = {
 	args: {
 		isAuthenticated: true,
 		isLoading: false,
-		showAdmin: true,
-		showMentor: true,
+		showSidebarTrigger: true,
 	},
 	parameters: {
 		viewport: { defaultViewport: "desktop" },
