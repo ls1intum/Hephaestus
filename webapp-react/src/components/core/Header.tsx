@@ -14,6 +14,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Link } from "@tanstack/react-router";
 import { Hammer, LogOut, Menu, Settings, User } from "lucide-react";
+import { SidebarTrigger } from "../ui/sidebar";
 
 export interface HeaderProps {
 	/** Application version displayed beside logo */
@@ -26,10 +27,8 @@ export interface HeaderProps {
 	name?: string;
 	/** Username of the authenticated user */
 	username?: string;
-	/** Whether user has admin access */
-	showAdmin: boolean;
-	/** Whether user has mentor access */
-	showMentor: boolean;
+	/** Whether to show the sidebar trigger button */
+	showSidebarTrigger: boolean;
 	/** Function to call on login button click */
 	onLogin: () => void;
 	/** Function to call on logout button click */
@@ -42,14 +41,14 @@ export default function Header({
 	isLoading,
 	name,
 	username,
-	showAdmin,
-	showMentor,
+	showSidebarTrigger,
 	onLogin,
 	onLogout,
 }: HeaderProps) {
 	return (
-		<header className="container flex items-center justify-between pt-4 gap-2">
-			<div className="flex gap-4 items-center flex-1">
+		<header className="flex h-16 shrink-0 items-center gap-2 transition-[width,height] ease-linear group-has-[[data-collapsible=icon]]/sidebar-wrapper:h-12 justify-between">
+      <div className="flex items-center gap-2 px-4">
+				{showSidebarTrigger && <SidebarTrigger className="-ml-1" />}
 				<div className="flex items-center gap-2">
 					<Link
 						to="/"
@@ -65,89 +64,8 @@ export default function Header({
 						{version}
 					</span>
 				</div>
-
-				{/* Desktop navigation links */}
-				{isAuthenticated && (
-					<div className="hidden md:flex gap-4">
-						{showAdmin && (
-							<Button asChild variant="link" size="none">
-								<Link to="/workspace" search={{}}>
-									Workspace
-								</Link>
-							</Button>
-						)}
-						<Button asChild variant="link" size="none">
-							<Link to="/best-practices" search={{}}>
-								Best practices
-							</Link>
-						</Button>
-						<Button asChild variant="link" size="none">
-							<Link to="/teams" search={{}}>
-								Teams
-							</Link>
-						</Button>
-					</div>
-				)}
-
-				{/* Mobile navigation menu */}
-				{isAuthenticated && (
-					<div className="md:hidden">
-						<DropdownMenu>
-							<DropdownMenuTrigger asChild>
-								<Button variant="outline" size="icon">
-									<Menu />
-									<span className="sr-only">Navigation Menu</span>
-								</Button>
-							</DropdownMenuTrigger>
-							<DropdownMenuContent align="start">
-								<DropdownMenuLabel>Navigation</DropdownMenuLabel>
-								<DropdownMenuSeparator />
-								{showAdmin && (
-									<DropdownMenuItem asChild>
-										<Link to="/workspace" search={{}}>
-											Workspace
-										</Link>
-									</DropdownMenuItem>
-								)}
-								<DropdownMenuItem asChild>
-									<Link to="/best-practices" search={{}}>
-										Best practices
-									</Link>
-								</DropdownMenuItem>
-								<DropdownMenuItem asChild>
-									<Link to="/teams" search={{}}>
-										Teams
-									</Link>
-								</DropdownMenuItem>
-							</DropdownMenuContent>
-						</DropdownMenu>
-					</div>
-				)}
 			</div>
-
-			{showMentor && (
-				<>
-					{/* Desktop AI Mentor component */}
-					<div className="hidden sm:block">
-						<AIMentor iconOnly={false} />
-					</div>
-
-					{/* Mobile AI Mentor component */}
-					<div className="sm:hidden">
-						<AIMentor iconOnly={true} />
-					</div>
-				</>
-			)}
-
-			{/* Desktop RequestFeature component */}
-			<div className="hidden sm:block">
-				<RequestFeature iconOnly={false} />
-			</div>
-
-			{/* Mobile RequestFeature component */}
-			<div className="sm:hidden">
-				<RequestFeature iconOnly={true} />
-			</div>
+			<div className="flex gap-2 px-4">
 
 			<ModeToggle />
 
@@ -206,6 +124,7 @@ export default function Header({
 						</DropdownMenu>
 					</div>
 				)}
+			</div>
 			</div>
 		</header>
 	);

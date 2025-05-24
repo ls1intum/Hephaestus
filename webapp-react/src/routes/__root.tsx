@@ -1,11 +1,13 @@
 import type { QueryClient } from "@tanstack/react-query";
-import { Outlet, createRootRouteWithContext } from "@tanstack/react-router";
+import { Link, Outlet, createRootRouteWithContext, useLocation } from "@tanstack/react-router";
 import { TanStackRouterDevtools } from "@tanstack/react-router-devtools";
 
 import TanstackQueryLayout from "../integrations/tanstack-query/layout";
 
+import { AppSidebar } from "@/components/core/AppSidebar";
 import Footer from "@/components/core/Footer";
 import Header from "@/components/core/Header";
+import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar";
 import environment from "@/environment";
 import { type AuthContextType, useAuth } from "@/integrations/auth/AuthContext";
 import { useTheme } from "@/integrations/theme";
@@ -21,14 +23,17 @@ export const Route = createRootRouteWithContext<MyRouterContext>()({
 		const { theme } = useTheme();
 		return (
 			<>
-				<div className="flex flex-col min-h-screen">
-					<HeaderContainer />
-					<main className="container flex-grow pt-4 pb-8">
-						<Outlet />
-					</main>
-					<Toaster theme={theme} />
-					<Footer />
-				</div>
+				<SidebarProvider>
+					<AppSidebarContainer />
+					<SidebarInset>
+						<HeaderContainer />
+						<main className="container flex-grow pt-4 pb-8">
+							<Outlet />
+						</main>
+						<Footer />
+					</SidebarInset>
+				</SidebarProvider>
+				<Toaster theme={theme} />
 				<TanStackRouterDevtools />
 				<TanstackQueryLayout />
 			</>
@@ -42,14 +47,15 @@ export const Route = createRootRouteWithContext<MyRouterContext>()({
 				The page you're looking for doesn't exist or you don't have permission
 				to view it.
 			</p>
-			<a href="/" className="text-blue-500 hover:underline font-medium">
+			<Link to="/" className="text-blue-500 hover:underline font-medium">
 				Return to Home
-			</a>
+			</Link>
 		</div>
 	),
 });
 
 function HeaderContainer() {
+	const { pathname } = useLocation();
 	const {
 		isAuthenticated,
 		isLoading,
@@ -57,7 +63,6 @@ function HeaderContainer() {
 		userProfile,
 		login,
 		logout,
-		hasRole,
 	} = useAuth();
 	return (
 		<Header
@@ -66,10 +71,22 @@ function HeaderContainer() {
 			isLoading={isLoading}
 			name={userProfile && `${userProfile.firstName} ${userProfile.lastName}`}
 			username={username}
-			showAdmin={hasRole("admin")}
-			showMentor={hasRole("mentor_access")}
+			showSidebarTrigger={!(pathname === "/landing" || !isAuthenticated)}
 			onLogin={login}
 			onLogout={logout}
 		/>
+	);
+}
+
+function AppSidebarContainer() {
+	const { pathname } = useLocation();
+	const { isAuthenticated, username, hasRole } = useAuth();
+	
+	if (pathname === "/landing" || !isAuthenticated || username === undefined) {
+		return null;
+	}
+
+	return (
+		<AppSidebar username={username} isAdmin={hasRole("admin")} />
 	);
 }
