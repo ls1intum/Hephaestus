@@ -1,18 +1,18 @@
-import type { DefaultError } from "@tanstack/query-core";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { createFileRoute } from "@tanstack/react-router";
-import { toast } from "sonner";
-
 import {
+  addTeamToUserMutation,
 	automaticallyAssignTeamsMutation,
 	getTeamsOptions,
 	getUsersWithTeamsOptions,
 	getUsersWithTeamsQueryKey,
+  removeUserFromTeamMutation,
 } from "@/api/@tanstack/react-query.gen";
 import { addTeamToUser, removeUserFromTeam } from "@/api/sdk.gen";
-import type { UserInfo } from "@/api/types.gen";
 import { AdminMembersPage } from "@/components/admin/AdminMembersPage";
 import { adaptApiUserTeams } from "@/components/admin/types";
+import type { DefaultError } from "@tanstack/query-core";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { createFileRoute } from "@tanstack/react-router";
+import { toast } from "sonner";
 
 export const Route = createFileRoute("/_authenticated/_admin/admin/members")({
 	component: AdminMembersContainer,
@@ -48,20 +48,10 @@ function AdminMembersContainer() {
 	});
 
 	// Mutations for team management
-	const addTeamMutation = useMutation<
-		UserInfo,
-		DefaultError,
-		{ login: string; teamId: number }
-	>({
-		mutationFn: async ({ login, teamId }) => {
-			const { data } = await addTeamToUser({
-				path: { login, teamId },
-				throwOnError: true,
-			});
-			return data;
-		},
+	const addTeamMutation = useMutation({
+		...addTeamToUserMutation(),
 		onSuccess: () => {
-			queryClient.invalidateQueries({ queryKey: ["getUsersWithTeams"] });
+			queryClient.invalidateQueries({ queryKey: getUsersWithTeamsQueryKey() });
 			toast.success("User successfully added to team");
 		},
 		onError: (error: DefaultError) => {
@@ -69,20 +59,10 @@ function AdminMembersContainer() {
 		},
 	});
 
-	const removeTeamMutation = useMutation<
-		UserInfo,
-		DefaultError,
-		{ login: string; teamId: number }
-	>({
-		mutationFn: async ({ login, teamId }) => {
-			const { data } = await removeUserFromTeam({
-				path: { login, teamId },
-				throwOnError: true,
-			});
-			return data;
-		},
+	const removeTeamMutation = useMutation({
+		...removeUserFromTeamMutation(),
 		onSuccess: () => {
-			queryClient.invalidateQueries({ queryKey: ["getUsersWithTeams"] });
+			queryClient.invalidateQueries({ queryKey: getUsersWithTeamsQueryKey() });
 			toast.success("User successfully removed from team");
 		},
 		onError: (error: DefaultError) => {
@@ -100,8 +80,10 @@ function AdminMembersContainer() {
 		const user = usersData?.find((u) => u.id.toString() === userId);
 		if (user) {
 			addTeamMutation.mutate({
-				login: user.login,
-				teamId: Number.parseInt(teamId),
+				path: {
+          login: user.login,
+          teamId: Number.parseInt(teamId),
+        }
 			});
 		}
 	};
@@ -110,9 +92,11 @@ function AdminMembersContainer() {
 		const user = usersData?.find((u) => u.id.toString() === userId);
 		if (user) {
 			removeTeamMutation.mutate({
-				login: user.login,
-				teamId: Number.parseInt(teamId),
-			});
+				path: {
+					login: user.login,
+					teamId: Number.parseInt(teamId),
+				}
+  			});
 		}
 	};
 
@@ -131,7 +115,7 @@ function AdminMembersContainer() {
 
 		Promise.all(promises)
 			.then(() => {
-				queryClient.invalidateQueries({ queryKey: ["getUsersWithTeams"] });
+				queryClient.invalidateQueries({ queryKey: getUsersWithTeamsQueryKey() });
 				toast.success(`Successfully added ${userIds.length} users to team`);
 			})
 			.catch((error) => {
@@ -153,7 +137,7 @@ function AdminMembersContainer() {
 
 		Promise.all(promises)
 			.then(() => {
-				queryClient.invalidateQueries({ queryKey: ["getUsersWithTeams"] });
+				queryClient.invalidateQueries({ queryKey: getUsersWithTeamsQueryKey() });
 				toast.success(`Successfully removed ${userIds.length} users from team`);
 			})
 			.catch((error) => {

@@ -22,6 +22,7 @@ import {
 } from "lucide-react";
 import { useMemo, useState } from "react";
 
+import { GithubBadge } from "@/components/shared/GithubBadge";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -185,20 +186,12 @@ export function UsersTable({
 								</Badge>
 							) : (
 								userTeams.map((team) => (
-									<Badge
+									<GithubBadge
 										key={team.id}
-										variant="secondary"
-										className="text-xs flex items-center gap-1"
-										style={{
-											backgroundColor: team.color
-												? `${team.color}15`
-												: undefined,
-											borderColor: team.color || undefined,
-											color: team.color || undefined,
-										}}
-									>
-										{team.name}
-									</Badge>
+										label={team.name}
+										color={team.color?.replace("#", "")}
+										className="text-xs"
+									/>
 								))
 							)}
 						</div>
@@ -216,7 +209,7 @@ export function UsersTable({
 				cell: ({ row }) => {
 					const user = row.original.user;
 					const userTeams = new Set(
-						(row.original.teams || []).map((team) => team.id)
+						(row.original.teams || []).map((team) => team.id),
 					);
 
 					const toggleTeam = (teamId: number) => {
@@ -246,31 +239,30 @@ export function UsersTable({
 											const isActive = userTeams.has(team.id);
 
 											return (
-												<Badge
+												<button
+													type="button"
 													key={team.id}
-													variant={isActive ? "default" : "outline"}
 													className={cn(
-														"cursor-pointer transition-all duration-200 text-xs px-2 py-1 h-7",
-														isActive && team.color && {
-															backgroundColor: `${team.color}15`,
-															borderColor: team.color,
-															color: team.color,
-														},
-														isActive && "text-white border-transparent",
-														!isActive && "hover:bg-muted",
+														"cursor-pointer transition-all duration-200 p-0 border-none bg-transparent",
+														!isActive && "hover:opacity-80",
 													)}
 													onClick={() => toggleTeam(team.id)}
-													style={
-														isActive && team.color
-															? {
-																	backgroundColor: team.color,
-																	borderColor: team.color,
-															  }
-															: undefined
-													}
+													onKeyDown={(e) => {
+														if (e.key === "Enter" || e.key === " ") {
+															e.preventDefault();
+															toggleTeam(team.id);
+														}
+													}}
 												>
-													{team.name}
-												</Badge>
+													<GithubBadge
+														label={team.name}
+														color={team.color?.replace("#", "")}
+														className={cn(
+															"text-xs transition-all duration-200",
+															!isActive && "opacity-60",
+														)}
+													/>
+												</button>
 											);
 										})}
 									</div>
