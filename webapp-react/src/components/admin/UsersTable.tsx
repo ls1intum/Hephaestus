@@ -15,7 +15,6 @@ import {
 	ArrowUpDown,
 	ChevronDown,
 	Filter,
-	MoreHorizontal,
 	Search,
 	UserMinus,
 	UserPlus,
@@ -38,8 +37,6 @@ import {
 	DropdownMenu,
 	DropdownMenuCheckboxItem,
 	DropdownMenuContent,
-	DropdownMenuItem,
-	DropdownMenuLabel,
 	DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
@@ -52,6 +49,11 @@ import {
 	PaginationNext,
 	PaginationPrevious,
 } from "@/components/ui/pagination";
+import {
+	Popover,
+	PopoverContent,
+	PopoverTrigger,
+} from "@/components/ui/popover";
 import {
 	Select,
 	SelectContent,
@@ -69,6 +71,7 @@ import {
 } from "@/components/ui/table";
 
 import type { TeamInfo } from "@/api/types.gen";
+import { cn } from "@/lib/utils";
 import type { ExtendedUserTeams } from "./types";
 
 interface UsersTableProps {
@@ -212,44 +215,73 @@ export function UsersTable({
 				enableHiding: false,
 				cell: ({ row }) => {
 					const user = row.original.user;
+					const userTeams = new Set(
+						(row.original.teams || []).map((team) => team.id)
+					);
+
+					const toggleTeam = (teamId: number) => {
+						if (userTeams.has(teamId)) {
+							onRemoveUserFromTeam(user.id.toString(), teamId.toString());
+						} else {
+							onAddTeamToUser(user.id.toString(), teamId.toString());
+						}
+					};
 
 					return (
-						<DropdownMenu>
-							<DropdownMenuTrigger asChild>
+						<Popover>
+							<PopoverTrigger asChild>
 								<Button variant="ghost" className="h-8 w-8 p-0">
-									<span className="sr-only">Open menu</span>
-									<MoreHorizontal className="h-4 w-4" />
+									<span className="sr-only">Manage teams</span>
+									<Users className="h-4 w-4" />
 								</Button>
-							</DropdownMenuTrigger>
-							<DropdownMenuContent align="end">
-								<DropdownMenuLabel>Actions</DropdownMenuLabel>
-								<DropdownMenuItem
-									onClick={() => {
-										setSelectedUserId(user.id.toString());
-										setAddTeamDialogOpen(true);
-									}}
-								>
-									<UserPlus className="mr-2 h-4 w-4" />
-									Add to team
-								</DropdownMenuItem>
-								{row.original.teams && row.original.teams.length > 0 && (
-									<DropdownMenuItem
-										onClick={() => {
-											setSelectedUserId(user.id.toString());
-											setRemoveTeamDialogOpen(true);
-										}}
-									>
-										<UserMinus className="mr-2 h-4 w-4" />
-										Remove from team
-									</DropdownMenuItem>
-								)}
-							</DropdownMenuContent>
-						</DropdownMenu>
+							</PopoverTrigger>
+							<PopoverContent className="w-80" align="end">
+								<div className="space-y-3">
+									<h4 className="font-medium">Manage Teams</h4>
+									<p className="text-sm text-muted-foreground">
+										Click team badges to add or remove {user.name} from teams.
+									</p>
+									<div className="flex flex-wrap gap-1.5">
+										{teams.map((team) => {
+											const isActive = userTeams.has(team.id);
+
+											return (
+												<Badge
+													key={team.id}
+													variant={isActive ? "default" : "outline"}
+													className={cn(
+														"cursor-pointer transition-all duration-200 text-xs px-2 py-1 h-7",
+														isActive && team.color && {
+															backgroundColor: `${team.color}15`,
+															borderColor: team.color,
+															color: team.color,
+														},
+														isActive && "text-white border-transparent",
+														!isActive && "hover:bg-muted",
+													)}
+													onClick={() => toggleTeam(team.id)}
+													style={
+														isActive && team.color
+															? {
+																	backgroundColor: team.color,
+																	borderColor: team.color,
+															  }
+															: undefined
+													}
+												>
+													{team.name}
+												</Badge>
+											);
+										})}
+									</div>
+								</div>
+							</PopoverContent>
+						</Popover>
 					);
 				},
 			},
 		],
-		[],
+		[teams, onAddTeamToUser, onRemoveUserFromTeam],
 	);
 
 	const filteredData = useMemo(() => {
@@ -453,24 +485,24 @@ export function UsersTable({
 
 			{/* Enhanced Bulk actions */}
 			{selectedUserIds.length > 0 && (
-				<div className="flex items-center justify-between p-4 bg-accent/50 border border-border rounded-lg shadow-sm">
+				<div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4 p-4 bg-accent/50 border border-border rounded-lg shadow-sm">
 					<div className="flex items-center space-x-3">
-						<div className="flex items-center justify-center w-8 h-8 bg-primary/10 rounded-full">
+						<div className="flex items-center justify-center w-8 h-8 bg-primary/10 rounded-full aspect-square flex-shrink-0">
 							<Users className="h-4 w-4 text-primary" />
 						</div>
-						<div>
+						<div className="min-w-0">
 							<p className="text-sm font-medium">
 								{selectedUserIds.length} user
 								{selectedUserIds.length > 1 ? "s" : ""} selected
 							</p>
-							<p className="text-xs text-muted-foreground">
+							<p className="text-xs text-muted-foreground hidden sm:block">
 								Choose a team and action to perform on selected users
 							</p>
 						</div>
 					</div>
-					<div className="flex items-center space-x-3">
+					<div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 sm:gap-3">
 						<Select value={selectedTeamId} onValueChange={setSelectedTeamId}>
-							<SelectTrigger className="w-[180px]">
+							<SelectTrigger className="w-full sm:w-[180px]">
 								<SelectValue placeholder="Select team" />
 							</SelectTrigger>
 							<SelectContent>
@@ -489,25 +521,25 @@ export function UsersTable({
 								))}
 							</SelectContent>
 						</Select>
-						<div className="flex items-center space-x-2">
+						<div className="flex flex-col sm:flex-row gap-2 sm:gap-2">
 							<Button
 								size="sm"
 								onClick={handleBulkAddTeam}
 								disabled={!selectedTeamId}
-								className="gap-2"
+								className="gap-2 w-full sm:w-auto"
 							>
 								<UserPlus className="h-4 w-4" />
-								Add to team
+								<span className="sm:inline">Add to team</span>
 							</Button>
 							<Button
 								size="sm"
 								variant="outline"
 								onClick={handleBulkRemoveTeam}
 								disabled={!selectedTeamId}
-								className="gap-2"
+								className="gap-2 w-full sm:w-auto"
 							>
 								<UserMinus className="h-4 w-4" />
-								Remove from team
+								<span className="sm:inline">Remove from team</span>
 							</Button>
 						</div>
 					</div>
