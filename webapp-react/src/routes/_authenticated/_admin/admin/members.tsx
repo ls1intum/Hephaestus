@@ -1,10 +1,10 @@
 import {
-  addTeamToUserMutation,
+	addTeamToUserMutation,
 	automaticallyAssignTeamsMutation,
 	getTeamsOptions,
 	getUsersWithTeamsOptions,
 	getUsersWithTeamsQueryKey,
-  removeUserFromTeamMutation,
+	removeUserFromTeamMutation,
 } from "@/api/@tanstack/react-query.gen";
 import { addTeamToUser, removeUserFromTeam } from "@/api/sdk.gen";
 import { AdminMembersPage } from "@/components/admin/AdminMembersPage";
@@ -70,9 +70,18 @@ function AdminMembersContainer() {
 		},
 	});
 
-	// Transform API data for the component
-	const users = usersData?.map(adaptApiUserTeams) || [];
-	const teams = teamsData || [];
+	// Transform API data for the component and sort alphabetically
+	const users = (usersData?.map(adaptApiUserTeams) || [])
+		.map((user) => ({
+			...user,
+			teams: [...(user.teams || [])].sort((a, b) =>
+				a.name.localeCompare(b.name),
+			),
+		}))
+		.sort((a, b) => a.user.name.localeCompare(b.user.name));
+	const teams = [...(teamsData || [])].sort((a, b) =>
+		a.name.localeCompare(b.name),
+	);
 	const isLoading = usersLoading || teamsLoading;
 
 	// Handle individual user actions
@@ -81,9 +90,9 @@ function AdminMembersContainer() {
 		if (user) {
 			addTeamMutation.mutate({
 				path: {
-          login: user.login,
-          teamId: Number.parseInt(teamId),
-        }
+					login: user.login,
+					teamId: Number.parseInt(teamId),
+				},
 			});
 		}
 	};
@@ -95,8 +104,8 @@ function AdminMembersContainer() {
 				path: {
 					login: user.login,
 					teamId: Number.parseInt(teamId),
-				}
-  			});
+				},
+			});
 		}
 	};
 
@@ -115,7 +124,9 @@ function AdminMembersContainer() {
 
 		Promise.all(promises)
 			.then(() => {
-				queryClient.invalidateQueries({ queryKey: getUsersWithTeamsQueryKey() });
+				queryClient.invalidateQueries({
+					queryKey: getUsersWithTeamsQueryKey(),
+				});
 				toast.success(`Successfully added ${userIds.length} users to team`);
 			})
 			.catch((error) => {
@@ -137,7 +148,9 @@ function AdminMembersContainer() {
 
 		Promise.all(promises)
 			.then(() => {
-				queryClient.invalidateQueries({ queryKey: getUsersWithTeamsQueryKey() });
+				queryClient.invalidateQueries({
+					queryKey: getUsersWithTeamsQueryKey(),
+				});
 				toast.success(`Successfully removed ${userIds.length} users from team`);
 			})
 			.catch((error) => {

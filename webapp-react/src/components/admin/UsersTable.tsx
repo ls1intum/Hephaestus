@@ -235,36 +235,38 @@ export function UsersTable({
 										Click team badges to add or remove {user.name} from teams.
 									</p>
 									<div className="flex flex-wrap gap-1.5">
-										{teams.map((team) => {
-											const isActive = userTeams.has(team.id);
+										{[...teams]
+											.sort((a, b) => a.name.localeCompare(b.name))
+											.map((team) => {
+												const isActive = userTeams.has(team.id);
 
-											return (
-												<button
-													type="button"
-													key={team.id}
-													className={cn(
-														"cursor-pointer transition-all duration-200 p-0 border-none bg-transparent",
-														!isActive && "hover:opacity-80",
-													)}
-													onClick={() => toggleTeam(team.id)}
-													onKeyDown={(e) => {
-														if (e.key === "Enter" || e.key === " ") {
-															e.preventDefault();
-															toggleTeam(team.id);
-														}
-													}}
-												>
-													<GithubBadge
-														label={team.name}
-														color={team.color?.replace("#", "")}
+												return (
+													<button
+														type="button"
+														key={team.id}
 														className={cn(
-															"text-xs transition-all duration-200",
-															!isActive && "opacity-60",
+															"cursor-pointer transition-all duration-200 p-0 border-none bg-transparent",
+															!isActive && "hover:opacity-80",
 														)}
-													/>
-												</button>
-											);
-										})}
+														onClick={() => toggleTeam(team.id)}
+														onKeyDown={(e) => {
+															if (e.key === "Enter" || e.key === " ") {
+																e.preventDefault();
+																toggleTeam(team.id);
+															}
+														}}
+													>
+														<GithubBadge
+															label={team.name}
+															color={team.color?.replace("#", "")}
+															className={cn(
+																"text-xs transition-all duration-200",
+																!isActive && "opacity-60",
+															)}
+														/>
+													</button>
+												);
+											})}
 									</div>
 								</div>
 							</PopoverContent>
@@ -419,19 +421,21 @@ export function UsersTable({
 									<span>All teams</span>
 								</div>
 							</SelectItem>
-							{teams.map((team) => (
-								<SelectItem key={team.id} value={team.id.toString()}>
-									<div className="flex items-center space-x-2">
-										{team.color && (
-											<div
-												className="w-3 h-3 rounded-full"
-												style={{ backgroundColor: team.color }}
-											/>
-										)}
-										<span>{team.name}</span>
-									</div>
-								</SelectItem>
-							))}
+							{[...teams]
+								.sort((a, b) => a.name.localeCompare(b.name))
+								.map((team) => (
+									<SelectItem key={team.id} value={team.id.toString()}>
+										<div className="flex items-center space-x-2">
+											{team.color && (
+												<div
+													className="w-3 h-3 rounded-full"
+													style={{ backgroundColor: team.color }}
+												/>
+											)}
+											<span>{team.name}</span>
+										</div>
+									</SelectItem>
+								))}
 						</SelectContent>
 					</Select>
 				</div>
@@ -498,19 +502,21 @@ export function UsersTable({
 								<SelectValue placeholder="Select team" />
 							</SelectTrigger>
 							<SelectContent>
-								{teams.map((team) => (
-									<SelectItem key={team.id} value={team.id.toString()}>
-										<div className="flex items-center space-x-2">
-											{team.color && (
-												<div
-													className="w-3 h-3 rounded-full"
-													style={{ backgroundColor: team.color }}
-												/>
-											)}
-											<span>{team.name}</span>
-										</div>
-									</SelectItem>
-								))}
+								{[...teams]
+									.sort((a, b) => a.name.localeCompare(b.name))
+									.map((team) => (
+										<SelectItem key={team.id} value={team.id.toString()}>
+											<div className="flex items-center space-x-2">
+												{team.color && (
+													<div
+														className="w-3 h-3 rounded-full"
+														style={{ backgroundColor: team.color }}
+													/>
+												)}
+												<span>{team.name}</span>
+											</div>
+										</SelectItem>
+									))}
 							</SelectContent>
 						</Select>
 						<div className="flex flex-col sm:flex-row gap-2 sm:gap-2">
@@ -725,13 +731,14 @@ export function UsersTable({
 								<SelectValue placeholder="Select a team" />
 							</SelectTrigger>
 							<SelectContent>
-								{teams
+								{[...teams]
 									.filter(
 										(team) =>
 											!selectedUser?.teams?.some(
 												(userTeam) => userTeam.id === team.id,
 											),
 									)
+									.sort((a, b) => a.name.localeCompare(b.name))
 									.map((team) => (
 										<SelectItem key={team.id} value={team.id.toString()}>
 											<div className="flex items-center space-x-2">
@@ -780,19 +787,21 @@ export function UsersTable({
 								<SelectValue placeholder="Select a team" />
 							</SelectTrigger>
 							<SelectContent>
-								{selectedUser?.teams?.map((team) => (
-									<SelectItem key={team.id} value={team.id.toString()}>
-										<div className="flex items-center space-x-2">
-											{team.color && (
-												<div
-													className="w-3 h-3 rounded-full"
-													style={{ backgroundColor: team.color }}
-												/>
-											)}
-											<span>{team.name}</span>
-										</div>
-									</SelectItem>
-								))}
+								{selectedUser?.teams
+									?.sort((a, b) => a.name.localeCompare(b.name))
+									.map((team) => (
+										<SelectItem key={team.id} value={team.id.toString()}>
+											<div className="flex items-center space-x-2">
+												{team.color && (
+													<div
+														className="w-3 h-3 rounded-full"
+														style={{ backgroundColor: team.color }}
+													/>
+												)}
+												<span>{team.name}</span>
+											</div>
+										</SelectItem>
+									))}
 							</SelectContent>
 						</Select>
 					</div>
