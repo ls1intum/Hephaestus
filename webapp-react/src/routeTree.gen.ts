@@ -22,14 +22,12 @@ import { Route as AuthenticatedSettingsImport } from './routes/_authenticated/se
 import { Route as AuthenticatedMentorImport } from './routes/_authenticated/mentor'
 import { Route as AuthenticatedBestPracticesImport } from './routes/_authenticated/best-practices'
 import { Route as AuthenticatedAdminImport } from './routes/_authenticated/_admin'
-import { Route as AuthenticatedWorkspaceIndexImport } from './routes/_authenticated/workspace/index'
-import { Route as AuthenticatedWorkspaceUsersImport } from './routes/_authenticated/workspace/users'
-import { Route as AuthenticatedWorkspaceTeamsImport } from './routes/_authenticated/workspace/teams'
 import { Route as AuthenticatedUserUsernameIndexImport } from './routes/_authenticated/user/$username/index'
 import { Route as AuthenticatedAdminAdminIndexImport } from './routes/_authenticated/_admin/admin/index'
 import { Route as AuthenticatedUserUsernameBestPracticesImport } from './routes/_authenticated/user/$username/best-practices'
 import { Route as AuthenticatedAdminAdminTeamsImport } from './routes/_authenticated/_admin/admin/teams'
 import { Route as AuthenticatedAdminAdminSettingsImport } from './routes/_authenticated/_admin/admin/settings'
+import { Route as AuthenticatedAdminAdminMembersImport } from './routes/_authenticated/_admin/admin/members'
 
 // Create/Update Routes
 
@@ -99,27 +97,6 @@ const AuthenticatedAdminRoute = AuthenticatedAdminImport.update({
   getParentRoute: () => AuthenticatedRoute,
 } as any)
 
-const AuthenticatedWorkspaceIndexRoute =
-  AuthenticatedWorkspaceIndexImport.update({
-    id: '/workspace/',
-    path: '/workspace/',
-    getParentRoute: () => AuthenticatedRoute,
-  } as any)
-
-const AuthenticatedWorkspaceUsersRoute =
-  AuthenticatedWorkspaceUsersImport.update({
-    id: '/workspace/users',
-    path: '/workspace/users',
-    getParentRoute: () => AuthenticatedRoute,
-  } as any)
-
-const AuthenticatedWorkspaceTeamsRoute =
-  AuthenticatedWorkspaceTeamsImport.update({
-    id: '/workspace/teams',
-    path: '/workspace/teams',
-    getParentRoute: () => AuthenticatedRoute,
-  } as any)
-
 const AuthenticatedUserUsernameIndexRoute =
   AuthenticatedUserUsernameIndexImport.update({
     id: '/user/$username/',
@@ -152,6 +129,13 @@ const AuthenticatedAdminAdminSettingsRoute =
   AuthenticatedAdminAdminSettingsImport.update({
     id: '/admin/settings',
     path: '/admin/settings',
+    getParentRoute: () => AuthenticatedAdminRoute,
+  } as any)
+
+const AuthenticatedAdminAdminMembersRoute =
+  AuthenticatedAdminAdminMembersImport.update({
+    id: '/admin/members',
+    path: '/admin/members',
     getParentRoute: () => AuthenticatedAdminRoute,
   } as any)
 
@@ -236,26 +220,12 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedIndexImport
       parentRoute: typeof AuthenticatedImport
     }
-    '/_authenticated/workspace/teams': {
-      id: '/_authenticated/workspace/teams'
-      path: '/workspace/teams'
-      fullPath: '/workspace/teams'
-      preLoaderRoute: typeof AuthenticatedWorkspaceTeamsImport
-      parentRoute: typeof AuthenticatedImport
-    }
-    '/_authenticated/workspace/users': {
-      id: '/_authenticated/workspace/users'
-      path: '/workspace/users'
-      fullPath: '/workspace/users'
-      preLoaderRoute: typeof AuthenticatedWorkspaceUsersImport
-      parentRoute: typeof AuthenticatedImport
-    }
-    '/_authenticated/workspace/': {
-      id: '/_authenticated/workspace/'
-      path: '/workspace'
-      fullPath: '/workspace'
-      preLoaderRoute: typeof AuthenticatedWorkspaceIndexImport
-      parentRoute: typeof AuthenticatedImport
+    '/_authenticated/_admin/admin/members': {
+      id: '/_authenticated/_admin/admin/members'
+      path: '/admin/members'
+      fullPath: '/admin/members'
+      preLoaderRoute: typeof AuthenticatedAdminAdminMembersImport
+      parentRoute: typeof AuthenticatedAdminImport
     }
     '/_authenticated/_admin/admin/settings': {
       id: '/_authenticated/_admin/admin/settings'
@@ -298,12 +268,14 @@ declare module '@tanstack/react-router' {
 // Create and export the route tree
 
 interface AuthenticatedAdminRouteChildren {
+  AuthenticatedAdminAdminMembersRoute: typeof AuthenticatedAdminAdminMembersRoute
   AuthenticatedAdminAdminSettingsRoute: typeof AuthenticatedAdminAdminSettingsRoute
   AuthenticatedAdminAdminTeamsRoute: typeof AuthenticatedAdminAdminTeamsRoute
   AuthenticatedAdminAdminIndexRoute: typeof AuthenticatedAdminAdminIndexRoute
 }
 
 const AuthenticatedAdminRouteChildren: AuthenticatedAdminRouteChildren = {
+  AuthenticatedAdminAdminMembersRoute: AuthenticatedAdminAdminMembersRoute,
   AuthenticatedAdminAdminSettingsRoute: AuthenticatedAdminAdminSettingsRoute,
   AuthenticatedAdminAdminTeamsRoute: AuthenticatedAdminAdminTeamsRoute,
   AuthenticatedAdminAdminIndexRoute: AuthenticatedAdminAdminIndexRoute,
@@ -319,9 +291,6 @@ interface AuthenticatedRouteChildren {
   AuthenticatedSettingsRoute: typeof AuthenticatedSettingsRoute
   AuthenticatedTeamsRoute: typeof AuthenticatedTeamsRoute
   AuthenticatedIndexRoute: typeof AuthenticatedIndexRoute
-  AuthenticatedWorkspaceTeamsRoute: typeof AuthenticatedWorkspaceTeamsRoute
-  AuthenticatedWorkspaceUsersRoute: typeof AuthenticatedWorkspaceUsersRoute
-  AuthenticatedWorkspaceIndexRoute: typeof AuthenticatedWorkspaceIndexRoute
   AuthenticatedUserUsernameBestPracticesRoute: typeof AuthenticatedUserUsernameBestPracticesRoute
   AuthenticatedUserUsernameIndexRoute: typeof AuthenticatedUserUsernameIndexRoute
 }
@@ -333,9 +302,6 @@ const AuthenticatedRouteChildren: AuthenticatedRouteChildren = {
   AuthenticatedSettingsRoute: AuthenticatedSettingsRoute,
   AuthenticatedTeamsRoute: AuthenticatedTeamsRoute,
   AuthenticatedIndexRoute: AuthenticatedIndexRoute,
-  AuthenticatedWorkspaceTeamsRoute: AuthenticatedWorkspaceTeamsRoute,
-  AuthenticatedWorkspaceUsersRoute: AuthenticatedWorkspaceUsersRoute,
-  AuthenticatedWorkspaceIndexRoute: AuthenticatedWorkspaceIndexRoute,
   AuthenticatedUserUsernameBestPracticesRoute:
     AuthenticatedUserUsernameBestPracticesRoute,
   AuthenticatedUserUsernameIndexRoute: AuthenticatedUserUsernameIndexRoute,
@@ -356,9 +322,7 @@ export interface FileRoutesByFullPath {
   '/settings': typeof AuthenticatedSettingsRoute
   '/teams': typeof AuthenticatedTeamsRoute
   '/': typeof AuthenticatedIndexRoute
-  '/workspace/teams': typeof AuthenticatedWorkspaceTeamsRoute
-  '/workspace/users': typeof AuthenticatedWorkspaceUsersRoute
-  '/workspace': typeof AuthenticatedWorkspaceIndexRoute
+  '/admin/members': typeof AuthenticatedAdminAdminMembersRoute
   '/admin/settings': typeof AuthenticatedAdminAdminSettingsRoute
   '/admin/teams': typeof AuthenticatedAdminAdminTeamsRoute
   '/user/$username/best-practices': typeof AuthenticatedUserUsernameBestPracticesRoute
@@ -377,9 +341,7 @@ export interface FileRoutesByTo {
   '/settings': typeof AuthenticatedSettingsRoute
   '/teams': typeof AuthenticatedTeamsRoute
   '/': typeof AuthenticatedIndexRoute
-  '/workspace/teams': typeof AuthenticatedWorkspaceTeamsRoute
-  '/workspace/users': typeof AuthenticatedWorkspaceUsersRoute
-  '/workspace': typeof AuthenticatedWorkspaceIndexRoute
+  '/admin/members': typeof AuthenticatedAdminAdminMembersRoute
   '/admin/settings': typeof AuthenticatedAdminAdminSettingsRoute
   '/admin/teams': typeof AuthenticatedAdminAdminTeamsRoute
   '/user/$username/best-practices': typeof AuthenticatedUserUsernameBestPracticesRoute
@@ -400,9 +362,7 @@ export interface FileRoutesById {
   '/_authenticated/settings': typeof AuthenticatedSettingsRoute
   '/_authenticated/teams': typeof AuthenticatedTeamsRoute
   '/_authenticated/': typeof AuthenticatedIndexRoute
-  '/_authenticated/workspace/teams': typeof AuthenticatedWorkspaceTeamsRoute
-  '/_authenticated/workspace/users': typeof AuthenticatedWorkspaceUsersRoute
-  '/_authenticated/workspace/': typeof AuthenticatedWorkspaceIndexRoute
+  '/_authenticated/_admin/admin/members': typeof AuthenticatedAdminAdminMembersRoute
   '/_authenticated/_admin/admin/settings': typeof AuthenticatedAdminAdminSettingsRoute
   '/_authenticated/_admin/admin/teams': typeof AuthenticatedAdminAdminTeamsRoute
   '/_authenticated/user/$username/best-practices': typeof AuthenticatedUserUsernameBestPracticesRoute
@@ -423,9 +383,7 @@ export interface FileRouteTypes {
     | '/settings'
     | '/teams'
     | '/'
-    | '/workspace/teams'
-    | '/workspace/users'
-    | '/workspace'
+    | '/admin/members'
     | '/admin/settings'
     | '/admin/teams'
     | '/user/$username/best-practices'
@@ -443,9 +401,7 @@ export interface FileRouteTypes {
     | '/settings'
     | '/teams'
     | '/'
-    | '/workspace/teams'
-    | '/workspace/users'
-    | '/workspace'
+    | '/admin/members'
     | '/admin/settings'
     | '/admin/teams'
     | '/user/$username/best-practices'
@@ -464,9 +420,7 @@ export interface FileRouteTypes {
     | '/_authenticated/settings'
     | '/_authenticated/teams'
     | '/_authenticated/'
-    | '/_authenticated/workspace/teams'
-    | '/_authenticated/workspace/users'
-    | '/_authenticated/workspace/'
+    | '/_authenticated/_admin/admin/members'
     | '/_authenticated/_admin/admin/settings'
     | '/_authenticated/_admin/admin/teams'
     | '/_authenticated/user/$username/best-practices'
@@ -517,9 +471,6 @@ export const routeTree = rootRoute
         "/_authenticated/settings",
         "/_authenticated/teams",
         "/_authenticated/",
-        "/_authenticated/workspace/teams",
-        "/_authenticated/workspace/users",
-        "/_authenticated/workspace/",
         "/_authenticated/user/$username/best-practices",
         "/_authenticated/user/$username/"
       ]
@@ -540,6 +491,7 @@ export const routeTree = rootRoute
       "filePath": "_authenticated/_admin.tsx",
       "parent": "/_authenticated",
       "children": [
+        "/_authenticated/_admin/admin/members",
         "/_authenticated/_admin/admin/settings",
         "/_authenticated/_admin/admin/teams",
         "/_authenticated/_admin/admin/"
@@ -565,17 +517,9 @@ export const routeTree = rootRoute
       "filePath": "_authenticated/index.tsx",
       "parent": "/_authenticated"
     },
-    "/_authenticated/workspace/teams": {
-      "filePath": "_authenticated/workspace/teams.tsx",
-      "parent": "/_authenticated"
-    },
-    "/_authenticated/workspace/users": {
-      "filePath": "_authenticated/workspace/users.tsx",
-      "parent": "/_authenticated"
-    },
-    "/_authenticated/workspace/": {
-      "filePath": "_authenticated/workspace/index.tsx",
-      "parent": "/_authenticated"
+    "/_authenticated/_admin/admin/members": {
+      "filePath": "_authenticated/_admin/admin/members.tsx",
+      "parent": "/_authenticated/_admin"
     },
     "/_authenticated/_admin/admin/settings": {
       "filePath": "_authenticated/_admin/admin/settings.tsx",

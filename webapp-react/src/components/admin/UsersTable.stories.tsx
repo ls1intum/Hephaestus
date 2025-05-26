@@ -54,7 +54,6 @@ const mockUsers: ExtendedUserTeams[] = [
 			id: "user-1",
 			name: "Alice Johnson",
 			email: "alice@example.com",
-			role: "admin",
 		},
 	},
 	{
@@ -67,7 +66,6 @@ const mockUsers: ExtendedUserTeams[] = [
 			id: "user-2",
 			name: "Bob Smith",
 			email: "bob@example.com",
-			role: "user",
 		},
 	},
 	{
@@ -80,7 +78,6 @@ const mockUsers: ExtendedUserTeams[] = [
 			id: "user-3",
 			name: "Charlie Brown",
 			email: "charlie@example.com",
-			role: "user",
 		},
 	},
 	{
@@ -93,7 +90,6 @@ const mockUsers: ExtendedUserTeams[] = [
 			id: "user-4",
 			name: "Diana Prince",
 			email: "diana@example.com",
-			role: "user",
 		},
 	},
 	{
@@ -106,13 +102,11 @@ const mockUsers: ExtendedUserTeams[] = [
 			id: "user-5",
 			name: "Ethan Hunt",
 			email: "ethan@example.com",
-			role: "user",
 		},
 	},
 ];
 
 const meta: Meta<typeof UsersTable> = {
-	title: "Workspace/UsersTable",
 	component: UsersTable,
 	parameters: {
 		layout: "fullscreen",
@@ -171,7 +165,6 @@ export const UsersWithoutTeams: Story = {
 					id: "user-6",
 					name: "John Doe",
 					email: "john@example.com",
-					role: "user",
 				},
 			},
 			{
@@ -184,7 +177,6 @@ export const UsersWithoutTeams: Story = {
 					id: "user-7",
 					name: "Jane Smith",
 					email: "jane@example.com",
-					role: "user",
 				},
 			},
 		],
@@ -203,7 +195,6 @@ export const ManyUsers: Story = {
 				id: `user-${i + 10}`,
 				name: `User ${i + 1}`,
 				email: `user${i + 1}@example.com`,
-				role: i % 5 === 0 ? "admin" : "user",
 			},
 		})),
 	},

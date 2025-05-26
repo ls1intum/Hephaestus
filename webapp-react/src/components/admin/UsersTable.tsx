@@ -44,6 +44,15 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
 import {
+	Pagination,
+	PaginationContent,
+	PaginationEllipsis,
+	PaginationItem,
+	PaginationLink,
+	PaginationNext,
+	PaginationPrevious,
+} from "@/components/ui/pagination";
+import {
 	Select,
 	SelectContent,
 	SelectItem,
@@ -166,7 +175,7 @@ export function UsersTable({
 				cell: ({ row }) => {
 					const userTeams = row.original.teams || [];
 					return (
-						<div className="flex flex-wrap gap-1">
+						<div className="flex flex-wrap gap-1 max-w-xs">
 							{userTeams.length === 0 ? (
 								<Badge variant="outline" className="text-muted-foreground">
 									No teams
@@ -176,12 +185,13 @@ export function UsersTable({
 									<Badge
 										key={team.id}
 										variant="secondary"
-										className="text-xs"
+										className="text-xs flex items-center gap-1"
 										style={{
 											backgroundColor: team.color
-												? `${team.color}20`
+												? `${team.color}15`
 												: undefined,
 											borderColor: team.color || undefined,
+											color: team.color || undefined,
 										}}
 									>
 										{team.name}
@@ -195,31 +205,6 @@ export function UsersTable({
 					if (value === "all") return true;
 					const userTeams = row.original.teams || [];
 					return userTeams.some((team) => team.id.toString() === value);
-				},
-			},
-			{
-				accessorKey: "user.role",
-				header: ({ column }) => {
-					return (
-						<Button
-							variant="ghost"
-							onClick={() =>
-								column.toggleSorting(column.getIsSorted() === "asc")
-							}
-							className="h-auto p-0 font-semibold"
-						>
-							Role
-							<ArrowUpDown className="ml-2 h-4 w-4" />
-						</Button>
-					);
-				},
-				cell: ({ row }) => {
-					const role = row.original.user.role;
-					return (
-						<Badge variant={role === "admin" ? "default" : "outline"}>
-							{role}
-						</Badge>
-					);
 				},
 			},
 			{
@@ -341,41 +326,105 @@ export function UsersTable({
 		? users.find((u) => u.user.id === selectedUserId)
 		: null;
 
+	// Helper function to generate pagination items
+	const generatePaginationItems = () => {
+		const pageCount = table.getPageCount();
+		const currentPage = table.getState().pagination.pageIndex + 1;
+		const items = [];
+
+		if (pageCount <= 7) {
+			// Show all pages if 7 or fewer
+			for (let i = 1; i <= pageCount; i++) {
+				items.push(i);
+			}
+		} else {
+			// Show smart pagination with ellipsis
+			if (currentPage <= 3) {
+				// Show 1-4 ... last
+				items.push(1, 2, 3, 4, "...", pageCount);
+			} else if (currentPage >= pageCount - 2) {
+				// Show 1 ... last-3 to last
+				items.push(
+					1,
+					"...",
+					pageCount - 3,
+					pageCount - 2,
+					pageCount - 1,
+					pageCount,
+				);
+			} else {
+				// Show 1 ... current-1, current, current+1 ... last
+				items.push(
+					1,
+					"...",
+					currentPage - 1,
+					currentPage,
+					currentPage + 1,
+					"...",
+					pageCount,
+				);
+			}
+		}
+
+		return items;
+	};
+
 	return (
 		<div className="w-full space-y-4">
-			{/* Header with search and filters */}
-			<div className="flex items-center justify-between">
-				<div className="flex items-center space-x-2">
-					<div className="relative">
-						<Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
+			{/* Enhanced Header with search and filters */}
+			<div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+				<div className="flex flex-col sm:flex-row items-start sm:items-center space-y-2 sm:space-y-0 sm:space-x-3 w-full sm:w-auto">
+					<div className="relative w-full sm:w-auto">
+						<Search className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
 						<Input
-							placeholder="Search users..."
+							placeholder="Search by name or email..."
 							value={globalFilter}
 							onChange={(event) => setGlobalFilter(event.target.value)}
-							className="pl-8 max-w-sm"
+							className="pl-9 w-full sm:w-[300px]"
 						/>
 					</div>
 					<Select value={teamFilter} onValueChange={setTeamFilter}>
-						<SelectTrigger className="w-[180px]">
+						<SelectTrigger className="w-full sm:w-[200px]">
 							<Filter className="mr-2 h-4 w-4" />
 							<SelectValue placeholder="Filter by team" />
 						</SelectTrigger>
 						<SelectContent>
-							<SelectItem key="all" value="all">
-								All teams
+							<SelectItem value="all">
+								<div className="flex items-center space-x-2">
+									<div className="w-3 h-3 rounded-full bg-muted" />
+									<span>All teams</span>
+								</div>
 							</SelectItem>
 							{teams.map((team) => (
 								<SelectItem key={team.id} value={team.id.toString()}>
-									{team.name}
+									<div className="flex items-center space-x-2">
+										{team.color && (
+											<div
+												className="w-3 h-3 rounded-full"
+												style={{ backgroundColor: team.color }}
+											/>
+										)}
+										<span>{team.name}</span>
+									</div>
 								</SelectItem>
 							))}
 						</SelectContent>
 					</Select>
 				</div>
 				<div className="flex items-center space-x-2">
+					{globalFilter && (
+						<Button
+							variant="ghost"
+							size="sm"
+							onClick={() => setGlobalFilter("")}
+							className="h-8 px-2 lg:px-3"
+						>
+							Clear search
+						</Button>
+					)}
 					<DropdownMenu>
 						<DropdownMenuTrigger asChild>
-							<Button variant="outline" className="ml-auto">
+							<Button variant="outline" size="sm" className="ml-auto">
 								Columns <ChevronDown className="ml-2 h-4 w-4" />
 							</Button>
 						</DropdownMenuTrigger>
@@ -402,44 +451,65 @@ export function UsersTable({
 				</div>
 			</div>
 
-			{/* Bulk actions */}
+			{/* Enhanced Bulk actions */}
 			{selectedUserIds.length > 0 && (
-				<div className="flex items-center space-x-2 p-2 bg-muted rounded-md">
-					<Users className="h-4 w-4" />
-					<span className="text-sm font-medium">
-						{selectedUserIds.length} user{selectedUserIds.length > 1 ? "s" : ""}{" "}
-						selected
-					</span>
-					<div className="flex items-center space-x-2 ml-auto">
+				<div className="flex items-center justify-between p-4 bg-accent/50 border border-border rounded-lg shadow-sm">
+					<div className="flex items-center space-x-3">
+						<div className="flex items-center justify-center w-8 h-8 bg-primary/10 rounded-full">
+							<Users className="h-4 w-4 text-primary" />
+						</div>
+						<div>
+							<p className="text-sm font-medium">
+								{selectedUserIds.length} user
+								{selectedUserIds.length > 1 ? "s" : ""} selected
+							</p>
+							<p className="text-xs text-muted-foreground">
+								Choose a team and action to perform on selected users
+							</p>
+						</div>
+					</div>
+					<div className="flex items-center space-x-3">
 						<Select value={selectedTeamId} onValueChange={setSelectedTeamId}>
-							<SelectTrigger className="w-[150px]">
+							<SelectTrigger className="w-[180px]">
 								<SelectValue placeholder="Select team" />
 							</SelectTrigger>
 							<SelectContent>
 								{teams.map((team) => (
 									<SelectItem key={team.id} value={team.id.toString()}>
-										{team.name}
+										<div className="flex items-center space-x-2">
+											{team.color && (
+												<div
+													className="w-3 h-3 rounded-full"
+													style={{ backgroundColor: team.color }}
+												/>
+											)}
+											<span>{team.name}</span>
+										</div>
 									</SelectItem>
 								))}
 							</SelectContent>
 						</Select>
-						<Button
-							size="sm"
-							onClick={handleBulkAddTeam}
-							disabled={!selectedTeamId}
-						>
-							<UserPlus className="h-4 w-4 mr-1" />
-							Add to team
-						</Button>
-						<Button
-							size="sm"
-							variant="outline"
-							onClick={handleBulkRemoveTeam}
-							disabled={!selectedTeamId}
-						>
-							<UserMinus className="h-4 w-4 mr-1" />
-							Remove from team
-						</Button>
+						<div className="flex items-center space-x-2">
+							<Button
+								size="sm"
+								onClick={handleBulkAddTeam}
+								disabled={!selectedTeamId}
+								className="gap-2"
+							>
+								<UserPlus className="h-4 w-4" />
+								Add to team
+							</Button>
+							<Button
+								size="sm"
+								variant="outline"
+								onClick={handleBulkRemoveTeam}
+								disabled={!selectedTeamId}
+								className="gap-2"
+							>
+								<UserMinus className="h-4 w-4" />
+								Remove from team
+							</Button>
+						</div>
 					</div>
 				</div>
 			)}
@@ -470,9 +540,14 @@ export function UsersTable({
 							<TableRow>
 								<TableCell
 									colSpan={columns.length}
-									className="h-24 text-center"
+									className="h-32 text-center"
 								>
-									Loading users...
+									<div className="flex flex-col items-center justify-center space-y-2">
+										<div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary" />
+										<p className="text-sm text-muted-foreground">
+											Loading users...
+										</p>
+									</div>
 								</TableCell>
 							</TableRow>
 						) : table.getRowModel().rows?.length ? (
@@ -480,6 +555,7 @@ export function UsersTable({
 								<TableRow
 									key={row.id}
 									data-state={row.getIsSelected() && "selected"}
+									className="hover:bg-muted/50 transition-colors"
 								>
 									{row.getVisibleCells().map((cell) => (
 										<TableCell key={cell.id}>
@@ -495,9 +571,17 @@ export function UsersTable({
 							<TableRow>
 								<TableCell
 									colSpan={columns.length}
-									className="h-24 text-center"
+									className="h-32 text-center"
 								>
-									No users found.
+									<div className="flex flex-col items-center justify-center space-y-2">
+										<Users className="h-8 w-8 text-muted-foreground" />
+										<p className="text-sm font-medium">No users found</p>
+										<p className="text-xs text-muted-foreground">
+											{globalFilter || teamFilter !== "all"
+												? "Try adjusting your search or filter criteria"
+												: "No users have been added to the workspace yet"}
+										</p>
+									</div>
 								</TableCell>
 							</TableRow>
 						)}
@@ -505,15 +589,26 @@ export function UsersTable({
 				</Table>
 			</div>
 
-			{/* Pagination */}
-			<div className="flex items-center justify-between space-x-2 py-4">
-				<div className="flex-1 text-sm text-muted-foreground">
-					{table.getFilteredSelectedRowModel().rows.length} of{" "}
-					{table.getFilteredRowModel().rows.length} row(s) selected.
+			{/* Enhanced Pagination */}
+			<div className="flex flex-col sm:flex-row items-center justify-between space-y-4 sm:space-y-0 sm:space-x-2 py-4">
+				<div className="flex-1 text-sm text-muted-foreground order-2 sm:order-1">
+					<div className="flex flex-col sm:flex-row gap-1 sm:gap-4">
+						<span>
+							{table.getFilteredSelectedRowModel().rows.length} of{" "}
+							{table.getFilteredRowModel().rows.length} row(s) selected
+						</span>
+						<span className="hidden sm:inline">•</span>
+						<span>
+							Showing {table.getRowModel().rows.length} of {filteredData.length}{" "}
+							users
+						</span>
+					</div>
 				</div>
-				<div className="flex items-center space-x-6 lg:space-x-8">
+				<div className="flex flex-col sm:flex-row items-center space-y-4 sm:space-y-0 sm:space-x-6 lg:space-x-8 order-1 sm:order-2">
 					<div className="flex items-center space-x-2">
-						<p className="text-sm font-medium">Rows per page</p>
+						<p className="text-sm font-medium whitespace-nowrap">
+							Rows per page
+						</p>
 						<Select
 							value={`${table.getState().pagination.pageSize}`}
 							onValueChange={(value) => {
@@ -534,47 +629,59 @@ export function UsersTable({
 							</SelectContent>
 						</Select>
 					</div>
+
+					{/* Enhanced Pagination with Shadcn Components */}
+					{table.getPageCount() > 1 && (
+						<Pagination>
+							<PaginationContent>
+								<PaginationItem>
+									<PaginationPrevious
+										onClick={() => table.previousPage()}
+										className={
+											!table.getCanPreviousPage()
+												? "pointer-events-none opacity-50"
+												: "cursor-pointer"
+										}
+									/>
+								</PaginationItem>
+
+								{generatePaginationItems().map((page, index) => (
+									<PaginationItem
+										key={page === "..." ? `ellipsis-${index}` : `page-${page}`}
+									>
+										{page === "..." ? (
+											<PaginationEllipsis />
+										) : (
+											<PaginationLink
+												onClick={() => table.setPageIndex(Number(page) - 1)}
+												isActive={
+													table.getState().pagination.pageIndex + 1 === page
+												}
+												className="cursor-pointer"
+											>
+												{page}
+											</PaginationLink>
+										)}
+									</PaginationItem>
+								))}
+
+								<PaginationItem>
+									<PaginationNext
+										onClick={() => table.nextPage()}
+										className={
+											!table.getCanNextPage()
+												? "pointer-events-none opacity-50"
+												: "cursor-pointer"
+										}
+									/>
+								</PaginationItem>
+							</PaginationContent>
+						</Pagination>
+					)}
+
 					<div className="flex w-[100px] items-center justify-center text-sm font-medium">
 						Page {table.getState().pagination.pageIndex + 1} of{" "}
 						{table.getPageCount()}
-					</div>
-					<div className="flex items-center space-x-2">
-						<Button
-							variant="outline"
-							className="hidden h-8 w-8 p-0 lg:flex"
-							onClick={() => table.setPageIndex(0)}
-							disabled={!table.getCanPreviousPage()}
-						>
-							<span className="sr-only">Go to first page</span>
-							{"<<"}
-						</Button>
-						<Button
-							variant="outline"
-							className="h-8 w-8 p-0"
-							onClick={() => table.previousPage()}
-							disabled={!table.getCanPreviousPage()}
-						>
-							<span className="sr-only">Go to previous page</span>
-							{"<"}
-						</Button>
-						<Button
-							variant="outline"
-							className="h-8 w-8 p-0"
-							onClick={() => table.nextPage()}
-							disabled={!table.getCanNextPage()}
-						>
-							<span className="sr-only">Go to next page</span>
-							{">"}
-						</Button>
-						<Button
-							variant="outline"
-							className="hidden h-8 w-8 p-0 lg:flex"
-							onClick={() => table.setPageIndex(table.getPageCount() - 1)}
-							disabled={!table.getCanNextPage()}
-						>
-							<span className="sr-only">Go to last page</span>
-							{">>"}
-						</Button>
 					</div>
 				</div>
 			</div>
@@ -594,7 +701,6 @@ export function UsersTable({
 								<SelectValue placeholder="Select a team" />
 							</SelectTrigger>
 							<SelectContent>
-								{" "}
 								{teams
 									.filter(
 										(team) =>
@@ -604,7 +710,15 @@ export function UsersTable({
 									)
 									.map((team) => (
 										<SelectItem key={team.id} value={team.id.toString()}>
-											{team.name}
+											<div className="flex items-center space-x-2">
+												{team.color && (
+													<div
+														className="w-3 h-3 rounded-full"
+														style={{ backgroundColor: team.color }}
+													/>
+												)}
+												<span>{team.name}</span>
+											</div>
 										</SelectItem>
 									))}
 							</SelectContent>
@@ -644,7 +758,15 @@ export function UsersTable({
 							<SelectContent>
 								{selectedUser?.teams?.map((team) => (
 									<SelectItem key={team.id} value={team.id.toString()}>
-										{team.name}
+										<div className="flex items-center space-x-2">
+											{team.color && (
+												<div
+													className="w-3 h-3 rounded-full"
+													style={{ backgroundColor: team.color }}
+												/>
+											)}
+											<span>{team.name}</span>
+										</div>
 									</SelectItem>
 								))}
 							</SelectContent>
