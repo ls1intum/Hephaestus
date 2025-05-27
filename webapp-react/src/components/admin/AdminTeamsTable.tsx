@@ -144,9 +144,9 @@ export function AdminTeamsTable({
 
 	return (
 		<div className="space-y-6">
-			{/* Header */}
-			<div className="flex items-center justify-between">
-				<div className="relative flex-1 max-w-md">
+			{/* Header - Make it stack on mobile */}
+			<div className="flex flex-col sm:flex-row gap-4 sm:items-center sm:justify-between">
+				<div className="relative w-full sm:max-w-md">
 					<Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
 					<Input
 						placeholder="Search teams..."
@@ -155,13 +155,13 @@ export function AdminTeamsTable({
 						className="pl-10"
 					/>
 				</div>
-				<Button onClick={() => setCreateDialogOpen(true)} className="gap-2">
+				<Button onClick={() => setCreateDialogOpen(true)} className="gap-2 w-full sm:w-auto">
 					<Plus className="h-4 w-4" />
 					Create Team
 				</Button>
 			</div>
 
-			{/* Teams List */}
+			{/* Teams List - Changed from grid to vertical stack */}
 			{filteredTeams.length === 0 ? (
 				<div className="text-center py-12">
 					<Users className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
@@ -173,13 +173,13 @@ export function AdminTeamsTable({
 					</p>
 				</div>
 			) : (
-				<div className="space-y-4">
+				<div className="space-y-4"> {/* Changed from grid to vertical stack with space-y-4 */}
 					{filteredTeams.map((team) => (
 						<TeamCard
 							key={team.id}
 							team={team}
 							memberCount={team.members.length}
-							availableRepositories={availableRepositories}  // Add this line
+							availableRepositories={availableRepositories}
 							onEdit={() => handleEditTeam(team)}
 							onDelete={() => handleDeleteTeam(team)}
 							onToggleVisibility={(hidden) => onHideTeam?.(team.id, hidden)}
@@ -344,7 +344,7 @@ interface TeamCardProps {
 function TeamCard({
 	team,
 	memberCount,
-	availableRepositories, // Add this to the function parameters
+	availableRepositories,
 	onEdit,
 	onDelete,
 	onToggleVisibility,
@@ -361,17 +361,17 @@ function TeamCard({
 			className={`transition-all hover:shadow-md ${team.hidden ? "opacity-60" : ""}`}
 		>
 			<CardHeader className="pb-4">
-				<div className="flex items-center justify-between">
-					<div className="flex items-center gap-3">
+				<div className="flex flex-wrap items-start justify-between gap-2">
+					<div className="flex items-center gap-3 min-w-0 flex-1">
 						<div
 							className="w-4 h-4 rounded-full border-2 border-white shadow-sm flex-shrink-0"
 							style={{ backgroundColor: team.color }}
 						/>
-						<div>
-							<h3 className="font-semibold text-lg">{team.name}</h3>
-							<div className="flex items-center gap-4 text-sm text-muted-foreground">
+						<div className="min-w-0 flex-1">
+							<h3 className="font-semibold text-lg truncate" title={team.name}>{team.name}</h3>
+							<div className="flex flex-wrap items-center gap-2 sm:gap-4 text-sm text-muted-foreground">
 								<span className="flex items-center gap-1">
-									<Users className="h-3 w-3" />
+									<Users className="h-3 w-3 flex-shrink-0" />
 									{memberCount} {memberCount === 1 ? "member" : "members"}
 								</span>
 								<span>
@@ -387,6 +387,7 @@ function TeamCard({
 							size="icon"
 							onClick={() => onToggleVisibility(!team.hidden)}
 							className="h-8 w-8"
+							title={team.hidden ? "Show team" : "Hide team"}
 						>
 							{team.hidden ? (
 								<EyeOff className="h-4 w-4" />
@@ -399,6 +400,7 @@ function TeamCard({
 							size="icon"
 							onClick={onEdit}
 							className="h-8 w-8"
+							title="Edit team"
 						>
 							<Pencil className="h-4 w-4" />
 						</Button>
@@ -407,6 +409,7 @@ function TeamCard({
 							size="icon"
 							onClick={onDelete}
 							className="h-8 w-8 text-destructive"
+							title="Delete team"
 						>
 							<Trash2 className="h-4 w-4" />
 						</Button>
@@ -414,7 +417,6 @@ function TeamCard({
 				</div>
 			</CardHeader>
 			<CardContent>
-				{/* Add this section with a flex container for the title and button */}
 				<div className="flex items-center justify-between mb-3">
 					<h4 className="text-sm font-medium text-muted-foreground">
 						Repositories
@@ -433,7 +435,7 @@ function TeamCard({
 				</div>
 
 				{team.repositories.length > 0 ? (
-					<div className="flex flex-wrap gap-3">
+					<div className="space-y-3"> {/* Changed from grid to vertical space-y-3 */}
 						{[...team.repositories]
 							.sort((a, b) => a.nameWithOwner.localeCompare(b.nameWithOwner))
 							.map((repo) => (
@@ -456,14 +458,14 @@ function TeamCard({
 				{/* Add repository dialog */}
 				{onAddRepository && (
 					<Dialog open={addRepoDialogOpen} onOpenChange={setAddRepoDialogOpen}>
-						<DialogContent>
+						<DialogContent className="sm:max-w-lg max-h-[90vh] overflow-hidden flex flex-col">
 							<DialogHeader>
 								<DialogTitle>Add Repository to {team.name}</DialogTitle>
 								<DialogDescription>
 									Select a repository to add to this team.
 								</DialogDescription>
 							</DialogHeader>
-							<div className="space-y-4 py-2">
+							<div className="space-y-4 py-2 flex-1 overflow-hidden">
 								<div className="relative">
 									<Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
 									<Input
@@ -473,7 +475,7 @@ function TeamCard({
 										className="pl-10"
 									/>
 								</div>
-								<div className="h-[300px] overflow-y-auto border rounded-md">
+								<div className="overflow-y-auto border rounded-md" style={{ maxHeight: "calc(70vh - 200px)" }}>
 									{availableRepositories?.filter(repo => 
 										repo.nameWithOwner.toLowerCase().includes(repoSearchTerm.toLowerCase())
 									)
@@ -490,8 +492,8 @@ function TeamCard({
 												setRepoSearchTerm("");
 											}}
 										>
-											<div>
-												<div className="font-medium">{repo.nameWithOwner}</div>
+											<div className="min-w-0 w-full">
+												<div className="font-medium truncate" title={repo.nameWithOwner}>{repo.nameWithOwner}</div>
 												{repo.description && (
 													<p className="text-xs text-muted-foreground mt-1 line-clamp-2">
 														{repo.description}
@@ -509,7 +511,7 @@ function TeamCard({
 									)}
 								</div>
 							</div>
-							<DialogFooter>
+							<DialogFooter className="pt-4 border-t">
 								<Button variant="outline" onClick={() => setAddRepoDialogOpen(false)}>
 									Cancel
 								</Button>
@@ -574,9 +576,9 @@ function RepositoryCard({
 	};
 
 	return (
-		<Card className="min-w-0 flex-1 max-w-md">
-			<CardContent className="p-4">
-				<div className="flex items-start justify-between mb-3">
+		<Card className="flex flex-col border-border/50"> {/* Lighter border for better visual separation */}
+			<CardContent className="flex flex-col">
+				<div className="flex items-start justify-between">
 					<div className="min-w-0 flex-1">
 						<a
 							href={repository.htmlUrl}
@@ -593,7 +595,7 @@ function RepositoryCard({
 							</p>
 						)}
 					</div>
-					<div className="flex items-center gap-1 ml-2">
+					<div className="flex items-center gap-1 ml-2 flex-shrink-0">
 						{(repoLabels.length > 0 || onAddLabel) && (
 							<Popover>
 								<PopoverTrigger asChild>
@@ -601,7 +603,7 @@ function RepositoryCard({
 										<Settings className="h-3 w-3" />
 									</Button>
 								</PopoverTrigger>
-								<PopoverContent className="w-80" align="end">
+								<PopoverContent className="w-80 max-w-[calc(100vw-2rem)]" align="end">
 									<div className="space-y-3">
 										<div className="space-y-2">
 											<h4 className="font-medium text-sm">Labels</h4>
@@ -677,6 +679,7 @@ function RepositoryCard({
 									onRemove(team.id, owner, name);
 								}}
 								className="h-7 w-7 p-0 text-destructive"
+								title="Remove repository"
 							>
 								<X className="h-3 w-3" />
 							</Button>
@@ -684,8 +687,8 @@ function RepositoryCard({
 					</div>
 				</div>
 				{repoLabels.length > 0 && (
-					<div className="flex flex-wrap gap-1">
-						{repoLabels.slice(0, 3).map((label) => (
+					<div className="flex flex-wrap gap-1 mt-2">
+						{repoLabels.map((label) => (
 							<GithubBadge
 								key={label.id}
 								label={label.name}
@@ -693,11 +696,6 @@ function RepositoryCard({
 								className="text-xs"
 							/>
 						))}
-						{repoLabels.length > 3 && (
-							<span className="text-xs text-muted-foreground">
-								+{repoLabels.length - 3} more
-							</span>
-						)}
 					</div>
 				)}
 			</CardContent>
