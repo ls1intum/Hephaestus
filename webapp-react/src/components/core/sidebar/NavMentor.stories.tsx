@@ -7,24 +7,24 @@ import { NavMentor } from "./NavMentor";
  * mentoring system.
  */
 const meta = {
-  component: NavMentor,
-  parameters: {
-    layout: "centered",
-    docs: {
-      description: {
-        component:
-          "Mentor navigation sidebar component with links to AI mentoring features and resources.",
-      },
-    },
-  },
-  tags: ["autodocs"],
-  decorators: [
-    (Story) => (
-      <SidebarProvider className="min-h-0 w-[16rem] border border-border rounded-lg p-2 bg-sidebar">
-        <Story />
-      </SidebarProvider>
-    ),
-  ],
+	component: NavMentor,
+	parameters: {
+		layout: "centered",
+		docs: {
+			description: {
+				component:
+					"Mentor navigation sidebar component with links to AI mentoring features and resources.",
+			},
+		},
+	},
+	tags: ["autodocs"],
+	decorators: [
+		(Story) => (
+			<SidebarProvider className="min-h-0 w-[16rem] border border-border rounded-lg p-2 bg-sidebar">
+				<Story />
+			</SidebarProvider>
+		),
+	],
 } satisfies Meta<typeof NavMentor>;
 
 export default meta;

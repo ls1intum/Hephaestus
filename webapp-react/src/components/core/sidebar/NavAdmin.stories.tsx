@@ -7,24 +7,24 @@ import { NavAdmin } from "./NavAdmin";
  * management and workspace settings.
  */
 const meta = {
-  component: NavAdmin,
-  parameters: {
-    layout: "centered",
-    docs: {
-      description: {
-        component:
-          "Administration navigation sidebar component with links to member management and workspace settings.",
-      },
-    },
-  },
-  tags: ["autodocs"],
-  decorators: [
-    (Story) => (
-      <SidebarProvider className="min-h-0 w-[16rem] border border-border rounded-lg p-2 bg-sidebar">
-        <Story />
-      </SidebarProvider>
-    ),
-  ],
+	component: NavAdmin,
+	parameters: {
+		layout: "centered",
+		docs: {
+			description: {
+				component:
+					"Administration navigation sidebar component with links to member management and workspace settings.",
+			},
+		},
+	},
+	tags: ["autodocs"],
+	decorators: [
+		(Story) => (
+			<SidebarProvider className="min-h-0 w-[16rem] border border-border rounded-lg p-2 bg-sidebar">
+				<Story />
+			</SidebarProvider>
+		),
+	],
 } satisfies Meta<typeof NavAdmin>;
 
 export default meta;

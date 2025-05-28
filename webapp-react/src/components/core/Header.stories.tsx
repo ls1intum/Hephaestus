@@ -79,7 +79,8 @@ export const LoggedInUser: Story = {
 	parameters: {
 		docs: {
 			description: {
-				story: "Standard header view for authenticated users showing the user profile dropdown with navigation options.",
+				story:
+					"Standard header view for authenticated users showing the user profile dropdown with navigation options.",
 			},
 		},
 	},
@@ -96,7 +97,8 @@ export const LoggedOut: Story = {
 	parameters: {
 		docs: {
 			description: {
-				story: "Header view for unauthenticated users with sign-in button and limited navigation options.",
+				story:
+					"Header view for unauthenticated users with sign-in button and limited navigation options.",
 			},
 		},
 	},
@@ -113,7 +115,8 @@ export const Loading: Story = {
 	parameters: {
 		docs: {
 			description: {
-				story: "Header in loading state while user authentication is being verified.",
+				story:
+					"Header in loading state while user authentication is being verified.",
 			},
 		},
 	},
@@ -170,7 +173,8 @@ export const WithoutSidebarTrigger: Story = {
 	parameters: {
 		docs: {
 			description: {
-				story: "Header variant without a sidebar toggle button for pages with fixed layouts.",
+				story:
+					"Header variant without a sidebar toggle button for pages with fixed layouts.",
 			},
 		},
 	},

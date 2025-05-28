@@ -52,9 +52,7 @@ export default function Header({
 						className="flex gap-2 items-center hover:text-muted-foreground"
 					>
 						<Hammer className="text-2xl sm:text-3xl" />
-						<span className="text-xl font-semibold">
-							Hephaestus
-						</span>
+						<span className="text-xl font-semibold">Hephaestus</span>
 					</Link>
 					<span className="text-xs font-semibold mt-1 text-muted-foreground">
 						{version}
