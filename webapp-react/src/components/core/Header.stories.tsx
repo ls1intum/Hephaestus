@@ -1,3 +1,4 @@
+import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import type { Meta, StoryObj } from "@storybook/react";
 import { fn } from "@storybook/test";
 import Header from "./Header";
@@ -23,10 +24,19 @@ const meta = {
 		version: "1.0.0",
 		name: "John Doe",
 		username: "johnDoe",
-		showSidebarTrigger: true,
+		sidebarTrigger: <SidebarTrigger />,
 		onLogin: fn(),
 		onLogout: fn(),
 	},
+	decorators: [
+		(Story) => (
+			<SidebarProvider>
+				<div className="w-full">
+					<Story />
+				</div>
+			</SidebarProvider>
+		),
+	],
 	argTypes: {
 		isAuthenticated: {
 			control: "boolean",
@@ -48,6 +58,10 @@ const meta = {
 			control: "text",
 			description: "Application version displayed beside logo",
 		},
+		sidebarTrigger: {
+			control: "object",
+			description: "Sidebar trigger button component",
+		},
 	},
 } satisfies Meta<typeof Header>;
 
@@ -55,36 +69,19 @@ export default meta;
 type Story = StoryObj<typeof meta>;
 
 /**
- * Header state for an authenticated admin user with full permissions.
- * Shows admin navigation options and mentor access.
- */
-export const LoggedInAdmin: Story = {
-	args: {
-		isAuthenticated: true,
-		isLoading: false,
-		showSidebarTrigger: true,
-	},
-};
-
-/**
- * Header state for an authenticated user with mentor access but not admin privileges.
- */
-export const LoggedInNonAdminWithMentor: Story = {
-	args: {
-		isAuthenticated: true,
-		isLoading: false,
-		showSidebarTrigger: true,
-	},
-};
-
-/**
  * Header state for a regular authenticated user without special permissions.
  */
-export const LoggedInNonAdmin: Story = {
+export const LoggedInUser: Story = {
 	args: {
 		isAuthenticated: true,
 		isLoading: false,
-		showSidebarTrigger: true,
+	},
+	parameters: {
+		docs: {
+			description: {
+				story: "Standard header view for authenticated users showing the user profile dropdown with navigation options.",
+			},
+		},
 	},
 };
 
@@ -95,7 +92,13 @@ export const LoggedOut: Story = {
 	args: {
 		isAuthenticated: false,
 		isLoading: false,
-		showSidebarTrigger: false,
+	},
+	parameters: {
+		docs: {
+			description: {
+				story: "Header view for unauthenticated users with sign-in button and limited navigation options.",
+			},
+		},
 	},
 };
 
@@ -106,7 +109,13 @@ export const Loading: Story = {
 	args: {
 		isAuthenticated: false,
 		isLoading: true,
-		showSidebarTrigger: false,
+	},
+	parameters: {
+		docs: {
+			description: {
+				story: "Header in loading state while user authentication is being verified.",
+			},
+		},
 	},
 };
 
@@ -118,7 +127,6 @@ export const MobileView: Story = {
 	args: {
 		isAuthenticated: true,
 		isLoading: false,
-		showSidebarTrigger: true,
 	},
 	parameters: {
 		viewport: { defaultViewport: "mobile1" },
@@ -138,7 +146,6 @@ export const DesktopView: Story = {
 	args: {
 		isAuthenticated: true,
 		isLoading: false,
-		showSidebarTrigger: true,
 	},
 	parameters: {
 		viewport: { defaultViewport: "desktop" },
@@ -146,6 +153,24 @@ export const DesktopView: Story = {
 			description: {
 				story:
 					"Header in desktop view with full horizontal navigation and expanded controls.",
+			},
+		},
+	},
+};
+
+/**
+ * Header without sidebar trigger for layouts that don't require a sidebar.
+ */
+export const WithoutSidebarTrigger: Story = {
+	args: {
+		isAuthenticated: true,
+		isLoading: false,
+		sidebarTrigger: undefined,
+	},
+	parameters: {
+		docs: {
+			description: {
+				story: "Header variant without a sidebar toggle button for pages with fixed layouts.",
 			},
 		},
 	},

@@ -49,11 +49,10 @@ export default function Header({
 				<div className="flex items-center gap-2">
 					<Link
 						to="/"
-						search={{}}
 						className="flex gap-2 items-center hover:text-muted-foreground"
 					>
 						<Hammer className="text-2xl sm:text-3xl" />
-						<span className="hidden sm:inline-block text-xl font-semibold">
+						<span className="text-xl font-semibold">
 							Hephaestus
 						</span>
 					</Link>
