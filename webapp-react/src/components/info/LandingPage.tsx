@@ -169,17 +169,6 @@ export function LandingPage({
 
 	return (
 		<div className="flex flex-col">
-			{/* Override the container class in main to make sections full width */}
-			<style>{`
-        main.container {
-          max-width: 100% !important;
-          padding-left: 0 !important;
-          padding-right: 0 !important;
-          padding-top: 0 !important;
-          margin-top: 0 !important;
-        }
-      `}</style>
-
 			{/* Hero Section - Full Width */}
 			<section className="w-full bg-gradient-to-b from-background to-muted/30 pt-8 md:pt-16 lg:pt-24 text-foreground">
 				<div className="container mx-auto px-4 md:px-6 mb-12">
@@ -480,7 +469,7 @@ export function LandingPage({
 			</section>
 
 			{/* CTA */}
-			<section className="w-full py-8 md:py-16 bg-foreground mb-[-2rem]">
+			<section className="w-full py-8 md:py-16 bg-foreground">
 				<div className="container px-4 md:px-6">
 					<div className="flex flex-col items-center space-y-6 text-center max-w-3xl mx-auto">
 						<h2 className="text-3xl md:text-4xl font-bold text-primary-foreground">

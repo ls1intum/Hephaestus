@@ -8,5 +8,9 @@ export const Route = createFileRoute("/landing")({
 
 export function LandingContainer() {
 	const { login, isAuthenticated } = useAuth();
-	return <LandingPage onSignIn={() => login()} isSignedIn={isAuthenticated} />;
+	return (
+		<div className="-m-4">
+			<LandingPage onSignIn={() => login()} isSignedIn={isAuthenticated} />
+		</div>
+	);
 }

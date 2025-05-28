@@ -24,15 +24,6 @@ export default function Footer() {
 							</Button>
 
 							<Button variant="link" size="none" asChild>
-								<a
-									data-canny-link
-									href="https://hephaestus.canny.io/feature-requests"
-								>
-									Feature requests
-								</a>
-							</Button>
-
-							<Button variant="link" size="none" asChild>
 								<Link to="/privacy">Privacy</Link>
 							</Button>
 
@@ -43,7 +34,7 @@ export default function Footer() {
 					</div>
 
 					{/* Copyright/Credits Section */}
-					<div className="text-sm text-muted-foreground text-center sm:text-right w-full md:w-auto mt-2 md:mt-0">
+					<div className="text-sm text-muted-foreground text-center w-full sm:w-auto mt-2 md:mt-0">
 						<p className="text-balance">
 							Built by{" "}
 							<Button variant="link" size="none" asChild>
