@@ -81,7 +81,9 @@ export function AdminTeamsTable({
 	const [teamColor, setTeamColor] = useState("");
 
 	const filteredTeams = teams
-		.filter((team) => team.name.toLowerCase().includes(searchTerm.toLowerCase()))
+		.filter((team) =>
+			team.name.toLowerCase().includes(searchTerm.toLowerCase()),
+		)
 		.sort((a, b) => a.name.localeCompare(b.name));
 
 	const handleUpdateTeam = async () => {
@@ -155,7 +157,10 @@ export function AdminTeamsTable({
 						className="pl-10"
 					/>
 				</div>
-				<Button onClick={() => setCreateDialogOpen(true)} className="gap-2 w-full sm:w-auto">
+				<Button
+					onClick={() => setCreateDialogOpen(true)}
+					className="gap-2 w-full sm:w-auto"
+				>
 					<Plus className="h-4 w-4" />
 					Create Team
 				</Button>
@@ -173,7 +178,9 @@ export function AdminTeamsTable({
 					</p>
 				</div>
 			) : (
-				<div className="space-y-4"> {/* Changed from grid to vertical stack with space-y-4 */}
+				<div className="space-y-4">
+					{" "}
+					{/* Changed from grid to vertical stack with space-y-4 */}
 					{filteredTeams.map((team) => (
 						<TeamCard
 							key={team.id}
@@ -368,7 +375,9 @@ function TeamCard({
 							style={{ backgroundColor: team.color }}
 						/>
 						<div className="min-w-0 flex-1">
-							<h3 className="font-semibold text-lg truncate" title={team.name}>{team.name}</h3>
+							<h3 className="font-semibold text-lg truncate" title={team.name}>
+								{team.name}
+							</h3>
 							<div className="flex flex-wrap items-center gap-2 sm:gap-4 text-sm text-muted-foreground">
 								<span className="flex items-center gap-1">
 									<Users className="h-3 w-3 flex-shrink-0" />
@@ -435,7 +444,9 @@ function TeamCard({
 				</div>
 
 				{team.repositories.length > 0 ? (
-					<div className="space-y-3"> {/* Changed from grid to vertical space-y-3 */}
+					<div className="space-y-3">
+						{" "}
+						{/* Changed from grid to vertical space-y-3 */}
 						{[...team.repositories]
 							.sort((a, b) => a.nameWithOwner.localeCompare(b.nameWithOwner))
 							.map((repo) => (
@@ -475,35 +486,50 @@ function TeamCard({
 										className="pl-10"
 									/>
 								</div>
-								<div className="overflow-y-auto border rounded-md" style={{ maxHeight: "calc(70vh - 200px)" }}>
-									{availableRepositories?.filter(repo => 
-										repo.nameWithOwner.toLowerCase().includes(repoSearchTerm.toLowerCase())
-									)
-									.sort((a, b) => a.nameWithOwner.localeCompare(b.nameWithOwner))
-									.map(repo => (
-										<Button
-											key={repo.id}
-											variant="ghost" 
-											className="w-full justify-start text-left font-normal h-auto py-3 px-4 border-b last:border-b-0"
-											onClick={() => {
-												const [owner, name] = repo.nameWithOwner.split("/");
-												onAddRepository(team.id, owner, name);
-												setAddRepoDialogOpen(false);
-												setRepoSearchTerm("");
-											}}
-										>
-											<div className="min-w-0 w-full">
-												<div className="font-medium truncate" title={repo.nameWithOwner}>{repo.nameWithOwner}</div>
-												{repo.description && (
-													<p className="text-xs text-muted-foreground mt-1 line-clamp-2">
-														{repo.description}
-													</p>
-												)}
-											</div>
-										</Button>
-									))}
-									{availableRepositories?.filter(repo => 
-										repo.nameWithOwner.toLowerCase().includes(repoSearchTerm.toLowerCase())
+								<div
+									className="overflow-y-auto border rounded-md"
+									style={{ maxHeight: "calc(70vh - 200px)" }}
+								>
+									{availableRepositories
+										?.filter((repo) =>
+											repo.nameWithOwner
+												.toLowerCase()
+												.includes(repoSearchTerm.toLowerCase()),
+										)
+										.sort((a, b) =>
+											a.nameWithOwner.localeCompare(b.nameWithOwner),
+										)
+										.map((repo) => (
+											<Button
+												key={repo.id}
+												variant="ghost"
+												className="w-full justify-start text-left font-normal h-auto py-3 px-4 border-b last:border-b-0"
+												onClick={() => {
+													const [owner, name] = repo.nameWithOwner.split("/");
+													onAddRepository(team.id, owner, name);
+													setAddRepoDialogOpen(false);
+													setRepoSearchTerm("");
+												}}
+											>
+												<div className="min-w-0 w-full">
+													<div
+														className="font-medium truncate"
+														title={repo.nameWithOwner}
+													>
+														{repo.nameWithOwner}
+													</div>
+													{repo.description && (
+														<p className="text-xs text-muted-foreground mt-1 line-clamp-2">
+															{repo.description}
+														</p>
+													)}
+												</div>
+											</Button>
+										))}
+									{availableRepositories?.filter((repo) =>
+										repo.nameWithOwner
+											.toLowerCase()
+											.includes(repoSearchTerm.toLowerCase()),
 									).length === 0 && (
 										<div className="text-center py-8 text-sm text-muted-foreground">
 											No repositories found
@@ -512,7 +538,10 @@ function TeamCard({
 								</div>
 							</div>
 							<DialogFooter className="pt-4 border-t">
-								<Button variant="outline" onClick={() => setAddRepoDialogOpen(false)}>
+								<Button
+									variant="outline"
+									onClick={() => setAddRepoDialogOpen(false)}
+								>
 									Cancel
 								</Button>
 							</DialogFooter>
@@ -576,7 +605,9 @@ function RepositoryCard({
 	};
 
 	return (
-		<Card className="flex flex-col border-border/50"> {/* Lighter border for better visual separation */}
+		<Card className="flex flex-col border-border/50">
+			{" "}
+			{/* Lighter border for better visual separation */}
 			<CardContent className="flex flex-col">
 				<div className="flex items-start justify-between">
 					<div className="min-w-0 flex-1">
@@ -603,7 +634,10 @@ function RepositoryCard({
 										<Settings className="h-3 w-3" />
 									</Button>
 								</PopoverTrigger>
-								<PopoverContent className="w-80 max-w-[calc(100vw-2rem)]" align="end">
+								<PopoverContent
+									className="w-80 max-w-[calc(100vw-2rem)]"
+									align="end"
+								>
 									<div className="space-y-3">
 										<div className="space-y-2">
 											<h4 className="font-medium text-sm">Labels</h4>
