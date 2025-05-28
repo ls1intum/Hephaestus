@@ -1,7 +1,6 @@
 package de.tum.in.www1.hephaestus.gitprovider.teamV2.permission;
 
 import de.tum.in.www1.hephaestus.gitprovider.repository.Repository;
-
 import de.tum.in.www1.hephaestus.gitprovider.teamV2.TeamV2;
 import jakarta.persistence.*;
 import lombok.*;
@@ -33,7 +32,7 @@ public class TeamRepositoryPermission {
         READ,
         WRITE,
         MAINTAIN,
-        ADMIN
+        ADMIN,
     }
 
     public TeamRepositoryPermission(TeamV2 team, Repository repository, PermissionLevel permission) {

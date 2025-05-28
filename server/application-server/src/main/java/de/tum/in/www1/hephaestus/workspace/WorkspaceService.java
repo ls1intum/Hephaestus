@@ -105,24 +105,22 @@ public class WorkspaceService {
                 .toArray(CompletableFuture[]::new);
             CompletableFuture<Void> reposDone = CompletableFuture.allOf(repoFutures);
 
-            CompletableFuture<Void> usersFuture = reposDone.thenRunAsync(
-                    () -> {
-                        logger.info("All repositories synced, now syncing users");
-                        gitHubDataSyncService.syncUsers(workspace);
-                    }
-            );
+            // When all repository syncs complete, then sync users
+            CompletableFuture<Void> usersFuture = reposDone.thenRunAsync(() -> {
+                logger.info("All repositories synced, now syncing users");
+                gitHubDataSyncService.syncUsers(workspace);
+            });
             CompletableFuture<Void> usersDone = CompletableFuture.allOf(usersFuture);
 
-            CompletableFuture<Void> teamsFuture = usersDone.thenRunAsync(
-                    () -> {
-                        logger.info("Syncing teams");
-                        gitHubDataSyncService.syncTeams(workspace);
-                    }
-            );
+            CompletableFuture<Void> teamsFuture = usersDone.thenRunAsync(() -> {
+                logger.info("Syncing teams");
+                gitHubDataSyncService.syncTeams(workspace);
+            });
 
             CompletableFuture.allOf(teamsFuture).thenRun(() -> {
                 //TODO: to be removed after teamV2 is released
                 if (initDefaultWorkspace) {
+                    // Setup default teams
                     logger.info("Setting up default teams");
                     teamService.setupDefaultTeams();
                 }

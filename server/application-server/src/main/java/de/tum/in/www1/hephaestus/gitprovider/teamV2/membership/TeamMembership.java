@@ -30,7 +30,7 @@ public class TeamMembership {
 
     public enum Role {
         MEMBER,
-        MAINTAINER
+        MAINTAINER,
     }
 
     public TeamMembership(TeamV2 team, User user, Role role) {

@@ -1,9 +1,8 @@
 package de.tum.in.www1.hephaestus.gitprovider.teamV2.permission;
 
 import jakarta.persistence.Embeddable;
-import lombok.*;
-
 import java.io.Serializable;
+import lombok.*;
 
 @Embeddable
 @Getter
@@ -12,6 +11,7 @@ import java.io.Serializable;
 @AllArgsConstructor
 @EqualsAndHashCode
 public class TeamRepositoryPermissionId implements Serializable {
+
     private Long teamId;
     private Long repositoryId;
 }

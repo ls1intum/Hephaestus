@@ -1,13 +1,12 @@
 package de.tum.in.www1.hephaestus.gitprovider.teamV2;
 
 import de.tum.in.www1.hephaestus.gitprovider.common.BaseGitServiceEntity;
-import java.time.OffsetDateTime;
-import java.util.HashSet;
-import java.util.Set;
-
 import de.tum.in.www1.hephaestus.gitprovider.teamV2.membership.TeamMembership;
 import de.tum.in.www1.hephaestus.gitprovider.teamV2.permission.TeamRepositoryPermission;
 import jakarta.persistence.*;
+import java.time.OffsetDateTime;
+import java.util.HashSet;
+import java.util.Set;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
@@ -46,6 +45,11 @@ public class TeamV2 extends BaseGitServiceEntity {
         membership.setTeam(this);
     }
 
+    public void removeMembership(TeamMembership membership) {
+        memberships.remove(membership);
+        membership.setTeam(null);
+    }
+
     public void addRepoPermission(TeamRepositoryPermission permission) {
         repoPermissions.add(permission);
         permission.setTeam(this);
@@ -55,4 +59,15 @@ public class TeamV2 extends BaseGitServiceEntity {
         repoPermissions.clear();
         fresh.forEach(this::addRepoPermission);
     }
+    // Ignored GitHub properties:
+    // - node_id           (internal GraphQL/REST node identifier)
+    // - url               (API URL for this team)
+    // - html_url          (web URL for team page; we derive slug+org)
+    // - members_url       (templated URL for member listing)
+    // - repositories_url  (templated URL for repos listing)
+    // - parent            (if this team has a parent team)
+    // - permissions       (maps to our repoPermissions, but scoped to the OAuth user)
+    // - members_count     (cached count; we page through listMembers())
+    // - repos_count       (cached count; we page through listRepositories())
+    // - privacy_level     (older name for privacy)
 }

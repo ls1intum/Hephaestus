@@ -195,20 +195,21 @@ public class GitHubDataSyncService {
         return repository;
     }
 
-
     public void syncTeams(Workspace workspace) {
-        workspace.getRepositoriesToMonitor().stream()
-                .map(RepositoryToMonitor::getNameWithOwner)
-                .map(s -> s.split("/")[0])
-                .distinct()
-                .forEach(org -> {
-                    try {
-                        logger.info("Syncing teams for organisation {}", org);
-                        teamSyncService.syncAndSaveTeams(org);
-                    } catch (IOException e) {
-                        logger.error("Team sync for {} failed: {}", org, e.getMessage());
-                    }
-                });
+        workspace
+            .getRepositoriesToMonitor()
+            .stream()
+            .map(RepositoryToMonitor::getNameWithOwner)
+            .map(s -> s.split("/")[0])
+            .distinct()
+            .forEach(org -> {
+                try {
+                    logger.info("Syncing teams for organisation {}", org);
+                    teamSyncService.syncAndSaveTeams(org);
+                } catch (IOException e) {
+                    logger.error("Team sync for {} failed: {}", org, e.getMessage());
+                }
+            });
 
         logger.info("Team sync completed.");
     }
