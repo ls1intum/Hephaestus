@@ -12,9 +12,10 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Link } from "@tanstack/react-router";
 import { Hammer, LogOut, Settings, User } from "lucide-react";
-import { SidebarTrigger } from "../ui/sidebar";
 
 export interface HeaderProps {
+	/** Sidebar trigger button component */
+	sidebarTrigger?: React.ReactNode;
 	/** Application version displayed beside logo */
 	version: string;
 	/** User authentication state */
@@ -25,8 +26,6 @@ export interface HeaderProps {
 	name?: string;
 	/** Username of the authenticated user */
 	username?: string;
-	/** Whether to show the sidebar trigger button */
-	showSidebarTrigger: boolean;
 	/** Function to call on login button click */
 	onLogin: () => void;
 	/** Function to call on logout button click */
@@ -34,19 +33,19 @@ export interface HeaderProps {
 }
 
 export default function Header({
+	sidebarTrigger,
 	version,
 	isAuthenticated,
 	isLoading,
 	name,
 	username,
-	showSidebarTrigger,
 	onLogin,
 	onLogout,
 }: HeaderProps) {
 	return (
 		<header className="flex h-16 shrink-0 items-center gap-2 transition-[width,height] ease-linear group-has-[[data-collapsible=icon]]/sidebar-wrapper:h-12 justify-between">
 			<div className="flex items-center gap-2 px-4">
-				{showSidebarTrigger && <SidebarTrigger className="-ml-1" />}
+				{sidebarTrigger}
 				<div className="flex items-center gap-2">
 					<Link
 						to="/"

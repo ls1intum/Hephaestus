@@ -12,7 +12,7 @@ import TanstackQueryLayout from "../integrations/tanstack-query/layout";
 import { AppSidebar } from "@/components/core/AppSidebar";
 import Footer from "@/components/core/Footer";
 import Header from "@/components/core/Header";
-import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar";
+import { SidebarInset, SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import environment from "@/environment";
 import { type AuthContextType, useAuth } from "@/integrations/auth/AuthContext";
 import { useTheme } from "@/integrations/theme";
@@ -65,12 +65,12 @@ function HeaderContainer() {
 		useAuth();
 	return (
 		<Header
+			sidebarTrigger={!(pathname === "/landing" || !isAuthenticated) && <SidebarTrigger className="-ml-1" />}
 			version={environment.version}
 			isAuthenticated={isAuthenticated}
 			isLoading={isLoading}
 			name={userProfile && `${userProfile.firstName} ${userProfile.lastName}`}
 			username={username}
-			showSidebarTrigger={!(pathname === "/landing" || !isAuthenticated)}
 			onLogin={login}
 			onLogout={logout}
 		/>
