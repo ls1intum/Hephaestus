@@ -16,16 +16,23 @@ import {
 import { ChevronsUpDown, Plus } from "lucide-react";
 import { useEffect, useState } from "react";
 
+interface Workspace {
+	name: string;
+	logoUrl: string;
+}
+
 export function WorkspaceSwitcher({
 	workspaces,
+	activeWorkspace,
+	onWorkspaceChange,
+	onAddWorkspace,
 }: {
-	workspaces: {
-		name: string;
-		logoUrl: string;
-	}[];
+	workspaces: Workspace[];
+	activeWorkspace: Workspace;
+	onWorkspaceChange?: (workspace: Workspace) => void;
+	onAddWorkspace?: () => void;
 }) {
 	const { isMobile } = useSidebar();
-	const [activeWorkspace, setActiveWorkspace] = useState(workspaces[0]);
 	const [isDropdownOpen, setIsDropdownOpen] = useState(false);
 
 	useEffect(() => {
@@ -39,7 +46,8 @@ export function WorkspaceSwitcher({
 					const workspaceIndex = keyNum - 1;
 					if (workspaceIndex < workspaces.length) {
 						event.preventDefault();
-						setActiveWorkspace(workspaces[workspaceIndex]);
+						const selectedWorkspace = workspaces[workspaceIndex];
+						onWorkspaceChange?.(selectedWorkspace);
 					}
 				}
 			}
@@ -49,11 +57,7 @@ export function WorkspaceSwitcher({
 		return () => {
 			document.removeEventListener("keydown", handleKeyDown);
 		};
-	}, [workspaces]);
-
-	if (!activeWorkspace) {
-		return null;
-	}
+	}, [workspaces, onWorkspaceChange]);
 
 	return (
 		<SidebarMenu>
@@ -90,7 +94,7 @@ export function WorkspaceSwitcher({
 						{workspaces.map((workspace, index) => (
 							<DropdownMenuItem
 								key={workspace.name}
-								onClick={() => setActiveWorkspace(workspace)}
+								onClick={() => onWorkspaceChange?.(workspace)}
 								className="gap-2 p-2"
 							>
 								<div className="flex size-6 items-center justify-center rounded-sm border overflow-clip">
@@ -105,7 +109,11 @@ export function WorkspaceSwitcher({
 							</DropdownMenuItem>
 						))}
 						<DropdownMenuSeparator />
-						<DropdownMenuItem className="gap-2 p-2">
+						<DropdownMenuItem
+							className="gap-2 p-2"
+							onClick={() => onAddWorkspace?.()}
+							disabled
+						>
 							<div className="flex size-6 items-center justify-center rounded-md border bg-background">
 								<Plus className="size-4" />
 							</div>

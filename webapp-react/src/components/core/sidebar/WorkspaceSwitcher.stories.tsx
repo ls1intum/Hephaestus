@@ -1,5 +1,6 @@
 import { SidebarProvider } from "@/components/ui/sidebar";
 import type { Meta, StoryObj } from "@storybook/react";
+import { fn } from "@storybook/test";
 import { WorkspaceSwitcher } from "./WorkspaceSwitcher";
 
 /**
@@ -26,11 +27,29 @@ const meta = {
 				logoUrl: "https://avatars.githubusercontent.com/u/11064260?s=200&v=4",
 			},
 		],
+		activeWorkspace: {
+			name: "AET",
+			logoUrl: "https://avatars.githubusercontent.com/u/11064260?s=200&v=4",
+		},
+		onWorkspaceChange: fn(),
+		onAddWorkspace: fn(),
 	},
 	argTypes: {
 		workspaces: {
 			control: "object",
 			description: "List of available workspaces",
+		},
+		activeWorkspace: {
+			control: "object",
+			description: "Currently selected workspace",
+		},
+		onWorkspaceChange: {
+			action: "workspace changed",
+			description: "Callback fired when a workspace is selected",
+		},
+		onAddWorkspace: {
+			action: "add workspace clicked",
+			description: "Callback fired when the add workspace button is clicked",
 		},
 	},
 	decorators: [
@@ -79,6 +98,10 @@ export const MultipleWorkspaces: Story = {
 				logoUrl: "https://github.com/identicons/team-b.png",
 			},
 		],
+		activeWorkspace: {
+			name: "AET",
+			logoUrl: "https://avatars.githubusercontent.com/u/11064260?s=200&v=4",
+		},
 	},
 	parameters: {
 		docs: {

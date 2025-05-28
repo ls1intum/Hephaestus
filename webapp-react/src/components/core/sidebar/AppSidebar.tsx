@@ -33,7 +33,10 @@ export function AppSidebar({
 	return (
 		<Sidebar collapsible="icon" {...props}>
 			<SidebarHeader>
-				<WorkspaceSwitcher workspaces={data.workspaces} />
+				<WorkspaceSwitcher
+					workspaces={data.workspaces}
+					activeWorkspace={data.workspaces[0]}
+				/>
 			</SidebarHeader>
 			<SidebarContent>
 				<NavDashboards username={props.username} />
