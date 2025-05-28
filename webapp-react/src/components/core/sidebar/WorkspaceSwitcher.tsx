@@ -28,10 +28,6 @@ export function WorkspaceSwitcher({
 	const [activeWorkspace, setActiveWorkspace] = useState(workspaces[0]);
 	const [isDropdownOpen, setIsDropdownOpen] = useState(false);
 
-	// Detect operating system for correct shortcut display
-	const isMacOS = navigator.platform.toUpperCase().indexOf("MAC") >= 0;
-	const shortcutPrefix = isMacOS ? "⌘" : "Ctrl+";
-
 	useEffect(() => {
 		const handleKeyDown = (event: KeyboardEvent) => {
 			// Check if Command (Mac) or Control (Windows/Linux) is pressed
@@ -105,10 +101,7 @@ export function WorkspaceSwitcher({
 									/>
 								</div>
 								{workspace.name}
-								<DropdownMenuShortcut>
-									{shortcutPrefix}
-									{index + 1}
-								</DropdownMenuShortcut>
+								<DropdownMenuShortcut>⌘{index + 1}</DropdownMenuShortcut>
 							</DropdownMenuItem>
 						))}
 						<DropdownMenuSeparator />
