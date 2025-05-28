@@ -9,9 +9,9 @@ import { TanStackRouterDevtools } from "@tanstack/react-router-devtools";
 
 import TanstackQueryLayout from "../integrations/tanstack-query/layout";
 
-import { AppSidebar } from "@/components/core/AppSidebar";
 import Footer from "@/components/core/Footer";
 import Header from "@/components/core/Header";
+import { AppSidebar } from "@/components/core/sidebar/AppSidebar";
 import { SidebarInset, SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import environment from "@/environment";
 import { type AuthContextType, useAuth } from "@/integrations/auth/AuthContext";

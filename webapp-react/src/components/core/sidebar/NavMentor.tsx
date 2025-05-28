@@ -7,7 +7,7 @@ import {
 } from "@/components/ui/sidebar";
 import { Link } from "@tanstack/react-router";
 import { BotMessageSquare } from "lucide-react";
-import { Badge } from "../ui/badge";
+import { Badge } from "../../ui/badge";
 
 export function NavMentor() {
 	return (
