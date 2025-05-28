@@ -1,5 +1,5 @@
-import { AdminRepositoriesSettings } from "./AdminRepositoriesSettings";
 import { AdminLeagueSettings } from "./AdminLeagueSettings";
+import { AdminRepositoriesSettings } from "./AdminRepositoriesSettings";
 
 // Use the RepositoryItem type from the AdminRepositoriesSettings component
 type RepositoryItem = {

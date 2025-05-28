@@ -5,8 +5,8 @@ import {
 	resetAndRecalculateLeaguesMutation,
 } from "@/api/@tanstack/react-query.gen";
 import { AdminSettingsPage } from "@/components/admin/AdminSettingsPage";
-import { createFileRoute } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { createFileRoute } from "@tanstack/react-router";
 
 export const Route = createFileRoute("/_authenticated/_admin/admin/settings")({
 	component: AdminSettings,

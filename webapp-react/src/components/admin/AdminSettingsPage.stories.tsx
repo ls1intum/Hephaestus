@@ -7,7 +7,7 @@ import { AdminSettingsPage } from "./AdminSettingsPage";
  */
 const meta = {
 	component: AdminSettingsPage,
-	parameters: { layout: "centered" },
+	parameters: { layout: "padded" },
 	tags: ["autodocs"],
 	argTypes: {
 		repositories: {
