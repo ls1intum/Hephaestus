@@ -10,14 +10,14 @@ interface AboutPageProps {
 	isPending: boolean;
 	isError: boolean;
 	error?: Error;
-  projectManager: ProjectManager;
+	projectManager: ProjectManager;
 	otherContributors: Contributor[];
 }
 
 export function AboutPage({
 	isPending,
 	isError,
-  projectManager,
+	projectManager,
 	otherContributors,
 }: AboutPageProps) {
 	return (

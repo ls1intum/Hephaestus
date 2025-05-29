@@ -12,7 +12,7 @@ const projectManager: ProjectManager = {
 	avatarUrl: "https://avatars.githubusercontent.com/u/5898705",
 	htmlUrl: "https://github.com/felixtjdietrich",
 	websiteUrl: "https://aet.cit.tum.de/people/dietrich/",
-}
+};
 
 // Mock data for the stories
 const mockContributors = [
