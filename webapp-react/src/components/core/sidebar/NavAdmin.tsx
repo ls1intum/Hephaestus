@@ -15,18 +15,18 @@ export function NavAdmin() {
 			<SidebarGroupLabel>Administration</SidebarGroupLabel>
 			<SidebarMenu>
 				<SidebarMenuItem>
-					<SidebarMenuButton asChild tooltip="Manage members">
-						<Link to="/admin">
-							<BookUser />
-							<span>Manage members</span>
-						</Link>
-					</SidebarMenuButton>
-				</SidebarMenuItem>
-				<SidebarMenuItem>
 					<SidebarMenuButton asChild tooltip="Manage workspace">
 						<Link to="/admin/settings">
 							<Settings2 />
 							<span>Manage workspace</span>
+						</Link>
+					</SidebarMenuButton>
+				</SidebarMenuItem>
+				<SidebarMenuItem>
+					<SidebarMenuButton asChild tooltip="Manage members">
+						<Link to="/admin">
+							<BookUser />
+							<span>Manage members</span>
 						</Link>
 					</SidebarMenuButton>
 				</SidebarMenuItem>
