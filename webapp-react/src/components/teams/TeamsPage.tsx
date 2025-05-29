@@ -1,4 +1,8 @@
 import type { TeamInfo } from "@/api/types.gen";
+import {
+	type Contributor,
+	ContributorGrid,
+} from "@/components/shared/ContributorGrid";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 
@@ -23,6 +27,17 @@ export function TeamsPage({ teams, isLoading }: TeamsPageProps) {
 		return [...team.members].sort((a, b) => a.name.localeCompare(b.name));
 	};
 
+	// Helper function to convert team members to Contributors
+	const convertMembersToContributors = (team: TeamInfo): Contributor[] => {
+		return sortMembers(team).map((member) => ({
+			id: member.id,
+			login: member.login,
+			name: member.name,
+			avatarUrl: member.avatarUrl,
+			htmlUrl: `https://github.com/${member.login}`,
+		}));
+	};
+
 	return (
 		<>
 			<h2 className="text-2xl font-bold mb-2">Team Contributors</h2>
@@ -38,37 +53,18 @@ export function TeamsPage({ teams, isLoading }: TeamsPageProps) {
 								<CardTitle>{team.name}</CardTitle>
 							</CardHeader>
 							<CardContent>
-								{sortMembers(team).length > 0 ? (
-									<div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-7 xl:grid-cols-8 gap-4 self-center">
-										{sortMembers(team).map((member) => (
-											<a
-												key={member.id}
-												href={`https://github.com/${member.login}`}
-												target="_blank"
-												rel="noopener noreferrer"
-												className="flex flex-col items-center text-center hover:bg-accent hover:text-accent-foreground rounded-md p-2 transition-colors"
-											>
-												<div className="w-20 h-20 rounded-full flex items-center justify-center overflow-hidden">
-													<img
-														src={member.avatarUrl}
-														alt={member.name}
-														className="w-full h-full object-cover"
-													/>
-												</div>
-												<p className="font-semibold mt-2">{member.name}</p>
-												<p className="text-muted-foreground text-sm">
-													@{member.login}
-												</p>
-											</a>
-										))}
-									</div>
-								) : (
-									<div className="py-8 text-center">
-										<p className="text-muted-foreground">
-											No members assigned to this team
-										</p>
-									</div>
-								)}
+								<ContributorGrid
+									contributors={convertMembersToContributors(team)}
+									size="sm"
+									layout="compact"
+									emptyState={
+										<div className="py-8 text-center">
+											<p className="text-muted-foreground">
+												No members assigned to this team
+											</p>
+										</div>
+									}
+								/>
 							</CardContent>
 						</Card>
 					))}
@@ -94,23 +90,13 @@ export function TeamsPage({ teams, isLoading }: TeamsPageProps) {
 								<Skeleton className="h-6 w-1/4" />
 							</CardHeader>
 							<CardContent>
-								<div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 gap-4 self-center">
-									{Array(4)
-										.fill(null)
-										.map((_, memberIndex) => (
-											<div
-												// biome-ignore lint/suspicious/noArrayIndexKey: Static arrays
-												key={`loading-team-${teamIndex}-member-${memberIndex}`}
-												className="flex flex-col items-center text-center"
-											>
-												<div className="w-20 h-20 rounded-full flex items-center justify-center overflow-hidden">
-													<Skeleton className="w-full h-full object-cover" />
-												</div>
-												<Skeleton className="h-4 w-3/4 mt-2 mx-auto" />
-												<Skeleton className="h-3 w-1/2 mt-1 mx-auto" />
-											</div>
-										))}
-								</div>
+								<ContributorGrid
+									contributors={[]}
+									isLoading={true}
+									size="sm"
+									layout="compact"
+									loadingSkeletonCount={4}
+								/>
 							</CardContent>
 						</Card>
 					))}

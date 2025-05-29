@@ -1,3 +1,7 @@
+import {
+	type Contributor,
+	ContributorGrid,
+} from "@/components/shared/ContributorGrid";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -9,25 +13,15 @@ import {
 	CardTitle,
 } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
-import { Skeleton } from "@/components/ui/skeleton";
 import {
 	AlertCircle,
 	Code,
 	Github,
 	Globe,
 	Hammer,
-	MessageSquare,
 	Sparkles,
 	Users,
 } from "lucide-react";
-
-interface Contributor {
-	id: number;
-	login: string;
-	name: string;
-	avatarUrl: string;
-	htmlUrl: string;
-}
 
 interface AboutPageProps {
 	isPending: boolean;
@@ -186,7 +180,6 @@ export function AboutPage({
 					</div>
 				</div>
 
-				{/* Contributors - clean grid with meaningful states */}
 				<div className="space-y-6">
 					<div className="flex items-center gap-2 mb-4">
 						<Users className="h-5 w-5 text-primary" />
@@ -198,18 +191,12 @@ export function AboutPage({
 						unique expertise that strengthens our platform.
 					</p>
 
-					{/* Loading state - elegant skeletons */}
-					{isPending && (
-						<div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-5 gap-6">
-							{Array.from({ length: 10 }).map((_, index) => (
-								// biome-ignore lint/suspicious/noArrayIndexKey: Data is static and not user-generated
-								<div key={index} className="flex flex-col items-center gap-2">
-									<Skeleton className="h-20 w-20 rounded-full" />
-									<Skeleton className="h-4 w-24" />
-								</div>
-							))}
-						</div>
-					)}
+					<ContributorGrid
+						contributors={otherContributors}
+						isLoading={isPending}
+						layout="comfortable"
+						size="md"
+					/>
 
 					{/* Error state - simple and informative */}
 					{isError && (
@@ -222,70 +209,6 @@ export function AboutPage({
 								We're having trouble reaching our contributor information. Our
 								team is working on it—please check back soon!
 							</p>
-						</div>
-					)}
-
-					{/* Contributors display - clean and focused grid */}
-					{!isPending && !isError && (
-						<div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-5 gap-x-6 gap-y-8">
-							{otherContributors.length > 0 ? (
-								otherContributors.map((contributor) => (
-									<Button
-										key={contributor.id}
-										variant="ghost"
-										asChild
-										className="h-auto"
-									>
-										<a
-											href={contributor.htmlUrl}
-											target="_blank"
-											rel="noopener noreferrer"
-											className="flex flex-col items-center group"
-										>
-											<Avatar className="size-20">
-												<AvatarImage
-													src={contributor.avatarUrl}
-													alt={`${contributor.login}'s avatar`}
-												/>
-												<AvatarFallback>
-													{contributor.login.slice(0, 2).toUpperCase()}
-												</AvatarFallback>
-											</Avatar>
-											<div className="flex flex-col items-center">
-												<div className="font-medium text-center">
-													{contributor.name}
-												</div>
-												<div className="text-sm text-muted-foreground">
-													@{contributor.login}
-												</div>
-											</div>
-										</a>
-									</Button>
-								))
-							) : (
-								<div className="col-span-full bg-gradient-to-br from-background to-muted/30 rounded-lg p-8 text-center border border-muted/50">
-									<MessageSquare className="h-8 w-8 text-primary mx-auto mb-4" />
-									<h4 className="text-lg font-medium mb-2">
-										Join Our Community
-									</h4>
-									<p className="text-muted-foreground mb-6">
-										Our forge is warming up! Be the first to join our
-										contributor community and help shape the future of
-										Hephaestus.
-									</p>
-									<Button asChild>
-										<a
-											href="https://github.com/ls1intum/Hephaestus"
-											target="_blank"
-											rel="noopener noreferrer"
-											className="inline-flex items-center gap-2"
-										>
-											<Github className="h-4 w-4" />
-											<span>Join Us on GitHub</span>
-										</a>
-									</Button>
-								</div>
-							)}
 						</div>
 					)}
 				</div>
