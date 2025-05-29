@@ -1,6 +1,4 @@
-import { Button } from "@/components/ui/button";
 import type { Meta, StoryObj } from "@storybook/react";
-import { Github, MessageSquare } from "lucide-react";
 import { ContributorGrid } from "./ContributorGrid";
 
 /**
@@ -81,7 +79,6 @@ const mockContributors = [
 	},
 ];
 
-
 /**
  * Grid with multiple contributors in default configuration.
  */
@@ -101,7 +98,6 @@ export const Loading: Story = {
 		loadingSkeletonCount: 6,
 	},
 };
-
 
 /**
  * Compact grid with small contributor cards.

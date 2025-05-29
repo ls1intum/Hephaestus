@@ -1,5 +1,18 @@
 import type { Meta, StoryObj } from "@storybook/react";
 import { AboutPage } from "./AboutPage";
+import type { ProjectManager } from "./ProjectManagerCard";
+
+const projectManager: ProjectManager = {
+	id: 5898705,
+	login: "felixtjdietrich",
+	name: "Felix T.J. Dietrich",
+	title: "Project Architect & Vision Lead",
+	description:
+		"Forging Hephaestus from concept to reality, Felix combines technical mastery with a passion for creating tools that empower software teams to achieve their full potential through data-driven insights and collaborative learning.",
+	avatarUrl: "https://avatars.githubusercontent.com/u/5898705",
+	htmlUrl: "https://github.com/felixtjdietrich",
+	websiteUrl: "https://aet.cit.tum.de/people/dietrich/",
+}
 
 // Mock data for the stories
 const mockContributors = [
@@ -91,6 +104,10 @@ const meta = {
 			description: "Optional error object when loading fails",
 			control: "object",
 		},
+		projectManager: {
+			description: "Project manager information to display",
+			control: "object",
+		},
 		otherContributors: {
 			description: "List of project contributors to display",
 			control: "object",
@@ -110,6 +127,7 @@ export const Showcase: Story = {
 		isPending: false,
 		isError: false,
 		otherContributors: mockContributors,
+		projectManager: projectManager,
 	},
 };
 
@@ -122,6 +140,7 @@ export const IsLoading: Story = {
 		isPending: true,
 		isError: false,
 		otherContributors: [],
+		projectManager: projectManager,
 	},
 };
 
@@ -134,6 +153,7 @@ export const IsError: Story = {
 		isPending: false,
 		isError: true,
 		otherContributors: [],
+		projectManager: projectManager,
 	},
 };
 
@@ -146,5 +166,6 @@ export const NoContributors: Story = {
 		isPending: false,
 		isError: false,
 		otherContributors: [],
+		projectManager: projectManager,
 	},
 };
