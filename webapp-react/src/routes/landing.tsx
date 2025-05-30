@@ -1,4 +1,4 @@
-import { LandingPage } from "@/components/info/LandingPage";
+import { LandingPage } from "@/components/info/landing/LandingPage";
 import { useAuth } from "@/integrations/auth/AuthContext";
 import { createFileRoute } from "@tanstack/react-router";
 
