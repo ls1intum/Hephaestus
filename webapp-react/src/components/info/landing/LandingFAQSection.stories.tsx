@@ -7,30 +7,31 @@ import { LandingFAQSection } from "./LandingFAQSection";
  * through an accordion interface, along with a community link.
  */
 const meta = {
-  component: LandingFAQSection,
-  parameters: {
-    layout: "padded",
-    docs: {
-      description: {
-        component:
-          "The FAQ section provides answers to common questions through an accordion interface, helping users find information quickly and easily. It also includes a link to the community for additional support.",
-      },
-    },
-  },
-  tags: ["autodocs"],
-  argTypes: {
-    onSignIn: {
-      description: "Callback function triggered when the sign-in button is clicked",
-      action: "signed in",
-    },
-    isSignedIn: {
-      description: "Whether the user is currently signed in",
-      control: "boolean",
-    },
-  },
-  args: {
-    onSignIn: fn(),
-  },
+	component: LandingFAQSection,
+	parameters: {
+		layout: "padded",
+		docs: {
+			description: {
+				component:
+					"The FAQ section provides answers to common questions through an accordion interface, helping users find information quickly and easily. It also includes a link to the community for additional support.",
+			},
+		},
+	},
+	tags: ["autodocs"],
+	argTypes: {
+		onSignIn: {
+			description:
+				"Callback function triggered when the sign-in button is clicked",
+			action: "signed in",
+		},
+		isSignedIn: {
+			description: "Whether the user is currently signed in",
+			control: "boolean",
+		},
+	},
+	args: {
+		onSignIn: fn(),
+	},
 } satisfies Meta<typeof LandingFAQSection>;
 
 export default meta;
@@ -41,9 +42,9 @@ type Story = StoryObj<typeof meta>;
  * Features "Get Started" CTA and FAQ accordion.
  */
 export const Default: Story = {
-  args: {
-    isSignedIn: false,
-  },
+	args: {
+		isSignedIn: false,
+	},
 };
 
 /**
@@ -51,7 +52,7 @@ export const Default: Story = {
  * "Get Started" button is replaced with "Go to Dashboard".
  */
 export const SignedIn: Story = {
-  args: {
-    isSignedIn: true,
-  },
-}; 
+	args: {
+		isSignedIn: true,
+	},
+};

@@ -1,4 +1,4 @@
-import type { LeaderboardEntry } from "@/api/types.gen";
+import type { LeaderboardEntry, PullRequestInfo } from "@/api/types.gen";
 import aliceAvatar from "@/assets/alice_developer.jpg";
 import bobAvatar from "@/assets/bob_builder.jpg";
 import charlieAvatar from "@/assets/charlie_coder.jpg";

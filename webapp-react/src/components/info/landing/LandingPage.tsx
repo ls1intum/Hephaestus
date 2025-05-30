@@ -1,4 +1,3 @@
-import type { LeaderboardEntry } from "@/api/types.gen";
 import { useRef } from "react";
 import { LandingCTASection } from "./LandingCTASection";
 import { LandingFAQSection } from "./LandingFAQSection";

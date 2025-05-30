@@ -7,30 +7,31 @@ import { LandingCTASection } from "./LandingCTASection";
  * with Hephaestus through a prominent CTA button.
  */
 const meta = {
-  component: LandingCTASection,
-  parameters: {
-    layout: "padded",
-    docs: {
-      description: {
-        component:
-          "The CTA section provides a final opportunity to convert visitors into users through a prominent call-to-action button and compelling copy.",
-      },
-    },
-  },
-  tags: ["autodocs"],
-  argTypes: {
-    onSignIn: {
-      description: "Callback function triggered when the sign-in button is clicked",
-      action: "signed in",
-    },
-    isSignedIn: {
-      description: "Whether the user is currently signed in",
-      control: "boolean",
-    },
-  },
-  args: {
-    onSignIn: fn(),
-  },
+	component: LandingCTASection,
+	parameters: {
+		layout: "padded",
+		docs: {
+			description: {
+				component:
+					"The CTA section provides a final opportunity to convert visitors into users through a prominent call-to-action button and compelling copy.",
+			},
+		},
+	},
+	tags: ["autodocs"],
+	argTypes: {
+		onSignIn: {
+			description:
+				"Callback function triggered when the sign-in button is clicked",
+			action: "signed in",
+		},
+		isSignedIn: {
+			description: "Whether the user is currently signed in",
+			control: "boolean",
+		},
+	},
+	args: {
+		onSignIn: fn(),
+	},
 } satisfies Meta<typeof LandingCTASection>;
 
 export default meta;
@@ -41,9 +42,9 @@ type Story = StoryObj<typeof meta>;
  * Features "Get Started" CTA button.
  */
 export const Default: Story = {
-  args: {
-    isSignedIn: false,
-  },
+	args: {
+		isSignedIn: false,
+	},
 };
 
 /**
@@ -51,7 +52,7 @@ export const Default: Story = {
  * "Get Started" button is replaced with "Go to Dashboard".
  */
 export const SignedIn: Story = {
-  args: {
-    isSignedIn: true,
-  },
-}; 
+	args: {
+		isSignedIn: true,
+	},
+};
