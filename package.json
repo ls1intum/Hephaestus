@@ -21,7 +21,8 @@
     "db:changelog:diff": "cd server/application-server && docker compose down postgres && shx --silent mv postgres-data postgres-data-temp && docker compose up -d postgres && docker compose exec postgres sh -c \"until pg_isready -h localhost -p 5432; do sleep 1; done\" && mvn liquibase:update && mvn liquibase:diff && docker compose down postgres && shx rm -rf postgres-data && shx --silent mv postgres-data-temp postgres-data"
   },
   "devDependencies": {
-    "@hey-api/openapi-ts": "^0.69.1",
+    "@biomejs/biome": "1.9.4",
+    "@hey-api/openapi-ts": "0.69.1",
     "@openapitools/openapi-generator-cli": "2.16.3",
     "prettier": "3.5.1",
     "prettier-plugin-java": "2.6.7",
