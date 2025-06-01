@@ -7,6 +7,7 @@ import {
 	DialogFooter,
 	DialogHeader,
 	DialogTitle,
+	DialogTrigger,
 } from "@/components/ui/dialog";
 import {
 	DropdownMenu,
@@ -138,20 +139,23 @@ export function BadPracticeCard({
 									</DropdownMenuItem>
 								</DropdownMenuGroup>
 								<DropdownMenuGroup>
-									<DropdownMenuItem
-										onClick={() => {
-											handleResolveAsWrong();
-											setDialogOpen(true);
-										}}
-									>
-										Resolve as wrong
-									</DropdownMenuItem>
+									<DialogTrigger className="w-full">
+										<DropdownMenuItem
+											onClick={() => {
+												handleResolveAsWrong();
+											}}
+										>
+											Resolve as wrong
+										</DropdownMenuItem>
+									</DialogTrigger>
 								</DropdownMenuGroup>
 								<DropdownMenuSeparator />
 								<DropdownMenuGroup>
-									<DropdownMenuItem onClick={() => setDialogOpen(true)}>
-										Provide feedback
-									</DropdownMenuItem>
+									<DialogTrigger className="w-full">
+										<DropdownMenuItem>
+											Provide feedback
+										</DropdownMenuItem>
+									</DialogTrigger>
 								</DropdownMenuGroup>
 							</DropdownMenuContent>
 						</DropdownMenu>
