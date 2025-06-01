@@ -216,6 +216,7 @@ public class NatsConsumerService {
         }
 
         try {
+            
             cleanupConsumer(repositoryToMonitor);
             logger.info(
                 "Consumer cleanup successful for repository: {} with monitoring ID: {}",
