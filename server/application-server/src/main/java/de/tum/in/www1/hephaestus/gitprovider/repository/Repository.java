@@ -5,13 +5,9 @@ import de.tum.in.www1.hephaestus.gitprovider.issue.Issue;
 import de.tum.in.www1.hephaestus.gitprovider.label.Label;
 import de.tum.in.www1.hephaestus.gitprovider.milestone.Milestone;
 import de.tum.in.www1.hephaestus.gitprovider.team.Team;
-import jakarta.persistence.CascadeType;
-import jakarta.persistence.Entity;
-import jakarta.persistence.EnumType;
-import jakarta.persistence.Enumerated;
-import jakarta.persistence.ManyToMany;
-import jakarta.persistence.OneToMany;
-import jakarta.persistence.Table;
+import de.tum.in.www1.hephaestus.gitprovider.teamV2.TeamV2;
+import jakarta.persistence.*;
+
 import java.time.OffsetDateTime;
 import java.util.HashSet;
 import java.util.Set;
@@ -85,6 +81,15 @@ public class Repository extends BaseGitServiceEntity {
     @ManyToMany(mappedBy = "repositories")
     @ToString.Exclude
     private Set<Team> teams = new HashSet<>();
+
+    @ManyToMany
+    @JoinTable(
+            name = "team_v2_repository_permission",
+            joinColumns = @JoinColumn(name = "repository_id"),
+            inverseJoinColumns = @JoinColumn(name = "team_id")
+    )
+    @ToString.Exclude
+    private Set<TeamV2> teamsV2 = new HashSet<>();
 
     public enum Visibility {
         PUBLIC,
