@@ -15,6 +15,7 @@ import reportWebVitals from "./reportWebVitals.ts";
 import environment from "@/environment";
 import { AuthProvider, keycloakService, useAuth } from "@/integrations/auth";
 import { ThemeProvider } from "@/integrations/theme";
+import { StrictMode } from "react";
 
 client.setConfig({
 	baseUrl: environment.serverUrl,
@@ -90,21 +91,23 @@ if (rootElement && !rootElement.innerHTML) {
 		onRecoverableError: Sentry.reactErrorHandler(),
 	});
 	root.render(
-		<PostHogProvider
-			apiKey={environment.posthog.projectApiKey}
-			options={{
-				api_host: environment.posthog.apiHost,
-				cross_subdomain_cookie: false,
-			}}
-		>
-			<TanstackQuery.Provider>
-				<AuthProvider>
-					<ThemeProvider defaultTheme="dark" storageKey="theme">
-						<WrappedRouterProvider />
-					</ThemeProvider>
-				</AuthProvider>
-			</TanstackQuery.Provider>
-		</PostHogProvider>,
+		<StrictMode>
+			<PostHogProvider
+				apiKey={environment.posthog.projectApiKey}
+				options={{
+					api_host: environment.posthog.apiHost,
+					cross_subdomain_cookie: false,
+				}}
+			>
+				<TanstackQuery.Provider>
+					<AuthProvider>
+						<ThemeProvider defaultTheme="dark" storageKey="theme">
+							<WrappedRouterProvider />
+						</ThemeProvider>
+					</AuthProvider>
+				</TanstackQuery.Provider>
+			</PostHogProvider>
+		</StrictMode>,
 	);
 }
 

@@ -60,8 +60,8 @@ export function LeaderboardTable({
 		<Table>
 			<TableHeader>
 				<TableRow>
-					<TableHead className="text-center">Rank</TableHead>
-					<TableHead className="text-center">League</TableHead>
+					<TableHead className="text-center w-10">Rank</TableHead>
+					<TableHead className="text-center w-20">League</TableHead>
 					<TableHead className="w-56">Contributor</TableHead>
 					<TableHead className="text-center">
 						<div className="flex justify-center items-center gap-1 text-github-done-foreground">

@@ -36,17 +36,35 @@ export interface UserProfile {
 class KeycloakService {
 	private keycloak: Keycloak | null = null;
 	private initialized = false;
+	private initializationPromise: Promise<boolean> | null = null;
 	private profile: UserProfile | undefined;
 
 	/**
 	 * Initialize the Keycloak instance
 	 */
 	public async init(): Promise<boolean> {
+		// If already initialized, return the current authentication state
 		if (this.initialized) {
 			return this.keycloak?.authenticated || false;
 		}
 
+		// If initialization is in progress, wait for it to complete
+		if (this.initializationPromise) {
+			return this.initializationPromise;
+		}
+
+		// Start initialization
+		this.initializationPromise = this.performInit();
+		return this.initializationPromise;
+	}
+
+	private async performInit(): Promise<boolean> {
 		try {
+			// Double-check if already initialized (for race conditions)
+			if (this.initialized) {
+				return this.keycloak?.authenticated || false;
+			}
+
 			this.keycloak = new Keycloak({
 				url: environment.keycloak.url,
 				realm: environment.keycloak.realm,
@@ -57,6 +75,7 @@ class KeycloakService {
 				onLoad: "check-sso",
 				silentCheckSsoRedirectUri: `${window.location.origin}/silent-check-sso.html`,
 				checkLoginIframe: false,
+				silentCheckSsoFallback: false, // Prevent fallback redirects in strict mode
 			});
 
 			this.initialized = true;
@@ -76,6 +95,9 @@ class KeycloakService {
 			return authenticated;
 		} catch (error) {
 			console.error("Failed to initialize Keycloak:", error);
+			// Reset initialization state on error
+			this.initialized = false;
+			this.initializationPromise = null;
 			return false;
 		}
 	}
@@ -201,7 +223,10 @@ class KeycloakService {
 	 * Logout the current user
 	 */
 	public logout(): Promise<void> {
+		// Reset all state
 		this.initialized = false;
+		this.initializationPromise = null;
+		this.profile = undefined;
 
 		return (
 			this.keycloak?.logout({

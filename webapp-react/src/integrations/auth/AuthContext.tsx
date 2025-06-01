@@ -3,15 +3,15 @@ import {
 	useCallback,
 	useContext,
 	useEffect,
-	useRef,
 	useState,
 } from "react";
 import type { ReactNode } from "react";
 import keycloakService, { type UserProfile } from "./keycloak";
 
-// Simple global state to prevent duplicate initialization
+// Global state to prevent duplicate initialization across strict mode renders
 const globalState = {
 	initialized: false,
+	initPromise: null as Promise<boolean> | null,
 };
 
 export interface AuthContextType {
@@ -52,7 +52,6 @@ export function AuthProvider({ children }: AuthProviderProps) {
 	const [userProfile, setUserProfile] = useState<UserProfile | undefined>(
 		undefined,
 	);
-	const initRef = useRef(globalState.initialized);
 
 	// Clean the URL from authentication parameters
 	const cleanUrlFromAuthParams = useCallback(() => {
@@ -76,9 +75,49 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
 	// Initialize Keycloak once
 	useEffect(() => {
-		if (initRef.current) {
-			console.log("AuthProvider: Already initialized");
+		// Prevent multiple initializations in strict mode
+		if (globalState.initialized) {
+			console.log("AuthProvider: Already initialized globally");
 			setIsLoading(false);
+
+			// Update local state with current authentication status
+			const authenticated = keycloakService.isAuthenticated();
+			if (authenticated) {
+				const userName = keycloakService.getUsername();
+				const roles = keycloakService.getUserRoles();
+				const profile = keycloakService.getUserProfile();
+				setUsername(userName);
+				setUserRoles(roles);
+				setUserProfile(profile);
+			}
+			setIsAuthenticated(authenticated);
+			return;
+		}
+
+		// If initialization is already in progress, wait for it
+		if (globalState.initPromise) {
+			console.log("AuthProvider: Waiting for existing initialization");
+			globalState.initPromise
+				.then((authenticated) => {
+					console.log(
+						"AuthProvider: Existing initialization completed:",
+						authenticated,
+					);
+					if (authenticated) {
+						const userName = keycloakService.getUsername();
+						const roles = keycloakService.getUserRoles();
+						const profile = keycloakService.getUserProfile();
+						setUsername(userName);
+						setUserRoles(roles);
+						setUserProfile(profile);
+					}
+					setIsAuthenticated(authenticated);
+					setIsLoading(false);
+				})
+				.catch((error) => {
+					console.error("AuthProvider: Initialization failed:", error);
+					setIsLoading(false);
+				});
 			return;
 		}
 
@@ -105,19 +144,23 @@ export function AuthProvider({ children }: AuthProviderProps) {
 				}
 
 				setIsAuthenticated(authenticated);
-				initRef.current = true;
 				globalState.initialized = true;
+				globalState.initPromise = null;
+				return authenticated;
 			} catch (error) {
 				console.error(
 					"AuthProvider: Failed to initialize authentication",
 					error,
 				);
+				globalState.initPromise = null;
+				throw error;
 			} finally {
 				setIsLoading(false);
 			}
 		};
 
-		initKeycloak();
+		// Start initialization and store the promise
+		globalState.initPromise = initKeycloak();
 	}, [cleanUrlFromAuthParams]);
 
 	const login = async () => {
@@ -125,9 +168,9 @@ export function AuthProvider({ children }: AuthProviderProps) {
 	};
 
 	const logout = async () => {
-		// Reset initialization state
-		initRef.current = false;
+		// Reset global initialization state
 		globalState.initialized = false;
+		globalState.initPromise = null;
 
 		await keycloakService.logout();
 	};
