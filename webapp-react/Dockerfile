@@ -6,7 +6,7 @@ WORKDIR /app
 # Copy and install dependencies early to leverage Docker layer caching
 COPY package.json package-lock.json* /app/
 
-RUN npm ci --legacy-peer-deps
+RUN npm ci
 
 # Copy the rest of the application code
 COPY ./ /app/
