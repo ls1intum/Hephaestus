@@ -3,12 +3,10 @@ name: "Chromatic"
 on:
   pull_request:
       paths:
-          - "webapp/**"
-          - "!webapp/src/app/core/modules/openapi/**"
+          - "webapp-react/**"
   push:
       paths:
-          - "webapp/**"
-          - "!webapp/src/app/core/modules/openapi/**"
+          - "webapp-react/**"
       branches: [develop]
 
 jobs:
@@ -25,8 +23,8 @@ jobs:
           node-version: 22
       - name: Install dependencies
         # ⚠️ See your package manager's documentation for the correct command to install dependencies in a CI environment.
-        working-directory: ./webapp
-        run: npm ci
+        working-directory: ./webapp-react
+        run: npm ci --force
       - name: Run Chromatic
         id: chromatic
         uses: chromaui/action@latest
@@ -34,7 +32,7 @@ jobs:
           # ⚠️ Make sure to configure a `CHROMATIC_PROJECT_TOKEN` repository secret
           projectToken: ${{ secrets.CHROMATIC_PROJECT_TOKEN }}
           autoAcceptChanges: "develop"
-          workingDir: webapp
+          workingDir: webapp-react
           skip: "dependabot/**"
       - name: Publish Summary
         run: echo -e "| Results |  |\n| --- | --- |\n| Build Results | ${{ steps.chromatic.outputs.buildUrl }} |\n| Storybook Preview | ${{ steps.chromatic.outputs.storybookUrl }} |\n| Component Count | ${{steps.chromatic.outputs.componentCount}} |" >> $GITHUB_STEP_SUMMARY
