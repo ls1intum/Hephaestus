@@ -1,5 +1,6 @@
-import * as Sentry from "@sentry/react";
+import * as Sentry from '@sentry/react';
 import { RouterProvider, createRouter } from "@tanstack/react-router";
+import { PostHogProvider } from 'posthog-js/react'
 import ReactDOM from "react-dom/client";
 
 import * as TanstackQuery from "./integrations/tanstack-query/root-provider";
@@ -75,27 +76,34 @@ function WrappedRouterProvider() {
 	);
 }
 
+
+
 // Render the app
 const rootElement = document.getElementById("app");
 if (rootElement && !rootElement.innerHTML) {
 	const root = ReactDOM.createRoot(rootElement, {
-		// Callback called when an error is thrown and not caught by an ErrorBoundary.
-		onUncaughtError: Sentry.reactErrorHandler((error, errorInfo) => {
-			console.warn("Uncaught error", error, errorInfo.componentStack);
-		}),
-		// Callback called when React catches an error in an ErrorBoundary.
-		onCaughtError: Sentry.reactErrorHandler(),
-		// Callback called when React automatically recovers from errors.
-		onRecoverableError: Sentry.reactErrorHandler(),
-	});
+  // Callback called when an error is thrown and not caught by an ErrorBoundary.
+  onUncaughtError: Sentry.reactErrorHandler((error, errorInfo) => {
+    console.warn('Uncaught error', error, errorInfo.componentStack);
+  }),
+  // Callback called when React catches an error in an ErrorBoundary.
+  onCaughtError: Sentry.reactErrorHandler(),
+  // Callback called when React automatically recovers from errors.
+  onRecoverableError: Sentry.reactErrorHandler(),
+});
 	root.render(
-		<TanstackQuery.Provider>
-			<AuthProvider>
-				<ThemeProvider defaultTheme="dark" storageKey="theme">
-					<WrappedRouterProvider />
-				</ThemeProvider>
-			</AuthProvider>
-		</TanstackQuery.Provider>,
+	  <PostHogProvider apiKey={environment.posthog.projectApiKey} options={{
+				api_host: environment.posthog.apiHost,
+				cross_subdomain_cookie: false,
+			}}>
+			<TanstackQuery.Provider>
+				<AuthProvider>
+					<ThemeProvider defaultTheme="dark" storageKey="theme">
+						<WrappedRouterProvider />
+					</ThemeProvider>
+				</AuthProvider>
+			</TanstackQuery.Provider>
+		</PostHogProvider>,
 	);
 }
 
