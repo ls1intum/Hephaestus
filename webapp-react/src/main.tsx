@@ -1,7 +1,9 @@
+import * as Sentry from "@sentry/react";
 import { RouterProvider, createRouter } from "@tanstack/react-router";
 import ReactDOM from "react-dom/client";
 
 import * as TanstackQuery from "./integrations/tanstack-query/root-provider";
+import "./integrations/sentry";
 
 import { client } from "@/api/client.gen";
 import { routeTree } from "./routeTree.gen";
@@ -76,7 +78,16 @@ function WrappedRouterProvider() {
 // Render the app
 const rootElement = document.getElementById("app");
 if (rootElement && !rootElement.innerHTML) {
-	const root = ReactDOM.createRoot(rootElement);
+	const root = ReactDOM.createRoot(rootElement, {
+		// Callback called when an error is thrown and not caught by an ErrorBoundary.
+		onUncaughtError: Sentry.reactErrorHandler((error, errorInfo) => {
+			console.warn("Uncaught error", error, errorInfo.componentStack);
+		}),
+		// Callback called when React catches an error in an ErrorBoundary.
+		onCaughtError: Sentry.reactErrorHandler(),
+		// Callback called when React automatically recovers from errors.
+		onRecoverableError: Sentry.reactErrorHandler(),
+	});
 	root.render(
 		<TanstackQuery.Provider>
 			<AuthProvider>
