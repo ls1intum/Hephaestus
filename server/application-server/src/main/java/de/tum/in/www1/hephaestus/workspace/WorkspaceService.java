@@ -90,9 +90,9 @@ public class WorkspaceService {
         Set<RepositoryToMonitor> repositoriesToMonitor = workspace.getRepositoriesToMonitor();
 
         if (isNatsEnabled) {
-            repositoriesToMonitor.forEach(repositoryToMonitor -> {
-                natsConsumerService.startConsumingRepositoryToMonitorAsync(repositoryToMonitor);
-            });
+            repositoriesToMonitor.forEach(repositoryToMonitor ->
+                natsConsumerService.startConsumingRepositoryToMonitorAsync(repositoryToMonitor)
+            );
         }
 
         if (runMonitoringOnStartup) {
@@ -106,16 +106,26 @@ public class WorkspaceService {
             CompletableFuture<Void> reposDone = CompletableFuture.allOf(repoFutures);
 
             // When all repository syncs complete, then sync users
-            CompletableFuture<Void> usersFuture = reposDone.thenRunAsync(() -> {
-                logger.info("All repositories synced, now syncing users");
-                gitHubDataSyncService.syncUsers(workspace);
-            });
-            CompletableFuture<Void> usersDone = CompletableFuture.allOf(usersFuture);
+            CompletableFuture<Void> usersFuture = reposDone
+                .thenRunAsync(() -> {
+                    logger.info("All repositories synced, now syncing users");
+                    gitHubDataSyncService.syncUsers(workspace);
+                })
+                .exceptionally(ex -> {
+                    logger.error("Error during syncUsers: {}", ex.getMessage(), ex);
+                    return null;
+                });
 
-            CompletableFuture<Void> teamsFuture = usersDone.thenRunAsync(() -> {
-                logger.info("Syncing teams");
-                gitHubDataSyncService.syncTeams(workspace);
-            });
+            // When all users syncs complete, then sync teams
+            CompletableFuture<Void> teamsFuture = usersFuture
+                .thenRunAsync(() -> {
+                    logger.info("Syncing teams");
+                    gitHubDataSyncService.syncTeams(workspace);
+                })
+                .exceptionally(ex -> {
+                    logger.error("Error during syncTeams: {}", ex.getMessage(), ex);
+                    return null;
+                });
 
             CompletableFuture.allOf(teamsFuture).thenRun(() -> {
                 //TODO: to be removed after teamV2 is released
