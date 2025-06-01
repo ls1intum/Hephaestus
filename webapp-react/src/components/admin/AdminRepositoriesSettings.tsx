@@ -61,7 +61,7 @@ export function AdminRepositoriesSettings({
 			<div>
 				<h2 className="text-lg font-semibold mb-4">Monitored Repositories</h2>
 				<Card>
-					<CardContent className="pt-6">
+					<CardContent>
 						<div className="space-y-4">
 							{/* Repository List */}
 							<div className="space-y-2">

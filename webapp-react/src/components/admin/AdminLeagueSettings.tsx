@@ -29,7 +29,7 @@ export function AdminLeagueSettings({
 			<div>
 				<h2 className="text-lg font-semibold mb-4">Leagues</h2>
 				<Card>
-					<CardContent className="pt-6">
+					<CardContent>
 						<div className="space-y-4">
 							<p className="text-sm text-muted-foreground mb-4">
 								Reset and recalculate all leagues. This will clear current
