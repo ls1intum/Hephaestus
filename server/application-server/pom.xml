@@ -297,6 +297,7 @@
 				<configuration>
 					<changeLogFile>db/master.xml</changeLogFile>
 					<diffChangeLogFile>src/main/resources/db/changelog_new.xml</diffChangeLogFile>
+					<searchPath>${project.basedir}/src/main/resources</searchPath>
 					<driver>org.postgresql.Driver</driver>
 					<url>jdbc:postgresql://localhost:5432/hephaestus</url>
 					<username>root</username>
