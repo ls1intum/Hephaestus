@@ -152,9 +152,7 @@ export function BadPracticeCard({
 								<DropdownMenuSeparator />
 								<DropdownMenuGroup>
 									<DialogTrigger className="w-full">
-										<DropdownMenuItem>
-											Provide feedback
-										</DropdownMenuItem>
+										<DropdownMenuItem>Provide feedback</DropdownMenuItem>
 									</DialogTrigger>
 								</DropdownMenuGroup>
 							</DropdownMenuContent>
