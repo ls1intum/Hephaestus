@@ -9,7 +9,7 @@ on:
   push:
     paths:
       - 'server/application-server/openapi.yaml'
-      - 'webapp/src/app/core/modules/openapi/**'
+      - 'webapp-react/src/api/**/*.gen.ts'
     branches: [develop]
   workflow_dispatch:
 
@@ -53,12 +53,20 @@ jobs:
         id: check_changes
         run: |
           echo "Checking for changes in the API client directory..."
+          echo "Current git status:"
+          git status
+          echo "Current git diff:"
+          git diff
           git add .
+          echo "Git status after adding changes:"
+          git status
           if git diff --cached --quiet; then
             echo "No changes detected in the API client directory."
             echo "NO_CHANGES_DETECTED=true" >> $GITHUB_ENV
           else
             echo "Changes detected in the API client directory."
+            echo "Staged changes:"
+            git diff --cached
             echo "NO_CHANGES_DETECTED=false" >> $GITHUB_ENV
             exit 1
           fi
