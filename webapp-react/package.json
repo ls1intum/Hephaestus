@@ -16,7 +16,7 @@
     "storybook": "storybook dev -p 6006",
     "build-storybook": "storybook build",
     "chromatic": "npx chromatic --exit-zero-on-changes",
-    "openapi-ts": "openapi-ts && npm run check --fix"
+    "openapi-ts": "openapi-ts"
   },
   "dependencies": {
     "@hey-api/client-fetch": "^0.10.0",
