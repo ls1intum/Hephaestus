@@ -2,14 +2,13 @@ package de.tum.in.www1.hephaestus.gitprovider.teamV2.github;
 
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubMessageHandler;
 import de.tum.in.www1.hephaestus.gitprovider.teamV2.TeamV2Repository;
+import java.io.IOException;
 import org.kohsuke.github.GHEvent;
 import org.kohsuke.github.GHEventPayload;
 import org.kohsuke.github.GitHub;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
-
-import java.io.IOException;
 
 @Component
 public class GitHubTeamMessageHandler extends GitHubMessageHandler<GHEventPayload.Team> {
@@ -20,7 +19,11 @@ public class GitHubTeamMessageHandler extends GitHubMessageHandler<GHEventPayloa
     private final GitHubTeamSyncService teamSyncService;
     private final GitHub gitHub;
 
-    public GitHubTeamMessageHandler(TeamV2Repository teamRepository, GitHubTeamSyncService teamSyncService, GitHub gitHub) {
+    public GitHubTeamMessageHandler(
+        TeamV2Repository teamRepository,
+        GitHubTeamSyncService teamSyncService,
+        GitHub gitHub
+    ) {
         super(GHEventPayload.Team.class);
         this.teamRepository = teamRepository;
         this.teamSyncService = teamSyncService;
@@ -37,12 +40,10 @@ public class GitHubTeamMessageHandler extends GitHubMessageHandler<GHEventPayloa
 
         if (action.equals("deleted")) {
             teamRepository.deleteById(teamId);
-        }
-        else {
+        } else {
             try {
                 teamSyncService.processTeam(gitHub.getOrganization(orgLogin).getTeam(teamId));
-            }
-            catch (IOException e) {
+            } catch (IOException e) {
                 logger.error("Could not fetch GHTeam id={} (org={}): {}", teamId, orgLogin, e.getMessage());
             }
         }

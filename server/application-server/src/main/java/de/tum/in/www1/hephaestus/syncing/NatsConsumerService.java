@@ -159,8 +159,8 @@ public class NatsConsumerService {
 
                     var config = consumerContext.getConsumerInfo().getConsumerConfiguration();
                     var filterSubjects = config.getFilterSubjects();
-                    var filterMatches =
-                        new HashSet<>(filterSubjects).containsAll(Arrays.asList(subjects)) && filterSubjects.size() == subjects.length;
+                    var filterMatches = new HashSet<>(filterSubjects).containsAll(Arrays.asList(subjects)) &&
+                    filterSubjects.size() == subjects.length;
                     if (!filterMatches) {
                         logger.info("Consumer exists but with different subjects. Updating consumer.");
                         consumerContext = streamContext.createOrUpdateConsumer(
@@ -288,22 +288,24 @@ public class NatsConsumerService {
         String[] parts = nameWithOwner.split("/");
         if (parts.length != 2) {
             throw new IllegalArgumentException(
-                    "Invalid repository format '" + nameWithOwner + "', expected 'org/repo'"
+                "Invalid repository format '" + nameWithOwner + "', expected 'org/repo'"
             );
         }
         String orgWildcardPrefix = "github." + parts[0] + ".*";
 
-        return handlerRegistry.getSupportedEvents().stream()
-                .map(ev -> {
-                    String evt = ev.name().toLowerCase();
-                    if (ev == GHEvent.TEAM) {
-                        // only a single wildcard subscription for team events
-                        return orgWildcardPrefix + "." + evt;
-                    }
-                    // everything else is repo‐specific
-                    return repoPrefix + "." + evt;
-                })
-                .toArray(String[]::new);
+        return handlerRegistry
+            .getSupportedEvents()
+            .stream()
+            .map(ev -> {
+                String evt = ev.name().toLowerCase();
+                if (ev == GHEvent.TEAM) {
+                    // only a single wildcard subscription for team events
+                    return orgWildcardPrefix + "." + evt;
+                }
+                // everything else is repo‐specific
+                return repoPrefix + "." + evt;
+            })
+            .toArray(String[]::new);
     }
 
     /**
