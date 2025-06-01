@@ -6,7 +6,7 @@ set -euo pipefail
 #
 # This script updates the version in:
 #   - webapp/package.json & webapp/package-lock.json (for "hephaestus")
-#   - webapp-react/package.json & webapp-react/package-lock.json (for "webapp-react")
+#   - webapp-react/package.json & webapp-react/package-lock.json (for "hephaestus")
 #   - Java source: server/application-server/src/main/java/de/tum/in/www1/hephaestus/OpenAPIConfiguration.java
 #   - YAML config: server/application-server/src/main/resources/application.yml
 #   - Python projects: server/intelligence-service/pyproject.toml & server/webhook-ingest/pyproject.toml
@@ -94,7 +94,7 @@ awk -v old_version="$CURRENT_VERSION" -v new_version="$NEW_VERSION" '
 # Update webapp-react/package.json
 awk -v old_version="$CURRENT_VERSION" -v new_version="$NEW_VERSION" '
     BEGIN {found_name = 0}
-    /"name": "webapp-react"/ {found_name = 1}
+    /"name": "hephaestus"/ {found_name = 1}
     found_name && /"version":/ {
         sub("\"version\": \"" old_version "\"", "\"version\": \"" new_version "\"")
         found_name = 0
@@ -105,7 +105,7 @@ awk -v old_version="$CURRENT_VERSION" -v new_version="$NEW_VERSION" '
 # Update webapp-react/package-lock.json
 awk -v old_version="$CURRENT_VERSION" -v new_version="$NEW_VERSION" '
     BEGIN {found_name = 0}
-    /"name": "webapp-react"/ {found_name = 1}
+    /"name": "hephaestus"/ {found_name = 1}
     found_name && /"version":/ {
         sub("\"version\": \"" old_version "\"", "\"version\": \"" new_version "\"")
         found_name = 0
