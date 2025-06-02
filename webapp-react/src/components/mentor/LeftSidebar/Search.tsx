@@ -134,7 +134,10 @@ export default function SearchChats() {
 										value={`${searchQuery}-${thread.id}`}
 										onSelect={() => {
 											setOpen(false);
-											navigate({ to: "/mentor/thread/$threadId", params: { threadId: thread.id } });
+											navigate({
+												to: "/mentor/thread/$threadId",
+												params: { threadId: thread.id },
+											});
 										}}
 									>
 										<div className="line-clamp-2">
