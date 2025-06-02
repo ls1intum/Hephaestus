@@ -1,7 +1,9 @@
+import { ChainlitAPI, ChainlitContext } from "@chainlit/react-client";
 import * as Sentry from "@sentry/react";
 import { RouterProvider, createRouter } from "@tanstack/react-router";
 import { PostHogProvider } from "posthog-js/react";
 import ReactDOM from "react-dom/client";
+import { RecoilRoot } from "recoil";
 
 import * as TanstackQuery from "./integrations/tanstack-query/root-provider";
 import "./integrations/sentry";
@@ -77,6 +79,10 @@ function WrappedRouterProvider() {
 	);
 }
 
+const CHAINLIT_SERVER_URL = "http://localhost:8000/chainlit";
+
+const apiClient = new ChainlitAPI(CHAINLIT_SERVER_URL, "webapp");
+
 // Render the app
 const rootElement = document.getElementById("app");
 if (rootElement && !rootElement.innerHTML) {
@@ -92,21 +98,25 @@ if (rootElement && !rootElement.innerHTML) {
 	});
 	root.render(
 		<StrictMode>
-			<PostHogProvider
-				apiKey={environment.posthog.projectApiKey}
-				options={{
-					api_host: environment.posthog.apiHost,
-					cross_subdomain_cookie: false,
-				}}
-			>
-				<TanstackQuery.Provider>
-					<AuthProvider>
-						<ThemeProvider defaultTheme="dark" storageKey="theme">
-							<WrappedRouterProvider />
-						</ThemeProvider>
-					</AuthProvider>
-				</TanstackQuery.Provider>
-			</PostHogProvider>
+			<ChainlitContext.Provider value={apiClient}>
+				<RecoilRoot>
+					<PostHogProvider
+						apiKey={environment.posthog.projectApiKey}
+						options={{
+							api_host: environment.posthog.apiHost,
+							cross_subdomain_cookie: false,
+						}}
+					>
+						<TanstackQuery.Provider>
+							<AuthProvider>
+								<ThemeProvider defaultTheme="dark" storageKey="theme">
+									<WrappedRouterProvider />
+								</ThemeProvider>
+							</AuthProvider>
+						</TanstackQuery.Provider>
+					</PostHogProvider>
+				</RecoilRoot>
+			</ChainlitContext.Provider>
 		</StrictMode>,
 	);
 }
