@@ -1,0 +1,159 @@
+import { MessageContext } from "@/contexts/MessageContext";
+import { useCallback, useContext, useMemo } from "react";
+import { useSetRecoilState } from "recoil";
+import { toast } from "sonner";
+
+import {
+	ChainlitContext,
+	type IFeedback,
+	type IMessageElement,
+	type IStep,
+	messagesState,
+	sideViewState,
+	updateMessageById,
+	useChatData,
+	useChatInteract,
+	useChatMessages,
+	useConfig,
+} from "@chainlit/react-client";
+
+import type { UseNavigateResult } from "@tanstack/react-router";
+import { Messages } from "../Messages";
+
+interface Props {
+	navigate?: UseNavigateResult<string>;
+}
+
+const MessagesContainer = ({ navigate }: Props) => {
+	const apiClient = useContext(ChainlitContext);
+	const { config } = useConfig();
+	const { elements, askUser, loading, actions } = useChatData();
+	const { messages } = useChatMessages();
+	const { uploadFile: _uploadFile } = useChatInteract();
+	const setMessages = useSetRecoilState(messagesState);
+	const setSideView = useSetRecoilState(sideViewState);
+
+	const uploadFile = useCallback(
+		(file: File, onProgress: (progress: number) => void) => {
+			return _uploadFile(file, onProgress);
+		},
+		[_uploadFile],
+	);
+
+	const onFeedbackUpdated = useCallback(
+		async (message: IStep, onSuccess: () => void, feedback: IFeedback) => {
+			toast.promise(apiClient.setFeedback(feedback), {
+				loading: "Updating",
+				success: (res) => {
+					setMessages((prev) =>
+						updateMessageById(prev, message.id, {
+							...message,
+							feedback: {
+								...feedback,
+								id: res.feedbackId,
+							},
+						}),
+					);
+					onSuccess();
+					return "Feedback updated";
+				},
+				error: (err) => {
+					return <span>{err.message}</span>;
+				},
+			});
+		},
+		[],
+	);
+
+	const onFeedbackDeleted = useCallback(
+		async (message: IStep, onSuccess: () => void, feedbackId: string) => {
+			toast.promise(apiClient.deleteFeedback(feedbackId), {
+				loading: "Updating",
+				success: () => {
+					setMessages((prev) =>
+						updateMessageById(prev, message.id, {
+							...message,
+							feedback: undefined,
+						}),
+					);
+					onSuccess();
+					return "Feedback updated";
+				},
+				error: (err) => {
+					return <span>{err.message}</span>;
+				},
+			});
+		},
+		[],
+	);
+
+	const onElementRefClick = useCallback(
+		(element: IMessageElement) => {
+			if (
+				element.display === "side" ||
+				(element.display === "page" && !navigate)
+			) {
+				setSideView({ title: element.name, elements: [element] });
+				return;
+			}
+
+			let path = `/element/${element.id}`;
+
+			if (element.threadId) {
+				path += `?thread=${element.threadId}`;
+			}
+
+			// return navigate?.(element.display === "page" ? path : "#");
+			return navigate?.({ to: path, replace: true });
+		},
+		[setSideView, navigate],
+	);
+
+	const onError = useCallback((error: string) => toast.error(error), [toast]);
+
+	const enableFeedback = !!config?.dataPersistence;
+
+	// Memoize the context object since it's created on each render.
+	// This prevents unnecessary re-renders of children components when no props have changed.
+	const memoizedContext = useMemo(() => {
+		return {
+			uploadFile,
+			askUser,
+			allowHtml: config?.features?.unsafe_allow_html,
+			latex: config?.features?.latex,
+			editable: !!config?.features.edit_message,
+			loading,
+			showFeedbackButtons: enableFeedback,
+			uiName: config?.ui?.name || "",
+			cot: config?.ui?.cot || "hidden",
+			onElementRefClick,
+			onError,
+			onFeedbackUpdated,
+			onFeedbackDeleted,
+		};
+	}, [
+		askUser,
+		enableFeedback,
+		loading,
+		config?.ui?.name,
+		config?.ui?.cot,
+		config?.features?.unsafe_allow_html,
+		onElementRefClick,
+		onError,
+		onFeedbackUpdated,
+	]);
+
+	return (
+		<MessageContext.Provider value={memoizedContext}>
+			<Messages
+				indent={0}
+				isRunning={loading}
+				messages={messages}
+				elements={elements}
+				actions={actions}
+			/>
+		</MessageContext.Provider>
+	);
+};
+
+export default MessagesContainer;
