@@ -39,7 +39,11 @@ export function EmptyState({
 		}
 
 		if (typeof icon === "function") {
-			return React.createElement(icon, {
+			const IconComponent = icon as ComponentType<{
+				className?: string;
+				size?: number;
+			}>;
+			return React.createElement(IconComponent, {
 				className: "h-6 w-6 text-muted-foreground",
 				size: 24,
 			});

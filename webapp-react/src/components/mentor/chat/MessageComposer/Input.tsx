@@ -1,6 +1,7 @@
 import { cn } from "@/lib/utils";
 import {
 	forwardRef,
+	useCallback,
 	useEffect,
 	useImperativeHandle,
 	useRef,
@@ -26,7 +27,7 @@ interface Props {
 	selectedCommand?: ICommand;
 	setSelectedCommand: (command: ICommand | undefined) => void;
 	onChange: (value: string) => void;
-	onPaste?: (event: any) => void;
+	onPaste?: (event: ClipboardEvent) => void;
 	onEnter?: (event: React.KeyboardEvent<HTMLDivElement>) => void;
 }
 
@@ -68,7 +69,7 @@ const Input = forwardRef<InputMethods, Props>(
 		const mutationObserverRef = useRef<MutationObserver | null>(null);
 		const isUpdatingRef = useRef(false);
 
-		const getContentWithoutCommand = () => {
+		const getContentWithoutCommand = useCallback(() => {
 			if (!contentEditableRef.current) return "";
 
 			// Create a clone of the content
@@ -94,12 +95,10 @@ const Input = forwardRef<InputMethods, Props>(
 					.replace(/&amp;/g, "&")
 					.replace("\u200B", "") || ""
 			);
-		};
+		}, []);
 
 		const reset = () => {
-			if (!selectedCommand?.persistent) {
-				setSelectedCommand(undefined);
-			}
+			setSelectedCommand(undefined);
 			setSelectedIndex(0);
 			setCommandInput("");
 			if (contentEditableRef.current) {
@@ -111,6 +110,13 @@ const Input = forwardRef<InputMethods, Props>(
 		useImperativeHandle(ref, () => ({
 			reset,
 		}));
+
+		// Handle autoFocus
+		useEffect(() => {
+			if (autoFocus && contentEditableRef.current) {
+				contentEditableRef.current.focus();
+			}
+		}, [autoFocus]);
 
 		// Set up mutation observer to detect command span removal
 		useEffect(() => {
@@ -183,7 +189,7 @@ const Input = forwardRef<InputMethods, Props>(
 						}
 					}
 
-					let textNode;
+					let textNode: Text | null = null;
 
 					// Create a text node after the command span if none exists
 					if (!newCommandBlock.nextSibling) {
@@ -221,7 +227,7 @@ const Input = forwardRef<InputMethods, Props>(
 					isUpdatingRef.current = false;
 				}, 0);
 			}
-		}, [selectedCommand, onChange]);
+		}, [selectedCommand, onChange, getContentWithoutCommand]);
 
 		const normalizedInput = commandInput.toLowerCase().slice(1);
 

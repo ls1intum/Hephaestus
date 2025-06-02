@@ -262,7 +262,7 @@ export function ThreadList({
 							<SidebarGroupLabel>{getTimeGroupLabel(group)}</SidebarGroupLabel>
 							<SidebarGroupContent>
 								<SidebarMenu>
-									{items.map((thread) => {
+									{items?.map((thread) => {
 										const isResumed =
 											idToResume === thread.id &&
 											!threadHistory?.currentThreadId;
@@ -275,7 +275,7 @@ export function ThreadList({
 											>
 												<Tooltip>
 													<TooltipTrigger asChild>
-														<Link to={isResumed ? "" : `/thread/${thread.id}`}>
+														<Link to={isResumed ? "" : "/mentor/thread/$threadId"} params={{ threadId: thread.id }}>
 															<SidebarMenuButton
 																isActive={isSelected}
 																className="relative truncate h-9 group/thread"

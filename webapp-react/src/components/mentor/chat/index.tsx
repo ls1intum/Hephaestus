@@ -175,7 +175,7 @@ const Chat = () => {
 			threadId &&
 			currentPage.pathname === "/"
 		) {
-			navigate(`/thread/${threadId}`);
+			navigate({ to: "/mentor/thread/$threadId", params: { threadId } });
 		} else {
 			setThreads((prev) => ({
 				...prev,

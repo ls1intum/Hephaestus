@@ -53,7 +53,7 @@ export function ThreadHistory() {
 
 			const currentPage = new URL(window.location.href);
 			if (threadId && currentPage.pathname === "/") {
-				navigate({ to: `/thread/${threadId}`, replace: true });
+				navigate({ to: "/mentor/thread/$threadId", params: { threadId } });
 			}
 		};
 

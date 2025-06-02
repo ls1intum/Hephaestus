@@ -4,7 +4,7 @@ import { Playground } from "@/components/mentor/Playground";
 import { ComingSoon } from "@/components/shared/ComingSoon";
 import { useAuth } from "@/integrations/auth";
 
-export const Route = createFileRoute("/_authenticated/mentor")({
+export const Route = createFileRoute("/_authenticated/mentor/")({
 	component: RouteComponent,
 });
 

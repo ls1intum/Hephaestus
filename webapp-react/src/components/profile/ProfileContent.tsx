@@ -67,7 +67,7 @@ export function ProfileContent({
 						))
 					) : (
 						<EmptyState
-							icon={CodeReviewIcon}
+							icon={<CodeReviewIcon size={24} />}
 							title="No review activity"
 							description={
 								currUserIsDashboardUser
@@ -110,7 +110,7 @@ export function ProfileContent({
 						))
 					) : (
 						<EmptyState
-							icon={GitPullRequestIcon}
+							icon={<GitPullRequestIcon size={24} />}
 							title="No open pull requests"
 							description={
 								currUserIsDashboardUser

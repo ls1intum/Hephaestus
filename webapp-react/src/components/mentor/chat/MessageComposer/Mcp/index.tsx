@@ -35,9 +35,10 @@ const McpButton = ({ disabled }: Props) => {
 	const [open, setOpen] = useState(false);
 	const [activeTab, setActiveTab] = useState("add");
 
-	const allowSse = !!config?.features.mcp?.sse?.enabled;
-	const allowStdio = !!config?.features.mcp?.stdio?.enabled;
-	const allowMcp = !!config?.features.mcp?.enabled;
+	// Simplified MCP configuration check - just check if mcp is enabled as a boolean
+	const allowMcp = !!config?.features?.mcp;
+	const allowSse = allowMcp; // For now, both sse and stdio are allowed if mcp is enabled
+	const allowStdio = allowMcp;
 
 	if (!allowMcp || (!allowSse && !allowStdio)) return null;
 

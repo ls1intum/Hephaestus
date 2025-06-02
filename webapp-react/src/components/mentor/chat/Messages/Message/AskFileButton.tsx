@@ -107,7 +107,7 @@ const _AskFileButton = ({
 			.then((fileRefs) => askUser.callback(fileRefs))
 			.catch((error) => {
 				onError(
-					`${t("chat.fileUpload.errors.failed")}: ${
+					`File upload failed: ${
 						typeof error === "object" && error !== null
 							? (error.message ?? error)
 							: error

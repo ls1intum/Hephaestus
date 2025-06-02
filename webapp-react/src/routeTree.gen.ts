@@ -19,12 +19,13 @@ import { Route as AuthenticatedImport } from './routes/_authenticated'
 import { Route as AuthenticatedIndexImport } from './routes/_authenticated/index'
 import { Route as AuthenticatedTeamsImport } from './routes/_authenticated/teams'
 import { Route as AuthenticatedSettingsImport } from './routes/_authenticated/settings'
-import { Route as AuthenticatedMentorImport } from './routes/_authenticated/mentor'
 import { Route as AuthenticatedBestPracticesImport } from './routes/_authenticated/best-practices'
 import { Route as AuthenticatedAdminImport } from './routes/_authenticated/_admin'
+import { Route as AuthenticatedMentorIndexImport } from './routes/_authenticated/mentor/index'
 import { Route as AuthenticatedUserUsernameIndexImport } from './routes/_authenticated/user/$username/index'
 import { Route as AuthenticatedAdminAdminIndexImport } from './routes/_authenticated/_admin/admin/index'
 import { Route as AuthenticatedUserUsernameBestPracticesImport } from './routes/_authenticated/user/$username/best-practices'
+import { Route as AuthenticatedMentorThreadThreadIdImport } from './routes/_authenticated/mentor/thread/$threadId'
 import { Route as AuthenticatedAdminAdminTeamsImport } from './routes/_authenticated/_admin/admin/teams'
 import { Route as AuthenticatedAdminAdminSettingsImport } from './routes/_authenticated/_admin/admin/settings'
 import { Route as AuthenticatedAdminAdminMembersImport } from './routes/_authenticated/_admin/admin/members'
@@ -78,12 +79,6 @@ const AuthenticatedSettingsRoute = AuthenticatedSettingsImport.update({
   getParentRoute: () => AuthenticatedRoute,
 } as any)
 
-const AuthenticatedMentorRoute = AuthenticatedMentorImport.update({
-  id: '/mentor',
-  path: '/mentor',
-  getParentRoute: () => AuthenticatedRoute,
-} as any)
-
 const AuthenticatedBestPracticesRoute = AuthenticatedBestPracticesImport.update(
   {
     id: '/best-practices',
@@ -94,6 +89,12 @@ const AuthenticatedBestPracticesRoute = AuthenticatedBestPracticesImport.update(
 
 const AuthenticatedAdminRoute = AuthenticatedAdminImport.update({
   id: '/_admin',
+  getParentRoute: () => AuthenticatedRoute,
+} as any)
+
+const AuthenticatedMentorIndexRoute = AuthenticatedMentorIndexImport.update({
+  id: '/mentor/',
+  path: '/mentor/',
   getParentRoute: () => AuthenticatedRoute,
 } as any)
 
@@ -115,6 +116,13 @@ const AuthenticatedUserUsernameBestPracticesRoute =
   AuthenticatedUserUsernameBestPracticesImport.update({
     id: '/user/$username/best-practices',
     path: '/user/$username/best-practices',
+    getParentRoute: () => AuthenticatedRoute,
+  } as any)
+
+const AuthenticatedMentorThreadThreadIdRoute =
+  AuthenticatedMentorThreadThreadIdImport.update({
+    id: '/mentor/thread/$threadId',
+    path: '/mentor/thread/$threadId',
     getParentRoute: () => AuthenticatedRoute,
   } as any)
 
@@ -192,13 +200,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedBestPracticesImport
       parentRoute: typeof AuthenticatedImport
     }
-    '/_authenticated/mentor': {
-      id: '/_authenticated/mentor'
-      path: '/mentor'
-      fullPath: '/mentor'
-      preLoaderRoute: typeof AuthenticatedMentorImport
-      parentRoute: typeof AuthenticatedImport
-    }
     '/_authenticated/settings': {
       id: '/_authenticated/settings'
       path: '/settings'
@@ -218,6 +219,13 @@ declare module '@tanstack/react-router' {
       path: '/'
       fullPath: '/'
       preLoaderRoute: typeof AuthenticatedIndexImport
+      parentRoute: typeof AuthenticatedImport
+    }
+    '/_authenticated/mentor/': {
+      id: '/_authenticated/mentor/'
+      path: '/mentor'
+      fullPath: '/mentor'
+      preLoaderRoute: typeof AuthenticatedMentorIndexImport
       parentRoute: typeof AuthenticatedImport
     }
     '/_authenticated/_admin/admin/members': {
@@ -240,6 +248,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/admin/teams'
       preLoaderRoute: typeof AuthenticatedAdminAdminTeamsImport
       parentRoute: typeof AuthenticatedAdminImport
+    }
+    '/_authenticated/mentor/thread/$threadId': {
+      id: '/_authenticated/mentor/thread/$threadId'
+      path: '/mentor/thread/$threadId'
+      fullPath: '/mentor/thread/$threadId'
+      preLoaderRoute: typeof AuthenticatedMentorThreadThreadIdImport
+      parentRoute: typeof AuthenticatedImport
     }
     '/_authenticated/user/$username/best-practices': {
       id: '/_authenticated/user/$username/best-practices'
@@ -287,10 +302,11 @@ const AuthenticatedAdminRouteWithChildren =
 interface AuthenticatedRouteChildren {
   AuthenticatedAdminRoute: typeof AuthenticatedAdminRouteWithChildren
   AuthenticatedBestPracticesRoute: typeof AuthenticatedBestPracticesRoute
-  AuthenticatedMentorRoute: typeof AuthenticatedMentorRoute
   AuthenticatedSettingsRoute: typeof AuthenticatedSettingsRoute
   AuthenticatedTeamsRoute: typeof AuthenticatedTeamsRoute
   AuthenticatedIndexRoute: typeof AuthenticatedIndexRoute
+  AuthenticatedMentorIndexRoute: typeof AuthenticatedMentorIndexRoute
+  AuthenticatedMentorThreadThreadIdRoute: typeof AuthenticatedMentorThreadThreadIdRoute
   AuthenticatedUserUsernameBestPracticesRoute: typeof AuthenticatedUserUsernameBestPracticesRoute
   AuthenticatedUserUsernameIndexRoute: typeof AuthenticatedUserUsernameIndexRoute
 }
@@ -298,10 +314,12 @@ interface AuthenticatedRouteChildren {
 const AuthenticatedRouteChildren: AuthenticatedRouteChildren = {
   AuthenticatedAdminRoute: AuthenticatedAdminRouteWithChildren,
   AuthenticatedBestPracticesRoute: AuthenticatedBestPracticesRoute,
-  AuthenticatedMentorRoute: AuthenticatedMentorRoute,
   AuthenticatedSettingsRoute: AuthenticatedSettingsRoute,
   AuthenticatedTeamsRoute: AuthenticatedTeamsRoute,
   AuthenticatedIndexRoute: AuthenticatedIndexRoute,
+  AuthenticatedMentorIndexRoute: AuthenticatedMentorIndexRoute,
+  AuthenticatedMentorThreadThreadIdRoute:
+    AuthenticatedMentorThreadThreadIdRoute,
   AuthenticatedUserUsernameBestPracticesRoute:
     AuthenticatedUserUsernameBestPracticesRoute,
   AuthenticatedUserUsernameIndexRoute: AuthenticatedUserUsernameIndexRoute,
@@ -318,13 +336,14 @@ export interface FileRoutesByFullPath {
   '/landing': typeof LandingRoute
   '/privacy': typeof PrivacyRoute
   '/best-practices': typeof AuthenticatedBestPracticesRoute
-  '/mentor': typeof AuthenticatedMentorRoute
   '/settings': typeof AuthenticatedSettingsRoute
   '/teams': typeof AuthenticatedTeamsRoute
   '/': typeof AuthenticatedIndexRoute
+  '/mentor': typeof AuthenticatedMentorIndexRoute
   '/admin/members': typeof AuthenticatedAdminAdminMembersRoute
   '/admin/settings': typeof AuthenticatedAdminAdminSettingsRoute
   '/admin/teams': typeof AuthenticatedAdminAdminTeamsRoute
+  '/mentor/thread/$threadId': typeof AuthenticatedMentorThreadThreadIdRoute
   '/user/$username/best-practices': typeof AuthenticatedUserUsernameBestPracticesRoute
   '/admin': typeof AuthenticatedAdminAdminIndexRoute
   '/user/$username': typeof AuthenticatedUserUsernameIndexRoute
@@ -337,13 +356,14 @@ export interface FileRoutesByTo {
   '/privacy': typeof PrivacyRoute
   '': typeof AuthenticatedAdminRouteWithChildren
   '/best-practices': typeof AuthenticatedBestPracticesRoute
-  '/mentor': typeof AuthenticatedMentorRoute
   '/settings': typeof AuthenticatedSettingsRoute
   '/teams': typeof AuthenticatedTeamsRoute
   '/': typeof AuthenticatedIndexRoute
+  '/mentor': typeof AuthenticatedMentorIndexRoute
   '/admin/members': typeof AuthenticatedAdminAdminMembersRoute
   '/admin/settings': typeof AuthenticatedAdminAdminSettingsRoute
   '/admin/teams': typeof AuthenticatedAdminAdminTeamsRoute
+  '/mentor/thread/$threadId': typeof AuthenticatedMentorThreadThreadIdRoute
   '/user/$username/best-practices': typeof AuthenticatedUserUsernameBestPracticesRoute
   '/admin': typeof AuthenticatedAdminAdminIndexRoute
   '/user/$username': typeof AuthenticatedUserUsernameIndexRoute
@@ -358,13 +378,14 @@ export interface FileRoutesById {
   '/privacy': typeof PrivacyRoute
   '/_authenticated/_admin': typeof AuthenticatedAdminRouteWithChildren
   '/_authenticated/best-practices': typeof AuthenticatedBestPracticesRoute
-  '/_authenticated/mentor': typeof AuthenticatedMentorRoute
   '/_authenticated/settings': typeof AuthenticatedSettingsRoute
   '/_authenticated/teams': typeof AuthenticatedTeamsRoute
   '/_authenticated/': typeof AuthenticatedIndexRoute
+  '/_authenticated/mentor/': typeof AuthenticatedMentorIndexRoute
   '/_authenticated/_admin/admin/members': typeof AuthenticatedAdminAdminMembersRoute
   '/_authenticated/_admin/admin/settings': typeof AuthenticatedAdminAdminSettingsRoute
   '/_authenticated/_admin/admin/teams': typeof AuthenticatedAdminAdminTeamsRoute
+  '/_authenticated/mentor/thread/$threadId': typeof AuthenticatedMentorThreadThreadIdRoute
   '/_authenticated/user/$username/best-practices': typeof AuthenticatedUserUsernameBestPracticesRoute
   '/_authenticated/_admin/admin/': typeof AuthenticatedAdminAdminIndexRoute
   '/_authenticated/user/$username/': typeof AuthenticatedUserUsernameIndexRoute
@@ -379,13 +400,14 @@ export interface FileRouteTypes {
     | '/landing'
     | '/privacy'
     | '/best-practices'
-    | '/mentor'
     | '/settings'
     | '/teams'
     | '/'
+    | '/mentor'
     | '/admin/members'
     | '/admin/settings'
     | '/admin/teams'
+    | '/mentor/thread/$threadId'
     | '/user/$username/best-practices'
     | '/admin'
     | '/user/$username'
@@ -397,13 +419,14 @@ export interface FileRouteTypes {
     | '/privacy'
     | ''
     | '/best-practices'
-    | '/mentor'
     | '/settings'
     | '/teams'
     | '/'
+    | '/mentor'
     | '/admin/members'
     | '/admin/settings'
     | '/admin/teams'
+    | '/mentor/thread/$threadId'
     | '/user/$username/best-practices'
     | '/admin'
     | '/user/$username'
@@ -416,13 +439,14 @@ export interface FileRouteTypes {
     | '/privacy'
     | '/_authenticated/_admin'
     | '/_authenticated/best-practices'
-    | '/_authenticated/mentor'
     | '/_authenticated/settings'
     | '/_authenticated/teams'
     | '/_authenticated/'
+    | '/_authenticated/mentor/'
     | '/_authenticated/_admin/admin/members'
     | '/_authenticated/_admin/admin/settings'
     | '/_authenticated/_admin/admin/teams'
+    | '/_authenticated/mentor/thread/$threadId'
     | '/_authenticated/user/$username/best-practices'
     | '/_authenticated/_admin/admin/'
     | '/_authenticated/user/$username/'
@@ -467,10 +491,11 @@ export const routeTree = rootRoute
       "children": [
         "/_authenticated/_admin",
         "/_authenticated/best-practices",
-        "/_authenticated/mentor",
         "/_authenticated/settings",
         "/_authenticated/teams",
         "/_authenticated/",
+        "/_authenticated/mentor/",
+        "/_authenticated/mentor/thread/$threadId",
         "/_authenticated/user/$username/best-practices",
         "/_authenticated/user/$username/"
       ]
@@ -501,10 +526,6 @@ export const routeTree = rootRoute
       "filePath": "_authenticated/best-practices.tsx",
       "parent": "/_authenticated"
     },
-    "/_authenticated/mentor": {
-      "filePath": "_authenticated/mentor.tsx",
-      "parent": "/_authenticated"
-    },
     "/_authenticated/settings": {
       "filePath": "_authenticated/settings.tsx",
       "parent": "/_authenticated"
@@ -515,6 +536,10 @@ export const routeTree = rootRoute
     },
     "/_authenticated/": {
       "filePath": "_authenticated/index.tsx",
+      "parent": "/_authenticated"
+    },
+    "/_authenticated/mentor/": {
+      "filePath": "_authenticated/mentor/index.tsx",
       "parent": "/_authenticated"
     },
     "/_authenticated/_admin/admin/members": {
@@ -528,6 +553,10 @@ export const routeTree = rootRoute
     "/_authenticated/_admin/admin/teams": {
       "filePath": "_authenticated/_admin/admin/teams.tsx",
       "parent": "/_authenticated/_admin"
+    },
+    "/_authenticated/mentor/thread/$threadId": {
+      "filePath": "_authenticated/mentor/thread/$threadId.tsx",
+      "parent": "/_authenticated"
     },
     "/_authenticated/user/$username/best-practices": {
       "filePath": "_authenticated/user/$username/best-practices.tsx",
