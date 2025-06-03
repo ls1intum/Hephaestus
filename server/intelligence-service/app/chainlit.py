@@ -1,6 +1,13 @@
 import chainlit as cl
+from chainlit.data.sql_alchemy import SQLAlchemyDataLayer
 from chainlit.types import ThreadDict
 from typing import Optional, Dict
+from app.settings import settings
+
+
+@cl.data_layer
+def setup_data_layer():
+    return SQLAlchemyDataLayer(conninfo=settings.DATABASE_CONNECTION_STRING)
 
 
 @cl.header_auth_callback
@@ -31,4 +38,4 @@ def on_chat_end():
 
 @cl.on_chat_resume
 async def on_chat_resume(thread: ThreadDict):
-    print("The user resumed a previous chat session!")    
+    print("The user resumed a previous chat session!")

@@ -24,7 +24,7 @@ services:
   intelligence-service:
     build: server/intelligence-service
     environment:
-      - DATABASE_URL=postgresql://postgres:5432/hephaestus
+      - DATABASE_URL=postgresql://postgres:5432/mentor
       - DATABASE_USERNAME=root
       - DATABASE_PASSWORD=root
       # Either OPENAI_API_KEY or AZURE_OPENAI_API_KEY must be set
@@ -60,8 +60,9 @@ services:
           - postgres
     volumes:
       - postgresql-data:/var/lib/postgresql/data
+      - ./postgres/init-scripts:/docker-entrypoint-initdb.d
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready"]
+      test: ["CMD-SHELL", "pg_isready -U root -d hephaestus"]
       interval: 10s
       timeout: 5s
       retries: 5

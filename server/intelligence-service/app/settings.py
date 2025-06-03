@@ -33,7 +33,7 @@ class Settings(BaseSettings):
             return "fake:model"
         return value
 
-    DATABASE_URL: str = "postgresql://localhost:5432/hephaestus"
+    DATABASE_URL: str = "postgresql://localhost:5432/mentor"
     DATABASE_USERNAME: str = "root"
     DATABASE_PASSWORD: str = "root"
 

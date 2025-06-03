@@ -121,7 +121,7 @@ services:
   intelligence-service:
     image: "ghcr.io/ls1intum/hephaestus/intelligence-service:${IMAGE_TAG}"
     environment:
-      DATABASE_URL: postgresql://postgres:5432/hephaestus
+      DATABASE_URL: postgresql://postgres:5432/mentor
       DATABASE_USERNAME: root
       DATABASE_PASSWORD: root
       MODEL_NAME: ${MODEL_NAME}
@@ -170,6 +170,7 @@ services:
     restart: unless-stopped
     volumes:
       - postgresql-data:/var/lib/postgresql/data
+      - ../postgres/init-scripts:/docker-entrypoint-initdb.d
     healthcheck:
       test:
         - CMD-SHELL
