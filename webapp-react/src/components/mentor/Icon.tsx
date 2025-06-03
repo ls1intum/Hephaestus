@@ -20,6 +20,7 @@ const Icon = ({ name, ...props }: Props) => {
 	const formattedName = formatIconName(name);
 	const IconComponent = LucideIcons[
 		formattedName as keyof typeof LucideIcons
+		// biome-ignore lint/suspicious/noExplicitAny: Lucide icon component type inference
 	] as any;
 
 	if (!IconComponent) {

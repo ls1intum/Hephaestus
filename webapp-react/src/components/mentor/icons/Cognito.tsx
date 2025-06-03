@@ -6,6 +6,8 @@ export const Cognito = () => {
 			viewBox="0 0 256 299"
 			xmlns="http://www.w3.org/2000/svg"
 			preserveAspectRatio="xMidYMid"
+			role="img"
+			aria-label="AWS Cognito"
 		>
 			<path
 				d="M208.752 58.061l25.771-6.636.192.283.651 155.607-.843.846-5.31.227-20.159-3.138-.302-.794V58.061M59.705 218.971l.095.007 68.027 19.767.173.133.296.236-.096 59.232-.2.252-68.295-33.178v-46.449"

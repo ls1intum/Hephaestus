@@ -7,6 +7,8 @@ export const Send = ({ className }: { className?: string }) => {
 			fill="none"
 			className={className}
 			xmlns="http://www.w3.org/2000/svg"
+			role="img"
+			aria-label="Send message"
 		>
 			<path
 				fillRule="evenodd"

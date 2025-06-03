@@ -15,6 +15,7 @@ const PDFElement = ({ element }: Props) => {
 		<iframe
 			className={`${element.display}-pdf h-full w-full border-none`}
 			src={url}
+			title={`PDF: ${element.name}`}
 		/>
 	);
 };

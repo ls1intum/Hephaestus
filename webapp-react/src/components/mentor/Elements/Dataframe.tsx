@@ -48,14 +48,16 @@ const _DataframeElement = ({ data }: { data: DataframeData }) => {
 				header: ({ column }) => {
 					const sort = column.getIsSorted();
 					return (
-						<div
+						<button
+							type="button"
 							className="flex items-center cursor-pointer"
 							onClick={() => column.toggleSorting()}
+							aria-label={`Sort by ${col}`}
 						>
 							{col}
 							{sort === "asc" && <ArrowUp className="ml-2 !size-3" />}
 							{sort === "desc" && <ArrowDown className="ml-2 !size-3" />}
-						</div>
+						</button>
 					);
 				},
 			})),
@@ -86,17 +88,20 @@ const _DataframeElement = ({ data }: { data: DataframeData }) => {
 	});
 
 	const renderPaginationItems = useCallback(() => {
-		return Array.from({ length: table.getPageCount() }, (_, i) => (
-			<PaginationItem key={i}>
+		const pageCount = table.getPageCount();
+		const currentPage = table.getState().pagination.pageIndex;
+
+		return Array.from({ length: pageCount }, (_, i) => (
+			<PaginationItem key={`page-${i}-of-${pageCount}`}>
 				<PaginationLink
 					onClick={() => table.setPageIndex(i)}
-					isActive={table.getState().pagination.pageIndex === i}
+					isActive={currentPage === i}
 				>
 					{i + 1}
 				</PaginationLink>
 			</PaginationItem>
 		));
-	}, [table.getPageCount(), table.getState().pagination.pageIndex]);
+	}, [table]);
 
 	return (
 		<div className="flex flex-col gap-2 h-full overflow-y-auto dataframe">
@@ -178,7 +183,8 @@ function DataframeElement({ element }: { element: IDataframeElement }) {
 	const { data, isLoading, error } = useFetch(element.url || null);
 
 	const jsonData = useMemo(() => {
-		if (data) return JSON.parse(data);
+		if (data && typeof data === "string") return JSON.parse(data);
+		if (data && typeof data === "object") return data;
 	}, [data]);
 
 	if (isLoading) {

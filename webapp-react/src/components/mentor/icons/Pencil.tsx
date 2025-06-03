@@ -1,6 +1,8 @@
 export const Pencil = ({ className }: { className?: string }) => {
 	return (
 		<svg
+			role="img"
+			aria-label="Edit"
 			width="24"
 			height="24"
 			viewBox="0 0 24 24"

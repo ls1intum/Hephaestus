@@ -23,6 +23,7 @@ export default function AudioPresence({
 	const { wavRecorder, wavStreamPlayer, isAiSpeaking } = useAudio();
 	const canvasRef = useRef<HTMLCanvasElement>(null);
 
+	// biome-ignore lint/correctness/useExhaustiveDependencies: This is a memoized value that depends on the theme
 	const foregroundColor = useMemo(() => {
 		const root = document.documentElement;
 		const styles = getComputedStyle(root);
@@ -119,7 +120,9 @@ export default function AudioPresence({
 		barSpacing,
 		foregroundColor,
 		wavRecorder,
+		wavStreamPlayer,
 		isAiSpeaking,
+		type,
 	]);
 
 	return (

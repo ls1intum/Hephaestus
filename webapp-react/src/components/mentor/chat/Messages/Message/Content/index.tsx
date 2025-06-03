@@ -52,7 +52,7 @@ const MessageContent = memo(
 			</>
 		);
 
-		let inputMarkdown;
+		let inputMarkdown: JSX.Element | undefined;
 
 		if (displayInput) {
 			const inputContent =

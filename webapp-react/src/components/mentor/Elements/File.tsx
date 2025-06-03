@@ -15,7 +15,10 @@ const FileElement = ({ element }: { element: IFileElement }) => {
 			target="_blank"
 			rel="noopener noreferrer"
 		>
-			<Attachment name={element.name} mime={element.mime!} />
+			<Attachment
+				name={element.name}
+				mime={element.mime || "application/octet-stream"}
+			/>
 		</a>
 	);
 };

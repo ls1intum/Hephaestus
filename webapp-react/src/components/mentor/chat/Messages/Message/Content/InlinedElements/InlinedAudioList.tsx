@@ -9,8 +9,11 @@ interface InlinedAudioListProps {
 const InlinedAudioList = ({ items }: InlinedAudioListProps) => {
 	return (
 		<div className="flex flex-col space-y-4">
-			{items.map((audio, i) => (
-				<div key={i} className="pt-2">
+			{items.map((audio) => (
+				<div
+					key={audio.id || audio.name || `audio-${audio.url}`}
+					className="pt-2"
+				>
 					<AudioElement element={audio} />
 				</div>
 			))}

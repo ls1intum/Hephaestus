@@ -8,9 +8,16 @@ interface Props {
 
 const InlinedDataframeList = ({ items }: Props) => (
 	<div className="flex gap-1">
-		{items.map((element, i) => {
+		{items.map((element) => {
 			return (
-				<div key={i} className="max-h-[450px] w-full">
+				<div
+					key={
+						element.id ||
+						element.name ||
+						`dataframe-${element.url || Math.random()}`
+					}
+					className="max-h-[450px] w-full"
+				>
 					<LazyDataframe element={element} />
 				</div>
 			);

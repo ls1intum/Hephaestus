@@ -71,7 +71,7 @@ export const McpList = ({ onAddNewClick }: McpListProps) => {
 		<>
 			{mcps.map((mcp, index) => (
 				<McpItem
-					key={index}
+					key={mcp.name || `mcp-${index}`}
 					mcp={mcp}
 					onDelete={deleteMcp}
 					isLoading={isLoading}
@@ -132,7 +132,7 @@ const McpItem = ({ mcp, onDelete, isLoading }: McpItemProps) => {
 			</div>
 			<div className="flex flex-wrap gap-2">
 				{mcp.tools?.map((tool, toolIndex) => (
-					<Badge key={toolIndex} variant="secondary">
+					<Badge key={tool.name || `tool-${toolIndex}`} variant="secondary">
 						{tool.name}
 					</Badge>
 				))}
@@ -203,7 +203,7 @@ const ReconnectMcpButton = ({ mcp }: { mcp: IMcp }) => {
 			}),
 		);
 
-		const updateMcpStatus = (success: boolean, updatedMcp?: any) => {
+		const updateMcpStatus = (success: boolean, updatedMcp?: IMcp) => {
 			setMcps((prev) =>
 				prev.map((existingMcp) => {
 					if (existingMcp.name === mcp.name) {
@@ -219,9 +219,16 @@ const ReconnectMcpButton = ({ mcp }: { mcp: IMcp }) => {
 		};
 
 		if (mcp.clientType === "stdio") {
+			// Check if command exists
+			if (!mcp.command) {
+				toast.error("Command is required for stdio MCP");
+				setIsLoading(false);
+				return;
+			}
+
 			toast.promise(
 				apiClient
-					.connectStdioMCP(sessionId, mcp.name, mcp.command!)
+					.connectStdioMCP(sessionId, mcp.name, mcp.command)
 					.then(async ({ success, mcp: updatedMcp }) => {
 						updateMcpStatus(success, updatedMcp);
 					})
@@ -236,9 +243,16 @@ const ReconnectMcpButton = ({ mcp }: { mcp: IMcp }) => {
 				},
 			);
 		} else {
+			// Check if URL exists
+			if (!mcp.url) {
+				toast.error("URL is required for SSE MCP");
+				setIsLoading(false);
+				return;
+			}
+
 			toast.promise(
 				apiClient
-					.connectSseMCP(sessionId, mcp.name, mcp.url!)
+					.connectSseMCP(sessionId, mcp.name, mcp.url)
 					.then(async ({ success, mcp: updatedMcp }) => {
 						updateMcpStatus(success, updatedMcp);
 					})

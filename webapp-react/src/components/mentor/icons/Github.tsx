@@ -7,6 +7,8 @@ export const GitHub = () => {
 			className="fill-text-primary"
 			xmlns="http://www.w3.org/2000/svg"
 			preserveAspectRatio="xMinYMin meet"
+			role="img"
+			aria-label="GitHub"
 		>
 			<path
 				fillRule="evenodd"

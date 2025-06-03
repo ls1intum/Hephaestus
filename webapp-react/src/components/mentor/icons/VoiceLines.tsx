@@ -7,6 +7,8 @@ export const VoiceLines = ({ className }: { className?: string }) => {
 			fill="none"
 			className={className}
 			xmlns="http://www.w3.org/2000/svg"
+			role="img"
+			aria-label="Voice lines"
 		>
 			<path
 				d="M9.5 4C8.67157 4 8 4.67157 8 5.5V18.5C8 19.3284 8.67157 20 9.5 20C10.3284 20 11 19.3284 11 18.5V5.5C11 4.67157 10.3284 4 9.5 4Z"

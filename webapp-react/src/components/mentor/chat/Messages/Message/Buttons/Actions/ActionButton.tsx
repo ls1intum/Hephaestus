@@ -39,7 +39,7 @@ const ActionButton = ({ action }: ActionProps) => {
 
 	const icon = useMemo(() => {
 		if (isRunning) return <Loader />;
-		if (action.icon) return <Icon name={action.icon as any} />;
+		if (action.icon) return <Icon name={String(action.icon)} />;
 		return null;
 	}, [action, isRunning]);
 

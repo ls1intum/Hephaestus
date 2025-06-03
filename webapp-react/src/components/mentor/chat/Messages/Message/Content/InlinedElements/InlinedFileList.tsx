@@ -9,9 +9,11 @@ interface Props {
 const InlinedFileList = ({ items }: Props) => {
 	return (
 		<div className="flex items-center gap-2">
-			{items.map((file, i) => {
+			{items.map((file) => {
 				return (
-					<div key={i}>
+					<div
+						key={file.id || file.name || `file-${file.mime || Math.random()}`}
+					>
 						<FileElement element={file} />
 					</div>
 				);

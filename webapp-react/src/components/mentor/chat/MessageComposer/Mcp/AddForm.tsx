@@ -128,7 +128,7 @@ export const McpAddForm = ({
 						</Label>
 						<Select
 							value={serverType}
-							onValueChange={setServerType as any}
+							onValueChange={(value: "stdio" | "sse") => setServerType(value)}
 							disabled={isLoading}
 						>
 							<SelectTrigger

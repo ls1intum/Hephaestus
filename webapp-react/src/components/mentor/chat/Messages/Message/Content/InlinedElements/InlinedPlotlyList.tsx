@@ -8,10 +8,14 @@ interface Props {
 
 const InlinedPlotlyList = ({ items }: Props) => (
 	<div className="flex flex-col gap-2">
-		{items.map((element, i) => {
+		{items.map((element) => {
 			return (
 				<div
-					key={i}
+					key={
+						element.id ||
+						element.name ||
+						`plotly-${element.url || Math.random()}`
+					}
 					className="max-w-[600px] h-[400px]"
 					style={{
 						maxWidth: "fit-content",

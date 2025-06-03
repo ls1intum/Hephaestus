@@ -34,6 +34,17 @@ import {
 	normalizeAlertType,
 } from "./MarkdownAlert";
 
+// Define types to replace 'any'
+interface TreeNode {
+	type: string;
+	value?: string;
+	children?: TreeNode[];
+	data?: {
+		hName?: string;
+		hProperties?: Record<string, unknown>;
+	};
+}
+
 interface Props {
 	allowHtml?: boolean;
 	latex?: boolean;
@@ -43,48 +54,54 @@ interface Props {
 }
 
 const cursorPlugin = () => {
-	return (tree: any) => {
-		visit(tree, "text", (node: any, index, parent) => {
-			const placeholderPattern = /\u200B/g;
-			const matches = [...(node.value?.matchAll(placeholderPattern) || [])];
+	return (tree: TreeNode) => {
+		visit(
+			tree,
+			"text",
+			(node: TreeNode, index: number, parent: { children?: TreeNode[] }) => {
+				const placeholderPattern = /\u200B/g;
+				const matches = [...(node.value?.matchAll(placeholderPattern) || [])];
 
-			if (matches.length > 0) {
-				const newNodes: any[] = [];
-				let lastIndex = 0;
+				if (matches.length > 0) {
+					const newNodes: TreeNode[] = [];
+					let lastIndex = 0;
 
-				matches.forEach((match) => {
-					const [fullMatch] = match;
-					const startIndex = match.index!;
-					const endIndex = startIndex + fullMatch.length;
+					for (const match of matches) {
+						const [fullMatch] = match;
+						const startIndex = match.index !== undefined ? match.index : 0;
+						const endIndex = startIndex + fullMatch.length;
 
-					if (startIndex > lastIndex) {
+						if (startIndex > lastIndex) {
+							newNodes.push({
+								type: "text",
+								value: node.value?.slice(lastIndex, startIndex),
+							});
+						}
+
+						newNodes.push({
+							type: "blinkingCursor",
+							data: {
+								hName: "blinkingCursor",
+								hProperties: { text: "Blinking Cursor" },
+							},
+						});
+
+						lastIndex = endIndex;
+					}
+
+					if (lastIndex < (node.value?.length ?? 0)) {
 						newNodes.push({
 							type: "text",
-							value: node.value?.slice(lastIndex, startIndex),
+							value: node.value?.slice(lastIndex),
 						});
 					}
 
-					newNodes.push({
-						type: "blinkingCursor",
-						data: {
-							hName: "blinkingCursor",
-							hProperties: { text: "Blinking Cursor" },
-						},
-					});
-
-					lastIndex = endIndex;
-				});
-
-				if (lastIndex < node.value?.length) {
-					newNodes.push({
-						type: "text",
-						value: node.value?.slice(lastIndex),
-					});
+					if (parent?.children && Array.isArray(parent.children)) {
+						parent.children.splice(index, 1, ...newNodes);
+					}
 				}
-
-				parent?.children.splice(index, 1, ...newNodes);
-			}
-		});
+			},
+		);
 	};
 };
 
@@ -100,10 +117,16 @@ const Markdown = ({
 	const rehypePlugins = useMemo(() => {
 		let rehypePlugins: PluggableList = [];
 		if (allowHtml) {
-			rehypePlugins = [rehypeRaw as any, ...rehypePlugins];
+			rehypePlugins = [
+				rehypeRaw as unknown as PluggableList[number],
+				...rehypePlugins,
+			];
 		}
 		if (latex) {
-			rehypePlugins = [rehypeKatex as any, ...rehypePlugins];
+			rehypePlugins = [
+				rehypeKatex as unknown as PluggableList[number],
+				...rehypePlugins,
+			];
 		}
 		return rehypePlugins;
 	}, [allowHtml, latex]);
@@ -111,13 +134,16 @@ const Markdown = ({
 	const remarkPlugins = useMemo(() => {
 		let remarkPlugins: PluggableList = [
 			cursorPlugin,
-			remarkGfm as any,
-			remarkDirective as any,
+			remarkGfm as unknown as PluggableList[number],
+			remarkDirective as unknown as PluggableList[number],
 			MarkdownAlert,
 		];
 
 		if (latex) {
-			remarkPlugins = [...remarkPlugins, remarkMath as any];
+			remarkPlugins = [
+				...remarkPlugins,
+				remarkMath as unknown as PluggableList[number],
+			];
 		}
 		return remarkPlugins;
 	}, [latex]);
@@ -137,8 +163,13 @@ const Markdown = ({
 						/>
 					);
 				},
-				pre({ children, ...props }: any) {
-					return <CodeSnippet {...props} />;
+				pre(props) {
+					// CodeSnippet requires children to be passed explicitly
+					return (
+						<CodeSnippet {...omit(props, ["node"])}>
+							{props.children}
+						</CodeSnippet>
+					);
 				},
 				a({ children, ...props }) {
 					const name = children as string;
@@ -156,7 +187,7 @@ const Markdown = ({
 						</a>
 					);
 				},
-				img: (image: any) => {
+				img(props) {
 					return (
 						<div className="sm:max-w-sm md:max-w-md">
 							<AspectRatio
@@ -165,11 +196,11 @@ const Markdown = ({
 							>
 								<img
 									src={
-										image.src.startsWith("/public")
-											? apiClient.buildEndpoint(image.src)
-											: image.src
+										(props.src as string)?.startsWith("/public")
+											? apiClient.buildEndpoint(props.src as string)
+											: (props.src as string)
 									}
-									alt={image.alt}
+									alt={props.alt as string}
 									className="h-full w-full object-contain"
 								/>
 							</AspectRatio>
@@ -253,24 +284,26 @@ const Markdown = ({
 				table({ children, ...props }) {
 					return (
 						<Card className="[&:not(:first-child)]:mt-2 [&:not(:last-child)]:mb-2">
-							<Table {...(props as any)}>{children}</Table>
+							<Table {...omit(props, ["node"])}>{children}</Table>
 						</Card>
 					);
 				},
 				thead({ children, ...props }) {
-					return <TableHeader {...(props as any)}>{children}</TableHeader>;
+					return (
+						<TableHeader {...omit(props, ["node"])}>{children}</TableHeader>
+					);
 				},
 				tr({ children, ...props }) {
-					return <TableRow {...(props as any)}>{children}</TableRow>;
+					return <TableRow {...omit(props, ["node"])}>{children}</TableRow>;
 				},
 				th({ children, ...props }) {
-					return <TableHead {...(props as any)}>{children}</TableHead>;
+					return <TableHead {...omit(props, ["node"])}>{children}</TableHead>;
 				},
 				td({ children, ...props }) {
-					return <TableCell {...(props as any)}>{children}</TableCell>;
+					return <TableCell {...omit(props, ["node"])}>{children}</TableCell>;
 				},
 				tbody({ children, ...props }) {
-					return <TableBody {...(props as any)}>{children}</TableBody>;
+					return <TableBody {...omit(props, ["node"])}>{children}</TableBody>;
 				},
 				// @ts-expect-error custom plugin
 				blinkingCursor: () => <BlinkingCursor whitespace />,

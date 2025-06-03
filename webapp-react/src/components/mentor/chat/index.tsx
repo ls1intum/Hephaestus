@@ -150,12 +150,12 @@ const Chat = () => {
 			});
 			setAttachments((prev) => prev.concat(attachements));
 		},
-		[uploadFile],
+		[setAttachments],
 	);
 
 	const onFileUploadError = useCallback(
 		(error: string) => toast.error(error),
-		[toast],
+		[],
 	);
 
 	const upload = useUpload({
@@ -182,7 +182,7 @@ const Chat = () => {
 				currentThreadId: threadId,
 			}));
 		}
-	}, []);
+	}, [user, config?.dataPersistence, threadId, navigate, setThreads]);
 
 	const enableAttachments =
 		!disabled && config?.features?.spontaneous_file_upload?.enabled;

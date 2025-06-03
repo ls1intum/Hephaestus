@@ -212,6 +212,7 @@ const AlertComponent = ({
 };
 // MarkdownAlert plugin
 export const MarkdownAlert = () => {
+	// biome-ignore lint/suspicious/noExplicitAny: AST tree structure is complex
 	return (tree: any) => {
 		visit(tree, "text", (node) => {
 			const regex = /^:::\s*([\w-]+)\n([\s\S]*?)\n:::/i;

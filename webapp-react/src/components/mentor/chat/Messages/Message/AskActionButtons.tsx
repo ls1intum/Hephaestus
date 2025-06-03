@@ -24,7 +24,7 @@ const AskActionButton = ({ action }: { action: IAction }) => {
 	}, [action]);
 
 	const icon = useMemo(() => {
-		if (action.icon) return <Icon name={action.icon as any} />;
+		if (action.icon) return <Icon name={action.icon as string} />;
 		return null;
 	}, [action]);
 

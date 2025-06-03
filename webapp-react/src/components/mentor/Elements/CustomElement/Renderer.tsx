@@ -8,7 +8,7 @@ import Imports from "./Imports";
 const createMockAPIs = () => {
 	return {
 		updateElement: async (
-			nextProps: Record<string, any>,
+			nextProps: Record<string, unknown>,
 		): Promise<{ success: boolean }> => {
 			console.log("updateElement called with:", nextProps);
 			return { success: true };

@@ -42,6 +42,8 @@ const CircularProgress = ({ value }: { value: number }) => {
 				width={size}
 				height={size}
 				viewBox={`0 0 ${size} ${size}`}
+				aria-hidden="true"
+				role="presentation"
 			>
 				<circle
 					className="text-muted-foreground/20"
@@ -69,7 +71,6 @@ const CircularProgress = ({ value }: { value: number }) => {
 		</div>
 	);
 };
-
 const _AskFileButton = ({
 	askUser,
 	uploadFile,
@@ -114,7 +115,9 @@ const _AskFileButton = ({
 					}`,
 				);
 				setUploads((prev) => {
-					prev.forEach((u) => u.cancel());
+					for (const u of prev) {
+						u.cancel();
+					}
 					return [];
 				});
 			});
@@ -174,14 +177,19 @@ const AskFileButton = ({ messageId, onError }: AskFileButtonProps) => {
 	const belongsToMessage = messageContext.askUser?.spec.step_id === messageId;
 	const isAskFile = messageContext.askUser?.spec.type === "file";
 
-	if (!belongsToMessage || !isAskFile || !messageContext?.uploadFile)
+	if (
+		!belongsToMessage ||
+		!isAskFile ||
+		!messageContext?.uploadFile ||
+		!messageContext.askUser
+	)
 		return null;
 
 	return (
 		<_AskFileButton
 			onError={onError}
 			uploadFile={messageContext.uploadFile}
-			askUser={messageContext.askUser!}
+			askUser={messageContext.askUser}
 		/>
 	);
 };

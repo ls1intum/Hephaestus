@@ -30,7 +30,14 @@ export default function AutoResumeThread({ id }: Props) {
 		if (!config?.dataPersistence) {
 			navigate({ to: "/mentor", replace: true });
 		}
-	}, [config?.threadResumable, id]);
+	}, [
+		config?.threadResumable,
+		config?.dataPersistence,
+		id,
+		clear,
+		setIdToResume,
+		navigate,
+	]);
 
 	useEffect(() => {
 		if (id !== idToResume) {
@@ -40,7 +47,7 @@ export default function AutoResumeThread({ id }: Props) {
 			toast.error("Couldn't resume chat");
 			navigate({ to: "/", replace: true });
 		}
-	}, [session, idToResume, id]);
+	}, [session, idToResume, id, navigate]);
 
 	useEffect(() => {
 		if (resumeThreadError) {
@@ -48,7 +55,7 @@ export default function AutoResumeThread({ id }: Props) {
 			navigate({ to: "/", replace: true });
 			setResumeThreadError(undefined);
 		}
-	}, [resumeThreadError]);
+	}, [resumeThreadError, navigate, setResumeThreadError]);
 
 	return null;
 }

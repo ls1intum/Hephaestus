@@ -23,7 +23,8 @@ const _PlotlyElement = ({ element }: Props) => {
 		return <div>An error occurred</div>;
 	}
 
-	let state;
+	// biome-ignore lint/suspicious/noExplicitAny: External library data structure
+	let state: any;
 
 	if (data) {
 		state = data;

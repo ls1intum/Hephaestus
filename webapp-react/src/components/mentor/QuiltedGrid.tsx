@@ -63,7 +63,7 @@ const QuiltedGrid = <T extends IImageElement | IVideoElement>({
 
 				return (
 					<div
-						key={i}
+						key={element.id || `element-${i}`}
 						className={cn(
 							"relative",
 							cols === 1

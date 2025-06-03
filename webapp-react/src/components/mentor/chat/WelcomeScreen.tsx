@@ -43,7 +43,6 @@ export default function WelcomeScreen(props: Props) {
 	useEffect(() => {
 		setIsVisible(true);
 	}, []);
-
 	const logo = useMemo(() => {
 		if (chatProfile && chatProfiles) {
 			const currentChatProfile = chatProfiles.find(
@@ -59,6 +58,7 @@ export default function WelcomeScreen(props: Props) {
 									? apiClient.buildEndpoint(currentChatProfile?.icon)
 									: currentChatProfile?.icon
 							}
+							alt={`${currentChatProfile.name} profile icon`}
 						/>
 						{currentChatProfile?.markdown_description ? (
 							<Markdown allowHtml={allowHtml} latex={latex}>
@@ -69,9 +69,8 @@ export default function WelcomeScreen(props: Props) {
 				);
 			}
 		}
-
 		return <Logo className="w-[200px] mb-2" />;
-	}, [chatProfiles, chatProfile]);
+	}, [chatProfiles, chatProfile, apiClient, allowHtml, latex]);
 
 	if (hasMessage(messages)) return null;
 

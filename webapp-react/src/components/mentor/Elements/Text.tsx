@@ -29,7 +29,7 @@ const TextElement = ({ element }: TextElementProps) => {
 	}
 
 	if (data) {
-		content = data;
+		content = typeof data === "string" ? data : JSON.stringify(data);
 	}
 
 	if (element.language) {

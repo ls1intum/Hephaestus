@@ -44,8 +44,8 @@ const MessageButtons = ({ message, actions, run }: Props) => {
 			{messageActions.length ? (
 				<MessageActions actions={messageActions} />
 			) : null}
-			{showDebugButton ? (
-				<DebugButton debugUrl={config.debugUrl!} step={message} />
+			{showDebugButton && config.debugUrl ? (
+				<DebugButton debugUrl={config.debugUrl} step={message} />
 			) : null}
 		</div>
 	);

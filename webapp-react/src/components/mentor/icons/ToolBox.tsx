@@ -7,6 +7,8 @@ export const ToolBox = ({ className }: { className?: string }) => {
 			fill="none"
 			xmlns="http://www.w3.org/2000/svg"
 			className={className}
+			role="img"
+			aria-label="Tools"
 		>
 			<mask id="stuff-part-box-fill">
 				<path d="M-6 -10H30V11H-6Z" fill="white" />

@@ -20,6 +20,13 @@ const ImageElement = ({ element }: { element: IImageElement }) => {
 		setLightboxOpen(true);
 	};
 
+	const handleKeyDown = (event: React.KeyboardEvent<HTMLImageElement>) => {
+		if (event.key === "Enter" || event.key === " ") {
+			event.preventDefault();
+			handleClick();
+		}
+	};
+
 	return (
 		<>
 			<div className="rounded-sm bg-accent overflow-hidden">
@@ -33,6 +40,9 @@ const ImageElement = ({ element }: { element: IImageElement }) => {
 					alt={element.name}
 					loading="lazy"
 					onClick={handleClick}
+					onKeyDown={handleKeyDown}
+					tabIndex={element.display === "inline" ? 0 : -1}
+					role={element.display === "inline" ? "button" : undefined}
 				/>
 			</div>
 
@@ -42,6 +52,7 @@ const ImageElement = ({ element }: { element: IImageElement }) => {
 					<DialogContent className="border-none bg-transparent shadow-none max-w-none p-0 max-h-screen overflow-auto [&>button]:hidden">
 						<div className="relative w-full h-full flex items-center justify-center">
 							<button
+								type="button"
 								onClick={() => setLightboxOpen(false)}
 								className="absolute top-4 right-4 p-2 rounded-full bg-black/50 text-white hover:bg-black/70 focus:outline-none focus:ring-2 focus:ring-white"
 								aria-label="Close lightbox"
@@ -53,7 +64,6 @@ const ImageElement = ({ element }: { element: IImageElement }) => {
 								src={element.url}
 								alt={element.name}
 								className="max-w-[90vw] max-h-[90vh] object-contain"
-								onClick={(e) => e.stopPropagation()}
 							/>
 						</div>
 					</DialogContent>

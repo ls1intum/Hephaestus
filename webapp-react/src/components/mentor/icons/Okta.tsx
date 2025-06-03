@@ -7,6 +7,8 @@ export const Okta = () => {
 			width="24"
 			height="24"
 			style={{ fill: "inherit" }}
+			role="img"
+			aria-label="Okta"
 		>
 			<path
 				fillRule="evenodd"

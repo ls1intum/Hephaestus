@@ -7,6 +7,8 @@ export const Stop = ({ className }: { className?: string }) => {
 			fill="none"
 			className={className}
 			xmlns="http://www.w3.org/2000/svg"
+			role="img"
+			aria-label="Stop"
 		>
 			<rect x="7" y="7" width="10" height="10" rx="1.25" fill="currentColor" />
 		</svg>

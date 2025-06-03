@@ -56,21 +56,24 @@ export default function MessageComposer({
 
 	const disabled = _disabled || !!attachments.find((a) => !a.uploaded);
 
-	const onPaste = useCallback((event: ClipboardEvent) => {
-		if (event.clipboardData?.items) {
-			const items = Array.from(event.clipboardData.items);
+	const onPaste = useCallback(
+		(event: ClipboardEvent) => {
+			if (event.clipboardData?.items) {
+				const items = Array.from(event.clipboardData.items);
 
-			// If no text data, check for files (e.g., images)
-			items.forEach((item) => {
-				if (item.kind === "file") {
-					const file = item.getAsFile();
-					if (file) {
-						onFileUpload([file]);
+				// If no text data, check for files (e.g., images)
+				for (const item of items) {
+					if (item.kind === "file") {
+						const file = item.getAsFile();
+						if (file) {
+							onFileUpload([file]);
+						}
 					}
 				}
-			});
-		}
-	}, []);
+			}
+		},
+		[onFileUpload],
+	);
 
 	const onSubmit = useCallback(
 		async (
@@ -91,14 +94,21 @@ export default function MessageComposer({
 
 			const fileReferences = attachments
 				?.filter((a) => !!a.serverId)
-				.map((a) => ({ id: a.serverId! }));
+				.map((a) => {
+					// Only include attachments where serverId is definitely defined
+					if (typeof a.serverId === "string") {
+						return { id: a.serverId };
+					}
+					return null;
+				})
+				.filter((ref): ref is { id: string } => ref !== null);
 
 			if (autoScrollRef) {
 				autoScrollRef.current = true;
 			}
 			sendMessage(message, fileReferences);
 		},
-		[user, sendMessage],
+		[user, sendMessage, autoScrollRef],
 	);
 
 	const onReply = useCallback(
@@ -118,9 +128,10 @@ export default function MessageComposer({
 				autoScrollRef.current = true;
 			}
 		},
-		[user, replyMessage],
+		[user, replyMessage, autoScrollRef],
 	);
 
+	// biome-ignore lint/correctness/useExhaustiveDependencies: This is a callback that does not need to be exhaustive
 	const submit = useCallback(() => {
 		if (disabled || (value === "" && attachments.length === 0)) {
 			return;
@@ -135,12 +146,11 @@ export default function MessageComposer({
 	}, [
 		value,
 		disabled,
-		setValue,
 		askUser,
 		attachments,
-		selectedCommand,
-		setAttachments,
+		onReply,
 		onSubmit,
+		selectedCommand,
 	]);
 
 	return (

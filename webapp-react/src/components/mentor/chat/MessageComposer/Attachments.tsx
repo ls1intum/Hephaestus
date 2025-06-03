@@ -35,7 +35,9 @@ const CircularProgressButton = ({
 				width={size}
 				height={size}
 				viewBox={`0 0 ${size} ${size}`}
+				aria-label={`Upload progress: ${progress}%`}
 			>
+				<title>Upload progress: {progress}%</title>
 				<circle
 					className="text-muted-foreground/20"
 					cx={size / 2}

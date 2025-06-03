@@ -19,7 +19,7 @@ const AnimatedPlugIcon: React.FC<AnimatedPlugIconProps> = ({
 			// Get all SVG paths inside the icon
 			const paths = iconRef.current.querySelectorAll("path");
 
-			paths.forEach((path: SVGPathElement) => {
+			for (const path of paths) {
 				// Get the total length of the path
 				const length = path.getTotalLength();
 
@@ -34,7 +34,7 @@ const AnimatedPlugIcon: React.FC<AnimatedPlugIconProps> = ({
 					iterations: Number.POSITIVE_INFINITY,
 					direction: "alternate",
 				});
-			});
+			}
 		}
 	}, [duration]);
 

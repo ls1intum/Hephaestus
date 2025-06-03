@@ -85,7 +85,11 @@ const TaskList = ({ isMobile, isCopilot }: TaskListProps) => {
 				<Header status={content?.status} />
 				<CardContent className="flex flex-col gap-2">
 					{tasks?.map((task, index) => (
-						<Task key={index} index={index + 1} task={task} />
+						<Task
+							key={task.title || `task-${index}`}
+							index={index + 1}
+							task={task}
+						/>
 					))}
 				</CardContent>
 			</Card>

@@ -10,7 +10,10 @@ const AudioElement = ({ element }: { element: IAudioElement }) => {
 	return (
 		<div className={cn("space-y-2", `${element.display}-audio`)}>
 			<p className="text-sm leading-7 text-muted-foreground">{element.name}</p>
-			<audio controls src={element.url} autoPlay={element.autoPlay} />
+			<audio controls src={element.url} autoPlay={element.autoPlay}>
+				<track kind="captions" label="No captions available" />
+				Your browser does not support the audio element.
+			</audio>
 		</div>
 	);
 };

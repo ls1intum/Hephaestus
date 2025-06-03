@@ -29,18 +29,18 @@ const useUpload = ({ onError, onResolved, options, spec }: useUploadProps) => {
 			if (!acceptedFiles.length) return;
 			return onResolved(acceptedFiles);
 		},
-		[spec],
+		[spec, onError, onResolved],
 	);
 
 	let dzAccept: Record<string, string[]> = {};
 	const accept = spec.accept;
 
 	if (Array.isArray(accept)) {
-		accept.forEach((a) => {
+		for (const a of accept) {
 			if (typeof a === "string") {
 				dzAccept[a] = [];
 			}
-		});
+		}
 	} else if (typeof accept === "object") {
 		dzAccept = accept;
 	}

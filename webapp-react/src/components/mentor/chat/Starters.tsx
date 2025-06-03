@@ -32,8 +32,11 @@ export default function Starters({ className }: Props) {
 			id="starters"
 			className={cn("flex gap-2 justify-center flex-wrap", className)}
 		>
-			{starters?.map((starter, i) => (
-				<Starter key={i} starter={starter} />
+			{starters?.map((starter) => (
+				<Starter
+					key={`starter-${starter.label?.trim().toLowerCase().replaceAll(" ", "-") || Math.random()}`}
+					starter={starter}
+				/>
 			))}
 		</div>
 	);

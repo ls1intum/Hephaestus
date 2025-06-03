@@ -62,7 +62,7 @@ const MessagesContainer = ({ navigate }: Props) => {
 				},
 			});
 		},
-		[],
+		[apiClient, setMessages],
 	);
 
 	const onFeedbackDeleted = useCallback(
@@ -84,7 +84,7 @@ const MessagesContainer = ({ navigate }: Props) => {
 				},
 			});
 		},
-		[],
+		[apiClient, setMessages],
 	);
 
 	const onElementRefClick = useCallback(
@@ -109,7 +109,7 @@ const MessagesContainer = ({ navigate }: Props) => {
 		[setSideView, navigate],
 	);
 
-	const onError = useCallback((error: string) => toast.error(error), [toast]);
+	const onError = useCallback((error: string) => toast.error(error), []);
 
 	const enableFeedback = !!config?.dataPersistence;
 
@@ -132,15 +132,19 @@ const MessagesContainer = ({ navigate }: Props) => {
 			onFeedbackDeleted,
 		};
 	}, [
+		uploadFile,
 		askUser,
-		enableFeedback,
+		config?.features?.unsafe_allow_html,
+		config?.features?.latex,
+		config?.features.edit_message,
 		loading,
+		enableFeedback,
 		config?.ui?.name,
 		config?.ui?.cot,
-		config?.features?.unsafe_allow_html,
 		onElementRefClick,
 		onError,
 		onFeedbackUpdated,
+		onFeedbackDeleted,
 	]);
 
 	return (

@@ -24,7 +24,8 @@ export default function ThreadOptions({
 	return (
 		<DropdownMenu>
 			<DropdownMenuTrigger asChild>
-				<div
+				<button
+					type="button"
 					onClick={(e) => {
 						e.stopPropagation();
 						e.preventDefault();
@@ -35,9 +36,10 @@ export default function ThreadOptions({
 						"focus:ring-0 focus:ring-offset-0 focus-visible:ring-0 focus-visible:ring-offset-0 text-muted-foreground",
 						className,
 					)}
+					aria-label="Thread options"
 				>
 					<Ellipsis />
-				</div>
+				</button>
 			</DropdownMenuTrigger>
 			<DropdownMenuContent className="w-20" align="start" forceMount>
 				<DropdownMenuItem

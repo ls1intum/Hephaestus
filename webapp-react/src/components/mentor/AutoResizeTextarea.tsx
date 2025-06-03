@@ -6,7 +6,7 @@ import { Textarea } from "@/components/ui/textarea";
 interface Props extends React.ComponentProps<"textarea"> {
 	maxHeight?: number;
 	placeholder?: string;
-	onPaste?: (event: any) => void;
+	onPaste?: (event: React.ClipboardEvent<HTMLTextAreaElement>) => void;
 	onEnter?: (event: React.KeyboardEvent<HTMLTextAreaElement>) => void;
 }
 
@@ -25,10 +25,25 @@ const AutoResizeTextarea = ({
 		const textarea = textareaRef.current;
 		if (!textarea || !onPaste) return;
 
-		textarea.addEventListener("paste", onPaste);
+		const handlePaste = (event: ClipboardEvent) => {
+			// Convert native ClipboardEvent to React.ClipboardEvent-like object
+			const reactEvent = {
+				...event,
+				nativeEvent: event,
+				isDefaultPrevented: () => event.defaultPrevented,
+				isPropagationStopped: () => false,
+				persist: () => {},
+				currentTarget: event.currentTarget as HTMLTextAreaElement,
+				target: event.target as HTMLTextAreaElement,
+			} as React.ClipboardEvent<HTMLTextAreaElement>;
+
+			onPaste(reactEvent);
+		};
+
+		textarea.addEventListener("paste", handlePaste);
 
 		return () => {
-			textarea.removeEventListener("paste", onPaste);
+			textarea.removeEventListener("paste", handlePaste);
 		};
 	}, [onPaste]);
 
@@ -38,7 +53,7 @@ const AutoResizeTextarea = ({
 		textarea.style.height = "40px";
 		const newHeight = Math.min(textarea.scrollHeight, maxHeight);
 		textarea.style.height = `${newHeight}px`;
-	}, [props.value]);
+	}, [maxHeight]);
 
 	const handleKeyDown = (event: React.KeyboardEvent<HTMLTextAreaElement>) => {
 		if (event.key === "Enter" && !event.shiftKey && onEnter && !isComposing) {
@@ -49,7 +64,7 @@ const AutoResizeTextarea = ({
 
 	return (
 		<Textarea
-			ref={textareaRef as any}
+			ref={textareaRef as React.RefObject<HTMLTextAreaElement>}
 			{...props}
 			onKeyDown={handleKeyDown}
 			onCompositionStart={() => setIsComposing(true)}

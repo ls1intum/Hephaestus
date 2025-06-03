@@ -127,7 +127,7 @@ const Input = forwardRef<InputMethods, Props>(
 			mutationObserverRef.current = new MutationObserver((mutations) => {
 				if (isUpdatingRef.current) return;
 
-				mutations.forEach((mutation) => {
+				for (const mutation of mutations) {
 					if (
 						mutation.type === "childList" &&
 						mutation.removedNodes.length > 0
@@ -143,7 +143,7 @@ const Input = forwardRef<InputMethods, Props>(
 							handleCommandSelect(undefined);
 						}
 					}
-				});
+				}
 			});
 
 			mutationObserverRef.current.observe(contentEditableRef.current, {

@@ -17,13 +17,13 @@ const ElementRef = ({ element }: ElementRefProps) => {
 
 	// For other elements, return a clickable link
 	return (
-		<a
-			href="#"
+		<button
+			type="button"
 			className="cursor-pointer uppercase -translate-y-px inline-flex items-center rounded-xl bg-muted px-1.5 text-[0.7rem] font-medium text-muted-foreground element-link hover:bg-primary hover:text-primary-foreground"
 			onClick={() => onElementRefClick?.(element)}
 		>
 			{element.name}
-		</a>
+		</button>
 	);
 };
 

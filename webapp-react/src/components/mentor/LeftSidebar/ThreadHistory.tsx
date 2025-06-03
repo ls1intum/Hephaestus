@@ -1,5 +1,5 @@
 import { uniqBy } from "lodash";
-import { useContext, useEffect, useRef, useState } from "react";
+import { useCallback, useContext, useEffect, useRef, useState } from "react";
 import { useRecoilState } from "recoil";
 
 import {
@@ -31,6 +31,43 @@ export function ThreadHistory() {
 	const [isFetching, setIsFetching] = useState(false);
 	const [shouldLoadMore, setShouldLoadMore] = useState(false);
 
+	const fetchThreads = useCallback(
+		async (cursor?: string | number, isLoadingMore = false) => {
+			try {
+				setIsLoadingMore(!!cursor || isLoadingMore);
+				setIsFetching(!cursor && !isLoadingMore);
+
+				const { pageInfo, data } = await apiClient.listThreads(
+					{ first: BATCH_SIZE, cursor },
+					{},
+				);
+
+				setError(undefined);
+
+				// Prevent duplicate threads
+				const allThreads = uniqBy(
+					cursor ? threadHistory?.threads?.concat(data) : data,
+					"id",
+				);
+
+				if (allThreads) {
+					setThreadHistory((prev) => ({
+						...prev,
+						pageInfo,
+						threads: allThreads,
+					}));
+				}
+			} catch (err) {
+				setError(err instanceof Error ? err.message : "Unknown error occurred");
+			} finally {
+				setShouldLoadMore(false);
+				setIsLoadingMore(false);
+				setIsFetching(false);
+			}
+		},
+		[apiClient, threadHistory?.threads, setThreadHistory],
+	);
+
 	// Restore scroll position
 	useEffect(() => {
 		if (scrollRef.current) {
@@ -58,7 +95,7 @@ export function ThreadHistory() {
 		};
 
 		handleFirstInteraction();
-	}, [firstInteraction]);
+	}, [firstInteraction, messages, threadId, navigate, fetchThreads]);
 
 	const handleScroll = () => {
 		if (!scrollRef.current) return;
@@ -69,49 +106,12 @@ export function ThreadHistory() {
 		setShouldLoadMore(atBottom);
 	};
 
-	const fetchThreads = async (
-		cursor?: string | number,
-		isLoadingMore = false,
-	) => {
-		try {
-			setIsLoadingMore(!!cursor || isLoadingMore);
-			setIsFetching(!cursor && !isLoadingMore);
-
-			const { pageInfo, data } = await apiClient.listThreads(
-				{ first: BATCH_SIZE, cursor },
-				{},
-			);
-
-			setError(undefined);
-
-			// Prevent duplicate threads
-			const allThreads = uniqBy(
-				cursor ? threadHistory?.threads?.concat(data) : data,
-				"id",
-			);
-
-			if (allThreads) {
-				setThreadHistory((prev) => ({
-					...prev,
-					pageInfo,
-					threads: allThreads,
-				}));
-			}
-		} catch (err) {
-			setError(err instanceof Error ? err.message : "Unknown error occurred");
-		} finally {
-			setShouldLoadMore(false);
-			setIsLoadingMore(false);
-			setIsFetching(false);
-		}
-	};
-
 	// Initial fetch
 	useEffect(() => {
 		if (!isFetching && !threadHistory?.threads && !error) {
 			fetchThreads();
 		}
-	}, [isFetching, threadHistory, error]);
+	}, [isFetching, threadHistory, error, fetchThreads]);
 
 	// Handle infinite scroll
 	useEffect(() => {
@@ -122,7 +122,7 @@ export function ThreadHistory() {
 				fetchThreads(endCursor);
 			}
 		}
-	}, [shouldLoadMore, isLoadingMore, threadHistory]);
+	}, [shouldLoadMore, isLoadingMore, threadHistory, fetchThreads]);
 
 	return (
 		<SidebarContent onScroll={handleScroll} ref={scrollRef}>

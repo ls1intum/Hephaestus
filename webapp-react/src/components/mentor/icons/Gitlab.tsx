@@ -5,6 +5,8 @@ export const Gitlab = () => {
 			viewBox="0 0 380 380"
 			width="24"
 			height="24"
+			role="img"
+			aria-label="GitLab"
 		>
 			<path
 				fill="#e24329"

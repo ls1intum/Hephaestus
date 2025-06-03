@@ -55,7 +55,7 @@ const ReadOnlyThread = ({ id }: Props) => {
 			navigate({ to: "/mentor", replace: true });
 			toast.error(`Failed to load thread: ${threadError.message}`);
 		}
-	}, [threadError]);
+	}, [threadError, navigate]);
 
 	const onFeedbackUpdated = useCallback(
 		async (message: IStep, onSuccess: () => void, feedback: IFeedback) => {
@@ -85,7 +85,7 @@ const ReadOnlyThread = ({ id }: Props) => {
 				},
 			});
 		},
-		[setSteps],
+		[apiClient.setFeedback],
 	);
 
 	const onFeedbackDeleted = useCallback(
@@ -113,7 +113,7 @@ const ReadOnlyThread = ({ id }: Props) => {
 				},
 			});
 		},
-		[setSteps],
+		[apiClient.deleteFeedback],
 	);
 
 	const onElementRefClick = useCallback(
@@ -138,7 +138,7 @@ const ReadOnlyThread = ({ id }: Props) => {
 		[setSideView, navigate],
 	);
 
-	const onError = useCallback((error: string) => toast.error(error), [toast]);
+	const onError = useCallback((error: string) => toast.error(error), []);
 
 	const elements = thread?.elements || [];
 	const actions: IAction[] = [];
@@ -162,6 +162,8 @@ const ReadOnlyThread = ({ id }: Props) => {
 		config?.ui?.name,
 		config?.ui?.cot,
 		config?.features?.unsafe_allow_html,
+		config?.features?.latex,
+		config?.dataPersistence,
 		onElementRefClick,
 		onError,
 		onFeedbackUpdated,
@@ -193,6 +195,7 @@ const ReadOnlyThread = ({ id }: Props) => {
 						<Messages
 							indent={0}
 							messages={messages}
+							// biome-ignore lint/suspicious/noExplicitAny: Elements prop type compatibility
 							elements={elements as any}
 							actions={actions}
 						/>
