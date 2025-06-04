@@ -115,7 +115,7 @@ public class GitHubPullRequestSyncService {
                 .stream()
                 .filter(pullRequest -> {
                     try {
-                        return sinceDate.isEmpty() || pullRequest.getUpdatedAt().after(sinceDate.get());
+                        return sinceDate.isEmpty() || Date.from(pullRequest.getUpdatedAt()).after(sinceDate.get());
                     } catch (IOException e) {
                         logger.error("Failed to filter pull request {}: {}", pullRequest.getId(), e.getMessage());
                         return false;
@@ -200,7 +200,7 @@ public class GitHubPullRequestSyncService {
                         pullRequest.getUpdatedAt() == null ||
                         pullRequest
                             .getUpdatedAt()
-                            .isBefore(DateUtil.convertToOffsetDateTime(ghPullRequest.getUpdatedAt()))
+                            .isBefore(DateUtil.convertToOffsetDateTime(Date.from(ghPullRequest.getUpdatedAt())))
                     ) {
                         return pullRequestConverter.update(ghPullRequest, pullRequest);
                     }
@@ -252,15 +252,11 @@ public class GitHubPullRequestSyncService {
         }
 
         // Link author
-        try {
-            var author = ghPullRequest.getUser();
-            var resultAuthor = userRepository
-                .findById(author.getId())
-                .orElseGet(() -> userRepository.save(userConverter.convert(author)));
-            result.setAuthor(resultAuthor);
-        } catch (IOException e) {
-            logger.error("Failed to link author for pull request {}: {}", ghPullRequest.getId(), e.getMessage());
-        }
+        var author = ghPullRequest.getUser();
+        var resultAuthor = userRepository
+            .findById(author.getId())
+            .orElseGet(() -> userRepository.save(userConverter.convert(author)));
+        result.setAuthor(resultAuthor);
 
         // Link assignees
         var assignees = ghPullRequest.getAssignees();

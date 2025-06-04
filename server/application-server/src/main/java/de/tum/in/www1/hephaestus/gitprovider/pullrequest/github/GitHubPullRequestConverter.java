@@ -5,6 +5,8 @@ import de.tum.in.www1.hephaestus.gitprovider.common.DateUtil;
 import de.tum.in.www1.hephaestus.gitprovider.issue.github.GitHubIssueConverter;
 import de.tum.in.www1.hephaestus.gitprovider.pullrequest.PullRequest;
 import java.io.IOException;
+import java.util.Date;
+
 import org.kohsuke.github.GHPullRequest;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -31,7 +33,7 @@ public class GitHubPullRequestConverter extends BaseGitServiceEntityConverter<GH
     public PullRequest update(@NonNull GHPullRequest source, @NonNull PullRequest pullRequest) {
         issueConverter.update(source, pullRequest);
 
-        pullRequest.setMergedAt(DateUtil.convertToOffsetDateTime(source.getMergedAt()));
+        pullRequest.setMergedAt(DateUtil.convertToOffsetDateTime(Date.from(source.getMergedAt())));
         try {
             pullRequest.setMergeCommitSha(source.getMergeCommitSha());
         } catch (IOException e) {

@@ -163,7 +163,7 @@ public class GitHubIssueSyncService {
                 try {
                     if (
                         issue.getUpdatedAt() == null ||
-                        issue.getUpdatedAt().isBefore(DateUtil.convertToOffsetDateTime(ghIssue.getUpdatedAt()))
+                        issue.getUpdatedAt().isBefore(DateUtil.convertToOffsetDateTime(Date.from(ghIssue.getUpdatedAt())))
                     ) {
                         return issueConverter.update(ghIssue, issue);
                     }
@@ -218,15 +218,11 @@ public class GitHubIssueSyncService {
         }
 
         // Link author
-        try {
-            var author = ghIssue.getUser();
-            var resultAuthor = userRepository
-                .findById(author.getId())
-                .orElseGet(() -> userRepository.save(userConverter.convert(author)));
-            result.setAuthor(resultAuthor);
-        } catch (IOException e) {
-            logger.error("Failed to link author for issue {}: {}", ghIssue.getId(), e.getMessage());
-        }
+        var author = ghIssue.getUser();
+        var resultAuthor = userRepository
+            .findById(author.getId())
+            .orElseGet(() -> userRepository.save(userConverter.convert(author)));
+        result.setAuthor(resultAuthor);
 
         // Link assignees
         var assignees = ghIssue.getAssignees();

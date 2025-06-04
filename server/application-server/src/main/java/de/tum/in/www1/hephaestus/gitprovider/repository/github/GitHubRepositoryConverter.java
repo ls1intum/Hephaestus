@@ -10,6 +10,8 @@ import org.slf4j.LoggerFactory;
 import org.springframework.lang.NonNull;
 import org.springframework.stereotype.Component;
 
+import java.util.Date;
+
 @Component
 public class GitHubRepositoryConverter extends BaseGitServiceEntityConverter<GHRepository, Repository> {
 
@@ -29,7 +31,7 @@ public class GitHubRepositoryConverter extends BaseGitServiceEntityConverter<GHR
         repository.setHtmlUrl(source.getHtmlUrl().toString());
         repository.setDescription(source.getDescription());
         repository.setHomepage(source.getHomepage());
-        repository.setPushedAt(DateUtil.convertToOffsetDateTime(source.getPushedAt()));
+        repository.setPushedAt(DateUtil.convertToOffsetDateTime(Date.from(source.getPushedAt())));
         repository.setArchived(source.isArchived());
         repository.setDisabled(source.isDisabled());
         repository.setVisibility(convertVisibility(source.getVisibility()));

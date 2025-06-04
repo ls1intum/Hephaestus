@@ -10,6 +10,8 @@ import org.slf4j.LoggerFactory;
 import org.springframework.lang.NonNull;
 import org.springframework.stereotype.Component;
 
+import java.util.Date;
+
 @Component
 public class GitHubMilestoneConverter extends BaseGitServiceEntityConverter<GHMilestone, Milestone> {
 
@@ -28,9 +30,9 @@ public class GitHubMilestoneConverter extends BaseGitServiceEntityConverter<GHMi
         milestone.setHtmlUrl(source.getHtmlUrl().toString());
         milestone.setTitle(source.getTitle());
         milestone.setDescription(source.getDescription());
-        milestone.setDueOn(DateUtil.convertToOffsetDateTime(source.getDueOn()));
+        milestone.setDueOn(DateUtil.convertToOffsetDateTime(Date.from(source.getDueOn())));
         try {
-            milestone.setClosedAt(DateUtil.convertToOffsetDateTime(source.getClosedAt()));
+            milestone.setClosedAt(DateUtil.convertToOffsetDateTime(Date.from(source.getClosedAt())));
         } catch (Exception e) {
             logger.error("Failed to convert closedAt field for source {}: {}", source.getId(), e.getMessage());
         }
