@@ -508,12 +508,6 @@ class MermaidErdGenerator:
             if style_class:
                 lines.append(f"    class {entity_name} {style_class}")
         
-        lines.append("")
-        lines.append("    %% Legend:")
-        lines.append("    %% ||--|| : One-to-One relationship")
-        lines.append("    %% ||--o{ : One-to-Many relationship")
-        lines.append("    %% }o--o{ : Many-to-Many relationship")
-        
         return "\n".join(lines)
 
     def _to_entity_name(self, table_name: str) -> str:
