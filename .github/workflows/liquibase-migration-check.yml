@@ -1,4 +1,13 @@
-name: Liquibase Migration Check
+# This workflow validates that database migrations are complete and up-to-date
+# It ensures that:
+# 1. All Liquibase migrations apply successfully
+# 2. No manual schema changes were made outside of migrations
+# 3. Database documentation (ERD) reflects the current schema
+#
+# If this check fails, it usually means you need to create additional
+# Liquibase migration files to capture your schema changes.
+
+name: Database Migration Validation
 
 on:
   pull_request:
@@ -11,8 +20,8 @@ on:
   workflow_dispatch:
 
 jobs:
-  liquibase-check:
-    name: Liquibase Migration Check
+  database-validation:
+    name: Database Migration Validation
     runs-on: ubuntu-latest
 
     services:
@@ -60,11 +69,11 @@ jobs:
         working-directory: server/application-server
         run: mvn compile -DskipTests
 
-      - name: Run Liquibase update
+      - name: Apply database migrations
         working-directory: server/application-server
         run: mvn liquibase:update
 
-      - name: Run Liquibase diff
+      - name: Validate migration integrity
         working-directory: server/application-server
         run: mvn liquibase:diff
 
@@ -76,28 +85,52 @@ jobs:
       - name: Generate Database ERD
         run: npm run db:erd:generate
 
-      - name: Check for changes in the liquibase changelog
+      - name: Check for unexpected schema changes
         id: check_changes
         run: |
-          echo "Checking for changes in the liquibase changelog..."
+          echo "🔍 Validating that database schema matches migrations..."
+          
+          # Check if any files were modified during migration/ERD generation
           git add .
           if git diff --cached --quiet; then
-            echo "No changes detected in the liquibase changelog."
+            echo "✅ Database schema is in sync with migrations"
             echo "changes_detected=false" >> $GITHUB_OUTPUT
           else
-            echo "Changes detected in the liquibase changelog."
-            cat server/application-server/src/main/resources/db/changelog_new.xml
+            echo "⚠️  Unexpected changes detected after running migrations:"
+            echo ""
+            echo "Changed files:"
+            git diff --cached --name-only
+            echo ""
+            echo "This usually means:"
+            echo "1. Database migrations are missing for some schema changes"
+            echo "2. The ERD generation script found schema differences"
+            echo "3. Manual schema changes were made outside of migrations"
+            echo ""
+            echo "Please review the changes and ensure all schema modifications"
+            echo "are properly captured in Liquibase migration files."
+            echo ""
+            if [ -f "server/application-server/src/main/resources/db/changelog_new.xml" ]; then
+              echo "Generated changelog content:"
+              cat server/application-server/src/main/resources/db/changelog_new.xml
+            fi
             echo "changes_detected=true" >> $GITHUB_OUTPUT
             exit 1
           fi
 
-      - name: Check for ERD changes
+      - name: Validate ERD documentation is up-to-date
         if: steps.check_changes.outputs.changes_detected == 'false'
         run: |
-          echo "Checking for changes in the database ERD..."
-          if git diff --cached --quiet docs/database-schema.mmd; then
-            echo "No changes detected in the database ERD."
+          echo "📊 Checking if database documentation needs updating..."
+          
+          # Check specifically for ERD file changes
+          if git diff --cached --quiet docs/dev/database-schema.mmd; then
+            echo "✅ Database ERD documentation is up-to-date"
           else
-            echo "ERD has been updated to reflect database changes."
-            echo "Consider committing the updated ERD for documentation."
+            echo "📝 Database ERD has been updated to reflect current schema"
+            echo ""
+            echo "The following documentation files were updated:"
+            git diff --cached --name-only docs/
+            echo ""
+            echo "💡 Consider committing these documentation updates"
+            echo "   to keep the ERD in sync with your schema changes."
           fi
