@@ -1,0 +1,3 @@
+# Supporting Scripts Dependencies
+# Modern PostgreSQL adapter with binary wheels
+psycopg[binary]==3.2.9

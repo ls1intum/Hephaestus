@@ -5,6 +5,8 @@ on:
     types: [opened, synchronize, labeled, reopened]
     paths:
       - 'server/application-server/**'
+      - 'supporting_scripts/**'
+      - 'package.json'
       - '.github/workflows/liquibase-migration-check.yml'
   workflow_dispatch:
 
@@ -44,6 +46,15 @@ jobs:
           distribution: 'temurin'
           java-version: '21'
           cache: 'maven'  
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
     
       - name: Build application (compile only)
         working-directory: server/application-server
@@ -57,6 +68,14 @@ jobs:
         working-directory: server/application-server
         run: mvn liquibase:diff
 
+      - name: Set up Python for ERD generation
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.x'
+
+      - name: Generate Database ERD
+        run: npm run db:erd:generate
+
       - name: Check for changes in the liquibase changelog
         id: check_changes
         run: |
@@ -64,10 +83,21 @@ jobs:
           git add .
           if git diff --cached --quiet; then
             echo "No changes detected in the liquibase changelog."
-            echo "NO_CHANGES_DETECTED=true" >> $GITHUB_ENV
+            echo "changes_detected=false" >> $GITHUB_OUTPUT
           else
             echo "Changes detected in the liquibase changelog."
             cat server/application-server/src/main/resources/db/changelog_new.xml
-            echo "NO_CHANGES_DETECTED=false" >> $GITHUB_ENV
+            echo "changes_detected=true" >> $GITHUB_OUTPUT
             exit 1
+          fi
+
+      - name: Check for ERD changes
+        if: steps.check_changes.outputs.changes_detected == 'false'
+        run: |
+          echo "Checking for changes in the database ERD..."
+          if git diff --cached --quiet docs/database-schema.mmd; then
+            echo "No changes detected in the database ERD."
+          else
+            echo "ERD has been updated to reflect database changes."
+            echo "Consider committing the updated ERD for documentation."
           fi
