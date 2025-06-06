@@ -83,7 +83,11 @@ jobs:
           python-version: '3.x'
 
       - name: Generate Database ERD
-        run: npm run db:erd:generate
+        run: |
+          # Use the existing PostgreSQL service instead of starting a new container
+          cd supporting_scripts
+          python3 -m pip install -r requirements.txt --break-system-packages --quiet
+          python3 generate_mermaid_erd.py jdbc:postgresql://localhost:5432/hephaestus root root ../docs/dev/database-schema.mmd
 
       - name: Check for unexpected schema changes
         id: check_changes
