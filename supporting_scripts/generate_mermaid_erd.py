@@ -137,134 +137,132 @@ class MermaidErdGenerator:
 
     def get_table_columns(self, table_name: str) -> List[Dict]:
         """Get column information for a specific table."""
-        cursor = self.connection.cursor()
-        cursor.execute("""
-            SELECT 
-                c.column_name,
-                c.data_type,
-                c.character_maximum_length,
-                c.numeric_precision,
-                c.numeric_scale,
-                c.is_nullable,
-                c.column_default,
-                CASE 
-                    WHEN pk.column_name IS NOT NULL THEN 'YES'
-                    ELSE 'NO'
-                END as is_primary_key,
-                CASE 
-                    WHEN fk.column_name IS NOT NULL THEN 'YES'
-                    ELSE 'NO'
-                END as is_foreign_key,
-                CASE 
-                    WHEN uk.column_name IS NOT NULL THEN 'YES'
-                    ELSE 'NO'
-                END as is_unique_key
-            FROM information_schema.columns c
-            LEFT JOIN (
-                SELECT ku.column_name
-                FROM information_schema.table_constraints tc
-                JOIN information_schema.key_column_usage ku
-                    ON tc.constraint_name = ku.constraint_name
-                WHERE tc.table_name = %s
-                AND tc.constraint_type = 'PRIMARY KEY'
-            ) pk ON c.column_name = pk.column_name
-            LEFT JOIN (
-                SELECT ku.column_name
-                FROM information_schema.table_constraints tc
-                JOIN information_schema.key_column_usage ku
-                    ON tc.constraint_name = ku.constraint_name
-                WHERE tc.table_name = %s
-                AND tc.constraint_type = 'FOREIGN KEY'
-            ) fk ON c.column_name = fk.column_name
-            LEFT JOIN (
-                SELECT ku.column_name
-                FROM information_schema.table_constraints tc
-                JOIN information_schema.key_column_usage ku
-                    ON tc.constraint_name = ku.constraint_name
-                WHERE tc.table_name = %s
-                AND tc.constraint_type = 'UNIQUE'
-            ) uk ON c.column_name = uk.column_name
-            WHERE c.table_name = %s
-            ORDER BY c.ordinal_position
-        """, (table_name, table_name, table_name, table_name))
-        
-        columns = []
-        for row in cursor.fetchall():
-            column_name, data_type, char_max_len, num_precision, num_scale, is_nullable, column_default, is_pk, is_fk, is_uk = row
+        with self.connection.cursor() as cursor:
+            cursor.execute("""
+                SELECT 
+                    c.column_name,
+                    c.data_type,
+                    c.character_maximum_length,
+                    c.numeric_precision,
+                    c.numeric_scale,
+                    c.is_nullable,
+                    c.column_default,
+                    CASE 
+                        WHEN pk.column_name IS NOT NULL THEN 'YES'
+                        ELSE 'NO'
+                    END as is_primary_key,
+                    CASE 
+                        WHEN fk.column_name IS NOT NULL THEN 'YES'
+                        ELSE 'NO'
+                    END as is_foreign_key,
+                    CASE 
+                        WHEN uk.column_name IS NOT NULL THEN 'YES'
+                        ELSE 'NO'
+                    END as is_unique_key
+                FROM information_schema.columns c
+                LEFT JOIN (
+                    SELECT ku.column_name
+                    FROM information_schema.table_constraints tc
+                    JOIN information_schema.key_column_usage ku
+                        ON tc.constraint_name = ku.constraint_name
+                    WHERE tc.table_name = %s
+                    AND tc.constraint_type = 'PRIMARY KEY'
+                ) pk ON c.column_name = pk.column_name
+                LEFT JOIN (
+                    SELECT ku.column_name
+                    FROM information_schema.table_constraints tc
+                    JOIN information_schema.key_column_usage ku
+                        ON tc.constraint_name = ku.constraint_name
+                    WHERE tc.table_name = %s
+                    AND tc.constraint_type = 'FOREIGN KEY'
+                ) fk ON c.column_name = fk.column_name
+                LEFT JOIN (
+                    SELECT ku.column_name
+                    FROM information_schema.table_constraints tc
+                    JOIN information_schema.key_column_usage ku
+                        ON tc.constraint_name = ku.constraint_name
+                    WHERE tc.table_name = %s
+                    AND tc.constraint_type = 'UNIQUE'
+                ) uk ON c.column_name = uk.column_name
+                WHERE c.table_name = %s
+                ORDER BY c.ordinal_position
+            """, (table_name, table_name, table_name, table_name))
             
-            # Format the data type
-            formatted_type = self._format_data_type(data_type, char_max_len, num_precision, num_scale)
+            columns = []
+            for row in cursor.fetchall():
+                column_name, data_type, char_max_len, num_precision, num_scale, is_nullable, column_default, is_pk, is_fk, is_uk = row
+                
+                # Format the data type
+                formatted_type = self._format_data_type(data_type, char_max_len, num_precision, num_scale)
+                
+                # Build constraints list
+                constraints = []
+                if is_pk == 'YES':
+                    constraints.append("PK")
+                if is_fk == 'YES':
+                    constraints.append("FK")
+                if is_uk == 'YES':
+                    constraints.append("UK")
+                
+                # Add comment for nullable/not null
+                comment = ""
+                if is_nullable == 'NO' and is_pk != 'YES':  # PK is implicitly NOT NULL
+                    comment = "NOT NULL"
+                
+                columns.append({
+                    'name': column_name,
+                    'type': formatted_type,
+                    'constraints': constraints,
+                    'comment': comment,
+                    'is_primary_key': is_pk == 'YES',
+                    'is_foreign_key': is_fk == 'YES'
+                })
             
-            # Build constraints list
-            constraints = []
-            if is_pk == 'YES':
-                constraints.append("PK")
-            if is_fk == 'YES':
-                constraints.append("FK")
-            if is_uk == 'YES':
-                constraints.append("UK")
-            
-            # Add comment for nullable/not null
-            comment = ""
-            if is_nullable == 'NO' and is_pk != 'YES':  # PK is implicitly NOT NULL
-                comment = "NOT NULL"
-            
-            columns.append({
-                'name': column_name,
-                'type': formatted_type,
-                'constraints': constraints,
-                'comment': comment,
-                'is_primary_key': is_pk == 'YES',
-                'is_foreign_key': is_fk == 'YES'
-            })
-        
-        cursor.close()
-        return columns
+            return columns
 
     def get_foreign_key_relationships(self) -> List[Dict]:
         """Get all foreign key relationships in the database, excluding Liquibase metadata tables."""
-        cursor = self.connection.cursor()
-        cursor.execute("""
-            SELECT DISTINCT
-                tc.table_name as child_table,
-                kcu.column_name as child_column,
-                ccu.table_name as parent_table,
-                ccu.column_name as parent_column,
-                tc.constraint_name
-            FROM information_schema.table_constraints tc
-            JOIN information_schema.key_column_usage kcu
-                ON tc.constraint_name = kcu.constraint_name
-            JOIN information_schema.constraint_column_usage ccu
-                ON ccu.constraint_name = tc.constraint_name
-            WHERE tc.constraint_type = 'FOREIGN KEY'
-            AND tc.table_schema = 'public'
-            AND tc.table_name NOT IN ('databasechangelog', 'databasechangeloglock')
-            AND ccu.table_name NOT IN ('databasechangelog', 'databasechangeloglock')
-            ORDER BY tc.table_name, kcu.column_name
-        """)
-        
-        relationships = []
-        for row in cursor.fetchall():
-            child_table, child_column, parent_table, parent_column, constraint_name = row
+        with self.connection.cursor() as cursor:
+            cursor.execute("""
+                SELECT DISTINCT
+                    tc.table_name as child_table,
+                    kcu.column_name as child_column,
+                    ccu.table_name as parent_table,
+                    ccu.column_name as parent_column,
+                    tc.constraint_name
+                FROM information_schema.table_constraints tc
+                JOIN information_schema.key_column_usage kcu
+                    ON tc.constraint_name = kcu.constraint_name
+                JOIN information_schema.constraint_column_usage ccu
+                    ON ccu.constraint_name = tc.constraint_name
+                WHERE tc.constraint_type = 'FOREIGN KEY'
+                AND tc.table_schema = 'public'
+                AND tc.table_name NOT IN ('databasechangelog', 'databasechangeloglock')
+                AND ccu.table_name NOT IN ('databasechangelog', 'databasechangeloglock')
+                ORDER BY tc.table_name, kcu.column_name
+            """)
             
-            # Generate a meaningful relationship label
-            relationship_label = self._generate_relationship_label(child_table, parent_table, child_column)
+            relationships = []
+            for row in cursor.fetchall():
+                child_table, child_column, parent_table, parent_column, constraint_name = row
+                
+                # Generate a meaningful relationship label
+                relationship_label = self._generate_relationship_label(child_table, parent_table, child_column)
+                
+                # Detect relationship cardinality
+                cardinality = self._detect_relationship_cardinality(child_table, child_column, parent_table, parent_column)
+                
+                relationships.append({
+                    'child_table': child_table,
+                    'child_column': child_column,
+                    'parent_table': parent_table,
+                    'parent_column': parent_column,
+                    'constraint_name': constraint_name,
+                    'label': relationship_label,
+                    'cardinality': cardinality
+                })
             
-            # Detect relationship cardinality
-            cardinality = self._detect_relationship_cardinality(child_table, child_column, parent_table, parent_column)
-            
-            relationships.append({
-                'child_table': child_table,
-                'child_column': child_column,
-                'parent_table': parent_table,
-                'parent_column': parent_column,
-                'constraint_name': constraint_name,
-                'label': relationship_label,
-                'cardinality': cardinality
-            })
-        
-        cursor.close()
-        return relationships
+            return relationships
 
     def _generate_relationship_label(self, child_table: str, parent_table: str, child_column: str) -> str:
         """Generate a meaningful relationship label."""
@@ -298,48 +296,45 @@ class MermaidErdGenerator:
     def _detect_relationship_cardinality(self, child_table: str, child_column: str, 
                                        parent_table: str, parent_column: str) -> str:
         """Detect the cardinality of the relationship."""
-        cursor = self.connection.cursor()
-        
-        # Check if child column is part of a composite primary key or has unique constraint
-        cursor.execute("""
-            SELECT COUNT(*) FROM (
-                SELECT ku.column_name
-                FROM information_schema.table_constraints tc
-                JOIN information_schema.key_column_usage ku
-                    ON tc.constraint_name = ku.constraint_name
+        with self.connection.cursor() as cursor:
+            # Check if child column is part of a composite primary key or has unique constraint
+            cursor.execute("""
+                SELECT COUNT(*) FROM (
+                    SELECT ku.column_name
+                    FROM information_schema.table_constraints tc
+                    JOIN information_schema.key_column_usage ku
+                        ON tc.constraint_name = ku.constraint_name
+                    WHERE tc.table_name = %s
+                    AND ku.column_name = %s
+                    AND tc.constraint_type IN ('PRIMARY KEY', 'UNIQUE')
+                ) AS unique_constraints
+            """, (child_table, child_column))
+            
+            is_unique = cursor.fetchone()[0] > 0
+            
+            # Check if it's a junction/bridge table (many-to-many)
+            cursor.execute("""
+                SELECT COUNT(*) FROM information_schema.table_constraints tc
                 WHERE tc.table_name = %s
-                AND ku.column_name = %s
-                AND tc.constraint_type IN ('PRIMARY KEY', 'UNIQUE')
-            ) AS unique_constraints
-        """, (child_table, child_column))
-        
-        is_unique = cursor.fetchone()[0] > 0
-        
-        # Check if it's a junction/bridge table (many-to-many)
-        cursor.execute("""
-            SELECT COUNT(*) FROM information_schema.table_constraints tc
-            WHERE tc.table_name = %s
-            AND tc.constraint_type = 'FOREIGN KEY'
-        """, (child_table,))
-        
-        fk_count = cursor.fetchone()[0]
-        
-        cursor.execute("""
-            SELECT COUNT(*) FROM information_schema.columns
-            WHERE table_name = %s
-        """, (child_table,))
-        
-        total_columns = cursor.fetchone()[0]
-        
-        cursor.close()
-        
-        # Junction table: has 2+ foreign keys and few other columns
-        if fk_count >= 2 and total_columns <= fk_count + 2:
-            return "}o--o{"  # Many-to-many
-        elif is_unique:
-            return "||--||"  # One-to-one
-        else:
-            return "||--o{"  # One-to-many (default)
+                AND tc.constraint_type = 'FOREIGN KEY'
+            """, (child_table,))
+            
+            fk_count = cursor.fetchone()[0]
+            
+            cursor.execute("""
+                SELECT COUNT(*) FROM information_schema.columns
+                WHERE table_name = %s
+            """, (child_table,))
+            
+            total_columns = cursor.fetchone()[0]
+            
+            # Junction table: has 2+ foreign keys and few other columns
+            if fk_count >= 2 and total_columns <= fk_count + 2:
+                return "}o--o{"  # Many-to-many
+            elif is_unique:
+                return "||--||"  # One-to-one
+            else:
+                return "||--o{"  # One-to-many (default)
 
     def _format_data_type(self, data_type: str, char_max_len: Optional[int], 
                          num_precision: Optional[int], num_scale: Optional[int]) -> str:
