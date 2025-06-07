@@ -35,4 +35,67 @@ By following these guidelines, we foster a collaborative environment built on mu
 
 1. **External contributors only**: Fork the Repository and create a branch.
 2. **Create a feature branch**: Work on your changes in a separate branch.
-3. **Submit a pull request**: Once your work is complete, submit a pull request for review.
+3. **Follow pull request title guidelines**: Ensure your PR title follows the [Conventional Commits](https://www.conventionalcommits.org/) specification.
+4. **Submit a pull request**: Once your work is complete, submit a pull request for review.
+
+## Pull Request Title Guidelines
+
+We use automated semantic pull request validation to ensure consistent and meaningful commit history. Your pull request titles must follow the [Conventional Commits](https://www.conventionalcommits.org/) specification.
+
+### Format
+
+```text
+<type>[optional scope]: <description>
+```
+
+### Allowed Types
+
+- `fix`: A bug fix
+- `feat`: A new feature
+- `docs`: Documentation only changes
+- `style`: Changes that do not affect the meaning of the code (white-space, formatting, missing semi-colons, etc.)
+- `refactor`: A code change that neither fixes a bug nor adds a feature
+- `perf`: A code change that improves performance
+- `test`: Adding missing tests or correcting existing tests
+- `build`: Changes that affect the build system or external dependencies
+- `ci`: Changes to our CI configuration files and scripts
+- `chore`: Other changes that don't modify src or test files
+- `revert`: Reverts a previous commit
+
+### Recommended Scopes
+
+- `webapp`: Changes to the Angular webapp
+- `webapp-react`: Changes to the React webapp
+- `application-server`: Changes to the Java application server
+- `intelligence-service`: Changes to the Python intelligence service
+- `webhook-ingest`: Changes to the webhook ingestion service
+- `docs`: Documentation changes
+- `ci`: CI/CD related changes
+- `deps`: Dependency updates
+- `config`: Configuration changes
+
+### Examples
+
+**Valid pull request titles:**
+
+- `fix: correct typo in user authentication`
+- `feat(webapp): add leaderboard sorting functionality`
+- `docs: update installation instructions`
+- `refactor(intelligence-service): improve code analysis performance`
+- `chore(deps): update dependencies to latest versions`
+
+**Work-in-progress PRs:**
+
+If your pull request is still in progress, you can prefix it with `[WIP]`:
+
+- `[WIP] feat(webapp): add new dashboard component`
+
+### Guidelines
+
+- Use lowercase for the description
+- Don't end the description with a period
+- Use the imperative mood in the description (e.g., "add" not "adds" or "added")
+  - Think of it as completing the sentence: "If applied, this commit will ..."
+  - ✅ "fix authentication bug" → "If applied, this commit will fix authentication bug"
+  - ❌ "fixed authentication bug" or "fixes authentication bug"
+- Keep the entire title under 72 characters when possible
