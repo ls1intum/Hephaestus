@@ -4,7 +4,7 @@
 # 2. No manual schema changes were made outside of migrations
 # 3. Database documentation (ERD) reflects the current schema
 #
-# The workflow uses the simplified database utility scripts:
+# The workflow uses the database utility scripts:
 # - scripts/db-utils.sh generate-erd    (applies migrations + generates ERD)
 # - scripts/db-utils.sh draft-changelog (detects schema drift)
 #
@@ -75,7 +75,7 @@ jobs:
           # instead of starting their own Docker container
           CI: true
         run: |
-          # Use the simplified database utility script
+          # Use the database utility script
           # This will:
           # 1. Apply all Liquibase migrations
           # 2. Generate up-to-date ERD documentation
