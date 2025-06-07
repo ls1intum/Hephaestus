@@ -12,7 +12,7 @@
 # - npm run db:generate-erd-docs
 # - npm run db:draft-changelog
 #
-# For detailed instructions, see: docs/dev/database/migration.md
+# For detailed instructions, see: https://ls1intum.github.io/Hephaestus/dev/database/migration.html
 
 name: Database Migration Validation
 
@@ -142,7 +142,7 @@ jobs:
               echo "   git add docs/dev/database/schema.mmd"
               echo "   git commit -m 'Update database ERD after migration'"
               echo ""
-              echo "📖 Migration validation guide: docs/dev/database/migration.md#migration-validation-critical-issues-to-check"
+              echo "📖 Migration validation guide: https://ls1intum.github.io/Hephaestus/dev/database/migration.html#migration-validation-critical-issues-to-check"
               
             elif [ "$ERD_CHANGED" = true ] && [ "$MIGRATION_CHANGED" = false ]; then
               echo "📝 ISSUE: Database documentation is out of sync with current schema"
@@ -155,7 +155,7 @@ jobs:
               echo "   git add docs/dev/database/schema.mmd"
               echo "   git commit -m 'Update database ERD documentation'"
               echo ""
-              echo "📖 Documentation guide: docs/dev/database/migration.md#database-documentation-erd-generation"
+              echo "📖 Documentation guide: https://ls1intum.github.io/Hephaestus/dev/database/migration.html#database-documentation-erd-generation"
               
             elif [ "$MIGRATION_CHANGED" = true ] && [ "$ERD_CHANGED" = false ]; then
               echo "🔧 ISSUE: Schema changes detected that require proper migrations"
@@ -171,7 +171,7 @@ jobs:
               echo "   # Then update documentation"
               echo "   npm run db:generate-erd-docs"
               echo ""
-              echo "📖 Migration creation guide: docs/dev/database/migration.md#creating-new-migrations-with-liquibase"
+              echo "📖 Migration creation guide: https://ls1intum.github.io/Hephaestus/dev/database/migration.html#creating-new-migrations-with-liquibase"
 
             elif [ "$OTHER_CHANGES" = true ]; then
               echo "❓ ISSUE: Unexpected files were modified during validation"
@@ -182,7 +182,7 @@ jobs:
               echo "   # Review what changed"
               echo "   git diff --cached"
               echo ""
-              echo "📖 Troubleshooting guide: docs/dev/database/migration.md#troubleshooting-common-issues"
+              echo "📖 Troubleshooting guide: https://ls1intum.github.io/Hephaestus/dev/database/migration.html#troubleshooting-common-issues"
             fi
             
             echo ""
