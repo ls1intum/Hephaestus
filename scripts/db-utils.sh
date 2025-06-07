@@ -149,7 +149,7 @@ generate_erd() {
     cd "$SCRIPTS_DIR"
     
     # Check if Python dependencies are available, install if needed
-    if ! python3 -c "import psycopg2" 2>/dev/null; then
+    if ! python3 -c "import psycopg" 2>/dev/null; then
         log_info "Installing Python dependencies..."
         python3 -m pip install -r requirements.txt --break-system-packages --quiet
     fi
