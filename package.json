@@ -18,7 +18,8 @@
     "format:java:write": "prettier --write server/application-server/src/**/*.java --config-precedence prefer-file --config server/application-server/.prettierrc.yaml --ignore-path server/application-server/.prettierignore",
     "format:python:check": "cd server/intelligence-service/ && poetry run black --check .",
     "format:python:write": "cd server/intelligence-service/ && poetry run black .",
-    "db:changelog:diff": "cd server/application-server && docker compose down postgres && shx --silent mv postgres-data postgres-data-temp && docker compose up -d postgres && docker compose exec postgres sh -c \"until pg_isready -h localhost -p 5432; do sleep 1; done\" && mvn liquibase:update && mvn liquibase:diff && docker compose down postgres && shx rm -rf postgres-data && shx --silent mv postgres-data-temp postgres-data"
+    "db:draft-changelog": "scripts/db-utils.sh draft-changelog",
+    "db:generate-erd-docs": "scripts/db-utils.sh generate-erd"
   },
   "devDependencies": {
     "@openapitools/openapi-generator-cli": "2.16.3",
