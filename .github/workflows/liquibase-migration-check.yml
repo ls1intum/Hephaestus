@@ -57,6 +57,10 @@ jobs:
           java-version: '21'
           cache: 'maven'
 
+      - name: Build application (compile only)
+        working-directory: server/application-server
+        run: mvn compile -DskipTests
+
       - name: Set up Python for ERD generation
         uses: actions/setup-python@v5
         with:
