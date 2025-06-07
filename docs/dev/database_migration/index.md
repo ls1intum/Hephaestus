@@ -109,3 +109,44 @@ In exceptional cases, you may need to write migrations manually. Before doing so
 ```{warning}
 Try to avoid manually written SQL statements (`<sql>...</sql>`). A valid scenario for manual SQL is converting the row values when modifying the data type of a column, e.g. `varchar` to `oid`.
 ```
+
+## Database Documentation (ERD Generation)
+
+After making database schema changes, it's important to keep the database documentation up-to-date. The project includes an automated ERD (Entity Relationship Diagram) generation script.
+
+### Updating Database Documentation
+
+To generate or update the database ERD documentation, run:
+
+```bash
+npm run db:erd:generate
+```
+
+This command:
+
+- Starts a PostgreSQL container using Docker Compose
+- Waits for the database to be ready
+- Applies all Liquibase migrations to ensure the schema is current
+- Runs a Python script to generate the Mermaid ERD from the database schema
+- Updates the documentation file at `docs/dev/database-schema.mmd`
+
+The generated ERD file is used in the database documentation and provides a visual representation of:
+
+- All database tables and their columns
+- Primary and foreign key relationships
+- Data types and constraints
+- Entity relationships (one-to-one, one-to-many, many-to-many)
+
+```{note}
+The ERD generation is also part of the CI/CD pipeline and will automatically check if the documentation is up-to-date when you create a pull request. If the ERD is out of sync with your schema changes, the build will prompt you to update it.
+```
+
+### When to Update the ERD
+
+- After creating new Liquibase migrations
+- Before creating a pull request with database changes
+- When the CI pipeline indicates the ERD is out of date
+
+```{hint}
+The ERD generation script uses the actual database schema (after migrations) rather than JPA entities, ensuring the documentation reflects the true database state.
+```

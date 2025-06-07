@@ -4,8 +4,8 @@
 # 2. No manual schema changes were made outside of migrations
 # 3. Database documentation (ERD) reflects the current schema
 #
-# If this check fails, it usually means you need to create additional
-# Liquibase migration files to capture your schema changes.
+# If this check fails, it will show you the exact commands to run.
+# For detailed instructions, see: docs/dev/database_migration/index.md
 
 name: Database Migration Validation
 
@@ -100,23 +100,76 @@ jobs:
             echo "✅ Database schema is in sync with migrations"
             echo "changes_detected=false" >> $GITHUB_OUTPUT
           else
-            echo "⚠️  Unexpected changes detected after running migrations:"
+            echo "⚠️  Database schema changes detected!"
             echo ""
             echo "Changed files:"
             git diff --cached --name-only
             echo ""
-            echo "This usually means:"
-            echo "1. Database migrations are missing for some schema changes"
-            echo "2. The ERD generation script found schema differences"
-            echo "3. Manual schema changes were made outside of migrations"
-            echo ""
-            echo "Please review the changes and ensure all schema modifications"
-            echo "are properly captured in Liquibase migration files."
-            echo ""
-            if [ -f "server/application-server/src/main/resources/db/changelog_new.xml" ]; then
-              echo "Generated changelog content:"
-              cat server/application-server/src/main/resources/db/changelog_new.xml
+            
+            # Detect what types of changes occurred
+            ERD_CHANGED=false
+            MIGRATION_CHANGED=false
+            
+            if ! git diff --cached --quiet docs/dev/database-schema.mmd; then
+              ERD_CHANGED=true
             fi
+            
+            if [ -f "server/application-server/src/main/resources/db/changelog_new.xml" ] || \
+               git diff --cached --name-only | grep -q "server/application-server/src/main/resources/db/changelog"; then
+              MIGRATION_CHANGED=true
+            fi
+            
+            # Provide specific solutions based on what changed
+            if [ "$ERD_CHANGED" = true ] && [ "$MIGRATION_CHANGED" = true ]; then
+              echo "🔧 SOLUTION: Both migrations and documentation need attention."
+              echo ""
+              echo "Run these commands:"
+              echo "  npm run db:changelog:diff"
+              echo "  npm run db:erd:generate"
+              echo ""
+              echo "📖 See detailed instructions: docs/dev/database_migration/index.md"
+              
+            elif [ "$ERD_CHANGED" = true ] && [ "$MIGRATION_CHANGED" = false ]; then
+              echo "📝 SOLUTION: Database documentation is out of sync."
+              echo ""
+              echo "Run this command:"
+              echo "  npm run db:erd:generate"
+              echo ""
+              echo "📖 See detailed instructions: docs/dev/database_migration/index.md#database-documentation-erd-generation"
+              
+            elif [ "$ERD_CHANGED" = false ] && [ "$MIGRATION_CHANGED" = true ]; then
+              echo "🔧 SOLUTION: Database schema changes need proper migrations."
+              echo ""
+              echo "Run these commands:"
+              echo "  npm run db:changelog:diff"
+              echo "  npm run db:erd:generate"
+              echo ""
+              echo "📖 See detailed instructions: docs/dev/database_migration/index.md#creating-new-migrations-with-liquibase"
+              
+            else
+              echo "❓ SOLUTION: Unexpected file changes detected."
+              echo ""
+              echo "Run this command to investigate:"
+              echo "  git diff --cached --name-only"
+              echo ""
+              echo "📖 See documentation: docs/dev/database_migration/index.md"
+            fi
+            
+            echo ""
+            echo "💡 EXPLANATION:"
+            echo "This check ensures that:"
+            echo "• All database schema changes are captured in Liquibase migrations"
+            echo "• Database documentation (ERD) reflects the current schema"
+            echo "• No manual schema changes were made outside of migrations"
+            echo ""
+            
+            if [ -f "server/application-server/src/main/resources/db/changelog_new.xml" ]; then
+              echo "📄 Generated changelog content:"
+              echo "----------------------------------------"
+              cat server/application-server/src/main/resources/db/changelog_new.xml
+              echo "----------------------------------------"
+            fi
+            
             echo "changes_detected=true" >> $GITHUB_OUTPUT
             exit 1
           fi
@@ -135,6 +188,10 @@ jobs:
             echo "The following documentation files were updated:"
             git diff --cached --name-only docs/
             echo ""
-            echo "💡 Consider committing these documentation updates"
-            echo "   to keep the ERD in sync with your schema changes."
+            echo "💡 NEXT STEPS:"
+            echo "Consider committing these documentation updates:"
+            echo "  git add docs/dev/database-schema.mmd"
+            echo "  git commit -m 'Update database ERD documentation'"
+            echo ""
+            echo "This keeps the ERD in sync with your schema changes."
           fi
