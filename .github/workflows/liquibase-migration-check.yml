@@ -14,7 +14,7 @@
 #
 # For detailed instructions, see: https://ls1intum.github.io/Hephaestus/dev/database/migration.html
 
-name: Database Migration Validation
+name: DB QA
 
 on:
   pull_request:
