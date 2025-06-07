@@ -4,7 +4,14 @@
 # 2. No manual schema changes were made outside of migrations
 # 3. Database documentation (ERD) reflects the current schema
 #
-# If this check fails, it will show you the exact commands to run.
+# The workflow uses the simplified database utility scripts:
+# - scripts/db-utils.sh generate-erd    (applies migrations + generates ERD)
+# - scripts/db-utils.sh draft-changelog (detects schema drift)
+#
+# If this check fails, it will show you the exact npm commands to run:
+# - npm run db:generate-erd-docs
+# - npm run db:draft-changelog
+#
 # For detailed instructions, see: docs/dev/database_migration/index.md
 
 name: Database Migration Validation
@@ -14,7 +21,7 @@ on:
     types: [opened, synchronize, labeled, reopened]
     paths:
       - 'server/application-server/**'
-      - 'supporting_scripts/**'
+      - 'scripts/**'
       - 'package.json'
       - '.github/workflows/liquibase-migration-check.yml'
   workflow_dispatch:
@@ -48,67 +55,59 @@ jobs:
         with:
           distribution: 'temurin'
           java-version: '21'
-
-      - name: Setup Maven
-        uses: actions/setup-java@v4
-        with:
-          distribution: 'temurin'
-          java-version: '21'
-          cache: 'maven'  
-
-      - name: Set up Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: '20'
-          cache: 'npm'
-
-      - name: Install dependencies
-        run: npm ci
-    
-      - name: Build application (compile only)
-        working-directory: server/application-server
-        run: mvn compile -DskipTests
-
-      - name: Apply database migrations
-        working-directory: server/application-server
-        run: mvn liquibase:update
-
-      - name: Validate migration integrity
-        working-directory: server/application-server
-        run: mvn liquibase:diff
+          cache: 'maven'
 
       - name: Set up Python for ERD generation
         uses: actions/setup-python@v5
         with:
           python-version: '3.x'
 
-      - name: Generate Database ERD
-        run: |
-          # Use the existing PostgreSQL service instead of starting a new container
-          cd supporting_scripts
-          python3 -m pip install -r requirements.txt --break-system-packages --quiet
-          python3 generate_mermaid_erd.py jdbc:postgresql://localhost:5432/hephaestus root root ../docs/dev/database-schema.mmd
+      - name: Make database utility script executable
+        run: chmod +x scripts/db-utils.sh
 
-      - name: Check for unexpected schema changes
-        id: check_changes
+      - name: Apply database migrations and generate ERD
+        env:
+          # Database utilities will use the GitHub Actions PostgreSQL service
+          # instead of starting their own Docker container
+          CI: true
+        run: |
+          # Use the simplified database utility script
+          # This will:
+          # 1. Apply all Liquibase migrations
+          # 2. Generate up-to-date ERD documentation
+          scripts/db-utils.sh generate-erd
+
+      - name: Check for migration changes (draft changelog)
+        env:
+          CI: true
+        run: |
+          # Generate changelog diff to detect any schema drift
+          # This creates a changelog_new.xml file if schema changes are detected
+          scripts/db-utils.sh draft-changelog
+
+      - name: Validate database schema and documentation
         run: |
           echo "🔍 Validating that database schema matches migrations..."
           
           # Check if any files were modified during migration/ERD generation
           git add .
           if git diff --cached --quiet; then
-            echo "✅ Database schema is in sync with migrations"
-            echo "changes_detected=false" >> $GITHUB_OUTPUT
+            echo "✅ All checks passed:"
+            echo "• Database schema matches committed migrations"
+            echo "• ERD documentation is up-to-date"
+            echo "• No unexpected schema drift detected"
+            
           else
-            echo "⚠️  Database schema changes detected!"
+            echo "⚠️  Database validation issues detected!"
             echo ""
-            echo "Changed files:"
-            git diff --cached --name-only
+            echo "📋 Changed files:"
+            git diff --cached --name-only | sed 's/^/  /'
             echo ""
             
             # Detect what types of changes occurred
             ERD_CHANGED=false
             MIGRATION_CHANGED=false
+            OTHER_CHANGES=false
             
             if ! git diff --cached --quiet docs/dev/database-schema.mmd; then
               ERD_CHANGED=true
@@ -119,79 +118,90 @@ jobs:
               MIGRATION_CHANGED=true
             fi
             
-            # Provide specific solutions based on what changed
-            if [ "$ERD_CHANGED" = true ] && [ "$MIGRATION_CHANGED" = true ]; then
-              echo "🔧 SOLUTION: Both migrations and documentation need attention."
+            # Check for any other unexpected changes
+            if git diff --cached --name-only | grep -v "docs/dev/database-schema.mmd" | grep -v "server/application-server/src/main/resources/db/changelog" | grep -q .; then
+              OTHER_CHANGES=true
+            fi
+            
+            # Provide specific solutions based on detected changes
+            if [ "$MIGRATION_CHANGED" = true ] && [ "$ERD_CHANGED" = true ]; then
+              echo "🔧 ISSUE: Schema changes detected that require migrations and documentation updates"
               echo ""
-              echo "Run these commands:"
-              echo "  npm run db:changelog:diff"
-              echo "  npm run db:erd:generate"
+              echo "💡 SOLUTION:"
+              echo "You have database schema changes that need proper migrations:"
               echo ""
-              echo "📖 See detailed instructions: docs/dev/database_migration/index.md"
+              echo "   # Review generated migration carefully (check for data loss patterns)"
+              echo "   cat server/application-server/src/main/resources/db/changelog_new.xml"
+              echo ""
+              echo "   # If migration looks correct, regenerate ERD and commit"
+              echo "   npm run db:generate-erd-docs"
+              echo "   git add docs/dev/database-schema.mmd"
+              echo "   git commit -m 'Update database ERD after migration'"
+              echo ""
+              echo "📖 Migration validation guide: docs/dev/database_migration/index.md#migration-validation-critical-issues-to-check"
               
             elif [ "$ERD_CHANGED" = true ] && [ "$MIGRATION_CHANGED" = false ]; then
-              echo "📝 SOLUTION: Database documentation is out of sync."
+              echo "📝 ISSUE: Database documentation is out of sync with current schema"
               echo ""
-              echo "Run this command:"
-              echo "  npm run db:erd:generate"
+              echo "💡 SOLUTION:"
+              echo "The ERD has been automatically updated to reflect the current database state."
+              echo "This typically happens when migrations were applied but ERD wasn't regenerated."
               echo ""
-              echo "📖 See detailed instructions: docs/dev/database_migration/index.md#database-documentation-erd-generation"
+              echo "   # Commit the updated documentation"
+              echo "   git add docs/dev/database-schema.mmd"
+              echo "   git commit -m 'Update database ERD documentation'"
+              echo ""
+              echo "📖 Documentation guide: docs/dev/database_migration/index.md#database-documentation-erd-generation"
               
-            elif [ "$ERD_CHANGED" = false ] && [ "$MIGRATION_CHANGED" = true ]; then
-              echo "🔧 SOLUTION: Database schema changes need proper migrations."
+            elif [ "$MIGRATION_CHANGED" = true ] && [ "$ERD_CHANGED" = false ]; then
+              echo "🔧 ISSUE: Schema changes detected that require proper migrations"
               echo ""
-              echo "Run these commands:"
-              echo "  npm run db:changelog:diff"
-              echo "  npm run db:erd:generate"
+              echo "💡 SOLUTION:"
+              echo "Database schema differs from entity definitions. You need to create and validate migrations:"
               echo ""
-              echo "📖 See detailed instructions: docs/dev/database_migration/index.md#creating-new-migrations-with-liquibase"
+              echo "   # Review the detected changes"
+              echo "   npm run db:draft-changelog"
+              echo ""
+              echo "   # Validate the migration thoroughly (check for data loss!)"
+              echo "   # Edit author, rename file, and move to changelog directory"
+              echo "   # Then update documentation"
+              echo "   npm run db:generate-erd-docs"
+              echo ""
+              echo "📖 Migration creation guide: docs/dev/database_migration/index.md#creating-new-migrations-with-liquibase"
               
-            else
-              echo "❓ SOLUTION: Unexpected file changes detected."
+            elif [ "$OTHER_CHANGES" = true ]; then
+              echo "❓ ISSUE: Unexpected files were modified during validation"
               echo ""
-              echo "Run this command to investigate:"
-              echo "  git diff --cached --name-only"
+              echo "💡 SOLUTION:"
+              echo "Investigate the unexpected changes:"
               echo ""
-              echo "📖 See documentation: docs/dev/database_migration/index.md"
+              echo "   # Review what changed"
+              echo "   git diff --cached"
+              echo ""
+              echo "📖 Troubleshooting guide: docs/dev/database_migration/index.md#troubleshooting-common-issues"
             fi
             
             echo ""
-            echo "💡 EXPLANATION:"
-            echo "This check ensures that:"
-            echo "• All database schema changes are captured in Liquibase migrations"
-            echo "• Database documentation (ERD) reflects the current schema"
-            echo "• No manual schema changes were made outside of migrations"
-            echo ""
+            echo "🛡️  DATABASE SAFETY REMINDER:"
+            echo "This validation ensures that:"
+            echo "• All database schema changes are captured in versioned migrations"
+            echo "• Database documentation accurately reflects the current schema"
+            echo "• No manual schema changes were made outside of the migration system"
+            echo "• Team members can reliably reproduce the database state"
             
+            # Show generated changelog content if it exists for debugging
             if [ -f "server/application-server/src/main/resources/db/changelog_new.xml" ]; then
-              echo "📄 Generated changelog content:"
-              echo "----------------------------------------"
+              echo ""
+              echo "📄 Generated migration content (review carefully for data safety):"
+              echo "=========================================="
               cat server/application-server/src/main/resources/db/changelog_new.xml
-              echo "----------------------------------------"
+              echo "=========================================="
+              echo ""
+              echo "⚠️  CRITICAL: Always validate generated migrations for data loss patterns!"
+              echo "   Look for: dropColumn + addColumn (should be renameColumn)"
+              echo "   Look for: Incorrect sequence start values"
+              echo "   Look for: System objects that shouldn't be in migrations"
             fi
             
-            echo "changes_detected=true" >> $GITHUB_OUTPUT
             exit 1
-          fi
-
-      - name: Validate ERD documentation is up-to-date
-        if: steps.check_changes.outputs.changes_detected == 'false'
-        run: |
-          echo "📊 Checking if database documentation needs updating..."
-          
-          # Check specifically for ERD file changes
-          if git diff --cached --quiet docs/dev/database-schema.mmd; then
-            echo "✅ Database ERD documentation is up-to-date"
-          else
-            echo "📝 Database ERD has been updated to reflect current schema"
-            echo ""
-            echo "The following documentation files were updated:"
-            git diff --cached --name-only docs/
-            echo ""
-            echo "💡 NEXT STEPS:"
-            echo "Consider committing these documentation updates:"
-            echo "  git add docs/dev/database-schema.mmd"
-            echo "  git commit -m 'Update database ERD documentation'"
-            echo ""
-            echo "This keeps the ERD in sync with your schema changes."
           fi

@@ -4,7 +4,7 @@ config:
 ---
 erDiagram
     %% Generated automatically from PostgreSQL database schema
-    %% using supporting_scripts/generate_mermaid_erd.py
+    %% using scripts/generate_mermaid_erd.py
     %% To regenerate: npm run db:erd:generate
 
     direction LR
@@ -187,7 +187,6 @@ erDiagram
         INTEGER stargazers_count "NOT NULL"
         VARCHAR(255) visibility
         INTEGER watchers_count "NOT NULL"
-        VARCHAR(255) type
     }
 
     RepositoryToMonitor {

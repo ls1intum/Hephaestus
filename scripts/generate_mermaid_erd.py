@@ -423,7 +423,7 @@ class MermaidErdGenerator:
         lines.append("---")
         lines.append("erDiagram")
         lines.append("    %% Generated automatically from PostgreSQL database schema")
-        lines.append("    %% using supporting_scripts/generate_mermaid_erd.py")
+        lines.append("    %% using scripts/generate_mermaid_erd.py")
         lines.append("    %% To regenerate: npm run db:erd:generate")
         lines.append("")
         
