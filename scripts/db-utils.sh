@@ -158,9 +158,9 @@ generate_erd() {
         jdbc:postgresql://localhost:5432/hephaestus \
         root \
         root \
-        ../docs/dev/database-schema.mmd
+        ../docs/dev/database/schema.mmd
     
-    log_success "ERD documentation updated at 'docs/dev/database-schema.mmd'"
+    log_success "ERD documentation updated at 'docs/dev/database/schema.mmd'"
 }
 
 # Generate changelog diff with database backup/restore

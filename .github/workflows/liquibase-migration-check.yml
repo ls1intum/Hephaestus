@@ -109,7 +109,7 @@ jobs:
             MIGRATION_CHANGED=false
             OTHER_CHANGES=false
             
-            if ! git diff --cached --quiet docs/dev/database-schema.mmd; then
+            if ! git diff --cached --quiet docs/dev/database/schema.mmd; then
               ERD_CHANGED=true
             fi
             
@@ -119,7 +119,7 @@ jobs:
             fi
             
             # Check for any other unexpected changes
-            if git diff --cached --name-only | grep -v "docs/dev/database-schema.mmd" | grep -v "server/application-server/src/main/resources/db/changelog" | grep -q .; then
+            if git diff --cached --name-only | grep -v "docs/dev/database/schema.mmd" | grep -v "server/application-server/src/main/resources/db/changelog" | grep -q .; then
               OTHER_CHANGES=true
             fi
             
@@ -135,7 +135,7 @@ jobs:
               echo ""
               echo "   # If migration looks correct, regenerate ERD and commit"
               echo "   npm run db:generate-erd-docs"
-              echo "   git add docs/dev/database-schema.mmd"
+              echo "   git add docs/dev/database/schema.mmd"
               echo "   git commit -m 'Update database ERD after migration'"
               echo ""
               echo "📖 Migration validation guide: docs/dev/database_migration/index.md#migration-validation-critical-issues-to-check"
@@ -148,7 +148,7 @@ jobs:
               echo "This typically happens when migrations were applied but ERD wasn't regenerated."
               echo ""
               echo "   # Commit the updated documentation"
-              echo "   git add docs/dev/database-schema.mmd"
+              echo "   git add docs/dev/database/schema.mmd"
               echo "   git commit -m 'Update database ERD documentation'"
               echo ""
               echo "📖 Documentation guide: docs/dev/database_migration/index.md#database-documentation-erd-generation"
