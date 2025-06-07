@@ -47,7 +47,7 @@ To create a new migration, follow these steps:
    ```bash
    npm run db:changelog:diff
    ```
-   This will create a new changelog file at `src/main/resources/db/changelog-new.xml`.
+   This will create a new changelog file at `src/main/resources/db/changelog_new.xml`.
 2. Review if the generated file reflects the schema changes as intended.
 3. If the changes need adjustments, try to find suitable [Jakarta Persistence](https://jakarta.ee/specifications/persistence/3.2/apidocs/jakarta.persistence/jakarta/persistence/package-summary) annotations before manually editing a changeset. 
 4. When the changes are correct, adapt the changelog file according to the [changelog conventions](#changelog-conventions):
