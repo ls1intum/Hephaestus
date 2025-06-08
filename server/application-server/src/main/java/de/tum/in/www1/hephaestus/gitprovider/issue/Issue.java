@@ -51,6 +51,9 @@ public class Issue extends BaseGitServiceEntity {
     private Issue.State state;
 
     @NonNull
+    private String TEST_REMOVE_LATER;
+
+    @NonNull
     private String title;
 
     @Lob

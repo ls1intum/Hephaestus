@@ -14,7 +14,7 @@ on:
 
 jobs:
   schema-validation:
-    name: Database / Validate Schema Migrations
+    name: Database / Validate schema migrations
     runs-on: ubuntu-latest
     outputs:
       schema-valid: ${{ steps.validate.outputs.valid }}
@@ -86,7 +86,7 @@ jobs:
           key: app-build-${{ github.sha }}
 
   documentation-validation:
-    name: Documentation / Validate ERD Database Schema
+    name: Documentation / Validate database schema ERD
     runs-on: ubuntu-latest
     needs: schema-validation
     if: needs.schema-validation.outputs.schema-valid == 'true'
@@ -135,7 +135,7 @@ jobs:
           cache: 'pip'
           cache-dependency-path: 'scripts/requirements.txt'
 
-      - name: Generate ERD Documentation
+      - name: Generate ERD documentation
         env:
           CI: true
         run: scripts/db-utils.sh generate-erd
