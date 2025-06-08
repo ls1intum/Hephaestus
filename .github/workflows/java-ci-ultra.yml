@@ -1,4 +1,4 @@
-name: Java CI Pipeline (Ultra-Parallel)
+name: CI/CD
 
 on:
   push:
@@ -23,7 +23,7 @@ env:
 jobs:
   # Code quality checks - run independently for complete feedback
   code-quality:
-    name: Code Quality (Formatting & Compilation)
+    name: Application Server / Code Quality
     runs-on: ubuntu-latest
     timeout-minutes: 8
     steps:
@@ -58,7 +58,7 @@ jobs:
 
   # Pure unit tests - run completely independently
   unit-tests:
-    name: Unit Tests (No Spring Context)
+    name: Application Server / Unit Tests
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
@@ -92,7 +92,7 @@ jobs:
 
   # Architecture tests - run completely independently
   architecture-tests:
-    name: Architecture Tests
+    name: Application Server / Architecture Tests
     runs-on: ubuntu-latest
     timeout-minutes: 8
     steps:
@@ -125,7 +125,7 @@ jobs:
 
   # Integration tests - run completely independently
   integration-tests:
-    name: Integration Tests (Optimized)
+    name: Application Server / Integration Tests
     runs-on: ubuntu-latest-4-cores
     timeout-minutes: 20
     services:
@@ -198,7 +198,7 @@ jobs:
 
   # Application build - run completely independently
   build:
-    name: Build Application
+    name: Application Server / Build
     runs-on: ubuntu-latest
     timeout-minutes: 8
     steps:
@@ -296,14 +296,3 @@ jobs:
             echo "All jobs ran to completion to provide comprehensive feedback."
             exit 1
           fi
-
-      - name: Performance metrics
-        run: |
-          echo ""
-          echo "🚀 PERFORMANCE METRICS"
-          echo "======================"
-          echo "✅ Full parallel execution - all 5 jobs run simultaneously"
-          echo "✅ Comprehensive feedback - no early termination"
-          echo "✅ Maximum resource utilization - 5 concurrent jobs"
-          echo "✅ Developer-friendly - complete information available"
-          echo "✅ Time optimized - jobs complete when ready, not when others finish"
