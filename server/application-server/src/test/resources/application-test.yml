@@ -1,8 +1,5 @@
-# Test configuration for Spring Boot tests
+# Minimal test configuration for Spring Boot tests
 spring:
-  profiles:
-    active: test
-  
   # Use in-memory database for tests
   datasource:
     url: jdbc:h2:mem:testdb
@@ -17,39 +14,30 @@ spring:
     database-platform: org.hibernate.dialect.H2Dialect
     show-sql: false
   
-  # Disable liquibase for tests
+  # Disable liquibase for tests (use JPA auto DDL instead)
   liquibase:
     enabled: false
   
-  # Security configuration for tests
+  # Security configuration for tests (minimal config)
   security:
     oauth2:
       resourceserver:
         jwt:
-          # Use a mock JWT decoder for tests
-          jwk-set-uri: http://localhost:8080/auth/realms/hephaestus/protocol/openid_connect/certs
+          issuer-uri: http://localhost:8081/realms/test
 
-# Disable NATS for tests
+# GitHub configuration for tests (matches actual property)
+github:
+  auth-token: test-token-not-real
+
+# NATS configuration for tests (matches actual properties)
 nats:
   enabled: false
   server: nats://localhost:4222
-
-# Disable monitoring for tests  
-monitoring:
-  run-on-startup: false
   timeframe: 1
-  sync-cooldown-in-minutes: 60
+  durable-consumer-name: test-consumer
 
 # Logging configuration for tests
 logging:
   level:
-    de.tum.in.www1.hephaestus: DEBUG
-    org.springframework.security: DEBUG
-    org.hibernate.SQL: DEBUG
-
-# Keycloak configuration for tests
-keycloak:
-  realm: test-realm
-  admin-username: admin
-  admin-password: admin
-  server-url: http://localhost:8080/auth
+    de.tum.in.www1.hephaestus: INFO
+    root: WARN

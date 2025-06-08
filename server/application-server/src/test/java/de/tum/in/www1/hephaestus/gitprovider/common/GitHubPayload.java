@@ -9,8 +9,8 @@ import java.lang.annotation.Target;
 @Retention(RetentionPolicy.RUNTIME)
 public @interface GitHubPayload {
     /**
-     * The file name pattern (e.g., "label.created", "issue.opened", "milestone").
-     * This will be resolved to {value}.json in test resources.
+     * The file name pattern (e.g., "label.created", "issue.opened", "milestone"). This will be
+     * resolved to {value}.json in test resources.
      */
     String value();
 }
