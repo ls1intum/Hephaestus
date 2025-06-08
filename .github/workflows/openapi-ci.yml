@@ -58,8 +58,7 @@ jobs:
         run: poetry lock && poetry install --no-interaction --no-root
 
       - name: Generate and validate OpenAPI specs
-        working-directory: server/intelligence-service
-        run: poetry run openapi
+        run: npm run generate:api:intelligence-service:specs
 
       - name: Check for spec changes
         id: check_spec_changes
@@ -90,6 +89,7 @@ jobs:
               echo "- Intelligence Service FastAPI code changes were made without regenerating the OpenAPI specification" >> $GITHUB_STEP_SUMMARY
               echo "- The Intelligence Service spec file is out of sync with the actual FastAPI endpoints" >> $GITHUB_STEP_SUMMARY
               echo "- This will cause the Application Server's Java client generation to use outdated API definitions" >> $GITHUB_STEP_SUMMARY
+              echo "- The outdated spec will also affect any future Java client regeneration" >> $GITHUB_STEP_SUMMARY
               echo "" >> $GITHUB_STEP_SUMMARY
               echo "**Fix Required (choose one):**" >> $GITHUB_STEP_SUMMARY
               echo "" >> $GITHUB_STEP_SUMMARY
@@ -98,10 +98,15 @@ jobs:
               echo "" >> $GITHUB_STEP_SUMMARY
               echo "**Option 2 - Manual fix:**" >> $GITHUB_STEP_SUMMARY
               echo '```bash' >> $GITHUB_STEP_SUMMARY
-              echo 'cd server/intelligence-service' >> $GITHUB_STEP_SUMMARY
-              echo 'poetry run openapi' >> $GITHUB_STEP_SUMMARY
-              echo 'git add openapi.yaml' >> $GITHUB_STEP_SUMMARY
+              echo '# Option 2a: Update just the spec' >> $GITHUB_STEP_SUMMARY
+              echo 'npm run generate:api:intelligence-service:specs' >> $GITHUB_STEP_SUMMARY
+              echo 'git add server/intelligence-service/openapi.yaml' >> $GITHUB_STEP_SUMMARY
               echo 'git commit -m "chore: update intelligence service OpenAPI spec"' >> $GITHUB_STEP_SUMMARY
+              echo '' >> $GITHUB_STEP_SUMMARY
+              echo '# Option 2b: Update spec + Java client (recommended)' >> $GITHUB_STEP_SUMMARY
+              echo 'npm run generate:api:intelligence-service' >> $GITHUB_STEP_SUMMARY
+              echo 'git add server/intelligence-service/openapi.yaml server/application-server/src/main/java/de/tum/in/www1/hephaestus/intelligenceservice/' >> $GITHUB_STEP_SUMMARY
+              echo 'git commit -m "chore: update intelligence service OpenAPI spec and Java client"' >> $GITHUB_STEP_SUMMARY
               echo '```' >> $GITHUB_STEP_SUMMARY
               echo "" >> $GITHUB_STEP_SUMMARY
               echo "**Changes detected:**" >> $GITHUB_STEP_SUMMARY
@@ -149,8 +154,7 @@ jobs:
           chmod -R 755 ./keycloak-data
 
       - name: Generate and validate OpenAPI specs
-        working-directory: server/application-server
-        run: mvn verify -DskipTests=true -Dapp.profiles=specs
+        run: npm run generate:api:application-server:specs
 
       - name: Check for spec changes
         id: check_spec_changes
@@ -181,6 +185,7 @@ jobs:
               echo "- Application Server Spring Boot code changes were made without regenerating the OpenAPI specification" >> $GITHUB_STEP_SUMMARY
               echo "- The Application Server spec file is out of sync with the actual Spring Boot API endpoints" >> $GITHUB_STEP_SUMMARY
               echo "- This will cause the Webapp's TypeScript client generation to use outdated API definitions" >> $GITHUB_STEP_SUMMARY
+              echo "- The outdated spec will also affect any future TypeScript client regeneration" >> $GITHUB_STEP_SUMMARY
               echo "" >> $GITHUB_STEP_SUMMARY
               echo "**Fix Required (choose one):**" >> $GITHUB_STEP_SUMMARY
               echo "" >> $GITHUB_STEP_SUMMARY
@@ -189,10 +194,15 @@ jobs:
               echo "" >> $GITHUB_STEP_SUMMARY
               echo "**Option 2 - Manual fix:**" >> $GITHUB_STEP_SUMMARY
               echo '```bash' >> $GITHUB_STEP_SUMMARY
-              echo 'cd server/application-server' >> $GITHUB_STEP_SUMMARY
-              echo 'mvn verify -DskipTests=true -Dapp.profiles=specs' >> $GITHUB_STEP_SUMMARY
-              echo 'git add openapi.yaml' >> $GITHUB_STEP_SUMMARY
+              echo '# Option 2a: Update just the spec' >> $GITHUB_STEP_SUMMARY
+              echo 'npm run generate:api:application-server:specs' >> $GITHUB_STEP_SUMMARY
+              echo 'git add server/application-server/openapi.yaml' >> $GITHUB_STEP_SUMMARY
               echo 'git commit -m "chore: update application server OpenAPI spec"' >> $GITHUB_STEP_SUMMARY
+              echo '' >> $GITHUB_STEP_SUMMARY
+              echo '# Option 2b: Update spec + clients (recommended)' >> $GITHUB_STEP_SUMMARY
+              echo 'npm run generate:api:application-server' >> $GITHUB_STEP_SUMMARY
+              echo 'git add server/application-server/openapi.yaml webapp/src/api/' >> $GITHUB_STEP_SUMMARY
+              echo 'git commit -m "chore: update application server OpenAPI spec and clients"' >> $GITHUB_STEP_SUMMARY
               echo '```' >> $GITHUB_STEP_SUMMARY
               echo "" >> $GITHUB_STEP_SUMMARY
               echo "**Changes detected:**" >> $GITHUB_STEP_SUMMARY
@@ -212,11 +222,12 @@ jobs:
           name: application-server-openapi-spec
           path: server/application-server/openapi.yaml
 
-  # Intelligence Service Java client generation (depends on spec validation)
+  # Intelligence Service Java client generation (runs even if spec validation fails)
   intelligence-service-client:
     name: Application Server / Validate Java API client (add autocommit-openapi label to PR to auto-commit changes)
     runs-on: ubuntu-latest
     needs: intelligence-service-specs
+    if: always()
     outputs:
       client-changed: ${{ steps.check_changes.outputs.changes_detected }}
 
@@ -230,6 +241,7 @@ jobs:
 
       - name: Download OpenAPI specs
         uses: actions/download-artifact@v4
+        if: needs.intelligence-service-specs.result == 'success'
         with:
           name: intelligence-service-openapi-spec
           path: server/intelligence-service/
@@ -269,6 +281,7 @@ jobs:
               echo "- Intelligence Service OpenAPI spec was updated but the Application Server's Java client wasn't regenerated" >> $GITHUB_STEP_SUMMARY
               echo "- The Application Server will use an outdated Java client to call the Intelligence Service" >> $GITHUB_STEP_SUMMARY
               echo "- API calls from Application Server to Intelligence Service may fail or use wrong data structures" >> $GITHUB_STEP_SUMMARY
+              echo "- This affects the entire chain: Intelligence Service spec → Application Server Java client → Application functionality" >> $GITHUB_STEP_SUMMARY
               echo "" >> $GITHUB_STEP_SUMMARY
               echo "**Fix Required (choose one):**" >> $GITHUB_STEP_SUMMARY
               echo "" >> $GITHUB_STEP_SUMMARY
@@ -277,9 +290,15 @@ jobs:
               echo "" >> $GITHUB_STEP_SUMMARY
               echo "**Option 2 - Manual fix:**" >> $GITHUB_STEP_SUMMARY
               echo '```bash' >> $GITHUB_STEP_SUMMARY
+              echo '# Option 2a: Update just the client' >> $GITHUB_STEP_SUMMARY
               echo 'npm run generate:api:intelligence-service:client' >> $GITHUB_STEP_SUMMARY
               echo 'git add server/application-server/src/main/java/de/tum/in/www1/hephaestus/intelligenceservice/' >> $GITHUB_STEP_SUMMARY
               echo 'git commit -m "chore: update intelligence service Java client"' >> $GITHUB_STEP_SUMMARY
+              echo '' >> $GITHUB_STEP_SUMMARY
+              echo '# Option 2b: Update spec + client (recommended)' >> $GITHUB_STEP_SUMMARY
+              echo 'npm run generate:api:intelligence-service' >> $GITHUB_STEP_SUMMARY
+              echo 'git add server/intelligence-service/openapi.yaml server/application-server/src/main/java/de/tum/in/www1/hephaestus/intelligenceservice/' >> $GITHUB_STEP_SUMMARY
+              echo 'git commit -m "chore: update intelligence service OpenAPI spec and Java client"' >> $GITHUB_STEP_SUMMARY
               echo '```' >> $GITHUB_STEP_SUMMARY
               echo "" >> $GITHUB_STEP_SUMMARY
               echo "**Changes detected:**" >> $GITHUB_STEP_SUMMARY
@@ -293,11 +312,12 @@ jobs:
             echo "✅ Application Server Java client validation passed - client matches Intelligence Service OpenAPI spec"
           fi
 
-  # Application Server React client generation (depends on spec validation)
+  # Application Server React client generation (runs even if spec validation fails)
   application-server-client:
     name: Webapp (React) / Validate TypeScript API client (add autocommit-openapi label to PR to auto-commit changes)
     runs-on: ubuntu-latest
     needs: application-server-specs
+    if: always()
     outputs:
       client-changed: ${{ steps.check_changes.outputs.changes_detected }}
 
@@ -311,6 +331,7 @@ jobs:
 
       - name: Download OpenAPI specs
         uses: actions/download-artifact@v4
+        if: needs.application-server-specs.result == 'success'
         with:
           name: application-server-openapi-spec
           path: server/application-server/
@@ -362,6 +383,7 @@ jobs:
               echo "- Application Server OpenAPI spec was updated but the Webapp's TypeScript client wasn't regenerated" >> $GITHUB_STEP_SUMMARY
               echo "- The Webapp (React) will use an outdated TypeScript client to call the Application Server" >> $GITHUB_STEP_SUMMARY
               echo "- API calls from Webapp to Application Server may fail or use wrong data structures" >> $GITHUB_STEP_SUMMARY
+              echo "- This affects the entire chain: Application Server spec → Webapp TypeScript client → Client functionality" >> $GITHUB_STEP_SUMMARY
               echo "" >> $GITHUB_STEP_SUMMARY
               echo "**Fix Required (choose one):**" >> $GITHUB_STEP_SUMMARY
               echo "" >> $GITHUB_STEP_SUMMARY
@@ -372,7 +394,14 @@ jobs:
               echo '```bash' >> $GITHUB_STEP_SUMMARY
               echo 'npm run generate:api:application-server:client-react' >> $GITHUB_STEP_SUMMARY
               echo 'git add webapp-react/src/api/' >> $GITHUB_STEP_SUMMARY
-              echo 'git commit -m "chore: update application server React client"' >> $GITHUB_STEP_SUMMARY
+              echo 'git commit -m "chore: update application server TypeScript client"' >> $GITHUB_STEP_SUMMARY
+              echo '```' >> $GITHUB_STEP_SUMMARY
+              echo "" >> $GITHUB_STEP_SUMMARY
+              echo "**Option 3 - Generate everything (specs + clients):**" >> $GITHUB_STEP_SUMMARY
+              echo '```bash' >> $GITHUB_STEP_SUMMARY
+              echo 'npm run generate:api  # Generates all specs and clients at once' >> $GITHUB_STEP_SUMMARY
+              echo 'git add .' >> $GITHUB_STEP_SUMMARY
+              echo 'git commit -m "chore: update all OpenAPI specs and clients"' >> $GITHUB_STEP_SUMMARY
               echo '```' >> $GITHUB_STEP_SUMMARY
               echo "" >> $GITHUB_STEP_SUMMARY
               echo "**Changes detected:**" >> $GITHUB_STEP_SUMMARY
@@ -432,8 +461,7 @@ jobs:
 
       - name: Regenerate intelligence service OpenAPI specs
         if: needs.intelligence-service-specs.outputs.spec-changed == 'true'
-        working-directory: server/intelligence-service
-        run: poetry run openapi
+        run: npm run generate:api:intelligence-service:specs
 
       - name: Set up JDK 21 (for application server spec regeneration)
         if: needs.application-server-specs.outputs.spec-changed == 'true'
@@ -451,8 +479,7 @@ jobs:
 
       - name: Regenerate application server OpenAPI specs
         if: needs.application-server-specs.outputs.spec-changed == 'true'
-        working-directory: server/application-server
-        run: mvn verify -DskipTests=true -Dapp.profiles=specs
+        run: npm run generate:api:application-server:specs
 
       - name: Set up Node.js (for client regeneration)
         if: |
