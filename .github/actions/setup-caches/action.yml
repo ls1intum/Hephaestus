@@ -1,0 +1,93 @@
+name: 'Setup Advanced Caches'
+description: 'Sets up intelligent caching for CI/CD pipeline optimization'
+inputs:
+  cache-type:
+    description: 'Type of cache to setup'
+    required: true
+  os:
+    description: 'Operating system for cache key'
+    required: false
+    default: 'ubuntu-latest'
+
+runs:
+  using: "composite"
+  steps:
+    # Node.js caching
+    - name: Setup Node.js
+      if: contains(fromJSON('["java-format", "frontend-quality", "frontend-unit", "frontend-visual", "openapi-validation"]'), inputs.cache-type)
+      uses: actions/setup-node@v4
+      with:
+        node-version: 22
+        cache: "npm"
+
+    - name: Cache Node.js dependencies
+      if: contains(fromJSON('["java-format", "frontend-quality", "frontend-unit", "frontend-visual", "openapi-validation"]'), inputs.cache-type)
+      uses: actions/cache@v4
+      with:
+        path: |
+          ~/.npm
+          webapp-react/node_modules
+          node_modules
+        key: ${{ inputs.os }}-node-${{ hashFiles('**/package-lock.json') }}-${{ inputs.cache-type }}
+        restore-keys: |
+          ${{ inputs.os }}-node-${{ hashFiles('**/package-lock.json') }}-
+          ${{ inputs.os }}-node-
+
+    # Java/Maven caching
+    - name: Set up JDK 21
+      if: contains(fromJSON('["java-unit", "java-integration", "java-architecture", "openapi-validation"]'), inputs.cache-type)
+      uses: actions/setup-java@v4
+      with:
+        distribution: 'temurin'
+        java-version: '21'
+        cache: maven
+
+    - name: Cache Maven dependencies
+      if: contains(fromJSON('["java-unit", "java-integration", "java-architecture", "openapi-validation"]'), inputs.cache-type)
+      uses: actions/cache@v4
+      with:
+        path: |
+          ~/.m2/repository
+          server/application-server/target
+        key: ${{ inputs.os }}-maven-${{ hashFiles('**/pom.xml') }}-${{ inputs.cache-type }}
+        restore-keys: |
+          ${{ inputs.os }}-maven-${{ hashFiles('**/pom.xml') }}-
+          ${{ inputs.os }}-maven-
+
+    # Python/Poetry caching
+    - name: Set up Python 3.13
+      if: contains(fromJSON('["python-quality", "python-intelligence", "openapi-validation"]'), inputs.cache-type)
+      uses: actions/setup-python@v4
+      with:
+        python-version: 3.13
+        
+    - name: Install Poetry
+      if: contains(fromJSON('["python-quality", "python-intelligence", "openapi-validation"]'), inputs.cache-type)
+      uses: snok/install-poetry@v1
+      with:
+        version: 2.1.1
+        virtualenvs-create: true
+        virtualenvs-in-project: true
+
+    - name: Cache Poetry dependencies
+      if: contains(fromJSON('["python-quality", "python-intelligence", "openapi-validation"]'), inputs.cache-type)
+      uses: actions/cache@v4
+      with:
+        path: |
+          ~/.cache/pypoetry
+          server/intelligence-service/.venv
+          server/webhook-ingest/.venv
+        key: ${{ inputs.os }}-poetry-${{ hashFiles('**/poetry.lock') }}-${{ inputs.cache-type }}
+        restore-keys: |
+          ${{ inputs.os }}-poetry-${{ hashFiles('**/poetry.lock') }}-
+          ${{ inputs.os }}-poetry-
+
+    # Docker build cache
+    - name: Cache Docker layers
+      if: contains(fromJSON('["containers"]'), inputs.cache-type)
+      uses: actions/cache@v4
+      with:
+        path: /tmp/.buildx-cache
+        key: ${{ inputs.os }}-buildx-${{ github.sha }}
+        restore-keys: |
+          ${{ inputs.os }}-buildx-
