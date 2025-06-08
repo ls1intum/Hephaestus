@@ -24,7 +24,6 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       spec-changed: ${{ steps.check_spec_changes.outputs.spec_changed }}
-      spec-content: ${{ steps.spec_output.outputs.spec_content }}
 
     steps:
       - name: Checkout repository
@@ -62,11 +61,6 @@ jobs:
       - name: Generate and validate OpenAPI specs
         run: npm run generate:api:intelligence-service:specs
 
-      - name: Output OpenAPI spec content
-        id: spec_output
-        run: |
-          echo "spec_content=$(base64 -w 0 server/intelligence-service/openapi.yaml)" >> $GITHUB_OUTPUT
-
       - name: Check for spec changes
         id: check_spec_changes
         run: |
@@ -80,6 +74,14 @@ jobs:
             git diff --cached
             echo "spec_changed=true" >> $GITHUB_OUTPUT
           fi
+
+      - name: Upload OpenAPI spec
+        if: steps.check_spec_changes.outputs.spec_changed == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: intelligence-service-openapi-spec
+          path: server/intelligence-service/openapi.yaml
+          retention-days: 1
 
       - name: Validate spec consistency
         run: |
@@ -133,7 +135,6 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       spec-changed: ${{ steps.check_spec_changes.outputs.spec_changed }}
-      spec-content: ${{ steps.spec_output.outputs.spec_content }}
 
     steps:
       - name: Checkout repository
@@ -158,24 +159,24 @@ jobs:
       - name: Generate and validate OpenAPI specs
         run: npm run generate:api:application-server:specs
 
-      - name: Output OpenAPI spec content
-        id: spec_output
-        run: |
-          echo "spec_content=$(base64 -w 0 server/application-server/openapi.yaml)" >> $GITHUB_OUTPUT
-
       - name: Check for spec changes
         id: check_spec_changes
         run: |
           echo "Checking for changes in OpenAPI spec..."
           git add server/application-server/openapi.yaml
           if git diff --cached --quiet; then
-            echo "No changes detected in OpenAPI spec."
             echo "spec_changed=false" >> $GITHUB_OUTPUT
           else
-            echo "Changes detected in OpenAPI spec."
-            git diff --cached
             echo "spec_changed=true" >> $GITHUB_OUTPUT
           fi
+
+      - name: Upload OpenAPI spec
+        if: steps.check_spec_changes.outputs.spec_changed == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: application-server-openapi-spec
+          path: server/application-server/openapi.yaml
+          retention-days: 1
 
       - name: Validate spec consistency
         run: |
@@ -240,10 +241,11 @@ jobs:
           persist-credentials: false
           fetch-depth: 0
 
-      - name: Create Intelligence Service OpenAPI spec from previous job output
-        run: |
-          mkdir -p server/intelligence-service
-          echo '${{ needs.intelligence-service-specs.outputs.spec-content }}' | base64 -d > server/intelligence-service/openapi.yaml
+      - name: Download Intelligence Service OpenAPI spec from previous job
+        uses: actions/download-artifact@v4
+        with:
+          name: intelligence-service-openapi-spec
+          path: server/intelligence-service/
 
       - name: Install dependencies
         run: npm install
@@ -265,50 +267,55 @@ jobs:
             git diff --cached
           fi
 
+      - name: Upload generated client files
+        if: steps.check_changes.outputs.changes_detected == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: intelligence-service-java-client
+          path: server/application-server/src/main/java/de/tum/in/www1/hephaestus/intelligenceservice/
+          retention-days: 1
+
       - name: Validate client consistency
         run: |
           if [[ "${{ steps.check_changes.outputs.changes_detected }}" == "true" ]]; then
             # Check if autocommit label is present
             if [[ "${{ contains(github.event.pull_request.labels.*.name, 'autocommit-openapi') }}" == "true" ]]; then
-              echo "✅ Intelligence Service Java client changes detected, but autocommit-openapi label is present - will auto-commit"
+              echo "✅ Java client needs updating due to your code changes, but autocommit-openapi label is present - will auto-commit"
             else
-              echo "## ⚠️ Intelligence Service Java Client Out of Sync" >> $GITHUB_STEP_SUMMARY
+              echo "## ⚠️ Java Client Out of Sync with Code Changes" >> $GITHUB_STEP_SUMMARY
               echo "" >> $GITHUB_STEP_SUMMARY
-              echo "**Issue:** The Application Server's Java client for Intelligence Service does not match the current Intelligence Service OpenAPI spec." >> $GITHUB_STEP_SUMMARY
+              echo "**Issue:** Your Intelligence Service code changes require updating the committed Java client." >> $GITHUB_STEP_SUMMARY
               echo "" >> $GITHUB_STEP_SUMMARY
-              echo "**What this means:**" >> $GITHUB_STEP_SUMMARY
-              echo "- Intelligence Service OpenAPI spec was updated but the Application Server's Java client wasn't regenerated" >> $GITHUB_STEP_SUMMARY
-              echo "- The Application Server will use an outdated Java client to call the Intelligence Service" >> $GITHUB_STEP_SUMMARY
-              echo "- API calls from Application Server to Intelligence Service may fail or use wrong data structures" >> $GITHUB_STEP_SUMMARY
-              echo "- This affects the entire chain: Intelligence Service spec → Application Server Java client → Application functionality" >> $GITHUB_STEP_SUMMARY
+              echo "**What happened:**" >> $GITHUB_STEP_SUMMARY
+              echo "1. 🔄 Your Intelligence Service FastAPI code was changed" >> $GITHUB_STEP_SUMMARY
+              echo "2. 📋 CI generated a new OpenAPI spec from your code" >> $GITHUB_STEP_SUMMARY
+              echo "3. ☕ CI generated a new Java client from the new spec" >> $GITHUB_STEP_SUMMARY
+              echo "4. ❌ **The new Java client differs from what's committed in git**" >> $GITHUB_STEP_SUMMARY
+              echo "" >> $GITHUB_STEP_SUMMARY
+              echo "**This means:** The Application Server's Java client needs to be updated to match your Intelligence Service changes." >> $GITHUB_STEP_SUMMARY
               echo "" >> $GITHUB_STEP_SUMMARY
               echo "**Fix Required (choose one):**" >> $GITHUB_STEP_SUMMARY
               echo "" >> $GITHUB_STEP_SUMMARY
-              echo "**Option 1 - Auto-commit (Recommended):**" >> $GITHUB_STEP_SUMMARY
-              echo "Add the \`autocommit-openapi\` label to this PR to automatically commit the updated client." >> $GITHUB_STEP_SUMMARY
+              echo "**✅ Option 1 - Auto-commit (Recommended):**" >> $GITHUB_STEP_SUMMARY
+              echo "Add the \`autocommit-openapi\` label to this PR and CI will automatically commit the updated client." >> $GITHUB_STEP_SUMMARY
               echo "" >> $GITHUB_STEP_SUMMARY
-              echo "**Option 2 - Manual fix:**" >> $GITHUB_STEP_SUMMARY
+              echo "**🔧 Option 2 - Manual update:**" >> $GITHUB_STEP_SUMMARY
               echo '```bash' >> $GITHUB_STEP_SUMMARY
-              echo '# Option 2a: Update just the client' >> $GITHUB_STEP_SUMMARY
-              echo 'npm run generate:api:intelligence-service:client' >> $GITHUB_STEP_SUMMARY
-              echo 'git add server/application-server/src/main/java/de/tum/in/www1/hephaestus/intelligenceservice/' >> $GITHUB_STEP_SUMMARY
-              echo 'git commit -m "chore: update intelligence service Java client"' >> $GITHUB_STEP_SUMMARY
-              echo '' >> $GITHUB_STEP_SUMMARY
-              echo '# Option 2b: Update spec + client (recommended)' >> $GITHUB_STEP_SUMMARY
+              echo '# Update everything (spec + Java client):' >> $GITHUB_STEP_SUMMARY
               echo 'npm run generate:api:intelligence-service' >> $GITHUB_STEP_SUMMARY
               echo 'git add server/intelligence-service/openapi.yaml server/application-server/src/main/java/de/tum/in/www1/hephaestus/intelligenceservice/' >> $GITHUB_STEP_SUMMARY
-              echo 'git commit -m "chore: update intelligence service OpenAPI spec and Java client"' >> $GITHUB_STEP_SUMMARY
+              echo 'git commit -m "chore: update Intelligence Service spec and Java client"' >> $GITHUB_STEP_SUMMARY
               echo '```' >> $GITHUB_STEP_SUMMARY
               echo "" >> $GITHUB_STEP_SUMMARY
               echo "**Changes detected:**" >> $GITHUB_STEP_SUMMARY
               echo '```diff' >> $GITHUB_STEP_SUMMARY
               git diff --cached server/application-server/src/main/java/de/tum/in/www1/hephaestus/intelligenceservice/ >> $GITHUB_STEP_SUMMARY
               echo '```' >> $GITHUB_STEP_SUMMARY
-              echo "Application Server Java client (for Intelligence Service) validation failed. Check the CI summary above for details."
+              echo "Java client validation failed - your code changes require updating the committed client. Check the CI summary above for details."
               exit 1
             fi
           else
-            echo "✅ Application Server Java client validation passed - client matches Intelligence Service OpenAPI spec"
+            echo "✅ Java client validation passed - committed client matches what your code generates"
           fi
 
   # Application Server React client generation (runs even if spec validation fails)
@@ -328,21 +335,11 @@ jobs:
           persist-credentials: false
           fetch-depth: 0
 
-      - name: Create Application Server OpenAPI spec from previous job output
-        run: |
-          mkdir -p server/application-server
-          echo "Decoding spec content from previous job..."
-          echo '${{ needs.application-server-specs.outputs.spec-content }}' | base64 -d > server/application-server/openapi.yaml
-          echo "Checking if spec file was created successfully..."
-          if [ -f server/application-server/openapi.yaml ]; then
-            echo "✅ OpenAPI spec file created successfully"
-            echo "File size: $(wc -c < server/application-server/openapi.yaml) bytes"
-            echo "First few lines of the spec:"
-            head -n 10 server/application-server/openapi.yaml
-          else
-            echo "❌ OpenAPI spec file was not created"
-            exit 1
-          fi
+      - name: Download Application Server OpenAPI spec from previous job
+        uses: actions/download-artifact@v4
+        with:
+          name: application-server-openapi-spec
+          path: server/application-server/
 
       - name: Set up Node.js
         uses: actions/setup-node@v4
@@ -376,36 +373,47 @@ jobs:
             echo "changes_detected=true" >> $GITHUB_OUTPUT
           fi
 
+      - name: Upload generated client files
+        if: steps.check_changes.outputs.changes_detected == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: application-server-react-client
+          path: webapp-react/src/api/
+          retention-days: 1
+
       - name: Validate client consistency
         run: |
           if [[ "${{ steps.check_changes.outputs.changes_detected }}" == "true" ]]; then
             # Check if autocommit label is present
             if [[ "${{ contains(github.event.pull_request.labels.*.name, 'autocommit-openapi') }}" == "true" ]]; then
-              echo "✅ Application Server TypeScript client changes detected, but autocommit-openapi label is present - will auto-commit"
+              echo "✅ TypeScript client needs updating due to your code changes, but autocommit-openapi label is present - will auto-commit"
             else
-              echo "## ⚠️ Application Server TypeScript Client Out of Sync" >> $GITHUB_STEP_SUMMARY
+              echo "## ⚠️ TypeScript Client Out of Sync with Code Changes" >> $GITHUB_STEP_SUMMARY
               echo "" >> $GITHUB_STEP_SUMMARY
-              echo "**Issue:** The Webapp's TypeScript client for Application Server does not match the current Application Server OpenAPI spec." >> $GITHUB_STEP_SUMMARY
+              echo "**Issue:** Your Application Server code changes require updating the committed TypeScript client." >> $GITHUB_STEP_SUMMARY
               echo "" >> $GITHUB_STEP_SUMMARY
-              echo "**What this means:**" >> $GITHUB_STEP_SUMMARY
-              echo "- Application Server OpenAPI spec was updated but the Webapp's TypeScript client wasn't regenerated" >> $GITHUB_STEP_SUMMARY
-              echo "- The Webapp (React) will use an outdated TypeScript client to call the Application Server" >> $GITHUB_STEP_SUMMARY
-              echo "- API calls from Webapp to Application Server may fail or use wrong data structures" >> $GITHUB_STEP_SUMMARY
-              echo "- This affects the entire chain: Application Server spec → Webapp TypeScript client → Client functionality" >> $GITHUB_STEP_SUMMARY
+              echo "**What happened:**" >> $GITHUB_STEP_SUMMARY
+              echo "1. 🔄 Your Application Server Spring Boot code was changed" >> $GITHUB_STEP_SUMMARY
+              echo "2. 📋 CI generated a new OpenAPI spec from your code" >> $GITHUB_STEP_SUMMARY
+              echo "3. 📱 CI generated a new TypeScript client from the new spec" >> $GITHUB_STEP_SUMMARY
+              echo "4. ❌ **The new TypeScript client differs from what's committed in git**" >> $GITHUB_STEP_SUMMARY
+              echo "" >> $GITHUB_STEP_SUMMARY
+              echo "**This means:** The Webapp's TypeScript client needs to be updated to match your Application Server changes." >> $GITHUB_STEP_SUMMARY
               echo "" >> $GITHUB_STEP_SUMMARY
               echo "**Fix Required (choose one):**" >> $GITHUB_STEP_SUMMARY
               echo "" >> $GITHUB_STEP_SUMMARY
-              echo "**Option 1 - Auto-commit (Recommended):**" >> $GITHUB_STEP_SUMMARY
-              echo "Add the \`autocommit-openapi\` label to this PR to automatically commit the updated client." >> $GITHUB_STEP_SUMMARY
+              echo "**✅ Option 1 - Auto-commit (Recommended):**" >> $GITHUB_STEP_SUMMARY
+              echo "Add the \`autocommit-openapi\` label to this PR and CI will automatically commit the updated client." >> $GITHUB_STEP_SUMMARY
               echo "" >> $GITHUB_STEP_SUMMARY
-              echo "**Option 2 - Manual fix:**" >> $GITHUB_STEP_SUMMARY
+              echo "**🔧 Option 2 - Manual update:**" >> $GITHUB_STEP_SUMMARY
               echo '```bash' >> $GITHUB_STEP_SUMMARY
-              echo 'npm run generate:api:application-server:client-react' >> $GITHUB_STEP_SUMMARY
-              echo 'git add webapp-react/src/api/' >> $GITHUB_STEP_SUMMARY
-              echo 'git commit -m "chore: update application server TypeScript client"' >> $GITHUB_STEP_SUMMARY
+              echo '# Update everything (spec + TypeScript client):' >> $GITHUB_STEP_SUMMARY
+              echo 'npm run generate:api:application-server' >> $GITHUB_STEP_SUMMARY
+              echo 'git add server/application-server/openapi.yaml webapp-react/src/api/' >> $GITHUB_STEP_SUMMARY
+              echo 'git commit -m "chore: update Application Server spec and TypeScript client"' >> $GITHUB_STEP_SUMMARY
               echo '```' >> $GITHUB_STEP_SUMMARY
               echo "" >> $GITHUB_STEP_SUMMARY
-              echo "**Option 3 - Generate everything (specs + clients):**" >> $GITHUB_STEP_SUMMARY
+              echo "**🚀 Option 3 - Update everything:**" >> $GITHUB_STEP_SUMMARY
               echo '```bash' >> $GITHUB_STEP_SUMMARY
               echo 'npm run generate:api  # Generates all specs and clients at once' >> $GITHUB_STEP_SUMMARY
               echo 'git add .' >> $GITHUB_STEP_SUMMARY
@@ -416,11 +424,11 @@ jobs:
               echo '```diff' >> $GITHUB_STEP_SUMMARY
               git diff --cached webapp-react/src/api/ >> $GITHUB_STEP_SUMMARY
               echo '```' >> $GITHUB_STEP_SUMMARY
-              echo "Webapp TypeScript client (for Application Server) validation failed. Check the CI summary above for details."
+              echo "TypeScript client validation failed - your code changes require updating the committed client. Check the CI summary above for details."
               exit 1
             fi
           else
-            echo "✅ Webapp TypeScript client validation passed - client matches Application Server OpenAPI spec"
+            echo "✅ TypeScript client validation passed - committed client matches what your code generates"
           fi
 
   # Unified commit job - runs after both client generations complete
@@ -446,70 +454,33 @@ jobs:
           persist-credentials: false
           fetch-depth: 0
 
-      - name: Set up Python 3.13 (for intelligence service spec regeneration)
+      - name: Download Intelligence Service OpenAPI spec
         if: needs.intelligence-service-specs.outputs.spec-changed == 'true'
-        uses: actions/setup-python@v2
+        uses: actions/download-artifact@v4
         with:
-          python-version: 3.13
+          name: intelligence-service-openapi-spec
+          path: server/intelligence-service/
 
-      - name: Install Poetry (for intelligence service spec regeneration)
-        if: needs.intelligence-service-specs.outputs.spec-changed == 'true'
-        uses: snok/install-poetry@v1
-        with:
-          version: 2.1.1
-          virtualenvs-create: true
-          virtualenvs-in-project: true
-          virtualenvs-path: .venv
-          installer-parallel: true
-
-      - name: Install Python dependencies (for intelligence service spec regeneration)
-        if: needs.intelligence-service-specs.outputs.spec-changed == 'true'
-        working-directory: server/intelligence-service
-        run: poetry lock && poetry install --no-interaction --no-root
-
-      - name: Regenerate intelligence service OpenAPI specs
-        if: needs.intelligence-service-specs.outputs.spec-changed == 'true'
-        run: npm run generate:api:intelligence-service:specs
-
-      - name: Set up JDK 21 (for application server spec regeneration)
+      - name: Download Application Server OpenAPI spec
         if: needs.application-server-specs.outputs.spec-changed == 'true'
-        uses: actions/setup-java@v4
+        uses: actions/download-artifact@v4
         with:
-          distribution: 'temurin'
-          java-version: '21'
+          name: application-server-openapi-spec
+          path: server/application-server/
 
-      - name: Set up directories (for application server spec regeneration)
-        if: needs.application-server-specs.outputs.spec-changed == 'true'
-        working-directory: server/application-server
-        run: |
-          mkdir -p ./keycloak-data
-          chmod -R 755 ./keycloak-data
-
-      - name: Regenerate application server OpenAPI specs
-        if: needs.application-server-specs.outputs.spec-changed == 'true'
-        run: npm run generate:api:application-server:specs
-
-      - name: Set up Node.js (for client regeneration)
-        if: |
-          needs.intelligence-service-client.outputs.client-changed == 'true' ||
-          needs.application-server-client.outputs.client-changed == 'true'
-        uses: actions/setup-node@v4
-        with:
-          node-version: '22'
-
-      - name: Install dependencies (for client regeneration)
-        if: |
-          needs.intelligence-service-client.outputs.client-changed == 'true' ||
-          needs.application-server-client.outputs.client-changed == 'true'
-        run: npm install
-
-      - name: Regenerate intelligence service Java client
+      - name: Download Intelligence Service Java client
         if: needs.intelligence-service-client.outputs.client-changed == 'true'
-        run: npm run generate:api:intelligence-service:client
+        uses: actions/download-artifact@v4
+        with:
+          name: intelligence-service-java-client
+          path: server/application-server/src/main/java/de/tum/in/www1/hephaestus/intelligenceservice/
 
-      - name: Regenerate application server React client
+      - name: Download Application Server React client
         if: needs.application-server-client.outputs.client-changed == 'true'
-        run: npm run generate:api:application-server:client-react
+        uses: actions/download-artifact@v4
+        with:
+          name: application-server-react-client
+          path: webapp-react/src/api/
 
       - name: Check for any changes and commit
         run: |
@@ -554,6 +525,7 @@ jobs:
           branch: ${{ github.event.pull_request.head.ref  }}
 
       - name: Remove autocommit-openapi label
+        if: env.CHANGES_COMMITTED == 'true'
         run: |
           echo "Removing the autocommit-openapi label..."
           curl --silent --fail-with-body -X DELETE -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
