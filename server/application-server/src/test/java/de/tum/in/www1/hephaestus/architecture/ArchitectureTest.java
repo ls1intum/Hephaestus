@@ -13,18 +13,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.web.bind.annotation.RestController;
 
 /**
- * Basic architecture tests for compliance.
- *
- * <p>These tests verify essential architectural principles:
- * <ul>
- *   <li>Spring annotation conventions</li>
- *   <li>Basic logging practices</li>
- *   <li>Repository interface contracts</li>
- * </ul>
- *
- * More comprehensive architecture rules will be added in future PRs.
- *
- * @author Felix T.J. Dietrich
+ * Enforces Spring naming conventions and basic coding standards.
+ * Catches architectural violations early in CI/CD pipeline.
  */
 @DisplayName("Architecture Compliance")
 class ArchitectureTest extends BaseUnitTest {

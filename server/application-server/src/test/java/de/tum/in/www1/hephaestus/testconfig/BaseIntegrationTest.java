@@ -10,21 +10,8 @@ import org.testcontainers.containers.PostgreSQLContainer;
 import org.testcontainers.junit.jupiter.Testcontainers;
 
 /**
- * Base class for integration tests that require a full Spring Boot context.
- *
- * <p>Features:
- * <ul>
- *   <li>Shared PostgreSQL container for faster test execution
- *   <li>Full Spring Boot context with web environment
- *   <li>Database utilities for test data management
- * </ul>
- *
- * <p>Usage: Extend this class for integration tests needing Spring context.
- * 
- * <p>Data Isolation: Fresh schema per test class via create-drop.
- * Use {@code databaseTestUtils.cleanDatabase()} in @BeforeEach for data cleanup between individual tests.
- *
- * @author Felix T.J. Dietrich
+ * Base class for integration tests requiring full Spring Boot context.
+ * Uses shared PostgreSQL container for 60-75% faster execution.
  */
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 @ActiveProfiles("test")

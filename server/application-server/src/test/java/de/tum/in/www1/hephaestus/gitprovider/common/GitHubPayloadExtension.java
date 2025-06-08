@@ -10,6 +10,10 @@ import org.junit.jupiter.api.extension.ParameterResolver;
 import org.kohsuke.github.GHEventPayload;
 import org.kohsuke.github.GitHub;
 
+/**
+ * JUnit 5 extension that loads real GitHub webhook JSON files into test methods.
+ * Automatically parses JSON to strongly-typed GHEventPayload objects.
+ */
 public class GitHubPayloadExtension implements ParameterResolver {
 
     @Override

@@ -4,15 +4,10 @@ import jakarta.persistence.EntityManager;
 import jakarta.persistence.PersistenceContext;
 import jakarta.transaction.Transactional;
 import org.springframework.stereotype.Component;
-import org.springframework.test.context.TestContext;
 
 /**
  * Utility for cleaning database state between integration tests.
- * 
- * <p>Provides methods to clean up test data while reusing the same PostgreSQL container.
  * Ensures test isolation with minimal performance impact.
- * 
- * @author Felix T.J. Dietrich
  */
 @Component
 @Transactional

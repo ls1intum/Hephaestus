@@ -4,19 +4,7 @@ import org.testcontainers.containers.PostgreSQLContainer;
 
 /**
  * Singleton PostgreSQL container for integration tests.
- * 
- * <p>This class manages a single PostgreSQL container instance that is shared
- * across all integration tests in the test suite. The container is started
- * lazily on first access and cleaned up automatically on JVM shutdown.
- * 
- * <p>Benefits:
- * <ul>
- *   <li>Significant performance improvement by avoiding container startup overhead
- *   <li>Resource efficiency by sharing the same database instance
- *   <li>Proper lifecycle management with automatic cleanup
- * </ul>
- * 
- * @author Felix T.J. Dietrich
+ * Shared across all tests for performance improvement.
  */
 public final class PostgreSQLTestContainer {
     
