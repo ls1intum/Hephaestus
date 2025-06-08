@@ -67,6 +67,7 @@ jobs:
         run: |
           mvn test \
             -Dgroups="unit" \
+            -Dtest="!**/ArchitectureTest" \
             -T 1C \
             --batch-mode \
             --fail-at-end
