@@ -1,10 +1,6 @@
-name: Documentation
+name: CI/CD
 
 on:
-  pull_request:
-    paths:
-    - 'docs/**'
-    - '.github/workflows/docs.yml'
   push:
     branches:
     - develop
@@ -12,7 +8,7 @@ on:
     paths:
     - 'docs/**'
     - '.github/workflows/docs.yml'
-# TODO: Add paths where function docstrings might change 'path/**'
+    
   release:
     types:
     - created
@@ -28,6 +24,7 @@ permissions:
 
 jobs: 
   build-docs: 
+    name: Documentation / Build
     runs-on: ubuntu-22.04
 
     permissions:
@@ -66,6 +63,7 @@ jobs:
           path: docs/_build/html
   
   deploy-docs:
+    name: Documentation / Deploy to GitHub Pages
     if: github.ref == 'refs/heads/develop'
     environment:
       name: github-pages
