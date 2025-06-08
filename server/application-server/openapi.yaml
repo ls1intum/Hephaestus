@@ -218,18 +218,7 @@ paths:
       responses:
         "200":
           description: OK
-  /user/settings:
-    get:
-      tags:
-      - user
-      operationId: getUserSettings
-      responses:
-        "200":
-          description: OK
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/UserSettings"
+  /user/settingsREMOVEBEFOREMERGING:
     post:
       tags:
       - user
@@ -529,6 +518,18 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/UserProfile"
+  /user/settings:
+    get:
+      tags:
+      - user
+      operationId: getUserSettings
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UserSettings"
   /team/all:
     get:
       tags:
