@@ -1,4 +1,4 @@
-name: "Semantic Pull Request"
+name: "Pull Request"
 
 on:
   pull_request_target:
@@ -9,7 +9,7 @@ on:
 
 jobs:
   main:
-    name: Validate PR title
+    name: Validate title
     runs-on: ubuntu-latest
     permissions:
       pull-requests: write
