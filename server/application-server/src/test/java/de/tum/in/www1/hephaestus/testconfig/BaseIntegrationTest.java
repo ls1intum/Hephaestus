@@ -12,33 +12,17 @@ import org.testcontainers.junit.jupiter.Testcontainers;
 /**
  * Base class for integration tests that require a full Spring Boot context.
  *
- * <p>This class provides:
- *
+ * <p>Features:
  * <ul>
- *   <li>Shared PostgreSQL database via Testcontainers for faster integration testing
+ *   <li>Shared PostgreSQL container for faster test execution
  *   <li>Full Spring Boot context with web environment
- *   <li>Proper test profile configuration
- *   <li>JUnit 5 tagging for test categorization
- *   <li>Database utilities for managing test data
+ *   <li>Database utilities for test data management
  * </ul>
  *
- * <p>Usage: Extend this class for your integration tests that need full Spring context.
- *
- * <p>Performance: Uses a shared PostgreSQL container across all integration tests,
- * which significantly improves test performance by avoiding container startup overhead.
- * The same database instance is reused, but the schema is recreated for each test class.
+ * <p>Usage: Extend this class for integration tests needing Spring context.
  * 
- * <p>Database Management: Use the {@link #databaseTestUtils} to clean up data between
- * individual tests if needed, or rely on the default create-drop behavior for isolation
- * between test classes.
- * 
- * <p>Example usage for test isolation:
- * <pre>{@code
- * @BeforeEach
- * void setUp() {
- *     databaseTestUtils.cleanDatabase(); // Clean all tables before each test
- * }
- * }</pre>
+ * <p>Data Isolation: Fresh schema per test class via create-drop.
+ * Use {@code databaseTestUtils.cleanDatabase()} in @BeforeEach for data cleanup between individual tests.
  *
  * @author Felix T.J. Dietrich
  */

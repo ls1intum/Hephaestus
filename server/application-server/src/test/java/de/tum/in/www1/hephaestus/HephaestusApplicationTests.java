@@ -9,6 +9,10 @@ import org.springframework.test.context.DynamicPropertySource;
 import org.testcontainers.containers.PostgreSQLContainer;
 import org.testcontainers.junit.jupiter.Testcontainers;
 
+/**
+ * Smoke test that verifies the Spring Boot application context can start successfully.
+ * Tests basic configuration, bean wiring, and database connectivity.
+ */
 @SpringBootTest
 @ActiveProfiles("test")
 @Testcontainers
@@ -25,7 +29,6 @@ class HephaestusApplicationTests {
 
     @Test
     void contextLoads() {
-        // ContextLoads
-        assert (true);
+        // Verifies Spring context can start and all beans are properly configured
     }
 }

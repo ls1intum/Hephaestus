@@ -7,11 +7,10 @@ import org.springframework.stereotype.Component;
 import org.springframework.test.context.TestContext;
 
 /**
- * Utility class for managing database state in integration tests.
+ * Utility for cleaning database state between integration tests.
  * 
- * <p>This class provides methods to clean up database state between tests
- * while reusing the same PostgreSQL container. This ensures test isolation
- * while maintaining performance benefits from container reuse.
+ * <p>Provides methods to clean up test data while reusing the same PostgreSQL container.
+ * Ensures test isolation with minimal performance impact.
  * 
  * @author Felix T.J. Dietrich
  */
@@ -24,12 +23,7 @@ public class DatabaseTestUtils {
     
     /**
      * Truncates all tables in the test database.
-     * 
-     * <p>This method provides a fast way to clean up all data between tests
-     * without recreating the entire database schema.
-     * 
-     * <p>Usage: Call this method in a @BeforeEach method to ensure clean state
-     * between individual tests within a test class.
+     * Call in @BeforeEach to ensure clean state between individual tests.
      */
     public void cleanDatabase() {
         try {
@@ -69,16 +63,14 @@ public class DatabaseTestUtils {
     }
     
     /**
-     * Resets the database to a clean state by truncating all tables.
-     * This is an alias for cleanDatabase() to provide more descriptive naming.
+     * Alias for cleanDatabase() with descriptive naming.
      */
     public void resetDatabase() {
         cleanDatabase();
     }
     
     /**
-     * Alternative cleanup method that uses DELETE statements instead of TRUNCATE.
-     * This is safer but slower than truncate, useful as a fallback.
+     * DELETE-based cleanup - slower but more reliable than TRUNCATE.
      */
     public void clearAllData() {
         try {
