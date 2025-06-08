@@ -1,4 +1,4 @@
-name: Intelligence Service QA
+name: CI/CD
 
 on:
     pull_request:
@@ -10,8 +10,8 @@ on:
         branches: [develop]
 
 jobs:
-  lint:
-    name: Code Quality Checks
+  code-quality:
+    name: Intelligence Service / Code Quality
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
