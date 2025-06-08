@@ -62,6 +62,11 @@ jobs:
       - name: Generate and validate OpenAPI specs
         run: npm run generate:api:intelligence-service:specs
 
+      - name: Output OpenAPI spec content
+        id: spec_output
+        run: |
+          echo "spec_content=$(base64 -w 0 server/intelligence-service/openapi.yaml)" >> $GITHUB_OUTPUT
+
       - name: Check for spec changes
         id: check_spec_changes
         run: |
@@ -122,11 +127,6 @@ jobs:
             echo "✅ Intelligence Service OpenAPI spec validation passed - FastAPI spec matches code"
           fi
 
-      - name: Output OpenAPI spec content
-        id: spec_output
-        run: |
-          echo "spec_content=$(base64 -w 0 server/intelligence-service/openapi.yaml)" >> $GITHUB_OUTPUT
-
   # Application Server spec validation
   application-server-specs:
     name: Application Server / Validate OpenAPI spec (add autocommit-openapi label to PR to auto-commit changes)
@@ -157,6 +157,11 @@ jobs:
 
       - name: Generate and validate OpenAPI specs
         run: npm run generate:api:application-server:specs
+
+      - name: Output OpenAPI spec content
+        id: spec_output
+        run: |
+          echo "spec_content=$(base64 -w 0 server/application-server/openapi.yaml)" >> $GITHUB_OUTPUT
 
       - name: Check for spec changes
         id: check_spec_changes
@@ -217,11 +222,6 @@ jobs:
           else
             echo "✅ Application Server OpenAPI spec validation passed - Spring Boot spec matches code"
           fi
-
-      - name: Output OpenAPI spec content
-        id: spec_output
-        run: |
-          echo "spec_content=$(base64 -w 0 server/application-server/openapi.yaml)" >> $GITHUB_OUTPUT
 
   # Intelligence Service Java client generation (runs even if spec validation fails)
   intelligence-service-client:
@@ -331,7 +331,18 @@ jobs:
       - name: Create Application Server OpenAPI spec from previous job output
         run: |
           mkdir -p server/application-server
+          echo "Decoding spec content from previous job..."
           echo '${{ needs.application-server-specs.outputs.spec-content }}' | base64 -d > server/application-server/openapi.yaml
+          echo "Checking if spec file was created successfully..."
+          if [ -f server/application-server/openapi.yaml ]; then
+            echo "✅ OpenAPI spec file created successfully"
+            echo "File size: $(wc -c < server/application-server/openapi.yaml) bytes"
+            echo "First few lines of the spec:"
+            head -n 10 server/application-server/openapi.yaml
+          else
+            echo "❌ OpenAPI spec file was not created"
+            exit 1
+          fi
 
       - name: Set up Node.js
         uses: actions/setup-node@v4
