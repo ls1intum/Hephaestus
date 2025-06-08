@@ -10,7 +10,6 @@ import de.tum.in.www1.hephaestus.gitprovider.label.LabelRepository;
 import de.tum.in.www1.hephaestus.gitprovider.repository.Repository;
 import de.tum.in.www1.hephaestus.gitprovider.repository.RepositoryRepository;
 import de.tum.in.www1.hephaestus.gitprovider.repository.github.GitHubRepositorySyncService;
-import java.lang.reflect.Constructor;
 import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -39,16 +38,8 @@ class GitHubLabelMessageHandlerTest {
     private GitHubLabelMessageHandler handler;
 
     @BeforeEach
-    void setUp() throws Exception {
-        // Use reflection to create handler since constructor is private
-        Constructor<GitHubLabelMessageHandler> constructor =
-            GitHubLabelMessageHandler.class.getDeclaredConstructor(
-                    LabelRepository.class,
-                    GitHubLabelSyncService.class,
-                    GitHubRepositorySyncService.class
-                );
-        constructor.setAccessible(true);
-        handler = constructor.newInstance(labelRepository, labelSyncService, repositorySyncService);
+    void setUp() {
+        handler = new GitHubLabelMessageHandler(labelRepository, labelSyncService, repositorySyncService);
     }
 
     @Test
@@ -83,7 +74,7 @@ class GitHubLabelMessageHandlerTest {
         handler.handleEvent(payload);
 
         verify(repositorySyncService).processRepository(payload.getRepository());
-        verify(labelRepository).deleteById(8747406390L);
+        verify(labelRepository).deleteById(payload.getLabel().getId());
         verify(labelSyncService, never()).processLabel(any());
     }
 
@@ -109,12 +100,13 @@ class GitHubLabelMessageHandlerTest {
         void testProcessNewLabelWithCreatedPayload(@GitHubPayload("label.created") GHEventPayload.Label payload) {
             // Setup - label doesn't exist in database yet
             GHLabel ghLabel = payload.getLabel();
+            String repositoryFullName = payload.getRepository().getFullName();
             Label convertedLabel = new Label();
             Repository repository = new Repository();
             
-            when(labelRepository.findById(8747399111L)).thenReturn(Optional.empty());
+            when(labelRepository.findById(ghLabel.getId())).thenReturn(Optional.empty());
             when(labelConverter.convert(ghLabel)).thenReturn(convertedLabel);
-            when(repositoryRepository.findByNameWithOwner("HephaestusTest/TestRepository"))
+            when(repositoryRepository.findByNameWithOwner(repositoryFullName))
                 .thenReturn(Optional.of(repository));
             when(labelRepository.save(convertedLabel)).thenReturn(convertedLabel);
 
@@ -122,9 +114,9 @@ class GitHubLabelMessageHandlerTest {
             Label result = syncService.processLabel(ghLabel);
 
             // Verify correct methods called with actual payload data
-            verify(labelRepository).findById(8747399111L);
+            verify(labelRepository).findById(ghLabel.getId());
             verify(labelConverter).convert(ghLabel);
-            verify(repositoryRepository).findByNameWithOwner("HephaestusTest/TestRepository");
+            verify(repositoryRepository).findByNameWithOwner(repositoryFullName);
             verify(labelRepository).save(convertedLabel);
             assertSame(convertedLabel, result);
             assertSame(repository, convertedLabel.getRepository());
@@ -135,13 +127,14 @@ class GitHubLabelMessageHandlerTest {
         void testProcessExistingLabelWithEditedPayload(@GitHubPayload("label.edited") GHEventPayload.Label payload) {
             // Setup - label already exists in database
             GHLabel ghLabel = payload.getLabel();
+            String repositoryFullName = payload.getRepository().getFullName();
             Label existingLabel = new Label();
             Label updatedLabel = new Label();
             Repository repository = new Repository();
             
-            when(labelRepository.findById(8747406390L)).thenReturn(Optional.of(existingLabel));
+            when(labelRepository.findById(ghLabel.getId())).thenReturn(Optional.of(existingLabel));
             when(labelConverter.update(ghLabel, existingLabel)).thenReturn(updatedLabel);
-            when(repositoryRepository.findByNameWithOwner("HephaestusTest/TestRepository"))
+            when(repositoryRepository.findByNameWithOwner(repositoryFullName))
                 .thenReturn(Optional.of(repository));
             when(labelRepository.save(updatedLabel)).thenReturn(updatedLabel);
 
@@ -149,9 +142,9 @@ class GitHubLabelMessageHandlerTest {
             Label result = syncService.processLabel(ghLabel);
 
             // Verify correct methods called with actual payload data
-            verify(labelRepository).findById(8747406390L);
+            verify(labelRepository).findById(ghLabel.getId());
             verify(labelConverter).update(ghLabel, existingLabel);
-            verify(repositoryRepository).findByNameWithOwner("HephaestusTest/TestRepository");
+            verify(repositoryRepository).findByNameWithOwner(repositoryFullName);
             verify(labelRepository).save(updatedLabel);
             assertSame(updatedLabel, result);
             assertSame(repository, updatedLabel.getRepository());
@@ -162,11 +155,12 @@ class GitHubLabelMessageHandlerTest {
         void testProcessLabelWithMissingRepository(@GitHubPayload("label.created") GHEventPayload.Label payload) {
             // Setup - repository doesn't exist in our database
             GHLabel ghLabel = payload.getLabel();
+            String repositoryFullName = payload.getRepository().getFullName();
             Label convertedLabel = new Label();
             
-            when(labelRepository.findById(8747399111L)).thenReturn(Optional.empty());
+            when(labelRepository.findById(ghLabel.getId())).thenReturn(Optional.empty());
             when(labelConverter.convert(ghLabel)).thenReturn(convertedLabel);
-            when(repositoryRepository.findByNameWithOwner("HephaestusTest/TestRepository"))
+            when(repositoryRepository.findByNameWithOwner(repositoryFullName))
                 .thenReturn(Optional.empty());
             when(labelRepository.save(convertedLabel)).thenReturn(convertedLabel);
 
@@ -174,7 +168,7 @@ class GitHubLabelMessageHandlerTest {
             Label result = syncService.processLabel(ghLabel);
 
             // Verify it still processes but without repository link
-            verify(repositoryRepository).findByNameWithOwner("HephaestusTest/TestRepository");
+            verify(repositoryRepository).findByNameWithOwner(repositoryFullName);
             verify(labelRepository).save(convertedLabel);
             assertSame(convertedLabel, result);
             assertNull(convertedLabel.getRepository());

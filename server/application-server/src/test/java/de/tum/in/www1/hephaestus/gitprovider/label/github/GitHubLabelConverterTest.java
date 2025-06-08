@@ -24,53 +24,59 @@ class GitHubLabelConverterTest {
     @Test
     @DisplayName("Should convert real GitHub created label payload")
     void testConvertRealCreatedPayload(@GitHubPayload("label.created") GHEventPayload.Label payload) {
+        // Given
+        var ghLabel = payload.getLabel();
+        
         // When
-        Label result = converter.convert(payload.getLabel());
+        Label result = converter.convert(ghLabel);
 
         // Then
         assertNotNull(result, "Converted label should not be null");
-        assertEquals(8747399111L, result.getId(), "Should preserve GitHub label ID");
-        assertEquals("documentation", result.getName(), "Should preserve label name");
-        assertEquals("0075ca", result.getColor(), "Should preserve label color");
-        assertEquals(
-            "Improvements or additions to documentation",
-            result.getDescription(),
-            "Should preserve description"
-        );
+        assertEquals(ghLabel.getId(), result.getId(), "Should preserve GitHub label ID");
+        assertEquals(ghLabel.getName(), result.getName(), "Should preserve label name");
+        assertEquals(ghLabel.getColor(), result.getColor(), "Should preserve label color");
+        assertEquals(ghLabel.getDescription(), result.getDescription(), "Should preserve description");
     }
 
     @Test
     @DisplayName("Should convert real GitHub edited label payload")
     void testConvertRealEditedPayload(@GitHubPayload("label.edited") GHEventPayload.Label payload) {
+        // Given
+        var ghLabel = payload.getLabel();
+        
         // When
-        Label result = converter.convert(payload.getLabel());
+        Label result = converter.convert(ghLabel);
 
         // Then
         assertNotNull(result, "Converted label should not be null");
-        assertEquals(8747406390L, result.getId(), "Should preserve GitHub label ID");
-        assertEquals("ready to review", result.getName(), "Should preserve label name");
-        assertEquals("AC12F4", result.getColor(), "Should preserve label color");
-        assertEquals("PR is ready to review (edited)", result.getDescription(), "Should preserve description");
+        assertEquals(ghLabel.getId(), result.getId(), "Should preserve GitHub label ID");
+        assertEquals(ghLabel.getName(), result.getName(), "Should preserve label name");
+        assertEquals(ghLabel.getColor(), result.getColor(), "Should preserve label color");
+        assertEquals(ghLabel.getDescription(), result.getDescription(), "Should preserve description");
     }
 
     @Test
     @DisplayName("Should convert real GitHub deleted label payload")
     void testConvertRealDeletedPayload(@GitHubPayload("label.deleted") GHEventPayload.Label payload) {
+        // Given
+        var ghLabel = payload.getLabel();
+        
         // When
-        Label result = converter.convert(payload.getLabel());
+        Label result = converter.convert(ghLabel);
 
         // Then
         assertNotNull(result, "Converted label should not be null");
-        assertEquals(8747406390L, result.getId(), "Should preserve GitHub label ID");
-        assertEquals("ready to review", result.getName(), "Should preserve label name");
-        assertEquals("AC12F4", result.getColor(), "Should preserve label color");
-        assertEquals("PR is ready to review (edited)", result.getDescription(), "Should preserve description");
+        assertEquals(ghLabel.getId(), result.getId(), "Should preserve GitHub label ID");
+        assertEquals(ghLabel.getName(), result.getName(), "Should preserve label name");
+        assertEquals(ghLabel.getColor(), result.getColor(), "Should preserve label color");
+        assertEquals(ghLabel.getDescription(), result.getDescription(), "Should preserve description");
     }
 
     @Test
     @DisplayName("Should update existing label with new data")
     void testUpdateExistingLabel(@GitHubPayload("label.edited") GHEventPayload.Label payload) {
         // Given
+        var ghLabel = payload.getLabel();
         Label existingLabel = new Label();
         existingLabel.setId(999L);
         existingLabel.setName("old-label");
@@ -78,13 +84,13 @@ class GitHubLabelConverterTest {
         existingLabel.setDescription("old description");
 
         // When
-        Label result = converter.update(payload.getLabel(), existingLabel);
+        Label result = converter.update(ghLabel, existingLabel);
 
         // Then
         assertSame(existingLabel, result, "Should return the same instance");
-        assertEquals(8747406390L, result.getId(), "Should update to new GitHub ID");
-        assertEquals("ready to review", result.getName(), "Should update to new name");
-        assertEquals("AC12F4", result.getColor(), "Should update to new color");
-        assertEquals("PR is ready to review (edited)", result.getDescription(), "Should update to new description");
+        assertEquals(ghLabel.getId(), result.getId(), "Should update to new GitHub ID");
+        assertEquals(ghLabel.getName(), result.getName(), "Should update to new name");
+        assertEquals(ghLabel.getColor(), result.getColor(), "Should update to new color");
+        assertEquals(ghLabel.getDescription(), result.getDescription(), "Should update to new description");
     }
 }
