@@ -43,7 +43,7 @@ def status():
 @router.post(
     "/start",
     response_model=MentorResponse,
-    summary="Start a chat session with an LLM.",
+    summary="Start a chat session with an LLM. TODO REMOVE",
 )
 def start(request: MentorStartRequest):
     config = RunnableConfig({"configurable": {"thread_id": request.session_id}})

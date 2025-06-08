@@ -14,7 +14,7 @@ on:
 
 jobs:
   schema-validation:
-    name: Database / Validate schema migrations
+    name: Database / Validate JPA entities match committed migrations
     runs-on: ubuntu-latest
 
     services:
@@ -50,12 +50,20 @@ jobs:
       - name: Check Schema Drift
         env:
           CI: true
-        run: scripts/db-utils.sh draft-changelog
+        run: |
+          echo "🔍 Checking for schema drift between JPA entities and committed migrations..."
+          scripts/db-utils.sh draft-changelog
 
       - name: Validate Schema Consistency
         run: |
           if [ -f "server/application-server/src/main/resources/db/changelog_new.xml" ]; then
             echo "## ⚠️ Schema Drift Detected" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "**Issue:** Your JPA entity definitions have changes that are not reflected in committed database migrations." >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "**What this means:**" >> $GITHUB_STEP_SUMMARY
+            echo "- Entity code has changes compared to the current migration-generated schema" >> $GITHUB_STEP_SUMMARY
+            echo "- New migrations need to be created and committed" >> $GITHUB_STEP_SUMMARY
             echo "" >> $GITHUB_STEP_SUMMARY
             echo "**Fix Required:** Run these commands locally:" >> $GITHUB_STEP_SUMMARY
             echo '```bash' >> $GITHUB_STEP_SUMMARY
@@ -71,11 +79,11 @@ jobs:
             echo "Schema validation failed. Check the CI summary above for details."
             exit 1
           else
-            echo "✅ Schema validation passed - no drift detected"
+            echo "✅ Schema validation passed - JPA entities match committed migrations"
           fi
 
   documentation-validation:
-    name: Documentation / Validate database schema ERD
+    name: Database / Validate ERD documentation matches migration-based schema
     runs-on: ubuntu-latest
 
     services:
@@ -118,7 +126,10 @@ jobs:
       - name: Generate ERD documentation
         env:
           CI: true
-        run: scripts/db-utils.sh generate-erd
+        run: |
+          echo "📊 Generating ERD from committed migration-based schema..."
+          echo "Note: ERD always reflects the current committed migration state, not entity code changes"
+          scripts/db-utils.sh generate-erd
 
       - name: Validate ERD Documentation
         run: |
@@ -129,8 +140,12 @@ jobs:
           if ! git diff --cached --quiet docs/dev/database/schema.mmd; then
             echo "## ⚠️ ERD Documentation Outdated" >> $GITHUB_STEP_SUMMARY
             echo "" >> $GITHUB_STEP_SUMMARY
-            echo "The ERD documentation was automatically updated during validation." >> $GITHUB_STEP_SUMMARY
-            echo "This means your committed ERD was out of sync with the current database schema." >> $GITHUB_STEP_SUMMARY
+            echo "**Issue:** The committed ERD documentation does not match the current migration-based database schema." >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "**What this means:**" >> $GITHUB_STEP_SUMMARY
+            echo "- Committed migrations have been updated without updating the ERD documentation" >> $GITHUB_STEP_SUMMARY
+            echo "- ERD documentation is out of sync with the actual migration-generated schema" >> $GITHUB_STEP_SUMMARY
+            echo "- ERD always reflects migration state, not entity code (entity changes need migrations first)" >> $GITHUB_STEP_SUMMARY
             echo "" >> $GITHUB_STEP_SUMMARY
             echo "**Fix Required:**" >> $GITHUB_STEP_SUMMARY
             echo '```bash' >> $GITHUB_STEP_SUMMARY
@@ -146,5 +161,5 @@ jobs:
             echo "ERD documentation validation failed. Check the CI summary above for details."
             exit 1
           else
-            echo "✅ ERD documentation validation passed"
+            echo "✅ ERD documentation validation passed - ERD matches migration-based schema"
           fi

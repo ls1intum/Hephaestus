@@ -198,11 +198,56 @@ For complex data transformations:
 
 ### CI Pipeline Integration
 
-The CI pipeline validates:
+The CI pipeline validates database consistency with **two independent checks**:
 
-1. All migrations apply successfully
-2. ERD documentation matches actual schema
-3. No schema drift exists
+#### 1. Schema Drift Detection
+
+- **What it checks**: JPA entity code ↔ committed migrations
+- **Purpose**: Ensures entity changes have corresponding migrations  
+- **Failure scenario**: You modified entities but didn't create/commit migrations
+- **Fix**: Run `npm run db:draft-changelog` and commit the generated migration
+
+#### 2. ERD Documentation Validation  
+
+- **What it checks**: Committed migrations ↔ committed ERD documentation
+- **Purpose**: Ensures documentation reflects the actual migration-based schema
+- **Failure scenario**: Migrations were updated but ERD documentation wasn't regenerated
+- **Fix**: Run `npm run db:generate-erd-docs` and commit the updated ERD
+
+#### Key Understanding
+
+```mermaid
+flowchart TD
+    A[Entity Code Changes] --> B[Migration Files]
+    B --> C[ERD Documentation]
+    
+    subgraph CI_Validation ["CI Pipeline Validation"]
+        D["CI Check 1: Schema Drift<br/>Compare: Entities ↔ Migrations"]
+        E["CI Check 2: ERD Validation<br/>Compare: Migrations ↔ ERD"]
+    end
+    
+    A -.-> D
+    B -.-> D
+    B -.-> E  
+    C -.-> E
+    
+    D -->|❌ Drift Found| F[Fail: Create Migration]
+    D -->|✅ No Drift| G[Pass: Entities Match Migrations]
+    
+    E -->|❌ Outdated| H[Fail: Update ERD]
+    E -->|✅ Current| I[Pass: ERD Matches Schema]
+    
+    style A fill:#e1f5fe
+    style B fill:#f3e5f5  
+    style C fill:#e8f5e8
+    style CI_Validation fill:#fff3e0,stroke:#ff9800,stroke-width:2px
+    style F fill:#ffebee
+    style H fill:#ffebee
+    style G fill:#e8f5e8
+    style I fill:#e8f5e8
+```
+
+**Important**: ERD documentation always reflects the **migration-based schema**, not entity code changes. This ensures the ERD shows the actual database state that would be created in production.
 
 ## Resources
 
