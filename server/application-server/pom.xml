@@ -569,5 +569,63 @@
 				<skipCoverage>false</skipCoverage>
 			</properties>
 		</profile>
+		
+		<!-- Ultra-optimized CI profile for maximum performance -->
+		<profile>
+			<id>ci-ultra</id>
+			<properties>
+				<!-- Coverage and optimization settings -->
+				<skipCoverage>false</skipCoverage>
+				<maven.test.failure.ignore>false</maven.test.failure.ignore>
+			</properties>
+			<build>
+				<plugins>
+					<!-- Optimized Surefire configuration -->
+					<plugin>
+						<groupId>org.apache.maven.plugins</groupId>
+						<artifactId>maven-surefire-plugin</artifactId>
+						<configuration>
+							<!-- Parallel execution -->
+							<parallel>methods</parallel>
+							<threadCount>4</threadCount>
+							<perCoreThreadCount>true</perCoreThreadCount>
+							
+							<!-- Memory optimization -->
+							<forkCount>1</forkCount>
+							<reuseForks>true</reuseForks>
+							<argLine>@{argLine} -Xmx768m -XX:+UseParallelGC</argLine>
+							
+							<!-- Fast failure -->
+							<skipAfterFailureCount>1</skipAfterFailureCount>
+							
+							<!-- Optimized includes/excludes -->
+							<includes>
+								<include>**/*Test.java</include>
+								<include>**/*Tests.java</include>
+								<include>**/*IntegrationTest.java</include>
+							</includes>
+						</configuration>
+					</plugin>
+					
+					<!-- Optimized Failsafe for integration tests -->
+					<plugin>
+						<groupId>org.apache.maven.plugins</groupId>
+						<artifactId>maven-failsafe-plugin</artifactId>
+						<configuration>
+							<!-- Optimized integration test settings -->
+							<forkCount>1</forkCount>
+							<reuseForks>true</reuseForks>
+							<argLine>@{argLine} -Xmx1024m -XX:+UseParallelGC</argLine>
+							
+							<!-- Testcontainers optimization -->
+							<systemPropertyVariables>
+								<testcontainers.reuse.enable>true</testcontainers.reuse.enable>
+								<testcontainers.pull.pause.timeout>60</testcontainers.pull.pause.timeout>
+							</systemPropertyVariables>
+						</configuration>
+					</plugin>
+				</plugins>
+			</build>
+		</profile>
 	</profiles>
 </project>

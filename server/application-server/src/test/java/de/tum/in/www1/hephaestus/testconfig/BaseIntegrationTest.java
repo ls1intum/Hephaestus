@@ -35,9 +35,9 @@ public abstract class BaseIntegrationTest {
 
     @Container
     static PostgreSQLContainer<?> postgres = new PostgreSQLContainer<>("postgres:16")
-            .withDatabaseName("hephaestus_test")
-            .withUsername("test")
-            .withPassword("test");
+        .withDatabaseName("hephaestus_test")
+        .withUsername("test")
+        .withPassword("test");
 
     @DynamicPropertySource
     static void configureProperties(DynamicPropertyRegistry registry) {
@@ -45,5 +45,21 @@ public abstract class BaseIntegrationTest {
         registry.add("spring.datasource.username", postgres::getUsername);
         registry.add("spring.datasource.password", postgres::getPassword);
         registry.add("spring.datasource.driver-class-name", () -> "org.postgresql.Driver");
+        
+        // Optimizations for faster test execution
+        registry.add("spring.datasource.hikari.maximum-pool-size", () -> "5");
+        registry.add("spring.datasource.hikari.connection-timeout", () -> "5000");
+        registry.add("spring.datasource.hikari.validation-timeout", () -> "2000");
+        registry.add("spring.datasource.hikari.max-lifetime", () -> "600000");
+        registry.add("spring.datasource.hikari.leak-detection-threshold", () -> "10000");
+        
+        // JPA optimizations for tests
+        registry.add("spring.jpa.hibernate.ddl-auto", () -> "create-drop");
+        registry.add("spring.jpa.show-sql", () -> "false");
+        registry.add("spring.jpa.properties.hibernate.format_sql", () -> "false");
+        registry.add("spring.jpa.properties.hibernate.jdbc.batch_size", () -> "25");
+        
+        // Test context optimizations
+        registry.add("spring.test.context.cache.maxSize", () -> "1");
     }
 }

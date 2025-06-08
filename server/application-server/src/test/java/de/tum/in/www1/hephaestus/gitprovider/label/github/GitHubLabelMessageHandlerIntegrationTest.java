@@ -36,17 +36,18 @@ class GitHubLabelMessageHandlerIntegrationTest extends BaseIntegrationTest {
 
     @Test
     @DisplayName("Should process created label events")
-    void shouldProcessCreatedLabelEventsEndToEnd(@GitHubPayload("label.created") GHEventPayload.Label payload) throws Exception {
+    void shouldProcessCreatedLabelEventsEndToEnd(@GitHubPayload("label.created") GHEventPayload.Label payload)
+        throws Exception {
         // Given
         var ghLabel = payload.getLabel();
         var ghRepository = payload.getRepository();
-        
+
         // Ensure label doesn't exist initially
         labelRepository.deleteById(ghLabel.getId());
-        
+
         // When
         handler.handleEvent(payload);
-        
+
         // Then
         assertThat(labelRepository.findById(ghLabel.getId()))
             .isPresent()
@@ -57,18 +58,18 @@ class GitHubLabelMessageHandlerIntegrationTest extends BaseIntegrationTest {
                 assertThat(label.getColor()).isEqualTo(ghLabel.getColor());
                 assertThat(label.getDescription()).isEqualTo(ghLabel.getDescription());
             });
-        
+
         // Repository should also be processed
-        assertThat(repositoryRepository.findByNameWithOwner(ghRepository.getFullName()))
-            .isPresent();
+        assertThat(repositoryRepository.findByNameWithOwner(ghRepository.getFullName())).isPresent();
     }
 
     @Test
     @DisplayName("Should process edited label events")
-    void shouldProcessEditedLabelEventsEndToEnd(@GitHubPayload("label.edited") GHEventPayload.Label payload) throws Exception {
+    void shouldProcessEditedLabelEventsEndToEnd(@GitHubPayload("label.edited") GHEventPayload.Label payload)
+        throws Exception {
         // Given
         var ghLabel = payload.getLabel();
-        
+
         // Create existing label with different data
         Label existingLabel = new Label();
         existingLabel.setId(ghLabel.getId());
@@ -76,10 +77,10 @@ class GitHubLabelMessageHandlerIntegrationTest extends BaseIntegrationTest {
         existingLabel.setColor("ffffff");
         existingLabel.setDescription("old description");
         labelRepository.save(existingLabel);
-        
+
         // When
         handler.handleEvent(payload);
-        
+
         // Then
         assertThat(labelRepository.findById(ghLabel.getId()))
             .isPresent()
@@ -94,23 +95,24 @@ class GitHubLabelMessageHandlerIntegrationTest extends BaseIntegrationTest {
 
     @Test
     @DisplayName("Should process deleted label events")
-    void shouldProcessDeletedLabelEventsEndToEnd(@GitHubPayload("label.deleted") GHEventPayload.Label payload) throws Exception {
+    void shouldProcessDeletedLabelEventsEndToEnd(@GitHubPayload("label.deleted") GHEventPayload.Label payload)
+        throws Exception {
         // Given
         var ghLabel = payload.getLabel();
-        
+
         // Create existing label
         Label existingLabel = new Label();
         existingLabel.setId(ghLabel.getId());
         existingLabel.setName(ghLabel.getName());
         existingLabel.setColor(ghLabel.getColor());
         labelRepository.save(existingLabel);
-        
+
         // Verify it exists
         assertThat(labelRepository.findById(ghLabel.getId())).isPresent();
-        
+
         // When
         handler.handleEvent(payload);
-        
+
         // Then
         assertThat(labelRepository.findById(ghLabel.getId())).isEmpty();
     }

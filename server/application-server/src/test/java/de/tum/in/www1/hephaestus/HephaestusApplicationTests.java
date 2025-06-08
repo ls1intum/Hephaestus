@@ -16,9 +16,9 @@ class HephaestusApplicationTests {
 
     @Container
     static PostgreSQLContainer<?> postgres = new PostgreSQLContainer<>("postgres:16")
-            .withDatabaseName("hephaestus_test")
-            .withUsername("test")
-            .withPassword("test");
+        .withDatabaseName("hephaestus_test")
+        .withUsername("test")
+        .withPassword("test");
 
     @DynamicPropertySource
     static void configureProperties(DynamicPropertyRegistry registry) {

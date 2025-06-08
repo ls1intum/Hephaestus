@@ -14,16 +14,16 @@ import org.springframework.web.bind.annotation.RestController;
 
 /**
  * Basic architecture tests for compliance.
- * 
+ *
  * <p>These tests verify essential architectural principles:
  * <ul>
  *   <li>Spring annotation conventions</li>
  *   <li>Basic logging practices</li>
  *   <li>Repository interface contracts</li>
  * </ul>
- * 
+ *
  * More comprehensive architecture rules will be added in future PRs.
- * 
+ *
  * @author Felix T.J. Dietrich
  */
 @DisplayName("Architecture Compliance")
@@ -33,60 +33,77 @@ class ArchitectureTest extends BaseUnitTest {
 
     @BeforeAll
     static void setUp() {
-        applicationClasses = new ClassFileImporter()
-                .importPackages("de.tum.in.www1.hephaestus");
+        applicationClasses = new ClassFileImporter().importPackages("de.tum.in.www1.hephaestus");
     }
 
     @Test
     @DisplayName("Should follow Spring component naming conventions")
     void shouldFollowSpringComponentNamingConventions() {
         classes()
-                .that().areAnnotatedWith(RestController.class)
-                .should().haveSimpleNameEndingWith("Controller")
-                .check(applicationClasses);
+            .that()
+            .areAnnotatedWith(RestController.class)
+            .should()
+            .haveSimpleNameEndingWith("Controller")
+            .check(applicationClasses);
 
         classes()
-                .that().areAnnotatedWith(Service.class)
-                .should().haveSimpleNameEndingWith("Service")
-                .orShould().haveSimpleNameEndingWith("Scheduler")
-                .because("Services can be either business services or scheduled components")
-                .check(applicationClasses);
+            .that()
+            .areAnnotatedWith(Service.class)
+            .should()
+            .haveSimpleNameEndingWith("Service")
+            .orShould()
+            .haveSimpleNameEndingWith("Scheduler")
+            .because("Services can be either business services or scheduled components")
+            .check(applicationClasses);
 
         classes()
-                .that().areAnnotatedWith(Repository.class)
-                .should().haveSimpleNameEndingWith("Repository")
-                .check(applicationClasses);
+            .that()
+            .areAnnotatedWith(Repository.class)
+            .should()
+            .haveSimpleNameEndingWith("Repository")
+            .check(applicationClasses);
     }
 
     @Test
     @DisplayName("Repository interfaces should extend Spring Data repositories")
     void repositoryInterfacesShouldExtendSpringDataRepositories() {
         classes()
-                .that().areInterfaces()
-                .and().areAnnotatedWith(Repository.class)
-                .should().beAssignableTo("org.springframework.data.repository.Repository")
-                .check(applicationClasses);
+            .that()
+            .areInterfaces()
+            .and()
+            .areAnnotatedWith(Repository.class)
+            .should()
+            .beAssignableTo("org.springframework.data.repository.Repository")
+            .check(applicationClasses);
     }
 
     @Test
     @DisplayName("Should not use System.out or System.err for logging")
     void shouldNotUseSystemOutForLogging() {
         noClasses()
-                .that().resideInAPackage("de.tum.in.www1.hephaestus..")
-                .and().areNotAssignableFrom("de.tum.in.www1.hephaestus.Application")
-                .should().callMethod("java.lang.System", "out")
-                .orShould().callMethod("java.lang.System", "err")
-                .because("Use proper logging framework instead of System.out/err")
-                .check(applicationClasses);
+            .that()
+            .resideInAPackage("de.tum.in.www1.hephaestus..")
+            .and()
+            .areNotAssignableFrom("de.tum.in.www1.hephaestus.Application")
+            .should()
+            .callMethod("java.lang.System", "out")
+            .orShould()
+            .callMethod("java.lang.System", "err")
+            .because("Use proper logging framework instead of System.out/err")
+            .check(applicationClasses);
     }
 
     @Test
     @DisplayName("Test classes should follow naming conventions")
     void testClassesShouldFollowNamingConventions() {
         classes()
-                .that().haveSimpleNameEndingWith("Test")
-                .should().bePackagePrivate().orShould().bePublic()
-                .because("Test classes should be accessible for testing")
-                .check(applicationClasses);
+            .that()
+            .haveSimpleNameEndingWith("Test")
+            .should()
+            .bePackagePrivate()
+            .orShould()
+            .bePublic()
+            .because("Test classes should be accessible for testing")
+            .check(applicationClasses);
     }
 }
