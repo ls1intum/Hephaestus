@@ -429,10 +429,10 @@ jobs:
     strategy:
       matrix:
         component: 
-          - { name: "webapp", tag: "webapp", dockerfile: "./webapp-react/Dockerfile", context: "./webapp-react" }
-          - { name: "application-server", tag: "application-server", dockerfile: "./server/application-server/Dockerfile", context: "./server/application-server" }
-          - { name: "intelligence-service", tag: "intelligence-service", dockerfile: "./server/intelligence-service/Dockerfile", context: "./server/intelligence-service" }
-          - { name: "webhook-ingest", tag: "webhook-ingest", dockerfile: "./server/webhook-ingest/Dockerfile", context: "./server/webhook-ingest" }
+          - { name: "webapp", dockerfile: "./webapp-react/Dockerfile", context: "./webapp-react" }
+          - { name: "application-server", dockerfile: "./server/application-server/Dockerfile", context: "./server/application-server" }
+          - { name: "intelligence-service", dockerfile: "./server/intelligence-service/Dockerfile", context: "./server/intelligence-service" }
+          - { name: "webhook-ingest", dockerfile: "./server/webhook-ingest/Dockerfile", context: "./server/webhook-ingest" }
     steps:
       - uses: actions/checkout@v4
       
@@ -444,7 +444,7 @@ jobs:
         with:
           context: ${{ matrix.component.context }}
           file: ${{ matrix.component.dockerfile }}
-          tags: test-${{ matrix.component.tag }}:latest
+          tags: test-${{ matrix.component.name }}:latest
           load: true
           cache-from: type=gha
           cache-to: type=gha,mode=max
@@ -458,21 +458,6 @@ jobs:
           ignore-unfixed: true
           severity: 'CRITICAL,HIGH'
 
-  # Pipeline metrics and observability
-  pipeline-metrics:
-    runs-on: ubuntu-latest
-    needs: [test-matrix, docker-build-and-scan]
-    if: always()
-    steps:
-      - name: Collect and report pipeline metrics
-        run: |
-          echo "## 📊 Pipeline Performance Summary" >> $GITHUB_STEP_SUMMARY
-          echo "| Metric | Value |" >> $GITHUB_STEP_SUMMARY
-          echo "| --- | --- |" >> $GITHUB_STEP_SUMMARY
-          echo "| Total Duration | ${{ github.event.workflow_run.conclusion_time - github.event.workflow_run.started_time }} |" >> $GITHUB_STEP_SUMMARY
-          echo "| Test Results | ${{ join(needs.test-matrix.outputs.*, ', ') }} |" >> $GITHUB_STEP_SUMMARY
-          echo "| Security Scans | ${{ needs.security-scan.result }} |" >> $GITHUB_STEP_SUMMARY
-          echo "| Docker Builds | ${{ needs.docker-build-and-scan.result }} |" >> $GITHUB_STEP_SUMMARY
 
   # Aggregated success gate for branch protection
   all-ci-passed:
