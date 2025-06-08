@@ -125,9 +125,7 @@ jobs:
       - name: Output OpenAPI spec content
         id: spec_output
         run: |
-          echo "spec_content<<EOF" >> $GITHUB_OUTPUT
-          cat server/intelligence-service/openapi.yaml >> $GITHUB_OUTPUT
-          echo "EOF" >> $GITHUB_OUTPUT
+          echo "spec_content=$(base64 -w 0 server/intelligence-service/openapi.yaml)" >> $GITHUB_OUTPUT
 
   # Application Server spec validation
   application-server-specs:
@@ -223,9 +221,7 @@ jobs:
       - name: Output OpenAPI spec content
         id: spec_output
         run: |
-          echo "spec_content<<EOF" >> $GITHUB_OUTPUT
-          cat server/application-server/openapi.yaml >> $GITHUB_OUTPUT
-          echo "EOF" >> $GITHUB_OUTPUT
+          echo "spec_content=$(base64 -w 0 server/application-server/openapi.yaml)" >> $GITHUB_OUTPUT
 
   # Intelligence Service Java client generation (runs even if spec validation fails)
   intelligence-service-client:
@@ -247,7 +243,7 @@ jobs:
       - name: Create Intelligence Service OpenAPI spec from previous job output
         run: |
           mkdir -p server/intelligence-service
-          echo '${{ needs.intelligence-service-specs.outputs.spec-content }}' > server/intelligence-service/openapi.yaml
+          echo '${{ needs.intelligence-service-specs.outputs.spec-content }}' | base64 -d > server/intelligence-service/openapi.yaml
 
       - name: Install dependencies
         run: npm install
@@ -335,7 +331,7 @@ jobs:
       - name: Create Application Server OpenAPI spec from previous job output
         run: |
           mkdir -p server/application-server
-          echo '${{ needs.application-server-specs.outputs.spec-content }}' > server/application-server/openapi.yaml
+          echo '${{ needs.application-server-specs.outputs.spec-content }}' | base64 -d > server/application-server/openapi.yaml
 
       - name: Set up Node.js
         uses: actions/setup-node@v4
