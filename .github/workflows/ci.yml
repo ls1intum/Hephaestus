@@ -310,16 +310,16 @@ jobs:
     strategy:
       matrix:
         component: 
-          - { name: "Webapp", dockerfile: "./webapp-react/Dockerfile", context: "./webapp-react" }
-          - { name: "Application Server", dockerfile: "./server/application-server/Dockerfile", context: "./server/application-server" }
-          - { name: "Intelligence Service", dockerfile: "./server/intelligence-service/Dockerfile", context: "./server/intelligence-service" }
-          - { name: "Webhook Ingest", dockerfile: "./server/webhook-ingest/Dockerfile", context: "./server/webhook-ingest" }
+          - { name: "Webapp", tag: "webapp", dockerfile: "./webapp-react/Dockerfile", context: "./webapp-react" }
+          - { name: "Application Server", tag: "application-server", dockerfile: "./server/application-server/Dockerfile", context: "./server/application-server" }
+          - { name: "Intelligence Service", tag: "intelligence-service", dockerfile: "./server/intelligence-service/Dockerfile", context: "./server/intelligence-service" }
+          - { name: "Webhook Ingest", tag: "webhook-ingest", dockerfile: "./server/webhook-ingest/Dockerfile", context: "./server/webhook-ingest" }
     steps:
       - uses: actions/checkout@v4
       
       - name: Build ${{ matrix.component.name }} Docker image
         run: |
-          docker build -f ${{ matrix.component.dockerfile }} ${{ matrix.component.context }} -t test-${{ matrix.component.name }}
+          docker build -f ${{ matrix.component.dockerfile }} ${{ matrix.component.context }} -t test-${{ matrix.component.tag }}
 
   # Aggregate job for branch protection
   all-ci-passed:
