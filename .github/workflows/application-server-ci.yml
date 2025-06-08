@@ -63,7 +63,7 @@ jobs:
           distribution: 'temurin'
           cache: maven
 
-      - name: Run pure unit tests
+      - name: Run unit tests
         run: |
           mvn test \
             -Dgroups="unit" \
@@ -114,25 +114,11 @@ jobs:
           reporter: java-junit
           fail-on-error: false
 
-  # Integration tests - run independently
+  # Integration tests - run independently with Testcontainers
   integration-tests:
     name: Application Server / Integration Tests
     runs-on: ubuntu-latest
-    timeout-minutes: 20
-    services:
-      postgres:
-        image: postgres:16
-        env:
-          POSTGRES_DB: hephaestus_test
-          POSTGRES_USER: test
-          POSTGRES_PASSWORD: test
-        options: >-
-          --health-cmd pg_isready
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 5
-        ports:
-          - 5432:5432
+    timeout-minutes: 15
     
     steps:
       - name: Checkout code
@@ -145,26 +131,11 @@ jobs:
           distribution: 'temurin'
           cache: maven
 
-      - name: Wait for PostgreSQL
-        run: |
-          until pg_isready -h localhost -p 5432 -U test; do
-            echo "Waiting for PostgreSQL..."
-            sleep 2
-          done
-
-      - name: Run optimized integration tests
-        env:
-          SPRING_DATASOURCE_URL: jdbc:postgresql://localhost:5432/hephaestus_test
-          SPRING_DATASOURCE_USERNAME: test
-          SPRING_DATASOURCE_PASSWORD: test
-          SPRING_JPA_HIBERNATE_DDL_AUTO: create-drop
-          SPRING_DATASOURCE_HIKARI_MAXIMUM_POOL_SIZE: 5
-          SPRING_DATASOURCE_HIKARI_CONNECTION_TIMEOUT: 5000
-          SPRING_TEST_CONTEXT_CACHE_MAXSIZE: 1
+      - name: Run integration tests
         run: |
           mvn test \
-            -Dtest="**/*IntegrationTest,**/HephaestusApplicationTests" \
-            -Pci \
+            -Dgroups="integration" \
+            -T 1C \
             --batch-mode \
             --fail-at-end
         continue-on-error: true
@@ -177,12 +148,3 @@ jobs:
           path: server/application-server/target/surefire-reports/*.xml
           reporter: java-junit
           fail-on-error: false
-
-      - name: Upload coverage report
-        uses: codecov/codecov-action@v4
-        if: success()
-        with:
-          file: server/application-server/target/site/jacoco/jacoco.xml
-          flags: integration-tests
-          name: codecov-umbrella
-          fail_ci_if_error: false
