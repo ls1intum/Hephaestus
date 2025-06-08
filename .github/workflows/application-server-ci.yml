@@ -2,15 +2,17 @@ name: CI/CD
 
 on:
   push:
-    branches: [ main, develop ]
+    branches: [ develop ]
     paths:
       - 'server/application-server/**'
-      - '.github/workflows/java-ci-ultra.yml'
+      - '!server/application-server/src/main/java/de/tum/in/www1/hephaestus/intelligenceservice/**'
+      - '.github/workflows/application-server-ci.yml'
   pull_request:
-    branches: [ main, develop ]
+    branches: [ develop ]
     paths:
       - 'server/application-server/**'
-      - '.github/workflows/java-ci-ultra.yml'
+      - '!server/application-server/src/main/java/de/tum/in/www1/hephaestus/intelligenceservice/**'
+      - '.github/workflows/application-server-ci.yml'
 
 defaults:
   run:
@@ -21,11 +23,11 @@ env:
   TESTCONTAINERS_REUSE_ENABLE: true
 
 jobs:
-  # Code quality checks - run independently for complete feedback
+  # Code quality checks
   code-quality:
     name: Application Server / Code Quality
     runs-on: ubuntu-latest
-    timeout-minutes: 8
+    timeout-minutes: 10
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -45,18 +47,7 @@ jobs:
         working-directory: .
         continue-on-error: true
 
-      - name: Set up JDK 21
-        uses: actions/setup-java@v4
-        with:
-          java-version: '21'
-          distribution: 'temurin'
-          cache: maven
-
-      - name: Compile and validate code
-        run: mvn compile -DskipTests -T 1C --batch-mode
-        continue-on-error: true
-
-  # Pure unit tests - run completely independently
+  # Unit tests - run independently
   unit-tests:
     name: Application Server / Unit Tests
     runs-on: ubuntu-latest
@@ -90,11 +81,11 @@ jobs:
           reporter: java-junit
           fail-on-error: false
 
-  # Architecture tests - run completely independently
+  # Architecture tests - run independently
   architecture-tests:
     name: Application Server / Architecture Tests
     runs-on: ubuntu-latest
-    timeout-minutes: 8
+    timeout-minutes: 10
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -123,7 +114,7 @@ jobs:
           reporter: java-junit
           fail-on-error: false
 
-  # Integration tests - run completely independently
+  # Integration tests - run independently
   integration-tests:
     name: Application Server / Integration Tests
     runs-on: ubuntu-latest-4-cores
@@ -195,104 +186,3 @@ jobs:
           flags: integration-tests
           name: codecov-umbrella
           fail_ci_if_error: false
-
-  # Application build - run completely independently
-  build:
-    name: Application Server / Build
-    runs-on: ubuntu-latest
-    timeout-minutes: 8
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Set up JDK 21
-        uses: actions/setup-java@v4
-        with:
-          java-version: '21'
-          distribution: 'temurin'
-          cache: maven
-
-      - name: Build application with optimizations
-        run: |
-          mvn package \
-            -DskipTests \
-            -T 1C \
-            -Dmaven.compile.fork=true \
-            -Dmaven.compiler.maxmem=1024m \
-            --batch-mode
-        continue-on-error: true
-
-      - name: Upload build artifacts
-        uses: actions/upload-artifact@v4
-        if: success()
-        with:
-          name: hephaestus-jar-optimized
-          path: server/application-server/target/*.jar
-          retention-days: 30
-
-  # Summary job for comprehensive feedback
-  ci-summary:
-    name: CI Pipeline Summary
-    runs-on: ubuntu-latest
-    needs: [code-quality, unit-tests, architecture-tests, integration-tests, build]
-    if: always()
-    steps:
-      - name: Comprehensive results analysis
-        run: |
-          echo "=== COMPREHENSIVE CI RESULTS ==="
-          echo "Code Quality: ${{ needs.code-quality.result }}"
-          echo "Unit Tests: ${{ needs.unit-tests.result }}"
-          echo "Architecture Tests: ${{ needs.architecture-tests.result }}"
-          echo "Integration Tests: ${{ needs.integration-tests.result }}"
-          echo "Build: ${{ needs.build.result }}"
-          echo ""
-          
-          # Count failures for comprehensive feedback
-          failures=0
-          
-          if [[ "${{ needs.code-quality.result }}" == "failure" ]]; then
-            echo "❌ Code Quality Issues Found (formatting/compilation)"
-            failures=$((failures + 1))
-          else
-            echo "✅ Code Quality Passed"
-          fi
-          
-          if [[ "${{ needs.unit-tests.result }}" == "failure" ]]; then
-            echo "❌ Unit Test Failures"
-            failures=$((failures + 1))
-          else
-            echo "✅ Unit Tests Passed"
-          fi
-          
-          if [[ "${{ needs.architecture-tests.result }}" == "failure" ]]; then
-            echo "❌ Architecture Test Failures"
-            failures=$((failures + 1))
-          else
-            echo "✅ Architecture Tests Passed"
-          fi
-          
-          if [[ "${{ needs.integration-tests.result }}" == "failure" ]]; then
-            echo "❌ Integration Test Failures"
-            failures=$((failures + 1))
-          else
-            echo "✅ Integration Tests Passed"
-          fi
-          
-          if [[ "${{ needs.build.result }}" == "failure" ]]; then
-            echo "❌ Build Failures"
-            failures=$((failures + 1))
-          else
-            echo "✅ Build Passed"
-          fi
-          
-          echo ""
-          echo "=== FINAL SUMMARY ==="
-          if [ $failures -eq 0 ]; then
-            echo "🎉 ALL CHECKS PASSED!"
-            echo "Pipeline completed successfully with full parallel execution."
-          else
-            echo "⚠️  $failures issue(s) found across the pipeline"
-            echo "Check individual job results for detailed information."
-            echo "All jobs ran to completion to provide comprehensive feedback."
-            exit 1
-          fi

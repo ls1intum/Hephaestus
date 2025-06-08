@@ -1,4 +1,4 @@
-name: Build Docker Images
+name: CI/CD
 
 on:
   pull_request:
