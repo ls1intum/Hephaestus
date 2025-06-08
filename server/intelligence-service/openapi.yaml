@@ -288,6 +288,6 @@ paths:
               schema:
                 $ref: '#/components/schemas/HTTPValidationError'
           description: Validation Error
-      summary: Start a chat session with an LLM.
+      summary: Start a chat session with an LLM. TODO REMOVE
       tags:
       - mentor

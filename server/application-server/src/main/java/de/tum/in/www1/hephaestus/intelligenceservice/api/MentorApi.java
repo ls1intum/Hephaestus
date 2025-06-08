@@ -91,7 +91,7 @@ public class MentorApi extends BaseApi {
         return apiClient.invokeAPI("/mentor/", HttpMethod.POST, Collections.<String, Object>emptyMap(), localVarQueryParams, localVarPostBody, localVarHeaderParams, localVarCookieParams, localVarFormParams, localVarAccept, localVarContentType, localVarAuthNames, localReturnType);
     }
     /**
-     * Start a chat session with an LLM.
+     * Start a chat session with an LLM. TODO REMOVE
      * 
      * <p><b>200</b> - Successful Response
      * <p><b>422</b> - Validation Error
@@ -104,7 +104,7 @@ public class MentorApi extends BaseApi {
     }
 
     /**
-     * Start a chat session with an LLM.
+     * Start a chat session with an LLM. TODO REMOVE
      * 
      * <p><b>200</b> - Successful Response
      * <p><b>422</b> - Validation Error
