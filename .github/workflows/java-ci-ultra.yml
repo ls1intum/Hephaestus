@@ -75,8 +75,7 @@ jobs:
       - name: Run pure unit tests
         run: |
           mvn test \
-            -Dtest="**/*Test" \
-            -DexcludeGroups="integration" \
+            -Dgroups="unit" \
             -T 1C \
             --batch-mode \
             --fail-at-end
@@ -110,7 +109,7 @@ jobs:
       - name: Run architecture tests
         run: |
           mvn test \
-            -Dtest="**/*ArchitectureTest" \
+            -Dtest="**/ArchitectureTest" \
             --batch-mode \
             --fail-at-end
         continue-on-error: true
