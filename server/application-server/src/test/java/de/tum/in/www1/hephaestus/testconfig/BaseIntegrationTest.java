@@ -1,12 +1,12 @@
 package de.tum.in.www1.hephaestus.testconfig;
 
 import org.junit.jupiter.api.Tag;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
 import org.testcontainers.containers.PostgreSQLContainer;
-import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
 
 /**
@@ -15,15 +15,30 @@ import org.testcontainers.junit.jupiter.Testcontainers;
  * <p>This class provides:
  *
  * <ul>
- *   <li>PostgreSQL database via Testcontainers for realistic integration testing
+ *   <li>Shared PostgreSQL database via Testcontainers for faster integration testing
  *   <li>Full Spring Boot context with web environment
  *   <li>Proper test profile configuration
  *   <li>JUnit 5 tagging for test categorization
+ *   <li>Database utilities for managing test data
  * </ul>
  *
  * <p>Usage: Extend this class for your integration tests that need full Spring context.
  *
- * <p>Note: Uses PostgreSQL to match the production environment and support all entity features.
+ * <p>Performance: Uses a shared PostgreSQL container across all integration tests,
+ * which significantly improves test performance by avoiding container startup overhead.
+ * The same database instance is reused, but the schema is recreated for each test class.
+ * 
+ * <p>Database Management: Use the {@link #databaseTestUtils} to clean up data between
+ * individual tests if needed, or rely on the default create-drop behavior for isolation
+ * between test classes.
+ * 
+ * <p>Example usage for test isolation:
+ * <pre>{@code
+ * @BeforeEach
+ * void setUp() {
+ *     databaseTestUtils.cleanDatabase(); // Clean all tables before each test
+ * }
+ * }</pre>
  *
  * @author Felix T.J. Dietrich
  */
@@ -33,14 +48,12 @@ import org.testcontainers.junit.jupiter.Testcontainers;
 @Tag("integration")
 public abstract class BaseIntegrationTest {
 
-    @Container
-    static PostgreSQLContainer<?> postgres = new PostgreSQLContainer<>("postgres:16")
-        .withDatabaseName("hephaestus_test")
-        .withUsername("test")
-        .withPassword("test");
+    @Autowired
+    protected DatabaseTestUtils databaseTestUtils;
 
     @DynamicPropertySource
     static void configureProperties(DynamicPropertyRegistry registry) {
+        PostgreSQLContainer<?> postgres = PostgreSQLTestContainer.getInstance();
         registry.add("spring.datasource.url", postgres::getJdbcUrl);
         registry.add("spring.datasource.username", postgres::getUsername);
         registry.add("spring.datasource.password", postgres::getPassword);

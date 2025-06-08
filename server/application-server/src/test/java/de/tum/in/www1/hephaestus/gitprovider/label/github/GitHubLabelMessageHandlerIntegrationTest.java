@@ -8,6 +8,7 @@ import de.tum.in.www1.hephaestus.gitprovider.label.Label;
 import de.tum.in.www1.hephaestus.gitprovider.label.LabelRepository;
 import de.tum.in.www1.hephaestus.gitprovider.repository.RepositoryRepository;
 import de.tum.in.www1.hephaestus.testconfig.BaseIntegrationTest;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -28,6 +29,14 @@ class GitHubLabelMessageHandlerIntegrationTest extends BaseIntegrationTest {
     @Autowired
     private RepositoryRepository repositoryRepository;
 
+    @BeforeEach
+    void setUp() {
+        // Clean all database tables before each test to ensure isolation
+        // This provides a clean slate for each test without affecting performance
+        // Note: Comment this out to see data persistence between tests
+        databaseTestUtils.cleanDatabase();
+    }
+
     @Test
     @DisplayName("Should return correct handler event type")
     void shouldReturnCorrectHandlerEventType() {
@@ -42,8 +51,8 @@ class GitHubLabelMessageHandlerIntegrationTest extends BaseIntegrationTest {
         var ghLabel = payload.getLabel();
         var ghRepository = payload.getRepository();
 
-        // Ensure label doesn't exist initially
-        labelRepository.deleteById(ghLabel.getId());
+        // Verify label doesn't exist initially
+        assertThat(labelRepository.findById(ghLabel.getId())).isEmpty();
 
         // When
         handler.handleEvent(payload);
