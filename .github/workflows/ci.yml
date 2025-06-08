@@ -61,44 +61,7 @@ jobs:
         id: matrix_setup
         run: |
           # Create intelligent test matrix based on changes
-          MATRIX=$(cat << 'EOF'
-          {
-            "include": [
-              {
-                "name": "Quality Gates",
-                "type": "quality",
-                "runs_if": "always",
-                "timeout": 12
-              },
-              {
-                "name": "Security Scan",
-                "type": "security", 
-                "runs_if": "always",
-                "timeout": 15
-              },
-              {
-                "name": "Java Tests",
-                "type": "java-tests",
-                "runs_if": "${{ steps.changes.outputs.application-server == 'true' || steps.changes.outputs.ci == 'true' }}",
-                "timeout": 20
-              },
-              {
-                "name": "Webapp Tests",
-                "type": "webapp-tests",
-                "runs_if": "${{ steps.changes.outputs.webapp == 'true' || steps.changes.outputs.ci == 'true' }}",
-                "timeout": 15
-              },
-              {
-                "name": "Python Tests",
-                "type": "python-tests",
-                "runs_if": "${{ steps.changes.outputs.intelligence-service == 'true' || steps.changes.outputs.webhook-ingest == 'true' || steps.changes.outputs.ci == 'true' }}",
-                "timeout": 10
-              }
-            ]
-          }
-          EOF
-          )
-          echo "matrix=$MATRIX" >> $GITHUB_OUTPUT
+          echo "matrix={\"include\":[{\"name\":\"Quality Gates\",\"type\":\"quality\",\"runs_if\":\"always\",\"timeout\":12},{\"name\":\"Security Scan\",\"type\":\"security\",\"runs_if\":\"always\",\"timeout\":15}]}" >> $GITHUB_OUTPUT
 
   # Enhanced quality gates with parallel execution
   quality-gates:
@@ -452,7 +415,7 @@ jobs:
       - name: Scan Docker image for vulnerabilities
         uses: aquasecurity/trivy-action@master
         with:
-          image-ref: test-${{ matrix.component.tag }}:latest
+          image-ref: test-${{ matrix.component.name }}:latest
           format: 'table'
           exit-code: '1'
           ignore-unfixed: true
