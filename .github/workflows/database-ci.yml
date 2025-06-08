@@ -122,12 +122,26 @@ jobs:
 
       - name: Validate ERD Documentation
         run: |
-          if ! git diff --quiet docs/dev/database/schema.mmd; then
+          # Add all changes to git index so we can detect them
+          git add .
+          
+          # Check if the ERD file was modified during generation
+          if ! git diff --cached --quiet docs/dev/database/schema.mmd; then
             echo "## ⚠️ ERD Documentation Outdated" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "The ERD documentation was automatically updated during validation." >> $GITHUB_STEP_SUMMARY
+            echo "This means your committed ERD was out of sync with the current database schema." >> $GITHUB_STEP_SUMMARY
             echo "" >> $GITHUB_STEP_SUMMARY
             echo "**Fix Required:**" >> $GITHUB_STEP_SUMMARY
             echo '```bash' >> $GITHUB_STEP_SUMMARY
             echo 'npm run db:generate-erd-docs' >> $GITHUB_STEP_SUMMARY
+            echo 'git add docs/dev/database/schema.mmd' >> $GITHUB_STEP_SUMMARY
+            echo 'git commit -m "Update database ERD documentation"' >> $GITHUB_STEP_SUMMARY
+            echo '```' >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "**Changes detected in ERD file:**" >> $GITHUB_STEP_SUMMARY
+            echo '```diff' >> $GITHUB_STEP_SUMMARY
+            git diff --cached docs/dev/database/schema.mmd >> $GITHUB_STEP_SUMMARY
             echo '```' >> $GITHUB_STEP_SUMMARY
             echo "ERD documentation validation failed. Check the CI summary above for details."
             exit 1
