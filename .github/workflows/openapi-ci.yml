@@ -75,6 +75,46 @@ jobs:
             echo "spec_changed=true" >> $GITHUB_OUTPUT
           fi
 
+      - name: Validate spec consistency
+        run: |
+          if [[ "${{ steps.check_spec_changes.outputs.spec_changed }}" == "true" ]]; then
+            # Check if autocommit label is present
+            if [[ "${{ contains(github.event.pull_request.labels.*.name, 'autocommit-openapi') }}" == "true" ]]; then
+              echo "✅ Intelligence Service OpenAPI spec changes detected, but autocommit-openapi label is present - will auto-commit"
+            else
+              echo "## ⚠️ Intelligence Service OpenAPI Spec Out of Sync" >> $GITHUB_STEP_SUMMARY
+              echo "" >> $GITHUB_STEP_SUMMARY
+              echo "**Issue:** The committed Intelligence Service OpenAPI spec does not match the current FastAPI code." >> $GITHUB_STEP_SUMMARY
+              echo "" >> $GITHUB_STEP_SUMMARY
+              echo "**What this means:**" >> $GITHUB_STEP_SUMMARY
+              echo "- Intelligence Service FastAPI code changes were made without regenerating the OpenAPI specification" >> $GITHUB_STEP_SUMMARY
+              echo "- The Intelligence Service spec file is out of sync with the actual FastAPI endpoints" >> $GITHUB_STEP_SUMMARY
+              echo "- This will cause the Application Server's Java client generation to use outdated API definitions" >> $GITHUB_STEP_SUMMARY
+              echo "" >> $GITHUB_STEP_SUMMARY
+              echo "**Fix Required (choose one):**" >> $GITHUB_STEP_SUMMARY
+              echo "" >> $GITHUB_STEP_SUMMARY
+              echo "**Option 1 - Auto-commit (Recommended):**" >> $GITHUB_STEP_SUMMARY
+              echo "Add the \`autocommit-openapi\` label to this PR to automatically commit the updated spec." >> $GITHUB_STEP_SUMMARY
+              echo "" >> $GITHUB_STEP_SUMMARY
+              echo "**Option 2 - Manual fix:**" >> $GITHUB_STEP_SUMMARY
+              echo '```bash' >> $GITHUB_STEP_SUMMARY
+              echo 'cd server/intelligence-service' >> $GITHUB_STEP_SUMMARY
+              echo 'poetry run openapi' >> $GITHUB_STEP_SUMMARY
+              echo 'git add openapi.yaml' >> $GITHUB_STEP_SUMMARY
+              echo 'git commit -m "chore: update intelligence service OpenAPI spec"' >> $GITHUB_STEP_SUMMARY
+              echo '```' >> $GITHUB_STEP_SUMMARY
+              echo "" >> $GITHUB_STEP_SUMMARY
+              echo "**Changes detected:**" >> $GITHUB_STEP_SUMMARY
+              echo '```diff' >> $GITHUB_STEP_SUMMARY
+              git diff --cached server/intelligence-service/openapi.yaml >> $GITHUB_STEP_SUMMARY
+              echo '```' >> $GITHUB_STEP_SUMMARY
+              echo "Intelligence Service OpenAPI spec validation failed. Check the CI summary above for details."
+              exit 1
+            fi
+          else
+            echo "✅ Intelligence Service OpenAPI spec validation passed - FastAPI spec matches code"
+          fi
+
       - name: Upload OpenAPI specs as artifact
         uses: actions/upload-artifact@v4
         with:
@@ -126,6 +166,46 @@ jobs:
             echo "spec_changed=true" >> $GITHUB_OUTPUT
           fi
 
+      - name: Validate spec consistency
+        run: |
+          if [[ "${{ steps.check_spec_changes.outputs.spec_changed }}" == "true" ]]; then
+            # Check if autocommit label is present
+            if [[ "${{ contains(github.event.pull_request.labels.*.name, 'autocommit-openapi') }}" == "true" ]]; then
+              echo "✅ Application Server OpenAPI spec changes detected, but autocommit-openapi label is present - will auto-commit"
+            else
+              echo "## ⚠️ Application Server OpenAPI Spec Out of Sync" >> $GITHUB_STEP_SUMMARY
+              echo "" >> $GITHUB_STEP_SUMMARY
+              echo "**Issue:** The committed Application Server OpenAPI spec does not match the current Spring Boot code." >> $GITHUB_STEP_SUMMARY
+              echo "" >> $GITHUB_STEP_SUMMARY
+              echo "**What this means:**" >> $GITHUB_STEP_SUMMARY
+              echo "- Application Server Spring Boot code changes were made without regenerating the OpenAPI specification" >> $GITHUB_STEP_SUMMARY
+              echo "- The Application Server spec file is out of sync with the actual Spring Boot API endpoints" >> $GITHUB_STEP_SUMMARY
+              echo "- This will cause the Webapp's TypeScript client generation to use outdated API definitions" >> $GITHUB_STEP_SUMMARY
+              echo "" >> $GITHUB_STEP_SUMMARY
+              echo "**Fix Required (choose one):**" >> $GITHUB_STEP_SUMMARY
+              echo "" >> $GITHUB_STEP_SUMMARY
+              echo "**Option 1 - Auto-commit (Recommended):**" >> $GITHUB_STEP_SUMMARY
+              echo "Add the \`autocommit-openapi\` label to this PR to automatically commit the updated spec." >> $GITHUB_STEP_SUMMARY
+              echo "" >> $GITHUB_STEP_SUMMARY
+              echo "**Option 2 - Manual fix:**" >> $GITHUB_STEP_SUMMARY
+              echo '```bash' >> $GITHUB_STEP_SUMMARY
+              echo 'cd server/application-server' >> $GITHUB_STEP_SUMMARY
+              echo 'mvn verify -DskipTests=true -Dapp.profiles=specs' >> $GITHUB_STEP_SUMMARY
+              echo 'git add openapi.yaml' >> $GITHUB_STEP_SUMMARY
+              echo 'git commit -m "chore: update application server OpenAPI spec"' >> $GITHUB_STEP_SUMMARY
+              echo '```' >> $GITHUB_STEP_SUMMARY
+              echo "" >> $GITHUB_STEP_SUMMARY
+              echo "**Changes detected:**" >> $GITHUB_STEP_SUMMARY
+              echo '```diff' >> $GITHUB_STEP_SUMMARY
+              git diff --cached server/application-server/openapi.yaml >> $GITHUB_STEP_SUMMARY
+              echo '```' >> $GITHUB_STEP_SUMMARY
+              echo "Application Server OpenAPI spec validation failed. Check the CI summary above for details."
+              exit 1
+            fi
+          else
+            echo "✅ Application Server OpenAPI spec validation passed - Spring Boot spec matches code"
+          fi
+
       - name: Upload OpenAPI specs as artifact
         uses: actions/upload-artifact@v4
         with:
@@ -172,6 +252,45 @@ jobs:
             echo "Changes detected in the API client directory."
             echo "changes_detected=true" >> $GITHUB_OUTPUT
             git diff --cached
+          fi
+
+      - name: Validate client consistency
+        run: |
+          if [[ "${{ steps.check_changes.outputs.changes_detected }}" == "true" ]]; then
+            # Check if autocommit label is present
+            if [[ "${{ contains(github.event.pull_request.labels.*.name, 'autocommit-openapi') }}" == "true" ]]; then
+              echo "✅ Intelligence Service Java client changes detected, but autocommit-openapi label is present - will auto-commit"
+            else
+              echo "## ⚠️ Intelligence Service Java Client Out of Sync" >> $GITHUB_STEP_SUMMARY
+              echo "" >> $GITHUB_STEP_SUMMARY
+              echo "**Issue:** The Application Server's Java client for Intelligence Service does not match the current Intelligence Service OpenAPI spec." >> $GITHUB_STEP_SUMMARY
+              echo "" >> $GITHUB_STEP_SUMMARY
+              echo "**What this means:**" >> $GITHUB_STEP_SUMMARY
+              echo "- Intelligence Service OpenAPI spec was updated but the Application Server's Java client wasn't regenerated" >> $GITHUB_STEP_SUMMARY
+              echo "- The Application Server will use an outdated Java client to call the Intelligence Service" >> $GITHUB_STEP_SUMMARY
+              echo "- API calls from Application Server to Intelligence Service may fail or use wrong data structures" >> $GITHUB_STEP_SUMMARY
+              echo "" >> $GITHUB_STEP_SUMMARY
+              echo "**Fix Required (choose one):**" >> $GITHUB_STEP_SUMMARY
+              echo "" >> $GITHUB_STEP_SUMMARY
+              echo "**Option 1 - Auto-commit (Recommended):**" >> $GITHUB_STEP_SUMMARY
+              echo "Add the \`autocommit-openapi\` label to this PR to automatically commit the updated client." >> $GITHUB_STEP_SUMMARY
+              echo "" >> $GITHUB_STEP_SUMMARY
+              echo "**Option 2 - Manual fix:**" >> $GITHUB_STEP_SUMMARY
+              echo '```bash' >> $GITHUB_STEP_SUMMARY
+              echo 'npm run generate:api:intelligence-service:client' >> $GITHUB_STEP_SUMMARY
+              echo 'git add server/application-server/src/main/java/de/tum/in/www1/hephaestus/intelligenceservice/' >> $GITHUB_STEP_SUMMARY
+              echo 'git commit -m "chore: update intelligence service Java client"' >> $GITHUB_STEP_SUMMARY
+              echo '```' >> $GITHUB_STEP_SUMMARY
+              echo "" >> $GITHUB_STEP_SUMMARY
+              echo "**Changes detected:**" >> $GITHUB_STEP_SUMMARY
+              echo '```diff' >> $GITHUB_STEP_SUMMARY
+              git diff --cached server/application-server/src/main/java/de/tum/in/www1/hephaestus/intelligenceservice/ >> $GITHUB_STEP_SUMMARY
+              echo '```' >> $GITHUB_STEP_SUMMARY
+              echo "Application Server Java client (for Intelligence Service) validation failed. Check the CI summary above for details."
+              exit 1
+            fi
+          else
+            echo "✅ Application Server Java client validation passed - client matches Intelligence Service OpenAPI spec"
           fi
 
   # Application Server React client generation (depends on spec validation)
@@ -226,6 +345,45 @@ jobs:
             echo "Staged changes:"
             git diff --cached
             echo "changes_detected=true" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Validate client consistency
+        run: |
+          if [[ "${{ steps.check_changes.outputs.changes_detected }}" == "true" ]]; then
+            # Check if autocommit label is present
+            if [[ "${{ contains(github.event.pull_request.labels.*.name, 'autocommit-openapi') }}" == "true" ]]; then
+              echo "✅ Application Server TypeScript client changes detected, but autocommit-openapi label is present - will auto-commit"
+            else
+              echo "## ⚠️ Application Server TypeScript Client Out of Sync" >> $GITHUB_STEP_SUMMARY
+              echo "" >> $GITHUB_STEP_SUMMARY
+              echo "**Issue:** The Webapp's TypeScript client for Application Server does not match the current Application Server OpenAPI spec." >> $GITHUB_STEP_SUMMARY
+              echo "" >> $GITHUB_STEP_SUMMARY
+              echo "**What this means:**" >> $GITHUB_STEP_SUMMARY
+              echo "- Application Server OpenAPI spec was updated but the Webapp's TypeScript client wasn't regenerated" >> $GITHUB_STEP_SUMMARY
+              echo "- The Webapp (React) will use an outdated TypeScript client to call the Application Server" >> $GITHUB_STEP_SUMMARY
+              echo "- API calls from Webapp to Application Server may fail or use wrong data structures" >> $GITHUB_STEP_SUMMARY
+              echo "" >> $GITHUB_STEP_SUMMARY
+              echo "**Fix Required (choose one):**" >> $GITHUB_STEP_SUMMARY
+              echo "" >> $GITHUB_STEP_SUMMARY
+              echo "**Option 1 - Auto-commit (Recommended):**" >> $GITHUB_STEP_SUMMARY
+              echo "Add the \`autocommit-openapi\` label to this PR to automatically commit the updated client." >> $GITHUB_STEP_SUMMARY
+              echo "" >> $GITHUB_STEP_SUMMARY
+              echo "**Option 2 - Manual fix:**" >> $GITHUB_STEP_SUMMARY
+              echo '```bash' >> $GITHUB_STEP_SUMMARY
+              echo 'npm run generate:api:application-server:client-react' >> $GITHUB_STEP_SUMMARY
+              echo 'git add webapp-react/src/api/' >> $GITHUB_STEP_SUMMARY
+              echo 'git commit -m "chore: update application server React client"' >> $GITHUB_STEP_SUMMARY
+              echo '```' >> $GITHUB_STEP_SUMMARY
+              echo "" >> $GITHUB_STEP_SUMMARY
+              echo "**Changes detected:**" >> $GITHUB_STEP_SUMMARY
+              echo '```diff' >> $GITHUB_STEP_SUMMARY
+              git diff --cached webapp-react/src/api/ >> $GITHUB_STEP_SUMMARY
+              echo '```' >> $GITHUB_STEP_SUMMARY
+              echo "Webapp TypeScript client (for Application Server) validation failed. Check the CI summary above for details."
+              exit 1
+            fi
+          else
+            echo "✅ Webapp TypeScript client validation passed - client matches Application Server OpenAPI spec"
           fi
 
   # Unified commit job - runs after both client generations complete
