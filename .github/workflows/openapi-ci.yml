@@ -1,4 +1,4 @@
-name: OpenAPI Generation
+name: CI/CD
 
 on:
   pull_request:
@@ -19,7 +19,7 @@ on:
 jobs:
   # Intelligence Service spec validation
   intelligence-service-specs:
-    name: Intelligence Service / API Spec Validation
+    name: Intelligence Service / Validate OpenAPI spec (add autocommit-openapi label to PR to auto-commit changes)
     runs-on: ubuntu-latest
     outputs:
       spec-changed: ${{ steps.check_spec_changes.outputs.spec_changed }}
@@ -83,7 +83,7 @@ jobs:
 
   # Application Server spec validation
   application-server-specs:
-    name: Application Server / API Spec Validation
+    name: Application Server / Validate OpenAPI spec (add autocommit-openapi label to PR to auto-commit changes)
     runs-on: ubuntu-latest
     outputs:
       spec-changed: ${{ steps.check_spec_changes.outputs.spec_changed }}
@@ -134,7 +134,7 @@ jobs:
 
   # Intelligence Service Java client generation (depends on spec validation)
   intelligence-service-client:
-    name: Intelligence Service / Java Client Generation
+    name: Application Server / Validate Java API client (add autocommit-openapi label to PR to auto-commit changes)
     runs-on: ubuntu-latest
     needs: intelligence-service-specs
     outputs:
@@ -176,7 +176,7 @@ jobs:
 
   # Application Server React client generation (depends on spec validation)
   application-server-client:
-    name: Application Server / React Client Generation
+    name: Webapp (React) / Validate TypeScript API client (add autocommit-openapi label to PR to auto-commit changes)
     runs-on: ubuntu-latest
     needs: application-server-specs
     outputs:
