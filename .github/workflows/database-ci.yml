@@ -16,8 +16,6 @@ jobs:
   schema-validation:
     name: Database / Validate schema migrations
     runs-on: ubuntu-latest
-    outputs:
-      schema-valid: ${{ steps.validate.outputs.valid }}
 
     services:
       postgres:
@@ -55,7 +53,6 @@ jobs:
         run: scripts/db-utils.sh draft-changelog
 
       - name: Validate Schema Consistency
-        id: validate
         run: |
           if [ -f "server/application-server/src/main/resources/db/changelog_new.xml" ]; then
             echo "## ⚠️ Schema Drift Detected" >> $GITHUB_STEP_SUMMARY
@@ -71,25 +68,15 @@ jobs:
             echo '```xml' >> $GITHUB_STEP_SUMMARY
             cat server/application-server/src/main/resources/db/changelog_new.xml >> $GITHUB_STEP_SUMMARY
             echo '```' >> $GITHUB_STEP_SUMMARY
-            echo "valid=false" >> $GITHUB_OUTPUT
+            echo "Schema validation failed. Check the CI summary above for details."
             exit 1
           else
-            echo "valid=true" >> $GITHUB_OUTPUT
+            echo "✅ Schema validation passed - no drift detected"
           fi
-
-      - name: Cache Application Build
-        uses: actions/cache@v4
-        with:
-          path: |
-            server/application-server/target/
-            ~/.m2/repository/
-          key: app-build-${{ github.sha }}
 
   documentation-validation:
     name: Documentation / Validate database schema ERD
     runs-on: ubuntu-latest
-    needs: schema-validation
-    if: needs.schema-validation.outputs.schema-valid == 'true'
 
     services:
       postgres:
@@ -110,21 +97,14 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Restore Application Build
-        uses: actions/cache@v4
-        with:
-          path: |
-            server/application-server/target/
-            ~/.m2/repository/
-          key: app-build-${{ github.sha }}
-
       - name: Setup Java
         uses: actions/setup-java@v4
         with:
           distribution: 'temurin'
           java-version: '21'
+          cache: 'maven'
 
-      - name: Build Application (if cache miss)
+      - name: Build Application
         working-directory: server/application-server
         run: mvn compile -DskipTests
 
@@ -149,5 +129,8 @@ jobs:
             echo '```bash' >> $GITHUB_STEP_SUMMARY
             echo 'npm run db:generate-erd-docs' >> $GITHUB_STEP_SUMMARY
             echo '```' >> $GITHUB_STEP_SUMMARY
+            echo "ERD documentation validation failed. Check the CI summary above for details."
             exit 1
+          else
+            echo "✅ ERD documentation validation passed"
           fi
