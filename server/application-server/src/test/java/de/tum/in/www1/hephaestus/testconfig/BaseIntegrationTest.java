@@ -1,10 +1,13 @@
 package de.tum.in.www1.hephaestus.testconfig;
 
-import io.zonky.test.db.AutoConfigureEmbeddedDatabase;
-import io.zonky.test.db.AutoConfigureEmbeddedDatabase.DatabaseType;
 import org.junit.jupiter.api.Tag;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.test.context.ActiveProfiles;
+import org.springframework.test.context.DynamicPropertyRegistry;
+import org.springframework.test.context.DynamicPropertySource;
+import org.testcontainers.containers.PostgreSQLContainer;
+import org.testcontainers.junit.jupiter.Container;
+import org.testcontainers.junit.jupiter.Testcontainers;
 
 /**
  * Base class for integration tests that require a full Spring Boot context.
@@ -12,7 +15,7 @@ import org.springframework.test.context.ActiveProfiles;
  * <p>This class provides:
  *
  * <ul>
- *   <li>Embedded database for integration testing (consistent with existing setup)
+ *   <li>PostgreSQL database via Testcontainers for realistic integration testing
  *   <li>Full Spring Boot context with web environment
  *   <li>Proper test profile configuration
  *   <li>JUnit 5 tagging for test categorization
@@ -20,15 +23,27 @@ import org.springframework.test.context.ActiveProfiles;
  *
  * <p>Usage: Extend this class for your integration tests that need full Spring context.
  *
- * <p>Note: Uses the same embedded database approach as the main application test.
+ * <p>Note: Uses PostgreSQL to match the production environment and support all entity features.
  *
  * @author Felix T.J. Dietrich
  */
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 @ActiveProfiles("test")
-@AutoConfigureEmbeddedDatabase(type = DatabaseType.H2)
+@Testcontainers
 @Tag("integration")
 public abstract class BaseIntegrationTest {
-    // Configuration provided by annotations
-    // Uses the same embedded database setup as HephaestusApplicationTests
+
+    @Container
+    static PostgreSQLContainer<?> postgres = new PostgreSQLContainer<>("postgres:16")
+            .withDatabaseName("hephaestus_test")
+            .withUsername("test")
+            .withPassword("test");
+
+    @DynamicPropertySource
+    static void configureProperties(DynamicPropertyRegistry registry) {
+        registry.add("spring.datasource.url", postgres::getJdbcUrl);
+        registry.add("spring.datasource.username", postgres::getUsername);
+        registry.add("spring.datasource.password", postgres::getPassword);
+        registry.add("spring.datasource.driver-class-name", () -> "org.postgresql.Driver");
+    }
 }

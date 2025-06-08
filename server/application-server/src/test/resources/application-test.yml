@@ -1,17 +1,17 @@
 # Minimal test configuration for Spring Boot tests
 spring:
-  # Use in-memory database for tests
+  # Database configuration for tests (overridden by Testcontainers)
   datasource:
-    url: jdbc:h2:mem:testdb
-    driver-class-name: org.h2.Driver
-    username: sa
-    password: password
+    # These values will be overridden by @DynamicPropertySource in test classes
+    url: jdbc:postgresql://localhost:5432/test
+    driver-class-name: org.postgresql.Driver
+    username: test
+    password: test
   
   # JPA configuration for tests
   jpa:
     hibernate:
       ddl-auto: create-drop
-    database-platform: org.hibernate.dialect.H2Dialect
     show-sql: false
   
   # Disable liquibase for tests (use JPA auto DDL instead)
