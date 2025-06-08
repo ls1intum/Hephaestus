@@ -7,6 +7,7 @@ on:
       - 'server/application-server/**'
       - 'server/intelligence-service/**'
       - '.github/workflows/openapi-ci.yml'
+      - 'server/application-server/src/main/java/de/tum/in/www1/hephaestus/intelligenceservice/**'
   push:
     paths:
       - 'server/application-server/openapi.yaml'
@@ -23,6 +24,7 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       spec-changed: ${{ steps.check_spec_changes.outputs.spec_changed }}
+      spec-content: ${{ steps.spec_output.outputs.spec_content }}
 
     steps:
       - name: Checkout repository
@@ -120,11 +122,12 @@ jobs:
             echo "✅ Intelligence Service OpenAPI spec validation passed - FastAPI spec matches code"
           fi
 
-      - name: Upload OpenAPI specs as artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: intelligence-service-openapi-spec
-          path: server/intelligence-service/openapi.yaml
+      - name: Output OpenAPI spec content
+        id: spec_output
+        run: |
+          echo "spec_content<<EOF" >> $GITHUB_OUTPUT
+          cat server/intelligence-service/openapi.yaml >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
 
   # Application Server spec validation
   application-server-specs:
@@ -132,6 +135,7 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       spec-changed: ${{ steps.check_spec_changes.outputs.spec_changed }}
+      spec-content: ${{ steps.spec_output.outputs.spec_content }}
 
     steps:
       - name: Checkout repository
@@ -216,11 +220,12 @@ jobs:
             echo "✅ Application Server OpenAPI spec validation passed - Spring Boot spec matches code"
           fi
 
-      - name: Upload OpenAPI specs as artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: application-server-openapi-spec
-          path: server/application-server/openapi.yaml
+      - name: Output OpenAPI spec content
+        id: spec_output
+        run: |
+          echo "spec_content<<EOF" >> $GITHUB_OUTPUT
+          cat server/application-server/openapi.yaml >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
 
   # Intelligence Service Java client generation (runs even if spec validation fails)
   intelligence-service-client:
@@ -239,12 +244,10 @@ jobs:
           persist-credentials: false
           fetch-depth: 0
 
-      - name: Download OpenAPI specs
-        uses: actions/download-artifact@v4
-        if: needs.intelligence-service-specs.result == 'success'
-        with:
-          name: intelligence-service-openapi-spec
-          path: server/intelligence-service/
+      - name: Create Intelligence Service OpenAPI spec from previous job output
+        run: |
+          mkdir -p server/intelligence-service
+          echo '${{ needs.intelligence-service-specs.outputs.spec-content }}' > server/intelligence-service/openapi.yaml
 
       - name: Install dependencies
         run: npm install
@@ -329,12 +332,10 @@ jobs:
           persist-credentials: false
           fetch-depth: 0
 
-      - name: Download OpenAPI specs
-        uses: actions/download-artifact@v4
-        if: needs.application-server-specs.result == 'success'
-        with:
-          name: application-server-openapi-spec
-          path: server/application-server/
+      - name: Create Application Server OpenAPI spec from previous job output
+        run: |
+          mkdir -p server/application-server
+          echo '${{ needs.application-server-specs.outputs.spec-content }}' > server/application-server/openapi.yaml
 
       - name: Set up Node.js
         uses: actions/setup-node@v4
