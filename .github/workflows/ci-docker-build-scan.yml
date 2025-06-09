@@ -66,9 +66,11 @@ jobs:
         with:
           image-ref: test-${{ matrix.component.name }}:latest
           format: "table"
-          exit-code: "1"
+          exit-code: "1"  # Fail on real vulnerabilities
           ignore-unfixed: true
           severity: "CRITICAL,HIGH"
+          # Use .trivyignore file for managing ignored CVEs
+          trivyignores: ".trivyignore"
 
       # Enhanced error handling and reporting
       - name: Docker build and scan status report
