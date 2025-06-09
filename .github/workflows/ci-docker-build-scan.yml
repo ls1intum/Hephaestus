@@ -21,13 +21,42 @@ env:
   JAVA_VERSION: 21
 
 jobs:
-  webapp-react:
+  docker-build:
+    name: "${{ matrix.component.name }}-build"
     if: inputs.should_skip != 'true'
+    strategy:
+      fail-fast: false
+      matrix:
+        component:
+          - name: "webapp-react"
+            image-name: "ls1intum/hephaestus/webapp-react"
+            docker-file: "./webapp-react/Dockerfile"
+            docker-context: "./webapp-react"
+            title: "Hephaestus Webapp"
+            description: "React-based web client for Hephaestus"
+          - name: "application-server"
+            image-name: "ls1intum/hephaestus/application-server"
+            docker-file: "./server/application-server/Dockerfile"
+            docker-context: "./server/application-server"
+            title: "Hephaestus Application Server"
+            description: "Spring Boot server for Hephaestus"
+          - name: "intelligence-service"
+            image-name: "ls1intum/hephaestus/intelligence-service"
+            docker-file: "./server/intelligence-service/Dockerfile"
+            docker-context: "./server/intelligence-service"
+            title: "Hephaestus Intelligence Service"
+            description: "FastAPI-based AI service for Hephaestus"
+          - name: "webhook-ingest"
+            image-name: "ls1intum/hephaestus/webhook-ingest"
+            docker-file: "./server/webhook-ingest/Dockerfile"
+            docker-context: "./server/webhook-ingest"
+            title: "Hephaestus Webhook Ingest"
+            description: "Python-based webhook processor for Hephaestus"
     uses: ls1intum/.github/.github/workflows/build-and-push-docker-image.yml@main
     with:
-      image-name: "ls1intum/hephaestus/webapp-react"
-      docker-file: "./webapp-react/Dockerfile"
-      docker-context: "./webapp-react"
+      image-name: "${{ matrix.component.image-name }}"
+      docker-file: "${{ matrix.component.docker-file }}"
+      docker-context: "${{ matrix.component.docker-context }}"
       registry: "ghcr.io"
       tags: |
         ${{ github.ref_name }}
@@ -35,82 +64,19 @@ jobs:
         ci-${{ github.run_number }}
         ${{ github.event_name == 'pull_request' && format('pr-{0}', github.event.number) || 'latest' }}
       labels: |
-        org.opencontainers.image.title=Hephaestus Webapp
-        org.opencontainers.image.description=React-based frontend for Hephaestus
+        org.opencontainers.image.title=${{ matrix.component.title }}
+        org.opencontainers.image.description=${{ matrix.component.description }}
         org.opencontainers.image.vendor=AET TUM
         org.opencontainers.image.licenses=MIT
-        hephaestus.component=webapp-react
-    secrets: inherit
-
-  application-server:
-    if: inputs.should_skip != 'true'
-    uses: ls1intum/.github/.github/workflows/build-and-push-docker-image.yml@main
-    with:
-      image-name: "ls1intum/hephaestus/application-server"
-      docker-file: "./server/application-server/Dockerfile"
-      docker-context: "./server/application-server"
-      registry: "ghcr.io"
-      tags: |
-        ${{ github.ref_name }}
-        ${{ github.sha }}
-        ci-${{ github.run_number }}
-        ${{ github.event_name == 'pull_request' && format('pr-{0}', github.event.number) || 'latest' }}
-      labels: |
-        org.opencontainers.image.title=Hephaestus Application Server
-        org.opencontainers.image.description=Spring Boot backend for Hephaestus
-        org.opencontainers.image.vendor=AET TUM
-        org.opencontainers.image.licenses=MIT
-        hephaestus.component=application-server
-    secrets: inherit
-
-  intelligence-service:
-    if: inputs.should_skip != 'true'
-    uses: ls1intum/.github/.github/workflows/build-and-push-docker-image.yml@main
-    with:
-      image-name: "ls1intum/hephaestus/intelligence-service"
-      docker-file: "./server/intelligence-service/Dockerfile"
-      docker-context: "./server/intelligence-service"
-      registry: "ghcr.io"
-      tags: |
-        ${{ github.ref_name }}
-        ${{ github.sha }}
-        ci-${{ github.run_number }}
-        ${{ github.event_name == 'pull_request' && format('pr-{0}', github.event.number) || 'latest' }}
-      labels: |
-        org.opencontainers.image.title=Hephaestus Intelligence Service
-        org.opencontainers.image.description=FastAPI-based AI service for Hephaestus
-        org.opencontainers.image.vendor=AET TUM
-        org.opencontainers.image.licenses=MIT
-        hephaestus.component=intelligence-service
-    secrets: inherit
-
-  webhook-ingest:
-    if: inputs.should_skip != 'true'
-    uses: ls1intum/.github/.github/workflows/build-and-push-docker-image.yml@main
-    with:
-      image-name: "ls1intum/hephaestus/webhook-ingest"
-      docker-file: "./server/webhook-ingest/Dockerfile"
-      docker-context: "./server/webhook-ingest"
-      registry: "ghcr.io"
-      tags: |
-        ${{ github.ref_name }}
-        ${{ github.sha }}
-        ci-${{ github.run_number }}
-        ${{ github.event_name == 'pull_request' && format('pr-{0}', github.event.number) || 'latest' }}
-      labels: |
-        org.opencontainers.image.title=Hephaestus Webhook Ingest
-        org.opencontainers.image.description=Python-based webhook processor for Hephaestus
-        org.opencontainers.image.vendor=AET TUM
-        org.opencontainers.image.licenses=MIT
-        hephaestus.component=webhook-ingest
+        hephaestus.component=${{ matrix.component.name }}
     secrets: inherit
 
   # Security scanning with Trivy for all built images
   security-scan:
-    name: "Security Scan: ${{ matrix.component.name }}"
+    name: "${{ matrix.component.name }}-security-scan"
     runs-on: ubuntu-latest
     if: inputs.should_skip != 'true'
-    needs: [webapp-react, application-server, intelligence-service, webhook-ingest]
+    needs: [docker-build]
     timeout-minutes: 15
     strategy:
       fail-fast: false
@@ -168,7 +134,7 @@ jobs:
 
   aggregate-results:
     runs-on: ubuntu-latest
-    needs: [webapp-react, application-server, intelligence-service, webhook-ingest, security-scan]
+    needs: [docker-build, security-scan]
     if: always() && inputs.should_skip != 'true'
     outputs:
       images_built: ${{ steps.summary.outputs.images_built }}
@@ -179,23 +145,25 @@ jobs:
           echo "## 🐳 Docker Build & Security Scan Summary" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           
-          # Check build results
-          WEBAPP_STATUS="${{ needs.webapp-react.result }}"
-          SERVER_STATUS="${{ needs.application-server.result }}"
-          INTEL_STATUS="${{ needs.intelligence-service.result }}"
-          WEBHOOK_STATUS="${{ needs.webhook-ingest.result }}"
+          # Check build results using matrix outcomes
+          BUILD_STATUS="${{ needs.docker-build.result }}"
           SCAN_STATUS="${{ needs.security-scan.result }}"
           
           echo "### Build Results:" >> $GITHUB_STEP_SUMMARY
-          echo "- **Frontend (React)**: $WEBAPP_STATUS" >> $GITHUB_STEP_SUMMARY
-          echo "- **Backend (Spring)**: $SERVER_STATUS" >> $GITHUB_STEP_SUMMARY
-          echo "- **AI Service (FastAPI)**: $INTEL_STATUS" >> $GITHUB_STEP_SUMMARY
-          echo "- **Webhook Processor**: $WEBHOOK_STATUS" >> $GITHUB_STEP_SUMMARY
-          echo "- **Security Scan**: $SCAN_STATUS" >> $GITHUB_STEP_SUMMARY
+          echo "- **Docker Build (All Components)**: $BUILD_STATUS" >> $GITHUB_STEP_SUMMARY
+          echo "- **Security Scan (All Components)**: $SCAN_STATUS" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          
+          # List components that were built
+          echo "### Components Built:" >> $GITHUB_STEP_SUMMARY
+          echo "- **Frontend (React)**: webapp-react" >> $GITHUB_STEP_SUMMARY
+          echo "- **Backend (Spring)**: application-server" >> $GITHUB_STEP_SUMMARY
+          echo "- **AI Service (FastAPI)**: intelligence-service" >> $GITHUB_STEP_SUMMARY
+          echo "- **Webhook Processor**: webhook-ingest" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           
           # Determine overall status
-          if [[ "$WEBAPP_STATUS" == "success" && "$SERVER_STATUS" == "success" && "$INTEL_STATUS" == "success" && "$WEBHOOK_STATUS" == "success" && "$SCAN_STATUS" == "success" ]]; then
+          if [[ "$BUILD_STATUS" == "success" && "$SCAN_STATUS" == "success" ]]; then
             echo "### ✅ Overall Result: SUCCESS" >> $GITHUB_STEP_SUMMARY
             echo "All Docker images built successfully and passed security scans." >> $GITHUB_STEP_SUMMARY
             echo "images_built=webapp-react,application-server,intelligence-service,webhook-ingest" >> $GITHUB_OUTPUT
