@@ -221,9 +221,11 @@ jobs:
       - name: Python quality & security analysis
         if: matrix.check == 'python-quality'
         run: |
+          set -o pipefail  # Make pipelines fail if any command fails
           echo "🔍 Running comprehensive Python quality checks..."
           
-          # Track overall success
+          # Track issues found
+          ISSUES_FOUND=()
           OVERALL_SUCCESS=true
 
           # Intelligence Service checks
@@ -236,8 +238,11 @@ jobs:
 
           # Code formatting
           echo "🎨 Checking code formatting..."
-          if ! poetry run black --check --diff . 2>&1 | tee black-results.txt; then
+          poetry run black --check --diff . 2>&1 | tee black-results.txt
+          INTELLIGENCE_BLACK_EXIT_CODE=${PIPESTATUS[0]}
+          if [ $INTELLIGENCE_BLACK_EXIT_CODE -ne 0 ]; then
             echo "❌ Intelligence Service: Black formatting check failed"
+            ISSUES_FOUND+=("Intelligence Service: Black formatting needs fixing")
             OVERALL_SUCCESS=false
           else
             echo "✅ Intelligence Service: Black formatting check passed"
@@ -245,8 +250,11 @@ jobs:
 
           # Linting
           echo "🔍 Running flake8 linting..."
-          if ! poetry run flake8 . --statistics --count 2>&1 | tee flake8-results.txt; then
+          poetry run flake8 . --statistics --count 2>&1 | tee flake8-results.txt
+          INTELLIGENCE_FLAKE8_EXIT_CODE=${PIPESTATUS[0]}
+          if [ $INTELLIGENCE_FLAKE8_EXIT_CODE -ne 0 ]; then
             echo "❌ Intelligence Service: Flake8 linting failed"
+            ISSUES_FOUND+=("Intelligence Service: Flake8 linting issues found")
             OVERALL_SUCCESS=false
           else
             echo "✅ Intelligence Service: Flake8 linting passed"
@@ -255,8 +263,11 @@ jobs:
           # Type checking (if mypy is available)
           if poetry show mypy > /dev/null 2>&1; then
             echo "📊 Running type checking..."
-            if ! poetry run mypy . --ignore-missing-imports --show-error-codes 2>&1 | tee mypy-results.txt; then
-              echo "⚠️ Intelligence Service: MyPy type checking found issues"
+            poetry run mypy . --ignore-missing-imports --show-error-codes 2>&1 | tee mypy-results.txt
+            INTELLIGENCE_MYPY_EXIT_CODE=${PIPESTATUS[0]}
+            if [ $INTELLIGENCE_MYPY_EXIT_CODE -ne 0 ]; then
+              echo "⚠️ Intelligence Service: MyPy type checking found issues (warning only)"
+              ISSUES_FOUND+=("Intelligence Service: MyPy type checking issues (warning)")
               # Type checking issues are warnings, not failures
             else
               echo "✅ Intelligence Service: MyPy type checking passed"
@@ -266,8 +277,11 @@ jobs:
           # Security check (if bandit is available)
           if poetry show bandit > /dev/null 2>&1; then
             echo "🔒 Running security analysis..."
-            if ! poetry run bandit -r app/ -f json -o bandit-results.json 2>&1; then
-              echo "⚠️ Intelligence Service: Bandit security analysis found issues"
+            poetry run bandit -r app/ -f json -o bandit-results.json 2>&1
+            INTELLIGENCE_BANDIT_EXIT_CODE=${PIPESTATUS[0]}
+            if [ $INTELLIGENCE_BANDIT_EXIT_CODE -ne 0 ]; then
+              echo "⚠️ Intelligence Service: Bandit security analysis found issues (warning only)"
+              ISSUES_FOUND+=("Intelligence Service: Security analysis issues (warning)")
               # Security issues are warnings, not failures for now
             else
               echo "✅ Intelligence Service: Bandit security analysis passed"
@@ -286,8 +300,11 @@ jobs:
 
           # Code formatting
           echo "🎨 Checking webhook-ingest code formatting..."
-          if ! poetry run black --check --diff . 2>&1 | tee webhook-black-results.txt; then
+          poetry run black --check --diff . 2>&1 | tee webhook-black-results.txt
+          WEBHOOK_BLACK_EXIT_CODE=${PIPESTATUS[0]}
+          if [ $WEBHOOK_BLACK_EXIT_CODE -ne 0 ]; then
             echo "❌ Webhook Ingest: Black formatting check failed"
+            ISSUES_FOUND+=("Webhook Ingest: Black formatting needs fixing")
             OVERALL_SUCCESS=false
           else
             echo "✅ Webhook Ingest: Black formatting check passed"
@@ -295,8 +312,11 @@ jobs:
 
           # Linting
           echo "🔍 Running webhook-ingest flake8 linting..."
-          if ! poetry run flake8 . --statistics --count 2>&1 | tee webhook-flake8-results.txt; then
+          poetry run flake8 . --statistics --count 2>&1 | tee webhook-flake8-results.txt
+          WEBHOOK_FLAKE8_EXIT_CODE=${PIPESTATUS[0]}
+          if [ $WEBHOOK_FLAKE8_EXIT_CODE -ne 0 ]; then
             echo "❌ Webhook Ingest: Flake8 linting failed"
+            ISSUES_FOUND+=("Webhook Ingest: Flake8 linting issues found")
             OVERALL_SUCCESS=false
           else
             echo "✅ Webhook Ingest: Flake8 linting passed"
@@ -304,28 +324,46 @@ jobs:
 
           cd ../..
 
-          # Generate summary and exit with appropriate code
-          if [ "$OVERALL_SUCCESS" = true ]; then
+          # Generate comprehensive summary
+          echo ""
+          echo "📊 Python Quality Check Summary:"
+          echo "================================"
+          
+          if [ ${#ISSUES_FOUND[@]} -eq 0 ]; then
+            echo "✅ All Python quality checks passed successfully!"
+            echo ""
             echo "## ✅ Python Quality Results" >> $GITHUB_STEP_SUMMARY
+            echo "- **Intelligence Service**: All checks passed ✅" >> $GITHUB_STEP_SUMMARY
+            echo "- **Webhook Ingest**: All checks passed ✅" >> $GITHUB_STEP_SUMMARY
             echo "- **Code Formatting**: All Python files follow Black formatting" >> $GITHUB_STEP_SUMMARY
             echo "- **Linting**: Code passes Flake8 quality checks" >> $GITHUB_STEP_SUMMARY
             echo "- **Type Safety**: Static type analysis completed" >> $GITHUB_STEP_SUMMARY
             echo "- **Security**: Code security analysis performed" >> $GITHUB_STEP_SUMMARY
-            echo "✅ All Python quality checks passed successfully"
           else
-            echo "## ❌ Python Quality Results" >> $GITHUB_STEP_SUMMARY
-            echo "- **Code Formatting**: Formatting issues detected" >> $GITHUB_STEP_SUMMARY
-            echo "- **Linting**: Code quality issues found" >> $GITHUB_STEP_SUMMARY
+            echo "❌ Found ${#ISSUES_FOUND[@]} issue(s):"
+            for issue in "${ISSUES_FOUND[@]}"; do
+              echo "  • $issue"
+            done
+            echo ""
+            echo "## ❌ Python Quality Issues Found" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "The following issues need to be addressed:" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            for issue in "${ISSUES_FOUND[@]}"; do
+              echo "- $issue" >> $GITHUB_STEP_SUMMARY
+            done
             echo "" >> $GITHUB_STEP_SUMMARY
             echo "**To fix formatting issues:**" >> $GITHUB_STEP_SUMMARY
             echo '```bash' >> $GITHUB_STEP_SUMMARY
-            echo '# Fix Intelligence Service formatting:' >> $GITHUB_STEP_SUMMARY
             echo 'cd server/intelligence-service && poetry run black .' >> $GITHUB_STEP_SUMMARY
-            echo '' >> $GITHUB_STEP_SUMMARY
-            echo '# Fix Webhook Ingest formatting:' >> $GITHUB_STEP_SUMMARY
-            echo 'cd server/webhook-ingest && poetry run black .' >> $GITHUB_STEP_SUMMARY
+            echo 'cd ../webhook-ingest && poetry run black .' >> $GITHUB_STEP_SUMMARY
             echo '```' >> $GITHUB_STEP_SUMMARY
-            echo "❌ Python quality checks failed"
+          fi
+
+          # Exit with appropriate code
+          if [ "$OVERALL_SUCCESS" = false ]; then
+            echo ""
+            echo "❌ Python quality checks failed - please fix the issues above"
             exit 1
           fi
 
