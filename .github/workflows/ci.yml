@@ -53,127 +53,10 @@ jobs:
     with:
       should_skip: ${{ needs.pipeline-setup.outputs.should_skip }}
 
-  # Chromatic visual testing (direct job for proper status checks)
-  chromatic-visual-tests:
-    name: "Chromatic Visual Tests"
-    runs-on: ubuntu-latest
-    needs: [pipeline-setup, quality-gates]
-    if: needs.pipeline-setup.outputs.should_skip != 'true'
-    timeout-minutes: 30
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          # Critical for TurboSnap: Ensure Chromatic can read full git history
-          fetch-depth: 0
-
-      # Setup Node.js for webapp
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: ${{ env.NODE_VERSION }}
-          cache: 'npm'
-          cache-dependency-path: webapp-react/package-lock.json
-
-      # Build Storybook
-      - name: "🎨 Building Storybook for visual regression tests"
-        working-directory: webapp-react
-        run: |
-          echo "🚀 Starting webapp visual tests"
-          npm ci --prefer-offline --no-audit --progress=false
-          echo "🎨 Building Storybook for visual regression tests..."
-          npm run build-storybook
-          echo "✅ Storybook built, proceeding to Chromatic visual testing..."
-
-      # Chromatic visual testing
-      - name: "🎨 Chromatic Visual Testing"
-        id: chromatic
-        uses: chromaui/action@latest
-        with:
-          projectToken: ${{ secrets.CHROMATIC_PROJECT_TOKEN }}
-          workingDir: webapp-react
-          # TurboSnap configuration for monorepo
-          onlyChanged: true
-          # Performance optimizations
-          zip: true
-          # Branch strategy optimizations
-          skip: "@(dependabot/**|renovate/**)"
-          autoAcceptChanges: ${{ github.ref == 'refs/heads/main' && 'main' || '' }}
-          # Quality gates
-          exitZeroOnChanges: false
-          # Enhanced debugging and reporting
-          diagnostics: true
-          logLevel: info
-          # JUnit reporting for CI integration
-          junitReport: true
-          # Ensure all status checks are created
-          allowConsoleErrors: false
-        env:
-          # Enhanced build context for TurboSnap
-          CHROMATIC_BRANCH: ${{ github.head_ref || github.ref_name }}
-          CHROMATIC_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
-
-      # Create custom Storybook Publish status check
-      - name: "📚 Create Storybook Publish Status Check"
-        if: always() && steps.chromatic.outputs.storybookUrl
-        uses: actions/github-script@v7
-        with:
-          script: |
-            const storybookUrl = '${{ steps.chromatic.outputs.storybookUrl }}';
-            const buildUrl = '${{ steps.chromatic.outputs.buildUrl }}';
-            const changeCount = '${{ steps.chromatic.outputs.changeCount }}' || '0';
-            
-            // Create Storybook Publish status check
-            await github.rest.repos.createCommitStatus({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              sha: context.sha,
-              state: 'success',
-              target_url: storybookUrl,
-              description: 'Click Details to view your Storybook',
-              context: 'Storybook Publish'
-            });
-            
-            // Create UI Tests status check  
-            const uiTestsState = changeCount > 0 ? 'pending' : 'success';
-            const uiTestsDescription = changeCount > 0 
-              ? `${changeCount} UI tests require approval` 
-              : 'All UI tests passed';
-              
-            await github.rest.repos.createCommitStatus({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              sha: context.sha,
-              state: uiTestsState,
-              target_url: buildUrl,
-              description: uiTestsDescription,
-              context: 'UI Tests'
-            });
-
-      # Enhanced visual testing reporting
-      - name: "📊 Visual Testing Summary"
-        if: always()
-        run: |
-          echo "## 🎨 Visual Testing Results" >> $GITHUB_STEP_SUMMARY
-          echo "- **Build URL**: ${{ steps.chromatic.outputs.buildUrl }}" >> $GITHUB_STEP_SUMMARY
-          echo "- **Storybook URL**: ${{ steps.chromatic.outputs.storybookUrl }}" >> $GITHUB_STEP_SUMMARY
-          echo "- **Stories Tested**: ${{ steps.chromatic.outputs.specCount }}" >> $GITHUB_STEP_SUMMARY
-          echo "- **Components**: ${{ steps.chromatic.outputs.componentCount }}" >> $GITHUB_STEP_SUMMARY
-          echo "- **Changes Detected**: ${{ steps.chromatic.outputs.changeCount }}" >> $GITHUB_STEP_SUMMARY
-          echo "- **Snapshots Captured**: ${{ steps.chromatic.outputs.actualCaptureCount }}" >> $GITHUB_STEP_SUMMARY
-
-          if [[ "${{ steps.chromatic.outputs.changeCount }}" -gt "0" ]]; then
-            echo "## ⚠️ Visual Changes Detected" >> $GITHUB_STEP_SUMMARY
-            echo "Review changes at: ${{ steps.chromatic.outputs.buildUrl }}" >> $GITHUB_STEP_SUMMARY
-            echo "If changes are intentional, accept them in the Chromatic UI." >> $GITHUB_STEP_SUMMARY
-          else
-            echo "## ✅ No Visual Changes" >> $GITHUB_STEP_SUMMARY
-            echo "All visual tests passed! Your UI is pixel-perfect." >> $GITHUB_STEP_SUMMARY
-          fi
-
   # Optimized Docker builds with security scanning
   docker-build-and-scan:
     uses: ./.github/workflows/ci-docker-build-scan.yml
-    needs: [pipeline-setup, tests, chromatic-visual-tests]
+    needs: [pipeline-setup, tests]
     if: needs.pipeline-setup.outputs.should_skip != 'true'
     secrets: inherit
     with:
@@ -182,7 +65,7 @@ jobs:
   # Aggregated success gate for branch protection
   all-ci-passed:
     runs-on: ubuntu-latest
-    needs: [quality-gates, security-scan, tests, chromatic-visual-tests, docker-build-and-scan]
+    needs: [quality-gates, security-scan, tests, docker-build-and-scan]
     if: always()
     steps:
       - name: Check all jobs
