@@ -37,7 +37,7 @@ runs:
 
     # Java/Maven caching
     - name: Set up JDK 21
-      if: contains(fromJSON('["java-unit", "java-integration", "java-architecture", "openapi-validation"]'), inputs.cache-type)
+      if: contains(fromJSON('["java-unit", "java-integration", "java-architecture", "java-format", "openapi-validation", "database-schema-validation", "database-documentation-validation"]'), inputs.cache-type)
       uses: actions/setup-java@v4
       with:
         distribution: 'temurin'
@@ -45,7 +45,7 @@ runs:
         cache: maven
 
     - name: Cache Maven dependencies
-      if: contains(fromJSON('["java-unit", "java-integration", "java-architecture", "openapi-validation"]'), inputs.cache-type)
+      if: contains(fromJSON('["java-unit", "java-integration", "java-architecture", "java-format", "openapi-validation", "database-schema-validation", "database-documentation-validation"]'), inputs.cache-type)
       uses: actions/cache@v4
       with:
         path: |
@@ -58,13 +58,13 @@ runs:
 
     # Python/Poetry caching
     - name: Set up Python 3.13
-      if: contains(fromJSON('["python-quality", "openapi-validation"]'), inputs.cache-type)
+      if: contains(fromJSON('["python-quality", "openapi-validation", "database-schema-validation", "database-documentation-validation"]'), inputs.cache-type)
       uses: actions/setup-python@v4
       with:
         python-version: 3.13
         
     - name: Install Poetry
-      if: contains(fromJSON('["python-quality", "openapi-validation"]'), inputs.cache-type)
+      if: contains(fromJSON('["python-quality", "openapi-validation", "database-schema-validation", "database-documentation-validation"]'), inputs.cache-type)
       uses: snok/install-poetry@v1
       with:
         version: 2.1.1
@@ -72,7 +72,7 @@ runs:
         virtualenvs-in-project: true
 
     - name: Cache Poetry dependencies
-      if: contains(fromJSON('["python-quality", "openapi-validation"]'), inputs.cache-type)
+      if: contains(fromJSON('["python-quality", "openapi-validation", "database-schema-validation", "database-documentation-validation"]'), inputs.cache-type)
       uses: actions/cache@v4
       with:
         path: |

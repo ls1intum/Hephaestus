@@ -19,25 +19,26 @@ env:
 jobs:
   # Enterprise-grade quality gates with intelligent caching and error handling
   quality-gates:
+    name: ${{ matrix.check }}
     runs-on: ubuntu-latest
     if: inputs.should_skip != 'true'
-    timeout-minutes: 15
+    timeout-minutes: ${{ contains(fromJSON('["database-schema-validation", "database-documentation-validation"]'), matrix.check) && 20 || 15 }}
     strategy:
       fail-fast: false
       matrix:
-        check: [java-format, webapp-quality, python-quality, openapi-validation]
+        check: [java-format, webapp-quality, python-quality, openapi-validation, database-schema-validation, database-documentation-validation]
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
-          token: ${{ secrets.GITHUB_TOKEN }}
 
       # Advanced cache setup with fallback
       - name: Setup shared caches
         uses: ./.github/actions/setup-caches
         with:
           cache-type: ${{ matrix.check }}
+          os: ${{ runner.os }}
 
       # Additional cache for webapp build artifacts
       - name: Cache webapp build artifacts
@@ -433,6 +434,182 @@ jobs:
             echo "- **Java Clients**: Generated clients match current specs" >> $GITHUB_STEP_SUMMARY
             echo "- **TypeScript Clients**: Generated clients match current specs" >> $GITHUB_STEP_SUMMARY
             echo "- **Consistency**: All API contracts are synchronized" >> $GITHUB_STEP_SUMMARY
+          fi
+
+      # Database schema validation - JPA entities vs committed migrations
+      - name: Database schema validation
+        if: matrix.check == 'database-schema-validation'
+        run: |
+          echo "🔍 Validating JPA entities match committed migrations..."
+
+          # Start PostgreSQL service for schema operations
+          echo "🐘 Starting PostgreSQL service for schema validation..."
+          docker run -d \
+            --name postgres-schema \
+            -e POSTGRES_DB=hephaestus \
+            -e POSTGRES_PASSWORD=root \
+            -e POSTGRES_USER=root \
+            -p 5432:5432 \
+            --health-cmd="pg_isready" \
+            --health-interval=10s \
+            --health-timeout=5s \
+            --health-retries=5 \
+            postgres:16
+
+          # Wait for PostgreSQL to be ready
+          echo "⏳ Waiting for PostgreSQL to be ready..."
+          until docker exec postgres-schema pg_isready -U root -d hephaestus; do
+            echo "PostgreSQL is not ready yet, waiting..."
+            sleep 2
+          done
+          echo "✅ PostgreSQL is ready for schema validation"
+
+          # Set environment variables for database connection
+          export SPRING_DATASOURCE_URL="jdbc:postgresql://localhost:5432/hephaestus"
+          export SPRING_DATASOURCE_USERNAME="root"
+          export SPRING_DATASOURCE_PASSWORD="root"
+
+          # Build Application Server for schema operations
+          echo "🏗️ Building Application Server for schema validation..."
+          cd server/application-server
+          if ! mvn compile -DskipTests --quiet; then
+            echo "❌ Failed to build Application Server for schema validation"
+            docker stop postgres-schema && docker rm postgres-schema
+            exit 1
+          fi
+          cd ../..
+
+          # Check for schema drift between JPA entities and committed migrations
+          echo "📊 Checking for schema drift between JPA entities and committed migrations..."
+          if ! scripts/db-utils.sh draft-changelog; then
+            echo "❌ Failed to generate draft changelog for schema validation"
+            docker stop postgres-schema && docker rm postgres-schema
+            exit 1
+          fi
+
+          # Clean up PostgreSQL container
+          echo "🧹 Cleaning up PostgreSQL container..."
+          docker stop postgres-schema && docker rm postgres-schema
+
+          # Check results and generate summary
+          if [ -f "server/application-server/src/main/resources/db/changelog_new.xml" ]; then
+            echo "## ❌ Schema Drift Detected" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "**Issue:** Your JPA entity definitions have changes that are not reflected in committed database migrations." >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "**What this means:**" >> $GITHUB_STEP_SUMMARY
+            echo "- Entity code has changes compared to the current migration-generated schema" >> $GITHUB_STEP_SUMMARY
+            echo "- New migrations need to be created and committed" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "**Fix Required:** Run these commands locally:" >> $GITHUB_STEP_SUMMARY
+            echo '```bash' >> $GITHUB_STEP_SUMMARY
+            echo 'npm run db:draft-changelog' >> $GITHUB_STEP_SUMMARY
+            echo '# Review, edit author, rename file, move to changelog/' >> $GITHUB_STEP_SUMMARY
+            echo 'npm run db:generate-erd-docs' >> $GITHUB_STEP_SUMMARY
+            echo '```' >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "**Generated Migration:**" >> $GITHUB_STEP_SUMMARY
+            echo '```xml' >> $GITHUB_STEP_SUMMARY
+            cat server/application-server/src/main/resources/db/changelog_new.xml >> $GITHUB_STEP_SUMMARY
+            echo '```' >> $GITHUB_STEP_SUMMARY
+            echo "❌ Schema validation failed. Check the CI summary above for details."
+            exit 1
+          else
+            echo "## ✅ Database Schema Validation Results" >> $GITHUB_STEP_SUMMARY
+            echo "- **Schema Consistency**: JPA entities match committed migrations ✅" >> $GITHUB_STEP_SUMMARY
+            echo "- **Migration State**: No schema drift detected" >> $GITHUB_STEP_SUMMARY
+            echo "- **Database**: Schema is properly synchronized with entity definitions" >> $GITHUB_STEP_SUMMARY
+            echo "✅ Schema validation passed - JPA entities match committed migrations"
+          fi
+
+      # Database documentation validation - ERD matches migration-based schema  
+      - name: Database documentation validation
+        if: matrix.check == 'database-documentation-validation'
+        run: |
+          echo "📊 Validating ERD documentation matches migration-based schema..."
+
+          # Start PostgreSQL service for ERD generation
+          echo "🐘 Starting PostgreSQL service for ERD documentation validation..."
+          docker run -d \
+            --name postgres-erd \
+            -e POSTGRES_DB=hephaestus \
+            -e POSTGRES_PASSWORD=root \
+            -e POSTGRES_USER=root \
+            -p 5432:5432 \
+            --health-cmd="pg_isready" \
+            --health-interval=10s \
+            --health-timeout=5s \
+            --health-retries=5 \
+            postgres:16
+
+          # Wait for PostgreSQL to be ready
+          echo "⏳ Waiting for PostgreSQL to be ready..."
+          until docker exec postgres-erd pg_isready -U root -d hephaestus; do
+            echo "PostgreSQL is not ready yet, waiting..."
+            sleep 2
+          done
+          echo "✅ PostgreSQL is ready for ERD generation"
+
+          # Set environment variables for database connection
+          export SPRING_DATASOURCE_URL="jdbc:postgresql://localhost:5432/hephaestus"
+          export SPRING_DATASOURCE_USERNAME="root"
+          export SPRING_DATASOURCE_PASSWORD="root"
+
+          # Build Application Server for ERD operations
+          echo "🏗️ Building Application Server for ERD documentation validation..."
+          cd server/application-server
+          if ! mvn compile -DskipTests --quiet; then
+            echo "❌ Failed to build Application Server for ERD documentation validation"
+            docker stop postgres-erd && docker rm postgres-erd
+            exit 1
+          fi
+          cd ../..
+
+          # Generate ERD documentation from committed migration-based schema
+          echo "📈 Generating ERD from committed migration-based schema..."
+          echo "Note: ERD always reflects the current committed migration state, not entity code changes"
+          if ! scripts/db-utils.sh generate-erd; then
+            echo "❌ Failed to generate ERD documentation"
+            docker stop postgres-erd && docker rm postgres-erd
+            exit 1
+          fi
+
+          # Clean up PostgreSQL container
+          echo "🧹 Cleaning up PostgreSQL container..."
+          docker stop postgres-erd && docker rm postgres-erd
+
+          # Check if ERD documentation is up to date
+          git add docs/dev/database/schema.mmd
+          
+          if ! git diff --cached --quiet docs/dev/database/schema.mmd; then
+            echo "## ❌ ERD Documentation Outdated" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "**Issue:** The committed ERD documentation does not match the current migration-based database schema." >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "**What this means:**" >> $GITHUB_STEP_SUMMARY
+            echo "- Committed migrations have been updated without updating the ERD documentation" >> $GITHUB_STEP_SUMMARY
+            echo "- ERD documentation is out of sync with the actual migration-generated schema" >> $GITHUB_STEP_SUMMARY
+            echo "- ERD always reflects migration state, not entity code (entity changes need migrations first)" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "**Fix Required:**" >> $GITHUB_STEP_SUMMARY
+            echo '```bash' >> $GITHUB_STEP_SUMMARY
+            echo 'npm run db:generate-erd-docs' >> $GITHUB_STEP_SUMMARY
+            echo 'git add docs/dev/database/schema.mmd' >> $GITHUB_STEP_SUMMARY
+            echo 'git commit -m "Update database ERD documentation"' >> $GITHUB_STEP_SUMMARY
+            echo '```' >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "**Changes detected in ERD file:**" >> $GITHUB_STEP_SUMMARY
+            echo '```diff' >> $GITHUB_STEP_SUMMARY
+            git diff --cached docs/dev/database/schema.mmd >> $GITHUB_STEP_SUMMARY
+            echo '```' >> $GITHUB_STEP_SUMMARY
+            echo "❌ ERD documentation validation failed. Check the CI summary above for details."
+            exit 1
+          else
+            echo "## ✅ Database Documentation Validation Results" >> $GITHUB_STEP_SUMMARY
+            echo "- **ERD Documentation**: Documentation matches current migration state ✅" >> $GITHUB_STEP_SUMMARY
+            echo "- **Schema Synchronization**: ERD reflects actual migration-generated schema" >> $GITHUB_STEP_SUMMARY
+            echo "- **Documentation**: Database documentation is up to date" >> $GITHUB_STEP_SUMMARY
+            echo "✅ ERD documentation validation passed - ERD matches migration-based schema"
           fi
 
       # Enhanced error handling and reporting
