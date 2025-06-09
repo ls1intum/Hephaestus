@@ -1,0 +1,114 @@
+name: Tests
+
+on:
+  workflow_call:
+    inputs:
+      should_skip:
+        description: 'Whether to skip the workflow'
+        required: false
+        type: string
+        default: 'false'
+
+env:
+  # Global pipeline configuration
+  MAVEN_OPTS: -Xmx2048m -XX:+UseParallelGC
+  NODE_VERSION: 22
+  PYTHON_VERSION: 3.13
+  JAVA_VERSION: 21
+
+jobs:
+  # Intelligent test execution matrix
+  tests:
+    name: ${{ matrix.test-type }}
+    runs-on: ubuntu-latest
+    if: inputs.should_skip != 'true'
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        test-type:
+          [
+            java-unit,
+            java-integration,
+            java-architecture,
+            webapp-visual,
+            cross-platform,
+          ]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      # Advanced caching strategy
+      - name: Setup advanced caches
+        uses: ./.github/actions/setup-caches
+        with:
+          cache-type: ${{ matrix.test-type }}
+          os: ${{ runner.os }}
+
+      # Java tests with enhanced reporting
+      - name: "Java ${{ matrix.test-type }} execution"
+        if: startsWith(matrix.test-type, 'java-')
+        run: |
+          echo "🚀 Starting Java ${{ matrix.test-type }} tests"
+
+          case "${{ matrix.test-type }}" in
+            "java-unit")
+              echo "🧪 Running unit tests for core business logic..."
+              cd server/application-server
+              mvn test -Dgroups="unit" -Dtest="!**/ArchitectureTest" -T 2C --batch-mode
+              ;;
+            "java-integration")
+              echo "🔗 Running integration tests with database and APIs..."
+              cd server/application-server
+              mvn test -Dgroups="integration" -T 2C --batch-mode
+              ;;
+            "java-architecture")
+              echo "🏗️ Validating architecture compliance and dependencies..."
+              cd server/application-server
+              mvn test -Dtest="**/ArchitectureTest" --batch-mode
+              ;;
+          esac
+          echo "✅ Java ${{ matrix.test-type }} tests completed successfully"
+
+      # Webapp tests with enhanced reporting
+      - name: "Webapp ${{ matrix.test-type }} execution"
+        if: startsWith(matrix.test-type, 'webapp-')
+        working-directory: webapp-react
+        run: |
+          echo "🚀 Starting webapp ${{ matrix.test-type }} tests"
+
+          npm ci --prefer-offline --no-audit --progress=false
+
+          case "${{ matrix.test-type }}" in
+            "webapp-visual")
+              echo "🎨 Running visual regression tests with Storybook..."
+              npm run chromatic
+              ;;
+          esac
+          echo "✅ Webapp ${{ matrix.test-type }} tests completed successfully"
+
+      # Test result aggregation with enhanced reporting
+      - name: Upload test results
+        if: always()
+        uses: dorny/test-reporter@v2
+        with:
+          name: "Test Results - ${{ matrix.test-type }}"
+          path: "**/target/surefire-reports/*.xml,**/test-results.xml"
+          reporter: java-junit
+          fail-on-error: false
+
+      # Enhanced error handling and reporting
+      - name: Test execution status report
+        if: always()
+        run: |
+          echo "📊 Test Execution - Status: ${{ job.status }}"
+          echo "## 📋 Test Results" >> $GITHUB_STEP_SUMMARY
+          echo "- **Test Type**: ${{ matrix.test-type }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Status**: ${{ job.status }}" >> $GITHUB_STEP_SUMMARY
+          
+          if [[ "${{ job.status }}" == "failure" ]]; then
+            echo "## ❌ Test Execution Failed" >> $GITHUB_STEP_SUMMARY
+            echo "Test execution failed for ${{ matrix.test-type }}. Please review the test logs above." >> $GITHUB_STEP_SUMMARY
+          elif [[ "${{ job.status }}" == "success" ]]; then
+            echo "✅ Test execution completed successfully for ${{ matrix.test-type }}!" >> $GITHUB_STEP_SUMMARY
+          fi
