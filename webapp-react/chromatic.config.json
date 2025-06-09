@@ -1,29 +1,30 @@
 {
-  "buildScriptName": "build-storybook",
   "storybookBuildDir": "storybook-static",
+  "storybookBaseDir": "webapp-react",
+  "storybookConfigDir": "webapp-react/.storybook",
   "exitZeroOnChanges": false,
   "zip": true,
   "junitReport": true,
   "ignoreLastBuildOnBranch": "renovate/**",
   "skip": "dependabot/**",
   "externals": [
-    "public/**",
-    "src/assets/**",
-    "**/*.css",
-    "**/*.scss", 
-    "**/*.sass",
-    "tailwind.config.*",
-    "vite.config.*",
-    "biome.json",
-    "components.json"
+    "webapp-react/public/**",
+    "webapp-react/src/assets/**",
+    "webapp-react/**/*.css",
+    "webapp-react/**/*.scss", 
+    "webapp-react/**/*.sass",
+    "webapp-react/tailwind.config.*",
+    "webapp-react/vite.config.*",
+    "webapp-react/biome.json",
+    "webapp-react/components.json"
   ],
   "onlyChanged": true,
   "traceChanged": "expanded",
   "untraced": [
     "**/*.md",
     "**/*.stories.mdx",
-    ".storybook/addons.ts",
-    ".storybook/manager.ts",
+    "webapp-react/.storybook/addons.ts",
+    "webapp-react/.storybook/manager.ts",
     "docs/**"
   ]
 }

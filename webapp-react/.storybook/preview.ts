@@ -41,19 +41,12 @@ const preview: Preview = {
     },
     // Chromatic configuration for optimal visual testing
     chromatic: {
-      // Improved viewport coverage for comprehensive testing
-      viewports: [320, 768, 1024, 1440, 1920],
+      // Global viewport coverage for comprehensive testing
+      viewports: [375, 768, 1024, 1440, 1920],
       // Disable animations for consistent snapshots
       disableSnapshot: false,
-      // Force re-snapshot for specific stories when needed
-      modes: {
-        desktop: {
-          viewport: 'desktop'
-        },
-        mobile: {
-          viewport: 'mobile'
-        }
-      }
+      // Note: modes (themes) must be set per-story due to Chromatic limitation
+      // that doesn't support both viewports and modes on the same story
     },
     // Better viewport defaults
     viewport: {

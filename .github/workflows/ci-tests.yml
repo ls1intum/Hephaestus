@@ -84,9 +84,9 @@ jobs:
 
           case "${{ matrix.test-type }}" in
             "webapp-visual")
-              echo "🎨 Running visual regression tests with Storybook..."
-              # Visual testing handled by dedicated Chromatic step below
-              echo "✅ Dependencies installed, proceeding to Chromatic..."
+              echo "🎨 Building Storybook for visual regression tests..."
+              npm run build-storybook
+              echo "✅ Storybook built, proceeding to Chromatic visual testing..."
               ;;
           esac
 

@@ -14,8 +14,10 @@
     "lint": "biome lint",
     "check": "biome check",
     "storybook": "storybook dev -p 6006",
-    "build-storybook": "storybook build",
+    "build-storybook": "storybook build --stats-json",
     "chromatic": "npx chromatic --exit-zero-on-changes",
+    "chromatic:ci": "npx chromatic --only-changed",
+    "chromatic:dry-run": "npx chromatic --dry-run",
     "openapi-ts": "openapi-ts"
   },
   "dependencies": {
@@ -50,6 +52,7 @@
     "@tanstack/react-table": "^8.21.3",
     "@tanstack/router-plugin": "^1.120.13",
     "@tanstack/zod-adapter": "^1.120.13",
+    "chromatic": "^12.1.1",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "cmdk": "^1.1.1",
