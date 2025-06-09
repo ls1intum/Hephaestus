@@ -112,12 +112,33 @@ jobs:
             npm ci --prefer-offline --no-audit
           fi
           
-          # Run Java formatting check
-          npm run format:java:check
+          # Run Java formatting check and capture output
+          echo "🎨 Running Prettier formatting check..."
+          npm run format:java:check 2>&1 | tee java-format-results.txt
+          FORMAT_EXIT_CODE=${PIPESTATUS[0]}
           
-          echo "## ✅ Java Code Quality Results" >> $GITHUB_STEP_SUMMARY
-          echo "- **Formatting**: All Java files follow Prettier formatting rules" >> $GITHUB_STEP_SUMMARY
-          echo "- **Style Guide**: Code adheres to project style guidelines" >> $GITHUB_STEP_SUMMARY
+          # Generate summary based on results
+          if [ $FORMAT_EXIT_CODE -eq 0 ]; then
+            echo "## ✅ Java Code Quality Results" >> $GITHUB_STEP_SUMMARY
+            echo "- **Formatting**: All Java files follow Prettier formatting rules" >> $GITHUB_STEP_SUMMARY
+            echo "- **Style Guide**: Code adheres to project style guidelines" >> $GITHUB_STEP_SUMMARY
+            echo "✅ All Java formatting checks passed successfully"
+          else
+            echo "## ❌ Java Code Quality Results" >> $GITHUB_STEP_SUMMARY
+            echo "- **Formatting**: Code formatting issues detected" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "**Files with formatting issues:**" >> $GITHUB_STEP_SUMMARY
+            echo '```' >> $GITHUB_STEP_SUMMARY
+            grep -E '\[warn\]' java-format-results.txt | sed 's/\[warn\] /- /' >> $GITHUB_STEP_SUMMARY || echo "- Check the logs above for details" >> $GITHUB_STEP_SUMMARY
+            echo '```' >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "**To fix these issues:**" >> $GITHUB_STEP_SUMMARY
+            echo '```bash' >> $GITHUB_STEP_SUMMARY
+            echo 'npm run format:java:write' >> $GITHUB_STEP_SUMMARY
+            echo '```' >> $GITHUB_STEP_SUMMARY
+            echo "❌ Java formatting check failed"
+            exit 1
+          fi
 
       # Webapp quality checks with comprehensive validation
       - name: Webapp quality & type checking

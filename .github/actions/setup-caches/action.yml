@@ -28,9 +28,11 @@ runs:
           ~/.npm
           webapp-react/node_modules
           node_modules
-        key: ${{ inputs.os }}-node-${{ hashFiles('package-lock.json', 'webapp-react/package-lock.json') || 'no-lockfile' }}-${{ inputs.cache-type }}
+        key: ${{ inputs.os }}-node-${{ hashFiles('package-lock.json', 'webapp-react/package-lock.json', 'webapp-react/biome.json', 'webapp-react/tsconfig.json', 'webapp-react/vite.config.js', 'webapp-react/components.json') }}-${{ inputs.cache-type }}
         restore-keys: |
-          ${{ inputs.os }}-node-${{ hashFiles('package-lock.json', 'webapp-react/package-lock.json') || 'no-lockfile' }}-
+          ${{ inputs.os }}-node-${{ hashFiles('package-lock.json', 'webapp-react/package-lock.json', 'webapp-react/biome.json', 'webapp-react/tsconfig.json', 'webapp-react/vite.config.js', 'webapp-react/components.json') }}-
+          ${{ inputs.os }}-node-${{ hashFiles('package-lock.json', 'webapp-react/package-lock.json') }}-
+          ${{ inputs.os }}-node-
 
 
     # Java/Maven caching
