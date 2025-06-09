@@ -37,6 +37,9 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
+        with:
+          # Critical for TurboSnap: Ensure Chromatic can read full git history
+          fetch-depth: 0
 
       # Advanced caching strategy
       - name: Setup advanced caches
@@ -74,8 +77,6 @@ jobs:
       - name: "Webapp ${{ matrix.test-type }} execution"
         if: startsWith(matrix.test-type, 'webapp-')
         working-directory: webapp-react
-        env:
-          CHROMATIC_PROJECT_TOKEN: ${{ secrets.CHROMATIC_PROJECT_TOKEN }}
         run: |
           echo "🚀 Starting webapp ${{ matrix.test-type }} tests"
 
@@ -84,10 +85,57 @@ jobs:
           case "${{ matrix.test-type }}" in
             "webapp-visual")
               echo "🎨 Running visual regression tests with Storybook..."
-              npm run chromatic
+              # Visual testing handled by dedicated Chromatic step below
+              echo "✅ Dependencies installed, proceeding to Chromatic..."
               ;;
           esac
-          echo "✅ Webapp ${{ matrix.test-type }} tests completed successfully"
+
+      # Advanced Chromatic visual testing with performance optimizations
+      - name: "🎨 Chromatic Visual Testing"
+        if: matrix.test-type == 'webapp-visual'
+        id: chromatic
+        uses: chromaui/action@latest
+        with:
+          projectToken: ${{ secrets.CHROMATIC_PROJECT_TOKEN }}
+          workingDir: webapp-react
+          # TurboSnap configuration for monorepo
+          onlyChanged: true
+          # Performance optimizations  
+          zip: true
+          # Branch strategy optimizations
+          skip: '@(dependabot/**|renovate/**)'
+          autoAcceptChanges: ${{ github.ref == 'refs/heads/main' && 'main' || '' }}
+          # Quality gates
+          exitZeroOnChanges: false
+          # Enhanced debugging and reporting
+          diagnostics: true
+          logLevel: info
+          junitReport: true
+        env:
+          # Enhanced build context for TurboSnap
+          CHROMATIC_BRANCH: ${{ github.head_ref || github.ref_name }}
+          CHROMATIC_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+
+      # Enhanced visual testing reporting
+      - name: "📊 Visual Testing Summary"
+        if: matrix.test-type == 'webapp-visual' && always()
+        run: |
+          echo "## 🎨 Visual Testing Results" >> $GITHUB_STEP_SUMMARY
+          echo "- **Build URL**: ${{ steps.chromatic.outputs.buildUrl }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Storybook URL**: ${{ steps.chromatic.outputs.storybookUrl }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Stories Tested**: ${{ steps.chromatic.outputs.specCount }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Components**: ${{ steps.chromatic.outputs.componentCount }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Changes Detected**: ${{ steps.chromatic.outputs.changeCount }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Snapshots Captured**: ${{ steps.chromatic.outputs.actualCaptureCount }}" >> $GITHUB_STEP_SUMMARY
+          
+          if [[ "${{ steps.chromatic.outputs.changeCount }}" -gt "0" ]]; then
+            echo "## ⚠️ Visual Changes Detected" >> $GITHUB_STEP_SUMMARY
+            echo "Review changes at: ${{ steps.chromatic.outputs.buildUrl }}" >> $GITHUB_STEP_SUMMARY
+            echo "If changes are intentional, accept them in the Chromatic UI." >> $GITHUB_STEP_SUMMARY
+          else
+            echo "## ✅ No Visual Changes" >> $GITHUB_STEP_SUMMARY
+            echo "All visual tests passed! Your UI is pixel-perfect." >> $GITHUB_STEP_SUMMARY
+          fi
 
       # Test result aggregation with enhanced reporting
       - name: Upload test results

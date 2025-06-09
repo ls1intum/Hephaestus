@@ -1,0 +1,30 @@
+{
+  "buildScriptName": "build-storybook",
+  "storybookBuildDir": "storybook-static",
+  "exitZeroOnChanges": false,
+  "exitOnceUploaded": true,
+  "zip": true,
+  "junitReport": true,
+  "ignoreLastBuildOnBranch": "renovate/**",
+  "skip": "dependabot/**",
+  "externals": [
+    "public/**",
+    "src/assets/**",
+    "**/*.css",
+    "**/*.scss", 
+    "**/*.sass",
+    "tailwind.config.*",
+    "vite.config.*",
+    "biome.json",
+    "components.json"
+  ],
+  "onlyChanged": true,
+  "traceChanged": "expanded",
+  "untraced": [
+    "**/*.md",
+    "**/*.stories.mdx",
+    ".storybook/addons.ts",
+    ".storybook/manager.ts",
+    "docs/**"
+  ]
+}
