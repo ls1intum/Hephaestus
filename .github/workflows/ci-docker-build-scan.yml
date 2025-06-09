@@ -32,15 +32,16 @@ jobs:
       docker-context: "./webapp-react"
       registry: "ghcr.io"
       tags: |
-        type=ref,event=branch
-        type=ref,event=pr
-        type=sha,prefix={{branch}}-,format=short
-        pr-${{ github.event.number }}
+        ${{ github.ref_name }}
+        ${{ github.sha }}
+        ci-${{ github.run_number }}
+        ${{ github.event_name == 'pull_request' && format('pr-{0}', github.event.number) || 'latest' }}
       labels: |
         org.opencontainers.image.title=Hephaestus Webapp
         org.opencontainers.image.description=React-based frontend for Hephaestus
         org.opencontainers.image.vendor=AET TUM
         org.opencontainers.image.licenses=MIT
+        hephaestus.component=webapp-react
     secrets: inherit
 
   # Build and scan application-server component
@@ -54,15 +55,16 @@ jobs:
       docker-context: "./server/application-server"
       registry: "ghcr.io"
       tags: |
-        type=ref,event=branch
-        type=ref,event=pr
-        type=sha,prefix={{branch}}-,format=short
-        pr-${{ github.event.number }}
+        ${{ github.ref_name }}
+        ${{ github.sha }}
+        ci-${{ github.run_number }}
+        ${{ github.event_name == 'pull_request' && format('pr-{0}', github.event.number) || 'latest' }}
       labels: |
         org.opencontainers.image.title=Hephaestus Application Server
         org.opencontainers.image.description=Spring Boot backend for Hephaestus
         org.opencontainers.image.vendor=AET TUM
         org.opencontainers.image.licenses=MIT
+        hephaestus.component=application-server
     secrets: inherit
 
   # Build and scan intelligence-service component
@@ -76,15 +78,16 @@ jobs:
       docker-context: "./server/intelligence-service"
       registry: "ghcr.io"
       tags: |
-        type=ref,event=branch
-        type=ref,event=pr
-        type=sha,prefix={{branch}}-,format=short
-        pr-${{ github.event.number }}
+        ${{ github.ref_name }}
+        ${{ github.sha }}
+        ci-${{ github.run_number }}
+        ${{ github.event_name == 'pull_request' && format('pr-{0}', github.event.number) || 'latest' }}
       labels: |
         org.opencontainers.image.title=Hephaestus Intelligence Service
         org.opencontainers.image.description=FastAPI-based AI service for Hephaestus
         org.opencontainers.image.vendor=AET TUM
         org.opencontainers.image.licenses=MIT
+        hephaestus.component=intelligence-service
     secrets: inherit
 
   # Build and scan webhook-ingest component
@@ -98,15 +101,16 @@ jobs:
       docker-context: "./server/webhook-ingest"
       registry: "ghcr.io"
       tags: |
-        type=ref,event=branch
-        type=ref,event=pr
-        type=sha,prefix={{branch}}-,format=short
-        pr-${{ github.event.number }}
+        ${{ github.ref_name }}
+        ${{ github.sha }}
+        ci-${{ github.run_number }}
+        ${{ github.event_name == 'pull_request' && format('pr-{0}', github.event.number) || 'latest' }}
       labels: |
         org.opencontainers.image.title=Hephaestus Webhook Ingest
         org.opencontainers.image.description=Python-based webhook processor for Hephaestus
         org.opencontainers.image.vendor=AET TUM
         org.opencontainers.image.licenses=MIT
+        hephaestus.component=webhook-ingest
     secrets: inherit
 
   # Security scanning with Trivy for all built images
