@@ -4,10 +4,10 @@ on:
   workflow_call:
     inputs:
       should_skip:
-        description: 'Whether to skip the workflow'
+        description: "Whether to skip the workflow"
         required: false
         type: string
-        default: 'false'
+        default: "false"
 
 env:
   # Global pipeline configuration
@@ -160,7 +160,7 @@ jobs:
         run: |
           echo "📊 Security Scan (${{ matrix.scan-type }}) - Status: ${{ job.status }}"
           echo "## 🔒 Security Scan Results - ${{ matrix.scan-type }}" >> $GITHUB_STEP_SUMMARY
-          
+
           case "${{ matrix.scan-type }}" in
             "sast")
               echo "- **Static Application Security Testing**: CodeQL analysis completed" >> $GITHUB_STEP_SUMMARY
@@ -175,7 +175,7 @@ jobs:
               echo "- **Secret Detection**: TruffleHog secret scanning completed" >> $GITHUB_STEP_SUMMARY
               ;;
           esac
-          
+
           if [[ "${{ job.status }}" == "failure" ]]; then
             echo "## ❌ Security Scan Failed (${{ matrix.scan-type }})" >> $GITHUB_STEP_SUMMARY
             echo "Security vulnerabilities were detected. Please review the scan results and address any critical or high-severity issues." >> $GITHUB_STEP_SUMMARY

@@ -4,10 +4,10 @@ on:
   workflow_call:
     inputs:
       should_skip:
-        description: 'Whether to skip the workflow'
+        description: "Whether to skip the workflow"
         required: false
         type: string
-        default: 'false'
+        default: "false"
 
 env:
   # Global pipeline configuration
@@ -80,7 +80,7 @@ jobs:
           echo "- **Dockerfile**: ${{ matrix.component.dockerfile }}" >> $GITHUB_STEP_SUMMARY
           echo "- **Context**: ${{ matrix.component.context }}" >> $GITHUB_STEP_SUMMARY
           echo "- **Status**: ${{ job.status }}" >> $GITHUB_STEP_SUMMARY
-          
+
           if [[ "${{ job.status }}" == "failure" ]]; then
             echo "## ❌ Docker Build & Scan Failed" >> $GITHUB_STEP_SUMMARY
             echo "Docker build and security scan must complete successfully. Please review the errors above." >> $GITHUB_STEP_SUMMARY

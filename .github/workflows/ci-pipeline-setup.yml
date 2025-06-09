@@ -4,13 +4,13 @@ on:
   workflow_call:
     outputs:
       should_skip:
-        description: 'Whether to skip the workflow execution'
+        description: "Whether to skip the workflow execution"
         value: ${{ jobs.pipeline-setup.outputs.should_skip }}
       matrix_include:
-        description: 'Dynamic test matrix configuration'
+        description: "Dynamic test matrix configuration"
         value: ${{ jobs.pipeline-setup.outputs.matrix_include }}
       changes:
-        description: 'Detected changes in components'
+        description: "Detected changes in components"
         value: ${{ jobs.pipeline-setup.outputs.changes }}
 
 jobs:
@@ -64,7 +64,7 @@ jobs:
           echo "- **Duplicate Detection**: ${{ steps.skip_check.outputs.should_skip == 'true' && 'Skipping duplicate run' || 'Proceeding with pipeline execution' }}" >> $GITHUB_STEP_SUMMARY
           echo "- **Component Changes**: ${{ steps.changes.outputs.changes }}" >> $GITHUB_STEP_SUMMARY
           echo "- **Test Matrix**: Dynamic matrix configured based on detected changes" >> $GITHUB_STEP_SUMMARY
-          
+
           if [[ "${{ job.status }}" == "failure" ]]; then
             echo "## ❌ Pipeline Setup Failed" >> $GITHUB_STEP_SUMMARY
             echo "Pipeline setup must complete successfully before proceeding. Please review the errors above." >> $GITHUB_STEP_SUMMARY

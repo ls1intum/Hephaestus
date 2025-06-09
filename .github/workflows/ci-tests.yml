@@ -4,10 +4,10 @@ on:
   workflow_call:
     inputs:
       should_skip:
-        description: 'Whether to skip the workflow'
+        description: "Whether to skip the workflow"
         required: false
         type: string
-        default: 'false'
+        default: "false"
 
 env:
   # Global pipeline configuration
@@ -27,12 +27,7 @@ jobs:
       fail-fast: false
       matrix:
         test-type:
-          [
-            java-unit,
-            java-integration,
-            java-architecture,
-            webapp-visual,
-          ]
+          [java-unit, java-integration, java-architecture, webapp-visual]
 
     steps:
       - uses: actions/checkout@v4
@@ -99,10 +94,10 @@ jobs:
           workingDir: webapp-react
           # TurboSnap configuration for monorepo
           onlyChanged: true
-          # Performance optimizations  
+          # Performance optimizations
           zip: true
           # Branch strategy optimizations
-          skip: '@(dependabot/**|renovate/**)'
+          skip: "@(dependabot/**|renovate/**)"
           autoAcceptChanges: ${{ github.ref == 'refs/heads/main' && 'main' || '' }}
           # Quality gates - NOTE: exitOnceUploaded is incompatible with junitReport
           exitZeroOnChanges: false
@@ -127,7 +122,7 @@ jobs:
           echo "- **Components**: ${{ steps.chromatic.outputs.componentCount }}" >> $GITHUB_STEP_SUMMARY
           echo "- **Changes Detected**: ${{ steps.chromatic.outputs.changeCount }}" >> $GITHUB_STEP_SUMMARY
           echo "- **Snapshots Captured**: ${{ steps.chromatic.outputs.actualCaptureCount }}" >> $GITHUB_STEP_SUMMARY
-          
+
           if [[ "${{ steps.chromatic.outputs.changeCount }}" -gt "0" ]]; then
             echo "## ⚠️ Visual Changes Detected" >> $GITHUB_STEP_SUMMARY
             echo "Review changes at: ${{ steps.chromatic.outputs.buildUrl }}" >> $GITHUB_STEP_SUMMARY
@@ -165,7 +160,7 @@ jobs:
           echo "## 📋 Test Results" >> $GITHUB_STEP_SUMMARY
           echo "- **Test Type**: ${{ matrix.test-type }}" >> $GITHUB_STEP_SUMMARY
           echo "- **Status**: ${{ job.status }}" >> $GITHUB_STEP_SUMMARY
-          
+
           if [[ "${{ job.status }}" == "failure" ]]; then
             echo "## ❌ Test Execution Failed" >> $GITHUB_STEP_SUMMARY
             echo "Test execution failed for ${{ matrix.test-type }}. Please review the test logs above." >> $GITHUB_STEP_SUMMARY

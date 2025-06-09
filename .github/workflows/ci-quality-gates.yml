@@ -4,10 +4,10 @@ on:
   workflow_call:
     inputs:
       should_skip:
-        description: 'Whether to skip the workflow'
+        description: "Whether to skip the workflow"
         required: false
         type: string
-        default: 'false'
+        default: "false"
 
 env:
   # Global pipeline configuration
@@ -26,7 +26,15 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        check: [java-format, webapp-quality, python-quality, openapi-validation, database-schema-validation, database-documentation-validation]
+        check:
+          [
+            java-format,
+            webapp-quality,
+            python-quality,
+            openapi-validation,
+            database-schema-validation,
+            database-documentation-validation,
+          ]
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -177,7 +185,7 @@ jobs:
         run: |
           set -o pipefail  # Make pipelines fail if any command fails
           echo "🔍 Running comprehensive Python quality checks..."
-          
+
           # Track issues found
           ISSUES_FOUND=()
           OVERALL_SUCCESS=true
@@ -282,7 +290,7 @@ jobs:
           echo ""
           echo "📊 Python Quality Check Summary:"
           echo "================================"
-          
+
           if [ ${#ISSUES_FOUND[@]} -eq 0 ]; then
             echo "✅ All Python quality checks passed successfully!"
             echo ""
@@ -522,7 +530,7 @@ jobs:
             echo "✅ Schema validation passed - JPA entities match committed migrations"
           fi
 
-      # Database documentation validation - ERD matches migration-based schema  
+      # Database documentation validation - ERD matches migration-based schema
       - name: Database documentation validation
         if: matrix.check == 'database-documentation-validation'
         run: |
@@ -580,7 +588,7 @@ jobs:
 
           # Check if ERD documentation is up to date
           git add docs/dev/database/schema.mmd
-          
+
           if ! git diff --cached --quiet docs/dev/database/schema.mmd; then
             echo "## ❌ ERD Documentation Outdated" >> $GITHUB_STEP_SUMMARY
             echo "" >> $GITHUB_STEP_SUMMARY

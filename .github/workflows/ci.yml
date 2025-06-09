@@ -65,13 +65,7 @@ jobs:
   # Aggregated success gate for branch protection
   all-ci-passed:
     runs-on: ubuntu-latest
-    needs:
-      [
-        quality-gates,
-        security-scan,
-        tests,
-        docker-build-and-scan,
-      ]
+    needs: [quality-gates, security-scan, tests, docker-build-and-scan]
     if: always()
     steps:
       - name: Check all jobs
