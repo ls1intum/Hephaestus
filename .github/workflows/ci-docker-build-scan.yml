@@ -84,9 +84,7 @@ jobs:
         hephaestus.component=intelligence-service
     secrets: inherit
 
-  # Build webhook processing service
   webhook-ingest:
-    name: "🔗 Webhook Processor (Python)"
     if: inputs.should_skip != 'true'
     uses: ls1intum/.github/.github/workflows/build-and-push-docker-image.yml@main
     with:
@@ -168,9 +166,7 @@ jobs:
             echo "✅ **No critical or high vulnerabilities found.**" >> $GITHUB_STEP_SUMMARY
           fi
 
-  # Aggregate results and provide summary
   aggregate-results:
-    name: "📋 Build Summary"
     runs-on: ubuntu-latest
     needs: [webapp-react, application-server, intelligence-service, webhook-ingest, security-scan]
     if: always() && inputs.should_skip != 'true'
