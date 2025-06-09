@@ -20,6 +20,7 @@ package-mode = false
 
 [tool.poetry.group.dev.dependencies]
 black = "24.10.0"
+flake8 = "7.1.2"
 
 [virtualenvs]
 create = true
