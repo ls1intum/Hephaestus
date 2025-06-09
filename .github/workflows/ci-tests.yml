@@ -157,14 +157,6 @@ jobs:
           reporter: java-junit
           fail-on-error: false
 
-      # Upload cross-platform test results (placeholder)
-      - name: Upload cross-platform test results
-        if: always() && matrix.test-type == 'cross-platform'
-        run: |
-          echo "## 🔄 Cross-Platform Tests" >> $GITHUB_STEP_SUMMARY
-          echo "- **Status**: Placeholder (not implemented)" >> $GITHUB_STEP_SUMMARY
-          echo "- **Note**: This test type needs to be defined with actual test execution" >> $GITHUB_STEP_SUMMARY
-
       # Enhanced error handling and reporting
       - name: Test execution status report
         if: always()
