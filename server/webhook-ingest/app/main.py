@@ -12,16 +12,18 @@ from app.logger import logger
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     await nats_client.connect()
-    
+
     # Check if stream exists before creating it
     try:
-        stream_info = await nats_client.js.stream_info("github")
-        logger.info(f"Stream 'github' already exists")
-    except Exception as e:
+        await nats_client.js.stream_info("github")
+        logger.info("Stream 'github' already exists")
+    except Exception:
         # Only create stream if it doesn't exist
-        logger.info(f"Creating 'github' stream")
-        await nats_client.js.add_stream(name="github", subjects=["github.>"], config=StreamConfig(storage="file"))
-    
+        logger.info("Creating 'github' stream")
+        await nats_client.js.add_stream(
+            name="github", subjects=["github.>"], config=StreamConfig(storage="file")
+        )
+
     yield
     await nats_client.close()
 
@@ -37,28 +39,28 @@ def verify_github_signature(signature, secret, body):
 
 @app.post("/github")
 async def github_webhook(
-    request: Request, 
+    request: Request,
     signature: str = Header(
-        None, 
-        alias="X-Hub-Signature", 
-        description="GitHub's HMAC hex digest of the payload, used for verifying the webhook's authenticity"
-    ), 
+        None,
+        alias="X-Hub-Signature",
+        description="GitHub's HMAC hex digest of the payload, used for verifying the webhook's authenticity",
+    ),
     event_type: str = Header(
-        None, 
+        None,
         alias="X-Github-Event",
         description="The type of event that triggered the webhook, such as 'push', 'pull_request', etc.",
     ),
-    body = Body(...),
-):    
+    body=Body(...),
+):
     body = await request.body()
-    
+
     if not verify_github_signature(signature, settings.WEBHOOK_SECRET, body):
         raise HTTPException(status_code=401, detail="Invalid signature")
-    
+
     # Ignore ping events
     if event_type == "ping":
-        return { "status": "pong" }
-    
+        return {"status": "pong"}
+
     # Extract subject from the payload
     payload = await request.json()
 
@@ -69,16 +71,16 @@ async def github_webhook(
         repo = payload["repository"]["name"]
     elif "organization" in payload:
         org = payload["organization"]["login"]
-    
-    org_sanitized = org.replace('.', '~')
-    repo_sanitized = repo.replace('.', '~')
+
+    org_sanitized = org.replace(".", "~")
+    repo_sanitized = repo.replace(".", "~")
 
     subject = f"github.{org_sanitized}.{repo_sanitized}.{event_type}"
 
     # Publish the payload to NATS JetStream
     await nats_client.publish_with_retry(subject, body)
 
-    return { "status": "ok" }
+    return {"status": "ok"}
 
 
 class HealthCheck(BaseModel):
