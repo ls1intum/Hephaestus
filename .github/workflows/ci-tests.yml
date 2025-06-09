@@ -122,12 +122,12 @@ jobs:
             const storybookUrl = '${{ steps.chromatic.outputs.storybookUrl }}';
             const buildUrl = '${{ steps.chromatic.outputs.buildUrl }}';
             const changeCount = parseInt('${{ steps.chromatic.outputs.changeCount }}') || 0;
-
+            
             console.log(`Creating status checks for:
               - Storybook URL: ${storybookUrl}
               - Build URL: ${buildUrl}
               - Change Count: ${changeCount}`);
-
+            
             // Create Storybook Publish status check
             await github.rest.repos.createCommitStatus({
               owner: context.repo.owner,
@@ -138,7 +138,7 @@ jobs:
               description: 'Click Details to view your Storybook',
               context: 'Storybook Publish'
             });
-
+            
             console.log('✅ Custom status checks created successfully');
 
       # Enhanced visual testing reporting
