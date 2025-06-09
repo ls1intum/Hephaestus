@@ -23,45 +23,8 @@ env:
 jobs:
   # Pipeline orchestration and duplicate detection
   pipeline-setup:
-    runs-on: ubuntu-latest
-    outputs:
-      should_skip: ${{ steps.skip_check.outputs.should_skip }}
-      matrix_include: ${{ steps.matrix_setup.outputs.matrix }}
-      changes: ${{ steps.changes.outputs.changes }}
-    timeout-minutes: 5
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-
-      - id: skip_check
-        uses: fkirc/skip-duplicate-actions@v5
-        with:
-          do_not_skip: '["workflow_dispatch", "schedule"]'
-
-      - name: Detect changed components
-        id: changes
-        uses: dorny/paths-filter@v3
-        with:
-          filters: |
-            webapp:
-              - 'webapp-react/**'
-            application-server:
-              - 'server/application-server/**'
-            intelligence-service:
-              - 'server/intelligence-service/**'
-            webhook-ingest:
-              - 'server/webhook-ingest/**'
-            docs:
-              - 'docs/**'
-            ci:
-              - '.github/workflows/**'
-
-      - name: Setup dynamic test matrix
-        id: matrix_setup
-        run: |
-          # Create intelligent test matrix based on changes
-          echo "matrix={\"include\":[{\"name\":\"Quality Gates\",\"type\":\"quality\",\"runs_if\":\"always\",\"timeout\":12},{\"name\":\"Security Scan\",\"type\":\"security\",\"runs_if\":\"always\",\"timeout\":15}]}" >> $GITHUB_OUTPUT
+    uses: ./.github/workflows/ci-pipeline-setup.yml
+    secrets: inherit
 
   # Quality gates workflow call
   quality-gates:
