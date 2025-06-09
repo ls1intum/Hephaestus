@@ -8,9 +8,6 @@ on:
         required: false
         type: string
         default: 'false'
-    secrets:
-      GITHUB_TOKEN:
-        required: true
 
 env:
   # Global pipeline configuration

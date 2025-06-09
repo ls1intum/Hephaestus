@@ -68,8 +68,7 @@ jobs:
     uses: ./.github/workflows/ci-quality-gates.yml
     needs: [pipeline-setup]
     if: needs.pipeline-setup.outputs.should_skip != 'true'
-    secrets:
-      GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    secrets: inherit
     with:
       should_skip: ${{ needs.pipeline-setup.outputs.should_skip }}
 
