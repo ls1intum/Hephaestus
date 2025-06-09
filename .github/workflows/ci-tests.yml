@@ -74,6 +74,8 @@ jobs:
       - name: "Webapp ${{ matrix.test-type }} execution"
         if: startsWith(matrix.test-type, 'webapp-')
         working-directory: webapp-react
+        env:
+          CHROMATIC_PROJECT_TOKEN: ${{ secrets.CHROMATIC_PROJECT_TOKEN }}
         run: |
           echo "🚀 Starting webapp ${{ matrix.test-type }} tests"
 
