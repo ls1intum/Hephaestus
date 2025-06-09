@@ -128,23 +128,34 @@ jobs:
               - Build URL: ${buildUrl}
               - Change Count: ${changeCount}`);
             
-            // Create Storybook Publish check run (richer than commit status)
-            await github.rest.checks.create({
+            // Create Storybook Publish status check
+            await github.rest.repos.createCommitStatus({
               owner: context.repo.owner,
               repo: context.repo.repo,
-              name: 'Storybook Publish',
-              head_sha: context.sha,
-              status: 'completed',
-              conclusion: 'success',
-              details_url: storybookUrl,
-              output: {
-                title: '📖 Storybook Published Successfully',
-                summary: `Your Storybook has been published and is available at:\n\n🔗 **[View Storybook](${storybookUrl})**\n\n📊 **Stats:**\n- Stories: ${{ steps.chromatic.outputs.specCount || 'N/A' }}\n- Components: ${{ steps.chromatic.outputs.componentCount || 'N/A' }}`,
-                text: `Click the "Details" link above to view your published Storybook.\n\nStorybook URL: ${storybookUrl}`
-              }
+              sha: context.sha,
+              state: 'success',
+              target_url: storybookUrl,
+              description: 'Click Details to view your Storybook',
+              context: 'Storybook Publish'
             });
-
-            console.log('✅ Custom check runs created successfully');
+            
+            // Create UI Tests status check  
+            const uiTestsState = changeCount > 0 ? 'pending' : 'success';
+            const uiTestsDescription = changeCount > 0 
+              ? `${changeCount} UI tests require approval` 
+              : 'All UI tests passed';
+              
+            await github.rest.repos.createCommitStatus({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              sha: context.sha,
+              state: uiTestsState,
+              target_url: buildUrl,
+              description: uiTestsDescription,
+              context: 'UI Tests'
+            });
+            
+            console.log('✅ Custom status checks created successfully');
 
       # Enhanced visual testing reporting
       - name: "📊 Visual Testing Summary"
