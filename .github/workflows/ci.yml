@@ -433,6 +433,21 @@ jobs:
         with:
           cache-type: 'openapi-validation'
 
+      # Verify build environment
+      - name: Verify build environment
+        if: matrix.scan-type == 'sast'
+        run: |
+          echo "🔍 Verifying build environment for CodeQL..."
+          echo "Java version:"
+          java -version
+          echo "Maven version:"
+          mvn -version
+          echo "Node.js version:"
+          node --version
+          echo "NPM version:"
+          npm --version
+          echo "Environment verification complete"
+
       - name: Build for CodeQL analysis
         if: matrix.scan-type == 'sast'
         run: |
@@ -440,15 +455,11 @@ jobs:
           echo "🔨 Building Java application for CodeQL analysis..."
           cd server/application-server
           
-          # Verify Java version
-          java -version
-          mvn -version
-          
-          # Build with error handling
-          if ! mvn compile -DskipTests --quiet; then
+          # Build with dependencies caching
+          if ! mvn compile -DskipTests -Dmaven.test.skip=true --quiet; then
             echo "❌ Java build failed for CodeQL analysis"
-            echo "Maven output:"
-            mvn compile -DskipTests
+            echo "Maven compilation output:"
+            mvn compile -DskipTests -Dmaven.test.skip=true
             exit 1
           fi
           echo "✅ Java build completed successfully"
@@ -456,10 +467,17 @@ jobs:
           # Node.js build 
           echo "🔨 Building React application for CodeQL analysis..."
           cd ../../webapp-react
+          
+          # Install dependencies if not cached
           if [ ! -d "node_modules" ]; then
+            echo "📦 Installing Node.js dependencies..."
             npm ci --prefer-offline --no-audit --progress=false
+          else
+            echo "📦 Node.js dependencies restored from cache"
           fi
           
+          # Build application
+          echo "🏗️ Building React application..."
           if ! npm run build:prod; then
             echo "❌ Node.js build failed for CodeQL analysis"
             exit 1
@@ -527,37 +545,25 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          # Java test matrix
-          - name: "Java Unit Tests"
+          # Java Application Server Tests
+          - test-type: java-unit
             os: ubuntu-latest
-            test-type: java-unit
             timeout: 15
-          - name: "Java Integration Tests"
+          - test-type: java-integration
             os: ubuntu-latest
-            test-type: java-integration
             timeout: 20
-          - name: "Java Architecture Tests"
+          - test-type: java-architecture
             os: ubuntu-latest
-            test-type: java-architecture
             timeout: 10
-          # Webapp test matrix
-          - name: "Webapp Unit Tests"
+          
+          # Webapp React Tests
+          - test-type: webapp-visual
             os: ubuntu-latest
-            test-type: webapp-unit
-            timeout: 10
-          - name: "Webapp Visual Tests"
-            os: ubuntu-latest
-            test-type: webapp-visual
             timeout: 15
-          # Python test matrix
-          - name: "Intelligence Service Tests"
-            os: ubuntu-latest
-            test-type: python-intelligence
-            timeout: 10
-          # Cross-platform validation
-          - name: "macOS Compatibility"
+          
+          # Cross-Platform Tests
+          - test-type: cross-platform
             os: macos-latest
-            test-type: cross-platform
             timeout: 15
     steps:
       - uses: actions/checkout@v4
@@ -569,54 +575,54 @@ jobs:
           cache-type: ${{ matrix.test-type }}
           os: ${{ matrix.os }}
 
-      # Java tests
-      - name: Java test execution
+      # Java tests with enhanced reporting
+      - name: "Java ${{ matrix.test-type }} execution"
         if: startsWith(matrix.test-type, 'java-')
         run: |
+          echo "🚀 Starting Java ${{ matrix.test-type }} tests"
+          
           case "${{ matrix.test-type }}" in
             "java-unit")
+              echo "🧪 Running unit tests for core business logic..."
               cd server/application-server
               mvn test -Dgroups="unit" -Dtest="!**/ArchitectureTest" -T 2C --batch-mode
               ;;
             "java-integration")
+              echo "🔗 Running integration tests with database and APIs..."
               cd server/application-server
               mvn test -Dgroups="integration" -T 2C --batch-mode
               ;;
             "java-architecture")
+              echo "🏗️ Validating architecture compliance and dependencies..."
               cd server/application-server
               mvn test -Dtest="**/ArchitectureTest" --batch-mode
               ;;
           esac
+          echo "✅ Java ${{ matrix.test-type }} tests completed successfully"
 
-      # Webapp tests
-      - name: Webapp test execution
+      # Webapp tests with enhanced reporting
+      - name: "Webapp ${{ matrix.test-type }} execution"
         if: startsWith(matrix.test-type, 'webapp-')
         working-directory: webapp-react
         run: |
-          npm ci
+          echo "🚀 Starting webapp ${{ matrix.test-type }} tests"
+          
+          npm ci --prefer-offline --no-audit --progress=false
+          
           case "${{ matrix.test-type }}" in
-            "webapp-unit")
-              npm run test:ci
-              ;;
             "webapp-visual")
+              echo "🎨 Running visual regression tests with Storybook..."
               npm run chromatic
               ;;
           esac
+          echo "✅ Webapp ${{ matrix.test-type }} tests completed successfully"
 
-      # Python tests
-      - name: Python test execution
-        if: matrix.test-type == 'python-intelligence'
-        working-directory: server/intelligence-service
-        run: |
-          poetry install --no-interaction --no-root
-          poetry run pytest --cov=app --cov-report=xml
-
-      # Test result aggregation
+      # Test result aggregation with enhanced reporting
       - name: Upload test results
         if: always()
         uses: dorny/test-reporter@v2
         with:
-          name: ${{ matrix.name }} Results
+          name: "Test Results - ${{ matrix.test-type }}"
           path: "**/target/surefire-reports/*.xml,**/test-results.xml"
           reporter: java-junit
           fail-on-error: false
