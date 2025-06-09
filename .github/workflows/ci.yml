@@ -53,10 +53,19 @@ jobs:
     with:
       should_skip: ${{ needs.pipeline-setup.outputs.should_skip }}
 
-  # Step 5: Build and scan Docker images
-  docker-build-scan:
-    uses: ./.github/workflows/ci-docker-build-scan.yml
+  # Step 5: Build Docker images
+  docker-build:
+    uses: ./.github/workflows/ci-docker-build.yml
     needs: [pipeline-setup, test-suite]
+    if: needs.pipeline-setup.outputs.should_skip != 'true'
+    secrets: inherit
+    with:
+      should_skip: ${{ needs.pipeline-setup.outputs.should_skip }}
+
+  # Step 6: Security scan Docker images
+  docker-security-scan:
+    uses: ./.github/workflows/ci-docker-security-scan.yml
+    needs: [pipeline-setup, docker-build]
     if: needs.pipeline-setup.outputs.should_skip != 'true'
     secrets: inherit
     with:
@@ -65,7 +74,7 @@ jobs:
   # Final: Aggregated success gate for branch protection
   all-ci-passed:
     runs-on: ubuntu-latest
-    needs: [quality-gates, security-scan, test-suite, docker-build-scan]
+    needs: [quality-gates, security-scan, test-suite, docker-build, docker-security-scan]
     if: always()
     steps:
       - name: Generate comprehensive CI summary
@@ -78,13 +87,17 @@ jobs:
           echo "- **Code Quality**: ${{ needs.quality-gates.result }}" >> $GITHUB_STEP_SUMMARY
           echo "- **Security Scan**: ${{ needs.security-scan.result }}" >> $GITHUB_STEP_SUMMARY
           echo "- **Test Suite**: ${{ needs.test-suite.result }}" >> $GITHUB_STEP_SUMMARY
-          echo "- **Docker Build & Scan**: ${{ needs.docker-build-scan.result }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Docker Build**: ${{ needs.docker-build.result }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Docker Security Scan**: ${{ needs.docker-security-scan.result }}" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           
           # Docker images built
-          if [[ "${{ needs.docker-build-scan.outputs.images_built }}" != "" ]]; then
+          if [[ "${{ needs.docker-build.result }}" == "success" ]]; then
             echo "### 🐳 Images Built:" >> $GITHUB_STEP_SUMMARY
-            echo "${{ needs.docker-build-scan.outputs.images_built }}" | tr ',' '\n' | sed 's/^/- /' >> $GITHUB_STEP_SUMMARY
+            echo "- **Frontend (React)**: webapp-react" >> $GITHUB_STEP_SUMMARY
+            echo "- **Backend (Spring)**: application-server" >> $GITHUB_STEP_SUMMARY
+            echo "- **AI Service (FastAPI)**: intelligence-service" >> $GITHUB_STEP_SUMMARY
+            echo "- **Webhook Processor**: webhook-ingest" >> $GITHUB_STEP_SUMMARY
             echo "" >> $GITHUB_STEP_SUMMARY
           fi
 
