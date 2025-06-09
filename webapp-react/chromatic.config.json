@@ -2,7 +2,6 @@
   "buildScriptName": "build-storybook",
   "storybookBuildDir": "storybook-static",
   "exitZeroOnChanges": false,
-  "exitOnceUploaded": true,
   "zip": true,
   "junitReport": true,
   "ignoreLastBuildOnBranch": "renovate/**",

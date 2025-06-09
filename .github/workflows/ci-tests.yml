@@ -105,11 +105,12 @@ jobs:
           # Branch strategy optimizations
           skip: '@(dependabot/**|renovate/**)'
           autoAcceptChanges: ${{ github.ref == 'refs/heads/main' && 'main' || '' }}
-          # Quality gates
+          # Quality gates - NOTE: exitOnceUploaded is incompatible with junitReport
           exitZeroOnChanges: false
           # Enhanced debugging and reporting
           diagnostics: true
           logLevel: info
+          # JUnit reporting for CI integration (removes exitOnceUploaded due to incompatibility)
           junitReport: true
         env:
           # Enhanced build context for TurboSnap
