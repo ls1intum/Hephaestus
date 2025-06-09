@@ -139,22 +139,6 @@ jobs:
               context: 'Storybook Publish'
             });
             
-            // Create UI Tests status check  
-            const uiTestsState = changeCount > 0 ? 'pending' : 'success';
-            const uiTestsDescription = changeCount > 0 
-              ? `${changeCount} UI tests require approval` 
-              : 'All UI tests passed';
-              
-            await github.rest.repos.createCommitStatus({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              sha: context.sha,
-              state: uiTestsState,
-              target_url: buildUrl,
-              description: uiTestsDescription,
-              context: 'UI Tests'
-            });
-            
             console.log('✅ Custom status checks created successfully');
 
       # Enhanced visual testing reporting
