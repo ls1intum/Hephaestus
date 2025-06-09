@@ -110,7 +110,7 @@ class GitHubLabelConverterTest extends BaseUnitTest {
 
     /**
      * Verifies payload parsing handles GitHub API edge cases like null descriptions.
-     * 
+     *
      * <p>GitHub's REST API can return null for optional fields like label descriptions,
      * which requires proper null handling to prevent NullPointerExceptions during
      * entity mapping and database persistence.
