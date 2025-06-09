@@ -21,9 +21,7 @@ env:
   JAVA_VERSION: 21
 
 jobs:
-  # Build and scan webapp-react component
-  build-scan-webapp:
-    name: "Build & Scan: Webapp (React)"
+  webapp-react:
     if: inputs.should_skip != 'true'
     uses: ls1intum/.github/.github/workflows/build-and-push-docker-image.yml@main
     with:
@@ -44,9 +42,7 @@ jobs:
         hephaestus.component=webapp-react
     secrets: inherit
 
-  # Build and scan application-server component
-  build-scan-application-server:
-    name: "Build & Scan: Application Server"
+  application-server:
     if: inputs.should_skip != 'true'
     uses: ls1intum/.github/.github/workflows/build-and-push-docker-image.yml@main
     with:
@@ -67,9 +63,7 @@ jobs:
         hephaestus.component=application-server
     secrets: inherit
 
-  # Build and scan intelligence-service component
-  build-scan-intelligence-service:
-    name: "Build & Scan: Intelligence Service"
+  intelligence-service:
     if: inputs.should_skip != 'true'
     uses: ls1intum/.github/.github/workflows/build-and-push-docker-image.yml@main
     with:
@@ -90,9 +84,9 @@ jobs:
         hephaestus.component=intelligence-service
     secrets: inherit
 
-  # Build and scan webhook-ingest component
-  build-scan-webhook-ingest:
-    name: "Build & Scan: Webhook Ingest"
+  # Build webhook processing service
+  webhook-ingest:
+    name: "🔗 Webhook Processor (Python)"
     if: inputs.should_skip != 'true'
     uses: ls1intum/.github/.github/workflows/build-and-push-docker-image.yml@main
     with:
@@ -118,7 +112,7 @@ jobs:
     name: "Security Scan: ${{ matrix.component.name }}"
     runs-on: ubuntu-latest
     if: inputs.should_skip != 'true'
-    needs: [build-scan-webapp, build-scan-application-server, build-scan-intelligence-service, build-scan-webhook-ingest]
+    needs: [webapp-react, application-server, intelligence-service, webhook-ingest]
     timeout-minutes: 15
     strategy:
       fail-fast: false
@@ -176,9 +170,9 @@ jobs:
 
   # Aggregate results and provide summary
   aggregate-results:
-    name: "Build & Scan Summary"
+    name: "📋 Build Summary"
     runs-on: ubuntu-latest
-    needs: [build-scan-webapp, build-scan-application-server, build-scan-intelligence-service, build-scan-webhook-ingest, security-scan]
+    needs: [webapp-react, application-server, intelligence-service, webhook-ingest, security-scan]
     if: always() && inputs.should_skip != 'true'
     outputs:
       images_built: ${{ steps.summary.outputs.images_built }}
@@ -190,17 +184,17 @@ jobs:
           echo "" >> $GITHUB_STEP_SUMMARY
           
           # Check build results
-          WEBAPP_STATUS="${{ needs.build-scan-webapp.result }}"
-          SERVER_STATUS="${{ needs.build-scan-application-server.result }}"
-          INTEL_STATUS="${{ needs.build-scan-intelligence-service.result }}"
-          WEBHOOK_STATUS="${{ needs.build-scan-webhook-ingest.result }}"
+          WEBAPP_STATUS="${{ needs.webapp-react.result }}"
+          SERVER_STATUS="${{ needs.application-server.result }}"
+          INTEL_STATUS="${{ needs.intelligence-service.result }}"
+          WEBHOOK_STATUS="${{ needs.webhook-ingest.result }}"
           SCAN_STATUS="${{ needs.security-scan.result }}"
           
           echo "### Build Results:" >> $GITHUB_STEP_SUMMARY
-          echo "- **Webapp**: $WEBAPP_STATUS" >> $GITHUB_STEP_SUMMARY
-          echo "- **Application Server**: $SERVER_STATUS" >> $GITHUB_STEP_SUMMARY
-          echo "- **Intelligence Service**: $INTEL_STATUS" >> $GITHUB_STEP_SUMMARY
-          echo "- **Webhook Ingest**: $WEBHOOK_STATUS" >> $GITHUB_STEP_SUMMARY
+          echo "- **Frontend (React)**: $WEBAPP_STATUS" >> $GITHUB_STEP_SUMMARY
+          echo "- **Backend (Spring)**: $SERVER_STATUS" >> $GITHUB_STEP_SUMMARY
+          echo "- **AI Service (FastAPI)**: $INTEL_STATUS" >> $GITHUB_STEP_SUMMARY
+          echo "- **Webhook Processor**: $WEBHOOK_STATUS" >> $GITHUB_STEP_SUMMARY
           echo "- **Security Scan**: $SCAN_STATUS" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           
