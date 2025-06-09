@@ -8,10 +8,7 @@ on:
         required: false
         type: string
         default: "false"
-    outputs:
-      images_built:
-        description: "Images that were successfully built"
-        value: ${{ jobs.aggregate-results.outputs.images_built }}
+
 
 env:
   # Global pipeline configuration
@@ -70,43 +67,3 @@ jobs:
         org.opencontainers.image.licenses=MIT
         hephaestus.component=${{ matrix.component.name }}
     secrets: inherit
-
-  aggregate-results:
-    runs-on: ubuntu-latest
-    needs: [docker-build]
-    if: always() && inputs.should_skip != 'true'
-    outputs:
-      images_built: ${{ steps.summary.outputs.images_built }}
-    steps:
-      - name: Generate build summary
-        id: summary
-        run: |
-          echo "## 🐳 Docker Build Summary" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          
-          # Check build results
-          BUILD_STATUS="${{ needs.docker-build.result }}"
-          
-          echo "### Build Results:" >> $GITHUB_STEP_SUMMARY
-          echo "- **Docker Build (All Components)**: $BUILD_STATUS" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          
-          # List components that were built
-          echo "### Components Built:" >> $GITHUB_STEP_SUMMARY
-          echo "- **Frontend (React)**: webapp-react" >> $GITHUB_STEP_SUMMARY
-          echo "- **Backend (Spring)**: application-server" >> $GITHUB_STEP_SUMMARY
-          echo "- **AI Service (FastAPI)**: intelligence-service" >> $GITHUB_STEP_SUMMARY
-          echo "- **Webhook Processor**: webhook-ingest" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          
-          # Determine overall status
-          if [[ "$BUILD_STATUS" == "success" ]]; then
-            echo "### ✅ Overall Result: SUCCESS" >> $GITHUB_STEP_SUMMARY
-            echo "All Docker images built successfully." >> $GITHUB_STEP_SUMMARY
-            echo "images_built=webapp-react,application-server,intelligence-service,webhook-ingest" >> $GITHUB_OUTPUT
-          else
-            echo "### ❌ Overall Result: FAILURE" >> $GITHUB_STEP_SUMMARY
-            echo "One or more Docker builds failed. Check individual job logs for details." >> $GITHUB_STEP_SUMMARY
-            echo "images_built=" >> $GITHUB_OUTPUT
-            exit 1
-          fi
