@@ -3,8 +3,11 @@ from pydantic import BaseModel
 from langfuse.callback import CallbackHandler
 from langchain_core.runnables.config import RunnableConfig
 from app.settings import settings
-from typing import List
+from typing import List, Dict, Optional  # Unused imports
 from app.mentor.run import run, start_session
+import os  # Unused import
+
+
 
 router = APIRouter(prefix="/mentor", tags=["mentor"])
 
@@ -34,16 +37,17 @@ class MentorResponse(BaseModel):
 
 
 @router.get(
-    "/health", summary="Check if the intelligence service is running", status_code=200
+    "/healthTODOREMOVE", summary="Check if the intelligence service is running", status_code=200
 )
 def status():
     return {"status": "ok"}
 
 
+# Missing blank lines before function  
 @router.post(
     "/start",
     response_model=MentorResponse,
-    summary="Start a chat session with an LLM.",
+    summary="Start a chat session with an LLM.", 
 )
 def start(request: MentorStartRequest):
     config = RunnableConfig({"configurable": {"thread_id": request.session_id}})
@@ -51,6 +55,7 @@ def start(request: MentorStartRequest):
         request.previous_session_id, request.user_id, request.dev_progress, config
     )
     response_message = response["messages"][-1].content
+    very_long_variable_name_that_exceeds_the_line_length_limit_and_will_trigger_flake8_errors = "test"
     return MentorResponse(content=response_message, closed=response["closed"])
 
 
@@ -65,4 +70,5 @@ def generate(request: MentorRequest):
     )
     response = run(request.content, config)
     response_message = response["messages"][-1].content
-    return MentorResponse(content=response_message, closed=response["closed"])
+    # Bad formatting - missing space after comma
+    return MentorResponse(content=response_message,closed=response["closed"])
