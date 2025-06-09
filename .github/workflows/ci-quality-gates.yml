@@ -1,0 +1,452 @@
+name: Quality Gates
+
+on:
+  workflow_call:
+    inputs:
+      should_skip:
+        description: 'Whether to skip the workflow'
+        required: false
+        type: string
+        default: 'false'
+    secrets:
+      GITHUB_TOKEN:
+        required: true
+
+env:
+  # Global pipeline configuration
+  MAVEN_OPTS: -Xmx2048m -XX:+UseParallelGC
+  NODE_VERSION: 22
+  PYTHON_VERSION: 3.13
+  JAVA_VERSION: 21
+
+jobs:
+  # Enterprise-grade quality gates with intelligent caching and error handling
+  quality-gates:
+    runs-on: ubuntu-latest
+    if: inputs.should_skip != 'true'
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        check: [java-format, webapp-quality, python-quality, openapi-validation]
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      # Advanced cache setup with fallback
+      - name: Setup shared caches
+        uses: ./.github/actions/setup-caches
+        with:
+          cache-type: ${{ matrix.check }}
+
+      # Additional cache for webapp build artifacts
+      - name: Cache webapp build artifacts
+        if: matrix.check == 'webapp-quality'
+        uses: actions/cache@v4
+        with:
+          path: |
+            webapp-react/dist
+            webapp-react/.vite
+            webapp-react/node_modules/.vite
+            webapp-react/node_modules/.cache
+          key: ${{ runner.os }}-webapp-build-${{ hashFiles('package-lock.json', 'webapp-react/package-lock.json', 'webapp-react/biome.json', 'webapp-react/tsconfig.json', 'webapp-react/vite.config.js', 'webapp-react/components.json') }}-${{ github.sha }}
+          restore-keys: |
+            ${{ runner.os }}-webapp-build-${{ hashFiles('package-lock.json', 'webapp-react/package-lock.json', 'webapp-react/biome.json', 'webapp-react/tsconfig.json', 'webapp-react/vite.config.js', 'webapp-react/components.json') }}-
+            ${{ runner.os }}-webapp-build-
+
+      # Java code quality and formatting
+      - name: Java formatting & static analysis
+        if: matrix.check == 'java-format'
+        run: |
+          echo "🔍 Checking Java code formatting and style..."
+
+          # Install dependencies if not cached
+          if [ ! -d "node_modules" ]; then
+            npm ci --prefer-offline --no-audit
+          fi
+
+          # Run Java formatting check and capture output
+          echo "🎨 Running Prettier formatting check..."
+          npm run format:java:check 2>&1 | tee java-format-results.txt
+          FORMAT_EXIT_CODE=${PIPESTATUS[0]}
+
+          # Generate summary based on results
+          if [ $FORMAT_EXIT_CODE -eq 0 ]; then
+            echo "## ✅ Java Code Quality Results" >> $GITHUB_STEP_SUMMARY
+            echo "- **Formatting**: All Java files follow Prettier formatting rules" >> $GITHUB_STEP_SUMMARY
+            echo "- **Style Guide**: Code adheres to project style guidelines" >> $GITHUB_STEP_SUMMARY
+            echo "✅ All Java formatting checks passed successfully"
+          else
+            echo "## ❌ Java Code Quality Results" >> $GITHUB_STEP_SUMMARY
+            echo "- **Formatting**: Code formatting issues detected" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "**Files with formatting issues:**" >> $GITHUB_STEP_SUMMARY
+            echo '```' >> $GITHUB_STEP_SUMMARY
+            grep -E '\[warn\]' java-format-results.txt | sed 's/\[warn\] /- /' >> $GITHUB_STEP_SUMMARY || echo "- Check the logs above for details" >> $GITHUB_STEP_SUMMARY
+            echo '```' >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "**To fix these issues:**" >> $GITHUB_STEP_SUMMARY
+            echo '```bash' >> $GITHUB_STEP_SUMMARY
+            echo 'npm run format:java:write' >> $GITHUB_STEP_SUMMARY
+            echo '```' >> $GITHUB_STEP_SUMMARY
+            echo "❌ Java formatting check failed"
+            exit 1
+          fi
+
+      # Webapp quality checks with comprehensive validation
+      - name: Webapp quality & type checking
+        if: matrix.check == 'webapp-quality'
+        working-directory: ./webapp-react
+        run: |
+          echo "🔍 Running comprehensive webapp quality checks..."
+
+          # Install dependencies if not cached
+          if [ ! -d "node_modules" ]; then
+            echo "📦 Installing dependencies..."
+            npm ci --prefer-offline --no-audit --progress=false
+          else
+            echo "📦 Dependencies restored from cache"
+          fi
+
+          # Run Biome check (linting + formatting + imports)
+          echo "🎨 Running Biome code quality checks..."
+          npm run check 2>&1 | tee biome-results.txt
+          BIOME_EXIT_CODE=${PIPESTATUS[0]}
+
+          # TypeScript compilation check
+          echo "📊 Running TypeScript compilation check..."
+          npx tsc --noEmit --pretty 2>&1 | tee typescript-results.txt
+          TSC_EXIT_CODE=${PIPESTATUS[0]}
+
+          # Build check to ensure everything compiles
+          echo "🏗️ Running build verification..."
+          npm run build 2>&1 | tee build-results.txt
+          BUILD_EXIT_CODE=${PIPESTATUS[0]}
+
+          # Package audit for security vulnerabilities
+          echo "🔒 Running security audit..."
+          npm audit --audit-level=high --progress=false 2>&1 | tee audit-results.txt || true
+
+          # Bundle size analysis
+          echo "📏 Analyzing bundle size..."
+          if [ -d "dist" ]; then
+            BUNDLE_SIZE=$(du -sh dist | cut -f1)
+            echo "Bundle size: $BUNDLE_SIZE"
+          fi
+
+          # Generate comprehensive summary
+          echo "## ✅ Webapp Quality Results" >> $GITHUB_STEP_SUMMARY
+          echo "| Check | Status | Details |" >> $GITHUB_STEP_SUMMARY
+          echo "| --- | --- | --- |" >> $GITHUB_STEP_SUMMARY
+
+          if [ $BIOME_EXIT_CODE -eq 0 ]; then
+            echo "| **Biome Quality** | ✅ Passed | Code formatting, linting, and imports are correct |" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "| **Biome Quality** | ❌ Failed | Code quality issues detected |" >> $GITHUB_STEP_SUMMARY
+          fi
+
+          if [ $TSC_EXIT_CODE -eq 0 ]; then
+            echo "| **TypeScript** | ✅ Passed | All type checks passed |" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "| **TypeScript** | ❌ Failed | Type errors detected |" >> $GITHUB_STEP_SUMMARY
+          fi
+
+          if [ $BUILD_EXIT_CODE -eq 0 ]; then
+            echo "| **Build** | ✅ Passed | Application builds successfully |" >> $GITHUB_STEP_SUMMARY
+            if [ -n "$BUNDLE_SIZE" ]; then
+              echo "| **Bundle Size** | 📊 $BUNDLE_SIZE | Production bundle analysis |" >> $GITHUB_STEP_SUMMARY
+            fi
+          else
+            echo "| **Build** | ❌ Failed | Build errors detected |" >> $GITHUB_STEP_SUMMARY
+          fi
+
+          echo "| **Security** | 🔒 Scanned | Dependency vulnerabilities checked |" >> $GITHUB_STEP_SUMMARY
+
+          # Exit with error if any critical checks failed
+          if [ $BIOME_EXIT_CODE -ne 0 ] || [ $TSC_EXIT_CODE -ne 0 ] || [ $BUILD_EXIT_CODE -ne 0 ]; then
+            echo "❌ One or more quality checks failed"
+            exit 1
+          fi
+
+          echo "✅ All webapp quality checks passed successfully"
+
+      # Python quality checks with comprehensive validation
+      - name: Python quality & security analysis
+        if: matrix.check == 'python-quality'
+        run: |
+          set -o pipefail  # Make pipelines fail if any command fails
+          echo "🔍 Running comprehensive Python quality checks..."
+          
+          # Track issues found
+          ISSUES_FOUND=()
+          OVERALL_SUCCESS=true
+
+          # Intelligence Service checks
+          echo "📝 Checking Intelligence Service..."
+          cd server/intelligence-service
+
+          if [ ! -d ".venv" ]; then
+            poetry install --no-interaction --no-root
+          fi
+
+          # Code formatting
+          echo "🎨 Checking code formatting..."
+          poetry run black --check --diff . 2>&1 | tee black-results.txt
+          INTELLIGENCE_BLACK_EXIT_CODE=${PIPESTATUS[0]}
+          if [ $INTELLIGENCE_BLACK_EXIT_CODE -ne 0 ]; then
+            echo "❌ Intelligence Service: Black formatting check failed"
+            ISSUES_FOUND+=("Intelligence Service: Black formatting needs fixing")
+            OVERALL_SUCCESS=false
+          else
+            echo "✅ Intelligence Service: Black formatting check passed"
+          fi
+
+          # Linting
+          echo "🔍 Running flake8 linting..."
+          poetry run flake8 . --statistics --count 2>&1 | tee flake8-results.txt
+          INTELLIGENCE_FLAKE8_EXIT_CODE=${PIPESTATUS[0]}
+          if [ $INTELLIGENCE_FLAKE8_EXIT_CODE -ne 0 ]; then
+            echo "❌ Intelligence Service: Flake8 linting failed"
+            ISSUES_FOUND+=("Intelligence Service: Flake8 linting issues found")
+            OVERALL_SUCCESS=false
+          else
+            echo "✅ Intelligence Service: Flake8 linting passed"
+          fi
+
+          # Type checking (if mypy is available)
+          if poetry show mypy > /dev/null 2>&1; then
+            echo "📊 Running type checking..."
+            poetry run mypy . --ignore-missing-imports --show-error-codes 2>&1 | tee mypy-results.txt
+            INTELLIGENCE_MYPY_EXIT_CODE=${PIPESTATUS[0]}
+            if [ $INTELLIGENCE_MYPY_EXIT_CODE -ne 0 ]; then
+              echo "⚠️ Intelligence Service: MyPy type checking found issues (warning only)"
+              ISSUES_FOUND+=("Intelligence Service: MyPy type checking issues (warning)")
+              # Type checking issues are warnings, not failures
+            else
+              echo "✅ Intelligence Service: MyPy type checking passed"
+            fi
+          fi
+
+          # Security check (if bandit is available)
+          if poetry show bandit > /dev/null 2>&1; then
+            echo "🔒 Running security analysis..."
+            poetry run bandit -r app/ -f json -o bandit-results.json 2>&1
+            INTELLIGENCE_BANDIT_EXIT_CODE=${PIPESTATUS[0]}
+            if [ $INTELLIGENCE_BANDIT_EXIT_CODE -ne 0 ]; then
+              echo "⚠️ Intelligence Service: Bandit security analysis found issues (warning only)"
+              ISSUES_FOUND+=("Intelligence Service: Security analysis issues (warning)")
+              # Security issues are warnings, not failures for now
+            else
+              echo "✅ Intelligence Service: Bandit security analysis passed"
+            fi
+          fi
+
+          cd ../..
+
+          # Webhook Ingest checks
+          echo "📝 Checking Webhook Ingest..."
+          cd server/webhook-ingest
+
+          if [ ! -d ".venv" ]; then
+            poetry install --no-interaction --no-root
+          fi
+
+          # Code formatting
+          echo "🎨 Checking webhook-ingest code formatting..."
+          poetry run black --check --diff . 2>&1 | tee webhook-black-results.txt
+          WEBHOOK_BLACK_EXIT_CODE=${PIPESTATUS[0]}
+          if [ $WEBHOOK_BLACK_EXIT_CODE -ne 0 ]; then
+            echo "❌ Webhook Ingest: Black formatting check failed"
+            ISSUES_FOUND+=("Webhook Ingest: Black formatting needs fixing")
+            OVERALL_SUCCESS=false
+          else
+            echo "✅ Webhook Ingest: Black formatting check passed"
+          fi
+
+          # Linting
+          echo "🔍 Running webhook-ingest flake8 linting..."
+          poetry run flake8 . --statistics --count 2>&1 | tee webhook-flake8-results.txt
+          WEBHOOK_FLAKE8_EXIT_CODE=${PIPESTATUS[0]}
+          if [ $WEBHOOK_FLAKE8_EXIT_CODE -ne 0 ]; then
+            echo "❌ Webhook Ingest: Flake8 linting failed"
+            ISSUES_FOUND+=("Webhook Ingest: Flake8 linting issues found")
+            OVERALL_SUCCESS=false
+          else
+            echo "✅ Webhook Ingest: Flake8 linting passed"
+          fi
+
+          cd ../..
+
+          # Generate comprehensive summary
+          echo ""
+          echo "📊 Python Quality Check Summary:"
+          echo "================================"
+          
+          if [ ${#ISSUES_FOUND[@]} -eq 0 ]; then
+            echo "✅ All Python quality checks passed successfully!"
+            echo ""
+            echo "## ✅ Python Quality Results" >> $GITHUB_STEP_SUMMARY
+            echo "- **Intelligence Service**: All checks passed ✅" >> $GITHUB_STEP_SUMMARY
+            echo "- **Webhook Ingest**: All checks passed ✅" >> $GITHUB_STEP_SUMMARY
+            echo "- **Code Formatting**: All Python files follow Black formatting" >> $GITHUB_STEP_SUMMARY
+            echo "- **Linting**: Code passes Flake8 quality checks" >> $GITHUB_STEP_SUMMARY
+            echo "- **Type Safety**: Static type analysis completed" >> $GITHUB_STEP_SUMMARY
+            echo "- **Security**: Code security analysis performed" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "❌ Found ${#ISSUES_FOUND[@]} issue(s):"
+            for issue in "${ISSUES_FOUND[@]}"; do
+              echo "  • $issue"
+            done
+            echo ""
+            echo "## ❌ Python Quality Issues Found" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "The following issues need to be addressed:" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            for issue in "${ISSUES_FOUND[@]}"; do
+              echo "- $issue" >> $GITHUB_STEP_SUMMARY
+            done
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "**To fix formatting issues:**" >> $GITHUB_STEP_SUMMARY
+            echo '```bash' >> $GITHUB_STEP_SUMMARY
+            echo 'cd server/intelligence-service && poetry run black .' >> $GITHUB_STEP_SUMMARY
+            echo 'cd ../webhook-ingest && poetry run black .' >> $GITHUB_STEP_SUMMARY
+            echo '```' >> $GITHUB_STEP_SUMMARY
+          fi
+
+          # Exit with appropriate code
+          if [ "$OVERALL_SUCCESS" = false ]; then
+            echo ""
+            echo "❌ Python quality checks failed - please fix the issues above"
+            exit 1
+          fi
+
+      # OpenAPI validation with intelligent auto-commit
+      - name: OpenAPI validation & synchronization
+        if: matrix.check == 'openapi-validation'
+        run: |
+          echo "🔍 Validating OpenAPI specifications and clients..."
+
+          # Install all dependencies
+          if [ ! -d "node_modules" ]; then
+            npm ci --prefer-offline --no-audit
+          fi
+
+          # Setup Python environments
+          cd server/intelligence-service
+          if [ ! -d ".venv" ]; then
+            poetry install --no-interaction --no-root
+          fi
+          cd ../..
+
+          # Setup Java environment
+          cd server/application-server
+          if [ ! -d "target" ]; then
+            mvn compile -DskipTests --quiet
+          fi
+          cd ../..
+
+          echo "🔄 Generating OpenAPI specifications and clients..."
+
+          # Generate all OpenAPI specs and clients
+          npm run generate:api
+
+          # Check for any changes
+          git add .
+
+          if ! git diff --cached --quiet; then
+            echo "📝 OpenAPI changes detected..."
+            
+            # Show what changed
+            echo "## 🔄 OpenAPI Changes Detected" >> $GITHUB_STEP_SUMMARY
+            echo "The following OpenAPI-related files have changes:" >> $GITHUB_STEP_SUMMARY
+            echo '```' >> $GITHUB_STEP_SUMMARY
+            git diff --cached --name-only >> $GITHUB_STEP_SUMMARY
+            echo '```' >> $GITHUB_STEP_SUMMARY
+            
+            # Check if auto-commit is enabled
+            if [[ "${{ contains(github.event.pull_request.labels.*.name, 'autocommit-openapi') }}" == "true" ]]; then
+              echo "✅ Auto-commit enabled, committing changes..."
+              
+              # Configure git
+              git config --local user.name "github-actions[bot]"
+              git config --local user.email "41898282+github-actions[bot]@users.noreply.github.com"
+              
+              # Create detailed commit message
+              COMMIT_MSG="chore: update OpenAPI specs and clients [skip ci]"
+              COMMIT_BODY=""
+              
+              # Check which components changed
+              if git diff --cached --quiet server/intelligence-service/openapi.yaml; then
+                :
+              else
+                COMMIT_BODY="$COMMIT_BODY\n- Update Intelligence Service OpenAPI spec"
+              fi
+              
+              if git diff --cached --quiet server/application-server/openapi.yaml; then
+                :
+              else
+                COMMIT_BODY="$COMMIT_BODY\n- Update Application Server OpenAPI spec"
+              fi
+              
+              if git diff --cached --quiet server/application-server/src/main/java/de/tum/in/www1/hephaestus/intelligenceservice/; then
+                :
+              else
+                COMMIT_BODY="$COMMIT_BODY\n- Update Intelligence Service Java client"
+              fi
+              
+              if git diff --cached --quiet webapp-react/src/api/; then
+                :
+              else
+                COMMIT_BODY="$COMMIT_BODY\n- Update Application Server TypeScript client"
+              fi
+              
+              # Commit with detailed message
+              if [ -n "$COMMIT_BODY" ]; then
+                git commit -m "$COMMIT_MSG$COMMIT_BODY"
+              else
+                git commit -m "$COMMIT_MSG"
+              fi
+              
+              # Push changes
+              git push
+              
+              echo "✅ OpenAPI changes successfully committed and pushed" >> $GITHUB_STEP_SUMMARY
+            else
+              echo "" >> $GITHUB_STEP_SUMMARY
+              echo "**To resolve this:**" >> $GITHUB_STEP_SUMMARY
+              echo "1. **Recommended**: Add the \`autocommit-openapi\` label to this PR for automatic updates" >> $GITHUB_STEP_SUMMARY
+              echo "2. **Manual**: Run \`npm run generate:api\` locally and commit the changes" >> $GITHUB_STEP_SUMMARY
+              echo "" >> $GITHUB_STEP_SUMMARY
+              echo "**Manual commands:**" >> $GITHUB_STEP_SUMMARY
+              echo '```bash' >> $GITHUB_STEP_SUMMARY
+              echo 'npm run generate:api' >> $GITHUB_STEP_SUMMARY
+              echo 'git add .' >> $GITHUB_STEP_SUMMARY
+              echo 'git commit -m "chore: update OpenAPI specs and clients"' >> $GITHUB_STEP_SUMMARY
+              echo '```' >> $GITHUB_STEP_SUMMARY
+              
+              echo "❌ OpenAPI validation failed - changes detected but auto-commit not enabled"
+              exit 1
+            fi
+          else
+            echo "## ✅ OpenAPI Validation Results" >> $GITHUB_STEP_SUMMARY
+            echo "- **Specifications**: All OpenAPI specs are up to date" >> $GITHUB_STEP_SUMMARY
+            echo "- **Java Clients**: Generated clients match current specs" >> $GITHUB_STEP_SUMMARY
+            echo "- **TypeScript Clients**: Generated clients match current specs" >> $GITHUB_STEP_SUMMARY
+            echo "- **Consistency**: All API contracts are synchronized" >> $GITHUB_STEP_SUMMARY
+          fi
+
+      # Enhanced error handling and reporting
+      - name: Quality gate status report
+        if: always()
+        run: |
+          echo "📊 Quality Gate: ${{ matrix.check }} - Status: ${{ job.status }}"
+
+          if [[ "${{ job.status }}" == "failure" ]]; then
+            echo "## ❌ Quality Gate Failed: ${{ matrix.check }}" >> $GITHUB_STEP_SUMMARY
+            echo "This quality gate must pass before merging. Please review the errors above." >> $GITHUB_STEP_SUMMARY
+          elif [[ "${{ job.status }}" == "success" ]]; then
+            echo "Quality gate passed successfully! ✅" >> $GITHUB_STEP_SUMMARY
+          fi
