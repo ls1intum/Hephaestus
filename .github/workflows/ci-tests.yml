@@ -32,7 +32,6 @@ jobs:
             java-integration,
             java-architecture,
             webapp-visual,
-            cross-platform,
           ]
 
     steps:
@@ -139,14 +138,32 @@ jobs:
           fi
 
       # Test result aggregation with enhanced reporting
-      - name: Upload test results
-        if: always()
+      - name: Upload Java test results
+        if: always() && startsWith(matrix.test-type, 'java-')
         uses: dorny/test-reporter@v2
         with:
           name: "Test Results - ${{ matrix.test-type }}"
-          path: "**/target/surefire-reports/*.xml,**/test-results.xml"
+          path: "**/target/surefire-reports/*.xml"
           reporter: java-junit
           fail-on-error: false
+
+      # Upload Chromatic visual test results
+      - name: Upload Chromatic test results
+        if: always() && matrix.test-type == 'webapp-visual'
+        uses: dorny/test-reporter@v2
+        with:
+          name: "Test Results - ${{ matrix.test-type }}"
+          path: "webapp-react/chromatic-build-*.xml"
+          reporter: java-junit
+          fail-on-error: false
+
+      # Upload cross-platform test results (placeholder)
+      - name: Upload cross-platform test results
+        if: always() && matrix.test-type == 'cross-platform'
+        run: |
+          echo "## 🔄 Cross-Platform Tests" >> $GITHUB_STEP_SUMMARY
+          echo "- **Status**: Placeholder (not implemented)" >> $GITHUB_STEP_SUMMARY
+          echo "- **Note**: This test type needs to be defined with actual test execution" >> $GITHUB_STEP_SUMMARY
 
       # Enhanced error handling and reporting
       - name: Test execution status report
