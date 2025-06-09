@@ -426,13 +426,45 @@ jobs:
           languages: java, javascript, python
           queries: security-extended
 
+      # Setup required build tools for CodeQL
+      - name: Setup build environment for CodeQL
+        if: matrix.scan-type == 'sast'
+        uses: ./.github/actions/setup-caches
+        with:
+          cache-type: 'openapi-validation'
+
       - name: Build for CodeQL analysis
         if: matrix.scan-type == 'sast'
         run: |
           # Java build
-          cd server/application-server && mvn compile -DskipTests
-          # Node.js build
-          cd ../../webapp-react && npm ci && npm run build:prod
+          echo "🔨 Building Java application for CodeQL analysis..."
+          cd server/application-server
+          
+          # Verify Java version
+          java -version
+          mvn -version
+          
+          # Build with error handling
+          if ! mvn compile -DskipTests --quiet; then
+            echo "❌ Java build failed for CodeQL analysis"
+            echo "Maven output:"
+            mvn compile -DskipTests
+            exit 1
+          fi
+          echo "✅ Java build completed successfully"
+          
+          # Node.js build 
+          echo "🔨 Building React application for CodeQL analysis..."
+          cd ../../webapp-react
+          if [ ! -d "node_modules" ]; then
+            npm ci --prefer-offline --no-audit --progress=false
+          fi
+          
+          if ! npm run build:prod; then
+            echo "❌ Node.js build failed for CodeQL analysis"
+            exit 1
+          fi
+          echo "✅ React build completed successfully"
 
       - name: Perform CodeQL Analysis
         if: matrix.scan-type == 'sast'
@@ -455,14 +487,23 @@ jobs:
           sarif_file: 'trivy-results.sarif'
 
       # Container security scanning
+      - name: Setup Docker environment
+        if: matrix.scan-type == 'containers'
+        uses: ./.github/actions/setup-caches
+        with:
+          cache-type: 'containers'
+
       - name: Build and scan containers
         if: matrix.scan-type == 'containers'
         run: |
+          echo "🐳 Building containers for security scanning..."
+          
           # Build test images
           docker build -f webapp-react/Dockerfile webapp-react -t test-webapp:latest
           docker build -f server/application-server/Dockerfile server/application-server -t test-app-server:latest
           
           # Scan containers
+          echo "🔍 Scanning container images for vulnerabilities..."
           docker run --rm -v /var/run/docker.sock:/var/run/docker.sock \
             aquasec/trivy image --format sarif --output container-results.sarif test-webapp:latest
 
