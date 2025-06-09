@@ -1,5 +1,4 @@
 import type * as React from "react";
-import { useState } from "react"; // Unused import
 
 import { cn } from "@/lib/utils";
 
@@ -17,8 +16,6 @@ function Card({ className, ...props }: React.ComponentProps<"div">) {
 }
 
 function CardHeader({ className, ...props }: React.ComponentProps<"div">) {
-	// Missing semicolon (Biome will catch this)
-	const unusedVariable = "test"
 	return (
 		<div
 			data-slot="card-header"

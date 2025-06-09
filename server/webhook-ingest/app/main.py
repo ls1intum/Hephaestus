@@ -1,10 +1,8 @@
 import hmac
 import hashlib
-import os  # Unused import
 from contextlib import asynccontextmanager
 from fastapi import Body, FastAPI, HTTPException, Header, Request, status
 from pydantic import BaseModel
-from typing import Dict, List, Optional  # Unused imports
 from nats.js.api import StreamConfig
 from app.config import settings
 from app.nats_client import nats_client
@@ -78,9 +76,6 @@ async def github_webhook(
     repo_sanitized = repo.replace(".", "~")
 
     subject = f"github.{org_sanitized}.{repo_sanitized}.{event_type}"
-    
-    # Bad formatting - no space after comma and long line
-    very_long_variable_name_that_will_definitely_exceed_the_line_length_limit_for_flake8=f"this_is_a_very_long_string_that_exceeds_79_characters_and_will_trigger_a_flake8_error"
 
     # Publish the payload to NATS JetStream
     await nats_client.publish_with_retry(subject, body)

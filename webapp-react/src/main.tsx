@@ -2,7 +2,6 @@ import * as Sentry from "@sentry/react";
 import { RouterProvider, createRouter } from "@tanstack/react-router";
 import { PostHogProvider } from "posthog-js/react";
 import ReactDOM from "react-dom/client";
-import { useState, useEffect } from "react"; // Unused imports
 
 import * as TanstackQuery from "./integrations/tanstack-query/root-provider";
 import "./integrations/sentry";
@@ -21,9 +20,6 @@ import { StrictMode } from "react";
 client.setConfig({
 	baseUrl: environment.serverUrl,
 });
-
-// TypeScript error - assigning string to number
-const incorrectTypeAssignment: number = "this should be a number";
 
 // Add request interceptor to handle authentication
 client.interceptors.request.use(async (request) => {
