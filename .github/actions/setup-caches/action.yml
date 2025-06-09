@@ -14,24 +14,24 @@ runs:
   steps:
     # Node.js caching
     - name: Setup Node.js
-      if: contains(fromJSON('["java-format", "frontend-quality", "frontend-unit", "frontend-visual", "openapi-validation"]'), inputs.cache-type)
+      if: contains(fromJSON('["java-format", "webapp-quality", "webapp-unit", "webapp-visual", "openapi-validation"]'), inputs.cache-type)
       uses: actions/setup-node@v4
       with:
         node-version: 22
         cache: "npm"
 
     - name: Cache Node.js dependencies
-      if: contains(fromJSON('["java-format", "frontend-quality", "frontend-unit", "frontend-visual", "openapi-validation"]'), inputs.cache-type)
+      if: contains(fromJSON('["java-format", "webapp-quality", "webapp-unit", "webapp-visual", "openapi-validation"]'), inputs.cache-type)
       uses: actions/cache@v4
       with:
         path: |
           ~/.npm
           webapp-react/node_modules
           node_modules
-        key: ${{ inputs.os }}-node-${{ hashFiles('**/package-lock.json') }}-${{ inputs.cache-type }}
+        key: ${{ inputs.os }}-node-${{ hashFiles('package-lock.json', 'webapp-react/package-lock.json') || 'no-lockfile' }}-${{ inputs.cache-type }}
         restore-keys: |
-          ${{ inputs.os }}-node-${{ hashFiles('**/package-lock.json') }}-
-          ${{ inputs.os }}-node-
+          ${{ inputs.os }}-node-${{ hashFiles('package-lock.json', 'webapp-react/package-lock.json') || 'no-lockfile' }}-
+
 
     # Java/Maven caching
     - name: Set up JDK 21
@@ -49,9 +49,9 @@ runs:
         path: |
           ~/.m2/repository
           server/application-server/target
-        key: ${{ inputs.os }}-maven-${{ hashFiles('**/pom.xml') }}-${{ inputs.cache-type }}
+        key: ${{ inputs.os }}-maven-${{ hashFiles('server/application-server/pom.xml') || 'no-pom' }}-${{ inputs.cache-type }}
         restore-keys: |
-          ${{ inputs.os }}-maven-${{ hashFiles('**/pom.xml') }}-
+          ${{ inputs.os }}-maven-${{ hashFiles('server/application-server/pom.xml') || 'no-pom' }}-
           ${{ inputs.os }}-maven-
 
     # Python/Poetry caching
@@ -77,9 +77,9 @@ runs:
           ~/.cache/pypoetry
           server/intelligence-service/.venv
           server/webhook-ingest/.venv
-        key: ${{ inputs.os }}-poetry-${{ hashFiles('**/poetry.lock') }}-${{ inputs.cache-type }}
+        key: ${{ inputs.os }}-poetry-${{ hashFiles('server/intelligence-service/poetry.lock', 'server/webhook-ingest/poetry.lock') || 'no-poetry-lock' }}-${{ inputs.cache-type }}
         restore-keys: |
-          ${{ inputs.os }}-poetry-${{ hashFiles('**/poetry.lock') }}-
+          ${{ inputs.os }}-poetry-${{ hashFiles('server/intelligence-service/poetry.lock', 'server/webhook-ingest/poetry.lock') || 'no-poetry-lock' }}-
           ${{ inputs.os }}-poetry-
 
     # Docker build cache
