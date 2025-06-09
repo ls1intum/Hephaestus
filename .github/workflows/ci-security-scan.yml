@@ -1,4 +1,4 @@
-name: Security Scan
+name: Security Analysis
 
 on:
   workflow_call:
@@ -8,6 +8,11 @@ on:
         required: false
         type: string
         default: "false"
+      changed_components:
+        description: "JSON array of changed components"
+        required: false
+        type: string
+        default: '["webapp-react", "application-server", "intelligence-service", "webhook-ingest"]'
 
 env:
   # Global pipeline configuration
@@ -17,38 +22,294 @@ env:
   JAVA_VERSION: 21
 
 jobs:
-  # Comprehensive security scanning
-  security-scan:
-    name: ${{ matrix.scan-type }}
+  # Matrix setup for targeted security scanning
+  security-matrix:
     runs-on: ubuntu-latest
     if: inputs.should_skip != 'true'
-    timeout-minutes: 15
+    outputs:
+      matrix: ${{ steps.setup.outputs.matrix }}
+      has_changes: ${{ steps.setup.outputs.has_changes }}
+    steps:
+      - name: Setup security scan matrix
+        id: setup
+        run: |
+          # Parse changed components
+          COMPONENTS='${{ inputs.changed_components }}'
+
+          # Define security scan matrix based on components
+          cat > matrix.json << 'EOF'
+          {
+            "include": [
+              {
+                "scan-type": "sast",
+                "name": "Static Application Security Testing",
+                "description": "CodeQL SAST analysis for code vulnerabilities",
+                "languages": ["java", "javascript", "python"],
+                "paths": ["server/", "webapp-react/", "webapp/"],
+                "timeout": 30
+              },
+              {
+                "scan-type": "dependencies",
+                "name": "Dependency Vulnerability Scan",
+                "description": "Trivy dependency analysis for known CVEs",
+                "languages": ["java", "javascript", "python"],
+                "paths": [".", "server/", "webapp-react/", "webapp/"],
+                "timeout": 15
+              },
+              {
+                "scan-type": "secrets",
+                "name": "Secret Detection",
+                "description": "TruffleHog secret scanning across codebase",
+                "languages": ["*"],
+                "paths": ["."],
+                "timeout": 10
+              },
+              {
+                "scan-type": "license-compliance",
+                "name": "License Compliance",
+                "description": "License compatibility and compliance checking",
+                "languages": ["java", "javascript", "python"],
+                "paths": [".", "server/", "webapp-react/", "webapp/"],
+                "timeout": 10
+              }
+            ]
+          }
+          EOF
+
+          echo "matrix=$(cat matrix.json)" >> $GITHUB_OUTPUT
+          echo "has_changes=true" >> $GITHUB_OUTPUT
+
+          echo "## 🔐 Security Analysis Matrix" >> $GITHUB_STEP_SUMMARY
+          echo "\`\`\`json" >> $GITHUB_STEP_SUMMARY
+          cat matrix.json | jq '.' >> $GITHUB_STEP_SUMMARY
+          echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+
+  # Comprehensive security analysis with enhanced matrix
+  security-analysis:
+    name: "🔐 ${{ matrix.name }}"
+    runs-on: ubuntu-latest
+    needs: [security-matrix]
+    if: needs.security-matrix.outputs.has_changes == 'true'
+    timeout-minutes: ${{ matrix.timeout }}
     strategy:
       fail-fast: false
-      matrix:
-        scan-type: [sast, dependencies, containers, secrets]
+      matrix: ${{ fromJson(needs.security-matrix.outputs.matrix) }}
     permissions:
       security-events: write
       contents: read
+      actions: read
+      pull-requests: write
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout repository
+        uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
-      # SAST (Static Application Security Testing)
-      - name: Initialize CodeQL
+      # SAST - Static Application Security Testing
+      - name: Initialize CodeQL for SAST
         if: matrix.scan-type == 'sast'
         uses: github/codeql-action/init@v3
         with:
-          languages: java, javascript, python
-          queries: security-extended
+          languages: ${{ join(matrix.languages, ', ') }}
+          queries: security-extended,security-and-quality
+          config-file: .github/codeql/codeql-config.yml
 
-      # Setup required build tools for CodeQL
-      - name: Setup build environment for CodeQL
+      - name: Setup build environment for SAST
         if: matrix.scan-type == 'sast'
         uses: ./.github/actions/setup-caches
         with:
           cache-type: "openapi-validation"
+          os: ${{ runner.os }}
+
+      - name: Build applications for CodeQL
+        if: matrix.scan-type == 'sast'
+        run: |
+          echo "🔨 Building applications for SAST analysis..."
+
+          # Java/Spring Boot build
+          if [[ "${{ contains(matrix.languages, 'java') }}" == "true" ]]; then
+            echo "🔨 Building Java applications..."
+            cd server/application-server
+            mvn compile -DskipTests -Dmaven.test.skip=true --batch-mode --quiet
+            cd ../..
+          fi
+
+          # Node.js/React build
+          if [[ "${{ contains(matrix.languages, 'javascript') }}" == "true" ]]; then
+            echo "🔨 Building JavaScript applications..."
+            cd webapp-react
+            npm ci --prefer-offline --no-audit --progress=false
+            npm run build:prod
+            cd ..
+          fi
+
+          # Python applications
+          if [[ "${{ contains(matrix.languages, 'python') }}" == "true" ]]; then
+            echo "🔨 Setting up Python applications..."
+            # Python applications are analyzed without build step
+            echo "Python applications ready for analysis"
+          fi
+
+      - name: Perform CodeQL Analysis
+        if: matrix.scan-type == 'sast'
+        uses: github/codeql-action/analyze@v3
+        with:
+          category: "security-sast"
+
+      # Dependency Vulnerability Scanning
+      - name: Run comprehensive dependency scan
+        if: matrix.scan-type == 'dependencies'
+        uses: aquasecurity/trivy-action@master
+        with:
+          scan-type: "fs"
+          scan-ref: "."
+          format: "sarif"
+          output: "trivy-dependencies.sarif"
+          severity: "UNKNOWN,LOW,MEDIUM,HIGH,CRITICAL"
+          ignore-unfixed: false
+          list-all-pkgs: true
+
+      - name: Upload dependency scan results
+        if: matrix.scan-type == 'dependencies'
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: "trivy-dependencies.sarif"
+          category: "trivy-dependencies"
+
+      # Secret Detection
+      - name: Run advanced secret detection
+        if: matrix.scan-type == 'secrets'
+        uses: trufflesecurity/trufflehog@main
+        with:
+          path: ./
+          base: ${{ github.event.repository.default_branch }}
+          head: HEAD
+          extra_args: --debug --only-verified --json --fail
+
+      - name: Run GitLeaks secret detection
+        if: matrix.scan-type == 'secrets'
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITLEAKS_LICENSE: ${{ secrets.GITLEAKS_LICENSE }}
+
+      # License Compliance Checking
+      - name: Check license compliance
+        if: matrix.scan-type == 'license-compliance'
+        run: |
+          echo "📋 Checking license compliance..."
+
+          # Install license checker tools
+          npm install -g license-checker license-compliance-checker
+
+          # Check Node.js dependencies
+          if [ -f "webapp-react/package.json" ]; then
+            echo "🔍 Checking React app licenses..."
+            cd webapp-react
+            license-checker --summary --production --excludePrivatePackages > ../license-report-react.txt
+            cd ..
+          fi
+
+          # Check Maven dependencies  
+          if [ -f "server/application-server/pom.xml" ]; then
+            echo "🔍 Checking Java dependencies licenses..."
+            cd server/application-server
+            mvn org.codehaus.mojo:license-maven-plugin:2.0.0:add-third-party \
+              -Dlicense.outputDirectory=../../ \
+              -Dlicense.thirdPartyFilename=license-report-java.txt \
+              --batch-mode --quiet || true
+            cd ../..
+          fi
+
+          # Check Python dependencies
+          if [ -f "server/intelligence-service/pyproject.toml" ]; then
+            echo "🔍 Checking Python dependencies licenses..."
+            cd server/intelligence-service
+            pip install pip-licenses
+            pip-licenses --format=plain > ../../license-report-python.txt || true
+            cd ../..
+          fi
+
+      # Enhanced reporting and status
+      - name: Generate security analysis report
+        if: always()
+        run: |
+          echo "## 🔐 Security Analysis: ${{ matrix.name }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Type**: ${{ matrix.scan-type }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Status**: ${{ job.status }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Description**: ${{ matrix.description }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+          case "${{ matrix.scan-type }}" in
+            "sast")
+              echo "### 📊 SAST Analysis Results" >> $GITHUB_STEP_SUMMARY
+              echo "- **Languages Analyzed**: ${{ join(matrix.languages, ', ') }}" >> $GITHUB_STEP_SUMMARY
+              echo "- **Query Suites**: security-extended, security-and-quality" >> $GITHUB_STEP_SUMMARY
+              ;;
+            "dependencies")
+              if [ -f "trivy-dependencies.sarif" ]; then
+                CRITICAL=$(jq -r '.runs[0].results // [] | map(select(.level == "error")) | length' trivy-dependencies.sarif 2>/dev/null || echo "0")
+                HIGH=$(jq -r '.runs[0].results // [] | map(select(.level == "warning")) | length' trivy-dependencies.sarif 2>/dev/null || echo "0")
+                echo "### 📊 Dependency Analysis Results" >> $GITHUB_STEP_SUMMARY
+                echo "- **Critical Vulnerabilities**: $CRITICAL" >> $GITHUB_STEP_SUMMARY
+                echo "- **High Vulnerabilities**: $HIGH" >> $GITHUB_STEP_SUMMARY
+              fi
+              ;;
+            "secrets")
+              echo "### 📊 Secret Detection Results" >> $GITHUB_STEP_SUMMARY
+              echo "- **Tools**: TruffleHog, GitLeaks" >> $GITHUB_STEP_SUMMARY
+              echo "- **Scope**: Full repository history" >> $GITHUB_STEP_SUMMARY
+              ;;
+            "license-compliance")
+              echo "### 📊 License Compliance Results" >> $GITHUB_STEP_SUMMARY
+              if [ -f "license-report-react.txt" ]; then
+                echo "- **React Dependencies**: $(wc -l < license-report-react.txt) packages analyzed" >> $GITHUB_STEP_SUMMARY
+              fi
+              if [ -f "license-report-java.txt" ]; then
+                echo "- **Java Dependencies**: License report generated" >> $GITHUB_STEP_SUMMARY
+              fi
+              ;;
+          esac
+
+          if [[ "${{ job.status }}" == "failure" ]]; then
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "❌ **Security issues detected!** Review results in Security tab." >> $GITHUB_STEP_SUMMARY
+          else
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "✅ **Security analysis completed successfully.**" >> $GITHUB_STEP_SUMMARY
+          fi
+
+  # Aggregate security results
+  security-summary:
+    runs-on: ubuntu-latest
+    needs: [security-matrix, security-analysis]
+    if: always() && needs.security-matrix.outputs.has_changes == 'true'
+    steps:
+      - name: Generate comprehensive security summary
+        run: |
+          echo "## 🛡️ Security Analysis Pipeline Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+          echo "### 🔍 Analysis Coverage:" >> $GITHUB_STEP_SUMMARY
+          echo "- ✅ **Static Application Security Testing (SAST)**" >> $GITHUB_STEP_SUMMARY
+          echo "- ✅ **Dependency Vulnerability Scanning**" >> $GITHUB_STEP_SUMMARY  
+          echo "- ✅ **Secret Detection**" >> $GITHUB_STEP_SUMMARY
+          echo "- ✅ **License Compliance Checking**" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+          # Overall security status
+          SECURITY_STATUS="${{ needs.security-analysis.result }}"
+          echo "### 🚨 Overall Security Status: $SECURITY_STATUS" >> $GITHUB_STEP_SUMMARY
+
+          if [[ "$SECURITY_STATUS" == "success" ]]; then
+            echo "🟢 **All security checks passed successfully!**" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "Your codebase meets security standards with no critical issues detected." >> $GITHUB_STEP_SUMMARY
+          else
+            echo "🔴 **Security issues require attention!**" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "Please review the Security tab for detailed findings and remediation guidance." >> $GITHUB_STEP_SUMMARY
+          fi
           os: ${{ runner.os }}
 
       # Verify build environment

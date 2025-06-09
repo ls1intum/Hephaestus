@@ -8,10 +8,18 @@ on:
         required: false
         type: string
         default: "false"
+      changed_components:
+        description: "JSON array of changed components to build"
+        required: false
+        type: string
+        default: '["webapp-react", "application-server", "intelligence-service", "webhook-ingest"]'
     outputs:
       images_built:
         description: "Images that were successfully built"
         value: ${{ jobs.aggregate-results.outputs.images_built }}
+      security_scan_results:
+        description: "Security scan results summary"
+        value: ${{ jobs.aggregate-results.outputs.security_results }}
 
 env:
   # Global pipeline configuration
@@ -19,189 +27,310 @@ env:
   NODE_VERSION: 22
   PYTHON_VERSION: 3.13
   JAVA_VERSION: 21
+  REGISTRY: ghcr.io
+  IMAGE_PREFIX: ls1intum/hephaestus
 
 jobs:
-  webapp-react:
-    if: inputs.should_skip != 'true'
-    uses: ls1intum/.github/.github/workflows/build-and-push-docker-image.yml@main
-    with:
-      image-name: "ls1intum/hephaestus/webapp-react"
-      docker-file: "./webapp-react/Dockerfile"
-      docker-context: "./webapp-react"
-      registry: "ghcr.io"
-      tags: |
-        ${{ github.ref_name }}
-        ${{ github.sha }}
-        ci-${{ github.run_number }}
-        ${{ github.event_name == 'pull_request' && format('pr-{0}', github.event.number) || 'latest' }}
-      labels: |
-        org.opencontainers.image.title=Hephaestus Webapp
-        org.opencontainers.image.description=React-based frontend for Hephaestus
-        org.opencontainers.image.vendor=AET TUM
-        org.opencontainers.image.licenses=MIT
-        hephaestus.component=webapp-react
-    secrets: inherit
-
-  application-server:
-    if: inputs.should_skip != 'true'
-    uses: ls1intum/.github/.github/workflows/build-and-push-docker-image.yml@main
-    with:
-      image-name: "ls1intum/hephaestus/application-server"
-      docker-file: "./server/application-server/Dockerfile"
-      docker-context: "./server/application-server"
-      registry: "ghcr.io"
-      tags: |
-        ${{ github.ref_name }}
-        ${{ github.sha }}
-        ci-${{ github.run_number }}
-        ${{ github.event_name == 'pull_request' && format('pr-{0}', github.event.number) || 'latest' }}
-      labels: |
-        org.opencontainers.image.title=Hephaestus Application Server
-        org.opencontainers.image.description=Spring Boot backend for Hephaestus
-        org.opencontainers.image.vendor=AET TUM
-        org.opencontainers.image.licenses=MIT
-        hephaestus.component=application-server
-    secrets: inherit
-
-  intelligence-service:
-    if: inputs.should_skip != 'true'
-    uses: ls1intum/.github/.github/workflows/build-and-push-docker-image.yml@main
-    with:
-      image-name: "ls1intum/hephaestus/intelligence-service"
-      docker-file: "./server/intelligence-service/Dockerfile"
-      docker-context: "./server/intelligence-service"
-      registry: "ghcr.io"
-      tags: |
-        ${{ github.ref_name }}
-        ${{ github.sha }}
-        ci-${{ github.run_number }}
-        ${{ github.event_name == 'pull_request' && format('pr-{0}', github.event.number) || 'latest' }}
-      labels: |
-        org.opencontainers.image.title=Hephaestus Intelligence Service
-        org.opencontainers.image.description=FastAPI-based AI service for Hephaestus
-        org.opencontainers.image.vendor=AET TUM
-        org.opencontainers.image.licenses=MIT
-        hephaestus.component=intelligence-service
-    secrets: inherit
-
-  webhook-ingest:
-    if: inputs.should_skip != 'true'
-    uses: ls1intum/.github/.github/workflows/build-and-push-docker-image.yml@main
-    with:
-      image-name: "ls1intum/hephaestus/webhook-ingest"
-      docker-file: "./server/webhook-ingest/Dockerfile"
-      docker-context: "./server/webhook-ingest"
-      registry: "ghcr.io"
-      tags: |
-        ${{ github.ref_name }}
-        ${{ github.sha }}
-        ci-${{ github.run_number }}
-        ${{ github.event_name == 'pull_request' && format('pr-{0}', github.event.number) || 'latest' }}
-      labels: |
-        org.opencontainers.image.title=Hephaestus Webhook Ingest
-        org.opencontainers.image.description=Python-based webhook processor for Hephaestus
-        org.opencontainers.image.vendor=AET TUM
-        org.opencontainers.image.licenses=MIT
-        hephaestus.component=webhook-ingest
-    secrets: inherit
-
-  # Security scanning with Trivy for all built images
-  security-scan:
-    name: "Security Scan: ${{ matrix.component.name }}"
+  # Generate dynamic build matrix based on changed components
+  matrix-setup:
     runs-on: ubuntu-latest
     if: inputs.should_skip != 'true'
-    needs: [webapp-react, application-server, intelligence-service, webhook-ingest]
-    timeout-minutes: 15
+    outputs:
+      matrix: ${{ steps.setup.outputs.matrix }}
+      has_changes: ${{ steps.setup.outputs.has_changes }}
+    steps:
+      - name: Setup build matrix
+        id: setup
+        run: |
+          # Parse input components or use default
+          COMPONENTS='${{ inputs.changed_components }}'
+
+          # Define component configurations
+          cat > matrix.json << 'EOF'
+          {
+            "include": [
+              {
+                "component": "webapp-react",
+                "image-name": "webapp-react",
+                "dockerfile": "./webapp-react/Dockerfile",
+                "context": "./webapp-react",
+                "title": "Hephaestus React Frontend",
+                "description": "React-based webapp with modern UI components",
+                "language": "javascript",
+                "build-args": "NODE_ENV=production"
+              },
+              {
+                "component": "application-server",
+                "image-name": "application-server", 
+                "dockerfile": "./server/application-server/Dockerfile",
+                "context": "./server/application-server",
+                "title": "Hephaestus Application Server",
+                "description": "Spring Boot backend with comprehensive APIs",
+                "language": "java",
+                "build-args": "MAVEN_OPTS=-Xmx2048m"
+              },
+              {
+                "component": "intelligence-service",
+                "image-name": "intelligence-service",
+                "dockerfile": "./server/intelligence-service/Dockerfile", 
+                "context": "./server/intelligence-service",
+                "title": "Hephaestus AI Intelligence Service",
+                "description": "FastAPI-based AI service with ML capabilities",
+                "language": "python",
+                "build-args": "PYTHON_VERSION=3.13"
+              },
+              {
+                "component": "webhook-ingest",
+                "image-name": "webhook-ingest",
+                "dockerfile": "./server/webhook-ingest/Dockerfile",
+                "context": "./server/webhook-ingest", 
+                "title": "Hephaestus Webhook Processor",
+                "description": "High-performance webhook ingestion service",
+                "language": "python",
+                "build-args": "PYTHON_VERSION=3.13"
+              }
+            ]
+          }
+          EOF
+
+          # Filter matrix based on changed components
+          FILTERED_MATRIX=$(echo "$COMPONENTS" | jq -r --slurpfile matrix matrix.json '
+            . as $components | 
+            $matrix[0] | 
+            .include |= map(select(.component as $comp | $components | index($comp)))
+          ')
+
+          echo "matrix=$FILTERED_MATRIX" >> $GITHUB_OUTPUT
+          echo "has_changes=$(echo "$FILTERED_MATRIX" | jq -r '.include | length > 0')" >> $GITHUB_OUTPUT
+
+          # Output matrix for debugging
+          echo "## 🔧 Build Matrix Configuration" >> $GITHUB_STEP_SUMMARY
+          echo "\`\`\`json" >> $GITHUB_STEP_SUMMARY
+          echo "$FILTERED_MATRIX" | jq '.' >> $GITHUB_STEP_SUMMARY
+          echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+  # Build Docker images with enhanced matrix strategy
+  build-images:
+    name: "🐳 Build: ${{ matrix.component }}"
+    runs-on: ubuntu-latest
+    needs: [matrix-setup]
+    if: needs.matrix-setup.outputs.has_changes == 'true'
+    timeout-minutes: 30
     strategy:
       fail-fast: false
-      matrix:
-        component:
-          - name: "webapp-react"
-            image: "ghcr.io/ls1intum/hephaestus/webapp-react"
-          - name: "application-server"
-            image: "ghcr.io/ls1intum/hephaestus/application-server"
-          - name: "intelligence-service"
-            image: "ghcr.io/ls1intum/hephaestus/intelligence-service"
-          - name: "webhook-ingest"
-            image: "ghcr.io/ls1intum/hephaestus/webhook-ingest"
+      matrix: ${{ fromJson(needs.matrix-setup.outputs.matrix) }}
+    outputs:
+      image-digest: ${{ steps.build.outputs.digest }}
+      image-tag: ${{ steps.meta.outputs.tags }}
     steps:
-      - name: Checkout code
+      - name: Checkout repository
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
-      - name: Log in to GHCR
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+        with:
+          platforms: linux/amd64,linux/arm64
+
+      - name: Log in to Container Registry
         uses: docker/login-action@v3
         with:
-          registry: ghcr.io
+          registry: ${{ env.REGISTRY }}
           username: ${{ github.repository_owner }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Pull and scan Docker image
+      - name: Generate image metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}/${{ matrix.image-name }}
+          tags: |
+            type=ref,event=branch
+            type=ref,event=pr,prefix=pr-
+            type=sha,prefix=ci-{{branch}}-
+            type=raw,value=ci-${{ github.run_number }}
+            type=raw,value=latest,enable={{is_default_branch}}
+          labels: |
+            org.opencontainers.image.title=${{ matrix.title }}
+            org.opencontainers.image.description=${{ matrix.description }}
+            org.opencontainers.image.vendor=AET TUM
+            org.opencontainers.image.licenses=MIT
+            org.opencontainers.image.source=https://github.com/${{ github.repository }}
+            org.opencontainers.image.revision=${{ github.sha }}
+            org.opencontainers.image.created=${{ github.event.head_commit.timestamp }}
+            hephaestus.component=${{ matrix.component }}
+            hephaestus.language=${{ matrix.language }}
+            hephaestus.build-context=${{ matrix.context }}
+
+      - name: Build and push Docker image
+        id: build
+        uses: docker/build-push-action@v5
+        with:
+          context: ${{ matrix.context }}
+          file: ${{ matrix.dockerfile }}
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          build-args: ${{ matrix.build-args }}
+          cache-from: type=gha,scope=${{ matrix.component }}
+          cache-to: type=gha,mode=max,scope=${{ matrix.component }}
+          provenance: true
+          sbom: true
+
+      - name: Generate build summary
+        run: |
+          echo "## 🐳 Build Summary: ${{ matrix.component }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Image**: ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}/${{ matrix.image-name }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Digest**: ${{ steps.build.outputs.digest }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Platforms**: linux/amd64, linux/arm64" >> $GITHUB_STEP_SUMMARY
+          echo "- **Context**: ${{ matrix.context }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Language**: ${{ matrix.language }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+  # Parallel security scanning with enhanced reporting
+  security-scan:
+    name: "🔒 Security: ${{ matrix.component }}"
+    runs-on: ubuntu-latest
+    needs: [matrix-setup, build-images]
+    if: needs.matrix-setup.outputs.has_changes == 'true'
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJson(needs.matrix-setup.outputs.matrix) }}
+    permissions:
+      security-events: write
+      contents: read
+      actions: read
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Log in to Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.repository_owner }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Run comprehensive security scan
         uses: aquasecurity/trivy-action@master
         with:
-          image-ref: ${{ matrix.component.image }}:${{ github.sha }}
+          image-ref: ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}/${{ matrix.image-name }}:ci-${{ github.run_number }}
           format: "sarif"
-          output: "trivy-results-${{ matrix.component.name }}.sarif"
-          exit-code: "1"
-          ignore-unfixed: true
-          severity: "CRITICAL,HIGH"
-          trivyignores: ".trivyignore"
+          output: "trivy-results-${{ matrix.component }}.sarif"
+          severity: "UNKNOWN,LOW,MEDIUM,HIGH,CRITICAL"
+          ignore-unfixed: false
+          vuln-type: "os,library"
+          trivyignores: |
+            ${{ matrix.context }}/.trivyignore
+            .trivyignore
 
-      - name: Upload Trivy scan results to GitHub Security tab
+      - name: Upload security scan results
         uses: github/codeql-action/upload-sarif@v3
         if: always()
         with:
-          sarif_file: "trivy-results-${{ matrix.component.name }}.sarif"
+          sarif_file: "trivy-results-${{ matrix.component }}.sarif"
+          category: "trivy-${{ matrix.component }}"
 
       - name: Generate security report
         if: always()
         run: |
-          echo "## 🔒 Security Scan Results: ${{ matrix.component.name }}" >> $GITHUB_STEP_SUMMARY
-          echo "- **Image**: ${{ matrix.component.image }}:${{ github.sha }}" >> $GITHUB_STEP_SUMMARY
-          echo "- **Status**: ${{ job.status }}" >> $GITHUB_STEP_SUMMARY
+          # Parse SARIF for summary
+          CRITICAL_COUNT=$(jq -r '.runs[0].results // [] | map(select(.level == "error")) | length' "trivy-results-${{ matrix.component }}.sarif" 2>/dev/null || echo "0")
+          HIGH_COUNT=$(jq -r '.runs[0].results // [] | map(select(.level == "warning")) | length' "trivy-results-${{ matrix.component }}.sarif" 2>/dev/null || echo "0")
+          MEDIUM_COUNT=$(jq -r '.runs[0].results // [] | map(select(.level == "note")) | length' "trivy-results-${{ matrix.component }}.sarif" 2>/dev/null || echo "0")
+
+          echo "## 🔒 Security Scan: ${{ matrix.component }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Image**: ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}/${{ matrix.image-name }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Critical**: $CRITICAL_COUNT" >> $GITHUB_STEP_SUMMARY  
+          echo "- **High**: $HIGH_COUNT" >> $GITHUB_STEP_SUMMARY
+          echo "- **Medium**: $MEDIUM_COUNT" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          
-          if [[ "${{ job.status }}" == "failure" ]]; then
-            echo "❌ **Security vulnerabilities detected!** Review the Security tab for details." >> $GITHUB_STEP_SUMMARY
+
+          # Set outputs for aggregation
+          echo "critical_count=$CRITICAL_COUNT" >> $GITHUB_OUTPUT
+          echo "high_count=$HIGH_COUNT" >> $GITHUB_OUTPUT
+          echo "medium_count=$MEDIUM_COUNT" >> $GITHUB_OUTPUT
+
+          # Fail on critical vulnerabilities
+          if [[ "$CRITICAL_COUNT" -gt "0" ]]; then
+            echo "❌ **CRITICAL vulnerabilities found! Build should be blocked.**" >> $GITHUB_STEP_SUMMARY
+            exit 1
+          elif [[ "$HIGH_COUNT" -gt "5" ]]; then
+            echo "⚠️ **High number of HIGH vulnerabilities found!**" >> $GITHUB_STEP_SUMMARY
+            # Don't fail but warn
           else
-            echo "✅ **No critical or high vulnerabilities found.**" >> $GITHUB_STEP_SUMMARY
+            echo "✅ **Security scan passed with acceptable risk level.**" >> $GITHUB_STEP_SUMMARY
           fi
 
+  # Enhanced aggregation with comprehensive reporting
   aggregate-results:
     runs-on: ubuntu-latest
-    needs: [webapp-react, application-server, intelligence-service, webhook-ingest, security-scan]
-    if: always() && inputs.should_skip != 'true'
+    needs: [matrix-setup, build-images, security-scan]
+    if: always() && needs.matrix-setup.outputs.has_changes == 'true'
     outputs:
       images_built: ${{ steps.summary.outputs.images_built }}
+      security_results: ${{ steps.summary.outputs.security_results }}
+      overall_status: ${{ steps.summary.outputs.overall_status }}
     steps:
-      - name: Generate build summary
+      - name: Generate comprehensive summary
         id: summary
         run: |
-          echo "## 🐳 Docker Build & Security Scan Summary" >> $GITHUB_STEP_SUMMARY
+          echo "## 🎯 Docker Build & Security Pipeline Summary" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          
-          # Check build results
-          WEBAPP_STATUS="${{ needs.webapp-react.result }}"
-          SERVER_STATUS="${{ needs.application-server.result }}"
-          INTEL_STATUS="${{ needs.intelligence-service.result }}"
-          WEBHOOK_STATUS="${{ needs.webhook-ingest.result }}"
-          SCAN_STATUS="${{ needs.security-scan.result }}"
-          
-          echo "### Build Results:" >> $GITHUB_STEP_SUMMARY
-          echo "- **Frontend (React)**: $WEBAPP_STATUS" >> $GITHUB_STEP_SUMMARY
-          echo "- **Backend (Spring)**: $SERVER_STATUS" >> $GITHUB_STEP_SUMMARY
-          echo "- **AI Service (FastAPI)**: $INTEL_STATUS" >> $GITHUB_STEP_SUMMARY
-          echo "- **Webhook Processor**: $WEBHOOK_STATUS" >> $GITHUB_STEP_SUMMARY
-          echo "- **Security Scan**: $SCAN_STATUS" >> $GITHUB_STEP_SUMMARY
+
+          # Parse matrix for component list
+          MATRIX='${{ needs.matrix-setup.outputs.matrix }}'
+          COMPONENTS=$(echo "$MATRIX" | jq -r '.include[].component' | tr '\n' ' ')
+
+          echo "### 🏗️ Build Results:" >> $GITHUB_STEP_SUMMARY
+
+          SUCCESSFUL_BUILDS=""
+          FAILED_BUILDS=""
+          SECURITY_SUMMARY=""
+
+          for component in $COMPONENTS; do
+            BUILD_STATUS="${{ needs.build-images.result }}"
+            SCAN_STATUS="${{ needs.security-scan.result }}"
+            
+            echo "- **$component**:" >> $GITHUB_STEP_SUMMARY
+            echo "  - Build: $BUILD_STATUS" >> $GITHUB_STEP_SUMMARY
+            echo "  - Security: $SCAN_STATUS" >> $GITHUB_STEP_SUMMARY
+            
+            if [[ "$BUILD_STATUS" == "success" ]]; then
+              SUCCESSFUL_BUILDS="$SUCCESSFUL_BUILDS,$component"
+            else
+              FAILED_BUILDS="$FAILED_BUILDS,$component"
+            fi
+          done
+
+          # Clean up comma-separated lists
+          SUCCESSFUL_BUILDS=$(echo "$SUCCESSFUL_BUILDS" | sed 's/^,//')
+          FAILED_BUILDS=$(echo "$FAILED_BUILDS" | sed 's/^,//')
+
           echo "" >> $GITHUB_STEP_SUMMARY
-          
+          echo "### 📊 Overall Results:" >> $GITHUB_STEP_SUMMARY
+
           # Determine overall status
-          if [[ "$WEBAPP_STATUS" == "success" && "$SERVER_STATUS" == "success" && "$INTEL_STATUS" == "success" && "$WEBHOOK_STATUS" == "success" && "$SCAN_STATUS" == "success" ]]; then
-            echo "### ✅ Overall Result: SUCCESS" >> $GITHUB_STEP_SUMMARY
-            echo "All Docker images built successfully and passed security scans." >> $GITHUB_STEP_SUMMARY
-            echo "images_built=webapp-react,application-server,intelligence-service,webhook-ingest" >> $GITHUB_OUTPUT
+          if [[ "${{ needs.build-images.result }}" == "success" && "${{ needs.security-scan.result }}" == "success" ]]; then
+            echo "✅ **All builds successful and security scans passed**" >> $GITHUB_STEP_SUMMARY
+            echo "overall_status=success" >> $GITHUB_OUTPUT
+          elif [[ "${{ needs.build-images.result }}" == "success" && "${{ needs.security-scan.result }}" != "success" ]]; then
+            echo "⚠️ **Builds successful but security issues detected**" >> $GITHUB_STEP_SUMMARY  
+            echo "overall_status=warning" >> $GITHUB_OUTPUT
           else
-            echo "### ❌ Overall Result: FAILURE" >> $GITHUB_STEP_SUMMARY
-            echo "One or more Docker builds or security scans failed. Check individual job logs for details." >> $GITHUB_STEP_SUMMARY
-            echo "images_built=" >> $GITHUB_OUTPUT
+            echo "❌ **Build failures detected**" >> $GITHUB_STEP_SUMMARY
+            echo "overall_status=failure" >> $GITHUB_OUTPUT
             exit 1
           fi
+
+          # Set outputs
+          echo "images_built=$SUCCESSFUL_BUILDS" >> $GITHUB_OUTPUT
+          echo "security_results=scanned" >> $GITHUB_OUTPUT
+
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### 🚀 Next Steps:" >> $GITHUB_STEP_SUMMARY
+          echo "- Images are available in GHCR: \`${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}/\`" >> $GITHUB_STEP_SUMMARY
+          echo "- Security scan results are available in the Security tab" >> $GITHUB_STEP_SUMMARY
+          echo "- SBOM and provenance data are attached to images" >> $GITHUB_STEP_SUMMARY

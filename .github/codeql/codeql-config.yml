@@ -1,0 +1,130 @@
+# CodeQL Configuration for Best-in-Class Security Analysis
+# Security scanning for Hephaestus platform
+name: "Hephaestus Security Analysis"
+
+# Enable default queries alongside custom suites for comprehensive coverage
+disable-default-queries: false
+
+# Multi-layered query configuration for maximum security coverage
+queries:
+  - name: "Security and Quality Extended"
+    uses: security-extended
+  - name: "Security and Quality"
+    uses: security-and-quality
+  - name: "Code Scanning"
+    uses: code-scanning
+
+# Comprehensive path coverage focusing on production code
+paths:
+  # Core application server (Java/Spring Boot)
+  - "server/application-server/src/main"
+  - "server/application-server/src/test" # Include test configs for secrets
+  
+  # Python microservices
+  - "server/intelligence-service/app"
+  - "server/webhook-ingest/app"
+  
+  # Frontend applications
+  - "webapp-react/src"
+  
+  # Configuration files that may contain sensitive data
+  - "server/application-server/*.yml"
+  - "server/application-server/*.yaml"
+  - "server/application-server/*.properties"
+  - "webapp-react/*.config.*""
+  - "*.config.*"
+  - "compose.yaml"
+  - "docker/**"
+
+# Strategic exclusions for non-security-relevant code
+paths-ignore:
+  # Build artifacts and dependencies
+  - "server/application-server/target/**"
+  - "webapp-react/node_modules/**"
+  - "webapp-react/dist/**"
+  - "webapp-react/build/**"
+
+  # Python cache and virtual environments
+  - "server/intelligence-service/__pycache__/**"
+  - "server/webhook-ingest/__pycache__/**"
+  - "**/__pycache__/**"
+  - "webhook_extraction_env/**"
+
+  # Documentation build artifacts
+  - "docs/_build/**"
+  - "docs/_static/**"
+  
+  # Test files (but not test configs which may contain secrets)
+  - "**/*.test.ts"
+  - "**/*.test.js"
+  - "**/*.spec.ts"
+  - "**/*.spec.js"
+  - "**/*.test.py"
+  - "**/test_*.py"
+  - "**/*_test.py"
+  
+  # IDE and version control
+  - ".vscode/**"
+  - ".idea/**"
+  - ".git/**"
+  
+  # Logs and temporary files
+  - "**/*.log"
+  - "**/.DS_Store"
+  - "**/Thumbs.db"
+
+# Advanced language-specific security configurations
+packs:
+  # Java security analysis with comprehensive vulnerability detection
+  java:
+    - "codeql/java-queries:Security/CWE/CWE-022" # Path traversal
+    - "codeql/java-queries:Security/CWE/CWE-079" # XSS
+    - "codeql/java-queries:Security/CWE/CWE-089" # SQL injection
+    - "codeql/java-queries:Security/CWE/CWE-094" # Code injection
+    - "codeql/java-queries:Security/CWE/CWE-200" # Information exposure
+    - "codeql/java-queries:Security/CWE/CWE-295" # Certificate validation
+    - "codeql/java-queries:Security/CWE/CWE-502" # Deserialization
+    - "codeql/java-queries:Security/CWE/CWE-611" # XXE
+    - "codeql/java-queries:Security/CWE/CWE-798" # Hard-coded credentials
+    - "codeql/java-queries:codeql-suites/java-security-extended.qls"
+  
+  # JavaScript/TypeScript security with modern threat detection
+  javascript:
+    - "codeql/javascript-queries:Security/CWE/CWE-022" # Path traversal
+    - "codeql/javascript-queries:Security/CWE/CWE-079" # XSS
+    - "codeql/javascript-queries:Security/CWE/CWE-094" # Code injection
+    - "codeql/javascript-queries:Security/CWE/CWE-200" # Information exposure
+    - "codeql/javascript-queries:Security/CWE/CWE-295" # Certificate validation
+    - "codeql/javascript-queries:Security/CWE/CWE-601" # Open redirect
+    - "codeql/javascript-queries:Security/CWE/CWE-798" # Hard-coded credentials
+    - "codeql/javascript-queries:Security/CWE/CWE-918" # SSRF
+    - "codeql/javascript-queries:codeql-suites/javascript-security-extended.qls"
+  
+  # Python security analysis for microservices
+  python:
+    - "codeql/python-queries:Security/CWE/CWE-022" # Path traversal
+    - "codeql/python-queries:Security/CWE/CWE-079" # XSS
+    - "codeql/python-queries:Security/CWE/CWE-089" # SQL injection
+    - "codeql/python-queries:Security/CWE/CWE-094" # Code injection
+    - "codeql/python-queries:Security/CWE/CWE-200" # Information exposure
+    - "codeql/python-queries:Security/CWE/CWE-295" # Certificate validation
+    - "codeql/python-queries:Security/CWE/CWE-502" # Pickle deserialization
+    - "codeql/python-queries:Security/CWE/CWE-798" # Hard-coded credentials
+    - "codeql/python-queries:Security/CWE/CWE-918" # SSRF
+    - "codeql/python-queries:codeql-suites/python-security-extended.qls"
+
+# Advanced analysis configuration
+analysis-options:
+  # Enable enhanced dataflow analysis for better vulnerability detection
+  dataflow:
+    max-paths: 4
+    max-paths-per-use: 2
+  
+  # Optimize for security-focused analysis
+  security:
+    enable-experimental-features: true
+    
+  # Performance optimizations for large codebases
+  performance:
+    threads: 0 # Use all available cores
+    ram: 8192 # 8GB RAM limit

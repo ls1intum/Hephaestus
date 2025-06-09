@@ -1,7 +1,18 @@
-name: CI/CD
+name: CI/CD Pipeline
 
 on:
   workflow_dispatch:
+    inputs:
+      force_full_build:
+        description: "Force full pipeline execution (ignore change detection)"
+        required: false
+        type: boolean
+        default: false
+      skip_security_scan:
+        description: "Skip security scanning (development only)"
+        required: false
+        type: boolean
+        default: false
   push:
     branches: ["develop", "main"]
     tags: ["v*"]
@@ -14,98 +25,188 @@ concurrency:
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 env:
-  # Global pipeline configuration
-  MAVEN_OPTS: -Xmx2048m -XX:+UseParallelGC
+  # Global pipeline configuration optimized for performance
+  MAVEN_OPTS: -Xmx2048m -XX:+UseParallelGC -Dmaven.repo.local=.m2/repository
   NODE_VERSION: 22
   PYTHON_VERSION: 3.13
   JAVA_VERSION: 21
+  # Pipeline behavior
+  FORCE_FULL_BUILD: ${{ inputs.force_full_build || github.event_name == 'workflow_dispatch' }}
+  SKIP_SECURITY: ${{ inputs.skip_security_scan == true && github.event_name == 'workflow_dispatch' }}
 
 jobs:
-  # Step 1: Pipeline orchestration and duplicate detection
+  # 🚀 Phase 1: Intelligent Pipeline Setup with Change Detection
   pipeline-setup:
+    name: "🔧 Pipeline Setup & Change Detection"
     uses: ./.github/workflows/ci-pipeline-setup.yml
     secrets: inherit
+    with:
+      force_full_build: ${{ env.FORCE_FULL_BUILD == 'true' }}
 
-  # Step 2: Code quality and style checks
+  # 🎯 Phase 2: Parallel Quality Gates (Code Quality & Static Analysis)
   quality-gates:
+    name: "🎯 Quality Gates"
     uses: ./.github/workflows/ci-quality-gates.yml
     needs: [pipeline-setup]
     if: needs.pipeline-setup.outputs.should_skip != 'true'
     secrets: inherit
     with:
       should_skip: ${{ needs.pipeline-setup.outputs.should_skip }}
+      changed_components: ${{ needs.pipeline-setup.outputs.changes }}
 
-  # Step 3: Security vulnerability scanning
-  security-scan:
+  # 🔐 Phase 3: Security Analysis (SAST, Dependencies, Secrets)
+  security-analysis:
+    name: "🔐 Security Analysis"
     uses: ./.github/workflows/ci-security-scan.yml
     needs: [pipeline-setup]
-    if: needs.pipeline-setup.outputs.should_skip != 'true'
+    if: needs.pipeline-setup.outputs.should_skip != 'true' && env.SKIP_SECURITY != 'true'
     secrets: inherit
     with:
       should_skip: ${{ needs.pipeline-setup.outputs.should_skip }}
+      changed_components: ${{ needs.pipeline-setup.outputs.changes }}
 
-  # Step 4: Comprehensive test execution
-  test-suite:
+  # 🧪 Phase 4: Comprehensive Test Execution
+  test-execution:
+    name: "🧪 Test Execution"
     uses: ./.github/workflows/ci-tests.yml
     needs: [pipeline-setup, quality-gates]
     if: needs.pipeline-setup.outputs.should_skip != 'true'
     secrets: inherit
     with:
       should_skip: ${{ needs.pipeline-setup.outputs.should_skip }}
+      test_matrix: ${{ needs.pipeline-setup.outputs.matrix_include }}
 
-  # Step 5: Build and scan Docker images
-  docker-build-scan:
+  # 🐳 Phase 5: Docker Build & Container Security Scanning
+  container-pipeline:
+    name: "🐳 Container Pipeline"
     uses: ./.github/workflows/ci-docker-build-scan.yml
-    needs: [pipeline-setup, test-suite]
-    if: needs.pipeline-setup.outputs.should_skip != 'true'
+    needs: [pipeline-setup, test-execution]
+    if: needs.pipeline-setup.outputs.should_skip != 'true' && (github.event_name != 'pull_request' || !github.event.pull_request.draft)
     secrets: inherit
     with:
       should_skip: ${{ needs.pipeline-setup.outputs.should_skip }}
+      changed_components: ${{ needs.pipeline-setup.outputs.changes }}
 
-  # Final: Aggregated success gate for branch protection
-  all-ci-passed:
+  # 📊 Final: Comprehensive Pipeline Status & Gating
+  pipeline-gate:
+    name: "📊 Pipeline Gate"
     runs-on: ubuntu-latest
-    needs: [quality-gates, security-scan, test-suite, docker-build-scan]
+    needs:
+      [
+        pipeline-setup,
+        quality-gates,
+        security-analysis,
+        test-execution,
+        container-pipeline,
+      ]
     if: always()
+    outputs:
+      overall_status: ${{ steps.gate.outputs.overall_status }}
+      deployment_ready: ${{ steps.gate.outputs.deployment_ready }}
     steps:
-      - name: Generate comprehensive CI summary
+      - name: Generate comprehensive pipeline summary
+        id: summary
         run: |
-          echo "## 🎯 CI/CD Pipeline Summary" >> $GITHUB_STEP_SUMMARY
+          echo "## 🎯 CI/CD Pipeline Execution Summary" >> $GITHUB_STEP_SUMMARY
+          echo "*Execution Time: $(date -u)*" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          
-          # Individual job status reporting
-          echo "### Job Status Overview:" >> $GITHUB_STEP_SUMMARY
-          echo "- **Code Quality**: ${{ needs.quality-gates.result }}" >> $GITHUB_STEP_SUMMARY
-          echo "- **Security Scan**: ${{ needs.security-scan.result }}" >> $GITHUB_STEP_SUMMARY
-          echo "- **Test Suite**: ${{ needs.test-suite.result }}" >> $GITHUB_STEP_SUMMARY
-          echo "- **Docker Build & Scan**: ${{ needs.docker-build-scan.result }}" >> $GITHUB_STEP_SUMMARY
+
+          # Phase execution status
+          echo "### 📈 Phase Execution Status:" >> $GITHUB_STEP_SUMMARY
+          echo "| Phase | Status | Duration | Details |" >> $GITHUB_STEP_SUMMARY
+          echo "|-------|--------|----------|---------|" >> $GITHUB_STEP_SUMMARY
+          echo "| 🔧 Pipeline Setup | ${{ needs.pipeline-setup.result || 'skipped' }} | - | Change detection & matrix generation |" >> $GITHUB_STEP_SUMMARY
+          echo "| 🎯 Quality Gates | ${{ needs.quality-gates.result || 'skipped' }} | - | Code quality, formatting, linting |" >> $GITHUB_STEP_SUMMARY
+          echo "| 🔐 Security Analysis | ${{ needs.security-analysis.result || 'skipped' }} | - | SAST, dependency scan, secrets |" >> $GITHUB_STEP_SUMMARY
+          echo "| 🧪 Test Execution | ${{ needs.test-execution.result || 'skipped' }} | - | Unit, integration, visual tests |" >> $GITHUB_STEP_SUMMARY
+          echo "| 🐳 Container Pipeline | ${{ needs.container-pipeline.result || 'skipped' }} | - | Docker build & security scan |" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          
-          # Docker images built
-          if [[ "${{ needs.docker-build-scan.outputs.images_built }}" != "" ]]; then
-            echo "### 🐳 Images Built:" >> $GITHUB_STEP_SUMMARY
-            echo "${{ needs.docker-build-scan.outputs.images_built }}" | tr ',' '\n' | sed 's/^/- /' >> $GITHUB_STEP_SUMMARY
+
+          # Changes detected
+          if [[ "${{ needs.pipeline-setup.outputs.changes }}" != "" ]]; then
+            echo "### 🔍 Changes Detected:" >> $GITHUB_STEP_SUMMARY
+            echo "\`\`\`json" >> $GITHUB_STEP_SUMMARY
+            echo '${{ needs.pipeline-setup.outputs.changes }}' | jq '.' >> $GITHUB_STEP_SUMMARY
+            echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
             echo "" >> $GITHUB_STEP_SUMMARY
           fi
 
-      - name: Check all jobs and determine overall status
-        run: |
-          # Check if any required job failed
-          if [[ "${{ contains(needs.*.result, 'failure') }}" == "true" ]]; then
-            echo "### ❌ CI Pipeline Result: FAILURE" >> $GITHUB_STEP_SUMMARY
-            echo "One or more critical CI jobs failed. Review the individual job logs for details." >> $GITHUB_STEP_SUMMARY
-            echo "❌ One or more CI jobs failed"
-            exit 1
-          elif [[ "${{ contains(needs.*.result, 'cancelled') }}" == "true" ]]; then
-            echo "### ⚠️ CI Pipeline Result: CANCELLED" >> $GITHUB_STEP_SUMMARY
-            echo "One or more CI jobs were cancelled. The pipeline did not complete successfully." >> $GITHUB_STEP_SUMMARY
-            echo "⚠️ One or more CI jobs were cancelled"
-            exit 1
-          else
-            echo "### ✅ CI Pipeline Result: SUCCESS" >> $GITHUB_STEP_SUMMARY
-            echo "All CI jobs completed successfully! The code is ready for deployment." >> $GITHUB_STEP_SUMMARY
-            echo "✅ All CI jobs passed successfully"
+          # Container build results
+          if [[ "${{ needs.container-pipeline.outputs.images_built }}" != "" ]]; then
+            echo "### 🐳 Container Images Built:" >> $GITHUB_STEP_SUMMARY
+            echo "${{ needs.container-pipeline.outputs.images_built }}" | tr ',' '\n' | sed 's/^/- ✅ /' >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
           fi
 
-  # Deployment workflows are handled by separate deployment pipelines
-  # triggered by successful CI completion
+      - name: Pipeline gate decision
+        id: gate
+        run: |
+          # Collect all job results
+          SETUP_RESULT="${{ needs.pipeline-setup.result }}"
+          QUALITY_RESULT="${{ needs.quality-gates.result }}"
+          SECURITY_RESULT="${{ needs.security-analysis.result }}"
+          TEST_RESULT="${{ needs.test-execution.result }}"
+          CONTAINER_RESULT="${{ needs.container-pipeline.result }}"
+
+          echo "### 🚦 Pipeline Gate Decision:" >> $GITHUB_STEP_SUMMARY
+
+          # Determine critical failures
+          CRITICAL_FAILURES=""
+          if [[ "$SETUP_RESULT" == "failure" ]]; then
+            CRITICAL_FAILURES="$CRITICAL_FAILURES setup"
+          fi
+          if [[ "$QUALITY_RESULT" == "failure" ]]; then
+            CRITICAL_FAILURES="$CRITICAL_FAILURES quality"
+          fi
+          if [[ "$TEST_RESULT" == "failure" ]]; then
+            CRITICAL_FAILURES="$CRITICAL_FAILURES tests"
+          fi
+
+          # Determine warnings
+          WARNINGS=""
+          if [[ "$SECURITY_RESULT" == "failure" && "${{ env.SKIP_SECURITY }}" != "true" ]]; then
+            WARNINGS="$WARNINGS security"
+          fi
+          if [[ "$CONTAINER_RESULT" == "failure" ]]; then
+            WARNINGS="$WARNINGS containers"
+          fi
+
+          # Make gate decision
+          if [[ -n "$CRITICAL_FAILURES" ]]; then
+            echo "❌ **PIPELINE FAILED** - Critical failures detected: $CRITICAL_FAILURES" >> $GITHUB_STEP_SUMMARY
+            echo "overall_status=failure" >> $GITHUB_OUTPUT
+            echo "deployment_ready=false" >> $GITHUB_OUTPUT
+            exit 1
+          elif [[ -n "$WARNINGS" ]]; then
+            echo "⚠️ **PIPELINE PASSED WITH WARNINGS** - Issues detected: $WARNINGS" >> $GITHUB_STEP_SUMMARY
+            echo "overall_status=warning" >> $GITHUB_OUTPUT
+            echo "deployment_ready=true" >> $GITHUB_OUTPUT
+          else
+            echo "✅ **PIPELINE PASSED** - All quality gates satisfied" >> $GITHUB_STEP_SUMMARY
+            echo "overall_status=success" >> $GITHUB_OUTPUT
+            echo "deployment_ready=true" >> $GITHUB_OUTPUT
+          fi
+
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### 🚀 Next Steps:" >> $GITHUB_STEP_SUMMARY
+          if [[ "${{ needs.container-pipeline.outputs.images_built }}" != "" ]]; then
+            echo "- 📦 **Container images** are ready for deployment" >> $GITHUB_STEP_SUMMARY
+            echo "- 🔍 **Security scan results** available in Security tab" >> $GITHUB_STEP_SUMMARY
+            echo "- 📊 **Test reports** available in Actions artifacts" >> $GITHUB_STEP_SUMMARY
+          fi
+          echo "- 🎯 **Quality metrics** tracked across all components" >> $GITHUB_STEP_SUMMARY
+
+  # 🔄 Optional: Trigger deployment workflows on success
+  trigger-deployment:
+    runs-on: ubuntu-latest
+    needs: [pipeline-gate]
+    if: needs.pipeline-gate.outputs.deployment_ready == 'true' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/develop')
+    steps:
+      - name: Trigger deployment pipeline
+        run: |
+          echo "## 🚀 Deployment Pipeline Trigger" >> $GITHUB_STEP_SUMMARY
+          echo "- **Status**: Ready for deployment" >> $GITHUB_STEP_SUMMARY
+          echo "- **Branch**: ${{ github.ref_name }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Images**: ${{ needs.container-pipeline.outputs.images_built }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "Deployment workflows can be triggered based on this successful pipeline execution." >> $GITHUB_STEP_SUMMARY

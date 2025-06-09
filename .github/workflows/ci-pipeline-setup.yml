@@ -1,7 +1,13 @@
-name: Pipeline Setup
+name: Pipeline Setup & Change Detection
 
 on:
   workflow_call:
+    inputs:
+      force_full_build:
+        description: "Force full pipeline execution"
+        required: false
+        type: boolean
+        default: false
     outputs:
       should_skip:
         description: "Whether to skip the workflow execution"
@@ -10,64 +16,224 @@ on:
         description: "Dynamic test matrix configuration"
         value: ${{ jobs.pipeline-setup.outputs.matrix_include }}
       changes:
-        description: "Detected changes in components"
+        description: "Detected changes in components (JSON array)"
         value: ${{ jobs.pipeline-setup.outputs.changes }}
 
 jobs:
-  # Pipeline orchestration and duplicate detection
+  # Enhanced pipeline orchestration with intelligent change detection
   pipeline-setup:
+    name: "🔧 Setup & Change Detection"
     runs-on: ubuntu-latest
     outputs:
       should_skip: ${{ steps.skip_check.outputs.should_skip }}
       matrix_include: ${{ steps.matrix_setup.outputs.matrix }}
-      changes: ${{ steps.changes.outputs.changes }}
+      changes: ${{ steps.changes.outputs.changed_components }}
+      change_summary: ${{ steps.changes.outputs.summary }}
     timeout-minutes: 5
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout repository
+        uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
-      - id: skip_check
+      - name: Skip duplicate workflow runs
+        id: skip_check
         uses: fkirc/skip-duplicate-actions@v5
         with:
-          do_not_skip: '["workflow_dispatch", "schedule"]'
+          do_not_skip: '["workflow_dispatch", "schedule", "push"]'
+          paths_ignore: '["docs/**", "*.md", ".gitignore"]'
+          cancel_others: true
 
-      - name: Detect changed components
+      - name: Advanced change detection
         id: changes
         uses: dorny/paths-filter@v3
         with:
+          list-files: shell
           filters: |
-            webapp:
+            webapp-react:
               - 'webapp-react/**'
+              - '.github/workflows/ci-docker-build-scan.yml'
+            webapp-angular:
+              - 'webapp/**'
+              - '.github/workflows/ci-docker-build-scan.yml'
             application-server:
               - 'server/application-server/**'
+              - '.github/workflows/ci-docker-build-scan.yml'
             intelligence-service:
               - 'server/intelligence-service/**'
+              - '.github/workflows/ci-docker-build-scan.yml'
             webhook-ingest:
               - 'server/webhook-ingest/**'
-            docs:
+              - '.github/workflows/ci-docker-build-scan.yml'
+            documentation:
               - 'docs/**'
-            ci:
+              - '*.md'
+            ci-workflows:
               - '.github/workflows/**'
+              - '.github/actions/**'
+            root-config:
+              - 'package.json'
+              - 'compose.yaml'
+              - 'openapitools.json'
 
-      - name: Setup dynamic test matrix
+      - name: Generate component change matrix
         id: matrix_setup
+        env:
+          FORCE_FULL: ${{ inputs.force_full_build }}
         run: |
-          # Create intelligent test matrix based on changes
-          echo "matrix={\"include\":[{\"name\":\"Quality Gates\",\"type\":\"quality\",\"runs_if\":\"always\",\"timeout\":12},{\"name\":\"Security Scan\",\"type\":\"security\",\"runs_if\":\"always\",\"timeout\":15}]}" >> $GITHUB_OUTPUT
+          echo "🔍 Analyzing changed components..."
 
-      - name: Pipeline setup status report
+          # Collect changed components
+          CHANGED_COMPONENTS='[]'
+
+          # Check each component for changes or force full build
+          if [[ "$FORCE_FULL" == "true" ]] || [[ "${{ steps.changes.outputs.webapp-react }}" == "true" ]] || [[ "${{ steps.changes.outputs.ci-workflows }}" == "true" ]]; then
+            CHANGED_COMPONENTS=$(echo "$CHANGED_COMPONENTS" | jq '. + ["webapp-react"]')
+          fi
+
+          if [[ "$FORCE_FULL" == "true" ]] || [[ "${{ steps.changes.outputs.webapp-angular }}" == "true" ]] || [[ "${{ steps.changes.outputs.ci-workflows }}" == "true" ]]; then
+            CHANGED_COMPONENTS=$(echo "$CHANGED_COMPONENTS" | jq '. + ["webapp-angular"]')
+          fi
+
+          if [[ "$FORCE_FULL" == "true" ]] || [[ "${{ steps.changes.outputs.application-server }}" == "true" ]] || [[ "${{ steps.changes.outputs.ci-workflows }}" == "true" ]]; then
+            CHANGED_COMPONENTS=$(echo "$CHANGED_COMPONENTS" | jq '. + ["application-server"]')
+          fi
+
+          if [[ "$FORCE_FULL" == "true" ]] || [[ "${{ steps.changes.outputs.intelligence-service }}" == "true" ]] || [[ "${{ steps.changes.outputs.ci-workflows }}" == "true" ]]; then
+            CHANGED_COMPONENTS=$(echo "$CHANGED_COMPONENTS" | jq '. + ["intelligence-service"]')
+          fi
+
+          if [[ "$FORCE_FULL" == "true" ]] || [[ "${{ steps.changes.outputs.webhook-ingest }}" == "true" ]] || [[ "${{ steps.changes.outputs.ci-workflows }}" == "true" ]]; then
+            CHANGED_COMPONENTS=$(echo "$CHANGED_COMPONENTS" | jq '. + ["webhook-ingest"]')
+          fi
+
+          # Remove duplicates and create final array
+          CHANGED_COMPONENTS=$(echo "$CHANGED_COMPONENTS" | jq 'unique')
+
+          echo "changed_components=$CHANGED_COMPONENTS" >> $GITHUB_OUTPUT
+
+          # Generate dynamic test matrix based on changes
+          cat > test_matrix.json << EOF
+          {
+            "include": [
+              {
+                "name": "Java Unit Tests",
+                "type": "java-unit",
+                "condition": "$(echo "$CHANGED_COMPONENTS" | jq -r 'map(select(. == "application-server" or . == "intelligence-service")) | length > 0')",
+                "timeout": 20,
+                "components": ["application-server"]
+              },
+              {
+                "name": "JavaScript Unit Tests", 
+                "type": "javascript-unit",
+                "condition": "$(echo "$CHANGED_COMPONENTS" | jq -r 'map(select(. == "webapp-react" or . == "webapp-angular")) | length > 0')",
+                "timeout": 15,
+                "components": ["webapp-react", "webapp-angular"]
+              },
+              {
+                "name": "Python Unit Tests",
+                "type": "python-unit", 
+                "condition": "$(echo "$CHANGED_COMPONENTS" | jq -r 'map(select(. == "intelligence-service" or . == "webhook-ingest")) | length > 0')",
+                "timeout": 15,
+                "components": ["intelligence-service", "webhook-ingest"]
+              },
+              {
+                "name": "Integration Tests",
+                "type": "integration",
+                "condition": "$(echo "$CHANGED_COMPONENTS" | jq -r 'length > 1 or map(select(. == "application-server")) | length > 0')",
+                "timeout": 30,
+                "components": ["application-server", "intelligence-service", "webhook-ingest"]
+              },
+              {
+                "name": "Visual Regression Tests",
+                "type": "visual",
+                "condition": "$(echo "$CHANGED_COMPONENTS" | jq -r 'map(select(. == "webapp-react" or . == "webapp-angular")) | length > 0')",
+                "timeout": 25,
+                "components": ["webapp-react"]
+              }
+            ]
+          }
+          EOF
+
+          # Filter matrix to only include tests for changed components
+          FILTERED_MATRIX=$(jq -r '.include | map(select(.condition == "true"))' test_matrix.json)
+          FINAL_MATRIX="{\"include\":$FILTERED_MATRIX}"
+
+          echo "matrix=$FINAL_MATRIX" >> $GITHUB_OUTPUT
+
+          # Generate change summary
+          CHANGE_COUNT=$(echo "$CHANGED_COMPONENTS" | jq 'length')
+          if [[ "$CHANGE_COUNT" -eq 0 ]]; then
+            SUMMARY="No component changes detected"
+          elif [[ "$CHANGE_COUNT" -eq 1 ]]; then
+            COMPONENT=$(echo "$CHANGED_COMPONENTS" | jq -r '.[0]')
+            SUMMARY="Single component changed: $COMPONENT"
+          else
+            SUMMARY="Multiple components changed: $(echo "$CHANGED_COMPONENTS" | jq -r 'join(", ")')"
+          fi
+
+          echo "summary=$SUMMARY" >> $GITHUB_OUTPUT
+
+      - name: Generate comprehensive pipeline setup report
         if: always()
         run: |
-          echo "📊 Pipeline Setup - Status: ${{ job.status }}"
-          echo "## 📋 Pipeline Setup Results" >> $GITHUB_STEP_SUMMARY
-          echo "- **Duplicate Detection**: ${{ steps.skip_check.outputs.should_skip == 'true' && 'Skipping duplicate run' || 'Proceeding with pipeline execution' }}" >> $GITHUB_STEP_SUMMARY
-          echo "- **Component Changes**: ${{ steps.changes.outputs.changes }}" >> $GITHUB_STEP_SUMMARY
-          echo "- **Test Matrix**: Dynamic matrix configured based on detected changes" >> $GITHUB_STEP_SUMMARY
+          echo "## 🔧 Pipeline Setup & Change Detection Results" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
 
+          # Skip status
+          if [[ "${{ steps.skip_check.outputs.should_skip }}" == "true" ]]; then
+            echo "### ⏭️ Workflow Execution: SKIPPED" >> $GITHUB_STEP_SUMMARY
+            echo "This workflow run was skipped due to duplicate detection." >> $GITHUB_STEP_SUMMARY
+          else
+            echo "### ✅ Workflow Execution: PROCEEDING" >> $GITHUB_STEP_SUMMARY
+            echo "Pipeline will execute based on detected changes." >> $GITHUB_STEP_SUMMARY
+          fi
+
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+          # Change detection summary
+          echo "### 🔍 Change Detection Summary:" >> $GITHUB_STEP_SUMMARY
+          echo "**${{ steps.changes.outputs.summary }}**" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+          # Detailed changes
+          echo "### 📋 Component Changes:" >> $GITHUB_STEP_SUMMARY
+          CHANGED_COMPONENTS='${{ steps.changes.outputs.changed_components }}'
+          if [[ "$CHANGED_COMPONENTS" != "[]" ]]; then
+            echo "$CHANGED_COMPONENTS" | jq -r '.[] | "- ✅ " + .' >> $GITHUB_STEP_SUMMARY
+          else
+            echo "- 📝 No component changes detected" >> $GITHUB_STEP_SUMMARY
+          fi
+
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+          # Test matrix information
+          echo "### 🧪 Test Matrix Configuration:" >> $GITHUB_STEP_SUMMARY
+          TEST_MATRIX='${{ steps.matrix_setup.outputs.matrix }}'
+          TEST_COUNT=$(echo "$TEST_MATRIX" | jq '.include | length')
+          echo "- **Tests to Execute**: $TEST_COUNT test suites" >> $GITHUB_STEP_SUMMARY
+
+          if [[ "$TEST_COUNT" -gt 0 ]]; then
+            echo "$TEST_MATRIX" | jq -r '.include[] | "- 🧪 " + .name + " (" + .type + ")"' >> $GITHUB_STEP_SUMMARY
+          else
+            echo "- 📝 No tests required for detected changes" >> $GITHUB_STEP_SUMMARY
+          fi
+
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+          # Force build indicator
+          if [[ "${{ inputs.force_full_build }}" == "true" ]]; then
+            echo "### 🚀 Full Pipeline Execution: FORCED" >> $GITHUB_STEP_SUMMARY
+            echo "All components will be built and tested regardless of changes." >> $GITHUB_STEP_SUMMARY
+          fi
+
+          # Status summary
           if [[ "${{ job.status }}" == "failure" ]]; then
-            echo "## ❌ Pipeline Setup Failed" >> $GITHUB_STEP_SUMMARY
-            echo "Pipeline setup must complete successfully before proceeding. Please review the errors above." >> $GITHUB_STEP_SUMMARY
-          elif [[ "${{ job.status }}" == "success" ]]; then
-            echo "✅ Pipeline setup completed successfully!" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "### ❌ Setup Status: FAILED" >> $GITHUB_STEP_SUMMARY
+            echo "Pipeline setup encountered errors. Review logs above." >> $GITHUB_STEP_SUMMARY
+          else
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "### ✅ Setup Status: COMPLETED" >> $GITHUB_STEP_SUMMARY
+            echo "Pipeline is ready for execution with optimized change-based testing." >> $GITHUB_STEP_SUMMARY
           fi
