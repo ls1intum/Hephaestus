@@ -35,10 +35,6 @@
 		<maven.test.failure.ignore>false</maven.test.failure.ignore>
 		<maven.test.skip>false</maven.test.skip>
 		
-		<!-- Test Categorization (can be overridden via -D flags) -->
-		<test.groups></test.groups>
-		<test.excludedGroups></test.excludedGroups>
-		
 		<!-- Coverage Configuration (disabled by default) -->
 		<skipCoverage>true</skipCoverage>
 		<jacoco.line.coverage.minimum>0.00</jacoco.line.coverage.minimum>
@@ -415,8 +411,8 @@
 					<printSummary>true</printSummary>
 					<redirectTestOutputToFile>false</redirectTestOutputToFile>
 					<!-- Enable test categorization -->
-					<groups>${test.groups}</groups>
-					<excludedGroups>${test.excludedGroups}</excludedGroups>
+					<groups>${groups}</groups>
+					<excludedGroups>${excludedGroups}</excludedGroups>
 					<!-- Parallel execution for faster tests -->
 					<parallel>methods</parallel>
 					<threadCount>4</threadCount>
