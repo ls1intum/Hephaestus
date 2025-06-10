@@ -52,7 +52,6 @@
     "@tanstack/react-table": "^8.21.3",
     "@tanstack/router-plugin": "^1.120.13",
     "@tanstack/zod-adapter": "^1.120.13",
-    "chromatic": "^12.1.1",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "cmdk": "^1.1.1",
@@ -71,6 +70,7 @@
     "zod": "^3.25.46"
   },
   "devDependencies": {
+    "chromatic": "^12.1.1",
     "@biomejs/biome": "1.9.4",
     "@chromatic-com/storybook": "^3.2.6",
     "@hey-api/openapi-ts": "^0.69.1",
