@@ -1,4 +1,4 @@
-name: OpenAPI Auto-commit
+name: API
 
 on:
   pull_request:
@@ -11,7 +11,7 @@ env:
 
 jobs:
   autocommit:
-    name: Auto-commit OpenAPI changes
+    name: auto-commit spec and client changes
     runs-on: ubuntu-latest
     if: github.event.label.name == 'autocommit-openapi'
     timeout-minutes: 15
@@ -58,35 +58,56 @@ jobs:
       - name: Generate OpenAPI specs and clients
         run: npm run generate:api
 
-      - name: Commit and push changes
-        id: commit
+      - name: Check for changes in the API
+        id: check_changes
         run: |
-          git config --local user.name "github-actions[bot]"
-          git config --local user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          
+          echo "Checking for changes in the API client directory..."
+          echo "Current git status:"
+          git status
+          echo "Current git diff:"
+          git diff
           git add .
-          
-          if ! git diff --cached --quiet; then
-            git commit -m "chore: update OpenAPI specs and clients [skip ci]"
-            git push origin ${{ github.event.pull_request.head.ref }}
-            echo "changes_committed=true" >> $GITHUB_OUTPUT
+          echo "Git status after adding changes:"
+          git status
+          if git diff --cached --quiet; then
+            echo "No changes detected in the API client directory."
+            echo "no_changes_detected=true" >> $GITHUB_OUTPUT
           else
-            echo "changes_committed=false" >> $GITHUB_OUTPUT
+            echo "Changes detected in the API client directory."
+            echo "Staged changes:"
+            git diff --cached
+            echo "no_changes_detected=false" >> $GITHUB_OUTPUT
           fi
 
-      - name: Remove label and comment
+      - name: Commit files
+        if: ${{ always() && contains(github.event.pull_request.labels.*.name, 'autocommit-openapi') && steps.check_changes.outputs.no_changes_detected != 'true' }}
+        run: |
+          echo "Committing and pushing changes..."
+          git config --local user.name "github-actions[bot]"
+          git config --local user.email "github-actions[bot]@users.noreply.github.com"
+          git commit -a -m "chore: update API specs and client"
+
+      - name: Push changes
+        if: ${{ always() && contains(github.event.pull_request.labels.*.name, 'autocommit-openapi') && steps.check_changes.outputs.no_changes_detected != 'true' }}
+        uses: ad-m/github-push-action@master
+        with:
+          github_token: ${{ secrets.GH_PAT }}
+          branch: ${{ github.event.pull_request.head.ref }}
+
+      - name: Remove autocommit-openapi label
+        if: ${{ always() && contains(github.event.pull_request.labels.*.name, 'autocommit-openapi') }}
+        run: |
+          echo "Removing the autocommit-openapi label..."
+          curl --silent --fail-with-body -X DELETE -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
+          https://api.github.com/repos/${{ github.repository }}/issues/${{ github.event.pull_request.number }}/labels/autocommit-openapi
+
+      - name: Add PR comment with results
         if: always()
         run: |
-          # Remove the label
-          curl -s -X DELETE \
-            -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
-            "https://api.github.com/repos/${{ github.repository }}/issues/${{ github.event.pull_request.number }}/labels/autocommit-openapi"
-          
-          # Add comment
-          if [[ "${{ steps.commit.outputs.changes_committed }}" == "true" ]]; then
-            COMMENT="🤖 OpenAPI specs and clients have been automatically updated and committed."
-          else
+          if [[ "${{ steps.check_changes.outputs.no_changes_detected }}" == "true" ]]; then
             COMMENT="🤖 No OpenAPI changes were needed - everything is already up to date."
+          else
+            COMMENT="🤖 OpenAPI specs and clients have been automatically updated and committed."
           fi
           
           curl -s -X POST \
