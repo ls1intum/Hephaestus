@@ -57,349 +57,150 @@ jobs:
             ${{ runner.os }}-webapp-build-${{ hashFiles('package-lock.json', 'webapp-react/package-lock.json', 'webapp-react/biome.json', 'webapp-react/tsconfig.json', 'webapp-react/vite.config.js', 'webapp-react/components.json') }}-
             ${{ runner.os }}-webapp-build-
 
-      # Application Server code quality and formatting
-      - name: Application Server formatting & static analysis
+      # application-server code quality and formatting
+      - name: application-server formatting & static analysis
         if: matrix.check == 'application-server-quality'
         run: |
-          echo "🔍 Checking Application Server code formatting and style..."
+          echo "🔍 Checking application-server code formatting..."
 
-          # Install dependencies if not cached
           if [ ! -d "node_modules" ]; then
             npm ci --prefer-offline --no-audit
           fi
 
-          # Run Application Server formatting check and capture output
-          echo "🎨 Running Prettier formatting check..."
-          npm run format:application-server:check 2>&1 | tee application-server-format-results.txt
-          FORMAT_EXIT_CODE=${PIPESTATUS[0]}
-
-          # Generate summary based on results
-          if [ $FORMAT_EXIT_CODE -eq 0 ]; then
-            echo "## ✅ Application Server Code Quality Results" >> $GITHUB_STEP_SUMMARY
-            echo "- **Formatting**: All Application Server files follow Prettier formatting rules" >> $GITHUB_STEP_SUMMARY
-            echo "- **Style Guide**: Code adheres to project style guidelines" >> $GITHUB_STEP_SUMMARY
-            echo "✅ All Application Server formatting checks passed successfully"
-          else
-            echo "## ❌ Application Server Code Quality Results" >> $GITHUB_STEP_SUMMARY
-            echo "- **Formatting**: Code formatting issues detected" >> $GITHUB_STEP_SUMMARY
-            echo "" >> $GITHUB_STEP_SUMMARY
-            echo "**Files with formatting issues:**" >> $GITHUB_STEP_SUMMARY
-            echo '```' >> $GITHUB_STEP_SUMMARY
-            grep -E '\[warn\]' application-server-format-results.txt | sed 's/\[warn\] /- /' >> $GITHUB_STEP_SUMMARY || echo "- Check the logs above for details" >> $GITHUB_STEP_SUMMARY
-            echo '```' >> $GITHUB_STEP_SUMMARY
-            echo "" >> $GITHUB_STEP_SUMMARY
-            echo "**To fix these issues:**" >> $GITHUB_STEP_SUMMARY
-            echo '```bash' >> $GITHUB_STEP_SUMMARY
-            echo 'npm run format:application-server:write' >> $GITHUB_STEP_SUMMARY
-            echo '```' >> $GITHUB_STEP_SUMMARY
-            echo "❌ Application Server formatting check failed"
+          if ! npm run format:application-server:check; then
+            echo "❌ application-server formatting failed. Run: npm run format:application-server:write"
             exit 1
           fi
+
+          echo "✅ application-server formatting passed"
 
       # Webapp quality checks with comprehensive validation
       - name: Webapp quality & type checking
         if: matrix.check == 'webapp-quality'
         working-directory: ./webapp-react
         run: |
-          echo "🔍 Running comprehensive webapp quality checks..."
+          echo "🔍 Running webapp quality checks..."
 
-          # Install dependencies if not cached
           if [ ! -d "node_modules" ]; then
-            echo "📦 Installing dependencies..."
             npm ci --prefer-offline --no-audit --progress=false
+          fi
+
+          ISSUES_FOUND=()
+
+          echo "🎨 Running Biome checks..."
+          if ! npm run check; then
+            echo "❌ Biome checks failed"
+            ISSUES_FOUND+=("Biome checks failed. Run: npm run check -- --write")
           else
-            echo "📦 Dependencies restored from cache"
+            echo "✅ Biome checks passed"
           fi
 
-          # Run Biome check (linting + formatting + imports)
-          echo "🎨 Running Biome code quality checks..."
-          npm run check 2>&1 | tee biome-results.txt
-          BIOME_EXIT_CODE=${PIPESTATUS[0]}
-
-          # TypeScript compilation check
-          echo "📊 Running TypeScript compilation check..."
-          npx tsc --noEmit --pretty 2>&1 | tee typescript-results.txt
-          TSC_EXIT_CODE=${PIPESTATUS[0]}
-
-          # Build check to ensure everything compiles
-          echo "🏗️ Running build verification..."
-          npm run build 2>&1 | tee build-results.txt
-          BUILD_EXIT_CODE=${PIPESTATUS[0]}
-
-          # Package audit for security vulnerabilities
-          echo "🔒 Running security audit..."
-          npm audit --audit-level=high --progress=false 2>&1 | tee audit-results.txt || true
-
-          # Bundle size analysis
-          echo "📏 Analyzing bundle size..."
-          if [ -d "dist" ]; then
-            BUNDLE_SIZE=$(du -sh dist | cut -f1)
-            echo "Bundle size: $BUNDLE_SIZE"
-          fi
-
-          # Generate comprehensive summary
-          echo "## ✅ Webapp Quality Results" >> $GITHUB_STEP_SUMMARY
-          echo "| Check | Status | Details |" >> $GITHUB_STEP_SUMMARY
-          echo "| --- | --- | --- |" >> $GITHUB_STEP_SUMMARY
-
-          if [ $BIOME_EXIT_CODE -eq 0 ]; then
-            echo "| **Biome Quality** | ✅ Passed | Code formatting, linting, and imports are correct |" >> $GITHUB_STEP_SUMMARY
+          echo "📊 Running TypeScript check..."
+          if ! npx tsc --noEmit; then
+            echo "❌ TypeScript check failed"
+            ISSUES_FOUND+=("TypeScript compilation errors found")
           else
-            echo "| **Biome Quality** | ❌ Failed | Code quality issues detected |" >> $GITHUB_STEP_SUMMARY
+            echo "✅ TypeScript check passed"
           fi
 
-          if [ $TSC_EXIT_CODE -eq 0 ]; then
-            echo "| **TypeScript** | ✅ Passed | All type checks passed |" >> $GITHUB_STEP_SUMMARY
+          echo "🏗️ Running build check..."
+          if ! npm run build; then
+            echo "❌ Build check failed"
+            ISSUES_FOUND+=("Build failed")
           else
-            echo "| **TypeScript** | ❌ Failed | Type errors detected |" >> $GITHUB_STEP_SUMMARY
+            echo "✅ Build check passed"
           fi
 
-          if [ $BUILD_EXIT_CODE -eq 0 ]; then
-            echo "| **Build** | ✅ Passed | Application builds successfully |" >> $GITHUB_STEP_SUMMARY
-            if [ -n "$BUNDLE_SIZE" ]; then
-              echo "| **Bundle Size** | 📊 $BUNDLE_SIZE | Production bundle analysis |" >> $GITHUB_STEP_SUMMARY
-            fi
-          else
-            echo "| **Build** | ❌ Failed | Build errors detected |" >> $GITHUB_STEP_SUMMARY
-          fi
-
-          echo "| **Security** | 🔒 Scanned | Dependency vulnerabilities checked |" >> $GITHUB_STEP_SUMMARY
-
-          # Exit with error if any critical checks failed
-          if [ $BIOME_EXIT_CODE -ne 0 ] || [ $TSC_EXIT_CODE -ne 0 ] || [ $BUILD_EXIT_CODE -ne 0 ]; then
-            echo "❌ One or more quality checks failed"
+          if [ ${#ISSUES_FOUND[@]} -gt 0 ]; then
+            echo ""
+            echo "❌ Webapp quality issues found:"
+            for issue in "${ISSUES_FOUND[@]}"; do
+              echo "  • $issue"
+            done
             exit 1
           fi
 
-          echo "✅ All webapp quality checks passed successfully"
+          echo "✅ All webapp quality checks passed"
 
-      # Intelligence Service quality checks with comprehensive validation
-      - name: Intelligence Service quality & security analysis
+      # intelligence-service quality checks with comprehensive validation
+      - name: intelligence-service quality & security analysis
         if: matrix.check == 'intelligence-service-quality'
         run: |
-          set -o pipefail  # Make pipelines fail if any command fails
-          echo "🔍 Running comprehensive Intelligence Service quality checks..."
-
-          # Track issues found
-          ISSUES_FOUND=()
-          OVERALL_SUCCESS=true
-
-          # Intelligence Service checks
-          echo "📝 Checking Intelligence Service..."
+          echo "🔍 Running intelligence-service quality checks..."
           cd server/intelligence-service
 
           if [ ! -d ".venv" ]; then
             poetry install --no-interaction --no-root
           fi
 
-          # Code formatting
+          ISSUES_FOUND=()
+
           echo "🎨 Checking code formatting..."
-          poetry run black --check --diff . 2>&1 | tee black-results.txt
-          INTELLIGENCE_BLACK_EXIT_CODE=${PIPESTATUS[0]}
-          if [ $INTELLIGENCE_BLACK_EXIT_CODE -ne 0 ]; then
-            echo "❌ Intelligence Service: Black formatting check failed"
-            ISSUES_FOUND+=("Intelligence Service: Black formatting needs fixing")
-            OVERALL_SUCCESS=false
+          if ! poetry run black --check --diff .; then
+            echo "❌ Black formatting failed"
+            ISSUES_FOUND+=("Black formatting failed. Run: cd server/intelligence-service && poetry run black .")
           else
-            echo "✅ Intelligence Service: Black formatting check passed"
+            echo "✅ Black formatting passed"
           fi
 
-          # Linting
-          echo "🔍 Running flake8 linting..."
-          poetry run flake8 . --statistics --count 2>&1 | tee flake8-results.txt
-          INTELLIGENCE_FLAKE8_EXIT_CODE=${PIPESTATUS[0]}
-          if [ $INTELLIGENCE_FLAKE8_EXIT_CODE -ne 0 ]; then
-            echo "❌ Intelligence Service: Flake8 linting failed"
-            ISSUES_FOUND+=("Intelligence Service: Flake8 linting issues found")
-            OVERALL_SUCCESS=false
+          echo "🔍 Running linting..."
+          if ! poetry run flake8 . --statistics --count; then
+            echo "❌ Flake8 linting failed"
+            ISSUES_FOUND+=("Flake8 linting failed")
           else
-            echo "✅ Intelligence Service: Flake8 linting passed"
+            echo "✅ Flake8 linting passed"
           fi
 
-          # Type checking (if mypy is available)
-          if poetry show mypy > /dev/null 2>&1; then
-            echo "📊 Running type checking..."
-            poetry run mypy . --ignore-missing-imports --show-error-codes 2>&1 | tee mypy-results.txt
-            INTELLIGENCE_MYPY_EXIT_CODE=${PIPESTATUS[0]}
-            if [ $INTELLIGENCE_MYPY_EXIT_CODE -ne 0 ]; then
-              echo "⚠️ Intelligence Service: MyPy type checking found issues (warning only)"
-              ISSUES_FOUND+=("Intelligence Service: MyPy type checking issues (warning)")
-              # Type checking issues are warnings, not failures
-            else
-              echo "✅ Intelligence Service: MyPy type checking passed"
-            fi
-          fi
-
-          # Security check (if bandit is available)
-          if poetry show bandit > /dev/null 2>&1; then
-            echo "🔒 Running security analysis..."
-            poetry run bandit -r app/ -f json -o bandit-results.json 2>&1
-            INTELLIGENCE_BANDIT_EXIT_CODE=${PIPESTATUS[0]}
-            if [ $INTELLIGENCE_BANDIT_EXIT_CODE -ne 0 ]; then
-              echo "⚠️ Intelligence Service: Bandit security analysis found issues (warning only)"
-              ISSUES_FOUND+=("Intelligence Service: Security analysis issues (warning)")
-              # Security issues are warnings, not failures for now
-            else
-              echo "✅ Intelligence Service: Bandit security analysis passed"
-            fi
-          fi
-
-          cd ../..
-
-          # Generate comprehensive summary
-          echo ""
-          echo "📊 Intelligence Service Quality Check Summary:"
-          echo "============================================="
-
-          if [ ${#ISSUES_FOUND[@]} -eq 0 ]; then
-            echo "✅ All Intelligence Service quality checks passed successfully!"
+          if [ ${#ISSUES_FOUND[@]} -gt 0 ]; then
             echo ""
-            echo "## ✅ Intelligence Service Quality Results" >> $GITHUB_STEP_SUMMARY
-            echo "- **Intelligence Service**: All checks passed ✅" >> $GITHUB_STEP_SUMMARY
-            echo "- **Code Formatting**: All Python files follow Black formatting" >> $GITHUB_STEP_SUMMARY
-            echo "- **Linting**: Code passes Flake8 quality checks" >> $GITHUB_STEP_SUMMARY
-            echo "- **Type Safety**: Static type analysis completed" >> $GITHUB_STEP_SUMMARY
-            echo "- **Security**: Code security analysis performed" >> $GITHUB_STEP_SUMMARY
-          else
-            echo "❌ Found ${#ISSUES_FOUND[@]} issue(s):"
+            echo "❌ intelligence-service quality issues found:"
             for issue in "${ISSUES_FOUND[@]}"; do
               echo "  • $issue"
             done
-            echo ""
-            echo "## ❌ Intelligence Service Quality Issues Found" >> $GITHUB_STEP_SUMMARY
-            echo "" >> $GITHUB_STEP_SUMMARY
-            echo "The following issues need to be addressed:" >> $GITHUB_STEP_SUMMARY
-            echo "" >> $GITHUB_STEP_SUMMARY
-            for issue in "${ISSUES_FOUND[@]}"; do
-              echo "- $issue" >> $GITHUB_STEP_SUMMARY
-            done
-            echo "" >> $GITHUB_STEP_SUMMARY
-            echo "**To fix formatting issues:**" >> $GITHUB_STEP_SUMMARY
-            echo '```bash' >> $GITHUB_STEP_SUMMARY
-            echo 'cd server/intelligence-service && poetry run black .' >> $GITHUB_STEP_SUMMARY
-            echo '```' >> $GITHUB_STEP_SUMMARY
-          fi
-
-          # Exit with appropriate code
-          if [ "$OVERALL_SUCCESS" = false ]; then
-            echo ""
-            echo "❌ Intelligence Service quality checks failed - please fix the issues above"
             exit 1
           fi
 
-      # Webhook Ingest quality checks with comprehensive validation
-      - name: Webhook Ingest quality & security analysis
+          echo "✅ intelligence-service quality checks passed"
+
+      # webhook-ingest quality checks with comprehensive validation
+      - name: webhook-ingest quality & security analysis
         if: matrix.check == 'webhook-ingest-quality'
         run: |
-          set -o pipefail  # Make pipelines fail if any command fails
-          echo "🔍 Running comprehensive Webhook Ingest quality checks..."
-
-          # Track issues found
-          ISSUES_FOUND=()
-          OVERALL_SUCCESS=true
-
-          # Webhook Ingest checks
-          echo "📝 Checking Webhook Ingest..."
+          echo "🔍 Running webhook-ingest quality checks..."
           cd server/webhook-ingest
 
           if [ ! -d ".venv" ]; then
             poetry install --no-interaction --no-root
           fi
 
-          # Code formatting
-          echo "🎨 Checking webhook-ingest code formatting..."
-          poetry run black --check --diff . 2>&1 | tee webhook-black-results.txt
-          WEBHOOK_BLACK_EXIT_CODE=${PIPESTATUS[0]}
-          if [ $WEBHOOK_BLACK_EXIT_CODE -ne 0 ]; then
-            echo "❌ Webhook Ingest: Black formatting check failed"
-            ISSUES_FOUND+=("Webhook Ingest: Black formatting needs fixing")
-            OVERALL_SUCCESS=false
+          ISSUES_FOUND=()
+
+          echo "🎨 Checking code formatting..."
+          if ! poetry run black --check --diff .; then
+            echo "❌ Black formatting failed"
+            ISSUES_FOUND+=("Black formatting failed. Run: cd server/webhook-ingest && poetry run black .")
           else
-            echo "✅ Webhook Ingest: Black formatting check passed"
+            echo "✅ Black formatting passed"
           fi
 
-          # Linting
-          echo "🔍 Running webhook-ingest flake8 linting..."
-          poetry run flake8 . --statistics --count 2>&1 | tee webhook-flake8-results.txt
-          WEBHOOK_FLAKE8_EXIT_CODE=${PIPESTATUS[0]}
-          if [ $WEBHOOK_FLAKE8_EXIT_CODE -ne 0 ]; then
-            echo "❌ Webhook Ingest: Flake8 linting failed"
-            ISSUES_FOUND+=("Webhook Ingest: Flake8 linting issues found")
-            OVERALL_SUCCESS=false
+          echo "🔍 Running linting..."
+          if ! poetry run flake8 . --statistics --count; then
+            echo "❌ Flake8 linting failed"
+            ISSUES_FOUND+=("Flake8 linting failed")
           else
-            echo "✅ Webhook Ingest: Flake8 linting passed"
+            echo "✅ Flake8 linting passed"
           fi
 
-          # Type checking (if mypy is available)
-          if poetry show mypy > /dev/null 2>&1; then
-            echo "📊 Running type checking..."
-            poetry run mypy . --ignore-missing-imports --show-error-codes 2>&1 | tee mypy-results.txt
-            WEBHOOK_MYPY_EXIT_CODE=${PIPESTATUS[0]}
-            if [ $WEBHOOK_MYPY_EXIT_CODE -ne 0 ]; then
-              echo "⚠️ Webhook Ingest: MyPy type checking found issues (warning only)"
-              ISSUES_FOUND+=("Webhook Ingest: MyPy type checking issues (warning)")
-              # Type checking issues are warnings, not failures
-            else
-              echo "✅ Webhook Ingest: MyPy type checking passed"
-            fi
-          fi
-
-          # Security check (if bandit is available)
-          if poetry show bandit > /dev/null 2>&1; then
-            echo "🔒 Running security analysis..."
-            poetry run bandit -r app/ -f json -o bandit-results.json 2>&1
-            WEBHOOK_BANDIT_EXIT_CODE=${PIPESTATUS[0]}
-            if [ $WEBHOOK_BANDIT_EXIT_CODE -ne 0 ]; then
-              echo "⚠️ Webhook Ingest: Bandit security analysis found issues (warning only)"
-              ISSUES_FOUND+=("Webhook Ingest: Security analysis issues (warning)")
-              # Security issues are warnings, not failures for now
-            else
-              echo "✅ Webhook Ingest: Bandit security analysis passed"
-            fi
-          fi
-
-          cd ../..
-
-          # Generate comprehensive summary
-          echo ""
-          echo "📊 Webhook Ingest Quality Check Summary:"
-          echo "======================================="
-
-          if [ ${#ISSUES_FOUND[@]} -eq 0 ]; then
-            echo "✅ All Webhook Ingest quality checks passed successfully!"
+          if [ ${#ISSUES_FOUND[@]} -gt 0 ]; then
             echo ""
-            echo "## ✅ Webhook Ingest Quality Results" >> $GITHUB_STEP_SUMMARY
-            echo "- **Webhook Ingest**: All checks passed ✅" >> $GITHUB_STEP_SUMMARY
-            echo "- **Code Formatting**: All Python files follow Black formatting" >> $GITHUB_STEP_SUMMARY
-            echo "- **Linting**: Code passes Flake8 quality checks" >> $GITHUB_STEP_SUMMARY
-            echo "- **Type Safety**: Static type analysis completed" >> $GITHUB_STEP_SUMMARY
-            echo "- **Security**: Code security analysis performed" >> $GITHUB_STEP_SUMMARY
-          else
-            echo "❌ Found ${#ISSUES_FOUND[@]} issue(s):"
+            echo "❌ webhook-ingest quality issues found:"
             for issue in "${ISSUES_FOUND[@]}"; do
               echo "  • $issue"
             done
-            echo ""
-            echo "## ❌ Webhook Ingest Quality Issues Found" >> $GITHUB_STEP_SUMMARY
-            echo "" >> $GITHUB_STEP_SUMMARY
-            echo "The following issues need to be addressed:" >> $GITHUB_STEP_SUMMARY
-            echo "" >> $GITHUB_STEP_SUMMARY
-            for issue in "${ISSUES_FOUND[@]}"; do
-              echo "- $issue" >> $GITHUB_STEP_SUMMARY
-            done
-            echo "" >> $GITHUB_STEP_SUMMARY
-            echo "**To fix formatting issues:**" >> $GITHUB_STEP_SUMMARY
-            echo '```bash' >> $GITHUB_STEP_SUMMARY
-            echo 'cd server/webhook-ingest && poetry run black .' >> $GITHUB_STEP_SUMMARY
-            echo '```' >> $GITHUB_STEP_SUMMARY
-          fi
-
-          # Exit with appropriate code
-          if [ "$OVERALL_SUCCESS" = false ]; then
-            echo ""
-            echo "❌ Webhook Ingest quality checks failed - please fix the issues above"
             exit 1
           fi
+
+          echo "✅ webhook-ingest quality checks passed"
 
       # OpenAPI validation with intelligent auto-commit
       - name: OpenAPI validation & synchronization
@@ -419,7 +220,7 @@ jobs:
           fi
           cd ../..
 
-          # Setup Application Server environment
+          # Setup application-server environment
           cd server/application-server
           if [ ! -d "target" ]; then
             mvn compile -DskipTests --quiet
@@ -427,42 +228,17 @@ jobs:
           cd ../..
 
           echo "🔄 Generating OpenAPI specifications and clients..."
-
-          # Generate all OpenAPI specs and clients
           npm run generate:api
 
           # Check for any changes
           git add .
 
           if ! git diff --cached --quiet; then
-            echo "📝 OpenAPI changes detected..."
-            
-            # Show what changed
-            echo "## 🔄 OpenAPI Changes Detected" >> $GITHUB_STEP_SUMMARY
-            echo "The following OpenAPI-related files have changes:" >> $GITHUB_STEP_SUMMARY
-            echo '```' >> $GITHUB_STEP_SUMMARY
-            git diff --cached --name-only >> $GITHUB_STEP_SUMMARY
-            echo '```' >> $GITHUB_STEP_SUMMARY
-            echo "" >> $GITHUB_STEP_SUMMARY
-            echo "**To resolve this:**" >> $GITHUB_STEP_SUMMARY
-            echo "1. **Recommended**: Add the \`autocommit-openapi\` label to this PR for automatic updates" >> $GITHUB_STEP_SUMMARY
-            echo "2. **Manual**: Run \`npm run generate:api\` locally and commit the changes" >> $GITHUB_STEP_SUMMARY
-            echo "" >> $GITHUB_STEP_SUMMARY
-            echo "**Manual commands:**" >> $GITHUB_STEP_SUMMARY
-            echo '```bash' >> $GITHUB_STEP_SUMMARY
-            echo 'npm run generate:api' >> $GITHUB_STEP_SUMMARY
-            echo 'git add .' >> $GITHUB_STEP_SUMMARY
-            echo 'git commit -m "chore: update OpenAPI specs and clients"' >> $GITHUB_STEP_SUMMARY
-            echo '```' >> $GITHUB_STEP_SUMMARY
-            
             echo "❌ OpenAPI validation failed - changes detected"
+            echo "Fix: Add the 'autocommit-openapi' label to this PR or run 'npm run generate:api' locally"
             exit 1
           else
-            echo "## ✅ OpenAPI Validation Results" >> $GITHUB_STEP_SUMMARY
-            echo "- **Specifications**: All OpenAPI specs are up to date" >> $GITHUB_STEP_SUMMARY
-            echo "- **Application Server Clients**: Generated clients match current specs" >> $GITHUB_STEP_SUMMARY
-            echo "- **TypeScript Clients**: Generated clients match current specs" >> $GITHUB_STEP_SUMMARY
-            echo "- **Consistency**: All API contracts are synchronized" >> $GITHUB_STEP_SUMMARY
+            echo "✅ OpenAPI validation passed - all specs are up to date"
           fi
 
       # Database schema validation - JPA entities vs committed migrations
@@ -472,7 +248,7 @@ jobs:
           echo "🔍 Validating JPA entities match committed migrations..."
 
           # Start PostgreSQL service for schema operations
-          echo "🐘 Starting PostgreSQL service for schema validation..."
+          echo "🐘 Starting PostgreSQL service..."
           docker run -d \
             --name postgres-schema \
             -e POSTGRES_DB=hephaestus \
@@ -486,69 +262,45 @@ jobs:
             postgres:16
 
           # Wait for PostgreSQL to be ready
-          echo "⏳ Waiting for PostgreSQL to be ready..."
+          echo "⏳ Waiting for PostgreSQL..."
           until docker exec postgres-schema pg_isready -U root -d hephaestus; do
-            echo "PostgreSQL is not ready yet, waiting..."
             sleep 2
           done
-          echo "✅ PostgreSQL is ready for schema validation"
 
           # Set environment variables for database connection
           export SPRING_DATASOURCE_URL="jdbc:postgresql://localhost:5432/hephaestus"
           export SPRING_DATASOURCE_USERNAME="root"
           export SPRING_DATASOURCE_PASSWORD="root"
 
-          # Build Application Server for schema operations
-          echo "🏗️ Building Application Server for schema validation..."
+          # Build application-server for schema operations
+          echo "🏗️ Building application-server..."
           cd server/application-server
           if ! mvn compile -DskipTests --quiet; then
-            echo "❌ Failed to build Application Server for schema validation"
+            echo "❌ Failed to build application-server"
             docker stop postgres-schema && docker rm postgres-schema
             exit 1
           fi
           cd ../..
 
           # Check for schema drift between JPA entities and committed migrations
-          echo "📊 Checking for schema drift between JPA entities and committed migrations..."
+          echo "📊 Checking for schema drift..."
           if ! scripts/db-utils.sh draft-changelog; then
-            echo "❌ Failed to generate draft changelog for schema validation"
+            echo "❌ Failed to generate draft changelog"
             docker stop postgres-schema && docker rm postgres-schema
             exit 1
           fi
 
           # Clean up PostgreSQL container
-          echo "🧹 Cleaning up PostgreSQL container..."
           docker stop postgres-schema && docker rm postgres-schema
 
-          # Check results and generate summary
+          # Check results
           if [ -f "server/application-server/src/main/resources/db/changelog_new.xml" ]; then
-            echo "## ❌ Schema Drift Detected" >> $GITHUB_STEP_SUMMARY
-            echo "" >> $GITHUB_STEP_SUMMARY
-            echo "**Issue:** Your JPA entity definitions have changes that are not reflected in committed database migrations." >> $GITHUB_STEP_SUMMARY
-            echo "" >> $GITHUB_STEP_SUMMARY
-            echo "**What this means:**" >> $GITHUB_STEP_SUMMARY
-            echo "- Entity code has changes compared to the current migration-generated schema" >> $GITHUB_STEP_SUMMARY
-            echo "- New migrations need to be created and committed" >> $GITHUB_STEP_SUMMARY
-            echo "" >> $GITHUB_STEP_SUMMARY
-            echo "**Fix Required:** Run these commands locally:" >> $GITHUB_STEP_SUMMARY
-            echo '```bash' >> $GITHUB_STEP_SUMMARY
-            echo 'npm run db:draft-changelog' >> $GITHUB_STEP_SUMMARY
-            echo '# Review, edit author, rename file, move to changelog/' >> $GITHUB_STEP_SUMMARY
-            echo 'npm run db:generate-erd-docs' >> $GITHUB_STEP_SUMMARY
-            echo '```' >> $GITHUB_STEP_SUMMARY
-            echo "" >> $GITHUB_STEP_SUMMARY
-            echo "**Generated Migration:**" >> $GITHUB_STEP_SUMMARY
-            echo '```xml' >> $GITHUB_STEP_SUMMARY
-            cat server/application-server/src/main/resources/db/changelog_new.xml >> $GITHUB_STEP_SUMMARY
-            echo '```' >> $GITHUB_STEP_SUMMARY
-            echo "❌ Schema validation failed. Check the CI summary above for details."
+            echo "❌ Schema drift detected. Run: npm run db:draft-changelog"
+            echo "Generated migration:"
+            cat server/application-server/src/main/resources/db/changelog_new.xml
             exit 1
           else
-            echo "## ✅ Database Schema Validation Results" >> $GITHUB_STEP_SUMMARY
-            echo "- **Schema Consistency**: JPA entities match committed migrations ✅" >> $GITHUB_STEP_SUMMARY
-            echo "- **Migration State**: No schema drift detected" >> $GITHUB_STEP_SUMMARY
-            echo "- **Database**: Schema is properly synchronized with entity definitions" >> $GITHUB_STEP_SUMMARY
-            echo "✅ Schema validation passed - JPA entities match committed migrations"
+            echo "✅ Schema validation passed"
           fi
 
       # Database documentation validation - ERD matches migration-based schema
@@ -558,7 +310,7 @@ jobs:
           echo "📊 Validating ERD documentation matches migration-based schema..."
 
           # Start PostgreSQL service for ERD generation
-          echo "🐘 Starting PostgreSQL service for ERD documentation validation..."
+          echo "🐘 Starting PostgreSQL service..."
           docker run -d \
             --name postgres-erd \
             -e POSTGRES_DB=hephaestus \
@@ -572,23 +324,21 @@ jobs:
             postgres:16
 
           # Wait for PostgreSQL to be ready
-          echo "⏳ Waiting for PostgreSQL to be ready..."
+          echo "⏳ Waiting for PostgreSQL..."
           until docker exec postgres-erd pg_isready -U root -d hephaestus; do
-            echo "PostgreSQL is not ready yet, waiting..."
             sleep 2
           done
-          echo "✅ PostgreSQL is ready for ERD generation"
 
           # Set environment variables for database connection
           export SPRING_DATASOURCE_URL="jdbc:postgresql://localhost:5432/hephaestus"
           export SPRING_DATASOURCE_USERNAME="root"
           export SPRING_DATASOURCE_PASSWORD="root"
 
-          # Build Application Server for ERD operations
-          echo "🏗️ Building Application Server for ERD documentation validation..."
+          # Build application-server for ERD operations
+          echo "🏗️ Building application-server..."
           cd server/application-server
           if ! mvn compile -DskipTests --quiet; then
-            echo "❌ Failed to build Application Server for ERD documentation validation"
+            echo "❌ Failed to build application-server"
             docker stop postgres-erd && docker rm postgres-erd
             exit 1
           fi
@@ -596,7 +346,6 @@ jobs:
 
           # Generate ERD documentation from committed migration-based schema
           echo "📈 Generating ERD from committed migration-based schema..."
-          echo "Note: ERD always reflects the current committed migration state, not entity code changes"
           if ! scripts/db-utils.sh generate-erd; then
             echo "❌ Failed to generate ERD documentation"
             docker stop postgres-erd && docker rm postgres-erd
@@ -604,52 +353,15 @@ jobs:
           fi
 
           # Clean up PostgreSQL container
-          echo "🧹 Cleaning up PostgreSQL container..."
           docker stop postgres-erd && docker rm postgres-erd
 
           # Check if ERD documentation is up to date
           git add docs/dev/database/schema.mmd
 
           if ! git diff --cached --quiet docs/dev/database/schema.mmd; then
-            echo "## ❌ ERD Documentation Outdated" >> $GITHUB_STEP_SUMMARY
-            echo "" >> $GITHUB_STEP_SUMMARY
-            echo "**Issue:** The committed ERD documentation does not match the current migration-based database schema." >> $GITHUB_STEP_SUMMARY
-            echo "" >> $GITHUB_STEP_SUMMARY
-            echo "**What this means:**" >> $GITHUB_STEP_SUMMARY
-            echo "- Committed migrations have been updated without updating the ERD documentation" >> $GITHUB_STEP_SUMMARY
-            echo "- ERD documentation is out of sync with the actual migration-generated schema" >> $GITHUB_STEP_SUMMARY
-            echo "- ERD always reflects migration state, not entity code (entity changes need migrations first)" >> $GITHUB_STEP_SUMMARY
-            echo "" >> $GITHUB_STEP_SUMMARY
-            echo "**Fix Required:**" >> $GITHUB_STEP_SUMMARY
-            echo '```bash' >> $GITHUB_STEP_SUMMARY
-            echo 'npm run db:generate-erd-docs' >> $GITHUB_STEP_SUMMARY
-            echo 'git add docs/dev/database/schema.mmd' >> $GITHUB_STEP_SUMMARY
-            echo 'git commit -m "Update database ERD documentation"' >> $GITHUB_STEP_SUMMARY
-            echo '```' >> $GITHUB_STEP_SUMMARY
-            echo "" >> $GITHUB_STEP_SUMMARY
-            echo "**Changes detected in ERD file:**" >> $GITHUB_STEP_SUMMARY
-            echo '```diff' >> $GITHUB_STEP_SUMMARY
-            git diff --cached docs/dev/database/schema.mmd >> $GITHUB_STEP_SUMMARY
-            echo '```' >> $GITHUB_STEP_SUMMARY
-            echo "❌ ERD documentation validation failed. Check the CI summary above for details."
+            echo "❌ ERD documentation validation failed - outdated ERD"
+            echo "Fix: npm run db:generate-erd-docs"
             exit 1
           else
-            echo "## ✅ Database Documentation Validation Results" >> $GITHUB_STEP_SUMMARY
-            echo "- **ERD Documentation**: Documentation matches current migration state ✅" >> $GITHUB_STEP_SUMMARY
-            echo "- **Schema Synchronization**: ERD reflects actual migration-generated schema" >> $GITHUB_STEP_SUMMARY
-            echo "- **Documentation**: Database documentation is up to date" >> $GITHUB_STEP_SUMMARY
-            echo "✅ ERD documentation validation passed - ERD matches migration-based schema"
-          fi
-
-      # Enhanced error handling and reporting
-      - name: Quality gate status report
-        if: always()
-        run: |
-          echo "📊 Quality Gate: ${{ matrix.check }} - Status: ${{ job.status }}"
-
-          if [[ "${{ job.status }}" == "failure" ]]; then
-            echo "## ❌ Quality Gate Failed: ${{ matrix.check }}" >> $GITHUB_STEP_SUMMARY
-            echo "This quality gate must pass before merging. Please review the errors above." >> $GITHUB_STEP_SUMMARY
-          elif [[ "${{ job.status }}" == "success" ]]; then
-            echo "Quality gate passed successfully! ✅" >> $GITHUB_STEP_SUMMARY
+            echo "✅ ERD documentation validation passed"
           fi
