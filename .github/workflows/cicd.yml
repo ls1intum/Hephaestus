@@ -96,13 +96,13 @@ jobs:
             echo "✅ All CI jobs passed successfully"
           fi
 
-  # Automatic deployment to staging for tagged releases on develop
+  # Automatic deployment to staging for release candidates on develop branch
   deploy-to-staging:
     needs: [all-ci-passed]
     if: |
       success() && 
-      startsWith(github.ref, 'refs/tags/v') &&
-      github.event.base_ref == 'refs/heads/develop'
+      (startsWith(github.ref, 'refs/tags/v') && contains(github.ref, '-rc.')) ||
+      github.ref == 'refs/heads/develop'
     uses: ./.github/workflows/deploy-staging.yml
     with:
       image-tag: ${{ github.sha }}
@@ -111,11 +111,13 @@ jobs:
       deploy-proxy: false
     secrets: inherit
 
-  # Automatic deployment to production following successful staging deployment
+  # Automatic deployment to production for stable releases on main branch
   deploy-to-production:
-    needs: [deploy-to-staging]
+    needs: [all-ci-passed]
     if: |
-      success()
+      success() && 
+      (startsWith(github.ref, 'refs/tags/v') && !contains(github.ref, '-rc.')) ||
+      github.ref == 'refs/heads/main'
     uses: ./.github/workflows/deploy-prod.yml
     with:
       image-tag: ${{ github.sha }}
