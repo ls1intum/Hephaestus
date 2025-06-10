@@ -486,6 +486,7 @@
 			<plugin>
 				<groupId>org.liquibase</groupId>
 				<artifactId>liquibase-maven-plugin</artifactId>
+				<version>${liquibase.version}</version>
 				<configuration>
 					<changeLogFile>db/master.xml</changeLogFile>
 					<diffChangeLogFile>src/main/resources/db/changelog_new.xml</diffChangeLogFile>
@@ -507,14 +508,17 @@
 					<dependency>
 						<groupId>org.springframework.boot</groupId>
 						<artifactId>spring-boot-starter-data-jpa</artifactId>
+						<version>3.5.0</version>
 					</dependency>
 					<dependency>
 						<groupId>jakarta.validation</groupId>
 						<artifactId>jakarta.validation-api</artifactId>
+						<version>${jakarta-validation.version}</version>
 					</dependency>
 					<dependency>
 						<groupId>org.postgresql</groupId>
 						<artifactId>postgresql</artifactId>
+						<version>${postgresql.version}</version>
 					</dependency>
 				</dependencies>
 			</plugin>
