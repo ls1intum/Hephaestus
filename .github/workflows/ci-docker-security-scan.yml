@@ -9,13 +9,6 @@ on:
         type: string
         default: "false"
 
-env:
-  # Global pipeline configuration
-  MAVEN_OPTS: -Xmx2048m -XX:+UseParallelGC
-  NODE_VERSION: 22
-  PYTHON_VERSION: 3.13
-  JAVA_VERSION: 21
-
 jobs:
   # Security scanning with Trivy for all built images
   security-scan:

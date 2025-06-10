@@ -4,11 +4,6 @@ on:
   pull_request:
     types: [labeled]
 
-env:
-  NODE_VERSION: 22
-  PYTHON_VERSION: 3.13
-  JAVA_VERSION: 21
-
 jobs:
   autocommit:
     name: auto-commit spec and client changes
