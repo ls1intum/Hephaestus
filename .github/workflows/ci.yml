@@ -83,46 +83,16 @@ jobs:
       ]
     if: always()
     steps:
-      - name: Generate comprehensive CI summary
-        run: |
-          echo "## 🎯 CI/CD Pipeline Summary" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-
-          # Individual job status reporting
-          echo "### Job Status Overview:" >> $GITHUB_STEP_SUMMARY
-          echo "- **Code Quality**: ${{ needs.quality-gates.result }}" >> $GITHUB_STEP_SUMMARY
-          echo "- **Security Scan**: ${{ needs.security-scan.result }}" >> $GITHUB_STEP_SUMMARY
-          echo "- **Test Suite**: ${{ needs.test-suite.result }}" >> $GITHUB_STEP_SUMMARY
-          echo "- **Docker Build**: ${{ needs.docker-build.result }}" >> $GITHUB_STEP_SUMMARY
-          echo "- **Docker Security Scan**: ${{ needs.docker-security-scan.result }}" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-
-          # Docker images built
-          if [[ "${{ needs.docker-build.result }}" == "success" ]]; then
-            echo "### 🐳 Images Built:" >> $GITHUB_STEP_SUMMARY
-            echo "- webapp-react" >> $GITHUB_STEP_SUMMARY
-            echo "- application-server" >> $GITHUB_STEP_SUMMARY
-            echo "- intelligence-service" >> $GITHUB_STEP_SUMMARY
-            echo "- webhook-ingest" >> $GITHUB_STEP_SUMMARY
-            echo "" >> $GITHUB_STEP_SUMMARY
-          fi
-
       - name: Check all jobs and determine overall status
         run: |
           # Check if any required job failed
           if [[ "${{ contains(needs.*.result, 'failure') }}" == "true" ]]; then
-            echo "### ❌ CI Pipeline Result: FAILURE" >> $GITHUB_STEP_SUMMARY
-            echo "One or more critical CI jobs failed. Review the individual job logs for details." >> $GITHUB_STEP_SUMMARY
             echo "❌ One or more CI jobs failed"
             exit 1
           elif [[ "${{ contains(needs.*.result, 'cancelled') }}" == "true" ]]; then
-            echo "### ⚠️ CI Pipeline Result: CANCELLED" >> $GITHUB_STEP_SUMMARY
-            echo "One or more CI jobs were cancelled. The pipeline did not complete successfully." >> $GITHUB_STEP_SUMMARY
             echo "⚠️ One or more CI jobs were cancelled"
             exit 1
           else
-            echo "### ✅ CI Pipeline Result: SUCCESS" >> $GITHUB_STEP_SUMMARY
-            echo "All CI jobs completed successfully! The code is ready for deployment." >> $GITHUB_STEP_SUMMARY
             echo "✅ All CI jobs passed successfully"
           fi
 

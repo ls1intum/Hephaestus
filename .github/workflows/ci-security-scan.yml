@@ -33,7 +33,7 @@ jobs:
         if: matrix.scan-type == 'sast'
         uses: github/codeql-action/init@v3
         with:
-          languages: java, javascript, python
+          languages: java-kotlin, javascript-typescript, python
           queries: security-extended
 
       # Setup required build tools for CodeQL
