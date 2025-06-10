@@ -83,13 +83,3 @@ runs:
         restore-keys: |
           ${{ inputs.os }}-poetry-${{ hashFiles('server/intelligence-service/poetry.lock', 'server/webhook-ingest/poetry.lock') || 'no-poetry-lock' }}-
           ${{ inputs.os }}-poetry-
-
-    # Docker build cache
-    - name: Cache Docker layers
-      if: contains(fromJSON('["containers"]'), inputs.cache-type)
-      uses: actions/cache@v4
-      with:
-        path: /tmp/.buildx-cache
-        key: ${{ inputs.os }}-buildx-${{ github.sha }}
-        restore-keys: |
-          ${{ inputs.os }}-buildx-
