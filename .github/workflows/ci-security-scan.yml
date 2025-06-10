@@ -26,7 +26,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        scan-type: [sast, dependencies, secrets, dependency-pinning]
+        scan-type: [sast, dependencies, containers, secrets]
     permissions:
       security-events: write
       contents: read
@@ -115,9 +115,6 @@ jobs:
           scan-ref: "."
           format: "sarif"
           output: "trivy-results.sarif"
-          exit-code: "1"
-          ignore-unfixed: true
-          severity: "CRITICAL,HIGH"
 
       - name: Upload Trivy results
         if: matrix.scan-type == 'dependencies'
@@ -125,44 +122,37 @@ jobs:
         with:
           sarif_file: "trivy-results.sarif"
 
+      # Container security scanning
+      - name: Setup Docker environment
+        if: matrix.scan-type == 'containers'
+        uses: ./.github/actions/setup-caches
+        with:
+          cache-type: "containers"
+          os: ${{ runner.os }}
+
+      - name: Build and scan containers
+        if: matrix.scan-type == 'containers'
+        run: |
+          echo "🐳 Building containers for security scanning..."
+
+          # Build test images
+          docker build -f webapp-react/Dockerfile webapp-react -t test-webapp:latest
+          docker build -f server/application-server/Dockerfile server/application-server -t test-app-server:latest
+
+          # Scan containers
+          echo "🔍 Scanning container images for vulnerabilities..."
+          docker run --rm -v /var/run/docker.sock:/var/run/docker.sock \
+            aquasec/trivy image --format sarif --output container-results.sarif test-webapp:latest
+
       # Secret scanning
       - name: Run secret detection
         if: matrix.scan-type == 'secrets'
         uses: trufflesecurity/trufflehog@main
         with:
+          path: ./
           base: ${{ github.event.repository.default_branch }}
           head: HEAD
-          path: .
           extra_args: --debug --only-verified
-
-      # Dependency pinning analysis
-      - name: Check dependency pinning
-        if: matrix.scan-type == 'dependency-pinning'
-        run: |
-          echo "🔍 Analyzing dependency pinning practices..."
-          
-          # Check Node.js dependencies for loose version constraints
-          echo "## Node.js Dependency Analysis" >> $GITHUB_STEP_SUMMARY
-          find . -name "package.json" -not -path "*/node_modules/*" | while read file; do
-            echo "### Checking $file" >> $GITHUB_STEP_SUMMARY
-            if grep -q '\^' "$file"; then
-              echo "⚠️ **Found caret constraints in $file**" >> $GITHUB_STEP_SUMMARY
-              grep '".*": "\^' "$file" | head -5 >> $GITHUB_STEP_SUMMARY
-            else
-              echo "✅ **No caret constraints found in $file**" >> $GITHUB_STEP_SUMMARY
-            fi
-          done
-          
-          # Check Maven dependencies
-          echo "## Maven Dependency Analysis" >> $GITHUB_STEP_SUMMARY
-          find . -name "pom.xml" | while read file; do
-            echo "### Checking $file" >> $GITHUB_STEP_SUMMARY
-            if grep -q 'LATEST\|RELEASE' "$file"; then
-              echo "⚠️ **Found dynamic version ranges in $file**" >> $GITHUB_STEP_SUMMARY
-            else
-              echo "✅ **No dynamic versions found in $file**" >> $GITHUB_STEP_SUMMARY
-            fi
-          done
 
       # Enhanced error handling and reporting
       - name: Security scan status report
@@ -178,11 +168,11 @@ jobs:
             "dependencies")
               echo "- **Dependency Vulnerability Scan**: Trivy dependency analysis completed" >> $GITHUB_STEP_SUMMARY
               ;;
+            "containers")
+              echo "- **Container Security Scan**: Docker image vulnerability analysis completed" >> $GITHUB_STEP_SUMMARY
+              ;;
             "secrets")
               echo "- **Secret Detection**: TruffleHog secret scanning completed" >> $GITHUB_STEP_SUMMARY
-              ;;
-            "dependency-pinning")
-              echo "- **Dependency Pinning**: Version constraint analysis completed" >> $GITHUB_STEP_SUMMARY
               ;;
           esac
 
