@@ -51,13 +51,13 @@ jobs:
 
           case "${{ matrix.test-type }}" in
             "application-server-unit")
-              mvn test -Dgroups="unit" -T 2C --batch-mode
+              mvn test -Dtest.groups="unit" -T 2C --batch-mode
               ;;
             "application-server-integration")
-              mvn test -Dgroups="integration" -T 2C --batch-mode
+              mvn test -Dtest.groups="integration" -T 2C --batch-mode
               ;;
             "application-server-architecture")
-              mvn test -Dgroups="architecture" -T 2C --batch-mode
+              mvn test -Dtest.groups="architecture" -T 2C --batch-mode
               ;;
           esac
 
