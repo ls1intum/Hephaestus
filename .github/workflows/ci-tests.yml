@@ -48,6 +48,9 @@ jobs:
         run: |
           echo "🧪 Running application-server ${{ matrix.test-type }} tests"
           cd server/application-server
+          
+          # Clean previous test reports to ensure accurate reporting
+          rm -rf target/surefire-reports/*
 
           case "${{ matrix.test-type }}" in
             "application-server-unit")
@@ -118,7 +121,7 @@ jobs:
         uses: dorny/test-reporter@v2
         with:
           name: "Test Results - ${{ matrix.test-type }}"
-          path: "**/target/surefire-reports/*.xml"
+          path: "server/application-server/target/surefire-reports/TEST-*.xml"
           reporter: java-junit
           fail-on-error: false
 
