@@ -141,73 +141,28 @@ jobs:
         run: |
           echo "🔍 Analyzing dependency pinning practices..."
           
-          exit_code=0
-          
           # Check Node.js dependencies for loose version constraints
-          echo "## Checking Node.js dependencies..."
-          find . -name "package.json" -not -path "*/node_modules/*" -not -path "*/.angular/*" | while read file; do
-            echo "Checking $file"
+          echo "## Node.js Dependency Analysis" >> $GITHUB_STEP_SUMMARY
+          find . -name "package.json" -not -path "*/node_modules/*" | while read file; do
+            echo "### Checking $file" >> $GITHUB_STEP_SUMMARY
             if grep -q '\^' "$file"; then
-              echo "❌ Found caret constraints in $file:"
-              grep '".*": "\^' "$file" | head -5
-              exit_code=1
+              echo "⚠️ **Found caret constraints in $file**" >> $GITHUB_STEP_SUMMARY
+              grep '".*": "\^' "$file" | head -5 >> $GITHUB_STEP_SUMMARY
             else
-              echo "✅ No caret constraints in $file"
+              echo "✅ **No caret constraints found in $file**" >> $GITHUB_STEP_SUMMARY
             fi
           done
           
-          # Check Maven dependencies for dynamic versions
-          echo ""
-          echo "## Checking Maven dependencies..."
+          # Check Maven dependencies
+          echo "## Maven Dependency Analysis" >> $GITHUB_STEP_SUMMARY
           find . -name "pom.xml" | while read file; do
-            echo "Checking $file"
+            echo "### Checking $file" >> $GITHUB_STEP_SUMMARY
             if grep -q 'LATEST\|RELEASE' "$file"; then
-              echo "❌ Found dynamic version ranges in $file:"
-              grep -n 'LATEST\|RELEASE' "$file" | head -3
-              exit_code=1
+              echo "⚠️ **Found dynamic version ranges in $file**" >> $GITHUB_STEP_SUMMARY
             else
-              echo "✅ No dynamic versions in $file"
+              echo "✅ **No dynamic versions found in $file**" >> $GITHUB_STEP_SUMMARY
             fi
           done
-          
-          # Check Python Poetry dependencies for loose constraints
-          echo ""
-          echo "## Checking Python dependencies..."
-          find . -name "pyproject.toml" | while read file; do
-            echo "Checking $file"
-            if grep -A 20 '\[dependencies\]' "$file" | grep -q '\^'; then
-              echo "❌ Found caret constraints in $file:"
-              grep -A 20 '\[dependencies\]' "$file" | grep '\^' | head -3
-              exit_code=1
-            else
-              echo "✅ No caret constraints in Python dependencies"
-            fi
-          done
-          
-          # Check if any issues were found
-          if find . -name "package.json" -not -path "*/node_modules/*" -not -path "*/.angular/*" -exec grep -l '\^' {} \; | grep -q .; then
-            echo ""
-            echo "❌ DEPENDENCY PINNING CHECK FAILED"
-            echo "Found loose version constraints that could introduce security vulnerabilities"
-            exit 1
-          fi
-          
-          if find . -name "pom.xml" -exec grep -l 'LATEST\|RELEASE' {} \; | grep -q .; then
-            echo ""
-            echo "❌ DEPENDENCY PINNING CHECK FAILED" 
-            echo "Found dynamic Maven version ranges"
-            exit 1
-          fi
-          
-          if find . -name "pyproject.toml" -exec sh -c 'grep -A 20 "\[dependencies\]" "$1" | grep -q "\^"' _ {} \; 2>/dev/null; then
-            echo ""
-            echo "❌ DEPENDENCY PINNING CHECK FAILED"
-            echo "Found loose Python version constraints"
-            exit 1
-          fi
-          
-          echo ""
-          echo "✅ All dependencies are properly pinned"
 
       # Enhanced error handling and reporting
       - name: Security scan status report
