@@ -102,10 +102,10 @@ if (rootElement && !rootElement.innerHTML) {
 				<TanstackQuery.Provider>
 					<AuthProvider>
 						<ThemeProvider defaultTheme="dark" storageKey="theme">
-								<WrappedRouterProvider />
-														</ThemeProvider>
+							<WrappedRouterProvider />
+						</ThemeProvider>
 					</AuthProvider>
-												</TanstackQuery.Provider>
+				</TanstackQuery.Provider>
 			</PostHogProvider>
 		</StrictMode>,
 	);

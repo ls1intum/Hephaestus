@@ -7,19 +7,15 @@ from nats.js.api import StreamConfig
 from app.config import settings
 from app.nats_client import nats_client
 from app.logger import logger
-import asyncio # Unused import
 
 
-
-@asynccontextmanager  
+@asynccontextmanager
 async def lifespan(app: FastAPI):
     await nats_client.connect()
 
     # Check if stream exists before creating it
     try:
-        await nats_client.js.stream_info(
-            "github"
-        )
+        await nats_client.js.stream_info("github")
         logger.info("Stream 'github' already exists")
     except Exception:
         # Only create stream if it doesn't exist
