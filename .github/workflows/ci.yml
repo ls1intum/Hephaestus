@@ -21,55 +21,62 @@ env:
   JAVA_VERSION: 21
 
 jobs:
-  # Step 1: Pipeline orchestration and duplicate detection
-  pipeline-setup:
-    uses: ./.github/workflows/ci-pipeline-setup.yml
-    secrets: inherit
+  pre-job:
+    runs-on: ubuntu-latest
+    outputs:
+      should_skip: ${{ steps.skip_check.outputs.should_skip }}
+    timeout-minutes: 15
+    steps:
+      - id: skip_check
+        uses: fkirc/skip-duplicate-actions@v5
+        with:
+          do_not_skip: '["workflow_dispatch"]'
 
-  # Step 2: Code quality and style checks
+
+  # Step 1: Code quality and style checks
   quality-gates:
     uses: ./.github/workflows/ci-quality-gates.yml
-    needs: [pipeline-setup]
-    if: needs.pipeline-setup.outputs.should_skip != 'true'
+    needs: [pre-job]
+    if: needs.pre-job.outputs.should_skip != 'true'
     secrets: inherit
     with:
-      should_skip: ${{ needs.pipeline-setup.outputs.should_skip }}
+      should_skip: ${{ needs.pre-job.outputs.should_skip }}
 
-  # Step 3: Security vulnerability scanning
+  # Step 2: Security vulnerability scanning
   security-scan:
     uses: ./.github/workflows/ci-security-scan.yml
-    needs: [pipeline-setup]
-    if: needs.pipeline-setup.outputs.should_skip != 'true'
+    needs: [pre-job]
+    if: needs.pre-job.outputs.should_skip != 'true'
     secrets: inherit
     with:
-      should_skip: ${{ needs.pipeline-setup.outputs.should_skip }}
+      should_skip: ${{ needs.pre-job.outputs.should_skip }}
 
-  # Step 4: Comprehensive test execution
+  # Step 3: Comprehensive test execution
   test-suite:
     uses: ./.github/workflows/ci-tests.yml
-    needs: [pipeline-setup, quality-gates]
-    if: needs.pipeline-setup.outputs.should_skip != 'true'
+    needs: [pre-job, quality-gates]
+    if: needs.pre-job.outputs.should_skip != 'true'
     secrets: inherit
     with:
-      should_skip: ${{ needs.pipeline-setup.outputs.should_skip }}
+      should_skip: ${{ needs.pre-job.outputs.should_skip }}
 
-  # Step 5: Build Docker images
+  # Step 4: Build Docker images
   docker-build:
     uses: ./.github/workflows/ci-docker-build.yml
-    needs: [pipeline-setup, test-suite]
-    if: needs.pipeline-setup.outputs.should_skip != 'true'
+    needs: [pre-job, test-suite]
+    if: needs.pre-job.outputs.should_skip != 'true'
     secrets: inherit
     with:
-      should_skip: ${{ needs.pipeline-setup.outputs.should_skip }}
+      should_skip: ${{ needs.pre-job.outputs.should_skip }}
 
-  # Step 6: Security scan Docker images
+  # Step 5: Security scan Docker images
   docker-security-scan:
     uses: ./.github/workflows/ci-docker-security-scan.yml
-    needs: [pipeline-setup, docker-build]
-    if: needs.pipeline-setup.outputs.should_skip != 'true'
+    needs: [pre-job, docker-build]
+    if: needs.pre-job.outputs.should_skip != 'true'
     secrets: inherit
     with:
-      should_skip: ${{ needs.pipeline-setup.outputs.should_skip }}
+      should_skip: ${{ needs.pre-job.outputs.should_skip }}
 
   # Final: Aggregated success gate for branch protection
   all-ci-passed:
