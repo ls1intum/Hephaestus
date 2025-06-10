@@ -371,71 +371,20 @@ jobs:
             echo '```' >> $GITHUB_STEP_SUMMARY
             git diff --cached --name-only >> $GITHUB_STEP_SUMMARY
             echo '```' >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "**To resolve this:**" >> $GITHUB_STEP_SUMMARY
+            echo "1. **Recommended**: Add the \`autocommit-openapi\` label to this PR for automatic updates" >> $GITHUB_STEP_SUMMARY
+            echo "2. **Manual**: Run \`npm run generate:api\` locally and commit the changes" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "**Manual commands:**" >> $GITHUB_STEP_SUMMARY
+            echo '```bash' >> $GITHUB_STEP_SUMMARY
+            echo 'npm run generate:api' >> $GITHUB_STEP_SUMMARY
+            echo 'git add .' >> $GITHUB_STEP_SUMMARY
+            echo 'git commit -m "chore: update OpenAPI specs and clients"' >> $GITHUB_STEP_SUMMARY
+            echo '```' >> $GITHUB_STEP_SUMMARY
             
-            # Check if auto-commit is enabled
-            if [[ "${{ contains(github.event.pull_request.labels.*.name, 'autocommit-openapi') }}" == "true" ]]; then
-              echo "✅ Auto-commit enabled, committing changes..."
-              
-              # Configure git
-              git config --local user.name "github-actions[bot]"
-              git config --local user.email "41898282+github-actions[bot]@users.noreply.github.com"
-              
-              # Create detailed commit message
-              COMMIT_MSG="chore: update OpenAPI specs and clients [skip ci]"
-              COMMIT_BODY=""
-              
-              # Check which components changed
-              if git diff --cached --quiet server/intelligence-service/openapi.yaml; then
-                :
-              else
-                COMMIT_BODY="$COMMIT_BODY\n- Update Intelligence Service OpenAPI spec"
-              fi
-              
-              if git diff --cached --quiet server/application-server/openapi.yaml; then
-                :
-              else
-                COMMIT_BODY="$COMMIT_BODY\n- Update Application Server OpenAPI spec"
-              fi
-              
-              if git diff --cached --quiet server/application-server/src/main/java/de/tum/in/www1/hephaestus/intelligenceservice/; then
-                :
-              else
-                COMMIT_BODY="$COMMIT_BODY\n- Update Intelligence Service Java client"
-              fi
-              
-              if git diff --cached --quiet webapp-react/src/api/; then
-                :
-              else
-                COMMIT_BODY="$COMMIT_BODY\n- Update Application Server TypeScript client"
-              fi
-              
-              # Commit with detailed message
-              if [ -n "$COMMIT_BODY" ]; then
-                git commit -m "$COMMIT_MSG$COMMIT_BODY"
-              else
-                git commit -m "$COMMIT_MSG"
-              fi
-              
-              # Push changes
-              git push
-              
-              echo "✅ OpenAPI changes successfully committed and pushed" >> $GITHUB_STEP_SUMMARY
-            else
-              echo "" >> $GITHUB_STEP_SUMMARY
-              echo "**To resolve this:**" >> $GITHUB_STEP_SUMMARY
-              echo "1. **Recommended**: Add the \`autocommit-openapi\` label to this PR for automatic updates" >> $GITHUB_STEP_SUMMARY
-              echo "2. **Manual**: Run \`npm run generate:api\` locally and commit the changes" >> $GITHUB_STEP_SUMMARY
-              echo "" >> $GITHUB_STEP_SUMMARY
-              echo "**Manual commands:**" >> $GITHUB_STEP_SUMMARY
-              echo '```bash' >> $GITHUB_STEP_SUMMARY
-              echo 'npm run generate:api' >> $GITHUB_STEP_SUMMARY
-              echo 'git add .' >> $GITHUB_STEP_SUMMARY
-              echo 'git commit -m "chore: update OpenAPI specs and clients"' >> $GITHUB_STEP_SUMMARY
-              echo '```' >> $GITHUB_STEP_SUMMARY
-              
-              echo "❌ OpenAPI validation failed - changes detected but auto-commit not enabled"
-              exit 1
-            fi
+            echo "❌ OpenAPI validation failed - changes detected"
+            exit 1
           else
             echo "## ✅ OpenAPI Validation Results" >> $GITHUB_STEP_SUMMARY
             echo "- **Specifications**: All OpenAPI specs are up to date" >> $GITHUB_STEP_SUMMARY

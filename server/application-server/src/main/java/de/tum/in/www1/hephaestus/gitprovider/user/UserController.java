@@ -73,7 +73,7 @@ public class UserController {
         return ResponseEntity.ok(userSettings);
     }
 
-    @PostMapping("/settings")
+    @PostMapping("/settingsTODOREMOVE")
     public ResponseEntity<UserSettingsDTO> updateUserSettings(@RequestBody UserSettingsDTO userSettings) {
         var user = userRepository.getCurrentUser();
         if (user.isEmpty()) {
