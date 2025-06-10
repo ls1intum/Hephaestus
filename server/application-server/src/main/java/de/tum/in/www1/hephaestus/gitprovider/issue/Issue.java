@@ -53,9 +53,6 @@ public class Issue extends BaseGitServiceEntity {
     @NonNull
     private String title;
 
-    @NonNull
-    private String TODOREMOVE;
-
     @Lob
     @ToString.Exclude
     private String body;
