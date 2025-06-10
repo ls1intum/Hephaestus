@@ -4,9 +4,9 @@ import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.*;
 
 import com.tngtech.archunit.core.domain.JavaClasses;
 import com.tngtech.archunit.core.importer.ClassFileImporter;
-import de.tum.in.www1.hephaestus.testconfig.BaseUnitTest;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.springframework.stereotype.Repository;
 import org.springframework.stereotype.Service;
@@ -17,7 +17,8 @@ import org.springframework.web.bind.annotation.RestController;
  * Catches architectural violations early in CI/CD pipeline.
  */
 @DisplayName("Architecture Compliance")
-class ArchitectureTest extends BaseUnitTest {
+@Tag("architecture")
+class ArchitectureTest {
 
     private static JavaClasses applicationClasses;
 
