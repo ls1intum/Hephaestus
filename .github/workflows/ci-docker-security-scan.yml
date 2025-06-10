@@ -16,15 +16,15 @@ jobs:
     if: inputs.should_skip != 'true'
     timeout-minutes: 15
     env:
-      TRIVY_QUIET: "true"        # hide progress + DB-download noise
+      TRIVY_QUIET: "true"          # suppress progress + DB noise
     strategy:
       fail-fast: false
       matrix:
         component:
-          - { name: "webapp-react",        image: "ghcr.io/ls1intum/hephaestus/webapp-react" }
-          - { name: "application-server",  image: "ghcr.io/ls1intum/hephaestus/application-server" }
-          - { name: "intelligence-service",image: "ghcr.io/ls1intum/hephaestus/intelligence-service" }
-          - { name: "webhook-ingest",      image: "ghcr.io/ls1intum/hephaestus/webhook-ingest" }
+          - { name: "webapp-react",         image: "ghcr.io/ls1intum/hephaestus/webapp-react" }
+          - { name: "application-server",   image: "ghcr.io/ls1intum/hephaestus/application-server" }
+          - { name: "intelligence-service", image: "ghcr.io/ls1intum/hephaestus/intelligence-service" }
+          - { name: "webhook-ingest",       image: "ghcr.io/ls1intum/hephaestus/webhook-ingest" }
 
     steps:
       - name: Checkout code
@@ -43,9 +43,9 @@ jobs:
         with:
           image-ref: ${{ matrix.component.image }}:${{ github.sha }}
           format: "sarif"
-          output: "trivy-results-${{ matrix.component.name }}.sarif"
-          exit-code: "1"           # fail on actionable HIGH/CRITICAL vulns
-          ignore-unfixed: true     # skip issues without fixes
+          output: "trivy-${{ matrix.component.name }}.sarif"
+          exit-code: "1"           # fail on HIGH/CRITICAL that have fixes
+          ignore-unfixed: true
           severity: "CRITICAL,HIGH"
           trivyignores: ".trivyignore"
 
@@ -53,17 +53,32 @@ jobs:
         uses: github/codeql-action/upload-sarif@v3
         if: always()
         with:
-          sarif_file: "trivy-results-${{ matrix.component.name }}.sarif"
+          sarif_file: "trivy-${{ matrix.component.name }}.sarif"
 
-      - name: Summarise findings in Job summary
-        if: always()               # runs even on failure
+      - name: 📋 Echo detailed findings to log
+        if: always()
         run: |
-          total=$(jq '.runs[].results | length' trivy-results-${{ matrix.component.name }}.sarif)
-          critical=$(jq '[.runs[].results[] | select(.level=="error")] | length' trivy-results-${{ matrix.component.name }}.sarif)
+          echo "### 🔍 Detailed vulnerabilities for ${{ matrix.component.name }}"
+          printf '%-9s %-18s %s\n' "Severity" "RuleID" "Message"
+          printf '%-9s %-18s %s\n' "--------" "------" "-------"
+          # Print each HIGH/CRITICAL finding (level=="error") in aligned columns
+          jq -r '.runs[].results[]
+                 | select(.level=="error")
+                 | [.level, .ruleId, .message.text]
+                 | @tsv' trivy-${{ matrix.component.name }}.sarif \
+            | while IFS=$'\t' read -r lvl id msg; do
+                printf '%-9s %-18s %s\n' "$lvl" "$id" "$msg"
+              done
+
+      - name: Summarise counts in Job summary
+        if: always()
+        run: |
+          total=$(jq '.runs[].results | length' trivy-${{ matrix.component.name }}.sarif)
+          crit=$(jq '[.runs[].results[] | select(.level=="error")] | length' trivy-${{ matrix.component.name }}.sarif)
           echo "### 📊 Trivy summary – ${{ matrix.component.name }}" >> "$GITHUB_STEP_SUMMARY"
-          echo "|Total (High+Critical)|Critical|High|" >> "$GITHUB_STEP_SUMMARY"
-          echo "|---|---|---|" >> "$GITHUB_STEP_SUMMARY"
-          echo "|$total|$critical|$((total - critical))|" >> "$GITHUB_STEP_SUMMARY"
+          echo "|Total (High+Critical)|Critical|High|"            >> "$GITHUB_STEP_SUMMARY"
+          echo "|---|---|---|"                                     >> "$GITHUB_STEP_SUMMARY"
+          echo "|$total|$crit|$((total-crit))|"                    >> "$GITHUB_STEP_SUMMARY"
 
       - name: Status line
         if: always()
