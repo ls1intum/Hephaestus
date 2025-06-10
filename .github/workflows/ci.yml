@@ -13,13 +13,6 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
-env:
-  # Global pipeline configuration
-  MAVEN_OPTS: -Xmx2048m -XX:+UseParallelGC
-  NODE_VERSION: 22
-  PYTHON_VERSION: 3.13
-  JAVA_VERSION: 21
-
 jobs:
   pre-job:
     runs-on: ubuntu-latest
@@ -31,7 +24,6 @@ jobs:
         uses: fkirc/skip-duplicate-actions@v5
         with:
           do_not_skip: '["workflow_dispatch"]'
-
 
   # Step 1: Code quality and style checks
   quality-gates:
