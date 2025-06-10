@@ -93,14 +93,6 @@ jobs:
         with:
           sarif_file: "trivy-results.sarif"
 
-      - name: Upload Trivy results as artifact
-        if: matrix.scan-type == 'dependencies'
-        uses: actions/upload-artifact@v4
-        with:
-          name: trivy-results-sarif
-          path: trivy-results.sarif
-          retention-days: 30
-
       # Secret scanning
       - name: Run secret detection
         if: matrix.scan-type == 'secrets'

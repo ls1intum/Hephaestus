@@ -55,32 +55,9 @@ jobs:
         with:
           sarif_file: "trivy-${{ matrix.component.name }}.sarif"
 
-      - name: 📋 Echo detailed findings to log
-        if: always()
-        run: |
-          echo "### 🔍 Detailed vulnerabilities for ${{ matrix.component.name }}"
-          printf '%-9s %-18s %s\n' "Severity" "RuleID" "Message"
-          printf '%-9s %-18s %s\n' "--------" "------" "-------"
-          # Print each HIGH/CRITICAL finding (level=="error") in aligned columns
-          jq -r '.runs[].results[]
-                 | select(.level=="error")
-                 | [.level, .ruleId, .message.text]
-                 | @tsv' trivy-${{ matrix.component.name }}.sarif \
-            | while IFS=$'\t' read -r lvl id msg; do
-                printf '%-9s %-18s %s\n' "$lvl" "$id" "$msg"
-              done
-
-      - name: Summarise counts in Job summary
-        if: always()
-        run: |
-          total=$(jq '.runs[].results | length' trivy-${{ matrix.component.name }}.sarif)
-          crit=$(jq '[.runs[].results[] | select(.level=="error")] | length' trivy-${{ matrix.component.name }}.sarif)
-          echo "### 📊 Trivy summary – ${{ matrix.component.name }}" >> "$GITHUB_STEP_SUMMARY"
-          echo "|Total (High+Critical)|Critical|High|"            >> "$GITHUB_STEP_SUMMARY"
-          echo "|---|---|---|"                                     >> "$GITHUB_STEP_SUMMARY"
-          echo "|$total|$crit|$((total-crit))|"                    >> "$GITHUB_STEP_SUMMARY"
-
-      - name: Status line
-        if: always()
-        run: |
-          echo "🔒 Scan complete for ${{ matrix.component.name }} – job status: ${{ job.status }}"
+      - name: Upload Trivy results as artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: trivy-${{ matrix.component.name }}.sarif
+          path: trivy-${{ matrix.component.name }}.sarif
+          retention-days: 30
