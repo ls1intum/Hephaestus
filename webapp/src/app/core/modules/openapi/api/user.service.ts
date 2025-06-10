@@ -335,7 +335,7 @@ export class UserService implements UserServiceInterface {
             }
         }
 
-        let localVarPath = `/user/settingsTODOREMOVE`;
+        let localVarPath = `/user/settings`;
         return this.httpClient.request<UserSettings>('post', `${this.configuration.basePath}${localVarPath}`,
             {
                 context: localVarHttpContext,
