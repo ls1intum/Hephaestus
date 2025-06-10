@@ -1,19 +1,23 @@
 # Trivy Vulnerability Ignore List
+
 # This file contains CVEs that are acceptable for Hephaestus in production
+
 # Each entry should include a justification comment
 
-# Example entries (remove these if not applicable):
-# CVE-2023-1234  # Fixed in next major version, temporary workaround in place
-# CVE-2023-5678  # Only affects unused feature, not exploitable in our context
+# Example entries (remove these if not applicable)
 
 # Node.js/NPM related vulnerabilities that are commonly flagged but not critical
+
 # Add specific CVEs here after review and risk assessment
 
 # Java/Maven related vulnerabilities
+
 # Add specific CVEs here after review and risk assessment
 
-# Python/Poetry related vulnerabilities  
+# Python/Poetry related vulnerabilities
+
 # Add specific CVEs here after review and risk assessment
 
 # Base image vulnerabilities that are not exploitable in container context
+
 # Add specific CVEs here after review and risk assessment
