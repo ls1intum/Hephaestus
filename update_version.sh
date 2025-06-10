@@ -3,6 +3,9 @@ set -euo pipefail
 
 # Script to update the version across multiple files to a single, consistent new version.
 # Usage: ./update_version.sh [major|minor|patch] OR ./update_version.sh <version>
+# 
+# Version can be a semantic version with optional pre-release/build metadata:
+#   Examples: 1.2.3, 1.0.0-alpha.1, 2.0.0-beta.1, 1.2.3+build.123
 #
 # This script updates the version in:
 #   - webapp/package.json & webapp/package-lock.json (for "hephaestus")
@@ -25,8 +28,9 @@ fi
 
 PARAM=$1
 
-# Check if parameter is a semantic version format (X.Y.Z)
-if [[ "$PARAM" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+# Check if parameter is a semantic version format (X.Y.Z with optional pre-release and build metadata)
+# Supports formats like: 1.2.3, 1.2.3-alpha, 1.2.3-alpha.1, 1.2.3-0.3.7, 1.2.3-x.7.z.92, 1.2.3+20130313144700, 1.2.3-beta+exp.sha.5114f85
+if [[ "$PARAM" =~ ^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z-]+(\.[0-9A-Za-z-]+)*)?(\+[0-9A-Za-z-]+(\.[0-9A-Za-z-]+)*)?$ ]]; then
     # Direct version specified (used by semantic-release)
     NEW_VERSION="$PARAM"
     # Extract the current version from webapp/package.json (the authoritative version for "hephaestus")
@@ -73,7 +77,7 @@ elif [[ "$PARAM" == "major" || "$PARAM" == "minor" || "$PARAM" == "patch" ]]; th
     NEW_VERSION=$(increment_version "$CURRENT_VERSION" "$INCREMENT_TYPE")
     echo "Updating version from $CURRENT_VERSION to $NEW_VERSION..."
 else
-    echo "Error: Invalid argument. Use one of [major, minor, patch] or provide a semantic version (e.g., 1.2.3)."
+    echo "Error: Invalid argument. Use one of [major, minor, patch] or provide a semantic version (e.g., 1.2.3, 1.0.0-alpha.1, 2.0.0-beta.1)."
     exit 1
 fi
 
