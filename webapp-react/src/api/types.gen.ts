@@ -357,27 +357,11 @@ export type AddRepositoryToMonitorResponses = {
     200: unknown;
 };
 
-export type GetUserSettingsData = {
-    body?: never;
-    path?: never;
-    query?: never;
-    url: '/user/settings';
-};
-
-export type GetUserSettingsResponses = {
-    /**
-     * OK
-     */
-    200: UserSettings;
-};
-
-export type GetUserSettingsResponse = GetUserSettingsResponses[keyof GetUserSettingsResponses];
-
 export type UpdateUserSettingsData = {
     body: UserSettings;
     path?: never;
     query?: never;
-    url: '/user/settings';
+    url: '/user/settingsTODOREMOVE';
 };
 
 export type UpdateUserSettingsResponses = {
@@ -629,6 +613,22 @@ export type GetUserProfileResponses = {
 };
 
 export type GetUserProfileResponse = GetUserProfileResponses[keyof GetUserProfileResponses];
+
+export type GetUserSettingsData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/user/settings';
+};
+
+export type GetUserSettingsResponses = {
+    /**
+     * OK
+     */
+    200: UserSettings;
+};
+
+export type GetUserSettingsResponse = GetUserSettingsResponses[keyof GetUserSettingsResponses];
 
 export type GetTeamsData = {
     body?: never;
