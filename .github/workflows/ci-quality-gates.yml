@@ -9,15 +9,8 @@ on:
         type: string
         default: "false"
 
-env:
-  # Global pipeline configuration
-  MAVEN_OPTS: -Xmx2048m -XX:+UseParallelGC
-  NODE_VERSION: 22
-  PYTHON_VERSION: 3.13
-  JAVA_VERSION: 21
-
 jobs:
-  # Enterprise-grade quality gates with intelligent caching and error handling
+  # Quality gates with intelligent caching and error handling
   quality-gates:
     name: ${{ matrix.check }}
     runs-on: ubuntu-latest
@@ -28,9 +21,10 @@ jobs:
       matrix:
         check:
           [
-            java-format,
+            application-server-quality,
             webapp-quality,
-            python-quality,
+            intelligence-service-quality,
+            webhook-ingest-quality,
             openapi-validation,
             database-schema-validation,
             database-documentation-validation,
@@ -63,42 +57,42 @@ jobs:
             ${{ runner.os }}-webapp-build-${{ hashFiles('package-lock.json', 'webapp-react/package-lock.json', 'webapp-react/biome.json', 'webapp-react/tsconfig.json', 'webapp-react/vite.config.js', 'webapp-react/components.json') }}-
             ${{ runner.os }}-webapp-build-
 
-      # Java code quality and formatting
-      - name: Java formatting & static analysis
-        if: matrix.check == 'java-format'
+      # Application Server code quality and formatting
+      - name: Application Server formatting & static analysis
+        if: matrix.check == 'application-server-quality'
         run: |
-          echo "🔍 Checking Java code formatting and style..."
+          echo "🔍 Checking Application Server code formatting and style..."
 
           # Install dependencies if not cached
           if [ ! -d "node_modules" ]; then
             npm ci --prefer-offline --no-audit
           fi
 
-          # Run Java formatting check and capture output
+          # Run Application Server formatting check and capture output
           echo "🎨 Running Prettier formatting check..."
-          npm run format:java:check 2>&1 | tee java-format-results.txt
+          npm run format:application-server:check 2>&1 | tee application-server-format-results.txt
           FORMAT_EXIT_CODE=${PIPESTATUS[0]}
 
           # Generate summary based on results
           if [ $FORMAT_EXIT_CODE -eq 0 ]; then
-            echo "## ✅ Java Code Quality Results" >> $GITHUB_STEP_SUMMARY
-            echo "- **Formatting**: All Java files follow Prettier formatting rules" >> $GITHUB_STEP_SUMMARY
+            echo "## ✅ Application Server Code Quality Results" >> $GITHUB_STEP_SUMMARY
+            echo "- **Formatting**: All Application Server files follow Prettier formatting rules" >> $GITHUB_STEP_SUMMARY
             echo "- **Style Guide**: Code adheres to project style guidelines" >> $GITHUB_STEP_SUMMARY
-            echo "✅ All Java formatting checks passed successfully"
+            echo "✅ All Application Server formatting checks passed successfully"
           else
-            echo "## ❌ Java Code Quality Results" >> $GITHUB_STEP_SUMMARY
+            echo "## ❌ Application Server Code Quality Results" >> $GITHUB_STEP_SUMMARY
             echo "- **Formatting**: Code formatting issues detected" >> $GITHUB_STEP_SUMMARY
             echo "" >> $GITHUB_STEP_SUMMARY
             echo "**Files with formatting issues:**" >> $GITHUB_STEP_SUMMARY
             echo '```' >> $GITHUB_STEP_SUMMARY
-            grep -E '\[warn\]' java-format-results.txt | sed 's/\[warn\] /- /' >> $GITHUB_STEP_SUMMARY || echo "- Check the logs above for details" >> $GITHUB_STEP_SUMMARY
+            grep -E '\[warn\]' application-server-format-results.txt | sed 's/\[warn\] /- /' >> $GITHUB_STEP_SUMMARY || echo "- Check the logs above for details" >> $GITHUB_STEP_SUMMARY
             echo '```' >> $GITHUB_STEP_SUMMARY
             echo "" >> $GITHUB_STEP_SUMMARY
             echo "**To fix these issues:**" >> $GITHUB_STEP_SUMMARY
             echo '```bash' >> $GITHUB_STEP_SUMMARY
-            echo 'npm run format:java:write' >> $GITHUB_STEP_SUMMARY
+            echo 'npm run format:application-server:write' >> $GITHUB_STEP_SUMMARY
             echo '```' >> $GITHUB_STEP_SUMMARY
-            echo "❌ Java formatting check failed"
+            echo "❌ Application Server formatting check failed"
             exit 1
           fi
 
@@ -179,12 +173,12 @@ jobs:
 
           echo "✅ All webapp quality checks passed successfully"
 
-      # Python quality checks with comprehensive validation
-      - name: Python quality & security analysis
-        if: matrix.check == 'python-quality'
+      # Intelligence Service quality checks with comprehensive validation
+      - name: Intelligence Service quality & security analysis
+        if: matrix.check == 'intelligence-service-quality'
         run: |
           set -o pipefail  # Make pipelines fail if any command fails
-          echo "🔍 Running comprehensive Python quality checks..."
+          echo "🔍 Running comprehensive Intelligence Service quality checks..."
 
           # Track issues found
           ISSUES_FOUND=()
@@ -252,6 +246,58 @@ jobs:
 
           cd ../..
 
+          # Generate comprehensive summary
+          echo ""
+          echo "📊 Intelligence Service Quality Check Summary:"
+          echo "============================================="
+
+          if [ ${#ISSUES_FOUND[@]} -eq 0 ]; then
+            echo "✅ All Intelligence Service quality checks passed successfully!"
+            echo ""
+            echo "## ✅ Intelligence Service Quality Results" >> $GITHUB_STEP_SUMMARY
+            echo "- **Intelligence Service**: All checks passed ✅" >> $GITHUB_STEP_SUMMARY
+            echo "- **Code Formatting**: All Python files follow Black formatting" >> $GITHUB_STEP_SUMMARY
+            echo "- **Linting**: Code passes Flake8 quality checks" >> $GITHUB_STEP_SUMMARY
+            echo "- **Type Safety**: Static type analysis completed" >> $GITHUB_STEP_SUMMARY
+            echo "- **Security**: Code security analysis performed" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "❌ Found ${#ISSUES_FOUND[@]} issue(s):"
+            for issue in "${ISSUES_FOUND[@]}"; do
+              echo "  • $issue"
+            done
+            echo ""
+            echo "## ❌ Intelligence Service Quality Issues Found" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "The following issues need to be addressed:" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            for issue in "${ISSUES_FOUND[@]}"; do
+              echo "- $issue" >> $GITHUB_STEP_SUMMARY
+            done
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "**To fix formatting issues:**" >> $GITHUB_STEP_SUMMARY
+            echo '```bash' >> $GITHUB_STEP_SUMMARY
+            echo 'cd server/intelligence-service && poetry run black .' >> $GITHUB_STEP_SUMMARY
+            echo '```' >> $GITHUB_STEP_SUMMARY
+          fi
+
+          # Exit with appropriate code
+          if [ "$OVERALL_SUCCESS" = false ]; then
+            echo ""
+            echo "❌ Intelligence Service quality checks failed - please fix the issues above"
+            exit 1
+          fi
+
+      # Webhook Ingest quality checks with comprehensive validation
+      - name: Webhook Ingest quality & security analysis
+        if: matrix.check == 'webhook-ingest-quality'
+        run: |
+          set -o pipefail  # Make pipelines fail if any command fails
+          echo "🔍 Running comprehensive Webhook Ingest quality checks..."
+
+          # Track issues found
+          ISSUES_FOUND=()
+          OVERALL_SUCCESS=true
+
           # Webhook Ingest checks
           echo "📝 Checking Webhook Ingest..."
           cd server/webhook-ingest
@@ -284,18 +330,45 @@ jobs:
             echo "✅ Webhook Ingest: Flake8 linting passed"
           fi
 
+          # Type checking (if mypy is available)
+          if poetry show mypy > /dev/null 2>&1; then
+            echo "📊 Running type checking..."
+            poetry run mypy . --ignore-missing-imports --show-error-codes 2>&1 | tee mypy-results.txt
+            WEBHOOK_MYPY_EXIT_CODE=${PIPESTATUS[0]}
+            if [ $WEBHOOK_MYPY_EXIT_CODE -ne 0 ]; then
+              echo "⚠️ Webhook Ingest: MyPy type checking found issues (warning only)"
+              ISSUES_FOUND+=("Webhook Ingest: MyPy type checking issues (warning)")
+              # Type checking issues are warnings, not failures
+            else
+              echo "✅ Webhook Ingest: MyPy type checking passed"
+            fi
+          fi
+
+          # Security check (if bandit is available)
+          if poetry show bandit > /dev/null 2>&1; then
+            echo "🔒 Running security analysis..."
+            poetry run bandit -r app/ -f json -o bandit-results.json 2>&1
+            WEBHOOK_BANDIT_EXIT_CODE=${PIPESTATUS[0]}
+            if [ $WEBHOOK_BANDIT_EXIT_CODE -ne 0 ]; then
+              echo "⚠️ Webhook Ingest: Bandit security analysis found issues (warning only)"
+              ISSUES_FOUND+=("Webhook Ingest: Security analysis issues (warning)")
+              # Security issues are warnings, not failures for now
+            else
+              echo "✅ Webhook Ingest: Bandit security analysis passed"
+            fi
+          fi
+
           cd ../..
 
           # Generate comprehensive summary
           echo ""
-          echo "📊 Python Quality Check Summary:"
-          echo "================================"
+          echo "📊 Webhook Ingest Quality Check Summary:"
+          echo "======================================="
 
           if [ ${#ISSUES_FOUND[@]} -eq 0 ]; then
-            echo "✅ All Python quality checks passed successfully!"
+            echo "✅ All Webhook Ingest quality checks passed successfully!"
             echo ""
-            echo "## ✅ Python Quality Results" >> $GITHUB_STEP_SUMMARY
-            echo "- **Intelligence Service**: All checks passed ✅" >> $GITHUB_STEP_SUMMARY
+            echo "## ✅ Webhook Ingest Quality Results" >> $GITHUB_STEP_SUMMARY
             echo "- **Webhook Ingest**: All checks passed ✅" >> $GITHUB_STEP_SUMMARY
             echo "- **Code Formatting**: All Python files follow Black formatting" >> $GITHUB_STEP_SUMMARY
             echo "- **Linting**: Code passes Flake8 quality checks" >> $GITHUB_STEP_SUMMARY
@@ -307,7 +380,7 @@ jobs:
               echo "  • $issue"
             done
             echo ""
-            echo "## ❌ Python Quality Issues Found" >> $GITHUB_STEP_SUMMARY
+            echo "## ❌ Webhook Ingest Quality Issues Found" >> $GITHUB_STEP_SUMMARY
             echo "" >> $GITHUB_STEP_SUMMARY
             echo "The following issues need to be addressed:" >> $GITHUB_STEP_SUMMARY
             echo "" >> $GITHUB_STEP_SUMMARY
@@ -317,15 +390,14 @@ jobs:
             echo "" >> $GITHUB_STEP_SUMMARY
             echo "**To fix formatting issues:**" >> $GITHUB_STEP_SUMMARY
             echo '```bash' >> $GITHUB_STEP_SUMMARY
-            echo 'cd server/intelligence-service && poetry run black .' >> $GITHUB_STEP_SUMMARY
-            echo 'cd ../webhook-ingest && poetry run black .' >> $GITHUB_STEP_SUMMARY
+            echo 'cd server/webhook-ingest && poetry run black .' >> $GITHUB_STEP_SUMMARY
             echo '```' >> $GITHUB_STEP_SUMMARY
           fi
 
           # Exit with appropriate code
           if [ "$OVERALL_SUCCESS" = false ]; then
             echo ""
-            echo "❌ Python quality checks failed - please fix the issues above"
+            echo "❌ Webhook Ingest quality checks failed - please fix the issues above"
             exit 1
           fi
 
@@ -347,7 +419,7 @@ jobs:
           fi
           cd ../..
 
-          # Setup Java environment
+          # Setup Application Server environment
           cd server/application-server
           if [ ! -d "target" ]; then
             mvn compile -DskipTests --quiet
@@ -388,7 +460,7 @@ jobs:
           else
             echo "## ✅ OpenAPI Validation Results" >> $GITHUB_STEP_SUMMARY
             echo "- **Specifications**: All OpenAPI specs are up to date" >> $GITHUB_STEP_SUMMARY
-            echo "- **Java Clients**: Generated clients match current specs" >> $GITHUB_STEP_SUMMARY
+            echo "- **Application Server Clients**: Generated clients match current specs" >> $GITHUB_STEP_SUMMARY
             echo "- **TypeScript Clients**: Generated clients match current specs" >> $GITHUB_STEP_SUMMARY
             echo "- **Consistency**: All API contracts are synchronized" >> $GITHUB_STEP_SUMMARY
           fi
