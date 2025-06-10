@@ -102,9 +102,3 @@ jobs:
           base: ${{ github.event.repository.default_branch }}
           head: HEAD
           extra_args: --debug --only-verified
-
-      # Enhanced error handling and reporting
-      - name: Security scan status report
-        if: always()
-        run: |
-          echo "📊 Security Scan (${{ matrix.scan-type }}) - Status: ${{ job.status }}"

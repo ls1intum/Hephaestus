@@ -44,7 +44,7 @@ jobs:
 
       # application-server tests
       - name: "application-server ${{ matrix.test-type }} execution"
-        if: startsWith(matrix.test-type, 'java-')
+        if: startsWith(matrix.test-type, 'application-server-')
         run: |
           echo "🧪 Running application-server ${{ matrix.test-type }} tests"
           cd server/application-server
@@ -114,7 +114,7 @@ jobs:
 
       # Test result aggregation
       - name: Upload application-server test results
-        if: always() && startsWith(matrix.test-type, 'java-')
+        if: always() && startsWith(matrix.test-type, 'application-server-')
         uses: dorny/test-reporter@v2
         with:
           name: "Test Results - ${{ matrix.test-type }}"
@@ -130,9 +130,3 @@ jobs:
           path: "webapp-react/chromatic-build-*.xml"
           reporter: java-junit
           fail-on-error: false
-
-      # Test status report
-      - name: Test execution status report
-        if: always()
-        run: |
-          echo "📊 Test Execution (${{ matrix.test-type }}) - Status: ${{ job.status }}"
