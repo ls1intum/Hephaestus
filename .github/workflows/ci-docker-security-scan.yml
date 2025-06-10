@@ -10,24 +10,22 @@ on:
         default: "false"
 
 jobs:
-  # Security scanning with Trivy for all built images
   security-scan:
     name: "${{ matrix.component.name }}-security-scan"
     runs-on: ubuntu-latest
     if: inputs.should_skip != 'true'
     timeout-minutes: 15
+    env:
+      TRIVY_QUIET: "true"        # hide progress + DB-download noise
     strategy:
       fail-fast: false
       matrix:
         component:
-          - name: "webapp-react"
-            image: "ghcr.io/ls1intum/hephaestus/webapp-react"
-          - name: "application-server"
-            image: "ghcr.io/ls1intum/hephaestus/application-server"
-          - name: "intelligence-service"
-            image: "ghcr.io/ls1intum/hephaestus/intelligence-service"
-          - name: "webhook-ingest"
-            image: "ghcr.io/ls1intum/hephaestus/webhook-ingest"
+          - { name: "webapp-react",        image: "ghcr.io/ls1intum/hephaestus/webapp-react" }
+          - { name: "application-server",  image: "ghcr.io/ls1intum/hephaestus/application-server" }
+          - { name: "intelligence-service",image: "ghcr.io/ls1intum/hephaestus/intelligence-service" }
+          - { name: "webhook-ingest",      image: "ghcr.io/ls1intum/hephaestus/webhook-ingest" }
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -39,24 +37,35 @@ jobs:
           username: ${{ github.repository_owner }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Pull and scan Docker image
+      - name: Pull & scan image with Trivy
+        id: trivy
         uses: aquasecurity/trivy-action@0.31.0
         with:
           image-ref: ${{ matrix.component.image }}:${{ github.sha }}
           format: "sarif"
           output: "trivy-results-${{ matrix.component.name }}.sarif"
-          exit-code: "1"
-          ignore-unfixed: true
+          exit-code: "1"           # fail on actionable HIGH/CRITICAL vulns
+          ignore-unfixed: true     # skip issues without fixes
           severity: "CRITICAL,HIGH"
           trivyignores: ".trivyignore"
 
-      - name: Upload Trivy scan results to GitHub Security tab
+      - name: Upload SARIF to Security tab
         uses: github/codeql-action/upload-sarif@v3
         if: always()
         with:
           sarif_file: "trivy-results-${{ matrix.component.name }}.sarif"
 
-      - name: Generate security report
+      - name: Summarise findings in Job summary
+        if: always()               # runs even on failure
+        run: |
+          total=$(jq '.runs[].results | length' trivy-results-${{ matrix.component.name }}.sarif)
+          critical=$(jq '[.runs[].results[] | select(.level=="error")] | length' trivy-results-${{ matrix.component.name }}.sarif)
+          echo "### 📊 Trivy summary – ${{ matrix.component.name }}" >> "$GITHUB_STEP_SUMMARY"
+          echo "|Total (High+Critical)|Critical|High|" >> "$GITHUB_STEP_SUMMARY"
+          echo "|---|---|---|" >> "$GITHUB_STEP_SUMMARY"
+          echo "|$total|$critical|$((total - critical))|" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Status line
         if: always()
         run: |
-          echo "📊 Security Scan (${{ matrix.component.name }}) - Status: ${{ job.status }}"
+          echo "🔒 Scan complete for ${{ matrix.component.name }} – job status: ${{ job.status }}"
