@@ -82,6 +82,8 @@ jobs:
         docker-security-scan,
       ]
     if: always()
+    outputs:
+      environment: ${{ steps.set-environment.outputs.environment }}
     steps:
       - name: Check all jobs and determine overall status
         run: |
@@ -95,19 +97,29 @@ jobs:
           else
             echo "✅ All CI jobs passed successfully"
           fi
+      
+      - name: Determine deployment environment
+        id: set-environment
+        run: |
+          if [[ "${{ github.ref }}" == "refs/heads/develop" ]]; then
+            echo "environment=Staging" >> $GITHUB_OUTPUT
+            echo "🎯 Deployment target: Staging (develop branch)"
+          elif [[ "${{ github.ref }}" == "refs/heads/main" ]]; then
+            echo "environment=Production" >> $GITHUB_OUTPUT
+            echo "🎯 Deployment target: Production (main branch)"
+          else
+            echo "environment=none" >> $GITHUB_OUTPUT
+            echo "🚫 No deployment target (branch/tag not configured for deployment)"
+            exit 0
+          fi
 
-  # Automatic deployment based on branch/tag
+  # Automatic deployment based on branch
   deploy-app:
     needs: [all-ci-passed]
-    if: |
-      success() && (
-        (startsWith(github.ref, 'refs/tags/v')) ||
-        github.ref == 'refs/heads/develop' ||
-        github.ref == 'refs/heads/main'
-      )
+    if: success()
     uses: ls1intum/.github/.github/workflows/deploy-docker-compose.yml@main
     with:
-      environment: ${{ (github.ref == 'refs/heads/develop' || (startsWith(github.ref, 'refs/tags/v') && contains(github.ref, '-rc.'))) && 'Staging' || 'Production' }}
+      environment: ${{ needs.all-ci-passed.outputs.environment }}
       docker-compose-file: "./docker/compose.app-react.yaml"
       main-image-name: ls1intum/hephaestus/application-server
       image-tag: ${{ github.sha }}
