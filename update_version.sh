@@ -2,7 +2,7 @@
 set -euo pipefail
 
 # Script to update the version across multiple files to a single, consistent new version.
-# Usage: ./update_version.sh [major|minor|patch]
+# Usage: ./update_version.sh [major|minor|patch] OR ./update_version.sh <version>
 #
 # This script updates the version in:
 #   - webapp/package.json & webapp/package-lock.json (for "hephaestus")
@@ -19,55 +19,63 @@ set -euo pipefail
 
 
 if [[ $# -ne 1 ]]; then
-    echo "Usage: $0 [major|minor|patch]"
+    echo "Usage: $0 [major|minor|patch] OR $0 <version>"
     exit 1
 fi
 
-INCREMENT_TYPE=$1
+PARAM=$1
 
-if [[ "$INCREMENT_TYPE" != "major" && "$INCREMENT_TYPE" != "minor" && "$INCREMENT_TYPE" != "patch" ]]; then
-    echo "Error: Invalid argument. Use one of [major, minor, patch]."
+# Check if parameter is a semantic version format (X.Y.Z)
+if [[ "$PARAM" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+    # Direct version specified (used by semantic-release)
+    NEW_VERSION="$PARAM"
+    # Extract the current version from webapp/package.json (the authoritative version for "hephaestus")
+    CURRENT_VERSION=$(awk '/"name": "hephaestus"/ {found=1} found && /"version":/ { sub(/.*"version": "/, ""); sub(/".*/, ""); print; exit }' webapp/package.json)
+    if [[ -z "$CURRENT_VERSION" ]]; then
+        echo "Error: Could not determine current version from webapp/package.json"
+        exit 1
+    fi
+    echo "Updating version from $CURRENT_VERSION to $NEW_VERSION..."
+elif [[ "$PARAM" == "major" || "$PARAM" == "minor" || "$PARAM" == "patch" ]]; then
+    # Increment type specified (manual usage)
+    INCREMENT_TYPE=$PARAM
+    
+    # Function to increment a semantic version number (format: X.Y.Z)
+    increment_version() {
+        local version=$1
+        local type=$2
+        IFS='.' read -r major minor patch <<< "$version"
+        case $type in
+            major)
+                major=$((major + 1))
+                minor=0
+                patch=0
+                ;;
+            minor)
+                minor=$((minor + 1))
+                patch=0
+                ;;
+            patch)
+                patch=$((patch + 1))
+                ;;
+        esac
+        echo "$major.$minor.$patch"
+    }
+
+    # Extract the current version from webapp/package.json (the authoritative version for "hephaestus")
+    # This uses awk to strip everything before/after the version string.
+    CURRENT_VERSION=$(awk '/"name": "hephaestus"/ {found=1} found && /"version":/ { sub(/.*"version": "/, ""); sub(/".*/, ""); print; exit }' webapp/package.json)
+    if [[ -z "$CURRENT_VERSION" ]]; then
+        echo "Error: Could not determine current version from webapp/package.json"
+        exit 1
+    fi
+
+    NEW_VERSION=$(increment_version "$CURRENT_VERSION" "$INCREMENT_TYPE")
+    echo "Updating version from $CURRENT_VERSION to $NEW_VERSION..."
+else
+    echo "Error: Invalid argument. Use one of [major, minor, patch] or provide a semantic version (e.g., 1.2.3)."
     exit 1
 fi
-
-# Ensure git working directory is clean
-if ! git diff-index --quiet HEAD --; then
-    echo "Error: Git working tree is not clean. Please commit or stash your changes before updating version."
-    exit 1
-fi
-
-# Function to increment a semantic version number (format: X.Y.Z)
-increment_version() {
-    local version=$1
-    local type=$2
-    IFS='.' read -r major minor patch <<< "$version"
-    case $type in
-        major)
-            major=$((major + 1))
-            minor=0
-            patch=0
-            ;;
-        minor)
-            minor=$((minor + 1))
-            patch=0
-            ;;
-        patch)
-            patch=$((patch + 1))
-            ;;
-    esac
-    echo "$major.$minor.$patch"
-}
-
-# Extract the current version from webapp/package.json (the authoritative version for "hephaestus")
-# This uses awk to strip everything before/after the version string.
-CURRENT_VERSION=$(awk '/"name": "hephaestus"/ {found=1} found && /"version":/ { sub(/.*"version": "/, ""); sub(/".*/, ""); print; exit }' webapp/package.json)
-if [[ -z "$CURRENT_VERSION" ]]; then
-    echo "Error: Could not determine current version from webapp/package.json"
-    exit 1
-fi
-
-NEW_VERSION=$(increment_version "$CURRENT_VERSION" "$INCREMENT_TYPE")
-echo "Updating version from $CURRENT_VERSION to $NEW_VERSION..."
 
 # Update webapp/package.json
 awk -v old_version="$CURRENT_VERSION" -v new_version="$NEW_VERSION" '
@@ -80,16 +88,18 @@ awk -v old_version="$CURRENT_VERSION" -v new_version="$NEW_VERSION" '
     {print}
 ' webapp/package.json > webapp/package.json.tmp && mv webapp/package.json.tmp webapp/package.json
 
-# Update webapp/package-lock.json
-awk -v old_version="$CURRENT_VERSION" -v new_version="$NEW_VERSION" '
-    BEGIN {found_name = 0}
-    /"name": "hephaestus"/ {found_name = 1}
-    found_name && /"version":/ {
-        sub("\"version\": \"" old_version "\"", "\"version\": \"" new_version "\"")
-        found_name = 0
-    }
-    {print}
-' webapp/package-lock.json > webapp/package-lock.json.tmp && mv webapp/package-lock.json.tmp webapp/package-lock.json
+# Update webapp/package-lock.json (if it exists)
+if [[ -f webapp/package-lock.json ]]; then
+    awk -v old_version="$CURRENT_VERSION" -v new_version="$NEW_VERSION" '
+        BEGIN {found_name = 0}
+        /"name": "hephaestus"/ {found_name = 1}
+        found_name && /"version":/ {
+            sub("\"version\": \"" old_version "\"", "\"version\": \"" new_version "\"")
+            found_name = 0
+        }
+        {print}
+    ' webapp/package-lock.json > webapp/package-lock.json.tmp && mv webapp/package-lock.json.tmp webapp/package-lock.json
+fi
 
 # Update webapp-react/package.json
 awk -v old_version="$CURRENT_VERSION" -v new_version="$NEW_VERSION" '
@@ -102,62 +112,81 @@ awk -v old_version="$CURRENT_VERSION" -v new_version="$NEW_VERSION" '
     {print}
 ' webapp-react/package.json > webapp-react/package.json.tmp && mv webapp-react/package.json.tmp webapp-react/package.json
 
-# Update webapp-react/package-lock.json
-awk -v old_version="$CURRENT_VERSION" -v new_version="$NEW_VERSION" '
-    BEGIN {found_name = 0}
-    /"name": "hephaestus"/ {found_name = 1}
-    found_name && /"version":/ {
-        sub("\"version\": \"" old_version "\"", "\"version\": \"" new_version "\"")
-        found_name = 0
-    }
-    {print}
-' webapp-react/package-lock.json > webapp-react/package-lock.json.tmp && mv webapp-react/package-lock.json.tmp webapp-react/package-lock.json
+# Update webapp-react/package-lock.json (if it exists)
+if [[ -f webapp-react/package-lock.json ]]; then
+    awk -v old_version="$CURRENT_VERSION" -v new_version="$NEW_VERSION" '
+        BEGIN {found_name = 0}
+        /"name": "hephaestus"/ {found_name = 1}
+        found_name && /"version":/ {
+            sub("\"version\": \"" old_version "\"", "\"version\": \"" new_version "\"")
+            found_name = 0
+        }
+        {print}
+    ' webapp-react/package-lock.json > webapp-react/package-lock.json.tmp && mv webapp-react/package-lock.json.tmp webapp-react/package-lock.json
+fi
 
-# Update Java source: OpenAPIConfiguration.java
-sed -E -i '' "s#(version *= *\")[0-9]+(\.[0-9]+){2}\"#\\1${NEW_VERSION}\"#" server/application-server/src/main/java/de/tum/in/www1/hephaestus/OpenAPIConfiguration.java
+# Update Java source: OpenAPIConfiguration.java (if it exists)
+if [[ -f server/application-server/src/main/java/de/tum/in/www1/hephaestus/OpenAPIConfiguration.java ]]; then
+    sed -E -i '' "s#(version *= *\")[0-9]+(\.[0-9]+){2}\"#\\1${NEW_VERSION}\"#" server/application-server/src/main/java/de/tum/in/www1/hephaestus/OpenAPIConfiguration.java
+fi
 
-
-# Update application.yml (server configuration)
-sed -E -i '' "s#(version: *\")[0-9]+(\.[0-9]+){2}\"#\1${NEW_VERSION}\"#" server/application-server/src/main/resources/application.yml
+# Update application.yml (server configuration) (if it exists)
+if [[ -f server/application-server/src/main/resources/application.yml ]]; then
+    sed -E -i '' "s#(version: *\")[0-9]+(\.[0-9]+){2}\"#\1${NEW_VERSION}\"#" server/application-server/src/main/resources/application.yml
+fi
 
 # Update server/intelligence-service/pyproject.toml
-sed -E -i '' "s#(version *= *\")[0-9]+(\.[0-9]+){2}\"#\1${NEW_VERSION}\"#" server/intelligence-service/pyproject.toml
+if [[ -f server/intelligence-service/pyproject.toml ]]; then
+    sed -E -i '' "s#(version *= *\")[0-9]+(\.[0-9]+){2}\"#\1${NEW_VERSION}\"#" server/intelligence-service/pyproject.toml
+fi
 
 # Update server/webhook-ingest/pyproject.toml
-sed -E -i '' "s#(version *= *\")[0-9]+(\.[0-9]+){2}\"#\1${NEW_VERSION}\"#" server/webhook-ingest/pyproject.toml
+if [[ -f server/webhook-ingest/pyproject.toml ]]; then
+    sed -E -i '' "s#(version *= *\")[0-9]+(\.[0-9]+){2}\"#\1${NEW_VERSION}\"#" server/webhook-ingest/pyproject.toml
+fi
 
-# Update server/intelligence-service/app/main.py
-sed -E -i '' "s#(version *= *\")[0-9]+(\.[0-9]+){2}\"#\1${NEW_VERSION}\"#" server/intelligence-service/app/main.py
+# Update server/intelligence-service/app/main.py (if it exists)
+if [[ -f server/intelligence-service/app/main.py ]]; then
+    sed -E -i '' "s#(version *= *\")[0-9]+(\.[0-9]+){2}\"#\1${NEW_VERSION}\"#" server/intelligence-service/app/main.py
+fi
 
-# Update Maven POM (only update the project version for hephaestus)
-# This awk script looks for the line with <artifactId>hephaestus</artifactId>,
-# then updates the next <version> element.
-awk -v new_version="${NEW_VERSION}" '
-    /<artifactId>hephaestus<\/artifactId>/ { print; getline; if ($0 ~ /<version>/) { sub(/<version>[0-9]+\.[0-9]+\.[0-9]+(-SNAPSHOT)?<\/version>/, "<version>" new_version "-SNAPSHOT</version>") } }
-    { print }
-' server/application-server/pom.xml > server/application-server/pom.xml.tmp && mv server/application-server/pom.xml.tmp server/application-server/pom.xml
+# Update Maven POM (only update the project version for hephaestus) (if it exists)
+if [[ -f server/application-server/pom.xml ]]; then
+    # This awk script looks for the line with <artifactId>hephaestus</artifactId>,
+    # then updates the next <version> element.
+    awk -v new_version="${NEW_VERSION}" '
+        /<artifactId>hephaestus<\/artifactId>/ { print; getline; if ($0 ~ /<version>/) { sub(/<version>[0-9]+\.[0-9]+\.[0-9]+(-SNAPSHOT)?<\/version>/, "<version>" new_version "-SNAPSHOT</version>") } }
+        { print }
+    ' server/application-server/pom.xml > server/application-server/pom.xml.tmp && mv server/application-server/pom.xml.tmp server/application-server/pom.xml
+fi
 
-# Update server/application-server/openapi.yaml (non-quoted version)
-sed -E -i '' "s#(version:[[:space:]]*)[0-9]+(\.[0-9]+){2}#\1${NEW_VERSION}#" server/application-server/openapi.yaml
+# Update server/application-server/openapi.yaml (non-quoted version) (if it exists)
+if [[ -f server/application-server/openapi.yaml ]]; then
+    sed -E -i '' "s#(version:[[:space:]]*)[0-9]+(\.[0-9]+){2}#\1${NEW_VERSION}#" server/application-server/openapi.yaml
+fi
 
-# Update server/intelligence-service/openapi.yaml (non-quoted version)
-sed -E -i '' "s#(version:[[:space:]]*)[0-9]+(\.[0-9]+){2}#\1${NEW_VERSION}#" server/intelligence-service/openapi.yaml
+# Update server/intelligence-service/openapi.yaml (non-quoted version) (if it exists)
+if [[ -f server/intelligence-service/openapi.yaml ]]; then
+    sed -E -i '' "s#(version:[[:space:]]*)[0-9]+(\.[0-9]+){2}#\1${NEW_VERSION}#" server/intelligence-service/openapi.yaml
+fi
 
 # Update all files containing "The version of the OpenAPI document:" to use the new version,
 # limited to the specified directories.
-openapi_files=$(grep -rl "The version of the OpenAPI document:" webapp/src/app/core/modules/openapi server/application-server/src/main/java/de/tum/in/www1/hephaestus/intelligenceservice)
-if [[ -n "$openapi_files" ]]; then
-    for file in $openapi_files; do
-        echo "Updating OpenAPI document version in $file"
-        sed -E -i '' "s#(The version of the OpenAPI document: )[0-9]+(\.[0-9]+){2}#\\1${NEW_VERSION}#g" "$file"
-    done
+openapi_files=""
+if [[ -d webapp/src/app/core/modules/openapi ]]; then
+    openapi_files+=" $(grep -rl "The version of the OpenAPI document:" webapp/src/app/core/modules/openapi 2>/dev/null || true)"
+fi
+if [[ -d server/application-server/src/main/java/de/tum/in/www1/hephaestus/intelligenceservice ]]; then
+    openapi_files+=" $(grep -rl "The version of the OpenAPI document:" server/application-server/src/main/java/de/tum/in/www1/hephaestus/intelligenceservice 2>/dev/null || true)"
 fi
 
-# Stage all changes and commit
-echo "Staging changes for git..."
-git add -A
-
-echo "Creating git commit..."
-git commit -m "Release: Bump version to ${NEW_VERSION} (${INCREMENT_TYPE} update)"
+if [[ -n "$openapi_files" ]]; then
+    for file in $openapi_files; do
+        if [[ -f "$file" ]]; then
+            echo "Updating OpenAPI document version in $file"
+            sed -E -i '' "s#(The version of the OpenAPI document: )[0-9]+(\.[0-9]+){2}#\\1${NEW_VERSION}#g" "$file"
+        fi
+    done
+fi
 
 echo "Version update complete. New version: ${NEW_VERSION}"

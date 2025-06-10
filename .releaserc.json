@@ -1,0 +1,89 @@
+{
+  "branches": [
+    "develop",
+    {
+      "name": "main",
+      "prerelease": false
+    }
+  ],
+  "plugins": [
+    [
+      "@semantic-release/exec",
+      {
+        "prepareCmd": "./update_version.sh ${nextRelease.version}",
+        "publishCmd": "echo 'Version ${nextRelease.version} has been released'"
+      }
+    ],
+    [
+      "@semantic-release/git",
+      {
+        "assets": [
+          "package.json",
+          "webapp/package.json",
+          "webapp/package-lock.json",
+          "webapp/src/app/core/modules/openapi/**/*",
+          "webapp-react/package.json",
+          "webapp-react/package-lock.json",
+          "webapp-react/src/api/**/*",
+          "server/application-server/pom.xml",
+          "server/application-server/src/main/java/de/tum/in/www1/hephaestus/OpenAPIConfiguration.java",
+          "server/application-server/src/main/java/de/tum/in/www1/hephaestus/intelligenceservice/**/*", 
+          "server/application-server/src/main/resources/application.yml",
+          "server/application-server/openapi.yaml",
+          "server/intelligence-service/pyproject.toml",
+          "server/intelligence-service/app/main.py",
+          "server/intelligence-service/openapi.yaml",
+          "server/webhook-ingest/pyproject.toml"
+        ],
+        "message": "chore(release): ${nextRelease.version} [skip ci]\n\n${nextRelease.notes}"
+      }
+    ]
+  ],
+  "preset": "conventionalcommits",
+  "releaseRules": [
+    {
+      "type": "feat",
+      "release": "minor"
+    },
+    {
+      "type": "fix",
+      "release": "patch"
+    },
+    {
+      "type": "perf",
+      "release": "patch"
+    },
+    {
+      "type": "revert",
+      "release": "patch"
+    },
+    {
+      "type": "docs",
+      "release": "patch"
+    },
+    {
+      "type": "style",
+      "release": false
+    },
+    {
+      "type": "refactor",
+      "release": "patch"
+    },
+    {
+      "type": "test",
+      "release": false
+    },
+    {
+      "type": "build",
+      "release": "patch"
+    },
+    {
+      "type": "ci",
+      "release": false
+    },
+    {
+      "scope": "no-release",
+      "release": false
+    }
+  ]
+}
