@@ -145,7 +145,7 @@ jobs:
 
           echo "🔍 Running linting..."
           if ! poetry run flake8 . --statistics --count; then
-            echo "❌ Flake8 linting failed"
+            echo "❌ Flake8 linting failed Run: cd server/intelligence-service && poetry run flake8 ."
             ISSUES_FOUND+=("Flake8 linting failed")
           else
             echo "✅ Flake8 linting passed"
@@ -185,7 +185,7 @@ jobs:
 
           echo "🔍 Running linting..."
           if ! poetry run flake8 . --statistics --count; then
-            echo "❌ Flake8 linting failed"
+            echo "❌ Flake8 linting failed Run: cd server/webhook-ingest && poetry run flake8 ."
             ISSUES_FOUND+=("Flake8 linting failed")
           else
             echo "✅ Flake8 linting passed"
@@ -295,7 +295,7 @@ jobs:
 
           # Check results
           if [ -f "server/application-server/src/main/resources/db/changelog_new.xml" ]; then
-            echo "❌ Schema drift detected. Run: npm run db:draft-changelog"
+            echo "❌ Schema drift detected. Run: npm run db:draft-changelog and follow the documentation"
             echo "Generated migration:"
             cat server/application-server/src/main/resources/db/changelog_new.xml
             exit 1
@@ -363,5 +363,5 @@ jobs:
             echo "Fix: npm run db:generate-erd-docs"
             exit 1
           else
-            echo "✅ ERD documentation validation passed"
+            echo "✅ ERD documentation validation passed (up-to-date with committed migrations)"
           fi
