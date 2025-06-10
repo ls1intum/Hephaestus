@@ -96,32 +96,20 @@ jobs:
             echo "✅ All CI jobs passed successfully"
           fi
 
-  # Automatic deployment to staging for release candidates on develop branch
-  deploy-to-staging:
+  # Automatic deployment based on branch/tag
+  deploy-app:
     needs: [all-ci-passed]
     if: |
-      success() && 
-      (startsWith(github.ref, 'refs/tags/v') && contains(github.ref, '-rc.')) ||
-      github.ref == 'refs/heads/develop'
-    uses: ./.github/workflows/deploy-staging.yml
+      success() && (
+        (startsWith(github.ref, 'refs/tags/v')) ||
+        github.ref == 'refs/heads/develop' ||
+        github.ref == 'refs/heads/main'
+      )
+    uses: ls1intum/.github/.github/workflows/deploy-docker-compose.yml@main
     with:
+      environment: ${{ (github.ref == 'refs/heads/develop' || (startsWith(github.ref, 'refs/tags/v') && contains(github.ref, '-rc.'))) && 'Staging' || 'Production' }}
+      docker-compose-file: "./docker/compose.app-react.yaml"
+      main-image-name: ls1intum/hephaestus/application-server
       image-tag: ${{ github.sha }}
-      deploy-app: true
-      deploy-core: false
-      deploy-proxy: false
-    secrets: inherit
-
-  # Automatic deployment to production for stable releases on main branch
-  deploy-to-production:
-    needs: [all-ci-passed]
-    if: |
-      success() && 
-      (startsWith(github.ref, 'refs/tags/v') && !contains(github.ref, '-rc.')) ||
-      github.ref == 'refs/heads/main'
-    uses: ./.github/workflows/deploy-prod.yml
-    with:
-      image-tag: ${{ github.sha }}
-      deploy-app: true
-      deploy-core: false
-      deploy-proxy: false
+      deployment-base-path: "/opt/hephaestus/app"
     secrets: inherit
