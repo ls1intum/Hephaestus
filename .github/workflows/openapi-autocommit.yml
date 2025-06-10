@@ -84,7 +84,7 @@ jobs:
 
       - name: Push changes
         if: ${{ always() && contains(github.event.pull_request.labels.*.name, 'autocommit-openapi') && steps.check_changes.outputs.no_changes_detected != 'true' }}
-        uses: ad-m/github-push-action@master
+        uses: ad-m/github-push-action@v0.8.0
         with:
           github_token: ${{ secrets.GH_PAT }}
           branch: ${{ github.event.pull_request.head.ref }}

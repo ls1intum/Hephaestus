@@ -80,7 +80,7 @@ jobs:
       # Dependency vulnerability scanning
       - name: Run Trivy dependency scan
         if: matrix.scan-type == 'dependencies'
-        uses: aquasecurity/trivy-action@master
+        uses: aquasecurity/trivy-action@0.31.0
         with:
           scan-type: "fs"
           scan-ref: "."
