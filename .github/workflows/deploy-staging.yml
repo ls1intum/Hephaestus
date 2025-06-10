@@ -10,10 +10,6 @@ on:
         type: boolean
         default: true
         description: (Re-)deploys the app components
-      use-react-webapp:
-        type: boolean
-        default: false
-        description: Use the React webapp instead of the Angular webapp
       deploy-core:
         default: false
         type: boolean
@@ -29,7 +25,7 @@ jobs:
     uses: ls1intum/.github/.github/workflows/deploy-docker-compose.yml@main
     with:
       environment: Staging
-      docker-compose-file: ${{ inputs.use-react-webapp && './docker/compose.app-react.yaml' || './docker/compose.app.yaml' }}
+      docker-compose-file:  "./docker/compose.app-react.yaml"
       main-image-name: ls1intum/hephaestus/application-server
       image-tag: ${{ inputs.image-tag }}
       deployment-base-path: "/opt/hephaestus/app"

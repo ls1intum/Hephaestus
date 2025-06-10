@@ -94,10 +94,10 @@ jobs:
           # Docker images built
           if [[ "${{ needs.docker-build.result }}" == "success" ]]; then
             echo "### 🐳 Images Built:" >> $GITHUB_STEP_SUMMARY
-            echo "- **Frontend (React)**: webapp-react" >> $GITHUB_STEP_SUMMARY
-            echo "- **Backend (Spring)**: application-server" >> $GITHUB_STEP_SUMMARY
-            echo "- **AI Service (FastAPI)**: intelligence-service" >> $GITHUB_STEP_SUMMARY
-            echo "- **Webhook Processor**: webhook-ingest" >> $GITHUB_STEP_SUMMARY
+            echo "- webapp-react" >> $GITHUB_STEP_SUMMARY
+            echo "- application-server" >> $GITHUB_STEP_SUMMARY
+            echo "- intelligence-service" >> $GITHUB_STEP_SUMMARY
+            echo "- webhook-ingest" >> $GITHUB_STEP_SUMMARY
             echo "" >> $GITHUB_STEP_SUMMARY
           fi
 
