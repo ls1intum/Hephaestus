@@ -25,7 +25,7 @@ jobs:
         with:
           do_not_skip: '["workflow_dispatch"]'
 
-  # Step 1: Code quality and style checks
+  # Code quality and style checks
   quality-gates:
     uses: ./.github/workflows/ci-quality-gates.yml
     needs: [pre-job]
@@ -34,7 +34,7 @@ jobs:
     with:
       should_skip: ${{ needs.pre-job.outputs.should_skip }}
 
-  # Step 2: Security vulnerability scanning
+  # Security vulnerability scanning
   security-scan:
     uses: ./.github/workflows/ci-security-scan.yml
     needs: [pre-job]
@@ -43,25 +43,25 @@ jobs:
     with:
       should_skip: ${{ needs.pre-job.outputs.should_skip }}
 
-  # Step 3: Comprehensive test execution
+  # Comprehensive test execution
   test-suite:
     uses: ./.github/workflows/ci-tests.yml
-    needs: [pre-job, quality-gates]
+    needs: [pre-job]
     if: needs.pre-job.outputs.should_skip != 'true'
     secrets: inherit
     with:
       should_skip: ${{ needs.pre-job.outputs.should_skip }}
 
-  # Step 4: Build Docker images
+  # Build Docker images and push to registry
   docker-build:
     uses: ./.github/workflows/ci-docker-build.yml
-    needs: [pre-job, test-suite]
+    needs: [pre-job]
     if: needs.pre-job.outputs.should_skip != 'true'
     secrets: inherit
     with:
       should_skip: ${{ needs.pre-job.outputs.should_skip }}
 
-  # Step 5: Security scan Docker images
+  # Security scan Docker images
   docker-security-scan:
     uses: ./.github/workflows/ci-docker-security-scan.yml
     needs: [pre-job, docker-build]
