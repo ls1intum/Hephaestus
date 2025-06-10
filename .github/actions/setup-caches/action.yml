@@ -37,7 +37,7 @@ runs:
 
     # Java/Maven caching
     - name: Set up JDK 21
-      if: contains(fromJSON('["java-unit", "java-integration", "java-architecture", "application-server-quality", "openapi-validation", "database-schema-validation", "database-documentation-validation"]'), inputs.cache-type)
+      if: contains(fromJSON('["application-server-unit", "application-server-integration", "application-server-architecture", "application-server-quality", "openapi-validation", "database-schema-validation", "database-documentation-validation"]'), inputs.cache-type)
       uses: actions/setup-java@v4
       with:
         distribution: 'temurin'
@@ -45,7 +45,7 @@ runs:
         cache: maven
 
     - name: Cache Maven dependencies
-      if: contains(fromJSON('["java-unit", "java-integration", "java-architecture", "application-server-quality", "openapi-validation", "database-schema-validation", "database-documentation-validation"]'), inputs.cache-type)
+      if: contains(fromJSON('["application-server-unit", "application-server-integration", "application-server-architecture", "application-server-quality", "openapi-validation", "database-schema-validation", "database-documentation-validation"]'), inputs.cache-type)
       uses: actions/cache@v4
       with:
         path: |
