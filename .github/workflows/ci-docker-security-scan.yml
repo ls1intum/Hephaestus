@@ -66,13 +66,4 @@ jobs:
       - name: Generate security report
         if: always()
         run: |
-          echo "## 🔒 Security Scan Results: ${{ matrix.component.name }}" >> $GITHUB_STEP_SUMMARY
-          echo "- **Image**: ${{ matrix.component.image }}:${{ github.sha }}" >> $GITHUB_STEP_SUMMARY
-          echo "- **Status**: ${{ job.status }}" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          
-          if [[ "${{ job.status }}" == "failure" ]]; then
-            echo "❌ **Security vulnerabilities detected!** Review the Security tab for details." >> $GITHUB_STEP_SUMMARY
-          else
-            echo "✅ **No critical or high vulnerabilities found.**" >> $GITHUB_STEP_SUMMARY
-          fi
+          echo "📊 Security Scan (${{ matrix.component.name }}) - Status: ${{ job.status }}"

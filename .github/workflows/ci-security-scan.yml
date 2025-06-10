@@ -9,13 +9,6 @@ on:
         type: string
         default: "false"
 
-env:
-  # Global pipeline configuration
-  MAVEN_OPTS: -Xmx2048m -XX:+UseParallelGC
-  NODE_VERSION: 22
-  PYTHON_VERSION: 3.13
-  JAVA_VERSION: 21
-
 jobs:
   # Comprehensive security scanning
   security-scan:
@@ -26,7 +19,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        scan-type: [sast, dependencies, containers, secrets]
+        scan-type: [sast, dependencies, secrets]
     permissions:
       security-events: write
       contents: read
@@ -51,56 +44,34 @@ jobs:
           cache-type: "openapi-validation"
           os: ${{ runner.os }}
 
-      # Verify build environment
-      - name: Verify build environment
-        if: matrix.scan-type == 'sast'
-        run: |
-          echo "🔍 Verifying build environment for CodeQL..."
-          echo "Java version:"
-          java -version
-          echo "Maven version:"
-          mvn -version
-          echo "Node.js version:"
-          node --version
-          echo "NPM version:"
-          npm --version
-          echo "Environment verification complete"
-
       - name: Build for CodeQL analysis
         if: matrix.scan-type == 'sast'
         run: |
+          echo "🔨 Building for CodeQL analysis..."
+          
           # Java build
-          echo "🔨 Building Java application for CodeQL analysis..."
           cd server/application-server
-
-          # Build with dependencies caching
-          if ! mvn compile -DskipTests -Dmaven.test.skip=true --quiet; then
-            echo "❌ Java build failed for CodeQL analysis"
-            echo "Maven compilation output:"
-            mvn compile -DskipTests -Dmaven.test.skip=true
-            exit 1
-          fi
-          echo "✅ Java build completed successfully"
-
+          mvn compile -DskipTests --quiet
+          
           # Node.js build 
-          echo "🔨 Building React application for CodeQL analysis..."
           cd ../../webapp-react
-
-          # Install dependencies if not cached
           if [ ! -d "node_modules" ]; then
-            echo "📦 Installing Node.js dependencies..."
             npm ci --prefer-offline --no-audit --progress=false
-          else
-            echo "📦 Node.js dependencies restored from cache"
+          fi
+          npm run build
+
+          # Python dependencies
+          cd ../server/intelligence-service
+          if [ ! -d ".venv" ]; then
+            poetry install --no-interaction --no-root
           fi
 
-          # Build application
-          echo "🏗️ Building React application..."
-          if ! npm run build:prod; then
-            echo "❌ Node.js build failed for CodeQL analysis"
-            exit 1
+          cd ../webhook-ingest
+          if [ ! -d ".venv" ]; then
+            poetry install --no-interaction --no-root
           fi
-          echo "✅ React build completed successfully"
+
+          echo "✅ Build completed"
 
       - name: Perform CodeQL Analysis
         if: matrix.scan-type == 'sast'
@@ -122,28 +93,6 @@ jobs:
         with:
           sarif_file: "trivy-results.sarif"
 
-      # Container security scanning
-      - name: Setup Docker environment
-        if: matrix.scan-type == 'containers'
-        uses: ./.github/actions/setup-caches
-        with:
-          cache-type: "containers"
-          os: ${{ runner.os }}
-
-      - name: Build and scan containers
-        if: matrix.scan-type == 'containers'
-        run: |
-          echo "🐳 Building containers for security scanning..."
-
-          # Build test images
-          docker build -f webapp-react/Dockerfile webapp-react -t test-webapp:latest
-          docker build -f server/application-server/Dockerfile server/application-server -t test-app-server:latest
-
-          # Scan containers
-          echo "🔍 Scanning container images for vulnerabilities..."
-          docker run --rm -v /var/run/docker.sock:/var/run/docker.sock \
-            aquasec/trivy image --format sarif --output container-results.sarif test-webapp:latest
-
       # Secret scanning
       - name: Run secret detection
         if: matrix.scan-type == 'secrets'
@@ -159,26 +108,3 @@ jobs:
         if: always()
         run: |
           echo "📊 Security Scan (${{ matrix.scan-type }}) - Status: ${{ job.status }}"
-          echo "## 🔒 Security Scan Results - ${{ matrix.scan-type }}" >> $GITHUB_STEP_SUMMARY
-
-          case "${{ matrix.scan-type }}" in
-            "sast")
-              echo "- **Static Application Security Testing**: CodeQL analysis completed" >> $GITHUB_STEP_SUMMARY
-              ;;
-            "dependencies")
-              echo "- **Dependency Vulnerability Scan**: Trivy dependency analysis completed" >> $GITHUB_STEP_SUMMARY
-              ;;
-            "containers")
-              echo "- **Container Security Scan**: Docker image vulnerability analysis completed" >> $GITHUB_STEP_SUMMARY
-              ;;
-            "secrets")
-              echo "- **Secret Detection**: TruffleHog secret scanning completed" >> $GITHUB_STEP_SUMMARY
-              ;;
-          esac
-
-          if [[ "${{ job.status }}" == "failure" ]]; then
-            echo "## ❌ Security Scan Failed (${{ matrix.scan-type }})" >> $GITHUB_STEP_SUMMARY
-            echo "Security vulnerabilities were detected. Please review the scan results and address any critical or high-severity issues." >> $GITHUB_STEP_SUMMARY
-          elif [[ "${{ job.status }}" == "success" ]]; then
-            echo "✅ Security scan (${{ matrix.scan-type }}) completed successfully!" >> $GITHUB_STEP_SUMMARY
-          fi
