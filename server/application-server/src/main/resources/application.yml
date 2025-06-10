@@ -16,7 +16,6 @@ spring:
         # show-sql: "true"
         properties:
             hibernate:
-                # Removed explicit dialect setting - Hibernate will auto-detect PostgreSQL dialect
                 integrator_provider: de.tum.in.www1.hephaestus.ClassImportIntegratorIntegratorProvider
                 format_sql: "true"
 
@@ -32,10 +31,6 @@ spring:
     thymeleaf:
         prefix: ${MAIL_TEMPLATE_FOLDER:classpath:/mail-templates/}
         suffix: .html
-
-    # Disable Mustache template location check since we don't use it
-    mustache:
-        check-template-location: false
 
     mail:
         host: ${MAIL_HOST:smtp.gmail.com}
