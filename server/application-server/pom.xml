@@ -346,7 +346,6 @@
 						<path>
 							<groupId>org.projectlombok</groupId>
 							<artifactId>lombok</artifactId>
-							<version>${lombok.version}</version>
 						</path>
 					</annotationProcessorPaths>
 				</configuration>
@@ -403,7 +402,6 @@
 			<plugin>
 				<groupId>org.apache.maven.plugins</groupId>
 				<artifactId>maven-surefire-plugin</artifactId>
-				<version>${maven-surefire-plugin.version}</version>
 				<configuration>
 					<!-- Memory and JVM settings - @{argLine} is replaced by JaCoCo -->
 					<argLine>@{argLine} -Xmx1024m -Dspring.profiles.active=test -Dfile.encoding=UTF-8 -XX:+EnableDynamicAgentLoading</argLine>
@@ -426,7 +424,6 @@
 			<plugin>
 				<groupId>org.apache.maven.plugins</groupId>
 				<artifactId>maven-failsafe-plugin</artifactId>
-				<version>${maven-failsafe-plugin.version}</version>
 				<configuration>
 					<argLine>@{argLine} -Xmx1024m -Dspring.profiles.active=test -Dfile.encoding=UTF-8</argLine>
 					<includes>
@@ -489,7 +486,6 @@
 			<plugin>
 				<groupId>org.liquibase</groupId>
 				<artifactId>liquibase-maven-plugin</artifactId>
-				<version>${liquibase.version}</version>
 				<configuration>
 					<changeLogFile>db/master.xml</changeLogFile>
 					<diffChangeLogFile>src/main/resources/db/changelog_new.xml</diffChangeLogFile>
@@ -511,17 +507,14 @@
 					<dependency>
 						<groupId>org.springframework.boot</groupId>
 						<artifactId>spring-boot-starter-data-jpa</artifactId>
-						<version>3.4.5</version>
 					</dependency>
 					<dependency>
 						<groupId>jakarta.validation</groupId>
 						<artifactId>jakarta.validation-api</artifactId>
-						<version>${jakarta-validation.version}</version>
 					</dependency>
 					<dependency>
 						<groupId>org.postgresql</groupId>
 						<artifactId>postgresql</artifactId>
-						<version>${postgresql.version}</version>
 					</dependency>
 				</dependencies>
 			</plugin>
