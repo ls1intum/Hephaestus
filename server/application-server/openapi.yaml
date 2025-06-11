@@ -342,6 +342,26 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/Message"
+  /mentor/chat:
+    post:
+      tags:
+      - mentor
+      operationId: chat
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ChatRequest"
+        required: true
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: string
   /leaderboard:
     get:
       tags:
@@ -1117,6 +1137,17 @@ components:
       - scheduledDay
       - scheduledTime
       - teams
+    ChatRequest:
+      type: object
+      properties:
+        messages:
+          type: array
+          items:
+            type: object
+            additionalProperties:
+              type: object
+      required:
+      - messages
     LeaderboardEntry:
       type: object
       properties:

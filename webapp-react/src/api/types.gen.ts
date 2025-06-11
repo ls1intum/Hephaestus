@@ -162,6 +162,14 @@ export type MetaData = {
     scheduledTime: string;
 };
 
+export type ChatRequest = {
+    messages: Array<{
+        [key: string]: {
+            [key: string]: unknown;
+        };
+    }>;
+};
+
 export type LeaderboardEntry = {
     rank: number;
     score: number;
@@ -474,6 +482,22 @@ export type CreateMessageResponses = {
 };
 
 export type CreateMessageResponse = CreateMessageResponses[keyof CreateMessageResponses];
+
+export type ChatData = {
+    body: ChatRequest;
+    path?: never;
+    query?: never;
+    url: '/mentor/chat';
+};
+
+export type ChatResponses = {
+    /**
+     * OK
+     */
+    200: Array<string>;
+};
+
+export type ChatResponse = ChatResponses[keyof ChatResponses];
 
 export type GetLeaderboardData = {
     body?: never;

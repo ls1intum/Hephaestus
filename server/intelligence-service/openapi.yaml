@@ -31,6 +31,91 @@ components:
       - Wrong
       title: BadPracticeStatus
       type: string
+    ClientAttachment:
+      properties:
+        contentType:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Contenttype
+        name:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Name
+        url:
+          title: Url
+          type: string
+      required:
+      - url
+      title: ClientAttachment
+      type: object
+    ClientMessage:
+      additionalProperties: true
+      description: 'PERFECT MATCH for actual frontend payload: {role=user, content=hello,
+        parts=[{type=text, text=hello}]}'
+      properties:
+        annotations:
+          anyOf:
+          - items:
+              type: string
+            type: array
+          - type: 'null'
+          title: Annotations
+        content:
+          title: Content
+          type: string
+        createdAt:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Createdat
+        data:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Data
+        experimental_attachments:
+          anyOf:
+          - items:
+              $ref: '#/components/schemas/ClientAttachment'
+            type: array
+          - type: 'null'
+          title: Experimental Attachments
+        id:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Id
+        parts:
+          anyOf:
+          - items:
+              additionalProperties:
+                type: string
+              type: object
+            type: array
+          - type: 'null'
+          title: Parts
+        reasoning:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Reasoning
+        role:
+          title: Role
+          type: string
+        toolInvocations:
+          anyOf:
+          - items:
+              $ref: '#/components/schemas/ToolInvocation'
+            type: array
+          - type: 'null'
+          title: Toolinvocations
+      required:
+      - role
+      - content
+      title: ClientMessage
+      type: object
     DetectorRequest:
       properties:
         bad_practice_summary:
@@ -155,6 +240,52 @@ components:
       - dev_progress
       title: MentorStartRequest
       type: object
+    Request:
+      properties:
+        messages:
+          items:
+            $ref: '#/components/schemas/ClientMessage'
+          title: Messages
+          type: array
+      required:
+      - messages
+      title: Request
+      type: object
+    ToolInvocation:
+      description: Simplified ToolInvocation model to avoid OpenAPI generator issues
+      properties:
+        args:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Args
+        result:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Result
+        state:
+          title: State
+          type: string
+        step:
+          anyOf:
+          - type: integer
+          - type: 'null'
+          title: Step
+        toolCallId:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Toolcallid
+        toolName:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Toolname
+      required:
+      - state
+      title: ToolInvocation
+      type: object
     ValidationError:
       properties:
         loc:
@@ -252,6 +383,41 @@ paths:
                 $ref: '#/components/schemas/HTTPValidationError'
           description: Validation Error
       summary: Continue a chat session with an LLM.
+      tags:
+      - mentor
+  /mentor/chat:
+    post:
+      operationId: handle_chat_data_mentor_chat_post
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Request'
+        required: true
+      responses:
+        '200':
+          content:
+            text/event-stream:
+              examples:
+                first-chunk:
+                  summary: Typical SSE frame
+                  value: '0: Hello World!\n\n'
+              schema:
+                type: string
+          description: SSE stream of chat deltas
+          headers:
+            x-vercel-ai-data-stream:
+              description: Protocol version for Vercel AI streaming
+              schema:
+                example: v1
+                type: string
+        '422':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+          description: Validation Error
+      summary: Handle Chat Data
       tags:
       - mentor
   /mentor/health:

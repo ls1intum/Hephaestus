@@ -7,6 +7,7 @@ import de.tum.in.www1.hephaestus.intelligenceservice.model.HTTPValidationError;
 import de.tum.in.www1.hephaestus.intelligenceservice.model.MentorRequest;
 import de.tum.in.www1.hephaestus.intelligenceservice.model.MentorResponse;
 import de.tum.in.www1.hephaestus.intelligenceservice.model.MentorStartRequest;
+import de.tum.in.www1.hephaestus.intelligenceservice.model.Request;
 
 import java.util.Collections;
 import java.util.HashMap;
@@ -89,6 +90,56 @@ public class MentorApi extends BaseApi {
 
         ParameterizedTypeReference<MentorResponse> localReturnType = new ParameterizedTypeReference<MentorResponse>() {};
         return apiClient.invokeAPI("/mentor/", HttpMethod.POST, Collections.<String, Object>emptyMap(), localVarQueryParams, localVarPostBody, localVarHeaderParams, localVarCookieParams, localVarFormParams, localVarAccept, localVarContentType, localVarAuthNames, localReturnType);
+    }
+    /**
+     * Handle Chat Data
+     * 
+     * <p><b>200</b> - SSE stream of chat deltas
+     * <p><b>422</b> - Validation Error
+     * @param request  (required)
+     * @return String
+     * @throws RestClientException if an error occurs while attempting to invoke the API
+     */
+    public String handleChatDataMentorChatPost(Request request) throws RestClientException {
+        return handleChatDataMentorChatPostWithHttpInfo(request).getBody();
+    }
+
+    /**
+     * Handle Chat Data
+     * 
+     * <p><b>200</b> - SSE stream of chat deltas
+     * <p><b>422</b> - Validation Error
+     * @param request  (required)
+     * @return ResponseEntity&lt;String&gt;
+     * @throws RestClientException if an error occurs while attempting to invoke the API
+     */
+    public ResponseEntity<String> handleChatDataMentorChatPostWithHttpInfo(Request request) throws RestClientException {
+        Object localVarPostBody = request;
+        
+        // verify the required parameter 'request' is set
+        if (request == null) {
+            throw new HttpClientErrorException(HttpStatus.BAD_REQUEST, "Missing the required parameter 'request' when calling handleChatDataMentorChatPost");
+        }
+        
+
+        final MultiValueMap<String, String> localVarQueryParams = new LinkedMultiValueMap<String, String>();
+        final HttpHeaders localVarHeaderParams = new HttpHeaders();
+        final MultiValueMap<String, String> localVarCookieParams = new LinkedMultiValueMap<String, String>();
+        final MultiValueMap<String, Object> localVarFormParams = new LinkedMultiValueMap<String, Object>();
+
+        final String[] localVarAccepts = { 
+            "text/event-stream", "application/json"
+         };
+        final List<MediaType> localVarAccept = apiClient.selectHeaderAccept(localVarAccepts);
+        final String[] localVarContentTypes = { 
+            "application/json"
+         };
+        final MediaType localVarContentType = apiClient.selectHeaderContentType(localVarContentTypes);
+
+        String[] localVarAuthNames = new String[] {  };
+
+        ParameterizedTypeReference<String> localReturnType = new ParameterizedTypeReference<String>() {};
+        return apiClient.invokeAPI("/mentor/chat", HttpMethod.POST, Collections.<String, Object>emptyMap(), localVarQueryParams, localVarPostBody, localVarHeaderParams, localVarCookieParams, localVarFormParams, localVarAccept, localVarContentType, localVarAuthNames, localReturnType);
     }
     /**
      * Start a chat session with an LLM.

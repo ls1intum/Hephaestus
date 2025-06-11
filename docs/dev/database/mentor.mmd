@@ -1,0 +1,70 @@
+---
+config:
+  theme: base
+---
+erDiagram
+    Thread {
+      BIGINT id PK
+      BIGINT user_id FK "NOT NULL"
+      TIMESTAMP created_at
+      VARCHAR(255) title
+      VARCHAR(255) description
+    }
+
+    Message {
+        BIGINT id PK
+        BIGINT thread_id FK "NOT NULL"
+        %% Thread
+        %% Role "assistant" or "user"
+        %% createdAt
+
+
+        VARCHAR(32767) content
+
+        
+        VARCHAR(255) sender
+        TIMESTAMP sent_at
+        BIGINT session_id FK "NOT NULL"
+        INTEGER messages_order
+    }
+
+    User ||--o{ Thread : starts
+    Thread ||--o{ Message : contains
+  
+    Session {
+        BIGINT id PK
+        TIMESTAMP created_at
+        BIGINT user_id FK
+        BOOLEAN is_closed "NOT NULL"
+    }
+
+    User {
+        BIGINT id PK
+    }
+
+    %% Relationships
+    %% One-to-Many relationships
+    Session ||--o{ Message : has
+    User ||--o{ Session : has
+
+    %% Styling
+    classDef primaryEntity fill:#e1f5fe,stroke:#01579b,stroke-width:2px
+    classDef associationEntity fill:#f3e5f5,stroke:#4a148c,stroke-width:2px
+    classDef metadataEntity fill:#e8f5e8,stroke:#1b5e20,stroke-width:2px
+
+    class Issue primaryEntity
+    class IssueAssignee associationEntity
+    class IssueLabel associationEntity
+    class Label primaryEntity
+    class Message metadataEntity
+    class Milestone primaryEntity
+    class PullRequestRequestedReviewer associationEntity
+    class Repository primaryEntity
+    class RepositoryToMonitor metadataEntity
+    class Session metadataEntity
+    class Team primaryEntity
+    class TeamLabel associationEntity
+    class TeamMember associationEntity
+    class TeamRepository associationEntity
+    class User primaryEntity
+    class Workspace primaryEntity
