@@ -1,21 +1,9 @@
-name: Documentation
+name: CI/CD / Documentation
 
 on:
-  pull_request:
-    paths:
-    - 'docs/**'
-    - '.github/workflows/docs.yml'
   push:
-    branches:
-    - develop
-    tags: '[0-9]+.[0-9]+.[0-9]+'
-    paths:
-    - 'docs/**'
-    - '.github/workflows/docs.yml'
-# TODO: Add paths where function docstrings might change 'path/**'
-  release:
-    types:
-    - created
+    branches: ["main"]
+    tags: ["v*"]
 
   # Allows you to run this workflow manually from the Actions tab
   workflow_dispatch:
@@ -28,6 +16,7 @@ permissions:
 
 jobs: 
   build-docs: 
+    name: Build
     runs-on: ubuntu-22.04
 
     permissions:
@@ -66,7 +55,8 @@ jobs:
           path: docs/_build/html
   
   deploy-docs:
-    if: github.ref == 'refs/heads/develop'
+    name: Documentation / Deploy to GitHub Pages
+    if: github.ref == 'refs/heads/main'
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}

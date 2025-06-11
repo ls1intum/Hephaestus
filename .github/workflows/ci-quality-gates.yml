@@ -1,0 +1,367 @@
+name: Quality Gates
+
+on:
+  workflow_call:
+    inputs:
+      should_skip:
+        description: "Whether to skip the workflow"
+        required: false
+        type: string
+        default: "false"
+
+jobs:
+  # Quality gates with intelligent caching and error handling
+  quality-gates:
+    name: ${{ matrix.check }}
+    runs-on: ubuntu-latest
+    if: inputs.should_skip != 'true'
+    timeout-minutes: ${{ contains(fromJSON('["database-schema-validation", "database-documentation-validation"]'), matrix.check) && 20 || 15 }}
+    strategy:
+      fail-fast: false
+      matrix:
+        check:
+          [
+            application-server-quality,
+            webapp-quality,
+            intelligence-service-quality,
+            webhook-ingest-quality,
+            openapi-validation,
+            database-schema-validation,
+            database-documentation-validation,
+          ]
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      # Advanced cache setup with fallback
+      - name: Setup shared caches
+        uses: ./.github/actions/setup-caches
+        with:
+          cache-type: ${{ matrix.check }}
+          os: ${{ runner.os }}
+
+      # Additional cache for webapp build artifacts
+      - name: Cache webapp build artifacts
+        if: matrix.check == 'webapp-quality'
+        uses: actions/cache@v4
+        with:
+          path: |
+            webapp-react/dist
+            webapp-react/.vite
+            webapp-react/node_modules/.vite
+            webapp-react/node_modules/.cache
+          key: ${{ runner.os }}-webapp-build-${{ hashFiles('package-lock.json', 'webapp-react/package-lock.json', 'webapp-react/biome.json', 'webapp-react/tsconfig.json', 'webapp-react/vite.config.js', 'webapp-react/components.json') }}-${{ github.sha }}
+          restore-keys: |
+            ${{ runner.os }}-webapp-build-${{ hashFiles('package-lock.json', 'webapp-react/package-lock.json', 'webapp-react/biome.json', 'webapp-react/tsconfig.json', 'webapp-react/vite.config.js', 'webapp-react/components.json') }}-
+            ${{ runner.os }}-webapp-build-
+
+      # application-server code quality and formatting
+      - name: application-server formatting & static analysis
+        if: matrix.check == 'application-server-quality'
+        run: |
+          echo "🔍 Checking application-server code formatting..."
+
+          if [ ! -d "node_modules" ]; then
+            npm ci --prefer-offline --no-audit
+          fi
+
+          if ! npm run format:application-server:check; then
+            echo "❌ application-server formatting failed. Run: npm run format:application-server:write"
+            exit 1
+          fi
+
+          echo "✅ application-server formatting passed"
+
+      # Webapp quality checks with comprehensive validation
+      - name: Webapp quality & type checking
+        if: matrix.check == 'webapp-quality'
+        working-directory: ./webapp-react
+        run: |
+          echo "🔍 Running webapp quality checks..."
+
+          if [ ! -d "node_modules" ]; then
+            npm ci --prefer-offline --no-audit --progress=false
+          fi
+
+          ISSUES_FOUND=()
+
+          echo "🎨 Running Biome checks..."
+          if ! npm run check; then
+            echo "❌ Biome checks failed"
+            ISSUES_FOUND+=("Biome checks failed. Run: npm run check -- --write")
+          else
+            echo "✅ Biome checks passed"
+          fi
+
+          echo "📊 Running TypeScript check..."
+          if ! npx tsc --noEmit; then
+            echo "❌ TypeScript check failed"
+            ISSUES_FOUND+=("TypeScript compilation errors found")
+          else
+            echo "✅ TypeScript check passed"
+          fi
+
+          echo "🏗️ Running build check..."
+          if ! npm run build; then
+            echo "❌ Build check failed"
+            ISSUES_FOUND+=("Build failed")
+          else
+            echo "✅ Build check passed"
+          fi
+
+          if [ ${#ISSUES_FOUND[@]} -gt 0 ]; then
+            echo ""
+            echo "❌ Webapp quality issues found:"
+            for issue in "${ISSUES_FOUND[@]}"; do
+              echo "  • $issue"
+            done
+            exit 1
+          fi
+
+          echo "✅ All webapp quality checks passed"
+
+      # intelligence-service quality checks with comprehensive validation
+      - name: intelligence-service quality & security analysis
+        if: matrix.check == 'intelligence-service-quality'
+        run: |
+          echo "🔍 Running intelligence-service quality checks..."
+          cd server/intelligence-service
+
+          if [ ! -d ".venv" ]; then
+            poetry install --no-interaction --no-root
+          fi
+
+          ISSUES_FOUND=()
+
+          echo "🎨 Checking code formatting..."
+          if ! poetry run black --check --diff .; then
+            echo "❌ Black formatting failed"
+            ISSUES_FOUND+=("Black formatting failed. Run: cd server/intelligence-service && poetry run black .")
+          else
+            echo "✅ Black formatting passed"
+          fi
+
+          echo "🔍 Running linting..."
+          if ! poetry run flake8 . --statistics --count; then
+            echo "❌ Flake8 linting failed Run: cd server/intelligence-service && poetry run flake8 ."
+            ISSUES_FOUND+=("Flake8 linting failed")
+          else
+            echo "✅ Flake8 linting passed"
+          fi
+
+          if [ ${#ISSUES_FOUND[@]} -gt 0 ]; then
+            echo ""
+            echo "❌ intelligence-service quality issues found:"
+            for issue in "${ISSUES_FOUND[@]}"; do
+              echo "  • $issue"
+            done
+            exit 1
+          fi
+
+          echo "✅ intelligence-service quality checks passed"
+
+      # webhook-ingest quality checks with comprehensive validation
+      - name: webhook-ingest quality & security analysis
+        if: matrix.check == 'webhook-ingest-quality'
+        run: |
+          echo "🔍 Running webhook-ingest quality checks..."
+          cd server/webhook-ingest
+
+          if [ ! -d ".venv" ]; then
+            poetry install --no-interaction --no-root
+          fi
+
+          ISSUES_FOUND=()
+
+          echo "🎨 Checking code formatting..."
+          if ! poetry run black --check --diff .; then
+            echo "❌ Black formatting failed"
+            ISSUES_FOUND+=("Black formatting failed. Run: cd server/webhook-ingest && poetry run black .")
+          else
+            echo "✅ Black formatting passed"
+          fi
+
+          echo "🔍 Running linting..."
+          if ! poetry run flake8 . --statistics --count; then
+            echo "❌ Flake8 linting failed Run: cd server/webhook-ingest && poetry run flake8 ."
+            ISSUES_FOUND+=("Flake8 linting failed")
+          else
+            echo "✅ Flake8 linting passed"
+          fi
+
+          if [ ${#ISSUES_FOUND[@]} -gt 0 ]; then
+            echo ""
+            echo "❌ webhook-ingest quality issues found:"
+            for issue in "${ISSUES_FOUND[@]}"; do
+              echo "  • $issue"
+            done
+            exit 1
+          fi
+
+          echo "✅ webhook-ingest quality checks passed"
+
+      # OpenAPI validation with intelligent auto-commit
+      - name: OpenAPI validation & synchronization
+        if: matrix.check == 'openapi-validation'
+        run: |
+          echo "🔍 Validating OpenAPI specifications and clients..."
+
+          # Install all dependencies
+          if [ ! -d "node_modules" ]; then
+            npm ci --prefer-offline --no-audit
+          fi
+
+          # Setup Python environments
+          cd server/intelligence-service
+          if [ ! -d ".venv" ]; then
+            poetry install --no-interaction --no-root
+          fi
+          cd ../..
+
+          # Setup application-server environment
+          cd server/application-server
+          if [ ! -d "target" ]; then
+            mvn compile -DskipTests --quiet
+          fi
+          cd ../..
+
+          echo "🔄 Generating OpenAPI specifications and clients..."
+          npm run generate:api
+
+          # Check for any changes
+          git add .
+
+          if ! git diff --cached --quiet; then
+            echo "❌ OpenAPI validation failed - changes detected"
+            echo "Fix: Add the 'autocommit-openapi' label to this PR or run 'npm run generate:api' locally"
+            exit 1
+          else
+            echo "✅ OpenAPI validation passed - all specs are up to date"
+          fi
+
+      # Database schema validation - JPA entities vs committed migrations
+      - name: Database schema validation
+        if: matrix.check == 'database-schema-validation'
+        run: |
+          echo "🔍 Validating JPA entities match committed migrations..."
+
+          # Start PostgreSQL service for schema operations
+          echo "🐘 Starting PostgreSQL service..."
+          docker run -d \
+            --name postgres-schema \
+            -e POSTGRES_DB=hephaestus \
+            -e POSTGRES_PASSWORD=root \
+            -e POSTGRES_USER=root \
+            -p 5432:5432 \
+            --health-cmd="pg_isready" \
+            --health-interval=10s \
+            --health-timeout=5s \
+            --health-retries=5 \
+            postgres:16
+
+          # Wait for PostgreSQL to be ready
+          echo "⏳ Waiting for PostgreSQL..."
+          until docker exec postgres-schema pg_isready -U root -d hephaestus; do
+            sleep 2
+          done
+
+          # Set environment variables for database connection
+          export SPRING_DATASOURCE_URL="jdbc:postgresql://localhost:5432/hephaestus"
+          export SPRING_DATASOURCE_USERNAME="root"
+          export SPRING_DATASOURCE_PASSWORD="root"
+
+          # Build application-server for schema operations
+          echo "🏗️ Building application-server..."
+          cd server/application-server
+          if ! mvn compile -DskipTests --quiet; then
+            echo "❌ Failed to build application-server"
+            docker stop postgres-schema && docker rm postgres-schema
+            exit 1
+          fi
+          cd ../..
+
+          # Check for schema drift between JPA entities and committed migrations
+          echo "📊 Checking for schema drift..."
+          if ! scripts/db-utils.sh draft-changelog; then
+            echo "❌ Failed to generate draft changelog"
+            docker stop postgres-schema && docker rm postgres-schema
+            exit 1
+          fi
+
+          # Clean up PostgreSQL container
+          docker stop postgres-schema && docker rm postgres-schema
+
+          # Check results
+          if [ -f "server/application-server/src/main/resources/db/changelog_new.xml" ]; then
+            echo "❌ Schema drift detected. Run: npm run db:draft-changelog and follow the documentation"
+            echo "Generated migration:"
+            cat server/application-server/src/main/resources/db/changelog_new.xml
+            exit 1
+          else
+            echo "✅ Schema validation passed"
+          fi
+
+      # Database documentation validation - ERD matches migration-based schema
+      - name: Database documentation validation
+        if: matrix.check == 'database-documentation-validation'
+        run: |
+          echo "📊 Validating ERD documentation matches migration-based schema..."
+
+          # Start PostgreSQL service for ERD generation
+          echo "🐘 Starting PostgreSQL service..."
+          docker run -d \
+            --name postgres-erd \
+            -e POSTGRES_DB=hephaestus \
+            -e POSTGRES_PASSWORD=root \
+            -e POSTGRES_USER=root \
+            -p 5432:5432 \
+            --health-cmd="pg_isready" \
+            --health-interval=10s \
+            --health-timeout=5s \
+            --health-retries=5 \
+            postgres:16
+
+          # Wait for PostgreSQL to be ready
+          echo "⏳ Waiting for PostgreSQL..."
+          until docker exec postgres-erd pg_isready -U root -d hephaestus; do
+            sleep 2
+          done
+
+          # Set environment variables for database connection
+          export SPRING_DATASOURCE_URL="jdbc:postgresql://localhost:5432/hephaestus"
+          export SPRING_DATASOURCE_USERNAME="root"
+          export SPRING_DATASOURCE_PASSWORD="root"
+
+          # Build application-server for ERD operations
+          echo "🏗️ Building application-server..."
+          cd server/application-server
+          if ! mvn compile -DskipTests --quiet; then
+            echo "❌ Failed to build application-server"
+            docker stop postgres-erd && docker rm postgres-erd
+            exit 1
+          fi
+          cd ../..
+
+          # Generate ERD documentation from committed migration-based schema
+          echo "📈 Generating ERD from committed migration-based schema..."
+          if ! scripts/db-utils.sh generate-erd; then
+            echo "❌ Failed to generate ERD documentation"
+            docker stop postgres-erd && docker rm postgres-erd
+            exit 1
+          fi
+
+          # Clean up PostgreSQL container
+          docker stop postgres-erd && docker rm postgres-erd
+
+          # Check if ERD documentation is up to date
+          git add docs/dev/database/schema.mmd
+
+          if ! git diff --cached --quiet docs/dev/database/schema.mmd; then
+            echo "❌ ERD documentation validation failed - outdated ERD"
+            echo "Fix: npm run db:generate-erd-docs"
+            exit 1
+          else
+            echo "✅ ERD documentation validation passed (up-to-date with committed migrations)"
+          fi

@@ -1,0 +1,35 @@
+name: Release
+
+on:
+  push:
+    branches: [develop, main]
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GH_PAT }}
+          persist-credentials: false
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - run: npm ci
+
+      - uses: cycjimmy/semantic-release-action@v4
+        with:
+          semantic_version: 24.0.0
+          extra_plugins: |
+            @semantic-release/changelog@6.0.0
+            @semantic-release/exec@6.0.0
+            @semantic-release/git@10.0.0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GH_PAT }}

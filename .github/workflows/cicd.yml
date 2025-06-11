@@ -1,0 +1,127 @@
+name: CI/CD
+
+on:
+  workflow_dispatch:
+  push:
+    branches: ["develop", "main"]
+    tags: ["v*"]
+  merge_group:
+  pull_request:
+    branches: ["**"]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  pre-job:
+    runs-on: ubuntu-latest
+    outputs:
+      should_skip: ${{ steps.skip_check.outputs.should_skip }}
+    timeout-minutes: 15
+    steps:
+      - id: skip_check
+        uses: fkirc/skip-duplicate-actions@v5
+        with:
+          do_not_skip: '["workflow_dispatch"]'
+
+  # Code quality and style checks
+  quality-gates:
+    uses: ./.github/workflows/ci-quality-gates.yml
+    needs: [pre-job]
+    if: needs.pre-job.outputs.should_skip != 'true'
+    secrets: inherit
+    with:
+      should_skip: ${{ needs.pre-job.outputs.should_skip }}
+
+  # Security vulnerability scanning
+  security-scan:
+    uses: ./.github/workflows/ci-security-scan.yml
+    needs: [pre-job]
+    if: needs.pre-job.outputs.should_skip != 'true'
+    secrets: inherit
+    with:
+      should_skip: ${{ needs.pre-job.outputs.should_skip }}
+
+  # Comprehensive test execution
+  test-suite:
+    uses: ./.github/workflows/ci-tests.yml
+    needs: [pre-job]
+    if: needs.pre-job.outputs.should_skip != 'true'
+    secrets: inherit
+    with:
+      should_skip: ${{ needs.pre-job.outputs.should_skip }}
+
+  # Build Docker images and push to registry
+  docker-build:
+    uses: ./.github/workflows/ci-docker-build.yml
+    needs: [pre-job]
+    if: needs.pre-job.outputs.should_skip != 'true'
+    secrets: inherit
+    with:
+      should_skip: ${{ needs.pre-job.outputs.should_skip }}
+
+  # Security scan Docker images (skipped for now)
+  # docker-security-scan:
+  #   uses: ./.github/workflows/ci-docker-security-scan.yml
+  #   needs: [pre-job, docker-build]
+  #   if: needs.pre-job.outputs.should_skip != 'true'
+  #   secrets: inherit
+  #   with:
+  #     should_skip: ${{ needs.pre-job.outputs.should_skip }}
+
+  # Final: Aggregated success gate for branch protection
+  all-ci-passed:
+    runs-on: ubuntu-latest
+    needs:
+      [
+        quality-gates,
+        security-scan,
+        test-suite,
+        docker-build,
+        # docker-security-scan, 
+      ]
+    if: always()
+    outputs:
+      environment: ${{ steps.set-environment.outputs.environment }}
+    steps:
+      - name: Check all jobs and determine overall status
+        run: |
+          # Check if any required job failed
+          if [[ "${{ contains(needs.*.result, 'failure') }}" == "true" ]]; then
+            echo "❌ One or more CI jobs failed"
+            exit 1
+          elif [[ "${{ contains(needs.*.result, 'cancelled') }}" == "true" ]]; then
+            echo "⚠️ One or more CI jobs were cancelled"
+            exit 1
+          else
+            echo "✅ All CI jobs passed successfully"
+          fi
+      
+      - name: Determine deployment environment
+        id: set-environment
+        run: |
+          if [[ "${{ github.ref }}" == "refs/heads/develop" ]]; then
+            echo "environment=Staging" >> $GITHUB_OUTPUT
+            echo "🎯 Deployment target: Staging (develop branch)"
+          elif [[ "${{ github.ref }}" == "refs/heads/main" ]]; then
+            echo "environment=Production" >> $GITHUB_OUTPUT
+            echo "🎯 Deployment target: Production (main branch)"
+          else
+            echo "environment=none" >> $GITHUB_OUTPUT
+            echo "🚫 No deployment target (branch/tag not configured for deployment)"
+            exit 0
+          fi
+
+  # Automatic deployment based on branch
+  deploy-app:
+    needs: [all-ci-passed]
+    if: ${{ github.ref == 'refs/heads/develop' || github.ref == 'refs/heads/main' }}
+    uses: ls1intum/.github/.github/workflows/deploy-docker-compose.yml@main
+    with:
+      environment: ${{ needs.all-ci-passed.outputs.environment }}
+      docker-compose-file: "./docker/compose.app-react.yaml"
+      main-image-name: ls1intum/hephaestus/application-server
+      image-tag: ${{ github.sha }}
+      deployment-base-path: "/opt/hephaestus/app"
+    secrets: inherit

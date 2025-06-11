@@ -1,0 +1,192 @@
+name: Docker Security Scan
+
+on:
+  workflow_call:
+    inputs:
+      should_skip:
+        description: "Whether to skip the workflow"
+        required: false
+        type: string
+        default: "false"
+
+jobs:
+  security-scan:
+    name: "${{ matrix.component.name }}-security-scan"
+    runs-on: ubuntu-latest
+    if: inputs.should_skip != 'true'
+    timeout-minutes: 15
+    env:
+      TRIVY_QUIET: "true"          # suppress progress + DB noise
+    strategy:
+      fail-fast: false
+      matrix:
+        component:
+          - { name: "webapp-react",         image: "ghcr.io/ls1intum/hephaestus/webapp-react" }
+          - { name: "application-server",   image: "ghcr.io/ls1intum/hephaestus/application-server" }
+          - { name: "intelligence-service", image: "ghcr.io/ls1intum/hephaestus/intelligence-service" }
+          - { name: "webhook-ingest",       image: "ghcr.io/ls1intum/hephaestus/webhook-ingest" }
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.repository_owner }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Pull & scan image with Trivy
+        id: trivy
+        uses: aquasecurity/trivy-action@0.31.0
+        with:
+          image-ref: ${{ matrix.component.image }}:${{ github.sha }}
+          format: "sarif"
+          output: "trivy-${{ matrix.component.name }}.sarif"
+          exit-code: "1"           # fail on HIGH/CRITICAL that have fixes
+          ignore-unfixed: true
+          severity: "CRITICAL,HIGH"
+          trivyignores: ".trivyignore"
+
+      - name: Upload SARIF to Security tab
+        uses: github/codeql-action/upload-sarif@v3
+        if: always()
+        with:
+          sarif_file: "trivy-${{ matrix.component.name }}.sarif"
+
+      - name: Upload Trivy results as artifact
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: trivy-${{ matrix.component.name }}.sarif
+          path: trivy-${{ matrix.component.name }}.sarif
+          retention-days: 30
+
+      - name: Generate security scan summary
+        if: always()
+        run: |
+          echo "# 🛡️ Security Scan Results - ${{ matrix.component.name }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          
+          SARIF_FILE="trivy-${{ matrix.component.name }}.sarif"
+          
+          if [ ! -f "$SARIF_FILE" ]; then
+            echo "❌ **SARIF file not found** - Scan may have failed" >> $GITHUB_STEP_SUMMARY
+            exit 0
+          fi
+          
+          # Extract vulnerability counts and details
+          TOTAL_VULNS=$(jq '.runs[0].results | length' "$SARIF_FILE" 2>/dev/null || echo "0")
+          
+          # Extract severities for each result with correct variable scope
+          SEVERITIES=$(jq -r '.runs[0] as $run | $run.results[] | .ruleIndex as $ri | ($run.tool.driver.rules[$ri].properties."security-severity" // "0")' "$SARIF_FILE" 2>/dev/null)
+          
+          CRITICAL_COUNT=0
+          HIGH_COUNT=0
+          
+          while IFS= read -r severity; do
+            if [ -n "$severity" ] && [ "$severity" != "null" ] && [ "$severity" != "0" ]; then
+              if (( $(echo "$severity >= 9.0" | bc -l 2>/dev/null || echo "0") )); then
+                CRITICAL_COUNT=$((CRITICAL_COUNT + 1))
+              elif (( $(echo "$severity >= 7.0" | bc -l 2>/dev/null || echo "0") )); then
+                HIGH_COUNT=$((HIGH_COUNT + 1))
+              fi
+            fi
+          done <<< "$SEVERITIES"
+          
+          # Component info
+          echo "## 📦 Component Information" >> $GITHUB_STEP_SUMMARY
+          echo "| Field | Value |" >> $GITHUB_STEP_SUMMARY
+          echo "|-------|-------|" >> $GITHUB_STEP_SUMMARY
+          echo "| **Component** | \`${{ matrix.component.name }}\` |" >> $GITHUB_STEP_SUMMARY
+          echo "| **Image** | \`${{ matrix.component.image }}:${{ github.sha }}\` |" >> $GITHUB_STEP_SUMMARY
+          echo "| **Scan Time** | $(date -u '+%Y-%m-%d %H:%M:%S UTC') |" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          
+          # Vulnerability summary
+          echo "## 📊 Vulnerability Summary" >> $GITHUB_STEP_SUMMARY
+          echo "| Severity | Count | Status |" >> $GITHUB_STEP_SUMMARY
+          echo "|----------|-------|--------|" >> $GITHUB_STEP_SUMMARY
+          
+          if [ "$CRITICAL_COUNT" -gt 0 ]; then
+            echo "| 🔴 **Critical** | $CRITICAL_COUNT | ❌ Action Required |" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "| 🔴 **Critical** | $CRITICAL_COUNT | ✅ Clean |" >> $GITHUB_STEP_SUMMARY
+          fi
+          
+          if [ "$HIGH_COUNT" -gt 0 ]; then
+            echo "| 🟠 **High** | $HIGH_COUNT | ❌ Action Required |" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "| 🟠 **High** | $HIGH_COUNT | ✅ Clean |" >> $GITHUB_STEP_SUMMARY
+          fi
+          
+          echo "| 📈 **Total** | $TOTAL_VULNS | - |" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          
+          # Overall status
+          if [ "$TOTAL_VULNS" -eq 0 ]; then
+            echo "## ✅ Security Status: CLEAN" >> $GITHUB_STEP_SUMMARY
+            echo "> 🎉 No vulnerabilities detected! This component is ready for deployment." >> $GITHUB_STEP_SUMMARY
+          elif [ "$CRITICAL_COUNT" -gt 0 ] || [ "$HIGH_COUNT" -gt 0 ]; then
+            echo "## ❌ Security Status: VULNERABILITIES DETECTED" >> $GITHUB_STEP_SUMMARY
+            echo "> ⚠️ Critical or high-severity vulnerabilities found. Review and remediate before deployment." >> $GITHUB_STEP_SUMMARY
+          else
+            echo "## ⚠️ Security Status: LOW RISK" >> $GITHUB_STEP_SUMMARY
+            echo "> 💡 Only low/medium severity vulnerabilities detected." >> $GITHUB_STEP_SUMMARY
+          fi
+          echo "" >> $GITHUB_STEP_SUMMARY
+          
+          # Detailed vulnerability list (if any found)
+          if [ "$TOTAL_VULNS" -gt 0 ]; then
+            echo "## 🔍 Vulnerability Details" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "<details>" >> $GITHUB_STEP_SUMMARY
+            echo "<summary>📋 <strong>View All $TOTAL_VULNS Vulnerabilities</strong> (Click to expand)</summary>" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "| CVE ID | Severity | Package/Location | Description |" >> $GITHUB_STEP_SUMMARY
+            echo "|--------|----------|------------------|-------------|" >> $GITHUB_STEP_SUMMARY
+            
+            # Process each vulnerability in table format
+            jq -r '.runs[0].results[] as $result | 
+                   .runs[0].tool.driver.rules[$result.ruleIndex] as $rule |
+                   "| " + ($result.ruleId // "Unknown") + 
+                   " | " + ($rule.properties."security-severity" // "N/A") + 
+                   " | `" + ($result.locations[0].physicalLocation.artifactLocation.uri // "N/A") + "` | " + 
+                   (($rule.help.markdown // $rule.help.text // "No description available") | gsub("\n"; " ") | .[0:100]) + 
+                   (if (($rule.help.markdown // $rule.help.text // "") | length) > 100 then "..." else "" end) + " |"' "$SARIF_FILE" 2>/dev/null >> $GITHUB_STEP_SUMMARY || echo "| Error | - | - | Could not parse vulnerability details |" >> $GITHUB_STEP_SUMMARY
+            
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "### 📖 Detailed Descriptions" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            
+            # Process each vulnerability with full details
+            jq -r '.runs[0].results[] as $result | 
+                   .runs[0].tool.driver.rules[$result.ruleIndex] as $rule |
+                   "#### " + ($result.ruleId // "Unknown") + 
+                   "\n**Severity Score:** " + ($rule.properties."security-severity" // "N/A") + 
+                   "\n**Message:** " + $result.message.text + 
+                   "\n**Location:** `" + ($result.locations[0].physicalLocation.artifactLocation.uri // "N/A") + "`" +
+                   "\n**Description:** " + ($rule.help.markdown // $rule.help.text // "No description available") + 
+                   "\n"' "$SARIF_FILE" 2>/dev/null >> $GITHUB_STEP_SUMMARY || echo "❌ Error parsing detailed vulnerability information" >> $GITHUB_STEP_SUMMARY
+            
+            echo "</details>" >> $GITHUB_STEP_SUMMARY
+          fi
+          
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "## 📋 Next Steps" >> $GITHUB_STEP_SUMMARY
+          
+          if [ "$TOTAL_VULNS" -gt 0 ]; then
+            echo "1. 🔍 **Review Details:** Check the [Security tab](../security) for full vulnerability details" >> $GITHUB_STEP_SUMMARY
+            echo "2. 📥 **Download Report:** Access the SARIF artifact from this workflow run" >> $GITHUB_STEP_SUMMARY
+            echo "3. 🔧 **Remediate:** Update dependencies or base images to fix vulnerabilities" >> $GITHUB_STEP_SUMMARY
+            echo "4. ✅ **Verify:** Re-run the scan after applying fixes" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "1. ✅ **Deploy Safely:** No security issues blocking deployment" >> $GITHUB_STEP_SUMMARY
+            echo "2. 📊 **Monitor:** Continue regular security scanning" >> $GITHUB_STEP_SUMMARY
+            echo "3. 🔄 **Maintain:** Keep dependencies updated" >> $GITHUB_STEP_SUMMARY
+          fi
+          
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "---" >> $GITHUB_STEP_SUMMARY
+          echo "*Powered by [Trivy](https://aquasecurity.github.io/trivy/) • Report generated $(date -u '+%Y-%m-%d %H:%M:%S UTC')*" >> $GITHUB_STEP_SUMMARY

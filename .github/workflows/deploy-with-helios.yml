@@ -1,12 +1,8 @@
-name: Deploy to Staging
+name: Deploy with Helios
 
 on:
   workflow_dispatch:
     inputs:
-      branch_name:
-        description: "Which branch to deploy"
-        required: false
-        type: string
       commit_sha:
         description: 'Commit SHA to deploy'
         required: true
@@ -14,18 +10,25 @@ on:
         description: "Which environment to deploy (e.g. environment defined in GitHub)"
         required: true
         type: string
+      branch_name:
+        description: "Which branch to deploy (unused)"
+        required: false
+        type: string
       triggered_by:
         description: "Username that triggered deployment (not required, shown if triggered via GitHub UI, logged if triggered via GitHub app)"
         required: false
         type: string
 
-jobs:  
+# Suggestion: Ensures only one workflow runs at a time for a given environment name
+concurrency: ${{ github.event.inputs.environment_name }}
+
+jobs:
   deploy-app:
     uses: ls1intum/.github/.github/workflows/deploy-docker-compose.yml@main
     with:
-      environment: ${{ inputs.environment_name }}
-      docker-compose-file: "./docker/compose.app.yaml"
+      environment: ${{ github.event.inputs.environment_name }}
+      docker-compose-file: './docker/compose.app-react.yaml'
       main-image-name: ls1intum/hephaestus/application-server
-      image-tag: ${{ inputs.commit_sha }}
+      image-tag: ${{ github.event.inputs.commit_sha }}
       deployment-base-path: "/opt/hephaestus/app"
     secrets: inherit

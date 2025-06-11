@@ -14,8 +14,10 @@
     "lint": "biome lint",
     "check": "biome check",
     "storybook": "storybook dev -p 6006",
-    "build-storybook": "storybook build",
+    "build-storybook": "storybook build --stats-json",
     "chromatic": "npx chromatic --exit-zero-on-changes",
+    "chromatic:ci": "npx chromatic --only-changed",
+    "chromatic:dry-run": "npx chromatic --dry-run",
     "openapi-ts": "openapi-ts"
   },
   "dependencies": {
@@ -68,6 +70,7 @@
     "zod": "^3.25.46"
   },
   "devDependencies": {
+    "chromatic": "^12.1.1",
     "@biomejs/biome": "1.9.4",
     "@chromatic-com/storybook": "^3.2.6",
     "@hey-api/openapi-ts": "^0.69.1",
