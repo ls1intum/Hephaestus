@@ -8,7 +8,7 @@ info:
   license:
     name: MIT License
     url: https://github.com/ls1intum/Hephaestus/blob/develop/LICENSE
-  version: 0.9.0-rc.1
+  version: 0.9.0-rc.2-rc.1
 servers:
 - url: /
   description: Default Server URL
