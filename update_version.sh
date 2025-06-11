@@ -142,27 +142,27 @@ sed_inplace() {
 
 # Update Java source: OpenAPIConfiguration.java (if it exists)
 if [[ -f server/application-server/src/main/java/de/tum/in/www1/hephaestus/OpenAPIConfiguration.java ]]; then
-    sed_inplace "s#(version *= *\")[0-9]+(\.[0-9]+){2}\"#\\1${NEW_VERSION}\"#" server/application-server/src/main/java/de/tum/in/www1/hephaestus/OpenAPIConfiguration.java
+    sed_inplace "s#(version *= *\")[0-9]+(\.[0-9]+){2}(-[0-9A-Za-z.-]+)?(\+[0-9A-Za-z.-]+)?\"#\\1${NEW_VERSION}\"#" server/application-server/src/main/java/de/tum/in/www1/hephaestus/OpenAPIConfiguration.java
 fi
 
 # Update application.yml (server configuration) (if it exists)
 if [[ -f server/application-server/src/main/resources/application.yml ]]; then
-    sed_inplace "s#(version: *\")[0-9]+(\.[0-9]+){2}\"#\1${NEW_VERSION}\"#" server/application-server/src/main/resources/application.yml
+    sed_inplace "s#(version: *\")[0-9]+(\.[0-9]+){2}(-[0-9A-Za-z.-]+)?(\+[0-9A-Za-z.-]+)?\"#\1${NEW_VERSION}\"#" server/application-server/src/main/resources/application.yml
 fi
 
 # Update server/intelligence-service/pyproject.toml
 if [[ -f server/intelligence-service/pyproject.toml ]]; then
-    sed_inplace "s#(version *= *\")[0-9]+(\.[0-9]+){2}\"#\1${NEW_VERSION}\"#" server/intelligence-service/pyproject.toml
+    sed_inplace "s#(version *= *\")[0-9]+(\.[0-9]+){2}(-[0-9A-Za-z.-]+)?(\+[0-9A-Za-z.-]+)?\"#\1${NEW_VERSION}\"#" server/intelligence-service/pyproject.toml
 fi
 
 # Update server/webhook-ingest/pyproject.toml
 if [[ -f server/webhook-ingest/pyproject.toml ]]; then
-    sed_inplace "s#(version *= *\")[0-9]+(\.[0-9]+){2}\"#\1${NEW_VERSION}\"#" server/webhook-ingest/pyproject.toml
+    sed_inplace "s#(version *= *\")[0-9]+(\.[0-9]+){2}(-[0-9A-Za-z.-]+)?(\+[0-9A-Za-z.-]+)?\"#\1${NEW_VERSION}\"#" server/webhook-ingest/pyproject.toml
 fi
 
 # Update server/intelligence-service/app/main.py (if it exists)
 if [[ -f server/intelligence-service/app/main.py ]]; then
-    sed_inplace "s#(version *= *\")[0-9]+(\.[0-9]+){2}\"#\1${NEW_VERSION}\"#" server/intelligence-service/app/main.py
+    sed_inplace "s#(version *= *\")[0-9]+(\.[0-9]+){2}(-[0-9A-Za-z.-]+)?(\+[0-9A-Za-z.-]+)?\"#\1${NEW_VERSION}\"#" server/intelligence-service/app/main.py
 fi
 
 # Update Maven POM (only update the project version for hephaestus) (if it exists)
@@ -170,19 +170,19 @@ if [[ -f server/application-server/pom.xml ]]; then
     # This awk script looks for the line with <artifactId>hephaestus</artifactId>,
     # then updates the next <version> element.
     awk -v new_version="${NEW_VERSION}" '
-        /<artifactId>hephaestus<\/artifactId>/ { print; getline; if ($0 ~ /<version>/) { sub(/<version>[0-9]+\.[0-9]+\.[0-9]+(-SNAPSHOT)?<\/version>/, "<version>" new_version "-SNAPSHOT</version>") } }
+        /<artifactId>hephaestus<\/artifactId>/ { print; getline; if ($0 ~ /<version>/) { sub(/<version>[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?(\+[0-9A-Za-z.-]+)?(-SNAPSHOT)?<\/version>/, "<version>" new_version "-SNAPSHOT</version>") } }
         { print }
     ' server/application-server/pom.xml > server/application-server/pom.xml.tmp && mv server/application-server/pom.xml.tmp server/application-server/pom.xml
 fi
 
 # Update server/application-server/openapi.yaml (non-quoted version) (if it exists)
 if [[ -f server/application-server/openapi.yaml ]]; then
-    sed_inplace "s#(version:[[:space:]]*)[0-9]+(\.[0-9]+){2}#\1${NEW_VERSION}#" server/application-server/openapi.yaml
+    sed_inplace "s#(version:[[:space:]]*)[0-9]+(\.[0-9]+){2}(-[0-9A-Za-z.-]+)?(\+[0-9A-Za-z.-]+)?#\1${NEW_VERSION}#" server/application-server/openapi.yaml
 fi
 
 # Update server/intelligence-service/openapi.yaml (non-quoted version) (if it exists)
 if [[ -f server/intelligence-service/openapi.yaml ]]; then
-    sed_inplace "s#(version:[[:space:]]*)[0-9]+(\.[0-9]+){2}#\1${NEW_VERSION}#" server/intelligence-service/openapi.yaml
+    sed_inplace "s#(version:[[:space:]]*)[0-9]+(\.[0-9]+){2}(-[0-9A-Za-z.-]+)?(\+[0-9A-Za-z.-]+)?#\1${NEW_VERSION}#" server/intelligence-service/openapi.yaml
 fi
 
 # Update all files containing "The version of the OpenAPI document:" to use the new version,
@@ -199,7 +199,7 @@ if [[ -n "$openapi_files" ]]; then
     for file in $openapi_files; do
         if [[ -f "$file" ]]; then
             echo "Updating OpenAPI document version in $file"
-            sed_inplace "s#(The version of the OpenAPI document: )[0-9]+(\.[0-9]+){2}#\\1${NEW_VERSION}#g" "$file"
+            sed_inplace "s#(The version of the OpenAPI document: )[0-9]+(\.[0-9]+){2}(-[0-9A-Za-z.-]+)?(\+[0-9A-Za-z.-]+)?#\\1${NEW_VERSION}#g" "$file"
         fi
     done
 fi
