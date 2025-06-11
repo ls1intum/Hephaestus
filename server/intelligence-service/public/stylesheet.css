@@ -1,0 +1,12 @@
+.logo {
+  width: 100px !important;
+}
+
+.watermark {
+  display: none !important;
+}
+/* 
+.ai-message > span {
+  display: none !important;
+} 
+*/

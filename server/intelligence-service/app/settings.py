@@ -33,16 +33,15 @@ class Settings(BaseSettings):
             return "fake:model"
         return value
 
-    DATABASE_URL: str = "postgresql://localhost:5432/hephaestus"
+    DATABASE_URL: str = "postgresql://localhost:5432/mentor"
     DATABASE_USERNAME: str = "root"
     DATABASE_PASSWORD: str = "root"
 
     @property
     def DATABASE_CONNECTION_STRING(self):
         return (
-            f"postgresql://{self.DATABASE_USERNAME}:{self.DATABASE_PASSWORD}"
+            f"postgresql+asyncpg://{self.DATABASE_USERNAME}:{self.DATABASE_PASSWORD}"
             + f"@{self.DATABASE_URL.replace('postgresql://', '')}"
-            + "?sslmode=disable"
         )
 
     LANGFUSE_PUBLIC_KEY: str = ""
