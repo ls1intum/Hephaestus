@@ -22,11 +22,22 @@ extensions = [
     "myst_parser",
     "sphinx.ext.autodoc",
     'sphinxcontrib.plantuml',
+    'sphinxcontrib.mermaid',
 ]
 
 myst_enable_extensions = [
     "attrs_inline"
 ]
+
+# Enable mermaid code blocks in markdown
+myst_fence_as_directive = ["mermaid"]
+
+# Mermaid configuration
+mermaid_output_format = 'raw'
+mermaid_version = "11.6.0"
+mermaid_init_js = "mermaid.initialize({startOnLoad:true});"
+# For PDF generation on Read the Docs
+mermaid_params = ['-p', 'puppeteer-config.json']
 
 exclude_patterns = ['_build', 'Thumbs.db', '.DS_Store', 'venv', '.venv', 'README.md']
 

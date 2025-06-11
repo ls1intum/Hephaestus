@@ -18,8 +18,11 @@ RUN npm run build:prod
 # Stage 2: Serve the app with Nginx
 FROM nginx:stable-alpine
 
-# Install necessary packages: bash, grep, sed
-RUN apk update && apk add --no-cache bash grep sed perl
+# Install necessary packages and explicitly update libxml2 for security fixes
+RUN apk update && \
+    apk upgrade && \
+    apk add --no-cache bash grep sed perl libxml2>=2.13.4-r6 && \
+    rm -rf /var/cache/apk/*
 
 # Copy built React app from the build stage 
 COPY --from=build /app/dist /usr/share/nginx/html

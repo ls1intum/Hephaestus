@@ -38,6 +38,36 @@ const preview: Preview = {
       storySort: {
         order: ['core', 'shared'],
       },
+    },
+    // Chromatic configuration for optimal visual testing
+    chromatic: {
+      // Global viewport coverage for comprehensive testing
+      viewports: [375, 768, 1024, 1440, 1920],
+      // Disable animations for consistent snapshots
+      disableSnapshot: false,
+      // Note: modes (themes) must be set per-story due to Chromatic limitation
+      // that doesn't support both viewports and modes on the same story
+    },
+    // Better viewport defaults
+    viewport: {
+      viewports: {
+        mobile: {
+          name: 'Mobile',
+          styles: { width: '375px', height: '667px' }
+        },
+        tablet: {
+          name: 'Tablet',
+          styles: { width: '768px', height: '1024px' }
+        },
+        desktop: {
+          name: 'Desktop',
+          styles: { width: '1440px', height: '900px' }
+        },
+        wide: {
+          name: 'Wide Desktop',
+          styles: { width: '1920px', height: '1080px' }
+        }
+      }
     }
   },
   decorators: [

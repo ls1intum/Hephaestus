@@ -10,10 +10,23 @@ on:
         type: boolean
         default: true
         description: (Re-)deploys the app components
-      use-react-webapp:
-        type: boolean
+      deploy-core:
         default: false
-        description: Use the React webapp instead of the Angular webapp
+        type: boolean
+        description: (Re-)deploys NATS, Keycloak, Webhook Ingest. Usually not necessary and might cause data gaps.
+      deploy-proxy:
+        default: false
+        type: boolean
+        description: (Re-)deploys the proxy components. Usually not necessary and might cause downtime.
+  workflow_call:
+    inputs:
+      image-tag:
+        type: string
+        description: "Image tag to deploy (default: pr-<number> if PR exists, latest for default branch)"
+      deploy-app:
+        type: boolean
+        default: true
+        description: (Re-)deploys the app components
       deploy-core:
         default: false
         type: boolean
@@ -29,7 +42,7 @@ jobs:
     uses: ls1intum/.github/.github/workflows/deploy-docker-compose.yml@main
     with:
       environment: Staging
-      docker-compose-file: ${{ inputs.use-react-webapp && './docker/compose.app-react.yaml' || './docker/compose.app.yaml' }}
+      docker-compose-file:  "./docker/compose.app-react.yaml"
       main-image-name: ls1intum/hephaestus/application-server
       image-tag: ${{ inputs.image-tag }}
       deployment-base-path: "/opt/hephaestus/app"

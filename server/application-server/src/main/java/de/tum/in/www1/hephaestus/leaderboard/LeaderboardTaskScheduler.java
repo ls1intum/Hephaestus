@@ -14,7 +14,7 @@ import org.springframework.scheduling.annotation.EnableScheduling;
 import org.springframework.scheduling.concurrent.ThreadPoolTaskScheduler;
 import org.springframework.scheduling.support.CronExpression;
 import org.springframework.scheduling.support.CronTrigger;
-import org.springframework.stereotype.Service;
+import org.springframework.stereotype.Component;
 
 /**
  * Schedules tasks to run at the end of every leaderboard cycle.
@@ -22,7 +22,7 @@ import org.springframework.stereotype.Service;
  */
 @Order(value = Ordered.LOWEST_PRECEDENCE)
 @EnableScheduling
-@Service
+@Component
 public class LeaderboardTaskScheduler {
 
     private static final Logger logger = LoggerFactory.getLogger(LeaderboardTaskScheduler.class);

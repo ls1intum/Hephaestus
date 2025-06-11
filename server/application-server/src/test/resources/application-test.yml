@@ -1,0 +1,43 @@
+# Minimal test configuration for Spring Boot tests
+spring:
+  # Database configuration for tests (overridden by Testcontainers)
+  datasource:
+    # These values will be overridden by @DynamicPropertySource in test classes
+    url: jdbc:postgresql://localhost:5432/test
+    driver-class-name: org.postgresql.Driver
+    username: test
+    password: test
+  
+  # JPA configuration for tests
+  jpa:
+    hibernate:
+      ddl-auto: create-drop
+    show-sql: false
+  
+  # Disable liquibase for tests (use JPA auto DDL instead)
+  liquibase:
+    enabled: false
+  
+  # Security configuration for tests (minimal config)
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          issuer-uri: http://localhost:8081/realms/test
+
+# GitHub configuration for tests (matches actual property)
+github:
+  auth-token: test-token-not-real
+
+# NATS configuration for tests (matches actual properties)
+nats:
+  enabled: false
+  server: nats://localhost:4222
+  timeframe: 1
+  durable-consumer-name: test-consumer
+
+# Logging configuration for tests
+logging:
+  level:
+    de.tum.in.www1.hephaestus: INFO
+    root: WARN

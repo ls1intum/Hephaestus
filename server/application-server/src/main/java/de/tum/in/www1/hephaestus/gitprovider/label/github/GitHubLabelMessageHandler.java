@@ -18,7 +18,7 @@ public class GitHubLabelMessageHandler extends GitHubMessageHandler<GHEventPaylo
     private final GitHubLabelSyncService labelSyncService;
     private final GitHubRepositorySyncService repositorySyncService;
 
-    private GitHubLabelMessageHandler(
+    GitHubLabelMessageHandler(
         LabelRepository labelRepository,
         GitHubLabelSyncService labelSyncService,
         GitHubRepositorySyncService repositorySyncService

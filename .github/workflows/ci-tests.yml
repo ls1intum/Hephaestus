@@ -1,0 +1,128 @@
+name: Tests
+
+on:
+  workflow_call:
+    inputs:
+      should_skip:
+        description: "Whether to skip the workflow"
+        required: false
+        type: string
+        default: "false"
+
+jobs:
+  # Intelligent test execution matrix
+  tests:
+    name: ${{ matrix.test-type }}
+    runs-on: ubuntu-latest
+    if: inputs.should_skip != 'true'
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        test-type:
+          [application-server-unit, application-server-integration, application-server-architecture, webapp-visual]
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # Critical for TurboSnap: Ensure Chromatic can read full git history
+          fetch-depth: 0
+
+      # Advanced caching strategy
+      - name: Setup advanced caches
+        uses: ./.github/actions/setup-caches
+        with:
+          cache-type: ${{ matrix.test-type }}
+          os: ${{ runner.os }}
+
+      # application-server tests
+      - name: "application-server ${{ matrix.test-type }} execution"
+        if: startsWith(matrix.test-type, 'application-server-')
+        run: |
+          echo "🧪 Running application-server ${{ matrix.test-type }} tests"
+          cd server/application-server
+          
+          # Clean previous test reports to ensure accurate reporting
+          rm -rf target/surefire-reports/*
+
+          case "${{ matrix.test-type }}" in
+            "application-server-unit")
+              mvn test -Dgroups="unit" -T 2C --batch-mode
+              ;;
+            "application-server-integration")
+              mvn test -Dgroups="integration" -T 2C --batch-mode
+              ;;
+            "application-server-architecture")
+              mvn test -Dgroups="architecture" -T 2C --batch-mode
+              ;;
+          esac
+
+      # Webapp tests
+      - name: "Webapp ${{ matrix.test-type }} execution"
+        if: startsWith(matrix.test-type, 'webapp-')
+        working-directory: webapp-react
+        run: |
+          echo "🎨 Running webapp ${{ matrix.test-type }} tests"
+          npm ci --prefer-offline --no-audit --progress=false
+
+          case "${{ matrix.test-type }}" in
+            "webapp-visual")
+              npm run build-storybook
+              ;;
+          esac
+
+      # Chromatic visual testing
+      - name: "Chromatic Visual Testing"
+        if: matrix.test-type == 'webapp-visual'
+        id: chromatic
+        uses: chromaui/action@latest
+        with:
+          projectToken: ${{ secrets.CHROMATIC_PROJECT_TOKEN }}
+          workingDir: webapp-react
+          onlyChanged: true
+          zip: true
+          skip: "@(dependabot/**|renovate/**)"
+          autoAcceptChanges: ${{ github.ref == 'refs/heads/main' && 'main' || '' }}
+          exitZeroOnChanges: false
+          diagnostics: true
+          logLevel: info
+          junitReport: true
+          allowConsoleErrors: false
+        env:
+          CHROMATIC_BRANCH: ${{ github.head_ref || github.ref_name }}
+          CHROMATIC_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+
+      # Create Storybook status check
+      - name: "Create Storybook status check"
+        if: matrix.test-type == 'webapp-visual' && always() && steps.chromatic.outputs.storybookUrl
+        uses: actions/github-script@v7
+        with:
+          script: |
+            await github.rest.repos.createCommitStatus({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              sha: context.sha,
+              state: 'success',
+              target_url: '${{ steps.chromatic.outputs.storybookUrl }}',
+              description: 'Click Details to view your Storybook',
+              context: 'Storybook Publish'
+            });
+
+      # Test result aggregation
+      - name: Upload application-server test results
+        if: always() && startsWith(matrix.test-type, 'application-server-')
+        uses: dorny/test-reporter@v2
+        with:
+          name: "Test Results - ${{ matrix.test-type }}"
+          path: "server/application-server/target/surefire-reports/TEST-*.xml"
+          reporter: java-junit
+          fail-on-error: false
+
+      - name: Upload Chromatic test results
+        if: always() && matrix.test-type == 'webapp-visual'
+        uses: dorny/test-reporter@v2
+        with:
+          name: "Test Results - ${{ matrix.test-type }}"
+          path: "webapp-react/chromatic-build-*.xml"
+          reporter: java-junit
+          fail-on-error: false
