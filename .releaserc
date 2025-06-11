@@ -7,8 +7,140 @@
     "main"
   ],
   "plugins": [
-    "@semantic-release/commit-analyzer",
-    "@semantic-release/release-notes-generator",
+    [
+      "@semantic-release/commit-analyzer",
+      {
+        "preset": "conventionalcommits",
+        "releaseRules": [
+          {
+            "breaking": true,
+            "release": "major"
+          },
+          {
+            "type": "feat",
+            "release": "minor"
+          },
+          {
+            "type": "fix",
+            "release": "patch"
+          },
+          {
+            "type": "perf",
+            "release": "patch"
+          },
+          {
+            "type": "revert",
+            "release": "patch"
+          },
+          {
+            "type": "docs",
+            "release": "patch"
+          },
+          {
+            "type": "style",
+            "release": false
+          },
+          {
+            "type": "refactor",
+            "release": "patch"
+          },
+          {
+            "type": "test",
+            "release": false
+          },
+          {
+            "type": "build",
+            "release": "patch"
+          },
+          {
+            "type": "ci",
+            "release": false
+          },
+          {
+            "scope": "no-release",
+            "release": false
+          }
+        ],
+        "parserOpts": {
+          "noteKeywords": ["BREAKING CHANGE", "BREAKING CHANGES", "BREAKING"],
+          "breakingHeaderPattern": "^(\\w*)(?:\\(([\\w\\$\\.\\-\\*\\s]*)\\))?!: (.*)$",
+          "headerPattern": "^(\\w*)(?:\\(([\\w\\$\\.\\-\\*\\s]*)\\))?!?: (.*)$"
+        }
+      }
+    ],
+    [
+      "@semantic-release/release-notes-generator",
+      {
+        "preset": "conventionalcommits",
+        "parserOpts": {
+          "noteKeywords": ["BREAKING CHANGE", "BREAKING CHANGES", "BREAKING"],
+          "breakingHeaderPattern": "^(\\w*)(?:\\(([\\w\\$\\.\\-\\*\\s]*)\\))?!: (.*)$",
+          "headerPattern": "^(\\w*)(?:\\(([\\w\\$\\.\\-\\*\\s]*)\\))?!?: (.*)$"
+        },
+        "writerOpts": {
+          "commitsSort": ["subject", "scope"]
+        },
+        "presetConfig": {
+          "types": [
+            {
+              "type": "feat",
+              "section": "🚀 Features",
+              "hidden": false
+            },
+            {
+              "type": "fix",
+              "section": "🐛 Bug Fixes",
+              "hidden": false
+            },
+            {
+              "type": "docs",
+              "section": "📚 Documentation",
+              "hidden": false
+            },
+            {
+              "type": "style",
+              "section": "💎 Styles",
+              "hidden": true
+            },
+            {
+              "type": "refactor",
+              "section": "♻️ Code Refactoring",
+              "hidden": false
+            },
+            {
+              "type": "perf",
+              "section": "⚡ Performance Improvements",
+              "hidden": false
+            },
+            {
+              "type": "test",
+              "section": "🧪 Tests",
+              "hidden": true
+            },
+            {
+              "type": "build",
+              "section": "🛠 Build System",
+              "hidden": false
+            },
+            {
+              "type": "ci",
+              "section": "🔧 Continuous Integration",
+              "hidden": true
+            },
+            {
+              "type": "chore",
+              "section": "🗃 Chores",
+              "hidden": true
+            },
+            {
+              "type": "revert",
+              "section": "🔙 Reverts",
+              "hidden": false
+            }
+          ]
+        }
+      }
+    ],
     [
       "@semantic-release/exec",
       {
@@ -40,53 +172,19 @@
         "message": "chore(release): ${nextRelease.version}\n\n${nextRelease.notes}"
       }
     ],
-    "@semantic-release/github"
+    [
+      "@semantic-release/github",
+      {
+        "successComment": "✅ **Released in v${nextRelease.version}**\n\nThis ${issue.pull_request ? 'pull request' : 'issue'} has been resolved and is now available in the [latest release](<github_release_url>).\n\nThank you for your contribution to Hephaestus! 🙏",
+        "successCommentCondition": "<% return issue.user.type !== 'Bot'; %>",
+        "failTitle": "🚨 Automated Release Pipeline Failed",
+        "failComment": "## Release Failure Report\n\nThe automated release pipeline for Hephaestus has encountered an error on branch `${branch.name}`.\n\n### Error Details\n${errors.map(err => `- **${err.pluginName}**: ${err.message}`).join('\\n')}\n\n### Next Steps\nOur team has been notified and will investigate this issue. You can track the resolution in this issue.\n\n---\n*This is an automated message from the Hephaestus release system.*",
+        "labels": ["release-failure", "bug"],
+        "releasedLabels": ["released-v${nextRelease.version}"],
+        "addReleases": "bottom",
+        "discussionCategoryName": "Announcements"
+      }
+    ]
   ],
-  "preset": "conventionalcommits",
-  "releaseRules": [
-    {
-      "type": "feat",
-      "release": "minor"
-    },
-    {
-      "type": "fix",
-      "release": "patch"
-    },
-    {
-      "type": "perf",
-      "release": "patch"
-    },
-    {
-      "type": "revert",
-      "release": "patch"
-    },
-    {
-      "type": "docs",
-      "release": "patch"
-    },
-    {
-      "type": "style",
-      "release": false
-    },
-    {
-      "type": "refactor",
-      "release": "patch"
-    },
-    {
-      "type": "test",
-      "release": false
-    },
-    {
-      "type": "build",
-      "release": "patch"
-    },
-    {
-      "type": "ci",
-      "release": false
-    },
-    {
-      "scope": "no-release",
-      "release": false
-    }
-  ]
+  "preset": "conventionalcommits"
 }
