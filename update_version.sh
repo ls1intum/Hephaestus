@@ -129,29 +129,40 @@ if [[ -f webapp-react/package-lock.json ]]; then
     ' webapp-react/package-lock.json > webapp-react/package-lock.json.tmp && mv webapp-react/package-lock.json.tmp webapp-react/package-lock.json
 fi
 
+# Function to perform cross-platform sed in-place editing
+sed_inplace() {
+    if [[ "$OSTYPE" == "darwin"* ]]; then
+        # macOS
+        sed -E -i '' "$@"
+    else
+        # Linux/Ubuntu
+        sed -E -i "$@"
+    fi
+}
+
 # Update Java source: OpenAPIConfiguration.java (if it exists)
 if [[ -f server/application-server/src/main/java/de/tum/in/www1/hephaestus/OpenAPIConfiguration.java ]]; then
-    sed -E -i '' "s#(version *= *\")[0-9]+(\.[0-9]+){2}\"#\\1${NEW_VERSION}\"#" server/application-server/src/main/java/de/tum/in/www1/hephaestus/OpenAPIConfiguration.java
+    sed_inplace "s#(version *= *\")[0-9]+(\.[0-9]+){2}\"#\\1${NEW_VERSION}\"#" server/application-server/src/main/java/de/tum/in/www1/hephaestus/OpenAPIConfiguration.java
 fi
 
 # Update application.yml (server configuration) (if it exists)
 if [[ -f server/application-server/src/main/resources/application.yml ]]; then
-    sed -E -i '' "s#(version: *\")[0-9]+(\.[0-9]+){2}\"#\1${NEW_VERSION}\"#" server/application-server/src/main/resources/application.yml
+    sed_inplace "s#(version: *\")[0-9]+(\.[0-9]+){2}\"#\1${NEW_VERSION}\"#" server/application-server/src/main/resources/application.yml
 fi
 
 # Update server/intelligence-service/pyproject.toml
 if [[ -f server/intelligence-service/pyproject.toml ]]; then
-    sed -E -i '' "s#(version *= *\")[0-9]+(\.[0-9]+){2}\"#\1${NEW_VERSION}\"#" server/intelligence-service/pyproject.toml
+    sed_inplace "s#(version *= *\")[0-9]+(\.[0-9]+){2}\"#\1${NEW_VERSION}\"#" server/intelligence-service/pyproject.toml
 fi
 
 # Update server/webhook-ingest/pyproject.toml
 if [[ -f server/webhook-ingest/pyproject.toml ]]; then
-    sed -E -i '' "s#(version *= *\")[0-9]+(\.[0-9]+){2}\"#\1${NEW_VERSION}\"#" server/webhook-ingest/pyproject.toml
+    sed_inplace "s#(version *= *\")[0-9]+(\.[0-9]+){2}\"#\1${NEW_VERSION}\"#" server/webhook-ingest/pyproject.toml
 fi
 
 # Update server/intelligence-service/app/main.py (if it exists)
 if [[ -f server/intelligence-service/app/main.py ]]; then
-    sed -E -i '' "s#(version *= *\")[0-9]+(\.[0-9]+){2}\"#\1${NEW_VERSION}\"#" server/intelligence-service/app/main.py
+    sed_inplace "s#(version *= *\")[0-9]+(\.[0-9]+){2}\"#\1${NEW_VERSION}\"#" server/intelligence-service/app/main.py
 fi
 
 # Update Maven POM (only update the project version for hephaestus) (if it exists)
@@ -166,12 +177,12 @@ fi
 
 # Update server/application-server/openapi.yaml (non-quoted version) (if it exists)
 if [[ -f server/application-server/openapi.yaml ]]; then
-    sed -E -i '' "s#(version:[[:space:]]*)[0-9]+(\.[0-9]+){2}#\1${NEW_VERSION}#" server/application-server/openapi.yaml
+    sed_inplace "s#(version:[[:space:]]*)[0-9]+(\.[0-9]+){2}#\1${NEW_VERSION}#" server/application-server/openapi.yaml
 fi
 
 # Update server/intelligence-service/openapi.yaml (non-quoted version) (if it exists)
 if [[ -f server/intelligence-service/openapi.yaml ]]; then
-    sed -E -i '' "s#(version:[[:space:]]*)[0-9]+(\.[0-9]+){2}#\1${NEW_VERSION}#" server/intelligence-service/openapi.yaml
+    sed_inplace "s#(version:[[:space:]]*)[0-9]+(\.[0-9]+){2}#\1${NEW_VERSION}#" server/intelligence-service/openapi.yaml
 fi
 
 # Update all files containing "The version of the OpenAPI document:" to use the new version,
@@ -188,7 +199,7 @@ if [[ -n "$openapi_files" ]]; then
     for file in $openapi_files; do
         if [[ -f "$file" ]]; then
             echo "Updating OpenAPI document version in $file"
-            sed -E -i '' "s#(The version of the OpenAPI document: )[0-9]+(\.[0-9]+){2}#\\1${NEW_VERSION}#g" "$file"
+            sed_inplace "s#(The version of the OpenAPI document: )[0-9]+(\.[0-9]+){2}#\\1${NEW_VERSION}#g" "$file"
         fi
     done
 fi
