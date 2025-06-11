@@ -3,15 +3,13 @@ name: Release
 on:
   push:
     branches: [develop, main]
-    tags-ignore:
-      - '**'
 
 jobs:
   release:
+    if: ${{ !startsWith(github.ref, 'refs/tags/v') }}
     runs-on: ubuntu-latest
     permissions:
       contents: write
-    
     steps:
       - uses: actions/checkout@v4
         with:
@@ -28,3 +26,7 @@ jobs:
             conventional-changelog-conventionalcommits
         env:
           GITHUB_TOKEN: ${{ secrets.GH_PAT }}
+          GIT_AUTHOR_NAME: "Felix T.J. Dietrich"
+          GIT_AUTHOR_EMAIL: "felixtj.dietrich@tum.de"
+          GIT_COMMITTER_NAME: "Felix T.J. Dietrich"
+          GIT_COMMITTER_EMAIL: "felixtj.dietrich@tum.de"
