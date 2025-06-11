@@ -3,6 +3,8 @@ package de.tum.in.www1.hephaestus.gitprovider.pullrequestreview.github;
 import de.tum.in.www1.hephaestus.gitprovider.pullrequestreview.PullRequestReview;
 import java.io.IOException;
 import java.time.ZoneOffset;
+import java.util.Date;
+
 import org.kohsuke.github.GHPullRequestReview;
 import org.kohsuke.github.GHPullRequestReviewState;
 import org.slf4j.Logger;
@@ -34,12 +36,8 @@ public class GitHubPullRequestReviewConverter implements Converter<GHPullRequest
         }
 
         review.setHtmlUrl(source.getHtmlUrl().toString());
-        try {
-            if (source.getSubmittedAt() != null) {
-                review.setSubmittedAt(source.getSubmittedAt().toInstant().atOffset(ZoneOffset.UTC));
-            }
-        } catch (IOException e) {
-            logger.error("Failed to convert submittedAt field for source {}: {}", source.getId(), e.getMessage());
+        if (source.getSubmittedAt() != null) {
+            review.setSubmittedAt(Date.from(source.getSubmittedAt()).toInstant().atOffset(ZoneOffset.UTC));
         }
         review.setCommitId(source.getCommitId());
         return review;

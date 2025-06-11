@@ -10,6 +10,7 @@ import de.tum.in.www1.hephaestus.gitprovider.user.UserRepository;
 import de.tum.in.www1.hephaestus.gitprovider.user.github.GitHubUserConverter;
 import jakarta.transaction.Transactional;
 import java.io.IOException;
+import java.util.Date;
 import java.util.List;
 import org.kohsuke.github.GHPullRequest;
 import org.kohsuke.github.GHPullRequestReviewComment;
@@ -65,15 +66,7 @@ public class GitHubPullRequestReviewCommentSyncService {
      * @param pullRequest the GitHub pull request to sync review comments for
      */
     public void syncReviewCommentsOfPullRequest(GHPullRequest pullRequest) {
-        try {
-            pullRequest.listReviewComments().withPageSize(100).forEach(this::processPullRequestReviewComment);
-        } catch (IOException e) {
-            logger.error(
-                "Failed to fetch review comments for pull request {}: {}",
-                pullRequest.getId(),
-                e.getMessage()
-            );
-        }
+        pullRequest.listReviewComments().withPageSize(100).forEach(this::processPullRequestReviewComment);
     }
 
     /**
@@ -99,7 +92,7 @@ public class GitHubPullRequestReviewCommentSyncService {
                         pullRequestReviewComment.getUpdatedAt() == null ||
                         pullRequestReviewComment
                             .getUpdatedAt()
-                            .isBefore(DateUtil.convertToOffsetDateTime(ghPullRequestReviewComment.getUpdatedAt()))
+                            .isBefore(DateUtil.convertToOffsetDateTime(Date.from(ghPullRequestReviewComment.getUpdatedAt())))
                     ) {
                         return pullRequestReviewCommentConverter.update(
                             ghPullRequestReviewComment,

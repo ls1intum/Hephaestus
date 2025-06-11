@@ -5,6 +5,7 @@ import de.tum.in.www1.hephaestus.gitprovider.repository.Repository;
 import de.tum.in.www1.hephaestus.gitprovider.repository.RepositoryRepository;
 import jakarta.transaction.Transactional;
 import java.io.IOException;
+import java.util.Date;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
@@ -97,7 +98,7 @@ public class GitHubRepositorySyncService {
                         repository.getUpdatedAt() == null ||
                         repository
                             .getUpdatedAt()
-                            .isBefore(DateUtil.convertToOffsetDateTime(ghRepository.getUpdatedAt()))
+                            .isBefore(DateUtil.convertToOffsetDateTime(Date.from(ghRepository.getUpdatedAt())))
                     ) {
                         return repositoryConverter.update(ghRepository, repository);
                     }

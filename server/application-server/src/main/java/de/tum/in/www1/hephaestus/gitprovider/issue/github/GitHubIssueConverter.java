@@ -8,6 +8,8 @@ import org.kohsuke.github.GHIssueState;
 import org.springframework.lang.NonNull;
 import org.springframework.stereotype.Component;
 
+import java.util.Date;
+
 @Component
 public class GitHubIssueConverter extends BaseGitServiceEntityConverter<GHIssue, Issue> {
 
@@ -25,7 +27,7 @@ public class GitHubIssueConverter extends BaseGitServiceEntityConverter<GHIssue,
         issue.setBody(source.getBody());
         issue.setHtmlUrl(source.getHtmlUrl().toString());
         issue.setLocked(source.isLocked());
-        issue.setClosedAt(DateUtil.convertToOffsetDateTime(source.getClosedAt()));
+        issue.setClosedAt(DateUtil.convertToOffsetDateTime(Date.from(source.getClosedAt())));
         issue.setCommentsCount(issue.getCommentsCount());
         issue.setHasPullRequest(source.getPullRequest() != null);
         return issue;

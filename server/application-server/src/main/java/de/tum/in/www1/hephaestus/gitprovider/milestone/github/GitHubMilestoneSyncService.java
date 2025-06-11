@@ -90,15 +90,11 @@ public class GitHubMilestoneSyncService {
         }
 
         // Link creator
-        try {
-            var creator = ghMilestone.getCreator();
-            var resultCreator = userRepository
-                .findById(creator.getId())
-                .orElseGet(() -> userRepository.save(userConverter.convert(creator)));
-            result.setCreator(resultCreator);
-        } catch (IOException e) {
-            logger.error("Failed to link creator for milestone {}: {}", ghMilestone.getId(), e.getMessage());
-        }
+        var creator = ghMilestone.getCreator();
+        var resultCreator = userRepository
+            .findById(creator.getId())
+            .orElseGet(() -> userRepository.save(userConverter.convert(creator)));
+        result.setCreator(resultCreator);
 
         return milestoneRepository.save(result);
     }
