@@ -116,7 +116,7 @@ jobs:
   # Automatic deployment based on branch
   deploy-app:
     needs: [all-ci-passed]
-    if: success()
+    if: ${{ github.ref == 'refs/heads/develop' || github.ref == 'refs/heads/main' }}
     uses: ls1intum/.github/.github/workflows/deploy-docker-compose.yml@main
     with:
       environment: ${{ needs.all-ci-passed.outputs.environment }}
