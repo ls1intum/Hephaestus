@@ -10,7 +10,6 @@
     [
       "@semantic-release/commit-analyzer",
       {
-        "preset": "conventionalcommits",
         "releaseRules": [
           {
             "breaking": true,
@@ -22,14 +21,6 @@
           },
           {
             "type": "fix",
-            "release": "patch"
-          },
-          {
-            "type": "perf",
-            "release": "patch"
-          },
-          {
-            "type": "revert",
             "release": "patch"
           },
           {
@@ -45,6 +36,10 @@
             "release": "patch"
           },
           {
+            "type": "perf",
+            "release": "patch"
+          },
+          {
             "type": "test",
             "release": false
           },
@@ -55,6 +50,19 @@
           {
             "type": "ci",
             "release": false
+          },
+          {
+            "type": "chore",
+            "scope": "release",
+            "release": false
+          },
+          {
+            "type": "chore",
+            "release": "patch"
+          },
+          {
+            "type": "revert",
+            "release": "patch"
           },
           {
             "scope": "no-release",
@@ -83,13 +91,13 @@
         "presetConfig": {
           "types": [
             {
-              "type": "feat",
-              "section": "🚀 Features",
+              "type": "fix",
+              "section": "🐛 Bug Fixes",
               "hidden": false
             },
             {
-              "type": "fix",
-              "section": "🐛 Bug Fixes",
+              "type": "feat",
+              "section": "🚀 Features",
               "hidden": false
             },
             {
