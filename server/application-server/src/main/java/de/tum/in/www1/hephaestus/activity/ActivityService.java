@@ -4,7 +4,6 @@ import com.langfuse.client.LangfuseClient;
 import com.langfuse.client.resources.commons.types.CreateScoreValue;
 import com.langfuse.client.resources.score.types.CreateScoreRequest;
 import com.langfuse.client.resources.score.types.CreateScoreResponse;
-import de.tum.in.www1.hephaestus.activity.badpracticedetector.PullRequestBadPracticeDetector;
 import de.tum.in.www1.hephaestus.activity.model.*;
 import de.tum.in.www1.hephaestus.gitprovider.issue.Issue;
 import de.tum.in.www1.hephaestus.gitprovider.pullrequest.PullRequest;
