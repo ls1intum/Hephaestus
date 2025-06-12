@@ -1,12 +1,11 @@
 package de.tum.in.www1.hephaestus.mentor;
 
-import de.tum.in.www1.hephaestus.intelligenceservice.model.Request;
+import de.tum.in.www1.hephaestus.intelligenceservice.model.ChatRequest;
+import io.swagger.v3.oas.annotations.Hidden;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
-import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -28,8 +27,9 @@ public class MentorController {
             .build();
     }
     
+    @Hidden // Hides it from the OpenAPI documentation
     @PostMapping(value = "/chat", produces = MediaType.TEXT_PLAIN_VALUE)
-    public Flux<String> chat(@RequestBody Request request) {
+    public Flux<String> chat(@RequestBody ChatRequest request) {
         logger.info("Received chat request with {} messages", request.getMessages().size());
 
         try {
@@ -59,14 +59,14 @@ public class MentorController {
                 .onErrorResume(error -> {
                     logger.error("Failed to call intelligence service", error);
                     // Fallback to simple error response
-                    return Flux.just("0:\"Sorry, I encountered an error. Please try again.\"\n", 
+                    return Flux.just("3:\"Sorry, I encountered an error. Please try again.\"\n", 
                                    "d:{\"finishReason\":\"stop\"}\n");
                 });
                 
         } catch (Exception e) {
             logger.error("Failed to process chat request", e);
             // Fallback to simple error response
-            return Flux.just("0:\"Sorry, I encountered an error. Please try again.\"\n", 
+            return Flux.just("3:\"Sorry, I encountered an error. Please try again.\"\n", 
                            "d:{\"finishReason\":\"stop\"}\n");
         }
     }

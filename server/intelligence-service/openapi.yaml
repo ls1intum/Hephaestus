@@ -31,90 +31,15 @@ components:
       - Wrong
       title: BadPracticeStatus
       type: string
-    ClientAttachment:
+    ChatRequest:
       properties:
-        contentType:
-          anyOf:
-          - type: string
-          - type: 'null'
-          title: Contenttype
-        name:
-          anyOf:
-          - type: string
-          - type: 'null'
-          title: Name
-        url:
-          title: Url
-          type: string
-      required:
-      - url
-      title: ClientAttachment
-      type: object
-    ClientMessage:
-      additionalProperties: true
-      description: 'PERFECT MATCH for actual frontend payload: {role=user, content=hello,
-        parts=[{type=text, text=hello}]}'
-      properties:
-        annotations:
-          anyOf:
-          - items:
-              type: string
-            type: array
-          - type: 'null'
-          title: Annotations
-        content:
-          title: Content
-          type: string
-        createdAt:
-          anyOf:
-          - type: string
-          - type: 'null'
-          title: Createdat
-        data:
-          anyOf:
-          - type: string
-          - type: 'null'
-          title: Data
-        experimental_attachments:
-          anyOf:
-          - items:
-              $ref: '#/components/schemas/ClientAttachment'
-            type: array
-          - type: 'null'
-          title: Experimental Attachments
-        id:
-          anyOf:
-          - type: string
-          - type: 'null'
-          title: Id
-        parts:
-          anyOf:
-          - items:
-              additionalProperties:
-                type: string
-              type: object
-            type: array
-          - type: 'null'
-          title: Parts
-        reasoning:
-          anyOf:
-          - type: string
-          - type: 'null'
-          title: Reasoning
-        role:
-          title: Role
-          type: string
-        toolInvocations:
-          anyOf:
-          - items:
-              $ref: '#/components/schemas/ToolInvocation'
-            type: array
-          - type: 'null'
-          title: Toolinvocations
-      required:
-      - role
-      - content
-      title: ClientMessage
+        messages:
+          description: A list of messages in the chat conversation
+          items:
+            $ref: '#/components/schemas/Message'
+          title: Messages
+          type: array
+      title: ChatRequest
       type: object
     DetectorRequest:
       properties:
@@ -174,6 +99,25 @@ components:
       - trace_id
       title: DetectorResponse
       type: object
+    FileUIPart:
+      description: A file part of a message.
+      properties:
+        data:
+          title: Data
+          type: string
+        mimeType:
+          title: Mimetype
+          type: string
+        type:
+          const: file
+          default: file
+          title: Type
+          type: string
+      required:
+      - mimeType
+      - data
+      title: FileUIPart
+      type: object
     HTTPValidationError:
       properties:
         detail:
@@ -193,78 +137,187 @@ components:
           type: string
       title: HealthCheck
       type: object
-    MentorRequest:
+    Message:
+      additionalProperties: true
       properties:
-        content:
-          title: Content
+        createdAt:
+          anyOf:
+          - type: string
+          - type: 'null'
+          description: The timestamp of the message
+          title: Createdat
+        id:
+          description: A unique identifier for the message
+          title: Id
           type: string
-        session_id:
-          title: Session Id
-          type: string
-      required:
-      - session_id
-      - content
-      title: MentorRequest
-      type: object
-    MentorResponse:
-      properties:
-        closed:
-          default: false
-          title: Closed
-          type: boolean
-        content:
-          title: Content
-          type: string
-      required:
-      - content
-      title: MentorResponse
-      type: object
-    MentorStartRequest:
-      properties:
-        dev_progress:
-          title: Dev Progress
-          type: string
-        previous_session_id:
-          title: Previous Session Id
-          type: string
-        session_id:
-          title: Session Id
-          type: string
-        user_id:
-          title: User Id
-          type: string
-      required:
-      - session_id
-      - user_id
-      - previous_session_id
-      - dev_progress
-      title: MentorStartRequest
-      type: object
-    Request:
-      properties:
-        messages:
+        parts:
+          description: 'The parts of the message. Use this for rendering the message
+            in the UI.
+
+
+            Assistant messages can have text, reasoning, and tool invocation parts.
+
+            User messages can have text parts.'
           items:
-            $ref: '#/components/schemas/ClientMessage'
-          title: Messages
+            anyOf:
+            - $ref: '#/components/schemas/TextUIPart'
+            - $ref: '#/components/schemas/ReasoningUIPart'
+            - $ref: '#/components/schemas/ToolInvocationUIPart'
+            - $ref: '#/components/schemas/SourceUIPart'
+            - $ref: '#/components/schemas/FileUIPart'
+            - $ref: '#/components/schemas/StepStartUIPart'
+          title: Parts
           type: array
+        role:
+          description: The role of the message sender
+          enum:
+          - user
+          - assistant
+          - system
+          title: Role
+          type: string
       required:
-      - messages
-      title: Request
+      - id
+      - role
+      title: Message
       type: object
-    ToolInvocation:
-      description: Simplified ToolInvocation model to avoid OpenAPI generator issues
+    ReasoningOpenDetail:
+      properties:
+        signature:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Signature
+        text:
+          title: Text
+          type: string
+        type:
+          const: text
+          default: text
+          title: Type
+          type: string
+      required:
+      - text
+      title: ReasoningOpenDetail
+      type: object
+    ReasoningRedactedDetail:
+      properties:
+        data:
+          title: Data
+          type: string
+        type:
+          const: redacted
+          default: redacted
+          title: Type
+          type: string
+      required:
+      - data
+      title: ReasoningRedactedDetail
+      type: object
+    ReasoningUIPart:
+      description: A reasoning part of a message.
+      properties:
+        details:
+          items:
+            anyOf:
+            - $ref: '#/components/schemas/ReasoningOpenDetail'
+            - $ref: '#/components/schemas/ReasoningRedactedDetail'
+          title: Details
+          type: array
+        reasoning:
+          description: The reasoning text
+          title: Reasoning
+          type: string
+        type:
+          const: reasoning
+          default: reasoning
+          title: Type
+          type: string
+      required:
+      - reasoning
+      title: ReasoningUIPart
+      type: object
+    Source:
+      properties:
+        id:
+          description: The ID of the source.
+          title: Id
+          type: string
+        providerMetadata:
+          anyOf:
+          - type: object
+          - type: 'null'
+          description: Additional provider metadata for the source.
+          title: Providermetadata
+        sourceType:
+          const: url
+          default: url
+          title: Sourcetype
+          type: string
+        title:
+          anyOf:
+          - type: string
+          - type: 'null'
+          description: The title of the source.
+          title: Title
+        url:
+          description: The URL of the source.
+          title: Url
+          type: string
+      required:
+      - id
+      - url
+      - providerMetadata
+      title: Source
+      type: object
+    SourceUIPart:
+      description: A source part of a message.
+      properties:
+        source:
+          $ref: '#/components/schemas/Source'
+          description: The source.
+        type:
+          const: source
+          default: source
+          title: Type
+          type: string
+      required:
+      - source
+      title: SourceUIPart
+      type: object
+    StepStartUIPart:
+      description: A step boundary part of a message.
+      properties:
+        type:
+          const: step-start
+          default: step-start
+          title: Type
+          type: string
+      title: StepStartUIPart
+      type: object
+    TextUIPart:
+      description: A text part of a message.
+      properties:
+        text:
+          title: Text
+          type: string
+        type:
+          const: text
+          default: text
+          title: Type
+          type: string
+      required:
+      - text
+      title: TextUIPart
+      type: object
+    ToolCall:
       properties:
         args:
-          anyOf:
-          - type: string
-          - type: 'null'
           title: Args
-        result:
-          anyOf:
-          - type: string
-          - type: 'null'
-          title: Result
+          type: object
         state:
+          const: call
+          default: call
           title: State
           type: string
         step:
@@ -273,18 +326,65 @@ components:
           - type: 'null'
           title: Step
         toolCallId:
-          anyOf:
-          - type: string
-          - type: 'null'
           title: Toolcallid
+          type: string
         toolName:
-          anyOf:
-          - type: string
-          - type: 'null'
           title: Toolname
+          type: string
+      required:
+      - toolCallId
+      - toolName
+      - args
+      title: ToolCall
+      type: object
+    ToolInvocationUIPart:
+      description: A tool invocation part of a message.
+      properties:
+        toolInvocation:
+          anyOf:
+          - $ref: '#/components/schemas/ToolCall'
+          - $ref: '#/components/schemas/ToolResult'
+          description: The tool invocation
+          title: Toolinvocation
+        type:
+          const: tool-invocation
+          default: tool-invocation
+          title: Type
+          type: string
+      required:
+      - toolInvocation
+      title: ToolInvocationUIPart
+      type: object
+    ToolResult:
+      properties:
+        args:
+          title: Args
+          type: object
+        result:
+          title: Result
+          type: object
+        state:
+          const: result
+          title: State
+          type: string
+        step:
+          anyOf:
+          - type: integer
+          - type: 'null'
+          title: Step
+        toolCallId:
+          title: Toolcallid
+          type: string
+        toolName:
+          title: Toolname
+          type: string
       required:
       - state
-      title: ToolInvocation
+      - toolCallId
+      - toolName
+      - args
+      - result
+      title: ToolResult
       type: object
     ValidationError:
       properties:
@@ -360,31 +460,6 @@ paths:
       summary: Perform a Health Check
       tags:
       - healthcheck
-  /mentor/:
-    post:
-      operationId: generate_mentor__post
-      requestBody:
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/MentorRequest'
-        required: true
-      responses:
-        '200':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/MentorResponse'
-          description: Successful Response
-        '422':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/HTTPValidationError'
-          description: Validation Error
-      summary: Continue a chat session with an LLM.
-      tags:
-      - mentor
   /mentor/chat:
     post:
       operationId: handle_chat_data_mentor_chat_post
@@ -392,19 +467,19 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/Request'
+              $ref: '#/components/schemas/ChatRequest'
         required: true
       responses:
         '200':
           content:
-            text/event-stream:
+            application/json:
+              schema: {}
+            text/plain:
               examples:
                 first-chunk:
-                  summary: Typical SSE frame
-                  value: '0: Hello World!\n\n'
-              schema:
-                type: string
-          description: SSE stream of chat deltas
+                  summary: Typical data stream frame
+                  value: 0:"Hello World!"
+          description: Data stream for Vercel AI SDK
           headers:
             x-vercel-ai-data-stream:
               description: Protocol version for Vercel AI streaming
@@ -418,42 +493,5 @@ paths:
                 $ref: '#/components/schemas/HTTPValidationError'
           description: Validation Error
       summary: Handle Chat Data
-      tags:
-      - mentor
-  /mentor/health:
-    get:
-      operationId: status_mentor_health_get
-      responses:
-        '200':
-          content:
-            application/json:
-              schema: {}
-          description: Successful Response
-      summary: Check if the intelligence service is running
-      tags:
-      - mentor
-  /mentor/start:
-    post:
-      operationId: start_mentor_start_post
-      requestBody:
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/MentorStartRequest'
-        required: true
-      responses:
-        '200':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/MentorResponse'
-          description: Successful Response
-        '422':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/HTTPValidationError'
-          description: Validation Error
-      summary: Start a chat session with an LLM.
       tags:
       - mentor

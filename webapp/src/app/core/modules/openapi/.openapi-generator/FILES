@@ -7,8 +7,6 @@ api/activity.serviceInterface.ts
 api/api.ts
 api/leaderboard.service.ts
 api/leaderboard.serviceInterface.ts
-api/mentor.service.ts
-api/mentor.serviceInterface.ts
 api/message.service.ts
 api/message.serviceInterface.ts
 api/meta.service.ts
@@ -27,7 +25,6 @@ git_push.sh
 index.ts
 model/activity.ts
 model/bad-practice-feedback.ts
-model/chat-request.ts
 model/contributor.ts
 model/label-info.ts
 model/leaderboard-entry.ts

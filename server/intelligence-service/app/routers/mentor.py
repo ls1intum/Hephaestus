@@ -1,5 +1,5 @@
 import json
-from typing import List, Optional, Union, Any, Dict
+from typing import List, Literal, Optional, Union, Any, Dict
 from pydantic import BaseModel, Field
 from fastapi import Query
 from fastapi.responses import StreamingResponse
@@ -14,162 +14,145 @@ from app.mentor.run import run, start_session
 
 router = APIRouter(prefix="/mentor", tags=["mentor"])
 
-
-callbacks: List[CallbackHandler] = []
-if settings.langfuse_enabled:
-    langfuse_handler = CallbackHandler()
-    langfuse_handler.auth_check()
-    callbacks.append(langfuse_handler)
-
-
-class MentorStartRequest(BaseModel):
-    session_id: str
-    user_id: str
-    previous_session_id: str
-    dev_progress: str
-
-
-class MentorRequest(BaseModel):
-    session_id: str
-    content: str
-
-
-class MentorResponse(BaseModel):
-    content: str
-    closed: bool = False
-
-
-@router.get(
-    "/health", summary="Check if the intelligence service is running", status_code=200
-)
-def status():
-    return {"status": "ok"}
-
-
-@router.post(
-    "/start",
-    response_model=MentorResponse,
-    summary="Start a chat session with an LLM.",
-)
-def start(request: MentorStartRequest):
-    config = RunnableConfig({"configurable": {"thread_id": request.session_id}})
-    response = start_session(
-        request.previous_session_id, request.user_id, request.dev_progress, config
-    )
-    response_message = response["messages"][-1].content
-    return MentorResponse(content=response_message, closed=response["closed"])
-
-
-@router.post(
-    "/",
-    response_model=MentorResponse,
-    summary="Continue a chat session with an LLM.",
-)
-def generate(request: MentorRequest):
-    config = RunnableConfig(
-        configurable={"thread_id": request.session_id}, callbacks=callbacks
-    )
-    response = run(request.content, config)
-    response_message = response["messages"][-1].content
-    return MentorResponse(content=response_message, closed=response["closed"])
-
-
-#############
-
 ChatModel = get_model(settings.MODEL_NAME)
 model = ChatModel(temperature=0.7, max_tokens=4096)
 
-class ClientAttachment(BaseModel):
-    name: Optional[str] = None
-    contentType: Optional[str] = None  
-    url: str
-
-class ToolCallDetail(BaseModel):
-    type: str
-    function: Optional[Dict[str, str]] = None  # Simplified from Any to str
-
-class ToolCall(BaseModel):
-    id: str
-    type: str = "function"
-    function: Dict[str, str]  # Simplified from Any to str
-
-class ToolResult(BaseModel):
-    toolCallId: str
-    result: str  # Changed from Any to str to avoid OpenAPI generator issues
-
-class ToolInvocation(BaseModel):
-    """Simplified ToolInvocation model to avoid OpenAPI generator issues"""
-    state: str  # 'partial-call' | 'call' | 'result'
-    step: Optional[int] = None
-    toolCallId: Optional[str] = None
-    toolName: Optional[str] = None
-    args: Optional[str] = None  # Changed from Dict[str, Any] to str to avoid complex types
-    result: Optional[str] = None  # Changed from Any to str to avoid complex types
-
-class ReasoningDetail(BaseModel):
-    type: str  # 'text' | 'redacted'
-    text: Optional[str] = None
-    signature: Optional[str] = None
-    data: Optional[str] = None
 
 class TextUIPart(BaseModel):
-    type: str = Field(default="text")
+    """A text part of a message."""
+
+    type: Literal["text"] = "text"
     text: str
 
+
+class ReasoningOpenDetail(BaseModel):
+    type: Literal["text"] = "text"
+    text: str
+    signature: Optional[str] = None
+
+
+class ReasoningRedactedDetail(BaseModel):
+    type: Literal["redacted"] = "redacted"
+    data: str
+
+
+ReasoningDetail = Union[ReasoningOpenDetail, ReasoningRedactedDetail]
+
+
 class ReasoningUIPart(BaseModel):
-    type: str = Field(default="reasoning")
-    reasoning: str
+    """A reasoning part of a message."""
+
+    type: Literal["reasoning"] = "reasoning"
+    reasoning: str = Field(..., description="The reasoning text")
     details: List[ReasoningDetail] = Field(default_factory=list)
 
+
+class ToolCall(BaseModel):
+    state: Literal["call"] = "call"
+    step: Optional[int] = None
+    toolCallId: str
+    toolName: str
+    args: Dict[str, Any]
+
+
+class ToolResult(BaseModel):
+    state: Literal["result"]
+    step: Optional[int] = None
+    toolCallId: str
+    toolName: str
+    args: Dict[str, Any]
+    result: Dict[str, Any]
+
+
+ToolInvocation = Union[ToolCall, ToolResult]
+
+
 class ToolInvocationUIPart(BaseModel):
-    type: str = Field(default="tool-invocation")
-    toolInvocation: ToolInvocation
+    """A tool invocation part of a message."""
+
+    type: Literal["tool-invocation"] = "tool-invocation"
+    toolInvocation: ToolInvocation = Field(
+        ...,
+        description="The tool invocation",
+    )
+
+
+class Source(BaseModel):
+    sourceType: Literal["url"] = "url"
+    id: str = Field(..., description="The ID of the source.")
+    url: str = Field(..., description="The URL of the source.")
+    title: Optional[str] = Field(None, description="The title of the source.")
+    providerMetadata: Optional[Dict[str, Any]] = Field(
+        ..., description="Additional provider metadata for the source."
+    )
+
 
 class SourceUIPart(BaseModel):
-    type: str = Field(default="source")
-    source: Dict[str, str]  # Simplified from Any to str
+    """A source part of a message."""
+
+    type: Literal["source"] = "source"
+    source: Source = Field(..., description="The source.")
+
 
 class FileUIPart(BaseModel):
-    type: str = Field(default="file")
+    """A file part of a message."""
+
+    type: Literal["file"] = "file"
     mimeType: str
     data: str
 
+
 class StepStartUIPart(BaseModel):
-    type: str = Field(default="step-start")
+    """A step boundary part of a message."""
 
-# Union type for all UI parts - EXACT match for Vercel AI SDK
-UIPart = Union[TextUIPart, ReasoningUIPart, ToolInvocationUIPart, SourceUIPart, FileUIPart, StepStartUIPart]
+    type: Literal["step-start"] = "step-start"
 
-class ClientMessage(BaseModel):
-    """PERFECT MATCH for actual frontend payload: {role=user, content=hello, parts=[{type=text, text=hello}]}"""
-    role: str           # REQUIRED: 'user' | 'assistant' | 'system'
-    content: str        # REQUIRED: Text content
-    
-    # Optional fields - ALL simplified to avoid Any types
-    parts: Optional[List[Dict[str, str]]] = None  # Simplified: parts array
-    id: Optional[str] = None
-    createdAt: Optional[str] = None
-    reasoning: Optional[str] = None
-    experimental_attachments: Optional[List[ClientAttachment]] = None
-    data: Optional[str] = None  # Simplified from JSONValue to str
-    annotations: Optional[List[str]] = None  # Simplified from JSONValue to str
-    toolInvocations: Optional[List[ToolInvocation]] = None
-    
+
+UIPart = Union[
+    TextUIPart,
+    ReasoningUIPart,
+    ToolInvocationUIPart,
+    SourceUIPart,
+    FileUIPart,
+    StepStartUIPart,
+]
+
+
+class Message(BaseModel):
+    id: str = Field(..., description="A unique identifier for the message")
+    createdAt: Optional[str] = Field(None, description="The timestamp of the message")
+    role: Literal["user", "assistant", "system"] = Field(
+        ..., description="The role of the message sender"
+    )
+    parts: List[UIPart] = Field(
+        default_factory=list,
+        description="""\
+The parts of the message. Use this for rendering the message in the UI.
+
+Assistant messages can have text, reasoning, and tool invocation parts.
+User messages can have text parts.\
+""",
+    )
+
     class Config:
         extra = "allow"
 
-class Request(BaseModel):
-    messages: List[ClientMessage]
+
+class ChatRequest(BaseModel):
+    messages: List[Message] = Field(
+        default_factory=list,
+        description="A list of messages in the chat conversation",
+    )
 
 
-def convert_to_langchain_messages(client_messages: List[ClientMessage]):
+def convert_to_langchain_messages(client_messages: List[Message]):
     """Convert ClientMessage objects to LangChain message objects."""
     langchain_messages = []
-    
+
     for msg in client_messages:
         role = msg.role.lower()
         content = msg.content
-        
+
         if role == "user":
             langchain_messages.append(HumanMessage(content=content))
         elif role == "assistant":
@@ -179,8 +162,9 @@ def convert_to_langchain_messages(client_messages: List[ClientMessage]):
         else:
             # Default to human message for unknown roles
             langchain_messages.append(HumanMessage(content=content))
-    
+
     return langchain_messages
+
 
 class EventStreamResponse(StreamingResponse):
     media_type = "text/event-stream"
@@ -192,38 +176,38 @@ class EventStreamResponse(StreamingResponse):
         200: {
             "description": "Data stream for Vercel AI SDK",
             "content": {
-                "text/plain": { 
+                "text/plain": {
                     "examples": {
                         "first-chunk": {
                             "summary": "Typical data stream frame",
-                            "value": '0:"Hello World!"'
+                            "value": '0:"Hello World!"',
                         }
                     }
                 }
             },
-            "headers": {              
+            "headers": {
                 "x-vercel-ai-data-stream": {
                     "description": "Protocol version for Vercel AI streaming",
-                    "schema": {"type": "string", "example": "v1"}
+                    "schema": {"type": "string", "example": "v1"},
                 }
             },
         }
-    }
+    },
 )
-async def handle_chat_data(request: Request):
+async def handle_chat_data(request: ChatRequest):
     messages = request.messages
-    
+
     def generate():
         # Convert ClientMessage objects to LangChain message objects
         langchain_messages = convert_to_langchain_messages(messages)
-        
+
         chain = model | StrOutputParser()
         for chunk in chain.stream(langchain_messages):
             # Skip empty chunks to avoid JSON parsing issues
-            yield '0:{text}\n'.format(text=json.dumps(chunk))
+            yield "0:{text}\n".format(text=json.dumps(chunk))
         # Use json.dumps with compact formatting (no spaces)
         yield 'd:{"finishReason":"stop"}\n'
-    
+
     response = StreamingResponse(generate(), media_type="text/plain")
-    response.headers['x-vercel-ai-data-stream'] = 'v1'
+    response.headers["x-vercel-ai-data-stream"] = "v1"
     return response

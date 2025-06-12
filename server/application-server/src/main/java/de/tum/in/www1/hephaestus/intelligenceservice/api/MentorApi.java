@@ -3,11 +3,8 @@ package de.tum.in.www1.hephaestus.intelligenceservice.api;
 import de.tum.in.www1.hephaestus.intelligenceservice.ApiClient;
 import de.tum.in.www1.hephaestus.intelligenceservice.BaseApi;
 
+import de.tum.in.www1.hephaestus.intelligenceservice.model.ChatRequest;
 import de.tum.in.www1.hephaestus.intelligenceservice.model.HTTPValidationError;
-import de.tum.in.www1.hephaestus.intelligenceservice.model.MentorRequest;
-import de.tum.in.www1.hephaestus.intelligenceservice.model.MentorResponse;
-import de.tum.in.www1.hephaestus.intelligenceservice.model.MentorStartRequest;
-import de.tum.in.www1.hephaestus.intelligenceservice.model.Request;
 
 import java.util.Collections;
 import java.util.HashMap;
@@ -42,175 +39,34 @@ public class MentorApi extends BaseApi {
     }
 
     /**
-     * Continue a chat session with an LLM.
-     * 
-     * <p><b>200</b> - Successful Response
-     * <p><b>422</b> - Validation Error
-     * @param mentorRequest  (required)
-     * @return MentorResponse
-     * @throws RestClientException if an error occurs while attempting to invoke the API
-     */
-    public MentorResponse generateMentorPost(MentorRequest mentorRequest) throws RestClientException {
-        return generateMentorPostWithHttpInfo(mentorRequest).getBody();
-    }
-
-    /**
-     * Continue a chat session with an LLM.
-     * 
-     * <p><b>200</b> - Successful Response
-     * <p><b>422</b> - Validation Error
-     * @param mentorRequest  (required)
-     * @return ResponseEntity&lt;MentorResponse&gt;
-     * @throws RestClientException if an error occurs while attempting to invoke the API
-     */
-    public ResponseEntity<MentorResponse> generateMentorPostWithHttpInfo(MentorRequest mentorRequest) throws RestClientException {
-        Object localVarPostBody = mentorRequest;
-        
-        // verify the required parameter 'mentorRequest' is set
-        if (mentorRequest == null) {
-            throw new HttpClientErrorException(HttpStatus.BAD_REQUEST, "Missing the required parameter 'mentorRequest' when calling generateMentorPost");
-        }
-        
-
-        final MultiValueMap<String, String> localVarQueryParams = new LinkedMultiValueMap<String, String>();
-        final HttpHeaders localVarHeaderParams = new HttpHeaders();
-        final MultiValueMap<String, String> localVarCookieParams = new LinkedMultiValueMap<String, String>();
-        final MultiValueMap<String, Object> localVarFormParams = new LinkedMultiValueMap<String, Object>();
-
-        final String[] localVarAccepts = { 
-            "application/json"
-         };
-        final List<MediaType> localVarAccept = apiClient.selectHeaderAccept(localVarAccepts);
-        final String[] localVarContentTypes = { 
-            "application/json"
-         };
-        final MediaType localVarContentType = apiClient.selectHeaderContentType(localVarContentTypes);
-
-        String[] localVarAuthNames = new String[] {  };
-
-        ParameterizedTypeReference<MentorResponse> localReturnType = new ParameterizedTypeReference<MentorResponse>() {};
-        return apiClient.invokeAPI("/mentor/", HttpMethod.POST, Collections.<String, Object>emptyMap(), localVarQueryParams, localVarPostBody, localVarHeaderParams, localVarCookieParams, localVarFormParams, localVarAccept, localVarContentType, localVarAuthNames, localReturnType);
-    }
-    /**
      * Handle Chat Data
      * 
-     * <p><b>200</b> - SSE stream of chat deltas
+     * <p><b>200</b> - Data stream for Vercel AI SDK
      * <p><b>422</b> - Validation Error
-     * @param request  (required)
-     * @return String
-     * @throws RestClientException if an error occurs while attempting to invoke the API
-     */
-    public String handleChatDataMentorChatPost(Request request) throws RestClientException {
-        return handleChatDataMentorChatPostWithHttpInfo(request).getBody();
-    }
-
-    /**
-     * Handle Chat Data
-     * 
-     * <p><b>200</b> - SSE stream of chat deltas
-     * <p><b>422</b> - Validation Error
-     * @param request  (required)
-     * @return ResponseEntity&lt;String&gt;
-     * @throws RestClientException if an error occurs while attempting to invoke the API
-     */
-    public ResponseEntity<String> handleChatDataMentorChatPostWithHttpInfo(Request request) throws RestClientException {
-        Object localVarPostBody = request;
-        
-        // verify the required parameter 'request' is set
-        if (request == null) {
-            throw new HttpClientErrorException(HttpStatus.BAD_REQUEST, "Missing the required parameter 'request' when calling handleChatDataMentorChatPost");
-        }
-        
-
-        final MultiValueMap<String, String> localVarQueryParams = new LinkedMultiValueMap<String, String>();
-        final HttpHeaders localVarHeaderParams = new HttpHeaders();
-        final MultiValueMap<String, String> localVarCookieParams = new LinkedMultiValueMap<String, String>();
-        final MultiValueMap<String, Object> localVarFormParams = new LinkedMultiValueMap<String, Object>();
-
-        final String[] localVarAccepts = { 
-            "text/event-stream", "application/json"
-         };
-        final List<MediaType> localVarAccept = apiClient.selectHeaderAccept(localVarAccepts);
-        final String[] localVarContentTypes = { 
-            "application/json"
-         };
-        final MediaType localVarContentType = apiClient.selectHeaderContentType(localVarContentTypes);
-
-        String[] localVarAuthNames = new String[] {  };
-
-        ParameterizedTypeReference<String> localReturnType = new ParameterizedTypeReference<String>() {};
-        return apiClient.invokeAPI("/mentor/chat", HttpMethod.POST, Collections.<String, Object>emptyMap(), localVarQueryParams, localVarPostBody, localVarHeaderParams, localVarCookieParams, localVarFormParams, localVarAccept, localVarContentType, localVarAuthNames, localReturnType);
-    }
-    /**
-     * Start a chat session with an LLM.
-     * 
-     * <p><b>200</b> - Successful Response
-     * <p><b>422</b> - Validation Error
-     * @param mentorStartRequest  (required)
-     * @return MentorResponse
-     * @throws RestClientException if an error occurs while attempting to invoke the API
-     */
-    public MentorResponse startMentorStartPost(MentorStartRequest mentorStartRequest) throws RestClientException {
-        return startMentorStartPostWithHttpInfo(mentorStartRequest).getBody();
-    }
-
-    /**
-     * Start a chat session with an LLM.
-     * 
-     * <p><b>200</b> - Successful Response
-     * <p><b>422</b> - Validation Error
-     * @param mentorStartRequest  (required)
-     * @return ResponseEntity&lt;MentorResponse&gt;
-     * @throws RestClientException if an error occurs while attempting to invoke the API
-     */
-    public ResponseEntity<MentorResponse> startMentorStartPostWithHttpInfo(MentorStartRequest mentorStartRequest) throws RestClientException {
-        Object localVarPostBody = mentorStartRequest;
-        
-        // verify the required parameter 'mentorStartRequest' is set
-        if (mentorStartRequest == null) {
-            throw new HttpClientErrorException(HttpStatus.BAD_REQUEST, "Missing the required parameter 'mentorStartRequest' when calling startMentorStartPost");
-        }
-        
-
-        final MultiValueMap<String, String> localVarQueryParams = new LinkedMultiValueMap<String, String>();
-        final HttpHeaders localVarHeaderParams = new HttpHeaders();
-        final MultiValueMap<String, String> localVarCookieParams = new LinkedMultiValueMap<String, String>();
-        final MultiValueMap<String, Object> localVarFormParams = new LinkedMultiValueMap<String, Object>();
-
-        final String[] localVarAccepts = { 
-            "application/json"
-         };
-        final List<MediaType> localVarAccept = apiClient.selectHeaderAccept(localVarAccepts);
-        final String[] localVarContentTypes = { 
-            "application/json"
-         };
-        final MediaType localVarContentType = apiClient.selectHeaderContentType(localVarContentTypes);
-
-        String[] localVarAuthNames = new String[] {  };
-
-        ParameterizedTypeReference<MentorResponse> localReturnType = new ParameterizedTypeReference<MentorResponse>() {};
-        return apiClient.invokeAPI("/mentor/start", HttpMethod.POST, Collections.<String, Object>emptyMap(), localVarQueryParams, localVarPostBody, localVarHeaderParams, localVarCookieParams, localVarFormParams, localVarAccept, localVarContentType, localVarAuthNames, localReturnType);
-    }
-    /**
-     * Check if the intelligence service is running
-     * 
-     * <p><b>200</b> - Successful Response
+     * @param chatRequest  (required)
      * @return Object
      * @throws RestClientException if an error occurs while attempting to invoke the API
      */
-    public Object statusMentorHealthGet() throws RestClientException {
-        return statusMentorHealthGetWithHttpInfo().getBody();
+    public Object handleChatDataMentorChatPost(ChatRequest chatRequest) throws RestClientException {
+        return handleChatDataMentorChatPostWithHttpInfo(chatRequest).getBody();
     }
 
     /**
-     * Check if the intelligence service is running
+     * Handle Chat Data
      * 
-     * <p><b>200</b> - Successful Response
+     * <p><b>200</b> - Data stream for Vercel AI SDK
+     * <p><b>422</b> - Validation Error
+     * @param chatRequest  (required)
      * @return ResponseEntity&lt;Object&gt;
      * @throws RestClientException if an error occurs while attempting to invoke the API
      */
-    public ResponseEntity<Object> statusMentorHealthGetWithHttpInfo() throws RestClientException {
-        Object localVarPostBody = null;
+    public ResponseEntity<Object> handleChatDataMentorChatPostWithHttpInfo(ChatRequest chatRequest) throws RestClientException {
+        Object localVarPostBody = chatRequest;
+        
+        // verify the required parameter 'chatRequest' is set
+        if (chatRequest == null) {
+            throw new HttpClientErrorException(HttpStatus.BAD_REQUEST, "Missing the required parameter 'chatRequest' when calling handleChatDataMentorChatPost");
+        }
         
 
         final MultiValueMap<String, String> localVarQueryParams = new LinkedMultiValueMap<String, String>();
@@ -219,16 +75,18 @@ public class MentorApi extends BaseApi {
         final MultiValueMap<String, Object> localVarFormParams = new LinkedMultiValueMap<String, Object>();
 
         final String[] localVarAccepts = { 
-            "application/json"
+            "application/json", "text/plain"
          };
         final List<MediaType> localVarAccept = apiClient.selectHeaderAccept(localVarAccepts);
-        final String[] localVarContentTypes = {  };
+        final String[] localVarContentTypes = { 
+            "application/json"
+         };
         final MediaType localVarContentType = apiClient.selectHeaderContentType(localVarContentTypes);
 
         String[] localVarAuthNames = new String[] {  };
 
         ParameterizedTypeReference<Object> localReturnType = new ParameterizedTypeReference<Object>() {};
-        return apiClient.invokeAPI("/mentor/health", HttpMethod.GET, Collections.<String, Object>emptyMap(), localVarQueryParams, localVarPostBody, localVarHeaderParams, localVarCookieParams, localVarFormParams, localVarAccept, localVarContentType, localVarAuthNames, localReturnType);
+        return apiClient.invokeAPI("/mentor/chat", HttpMethod.POST, Collections.<String, Object>emptyMap(), localVarQueryParams, localVarPostBody, localVarHeaderParams, localVarCookieParams, localVarFormParams, localVarAccept, localVarContentType, localVarAuthNames, localReturnType);
     }
 
     @Override
@@ -243,10 +101,12 @@ public class MentorApi extends BaseApi {
         final MultiValueMap<String, Object> localVarFormParams = new LinkedMultiValueMap<String, Object>();
 
         final String[] localVarAccepts = { 
-            "application/json"
+            "application/json", "text/plain"
          };
         final List<MediaType> localVarAccept = apiClient.selectHeaderAccept(localVarAccepts);
-        final String[] localVarContentTypes = {  };
+        final String[] localVarContentTypes = { 
+            "application/json"
+         };
         final MediaType localVarContentType = apiClient.selectHeaderContentType(localVarContentTypes);
 
         String[] localVarAuthNames = new String[] {  };

@@ -20,33 +20,38 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonTypeName;
 import com.fasterxml.jackson.annotation.JsonValue;
-import de.tum.in.www1.hephaestus.intelligenceservice.model.ToolCall;
-import de.tum.in.www1.hephaestus.intelligenceservice.model.ToolResult;
+import org.openapitools.jackson.nullable.JsonNullable;
+import com.fasterxml.jackson.annotation.JsonIgnore;
+import org.openapitools.jackson.nullable.JsonNullable;
+import java.util.NoSuchElementException;
 import com.fasterxml.jackson.annotation.JsonPropertyOrder;
 import com.fasterxml.jackson.annotation.JsonTypeName;
 import org.hibernate.validator.constraints.*;
 
 /**
- * The tool invocation
+ * ToolResult
  */
 @JsonPropertyOrder({
-  Toolinvocation.JSON_PROPERTY_ARGS,
-  Toolinvocation.JSON_PROPERTY_STATE,
-  Toolinvocation.JSON_PROPERTY_STEP,
-  Toolinvocation.JSON_PROPERTY_TOOL_CALL_ID,
-  Toolinvocation.JSON_PROPERTY_TOOL_NAME,
-  Toolinvocation.JSON_PROPERTY_RESULT
+  ToolResult.JSON_PROPERTY_ARGS,
+  ToolResult.JSON_PROPERTY_RESULT,
+  ToolResult.JSON_PROPERTY_STATE,
+  ToolResult.JSON_PROPERTY_STEP,
+  ToolResult.JSON_PROPERTY_TOOL_CALL_ID,
+  ToolResult.JSON_PROPERTY_TOOL_NAME
 })
 @jakarta.annotation.Generated(value = "org.openapitools.codegen.languages.JavaClientCodegen", comments = "Generator version: 7.7.0")
-public class Toolinvocation {
+public class ToolResult {
   public static final String JSON_PROPERTY_ARGS = "args";
   private Object args;
+
+  public static final String JSON_PROPERTY_RESULT = "result";
+  private Object result;
 
   public static final String JSON_PROPERTY_STATE = "state";
   private String state;
 
   public static final String JSON_PROPERTY_STEP = "step";
-  private Integer step;
+  private JsonNullable<Integer> step = JsonNullable.<Integer>undefined();
 
   public static final String JSON_PROPERTY_TOOL_CALL_ID = "toolCallId";
   private String toolCallId;
@@ -54,13 +59,10 @@ public class Toolinvocation {
   public static final String JSON_PROPERTY_TOOL_NAME = "toolName";
   private String toolName;
 
-  public static final String JSON_PROPERTY_RESULT = "result";
-  private Object result;
-
-  public Toolinvocation() {
+  public ToolResult() {
   }
 
-  public Toolinvocation args(Object args) {
+  public ToolResult args(Object args) {
     
     this.args = args;
     return this;
@@ -85,107 +87,7 @@ public class Toolinvocation {
     this.args = args;
   }
 
-  public Toolinvocation state(String state) {
-    
-    this.state = state;
-    return this;
-  }
-
-  /**
-   * Get state
-   * @return state
-   */
-  @jakarta.annotation.Nonnull
-  @JsonProperty(JSON_PROPERTY_STATE)
-  @JsonInclude(value = JsonInclude.Include.ALWAYS)
-
-  public String getState() {
-    return state;
-  }
-
-
-  @JsonProperty(JSON_PROPERTY_STATE)
-  @JsonInclude(value = JsonInclude.Include.ALWAYS)
-  public void setState(String state) {
-    this.state = state;
-  }
-
-  public Toolinvocation step(Integer step) {
-    
-    this.step = step;
-    return this;
-  }
-
-  /**
-   * Get step
-   * @return step
-   */
-  @jakarta.annotation.Nullable
-  @JsonProperty(JSON_PROPERTY_STEP)
-  @JsonInclude(value = JsonInclude.Include.USE_DEFAULTS)
-
-  public Integer getStep() {
-    return step;
-  }
-
-
-  @JsonProperty(JSON_PROPERTY_STEP)
-  @JsonInclude(value = JsonInclude.Include.USE_DEFAULTS)
-  public void setStep(Integer step) {
-    this.step = step;
-  }
-
-  public Toolinvocation toolCallId(String toolCallId) {
-    
-    this.toolCallId = toolCallId;
-    return this;
-  }
-
-  /**
-   * Get toolCallId
-   * @return toolCallId
-   */
-  @jakarta.annotation.Nonnull
-  @JsonProperty(JSON_PROPERTY_TOOL_CALL_ID)
-  @JsonInclude(value = JsonInclude.Include.ALWAYS)
-
-  public String getToolCallId() {
-    return toolCallId;
-  }
-
-
-  @JsonProperty(JSON_PROPERTY_TOOL_CALL_ID)
-  @JsonInclude(value = JsonInclude.Include.ALWAYS)
-  public void setToolCallId(String toolCallId) {
-    this.toolCallId = toolCallId;
-  }
-
-  public Toolinvocation toolName(String toolName) {
-    
-    this.toolName = toolName;
-    return this;
-  }
-
-  /**
-   * Get toolName
-   * @return toolName
-   */
-  @jakarta.annotation.Nonnull
-  @JsonProperty(JSON_PROPERTY_TOOL_NAME)
-  @JsonInclude(value = JsonInclude.Include.ALWAYS)
-
-  public String getToolName() {
-    return toolName;
-  }
-
-
-  @JsonProperty(JSON_PROPERTY_TOOL_NAME)
-  @JsonInclude(value = JsonInclude.Include.ALWAYS)
-  public void setToolName(String toolName) {
-    this.toolName = toolName;
-  }
-
-  public Toolinvocation result(Object result) {
+  public ToolResult result(Object result) {
     
     this.result = result;
     return this;
@@ -210,6 +112,114 @@ public class Toolinvocation {
     this.result = result;
   }
 
+  public ToolResult state(String state) {
+    
+    this.state = state;
+    return this;
+  }
+
+  /**
+   * Get state
+   * @return state
+   */
+  @jakarta.annotation.Nonnull
+  @JsonProperty(JSON_PROPERTY_STATE)
+  @JsonInclude(value = JsonInclude.Include.ALWAYS)
+
+  public String getState() {
+    return state;
+  }
+
+
+  @JsonProperty(JSON_PROPERTY_STATE)
+  @JsonInclude(value = JsonInclude.Include.ALWAYS)
+  public void setState(String state) {
+    this.state = state;
+  }
+
+  public ToolResult step(Integer step) {
+    this.step = JsonNullable.<Integer>of(step);
+    
+    return this;
+  }
+
+  /**
+   * Get step
+   * @return step
+   */
+  @jakarta.annotation.Nullable
+  @JsonIgnore
+
+  public Integer getStep() {
+        return step.orElse(null);
+  }
+
+  @JsonProperty(JSON_PROPERTY_STEP)
+  @JsonInclude(value = JsonInclude.Include.USE_DEFAULTS)
+
+  public JsonNullable<Integer> getStep_JsonNullable() {
+    return step;
+  }
+  
+  @JsonProperty(JSON_PROPERTY_STEP)
+  public void setStep_JsonNullable(JsonNullable<Integer> step) {
+    this.step = step;
+  }
+
+  public void setStep(Integer step) {
+    this.step = JsonNullable.<Integer>of(step);
+  }
+
+  public ToolResult toolCallId(String toolCallId) {
+    
+    this.toolCallId = toolCallId;
+    return this;
+  }
+
+  /**
+   * Get toolCallId
+   * @return toolCallId
+   */
+  @jakarta.annotation.Nonnull
+  @JsonProperty(JSON_PROPERTY_TOOL_CALL_ID)
+  @JsonInclude(value = JsonInclude.Include.ALWAYS)
+
+  public String getToolCallId() {
+    return toolCallId;
+  }
+
+
+  @JsonProperty(JSON_PROPERTY_TOOL_CALL_ID)
+  @JsonInclude(value = JsonInclude.Include.ALWAYS)
+  public void setToolCallId(String toolCallId) {
+    this.toolCallId = toolCallId;
+  }
+
+  public ToolResult toolName(String toolName) {
+    
+    this.toolName = toolName;
+    return this;
+  }
+
+  /**
+   * Get toolName
+   * @return toolName
+   */
+  @jakarta.annotation.Nonnull
+  @JsonProperty(JSON_PROPERTY_TOOL_NAME)
+  @JsonInclude(value = JsonInclude.Include.ALWAYS)
+
+  public String getToolName() {
+    return toolName;
+  }
+
+
+  @JsonProperty(JSON_PROPERTY_TOOL_NAME)
+  @JsonInclude(value = JsonInclude.Include.ALWAYS)
+  public void setToolName(String toolName) {
+    this.toolName = toolName;
+  }
+
   @Override
   public boolean equals(Object o) {
     if (this == o) {
@@ -218,30 +228,41 @@ public class Toolinvocation {
     if (o == null || getClass() != o.getClass()) {
       return false;
     }
-    Toolinvocation toolinvocation = (Toolinvocation) o;
-    return Objects.equals(this.args, toolinvocation.args) &&
-        Objects.equals(this.state, toolinvocation.state) &&
-        Objects.equals(this.step, toolinvocation.step) &&
-        Objects.equals(this.toolCallId, toolinvocation.toolCallId) &&
-        Objects.equals(this.toolName, toolinvocation.toolName) &&
-        Objects.equals(this.result, toolinvocation.result);
+    ToolResult toolResult = (ToolResult) o;
+    return Objects.equals(this.args, toolResult.args) &&
+        Objects.equals(this.result, toolResult.result) &&
+        Objects.equals(this.state, toolResult.state) &&
+        equalsNullable(this.step, toolResult.step) &&
+        Objects.equals(this.toolCallId, toolResult.toolCallId) &&
+        Objects.equals(this.toolName, toolResult.toolName);
+  }
+
+  private static <T> boolean equalsNullable(JsonNullable<T> a, JsonNullable<T> b) {
+    return a == b || (a != null && b != null && a.isPresent() && b.isPresent() && Objects.deepEquals(a.get(), b.get()));
   }
 
   @Override
   public int hashCode() {
-    return Objects.hash(args, state, step, toolCallId, toolName, result);
+    return Objects.hash(args, result, state, hashCodeNullable(step), toolCallId, toolName);
+  }
+
+  private static <T> int hashCodeNullable(JsonNullable<T> a) {
+    if (a == null) {
+      return 1;
+    }
+    return a.isPresent() ? Arrays.deepHashCode(new Object[]{a.get()}) : 31;
   }
 
   @Override
   public String toString() {
     StringBuilder sb = new StringBuilder();
-    sb.append("class Toolinvocation {\n");
+    sb.append("class ToolResult {\n");
     sb.append("    args: ").append(toIndentedString(args)).append("\n");
+    sb.append("    result: ").append(toIndentedString(result)).append("\n");
     sb.append("    state: ").append(toIndentedString(state)).append("\n");
     sb.append("    step: ").append(toIndentedString(step)).append("\n");
     sb.append("    toolCallId: ").append(toIndentedString(toolCallId)).append("\n");
     sb.append("    toolName: ").append(toIndentedString(toolName)).append("\n");
-    sb.append("    result: ").append(toIndentedString(result)).append("\n");
     sb.append("}");
     return sb.toString();
   }

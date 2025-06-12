@@ -25,71 +25,42 @@ import com.fasterxml.jackson.annotation.JsonTypeName;
 import org.hibernate.validator.constraints.*;
 
 /**
- * MentorResponse
+ * A step boundary part of a message.
  */
 @JsonPropertyOrder({
-  MentorResponse.JSON_PROPERTY_CLOSED,
-  MentorResponse.JSON_PROPERTY_CONTENT
+  StepStartUIPart.JSON_PROPERTY_TYPE
 })
 @jakarta.annotation.Generated(value = "org.openapitools.codegen.languages.JavaClientCodegen", comments = "Generator version: 7.7.0")
-public class MentorResponse {
-  public static final String JSON_PROPERTY_CLOSED = "closed";
-  private Boolean closed = false;
+public class StepStartUIPart {
+  public static final String JSON_PROPERTY_TYPE = "type";
+  private String type = "step-start";
 
-  public static final String JSON_PROPERTY_CONTENT = "content";
-  private String content;
-
-  public MentorResponse() {
+  public StepStartUIPart() {
   }
 
-  public MentorResponse closed(Boolean closed) {
+  public StepStartUIPart type(String type) {
     
-    this.closed = closed;
+    this.type = type;
     return this;
   }
 
   /**
-   * Get closed
-   * @return closed
+   * Get type
+   * @return type
    */
   @jakarta.annotation.Nullable
-  @JsonProperty(JSON_PROPERTY_CLOSED)
+  @JsonProperty(JSON_PROPERTY_TYPE)
   @JsonInclude(value = JsonInclude.Include.USE_DEFAULTS)
 
-  public Boolean getClosed() {
-    return closed;
+  public String getType() {
+    return type;
   }
 
 
-  @JsonProperty(JSON_PROPERTY_CLOSED)
+  @JsonProperty(JSON_PROPERTY_TYPE)
   @JsonInclude(value = JsonInclude.Include.USE_DEFAULTS)
-  public void setClosed(Boolean closed) {
-    this.closed = closed;
-  }
-
-  public MentorResponse content(String content) {
-    
-    this.content = content;
-    return this;
-  }
-
-  /**
-   * Get content
-   * @return content
-   */
-  @jakarta.annotation.Nonnull
-  @JsonProperty(JSON_PROPERTY_CONTENT)
-  @JsonInclude(value = JsonInclude.Include.ALWAYS)
-
-  public String getContent() {
-    return content;
-  }
-
-
-  @JsonProperty(JSON_PROPERTY_CONTENT)
-  @JsonInclude(value = JsonInclude.Include.ALWAYS)
-  public void setContent(String content) {
-    this.content = content;
+  public void setType(String type) {
+    this.type = type;
   }
 
   @Override
@@ -100,22 +71,20 @@ public class MentorResponse {
     if (o == null || getClass() != o.getClass()) {
       return false;
     }
-    MentorResponse mentorResponse = (MentorResponse) o;
-    return Objects.equals(this.closed, mentorResponse.closed) &&
-        Objects.equals(this.content, mentorResponse.content);
+    StepStartUIPart stepStartUIPart = (StepStartUIPart) o;
+    return Objects.equals(this.type, stepStartUIPart.type);
   }
 
   @Override
   public int hashCode() {
-    return Objects.hash(closed, content);
+    return Objects.hash(type);
   }
 
   @Override
   public String toString() {
     StringBuilder sb = new StringBuilder();
-    sb.append("class MentorResponse {\n");
-    sb.append("    closed: ").append(toIndentedString(closed)).append("\n");
-    sb.append("    content: ").append(toIndentedString(content)).append("\n");
+    sb.append("class StepStartUIPart {\n");
+    sb.append("    type: ").append(toIndentedString(type)).append("\n");
     sb.append("}");
     return sb.toString();
   }
