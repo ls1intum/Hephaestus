@@ -19,6 +19,7 @@ import java.time.Duration;
 import java.time.ZonedDateTime;
 import java.util.Arrays;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Map;
 import org.kohsuke.github.GHEvent;
 import org.slf4j.Logger;
@@ -158,8 +159,8 @@ public class NatsConsumerService {
 
                     var config = consumerContext.getConsumerInfo().getConsumerConfiguration();
                     var filterSubjects = config.getFilterSubjects();
-                    var filterMatches =
-                        filterSubjects.containsAll(Arrays.asList(subjects)) && filterSubjects.size() == subjects.length;
+                    var filterMatches = new HashSet<>(filterSubjects).containsAll(Arrays.asList(subjects)) &&
+                    filterSubjects.size() == subjects.length;
                     if (!filterMatches) {
                         logger.info("Consumer exists but with different subjects. Updating consumer.");
                         consumerContext = streamContext.createOrUpdateConsumer(
@@ -215,7 +216,7 @@ public class NatsConsumerService {
         }
 
         try {
-            cleanupConsumer(natsConnection, repositoryToMonitor);
+            cleanupConsumer(repositoryToMonitor);
             logger.info(
                 "Consumer cleanup successful for repository: {} with monitoring ID: {}",
                 repositoryToMonitor.getNameWithOwner(),
@@ -231,7 +232,7 @@ public class NatsConsumerService {
         }
     }
 
-    private void cleanupConsumer(Connection connection, RepositoryToMonitor repositoryToMonitor) throws IOException {
+    private void cleanupConsumer(RepositoryToMonitor repositoryToMonitor) throws IOException {
         try {
             ConsumerContext consumerContext = repositoryToMonitorIdToConsumerContext.get(repositoryToMonitor.getId());
             if (consumerContext == null) {
@@ -282,15 +283,28 @@ public class NatsConsumerService {
      * @return The subjects to monitor.
      */
     private String[] getSubjects(String nameWithOwner) {
-        String[] events = handlerRegistry
+        String repoPrefix = getSubjectPrefix(nameWithOwner);
+
+        String[] parts = nameWithOwner.split("/");
+        if (parts.length != 2) {
+            throw new IllegalArgumentException(
+                "Invalid repository format '" + nameWithOwner + "', expected 'org/repo'"
+            );
+        }
+        String orgWildcardPrefix = "github." + parts[0] + ".*";
+
+        return handlerRegistry
             .getSupportedEvents()
             .stream()
-            .map(GHEvent::name)
-            .map(String::toLowerCase)
-            .toArray(String[]::new);
-
-        return Arrays.stream(events)
-            .map(event -> this.getSubjectPrefix(nameWithOwner) + "." + event)
+            .map(ev -> {
+                String evt = ev.name().toLowerCase();
+                if (ev == GHEvent.TEAM) {
+                    // only a single wildcard subscription for team events
+                    return orgWildcardPrefix + "." + evt;
+                }
+                // everything else is repo‐specific
+                return repoPrefix + "." + evt;
+            })
             .toArray(String[]::new);
     }
 

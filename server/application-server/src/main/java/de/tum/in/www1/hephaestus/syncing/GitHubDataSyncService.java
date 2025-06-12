@@ -12,11 +12,13 @@ import de.tum.in.www1.hephaestus.gitprovider.pullrequestreview.github.GitHubPull
 import de.tum.in.www1.hephaestus.gitprovider.pullrequestreviewcomment.github.GitHubPullRequestReviewCommentSyncService;
 import de.tum.in.www1.hephaestus.gitprovider.repository.RepositoryRepository;
 import de.tum.in.www1.hephaestus.gitprovider.repository.github.GitHubRepositorySyncService;
+import de.tum.in.www1.hephaestus.gitprovider.teamV2.github.GitHubTeamSyncService;
 import de.tum.in.www1.hephaestus.gitprovider.user.github.GitHubUserSyncService;
 import de.tum.in.www1.hephaestus.workspace.RepositoryToMonitor;
 import de.tum.in.www1.hephaestus.workspace.RepositoryToMonitorRepository;
 import de.tum.in.www1.hephaestus.workspace.Workspace;
 import de.tum.in.www1.hephaestus.workspace.WorkspaceRepository;
+import java.io.IOException;
 import java.time.OffsetDateTime;
 import java.util.NoSuchElementException;
 import java.util.Optional;
@@ -54,6 +56,9 @@ public class GitHubDataSyncService {
 
     @Autowired
     private GitHubUserSyncService userSyncService;
+
+    @Autowired
+    private GitHubTeamSyncService teamSyncService;
 
     @Autowired
     private GitHubRepositorySyncService repositorySyncService;
@@ -188,6 +193,25 @@ public class GitHubDataSyncService {
         repositoryToMonitor.setRepositorySyncedAt(currentTime);
         repositoryToMonitorRepository.save(repositoryToMonitor);
         return repository;
+    }
+
+    public void syncTeams(Workspace workspace) {
+        workspace
+            .getRepositoriesToMonitor()
+            .stream()
+            .map(RepositoryToMonitor::getNameWithOwner)
+            .map(s -> s.split("/")[0])
+            .distinct()
+            .forEach(org -> {
+                try {
+                    logger.info("Syncing teams for organisation {}", org);
+                    teamSyncService.syncAndSaveTeams(org);
+                } catch (IOException e) {
+                    logger.error("Team sync for {} failed: {}", org, e.getMessage());
+                }
+            });
+
+        logger.info("Team sync completed.");
     }
 
     private void syncRepositoryLabels(GHRepository repository, RepositoryToMonitor repositoryToMonitor) {

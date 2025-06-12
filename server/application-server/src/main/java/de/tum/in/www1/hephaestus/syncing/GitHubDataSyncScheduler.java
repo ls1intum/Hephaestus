@@ -26,6 +26,7 @@ public class GitHubDataSyncScheduler {
         var workspace = workspaceService.getWorkspace();
         workspace.getRepositoriesToMonitor().forEach(dataSyncService::syncRepositoryToMonitor);
         dataSyncService.syncUsers(workspace);
+        dataSyncService.syncTeams(workspace);
         logger.info("Scheduled GitHub data sync completed.");
     }
 }
