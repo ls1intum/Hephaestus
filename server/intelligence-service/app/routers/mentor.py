@@ -4,13 +4,11 @@ from pydantic import BaseModel, Field
 from fastapi import Query
 from fastapi.responses import StreamingResponse
 from fastapi import APIRouter
-from langfuse.callback import CallbackHandler
-from langchain_core.runnables.config import RunnableConfig
 from langchain_core.output_parsers import StrOutputParser
 from langchain_core.messages import HumanMessage, AIMessage, SystemMessage
 from app.models import get_model
 from app.settings import settings
-from app.mentor.run import run, start_session
+
 
 router = APIRouter(prefix="/mentor", tags=["mentor"])
 
