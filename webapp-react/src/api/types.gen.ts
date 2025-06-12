@@ -21,14 +21,6 @@ export type PullRequestInfo = {
     updatedAt?: Date;
 };
 
-export type Message = {
-    id: number;
-    sentAt: Date;
-    sender: 'MENTOR' | 'USER';
-    content: string;
-    sessionId: number;
-};
-
 export type UserProfile = {
     userInfo: UserInfo;
     firstContribution: Date;
@@ -173,12 +165,6 @@ export type LeaderboardEntry = {
     numberOfComments: number;
     numberOfUnknowns: number;
     numberOfCodeComments: number;
-};
-
-export type Session = {
-    id: number;
-    createdAt: Date;
-    isClosed: boolean;
 };
 
 export type RemoveUserFromTeamData = {
@@ -407,74 +393,6 @@ export type HideTeamResponses = {
 
 export type HideTeamResponse = HideTeamResponses[keyof HideTeamResponses];
 
-export type GetAllSessionsData = {
-    body?: never;
-    path?: never;
-    query?: never;
-    url: '/mentor/sessions';
-};
-
-export type GetAllSessionsResponses = {
-    /**
-     * OK
-     */
-    200: Array<Session>;
-};
-
-export type GetAllSessionsResponse = GetAllSessionsResponses[keyof GetAllSessionsResponses];
-
-export type CreateNewSessionData = {
-    body?: never;
-    path?: never;
-    query?: never;
-    url: '/mentor/sessions';
-};
-
-export type CreateNewSessionResponses = {
-    /**
-     * OK
-     */
-    200: Session;
-};
-
-export type CreateNewSessionResponse = CreateNewSessionResponses[keyof CreateNewSessionResponses];
-
-export type GetMessagesData = {
-    body?: never;
-    path: {
-        sessionId: number;
-    };
-    query?: never;
-    url: '/mentor/sessions/{sessionId}';
-};
-
-export type GetMessagesResponses = {
-    /**
-     * OK
-     */
-    200: Array<Message>;
-};
-
-export type GetMessagesResponse = GetMessagesResponses[keyof GetMessagesResponses];
-
-export type CreateMessageData = {
-    body: string;
-    path: {
-        sessionId: number;
-    };
-    query?: never;
-    url: '/mentor/sessions/{sessionId}';
-};
-
-export type CreateMessageResponses = {
-    /**
-     * OK
-     */
-    200: Message;
-};
-
-export type CreateMessageResponse = CreateMessageResponses[keyof CreateMessageResponses];
-
 export type GetLeaderboardData = {
     body?: never;
     path?: never;
@@ -677,22 +595,6 @@ export type GetContributorsResponses = {
 };
 
 export type GetContributorsResponse = GetContributorsResponses[keyof GetContributorsResponses];
-
-export type GetLastSessionData = {
-    body?: never;
-    path?: never;
-    query?: never;
-    url: '/mentor/sessions/last';
-};
-
-export type GetLastSessionResponses = {
-    /**
-     * OK
-     */
-    200: Session;
-};
-
-export type GetLastSessionResponse = GetLastSessionResponses[keyof GetLastSessionResponses];
 
 export type GetActivityByUserData = {
     body?: never;

@@ -43,7 +43,7 @@ public class Toolinvocation {
   private Object args;
 
   public static final String JSON_PROPERTY_STATE = "state";
-  private String state;
+  private String state = "result";
 
   public static final String JSON_PROPERTY_STEP = "step";
   private Integer step;
@@ -95,9 +95,9 @@ public class Toolinvocation {
    * Get state
    * @return state
    */
-  @jakarta.annotation.Nonnull
+  @jakarta.annotation.Nullable
   @JsonProperty(JSON_PROPERTY_STATE)
-  @JsonInclude(value = JsonInclude.Include.ALWAYS)
+  @JsonInclude(value = JsonInclude.Include.USE_DEFAULTS)
 
   public String getState() {
     return state;
@@ -105,7 +105,7 @@ public class Toolinvocation {
 
 
   @JsonProperty(JSON_PROPERTY_STATE)
-  @JsonInclude(value = JsonInclude.Include.ALWAYS)
+  @JsonInclude(value = JsonInclude.Include.USE_DEFAULTS)
   public void setState(String state) {
     this.state = state;
   }

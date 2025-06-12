@@ -272,76 +272,6 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/TeamInfo"
-  /mentor/sessions:
-    get:
-      tags:
-      - session
-      operationId: getAllSessions
-      responses:
-        "200":
-          description: OK
-          content:
-            application/json:
-              schema:
-                type: array
-                items:
-                  $ref: "#/components/schemas/Session"
-    post:
-      tags:
-      - session
-      operationId: createNewSession
-      responses:
-        "200":
-          description: OK
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/Session"
-  /mentor/sessions/{sessionId}:
-    get:
-      tags:
-      - message
-      operationId: getMessages
-      parameters:
-      - name: sessionId
-        in: path
-        required: true
-        schema:
-          type: integer
-          format: int64
-      responses:
-        "200":
-          description: OK
-          content:
-            application/json:
-              schema:
-                type: array
-                items:
-                  $ref: "#/components/schemas/Message"
-    post:
-      tags:
-      - message
-      operationId: createMessage
-      parameters:
-      - name: sessionId
-        in: path
-        required: true
-        schema:
-          type: integer
-          format: int64
-      requestBody:
-        content:
-          application/json:
-            schema:
-              type: string
-        required: true
-      responses:
-        "200":
-          description: OK
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/Message"
   /leaderboard:
     get:
       tags:
@@ -569,18 +499,6 @@ paths:
                 type: array
                 items:
                   $ref: "#/components/schemas/Contributor"
-  /mentor/sessions/last:
-    get:
-      tags:
-      - session
-      operationId: getLastSession
-      responses:
-        "200":
-          description: OK
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/Session"
   /activity/{login}:
     get:
       tags:
@@ -719,31 +637,6 @@ components:
       - number
       - state
       - title
-    Message:
-      type: object
-      properties:
-        id:
-          type: integer
-          format: int64
-        sentAt:
-          type: string
-          format: date-time
-        sender:
-          type: string
-          enum:
-          - MENTOR
-          - USER
-        content:
-          type: string
-        sessionId:
-          type: integer
-          format: int64
-      required:
-      - content
-      - id
-      - sender
-      - sentAt
-      - sessionId
     UserProfile:
       type: object
       properties:
@@ -1161,18 +1054,3 @@ components:
       - reviewedPullRequests
       - score
       - user
-    Session:
-      type: object
-      properties:
-        id:
-          type: integer
-          format: int64
-        createdAt:
-          type: string
-          format: date-time
-        isClosed:
-          type: boolean
-      required:
-      - createdAt
-      - id
-      - isClosed

@@ -20,10 +20,6 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonTypeName;
 import com.fasterxml.jackson.annotation.JsonValue;
-import org.openapitools.jackson.nullable.JsonNullable;
-import com.fasterxml.jackson.annotation.JsonIgnore;
-import org.openapitools.jackson.nullable.JsonNullable;
-import java.util.NoSuchElementException;
 import com.fasterxml.jackson.annotation.JsonPropertyOrder;
 import com.fasterxml.jackson.annotation.JsonTypeName;
 import org.hibernate.validator.constraints.*;
@@ -39,7 +35,7 @@ import org.hibernate.validator.constraints.*;
 @jakarta.annotation.Generated(value = "org.openapitools.codegen.languages.JavaClientCodegen", comments = "Generator version: 7.7.0")
 public class ReasoningOpenDetail {
   public static final String JSON_PROPERTY_SIGNATURE = "signature";
-  private JsonNullable<String> signature = JsonNullable.<String>undefined();
+  private String signature;
 
   public static final String JSON_PROPERTY_TEXT = "text";
   private String text;
@@ -51,8 +47,8 @@ public class ReasoningOpenDetail {
   }
 
   public ReasoningOpenDetail signature(String signature) {
-    this.signature = JsonNullable.<String>of(signature);
     
+    this.signature = signature;
     return this;
   }
 
@@ -61,26 +57,18 @@ public class ReasoningOpenDetail {
    * @return signature
    */
   @jakarta.annotation.Nullable
-  @JsonIgnore
-
-  public String getSignature() {
-        return signature.orElse(null);
-  }
-
   @JsonProperty(JSON_PROPERTY_SIGNATURE)
   @JsonInclude(value = JsonInclude.Include.USE_DEFAULTS)
 
-  public JsonNullable<String> getSignature_JsonNullable() {
+  public String getSignature() {
     return signature;
   }
-  
-  @JsonProperty(JSON_PROPERTY_SIGNATURE)
-  public void setSignature_JsonNullable(JsonNullable<String> signature) {
-    this.signature = signature;
-  }
 
+
+  @JsonProperty(JSON_PROPERTY_SIGNATURE)
+  @JsonInclude(value = JsonInclude.Include.USE_DEFAULTS)
   public void setSignature(String signature) {
-    this.signature = JsonNullable.<String>of(signature);
+    this.signature = signature;
   }
 
   public ReasoningOpenDetail text(String text) {
@@ -142,25 +130,14 @@ public class ReasoningOpenDetail {
       return false;
     }
     ReasoningOpenDetail reasoningOpenDetail = (ReasoningOpenDetail) o;
-    return equalsNullable(this.signature, reasoningOpenDetail.signature) &&
+    return Objects.equals(this.signature, reasoningOpenDetail.signature) &&
         Objects.equals(this.text, reasoningOpenDetail.text) &&
         Objects.equals(this.type, reasoningOpenDetail.type);
   }
 
-  private static <T> boolean equalsNullable(JsonNullable<T> a, JsonNullable<T> b) {
-    return a == b || (a != null && b != null && a.isPresent() && b.isPresent() && Objects.deepEquals(a.get(), b.get()));
-  }
-
   @Override
   public int hashCode() {
-    return Objects.hash(hashCodeNullable(signature), text, type);
-  }
-
-  private static <T> int hashCodeNullable(JsonNullable<T> a) {
-    if (a == null) {
-      return 1;
-    }
-    return a.isPresent() ? Arrays.deepHashCode(new Object[]{a.get()}) : 31;
+    return Objects.hash(signature, text, type);
   }
 
   @Override

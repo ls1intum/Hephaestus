@@ -20,10 +20,6 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonTypeName;
 import com.fasterxml.jackson.annotation.JsonValue;
-import org.openapitools.jackson.nullable.JsonNullable;
-import com.fasterxml.jackson.annotation.JsonIgnore;
-import org.openapitools.jackson.nullable.JsonNullable;
-import java.util.NoSuchElementException;
 import com.fasterxml.jackson.annotation.JsonPropertyOrder;
 import com.fasterxml.jackson.annotation.JsonTypeName;
 import org.hibernate.validator.constraints.*;
@@ -50,7 +46,7 @@ public class Source {
   private String sourceType = "url";
 
   public static final String JSON_PROPERTY_TITLE = "title";
-  private JsonNullable<String> title = JsonNullable.<String>undefined();
+  private String title;
 
   public static final String JSON_PROPERTY_URL = "url";
   private String url;
@@ -134,8 +130,8 @@ public class Source {
   }
 
   public Source title(String title) {
-    this.title = JsonNullable.<String>of(title);
     
+    this.title = title;
     return this;
   }
 
@@ -144,26 +140,18 @@ public class Source {
    * @return title
    */
   @jakarta.annotation.Nullable
-  @JsonIgnore
-
-  public String getTitle() {
-        return title.orElse(null);
-  }
-
   @JsonProperty(JSON_PROPERTY_TITLE)
   @JsonInclude(value = JsonInclude.Include.USE_DEFAULTS)
 
-  public JsonNullable<String> getTitle_JsonNullable() {
+  public String getTitle() {
     return title;
   }
-  
-  @JsonProperty(JSON_PROPERTY_TITLE)
-  public void setTitle_JsonNullable(JsonNullable<String> title) {
-    this.title = title;
-  }
 
+
+  @JsonProperty(JSON_PROPERTY_TITLE)
+  @JsonInclude(value = JsonInclude.Include.USE_DEFAULTS)
   public void setTitle(String title) {
-    this.title = JsonNullable.<String>of(title);
+    this.title = title;
   }
 
   public Source url(String url) {
@@ -203,24 +191,13 @@ public class Source {
     return Objects.equals(this.id, source.id) &&
         Objects.equals(this.providerMetadata, source.providerMetadata) &&
         Objects.equals(this.sourceType, source.sourceType) &&
-        equalsNullable(this.title, source.title) &&
+        Objects.equals(this.title, source.title) &&
         Objects.equals(this.url, source.url);
-  }
-
-  private static <T> boolean equalsNullable(JsonNullable<T> a, JsonNullable<T> b) {
-    return a == b || (a != null && b != null && a.isPresent() && b.isPresent() && Objects.deepEquals(a.get(), b.get()));
   }
 
   @Override
   public int hashCode() {
-    return Objects.hash(id, providerMetadata, sourceType, hashCodeNullable(title), url);
-  }
-
-  private static <T> int hashCodeNullable(JsonNullable<T> a) {
-    if (a == null) {
-      return 1;
-    }
-    return a.isPresent() ? Arrays.deepHashCode(new Object[]{a.get()}) : 31;
+    return Objects.hash(id, providerMetadata, sourceType, title, url);
   }
 
   @Override

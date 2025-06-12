@@ -138,8 +138,11 @@ components:
       title: HealthCheck
       type: object
     Message:
-      additionalProperties: true
       properties:
+        content:
+          description: Text content of the message. Use parts when possible.
+          title: Content
+          type: string
         createdAt:
           anyOf:
           - type: string
@@ -169,15 +172,12 @@ components:
           title: Parts
           type: array
         role:
-          description: The role of the message sender
-          enum:
-          - user
-          - assistant
-          - system
+          description: 'The role of the message sender: ''user'', ''assistant'', ''system''.'
           title: Role
           type: string
       required:
       - id
+      - content
       - role
       title: Message
       type: object
@@ -365,6 +365,7 @@ components:
           type: object
         state:
           const: result
+          default: result
           title: State
           type: string
         step:
@@ -379,7 +380,6 @@ components:
           title: Toolname
           type: string
       required:
-      - state
       - toolCallId
       - toolName
       - args

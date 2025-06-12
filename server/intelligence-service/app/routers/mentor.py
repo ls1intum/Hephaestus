@@ -56,7 +56,7 @@ class ToolCall(BaseModel):
 
 
 class ToolResult(BaseModel):
-    state: Literal["result"]
+    state: Literal["result"] = "result"
     step: Optional[int] = None
     toolCallId: str
     toolName: str
@@ -121,8 +121,11 @@ UIPart = Union[
 class Message(BaseModel):
     id: str = Field(..., description="A unique identifier for the message")
     createdAt: Optional[str] = Field(None, description="The timestamp of the message")
-    role: Literal["user", "assistant", "system"] = Field(
-        ..., description="The role of the message sender"
+    content: str = Field(
+        ..., description="Text content of the message. Use parts when possible."
+    )
+    role: str = Field(
+        ..., description="The role of the message sender: 'user', 'assistant', 'system'.",
     )
     parts: List[UIPart] = Field(
         default_factory=list,
@@ -133,10 +136,6 @@ Assistant messages can have text, reasoning, and tool invocation parts.
 User messages can have text parts.\
 """,
     )
-
-    class Config:
-        extra = "allow"
-
 
 class ChatRequest(BaseModel):
     messages: List[Message] = Field(

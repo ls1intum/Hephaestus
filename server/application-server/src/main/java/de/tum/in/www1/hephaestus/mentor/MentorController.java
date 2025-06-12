@@ -12,12 +12,15 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.reactive.function.client.WebClient;
 import reactor.core.publisher.Flux;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import java.util.UUID;
 
 @RestController
 @RequestMapping("/mentor")
 public class MentorController {
 
     private static final Logger logger = LoggerFactory.getLogger(MentorController.class);
+    private final ObjectMapper objectMapper = new ObjectMapper();
     
     private final WebClient webClient;
     
@@ -29,17 +32,46 @@ public class MentorController {
     
     @Hidden // Hides it from the OpenAPI documentation
     @PostMapping(value = "/chat", produces = MediaType.TEXT_PLAIN_VALUE)
-    public Flux<String> chat(@RequestBody ChatRequest request) {
-        logger.info("Received chat request with {} messages", request.getMessages().size());
+    public Flux<String> chat(@RequestBody MentorChatRequestDTO mentorRequest) {
+        logger.info("Received chat request with {} messages", mentorRequest.messages().size());
+        //  Log messages for debugging
+        mentorRequest.messages().forEach(message -> 
+            logger.debug(message.toString())
+        );
 
         try {
-            // The request is already the perfect type! Just pass it directly to the intelligence service
+            // Convert to intelligence service ChatRequest and fix missing message IDs
+            ChatRequest intelligenceRequest = new ChatRequest();
+            intelligenceRequest.setMessages(mentorRequest.messages().stream()
+                .map(message -> {
+                    // Ensure each message has a unique ID
+                    if (message.getId() == null || message.getId().isEmpty()) {
+                        message.setId(UUID.randomUUID().toString());
+                        logger.debug("Added missing ID {} to message", message.getId());
+                    }
+                    return message;
+                })
+                .toList());
+
+            // Log the actual JSON payload being sent
+            try {
+                String jsonPayload = objectMapper.writeValueAsString(intelligenceRequest);
+                logger.info("Sending JSON payload to intelligence service: {}", jsonPayload);
+            } catch (Exception jsonException) {
+                logger.error("Failed to serialize request to JSON for logging", jsonException);
+            }
+
             return webClient.post()
                 .uri("/mentor/chat")
                 .contentType(MediaType.APPLICATION_JSON)
                 .accept(MediaType.TEXT_PLAIN)
-                .bodyValue(request)
+                .bodyValue(intelligenceRequest)
                 .retrieve()
+                .onStatus(status -> status.is4xxClientError(), response -> {
+                    return response.bodyToMono(String.class)
+                        .doOnNext(errorBody -> logger.error("422 Error response body: {}", errorBody))
+                        .then(response.createException());
+                })
                 .bodyToFlux(String.class)
                 .map(chunk -> {
                     // Ensure each chunk ends with proper line breaks for SSE
@@ -53,7 +85,7 @@ public class MentorController {
                     logger.error("Error calling intelligence service: {} - {}", 
                         error.getClass().getSimpleName(), error.getMessage());
                     if (error.getMessage() != null && error.getMessage().contains("422")) {
-                        logger.error("Request payload that caused 422: {}", request);
+                        logger.error("Request payload that caused 422: {}", intelligenceRequest);
                     }
                 })
                 .onErrorResume(error -> {

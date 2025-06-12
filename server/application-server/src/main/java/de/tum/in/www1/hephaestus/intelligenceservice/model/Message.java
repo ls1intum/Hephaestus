@@ -23,13 +23,7 @@ import com.fasterxml.jackson.annotation.JsonValue;
 import de.tum.in.www1.hephaestus.intelligenceservice.model.MessagePartsInner;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
-import org.openapitools.jackson.nullable.JsonNullable;
-import com.fasterxml.jackson.annotation.JsonIgnore;
-import org.openapitools.jackson.nullable.JsonNullable;
-import java.util.NoSuchElementException;
 import com.fasterxml.jackson.annotation.JsonPropertyOrder;
 import com.fasterxml.jackson.annotation.JsonTypeName;
 import org.hibernate.validator.constraints.*;
@@ -38,15 +32,19 @@ import org.hibernate.validator.constraints.*;
  * Message
  */
 @JsonPropertyOrder({
+  Message.JSON_PROPERTY_CONTENT,
   Message.JSON_PROPERTY_CREATED_AT,
   Message.JSON_PROPERTY_ID,
   Message.JSON_PROPERTY_PARTS,
   Message.JSON_PROPERTY_ROLE
 })
 @jakarta.annotation.Generated(value = "org.openapitools.codegen.languages.JavaClientCodegen", comments = "Generator version: 7.7.0")
-public class Message extends HashMap<String, Object> {
+public class Message {
+  public static final String JSON_PROPERTY_CONTENT = "content";
+  private String content;
+
   public static final String JSON_PROPERTY_CREATED_AT = "createdAt";
-  private JsonNullable<String> createdAt = JsonNullable.<String>undefined();
+  private String createdAt;
 
   public static final String JSON_PROPERTY_ID = "id";
   private String id;
@@ -54,53 +52,40 @@ public class Message extends HashMap<String, Object> {
   public static final String JSON_PROPERTY_PARTS = "parts";
   private List<MessagePartsInner> parts = new ArrayList<>();
 
-  /**
-   * The role of the message sender
-   */
-  public enum RoleEnum {
-    USER("user"),
-    
-    ASSISTANT("assistant"),
-    
-    SYSTEM("system");
-
-    private String value;
-
-    RoleEnum(String value) {
-      this.value = value;
-    }
-
-    @JsonValue
-    public String getValue() {
-      return value;
-    }
-
-    @Override
-    public String toString() {
-      return String.valueOf(value);
-    }
-
-    @JsonCreator
-    public static RoleEnum fromValue(String value) {
-      for (RoleEnum b : RoleEnum.values()) {
-        if (b.value.equals(value)) {
-          return b;
-        }
-      }
-      throw new IllegalArgumentException("Unexpected value '" + value + "'");
-    }
-  }
-
   public static final String JSON_PROPERTY_ROLE = "role";
-  private RoleEnum role;
+  private String role;
 
   public Message() {
+  }
 
+  public Message content(String content) {
+    
+    this.content = content;
+    return this;
+  }
+
+  /**
+   * Text content of the message. Use parts when possible.
+   * @return content
+   */
+  @jakarta.annotation.Nonnull
+  @JsonProperty(JSON_PROPERTY_CONTENT)
+  @JsonInclude(value = JsonInclude.Include.ALWAYS)
+
+  public String getContent() {
+    return content;
+  }
+
+
+  @JsonProperty(JSON_PROPERTY_CONTENT)
+  @JsonInclude(value = JsonInclude.Include.ALWAYS)
+  public void setContent(String content) {
+    this.content = content;
   }
 
   public Message createdAt(String createdAt) {
-    this.createdAt = JsonNullable.<String>of(createdAt);
     
+    this.createdAt = createdAt;
     return this;
   }
 
@@ -109,26 +94,18 @@ public class Message extends HashMap<String, Object> {
    * @return createdAt
    */
   @jakarta.annotation.Nullable
-  @JsonIgnore
-
-  public String getCreatedAt() {
-        return createdAt.orElse(null);
-  }
-
   @JsonProperty(JSON_PROPERTY_CREATED_AT)
   @JsonInclude(value = JsonInclude.Include.USE_DEFAULTS)
 
-  public JsonNullable<String> getCreatedAt_JsonNullable() {
+  public String getCreatedAt() {
     return createdAt;
   }
-  
-  @JsonProperty(JSON_PROPERTY_CREATED_AT)
-  public void setCreatedAt_JsonNullable(JsonNullable<String> createdAt) {
-    this.createdAt = createdAt;
-  }
 
+
+  @JsonProperty(JSON_PROPERTY_CREATED_AT)
+  @JsonInclude(value = JsonInclude.Include.USE_DEFAULTS)
   public void setCreatedAt(String createdAt) {
-    this.createdAt = JsonNullable.<String>of(createdAt);
+    this.createdAt = createdAt;
   }
 
   public Message id(String id) {
@@ -189,28 +166,28 @@ public class Message extends HashMap<String, Object> {
     this.parts = parts;
   }
 
-  public Message role(RoleEnum role) {
+  public Message role(String role) {
     
     this.role = role;
     return this;
   }
 
   /**
-   * The role of the message sender
+   * The role of the message sender: &#39;user&#39;, &#39;assistant&#39;, &#39;system&#39;.
    * @return role
    */
   @jakarta.annotation.Nonnull
   @JsonProperty(JSON_PROPERTY_ROLE)
   @JsonInclude(value = JsonInclude.Include.ALWAYS)
 
-  public RoleEnum getRole() {
+  public String getRole() {
     return role;
   }
 
 
   @JsonProperty(JSON_PROPERTY_ROLE)
   @JsonInclude(value = JsonInclude.Include.ALWAYS)
-  public void setRole(RoleEnum role) {
+  public void setRole(String role) {
     this.role = role;
   }
 
@@ -223,34 +200,23 @@ public class Message extends HashMap<String, Object> {
       return false;
     }
     Message message = (Message) o;
-    return equalsNullable(this.createdAt, message.createdAt) &&
+    return Objects.equals(this.content, message.content) &&
+        Objects.equals(this.createdAt, message.createdAt) &&
         Objects.equals(this.id, message.id) &&
         Objects.equals(this.parts, message.parts) &&
-        Objects.equals(this.role, message.role) &&
-        super.equals(o);
-  }
-
-  private static <T> boolean equalsNullable(JsonNullable<T> a, JsonNullable<T> b) {
-    return a == b || (a != null && b != null && a.isPresent() && b.isPresent() && Objects.deepEquals(a.get(), b.get()));
+        Objects.equals(this.role, message.role);
   }
 
   @Override
   public int hashCode() {
-    return Objects.hash(hashCodeNullable(createdAt), id, parts, role, super.hashCode());
-  }
-
-  private static <T> int hashCodeNullable(JsonNullable<T> a) {
-    if (a == null) {
-      return 1;
-    }
-    return a.isPresent() ? Arrays.deepHashCode(new Object[]{a.get()}) : 31;
+    return Objects.hash(content, createdAt, id, parts, role);
   }
 
   @Override
   public String toString() {
     StringBuilder sb = new StringBuilder();
     sb.append("class Message {\n");
-    sb.append("    ").append(toIndentedString(super.toString())).append("\n");
+    sb.append("    content: ").append(toIndentedString(content)).append("\n");
     sb.append("    createdAt: ").append(toIndentedString(createdAt)).append("\n");
     sb.append("    id: ").append(toIndentedString(id)).append("\n");
     sb.append("    parts: ").append(toIndentedString(parts)).append("\n");
