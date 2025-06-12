@@ -1,7 +1,6 @@
 import json
 from typing import List, Literal, Optional, Union, Any, Dict
 from pydantic import BaseModel, Field
-from fastapi import Query
 from fastapi.responses import StreamingResponse
 from fastapi import APIRouter
 from langchain_core.output_parsers import StrOutputParser

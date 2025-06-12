@@ -5,7 +5,7 @@ import org.springframework.lang.NonNull;
 
 import java.util.List;
 
-public record MentorChatRequestDTO(
+public record ChatRequestDTO(
     @NonNull String id,
     @NonNull List<Message> messages
 ) {

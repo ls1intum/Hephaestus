@@ -24,6 +24,10 @@ import de.tum.in.www1.hephaestus.intelligenceservice.model.MessagePartsInner;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import org.openapitools.jackson.nullable.JsonNullable;
+import com.fasterxml.jackson.annotation.JsonIgnore;
+import org.openapitools.jackson.nullable.JsonNullable;
+import java.util.NoSuchElementException;
 import com.fasterxml.jackson.annotation.JsonPropertyOrder;
 import com.fasterxml.jackson.annotation.JsonTypeName;
 import org.hibernate.validator.constraints.*;
@@ -44,7 +48,7 @@ public class Message {
   private String content;
 
   public static final String JSON_PROPERTY_CREATED_AT = "createdAt";
-  private String createdAt;
+  private JsonNullable<String> createdAt = JsonNullable.<String>undefined();
 
   public static final String JSON_PROPERTY_ID = "id";
   private String id;
@@ -84,8 +88,8 @@ public class Message {
   }
 
   public Message createdAt(String createdAt) {
+    this.createdAt = JsonNullable.<String>of(createdAt);
     
-    this.createdAt = createdAt;
     return this;
   }
 
@@ -94,18 +98,26 @@ public class Message {
    * @return createdAt
    */
   @jakarta.annotation.Nullable
-  @JsonProperty(JSON_PROPERTY_CREATED_AT)
-  @JsonInclude(value = JsonInclude.Include.USE_DEFAULTS)
+  @JsonIgnore
 
   public String getCreatedAt() {
-    return createdAt;
+        return createdAt.orElse(null);
   }
-
 
   @JsonProperty(JSON_PROPERTY_CREATED_AT)
   @JsonInclude(value = JsonInclude.Include.USE_DEFAULTS)
-  public void setCreatedAt(String createdAt) {
+
+  public JsonNullable<String> getCreatedAt_JsonNullable() {
+    return createdAt;
+  }
+  
+  @JsonProperty(JSON_PROPERTY_CREATED_AT)
+  public void setCreatedAt_JsonNullable(JsonNullable<String> createdAt) {
     this.createdAt = createdAt;
+  }
+
+  public void setCreatedAt(String createdAt) {
+    this.createdAt = JsonNullable.<String>of(createdAt);
   }
 
   public Message id(String id) {
@@ -201,15 +213,26 @@ public class Message {
     }
     Message message = (Message) o;
     return Objects.equals(this.content, message.content) &&
-        Objects.equals(this.createdAt, message.createdAt) &&
+        equalsNullable(this.createdAt, message.createdAt) &&
         Objects.equals(this.id, message.id) &&
         Objects.equals(this.parts, message.parts) &&
         Objects.equals(this.role, message.role);
   }
 
+  private static <T> boolean equalsNullable(JsonNullable<T> a, JsonNullable<T> b) {
+    return a == b || (a != null && b != null && a.isPresent() && b.isPresent() && Objects.deepEquals(a.get(), b.get()));
+  }
+
   @Override
   public int hashCode() {
-    return Objects.hash(content, createdAt, id, parts, role);
+    return Objects.hash(content, hashCodeNullable(createdAt), id, parts, role);
+  }
+
+  private static <T> int hashCodeNullable(JsonNullable<T> a) {
+    if (a == null) {
+      return 1;
+    }
+    return a.isPresent() ? Arrays.deepHashCode(new Object[]{a.get()}) : 31;
   }
 
   @Override
