@@ -7,9 +7,9 @@ import de.tum.in.www1.hephaestus.gitprovider.teamV2.membership.TeamMembership;
 import de.tum.in.www1.hephaestus.gitprovider.teamV2.permission.*;
 import de.tum.in.www1.hephaestus.gitprovider.user.*;
 import java.io.IOException;
-import java.io.UncheckedIOException;
 import java.util.HashSet;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.stream.Collectors;
 import org.kohsuke.github.*;
@@ -57,25 +57,12 @@ public class GitHubTeamSyncService {
     @Transactional
     public TeamV2 processTeam(GHTeam ghTeam) {
         try {
-            String orgName = ghTeam.getOrganization().getLogin();
             TeamV2 team = teamRepository
                 .findById(ghTeam.getId())
-                .orElseGet(() -> {
-                    try {
-                        return teamConverter.create(ghTeam, orgName);
-                    } catch (IOException e) {
-                        log.error(
-                            "Failed to create local TeamV2 for GitHub team {} (org={}): {}",
-                            ghTeam.getSlug(),
-                            orgName,
-                            e.getMessage()
-                        );
-                        throw new UncheckedIOException(e);
-                    }
-                });
-
-            teamConverter.update(ghTeam, orgName, team);
-            syncMemberships(ghTeam, team);
+                .orElseGet(() -> teamConverter.convert(ghTeam));
+            //TODO: check why team can be null here
+            teamConverter.update(ghTeam, team);
+            syncMemberships(ghTeam, Objects.requireNonNull(team));
             syncRepoPermissions(ghTeam, team);
             TeamV2 saved = teamRepository.save(team);
             log.info(
