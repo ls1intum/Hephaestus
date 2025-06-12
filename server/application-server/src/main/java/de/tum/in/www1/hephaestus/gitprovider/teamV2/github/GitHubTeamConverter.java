@@ -32,7 +32,7 @@ public class GitHubTeamConverter extends BaseGitServiceEntityConverter<GHTeam, T
         // getOrganization() may perform an API call and throw IOException.
         // If it fails, we log and leave the existing githubOrganization value intact.
         try {
-            organization = source.getOrganization().getName();
+            organization = source.getOrganization().getLogin();
         } catch (Exception e) {
             logger.error(
                     "Error while fetching organization name for the following team: {}. {}",
