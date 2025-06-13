@@ -72,8 +72,8 @@ public class SecurityConfig {
             .cors(cors -> cors.configurationSource(corsConfigurationSource()));
 
         http.authorizeHttpRequests(requests -> {
-            requests.requestMatchers("/workspace/**").hasAuthority("admin");
-            requests.requestMatchers("/mentor/**").hasAuthority("mentor_access");
+            // requests.requestMatchers("/workspace/**").hasAuthority("admin");
+            // requests.requestMatchers("/mentor/**").hasAuthority("mentor_access");
             requests.anyRequest().permitAll();
         });
 

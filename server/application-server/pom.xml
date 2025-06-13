@@ -150,6 +150,13 @@
 			<scope>test</scope>
 		</dependency>
 
+		<!-- Reactor test for reactive stream testing -->
+		<dependency>
+			<groupId>io.projectreactor</groupId>
+			<artifactId>reactor-test</artifactId>
+			<scope>test</scope>
+		</dependency>
+
 		<!-- Testcontainers for integration testing -->
 		<dependency>
 			<groupId>org.testcontainers</groupId>
@@ -410,6 +417,7 @@
 					<argLine>@{argLine} -Xmx1024m -Dspring.profiles.active=test -Dfile.encoding=UTF-8</argLine>
 					<includes>
 						<include>**/*IntegrationTest.java</include>
+						<include>**/*IT.java</include>
 					</includes>
 					<groups>integration</groups>
 				</configuration>
