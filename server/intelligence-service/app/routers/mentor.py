@@ -118,9 +118,6 @@ UIPart = Union[
 class Message(BaseModel):
     id: str = Field(..., description="A unique identifier for the message")
     createdAt: Optional[str] = Field(None, description="The timestamp of the message")
-    content: str = Field(
-        ..., description="Text content of the message. Use parts when possible."
-    )
     role: str = Field(
         ..., description="The role of the message sender: 'user', 'assistant', 'system'.",
     )
