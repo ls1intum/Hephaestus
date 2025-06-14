@@ -33,7 +33,7 @@ public class ChatMessagePart {
 
     @NonNull
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "message_id", nullable = false, insertable = false, updatable = false)
+    @JoinColumn(name = "messageId", insertable = false, updatable = false)
     @ToString.Exclude
     private ChatMessage message;
 

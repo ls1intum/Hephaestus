@@ -14,6 +14,30 @@ import reactor.test.StepVerifier;
 import java.util.List;
 import java.util.UUID;
 
+/**
+ * Integration tests for ChatController that cover all AI SDK stream protocol message parts.
+ * These tests are designed with future persistence in mind for ChatThread, ChatMessage, and ChatMessagePart entities.
+ * 
+ * CRITICAL AI SDK Stream Protocol Requirements (https://ai-sdk.dev/docs/ai-sdk-ui/stream-protocol):
+ * 1. MANDATORY Start Step Frame (f:{"messageId":"<id>"}) - MUST be the first frame in every stream
+ * 2. Finish Step Frame (e:) with usage and isContinued flag for each step
+ * 3. Finish Message Frame (d:) as the final frame with complete usage totals
+ * 4. Multi-step scenarios use isContinued:true in intermediate steps
+ * 
+ * Tests follow scenarios from the official AI SDK implementation:
+ * - Simple text responses (maps to TEXT message parts) - Frame type: 0:
+ * - Tool call workflows (maps to TOOL_INVOCATION message parts) - Frame types: b:, c:, 9:, a:
+ * - Reasoning streams (maps to REASONING message parts) - Frame types: g:, i:, j:
+ * - File attachments (maps to FILE message parts) - Frame type: k:
+ * - Source citations (maps to SOURCE message parts) - Frame type: h:
+ * - Data parts (structured JSON arrays) - Frame type: 2:
+ * - Message annotations (metadata) - Frame type: 8:
+ * - Error handling and recovery scenarios - Frame type: 3:
+ * - Multi-step conversations (demonstrates ChatThread structure)
+ * 
+ * Each test validates the complete stream protocol compliance to ensure compatibility
+ * with AI SDK clients and proper persistence mapping.
+ */
 @AutoConfigureWebTestClient
 public class ChatControllerIT extends BaseIntegrationTest {
 
@@ -28,13 +52,20 @@ public class ChatControllerIT extends BaseIntegrationTest {
         mockFrameHolder.frames = List.of();
     }
 
+    /**
+     * Test: Simple text response - matches "scenario: simple text response" from AI SDK
+     * Maps to: TEXT message parts in ChatMessagePart entity
+     * Persistence: Single ChatMessage with multiple TEXT parts
+     */
     @Test
-    void shouldStreamBasicTextResponse() {
-        // Given
+    void shouldStreamSimpleTextResponse() {
+        // Given - simple text response with required start step frame
         var expectedFrames = List.of(
-            "0:\"Hello world\"",
-            "0:\"!\"",
-            "d:{\"finishReason\":\"stop\"}"
+            "f:{\"messageId\":\"msg-simple-123\"}",
+            "0:\"Hello, \"",
+            "0:\"world!\"",
+            "e:{\"finishReason\":\"stop\",\"usage\":{\"completionTokens\":5,\"promptTokens\":10},\"isContinued\":false}",
+            "d:{\"finishReason\":\"stop\",\"usage\":{\"completionTokens\":5,\"promptTokens\":10}}"
         );
         
         // When
@@ -42,20 +73,31 @@ public class ChatControllerIT extends BaseIntegrationTest {
 
         // Then
         StepVerifier.create(actualFrames)
-            .expectNext("0:\"Hello world\"")
-            .expectNext("0:\"!\"")
-            .expectNext("d:{\"finishReason\":\"stop\"}")
+            .expectNext("f:{\"messageId\":\"msg-simple-123\"}")
+            .expectNext("0:\"Hello, \"")
+            .expectNext("0:\"world!\"")
+            .expectNext("e:{\"finishReason\":\"stop\",\"usage\":{\"completionTokens\":5,\"promptTokens\":10},\"isContinued\":false}")
+            .expectNext("d:{\"finishReason\":\"stop\",\"usage\":{\"completionTokens\":5,\"promptTokens\":10}}")
             .verifyComplete();
     }
 
+    /**
+     * Test: Server-side tool roundtrip - matches AI SDK "server-side tool roundtrip" 
+     * Maps to: TOOL_INVOCATION message parts
+     * Persistence: ChatMessage with TOOL_INVOCATION parts, demonstrates multi-step ChatThread
+     */
     @Test
-    void shouldStreamTextAndReasoningParts() {
-        // Given - simulates AI thinking and responding
+    void shouldStreamServerSideToolRoundtrip() {
+        // Given - complete tool call workflow with multi-step pattern
         var expectedFrames = List.of(
-            "g:\"I need to analyze this question carefully\"",
-            "0:\"Based on my analysis, \"",
-            "0:\"the answer is 42\"",
-            "d:{\"finishReason\":\"stop\",\"usage\":{\"promptTokens\":10,\"completionTokens\":15}}"
+            "f:{\"messageId\":\"msg-tool-step1\"}",
+            "9:{\"toolCallId\":\"tool-call-id\",\"toolName\":\"get-weather\",\"args\":{\"city\":\"London\"}}",
+            "a:{\"toolCallId\":\"tool-call-id\",\"result\":{\"weather\":\"sunny\"}}",
+            "e:{\"finishReason\":\"tool-calls\",\"usage\":{\"completionTokens\":5,\"promptTokens\":10},\"isContinued\":true}",
+            "f:{\"messageId\":\"msg-tool-step2\"}",
+            "0:\"The weather in London is sunny.\"",
+            "e:{\"finishReason\":\"stop\",\"usage\":{\"completionTokens\":2,\"promptTokens\":4},\"isContinued\":false}",
+            "d:{\"finishReason\":\"stop\",\"usage\":{\"completionTokens\":7,\"promptTokens\":14}}"
         );
         
         // When
@@ -63,27 +105,34 @@ public class ChatControllerIT extends BaseIntegrationTest {
 
         // Then
         StepVerifier.create(actualFrames)
-            .expectNext("g:\"I need to analyze this question carefully\"")
-            .expectNext("0:\"Based on my analysis, \"")
-            .expectNext("0:\"the answer is 42\"")
-            .expectNext("d:{\"finishReason\":\"stop\",\"usage\":{\"promptTokens\":10,\"completionTokens\":15}}")
+            .expectNext("f:{\"messageId\":\"msg-tool-step1\"}")
+            .expectNext("9:{\"toolCallId\":\"tool-call-id\",\"toolName\":\"get-weather\",\"args\":{\"city\":\"London\"}}")
+            .expectNext("a:{\"toolCallId\":\"tool-call-id\",\"result\":{\"weather\":\"sunny\"}}")
+            .expectNext("e:{\"finishReason\":\"tool-calls\",\"usage\":{\"completionTokens\":5,\"promptTokens\":10},\"isContinued\":true}")
+            .expectNext("f:{\"messageId\":\"msg-tool-step2\"}")
+            .expectNext("0:\"The weather in London is sunny.\"")
+            .expectNext("e:{\"finishReason\":\"stop\",\"usage\":{\"completionTokens\":2,\"promptTokens\":4},\"isContinued\":false}")
+            .expectNext("d:{\"finishReason\":\"stop\",\"usage\":{\"completionTokens\":7,\"promptTokens\":14}}")
             .verifyComplete();
     }
 
+    /**
+     * Test: Tool call streaming - matches AI SDK "tool call streaming"
+     * Maps to: TOOL_INVOCATION parts with streaming delta updates
+     * Persistence: Shows how partial tool calls evolve in ChatMessagePart
+     */
     @Test
-    void shouldStreamToolCallSequence() {
-        // Given - simulates complete tool call workflow
+    void shouldStreamToolCallWithDeltas() {
+        // Given - streaming tool call with deltas and proper start step
         var expectedFrames = List.of(
-            "0:\"I'll help you with that calculation. \"",
-            "b:{\"toolCallId\":\"call-123\",\"toolName\":\"calculator\"}",
-            "c:{\"toolCallId\":\"call-123\",\"argsTextDelta\":\"{\"}",
-            "c:{\"toolCallId\":\"call-123\",\"argsTextDelta\":\"\\\"operation\\\":\"}",
-            "c:{\"toolCallId\":\"call-123\",\"argsTextDelta\":\"\\\"multiply\\\",\"}",
-            "c:{\"toolCallId\":\"call-123\",\"argsTextDelta\":\"\\\"a\\\":5,\\\"b\\\":3}\"}",
-            "9:{\"toolCallId\":\"call-123\",\"toolName\":\"calculator\",\"args\":{\"operation\":\"multiply\",\"a\":5,\"b\":3}}",
-            "a:{\"toolCallId\":\"call-123\",\"result\":15}",
-            "0:\"The result is 15.\"",
-            "d:{\"finishReason\":\"stop\"}"
+            "f:{\"messageId\":\"msg-streaming-tool\"}",
+            "b:{\"toolCallId\":\"tool-call-0\",\"toolName\":\"test-tool\"}",
+            "c:{\"toolCallId\":\"tool-call-0\",\"argsTextDelta\":\"{\\\"testArg\\\":\\\"t\"}",
+            "c:{\"toolCallId\":\"tool-call-0\",\"argsTextDelta\":\"est-value\\\"}\"}",
+            "9:{\"toolCallId\":\"tool-call-0\",\"toolName\":\"test-tool\",\"args\":{\"testArg\":\"test-value\"}}",
+            "a:{\"toolCallId\":\"tool-call-0\",\"result\":\"test-result\"}",
+            "e:{\"finishReason\":\"stop\",\"usage\":{\"completionTokens\":5,\"promptTokens\":10},\"isContinued\":false}",
+            "d:{\"finishReason\":\"stop\",\"usage\":{\"completionTokens\":5,\"promptTokens\":10}}"
         );
         
         // When
@@ -91,31 +140,37 @@ public class ChatControllerIT extends BaseIntegrationTest {
 
         // Then
         StepVerifier.create(actualFrames)
-            .expectNext("0:\"I'll help you with that calculation. \"")
-            .expectNext("b:{\"toolCallId\":\"call-123\",\"toolName\":\"calculator\"}")
-            .expectNext("c:{\"toolCallId\":\"call-123\",\"argsTextDelta\":\"{\"}")
-            .expectNext("c:{\"toolCallId\":\"call-123\",\"argsTextDelta\":\"\\\"operation\\\":\"}")
-            .expectNext("c:{\"toolCallId\":\"call-123\",\"argsTextDelta\":\"\\\"multiply\\\",\"}")
-            .expectNext("c:{\"toolCallId\":\"call-123\",\"argsTextDelta\":\"\\\"a\\\":5,\\\"b\\\":3}\"}")
-            .expectNext("9:{\"toolCallId\":\"call-123\",\"toolName\":\"calculator\",\"args\":{\"operation\":\"multiply\",\"a\":5,\"b\":3}}")
-            .expectNext("a:{\"toolCallId\":\"call-123\",\"result\":15}")
-            .expectNext("0:\"The result is 15.\"")
-            .expectNext("d:{\"finishReason\":\"stop\"}")
+            .expectNext("f:{\"messageId\":\"msg-streaming-tool\"}")
+            .expectNext("b:{\"toolCallId\":\"tool-call-0\",\"toolName\":\"test-tool\"}")
+            .expectNext("c:{\"toolCallId\":\"tool-call-0\",\"argsTextDelta\":\"{\\\"testArg\\\":\\\"t\"}")
+            .expectNext("c:{\"toolCallId\":\"tool-call-0\",\"argsTextDelta\":\"est-value\\\"}\"}")
+            .expectNext("9:{\"toolCallId\":\"tool-call-0\",\"toolName\":\"test-tool\",\"args\":{\"testArg\":\"test-value\"}}")
+            .expectNext("a:{\"toolCallId\":\"tool-call-0\",\"result\":\"test-result\"}")
+            .expectNext("e:{\"finishReason\":\"stop\",\"usage\":{\"completionTokens\":5,\"promptTokens\":10},\"isContinued\":false}")
+            .expectNext("d:{\"finishReason\":\"stop\",\"usage\":{\"completionTokens\":5,\"promptTokens\":10}}")
             .verifyComplete();
     }
 
+    /**
+     * Test: Server provides reasoning - matches AI SDK "server provides reasoning"
+     * Maps to: REASONING message parts with signatures
+     * Persistence: ChatMessage with REASONING parts, including redacted reasoning
+     */
     @Test
-    void shouldStreamMultiStepResponse() {
-        // Given - simulates multi-step reasoning with step boundaries
+    void shouldStreamReasoningWithSignature() {
+        // Given - reasoning with signatures and redacted parts
         var expectedFrames = List.of(
-            "f:{\"messageId\":\"msg-1\"}",
-            "0:\"Let me think about this step by step.\"",
-            "e:{\"finishReason\":\"tool-calls\",\"usage\":{\"promptTokens\":5,\"completionTokens\":10},\"isContinued\":true}",
-            "f:{\"messageId\":\"msg-2\"}",
-            "0:\"Now I'll provide the final answer: \"",
-            "0:\"The solution is X.\"",
-            "e:{\"finishReason\":\"stop\",\"usage\":{\"promptTokens\":8,\"completionTokens\":12},\"isContinued\":false}",
-            "d:{\"finishReason\":\"stop\",\"usage\":{\"promptTokens\":13,\"completionTokens\":22}}"
+            "f:{\"messageId\":\"step_123\"}",
+            "g:\"I will open the conversation\"",
+            "g:\" with witty banter. \"",
+            "j:{\"signature\":\"1234567890\"}",
+            "i:{\"data\":\"redacted-data\"}",
+            "g:\"Once the user has relaxed,\"",
+            "g:\" I will pry for valuable information.\"",
+            "j:{\"signature\":\"abc123\"}",
+            "0:\"Hi there!\"",
+            "e:{\"finishReason\":\"stop\",\"usage\":{\"completionTokens\":5,\"promptTokens\":10},\"isContinued\":false}",
+            "d:{\"finishReason\":\"stop\",\"usage\":{\"completionTokens\":5,\"promptTokens\":10}}"
         );
         
         // When
@@ -123,27 +178,36 @@ public class ChatControllerIT extends BaseIntegrationTest {
 
         // Then
         StepVerifier.create(actualFrames)
-            .expectNext("f:{\"messageId\":\"msg-1\"}")
-            .expectNext("0:\"Let me think about this step by step.\"")
-            .expectNext("e:{\"finishReason\":\"tool-calls\",\"usage\":{\"promptTokens\":5,\"completionTokens\":10},\"isContinued\":true}")
-            .expectNext("f:{\"messageId\":\"msg-2\"}")
-            .expectNext("0:\"Now I'll provide the final answer: \"")
-            .expectNext("0:\"The solution is X.\"")
-            .expectNext("e:{\"finishReason\":\"stop\",\"usage\":{\"promptTokens\":8,\"completionTokens\":12},\"isContinued\":false}")
-            .expectNext("d:{\"finishReason\":\"stop\",\"usage\":{\"promptTokens\":13,\"completionTokens\":22}}")
+            .expectNext("f:{\"messageId\":\"step_123\"}")
+            .expectNext("g:\"I will open the conversation\"")
+            .expectNext("g:\" with witty banter. \"")
+            .expectNext("j:{\"signature\":\"1234567890\"}")
+            .expectNext("i:{\"data\":\"redacted-data\"}")
+            .expectNext("g:\"Once the user has relaxed,\"")
+            .expectNext("g:\" I will pry for valuable information.\"")
+            .expectNext("j:{\"signature\":\"abc123\"}")
+            .expectNext("0:\"Hi there!\"")
+            .expectNext("e:{\"finishReason\":\"stop\",\"usage\":{\"completionTokens\":5,\"promptTokens\":10},\"isContinued\":false}")
+            .expectNext("d:{\"finishReason\":\"stop\",\"usage\":{\"completionTokens\":5,\"promptTokens\":10}}")
             .verifyComplete();
     }
 
+    /**
+     * Test: File attachments - matches AI SDK "server provides file parts"
+     * Maps to: FILE message parts
+     * Persistence: ChatMessage with FILE parts containing base64 data
+     */
     @Test
-    void shouldStreamSourceAndFileAttachments() {
-        // Given - simulates response with source citations and file attachments
+    void shouldStreamFileAttachments() {
+        // Given - file attachments with different MIME types and start step
         var expectedFrames = List.of(
-            "0:\"According to the documentation, \"",
-            "h:{\"sourceType\":\"url\",\"id\":\"source-1\",\"url\":\"https://example.com/docs\",\"title\":\"API Documentation\"}",
-            "0:\"here's the relevant information. \"",
-            "k:{\"data\":\"aGVsbG8gd29ybGQ=\",\"mimeType\":\"text/plain\"}",
-            "0:\"Please see the attached file for details.\"",
-            "d:{\"finishReason\":\"stop\"}"
+            "f:{\"messageId\":\"msg-files-123\"}",
+            "0:\"Here is a file:\"",
+            "k:{\"data\":\"Hello World\",\"mimeType\":\"text/plain\"}",
+            "0:\"And another one:\"",
+            "k:{\"data\":\"{\\\"key\\\": \\\"value\\\"}\",\"mimeType\":\"application/json\"}",
+            "e:{\"finishReason\":\"stop\",\"usage\":{\"completionTokens\":7,\"promptTokens\":14},\"isContinued\":false}",
+            "d:{\"finishReason\":\"stop\",\"usage\":{\"completionTokens\":7,\"promptTokens\":14}}"
         );
         
         // When
@@ -151,24 +215,60 @@ public class ChatControllerIT extends BaseIntegrationTest {
 
         // Then
         StepVerifier.create(actualFrames)
-            .expectNext("0:\"According to the documentation, \"")
-            .expectNext("h:{\"sourceType\":\"url\",\"id\":\"source-1\",\"url\":\"https://example.com/docs\",\"title\":\"API Documentation\"}")
-            .expectNext("0:\"here's the relevant information. \"")
-            .expectNext("k:{\"data\":\"aGVsbG8gd29ybGQ=\",\"mimeType\":\"text/plain\"}")
-            .expectNext("0:\"Please see the attached file for details.\"")
-            .expectNext("d:{\"finishReason\":\"stop\"}")
+            .expectNext("f:{\"messageId\":\"msg-files-123\"}")
+            .expectNext("0:\"Here is a file:\"")
+            .expectNext("k:{\"data\":\"Hello World\",\"mimeType\":\"text/plain\"}")
+            .expectNext("0:\"And another one:\"")
+            .expectNext("k:{\"data\":\"{\\\"key\\\": \\\"value\\\"}\",\"mimeType\":\"application/json\"}")
+            .expectNext("e:{\"finishReason\":\"stop\",\"usage\":{\"completionTokens\":7,\"promptTokens\":14},\"isContinued\":false}")
+            .expectNext("d:{\"finishReason\":\"stop\",\"usage\":{\"completionTokens\":7,\"promptTokens\":14}}")
             .verifyComplete();
     }
 
+    /**
+     * Test: Source citations - matches AI SDK "server provides sources"
+     * Maps to: SOURCE message parts
+     * Persistence: ChatMessage with SOURCE parts containing citation metadata
+     */
+    @Test
+    void shouldStreamSourceCitations() {
+        // Given - source citations with start step
+        var expectedFrames = List.of(
+            "f:{\"messageId\":\"msg-sources-456\"}",
+            "0:\"The weather in London is sunny.\"",
+            "h:{\"sourceType\":\"url\",\"id\":\"source-id\",\"url\":\"https://example.com\",\"title\":\"Example\"}",
+            "e:{\"finishReason\":\"stop\",\"usage\":{\"completionTokens\":7,\"promptTokens\":14},\"isContinued\":false}",
+            "d:{\"finishReason\":\"stop\",\"usage\":{\"completionTokens\":7,\"promptTokens\":14}}"
+        );
+        
+        // When
+        var actualFrames = performChatRequest(expectedFrames);
+
+        // Then
+        StepVerifier.create(actualFrames)
+            .expectNext("f:{\"messageId\":\"msg-sources-456\"}")
+            .expectNext("0:\"The weather in London is sunny.\"")
+            .expectNext("h:{\"sourceType\":\"url\",\"id\":\"source-id\",\"url\":\"https://example.com\",\"title\":\"Example\"}")
+            .expectNext("e:{\"finishReason\":\"stop\",\"usage\":{\"completionTokens\":7,\"promptTokens\":14},\"isContinued\":false}")
+            .expectNext("d:{\"finishReason\":\"stop\",\"usage\":{\"completionTokens\":7,\"promptTokens\":14}}")
+            .verifyComplete();
+    }
+
+    /**
+     * Test: Error handling - demonstrates error part streaming
+     * Maps to: ERROR message parts for error recovery scenarios
+     * Persistence: ChatMessage with error parts for debugging
+     */
     @Test
     void shouldStreamErrorRecovery() {
-        // Given - simulates error handling during streaming
+        // Given - error handling scenario with start step and proper finish frames
         var expectedFrames = List.of(
+            "f:{\"messageId\":\"msg-error-recovery\"}",
             "0:\"I'll help you with that. \"",
             "3:\"Rate limit exceeded. Retrying...\"",
-            "0:\"Sorry for the delay. \"",
             "0:\"Here's your answer.\"",
-            "d:{\"finishReason\":\"stop\"}"
+            "e:{\"finishReason\":\"stop\",\"usage\":{\"completionTokens\":8,\"promptTokens\":12},\"isContinued\":false}",
+            "d:{\"finishReason\":\"stop\",\"usage\":{\"completionTokens\":8,\"promptTokens\":12}}"
         );
         
         // When
@@ -176,23 +276,26 @@ public class ChatControllerIT extends BaseIntegrationTest {
 
         // Then
         StepVerifier.create(actualFrames)
+            .expectNext("f:{\"messageId\":\"msg-error-recovery\"}")
             .expectNext("0:\"I'll help you with that. \"")
             .expectNext("3:\"Rate limit exceeded. Retrying...\"")
-            .expectNext("0:\"Sorry for the delay. \"")
             .expectNext("0:\"Here's your answer.\"")
-            .expectNext("d:{\"finishReason\":\"stop\"}")
+            .expectNext("e:{\"finishReason\":\"stop\",\"usage\":{\"completionTokens\":8,\"promptTokens\":12},\"isContinued\":false}")
+            .expectNext("d:{\"finishReason\":\"stop\",\"usage\":{\"completionTokens\":8,\"promptTokens\":12}}")
             .verifyComplete();
     }
 
     @Test
     void shouldStreamDataAndAnnotations() {
-        // Given - simulates structured data and annotations
+        // Given - structured data and annotations with start step
         var expectedFrames = List.of(
+            "f:{\"messageId\":\"msg-data-annotations\"}",
             "0:\"Here's the analysis result:\"",
             "2:[{\"metric\":\"accuracy\",\"value\":0.95},{\"metric\":\"precision\",\"value\":0.87}]",
             "8:[{\"id\":\"analysis-123\",\"timestamp\":\"2025-06-14T10:30:00Z\",\"confidence\":\"high\"}]",
             "0:\"The model performed well with 95% accuracy.\"",
-            "d:{\"finishReason\":\"stop\"}"
+            "e:{\"finishReason\":\"stop\",\"usage\":{\"completionTokens\":12,\"promptTokens\":8},\"isContinued\":false}",
+            "d:{\"finishReason\":\"stop\",\"usage\":{\"completionTokens\":12,\"promptTokens\":8}}"
         );
         
         // When
@@ -200,24 +303,28 @@ public class ChatControllerIT extends BaseIntegrationTest {
 
         // Then
         StepVerifier.create(actualFrames)
+            .expectNext("f:{\"messageId\":\"msg-data-annotations\"}")
             .expectNext("0:\"Here's the analysis result:\"")
             .expectNext("2:[{\"metric\":\"accuracy\",\"value\":0.95},{\"metric\":\"precision\",\"value\":0.87}]")
             .expectNext("8:[{\"id\":\"analysis-123\",\"timestamp\":\"2025-06-14T10:30:00Z\",\"confidence\":\"high\"}]")
             .expectNext("0:\"The model performed well with 95% accuracy.\"")
-            .expectNext("d:{\"finishReason\":\"stop\"}")
+            .expectNext("e:{\"finishReason\":\"stop\",\"usage\":{\"completionTokens\":12,\"promptTokens\":8},\"isContinued\":false}")
+            .expectNext("d:{\"finishReason\":\"stop\",\"usage\":{\"completionTokens\":12,\"promptTokens\":8}}")
             .verifyComplete();
     }
 
     @Test
     void shouldStreamRedactedReasoningWithSignature() {
-        // Given - simulates sensitive reasoning that gets redacted
+        // Given - sensitive reasoning that gets redacted with start step
         var expectedFrames = List.of(
+            "f:{\"messageId\":\"msg-redacted-reasoning\"}",
             "g:\"I need to analyze this sensitive data\"",
             "i:{\"data\":\"This reasoning has been redacted for security purposes.\"}",
             "j:{\"signature\":\"abc123xyz789\"}",
             "0:\"Based on the available information, \"",
             "0:\"I can provide this general guidance.\"",
-            "d:{\"finishReason\":\"stop\"}"
+            "e:{\"finishReason\":\"stop\",\"usage\":{\"completionTokens\":8,\"promptTokens\":15},\"isContinued\":false}",
+            "d:{\"finishReason\":\"stop\",\"usage\":{\"completionTokens\":8,\"promptTokens\":15}}"
         );
         
         // When
@@ -225,20 +332,24 @@ public class ChatControllerIT extends BaseIntegrationTest {
 
         // Then
         StepVerifier.create(actualFrames)
+            .expectNext("f:{\"messageId\":\"msg-redacted-reasoning\"}")
             .expectNext("g:\"I need to analyze this sensitive data\"")
             .expectNext("i:{\"data\":\"This reasoning has been redacted for security purposes.\"}")
             .expectNext("j:{\"signature\":\"abc123xyz789\"}")
             .expectNext("0:\"Based on the available information, \"")
             .expectNext("0:\"I can provide this general guidance.\"")
-            .expectNext("d:{\"finishReason\":\"stop\"}")
+            .expectNext("e:{\"finishReason\":\"stop\",\"usage\":{\"completionTokens\":8,\"promptTokens\":15},\"isContinued\":false}")
+            .expectNext("d:{\"finishReason\":\"stop\",\"usage\":{\"completionTokens\":8,\"promptTokens\":15}}")
             .verifyComplete();
     }
 
     @Test
     void shouldHandleEmptyResponse() {
-        // Given - simulates immediate completion without content
+        // Given - immediate completion without content (with start step for consistency)
         var expectedFrames = List.of(
-            "d:{\"finishReason\":\"content-filter\"}"
+            "f:{\"messageId\":\"msg-empty-response\"}",
+            "e:{\"finishReason\":\"content-filter\",\"usage\":{\"completionTokens\":0,\"promptTokens\":5},\"isContinued\":false}",
+            "d:{\"finishReason\":\"content-filter\",\"usage\":{\"completionTokens\":0,\"promptTokens\":5}}"
         );
         
         // When
@@ -246,7 +357,71 @@ public class ChatControllerIT extends BaseIntegrationTest {
 
         // Then
         StepVerifier.create(actualFrames)
-            .expectNext("d:{\"finishReason\":\"content-filter\"}")
+            .expectNext("f:{\"messageId\":\"msg-empty-response\"}")
+            .expectNext("e:{\"finishReason\":\"content-filter\",\"usage\":{\"completionTokens\":0,\"promptTokens\":5},\"isContinued\":false}")
+            .expectNext("d:{\"finishReason\":\"content-filter\",\"usage\":{\"completionTokens\":0,\"promptTokens\":5}}")
+            .verifyComplete();
+    }
+
+    /**
+     * Test: Comprehensive multi-step workflow - demonstrates all AI SDK stream protocol requirements
+     * This test shows:
+     * - Mandatory Start Step Frame (f:) at the beginning
+     * - Multiple step transitions with proper isContinued flags
+     * - All frame types working together in a realistic scenario
+     * - Consistent usage reporting between finish step and finish message
+     */
+    @Test
+    void shouldStreamComprehensiveMultiStepWorkflow() {
+        // Given - complete workflow with reasoning, tool calls, and multiple steps
+        var expectedFrames = List.of(
+            // Step 1: Reasoning and tool planning
+            "f:{\"messageId\":\"msg-step1-reasoning\"}",
+            "g:\"I need to check the weather first\"",
+            "j:{\"signature\":\"reasoning-sig-1\"}",
+            "9:{\"toolCallId\":\"weather-call\",\"toolName\":\"get-weather\",\"args\":{\"city\":\"London\"}}",
+            "a:{\"toolCallId\":\"weather-call\",\"result\":{\"temperature\":\"22°C\",\"condition\":\"sunny\"}}",
+            "e:{\"finishReason\":\"tool-calls\",\"usage\":{\"completionTokens\":15,\"promptTokens\":25},\"isContinued\":true}",
+            
+            // Step 2: Processing and response
+            "f:{\"messageId\":\"msg-step2-response\"}",
+            "0:\"Based on the weather data, London is experiencing \"",
+            "0:\"sunny conditions at 22°C. \"",
+            "h:{\"sourceType\":\"api\",\"id\":\"weather-api\",\"url\":\"https://weather-api.com\",\"title\":\"Weather API\"}",
+            "2:[{\"location\":\"London\",\"temp\":22,\"condition\":\"sunny\"}]",
+            "8:[{\"id\":\"weather-response-123\",\"accuracy\":\"high\",\"timestamp\":\"2025-06-14T15:30:00Z\"}]",
+            "0:\"Perfect weather for outdoor activities!\"",
+            "e:{\"finishReason\":\"stop\",\"usage\":{\"completionTokens\":12,\"promptTokens\":8},\"isContinued\":false}",
+            
+            // Final message completion
+            "d:{\"finishReason\":\"stop\",\"usage\":{\"completionTokens\":27,\"promptTokens\":33}}"
+        );
+        
+        // When
+        var actualFrames = performChatRequest(expectedFrames);
+
+        // Then - verify all frames in correct order
+        StepVerifier.create(actualFrames)
+            // Step 1 verification
+            .expectNext("f:{\"messageId\":\"msg-step1-reasoning\"}")
+            .expectNext("g:\"I need to check the weather first\"")
+            .expectNext("j:{\"signature\":\"reasoning-sig-1\"}")
+            .expectNext("9:{\"toolCallId\":\"weather-call\",\"toolName\":\"get-weather\",\"args\":{\"city\":\"London\"}}")
+            .expectNext("a:{\"toolCallId\":\"weather-call\",\"result\":{\"temperature\":\"22°C\",\"condition\":\"sunny\"}}")
+            .expectNext("e:{\"finishReason\":\"tool-calls\",\"usage\":{\"completionTokens\":15,\"promptTokens\":25},\"isContinued\":true}")
+            
+            // Step 2 verification
+            .expectNext("f:{\"messageId\":\"msg-step2-response\"}")
+            .expectNext("0:\"Based on the weather data, London is experiencing \"")
+            .expectNext("0:\"sunny conditions at 22°C. \"")
+            .expectNext("h:{\"sourceType\":\"api\",\"id\":\"weather-api\",\"url\":\"https://weather-api.com\",\"title\":\"Weather API\"}")
+            .expectNext("2:[{\"location\":\"London\",\"temp\":22,\"condition\":\"sunny\"}]")
+            .expectNext("8:[{\"id\":\"weather-response-123\",\"accuracy\":\"high\",\"timestamp\":\"2025-06-14T15:30:00Z\"}]")
+            .expectNext("0:\"Perfect weather for outdoor activities!\"")
+            .expectNext("e:{\"finishReason\":\"stop\",\"usage\":{\"completionTokens\":12,\"promptTokens\":8},\"isContinued\":false}")
+            
+            // Final completion
+            .expectNext("d:{\"finishReason\":\"stop\",\"usage\":{\"completionTokens\":27,\"promptTokens\":33}}")
             .verifyComplete();
     }
 
@@ -270,35 +445,11 @@ public class ChatControllerIT extends BaseIntegrationTest {
         );
     }
 
-    private ChatRequestDTO createMultiMessageRequest() {
-        return new ChatRequestDTO(
-            UUID.randomUUID().toString(),
-            List.of(
-                createMessage("user", "What is quantum computing?"),
-                createAssistantMessage("Quantum computing is a type of computation that uses quantum mechanics..."),
-                createMessage("user", "Can you show me an example calculation?")
-            )
-        );
-    }
-
     private Message createMessage(String role, String content) {
         var message = new Message();
         message.setId(UUID.randomUUID().toString());
         message.setRole(role);
         message.addPartsItem(new MessagePartsInner().type("text").text(content));
-        return message;
-    }
-
-    private Message createAssistantMessage(String content) {
-        return createMessage("assistant", content);
-    }
-
-    private Message createMultiPartMessage(String role) {
-        var message = new Message();
-        message.setId(UUID.randomUUID().toString());
-        message.setRole(role);
-        message.addPartsItem(new MessagePartsInner().type("text").text("Here's some text"));
-        message.addPartsItem(new MessagePartsInner().type("reasoning").reasoning("I need to think about this"));
         return message;
     }
 }
