@@ -150,14 +150,6 @@
 			<scope>test</scope>
 		</dependency>
 
-		<!-- MockWebServer for testing WebClient -->
-		<dependency>
-			<groupId>com.squareup.okhttp3</groupId>
-			<artifactId>mockwebserver</artifactId>
-			<version>4.12.0</version>
-			<scope>test</scope>
-		</dependency>
-
 		<!-- Reactor test for reactive stream testing -->
 		<dependency>
 			<groupId>io.projectreactor</groupId>
