@@ -1,5 +1,6 @@
 package de.tum.in.www1.hephaestus.mentor;
 
+import com.fasterxml.jackson.databind.JsonNode;
 import jakarta.persistence.*;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.Size;
@@ -8,6 +9,8 @@ import lombok.NoArgsConstructor;
 import lombok.Setter;
 import lombok.ToString;
 import org.hibernate.annotations.CreationTimestamp;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 import org.springframework.lang.NonNull;
 import java.time.Instant;
 import java.util.UUID;
@@ -46,6 +49,7 @@ public class ChatMessagePart {
      */
     @NonNull
     @Enumerated(EnumType.STRING)
+    @Column(nullable = false)
     private MessagePartType type;
 
     /**
@@ -64,14 +68,16 @@ public class ChatMessagePart {
     /**
      * Tool invocation object serialized as JSON (maps to MessagePartsInner.toolInvocation)
      */
-    @Column(name = "tool_invocation_json", columnDefinition = "JSONB")
-    private String toolInvocationJson;
+    @JdbcTypeCode(SqlTypes.JSON)
+    @Column(columnDefinition = "jsonb")
+    private JsonNode toolInvocationJson;
 
     /**
      * Source object serialized as JSON (maps to MessagePartsInner.source)  
      */
-    @Column(name = "source_json", columnDefinition = "JSONB")
-    private String sourceJson;
+    @JdbcTypeCode(SqlTypes.JSON)
+    @Column(columnDefinition = "jsonb")
+    private JsonNode sourceJson;
 
     /**
      * Generic data field (maps to MessagePartsInner.data)
@@ -89,16 +95,53 @@ public class ChatMessagePart {
     /**
      * Reasoning details list serialized as JSON (maps to MessagePartsInner.details)
      */
-    @Column(name = "reasoning_details_json", columnDefinition = "JSONB")
-    private String reasoningDetailsJson;
+    @JdbcTypeCode(SqlTypes.JSON)
+    @Column(columnDefinition = "jsonb")
+    private JsonNode reasoningDetailsJson;
+
+    /**
+     * Tool call ID for tool-related parts
+     */
+    @Size(max = 255)
+    @Column(name = "tool_call_id", length = 255)
+    private String toolCallId;
+
+    /**
+     * Tool name for tool invocation parts
+     */
+    @Size(max = 255)
+    @Column(name = "tool_name", length = 255)
+    private String toolName;
+
+    /**
+     * Generic content field for flexible content storage
+     */
+    @Column(columnDefinition = "TEXT")
+    private String content;
+
+    /**
+     * Part order within the message for proper sequencing
+     */
+    @Column(name = "part_order")
+    private Integer partOrder;
 
     public enum MessagePartType {
-        TEXT("text"),
-        REASONING("reasoning"),
-        TOOL_INVOCATION("tool-invocation"),
-        SOURCE("source"),
-        FILE("file"),
-        STEP_START("step-start");
+        TEXT("text"),                           // 0: frame - text content
+        REASONING("reasoning"),                 // g: frame - reasoning content  
+        REASONING_SIGNATURE("reasoning-signature"), // j: frame - reasoning signature
+        REASONING_REDACTED("reasoning-redacted"), // i: frame - redacted reasoning
+        TOOL_INVOCATION("tool-invocation"),     // 9: frame - complete tool call
+        TOOL_STREAMING_START("tool-streaming-start"), // b: frame - tool call start
+        TOOL_DELTA("tool-delta"),              // c: frame - tool call args delta
+        TOOL_RESULT("tool-result"),            // a: frame - tool call result
+        DATA("data"),                          // 2: frame - structured data
+        ANNOTATION("annotation"),              // 8: frame - message annotations
+        ERROR("error"),                        // 3: frame - error content
+        FILE("file"),                          // k: frame - file attachment
+        SOURCE("source"),                      // h: frame - source citation
+        STEP_START("step-start"),              // f: frame - step boundary
+        STEP_FINISH("step-finish"),            // e: frame - step completion
+        MESSAGE_FINISH("message-finish");       // d: frame - message - completion
 
         private final String value;
 
