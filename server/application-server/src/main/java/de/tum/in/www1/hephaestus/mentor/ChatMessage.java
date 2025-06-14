@@ -1,9 +1,12 @@
 package de.tum.in.www1.hephaestus.mentor;
 
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+import io.micrometer.common.lang.Nullable;
 import jakarta.persistence.*;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
+import lombok.EqualsAndHashCode;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
@@ -26,16 +29,26 @@ import java.util.UUID;
 @Setter
 @NoArgsConstructor
 @ToString
+@EqualsAndHashCode(onlyExplicitlyIncluded = true)
+@JsonIgnoreProperties({"thread", "parentMessage", "childMessages", "parts"})
 public class ChatMessage {
     
     @Id
+    @GeneratedValue(strategy = GenerationType.UUID)
+    @EqualsAndHashCode.Include
     private UUID id;
+
+    /**
+     * Version for optimistic locking to prevent lost updates
+     */
+    @Version
+    private Long version;
 
     /**
      * Thread this message belongs to.
      */
     @NonNull
-    @ManyToOne(fetch = FetchType.LAZY)
+    @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "thread_id", nullable = false)
     @ToString.Exclude
     private ChatThread thread;
@@ -43,6 +56,7 @@ public class ChatMessage {
     /**
      * Parent message - null for root messages (enables tree structure)
      */
+    @Nullable
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "parent_message_id")
     @ToString.Exclude
@@ -51,7 +65,8 @@ public class ChatMessage {
     /**
      * Child messages - branches from this message
      */
-    @OneToMany(mappedBy = "parentMessage", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
+    @OneToMany(mappedBy = "parentMessage", cascade = {CascadeType.PERSIST, CascadeType.MERGE}, 
+               fetch = FetchType.LAZY, orphanRemoval = true)
     @ToString.Exclude
     private List<ChatMessage> childMessages = new ArrayList<>();
 
@@ -60,16 +75,19 @@ public class ChatMessage {
      */
     @NonNull
     @Enumerated(EnumType.STRING)
+    @Column(nullable = false, length = 16)
     private Role role;
 
     @NonNull
     @CreationTimestamp
+    @Column(nullable = false, updatable = false)
     private Instant createdAt;
 
     /**
      * Message parts - handles complex multi part content
      */
-    @OneToMany(mappedBy = "message", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
+    @OneToMany(mappedBy = "message", cascade = {CascadeType.PERSIST, CascadeType.MERGE, CascadeType.REMOVE}, 
+               fetch = FetchType.LAZY, orphanRemoval = true)
     @OrderBy("orderIndex ASC")
     @ToString.Exclude
     private List<ChatMessagePart> parts = new ArrayList<>();
@@ -112,5 +130,59 @@ public class ChatMessage {
         }
         
         return path;
+    }
+
+    /**
+     * Helper method to add a child message and maintain bidirectional relationship
+     */
+    public void addChildMessage(ChatMessage child) {
+        if (child == null) {
+            return;
+        }
+        childMessages.add(child);
+        child.setParentMessage(this);
+    }
+
+    /**
+     * Helper method to remove a child message and maintain bidirectional relationship
+     */
+    public void removeChildMessage(ChatMessage child) {
+        if (child == null) {
+            return;
+        }
+        childMessages.remove(child);
+        child.setParentMessage(null);
+    }
+
+    /**
+     * Helper method to add a message part and maintain bidirectional relationship
+     */
+    public void addMessagePart(ChatMessagePart part) {
+        if (part == null) {
+            return;
+        }
+        parts.add(part);
+        part.setMessage(this);
+    }
+
+    /**
+     * Helper method to remove a message part and maintain bidirectional relationship
+     */
+    public void removeMessagePart(ChatMessagePart part) {
+        if (part == null) {
+            return;
+        }
+        parts.remove(part);
+        part.setMessage(null);
+    }
+
+    /**
+     * Sets the parent message and validates the relationship
+     */
+    public void setParentMessage(ChatMessage parent) {
+        if (parent != null && parent.equals(this)) {
+            throw new IllegalArgumentException("Message cannot be its own parent");
+        }
+        this.parentMessage = parent;
     }
 }

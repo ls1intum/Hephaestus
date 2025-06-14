@@ -5,18 +5,16 @@ import lombok.AllArgsConstructor;
 import lombok.EqualsAndHashCode;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
-import lombok.Setter;
 
 import java.io.Serializable;
 import java.util.UUID;
 
 /**
- * Composite primary key for ChatMessagePart entity.
+ * Immutable composite primary key for ChatMessagePart entity.
  * Combines message ID and order index to uniquely identify a message part.
  */
 @Embeddable
 @Getter
-@Setter
 @NoArgsConstructor
 @AllArgsConstructor
 @EqualsAndHashCode

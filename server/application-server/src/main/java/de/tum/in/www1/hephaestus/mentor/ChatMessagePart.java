@@ -1,18 +1,17 @@
 package de.tum.in.www1.hephaestus.mentor;
 
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.databind.JsonNode;
+import io.hypersistence.utils.hibernate.type.json.JsonType;
 import jakarta.persistence.*;
-import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.Size;
+import lombok.EqualsAndHashCode;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 import lombok.ToString;
-import org.hibernate.annotations.CreationTimestamp;
-import org.hibernate.annotations.JdbcTypeCode;
-import org.hibernate.type.SqlTypes;
+import org.hibernate.annotations.Type;
 import org.springframework.lang.NonNull;
-import java.time.Instant;
 import java.util.UUID;
 
 /**
@@ -20,128 +19,138 @@ import java.util.UUID;
  */
 @Entity
 @Table(name = "chat_message_part")
-@IdClass(ChatMessagePartId.class)
 @Getter
 @Setter
 @NoArgsConstructor
 @ToString
+@EqualsAndHashCode(onlyExplicitlyIncluded = true)
+@JsonIgnoreProperties({"message"})
 public class ChatMessagePart {
     
-    @Id
-    private UUID messageId;
-    
-    @Id
-    @Min(0)
-    private Integer orderIndex;
+    @EmbeddedId
+    @EqualsAndHashCode.Include
+    private ChatMessagePartId id;
+
+    /**
+     * Version for optimistic locking to prevent lost updates
+     */
+    @Version
+    private Long version;
 
     @NonNull
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "messageId", insertable = false, updatable = false)
+    @ManyToOne(fetch = FetchType.LAZY, optional = false)
+    @JoinColumn(name = "messageId", nullable = false, insertable = false, updatable = false)
     @ToString.Exclude
     private ChatMessage message;
-
-    @NonNull
-    @CreationTimestamp
-    private Instant createdAt;
 
     /**
      * Part type - Valid values: text, reasoning, tool-invocation, source, file, step-start
      */
     @NonNull
     @Enumerated(EnumType.STRING)
-    @Column(nullable = false)
+    @Column(nullable = false, length = 32)
+    @Size(max = 32)
     private MessagePartType type;
 
     /**
-     * Text content - REQUIRED ONLY for TEXT part types (maps to MessagePartsInner.text)
-     * For other types, this field may be null or empty
+     * The JSON content payload for this message part, stored as JSONB.
+     * 
+     * The structure and type of this JSON content varies based on the {@link MessagePartType}.
+     * This follows the AI SDK Data Stream Protocol specification for consistent streaming and processing.
+     * 
+     * NOTE: Not all message part types are typically persisted. Some are used primarily for 
+     * streaming control and may be filtered out before database storage.
+     * 
+     * Content Structure by Message Part Type:
+     * 
+     * === Core Persistent Content ===
+     * 
+     * TEXT: Simple string content (PERSISTED)
+     *   Example: "Hello world"
+     * 
+     * REASONING: AI reasoning explanation string (PERSISTED)
+     *   Example: "I will analyze this step by step"
+     * 
+     * TOOL_INVOCATION: Complete tool call with arguments (PERSISTED)
+     *   Example: {"toolCallId": "call-123", "toolName": "calculator", "args": {"operation": "add", "values": [1, 2]}}
+     * 
+     * TOOL_RESULT: Tool execution result (PERSISTED)
+     *   Example: {"toolCallId": "call-123", "result": "3"}
+     * 
+     * DATA: Array of structured JSON objects (PERSISTED)
+     *   Example: [{"key": "object1", "value": 123}, {"anotherKey": "object2", "count": 5}]
+     * 
+     * SOURCE: External source reference (PERSISTED)
+     *   Example: {"sourceType": "url", "id": "src-001", "url": "https://example.com/article", "title": "Example Article"}
+     * 
+     * FILE: File attachment with base64 encoded data (PERSISTED - but see note)
+     *   Example: {"data": "iVBORw0KGgoAAAANSUhEUgA...", "mimeType": "image/png"}
+     *   Note: In the future we will store files in object storage and only keep a reference here.
+     * 
+     * === Streaming Control (Often Not Persisted) ===
+     * 
+     * TOOL_STREAMING_START: Tool call initialization (STREAMING ONLY)
+     *   Example: {"toolCallId": "call-456", "toolName": "streaming-tool"}
+     *   Usage: Signals start of streaming tool call, typically not stored
+     * 
+     * TOOL_DELTA: Partial tool argument updates during streaming (STREAMING ONLY)
+     *   Example: {"toolCallId": "call-456", "argsTextDelta": "partial argument text"}
+     *   Usage: Progressive updates during streaming, replaced by final TOOL_INVOCATION
+     * 
+     * STEP_START: Step execution boundary marker (STREAMING ONLY)
+     *   Example: {"messageId": "step_123"}
+     *   Usage: Marks beginning of processing step, typically not stored
+     * 
+     * STEP_FINISH: Step completion with usage statistics (METADATA)
+     *   Example: {"finishReason": "stop", "usage": {"promptTokens": 150, "completionTokens": 75}, "isContinued": false}
+     *   Usage: May be stored for analytics, but not essential for message reconstruction
+     * 
+     * MESSAGE_FINISH: Final message completion metadata (METADATA)
+     *   Example: {"finishReason": "stop", "usage": {"promptTokens": 300, "completionTokens": 150}}
+     *   Usage: May be stored for analytics, but not essential for message reconstruction
+     * 
+     * === Security & Metadata (Conditional) ===
+     * 
+     * REASONING_SIGNATURE: Signature verification object (CONDITIONAL)
+     *   Example: {"signature": "abc123xyz"}
+     *   Usage: Only needed if reasoning verification is required
+     * 
+     * REASONING_REDACTED: Redacted reasoning content (CONDITIONAL)
+     *   Example: {"data": "This reasoning has been redacted for security"}
+     *   Usage: Alternative to REASONING when content needs redaction
+     * 
+     * ANNOTATION: Array of message annotations (CONDITIONAL)
+     *   Example: [{"id": "msg-123", "type": "highlight", "text": "Important note"}]
+     *   Usage: UI-specific annotations, may not need persistence
+     * 
+     * ERROR: Error message string (CONDITIONAL)
+     *   Example: "Connection timeout after 30 seconds"
+     *   Usage: Typically logged separately, may not need message-level persistence
+     * 
+     * @see <a href="https://ai-sdk.dev/docs/ai-sdk-ui/stream-protocol">AI SDK Data Stream Protocol</a>
      */
-    @Column(columnDefinition = "TEXT")
-    private String text;
-
-    /**
-     * Reasoning text for reasoning parts (maps to MessagePartsInner.reasoning)
-     */
-    @Column(columnDefinition = "TEXT")
-    private String reasoning;
-
-    /**
-     * Tool invocation object serialized as JSON (maps to MessagePartsInner.toolInvocation)
-     */
-    @JdbcTypeCode(SqlTypes.JSON)
+    @Type(JsonType.class)
     @Column(columnDefinition = "jsonb")
-    private JsonNode toolInvocationJson;
-
-    /**
-     * Source object serialized as JSON (maps to MessagePartsInner.source)  
-     */
-    @JdbcTypeCode(SqlTypes.JSON)
-    @Column(columnDefinition = "jsonb")
-    private JsonNode sourceJson;
-
-    /**
-     * Generic data field (maps to MessagePartsInner.data)
-     */
-    @Column(columnDefinition = "TEXT")
-    private String data;
-
-    /**
-     * MIME type for file parts (maps to MessagePartsInner.mimeType)
-     */
-    @Size(max = 255)
-    @Column(length = 255)
-    private String mimeType;
-
-    /**
-     * Reasoning details list serialized as JSON (maps to MessagePartsInner.details)
-     */
-    @JdbcTypeCode(SqlTypes.JSON)
-    @Column(columnDefinition = "jsonb")
-    private JsonNode reasoningDetailsJson;
-
-    /**
-     * Tool call ID for tool-related parts
-     */
-    @Size(max = 255)
-    @Column(name = "tool_call_id", length = 255)
-    private String toolCallId;
-
-    /**
-     * Tool name for tool invocation parts
-     */
-    @Size(max = 255)
-    @Column(name = "tool_name", length = 255)
-    private String toolName;
-
-    /**
-     * Generic content field for flexible content storage
-     */
-    @Column(columnDefinition = "TEXT")
-    private String content;
-
-    /**
-     * Part order within the message for proper sequencing
-     */
-    @Column(name = "part_order")
-    private Integer partOrder;
+    @ToString.Exclude
+    private JsonNode content;
 
     public enum MessagePartType {
-        TEXT("text"),                           // 0: frame - text content
-        REASONING("reasoning"),                 // g: frame - reasoning content  
-        REASONING_SIGNATURE("reasoning-signature"), // j: frame - reasoning signature
-        REASONING_REDACTED("reasoning-redacted"), // i: frame - redacted reasoning
-        TOOL_INVOCATION("tool-invocation"),     // 9: frame - complete tool call
+        TEXT("text"),                                 // 0: frame - text content
+        REASONING("reasoning"),                       // g: frame - reasoning content  
+        REASONING_SIGNATURE("reasoning-signature"),   // j: frame - reasoning signature
+        REASONING_REDACTED("reasoning-redacted"),     // i: frame - redacted reasoning
+        TOOL_INVOCATION("tool-invocation"),           // 9: frame - complete tool call
         TOOL_STREAMING_START("tool-streaming-start"), // b: frame - tool call start
-        TOOL_DELTA("tool-delta"),              // c: frame - tool call args delta
-        TOOL_RESULT("tool-result"),            // a: frame - tool call result
-        DATA("data"),                          // 2: frame - structured data
-        ANNOTATION("annotation"),              // 8: frame - message annotations
-        ERROR("error"),                        // 3: frame - error content
-        FILE("file"),                          // k: frame - file attachment
-        SOURCE("source"),                      // h: frame - source citation
-        STEP_START("step-start"),              // f: frame - step boundary
-        STEP_FINISH("step-finish"),            // e: frame - step completion
-        MESSAGE_FINISH("message-finish");       // d: frame - message - completion
+        TOOL_DELTA("tool-delta"),                     // c: frame - tool call args delta
+        TOOL_RESULT("tool-result"),                   // a: frame - tool call result
+        DATA("data"),                                 // 2: frame - structured data
+        ANNOTATION("annotation"),                     // 8: frame - message annotations
+        ERROR("error"),                               // 3: frame - error content
+        FILE("file"),                                 // k: frame - file attachment
+        SOURCE("source"),                             // h: frame - source citation
+        STEP_START("step-start"),                     // f: frame - step boundary
+        STEP_FINISH("step-finish"),                   // e: frame - step completion
+        MESSAGE_FINISH("message-finish");             // d: frame - message - completion
 
         private final String value;
 
@@ -162,21 +171,34 @@ public class ChatMessagePart {
             throw new IllegalArgumentException("Unknown message part type: " + value);
         }
     }
-    
+
     /**
-     * Get the composite primary key
+     * Convenience method to get message ID from the embedded ID
      */
-    public ChatMessagePartId getId() {
-        return new ChatMessagePartId(messageId, orderIndex);
+    public UUID getMessageId() {
+        return id != null ? id.getMessageId() : null;
     }
-    
+
     /**
-     * Set the composite primary key
+     * Convenience method to get order index from the embedded ID
      */
-    public void setId(ChatMessagePartId id) {
-        if (id != null) {
-            this.messageId = id.getMessageId();
-            this.orderIndex = id.getOrderIndex();
-        }
+    public Integer getOrderIndex() {
+        return id != null ? id.getOrderIndex() : null;
+    }
+
+    /**
+     * Convenience method to set message ID by creating a new embedded ID
+     */
+    public void setMessageId(UUID messageId) {
+        Integer currentOrderIndex = this.id != null ? this.id.getOrderIndex() : null;
+        this.id = new ChatMessagePartId(messageId, currentOrderIndex);
+    }
+
+    /**
+     * Convenience method to set order index by creating a new embedded ID
+     */
+    public void setOrderIndex(Integer orderIndex) {
+        UUID currentMessageId = this.id != null ? this.id.getMessageId() : null;
+        this.id = new ChatMessagePartId(currentMessageId, orderIndex);
     }
 }
