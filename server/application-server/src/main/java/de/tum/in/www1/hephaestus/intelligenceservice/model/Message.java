@@ -36,6 +36,7 @@ import org.hibernate.validator.constraints.*;
  * Message
  */
 @JsonPropertyOrder({
+  Message.JSON_PROPERTY_CONTENT,
   Message.JSON_PROPERTY_CREATED_AT,
   Message.JSON_PROPERTY_ID,
   Message.JSON_PROPERTY_PARTS,
@@ -43,6 +44,9 @@ import org.hibernate.validator.constraints.*;
 })
 @jakarta.annotation.Generated(value = "org.openapitools.codegen.languages.JavaClientCodegen", comments = "Generator version: 7.7.0")
 public class Message {
+  public static final String JSON_PROPERTY_CONTENT = "content";
+  private String content;
+
   public static final String JSON_PROPERTY_CREATED_AT = "createdAt";
   private JsonNullable<String> createdAt = JsonNullable.<String>undefined();
 
@@ -56,6 +60,31 @@ public class Message {
   private String role;
 
   public Message() {
+  }
+
+  public Message content(String content) {
+    
+    this.content = content;
+    return this;
+  }
+
+  /**
+   * Text content of the message. Important: Use parts when possible. This is a fallback for compatibility with AI SDK.
+   * @return content
+   */
+  @jakarta.annotation.Nonnull
+  @JsonProperty(JSON_PROPERTY_CONTENT)
+  @JsonInclude(value = JsonInclude.Include.ALWAYS)
+
+  public String getContent() {
+    return content;
+  }
+
+
+  @JsonProperty(JSON_PROPERTY_CONTENT)
+  @JsonInclude(value = JsonInclude.Include.ALWAYS)
+  public void setContent(String content) {
+    this.content = content;
   }
 
   public Message createdAt(String createdAt) {
@@ -183,7 +212,8 @@ public class Message {
       return false;
     }
     Message message = (Message) o;
-    return equalsNullable(this.createdAt, message.createdAt) &&
+    return Objects.equals(this.content, message.content) &&
+        equalsNullable(this.createdAt, message.createdAt) &&
         Objects.equals(this.id, message.id) &&
         Objects.equals(this.parts, message.parts) &&
         Objects.equals(this.role, message.role);
@@ -195,7 +225,7 @@ public class Message {
 
   @Override
   public int hashCode() {
-    return Objects.hash(hashCodeNullable(createdAt), id, parts, role);
+    return Objects.hash(content, hashCodeNullable(createdAt), id, parts, role);
   }
 
   private static <T> int hashCodeNullable(JsonNullable<T> a) {
@@ -209,6 +239,7 @@ public class Message {
   public String toString() {
     StringBuilder sb = new StringBuilder();
     sb.append("class Message {\n");
+    sb.append("    content: ").append(toIndentedString(content)).append("\n");
     sb.append("    createdAt: ").append(toIndentedString(createdAt)).append("\n");
     sb.append("    id: ").append(toIndentedString(id)).append("\n");
     sb.append("    parts: ").append(toIndentedString(parts)).append("\n");

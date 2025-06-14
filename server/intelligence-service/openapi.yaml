@@ -139,6 +139,11 @@ components:
       type: object
     Message:
       properties:
+        content:
+          description: 'Text content of the message. Important: Use parts when possible.
+            This is a fallback for compatibility with AI SDK.'
+          title: Content
+          type: string
         createdAt:
           anyOf:
           - type: string
@@ -173,6 +178,7 @@ components:
           type: string
       required:
       - id
+      - content
       - role
       title: Message
       type: object
