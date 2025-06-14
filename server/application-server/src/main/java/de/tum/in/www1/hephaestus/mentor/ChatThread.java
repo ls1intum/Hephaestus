@@ -11,6 +11,7 @@ import lombok.Setter;
 import lombok.ToString;
 import org.hibernate.annotations.CreationTimestamp;
 import org.springframework.lang.NonNull;
+import java.util.UUID;
 
 /**
  * Simple conversation thread for AI SDK that contains a tree of messages.
@@ -25,8 +26,7 @@ import org.springframework.lang.NonNull;
 public class ChatThread {
     
     @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
-    private Long id;
+    private UUID id;
 
     @NonNull
     @CreationTimestamp

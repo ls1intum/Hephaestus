@@ -10,6 +10,7 @@ import lombok.Setter;
 import lombok.ToString;
 import org.hibernate.annotations.CreationTimestamp;
 import org.springframework.lang.NonNull;
+import java.util.UUID;
 
 /**
  * Message in a conversation tree structure that maps to AI SDK message format.
@@ -28,8 +29,7 @@ import org.springframework.lang.NonNull;
 public class ChatMessage {
     
     @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
-    private Long id;
+    private UUID id;
 
     /**
      * Thread this message belongs to.

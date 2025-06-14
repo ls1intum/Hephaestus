@@ -1,6 +1,5 @@
 package de.tum.in.www1.hephaestus.mentor;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.persistence.*;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.Size;
@@ -8,48 +7,39 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 import lombok.ToString;
-import lombok.extern.slf4j.Slf4j;
 import org.hibernate.annotations.CreationTimestamp;
 import org.springframework.lang.NonNull;
 import java.time.Instant;
+import java.util.UUID;
 
 /**
  * Maps directly to de.tum.in.www1.hephaestus.intelligenceservice.model.MessagePartsInner
  */
 @Entity
-@Table(name = "chat_message_part", indexes = {
-    @Index(name = "idx_message_part_message_order", columnList = "message_id, orderIndex"),
-    @Index(name = "idx_message_part_type", columnList = "type")
-})
+@Table(name = "chat_message_part")
+@IdClass(ChatMessagePartId.class)
 @Getter
 @Setter
 @NoArgsConstructor
 @ToString
-@Slf4j
 public class ChatMessagePart {
     
-    private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
+    @Id
+    private UUID messageId;
     
     @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
-    private Long id;
+    @Min(0)
+    private Integer orderIndex;
 
     @NonNull
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "message_id", nullable = false)
+    @JoinColumn(name = "message_id", nullable = false, insertable = false, updatable = false)
     @ToString.Exclude
     private ChatMessage message;
 
     @NonNull
     @CreationTimestamp
     private Instant createdAt;
-
-    /**
-     * Order of this part within the message (0-based)
-     */
-    @NonNull
-    @Min(0)
-    private Integer orderIndex;
 
     /**
      * Part type - Valid values: text, reasoning, tool-invocation, source, file, step-start
@@ -127,6 +117,23 @@ public class ChatMessagePart {
                 }
             }
             throw new IllegalArgumentException("Unknown message part type: " + value);
+        }
+    }
+    
+    /**
+     * Get the composite primary key
+     */
+    public ChatMessagePartId getId() {
+        return new ChatMessagePartId(messageId, orderIndex);
+    }
+    
+    /**
+     * Set the composite primary key
+     */
+    public void setId(ChatMessagePartId id) {
+        if (id != null) {
+            this.messageId = id.getMessageId();
+            this.orderIndex = id.getOrderIndex();
         }
     }
 }
