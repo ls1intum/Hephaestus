@@ -34,15 +34,8 @@ import java.util.UUID;
 public class ChatMessage {
     
     @Id
-    @GeneratedValue(strategy = GenerationType.UUID)
     @EqualsAndHashCode.Include
     private UUID id;
-
-    /**
-     * Version for optimistic locking to prevent lost updates
-     */
-    @Version
-    private Long version;
 
     /**
      * Thread this message belongs to.
@@ -88,7 +81,7 @@ public class ChatMessage {
      */
     @OneToMany(mappedBy = "message", cascade = {CascadeType.PERSIST, CascadeType.MERGE, CascadeType.REMOVE}, 
                fetch = FetchType.LAZY, orphanRemoval = true)
-    @OrderBy("orderIndex ASC")
+    @OrderBy("id.orderIndex ASC")
     @ToString.Exclude
     private List<ChatMessagePart> parts = new ArrayList<>();
 

@@ -29,6 +29,7 @@ function MentorContainer() {
     sendExtraMessageFields: true,
 		api: `${environment.serverUrl}/mentor/chat`,
     headers: {
+      // Use the current token from keycloakService (will be updated by the main.tsx interceptor)
       "Authorization": `Bearer ${keycloakService.getToken()}`
 		},
 		onError: (error) => {

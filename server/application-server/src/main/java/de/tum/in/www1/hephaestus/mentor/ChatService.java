@@ -86,18 +86,40 @@ public class ChatService {
 
     /**
      * Find or create a chat thread using the client-provided ID.
+     * Handles race conditions where multiple requests try to create the same thread.
      */
     private ChatThread findOrCreateThreadByClientId(String threadId, User user) {
         try {
             UUID threadUuid = UUID.fromString(threadId);
-            return chatThreadRepository.findByIdAndUser(threadUuid, user)
-                    .orElseGet(() -> {
-                        ChatThread newThread = new ChatThread();
-                        newThread.setId(threadUuid); // Use the client-provided UUID
-                        newThread.setUser(user);
-                        newThread.setTitle("New chat");
-                        return chatThreadRepository.save(newThread);
-                    });
+            
+            // First try to find the thread
+            Optional<ChatThread> existingThread = chatThreadRepository.findByIdAndUser(threadUuid, user);
+            if (existingThread.isPresent()) {
+                return existingThread.get();
+            }
+            
+            // If thread doesn't exist, try to create it
+            ChatThread newThread = new ChatThread();
+            newThread.setId(threadUuid);
+            newThread.setUser(user);
+            newThread.setTitle("New chat");
+            
+            try {
+                // Try to save the thread
+                return chatThreadRepository.save(newThread);
+            } catch (Exception e) {
+                // If saving fails (likely due to concurrent creation), try to find it again
+                logger.debug("Exception while creating thread with ID {}. Attempting to retrieve it.", threadId);
+                return chatThreadRepository.findByIdAndUser(threadUuid, user)
+                        .orElseGet(() -> {
+                            // If still not found, create a new thread with a different ID
+                            logger.warn("Failed to create thread with ID {}. Creating with new ID.", threadId);
+                            ChatThread fallbackThread = new ChatThread();
+                            fallbackThread.setUser(user);
+                            fallbackThread.setTitle("New chat");
+                            return chatThreadRepository.save(fallbackThread);
+                        });
+            }
         } catch (IllegalArgumentException e) {
             logger.warn("Invalid thread UUID format: {}, creating new thread", threadId);
             ChatThread newThread = new ChatThread();
@@ -197,9 +219,25 @@ public class ChatService {
             switch (frameType) {
                 case "f": // start_step - initialize assistant message
                     logger.debug("Frame: start_step received");
+                    
+                    // Extract the messageId from the frame content if available
+                    String messageId = null;
+                    try {
+                        if (frameContent != null && !frameContent.isEmpty()) {
+                            JsonNode frameNode = objectMapper.readTree(frameContent);
+                            if (frameNode.has("messageId")) {
+                                messageId = frameNode.get("messageId").asText();
+                                logger.debug("Extracted message ID from frame: {}", messageId);
+                            }
+                        }
+                    } catch (Exception e) {
+                        logger.warn("Error parsing messageId from start_step frame: {}", frameContent, e);
+                    }
+                    
                     // Start of a new reasoning step
                     if (currentAssistantMessage.get() == null) {
-                        ChatMessage assistantMessage = createAssistantMessage(thread);
+                        // Create assistant message with the extracted ID
+                        ChatMessage assistantMessage = createAssistantMessage(thread, messageId);
                         currentAssistantMessage.set(assistantMessage);
                         textContentBuilder.set(new StringBuilder());
                         textPartIndex.set(0);
@@ -221,18 +259,18 @@ public class ChatService {
                     logger.debug("Frame: text content received");
                     // Text content streaming - append to current buffer
                     ChatMessage assistantMessage = currentAssistantMessage.get();
+                    String textContent = objectMapper.readTree(frameContent).asText();
                     if (assistantMessage != null) {
                         // Remove quotes from JSON string content
-                        String textContent = parseJsonString(frameContent);
                         textContentBuilder.get().append(textContent);
                         logger.debug("Added text content: {} chars to message: {}", 
                                    textContent.length(), assistantMessage.getId());
                     } else {
                         // Text content arrived before start_step, create message first
                         logger.debug("Text content arrived before start_step, creating new message");
-                        assistantMessage = createAssistantMessage(thread);
+                        assistantMessage = createAssistantMessage(thread, null);
                         currentAssistantMessage.set(assistantMessage);
-                        textContentBuilder.set(new StringBuilder(parseJsonString(frameContent)));
+                        textContentBuilder.set(new StringBuilder(textContent));
                         textPartIndex.set(0);
                         logger.debug("Created assistant message for unexpected text content: {}", 
                                    assistantMessage.getId());
@@ -325,12 +363,30 @@ public class ChatService {
     }
 
     /**
-     * Create an assistant message in the database.
+     * Create an assistant message in the database with a specific ID.
+     * 
+     * @param thread The chat thread to which the message belongs
+     * @param messageId The ID to use for the message, or null to generate one
+     * @return The saved chat message
      */
-    private ChatMessage createAssistantMessage(ChatThread thread) {
+    private ChatMessage createAssistantMessage(ChatThread thread, String messageId) {
         ChatMessage message = new ChatMessage();
         message.setRole(ChatMessage.Role.ASSISTANT);
         message.setThread(thread);
+        
+        // Set the ID if provided, otherwise generate one
+        if (messageId != null && !messageId.isEmpty()) {
+            try {
+                UUID id = UUID.fromString(messageId);
+                message.setId(id);
+                logger.debug("Using provided ID for assistant message: {}", id);
+            } catch (IllegalArgumentException e) {
+                logger.warn("Invalid UUID format for message ID: {}, will use generated ID", messageId);
+                message.setId(UUID.randomUUID());
+            }
+        } else {
+            message.setId(UUID.randomUUID());
+        }
         
         ChatMessage savedMessage = chatMessageRepository.save(message);
         thread.addMessage(savedMessage);
@@ -340,9 +396,10 @@ public class ChatService {
     }
 
     /**
-     * Save a text part for a message.
-     * Uses JPA's cascade functionality to avoid separate save operations.
+     * Saves the final text part for a message.
+     * This is called after the streaming is complete to save the accumulated text.
      */
+    @Transactional
     private void saveFinalTextPart(ChatMessage message, String textContent, int partIndex) {
         try {
             ChatMessagePart textPart = new ChatMessagePart();
@@ -362,7 +419,7 @@ public class ChatService {
             logger.debug("Saved text part for message: {} with {} chars", 
                         message.getId(), textContent.length());
         } catch (Exception e) {
-            logger.error("Error saving text part for message: {}", message.getId(), e);
+            logger.error("Error saving final text part: {}", e.getMessage(), e);
         }
     }
 
@@ -375,26 +432,51 @@ public class ChatService {
         message.setRole(role);
         message.setThread(thread);
         
+        // Set message ID from API message if available, otherwise generate a new one
+        if (apiMessage.getId() != null && !apiMessage.getId().isEmpty()) {
+            try {
+                UUID id = UUID.fromString(apiMessage.getId());
+                message.setId(id);
+                logger.debug("Using API message ID: {}", id);
+            } catch (IllegalArgumentException e) {
+                logger.warn("Invalid UUID format for API message ID: {}, will use generated ID", apiMessage.getId());
+                message.setId(UUID.randomUUID());
+            }
+        } else {
+            message.setId(UUID.randomUUID());
+        }
+        
         // Set parent message if available
         if (parentApiMessage.isPresent()) {
-            UUID parentId = UUID.fromString(parentApiMessage.get().getId());
-            ChatMessage parentMessage = entityManager.getReference(ChatMessage.class, parentId);
-            message.setParentMessage(parentMessage);
+            try {
+                UUID parentId = UUID.fromString(parentApiMessage.get().getId());
+                ChatMessage parentMessage = chatMessageRepository.findById(parentId).orElse(null);
+                if (parentMessage != null) {
+                    message.setParentMessage(parentMessage);
+                } else {
+                    logger.warn("Could not find parent message with ID: {}", parentId);
+                }
+            } catch (IllegalArgumentException e) {
+                logger.warn("Invalid UUID format for parent message ID: {}", parentApiMessage.get().getId());
+            }
         }
 
-        // Prepare message parts before saving
+        // First save the message to get an ID
+        ChatMessage savedMessage = chatMessageRepository.save(message);
+        
+        // Now prepare message parts using the saved message ID
         if (apiMessage.getParts() != null) {
             int partIndex = 0;
             for (var part : apiMessage.getParts()) {
                 if ("text".equals(part.getType()) && part.getText() != null) {
                     try {
                         ChatMessagePart textPart = new ChatMessagePart();
-                        textPart.setId(new ChatMessagePartId(message.getId(), partIndex++));
+                        textPart.setId(new ChatMessagePartId(savedMessage.getId(), partIndex++));
                         textPart.setType(ChatMessagePart.MessagePartType.TEXT);
                         
                         JsonNode contentNode = objectMapper.valueToTree(part.getText());
                         textPart.setContent(contentNode);
-                        message.addMessagePart(textPart);
+                        savedMessage.addMessagePart(textPart);
                     } catch (Exception e) {
                         logger.error("Error preparing text part for message: {}", e.getMessage(), e);
                     }
@@ -402,12 +484,12 @@ public class ChatService {
             }
         }
         
-        // Save the message once - the parts will be persisted via cascade
-        ChatMessage savedMessage = chatMessageRepository.save(message);
+        // Save the message again with its parts
+        savedMessage = chatMessageRepository.save(savedMessage);
+        
+        // Update thread references
         thread.addMessage(savedMessage);
         thread.setSelectedLeafMessage(savedMessage);
-        
-        // Save the thread with updated message references
         chatThreadRepository.save(thread);
         
         logger.debug("Persisted {} message: {} with {} parts", 
@@ -420,21 +502,12 @@ public class ChatService {
      */
     @Transactional
     private void finalizeThread(ChatThread thread, ChatMessage assistantMessage) {
-        thread.setSelectedLeafMessage(assistantMessage);
-        chatThreadRepository.save(thread);
-        logger.debug("Finalized thread with selected leaf message: {}", assistantMessage.getId());
-    }
-
-    private String parseJsonString(String jsonString) {
         try {
-            // Remove surrounding quotes and handle escaped quotes
-            if (jsonString.startsWith("\"") && jsonString.endsWith("\"")) {
-                return objectMapper.readValue(jsonString, String.class);
-            }
-            return jsonString;
+            thread.setSelectedLeafMessage(assistantMessage);
+            chatThreadRepository.save(thread);
+            logger.debug("Finalized thread with selected leaf message: {}", assistantMessage.getId());
         } catch (Exception e) {
-            logger.warn("Failed to parse JSON string, using raw content: {}", jsonString);
-            return jsonString;
+            logger.error("Error finalizing thread: {}", e.getMessage(), e);
         }
     }
 }

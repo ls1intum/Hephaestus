@@ -4,7 +4,6 @@ import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.databind.JsonNode;
 import io.hypersistence.utils.hibernate.type.json.JsonType;
 import jakarta.persistence.*;
-import jakarta.validation.constraints.Size;
 import lombok.EqualsAndHashCode;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
@@ -31,12 +30,6 @@ public class ChatMessagePart {
     @EqualsAndHashCode.Include
     private ChatMessagePartId id;
 
-    /**
-     * Version for optimistic locking to prevent lost updates
-     */
-    @Version
-    private Long version;
-
     @NonNull
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "messageId", nullable = false, insertable = false, updatable = false)
@@ -49,7 +42,6 @@ public class ChatMessagePart {
     @NonNull
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 32)
-    @Size(max = 32)
     private MessagePartType type;
 
     /**

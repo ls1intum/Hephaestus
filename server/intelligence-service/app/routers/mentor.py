@@ -1,3 +1,4 @@
+import uuid
 import json
 from typing import List, Literal, Optional, Union, Any, Dict
 from pydantic import BaseModel, Field
@@ -7,6 +8,7 @@ from langchain_core.output_parsers import StrOutputParser
 from langchain_core.messages import HumanMessage, AIMessage, SystemMessage
 from app.models import get_model
 from app.settings import settings
+from app.logger import logger
 
 
 router = APIRouter(prefix="/mentor", tags=["mentor"])
@@ -192,10 +194,15 @@ class EventStreamResponse(StreamingResponse):
 )
 async def handle_chat_data(request: ChatRequest):
     messages = request.messages
-
+    
     def generate():
+        message_id = str(uuid.uuid4())
+        logger.info(f"Processing chat request with message ID: {message_id}")
+
         # Convert ClientMessage objects to LangChain message objects
         langchain_messages = convert_to_langchain_messages(messages)
+
+        yield f'f:{{"messageId":"{message_id}"}}\n'
 
         chain = model | StrOutputParser()
         for chunk in chain.stream(langchain_messages):

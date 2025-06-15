@@ -1,5 +1,7 @@
 package de.tum.in.www1.hephaestus.mentor;
 
+import de.tum.in.www1.hephaestus.SecurityUtils;
+import de.tum.in.www1.hephaestus.gitprovider.user.User;
 import de.tum.in.www1.hephaestus.gitprovider.user.UserRepository;
 import io.swagger.v3.oas.annotations.Hidden;
 import org.slf4j.Logger;
@@ -37,15 +39,25 @@ public class ChatController {
                 chatRequest.messages().isEmpty() ? "none" : 
                     chatRequest.messages().get(0).getContent());
 
-        // Get current authenticated user
-        var userOptional = userRepository.getCurrentUser();
-        logger.debug("User authentication status: {}", userOptional.isPresent() ? "authenticated" : "not authenticated");
+        // Get current authenticated username
+        var currentUserLogin = SecurityUtils.getCurrentUserLogin();
         
-        if (userOptional.isEmpty()) {
-            logger.warn("No authenticated user found for chat request");
+        if (currentUserLogin.isEmpty()) {
+            logger.warn("No authenticated username found for chat request");
             String errorResponse = "3:\"Authentication required\"\n";
             String finishResponse = "d:{\"finishReason\":\"error\"}\n";
             logger.debug("Returning authentication error response: {}", errorResponse + finishResponse);
+            return Flux.just(errorResponse, finishResponse);
+        }
+
+        // Find user by login in database
+        var userOptional = userRepository.findByLogin(currentUserLogin.get());
+
+        if (userOptional.isEmpty()) {
+            logger.warn("User not found for login: {}", currentUserLogin.get());
+            String errorResponse = "3:\"User not found\"\n";
+            String finishResponse = "d:{\"finishReason\":\"error\"}\n";
+            logger.debug("Returning user not found response: {}", errorResponse + finishResponse);
             return Flux.just(errorResponse, finishResponse);
         }
 
