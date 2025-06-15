@@ -7,5 +7,5 @@ import org.springframework.stereotype.Repository;
 
 @Repository
 public interface ChatMessagePartRepository extends JpaRepository<ChatMessagePart, ChatMessagePartId> {
-    List<ChatMessagePart> findByMessageIdOrderByOrderIndexAsc(UUID messageId);
+    List<ChatMessagePart> findByIdMessageIdOrderByIdOrderIndexAsc(UUID messageId);
 }

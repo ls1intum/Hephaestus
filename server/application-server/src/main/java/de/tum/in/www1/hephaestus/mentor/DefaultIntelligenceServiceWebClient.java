@@ -47,7 +47,8 @@ public class DefaultIntelligenceServiceWebClient implements IntelligenceServiceW
     
     @Override
     public Flux<String> streamChat(ChatRequest request) {
-        logger.debug("Sending chat request to intelligence service");
+        logger.debug("Sending chat request to intelligence service with {} messages", 
+                   request.getMessages() != null ? request.getMessages().size() : 0);
         
         return webClient.post()
             .uri("/mentor/chat")
@@ -56,9 +57,17 @@ public class DefaultIntelligenceServiceWebClient implements IntelligenceServiceW
             .bodyValue(request)
             .retrieve()
             .bodyToFlux(String.class)
-            .map(chunk -> chunk + "\n")
+            .doOnSubscribe(s -> logger.debug("Subscribed to intelligence service response"))
+            .doOnNext(chunk -> logger.debug("Received chunk from intelligence service: length={}", 
+                                         chunk != null ? chunk.length() : 0))
+            .map(chunk -> {
+                logger.trace("Processing chunk: {}", chunk);
+                return chunk + "\n";
+            })
+            .doOnComplete(() -> logger.debug("Intelligence service response stream completed"))
+            .doOnError(error -> logger.error("Failed to call intelligence service", error))
             .onErrorResume(error -> {
-                logger.error("Failed to call intelligence service", error);
+                logger.error("Error in intelligence service call, returning fallback response", error);
                 return Flux.just(
                     "3:\"Sorry, I encountered an error. Please try again.\"\n", 
                     "d:{\"finishReason\":\"stop\"}\n"

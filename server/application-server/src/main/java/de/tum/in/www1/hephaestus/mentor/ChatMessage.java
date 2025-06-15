@@ -144,17 +144,6 @@ public class ChatMessage {
     }
 
     /**
-     * Helper method to remove a child message and maintain bidirectional relationship
-     */
-    public void removeChildMessage(ChatMessage child) {
-        if (child == null) {
-            return;
-        }
-        childMessages.remove(child);
-        child.setParentMessage(null);
-    }
-
-    /**
      * Helper method to add a message part and maintain bidirectional relationship
      */
     public void addMessagePart(ChatMessagePart part) {

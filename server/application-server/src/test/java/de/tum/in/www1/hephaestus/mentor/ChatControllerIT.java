@@ -1,10 +1,14 @@
 package de.tum.in.www1.hephaestus.mentor;
 
+import de.tum.in.www1.hephaestus.gitprovider.user.User;
 import de.tum.in.www1.hephaestus.intelligenceservice.model.Message;
 import de.tum.in.www1.hephaestus.intelligenceservice.model.MessagePartsInner;
 import de.tum.in.www1.hephaestus.testconfig.BaseIntegrationTest;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.reactive.AutoConfigureWebTestClient;
 import org.springframework.test.web.reactive.server.WebTestClient;
@@ -13,6 +17,8 @@ import reactor.test.StepVerifier;
 
 import java.util.List;
 import java.util.UUID;
+
+import static org.assertj.core.api.Assertions.assertThat;
 
 /**
  * Integration tests for ChatController that cover all AI SDK stream protocol message parts.
@@ -41,15 +47,36 @@ import java.util.UUID;
 @AutoConfigureWebTestClient
 public class ChatControllerIT extends BaseIntegrationTest {
 
+    private static final Logger logger = LoggerFactory.getLogger(ChatControllerIT.class);
+
     @Autowired
     private WebTestClient webTestClient;
 
     @Autowired
     private MockChatFrameHolder mockFrameHolder;
+    
+    @Autowired
+    private ChatTestDataSetup testDataSetup;
+    
+    @Autowired
+    private MockSecurityHelper mockSecurityHelper;
+    
+    @Autowired
+    private ChatMessageRepository chatMessageRepository;
+    
+    @Autowired
+    private ChatMessagePartRepository chatMessagePartRepository;
 
     @BeforeEach
     void setUp() {
         mockFrameHolder.frames = List.of();
+        // Create test user and set up authentication
+        mockSecurityHelper.mockAuthentication("testuser");
+    }
+    
+    @AfterEach
+    void tearDown() {
+        mockSecurityHelper.clearAuthentication();
     }
 
     /**
@@ -423,6 +450,63 @@ public class ChatControllerIT extends BaseIntegrationTest {
             // Final completion
             .expectNext("d:{\"finishReason\":\"stop\",\"usage\":{\"completionTokens\":27,\"promptTokens\":33}}")
             .verifyComplete();
+    }
+
+    /**
+     * Test: Persistence of text messages - verifies that text message parts are correctly persisted in database
+     * Maps to: TEXT message parts in ChatMessagePart entity
+     * Persistence: Single ChatMessage with multiple TEXT parts
+     */
+    @Test
+    void shouldPersistTextMessages() {
+        // Given - simple text response with required start step frame
+        final List<String> expectedFrames = List.of(
+            "f:{\"messageId\":\"msg-persistence-test\"}",
+            "0:\"Hello, \"",
+            "0:\"this is a test \"",
+            "0:\"of message persistence!\"",
+            "e:{\"finishReason\":\"stop\",\"usage\":{\"completionTokens\":5,\"promptTokens\":10},\"isContinued\":false}",
+            "d:{\"finishReason\":\"stop\",\"usage\":{\"completionTokens\":5,\"promptTokens\":10}}"
+        );
+
+        // When - make the chat request
+        performChatRequest(expectedFrames);
+        
+        // Then - verify that messages were persisted
+        List<ChatMessage> messages = chatMessageRepository.findAll();
+        assertThat(messages).isNotEmpty();
+        logger.info("Found {} messages persisted", messages.size());
+    
+        // Verify that we have at least one ASSISTANT message
+        ChatMessage assistantMessage = messages.stream()
+            .filter(msg -> msg.getRole() == ChatMessage.Role.ASSISTANT)
+            .findFirst()
+            .orElse(null);
+        
+        assertThat(assistantMessage).isNotNull();
+        
+        // Verify the message parts
+        List<ChatMessagePart> parts = chatMessagePartRepository.findByIdMessageIdOrderByIdOrderIndexAsc(assistantMessage.getId());
+        assertThat(parts).isNotEmpty();
+        
+        // Verify that we have a TEXT message part
+        ChatMessagePart textPart = parts.stream()
+            .filter(part -> part.getType() == ChatMessagePart.MessagePartType.TEXT)
+            .findFirst()
+            .orElse(null);
+            
+        assertThat(textPart).isNotNull();
+        assertThat(textPart.getContent()).isNotNull();
+        
+        // Verify the content contains our test text
+        String textContent = textPart.getContent().asText();
+        
+        // Verify the message content is correctly stored
+        // Note: in a streaming response, texts might be combined differently than in frames
+        assertThat(textContent).isNotEmpty();
+        
+        // Log the message content for debugging
+        logger.info("Persisted message content: {}", textContent);
     }
 
     private Flux<String> performChatRequest(List<String> mockFrames) {

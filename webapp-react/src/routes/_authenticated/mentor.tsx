@@ -1,5 +1,6 @@
 import { useChat } from '@ai-sdk/react';
 import { createFileRoute } from "@tanstack/react-router";
+import { v4 as uuidv4 } from 'uuid';
 
 import { ComingSoon } from "@/components/shared/ComingSoon";
 import environment from '@/environment';
@@ -24,6 +25,8 @@ function RouteComponent() {
 function MentorContainer() {
 	const { messages, input, handleSubmit, handleInputChange, status, error } = useChat({
 		streamProtocol: 'data',
+    generateId: () => uuidv4(),
+    sendExtraMessageFields: true,
 		api: `${environment.serverUrl}/mentor/chat`,
     headers: {
       "Authorization": `Bearer ${keycloakService.getToken()}`
