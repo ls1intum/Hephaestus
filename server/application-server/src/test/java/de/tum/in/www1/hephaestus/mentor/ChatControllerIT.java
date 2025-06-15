@@ -38,12 +38,17 @@ public class ChatControllerIT extends BaseIntegrationTest {
     void shouldHandleCompleteTextMessageProtocol() {
         // Given
         var request = createChatRequest();
-        String responseMessageId = UUID.randomUUID().toString();
+        String responseMessageId1 = UUID.randomUUID().toString();
+        String responseMessageId2 = UUID.randomUUID().toString();
         final List<String> responseFrames = List.of(
-            "f:{\"messageId\":\"" + responseMessageId + "\"}",  // Start step with message ID
+            "f:{\"messageId\":\"" + responseMessageId1 + "\"}",  // Start step with message ID
             "0:\"Hello, \"",                                 // Text part 1
             "0:\"this is a \"",                              // Text part 2
             "0:\"complete AI SDK test!\"",                   // Text part 3
+            "e:{\"finishReason\":\"stop\",\"usage\":{\"completionTokens\":6,\"promptTokens\":12},\"isContinued\":false}",
+            "f:{\"messageId\":\"" + responseMessageId2 + "\"}",  // Second message start
+            "0:\"What \"",
+            "0:\"can I do for you?\"",
             "e:{\"finishReason\":\"stop\",\"usage\":{\"completionTokens\":6,\"promptTokens\":12},\"isContinued\":false}",
             "d:{\"finishReason\":\"stop\",\"usage\":{\"completionTokens\":6,\"promptTokens\":12}}"
         );
@@ -53,10 +58,14 @@ public class ChatControllerIT extends BaseIntegrationTest {
 
         // Then - Verify streaming protocol compliance
         StepVerifier.create(response)
-            .expectNext("f:{\"messageId\":\"" + responseMessageId + "\"}")
+            .expectNext("f:{\"messageId\":\"" + responseMessageId1 + "\"}")
             .expectNext("0:\"Hello, \"")
             .expectNext("0:\"this is a \"")
             .expectNext("0:\"complete AI SDK test!\"")
+            .expectNext("e:{\"finishReason\":\"stop\",\"usage\":{\"completionTokens\":6,\"promptTokens\":12},\"isContinued\":false}")
+            .expectNext("f:{\"messageId\":\"" + responseMessageId2 + "\"}")
+            .expectNext("0:\"What \"")
+            .expectNext("0:\"can I do for you?\"")
             .expectNext("e:{\"finishReason\":\"stop\",\"usage\":{\"completionTokens\":6,\"promptTokens\":12},\"isContinued\":false}")
             .expectNext("d:{\"finishReason\":\"stop\",\"usage\":{\"completionTokens\":6,\"promptTokens\":12}}")
             .verifyComplete();
@@ -77,14 +86,21 @@ public class ChatControllerIT extends BaseIntegrationTest {
         assertThat(userPart.getType()).isEqualTo(ChatMessagePart.MessagePartType.TEXT);
         assertThat(userPart.getContent().asText()).isEqualTo("Hello, World!");
 
-        // Assistant message should have been created with the response ID
-        ChatMessage assistantMessage = chatMessageRepository.findById(UUID.fromString(responseMessageId))
+        // Assistant message should have been created with the second response ID (combined parts)
+        ChatMessage assistantMessage = chatMessageRepository.findById(UUID.fromString(responseMessageId2))
             .orElseThrow(() -> new AssertionError("No assistant message found"));
         assertThat(assistantMessage.getRole()).isEqualTo(ChatMessage.Role.ASSISTANT);
-        assertThat(assistantMessage.getParts()).hasSize(1); // Only one part for the assistant message
-        ChatMessagePart assistantPart = assistantMessage.getParts().get(0);
-        assertThat(assistantPart.getType()).isEqualTo(ChatMessagePart.MessagePartType.TEXT);
-        assertThat(assistantPart.getContent().asText()).isEqualTo("Hello, this is a complete AI SDK test!");
+        assertThat(assistantMessage.getParts()).hasSize(2); // 2 text parts combined into one message
+        ChatMessagePart assistantPart1 = assistantMessage.getParts().get(0);
+        assertThat(assistantPart1.getType()).isEqualTo(ChatMessagePart.MessagePartType.TEXT);
+        assertThat(assistantPart1.getContent().asText()).isEqualTo("Hello, this is a complete AI SDK test!");
+        ChatMessagePart assistantPart2 = assistantMessage.getParts().get(1);
+        assertThat(assistantPart2.getType()).isEqualTo(ChatMessagePart.MessagePartType.TEXT);
+        assertThat(assistantPart2.getContent().asText()).isEqualTo("What can I do for you?");
+
+        // Verify that first response message was not created as it was combined with the second one
+        assertThat(chatMessageRepository.findById(UUID.fromString(responseMessageId1)).isPresent()).isFalse();
+        // First response message should not exist as it should be combined with the second one -> one assistant message
 
         // Relationships should be established
         assertThat(assistantMessage.getThread()).isEqualTo(thread);
