@@ -19,7 +19,22 @@ import java.util.concurrent.atomic.AtomicReference;
 
 /**
  * Service for handling chat streaming and persistence.
- * Integrates with AI SDK message persistence for text parts.
+ * Implements full AI SDK Data Stream Protocol support with complete message part persistence.
+ * 
+ * Supports all AI SDK frame types:
+ * - Text parts (0:) -> TEXT message parts
+ * - Reasoning parts (g:) -> REASONING message parts  
+ * - Redacted reasoning (i:) -> REASONING_REDACTED message parts
+ * - Reasoning signatures (j:) -> REASONING_SIGNATURE message parts
+ * - Source citations (h:) -> SOURCE message parts
+ * - File attachments (k:) -> FILE message parts
+ * - Data arrays (2:) -> DATA message parts
+ * - Annotations (8:) -> ANNOTATION message parts
+ * - Error messages (3:) -> ERROR message parts
+ * - Tool calls (9:) -> TOOL_INVOCATION message parts
+ * - Tool results (a:) -> TOOL_RESULT message parts
+ * - Streaming frames (b:, c:) -> logged but not persisted
+ * - Control frames (f:, e:, d:) -> handled for flow control
  */
 @Service
 public class ChatService {
@@ -150,6 +165,7 @@ public class ChatService {
         // References to track the assistant message being built
         AtomicReference<ChatMessage> currentAssistantMessage = new AtomicReference<>();
         AtomicReference<StringBuilder> textContentBuilder = new AtomicReference<>(new StringBuilder());
+        AtomicReference<StringBuilder> reasoningContentBuilder = new AtomicReference<>(new StringBuilder());
         AtomicReference<Integer> partIndex = new AtomicReference<>(0);
 
         return intelligenceServiceWebClient.streamChat(intelligenceRequest)
@@ -158,7 +174,7 @@ public class ChatService {
                     logger.debug("Received chunk from intelligence service: {}", chunk);
                     try {
                         processStreamFrame(chunk, thread, currentAssistantMessage, 
-                                                textContentBuilder, partIndex);
+                                                textContentBuilder, reasoningContentBuilder, partIndex);
                     } catch (Exception e) {
                         logger.error("Error processing stream chunk: {}", chunk, e);
                     }
@@ -170,11 +186,21 @@ public class ChatService {
                     if (assistantMessage != null) {
                         // Save final text content if any
                         String finalTextContent = textContentBuilder.get().toString();
+                        String finalReasoningContent = reasoningContentBuilder.get().toString();
+                        
                         if (!finalTextContent.isEmpty()) {
                             logger.debug("Saving final text content: {} chars", finalTextContent.length());
                             saveFinalTextPart(assistantMessage, finalTextContent, partIndex.get());
                         } else {
                             logger.debug("No final text content to save");
+                        }
+                        
+                        if (!finalReasoningContent.isEmpty()) {
+                            logger.debug("Saving final reasoning content: {} chars", finalReasoningContent.length());
+                            saveMessagePart(assistantMessage, ChatMessagePart.MessagePartType.REASONING, 
+                                          finalReasoningContent, partIndex.get());
+                        } else {
+                            logger.debug("No final reasoning content to save");
                         }
                         
                         // Update thread's selected leaf message
@@ -201,6 +227,7 @@ public class ChatService {
     private void processStreamFrame(String frame, ChatThread thread, 
                                     AtomicReference<ChatMessage> currentAssistantMessage,
                                     AtomicReference<StringBuilder> textContentBuilder,
+                                    AtomicReference<StringBuilder> reasoningContentBuilder,
                                     AtomicReference<Integer> textPartIndex) {
         try {
             // Parse AI SDK frame format: "type:content"
@@ -240,16 +267,27 @@ public class ChatService {
                         ChatMessage assistantMessage = createAssistantMessage(thread, messageId);
                         currentAssistantMessage.set(assistantMessage);
                         textContentBuilder.set(new StringBuilder());
+                        reasoningContentBuilder.set(new StringBuilder());
                         textPartIndex.set(0);
                         logger.debug("Started new assistant message: {}", assistantMessage.getId());
                     } else {
                         // If continuing from a previous step, flush any existing content
                         String currentContent = textContentBuilder.get().toString();
+                        String currentReasoning = reasoningContentBuilder.get().toString();
+                        
                         if (!currentContent.isEmpty()) {
-                            logger.debug("Flushing existing content: {} chars", currentContent.length());
+                            logger.debug("Flushing existing text content: {} chars", currentContent.length());
                             saveFinalTextPart(currentAssistantMessage.get(), currentContent, textPartIndex.get());
                             textPartIndex.set(textPartIndex.get() + 1);
                             textContentBuilder.set(new StringBuilder());
+                        }
+                        
+                        if (!currentReasoning.isEmpty()) {
+                            logger.debug("Flushing existing reasoning content: {} chars", currentReasoning.length());
+                            saveMessagePart(currentAssistantMessage.get(), ChatMessagePart.MessagePartType.REASONING, 
+                                          currentReasoning, textPartIndex.get());
+                            textPartIndex.set(textPartIndex.get() + 1);
+                            reasoningContentBuilder.set(new StringBuilder());
                         }
                         logger.debug("Started new step in existing message: {}", currentAssistantMessage.get().getId());
                     }
@@ -300,12 +338,23 @@ public class ChatService {
                     // If not continued, flush content
                     if (!isContinued && currentAssistantMessage.get() != null) {
                         String currentContent = textContentBuilder.get().toString();
+                        String currentReasoning = reasoningContentBuilder.get().toString();
+                        
                         if (!currentContent.isEmpty()) {
-                            logger.debug("Flushing content at finish_step: {} chars", currentContent.length());
+                            logger.debug("Flushing text content at finish_step: {} chars", currentContent.length());
                             saveFinalTextPart(currentAssistantMessage.get(), currentContent, textPartIndex.get());
                             textPartIndex.set(textPartIndex.get() + 1);
                             textContentBuilder.set(new StringBuilder());
                         }
+                        
+                        if (!currentReasoning.isEmpty()) {
+                            logger.debug("Flushing reasoning content at finish_step: {} chars", currentReasoning.length());
+                            saveMessagePart(currentAssistantMessage.get(), ChatMessagePart.MessagePartType.REASONING, 
+                                          currentReasoning, textPartIndex.get());
+                            textPartIndex.set(textPartIndex.get() + 1);
+                            reasoningContentBuilder.set(new StringBuilder());
+                        }
+                        
                         logger.debug("Finished step, content flushed");
                     } else {
                         logger.debug("Finished step with continuation, content not flushed");
@@ -334,23 +383,122 @@ public class ChatService {
                     logger.debug("Message finished with reason: {}", finishReason);
                     break;
                     
-                case "1": // reasoning content (same as text but for reasoning parts)
-                case "2": // reasoning_signature (metadata about reasoning)
-                case "3": // error message
-                    logger.debug("Frame: error message received: {}", frameContent);
+                case "g": // reasoning content
+                    logger.debug("Frame: reasoning content received");
+                    if (currentAssistantMessage.get() != null) {
+                        String reasoningContent = objectMapper.readTree(frameContent).asText();
+                        // Accumulate reasoning content like text content
+                        reasoningContentBuilder.get().append(reasoningContent);
+                        logger.debug("Added reasoning content: {} chars to message: {}", 
+                                   reasoningContent.length(), currentAssistantMessage.get().getId());
+                    }
                     break;
-                case "4": // data (any JSON data)
-                case "5": // message_annotations
-                case "6": // file content
-                case "7": // source citation
-                case "8": // redacted_reasoning
-                case "9": // tool_call_streaming_start
-                case "a": // tool_call_delta
-                case "b": // tool_call
-                case "c": // tool_result
-                    // These frame types are not implemented yet but properly logged
-                    logger.debug("Received unimplemented frame type: {} with content length: {}", 
-                               frameType, frameContent != null ? frameContent.length() : 0);
+                    
+                case "i": // redacted reasoning
+                    logger.debug("Frame: redacted reasoning received");
+                    if (currentAssistantMessage.get() != null) {
+                        JsonNode redactedData = objectMapper.readTree(frameContent);
+                        saveMessagePart(currentAssistantMessage.get(), ChatMessagePart.MessagePartType.REASONING_REDACTED, 
+                                      redactedData, textPartIndex.get());
+                        textPartIndex.set(textPartIndex.get() + 1);
+                        logger.debug("Saved redacted reasoning part for message: {}", currentAssistantMessage.get().getId());
+                    }
+                    break;
+                    
+                case "j": // reasoning signature
+                    logger.debug("Frame: reasoning signature received");
+                    if (currentAssistantMessage.get() != null) {
+                        JsonNode signatureData = objectMapper.readTree(frameContent);
+                        saveMessagePart(currentAssistantMessage.get(), ChatMessagePart.MessagePartType.REASONING_SIGNATURE, 
+                                      signatureData, textPartIndex.get());
+                        textPartIndex.set(textPartIndex.get() + 1);
+                        logger.debug("Saved reasoning signature part for message: {}", currentAssistantMessage.get().getId());
+                    }
+                    break;
+                    
+                case "h": // source citation
+                    logger.debug("Frame: source citation received");
+                    if (currentAssistantMessage.get() != null) {
+                        JsonNode sourceData = objectMapper.readTree(frameContent);
+                        saveMessagePart(currentAssistantMessage.get(), ChatMessagePart.MessagePartType.SOURCE, 
+                                      sourceData, textPartIndex.get());
+                        textPartIndex.set(textPartIndex.get() + 1);
+                        logger.debug("Saved source part for message: {}", currentAssistantMessage.get().getId());
+                    }
+                    break;
+                    
+                case "k": // file attachment
+                    logger.debug("Frame: file attachment received");
+                    if (currentAssistantMessage.get() != null) {
+                        JsonNode fileData = objectMapper.readTree(frameContent);
+                        saveMessagePart(currentAssistantMessage.get(), ChatMessagePart.MessagePartType.FILE, 
+                                      fileData, textPartIndex.get());
+                        textPartIndex.set(textPartIndex.get() + 1);
+                        logger.debug("Saved file part for message: {}", currentAssistantMessage.get().getId());
+                    }
+                    break;
+                    
+                case "2": // data array
+                    logger.debug("Frame: data array received");
+                    if (currentAssistantMessage.get() != null) {
+                        JsonNode dataArray = objectMapper.readTree(frameContent);
+                        saveMessagePart(currentAssistantMessage.get(), ChatMessagePart.MessagePartType.DATA, 
+                                      dataArray, textPartIndex.get());
+                        textPartIndex.set(textPartIndex.get() + 1);
+                        logger.debug("Saved data part for message: {}", currentAssistantMessage.get().getId());
+                    }
+                    break;
+                    
+                case "8": // message annotations
+                    logger.debug("Frame: message annotations received");
+                    if (currentAssistantMessage.get() != null) {
+                        JsonNode annotations = objectMapper.readTree(frameContent);
+                        saveMessagePart(currentAssistantMessage.get(), ChatMessagePart.MessagePartType.ANNOTATION, 
+                                      annotations, textPartIndex.get());
+                        textPartIndex.set(textPartIndex.get() + 1);
+                        logger.debug("Saved annotation part for message: {}", currentAssistantMessage.get().getId());
+                    }
+                    break;
+                    
+                case "3": // error message
+                    logger.debug("Frame: error message received");
+                    if (currentAssistantMessage.get() != null) {
+                        String errorContent = objectMapper.readTree(frameContent).asText();
+                        saveMessagePart(currentAssistantMessage.get(), ChatMessagePart.MessagePartType.ERROR, 
+                                      errorContent, textPartIndex.get());
+                        textPartIndex.set(textPartIndex.get() + 1);
+                        logger.debug("Saved error part for message: {}", currentAssistantMessage.get().getId());
+                    }
+                    break;
+                    
+                case "9": // tool call (complete)
+                    logger.debug("Frame: tool call received");
+                    if (currentAssistantMessage.get() != null) {
+                        JsonNode toolCall = objectMapper.readTree(frameContent);
+                        saveMessagePart(currentAssistantMessage.get(), ChatMessagePart.MessagePartType.TOOL_INVOCATION, 
+                                      toolCall, textPartIndex.get());
+                        textPartIndex.set(textPartIndex.get() + 1);
+                        logger.debug("Saved tool invocation part for message: {}", currentAssistantMessage.get().getId());
+                    }
+                    break;
+                    
+                case "a": // tool result
+                    logger.debug("Frame: tool result received");
+                    if (currentAssistantMessage.get() != null) {
+                        JsonNode toolResult = objectMapper.readTree(frameContent);
+                        saveMessagePart(currentAssistantMessage.get(), ChatMessagePart.MessagePartType.TOOL_RESULT, 
+                                      toolResult, textPartIndex.get());
+                        textPartIndex.set(textPartIndex.get() + 1);
+                        logger.debug("Saved tool result part for message: {}", currentAssistantMessage.get().getId());
+                    }
+                    break;
+                    
+                case "b": // tool call streaming start (streaming only - don't persist)
+                    logger.debug("Frame: tool call streaming start (not persisted): {}", frameContent);
+                    break;
+                    
+                case "c": // tool call delta (streaming only - don't persist)
+                    logger.debug("Frame: tool call delta (not persisted): {}", frameContent);
                     break;
                     
                 default:
@@ -420,6 +568,42 @@ public class ChatService {
                         message.getId(), textContent.length());
         } catch (Exception e) {
             logger.error("Error saving final text part: {}", e.getMessage(), e);
+        }
+    }
+
+    /**
+     * Helper method to save a message part with proper content handling.
+     * Handles both String content and JsonNode content.
+     */
+    @Transactional
+    private void saveMessagePart(ChatMessage message, ChatMessagePart.MessagePartType type, Object content, int partIndex) {
+        try {
+            ChatMessagePart messagePart = new ChatMessagePart();
+            messagePart.setId(new ChatMessagePartId(message.getId(), partIndex));
+            messagePart.setType(type);
+            
+            // Convert content to JsonNode based on type
+            JsonNode contentNode;
+            if (content instanceof String) {
+                contentNode = objectMapper.valueToTree(content);
+            } else if (content instanceof JsonNode) {
+                contentNode = (JsonNode) content;
+            } else {
+                contentNode = objectMapper.valueToTree(content);
+            }
+            
+            messagePart.setContent(contentNode);
+            
+            // Add to message (don't save individually)
+            message.addMessagePart(messagePart);
+            
+            // Save the message which will cascade to the part
+            chatMessageRepository.save(message);
+            
+            logger.debug("Saved {} part for message: {} at index: {}", 
+                        type, message.getId(), partIndex);
+        } catch (Exception e) {
+            logger.error("Error saving message part of type {}: {}", type, e.getMessage(), e);
         }
     }
 

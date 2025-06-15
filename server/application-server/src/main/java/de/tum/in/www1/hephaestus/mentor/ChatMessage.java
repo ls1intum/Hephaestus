@@ -79,8 +79,7 @@ public class ChatMessage {
     /**
      * Message parts - handles complex multi part content
      */
-    @OneToMany(mappedBy = "message", cascade = {CascadeType.PERSIST, CascadeType.MERGE, CascadeType.REMOVE}, 
-               fetch = FetchType.LAZY, orphanRemoval = true)
+    @OneToMany(mappedBy = "message", cascade = CascadeType.ALL, fetch = FetchType.LAZY, orphanRemoval = true)
     @OrderBy("id.orderIndex ASC")
     @ToString.Exclude
     private List<ChatMessagePart> parts = new ArrayList<>();

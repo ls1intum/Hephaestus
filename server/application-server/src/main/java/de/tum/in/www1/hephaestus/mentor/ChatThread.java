@@ -47,8 +47,7 @@ public class ChatThread {
     /**
      * All messages in this thread (tree structure)
      */
-    @OneToMany(mappedBy = "thread", cascade = {CascadeType.PERSIST, CascadeType.MERGE}, 
-               fetch = FetchType.LAZY, orphanRemoval = true)
+    @OneToMany(mappedBy = "thread", cascade = CascadeType.ALL, fetch = FetchType.LAZY, orphanRemoval = true)
     @ToString.Exclude
     private List<ChatMessage> allMessages = new ArrayList<>();
 

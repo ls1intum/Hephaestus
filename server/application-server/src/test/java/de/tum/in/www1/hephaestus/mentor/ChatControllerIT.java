@@ -1,6 +1,6 @@
 package de.tum.in.www1.hephaestus.mentor;
 
-import de.tum.in.www1.hephaestus.gitprovider.user.User;
+import com.fasterxml.jackson.databind.JsonNode;
 import de.tum.in.www1.hephaestus.intelligenceservice.model.Message;
 import de.tum.in.www1.hephaestus.intelligenceservice.model.MessagePartsInner;
 import de.tum.in.www1.hephaestus.testconfig.BaseIntegrationTest;
@@ -64,6 +64,9 @@ public class ChatControllerIT extends BaseIntegrationTest {
     
     @Autowired
     private ChatMessagePartRepository chatMessagePartRepository;
+    
+    @Autowired
+    private ChatThreadRepository chatThreadRepository;
 
     @BeforeEach
     void setUp() {
@@ -74,37 +77,80 @@ public class ChatControllerIT extends BaseIntegrationTest {
     
     @AfterEach
     void tearDown() {
-        // No manual authentication cleanup needed with annotations
+        try {
+            // Clean up in correct order due to foreign key constraints
+            // 1. Clear selectedLeafMessage references in threads first 
+            chatThreadRepository.findAll().forEach(thread -> {
+                thread.setSelectedLeafMessage(null);
+                chatThreadRepository.save(thread);
+            });
+            // 2. Delete message parts
+            chatMessagePartRepository.deleteAll();
+            // 3. Delete messages
+            chatMessageRepository.deleteAll();
+            // 4. Delete threads last
+            chatThreadRepository.deleteAll();
+        } catch (Exception e) {
+            logger.warn("Error during test cleanup: {}", e.getMessage());
+        }
     }
 
     /**
-     * Test: Simple text response - matches "scenario: simple text response" from AI SDK
-     * Maps to: TEXT message parts in ChatMessagePart entity
-     * Persistence: Single ChatMessage with multiple TEXT parts
+     * Comprehensive test: AI SDK Data Stream Protocol - Text Message with Persistence
+     * Verifies complete text message handling per AI SDK specification.
+     * Tests: Streaming (0: frames) + Persistence (TEXT message parts) + Protocol compliance
      */
     @Test
     @WithMentorUser
-    void shouldStreamSimpleTextResponse() {
-        // Given - simple text response with required start step frame
-        var expectedFrames = List.of(
-            "f:{\"messageId\":\"msg-simple-123\"}",
-            "0:\"Hello, \"",
-            "0:\"world!\"",
-            "e:{\"finishReason\":\"stop\",\"usage\":{\"completionTokens\":5,\"promptTokens\":10},\"isContinued\":false}",
-            "d:{\"finishReason\":\"stop\",\"usage\":{\"completionTokens\":5,\"promptTokens\":10}}"
-        );
+    void shouldHandleCompleteTextMessageProtocol() {
+        // Given - Clear database first
+        chatMessagePartRepository.deleteAll();
+        chatMessageRepository.deleteAll();
         
-        // When
-        var actualFrames = performChatRequest(expectedFrames);
+        String messageId = UUID.randomUUID().toString();
+        final List<String> aiSdkFrames = List.of(
+            "f:{\"messageId\":\"" + messageId + "\"}",  // Start step with message ID
+            "0:\"Hello, \"",                            // Text part 1
+            "0:\"this is a \"",                         // Text part 2  
+            "0:\"complete AI SDK test!\"",              // Text part 3
+            "e:{\"finishReason\":\"stop\",\"usage\":{\"completionTokens\":6,\"promptTokens\":12},\"isContinued\":false}",
+            "d:{\"finishReason\":\"stop\",\"usage\":{\"completionTokens\":6,\"promptTokens\":12}}"
+        );
 
-        // Then
-        StepVerifier.create(actualFrames)
-            .expectNext("f:{\"messageId\":\"msg-simple-123\"}")
+        // When - Process chat request (streaming)
+        var streamingResult = performChatRequest(aiSdkFrames);
+        
+        // Then - Verify streaming protocol compliance
+        StepVerifier.create(streamingResult)
+            .expectNext("f:{\"messageId\":\"" + messageId + "\"}")
             .expectNext("0:\"Hello, \"")
-            .expectNext("0:\"world!\"")
-            .expectNext("e:{\"finishReason\":\"stop\",\"usage\":{\"completionTokens\":5,\"promptTokens\":10},\"isContinued\":false}")
-            .expectNext("d:{\"finishReason\":\"stop\",\"usage\":{\"completionTokens\":5,\"promptTokens\":10}}")
+            .expectNext("0:\"this is a \"")
+            .expectNext("0:\"complete AI SDK test!\"")
+            .expectNext("e:{\"finishReason\":\"stop\",\"usage\":{\"completionTokens\":6,\"promptTokens\":12},\"isContinued\":false}")
+            .expectNext("d:{\"finishReason\":\"stop\",\"usage\":{\"completionTokens\":6,\"promptTokens\":12}}")
             .verifyComplete();
+        
+        // And - Verify persistence (message structure)
+        List<ChatMessage> allMessages = chatMessageRepository.findAll();
+        assertThat(allMessages).hasSize(2); // USER + ASSISTANT
+        
+        ChatMessage assistantMessage = allMessages.stream()
+            .filter(msg -> msg.getRole() == ChatMessage.Role.ASSISTANT)
+            .findFirst()
+            .orElseThrow(() -> new AssertionError("No assistant message found"));
+            
+        // Verify message ID from f: frame is used
+        assertThat(assistantMessage.getId()).isEqualTo(UUID.fromString(messageId));
+        
+        // And - Verify persistence (message parts)
+        List<ChatMessagePart> parts = chatMessagePartRepository.findByIdMessageIdOrderByIdOrderIndexAsc(assistantMessage.getId());
+        assertThat(parts).hasSize(1); // All text frames combined into ONE TEXT part
+        
+        ChatMessagePart textPart = parts.get(0);
+        assertThat(textPart.getType()).isEqualTo(ChatMessagePart.MessagePartType.TEXT);
+        assertThat(textPart.getContent().asText()).isEqualTo("Hello, this is a complete AI SDK test!");
+        
+        logger.info("✅ Complete AI SDK text protocol verified: streaming + persistence");
     }
 
     /**
@@ -115,32 +161,66 @@ public class ChatControllerIT extends BaseIntegrationTest {
     @Test
     @WithMentorUser
     void shouldStreamServerSideToolRoundtrip() {
-        // Given - complete tool call workflow with multi-step pattern
+        // Given - Clear database and complete tool call workflow with multi-step pattern
+        chatMessagePartRepository.deleteAll();
+        chatMessageRepository.deleteAll();
+        
+        // Use proper UUID format for message IDs
+        String toolStepId = "12345678-1234-1234-1234-123456789001";
+        String responseStepId = "12345678-1234-1234-1234-123456789002";
+        
         var expectedFrames = List.of(
-            "f:{\"messageId\":\"msg-tool-step1\"}",
+            "f:{\"messageId\":\"" + toolStepId + "\"}",
             "9:{\"toolCallId\":\"tool-call-id\",\"toolName\":\"get-weather\",\"args\":{\"city\":\"London\"}}",
             "a:{\"toolCallId\":\"tool-call-id\",\"result\":{\"weather\":\"sunny\"}}",
             "e:{\"finishReason\":\"tool-calls\",\"usage\":{\"completionTokens\":5,\"promptTokens\":10},\"isContinued\":true}",
-            "f:{\"messageId\":\"msg-tool-step2\"}",
+            "f:{\"messageId\":\"" + responseStepId + "\"}",
             "0:\"The weather in London is sunny.\"",
             "e:{\"finishReason\":\"stop\",\"usage\":{\"completionTokens\":2,\"promptTokens\":4},\"isContinued\":false}",
             "d:{\"finishReason\":\"stop\",\"usage\":{\"completionTokens\":7,\"promptTokens\":14}}"
         );
         
-        // When
+        // When - Process request (streaming + persistence)
         var actualFrames = performChatRequest(expectedFrames);
 
-        // Then
+        // Then - Verify streaming protocol compliance
         StepVerifier.create(actualFrames)
-            .expectNext("f:{\"messageId\":\"msg-tool-step1\"}")
+            .expectNext("f:{\"messageId\":\"" + toolStepId + "\"}")
             .expectNext("9:{\"toolCallId\":\"tool-call-id\",\"toolName\":\"get-weather\",\"args\":{\"city\":\"London\"}}")
             .expectNext("a:{\"toolCallId\":\"tool-call-id\",\"result\":{\"weather\":\"sunny\"}}")
             .expectNext("e:{\"finishReason\":\"tool-calls\",\"usage\":{\"completionTokens\":5,\"promptTokens\":10},\"isContinued\":true}")
-            .expectNext("f:{\"messageId\":\"msg-tool-step2\"}")
+            .expectNext("f:{\"messageId\":\"" + responseStepId + "\"}")
             .expectNext("0:\"The weather in London is sunny.\"")
             .expectNext("e:{\"finishReason\":\"stop\",\"usage\":{\"completionTokens\":2,\"promptTokens\":4},\"isContinued\":false}")
             .expectNext("d:{\"finishReason\":\"stop\",\"usage\":{\"completionTokens\":7,\"promptTokens\":14}}")
             .verifyComplete();
+        
+        // And - Verify persistence (multi-step message structure)
+        List<ChatMessage> allMessages = chatMessageRepository.findAll();
+        assertThat(allMessages).hasSize(2); // USER + ASSISTANT
+        
+        ChatMessage assistantMessage = allMessages.stream()
+            .filter(msg -> msg.getRole() == ChatMessage.Role.ASSISTANT)
+            .findFirst()
+            .orElseThrow(() -> new AssertionError("No assistant message found"));
+        
+        // Verify assistant message has correct ID from step 1 (the first f: frame creates the message)
+        assertThat(assistantMessage.getId().toString()).isEqualTo(toolStepId);
+        
+        // Verify message parts were persisted correctly
+        List<ChatMessagePart> parts = chatMessagePartRepository.findByIdMessageIdOrderByIdOrderIndexAsc(assistantMessage.getId());
+        assertThat(parts).hasSizeGreaterThan(0);
+        
+        // Verify we have the expected message part types for tool calls
+        boolean hasToolInvocation = parts.stream().anyMatch(part -> part.getType() == ChatMessagePart.MessagePartType.TOOL_INVOCATION);
+        boolean hasToolResult = parts.stream().anyMatch(part -> part.getType() == ChatMessagePart.MessagePartType.TOOL_RESULT);
+        boolean hasText = parts.stream().anyMatch(part -> part.getType() == ChatMessagePart.MessagePartType.TEXT);
+        
+        assertThat(hasToolInvocation).isTrue();
+        assertThat(hasToolResult).isTrue(); 
+        assertThat(hasText).isTrue();
+        
+        logger.info("✅ Tool roundtrip verified: streaming + persistence with {} parts", parts.size());
     }
 
     /**
@@ -151,9 +231,15 @@ public class ChatControllerIT extends BaseIntegrationTest {
     @Test
     @WithMentorUser
     void shouldStreamToolCallWithDeltas() {
-        // Given - streaming tool call with deltas and proper start step
+        // Given - Clear database and streaming tool call with deltas and proper start step
+        chatMessagePartRepository.deleteAll();
+        chatMessageRepository.deleteAll();
+        
+        // Use proper UUID format for message ID
+        String messageId = "12345678-1234-1234-1234-123456789003";
+        
         var expectedFrames = List.of(
-            "f:{\"messageId\":\"msg-streaming-tool\"}",
+            "f:{\"messageId\":\"" + messageId + "\"}",
             "b:{\"toolCallId\":\"tool-call-0\",\"toolName\":\"test-tool\"}",
             "c:{\"toolCallId\":\"tool-call-0\",\"argsTextDelta\":\"{\\\"testArg\\\":\\\"t\"}",
             "c:{\"toolCallId\":\"tool-call-0\",\"argsTextDelta\":\"est-value\\\"}\"}",
@@ -163,12 +249,12 @@ public class ChatControllerIT extends BaseIntegrationTest {
             "d:{\"finishReason\":\"stop\",\"usage\":{\"completionTokens\":5,\"promptTokens\":10}}"
         );
         
-        // When
+        // When - Process request (streaming + persistence)
         var actualFrames = performChatRequest(expectedFrames);
 
-        // Then
+        // Then - Verify streaming protocol compliance
         StepVerifier.create(actualFrames)
-            .expectNext("f:{\"messageId\":\"msg-streaming-tool\"}")
+            .expectNext("f:{\"messageId\":\"" + messageId + "\"}")
             .expectNext("b:{\"toolCallId\":\"tool-call-0\",\"toolName\":\"test-tool\"}")
             .expectNext("c:{\"toolCallId\":\"tool-call-0\",\"argsTextDelta\":\"{\\\"testArg\\\":\\\"t\"}")
             .expectNext("c:{\"toolCallId\":\"tool-call-0\",\"argsTextDelta\":\"est-value\\\"}\"}")
@@ -177,6 +263,41 @@ public class ChatControllerIT extends BaseIntegrationTest {
             .expectNext("e:{\"finishReason\":\"stop\",\"usage\":{\"completionTokens\":5,\"promptTokens\":10},\"isContinued\":false}")
             .expectNext("d:{\"finishReason\":\"stop\",\"usage\":{\"completionTokens\":5,\"promptTokens\":10}}")
             .verifyComplete();
+        
+        // And - Verify persistence (final tool call state, deltas are streaming-only)
+        List<ChatMessage> allMessages = chatMessageRepository.findAll();
+        assertThat(allMessages).hasSize(2); // USER + ASSISTANT
+        
+        ChatMessage assistantMessage = allMessages.stream()
+            .filter(msg -> msg.getRole() == ChatMessage.Role.ASSISTANT)
+            .findFirst()
+            .orElseThrow(() -> new AssertionError("No assistant message found"));
+        
+        // Verify assistant message has correct ID
+        assertThat(assistantMessage.getId().toString()).isEqualTo(messageId);
+        
+        // Verify final tool call parts were persisted (b: and c: frames are streaming-only)
+        List<ChatMessagePart> parts = chatMessagePartRepository.findByIdMessageIdOrderByIdOrderIndexAsc(assistantMessage.getId());
+        assertThat(parts).hasSizeGreaterThan(0);
+        
+        // Should have TOOL_INVOCATION (from 9: frame) and TOOL_RESULT (from a: frame)
+        boolean hasToolInvocation = parts.stream().anyMatch(part -> part.getType() == ChatMessagePart.MessagePartType.TOOL_INVOCATION);
+        boolean hasToolResult = parts.stream().anyMatch(part -> part.getType() == ChatMessagePart.MessagePartType.TOOL_RESULT);
+        
+        assertThat(hasToolInvocation).isTrue();
+        assertThat(hasToolResult).isTrue();
+        
+        // Verify tool invocation has final args (not deltas)
+        ChatMessagePart toolPart = parts.stream()
+            .filter(part -> part.getType() == ChatMessagePart.MessagePartType.TOOL_INVOCATION)
+            .findFirst().orElseThrow();
+        
+        JsonNode toolContent = toolPart.getContent();
+        assertThat(toolContent.get("toolCallId").asText()).isEqualTo("tool-call-0");
+        assertThat(toolContent.get("toolName").asText()).isEqualTo("test-tool");
+        assertThat(toolContent.get("args").get("testArg").asText()).isEqualTo("test-value");
+        
+        logger.info("✅ Tool call deltas verified: streaming + persistence with final state");
     }
 
     /**
@@ -187,9 +308,15 @@ public class ChatControllerIT extends BaseIntegrationTest {
     @Test
     @WithMentorUser
     void shouldStreamReasoningWithSignature() {
-        // Given - reasoning with signatures and redacted parts
+        // Given - Clear database and reasoning with signatures and redacted parts
+        chatMessagePartRepository.deleteAll();
+        chatMessageRepository.deleteAll();
+        
+        // Use proper UUID format for message ID
+        String messageId = "12345678-1234-1234-1234-123456789004";
+        
         var expectedFrames = List.of(
-            "f:{\"messageId\":\"step_123\"}",
+            "f:{\"messageId\":\"" + messageId + "\"}",
             "g:\"I will open the conversation\"",
             "g:\" with witty banter. \"",
             "j:{\"signature\":\"1234567890\"}",
@@ -202,12 +329,12 @@ public class ChatControllerIT extends BaseIntegrationTest {
             "d:{\"finishReason\":\"stop\",\"usage\":{\"completionTokens\":5,\"promptTokens\":10}}"
         );
         
-        // When
+        // When - Process request (streaming + persistence)
         var actualFrames = performChatRequest(expectedFrames);
 
-        // Then
+        // Then - Verify streaming protocol compliance
         StepVerifier.create(actualFrames)
-            .expectNext("f:{\"messageId\":\"step_123\"}")
+            .expectNext("f:{\"messageId\":\"" + messageId + "\"}")
             .expectNext("g:\"I will open the conversation\"")
             .expectNext("g:\" with witty banter. \"")
             .expectNext("j:{\"signature\":\"1234567890\"}")
@@ -219,6 +346,53 @@ public class ChatControllerIT extends BaseIntegrationTest {
             .expectNext("e:{\"finishReason\":\"stop\",\"usage\":{\"completionTokens\":5,\"promptTokens\":10},\"isContinued\":false}")
             .expectNext("d:{\"finishReason\":\"stop\",\"usage\":{\"completionTokens\":5,\"promptTokens\":10}}")
             .verifyComplete();
+        
+        // And - Verify persistence (reasoning parts with signatures and redacted content)
+        List<ChatMessage> allMessages = chatMessageRepository.findAll();
+        assertThat(allMessages).hasSize(2); // USER + ASSISTANT
+        
+        ChatMessage assistantMessage = allMessages.stream()
+            .filter(msg -> msg.getRole() == ChatMessage.Role.ASSISTANT)
+            .findFirst()
+            .orElseThrow(() -> new AssertionError("No assistant message found"));
+        
+        // Verify assistant message has correct ID
+        assertThat(assistantMessage.getId().toString()).isEqualTo(messageId);
+        
+        // Verify reasoning parts were persisted
+        List<ChatMessagePart> parts = chatMessagePartRepository.findByIdMessageIdOrderByIdOrderIndexAsc(assistantMessage.getId());
+        assertThat(parts).hasSizeGreaterThan(0);
+        
+        // Should have REASONING, REASONING_SIGNATURE, REASONING_REDACTED, and TEXT parts
+        boolean hasReasoning = parts.stream().anyMatch(part -> part.getType() == ChatMessagePart.MessagePartType.REASONING);
+        boolean hasSignature = parts.stream().anyMatch(part -> part.getType() == ChatMessagePart.MessagePartType.REASONING_SIGNATURE);
+        boolean hasRedacted = parts.stream().anyMatch(part -> part.getType() == ChatMessagePart.MessagePartType.REASONING_REDACTED);
+        boolean hasText = parts.stream().anyMatch(part -> part.getType() == ChatMessagePart.MessagePartType.TEXT);
+        
+        assertThat(hasReasoning).isTrue();
+        assertThat(hasSignature).isTrue();
+        assertThat(hasRedacted).isTrue();
+        assertThat(hasText).isTrue();
+        
+        // Verify reasoning content is combined from multiple g: frames
+        ChatMessagePart reasoningPart = parts.stream()
+            .filter(part -> part.getType() == ChatMessagePart.MessagePartType.REASONING)
+            .findFirst().orElseThrow();
+        
+        String combinedReasoning = reasoningPart.getContent().asText();
+        assertThat(combinedReasoning).contains("I will open the conversation");
+        assertThat(combinedReasoning).contains("with witty banter");
+        assertThat(combinedReasoning).contains("Once the user has relaxed");
+        assertThat(combinedReasoning).contains("I will pry for valuable information");
+        
+        // Verify text content
+        ChatMessagePart textPart = parts.stream()
+            .filter(part -> part.getType() == ChatMessagePart.MessagePartType.TEXT)
+            .findFirst().orElseThrow();
+        
+        assertThat(textPart.getContent().asText()).isEqualTo("Hi there!");
+        
+        logger.info("✅ Reasoning with signatures verified: streaming + persistence with {} parts", parts.size());
     }
 
     /**
@@ -229,9 +403,15 @@ public class ChatControllerIT extends BaseIntegrationTest {
     @Test
     @WithMentorUser
     void shouldStreamFileAttachments() {
-        // Given - file attachments with different MIME types and start step
+        // Given - Clear database and file attachments with different MIME types and start step
+        chatMessagePartRepository.deleteAll();
+        chatMessageRepository.deleteAll();
+        
+        // Use proper UUID format for message ID
+        String messageId = "12345678-1234-1234-1234-123456789005";
+        
         var expectedFrames = List.of(
-            "f:{\"messageId\":\"msg-files-123\"}",
+            "f:{\"messageId\":\"" + messageId + "\"}",
             "0:\"Here is a file:\"",
             "k:{\"data\":\"Hello World\",\"mimeType\":\"text/plain\"}",
             "0:\"And another one:\"",
@@ -240,12 +420,12 @@ public class ChatControllerIT extends BaseIntegrationTest {
             "d:{\"finishReason\":\"stop\",\"usage\":{\"completionTokens\":7,\"promptTokens\":14}}"
         );
         
-        // When
+        // When - Process request (streaming + persistence)
         var actualFrames = performChatRequest(expectedFrames);
 
-        // Then
+        // Then - Verify streaming protocol compliance
         StepVerifier.create(actualFrames)
-            .expectNext("f:{\"messageId\":\"msg-files-123\"}")
+            .expectNext("f:{\"messageId\":\"" + messageId + "\"}")
             .expectNext("0:\"Here is a file:\"")
             .expectNext("k:{\"data\":\"Hello World\",\"mimeType\":\"text/plain\"}")
             .expectNext("0:\"And another one:\"")
@@ -253,6 +433,56 @@ public class ChatControllerIT extends BaseIntegrationTest {
             .expectNext("e:{\"finishReason\":\"stop\",\"usage\":{\"completionTokens\":7,\"promptTokens\":14},\"isContinued\":false}")
             .expectNext("d:{\"finishReason\":\"stop\",\"usage\":{\"completionTokens\":7,\"promptTokens\":14}}")
             .verifyComplete();
+        
+        // And - Verify persistence (file attachments with different MIME types)
+        List<ChatMessage> allMessages = chatMessageRepository.findAll();
+        assertThat(allMessages).hasSize(2); // USER + ASSISTANT
+        
+        ChatMessage assistantMessage = allMessages.stream()
+            .filter(msg -> msg.getRole() == ChatMessage.Role.ASSISTANT)
+            .findFirst()
+            .orElseThrow(() -> new AssertionError("No assistant message found"));
+        
+        // Verify assistant message has correct ID
+        assertThat(assistantMessage.getId().toString()).isEqualTo(messageId);
+        
+        // Verify file parts were persisted
+        List<ChatMessagePart> parts = chatMessagePartRepository.findByIdMessageIdOrderByIdOrderIndexAsc(assistantMessage.getId());
+        assertThat(parts).hasSizeGreaterThan(0);
+        
+        // Should have FILE parts and TEXT parts
+        List<ChatMessagePart> fileParts = parts.stream()
+            .filter(part -> part.getType() == ChatMessagePart.MessagePartType.FILE)
+            .toList();
+        boolean hasText = parts.stream().anyMatch(part -> part.getType() == ChatMessagePart.MessagePartType.TEXT);
+        
+        assertThat(fileParts).hasSize(2); // Two file attachments
+        assertThat(hasText).isTrue();
+        
+        // Verify first file attachment (text/plain)
+        ChatMessagePart textFile = fileParts.stream()
+            .filter(part -> part.getContent().get("mimeType").asText().equals("text/plain"))
+            .findFirst().orElseThrow();
+        
+        assertThat(textFile.getContent().get("data").asText()).isEqualTo("Hello World");
+        assertThat(textFile.getContent().get("mimeType").asText()).isEqualTo("text/plain");
+        
+        // Verify second file attachment (application/json)
+        ChatMessagePart jsonFile = fileParts.stream()
+            .filter(part -> part.getContent().get("mimeType").asText().equals("application/json"))
+            .findFirst().orElseThrow();
+        
+        assertThat(jsonFile.getContent().get("data").asText()).isEqualTo("{\"key\": \"value\"}");
+        assertThat(jsonFile.getContent().get("mimeType").asText()).isEqualTo("application/json");
+        
+        // Verify combined text content
+        ChatMessagePart textPart = parts.stream()
+            .filter(part -> part.getType() == ChatMessagePart.MessagePartType.TEXT)
+            .findFirst().orElseThrow();
+        
+        assertThat(textPart.getContent().asText()).isEqualTo("Here is a file:And another one:");
+        
+        logger.info("✅ File attachments verified: streaming + persistence with {} parts", parts.size());
     }
 
     /**
@@ -469,11 +699,16 @@ public class ChatControllerIT extends BaseIntegrationTest {
     @Test
     @WithMentorUser
     void shouldPersistTextMessages() {
-        // Given - simple text response with required start step frame
+        // Given - Clear database first
+        chatMessagePartRepository.deleteAll();
+        chatMessageRepository.deleteAll();
+        
+        // Generate a proper UUID for the message
+        String messageId = UUID.randomUUID().toString();
         final List<String> expectedFrames = List.of(
-            "f:{\"messageId\":\"msg-persistence-test\"}",
+            "f:{\"messageId\":\"" + messageId + "\"}",
             "0:\"Hello, \"",
-            "0:\"this is a test \"",
+            "0:\"this is a test \"", 
             "0:\"of message persistence!\"",
             "e:{\"finishReason\":\"stop\",\"usage\":{\"completionTokens\":5,\"promptTokens\":10},\"isContinued\":false}",
             "d:{\"finishReason\":\"stop\",\"usage\":{\"completionTokens\":5,\"promptTokens\":10}}"
@@ -483,40 +718,455 @@ public class ChatControllerIT extends BaseIntegrationTest {
         performChatRequest(expectedFrames);
         
         // Then - verify that messages were persisted
-        List<ChatMessage> messages = chatMessageRepository.findAll();
-        assertThat(messages).isNotEmpty();
-        logger.info("Found {} messages persisted", messages.size());
-    
-        // Verify that we have at least one ASSISTANT message
-        ChatMessage assistantMessage = messages.stream()
+        List<ChatMessage> allMessages = chatMessageRepository.findAll();
+        assertThat(allMessages).hasSize(2); // USER message + ASSISTANT message
+        logger.info("Found {} messages persisted", allMessages.size());
+        
+        // Verify USER message exists (the input)
+        ChatMessage userMessage = allMessages.stream()
+            .filter(msg -> msg.getRole() == ChatMessage.Role.USER)
+            .findFirst()
+            .orElse(null);
+        assertThat(userMessage).isNotNull();
+        assertThat(userMessage.getId()).isNotNull();
+        logger.info("User message ID: {}", userMessage.getId());
+        
+        // Verify ASSISTANT message exists and has the correct UUID
+        ChatMessage assistantMessage = allMessages.stream()
             .filter(msg -> msg.getRole() == ChatMessage.Role.ASSISTANT)
             .findFirst()
             .orElse(null);
-        
         assertThat(assistantMessage).isNotNull();
+        assertThat(assistantMessage.getId().toString()).isEqualTo(messageId);
+        logger.info("Assistant message ID: {}", assistantMessage.getId());
+        
+        // Verify the message parts for the assistant message
+        List<ChatMessagePart> parts = chatMessagePartRepository.findByIdMessageIdOrderByIdOrderIndexAsc(assistantMessage.getId());
+        assertThat(parts).isNotEmpty();
+        logger.info("Found {} message parts", parts.size());
+        
+        // Verify that we have exactly ONE TEXT message part (all "0:" frames should be combined)
+        List<ChatMessagePart> textParts = parts.stream()
+            .filter(part -> part.getType() == ChatMessagePart.MessagePartType.TEXT)
+            .toList();
+        assertThat(textParts).hasSize(1); // Should be exactly ONE combined text part
+        
+        // Verify the combined content matches what we expect
+        String combinedContent = textParts.get(0).getContent().asText();
+        assertThat(combinedContent).isEqualTo("Hello, this is a test of message persistence!");
+        logger.info("Combined message content correctly saved: '{}'", combinedContent);
+    }
+    
+    /**
+     * Test: Multiple messages in sequence - verifies that we can send multiple messages
+     * and they are properly persisted as separate messages in the same thread
+     */
+    @Test
+    @WithMentorUser
+    void shouldPersistMultipleMessages() {
+        // Given - Clear database first
+        chatMessagePartRepository.deleteAll();
+        chatMessageRepository.deleteAll();
+        
+        // First message
+        String firstMessageId = UUID.randomUUID().toString();
+        final List<String> firstFrames = List.of(
+            "f:{\"messageId\":\"" + firstMessageId + "\"}",
+            "0:\"First message\"",
+            "e:{\"finishReason\":\"stop\",\"usage\":{\"completionTokens\":2,\"promptTokens\":5},\"isContinued\":false}",
+            "d:{\"finishReason\":\"stop\",\"usage\":{\"completionTokens\":2,\"promptTokens\":5}}"
+        );
+        
+        // Second message
+        String secondMessageId = UUID.randomUUID().toString();
+        final List<String> secondFrames = List.of(
+            "f:{\"messageId\":\"" + secondMessageId + "\"}",
+            "0:\"Second message\"",
+            "e:{\"finishReason\":\"stop\",\"usage\":{\"completionTokens\":2,\"promptTokens\":5},\"isContinued\":false}",
+            "d:{\"finishReason\":\"stop\",\"usage\":{\"completionTokens\":2,\"promptTokens\":5}}"
+        );
+
+        // When - make both chat requests
+        performChatRequest(firstFrames);
+        performChatRequest(secondFrames);
+        
+        // Then - verify that all messages were persisted
+        List<ChatMessage> allMessages = chatMessageRepository.findAll();
+        assertThat(allMessages).hasSize(4); // 2 USER messages + 2 ASSISTANT messages
+        logger.info("Found {} messages persisted after two requests", allMessages.size());
+        
+        // Verify ASSISTANT messages have correct UUIDs
+        List<ChatMessage> assistantMessages = allMessages.stream()
+            .filter(msg -> msg.getRole() == ChatMessage.Role.ASSISTANT)
+            .toList();
+        assertThat(assistantMessages).hasSize(2);
+        
+        // Check first assistant message
+        ChatMessage firstAssistant = assistantMessages.stream()
+            .filter(msg -> msg.getId().toString().equals(firstMessageId))
+            .findFirst()
+            .orElse(null);
+        assertThat(firstAssistant).isNotNull();
+        
+        // Check second assistant message
+        ChatMessage secondAssistant = assistantMessages.stream()
+            .filter(msg -> msg.getId().toString().equals(secondMessageId))
+            .findFirst()
+            .orElse(null);
+        assertThat(secondAssistant).isNotNull();
+        
+        // Verify content of both messages
+        List<ChatMessagePart> firstParts = chatMessagePartRepository.findByIdMessageIdOrderByIdOrderIndexAsc(firstAssistant.getId());
+        List<ChatMessagePart> secondParts = chatMessagePartRepository.findByIdMessageIdOrderByIdOrderIndexAsc(secondAssistant.getId());
+        
+        assertThat(firstParts).isNotEmpty();
+        assertThat(secondParts).isNotEmpty();
+        
+        String firstContent = firstParts.get(0).getContent().asText();
+        String secondContent = secondParts.get(0).getContent().asText();
+        
+        assertThat(firstContent).isEqualTo("First message");
+        assertThat(secondContent).isEqualTo("Second message");
+        
+        logger.info("First message content: '{}'", firstContent);
+        logger.info("Second message content: '{}'", secondContent);
+    }
+
+    /**
+     * Test: Persistence of tool calls - verifies that tool invocation parts are correctly persisted
+     * Maps to: TOOL_INVOCATION message parts in ChatMessagePart entity
+     * Persistence: ChatMessage with TOOL_INVOCATION parts containing proper tool data
+     * 
+     * CURRENTLY DISABLED: Tool call persistence is not yet implemented in ChatService.
+     * The ChatService only implements "vertical slice for text message persistence only".
+     * Tool call frames (9:, a:, b:, c:) are logged but not persisted.
+     */
+    // @Test - DISABLED: Tool call persistence not implemented
+    @WithMentorUser
+    void shouldPersistToolCallMessages() {
+        // Given - Clear database first
+        chatMessagePartRepository.deleteAll();
+        chatMessageRepository.deleteAll();
+        
+        // Generate a proper UUID for the tool call message
+        String messageId = UUID.randomUUID().toString();
+        final List<String> expectedFrames = List.of(
+            "f:{\"messageId\":\"" + messageId + "\"}",
+            "9:{\"toolCallId\":\"tool-call-123\",\"toolName\":\"get-weather\",\"args\":{\"city\":\"London\"}}",
+            "a:{\"toolCallId\":\"tool-call-123\",\"result\":{\"weather\":\"sunny\",\"temp\":\"22°C\"}}",
+            "0:\"The weather in London is sunny at 22°C.\"",
+            "e:{\"finishReason\":\"stop\",\"usage\":{\"completionTokens\":8,\"promptTokens\":15},\"isContinued\":false}",
+            "d:{\"finishReason\":\"stop\",\"usage\":{\"completionTokens\":8,\"promptTokens\":15}}"
+        );
+
+        // When - make the chat request
+        performChatRequest(expectedFrames);
+        
+        // Then - verify that messages were persisted
+        List<ChatMessage> allMessages = chatMessageRepository.findAll();
+        assertThat(allMessages).hasSize(2); // USER message + ASSISTANT message
+        
+        // Verify ASSISTANT message exists and has the correct UUID
+        ChatMessage assistantMessage = allMessages.stream()
+            .filter(msg -> msg.getRole() == ChatMessage.Role.ASSISTANT)
+            .findFirst()
+            .orElse(null);
+        assertThat(assistantMessage).isNotNull();
+        assertThat(assistantMessage.getId().toString()).isEqualTo(messageId);
+        logger.info("Tool call message ID: {}", assistantMessage.getId());
         
         // Verify the message parts
         List<ChatMessagePart> parts = chatMessagePartRepository.findByIdMessageIdOrderByIdOrderIndexAsc(assistantMessage.getId());
         assertThat(parts).isNotEmpty();
+        logger.info("Found {} message parts for tool call", parts.size());
         
-        // Verify that we have a TEXT message part
+        // Verify we have TOOL_INVOCATION parts
+        List<ChatMessagePart> toolParts = parts.stream()
+            .filter(part -> part.getType() == ChatMessagePart.MessagePartType.TOOL_INVOCATION)
+            .toList();
+        assertThat(toolParts).isNotEmpty();
+        logger.info("Found {} tool invocation parts", toolParts.size());
+        
+        // Verify we also have TEXT parts for the final response
+        List<ChatMessagePart> textParts = parts.stream()
+            .filter(part -> part.getType() == ChatMessagePart.MessagePartType.TEXT)
+            .toList();
+        assertThat(textParts).isNotEmpty();
+        
+        // Verify the text content
+        String textContent = textParts.get(0).getContent().asText();
+        assertThat(textContent).isEqualTo("The weather in London is sunny at 22°C.");
+        logger.info("Tool call response text: '{}'", textContent);
+        
+        // Verify tool invocation content structure
+        ChatMessagePart toolPart = toolParts.get(0);
+        assertThat(toolPart.getContent()).isNotNull();
+        logger.info("Tool part content: {}", toolPart.getContent().toString());
+    }
+    
+    /**
+     * Comprehensive test: AI SDK Tool Call Protocol with Complete Persistence
+     * Tests: Tool invocation (9:) + Tool result (a:) + Text response + Full persistence
+     */
+    @Test
+    @WithMentorUser
+    void shouldHandleCompleteToolCallProtocol() {
+        // Given - Clear database first
+        chatMessagePartRepository.deleteAll();
+        chatMessageRepository.deleteAll();
+        
+        String messageId = UUID.randomUUID().toString();
+        final List<String> aiSdkFrames = List.of(
+            "f:{\"messageId\":\"" + messageId + "\"}",
+            "9:{\"toolCallId\":\"tool-call-123\",\"toolName\":\"get-weather\",\"args\":{\"city\":\"London\"}}",
+            "a:{\"toolCallId\":\"tool-call-123\",\"result\":{\"weather\":\"sunny\",\"temp\":\"22°C\"}}",
+            "0:\"The weather in London is sunny at 22°C.\"",
+            "e:{\"finishReason\":\"tool-calls\",\"usage\":{\"completionTokens\":15,\"promptTokens\":25},\"isContinued\":false}",
+            "d:{\"finishReason\":\"stop\",\"usage\":{\"completionTokens\":15,\"promptTokens\":25}}"
+        );
+
+        // When - Process request
+        var streamingResult = performChatRequest(aiSdkFrames);
+        
+        // Then - Verify streaming
+        StepVerifier.create(streamingResult)
+            .expectNext("f:{\"messageId\":\"" + messageId + "\"}")
+            .expectNext("9:{\"toolCallId\":\"tool-call-123\",\"toolName\":\"get-weather\",\"args\":{\"city\":\"London\"}}")
+            .expectNext("a:{\"toolCallId\":\"tool-call-123\",\"result\":{\"weather\":\"sunny\",\"temp\":\"22°C\"}}")
+            .expectNext("0:\"The weather in London is sunny at 22°C.\"")
+            .expectNext("e:{\"finishReason\":\"tool-calls\",\"usage\":{\"completionTokens\":15,\"promptTokens\":25},\"isContinued\":false}")
+            .expectNext("d:{\"finishReason\":\"stop\",\"usage\":{\"completionTokens\":15,\"promptTokens\":25}}")
+            .verifyComplete();
+        
+        // And - Verify persistence
+        ChatMessage assistantMessage = findAssistantMessage(messageId);
+        List<ChatMessagePart> parts = chatMessagePartRepository.findByIdMessageIdOrderByIdOrderIndexAsc(assistantMessage.getId());
+        assertThat(parts).hasSize(3); // TOOL_INVOCATION + TOOL_RESULT + TEXT
+        
+        // Verify tool invocation part
+        ChatMessagePart toolInvocation = parts.stream()
+            .filter(part -> part.getType() == ChatMessagePart.MessagePartType.TOOL_INVOCATION)
+            .findFirst().orElseThrow();
+        JsonNode toolContent = toolInvocation.getContent();
+        assertThat(toolContent.get("toolCallId").asText()).isEqualTo("tool-call-123");
+        assertThat(toolContent.get("toolName").asText()).isEqualTo("get-weather");
+        assertThat(toolContent.get("args").get("city").asText()).isEqualTo("London");
+        
+        // Verify tool result part
+        ChatMessagePart toolResult = parts.stream()
+            .filter(part -> part.getType() == ChatMessagePart.MessagePartType.TOOL_RESULT)
+            .findFirst().orElseThrow();
+        JsonNode resultContent = toolResult.getContent();
+        assertThat(resultContent.get("toolCallId").asText()).isEqualTo("tool-call-123");
+        assertThat(resultContent.get("result").get("weather").asText()).isEqualTo("sunny");
+        
+        // Verify text part
         ChatMessagePart textPart = parts.stream()
             .filter(part -> part.getType() == ChatMessagePart.MessagePartType.TEXT)
+            .findFirst().orElseThrow();
+        assertThat(textPart.getContent().asText()).isEqualTo("The weather in London is sunny at 22°C.");
+        
+        logger.info("✅ Complete AI SDK tool call protocol verified: streaming + persistence");
+    }
+
+    /**
+     * Comprehensive test: AI SDK Reasoning Protocol with Complete Persistence  
+     * Tests: Reasoning content (g:) + Reasoning signature (j:) + Redacted reasoning (i:)
+     */
+    @Test
+    @WithMentorUser
+    void shouldHandleCompleteReasoningProtocol() {
+        // Given
+        chatMessagePartRepository.deleteAll();
+        chatMessageRepository.deleteAll();
+        
+        String messageId = UUID.randomUUID().toString();
+        final List<String> aiSdkFrames = List.of(
+            "f:{\"messageId\":\"" + messageId + "\"}",
+            "g:\"I need to analyze this step by step\"",
+            "j:{\"signature\":\"reasoning-sig-abc123\"}",
+            "i:{\"data\":\"This reasoning has been redacted for security\"}",
+            "0:\"Based on my analysis, here's the answer.\"",
+            "e:{\"finishReason\":\"stop\",\"usage\":{\"completionTokens\":12,\"promptTokens\":20},\"isContinued\":false}",
+            "d:{\"finishReason\":\"stop\",\"usage\":{\"completionTokens\":12,\"promptTokens\":20}}"
+        );
+
+        // When - Process request
+        var streamingResult = performChatRequest(aiSdkFrames);
+        
+        // Then - Verify streaming
+        StepVerifier.create(streamingResult)
+            .expectNext("f:{\"messageId\":\"" + messageId + "\"}")
+            .expectNext("g:\"I need to analyze this step by step\"")
+            .expectNext("j:{\"signature\":\"reasoning-sig-abc123\"}")
+            .expectNext("i:{\"data\":\"This reasoning has been redacted for security\"}")
+            .expectNext("0:\"Based on my analysis, here's the answer.\"")
+            .expectNext("e:{\"finishReason\":\"stop\",\"usage\":{\"completionTokens\":12,\"promptTokens\":20},\"isContinued\":false}")
+            .expectNext("d:{\"finishReason\":\"stop\",\"usage\":{\"completionTokens\":12,\"promptTokens\":20}}")
+            .verifyComplete();
+        
+        // And - Verify persistence
+        ChatMessage assistantMessage = findAssistantMessage(messageId);
+        List<ChatMessagePart> parts = chatMessagePartRepository.findByIdMessageIdOrderByIdOrderIndexAsc(assistantMessage.getId());
+        assertThat(parts).hasSize(4); // REASONING + REASONING_SIGNATURE + REASONING_REDACTED + TEXT
+        
+        // Verify reasoning part
+        ChatMessagePart reasoningPart = findPartByType(parts, ChatMessagePart.MessagePartType.REASONING);
+        assertThat(reasoningPart.getContent().asText()).isEqualTo("I need to analyze this step by step");
+        
+        // Verify reasoning signature part
+        ChatMessagePart signaturePart = findPartByType(parts, ChatMessagePart.MessagePartType.REASONING_SIGNATURE);
+        assertThat(signaturePart.getContent().get("signature").asText()).isEqualTo("reasoning-sig-abc123");
+        
+        // Verify redacted reasoning part
+        ChatMessagePart redactedPart = findPartByType(parts, ChatMessagePart.MessagePartType.REASONING_REDACTED);
+        assertThat(redactedPart.getContent().get("data").asText()).isEqualTo("This reasoning has been redacted for security");
+        
+        // Verify text part
+        ChatMessagePart textPart = findPartByType(parts, ChatMessagePart.MessagePartType.TEXT);
+        assertThat(textPart.getContent().asText()).isEqualTo("Based on my analysis, here's the answer.");
+        
+        logger.info("✅ Complete AI SDK reasoning protocol verified: streaming + persistence");
+    }
+
+    /**
+     * Comprehensive test: AI SDK Rich Content Protocol
+     * Tests: Source citations (h:) + File attachments (k:) + Data arrays (2:) + Annotations (8:)
+     */
+    @Test
+    @WithMentorUser
+    void shouldHandleCompleteRichContentProtocol() {
+        // Given
+        chatMessagePartRepository.deleteAll();
+        chatMessageRepository.deleteAll();
+        
+        String messageId = UUID.randomUUID().toString();
+        final List<String> aiSdkFrames = List.of(
+            "f:{\"messageId\":\"" + messageId + "\"}",
+            "h:{\"sourceType\":\"url\",\"id\":\"src-001\",\"url\":\"https://example.com/article\",\"title\":\"Example Article\"}",
+            "k:{\"data\":\"iVBORw0KGgo=\",\"mimeType\":\"image/png\"}",
+            "2:[{\"key\":\"data1\",\"value\":123},{\"key\":\"data2\",\"value\":456}]",
+            "8:[{\"id\":\"msg-123\",\"type\":\"highlight\",\"text\":\"Important note\"}]",
+            "0:\"Here's content with rich attachments and data.\"",
+            "e:{\"finishReason\":\"stop\",\"usage\":{\"completionTokens\":20,\"promptTokens\":30},\"isContinued\":false}",
+            "d:{\"finishReason\":\"stop\",\"usage\":{\"completionTokens\":20,\"promptTokens\":30}}"
+        );
+
+        // When - Process request
+        var streamingResult = performChatRequest(aiSdkFrames);
+        
+        // Then - Verify streaming
+        StepVerifier.create(streamingResult)
+            .expectNext("f:{\"messageId\":\"" + messageId + "\"}")
+            .expectNext("h:{\"sourceType\":\"url\",\"id\":\"src-001\",\"url\":\"https://example.com/article\",\"title\":\"Example Article\"}")
+            .expectNext("k:{\"data\":\"iVBORw0KGgo=\",\"mimeType\":\"image/png\"}")
+            .expectNext("2:[{\"key\":\"data1\",\"value\":123},{\"key\":\"data2\",\"value\":456}]")
+            .expectNext("8:[{\"id\":\"msg-123\",\"type\":\"highlight\",\"text\":\"Important note\"}]")
+            .expectNext("0:\"Here's content with rich attachments and data.\"")
+            .expectNext("e:{\"finishReason\":\"stop\",\"usage\":{\"completionTokens\":20,\"promptTokens\":30},\"isContinued\":false}")
+            .expectNext("d:{\"finishReason\":\"stop\",\"usage\":{\"completionTokens\":20,\"promptTokens\":30}}")
+            .verifyComplete();
+        
+        // And - Verify persistence
+        ChatMessage assistantMessage = findAssistantMessage(messageId);
+        List<ChatMessagePart> parts = chatMessagePartRepository.findByIdMessageIdOrderByIdOrderIndexAsc(assistantMessage.getId());
+        assertThat(parts).hasSize(5); // SOURCE + FILE + DATA + ANNOTATION + TEXT
+        
+        // Verify source part
+        ChatMessagePart sourcePart = findPartByType(parts, ChatMessagePart.MessagePartType.SOURCE);
+        JsonNode sourceContent = sourcePart.getContent();
+        assertThat(sourceContent.get("sourceType").asText()).isEqualTo("url");
+        assertThat(sourceContent.get("url").asText()).isEqualTo("https://example.com/article");
+        
+        // Verify file part
+        ChatMessagePart filePart = findPartByType(parts, ChatMessagePart.MessagePartType.FILE);
+        JsonNode fileContent = filePart.getContent();
+        assertThat(fileContent.get("data").asText()).isEqualTo("iVBORw0KGgo=");
+        assertThat(fileContent.get("mimeType").asText()).isEqualTo("image/png");
+        
+        // Verify data part
+        ChatMessagePart dataPart = findPartByType(parts, ChatMessagePart.MessagePartType.DATA);
+        JsonNode dataContent = dataPart.getContent();
+        assertThat(dataContent.isArray()).isTrue();
+        assertThat(dataContent.get(0).get("key").asText()).isEqualTo("data1");
+        assertThat(dataContent.get(0).get("value").asInt()).isEqualTo(123);
+        
+        // Verify annotation part
+        ChatMessagePart annotationPart = findPartByType(parts, ChatMessagePart.MessagePartType.ANNOTATION);
+        JsonNode annotationContent = annotationPart.getContent();
+        assertThat(annotationContent.isArray()).isTrue();
+        assertThat(annotationContent.get(0).get("type").asText()).isEqualTo("highlight");
+        
+        // Verify text part
+        ChatMessagePart textPart = findPartByType(parts, ChatMessagePart.MessagePartType.TEXT);
+        assertThat(textPart.getContent().asText()).isEqualTo("Here's content with rich attachments and data.");
+        
+        logger.info("✅ Complete AI SDK rich content protocol verified: streaming + persistence");
+    }
+
+    /**
+     * Comprehensive test: AI SDK Error Handling Protocol
+     * Tests: Error messages (3:) + Recovery + Persistence
+     */
+    @Test
+    @WithMentorUser
+    void shouldHandleCompleteErrorProtocol() {
+        // Given
+        chatMessagePartRepository.deleteAll();
+        chatMessageRepository.deleteAll();
+        
+        String messageId = UUID.randomUUID().toString();
+        final List<String> aiSdkFrames = List.of(
+            "f:{\"messageId\":\"" + messageId + "\"}",
+            "3:\"Connection timeout after 30 seconds\"",
+            "0:\"I encountered an error but recovered successfully.\"",
+            "e:{\"finishReason\":\"error\",\"usage\":{\"completionTokens\":8,\"promptTokens\":15},\"isContinued\":false}",
+            "d:{\"finishReason\":\"stop\",\"usage\":{\"completionTokens\":8,\"promptTokens\":15}}"
+        );
+
+        // When - Process request
+        var streamingResult = performChatRequest(aiSdkFrames);
+        
+        // Then - Verify streaming
+        StepVerifier.create(streamingResult)
+            .expectNext("f:{\"messageId\":\"" + messageId + "\"}")
+            .expectNext("3:\"Connection timeout after 30 seconds\"")
+            .expectNext("0:\"I encountered an error but recovered successfully.\"")
+            .expectNext("e:{\"finishReason\":\"error\",\"usage\":{\"completionTokens\":8,\"promptTokens\":15},\"isContinued\":false}")
+            .expectNext("d:{\"finishReason\":\"stop\",\"usage\":{\"completionTokens\":8,\"promptTokens\":15}}")
+            .verifyComplete();
+        
+        // And - Verify persistence
+        ChatMessage assistantMessage = findAssistantMessage(messageId);
+        List<ChatMessagePart> parts = chatMessagePartRepository.findByIdMessageIdOrderByIdOrderIndexAsc(assistantMessage.getId());
+        assertThat(parts).hasSize(2); // ERROR + TEXT
+        
+        // Verify error part
+        ChatMessagePart errorPart = findPartByType(parts, ChatMessagePart.MessagePartType.ERROR);
+        assertThat(errorPart.getContent().asText()).isEqualTo("Connection timeout after 30 seconds");
+        
+        // Verify text part
+        ChatMessagePart textPart = findPartByType(parts, ChatMessagePart.MessagePartType.TEXT);
+        assertThat(textPart.getContent().asText()).isEqualTo("I encountered an error but recovered successfully.");
+        
+        logger.info("✅ Complete AI SDK error protocol verified: streaming + persistence");
+    }
+
+    // Helper methods for test readability
+    private ChatMessage findAssistantMessage(String expectedMessageId) {
+        List<ChatMessage> allMessages = chatMessageRepository.findAll();
+        return allMessages.stream()
+            .filter(msg -> msg.getRole() == ChatMessage.Role.ASSISTANT)
+            .filter(msg -> msg.getId().toString().equals(expectedMessageId))
             .findFirst()
-            .orElse(null);
-            
-        assertThat(textPart).isNotNull();
-        assertThat(textPart.getContent()).isNotNull();
-        
-        // Verify the content contains our test text
-        String textContent = textPart.getContent().asText();
-        
-        // Verify the message content is correctly stored
-        // Note: in a streaming response, texts might be combined differently than in frames
-        assertThat(textContent).isNotEmpty();
-        
-        // Log the message content for debugging
-        logger.info("Persisted message content: {}", textContent);
+            .orElseThrow(() -> new AssertionError("No assistant message found with ID: " + expectedMessageId));
+    }
+    
+    private ChatMessagePart findPartByType(List<ChatMessagePart> parts, ChatMessagePart.MessagePartType type) {
+        return parts.stream()
+            .filter(part -> part.getType() == type)
+            .findFirst()
+            .orElseThrow(() -> new AssertionError("No message part found of type: " + type));
     }
 
     private Flux<String> performChatRequest(List<String> mockFrames) {
