@@ -116,7 +116,20 @@ public class ChatControllerIT extends BaseIntegrationTest {
         // When - Process chat request
         performChatRequestWithFrames(request, responseFrames);
 
-        // Then - Verify persistence of reasoning parts
+        // Then - Verify streaming protocol compliance
+        StepVerifier.create(performChatRequestWithFrames(request, responseFrames))
+            .expectNext("f:{\"messageId\":\"" + responseMessageId + "\"}")
+            .expectNext("g:\"I will open the conversation\"")
+            .expectNext("g:\" with witty banter. \"")
+            .expectNext("g:\"Once the user has relaxed,\"")
+            .expectNext("g:\" I will pry for valuable information.\"")
+            .expectNext("0:\"Hello, \"")
+            .expectNext("0:\"what's up?\"")
+            .expectNext("e:{\"finishReason\":\"stop\",\"usage\":{\"completionTokens\":6,\"promptTokens\":12},\"isContinued\":false}")
+            .expectNext("d:{\"finishReason\":\"stop\",\"usage\":{\"completionTokens\":6,\"promptTokens\":12}}")
+            .verifyComplete();
+
+        // And - Verify persistence of reasoning parts
         ChatMessage assistantMessage = chatMessageRepository.findById(UUID.fromString(responseMessageId))
             .orElseThrow(() -> new AssertionError("No assistant message found"));
         assertThat(assistantMessage.getParts()).hasSize(2); // 1 reasoning part + 1 text part
@@ -141,7 +154,7 @@ public class ChatControllerIT extends BaseIntegrationTest {
             "0:\"I'm retrieving the \"",
             "0:\"weather for Munich...\"",
             "9:{\"toolCallId\":\"call_37478204\",\"toolName\":\"getWeather\",\"args\":{\"latitude\":48.1475,\"longitude\":11.5865}}\n",
-            "a:{\"toolCallId\":\"call_37478204\",\"result\": \"25.8°C\"}",
+            "a:{\"toolCallId\":\"call_37478204\",\"result\": 25.8}",
             "e:{\"finishReason\":\"tool-calls\",\"usage\":{\"promptTokens\":1004,\"completionTokens\":66},\"isContinued\":false}",
             "f:{\"messageId\":\"" + responseMessageId2 + "\"}",
             "0:\"The current weather in Munich is \"",
@@ -151,9 +164,24 @@ public class ChatControllerIT extends BaseIntegrationTest {
         );
 
         // When - Process chat request
-        performChatRequestWithFrames(request, responseFrames);
+        Flux<String> response = performChatRequestWithFrames(request, responseFrames);
 
-        // Then - Verify persistence of tool call and text parts in one message
+        // Then - Verify streaming protocol compliance
+        StepVerifier.create(response)
+            .expectNext("f:{\"messageId\":\"" + responseMessageId1 + "\"}")
+            .expectNext("0:\"I'm retrieving the \"")
+            .expectNext("0:\"weather for Munich...\"")
+            .expectNext("9:{\"toolCallId\":\"call_37478204\",\"toolName\":\"getWeather\",\"args\":{\"latitude\":48.1475,\"longitude\":11.5865}}")
+            .expectNext("a:{\"toolCallId\":\"call_37478204\",\"result\": 25.8}")
+            .expectNext("e:{\"finishReason\":\"tool-calls\",\"usage\":{\"promptTokens\":1004,\"completionTokens\":66},\"isContinued\":false}")
+            .expectNext("f:{\"messageId\":\"" + responseMessageId2 + "\"}")
+            .expectNext("0:\"The current weather in Munich is \"")
+            .expectNext("0:\"25.8°C.\"")
+            .expectNext("e:{\"finishReason\":\"stop\",\"usage\":{\"promptTokens\":5259,\"completionTokens\":28},\"isContinued\":false}")
+            .expectNext("d:{\"finishReason\":\"stop\",\"usage\":{\"promptTokens\":6263,\"completionTokens\":94}}")
+            .verifyComplete();
+
+        // And - Verify persistence of tool call and text parts in one message
         assertThat(chatMessageRepository.findById(UUID.fromString(responseMessageId1)).isPresent()).isFalse(); 
         // First response message should not exist as it should be combined with the second one -> one assistant message
 

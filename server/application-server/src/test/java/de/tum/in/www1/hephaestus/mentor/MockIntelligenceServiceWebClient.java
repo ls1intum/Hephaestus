@@ -1,7 +1,6 @@
 package de.tum.in.www1.hephaestus.mentor;
 
 import de.tum.in.www1.hephaestus.intelligenceservice.model.ChatRequest;
-import de.tum.in.www1.hephaestus.intelligenceservice.model.Message;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Primary;
 import org.springframework.context.annotation.Profile;
