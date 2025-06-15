@@ -31,7 +31,6 @@ import java.util.UUID;
 public class ChatThread {
     
     @Id
-    @GeneratedValue(strategy = GenerationType.UUID)
     @EqualsAndHashCode.Include
     private UUID id;
 

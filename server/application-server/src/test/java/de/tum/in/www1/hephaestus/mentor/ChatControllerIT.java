@@ -72,7 +72,6 @@ public class ChatControllerIT extends BaseIntegrationTest {
         ChatMessage userMessage = chatMessageRepository.findById(UUID.fromString(request.messages().getLast().getId()))
             .orElseThrow(() -> new AssertionError("No user message found"));
         assertThat(userMessage.getRole()).isEqualTo(ChatMessage.Role.USER);
-        assertThat(userMessage.getId().toString()).isEqualTo(responseMessageId);
         assertThat(userMessage.getParts()).hasSize(1); // Only one part for the user message
         ChatMessagePart userPart = userMessage.getParts().get(0);
         assertThat(userPart.getType()).isEqualTo(ChatMessagePart.MessagePartType.TEXT);
@@ -193,7 +192,7 @@ public class ChatControllerIT extends BaseIntegrationTest {
     }
 
     private Flux<String> performChatRequestWithFrames(ChatRequestDTO request, List<String> mockFrames) {
-        mockFrameHolder.setFrames(request.id().toString(), mockFrames);
+        mockFrameHolder.setFrames(request.messages().getLast().getId(), mockFrames);
 
         return webTestClient.post()
             .uri("/mentor/chat")
