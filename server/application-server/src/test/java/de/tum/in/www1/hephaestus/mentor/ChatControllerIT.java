@@ -4,6 +4,7 @@ import de.tum.in.www1.hephaestus.gitprovider.user.User;
 import de.tum.in.www1.hephaestus.intelligenceservice.model.Message;
 import de.tum.in.www1.hephaestus.intelligenceservice.model.MessagePartsInner;
 import de.tum.in.www1.hephaestus.testconfig.BaseIntegrationTest;
+import de.tum.in.www1.hephaestus.testconfig.WithMentorUser;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -59,9 +60,6 @@ public class ChatControllerIT extends BaseIntegrationTest {
     private ChatTestDataSetup testDataSetup;
     
     @Autowired
-    private MockSecurityHelper mockSecurityHelper;
-    
-    @Autowired
     private ChatMessageRepository chatMessageRepository;
     
     @Autowired
@@ -70,13 +68,13 @@ public class ChatControllerIT extends BaseIntegrationTest {
     @BeforeEach
     void setUp() {
         mockFrameHolder.frames = List.of();
-        // Create test user and set up authentication
-        mockSecurityHelper.mockAuthentication("testuser");
+        // Create test user - authentication will be handled by @WithMentorUser annotation
+        testDataSetup.createTestUser();
     }
     
     @AfterEach
     void tearDown() {
-        mockSecurityHelper.clearAuthentication();
+        // No manual authentication cleanup needed with annotations
     }
 
     /**
@@ -85,6 +83,7 @@ public class ChatControllerIT extends BaseIntegrationTest {
      * Persistence: Single ChatMessage with multiple TEXT parts
      */
     @Test
+    @WithMentorUser
     void shouldStreamSimpleTextResponse() {
         // Given - simple text response with required start step frame
         var expectedFrames = List.of(
@@ -114,6 +113,7 @@ public class ChatControllerIT extends BaseIntegrationTest {
      * Persistence: ChatMessage with TOOL_INVOCATION parts, demonstrates multi-step ChatThread
      */
     @Test
+    @WithMentorUser
     void shouldStreamServerSideToolRoundtrip() {
         // Given - complete tool call workflow with multi-step pattern
         var expectedFrames = List.of(
@@ -149,6 +149,7 @@ public class ChatControllerIT extends BaseIntegrationTest {
      * Persistence: Shows how partial tool calls evolve in ChatMessagePart
      */
     @Test
+    @WithMentorUser
     void shouldStreamToolCallWithDeltas() {
         // Given - streaming tool call with deltas and proper start step
         var expectedFrames = List.of(
@@ -184,6 +185,7 @@ public class ChatControllerIT extends BaseIntegrationTest {
      * Persistence: ChatMessage with REASONING parts, including redacted reasoning
      */
     @Test
+    @WithMentorUser
     void shouldStreamReasoningWithSignature() {
         // Given - reasoning with signatures and redacted parts
         var expectedFrames = List.of(
@@ -225,6 +227,7 @@ public class ChatControllerIT extends BaseIntegrationTest {
      * Persistence: ChatMessage with FILE parts containing base64 data
      */
     @Test
+    @WithMentorUser
     void shouldStreamFileAttachments() {
         // Given - file attachments with different MIME types and start step
         var expectedFrames = List.of(
@@ -258,6 +261,7 @@ public class ChatControllerIT extends BaseIntegrationTest {
      * Persistence: ChatMessage with SOURCE parts containing citation metadata
      */
     @Test
+    @WithMentorUser
     void shouldStreamSourceCitations() {
         // Given - source citations with start step
         var expectedFrames = List.of(
@@ -287,6 +291,7 @@ public class ChatControllerIT extends BaseIntegrationTest {
      * Persistence: ChatMessage with error parts for debugging
      */
     @Test
+    @WithMentorUser
     void shouldStreamErrorRecovery() {
         // Given - error handling scenario with start step and proper finish frames
         var expectedFrames = List.of(
@@ -313,6 +318,7 @@ public class ChatControllerIT extends BaseIntegrationTest {
     }
 
     @Test
+    @WithMentorUser
     void shouldStreamDataAndAnnotations() {
         // Given - structured data and annotations with start step
         var expectedFrames = List.of(
@@ -341,6 +347,7 @@ public class ChatControllerIT extends BaseIntegrationTest {
     }
 
     @Test
+    @WithMentorUser
     void shouldStreamRedactedReasoningWithSignature() {
         // Given - sensitive reasoning that gets redacted with start step
         var expectedFrames = List.of(
@@ -371,6 +378,7 @@ public class ChatControllerIT extends BaseIntegrationTest {
     }
 
     @Test
+    @WithMentorUser
     void shouldHandleEmptyResponse() {
         // Given - immediate completion without content (with start step for consistency)
         var expectedFrames = List.of(
@@ -399,6 +407,7 @@ public class ChatControllerIT extends BaseIntegrationTest {
      * - Consistent usage reporting between finish step and finish message
      */
     @Test
+    @WithMentorUser
     void shouldStreamComprehensiveMultiStepWorkflow() {
         // Given - complete workflow with reasoning, tool calls, and multiple steps
         var expectedFrames = List.of(
@@ -458,6 +467,7 @@ public class ChatControllerIT extends BaseIntegrationTest {
      * Persistence: Single ChatMessage with multiple TEXT parts
      */
     @Test
+    @WithMentorUser
     void shouldPersistTextMessages() {
         // Given - simple text response with required start step frame
         final List<String> expectedFrames = List.of(
@@ -514,12 +524,18 @@ public class ChatControllerIT extends BaseIntegrationTest {
         
         return webTestClient.post()
             .uri("/mentor/chat")
+            .headers(this::addAuthorizationHeader)
             .bodyValue(createChatRequest())
             .exchange()
             .expectStatus().isOk()
             .expectHeader().contentType("text/plain")
             .returnResult(String.class)
             .getResponseBody();
+    }
+    
+    private void addAuthorizationHeader(org.springframework.http.HttpHeaders headers) {
+        // Add a mock JWT token that will be processed by our mock JwtDecoder
+        headers.setBearerAuth("mock-jwt-token-for-mentor-user");
     }
 
     private ChatRequestDTO createChatRequest() {
