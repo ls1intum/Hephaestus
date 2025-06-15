@@ -1,6 +1,6 @@
 from abc import ABC, abstractmethod
 from typing import Type
-from langchain_core.language_models.chat_models import BaseLanguageModel
+from langchain_core.language_models.chat_models import BaseChatModel
 
 
 class ModelProvider(ABC):
@@ -47,7 +47,7 @@ class ModelProvider(ABC):
         pass
 
     @abstractmethod
-    def get_model(self, model_name: str) -> Type[BaseLanguageModel]:
+    def get_model(self, model_name: str) -> Type[BaseChatModel]:
         """
         Retrieve a language model instance based on the given model name.
 
@@ -55,6 +55,6 @@ class ModelProvider(ABC):
             model_name (str): The name of the model to retrieve.
 
         Returns:
-            BaseLanguageModel: An instance of a language model corresponding to the specified model name.
+            BaseChatModel: An instance of a language model corresponding to the specified model name.
         """
         pass

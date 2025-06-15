@@ -20,76 +20,59 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonTypeName;
 import com.fasterxml.jackson.annotation.JsonValue;
+import de.tum.in.www1.hephaestus.intelligenceservice.model.Message;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
 import com.fasterxml.jackson.annotation.JsonPropertyOrder;
 import com.fasterxml.jackson.annotation.JsonTypeName;
 import org.hibernate.validator.constraints.*;
 
 /**
- * MentorResponse
+ * ChatRequest
  */
 @JsonPropertyOrder({
-  MentorResponse.JSON_PROPERTY_CLOSED,
-  MentorResponse.JSON_PROPERTY_CONTENT
+  ChatRequest.JSON_PROPERTY_MESSAGES
 })
 @jakarta.annotation.Generated(value = "org.openapitools.codegen.languages.JavaClientCodegen", comments = "Generator version: 7.7.0")
-public class MentorResponse {
-  public static final String JSON_PROPERTY_CLOSED = "closed";
-  private Boolean closed = false;
+public class ChatRequest {
+  public static final String JSON_PROPERTY_MESSAGES = "messages";
+  private List<Message> messages = new ArrayList<>();
 
-  public static final String JSON_PROPERTY_CONTENT = "content";
-  private String content;
-
-  public MentorResponse() {
+  public ChatRequest() {
   }
 
-  public MentorResponse closed(Boolean closed) {
+  public ChatRequest messages(List<Message> messages) {
     
-    this.closed = closed;
+    this.messages = messages;
+    return this;
+  }
+
+  public ChatRequest addMessagesItem(Message messagesItem) {
+    if (this.messages == null) {
+      this.messages = new ArrayList<>();
+    }
+    this.messages.add(messagesItem);
     return this;
   }
 
   /**
-   * Get closed
-   * @return closed
+   * A list of messages in the chat conversation
+   * @return messages
    */
   @jakarta.annotation.Nullable
-  @JsonProperty(JSON_PROPERTY_CLOSED)
+  @JsonProperty(JSON_PROPERTY_MESSAGES)
   @JsonInclude(value = JsonInclude.Include.USE_DEFAULTS)
 
-  public Boolean getClosed() {
-    return closed;
+  public List<Message> getMessages() {
+    return messages;
   }
 
 
-  @JsonProperty(JSON_PROPERTY_CLOSED)
+  @JsonProperty(JSON_PROPERTY_MESSAGES)
   @JsonInclude(value = JsonInclude.Include.USE_DEFAULTS)
-  public void setClosed(Boolean closed) {
-    this.closed = closed;
-  }
-
-  public MentorResponse content(String content) {
-    
-    this.content = content;
-    return this;
-  }
-
-  /**
-   * Get content
-   * @return content
-   */
-  @jakarta.annotation.Nonnull
-  @JsonProperty(JSON_PROPERTY_CONTENT)
-  @JsonInclude(value = JsonInclude.Include.ALWAYS)
-
-  public String getContent() {
-    return content;
-  }
-
-
-  @JsonProperty(JSON_PROPERTY_CONTENT)
-  @JsonInclude(value = JsonInclude.Include.ALWAYS)
-  public void setContent(String content) {
-    this.content = content;
+  public void setMessages(List<Message> messages) {
+    this.messages = messages;
   }
 
   @Override
@@ -100,22 +83,20 @@ public class MentorResponse {
     if (o == null || getClass() != o.getClass()) {
       return false;
     }
-    MentorResponse mentorResponse = (MentorResponse) o;
-    return Objects.equals(this.closed, mentorResponse.closed) &&
-        Objects.equals(this.content, mentorResponse.content);
+    ChatRequest chatRequest = (ChatRequest) o;
+    return Objects.equals(this.messages, chatRequest.messages);
   }
 
   @Override
   public int hashCode() {
-    return Objects.hash(closed, content);
+    return Objects.hash(messages);
   }
 
   @Override
   public String toString() {
     StringBuilder sb = new StringBuilder();
-    sb.append("class MentorResponse {\n");
-    sb.append("    closed: ").append(toIndentedString(closed)).append("\n");
-    sb.append("    content: ").append(toIndentedString(content)).append("\n");
+    sb.append("class ChatRequest {\n");
+    sb.append("    messages: ").append(toIndentedString(messages)).append("\n");
     sb.append("}");
     return sb.toString();
   }

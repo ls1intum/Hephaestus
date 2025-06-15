@@ -59,8 +59,8 @@ public class SecurityConfig {
         Converter<Jwt, AbstractAuthenticationToken> authenticationConverter
     ) throws Exception {
         http.oauth2ResourceServer(resourceServer -> {
-            resourceServer.jwt(jwtDecoder -> {
-                jwtDecoder.jwtAuthenticationConverter(authenticationConverter);
+            resourceServer.jwt(jwtConfigurer -> {
+                jwtConfigurer.jwtAuthenticationConverter(authenticationConverter);
             });
         });
 

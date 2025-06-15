@@ -20,76 +20,77 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonTypeName;
 import com.fasterxml.jackson.annotation.JsonValue;
+import de.tum.in.www1.hephaestus.intelligenceservice.model.Source;
 import com.fasterxml.jackson.annotation.JsonPropertyOrder;
 import com.fasterxml.jackson.annotation.JsonTypeName;
 import org.hibernate.validator.constraints.*;
 
 /**
- * MentorRequest
+ * A source part of a message.
  */
 @JsonPropertyOrder({
-  MentorRequest.JSON_PROPERTY_CONTENT,
-  MentorRequest.JSON_PROPERTY_SESSION_ID
+  SourceUIPart.JSON_PROPERTY_SOURCE,
+  SourceUIPart.JSON_PROPERTY_TYPE
 })
 @jakarta.annotation.Generated(value = "org.openapitools.codegen.languages.JavaClientCodegen", comments = "Generator version: 7.7.0")
-public class MentorRequest {
-  public static final String JSON_PROPERTY_CONTENT = "content";
-  private String content;
+public class SourceUIPart {
+  public static final String JSON_PROPERTY_SOURCE = "source";
+  private Source source;
 
-  public static final String JSON_PROPERTY_SESSION_ID = "session_id";
-  private String sessionId;
+  public static final String JSON_PROPERTY_TYPE = "type";
+  private String type = "source";
 
-  public MentorRequest() {
+  public SourceUIPart() {
   }
 
-  public MentorRequest content(String content) {
+  public SourceUIPart source(Source source) {
     
-    this.content = content;
+    this.source = source;
     return this;
   }
 
   /**
-   * Get content
-   * @return content
+   * The source.
+   * @return source
    */
   @jakarta.annotation.Nonnull
-  @JsonProperty(JSON_PROPERTY_CONTENT)
+  @JsonProperty(JSON_PROPERTY_SOURCE)
   @JsonInclude(value = JsonInclude.Include.ALWAYS)
 
-  public String getContent() {
-    return content;
+  public Source getSource() {
+    return source;
   }
 
 
-  @JsonProperty(JSON_PROPERTY_CONTENT)
+  @JsonProperty(JSON_PROPERTY_SOURCE)
   @JsonInclude(value = JsonInclude.Include.ALWAYS)
-  public void setContent(String content) {
-    this.content = content;
+  public void setSource(Source source) {
+    this.source = source;
   }
 
-  public MentorRequest sessionId(String sessionId) {
+  public SourceUIPart type(String type) {
     
-    this.sessionId = sessionId;
+    this.type = type;
     return this;
   }
 
   /**
-   * Get sessionId
-   * @return sessionId
+   * Get type
+   * @return type
    */
-  @jakarta.annotation.Nonnull
-  @JsonProperty(JSON_PROPERTY_SESSION_ID)
-  @JsonInclude(value = JsonInclude.Include.ALWAYS)
+  @jakarta.annotation.Nullable
+  @JsonProperty(JSON_PROPERTY_TYPE)
+  @JsonInclude(value = JsonInclude.Include.USE_DEFAULTS)
 
-  public String getSessionId() {
-    return sessionId;
+  public String getType() {
+    return type;
   }
 
 
-  @JsonProperty(JSON_PROPERTY_SESSION_ID)
-  @JsonInclude(value = JsonInclude.Include.ALWAYS)
-  public void setSessionId(String sessionId) {
-    this.sessionId = sessionId;
+  @JsonProperty(JSON_PROPERTY_TYPE)
+  @JsonInclude(value = JsonInclude.Include.USE_DEFAULTS)
+  public void setType(String type) {
+    this.type = type;
   }
 
   @Override
@@ -100,22 +101,22 @@ public class MentorRequest {
     if (o == null || getClass() != o.getClass()) {
       return false;
     }
-    MentorRequest mentorRequest = (MentorRequest) o;
-    return Objects.equals(this.content, mentorRequest.content) &&
-        Objects.equals(this.sessionId, mentorRequest.sessionId);
+    SourceUIPart sourceUIPart = (SourceUIPart) o;
+    return Objects.equals(this.source, sourceUIPart.source) &&
+        Objects.equals(this.type, sourceUIPart.type);
   }
 
   @Override
   public int hashCode() {
-    return Objects.hash(content, sessionId);
+    return Objects.hash(source, type);
   }
 
   @Override
   public String toString() {
     StringBuilder sb = new StringBuilder();
-    sb.append("class MentorRequest {\n");
-    sb.append("    content: ").append(toIndentedString(content)).append("\n");
-    sb.append("    sessionId: ").append(toIndentedString(sessionId)).append("\n");
+    sb.append("class SourceUIPart {\n");
+    sb.append("    source: ").append(toIndentedString(source)).append("\n");
+    sb.append("    type: ").append(toIndentedString(type)).append("\n");
     sb.append("}");
     return sb.toString();
   }

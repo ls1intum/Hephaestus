@@ -35,7 +35,10 @@
 		"python.terminal.activateEnvInCurrentTerminal": true,
 		"python.defaultInterpreterPath": "${workspaceFolder}/.venv/bin/python",
 		"java.configuration.updateBuildConfiguration": "automatic",
-		"java.completion.importOrder": ["#"],
+		"java.completion.importOrder": [
+			"#"
+		],
+		"java.debug.settings.onBuildFailureProceed": true,
 	},
 	"extensions": {
 		"recommendations": [
