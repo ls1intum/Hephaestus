@@ -86,8 +86,8 @@ public class ChatControllerIT extends BaseIntegrationTest {
         assertThat(userPart.getType()).isEqualTo(ChatMessagePart.MessagePartType.TEXT);
         assertThat(userPart.getContent().asText()).isEqualTo("Hello, World!");
 
-        // Assistant message should have been created with the second response ID (combined parts)
-        ChatMessage assistantMessage = chatMessageRepository.findById(UUID.fromString(responseMessageId2))
+        // Assistant message should have been created with the first response ID (combined parts)
+        ChatMessage assistantMessage = chatMessageRepository.findById(UUID.fromString(responseMessageId1))
             .orElseThrow(() -> new AssertionError("No assistant message found"));
         assertThat(assistantMessage.getRole()).isEqualTo(ChatMessage.Role.ASSISTANT);
         assertThat(assistantMessage.getParts()).hasSize(2); // 2 text parts combined into one message
@@ -98,9 +98,9 @@ public class ChatControllerIT extends BaseIntegrationTest {
         assertThat(assistantPart2.getType()).isEqualTo(ChatMessagePart.MessagePartType.TEXT);
         assertThat(assistantPart2.getContent().asText()).isEqualTo("What can I do for you?");
 
-        // Verify that first response message was not created as it was combined with the second one
-        assertThat(chatMessageRepository.findById(UUID.fromString(responseMessageId1)).isPresent()).isFalse();
-        // First response message should not exist as it should be combined with the second one -> one assistant message
+        // Verify that second response message was not created as it was combined with the first one
+        assertThat(chatMessageRepository.findById(UUID.fromString(responseMessageId2)).isPresent()).isFalse();
+        // Second response message should not exist as it should be combined with the first one -> one assistant message
 
         // Relationships should be established
         assertThat(assistantMessage.getThread()).isEqualTo(thread);
@@ -198,11 +198,11 @@ public class ChatControllerIT extends BaseIntegrationTest {
             .verifyComplete();
 
         // And - Verify persistence of tool call and text parts in one message
-        assertThat(chatMessageRepository.findById(UUID.fromString(responseMessageId1)).isPresent()).isFalse(); 
-        // First response message should not exist as it should be combined with the second one -> one assistant message
+        assertThat(chatMessageRepository.findById(UUID.fromString(responseMessageId2)).isPresent()).isFalse();
+        // Second response message should not exist as it should be combined with the first one -> one assistant message
 
-        ChatMessage combinedMessage = chatMessageRepository.findById(UUID.fromString(responseMessageId2))
-            .orElseThrow(() -> new AssertionError("No second response message found"));
+        ChatMessage combinedMessage = chatMessageRepository.findById(UUID.fromString(responseMessageId1))
+            .orElseThrow(() -> new AssertionError("No first response message found"));
         assertThat(combinedMessage.getParts()).hasSize(3); // 2 text parts + 1 tool invocation part
         ChatMessagePart textPart1 = combinedMessage.getParts().get(0);
         assertThat(textPart1.getType()).isEqualTo(ChatMessagePart.MessagePartType.TEXT);
@@ -213,7 +213,9 @@ public class ChatControllerIT extends BaseIntegrationTest {
         JsonNode toolContent = toolInvocationPart.getContent();
         assertThat(toolContent.get("toolCallId").asText()).isEqualTo("call_37478204");
         assertThat(toolContent.get("toolName").asText()).isEqualTo("getWeather");
-        assertThat(toolContent.get("result").asText()).isEqualTo("25.8°C");
+        assertThat(toolContent.get("args").get("latitude").asDouble()).isEqualTo(48.1475);
+        assertThat(toolContent.get("args").get("longitude").asDouble()).isEqualTo(11.5865);
+        assertThat(toolContent.get("result").asDouble()).isEqualTo(25.8);
 
         ChatMessagePart textPart2 = combinedMessage.getParts().get(2);
         assertThat(textPart2.getType()).isEqualTo(ChatMessagePart.MessagePartType.TEXT);

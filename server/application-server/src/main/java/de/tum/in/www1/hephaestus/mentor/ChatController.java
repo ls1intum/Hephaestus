@@ -1,11 +1,12 @@
 package de.tum.in.www1.hephaestus.mentor;
 
 import de.tum.in.www1.hephaestus.SecurityUtils;
-import de.tum.in.www1.hephaestus.gitprovider.user.User;
 import de.tum.in.www1.hephaestus.gitprovider.user.UserRepository;
+import de.tum.in.www1.hephaestus.intelligenceservice.model.ChatRequest;
 import io.swagger.v3.oas.annotations.Hidden;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.MediaType;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -22,13 +23,12 @@ import reactor.core.publisher.Flux;
 public class ChatController {
 
     private static final Logger logger = LoggerFactory.getLogger(ChatController.class);
-    private final ChatService chatService;
-    private final UserRepository userRepository;
-    
-    public ChatController(ChatService chatService, UserRepository userRepository) {
-        this.chatService = chatService;
-        this.userRepository = userRepository;
-    }
+
+    @Autowired
+    private UserRepository userRepository;
+
+    @Autowired
+    private IntelligenceServiceWebClient intelligenceServiceWebClient;
     
     @Hidden
     @PostMapping(produces = MediaType.TEXT_PLAIN_VALUE)
@@ -62,9 +62,13 @@ public class ChatController {
         }
 
         logger.debug("Forwarding chat request to ChatService for user: {}", userOptional.get().getLogin());
-        return chatService.processChat(chatRequest, userOptional.get())
-                .doOnNext(chunk -> logger.trace("Sending response chunk: {}", chunk))
-                .doOnComplete(() -> logger.debug("Chat response completed"))
-                .doOnError(e -> logger.error("Error during chat response streaming", e));
+        ChatRequest intelligenceRequest = new ChatRequest();
+        intelligenceRequest.setMessages(chatRequest.messages());
+        return intelligenceServiceWebClient
+            .streamChat(intelligenceRequest);
+        // return chatService.processChat(chatRequest, userOptional.get())
+        //         .doOnNext(chunk -> logger.trace("Sending response chunk: {}", chunk))
+        //         .doOnComplete(() -> logger.debug("Chat response completed"))
+        //         .doOnError(e -> logger.error("Error during chat response streaming", e));
     }
 }

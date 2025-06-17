@@ -1,6 +1,6 @@
 package de.tum.in.www1.hephaestus.mentor;
 
-import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.databind.JsonNode;
 import io.hypersistence.utils.hibernate.type.json.JsonType;
 import jakarta.persistence.*;
@@ -14,7 +14,8 @@ import org.springframework.lang.NonNull;
 import java.util.UUID;
 
 /**
- * Maps directly to de.tum.in.www1.hephaestus.intelligenceservice.model.MessagePartsInner
+ * Represents a part of a chat message in the AI SDK Data Stream Protocol.
+ * Maps directly to the various UI message part types in the AI SDK.
  */
 @Entity
 @Table(name = "chat_message_part")
@@ -23,7 +24,6 @@ import java.util.UUID;
 @NoArgsConstructor
 @ToString
 @EqualsAndHashCode(onlyExplicitlyIncluded = true)
-@JsonIgnoreProperties({"message"})
 public class ChatMessagePart {
     
     @EmbeddedId
@@ -34,119 +34,62 @@ public class ChatMessagePart {
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "messageId", nullable = false, insertable = false, updatable = false)
     @ToString.Exclude
+    @JsonIgnore
     private ChatMessage message;
 
     /**
-     * Part type - Valid values: text, reasoning, tool-invocation, source, file, step-start
+     * The canonical type of the message part, matching the AI SDK UI part type system.
+     * For custom types like tool-{name} or data-{type}, use TOOL or DATA respectively
+     * and the specific type will be stored in the content.
      */
     @NonNull
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 32)
-    private MessagePartType type;
+    private PartType type;
+
+    /**
+     * Original type string from the UI message part, preserved for exact matching.
+     * This is especially important for tool-{name} and data-{type} formats.
+     */
+    @Column(length = 128)
+    private String originalType;
 
     /**
      * The JSON content payload for this message part, stored as JSONB.
-     * 
-     * The structure and type of this JSON content varies based on the {@link MessagePartType}.
-     * This follows the AI SDK Data Stream Protocol specification for consistent streaming and processing.
-     * 
-     * NOTE: Not all message part types are typically persisted. Some are used primarily for 
-     * streaming control and may be filtered out before database storage.
-     * 
-     * Content Structure by Message Part Type:
-     * 
-     * === Core Persistent Content ===
-     * 
-     * TEXT: Simple string content (PERSISTED)
-     *   Example: "Hello world"
-     * 
-     * REASONING: AI reasoning explanation string (PERSISTED)
-     *   Example: "I will analyze this step by step"
-     * 
-     * TOOL_INVOCATION: Complete tool call with arguments (PERSISTED)
-     *   Example: {"toolCallId": "call-123", "toolName": "calculator", "args": {"operation": "add", "values": [1, 2]}}
-     * 
-     * TOOL_RESULT: Tool execution result (PERSISTED)
-     *   Example: {"toolCallId": "call-123", "result": "3"}
-     * 
-     * DATA: Array of structured JSON objects (PERSISTED)
-     *   Example: [{"key": "object1", "value": 123}, {"anotherKey": "object2", "count": 5}]
-     * 
-     * SOURCE: External source reference (PERSISTED)
-     *   Example: {"sourceType": "url", "id": "src-001", "url": "https://example.com/article", "title": "Example Article"}
-     * 
-     * FILE: File attachment with base64 encoded data (PERSISTED - but see note)
-     *   Example: {"data": "iVBORw0KGgoAAAANSUhEUgA...", "mimeType": "image/png"}
-     *   Note: In the future we will store files in object storage and only keep a reference here.
-     * 
-     * === Streaming Control (Often Not Persisted) ===
-     * 
-     * TOOL_STREAMING_START: Tool call initialization (STREAMING ONLY)
-     *   Example: {"toolCallId": "call-456", "toolName": "streaming-tool"}
-     *   Usage: Signals start of streaming tool call, typically not stored
-     * 
-     * TOOL_DELTA: Partial tool argument updates during streaming (STREAMING ONLY)
-     *   Example: {"toolCallId": "call-456", "argsTextDelta": "partial argument text"}
-     *   Usage: Progressive updates during streaming, replaced by final TOOL_INVOCATION
-     * 
-     * STEP_START: Step execution boundary marker (STREAMING ONLY)
-     *   Example: {"messageId": "step_123"}
-     *   Usage: Marks beginning of processing step, typically not stored
-     * 
-     * STEP_FINISH: Step completion with usage statistics (METADATA)
-     *   Example: {"finishReason": "stop", "usage": {"promptTokens": 150, "completionTokens": 75}, "isContinued": false}
-     *   Usage: May be stored for analytics, but not essential for message reconstruction
-     * 
-     * MESSAGE_FINISH: Final message completion metadata (METADATA)
-     *   Example: {"finishReason": "stop", "usage": {"promptTokens": 300, "completionTokens": 150}}
-     *   Usage: May be stored for analytics, but not essential for message reconstruction
-     * 
-     * === Security & Metadata (Conditional) ===
-     * 
-     * REASONING_SIGNATURE: Signature verification object (CONDITIONAL)
-     *   Example: {"signature": "abc123xyz"}
-     *   Usage: Only needed if reasoning verification is required
-     * 
-     * REASONING_REDACTED: Redacted reasoning content (CONDITIONAL)
-     *   Example: {"data": "This reasoning has been redacted for security"}
-     *   Usage: Alternative to REASONING when content needs redaction
-     * 
-     * ANNOTATION: Array of message annotations (CONDITIONAL)
-     *   Example: [{"id": "msg-123", "type": "highlight", "text": "Important note"}]
-     *   Usage: UI-specific annotations, may not need persistence
-     * 
-     * ERROR: Error message string (CONDITIONAL)
-     *   Example: "Connection timeout after 30 seconds"
-     *   Usage: Typically logged separately, may not need message-level persistence
-     * 
-     * @see <a href="https://ai-sdk.dev/docs/ai-sdk-ui/stream-protocol">AI SDK Data Stream Protocol</a>
+     * Structure varies based on the {@link PartType}.
      */
     @Type(JsonType.class)
     @Column(columnDefinition = "jsonb")
-    @ToString.Exclude
     private JsonNode content;
 
-    public enum MessagePartType {
-        TEXT("text"),                                 // 0: frame - text content
-        REASONING("reasoning"),                       // g: frame - reasoning content  
-        REASONING_SIGNATURE("reasoning-signature"),   // j: frame - reasoning signature
-        REASONING_REDACTED("reasoning-redacted"),     // i: frame - redacted reasoning
-        TOOL_INVOCATION("tool-invocation"),           // 9: frame - complete tool call
-        TOOL_STREAMING_START("tool-streaming-start"), // b: frame - tool call start
-        TOOL_DELTA("tool-delta"),                     // c: frame - tool call args delta
-        TOOL_RESULT("tool-result"),                   // a: frame - tool call result
-        DATA("data"),                                 // 2: frame - structured data
-        ANNOTATION("annotation"),                     // 8: frame - message annotations
-        ERROR("error"),                               // 3: frame - error content
-        FILE("file"),                                 // k: frame - file attachment
-        SOURCE("source"),                             // h: frame - source citation
-        STEP_START("step-start"),                     // f: frame - step boundary
-        STEP_FINISH("step-finish"),                   // e: frame - step completion
-        MESSAGE_FINISH("message-finish");             // d: frame - message - completion
+    /**
+     * Enum representing all possible message part types from the AI SDK UI message system.
+     * Maps directly to the TypeScript union type UIMessagePart.
+     */
+    public enum PartType {
+        // Core message part types
+        TEXT("text"),
+        REASONING("reasoning"),
+        
+        // Tool-related parts
+        TOOL("tool"), // Generic type for tool-{name}
+        
+        // Source reference parts
+        SOURCE_URL("source-url"),
+        SOURCE_DOCUMENT("source-document"),
+        
+        // File part
+        FILE("file"),
+        
+        // Data part
+        DATA("data"), // Generic type for data-{type}
+        
+        // Step control
+        STEP_START("step-start");
 
         private final String value;
 
-        MessagePartType(String value) {
+        PartType(String value) {
             this.value = value;
         }
 
@@ -154,14 +97,74 @@ public class ChatMessagePart {
             return value;
         }
 
-        public static MessagePartType fromValue(String value) {
-            for (MessagePartType type : values()) {
-                if (type.value.equals(value)) {
+        /**
+         * Parse a type string from the UI system into our enum
+         * Handles special cases like tool-{name} and data-{type}
+         */
+        public static PartType fromValue(String typeString) {
+            if (typeString == null) {
+                throw new IllegalArgumentException("Type cannot be null");
+            }
+            
+            // Handle tool-{name} pattern
+            if (typeString.startsWith("tool-") && typeString.length() > 5) {
+                return TOOL;
+            }
+            
+            // Handle data-{type} pattern
+            if (typeString.startsWith("data-") && typeString.length() > 5) {
+                return DATA;
+            }
+            
+            // Handle standard types
+            for (PartType type : values()) {
+                if (type.value.equals(typeString)) {
                     return type;
                 }
             }
-            throw new IllegalArgumentException("Unknown message part type: " + value);
+            
+            throw new IllegalArgumentException("Unknown message part type: " + typeString);
         }
+    }
+
+    /**
+     * Get the specific tool name if this is a tool part
+     * @return Tool name or null if this isn't a tool part
+     */
+    public String getToolName() {
+        if (type == PartType.TOOL && originalType != null && originalType.startsWith("tool-")) {
+            return originalType.substring(5);
+        }
+        return null;
+    }
+    
+    /**
+     * Get the specific data type if this is a data part
+     * @return Data type or null if this isn't a data part
+     */
+    public String getDataType() {
+        if (type == PartType.DATA && originalType != null && originalType.startsWith("data-")) {
+            return originalType.substring(5);
+        }
+        return null;
+    }
+
+    /**
+     * Get the tool state if this is a tool part
+     * @return "partial-call", "call", or "result" if this is a tool part, null otherwise
+     */
+    public String getToolState() {
+        if (type == PartType.TOOL && content != null && content.has("state")) {
+            return content.get("state").asText();
+        }
+        return null;
+    }
+
+    /**
+     * Convenience method to check if this part contains a tool call result
+     */
+    public boolean isToolResult() {
+        return type == PartType.TOOL && "result".equals(getToolState());
     }
 
     /**

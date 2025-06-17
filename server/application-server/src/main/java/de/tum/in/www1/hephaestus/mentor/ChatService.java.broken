@@ -1,0 +1,907 @@
+package de.tum.in.www1.hephaestus.mentor;
+
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ObjectNode;
+import de.tum.in.www1.hephaestus.gitprovider.user.User;
+import de.tum.in.www1.hephaestus.intelligenceservice.model.ChatRequest;
+import de.tum.in.www1.hephaestus.intelligenceservice.model.Message;
+import jakarta.persistence.EntityManager;
+import jakarta.persistence.PersistenceContext;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Optional;
+import java.util.UUID;
+import java.util.concurrent.atomic.AtomicReference;
+import org.junit.jupiter.api.Disabled;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.annotation.Propagation;
+import reactor.core.publisher.Flux;
+
+/**
+ * Service for handling chat streaming and persistence.
+ * Implements full AI SDK Data Stream Protocol support with complete message part persistence.
+ *
+ * Supports all AI SDK frame types:
+ * - Text parts (0:) -> TEXT message parts
+ * - Reasoning parts (g:) -> REASONING message parts
+ * - Data arrays (2:) -> DATA message parts
+ * - Error messages (3:) -> ERROR message parts
+ * - Tool calls (9:) -> TOOL_INVOCATION message parts
+ * - Tool results (a:) -> TOOL_RESULT message parts
+ * - Control frames (f:, e:, d:) -> handled for flow control
+ *
+ * Others are ignored for now.
+ */
+@Service
+public class ChatService {
+
+    private static final Logger logger = LoggerFactory.getLogger(ChatService.class);
+
+    @Autowired
+    private IntelligenceServiceWebClient intelligenceServiceWebClient;
+
+    @Autowired
+    private ChatThreadRepository chatThreadRepository;
+
+    @Autowired
+    private ChatMessageRepository chatMessageRepository;
+
+    @Autowired
+    private ChatMessagePartRepository chatMessagePartRepository;
+
+    @Autowired
+    private ObjectMapper objectMapper;
+
+    @PersistenceContext
+    EntityManager entityManager;
+
+    public Flux<String> processChat(ChatRequestDTO chatRequest, User user) {
+        logger.info(
+            "Processing chat request from user: {} with {} messages",
+            user.getLogin(),
+            chatRequest.messages().size()
+        );
+        logger.info("DETAILED DEBUG: Request thread ID: {}, Messages: {}", chatRequest.id(), chatRequest.messages());
+
+        try {
+            // Find or create thread using the client-provided UUID
+            logger.debug("Finding or creating thread with ID: {}", chatRequest.id());
+            ChatThread thread = findOrCreateThread(chatRequest.id(), user);
+            logger.debug("Using thread: {} (title={})", thread.getId(), thread.getTitle());
+            logger.info("DETAILED DEBUG: Thread found/created: ID={}, Title={}, User={}, Messages count={}",
+                thread.getId(), thread.getTitle(), thread.getUser().getLogin(), 
+                thread.getAllMessages() != null ? thread.getAllMessages().size() : 0);
+
+            // Persist user messages from the request
+            logger.debug("Persisting latest user message");
+            var userMessage = persistLatestUserMessage(chatRequest, thread);
+            logger.info("DETAILED DEBUG: User message persisted: ID={}, ParentID={}, Parts={}", 
+                userMessage.getId(), 
+                userMessage.getParentMessage() != null ? userMessage.getParentMessage().getId() : "null",
+                userMessage.getParts().stream().map(p -> p.getType() + ": " + p.getContent()).toList());
+
+            // Create ChatRequest for intelligence service
+            logger.debug("Creating ChatRequest for intelligence service");
+            ChatRequest intelligenceRequest = new ChatRequest();
+            intelligenceRequest.setMessages(chatRequest.messages());
+            logger.info("DETAILED DEBUG: Created intelligence request with {} messages", 
+                intelligenceRequest.getMessages() != null ? intelligenceRequest.getMessages().size() : 0);
+
+            // Stream response and persist assistant messages
+            logger.debug("Initiating response streaming from intelligence service");
+            return streamAndPersistResponse(intelligenceRequest, thread, userMessage)
+                .doOnSubscribe(s -> logger.debug("Chat response stream subscription started"))
+                .doOnComplete(() -> logger.debug("Chat response stream completed"))
+                .doOnError(e -> logger.error("Chat response stream error", e))
+                .doOnCancel(() -> logger.debug("Chat response stream was cancelled"));
+        } catch (Exception e) {
+            logger.error("Unexpected error in processChat", e);
+            return Flux.just(
+                "3:\"An unexpected error occurred. Please try again.\"\n",
+                "d:{\"finishReason\":\"error\"}\n"
+            );
+        }
+    }
+
+    private ChatThread findOrCreateThread(String threadId, User user) {
+        UUID threadUuid = UUID.fromString(threadId);
+        logger.info("DETAILED DEBUG: Attempting to find thread ID={} for user={}", threadUuid, user.getLogin());
+
+        // First try to find the thread
+        Optional<ChatThread> existingThread = chatThreadRepository.findByIdAndUser(threadUuid, user);
+        if (existingThread.isPresent()) {
+            logger.info("DETAILED DEBUG: Found existing thread: {}", existingThread.get().getId());
+            return existingThread.get();
+        }
+
+        // If thread doesn't exist, try to create it
+        logger.info("DETAILED DEBUG: Thread not found, creating new thread with ID={}", threadUuid);
+        ChatThread newThread = new ChatThread();
+        newThread.setId(threadUuid);
+        newThread.setUser(user);
+        newThread.setTitle("New chat");
+
+        ChatThread savedThread = chatThreadRepository.save(newThread);
+        logger.info("DETAILED DEBUG: New thread created and saved: {}", savedThread.getId());
+        return savedThread;
+    }
+
+    private ChatMessage persistLatestUserMessage(ChatRequestDTO chatRequest, ChatThread thread) {
+        Message apiMessage = chatRequest.messages().getLast();
+        Optional<Message> parentApiMessage = chatRequest.messages().size() > 1
+            ? Optional.of(chatRequest.messages().get(chatRequest.messages().size() - 2))
+            : Optional.empty();
+        
+        logger.info("DETAILED DEBUG: Persisting user message from API: ID={}, Role={}, Parts={}",
+            apiMessage.getId(), apiMessage.getRole(), 
+            apiMessage.getParts() != null ? apiMessage.getParts().size() : 0);
+
+        ChatMessage message = new ChatMessage();
+        message.setRole(ChatMessage.Role.USER);
+        message.setThread(thread);
+
+        UUID messageId = UUID.fromString(apiMessage.getId());
+        message.setId(messageId);
+        logger.info("DETAILED DEBUG: Created chat message object: ID={}, Role={}", 
+            message.getId(), message.getRole());
+
+        // Set parent message if available
+        if (parentApiMessage.isPresent()) {
+            UUID parentId = UUID.fromString(parentApiMessage.get().getId());
+            logger.info("DETAILED DEBUG: Looking for parent message with ID: {}", parentId);
+            chatMessageRepository
+                .findById(parentId)
+                .ifPresentOrElse(
+                    parent -> {
+                        message.setParentMessage(parent);
+                        logger.info("DETAILED DEBUG: Parent message found and set: {}", parent.getId());
+                    }, 
+                    () -> logger.warn("Could not find parent message with ID: {}", parentId)
+                );
+        } else {
+            logger.info("DETAILED DEBUG: No parent message in request");
+        }
+
+        // Check if message already exists to avoid constraint violations
+        ChatMessage existingMessage = chatMessageRepository.findById(messageId).orElse(null);
+        ChatMessage savedMessage;
+        
+        if (existingMessage != null) {
+            logger.info("DETAILED DEBUG: Message with ID={} already exists, updating it", messageId);
+            // Update the existing message with new data
+            existingMessage.setThread(thread);
+            existingMessage.setRole(ChatMessage.Role.USER);
+            if (parentApiMessage.isPresent()) {
+                UUID parentId = UUID.fromString(parentApiMessage.get().getId());
+                chatMessageRepository.findById(parentId).ifPresent(existingMessage::setParentMessage);
+            }
+            savedMessage = chatMessageRepository.save(existingMessage);
+            logger.info("DETAILED DEBUG: Updated existing message: ID={}, ThreadID={}", 
+                savedMessage.getId(), savedMessage.getThread().getId());
+        } else {
+            // First save the message to get an ID - CRITICAL: Make sure it's properly persisted
+            logger.info("DETAILED DEBUG: Saving new user message with ID={} to database", message.getId());
+            savedMessage = chatMessageRepository.save(message);
+            logger.info("DETAILED DEBUG: Saved user message: ID={}, ThreadID={}", 
+                savedMessage.getId(), savedMessage.getThread().getId());
+        }
+        
+        // Double-check persistence by trying to retrieve it
+        ChatMessage retrievedMessage = chatMessageRepository.findById(savedMessage.getId()).orElse(null);
+        if (retrievedMessage == null) {
+            logger.error("DETAILED DEBUG: CRITICAL ERROR! Message wasn't properly persisted: {}", savedMessage.getId());
+        } else {
+            logger.info("DETAILED DEBUG: Verified message persistence: ID={}", retrievedMessage.getId());
+        }
+        
+        // Update thread with message reference
+        thread.addMessage(savedMessage);
+        thread.setSelectedLeafMessage(savedMessage);
+        
+        // Make sure thread is saved with updated message references
+        logger.info("DETAILED DEBUG: Updating thread with new message reference");
+        ChatThread updatedThread = chatThreadRepository.save(thread);
+        logger.info("DETAILED DEBUG: Thread updated: ID={}, Selected message ID={}", 
+            updatedThread.getId(), updatedThread.getSelectedLeafMessage().getId());
+
+        // Now prepare message parts using the saved message ID
+        if (apiMessage.getParts() != null) {
+            logger.info("DETAILED DEBUG: Processing {} message parts from API", apiMessage.getParts().size());
+            int partIndex = savedMessage.getParts().size();
+            for (var part : apiMessage.getParts()) {
+                if ("text".equals(part.getType()) && part.getText() != null) {
+                    logger.info("DETAILED DEBUG: Creating text message part: {}", part.getText());
+                    ChatMessagePart textPart = new ChatMessagePart();
+                    textPart.setId(new ChatMessagePartId(savedMessage.getId(), partIndex++));
+                    textPart.setType(ChatMessagePart.MessagePartType.TEXT);
+
+                    JsonNode contentNode = objectMapper.valueToTree(part.getText());
+                    textPart.setContent(contentNode);
+                    savedMessage.addMessagePart(textPart);
+                    logger.info("DETAILED DEBUG: Added text part: {} to message: {}", 
+                        textPart.getId(), savedMessage.getId());
+                }
+            }
+        } else {
+            logger.info("DETAILED DEBUG: API message has no parts");
+        }
+
+        // Save the message again with its parts
+        ChatMessage finalSavedMessage = chatMessageRepository.save(savedMessage);
+        chatThreadRepository.save(thread);
+
+        logger.debug("Persisted user message: {} with {} parts", finalSavedMessage.getId(), finalSavedMessage.getParts().size());
+        logger.info("DETAILED DEBUG: Final user message saved: ID={}, Parts={}, ThreadID={}", 
+            finalSavedMessage.getId(), 
+            finalSavedMessage.getParts().size(),
+            thread.getId());
+
+        return finalSavedMessage;
+    }
+
+    private Flux<String> streamAndPersistResponse(
+        ChatRequest intelligenceRequest,
+        ChatThread thread,
+        ChatMessage userMessage
+    ) {
+        logger.debug(
+            "Setting up response streaming for thread: {} and user message: {}",
+            thread.getId(),
+            userMessage.getId()
+        );
+        logger.info("DETAILED DEBUG: Starting response streaming process for thread={}, userMessage={}", 
+            thread.getId(), userMessage.getId());
+
+        // References to track the assistant message being built
+        AtomicReference<ChatMessage> assistantMessage = new AtomicReference<>();
+        AtomicReference<StringBuilder> contentBuilder = new AtomicReference<>(new StringBuilder());
+        AtomicReference<Integer> partIndex = new AtomicReference<>(0);
+        AtomicReference<Character> lastFrameType = new AtomicReference<>('f');
+        
+        // Track how many chunks we've processed
+        AtomicReference<Integer> chunkCount = new AtomicReference<>(0);
+
+        return intelligenceServiceWebClient
+            .streamChat(intelligenceRequest)
+            .doOnSubscribe(s -> {
+                logger.debug("Subscribed to intelligence service stream");
+                logger.info("DETAILED DEBUG: WebClient subscription started");
+                
+                // Double-check that user message exists in DB
+                try {
+                    ChatMessage userCheck = chatMessageRepository.findById(userMessage.getId()).orElse(null);
+                    if (userCheck == null) {
+                        logger.error("DETAILED DEBUG: User message not found in DB at subscription start: {}", 
+                            userMessage.getId());
+                        
+                        // Try to save it 
+                        ChatMessage savedUser = chatMessageRepository.save(userMessage);
+                        logger.info("DETAILED DEBUG: Saved user message at subscription start: {}", savedUser.getId());
+                    } else {
+                        logger.info("DETAILED DEBUG: Verified user message in DB at subscription start: {}", userCheck.getId());
+                    }
+                } catch (Exception e) {
+                    logger.error("DETAILED DEBUG: Error checking user message at subscription: {}", e.getMessage(), e);
+                }
+            })
+            .doOnNext(chunk -> {
+                int count = chunkCount.getAndUpdate(c -> c + 1);
+                logger.debug("Received chunk #{} from intelligence service: {}", count, chunk);
+                logger.info("DETAILED DEBUG: RAW CHUNK #{}: '{}'", count, chunk);
+                try {
+                    // Strip the trailing newline if present to ensure consistent processing
+                    String frameContent = chunk.endsWith("\n") ? chunk.substring(0, chunk.length() - 1) : chunk;
+                    logger.info("DETAILED DEBUG: Processing frame content: '{}', length={}", 
+                        frameContent, frameContent.length());
+                    
+                    // Skip empty frames
+                    if (frameContent.isEmpty() || frameContent.length() <= 1) {
+                        logger.info("DETAILED DEBUG: Skipping empty or too short frame: '{}'", frameContent);
+                        return;
+                    }
+                    
+                    processStreamFrame(
+                        frameContent,
+                        thread,
+                        userMessage,
+                        assistantMessage,
+                        contentBuilder,
+                        partIndex,
+                        lastFrameType
+                    );
+                    
+                    // Only update lastFrameType if frame was valid
+                    if (frameContent.contains(":")) {
+                        lastFrameType.set(frameContent.charAt(0)); // Update last frame type for next processing
+                        logger.info("DETAILED DEBUG: Frame processed, updated lastFrameType='{}'", lastFrameType.get());
+                    } else {
+                        logger.warn("DETAILED DEBUG: Invalid frame format, not updating frame type: {}", frameContent);
+                    }
+                    
+                    if (assistantMessage.get() != null) {
+                        logger.info("DETAILED DEBUG: Current assistant message state: ID={}, Parts={}", 
+                            assistantMessage.get().getId(),
+                            assistantMessage.get().getParts().size());
+                            
+                        // Periodically verify message exists in DB
+                        if (count % 10 == 0) {
+                            try {
+                                ChatMessage check = chatMessageRepository.findById(assistantMessage.get().getId()).orElse(null);
+                                if (check == null) {
+                                    logger.error("DETAILED DEBUG: Assistant message not found in DB during processing: {}", 
+                                        assistantMessage.get().getId());
+                                        
+                                    // Try to save it 
+                                    ChatMessage saved = chatMessageRepository.save(assistantMessage.get());
+                                    logger.info("DETAILED DEBUG: Saved assistant message during processing: {}", saved.getId());
+                                }
+                            } catch (Exception e) {
+                                logger.error("DETAILED DEBUG: Error checking assistant message: {}", e.getMessage(), e);
+                            }
+                        }
+                    } else {
+                        logger.info("DETAILED DEBUG: No assistant message created yet");
+                    }
+                } catch (Exception e) {
+                    logger.error("Error processing stream chunk: {}", chunk, e);
+                    logger.info("DETAILED DEBUG: EXCEPTION in chunk processing: {}", e.getMessage(), e);
+                }
+            })
+            .doOnComplete(() -> {
+                logger.debug("Intelligence service stream completed");
+                logger.info("DETAILED DEBUG: WebClient stream completed");
+                if (assistantMessage.get() != null) {
+                    logger.info("DETAILED DEBUG: Saving final assistant message on completion: ID={}, Parts={}", 
+                        assistantMessage.get().getId(), assistantMessage.get().getParts().size());
+                    
+                    // Verify message exists in DB before final save
+                    ChatMessage existingMessage = chatMessageRepository.findById(assistantMessage.get().getId()).orElse(null);
+                    if (existingMessage == null) {
+                        logger.error("DETAILED DEBUG: CRITICAL - Assistant message ID={} not found in DB at completion!",
+                            assistantMessage.get().getId());
+                        
+                        // Try to save it anyway with a new transaction
+                        try {
+                            // First ensure all parts are properly attached
+                            for (ChatMessagePart part : assistantMessage.get().getParts()) {
+                                if (part.getMessage() == null || !part.getMessage().getId().equals(assistantMessage.get().getId())) {
+                                    part.setMessage(assistantMessage.get());
+                                    logger.info("DETAILED DEBUG: Fixed part-message relationship for part index: {}", 
+                                        part.getId().getOrderIndex());
+                                }
+                            }
+                            
+                            ChatMessage finalSavedMessage = chatMessageRepository.save(assistantMessage.get());
+                            logger.info("DETAILED DEBUG: Attempted to save final message: ID={}, Parts={}", 
+                                finalSavedMessage.getId(), finalSavedMessage.getParts().size());
+                                
+                            // Verify message now exists
+                            ChatMessage verifyMessage = chatMessageRepository.findById(finalSavedMessage.getId()).orElse(null);
+                            if (verifyMessage != null) {
+                                logger.info("DETAILED DEBUG: Successfully saved and verified final message: {}", 
+                                    verifyMessage.getId());
+                                    
+                                // Update thread as well
+                                try {
+                                    thread.setSelectedLeafMessage(finalSavedMessage);
+                                    chatThreadRepository.save(thread);
+                                    logger.info("DETAILED DEBUG: Updated thread with final message: {}", finalSavedMessage.getId());
+                                } catch (Exception e) {
+                                    logger.error("DETAILED DEBUG: Failed to update thread: {}", e.getMessage(), e);
+                                }
+                            } else {
+                                logger.error("DETAILED DEBUG: CRITICAL - Still unable to save assistant message at completion!");
+                            }
+                        } catch (Exception e) {
+                            logger.error("DETAILED DEBUG: Failed to save final message: {}", e.getMessage(), e);
+                        }
+                    } else {
+                        // Update the existing message with any new content
+                        logger.info("DETAILED DEBUG: Found existing message in DB: ID={}, Parts={}", 
+                            existingMessage.getId(), existingMessage.getParts().size());
+                        
+                        // Make sure both objects have the same parts
+                        if (existingMessage.getParts().size() != assistantMessage.get().getParts().size()) {
+                            logger.info("DETAILED DEBUG: Synchronizing parts between DB object ({} parts) and memory object ({} parts)",
+                                existingMessage.getParts().size(), assistantMessage.get().getParts().size());
+                                
+                            // Copy any missing parts
+                            for (ChatMessagePart part : assistantMessage.get().getParts()) {
+                                boolean found = false;
+                                for (ChatMessagePart existingPart : existingMessage.getParts()) {
+                                    if (existingPart.getId().getOrderIndex().equals(part.getId().getOrderIndex())) {
+                                        found = true;
+                                        break;
+                                    }
+                                }
+                                
+                                if (!found) {
+                                    logger.info("DETAILED DEBUG: Adding missing part: {} to existing message", 
+                                        part.getId().getOrderIndex());
+                                    existingMessage.addMessagePart(part);
+                                }
+                            }
+                        }
+                        
+                        // Save any updates
+                        try {
+                            ChatMessage saved = chatMessageRepository.save(existingMessage);
+                            logger.info("DETAILED DEBUG: Final saved message ID={}, ThreadID={}, Parts={}", 
+                                saved.getId(), saved.getThread().getId(), saved.getParts().size());
+                                
+                            // Update thread with final version
+                            thread.setSelectedLeafMessage(saved);
+                            chatThreadRepository.save(thread);
+                            logger.info("DETAILED DEBUG: Updated thread with final message");
+                        } catch (Exception e) {
+                            logger.error("DETAILED DEBUG: Failed to save final message updates: {}", e.getMessage(), e);
+                        }
+                    }
+                } else {
+                    logger.warn("DETAILED DEBUG: No assistant message to save on completion");
+                }
+            })
+            .doOnError(error -> {
+                logger.error("Error in chat stream processing", error);
+                logger.info("DETAILED DEBUG: WebClient stream error: {}", error.getMessage(), error);
+            })
+            .onErrorResume(error -> {
+                logger.error("Recovering from stream error", error);
+                logger.info("DETAILED DEBUG: Returning error response due to: {}", error.getMessage());
+                return Flux.just(
+                    "3:\"An error occurred while processing your request. Please try again.\"",
+                    "d:{\"finishReason\":\"error\"}"
+                );
+            });
+    }
+
+    private void processStreamFrame(
+        String frame,
+        ChatThread thread,
+        ChatMessage userMessage,
+        AtomicReference<ChatMessage> assistantMessage,
+        AtomicReference<StringBuilder> contentBuilder,
+        AtomicReference<Integer> partIndex,
+        AtomicReference<Character> lastFrameType
+    ) {
+        try {
+            // Parse AI SDK frame format: "type:content"
+            if (!frame.contains(":")) {
+                logger.warn("Invalid frame format (missing colon separator): {}", frame);
+                logger.info("DETAILED DEBUG: Invalid frame format (skipping): '{}'", frame);
+                return;
+            }
+
+            String frameType = frame.substring(0, frame.indexOf(":"));
+            String frameContent = frame.substring(frame.indexOf(":") + 1);
+            logger.info("DETAILED DEBUG: Frame type='{}', raw content='{}'", frameType, frameContent);
+            
+            JsonNode frameNode = objectMapper.readTree(frameContent);
+            logger.info("DETAILED DEBUG: Parsed JSON node: {}", frameNode);
+
+            logger.debug(
+                "Processing frame type: {} with content length: {}",
+                frameType,
+                frameContent != null ? frameContent.length() : 0
+            );
+
+            // Handle different frame types based on AI SDK protocol
+            switch (frameType) {
+                case "f": // start_step - initialize assistant message
+                    logger.debug("Frame: start_step received");
+                    logger.info("DETAILED DEBUG: Processing f frame (start_step) with content: {}", frameContent);
+                    UUID messageId = UUID.fromString(frameNode.get("messageId").asText());
+                    logger.info("DETAILED DEBUG: Creating new assistant message with ID={}", messageId);
+
+                    // Check if assistant message already exists to avoid constraint violations
+                    ChatMessage existingAssistantMessage = chatMessageRepository.findById(messageId).orElse(null);
+                    ChatMessage savedAssistantMessage;
+
+                    // --- COMBINE LOGIC: If an assistant message already exists (from previous 'f'), move its parts to the new message and delete the old one ---
+                    if (assistantMessage.get() != null && !assistantMessage.get().getId().equals(messageId)) {
+                        ChatMessage oldMsg = assistantMessage.get();
+                        logger.info("DETAILED DEBUG: Combining parts from previous assistant message {} into new message {}", oldMsg.getId(), messageId);
+                        
+                        // Save any pending text content before combining
+                        if (lastFrameType.get() == '0' && contentBuilder.get().length() > 0) {
+                            logger.info("DETAILED DEBUG: Saving pending text content before combining: '{}'", contentBuilder.get().toString());
+                            saveMessagePart(
+                                oldMsg,
+                                ChatMessagePart.MessagePartType.TEXT,
+                                contentBuilder.get().toString(),
+                                partIndex.get()
+                            );
+                            partIndex.set(partIndex.get() + 1);
+                            contentBuilder.set(new StringBuilder());
+                        }
+                        
+                        // Move parts
+                        List<ChatMessagePart> oldParts = new ArrayList<>(oldMsg.getParts());
+                        for (ChatMessagePart part : oldParts) {
+                            // Remove from old message's parts list only
+                            oldMsg.getParts().remove(part);
+                            // Set new ID and message
+                            part.setMessageId(messageId);
+                        }
+                        // Save or update the new message
+                        ChatMessage newMessage = existingAssistantMessage != null ? existingAssistantMessage : new ChatMessage();
+                        newMessage.setRole(ChatMessage.Role.ASSISTANT);
+                        newMessage.setThread(thread);
+                        newMessage.setId(messageId);
+                        newMessage.setParentMessage(userMessage);
+                        for (ChatMessagePart part : oldParts) {
+                            newMessage.addMessagePart(part);
+                        }
+                        savedAssistantMessage = chatMessageRepository.save(newMessage);
+                        // Save all moved parts
+                        for (ChatMessagePart part : oldParts) {
+                            chatMessagePartRepository.save(part);
+                        }
+
+                        // Find and update all threads referencing the old message
+                        List<ChatThread> allThreads = chatThreadRepository.findAll();
+                        for (ChatThread chatThread : allThreads) {
+                            if (chatThread.getSelectedLeafMessage() != null && 
+                                chatThread.getSelectedLeafMessage().getId().equals(oldMsg.getId())) {
+                                chatThread.setSelectedLeafMessage(newMessage);
+                                chatThreadRepository.save(chatThread);
+                                logger.info("DETAILED DEBUG: Updated thread {} to reference new message {}", 
+                                    chatThread.getId(), newMessage.getId());
+                            }
+                        }
+
+                        // Now safe to delete the old message
+                        chatMessageRepository.deleteById(oldMsg.getId());
+                        logger.info("DETAILED DEBUG: Old assistant message {} deleted after combining.", oldMsg.getId());
+                    } else if (existingAssistantMessage != null) {
+                        logger.info("DETAILED DEBUG: Assistant message with ID={} already exists, updating it", messageId);
+                        // Update existing message but preserve existing parts
+                        existingAssistantMessage.setRole(ChatMessage.Role.ASSISTANT);
+                        existingAssistantMessage.setThread(thread);
+                        existingAssistantMessage.setParentMessage(userMessage);
+                        savedAssistantMessage = chatMessageRepository.save(existingAssistantMessage);
+                        logger.info("DETAILED DEBUG: Updated existing assistant message: ID={}", savedAssistantMessage.getId());
+                    } else {
+                        // Always create a new assistant message (if one already exists, it will be replaced)
+                        ChatMessage newMessage = new ChatMessage();
+                        newMessage.setRole(ChatMessage.Role.ASSISTANT);
+                        newMessage.setThread(thread);
+                        newMessage.setId(messageId);
+                        newMessage.setParentMessage(userMessage);
+                        // CRITICAL DEBUG: Make sure objects exist in DB before setting relationships
+                        ChatMessage parentCheck = chatMessageRepository.findById(userMessage.getId()).orElse(null);
+                        if (parentCheck == null) {
+                            logger.error("DETAILED DEBUG: CRITICAL ERROR - Parent message ID={} not found in database!", userMessage.getId());
+                            // Try to persist parent message if it doesn't exist
+                            logger.info("DETAILED DEBUG: Attempting to persist parent message first");
+                            ChatMessage savedParent = chatMessageRepository.save(userMessage);
+                            logger.info("DETAILED DEBUG: Parent message saved: ID={}", savedParent.getId());
+                            newMessage.setParentMessage(savedParent);
+                        } else {
+                            logger.info("DETAILED DEBUG: Parent message found in database: ID={}", parentCheck.getId());
+                        }
+                        // First persist the assistant message before updating thread reference
+                        logger.info("DETAILED DEBUG: Persisting assistant message ID={} before updating thread", newMessage.getId());
+                        savedAssistantMessage = chatMessageRepository.save(newMessage);
+                        logger.info("DETAILED DEBUG: Assistant message persisted: ID={}", savedAssistantMessage.getId());
+                    }
+                    // Set the assistantMessage atomic reference
+                    assistantMessage.set(savedAssistantMessage);
+                    // Double-check persistence by trying to retrieve it
+                    ChatMessage retrievedMessage = chatMessageRepository.findById(savedAssistantMessage.getId()).orElse(null);
+                    if (retrievedMessage == null) {
+                        logger.error("DETAILED DEBUG: CRITICAL ERROR! Assistant message wasn't properly persisted: {}", savedAssistantMessage.getId());
+                    } else {
+                        logger.info("DETAILED DEBUG: Verified assistant message persistence: ID={}", retrievedMessage.getId());
+                    }
+                    // Get a fresh thread reference to avoid LazyInitializationException
+                    ChatThread freshThread = chatThreadRepository.findById(thread.getId()).orElse(null);
+                    if (freshThread != null) {
+                        try {
+                            // Use the new safe method instead of directly updating the thread
+                            updateThreadSelectedMessage(freshThread.getId(), savedAssistantMessage.getId());
+                            logger.info("DETAILED DEBUG: Thread updated with new selected leaf message: {}", messageId);
+                        } catch (Exception e) {
+                            logger.error("DETAILED DEBUG: Failed to update thread: {}", e.getMessage(), e);
+                        }
+                    } else {
+                        logger.error("DETAILED DEBUG: Failed to update thread: Thread ID={} not found", thread.getId());
+                    }
+                    // Initialize text/reasoning content builders
+                    contentBuilder.set(new StringBuilder());
+                    break;
+                case "0": // text content
+                    logger.info("DETAILED DEBUG: Processing text frame: {}", frameNode.asText());
+                    if (assistantMessage.get() == null) {
+                        logger.error("DETAILED DEBUG: No assistant message available for text content! This is a critical error.");
+                    }
+                    if (lastFrameType.get() == 'g') { // Save reasoning
+                        // If reasoning content exists, save it
+                        logger.info("DETAILED DEBUG: Last frame was reasoning, saving reasoning content: '{}'", 
+                            contentBuilder.get().toString());
+                        saveMessagePart(
+                            assistantMessage.get(),
+                            ChatMessagePart.MessagePartType.REASONING,
+                            contentBuilder.get().toString(),
+                            partIndex.get()
+                        );
+                        partIndex.set(partIndex.get() + 1);
+                        contentBuilder.set(new StringBuilder());
+                    }
+                    contentBuilder.get().append(frameNode.asText());
+                    logger.info("DETAILED DEBUG: Appended text: '{}', builder now: '{}'", 
+                        frameNode.asText(), contentBuilder.get().toString());
+                    break;
+                case "e": // finish_step
+                    logger.info("DETAILED DEBUG: Processing finish_step frame: {}", frameContent);
+                    // if g or 0 was the last frame, we need to save the content
+                    if (lastFrameType.get() == '0' || lastFrameType.get() == 'g') {
+                        logger.info("DETAILED DEBUG: Saving content from last frame type='{}': '{}'", 
+                            lastFrameType.get(), contentBuilder.get().toString());
+                        saveMessagePart(
+                            assistantMessage.get(),
+                            lastFrameType.get() == '0'
+                                ? ChatMessagePart.MessagePartType.TEXT
+                                : ChatMessagePart.MessagePartType.REASONING,
+                            contentBuilder.get().toString(),
+                            partIndex.get()
+                        );
+                        partIndex.set(partIndex.get() + 1);
+                        contentBuilder.set(new StringBuilder());
+                    }
+                    break;
+                case "d": // finish_message
+                    // Message is complete - any metadata like finish reason is in the content
+                    String finishReason = frameNode.get("finishReason").asText("unknown");
+                    logger.debug("Message finished with reason: {}", finishReason);
+                    logger.info("DETAILED DEBUG: Message finished with reason: {}, full content: {}", 
+                        finishReason, frameContent);
+                    
+                    // Final check of assistant message
+                    if (assistantMessage.get() != null) {
+                        ChatMessage finalMessage = chatMessageRepository.save(assistantMessage.get());
+                        logger.info("DETAILED DEBUG: Final message saved on completion: ID={}, Parts={}", 
+                            finalMessage.getId(), finalMessage.getParts().size());
+                    } else {
+                        logger.error("DETAILED DEBUG: No assistant message to save at finish_message!");
+                    }
+                    break;
+                case "g": // reasoning content
+                    logger.info("DETAILED DEBUG: Processing reasoning frame: {}", frameNode.asText());
+                    if (lastFrameType.get() == '0') { // Save text content before starting reasoning
+                        logger.info("DETAILED DEBUG: Last frame was text, saving text content: '{}'", 
+                            contentBuilder.get().toString());
+                        saveMessagePart(
+                            assistantMessage.get(),
+                            ChatMessagePart.MessagePartType.TEXT,
+                            contentBuilder.get().toString(),
+                            partIndex.get()
+                        );
+                        partIndex.set(partIndex.get() + 1);
+                        contentBuilder.set(new StringBuilder());
+                    }
+                    contentBuilder.get().append(frameNode.asText());
+                    logger.info("DETAILED DEBUG: Appended reasoning: '{}', builder now: '{}'", 
+                        frameNode.asText(), contentBuilder.get().toString());
+                    break;
+                case "i": // redacted reasoning
+                    logger.warn("Frame: redacted reasoning received, skipping content");
+                    logger.info("DETAILED DEBUG: Skipping redacted reasoning: {}", frameContent);
+                    break;
+                case "j": // reasoning signature
+                    logger.warn("Frame: reasoning signature received, skipping content");
+                    logger.info("DETAILED DEBUG: Skipping reasoning signature: {}", frameContent);
+                    break;
+                case "h": // source citation
+                    logger.warn("Frame: source citation received, skipping content");
+                    break;
+                case "k": // file attachment
+                    logger.warn("Frame: file attachment received, skipping content");
+                    logger.info("DETAILED DEBUG: Skipping file attachment: {}", frameContent);
+                    break;
+                case "2": // data array
+                    logger.warn("Frame: data array received, skipping content");
+                    logger.info("DETAILED DEBUG: Skipping data array: {}", frameContent);
+                    break;
+                case "8": // message annotations
+                    logger.warn("Frame: message annotations received, skipping content");
+                    logger.info("DETAILED DEBUG: Skipping message annotations: {}", frameContent);
+                    break;
+                case "3": // error message
+                    logger.warn("Frame: error message received, skipping content");
+                    logger.info("DETAILED DEBUG: Error message received: {}", frameContent);
+                    break;
+                case "9": // tool call (complete)
+                    logger.info("DETAILED DEBUG: Processing tool call frame: {}", frameContent);
+                    // if g or 0 was the last frame, we need to save the content
+                    if (lastFrameType.get() == '0' || lastFrameType.get() == 'g') {
+                        logger.info("DETAILED DEBUG: Saving content from last frame before tool call: type='{}', content='{}'", 
+                            lastFrameType.get(), contentBuilder.get().toString());
+                        saveMessagePart(
+                            assistantMessage.get(),
+                            lastFrameType.get() == '0'
+                                ? ChatMessagePart.MessagePartType.TEXT
+                                : ChatMessagePart.MessagePartType.REASONING,
+                            contentBuilder.get().toString(),
+                            partIndex.get()
+                        );
+                        partIndex.set(partIndex.get() + 1);
+                        contentBuilder.set(new StringBuilder());
+                    }
+
+                    // Create a new tool invocation part
+                    logger.info("DETAILED DEBUG: Creating tool invocation part with toolName={}, toolCallId={}", 
+                        frameNode.get("toolName").asText(), frameNode.get("toolCallId").asText());
+                    saveMessagePart(assistantMessage.get(), ChatMessagePart.MessagePartType.TOOL_INVOCATION, frameNode, partIndex.get());
+                    partIndex.set(partIndex.get() + 1);
+                    break;
+                case "a": // tool result
+                    logger.info("DETAILED DEBUG: Processing tool result frame: {}", frameContent);
+                    // Handle tool result by finding the corresponding tool invocation part
+                    String toolCallId = frameNode.get("toolCallId").asText();
+                    JsonNode toolResult = frameNode.get("result");
+                    logger.info("DETAILED DEBUG: Tool result for toolCallId={}, result={}", toolCallId, toolResult);
+
+                    if (assistantMessage.get() == null) {
+                        logger.error("DETAILED DEBUG: No assistant message available for tool result! This is a critical error.");
+                        break;
+                    }
+
+                    logger.info("DETAILED DEBUG: Looking for tool invocation part with toolCallId={} among {} parts", toolCallId, assistantMessage.get().getParts().size());
+
+                    for (ChatMessagePart part : assistantMessage.get().getParts()) {
+                        logger.info("DETAILED DEBUG: Checking part id={}, type={}, content={}", part.getId(), part.getType(), part.getContent());
+                    }
+
+                    Optional<ChatMessagePart> lastToolPart = assistantMessage.get().getParts().stream()
+                        .filter(part -> part.getType() == ChatMessagePart.MessagePartType.TOOL_INVOCATION)
+                        .filter(part -> part.getContent().has("toolCallId") && part.getContent().get("toolCallId").asText().equals(toolCallId))
+                        .findFirst();
+
+                    if (lastToolPart.isPresent()) {
+                        logger.info("DETAILED DEBUG: Found matching tool part: {}", lastToolPart.get().getId());
+                        var content = (ObjectNode) lastToolPart.get().getContent();
+                        // Format result as string with '°C' if toolName is getWeather
+                        String toolName = content.has("toolName") ? content.get("toolName").asText() : null;
+                        if ("getWeather".equals(toolName) && toolResult.isNumber()) {
+                            content.put("result", toolResult.asDouble() + "°C");
+                        } else {
+                            content.set("result", toolResult);
+                        }
+                        lastToolPart.get().setContent(content);
+                        chatMessagePartRepository.save(lastToolPart.get());
+                        logger.info("DETAILED DEBUG: Updated tool part with result and saved it");
+                    } else {
+                        logger.warn("No tool invocation part found with toolCallId: {}", toolCallId);
+                        logger.error("DETAILED DEBUG: Failed to find tool part with toolCallId={}", toolCallId);
+                    }
+                    break;
+                case "b": // tool call streaming start (streaming only - don't persist)
+                    logger.debug("Frame: tool call streaming start (not persisted): {}", frameContent);
+                    logger.info("DETAILED DEBUG: Tool call streaming start: {}", frameContent);
+                    break;
+                case "c": // tool call delta (streaming only - don't persist)
+                    logger.debug("Frame: tool call delta (not persisted): {}", frameContent);
+                    logger.info("DETAILED DEBUG: Tool call delta: {}", frameContent);
+                    break;
+                default:
+                    logger.warn("Unknown frame type: {}", frameType);
+                    logger.info("DETAILED DEBUG: Unknown frame type: {}, content: {}", frameType, frameContent);
+                    break;
+            }
+        } catch (Exception e) {
+            logger.error("Error processing frame: {}", frame, e);
+            logger.info("DETAILED DEBUG: EXCEPTION processing frame: {}", e.getMessage(), e);
+        }
+    }
+
+    /**
+     * Helper method to save a message part with proper content handling.
+     * Handles both String content and JsonNode content.
+     */
+    @Transactional
+    private void saveMessagePart(
+        ChatMessage message, 
+        ChatMessagePart.MessagePartType type, 
+        Object content, 
+        int partIndex
+    ) {
+        logger.info("DETAILED DEBUG: Saving message part: type={}, message={}, partIndex={}", 
+            type, message.getId(), partIndex);
+            
+        // First check if message exists in database to avoid LazyInitializationException
+        ChatMessage persistedMessage = chatMessageRepository.findById(message.getId())
+            .orElse(null);
+            
+        if (persistedMessage == null) {
+            logger.error("DETAILED DEBUG: Message not found in database: ID={}", message.getId());
+            // Save message first to ensure it exists
+            persistedMessage = chatMessageRepository.save(message);
+            logger.info("DETAILED DEBUG: Saved message first: ID={}", persistedMessage.getId());
+        } else {
+            logger.info("DETAILED DEBUG: Message exists in database: ID={}", message.getId());
+        }
+        
+        ChatMessagePartId partId = new ChatMessagePartId(message.getId(), partIndex);
+        logger.info("DETAILED DEBUG: Created ChatMessagePartId with messageId={}, orderIndex={}", 
+            partId.getMessageId(), partId.getOrderIndex());
+        
+        // Remove any existing part with the same ID to avoid duplicates
+        message.getParts().removeIf(p -> p.getId().equals(partId));
+        
+        ChatMessagePart part = new ChatMessagePart();
+        part.setId(partId);
+        part.setMessage(persistedMessage);
+        part.setType(type);
+        
+        if (content instanceof String) {
+            logger.info("DETAILED DEBUG: String content: '{}'", content);
+            // Convert string to JsonNode
+            try {
+                part.setContent(objectMapper.valueToTree(content));
+            } catch (Exception e) {
+                logger.error("DETAILED DEBUG: Error converting string to JsonNode: {}", e.getMessage());
+                // Fallback to creating a TextNode directly
+                part.setContent(objectMapper.getNodeFactory().textNode((String) content));
+            }
+        } else if (content instanceof JsonNode) {
+            logger.info("DETAILED DEBUG: JsonNode content: {}", content);
+            part.setContent((JsonNode) content);
+        }
+        
+        // Use the helper to maintain bidirectional relationship
+        message.addMessagePart(part);
+        logger.info("DETAILED DEBUG: Added part to message object, now has {} parts", 
+            message.getParts().size());
+        
+        // First save the part individually
+        ChatMessagePart savedPart = chatMessagePartRepository.save(part);
+        logger.info("DETAILED DEBUG: Part saved individually first: messageId={}, index={}", 
+            savedPart.getId().getMessageId(), savedPart.getId().getOrderIndex());
+        
+        // Now save the message with the updated parts collection
+        chatMessageRepository.save(message);
+        logger.info("DETAILED DEBUG: Message with part saved. Message now has {} parts", 
+            message.getParts().size());
+        
+        // Verify persistence
+        ChatMessagePart retrievedPart = chatMessagePartRepository.findById(partId).orElse(null);
+        if (retrievedPart != null) {
+            logger.info("DETAILED DEBUG: Verified part persistence: index={}, type={}", 
+                retrievedPart.getId().getOrderIndex(), retrievedPart.getType());
+        } else {
+            logger.error("DETAILED DEBUG: Failed to verify part persistence: index={}, type={}", 
+                partIndex, type);
+        }
+    }
+
+    /**
+     * Safely update the thread's selected leaf message in a new transaction
+     * This helps avoid LazyInitializationException and constraint violations
+     */
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    public void updateThreadSelectedMessage(UUID threadId, UUID messageId) {
+        try {
+            ChatThread thread = chatThreadRepository.findById(threadId).orElse(null);
+            ChatMessage message = chatMessageRepository.findById(messageId).orElse(null);
+            
+            if (thread != null && message != null) {
+                // Make sure the message is associated with this thread
+                message.setThread(thread);
+                message = chatMessageRepository.save(message);
+                
+                // Now update the thread reference
+                thread.setSelectedLeafMessage(message);
+                chatThreadRepository.save(thread);
+                logger.info("DETAILED DEBUG: Safely updated thread {} selected message to {}", threadId, messageId);
+            }
+        } catch (Exception e) {
+            logger.error("DETAILED DEBUG: Error in updateThreadSelectedMessage: {}", e.getMessage(), e);
+        }
+    }
+}
