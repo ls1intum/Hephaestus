@@ -50,15 +50,15 @@ public class GitHubTeamSyncService {
 
     public void syncAndSaveTeams(String orgName) throws IOException {
         GHOrganization org = gitHub.getOrganization(orgName);
-        PagedIterable<GHTeam> teams = org.listTeams().withPageSize(100);
+        List<GHTeam> teams = org.listTeams().withPageSize(100).toList();
 
-        for (GHTeam ghTeam : teams) {
+        teams.parallelStream().forEach(ghTeam -> {
             // must call via the proxy (self) to trigger @Transactional on processTeam
             TeamV2 saved = self.processTeam(ghTeam);
             if (saved == null) {
                 log.warn("Skipped team {} with following id: {} due to error", ghTeam.getSlug(), ghTeam.getId());
             }
-        }
+        });
     }
 
     @Transactional
@@ -89,9 +89,6 @@ public class GitHubTeamSyncService {
     }
 
     private void syncMemberships(GHTeam ghTeam, TeamV2 team) throws IOException {
-
-        List<GHUser> members = ghTeam.listMembers().toList();
-
 
         Set<Long> maintainerIds = ghTeam
             .listMembers(GHTeam.Role.MAINTAINER)
