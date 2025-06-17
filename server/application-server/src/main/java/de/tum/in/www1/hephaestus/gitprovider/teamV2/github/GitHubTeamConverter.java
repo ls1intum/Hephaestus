@@ -14,7 +14,6 @@ public class GitHubTeamConverter extends BaseGitServiceEntityConverter<GHTeam, T
 
     private static final Logger logger = LoggerFactory.getLogger(GitHubTeamConverter.class);
 
-    @Override
     public TeamV2 convert(@NonNull GHTeam source) {
             return update(source, new TeamV2());
     }

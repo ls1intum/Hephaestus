@@ -9,17 +9,22 @@ import de.tum.in.www1.hephaestus.gitprovider.user.*;
 import java.io.IOException;
 import java.util.HashSet;
 import java.util.Map;
+import java.util.List;
 import java.util.Objects;
 import java.util.Set;
 import java.util.stream.Collectors;
 import org.kohsuke.github.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.annotation.Lazy;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 @Service
 public class GitHubTeamSyncService {
+
+    private GitHubTeamSyncService self;
 
     private static final Logger log = LoggerFactory.getLogger(GitHubTeamSyncService.class);
 
@@ -43,11 +48,11 @@ public class GitHubTeamSyncService {
         this.teamConverter = teamConverter;
     }
 
-    @Transactional
     public void syncAndSaveTeams(String orgName) throws IOException {
         GHOrganization org = gitHub.getOrganization(orgName);
         for (GHTeam ghTeam : org.listTeams()) {
-            TeamV2 saved = processTeam(ghTeam);
+            // must call via the proxy (self) to trigger @Transactional on processTeam
+            TeamV2 saved = self.processTeam(ghTeam);
             if (saved == null) {
                 log.warn("Skipped team {} with following id: {} due to error", ghTeam.getSlug(), ghTeam.getId());
             }
@@ -57,19 +62,21 @@ public class GitHubTeamSyncService {
     @Transactional
     public TeamV2 processTeam(GHTeam ghTeam) {
         try {
-            TeamV2 team = teamRepository
-                .findById(ghTeam.getId())
-                .orElseGet(() -> teamConverter.convert(ghTeam));
-            //TODO: check why team can be null here
-            teamConverter.update(ghTeam, team);
+            TeamV2 team = teamRepository.findById(ghTeam.getId())
+                    .map(existing -> {
+                        teamConverter.update(ghTeam, existing);
+                        return existing;
+                    })
+                    .orElseGet(() -> teamConverter.convert(ghTeam));
+
             syncMemberships(ghTeam, Objects.requireNonNull(team));
             syncRepoPermissions(ghTeam, team);
             TeamV2 saved = teamRepository.save(team);
             log.info(
-                "Processed team={}, having {} members with {} repository permissions",
-                team.getSlug(),
-                team.getMemberships().size(),
-                team.getRepoPermissions().size()
+                    "Processed team={}, having {} members with {} repository permissions",
+                    team.getSlug(),
+                    team.getMemberships().size(),
+                    team.getRepoPermissions().size()
             );
 
             return saved;
@@ -80,6 +87,10 @@ public class GitHubTeamSyncService {
     }
 
     private void syncMemberships(GHTeam ghTeam, TeamV2 team) throws IOException {
+
+        List<GHUser> members = ghTeam.listMembers().toList();
+
+
         Set<Long> maintainerIds = ghTeam
             .listMembers(GHTeam.Role.MAINTAINER)
             .toList()
@@ -107,15 +118,15 @@ public class GitHubTeamSyncService {
             if (!userRepository.existsById(id)) {
                 continue; //skip unknown users
             }
-            TeamMembership tm = existing.remove(id);
+            TeamMembership teamMembership = existing.remove(id);
             TeamMembership.Role newRole = maintainerIds.contains(id)
                 ? TeamMembership.Role.MAINTAINER
                 : TeamMembership.Role.MEMBER;
 
-            if (tm != null) {
-                // update role if promoted
-                if (tm.getRole() != newRole) {
-                    tm.setRole(newRole);
+            if (teamMembership != null) {
+                // update the role if promoted
+                if (teamMembership.getRole() != newRole) {
+                    teamMembership.setRole(newRole);
                 }
             } else {
                 // fresh membership
@@ -147,5 +158,11 @@ public class GitHubTeamSyncService {
             fresh.add(new TeamRepositoryPermission(team, repoRef, level));
         }
         team.clearAndAddRepoPermissions(fresh);
+    }
+
+    @Autowired
+    @Lazy
+    public void setSelf(GitHubTeamSyncService self) {
+        this.self = self;
     }
 }
