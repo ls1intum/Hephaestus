@@ -426,7 +426,7 @@ async def handle_chat(request: ChatRequest):
             async for chunk in stream.run_step(lambda: generate_response(langchain_messages, stream)):
                 yield chunk
 
-            yield stream.finish_message(request)
+            yield stream.finish_message()
         except Exception as e:
             logger.error(f"Error generating response: {str(e)}")
             yield stream.error(f"An error occurred: {str(e)}")
