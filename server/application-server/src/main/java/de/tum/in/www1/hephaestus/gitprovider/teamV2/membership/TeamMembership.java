@@ -5,6 +5,8 @@ import de.tum.in.www1.hephaestus.gitprovider.user.User;
 import jakarta.persistence.*;
 import lombok.*;
 
+import java.io.Serializable;
+
 @Entity
 @Table(name = "team_v2_membership")
 @Getter
@@ -15,7 +17,7 @@ public class TeamMembership {
 
     @EmbeddedId
     @EqualsAndHashCode.Include
-    private TeamMembershipId id = new TeamMembershipId();
+    private Id id = new Id();
 
     @ManyToOne(fetch = FetchType.LAZY)
     @MapsId("teamId")
@@ -28,11 +30,6 @@ public class TeamMembership {
     @Enumerated(EnumType.STRING)
     private Role role;
 
-    public enum Role {
-        MEMBER,
-        MAINTAINER,
-    }
-
     public TeamMembership(TeamV2 team, User user, Role role) {
         this.team = team;
         this.user = user;
@@ -40,4 +37,21 @@ public class TeamMembership {
         this.id.setTeamId(team.getId());
         this.id.setUserId(user.getId());
     }
+
+    public enum Role {
+        MEMBER,
+        MAINTAINER,
+    }
+
+    @Embeddable
+    @Getter
+    @Setter
+    @NoArgsConstructor
+    @AllArgsConstructor
+    @EqualsAndHashCode
+    public static class Id implements Serializable {
+        private Long teamId;
+        private Long userId;
+    }
+
 }
