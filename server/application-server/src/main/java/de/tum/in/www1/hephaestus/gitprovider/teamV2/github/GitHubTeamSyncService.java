@@ -8,8 +8,8 @@ import de.tum.in.www1.hephaestus.gitprovider.teamV2.permission.*;
 import de.tum.in.www1.hephaestus.gitprovider.user.*;
 import java.io.IOException;
 import java.util.HashSet;
-import java.util.Map;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 import java.util.stream.Collectors;
@@ -52,33 +52,36 @@ public class GitHubTeamSyncService {
         GHOrganization org = gitHub.getOrganization(orgName);
         List<GHTeam> teams = org.listTeams().withPageSize(100).toList();
 
-        teams.parallelStream().forEach(ghTeam -> {
-            // must call via the proxy (self) to trigger @Transactional on processTeam
-            TeamV2 saved = self.processTeam(ghTeam);
-            if (saved == null) {
-                log.warn("Skipped team {} with following id: {} due to error", ghTeam.getSlug(), ghTeam.getId());
-            }
-        });
+        teams
+            .parallelStream()
+            .forEach(ghTeam -> {
+                // must call via the proxy (self) to trigger @Transactional on processTeam
+                TeamV2 saved = self.processTeam(ghTeam);
+                if (saved == null) {
+                    log.warn("Skipped team {} with following id: {} due to error", ghTeam.getSlug(), ghTeam.getId());
+                }
+            });
     }
 
     @Transactional
     public TeamV2 processTeam(GHTeam ghTeam) {
         try {
-            TeamV2 team = teamRepository.findById(ghTeam.getId())
-                    .map(existing -> {
-                        teamConverter.update(ghTeam, existing);
-                        return existing;
-                    })
-                    .orElseGet(() -> teamConverter.convert(ghTeam));
+            TeamV2 team = teamRepository
+                .findById(ghTeam.getId())
+                .map(existing -> {
+                    teamConverter.update(ghTeam, existing);
+                    return existing;
+                })
+                .orElseGet(() -> teamConverter.convert(ghTeam));
 
             syncMemberships(ghTeam, Objects.requireNonNull(team));
             syncRepoPermissions(ghTeam, team);
             TeamV2 saved = teamRepository.save(team);
             log.info(
-                    "Processed team={}, having {} members with {} repository permissions",
-                    team.getSlug(),
-                    team.getMemberships().size(),
-                    team.getRepoPermissions().size()
+                "Processed team={}, having {} members with {} repository permissions",
+                team.getSlug(),
+                team.getMemberships().size(),
+                team.getRepoPermissions().size()
             );
 
             return saved;
@@ -89,7 +92,6 @@ public class GitHubTeamSyncService {
     }
 
     private void syncMemberships(GHTeam ghTeam, TeamV2 team) throws IOException {
-
         Set<Long> maintainerIds = ghTeam
             .listMembers(GHTeam.Role.MAINTAINER)
             .toList()

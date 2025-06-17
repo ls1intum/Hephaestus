@@ -3,9 +3,8 @@ package de.tum.in.www1.hephaestus.gitprovider.teamV2.membership;
 import de.tum.in.www1.hephaestus.gitprovider.teamV2.TeamV2;
 import de.tum.in.www1.hephaestus.gitprovider.user.User;
 import jakarta.persistence.*;
-import lombok.*;
-
 import java.io.Serializable;
+import lombok.*;
 
 @Entity
 @Table(name = "team_v2_membership")
@@ -50,8 +49,8 @@ public class TeamMembership {
     @AllArgsConstructor
     @EqualsAndHashCode
     public static class Id implements Serializable {
+
         private Long teamId;
         private Long userId;
     }
-
 }
