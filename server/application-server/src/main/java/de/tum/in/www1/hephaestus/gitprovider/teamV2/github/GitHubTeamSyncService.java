@@ -50,7 +50,9 @@ public class GitHubTeamSyncService {
 
     public void syncAndSaveTeams(String orgName) throws IOException {
         GHOrganization org = gitHub.getOrganization(orgName);
-        for (GHTeam ghTeam : org.listTeams()) {
+        PagedIterable<GHTeam> teams = org.listTeams().withPageSize(100);
+
+        for (GHTeam ghTeam : teams) {
             // must call via the proxy (self) to trigger @Transactional on processTeam
             TeamV2 saved = self.processTeam(ghTeam);
             if (saved == null) {
