@@ -28,7 +28,13 @@ public class TeamV2 extends BaseGitServiceEntity {
 
     private String privacy;
 
-    private String githubOrganization;
+    private String organization;
+
+    private String nodeId;
+
+    private String apiUrl;
+
+    private String htmlUrl;
 
     private OffsetDateTime lastSyncedAt;
 

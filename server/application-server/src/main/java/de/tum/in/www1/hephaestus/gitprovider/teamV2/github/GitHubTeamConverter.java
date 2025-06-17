@@ -25,6 +25,9 @@ public class GitHubTeamConverter extends BaseGitServiceEntityConverter<GHTeam, T
         team.setSlug(source.getSlug());
         team.setDescription(source.getDescription());
         team.setPrivacy(source.getPrivacy() != null ? source.getPrivacy().name() : null);
+        team.setNodeId(source.getNodeId());
+        team.setApiUrl(source.getUrl().toString());
+        team.setHtmlUrl(source.getHtmlUrl().toString());
         team.setLastSyncedAt(OffsetDateTime.now());
         String organization = null;
 
@@ -41,7 +44,7 @@ public class GitHubTeamConverter extends BaseGitServiceEntityConverter<GHTeam, T
         }
 
         if (organization != null) {
-            team.setGithubOrganization(organization);
+            team.setOrganization(organization);
         }
 
         return team;
