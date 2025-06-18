@@ -1,12 +1,15 @@
 import asyncio
+from collections import defaultdict
+import inspect
 import uuid
 import json
-from typing import AsyncGenerator, List, Literal, Optional, Any, Dict, Union
+from typing import AsyncGenerator, Callable, List, Literal, Optional, Any, Dict, Union
 from pydantic import BaseModel, Field, field_validator
 from fastapi import APIRouter
 from fastapi.responses import StreamingResponse
-from langchain_core.output_parsers import StrOutputParser
-from langchain_core.messages import HumanMessage, AIMessage, SystemMessage
+from langchain_core.messages import HumanMessage, AIMessage, SystemMessage, AIMessageChunk
+from langchain_core.tools import tool
+import requests
 from app.models import get_model
 from app.settings import settings
 from app.logger import logger
@@ -357,39 +360,157 @@ class StreamGenerator:
         """Send an error."""
         return self.format_event(StreamErrorPart(errorText=error_text))
     
+    def tool_input_start(self, tool_call_id: str, tool_name: str) -> str:
+        """Signal the start of tool input."""
+        return self.format_event(StreamToolInputStartPart(toolCallId=tool_call_id, toolName=tool_name))
+    
+    def tool_input_delta(self, tool_call_id: str, input_text_delta: str) -> str:
+        """Send a delta of tool input."""
+        return self.format_event(StreamToolInputDeltaPart(toolCallId=tool_call_id, inputTextDelta=input_text_delta))
+    
+    def tool_input_available(self, tool_call_id: str, tool_name: str, input_data: Any) -> str:
+        """Signal that tool input is available."""
+        return self.format_event(StreamToolInputAvailablePart(toolCallId=tool_call_id, toolName=tool_name, input=input_data))
+    
+    def tool_output_available(self, tool_call_id: str, output_data: Any, provider_metadata: Optional[Dict[str, Any]] = None) -> str:
+        """Signal that tool output is available."""
+        return self.format_event(StreamToolOutputAvailablePart(toolCallId=tool_call_id, output=output_data, providerMetadata=provider_metadata))
+    
     def done(self) -> str:
         """Signal the end of the stream."""
         return 'data: [DONE]\n\n'
     
-    async def run_step(self, generator_func) -> AsyncGenerator[str, None]:
-        """Run a generator function as a step."""
+    async def run_step(
+        self,
+        generator_func: Callable[..., Any],
+        *args,
+        **kwargs
+    ) -> AsyncGenerator[str, None]:
+        """Wrap any sync- or async-generator in a start/finish boundary."""
         yield self.start_step()
-        
         try:
-            if asyncio.iscoroutinefunction(generator_func):
-                async for chunk in generator_func():
+            kwargs['stream'] = self  # Pass the stream to the generator
+            gen = generator_func(*args, **kwargs)
+            # If it's an async-generator…
+            if inspect.isasyncgen(gen):
+                async for chunk in gen:
                     yield chunk
+            # If it's a plain generator…
             else:
-                # Handle synchronous generators
-                for chunk in generator_func():
+                for chunk in gen:
                     yield chunk
-                    # Allow other tasks to run
+                    # give the loop a breath
                     await asyncio.sleep(0)
         except Exception as e:
-            logger.error(f"Error in step generation: {str(e)}")
-            yield self.error(f"Error in step: {str(e)}")
-            
+            yield self.error(f"Error in step: {e}")
         yield self.finish_step()
 
 
-def generate_response(messages, stream: StreamGenerator):
+@tool
+def get_weather(latitude: float, longitude: float) -> dict:
+    """Get the current weather at a location"""
+    url = f"https://api.open-meteo.com/v1/forecast?latitude={latitude}&longitude={longitude}&current=temperature_2m&hourly=temperature_2m&daily=sunrise,sunset&timezone=auto"
+    result = requests.get(url)
+    return result.json()
+
+
+system_prompt = """\
+You are a friendly assistant! Keep your responses concise and helpful.
+
+About the origin of user's request:
+- lat: 48.137154
+- lon: 11.576124
+- city: Munich
+- country: Germany
+
+Before calling the weather give the user a brief explanation of what you are doing.
+"""
+
+
+async def generate_response(messages, stream: StreamGenerator):
     """Generate a response using the language model."""
-    chain = model | StrOutputParser()
+    model_with_tools = model.bind_tools([get_weather])
+    messages = [SystemMessage(content=system_prompt)] + messages
+    chain = model_with_tools
     
     try:        
-        for chunk in chain.stream(messages):
-            if chunk:
-                yield stream.text(chunk)
+        tool_call_started = {}  # Track which tool calls have been started: {tool_call_id: True}
+        tool_call_by_index = {}  # Track tool calls by index: {index: tool_call_id}
+        tool_call_accumulated_args = {}  # Track accumulated args: {tool_call_id: str}
+        tool_call_names = {}  # Track tool names: {tool_call_id: tool_name}
+        
+        async for chunk in chain.astream(messages):
+            logger.debug(f"Received chunk:\n{json.dumps(chunk.model_dump(), indent=2)}")
+            chunk = AIMessageChunk.model_validate(chunk)
+            
+            # Handle tool calls (initial tool call with ID and name)
+            if chunk.tool_calls:
+                for tool_call in chunk.tool_calls:
+                    tool_call_id = tool_call["id"]
+                    if tool_call_id and tool_call_id not in tool_call_started:
+                        # This is the start of a new tool call
+                        tool_call_started[tool_call_id] = True
+                        tool_call_accumulated_args[tool_call_id] = ""
+                        tool_call_names[tool_call_id] = tool_call["name"]
+                        yield stream.tool_input_start(
+                            tool_call_id=tool_call_id,
+                            tool_name=tool_call["name"]
+                        )
+            
+            # Handle tool call chunks (streaming arguments)
+            if chunk.tool_call_chunks:
+                for tool_chunk in chunk.tool_call_chunks:
+                    index = tool_chunk.get("index")
+                    tool_call_id = tool_chunk.get("id")
+                    
+                    # If this chunk has an ID, associate it with the index
+                    if tool_call_id and index is not None:
+                        tool_call_by_index[index] = tool_call_id
+                    
+                    # Get the tool call ID either from this chunk or from the index mapping
+                    current_tool_call_id = tool_call_id or tool_call_by_index.get(index)
+                    
+                    if current_tool_call_id and current_tool_call_id in tool_call_started:
+                        # Send the args as delta text
+                        args_text = tool_chunk.get("args", "")
+                        if args_text:
+                            # Accumulate args for final tool_input_available
+                            tool_call_accumulated_args[current_tool_call_id] += args_text
+                            
+                            yield stream.tool_input_delta(
+                                tool_call_id=current_tool_call_id,
+                                input_text_delta=args_text
+                            )
+            
+            # Handle regular text content
+            if chunk.content:
+                yield stream.text(chunk.content)
+                
+            # Check if this is the finish chunk (has finish_reason)
+            if hasattr(chunk, 'response_metadata') and chunk.response_metadata.get('finish_reason') == 'tool_calls':
+                # Send tool_input_available for all accumulated tool calls
+                for tool_call_id, accumulated_args in tool_call_accumulated_args.items():
+                    if accumulated_args and tool_call_id in tool_call_started:
+                        try:
+                            # Parse the accumulated JSON arguments
+                            parsed_args = json.loads(accumulated_args) if accumulated_args else {}
+                            # Get tool name from stored names
+                            tool_name = tool_call_names.get(tool_call_id, "unknown")
+                            yield stream.tool_input_available(
+                                tool_call_id=tool_call_id,
+                                tool_name=tool_name,
+                                input_data=parsed_args
+                            )
+                        except json.JSONDecodeError as e:
+                            logger.error(f"Failed to parse tool arguments for {tool_call_id}: {accumulated_args}")
+                            # Still send the raw args if JSON parsing fails
+                            tool_name = tool_call_names.get(tool_call_id, "unknown")
+                            yield stream.tool_input_available(
+                                tool_call_id=tool_call_id,
+                                tool_name=tool_name,
+                                input_data=accumulated_args
+                            )
+                
     except Exception as e:
         logger.error(f"Error in model response generation: {str(e)}")
         yield stream.error(f"Error generating response: {str(e)}")
@@ -423,7 +544,7 @@ async def handle_chat(request: ChatRequest):
             
             langchain_messages = convert_to_langchain_messages(request.messages)
             
-            async for chunk in stream.run_step(lambda: generate_response(langchain_messages, stream)):
+            async for chunk in stream.run_step(generate_response, langchain_messages):
                 yield chunk
 
             yield stream.finish_message()
