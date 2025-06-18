@@ -7,7 +7,7 @@ from typing import AsyncGenerator, Callable, List, Literal, Optional, Any, Dict,
 from pydantic import BaseModel, Field, field_validator
 from fastapi import APIRouter
 from fastapi.responses import StreamingResponse
-from langchain_core.messages import HumanMessage, AIMessage, SystemMessage, AIMessageChunk
+from langchain_core.messages import HumanMessage, AIMessage, SystemMessage, AIMessageChunk, Tool
 from langchain_core.tools import tool
 import requests
 from app.models import get_model
@@ -406,12 +406,25 @@ class StreamGenerator:
         yield self.finish_step()
 
 
+def fetch_weather_data(latitude: float, longitude: float) -> dict:
+    """Fetch weather data from the API"""
+    try:
+        url = f"https://api.open-meteo.com/v1/forecast?latitude={latitude}&longitude={longitude}&current=temperature_2m&hourly=temperature_2m&daily=sunrise,sunset&timezone=auto"
+        result = requests.get(url, timeout=10)
+        result.raise_for_status()  # Raise an exception for bad status codes
+        return result.json()
+    except requests.exceptions.RequestException as e:
+        logger.error(f"Failed to fetch weather data for lat={latitude}, lon={longitude}: {str(e)}")
+        raise Exception(f"Weather API request failed: {str(e)}")
+    except json.JSONDecodeError as e:
+        logger.error(f"Failed to parse weather API response: {str(e)}")
+        raise Exception(f"Weather API response parsing failed: {str(e)}")
+
+
 @tool
 def get_weather(latitude: float, longitude: float) -> dict:
     """Get the current weather at a location"""
-    url = f"https://api.open-meteo.com/v1/forecast?latitude={latitude}&longitude={longitude}&current=temperature_2m&hourly=temperature_2m&daily=sunrise,sunset&timezone=auto"
-    result = requests.get(url)
-    return result.json()
+    return fetch_weather_data(latitude, longitude)
 
 
 system_prompt = """\
@@ -434,10 +447,10 @@ async def generate_response(messages, stream: StreamGenerator):
     chain = model_with_tools
     
     try:        
-        tool_call_started = {}  # Track which tool calls have been started: {tool_call_id: True}
-        tool_call_by_index = {}  # Track tool calls by index: {index: tool_call_id}
-        tool_call_accumulated_args = {}  # Track accumulated args: {tool_call_id: str}
-        tool_call_names = {}  # Track tool names: {tool_call_id: tool_name}
+        toolCallStarted = {}  # Track which tool calls have been started: {tool_call_id: True}
+        toolCallByIndex = {}  # Track tool calls by index: {index: tool_call_id}
+        toolCallAccumulatedArgs = {}  # Track accumulated args: {tool_call_id: str}
+        toolCallNames = {}  # Track tool names: {tool_call_id: tool_name}
         
         async for chunk in chain.astream(messages):
             logger.debug(f"Received chunk:\n{json.dumps(chunk.model_dump(), indent=2)}")
@@ -445,41 +458,41 @@ async def generate_response(messages, stream: StreamGenerator):
             
             # Handle tool calls (initial tool call with ID and name)
             if chunk.tool_calls:
-                for tool_call in chunk.tool_calls:
-                    tool_call_id = tool_call["id"]
-                    if tool_call_id and tool_call_id not in tool_call_started:
+                for toolCall in chunk.tool_calls:
+                    toolCallId = toolCall["id"]
+                    if toolCallId and toolCallId not in toolCallStarted:
                         # This is the start of a new tool call
-                        tool_call_started[tool_call_id] = True
-                        tool_call_accumulated_args[tool_call_id] = ""
-                        tool_call_names[tool_call_id] = tool_call["name"]
+                        toolCallStarted[toolCallId] = True
+                        toolCallAccumulatedArgs[toolCallId] = ""
+                        toolCallNames[toolCallId] = toolCall["name"]
                         yield stream.tool_input_start(
-                            tool_call_id=tool_call_id,
-                            tool_name=tool_call["name"]
+                            tool_call_id=toolCallId,
+                            tool_name=toolCall["name"]
                         )
             
             # Handle tool call chunks (streaming arguments)
             if chunk.tool_call_chunks:
-                for tool_chunk in chunk.tool_call_chunks:
-                    index = tool_chunk.get("index")
-                    tool_call_id = tool_chunk.get("id")
+                for toolChunk in chunk.tool_call_chunks:
+                    index = toolChunk.get("index")
+                    toolCallId = toolChunk.get("id")
                     
                     # If this chunk has an ID, associate it with the index
-                    if tool_call_id and index is not None:
-                        tool_call_by_index[index] = tool_call_id
+                    if toolCallId and index is not None:
+                        toolCallByIndex[index] = toolCallId
                     
                     # Get the tool call ID either from this chunk or from the index mapping
-                    current_tool_call_id = tool_call_id or tool_call_by_index.get(index)
+                    currentToolCallId = toolCallId or toolCallByIndex.get(index)
                     
-                    if current_tool_call_id and current_tool_call_id in tool_call_started:
+                    if currentToolCallId and currentToolCallId in toolCallStarted:
                         # Send the args as delta text
-                        args_text = tool_chunk.get("args", "")
-                        if args_text:
+                        argsText = toolChunk.get("args", "")
+                        if argsText:
                             # Accumulate args for final tool_input_available
-                            tool_call_accumulated_args[current_tool_call_id] += args_text
+                            toolCallAccumulatedArgs[currentToolCallId] += argsText
                             
                             yield stream.tool_input_delta(
-                                tool_call_id=current_tool_call_id,
-                                input_text_delta=args_text
+                                tool_call_id=currentToolCallId,
+                                input_text_delta=argsText
                             )
             
             # Handle regular text content
@@ -488,27 +501,67 @@ async def generate_response(messages, stream: StreamGenerator):
                 
             # Check if this is the finish chunk (has finish_reason)
             if hasattr(chunk, 'response_metadata') and chunk.response_metadata.get('finish_reason') == 'tool_calls':
-                # Send tool_input_available for all accumulated tool calls
-                for tool_call_id, accumulated_args in tool_call_accumulated_args.items():
-                    if accumulated_args and tool_call_id in tool_call_started:
+                # Send tool_input_available and execute tools for all accumulated tool calls
+                for toolCallId, accumulatedArgs in toolCallAccumulatedArgs.items():
+                    if accumulatedArgs and toolCallId in toolCallStarted:
                         try:
                             # Parse the accumulated JSON arguments
-                            parsed_args = json.loads(accumulated_args) if accumulated_args else {}
+                            parsedArgs = json.loads(accumulatedArgs) if accumulatedArgs else {}
                             # Get tool name from stored names
-                            tool_name = tool_call_names.get(tool_call_id, "unknown")
+                            toolName = toolCallNames.get(toolCallId, "unknown")
+                            
+                            # Send tool_input_available
                             yield stream.tool_input_available(
-                                tool_call_id=tool_call_id,
-                                tool_name=tool_name,
-                                input_data=parsed_args
+                                tool_call_id=toolCallId,
+                                tool_name=toolName,
+                                input_data=parsedArgs
                             )
+                            
+                            # Execute the tool and send tool_output_available
+                            try:
+                                if toolName == "get_weather":
+                                    # Execute the weather tool
+                                    latitude = parsedArgs.get("latitude")
+                                    longitude = parsedArgs.get("longitude")
+                                    if latitude is not None and longitude is not None:
+                                        logger.info(f"Executing weather tool with lat={latitude}, lon={longitude}")
+                                        # Call the weather function directly
+                                        toolOutput = fetch_weather_data(latitude, longitude)
+                                        yield stream.tool_output_available(
+                                            tool_call_id=toolCallId,
+                                            output_data=toolOutput
+                                        )
+                                    else:
+                                        logger.error(f"Missing required arguments for weather tool: {parsedArgs}")
+                                        yield stream.tool_output_available(
+                                            tool_call_id=toolCallId,
+                                            output_data={"error": "Missing required arguments: latitude and longitude"}
+                                        )
+                                else:
+                                    logger.warning(f"Unknown tool: {toolName}")
+                                    yield stream.tool_output_available(
+                                        tool_call_id=toolCallId,
+                                        output_data={"error": f"Unknown tool: {toolName}"}
+                                    )
+                            except Exception as toolError:
+                                logger.error(f"Error executing tool {toolName}: {str(toolError)}")
+                                yield stream.tool_output_available(
+                                    tool_call_id=toolCallId,
+                                    output_data={"error": f"Tool execution failed: {str(toolError)}"}
+                                )
+                                
                         except json.JSONDecodeError as e:
-                            logger.error(f"Failed to parse tool arguments for {tool_call_id}: {accumulated_args}")
+                            logger.error(f"Failed to parse tool arguments for {toolCallId}: {accumulatedArgs}")
                             # Still send the raw args if JSON parsing fails
-                            tool_name = tool_call_names.get(tool_call_id, "unknown")
+                            toolName = toolCallNames.get(toolCallId, "unknown")
                             yield stream.tool_input_available(
-                                tool_call_id=tool_call_id,
-                                tool_name=tool_name,
-                                input_data=accumulated_args
+                                tool_call_id=toolCallId,
+                                tool_name=toolName,
+                                input_data=accumulatedArgs
+                            )
+                            yield stream.tool_output_available(
+                                tool_call_id=toolCallId,
+                                output_data={"error": f"Invalid JSON arguments: {str(e)}"}
                             )
                 
     except Exception as e:
