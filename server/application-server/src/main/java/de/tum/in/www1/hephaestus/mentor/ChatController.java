@@ -3,6 +3,8 @@ package de.tum.in.www1.hephaestus.mentor;
 import de.tum.in.www1.hephaestus.SecurityUtils;
 import de.tum.in.www1.hephaestus.gitprovider.user.UserRepository;
 import de.tum.in.www1.hephaestus.intelligenceservice.model.ChatRequest;
+import de.tum.in.www1.hephaestus.intelligenceservice.model.StreamErrorPart;
+import de.tum.in.www1.hephaestus.intelligenceservice.model.StreamFinishPart;
 import io.swagger.v3.oas.annotations.Hidden;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -39,30 +41,23 @@ public class ChatController {
         logger.info("Processing chat request with {} messages", chatRequest.messages().size());
 
         // Get current authenticated username
-        var currentUserLogin = SecurityUtils.getCurrentUserLogin();
-        
-        if (currentUserLogin.isEmpty()) {
-            logger.warn("No authenticated username found for chat request");
-            return Flux.just(
-                SseStreamParser.createErrorSSE("Authentication required"),
-                SseStreamParser.createFinishSSE(),
-                SseStreamParser.createDoneSSE()
-            );
-        }
+        var currentUserLogin = SecurityUtils.getCurrentUserLoginOrThrow();
 
         // Find user by login in database
-        var userOptional = userRepository.findByLogin(currentUserLogin.get());
+        var userOptional = userRepository.findByLogin(currentUserLogin);
 
+        // TODO: Separate app user and GitHub user handling, this should not be needed
         if (userOptional.isEmpty()) {
-            logger.warn("User not found for login: {}", currentUserLogin.get());
-            return Flux.just(
-                SseStreamParser.createErrorSSE("User not found"),
-                SseStreamParser.createFinishSSE(),
-                SseStreamParser.createDoneSSE()
+            logger.warn("User not found for login: {}", currentUserLogin);
+            return Flux.just(                
+                StreamPartProcessorUtils.streamPartToSSE(new StreamErrorPart().errorText("Sorry, we could not find your user.")),
+                StreamPartProcessorUtils.streamPartToSSE(new StreamFinishPart()),
+                StreamPartProcessorUtils.DONE_MARKER
             );
         }
 
-        logger.debug("Forwarding chat request to intelligence service for user: {}", userOptional.get().getLogin());
+        logger.debug("Forwarding chat request to intelligence service for user: {} with processor: {}", 
+                   userOptional.get().getLogin(), persistenceProcessor.getClass().getSimpleName());
         ChatRequest intelligenceRequest = new ChatRequest();
         intelligenceRequest.setMessages(chatRequest.messages());
         

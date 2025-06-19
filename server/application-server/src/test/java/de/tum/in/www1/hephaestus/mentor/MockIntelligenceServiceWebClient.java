@@ -42,6 +42,6 @@ public class MockIntelligenceServiceWebClient implements IntelligenceServiceWebC
         
         return Flux.fromIterable(frames)
             .map(chunk -> chunk + "\n")
-            .doOnNext(chunk -> StreamPartProcessorUtils.processSSEChunk(chunk, processor));
+            .doOnNext(chunk -> StreamPartProcessorUtils.processStreamChunk(chunk, processor));
     }
 }

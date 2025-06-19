@@ -3,6 +3,8 @@ package de.tum.in.www1.hephaestus.mentor;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import de.tum.in.www1.hephaestus.intelligenceservice.model.ChatRequest;
+import de.tum.in.www1.hephaestus.intelligenceservice.model.StreamErrorPart;
+import de.tum.in.www1.hephaestus.intelligenceservice.model.StreamFinishPart;
 import org.openapitools.jackson.nullable.JsonNullableModule;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -60,15 +62,15 @@ public class DefaultIntelligenceServiceWebClient implements IntelligenceServiceW
             .doOnSubscribe(s -> logger.debug("Subscribed to intelligence service SSE stream"))
             .doOnNext(chunk -> logger.trace("Received SSE chunk: {}", chunk))
             // Parse and process stream parts with callbacks
-            .doOnNext(chunk -> StreamPartProcessorUtils.processSSEChunk(chunk, processor))
+            .doOnNext(chunk -> StreamPartProcessorUtils.processStreamChunk(chunk, processor))
             .doOnComplete(() -> logger.debug("Intelligence service SSE stream completed"))
             .doOnError(error -> logger.error("Failed to call intelligence service", error))
             .onErrorResume(error -> {
                 logger.error("Error in intelligence service call, returning fallback SSE response", error);
                 return Flux.just(
-                    SseStreamParser.createErrorSSE("Sorry, I encountered an error. Please try again."),
-                    SseStreamParser.createFinishSSE(),
-                    SseStreamParser.createDoneSSE()
+                    StreamPartProcessorUtils.streamPartToSSE(new StreamErrorPart().errorText("Sorry, I encountered an error. Please try again.")),
+                    StreamPartProcessorUtils.streamPartToSSE(new StreamFinishPart()),
+                    StreamPartProcessorUtils.DONE_MARKER
                 );
             });
     }

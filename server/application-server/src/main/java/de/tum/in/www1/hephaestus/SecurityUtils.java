@@ -28,4 +28,15 @@ public final class SecurityUtils {
         }
         return Optional.empty();
     }
+
+    /**
+     * Get the login of the current user or throw an exception if not authenticated.
+     *
+     * @return the login of the current user.
+     * @throws IllegalStateException if no authenticated user is found.
+     */
+    public static String getCurrentUserLoginOrThrow() {
+        return getCurrentUserLogin()
+            .orElseThrow(() -> new IllegalStateException("No authenticated user found"));
+    }
 }

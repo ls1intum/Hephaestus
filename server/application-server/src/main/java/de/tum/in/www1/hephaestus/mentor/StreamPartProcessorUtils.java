@@ -1,6 +1,9 @@
 package de.tum.in.www1.hephaestus.mentor;
 
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import de.tum.in.www1.hephaestus.intelligenceservice.model.*;
+import org.openapitools.jackson.nullable.JsonNullableModule;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -10,14 +13,78 @@ import org.slf4j.LoggerFactory;
 public class StreamPartProcessorUtils {
     
     private static final Logger logger = LoggerFactory.getLogger(StreamPartProcessorUtils.class);
+    private static final ObjectMapper objectMapper = new ObjectMapper()
+            .registerModule(new JsonNullableModule());
+
+    public static final String DONE_MARKER = "[DONE]";
     
     /**
-     * Process an SSE chunk and trigger appropriate callbacks.
+     * Process a JSON chunk and trigger appropriate callbacks.
      */
-    public static void processSSEChunk(String sseChunk, StreamPartProcessor processor) {
-        SseStreamParser.parseSSELine(sseChunk).ifPresent(streamPart -> {
-            callProcessorCallback(streamPart, processor);
-        });
+    public static void processStreamChunk(String jsonChunk, StreamPartProcessor processor) {
+        if (jsonChunk == null || jsonChunk.trim().isEmpty() || DONE_MARKER.equals(jsonChunk.trim())) {
+            return;
+        }
+        
+        try {
+            JsonNode jsonNode = objectMapper.readTree(jsonChunk);
+            JsonNode typeNode = jsonNode.get("type");
+            
+            if (typeNode == null || !typeNode.isTextual()) {
+                return;
+            }
+            
+            String type = typeNode.asText();
+            Object streamPart = parseStreamPartByType(type, jsonNode);
+            
+            if (streamPart != null) {
+                callProcessorCallback(streamPart, processor);
+            }
+        } catch (Exception e) {
+            logger.error("Failed to parse stream chunk: {}", jsonChunk, e);
+        }
+    }
+    
+    private static Object parseStreamPartByType(String type, JsonNode jsonNode) {
+        Class<?> clazz = null;
+        switch (type) {
+            case "start" -> clazz = StreamStartPart.class;
+            case "text" -> clazz = StreamTextPart.class;
+            case "finish" -> clazz = StreamFinishPart.class;
+            case "error" -> clazz = StreamErrorPart.class;
+            case "tool-input-start" -> clazz = StreamToolInputStartPart.class;
+            case "tool-input-delta" -> clazz = StreamToolInputDeltaPart.class;
+            case "tool-input-available" -> clazz = StreamToolInputAvailablePart.class;
+            case "tool-output-available" -> clazz = StreamToolOutputAvailablePart.class;
+            case "reasoning" -> clazz = StreamReasoningPart.class;
+            case "reasoning-finish" -> clazz = StreamReasoningFinishPart.class;
+            case "source-url" -> clazz = StreamSourceUrlPart.class;
+            case "source-document" -> clazz = StreamSourceDocumentPart.class;
+            case "file" -> clazz = StreamFilePart.class;
+            case "start-step" -> clazz = StreamStepStartPart.class;
+            case "finish-step" -> clazz = StreamStepFinishPart.class;
+            case "message-metadata" -> clazz = StreamMessageMetadataPart.class;
+            default -> {
+                if (type.startsWith("data-")) {
+                    clazz = StreamDataPart.class;
+                } else {
+                    logger.warn("Unknown stream part type: {}", type);
+                }
+            }
+        };
+        if (clazz != null) {
+            return parseStreamPart(jsonNode, clazz);
+        }
+        return null;
+    }
+    
+    private static <T> T parseStreamPart(JsonNode jsonNode, Class<T> clazz) {
+        try {
+            return objectMapper.treeToValue(jsonNode, clazz);
+        } catch (Exception e) {
+            logger.error("Failed to parse stream part of type {}: {}", clazz.getSimpleName(), e.getMessage());
+            return null;
+        }
     }
     
     /**
@@ -48,6 +115,22 @@ public class StreamPartProcessorUtils {
         } catch (Exception e) {
             logger.error("Error in stream part processor callback for {}: {}", 
                         streamPart.getClass().getSimpleName(), e.getMessage(), e);
+        }
+    }
+
+
+    /**
+     * Converts an object to a Server-Sent Event (SSE) formatted string.
+     * 
+     * @param data The data to convert
+     * @return The SSE formatted string
+     */
+    public static String streamPartToSSE(Object data) {
+        try {
+            return objectMapper.writeValueAsString(data);
+        } catch (Exception e) {
+            logger.error("Failed to serialize data to JSON", e);
+            return "Internal server error";
         }
     }
 }
