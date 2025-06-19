@@ -40,6 +40,15 @@ public class ChatController {
     public Flux<String> chat(@RequestBody ChatRequestDTO chatRequest) {
         logger.info("Processing chat request with {} messages", chatRequest.messages().size());
 
+        // Validate message size and content
+        try {
+            validateChatRequest(chatRequest);
+        } catch (IllegalArgumentException e) {
+            logger.warn("Invalid chat request: {}", e.getMessage());
+            return Flux.error(new org.springframework.web.server.ResponseStatusException(
+                org.springframework.http.HttpStatus.BAD_REQUEST, e.getMessage()));
+        }
+
         // Get current authenticated username
         var currentUserLogin = SecurityUtils.getCurrentUserLoginOrThrow();
 
@@ -70,5 +79,36 @@ public class ChatController {
 
         // Use the enhanced streaming with persistence callbacks
         return intelligenceServiceWebClient.streamChat(intelligenceRequest, processor);
+    }
+    
+    private void validateChatRequest(ChatRequestDTO chatRequest) {
+        if (chatRequest.messages() == null || chatRequest.messages().isEmpty()) {
+            throw new IllegalArgumentException("Chat request must contain at least one message");
+        }
+        
+        // Check for empty or whitespace-only messages
+        for (var message : chatRequest.messages()) {
+            if (message.getParts() == null || message.getParts().isEmpty()) {
+                throw new IllegalArgumentException("Message must contain at least one part");
+            }
+            
+            boolean hasNonEmptyText = false;
+            for (var part : message.getParts()) {
+                if ("text".equals(part.getType()) && part.getText() != null) {
+                    String text = part.getText().trim();
+                    if (!text.isEmpty()) {
+                        hasNonEmptyText = true;
+                        // Check for very large messages (>20000 characters)
+                        if (text.length() > 20000) {
+                            throw new IllegalArgumentException("Message too large - maximum 20,000 characters allowed");
+                        }
+                    }
+                }
+            }
+            
+            if (!hasNonEmptyText) {
+                throw new IllegalArgumentException("Message cannot be empty or contain only whitespace");
+            }
+        }
     }
 }

@@ -56,7 +56,7 @@ public class StreamPartProcessorUtils {
             case "tool-input-available" -> clazz = StreamToolInputAvailablePart.class;
             case "tool-output-available" -> clazz = StreamToolOutputAvailablePart.class;
             case "reasoning" -> clazz = StreamReasoningPart.class;
-            case "reasoning-finish" -> clazz = StreamReasoningFinishPart.class;
+            case "reasoning-finish", "reasoning-part-finish" -> clazz = StreamReasoningFinishPart.class;
             case "source-url" -> clazz = StreamSourceUrlPart.class;
             case "source-document" -> clazz = StreamSourceDocumentPart.class;
             case "file" -> clazz = StreamFilePart.class;

@@ -1,6 +1,7 @@
 package de.tum.in.www1.hephaestus.mentor;
 
 import de.tum.in.www1.hephaestus.intelligenceservice.model.*;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.ConcurrentHashMap;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -40,8 +41,14 @@ public class MockIntelligenceServiceWebClient implements IntelligenceServiceWebC
         String requestMessageId = request.getMessages().getLast().getId();
         List<Object> streamParts = mockResponseHolder.getStreamPartsForMessageId(requestMessageId);
 
-        return Flux.fromIterable(streamParts)
-            .map(StreamPartProcessorUtils::streamPartToJson)
-            .doOnNext(json -> StreamPartProcessorUtils.processStreamChunk(json, processor));
+        // Process synchronously in the calling thread for tests
+        List<String> jsonParts = new ArrayList<>();
+        for (Object streamPart : streamParts) {
+            String json = StreamPartProcessorUtils.streamPartToJson(streamPart);
+            StreamPartProcessorUtils.processStreamChunk(json, processor);
+            jsonParts.add(json);
+        }
+
+        return Flux.fromIterable(jsonParts);
     }
 }

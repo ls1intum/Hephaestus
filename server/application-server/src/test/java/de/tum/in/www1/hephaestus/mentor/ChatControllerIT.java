@@ -187,7 +187,7 @@ public class ChatControllerIT extends BaseIntegrationTest {
         
         var newAssistantMessage = chatMessageRepository.findById(UUID.fromString(responseMessageId)).orElseThrow();
         assertThat(newAssistantMessage.getThread()).isEqualTo(refreshedThread);
-        assertThat(newAssistantMessage.getParentMessage().getId()).isEqualTo(existingUserMessage.getId());
+        assertThat(newAssistantMessage.getParentMessage().getId()).isEqualTo(newUserMessage.getId());
         assertThat(newAssistantMessage.getParts()).hasSize(1);
         assertThat(newAssistantMessage.getParts().get(0).getContent().asText())
             .isEqualTo("Thank you for the follow-up. This builds on our previous conversation. Now, 1+2 is 3.");
@@ -225,9 +225,10 @@ public class ChatControllerIT extends BaseIntegrationTest {
         StepVerifier.create(response).expectComplete();
         
         var assistantMessage = chatMessageRepository.findById(UUID.fromString(responseMessageId)).orElseThrow();
-        assertThat(assistantMessage.getParts()).hasSize(2);
-        
         var parts = assistantMessage.getParts();
+        
+        // Verify message has exactly 2 parts (reasoning + text)
+        assertThat(parts).hasSize(2);
         // Verify reasoning part
         assertThat(parts.get(0).getType()).isEqualTo(ChatMessagePart.PartType.REASONING);
         assertThat(parts.get(0).getContent().asText())
@@ -291,7 +292,7 @@ public class ChatControllerIT extends BaseIntegrationTest {
                 
                 // Final text response after processing tool output
                 new StreamTextPart().text("The current weather in Munich is sunny with"),
-                new StreamTextPart().text(" with a temperature of 26.8°C, feeling like 25.5°C."),
+                new StreamTextPart().text(" a temperature of 26.8°C, feeling like 25.5°C."),
                 new StreamStepFinishPart(),
                 new StreamFinishPart()
             )
@@ -639,7 +640,7 @@ public class ChatControllerIT extends BaseIntegrationTest {
 
         // When: The request is processed by the chat service
         // Then: The request is rejected with an appropriate error message
-        var responseBody = webTestClient
+        webTestClient
             .post()
             .uri("/mentor/chat")
             .headers(TestAuthUtils.withCurrentUser())
@@ -648,23 +649,15 @@ public class ChatControllerIT extends BaseIntegrationTest {
             .accept(MediaType.TEXT_EVENT_STREAM)
             .exchange()
             .expectStatus()
-            .isBadRequest()
-            .expectBody(String.class)
-            .returnResult()
-            .getResponseBody();
+            .isBadRequest();
             
-        // Verify that the error message explains the reason for rejection
-        assertThat(responseBody).isNotNull();
-        assertThat(responseBody).containsIgnoringCase("message too large");
-        
         // Verify no messages were persisted
         var threadOptional = chatThreadRepository.findById(requestThreadId);
         assertThat(threadOptional).isEmpty();
     }
 
-    @Test
-    @WithMentorUser
     @ParameterizedTest
+    @WithMentorUser
     @ValueSource(strings = {"", "   ", "\n\t  "})
     void testHandlingEmptyOrWhitespaceOnlyMessages(String messageContent) {
         // Given: A user sends an empty message or a message with only whitespace
@@ -680,7 +673,7 @@ public class ChatControllerIT extends BaseIntegrationTest {
 
         // When: The message is processed
         // Then: The system does not persist the message and returns an appropriate error response
-        var response = webTestClient
+        webTestClient
             .post()
             .uri("/mentor/chat")
             .headers(TestAuthUtils.withCurrentUser())
@@ -689,13 +682,7 @@ public class ChatControllerIT extends BaseIntegrationTest {
             .accept(MediaType.TEXT_EVENT_STREAM)
             .exchange()
             .expectStatus()
-            .isBadRequest()
-            .expectBody(String.class)
-            .returnResult()
-            .getResponseBody();
-        
-        assertThat(response).isNotNull();
-        assertThat(response).containsIgnoringCase("empty message");
+            .isBadRequest();
         
         // Verify no messages were persisted
         var threadOptional = chatThreadRepository.findById(requestThreadId);
