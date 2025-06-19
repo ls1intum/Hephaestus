@@ -42,30 +42,30 @@ import com.fasterxml.jackson.annotation.JsonTypeName;
 import org.hibernate.validator.constraints.*;
 
 /**
- * Stream part model.
+ * Response model for chat streaming.
  */
 @JsonPropertyOrder({
-  StreamPart.JSON_PROPERTY_TEXT,
-  StreamPart.JSON_PROPERTY_TYPE,
-  StreamPart.JSON_PROPERTY_ERROR_TEXT,
-  StreamPart.JSON_PROPERTY_TOOL_CALL_ID,
-  StreamPart.JSON_PROPERTY_TOOL_NAME,
-  StreamPart.JSON_PROPERTY_INPUT_TEXT_DELTA,
-  StreamPart.JSON_PROPERTY_INPUT,
-  StreamPart.JSON_PROPERTY_OUTPUT,
-  StreamPart.JSON_PROPERTY_PROVIDER_METADATA,
-  StreamPart.JSON_PROPERTY_SOURCE_ID,
-  StreamPart.JSON_PROPERTY_TITLE,
-  StreamPart.JSON_PROPERTY_URL,
-  StreamPart.JSON_PROPERTY_FILENAME,
-  StreamPart.JSON_PROPERTY_MEDIA_TYPE,
-  StreamPart.JSON_PROPERTY_DATA,
-  StreamPart.JSON_PROPERTY_ID,
-  StreamPart.JSON_PROPERTY_MESSAGE_ID,
-  StreamPart.JSON_PROPERTY_MESSAGE_METADATA
+  ChatResponse.JSON_PROPERTY_TEXT,
+  ChatResponse.JSON_PROPERTY_TYPE,
+  ChatResponse.JSON_PROPERTY_ERROR_TEXT,
+  ChatResponse.JSON_PROPERTY_TOOL_CALL_ID,
+  ChatResponse.JSON_PROPERTY_TOOL_NAME,
+  ChatResponse.JSON_PROPERTY_INPUT_TEXT_DELTA,
+  ChatResponse.JSON_PROPERTY_INPUT,
+  ChatResponse.JSON_PROPERTY_OUTPUT,
+  ChatResponse.JSON_PROPERTY_PROVIDER_METADATA,
+  ChatResponse.JSON_PROPERTY_SOURCE_ID,
+  ChatResponse.JSON_PROPERTY_TITLE,
+  ChatResponse.JSON_PROPERTY_URL,
+  ChatResponse.JSON_PROPERTY_FILENAME,
+  ChatResponse.JSON_PROPERTY_MEDIA_TYPE,
+  ChatResponse.JSON_PROPERTY_DATA,
+  ChatResponse.JSON_PROPERTY_ID,
+  ChatResponse.JSON_PROPERTY_MESSAGE_ID,
+  ChatResponse.JSON_PROPERTY_MESSAGE_METADATA
 })
 @jakarta.annotation.Generated(value = "org.openapitools.codegen.languages.JavaClientCodegen", comments = "Generator version: 7.7.0")
-public class StreamPart {
+public class ChatResponse {
   public static final String JSON_PROPERTY_TEXT = "text";
   private String text;
 
@@ -120,10 +120,10 @@ public class StreamPart {
   public static final String JSON_PROPERTY_MESSAGE_METADATA = "messageMetadata";
   private Object messageMetadata;
 
-  public StreamPart() {
+  public ChatResponse() {
   }
 
-  public StreamPart text(String text) {
+  public ChatResponse text(String text) {
     
     this.text = text;
     return this;
@@ -148,7 +148,7 @@ public class StreamPart {
     this.text = text;
   }
 
-  public StreamPart type(String type) {
+  public ChatResponse type(String type) {
     
     this.type = type;
     return this;
@@ -173,7 +173,7 @@ public class StreamPart {
     this.type = type;
   }
 
-  public StreamPart errorText(String errorText) {
+  public ChatResponse errorText(String errorText) {
     
     this.errorText = errorText;
     return this;
@@ -198,7 +198,7 @@ public class StreamPart {
     this.errorText = errorText;
   }
 
-  public StreamPart toolCallId(String toolCallId) {
+  public ChatResponse toolCallId(String toolCallId) {
     
     this.toolCallId = toolCallId;
     return this;
@@ -223,7 +223,7 @@ public class StreamPart {
     this.toolCallId = toolCallId;
   }
 
-  public StreamPart toolName(String toolName) {
+  public ChatResponse toolName(String toolName) {
     
     this.toolName = toolName;
     return this;
@@ -248,7 +248,7 @@ public class StreamPart {
     this.toolName = toolName;
   }
 
-  public StreamPart inputTextDelta(String inputTextDelta) {
+  public ChatResponse inputTextDelta(String inputTextDelta) {
     
     this.inputTextDelta = inputTextDelta;
     return this;
@@ -273,7 +273,7 @@ public class StreamPart {
     this.inputTextDelta = inputTextDelta;
   }
 
-  public StreamPart input(Object input) {
+  public ChatResponse input(Object input) {
     
     this.input = input;
     return this;
@@ -298,7 +298,7 @@ public class StreamPart {
     this.input = input;
   }
 
-  public StreamPart output(Object output) {
+  public ChatResponse output(Object output) {
     
     this.output = output;
     return this;
@@ -323,7 +323,7 @@ public class StreamPart {
     this.output = output;
   }
 
-  public StreamPart providerMetadata(Object providerMetadata) {
+  public ChatResponse providerMetadata(Object providerMetadata) {
     
     this.providerMetadata = providerMetadata;
     return this;
@@ -348,7 +348,7 @@ public class StreamPart {
     this.providerMetadata = providerMetadata;
   }
 
-  public StreamPart sourceId(String sourceId) {
+  public ChatResponse sourceId(String sourceId) {
     
     this.sourceId = sourceId;
     return this;
@@ -373,7 +373,7 @@ public class StreamPart {
     this.sourceId = sourceId;
   }
 
-  public StreamPart title(String title) {
+  public ChatResponse title(String title) {
     
     this.title = title;
     return this;
@@ -398,7 +398,7 @@ public class StreamPart {
     this.title = title;
   }
 
-  public StreamPart url(String url) {
+  public ChatResponse url(String url) {
     
     this.url = url;
     return this;
@@ -423,7 +423,7 @@ public class StreamPart {
     this.url = url;
   }
 
-  public StreamPart filename(String filename) {
+  public ChatResponse filename(String filename) {
     
     this.filename = filename;
     return this;
@@ -448,7 +448,7 @@ public class StreamPart {
     this.filename = filename;
   }
 
-  public StreamPart mediaType(String mediaType) {
+  public ChatResponse mediaType(String mediaType) {
     
     this.mediaType = mediaType;
     return this;
@@ -473,7 +473,7 @@ public class StreamPart {
     this.mediaType = mediaType;
   }
 
-  public StreamPart data(Object data) {
+  public ChatResponse data(Object data) {
     
     this.data = data;
     return this;
@@ -498,7 +498,7 @@ public class StreamPart {
     this.data = data;
   }
 
-  public StreamPart id(String id) {
+  public ChatResponse id(String id) {
     
     this.id = id;
     return this;
@@ -523,7 +523,7 @@ public class StreamPart {
     this.id = id;
   }
 
-  public StreamPart messageId(String messageId) {
+  public ChatResponse messageId(String messageId) {
     
     this.messageId = messageId;
     return this;
@@ -548,7 +548,7 @@ public class StreamPart {
     this.messageId = messageId;
   }
 
-  public StreamPart messageMetadata(Object messageMetadata) {
+  public ChatResponse messageMetadata(Object messageMetadata) {
     
     this.messageMetadata = messageMetadata;
     return this;
@@ -581,25 +581,25 @@ public class StreamPart {
     if (o == null || getClass() != o.getClass()) {
       return false;
     }
-    StreamPart streamPart = (StreamPart) o;
-    return Objects.equals(this.text, streamPart.text) &&
-        Objects.equals(this.type, streamPart.type) &&
-        Objects.equals(this.errorText, streamPart.errorText) &&
-        Objects.equals(this.toolCallId, streamPart.toolCallId) &&
-        Objects.equals(this.toolName, streamPart.toolName) &&
-        Objects.equals(this.inputTextDelta, streamPart.inputTextDelta) &&
-        Objects.equals(this.input, streamPart.input) &&
-        Objects.equals(this.output, streamPart.output) &&
-        Objects.equals(this.providerMetadata, streamPart.providerMetadata) &&
-        Objects.equals(this.sourceId, streamPart.sourceId) &&
-        Objects.equals(this.title, streamPart.title) &&
-        Objects.equals(this.url, streamPart.url) &&
-        Objects.equals(this.filename, streamPart.filename) &&
-        Objects.equals(this.mediaType, streamPart.mediaType) &&
-        Objects.equals(this.data, streamPart.data) &&
-        Objects.equals(this.id, streamPart.id) &&
-        Objects.equals(this.messageId, streamPart.messageId) &&
-        Objects.equals(this.messageMetadata, streamPart.messageMetadata);
+    ChatResponse chatResponse = (ChatResponse) o;
+    return Objects.equals(this.text, chatResponse.text) &&
+        Objects.equals(this.type, chatResponse.type) &&
+        Objects.equals(this.errorText, chatResponse.errorText) &&
+        Objects.equals(this.toolCallId, chatResponse.toolCallId) &&
+        Objects.equals(this.toolName, chatResponse.toolName) &&
+        Objects.equals(this.inputTextDelta, chatResponse.inputTextDelta) &&
+        Objects.equals(this.input, chatResponse.input) &&
+        Objects.equals(this.output, chatResponse.output) &&
+        Objects.equals(this.providerMetadata, chatResponse.providerMetadata) &&
+        Objects.equals(this.sourceId, chatResponse.sourceId) &&
+        Objects.equals(this.title, chatResponse.title) &&
+        Objects.equals(this.url, chatResponse.url) &&
+        Objects.equals(this.filename, chatResponse.filename) &&
+        Objects.equals(this.mediaType, chatResponse.mediaType) &&
+        Objects.equals(this.data, chatResponse.data) &&
+        Objects.equals(this.id, chatResponse.id) &&
+        Objects.equals(this.messageId, chatResponse.messageId) &&
+        Objects.equals(this.messageMetadata, chatResponse.messageMetadata);
   }
 
   @Override
@@ -610,7 +610,7 @@ public class StreamPart {
   @Override
   public String toString() {
     StringBuilder sb = new StringBuilder();
-    sb.append("class StreamPart {\n");
+    sb.append("class ChatResponse {\n");
     sb.append("    text: ").append(toIndentedString(text)).append("\n");
     sb.append("    type: ").append(toIndentedString(type)).append("\n");
     sb.append("    errorText: ").append(toIndentedString(errorText)).append("\n");

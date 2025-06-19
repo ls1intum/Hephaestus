@@ -4,8 +4,8 @@ import de.tum.in.www1.hephaestus.intelligenceservice.ApiClient;
 import de.tum.in.www1.hephaestus.intelligenceservice.BaseApi;
 
 import de.tum.in.www1.hephaestus.intelligenceservice.model.ChatRequest;
+import de.tum.in.www1.hephaestus.intelligenceservice.model.ChatResponse;
 import de.tum.in.www1.hephaestus.intelligenceservice.model.HTTPValidationError;
-import de.tum.in.www1.hephaestus.intelligenceservice.model.StreamPart;
 
 import java.util.Collections;
 import java.util.HashMap;
@@ -45,10 +45,10 @@ public class MentorApi extends BaseApi {
      * <p><b>200</b> - Event stream of chat updates.
      * <p><b>422</b> - Validation Error
      * @param chatRequest  (required)
-     * @return StreamPart
+     * @return ChatResponse
      * @throws RestClientException if an error occurs while attempting to invoke the API
      */
-    public StreamPart handleChatMentorChatPost(ChatRequest chatRequest) throws RestClientException {
+    public ChatResponse handleChatMentorChatPost(ChatRequest chatRequest) throws RestClientException {
         return handleChatMentorChatPostWithHttpInfo(chatRequest).getBody();
     }
 
@@ -58,10 +58,10 @@ public class MentorApi extends BaseApi {
      * <p><b>200</b> - Event stream of chat updates.
      * <p><b>422</b> - Validation Error
      * @param chatRequest  (required)
-     * @return ResponseEntity&lt;StreamPart&gt;
+     * @return ResponseEntity&lt;ChatResponse&gt;
      * @throws RestClientException if an error occurs while attempting to invoke the API
      */
-    public ResponseEntity<StreamPart> handleChatMentorChatPostWithHttpInfo(ChatRequest chatRequest) throws RestClientException {
+    public ResponseEntity<ChatResponse> handleChatMentorChatPostWithHttpInfo(ChatRequest chatRequest) throws RestClientException {
         Object localVarPostBody = chatRequest;
         
         // verify the required parameter 'chatRequest' is set
@@ -86,7 +86,7 @@ public class MentorApi extends BaseApi {
 
         String[] localVarAuthNames = new String[] {  };
 
-        ParameterizedTypeReference<StreamPart> localReturnType = new ParameterizedTypeReference<StreamPart>() {};
+        ParameterizedTypeReference<ChatResponse> localReturnType = new ParameterizedTypeReference<ChatResponse>() {};
         return apiClient.invokeAPI("/mentor/chat", HttpMethod.POST, Collections.<String, Object>emptyMap(), localVarQueryParams, localVarPostBody, localVarHeaderParams, localVarCookieParams, localVarFormParams, localVarAccept, localVarContentType, localVarAuthNames, localReturnType);
     }
 

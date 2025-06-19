@@ -1,7 +1,7 @@
-from app.mentor.state import State
+from app.mentor.logic.state import State
 from app.models import get_model
 from app.settings import settings
-from app.mentor.prompt_loader import PromptLoader
+from app.mentor.logic.prompt_loader import PromptLoader
 from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
 from uuid import uuid4
 from langchain_core.runnables.config import RunnableConfig

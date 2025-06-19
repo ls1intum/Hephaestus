@@ -53,6 +53,27 @@ components:
       - messages
       title: ChatRequest
       type: object
+    ChatResponse:
+      anyOf:
+      - $ref: '#/components/schemas/StreamTextPart'
+      - $ref: '#/components/schemas/StreamErrorPart'
+      - $ref: '#/components/schemas/StreamToolInputStartPart'
+      - $ref: '#/components/schemas/StreamToolInputDeltaPart'
+      - $ref: '#/components/schemas/StreamToolInputAvailablePart'
+      - $ref: '#/components/schemas/StreamToolOutputAvailablePart'
+      - $ref: '#/components/schemas/StreamReasoningPart'
+      - $ref: '#/components/schemas/StreamReasoningFinishPart'
+      - $ref: '#/components/schemas/StreamSourceUrlPart'
+      - $ref: '#/components/schemas/StreamSourceDocumentPart'
+      - $ref: '#/components/schemas/StreamFilePart'
+      - $ref: '#/components/schemas/StreamDataPart'
+      - $ref: '#/components/schemas/StreamStepStartPart'
+      - $ref: '#/components/schemas/StreamStepFinishPart'
+      - $ref: '#/components/schemas/StreamStartPart'
+      - $ref: '#/components/schemas/StreamFinishPart'
+      - $ref: '#/components/schemas/StreamMessageMetadataPart'
+      description: Response model for chat streaming.
+      title: StreamPart
     DataUIPart:
       description: A data part with dynamic type.
       properties:
@@ -348,27 +369,6 @@ components:
       - messageMetadata
       title: StreamMessageMetadataPart
       type: object
-    StreamPart:
-      anyOf:
-      - $ref: '#/components/schemas/StreamTextPart'
-      - $ref: '#/components/schemas/StreamErrorPart'
-      - $ref: '#/components/schemas/StreamToolInputStartPart'
-      - $ref: '#/components/schemas/StreamToolInputDeltaPart'
-      - $ref: '#/components/schemas/StreamToolInputAvailablePart'
-      - $ref: '#/components/schemas/StreamToolOutputAvailablePart'
-      - $ref: '#/components/schemas/StreamReasoningPart'
-      - $ref: '#/components/schemas/StreamReasoningFinishPart'
-      - $ref: '#/components/schemas/StreamSourceUrlPart'
-      - $ref: '#/components/schemas/StreamSourceDocumentPart'
-      - $ref: '#/components/schemas/StreamFilePart'
-      - $ref: '#/components/schemas/StreamDataPart'
-      - $ref: '#/components/schemas/StreamStepStartPart'
-      - $ref: '#/components/schemas/StreamStepFinishPart'
-      - $ref: '#/components/schemas/StreamStartPart'
-      - $ref: '#/components/schemas/StreamFinishPart'
-      - $ref: '#/components/schemas/StreamMessageMetadataPart'
-      description: Stream part model.
-      title: StreamPart
     StreamReasoningFinishPart:
       description: Reasoning finish event.
       properties:
@@ -825,7 +825,7 @@ paths:
                     text: Hello
                     type: text
               schema:
-                $ref: '#/components/schemas/StreamPart'
+                $ref: '#/components/schemas/ChatResponse'
           description: Event stream of chat updates.
         '422':
           content:

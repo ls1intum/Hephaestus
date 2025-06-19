@@ -4,7 +4,7 @@ from langgraph.checkpoint.postgres import PostgresSaver
 from langgraph.store.postgres import PostgresStore
 from langchain_core.messages import HumanMessage
 
-from app.mentor.state import State
+from app.mentor.logic.state import State
 from app.settings import settings
 
 from .conditions import (

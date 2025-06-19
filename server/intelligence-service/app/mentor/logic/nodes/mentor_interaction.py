@@ -1,8 +1,8 @@
-from app.mentor.state import State
+from app.mentor.logic.state import State
 from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
 from app.models import get_model
 from langgraph.store.base import BaseStore
-from app.mentor.prompt_loader import PromptLoader
+from app.mentor.logic.prompt_loader import PromptLoader
 from app.settings import settings
 
 prompt_loader = PromptLoader()

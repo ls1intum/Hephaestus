@@ -1,7 +1,7 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.routers.mentor import router as mentor_router
+from app.mentor.router import router as mentor_router
 from app.routers.health import router as health_router
 from app.routers.detector import router as detector_router
 
