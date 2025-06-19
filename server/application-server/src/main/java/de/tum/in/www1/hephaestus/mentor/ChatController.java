@@ -30,24 +30,24 @@ public class ChatController {
     @Autowired
     private IntelligenceServiceWebClient intelligenceServiceWebClient;
     
+    @Autowired
+    private PersistenceStreamPartProcessor persistenceProcessor;
+
     @Hidden
-    @PostMapping(produces = MediaType.TEXT_PLAIN_VALUE)
+    @PostMapping(produces = MediaType.TEXT_EVENT_STREAM_VALUE)
     public Flux<String> chat(@RequestBody ChatRequestDTO chatRequest) {
         logger.info("Processing chat request with {} messages", chatRequest.messages().size());
-        logger.debug("Chat request details: id={}, first message content='{}'", 
-                chatRequest.id(), 
-                chatRequest.messages().isEmpty() ? "none" : 
-                    chatRequest.messages().get(0).getContent());
 
         // Get current authenticated username
         var currentUserLogin = SecurityUtils.getCurrentUserLogin();
         
         if (currentUserLogin.isEmpty()) {
             logger.warn("No authenticated username found for chat request");
-            String errorResponse = "3:\"Authentication required\"\n";
-            String finishResponse = "d:{\"finishReason\":\"error\"}\n";
-            logger.debug("Returning authentication error response: {}", errorResponse + finishResponse);
-            return Flux.just(errorResponse, finishResponse);
+            return Flux.just(
+                SseStreamParser.createErrorSSE("Authentication required"),
+                SseStreamParser.createFinishSSE(),
+                SseStreamParser.createDoneSSE()
+            );
         }
 
         // Find user by login in database
@@ -55,20 +55,18 @@ public class ChatController {
 
         if (userOptional.isEmpty()) {
             logger.warn("User not found for login: {}", currentUserLogin.get());
-            String errorResponse = "3:\"User not found\"\n";
-            String finishResponse = "d:{\"finishReason\":\"error\"}\n";
-            logger.debug("Returning user not found response: {}", errorResponse + finishResponse);
-            return Flux.just(errorResponse, finishResponse);
+            return Flux.just(
+                SseStreamParser.createErrorSSE("User not found"),
+                SseStreamParser.createFinishSSE(),
+                SseStreamParser.createDoneSSE()
+            );
         }
 
-        logger.debug("Forwarding chat request to ChatService for user: {}", userOptional.get().getLogin());
+        logger.debug("Forwarding chat request to intelligence service for user: {}", userOptional.get().getLogin());
         ChatRequest intelligenceRequest = new ChatRequest();
         intelligenceRequest.setMessages(chatRequest.messages());
-        return intelligenceServiceWebClient
-            .streamChat(intelligenceRequest);
-        // return chatService.processChat(chatRequest, userOptional.get())
-        //         .doOnNext(chunk -> logger.trace("Sending response chunk: {}", chunk))
-        //         .doOnComplete(() -> logger.debug("Chat response completed"))
-        //         .doOnError(e -> logger.error("Error during chat response streaming", e));
+        
+        // Use the enhanced streaming with persistence callbacks
+        return intelligenceServiceWebClient.streamChat(intelligenceRequest, persistenceProcessor);
     }
 }

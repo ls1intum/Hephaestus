@@ -74,22 +74,22 @@ class ToolInputStreamingPart(ToolPartBase):
     """Tool part with input being streamed."""
 
     state: Literal["input-streaming"] = "input-streaming"
-    input: Optional[Any] = None
+    input: Optional[Dict[str, Any]] = None
 
 
 class ToolInputAvailablePart(ToolPartBase):
     """Tool part with input available."""
 
     state: Literal["input-available"] = "input-available"
-    input: Any
+    input: Dict[str, Any]
 
 
 class ToolOutputAvailablePart(ToolPartBase):
     """Tool part with output available."""
 
     state: Literal["output-available"] = "output-available"
-    input: Any
-    output: Any
+    input: Dict[str, Any]
+    output: Dict[str, Any]
 
 
 class DataUIPart(BasePart):
@@ -97,7 +97,7 @@ class DataUIPart(BasePart):
 
     type: Annotated[str, Field(pattern=r"^data-.*")]  # Will be in format 'data-{NAME}'
     id: Optional[str] = None
-    data: Any
+    data: Dict[str, Any]
 
 
 UIMessagePart = Union[
@@ -163,7 +163,7 @@ class StreamToolInputAvailablePart(BasePart):
     type: Literal["tool-input-available"] = "tool-input-available"
     toolCallId: str
     toolName: str
-    input: Any
+    input: Dict[str, Any]
 
 
 class StreamToolOutputAvailablePart(BasePart):
@@ -171,7 +171,7 @@ class StreamToolOutputAvailablePart(BasePart):
 
     type: Literal["tool-output-available"] = "tool-output-available"
     toolCallId: str
-    output: Any
+    output: Dict[str, Any]
     providerMetadata: Optional[Dict[str, Any]] = None
 
 
@@ -223,7 +223,7 @@ class StreamDataPart(BasePart):
 
     type: Annotated[str, Field(pattern=r"^data-.*")]  # Will be in format 'data-{NAME}'
     id: Optional[str] = None
-    data: Any
+    data: Dict[str, Any]
 
 
 class StreamStepStartPart(BasePart):

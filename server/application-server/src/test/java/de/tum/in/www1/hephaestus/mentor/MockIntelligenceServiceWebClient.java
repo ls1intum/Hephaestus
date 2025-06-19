@@ -36,9 +36,12 @@ public class MockIntelligenceServiceWebClient implements IntelligenceServiceWebC
     private MockChatFrameHolder mockFrameHolder;
 
     @Override
-    public Flux<String> streamChat(ChatRequest request) {
+    public Flux<String> streamChat(ChatRequest request, StreamPartProcessor processor) {
         String userMessageId = request.getMessages().getLast().getId();
         List<String> frames = mockFrameHolder.getFramesForMessageId(userMessageId);
-        return Flux.fromIterable(frames).map(chunk -> chunk + "\n");
+        
+        return Flux.fromIterable(frames)
+            .map(chunk -> chunk + "\n")
+            .doOnNext(chunk -> StreamPartProcessorUtils.processSSEChunk(chunk, processor));
     }
 }

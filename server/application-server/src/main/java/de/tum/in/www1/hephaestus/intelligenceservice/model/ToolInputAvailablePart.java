@@ -36,7 +36,7 @@ import org.hibernate.validator.constraints.*;
 @jakarta.annotation.Generated(value = "org.openapitools.codegen.languages.JavaClientCodegen", comments = "Generator version: 7.7.0")
 public class ToolInputAvailablePart {
   public static final String JSON_PROPERTY_INPUT = "input";
-  private Object input = null;
+  private Object input;
 
   public static final String JSON_PROPERTY_STATE = "state";
   private String state = "input-available";
@@ -60,7 +60,7 @@ public class ToolInputAvailablePart {
    * Get input
    * @return input
    */
-  @jakarta.annotation.Nullable
+  @jakarta.annotation.Nonnull
   @JsonProperty(JSON_PROPERTY_INPUT)
   @JsonInclude(value = JsonInclude.Include.ALWAYS)
 

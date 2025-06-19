@@ -37,10 +37,10 @@ import org.hibernate.validator.constraints.*;
 @jakarta.annotation.Generated(value = "org.openapitools.codegen.languages.JavaClientCodegen", comments = "Generator version: 7.7.0")
 public class ToolOutputAvailablePart {
   public static final String JSON_PROPERTY_INPUT = "input";
-  private Object input = null;
+  private Object input;
 
   public static final String JSON_PROPERTY_OUTPUT = "output";
-  private Object output = null;
+  private Object output;
 
   public static final String JSON_PROPERTY_STATE = "state";
   private String state = "output-available";
@@ -64,7 +64,7 @@ public class ToolOutputAvailablePart {
    * Get input
    * @return input
    */
-  @jakarta.annotation.Nullable
+  @jakarta.annotation.Nonnull
   @JsonProperty(JSON_PROPERTY_INPUT)
   @JsonInclude(value = JsonInclude.Include.ALWAYS)
 
@@ -89,7 +89,7 @@ public class ToolOutputAvailablePart {
    * Get output
    * @return output
    */
-  @jakarta.annotation.Nullable
+  @jakarta.annotation.Nonnull
   @JsonProperty(JSON_PROPERTY_OUTPUT)
   @JsonInclude(value = JsonInclude.Include.ALWAYS)
 

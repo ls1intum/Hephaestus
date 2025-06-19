@@ -26,27 +26,10 @@ function RouteComponent() {
 
 
 function MentorContainer() {
-  // generateId: () => uuidv4(),
-  //   sendExtraMessageFields: true,
-	// 	api: `${environment.serverUrl}/mentor/chat`,
-  //   headers: {
-  //     // Use the current token from keycloakService (will be updated by the main.tsx interceptor)
-  //     "Authorization": `Bearer ${keycloakService.getToken()}`
-	// 	},
-  // const { error, status, sendMessage, messages, reload, stop } = useChat({
-  //   generateId: () => uuidv4(),
-  //   transport: new DefaultChatTransport({ 
-  //     api: 'http://localhost:8000/mentor/chat',
-  //     headers: {
-  //       "Authorization": `Bearer ${keycloakService.getToken()}`
-  //     }
-  //   }),
-  // });
-
   const { error, status, sendMessage, messages, reload, stop } = useChat({
     generateId: () => uuidv4(),
     transport: new DefaultChatTransport({ 
-      api: 'http://localhost:8000/mentor/chat',
+      api: `${environment.serverUrl}/mentor/chat`,
       headers: {
         "Authorization": `Bearer ${keycloakService.getToken()}`
       }

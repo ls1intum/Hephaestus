@@ -46,31 +46,29 @@ public class DefaultIntelligenceServiceWebClient implements IntelligenceServiceW
     }
     
     @Override
-    public Flux<String> streamChat(ChatRequest request) {
+    public Flux<String> streamChat(ChatRequest request, StreamPartProcessor processor) {
         logger.debug("Sending chat request to intelligence service with {} messages", 
                    request.getMessages() != null ? request.getMessages().size() : 0);
         
         return webClient.post()
             .uri("/mentor/chat")
             .contentType(MediaType.APPLICATION_JSON)
-            .accept(MediaType.TEXT_PLAIN)
+            .accept(MediaType.TEXT_EVENT_STREAM)
             .bodyValue(request)
             .retrieve()
             .bodyToFlux(String.class)
-            .doOnSubscribe(s -> logger.debug("Subscribed to intelligence service response"))
-            .doOnNext(chunk -> logger.debug("Received chunk from intelligence service: length={}", 
-                                         chunk != null ? chunk.length() : 0))
-            .map(chunk -> {
-                logger.trace("Processing chunk: {}", chunk);
-                return chunk + "\n";
-            })
-            .doOnComplete(() -> logger.debug("Intelligence service response stream completed"))
+            .doOnSubscribe(s -> logger.debug("Subscribed to intelligence service SSE stream"))
+            .doOnNext(chunk -> logger.trace("Received SSE chunk: {}", chunk))
+            // Parse and process stream parts with callbacks
+            .doOnNext(chunk -> StreamPartProcessorUtils.processSSEChunk(chunk, processor))
+            .doOnComplete(() -> logger.debug("Intelligence service SSE stream completed"))
             .doOnError(error -> logger.error("Failed to call intelligence service", error))
             .onErrorResume(error -> {
-                logger.error("Error in intelligence service call, returning fallback response", error);
+                logger.error("Error in intelligence service call, returning fallback SSE response", error);
                 return Flux.just(
-                    "3:\"Sorry, I encountered an error. Please try again.\"\n", 
-                    "d:{\"finishReason\":\"stop\"}\n"
+                    SseStreamParser.createErrorSSE("Sorry, I encountered an error. Please try again."),
+                    SseStreamParser.createFinishSSE(),
+                    SseStreamParser.createDoneSSE()
                 );
             });
     }

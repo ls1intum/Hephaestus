@@ -40,7 +40,7 @@ import org.hibernate.validator.constraints.*;
 @jakarta.annotation.Generated(value = "org.openapitools.codegen.languages.JavaClientCodegen", comments = "Generator version: 7.7.0")
 public class StreamToolOutputAvailablePart {
   public static final String JSON_PROPERTY_OUTPUT = "output";
-  private Object output = null;
+  private Object output;
 
   public static final String JSON_PROPERTY_PROVIDER_METADATA = "providerMetadata";
   private JsonNullable<Object> providerMetadata = JsonNullable.<Object>undefined();
@@ -64,7 +64,7 @@ public class StreamToolOutputAvailablePart {
    * Get output
    * @return output
    */
-  @jakarta.annotation.Nullable
+  @jakarta.annotation.Nonnull
   @JsonProperty(JSON_PROPERTY_OUTPUT)
   @JsonInclude(value = JsonInclude.Include.ALWAYS)
 

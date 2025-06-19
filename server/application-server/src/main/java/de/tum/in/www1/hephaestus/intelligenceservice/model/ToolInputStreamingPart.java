@@ -20,7 +20,6 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonTypeName;
 import com.fasterxml.jackson.annotation.JsonValue;
-import de.tum.in.www1.hephaestus.intelligenceservice.model.AnyOf;
 import org.openapitools.jackson.nullable.JsonNullable;
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import org.openapitools.jackson.nullable.JsonNullable;
@@ -41,7 +40,7 @@ import org.hibernate.validator.constraints.*;
 @jakarta.annotation.Generated(value = "org.openapitools.codegen.languages.JavaClientCodegen", comments = "Generator version: 7.7.0")
 public class ToolInputStreamingPart {
   public static final String JSON_PROPERTY_INPUT = "input";
-  private JsonNullable<AnyOf> input = JsonNullable.<AnyOf>undefined();
+  private JsonNullable<Object> input = JsonNullable.<Object>undefined();
 
   public static final String JSON_PROPERTY_STATE = "state";
   private String state = "input-streaming";
@@ -55,8 +54,8 @@ public class ToolInputStreamingPart {
   public ToolInputStreamingPart() {
   }
 
-  public ToolInputStreamingPart input(AnyOf input) {
-    this.input = JsonNullable.<AnyOf>of(input);
+  public ToolInputStreamingPart input(Object input) {
+    this.input = JsonNullable.<Object>of(input);
     
     return this;
   }
@@ -68,24 +67,24 @@ public class ToolInputStreamingPart {
   @jakarta.annotation.Nullable
   @JsonIgnore
 
-  public AnyOf getInput() {
+  public Object getInput() {
         return input.orElse(null);
   }
 
   @JsonProperty(JSON_PROPERTY_INPUT)
   @JsonInclude(value = JsonInclude.Include.USE_DEFAULTS)
 
-  public JsonNullable<AnyOf> getInput_JsonNullable() {
+  public JsonNullable<Object> getInput_JsonNullable() {
     return input;
   }
   
   @JsonProperty(JSON_PROPERTY_INPUT)
-  public void setInput_JsonNullable(JsonNullable<AnyOf> input) {
+  public void setInput_JsonNullable(JsonNullable<Object> input) {
     this.input = input;
   }
 
-  public void setInput(AnyOf input) {
-    this.input = JsonNullable.<AnyOf>of(input);
+  public void setInput(Object input) {
+    this.input = JsonNullable.<Object>of(input);
   }
 
   public ToolInputStreamingPart state(String state) {

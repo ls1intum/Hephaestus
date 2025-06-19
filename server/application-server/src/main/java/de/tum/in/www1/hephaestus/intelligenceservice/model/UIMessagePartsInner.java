@@ -66,7 +66,7 @@ public class UIMessagePartsInner {
   private Object providerMetadata;
 
   public static final String JSON_PROPERTY_INPUT = "input";
-  private Object input = null;
+  private Object input;
 
   public static final String JSON_PROPERTY_STATE = "state";
   private String state = "output-available";
@@ -75,7 +75,7 @@ public class UIMessagePartsInner {
   private String toolCallId;
 
   public static final String JSON_PROPERTY_OUTPUT = "output";
-  private Object output = null;
+  private Object output;
 
   public static final String JSON_PROPERTY_SOURCE_ID = "sourceId";
   private String sourceId;
@@ -93,7 +93,7 @@ public class UIMessagePartsInner {
   private String mediaType;
 
   public static final String JSON_PROPERTY_DATA = "data";
-  private Object data = null;
+  private Object data;
 
   public static final String JSON_PROPERTY_ID = "id";
   private String id;
@@ -186,7 +186,7 @@ public class UIMessagePartsInner {
    * Get input
    * @return input
    */
-  @jakarta.annotation.Nullable
+  @jakarta.annotation.Nonnull
   @JsonProperty(JSON_PROPERTY_INPUT)
   @JsonInclude(value = JsonInclude.Include.ALWAYS)
 
@@ -261,7 +261,7 @@ public class UIMessagePartsInner {
    * Get output
    * @return output
    */
-  @jakarta.annotation.Nullable
+  @jakarta.annotation.Nonnull
   @JsonProperty(JSON_PROPERTY_OUTPUT)
   @JsonInclude(value = JsonInclude.Include.ALWAYS)
 
@@ -411,7 +411,7 @@ public class UIMessagePartsInner {
    * Get data
    * @return data
    */
-  @jakarta.annotation.Nullable
+  @jakarta.annotation.Nonnull
   @JsonProperty(JSON_PROPERTY_DATA)
   @JsonInclude(value = JsonInclude.Include.ALWAYS)
 

@@ -79,6 +79,7 @@ components:
       properties:
         data:
           title: Data
+          type: object
         id:
           anyOf:
           - type: string
@@ -291,6 +292,7 @@ components:
       properties:
         data:
           title: Data
+          type: object
         id:
           anyOf:
           - type: string
@@ -521,6 +523,7 @@ components:
       properties:
         input:
           title: Input
+          type: object
         toolCallId:
           title: Toolcallid
           type: string
@@ -581,6 +584,7 @@ components:
       properties:
         output:
           title: Output
+          type: object
         providerMetadata:
           anyOf:
           - type: object
@@ -619,6 +623,7 @@ components:
       properties:
         input:
           title: Input
+          type: object
         state:
           const: input-available
           default: input-available
@@ -642,7 +647,7 @@ components:
       properties:
         input:
           anyOf:
-          - {}
+          - type: object
           - type: 'null'
           title: Input
         state:
@@ -667,8 +672,10 @@ components:
       properties:
         input:
           title: Input
+          type: object
         output:
           title: Output
+          type: object
         state:
           const: output-available
           default: output-available
