@@ -31,9 +31,9 @@ public class ChatController {
 
     @Autowired
     private IntelligenceServiceWebClient intelligenceServiceWebClient;
-    
+
     @Autowired
-    private PersistenceStreamPartProcessor persistenceProcessor;
+    private ChatPersistenceService chatPersistenceService;
 
     @Hidden
     @PostMapping(produces = MediaType.TEXT_EVENT_STREAM_VALUE)
@@ -49,19 +49,26 @@ public class ChatController {
         // TODO: Separate app user and GitHub user handling, this should not be needed
         if (userOptional.isEmpty()) {
             logger.warn("User not found for login: {}", currentUserLogin);
-            return Flux.just(                
-                StreamPartProcessorUtils.streamPartToSSE(new StreamErrorPart().errorText("Sorry, we could not find your user.")),
-                StreamPartProcessorUtils.streamPartToSSE(new StreamFinishPart()),
+            return Flux.just(
+                StreamPartProcessorUtils.streamPartToJson(
+                    new StreamErrorPart().errorText("Sorry, we could not find your user.")
+                ),
+                StreamPartProcessorUtils.streamPartToJson(new StreamFinishPart()),
                 StreamPartProcessorUtils.DONE_MARKER
             );
         }
 
-        logger.debug("Forwarding chat request to intelligence service for user: {} with processor: {}", 
-                   userOptional.get().getLogin(), persistenceProcessor.getClass().getSimpleName());
+        logger.debug("Forwarding chat request to intelligence service for user: {}", userOptional.get().getLogin());
+
+        var user = userOptional.get();
+
+        // Delegate to the persistence service to handle thread and message creation
+        StreamPartProcessor processor = chatPersistenceService.createProcessorForRequest(user, chatRequest);
+
         ChatRequest intelligenceRequest = new ChatRequest();
         intelligenceRequest.setMessages(chatRequest.messages());
-        
+
         // Use the enhanced streaming with persistence callbacks
-        return intelligenceServiceWebClient.streamChat(intelligenceRequest, persistenceProcessor);
+        return intelligenceServiceWebClient.streamChat(intelligenceRequest, processor);
     }
 }

@@ -4,6 +4,7 @@ import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.databind.JsonNode;
 import io.hypersistence.utils.hibernate.type.json.JsonType;
 import jakarta.persistence.*;
+import java.util.UUID;
 import lombok.EqualsAndHashCode;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
@@ -11,7 +12,6 @@ import lombok.Setter;
 import lombok.ToString;
 import org.hibernate.annotations.Type;
 import org.springframework.lang.NonNull;
-import java.util.UUID;
 
 /**
  * Represents a part of a chat message in the AI SDK Data Stream Protocol.
@@ -25,7 +25,7 @@ import java.util.UUID;
 @ToString
 @EqualsAndHashCode(onlyExplicitlyIncluded = true)
 public class ChatMessagePart {
-    
+
     @EmbeddedId
     @EqualsAndHashCode.Include
     private ChatMessagePartId id;
@@ -70,20 +70,20 @@ public class ChatMessagePart {
         // Core message part types
         TEXT("text"),
         REASONING("reasoning"),
-        
+
         // Tool-related parts
         TOOL("tool"), // Generic type for tool-{name}
-        
+
         // Source reference parts
         SOURCE_URL("source-url"),
         SOURCE_DOCUMENT("source-document"),
-        
+
         // File part
         FILE("file"),
-        
+
         // Data part
         DATA("data"), // Generic type for data-{type}
-        
+
         // Step control
         STEP_START("step-start");
 
@@ -105,24 +105,24 @@ public class ChatMessagePart {
             if (typeString == null) {
                 throw new IllegalArgumentException("Type cannot be null");
             }
-            
+
             // Handle tool-{name} pattern
             if (typeString.startsWith("tool-") && typeString.length() > 5) {
                 return TOOL;
             }
-            
+
             // Handle data-{type} pattern
             if (typeString.startsWith("data-") && typeString.length() > 5) {
                 return DATA;
             }
-            
+
             // Handle standard types
             for (PartType type : values()) {
                 if (type.value.equals(typeString)) {
                     return type;
                 }
             }
-            
+
             throw new IllegalArgumentException("Unknown message part type: " + typeString);
         }
     }
@@ -137,7 +137,7 @@ public class ChatMessagePart {
         }
         return null;
     }
-    
+
     /**
      * Get the specific data type if this is a data part
      * @return Data type or null if this isn't a data part

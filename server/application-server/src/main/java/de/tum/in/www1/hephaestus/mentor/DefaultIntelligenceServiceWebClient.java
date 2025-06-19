@@ -23,16 +23,18 @@ import reactor.core.publisher.Flux;
 @Component
 @Profile("!test") // Exclude this implementation in test profile
 public class DefaultIntelligenceServiceWebClient implements IntelligenceServiceWebClient {
-    
+
     private static final Logger logger = LoggerFactory.getLogger(DefaultIntelligenceServiceWebClient.class);
     private final WebClient webClient;
-    
-    public DefaultIntelligenceServiceWebClient(@Value("${hephaestus.intelligence-service.url}") String intelligenceServiceUrl) {
+
+    public DefaultIntelligenceServiceWebClient(
+        @Value("${hephaestus.intelligence-service.url}") String intelligenceServiceUrl
+    ) {
         // Configure ObjectMapper to properly handle JsonNullable fields
         var objectMapper = new ObjectMapper()
             .registerModule(new JsonNullableModule())
             .setSerializationInclusion(JsonInclude.Include.NON_NULL);
-            
+
         // Configure WebClient with custom ObjectMapper for JsonNullable support
         ExchangeStrategies strategies = ExchangeStrategies.builder()
             .codecs(configurer -> {
@@ -40,19 +42,19 @@ public class DefaultIntelligenceServiceWebClient implements IntelligenceServiceW
             })
             .build();
 
-        this.webClient = WebClient.builder()
-            .baseUrl(intelligenceServiceUrl)
-            .exchangeStrategies(strategies)
-            .build();
+        this.webClient = WebClient.builder().baseUrl(intelligenceServiceUrl).exchangeStrategies(strategies).build();
         logger.info("Configured Intelligence Service WebClient with URL: {}", intelligenceServiceUrl);
     }
-    
+
     @Override
     public Flux<String> streamChat(ChatRequest request, StreamPartProcessor processor) {
-        logger.debug("Sending chat request to intelligence service with {} messages", 
-                   request.getMessages() != null ? request.getMessages().size() : 0);
-        
-        return webClient.post()
+        logger.debug(
+            "Sending chat request to intelligence service with {} messages",
+            request.getMessages() != null ? request.getMessages().size() : 0
+        );
+
+        return webClient
+            .post()
             .uri("/mentor/chat")
             .contentType(MediaType.APPLICATION_JSON)
             .accept(MediaType.TEXT_EVENT_STREAM)
@@ -68,8 +70,10 @@ public class DefaultIntelligenceServiceWebClient implements IntelligenceServiceW
             .onErrorResume(error -> {
                 logger.error("Error in intelligence service call, returning fallback SSE response", error);
                 return Flux.just(
-                    StreamPartProcessorUtils.streamPartToSSE(new StreamErrorPart().errorText("Sorry, I encountered an error. Please try again.")),
-                    StreamPartProcessorUtils.streamPartToSSE(new StreamFinishPart()),
+                    StreamPartProcessorUtils.streamPartToJson(
+                        new StreamErrorPart().errorText("Sorry, I encountered an error. Please try again.")
+                    ),
+                    StreamPartProcessorUtils.streamPartToJson(new StreamFinishPart()),
                     StreamPartProcessorUtils.DONE_MARKER
                 );
             });

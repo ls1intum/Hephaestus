@@ -5,11 +5,11 @@ import java.lang.annotation.RetentionPolicy;
 import org.springframework.security.test.context.support.WithSecurityContext;
 
 /**
- * Custom annotation to create a mock authenticated user for tests.
+ * Custom annotation to create a mock admin user for tests.
  */
 @Retention(RetentionPolicy.RUNTIME)
-@WithSecurityContext(factory = WithMockUserSecurityContextFactory.class)
-public @interface WithMockUser {
+@WithSecurityContext(factory = WithUserSecurityContextFactory.class)
+public @interface WithUser {
     /**
      * The username of the mock user.
      */
@@ -23,5 +23,5 @@ public @interface WithMockUser {
     /**
      * The user ID for the mock user.
      */
-    String userId() default "test-user-id";
+    String userId() default "testuser-user-id";
 }

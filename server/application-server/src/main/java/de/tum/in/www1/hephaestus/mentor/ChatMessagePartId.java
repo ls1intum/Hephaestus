@@ -1,13 +1,12 @@
 package de.tum.in.www1.hephaestus.mentor;
 
 import jakarta.persistence.Embeddable;
+import java.io.Serializable;
+import java.util.UUID;
 import lombok.AllArgsConstructor;
 import lombok.EqualsAndHashCode;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
-
-import java.io.Serializable;
-import java.util.UUID;
 
 /**
  * Immutable composite primary key for ChatMessagePart entity.
@@ -19,12 +18,12 @@ import java.util.UUID;
 @AllArgsConstructor
 @EqualsAndHashCode
 public class ChatMessagePartId implements Serializable {
-    
+
     /**
      * ID of the message this part belongs to
      */
     private UUID messageId;
-    
+
     /**
      * Order of this part within the message (0-based)
      */

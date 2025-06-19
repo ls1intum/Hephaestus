@@ -10,12 +10,11 @@ import reactor.core.publisher.Flux;
  */
 @Component
 public interface IntelligenceServiceWebClient {
-
     /**
      * Send a chat request with stream part processing callbacks.
      * This method allows for real-time processing of stream parts for persistence,
      * monitoring, and business logic while still returning the raw SSE stream.
-     * 
+     *
      * @param request The chat request containing messages
      * @param processor The stream part processor for handling callbacks
      * @return Flux of streaming response chunks

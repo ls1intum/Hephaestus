@@ -1,18 +1,17 @@
 package de.tum.in.www1.hephaestus.mentor;
 
+import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.*;
+
 import de.tum.in.www1.hephaestus.intelligenceservice.model.*;
 import de.tum.in.www1.hephaestus.testconfig.BaseUnitTest;
+import java.util.ArrayList;
+import java.util.List;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mock;
 import reactor.core.publisher.Flux;
 import reactor.test.StepVerifier;
-
-import java.util.ArrayList;
-import java.util.List;
-
-import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.Mockito.*;
 
 /**
  * Test class for stream part processing capabilities.
@@ -31,14 +30,15 @@ public class StreamPartProcessorTest extends BaseUnitTest {
         String sseData4 = "data: {\"type\": \"finish\"}\n\n";
         String sseData5 = "data: [DONE]\n\n";
 
-        when(webClient.streamChat(any(ChatRequest.class), any(StreamPartProcessor.class)))
-            .thenReturn(Flux.just(sseData1, sseData2, sseData3, sseData4, sseData5));
+        when(webClient.streamChat(any(ChatRequest.class), any(StreamPartProcessor.class))).thenReturn(
+            Flux.just(sseData1, sseData2, sseData3, sseData4, sseData5)
+        );
 
         // Create a test processor to capture callbacks
         TestStreamPartProcessor testProcessor = new TestStreamPartProcessor();
 
         ChatRequest request = new ChatRequest();
-        
+
         // Test the stream with processor
         StepVerifier.create(webClient.streamChat(request, testProcessor))
             .expectNext(sseData1)
@@ -52,7 +52,7 @@ public class StreamPartProcessorTest extends BaseUnitTest {
         assertEquals(1, testProcessor.startEvents.size());
         assertEquals(2, testProcessor.textEvents.size());
         assertEquals(1, testProcessor.finishEvents.size());
-        
+
         assertEquals("msg-123", testProcessor.startEvents.get(0).getMessageId());
         assertEquals("Hello", testProcessor.textEvents.get(0).getText());
         assertEquals(" world", testProcessor.textEvents.get(1).getText());
@@ -60,16 +60,20 @@ public class StreamPartProcessorTest extends BaseUnitTest {
 
     @Test
     void testToolCallbacks() {
-        String toolStartData = "data: {\"type\": \"tool-input-start\", \"toolCallId\": \"call_123\", \"toolName\": \"get_weather\"}\n\n";
-        String toolInputData = "data: {\"type\": \"tool-input-available\", \"toolCallId\": \"call_123\", \"toolName\": \"get_weather\", \"input\": {\"location\": \"Munich\"}}\n\n";
-        String toolOutputData = "data: {\"type\": \"tool-output-available\", \"toolCallId\": \"call_123\", \"output\": {\"temperature\": 23.8}}\n\n";
+        String toolStartData =
+            "data: {\"type\": \"tool-input-start\", \"toolCallId\": \"call_123\", \"toolName\": \"get_weather\"}\n\n";
+        String toolInputData =
+            "data: {\"type\": \"tool-input-available\", \"toolCallId\": \"call_123\", \"toolName\": \"get_weather\", \"input\": {\"location\": \"Munich\"}}\n\n";
+        String toolOutputData =
+            "data: {\"type\": \"tool-output-available\", \"toolCallId\": \"call_123\", \"output\": {\"temperature\": 23.8}}\n\n";
 
-        when(webClient.streamChat(any(ChatRequest.class), any(StreamPartProcessor.class)))
-            .thenReturn(Flux.just(toolStartData, toolInputData, toolOutputData));
+        when(webClient.streamChat(any(ChatRequest.class), any(StreamPartProcessor.class))).thenReturn(
+            Flux.just(toolStartData, toolInputData, toolOutputData)
+        );
 
         TestStreamPartProcessor testProcessor = new TestStreamPartProcessor();
         ChatRequest request = new ChatRequest();
-        
+
         StepVerifier.create(webClient.streamChat(request, testProcessor))
             .expectNext(toolStartData)
             .expectNext(toolInputData)
@@ -79,7 +83,7 @@ public class StreamPartProcessorTest extends BaseUnitTest {
         assertEquals(1, testProcessor.toolStartEvents.size());
         assertEquals(1, testProcessor.toolInputEvents.size());
         assertEquals(1, testProcessor.toolOutputEvents.size());
-        
+
         assertEquals("call_123", testProcessor.toolStartEvents.get(0).getToolCallId());
         assertEquals("get_weather", testProcessor.toolStartEvents.get(0).getToolName());
     }
@@ -91,18 +95,31 @@ public class StreamPartProcessorTest extends BaseUnitTest {
         String reasoningFinishData = "data: {\"type\": \"reasoning-part-finish\"}\n\n";
         String stepStartData = "data: {\"type\": \"start-step\"}\n\n";
         String stepFinishData = "data: {\"type\": \"finish-step\"}\n\n";
-        String sourceUrlData = "data: {\"type\": \"source-url\", \"sourceId\": \"src_123\", \"url\": \"https://example.com\", \"title\": \"Example\"}\n\n";
-        String sourceDocData = "data: {\"type\": \"source-document\", \"sourceId\": \"doc_456\", \"mediaType\": \"application/pdf\", \"title\": \"Document Title\"}\n\n";
-        String fileData = "data: {\"type\": \"file\", \"url\": \"https://example.com/file.png\", \"mediaType\": \"image/png\"}\n\n";
-        String metadataData = "data: {\"type\": \"message-metadata\", \"messageMetadata\": {\"usage\": {\"tokens\": 150}}}\n\n";
+        String sourceUrlData =
+            "data: {\"type\": \"source-url\", \"sourceId\": \"src_123\", \"url\": \"https://example.com\", \"title\": \"Example\"}\n\n";
+        String sourceDocData =
+            "data: {\"type\": \"source-document\", \"sourceId\": \"doc_456\", \"mediaType\": \"application/pdf\", \"title\": \"Document Title\"}\n\n";
+        String fileData =
+            "data: {\"type\": \"file\", \"url\": \"https://example.com/file.png\", \"mediaType\": \"image/png\"}\n\n";
+        String metadataData =
+            "data: {\"type\": \"message-metadata\", \"messageMetadata\": {\"usage\": {\"tokens\": 150}}}\n\n";
 
-        when(webClient.streamChat(any(ChatRequest.class), any(StreamPartProcessor.class)))
-            .thenReturn(Flux.just(reasoningData, reasoningFinishData, stepStartData, stepFinishData, 
-                               sourceUrlData, sourceDocData, fileData, metadataData));
+        when(webClient.streamChat(any(ChatRequest.class), any(StreamPartProcessor.class))).thenReturn(
+            Flux.just(
+                reasoningData,
+                reasoningFinishData,
+                stepStartData,
+                stepFinishData,
+                sourceUrlData,
+                sourceDocData,
+                fileData,
+                metadataData
+            )
+        );
 
         TestStreamPartProcessor testProcessor = new TestStreamPartProcessor();
         ChatRequest request = new ChatRequest();
-        
+
         StepVerifier.create(webClient.streamChat(request, testProcessor))
             .expectNext(reasoningData)
             .expectNext(reasoningFinishData)
@@ -123,7 +140,7 @@ public class StreamPartProcessorTest extends BaseUnitTest {
         assertEquals(1, testProcessor.sourceDocumentEvents.size());
         assertEquals(1, testProcessor.fileEvents.size());
         assertEquals(1, testProcessor.messageMetadataEvents.size());
-        
+
         // Verify specific content
         assertEquals("Let me think about this...", testProcessor.reasoningEvents.get(0).getText());
         assertEquals("src_123", testProcessor.sourceUrlEvents.get(0).getSourceId());
@@ -134,17 +151,17 @@ public class StreamPartProcessorTest extends BaseUnitTest {
 
     @Test
     void testToolInputDeltaCallback() {
-        String toolDeltaData = "data: {\"type\": \"tool-input-delta\", \"toolCallId\": \"call_123\", \"inputTextDelta\": \"Munich\"}\n\n";
+        String toolDeltaData =
+            "data: {\"type\": \"tool-input-delta\", \"toolCallId\": \"call_123\", \"inputTextDelta\": \"Munich\"}\n\n";
 
-        when(webClient.streamChat(any(ChatRequest.class), any(StreamPartProcessor.class)))
-            .thenReturn(Flux.just(toolDeltaData));
+        when(webClient.streamChat(any(ChatRequest.class), any(StreamPartProcessor.class))).thenReturn(
+            Flux.just(toolDeltaData)
+        );
 
         TestStreamPartProcessor testProcessor = new TestStreamPartProcessor();
         ChatRequest request = new ChatRequest();
-        
-        StepVerifier.create(webClient.streamChat(request, testProcessor))
-            .expectNext(toolDeltaData)
-            .verifyComplete();
+
+        StepVerifier.create(webClient.streamChat(request, testProcessor)).expectNext(toolDeltaData).verifyComplete();
 
         assertEquals(1, testProcessor.toolDeltaEvents.size());
         assertEquals("call_123", testProcessor.toolDeltaEvents.get(0).getToolCallId());
@@ -155,6 +172,7 @@ public class StreamPartProcessorTest extends BaseUnitTest {
      * Test implementation of StreamPartProcessor for capturing events.
      */
     static class TestStreamPartProcessor implements StreamPartProcessor {
+
         List<StreamStartPart> startEvents = new ArrayList<>();
         List<StreamTextPart> textEvents = new ArrayList<>();
         List<StreamFinishPart> finishEvents = new ArrayList<>();

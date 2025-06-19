@@ -1,26 +1,26 @@
 package de.tum.in.www1.hephaestus.mentor;
 
-import de.tum.in.www1.hephaestus.intelligenceservice.model.ChatRequest;
+import de.tum.in.www1.hephaestus.intelligenceservice.model.*;
+import java.util.List;
+import java.util.concurrent.ConcurrentHashMap;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Primary;
 import org.springframework.context.annotation.Profile;
 import org.springframework.stereotype.Component;
 import reactor.core.publisher.Flux;
 
-import java.util.List;
-import java.util.concurrent.ConcurrentHashMap;
-
 @Component
 @Profile("test")
-class MockChatFrameHolder {
-    private final ConcurrentHashMap<String, List<String>> messageFrames = new ConcurrentHashMap<>();
-    
-    public void setFrames(String userMessageId, List<String> frames) {
-        messageFrames.put(userMessageId, frames);
+class MockChatResponseHolder {
+
+    private final ConcurrentHashMap<String, List<Object>> streamParts = new ConcurrentHashMap<>();
+
+    public void setStreamParts(String requestMessageId, List<Object> parts) {
+        streamParts.put(requestMessageId, parts);
     }
-    
-    public List<String> getFramesForMessageId(String messageId) {
-        return messageFrames.getOrDefault(messageId, List.of());
+
+    public List<Object> getStreamPartsForMessageId(String messageId) {
+        return streamParts.getOrDefault(messageId, List.of());
     }
 }
 
@@ -33,15 +33,15 @@ class MockChatFrameHolder {
 public class MockIntelligenceServiceWebClient implements IntelligenceServiceWebClient {
 
     @Autowired
-    private MockChatFrameHolder mockFrameHolder;
+    private MockChatResponseHolder mockResponseHolder;
 
     @Override
     public Flux<String> streamChat(ChatRequest request, StreamPartProcessor processor) {
-        String userMessageId = request.getMessages().getLast().getId();
-        List<String> frames = mockFrameHolder.getFramesForMessageId(userMessageId);
-        
-        return Flux.fromIterable(frames)
-            .map(chunk -> chunk + "\n")
-            .doOnNext(chunk -> StreamPartProcessorUtils.processStreamChunk(chunk, processor));
+        String requestMessageId = request.getMessages().getLast().getId();
+        List<Object> streamParts = mockResponseHolder.getStreamPartsForMessageId(requestMessageId);
+
+        return Flux.fromIterable(streamParts)
+            .map(StreamPartProcessorUtils::streamPartToJson)
+            .doOnNext(json -> StreamPartProcessorUtils.processStreamChunk(json, processor));
     }
 }

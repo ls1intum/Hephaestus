@@ -11,13 +11,12 @@ import org.slf4j.LoggerFactory;
  * Utility class for common stream part processing logic.
  */
 public class StreamPartProcessorUtils {
-    
+
     private static final Logger logger = LoggerFactory.getLogger(StreamPartProcessorUtils.class);
-    private static final ObjectMapper objectMapper = new ObjectMapper()
-            .registerModule(new JsonNullableModule());
+    private static final ObjectMapper objectMapper = new ObjectMapper().registerModule(new JsonNullableModule());
 
     public static final String DONE_MARKER = "[DONE]";
-    
+
     /**
      * Process a JSON chunk and trigger appropriate callbacks.
      */
@@ -25,18 +24,18 @@ public class StreamPartProcessorUtils {
         if (jsonChunk == null || jsonChunk.trim().isEmpty() || DONE_MARKER.equals(jsonChunk.trim())) {
             return;
         }
-        
+
         try {
             JsonNode jsonNode = objectMapper.readTree(jsonChunk);
             JsonNode typeNode = jsonNode.get("type");
-            
+
             if (typeNode == null || !typeNode.isTextual()) {
                 return;
             }
-            
+
             String type = typeNode.asText();
             Object streamPart = parseStreamPartByType(type, jsonNode);
-            
+
             if (streamPart != null) {
                 callProcessorCallback(streamPart, processor);
             }
@@ -44,7 +43,7 @@ public class StreamPartProcessorUtils {
             logger.error("Failed to parse stream chunk: {}", jsonChunk, e);
         }
     }
-    
+
     private static Object parseStreamPartByType(String type, JsonNode jsonNode) {
         Class<?> clazz = null;
         switch (type) {
@@ -71,13 +70,13 @@ public class StreamPartProcessorUtils {
                     logger.warn("Unknown stream part type: {}", type);
                 }
             }
-        };
+        }
         if (clazz != null) {
             return parseStreamPart(jsonNode, clazz);
         }
         return null;
     }
-    
+
     private static <T> T parseStreamPart(JsonNode jsonNode, Class<T> clazz) {
         try {
             return objectMapper.treeToValue(jsonNode, clazz);
@@ -86,7 +85,7 @@ public class StreamPartProcessorUtils {
             return null;
         }
     }
-    
+
     /**
      * Call appropriate processor callback based on stream part type.
      */
@@ -113,24 +112,26 @@ public class StreamPartProcessorUtils {
                 default -> processor.onUnknownStreamPart(streamPart);
             }
         } catch (Exception e) {
-            logger.error("Error in stream part processor callback for {}: {}", 
-                        streamPart.getClass().getSimpleName(), e.getMessage(), e);
+            logger.error(
+                "Error in stream part processor callback for {}: {}",
+                streamPart.getClass().getSimpleName(),
+                e.getMessage(),
+                e
+            );
         }
     }
 
-
     /**
-     * Converts an object to a Server-Sent Event (SSE) formatted string.
-     * 
+     * Converts an object to a JSON string formatted for Server-Sent Events (SSE).
+     *
      * @param data The data to convert
      * @return The SSE formatted string
      */
-    public static String streamPartToSSE(Object data) {
+    public static String streamPartToJson(Object data) {
         try {
             return objectMapper.writeValueAsString(data);
         } catch (Exception e) {
-            logger.error("Failed to serialize data to JSON", e);
-            return "Internal server error";
+            throw new RuntimeException("Failed to serialize stream part", e);
         }
     }
 }

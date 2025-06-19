@@ -11,33 +11,46 @@ import org.springframework.security.core.context.SecurityContext;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken;
-import org.springframework.security.test.context.support.WithSecurityContextFactory;
 
 /**
- * Factory to create a mock security context with JWT authentication for tests.
+ * Base utility class for creating mock security contexts with JWT authentication.
+ * Eliminates code duplication across different user type security context factories.
  */
-public class WithMockUserSecurityContextFactory implements WithSecurityContextFactory<WithMockUser> {
+public class MockSecurityContextUtils {
 
-    @Override
-    public SecurityContext createSecurityContext(WithMockUser annotation) {
+    /**
+     * Creates a security context with JWT authentication for the specified user.
+     *
+     * @param username the username for the JWT claims
+     * @param userId the user ID for the JWT claims
+     * @param authorities the authorities/roles for the user
+     * @param tokenValue the JWT token value (used to identify user type in TestSecurityConfig)
+     * @return configured SecurityContext
+     */
+    public static SecurityContext createSecurityContext(
+        String username,
+        String userId,
+        String[] authorities,
+        String tokenValue
+    ) {
         SecurityContext context = SecurityContextHolder.createEmptyContext();
 
         // Create mock JWT claims
         Map<String, Object> claims = new HashMap<>();
-        claims.put("sub", annotation.userId());
-        claims.put("preferred_username", annotation.username());
+        claims.put("sub", userId);
+        claims.put("preferred_username", username);
         claims.put("iss", "https://test-issuer");
         claims.put("aud", "test-audience");
 
         // Add realm access with roles
-        if (annotation.authorities().length > 0) {
+        if (authorities.length > 0) {
             Map<String, Object> realmAccess = new HashMap<>();
-            realmAccess.put("roles", Arrays.asList(annotation.authorities()));
+            realmAccess.put("roles", Arrays.asList(authorities));
             claims.put("realm_access", realmAccess);
         }
 
-        // Create mock JWT
-        Jwt jwt = Jwt.withTokenValue("mock-token")
+        // Create mock JWT with specified token value
+        Jwt jwt = Jwt.withTokenValue(tokenValue)
             .header("alg", "HS256")
             .header("typ", "JWT")
             .claims(claimsMap -> claimsMap.putAll(claims))
@@ -46,12 +59,12 @@ public class WithMockUserSecurityContextFactory implements WithSecurityContextFa
             .build();
 
         // Create authorities from the annotation
-        var authorities = Arrays.stream(annotation.authorities())
+        var springAuthorities = Arrays.stream(authorities)
             .map(SimpleGrantedAuthority::new)
             .collect(Collectors.toList());
 
         // Create JWT authentication token
-        Authentication authentication = new JwtAuthenticationToken(jwt, authorities);
+        Authentication authentication = new JwtAuthenticationToken(jwt, springAuthorities);
         context.setAuthentication(authentication);
 
         return context;

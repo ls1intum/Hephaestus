@@ -11,6 +11,8 @@ import jakarta.persistence.*;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.UUID;
+import java.util.stream.Collectors;
 import lombok.EqualsAndHashCode;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
@@ -19,13 +21,11 @@ import lombok.ToString;
 import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.Type;
 import org.springframework.lang.NonNull;
-import java.util.UUID;
-import java.util.stream.Collectors;
 
 /**
  * Message in a conversation tree structure that maps to AI SDK UI Message format.
  * Each message can have multiple children (branches), but only one parent.
- * 
+ *
  * Maps directly to the UIMessage type from the AI SDK
  */
 @Entity
@@ -36,8 +36,9 @@ import java.util.stream.Collectors;
 @ToString
 @EqualsAndHashCode(onlyExplicitlyIncluded = true)
 public class ChatMessage {
+
     private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
-    
+
     @Id
     @EqualsAndHashCode.Include
     private UUID id;
@@ -65,8 +66,12 @@ public class ChatMessage {
     /**
      * Child messages - branches from this message
      */
-    @OneToMany(mappedBy = "parentMessage", cascade = {CascadeType.PERSIST, CascadeType.MERGE}, 
-               fetch = FetchType.LAZY, orphanRemoval = true)
+    @OneToMany(
+        mappedBy = "parentMessage",
+        cascade = { CascadeType.PERSIST, CascadeType.MERGE },
+        fetch = FetchType.LAZY,
+        orphanRemoval = true
+    )
     @OrderBy("createdAt ASC")
     @ToString.Exclude
     @JsonIgnore
@@ -105,7 +110,7 @@ public class ChatMessage {
 
     public enum Role {
         USER("user"),
-        ASSISTANT("assistant"), 
+        ASSISTANT("assistant"),
         SYSTEM("system");
 
         private final String value;
@@ -134,12 +139,12 @@ public class ChatMessage {
     public List<ChatMessage> getPathFromRoot() {
         List<ChatMessage> path = new ArrayList<>();
         ChatMessage current = this;
-        
+
         while (current != null) {
             path.add(0, current); // Add to beginning
             current = current.getParentMessage();
         }
-        
+
         return path;
     }
 
@@ -147,11 +152,7 @@ public class ChatMessage {
      * Adds a text part to the message
      */
     public ChatMessagePart addTextPart(String text) {
-        ChatMessagePart part = ChatMessagePartFactory.createTextPart(
-            this.id, 
-            this.parts.size(),
-            text
-        );
+        ChatMessagePart part = ChatMessagePartFactory.createTextPart(this.id, this.parts.size(), text);
         addMessagePart(part);
         return part;
     }
@@ -160,12 +161,7 @@ public class ChatMessage {
      * Adds a reasoning part to the message
      */
     public ChatMessagePart addReasoningPart(String text) {
-        ChatMessagePart part = ChatMessagePartFactory.createReasoningPart(
-            this.id,
-            this.parts.size(),
-            text,
-            null
-        );
+        ChatMessagePart part = ChatMessagePartFactory.createReasoningPart(this.id, this.parts.size(), text, null);
         addMessagePart(part);
         return part;
     }
@@ -220,13 +216,7 @@ public class ChatMessage {
      * Adds a data part to the message
      */
     public ChatMessagePart addDataPart(String dataType, Object data, @Nullable String id) {
-        ChatMessagePart part = ChatMessagePartFactory.createDataPart(
-            this.id,
-            this.parts.size(),
-            dataType,
-            data,
-            id
-        );
+        ChatMessagePart part = ChatMessagePartFactory.createDataPart(this.id, this.parts.size(), dataType, data, id);
         addMessagePart(part);
         return part;
     }
@@ -257,7 +247,7 @@ public class ChatMessage {
         if (part.getId() == null || !this.id.equals(part.getMessageId())) {
             part.setMessageId(this.id);
         }
-        
+
         // Ensure the orderIndex is set correctly
         if (part.getOrderIndex() == null || part.getOrderIndex() != parts.size() - 1) {
             part.setOrderIndex(parts.size() - 1);
@@ -284,50 +274,48 @@ public class ChatMessage {
         }
         this.parentMessage = parent;
     }
-    
+
     /**
      * Find message parts by type
      */
     public List<ChatMessagePart> findPartsByType(ChatMessagePart.PartType type) {
-        return parts.stream()
-                .filter(part -> part.getType() == type)
-                .collect(Collectors.toList());
+        return parts.stream().filter(part -> part.getType() == type).collect(Collectors.toList());
     }
-    
+
     /**
      * Find a message part by tool name
      */
     @Nullable
     public ChatMessagePart findToolPart(String toolName) {
-        return parts.stream()
-                .filter(part -> part.getType() == ChatMessagePart.PartType.TOOL && 
-                       toolName.equals(part.getToolName()))
-                .findFirst()
-                .orElse(null);
+        return parts
+            .stream()
+            .filter(part -> part.getType() == ChatMessagePart.PartType.TOOL && toolName.equals(part.getToolName()))
+            .findFirst()
+            .orElse(null);
     }
-    
+
     /**
      * Find all tool parts for a specific tool
      */
     public List<ChatMessagePart> findToolParts(String toolName) {
-        return parts.stream()
-                .filter(part -> part.getType() == ChatMessagePart.PartType.TOOL && 
-                       toolName.equals(part.getToolName()))
-                .collect(Collectors.toList());
+        return parts
+            .stream()
+            .filter(part -> part.getType() == ChatMessagePart.PartType.TOOL && toolName.equals(part.getToolName()))
+            .collect(Collectors.toList());
     }
-    
+
     /**
      * Find a message part by data type
      */
     @Nullable
     public ChatMessagePart findDataPart(String dataType) {
-        return parts.stream()
-                .filter(part -> part.getType() == ChatMessagePart.PartType.DATA && 
-                       dataType.equals(part.getDataType()))
-                .findFirst()
-                .orElse(null);
+        return parts
+            .stream()
+            .filter(part -> part.getType() == ChatMessagePart.PartType.DATA && dataType.equals(part.getDataType()))
+            .findFirst()
+            .orElse(null);
     }
-    
+
     /**
      * Convert this message to a UIMessage JSON representation
      */
@@ -335,19 +323,19 @@ public class ChatMessage {
         ObjectNode messageJson = OBJECT_MAPPER.createObjectNode();
         messageJson.put("id", id.toString());
         messageJson.put("role", role.getValue());
-        
+
         if (metadata != null) {
             messageJson.set("metadata", metadata);
         }
-        
+
         ArrayNode partsArray = messageJson.putArray("parts");
         for (ChatMessagePart part : parts) {
             partsArray.add(part.getContent());
         }
-        
+
         return messageJson;
     }
-    
+
     /**
      * Create a message from a UIMessage JSON representation
      */
@@ -355,16 +343,16 @@ public class ChatMessage {
         if (!uiMessage.has("id") || !uiMessage.has("role") || !uiMessage.has("parts")) {
             throw new IllegalArgumentException("Invalid UI message format");
         }
-        
+
         ChatMessage message = new ChatMessage();
         message.setId(UUID.fromString(uiMessage.get("id").asText()));
         message.setRole(Role.fromValue(uiMessage.get("role").asText()));
         message.setThread(thread);
-        
+
         if (uiMessage.has("metadata")) {
             message.setMetadata(uiMessage.get("metadata"));
         }
-        
+
         JsonNode parts = uiMessage.get("parts");
         if (parts.isArray()) {
             for (int index = 0; index < parts.size(); index++) {
@@ -376,7 +364,7 @@ public class ChatMessage {
                 message.addMessagePart(part);
             }
         }
-        
+
         return message;
     }
 }

@@ -36,7 +36,6 @@ public final class SecurityUtils {
      * @throws IllegalStateException if no authenticated user is found.
      */
     public static String getCurrentUserLoginOrThrow() {
-        return getCurrentUserLogin()
-            .orElseThrow(() -> new IllegalStateException("No authenticated user found"));
+        return getCurrentUserLogin().orElseThrow(() -> new IllegalStateException("No authenticated user found"));
     }
 }
