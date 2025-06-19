@@ -61,8 +61,12 @@ async def generate_response(messages, stream: StreamGenerator):
 
             async for chunk in model_with_tools.astream(working_messages):
                 chunk = AIMessageChunk.model_validate(chunk)
+                
+                logger.debug(
+                    f"Received chunk:\n{json.dumps(chunk.model_dump(), indent=2)}"
+                )
 
-                # Handle tool calls
+                # Handle tool calls - these are complete tool calls with name, id, and potentially args
                 if chunk.tool_calls:
                     # On first tool call chunk, start streaming tool input
                     if not gathered_response.tool_calls:
@@ -74,38 +78,75 @@ async def generate_response(messages, stream: StreamGenerator):
                                 tool_call_id=tool_call["id"],
                                 tool_name=tool_call["name"],
                             )
+                    
+                    # Look for any args updates to stream as deltas
+                    if gathered_response.tool_calls:
+                        for i, tool_call in enumerate(chunk.tool_calls):
+                            if i < len(gathered_response.tool_calls):
+                                # Get current tool call ID
+                                tool_call_id = tool_call["id"]
+                                
+                                # If we have args, convert to JSON and stream as delta
+                                if "args" in tool_call and tool_call["args"]:
+                                    try:
+                                        # Convert to JSON string
+                                        args_json = json.dumps(tool_call["args"])
+                                        logger.debug(f"Streaming complete args for {tool_call_id}: {args_json}")
+                                        
+                                        # Stream character by character to simulate typing
+                                        for char in args_json:
+                                            yield stream.tool_input_delta(
+                                                tool_call_id=tool_call_id,
+                                                input_text_delta=char,
+                                            )
+                                    except Exception as e:
+                                        logger.warning(f"Error streaming args as deltas: {e}")
 
-                    # Stream tool input deltas more intelligently
-                    for i, tool_call in enumerate(chunk.tool_calls):
-                        if i < len(gathered_response.tool_calls):
-                            # Continuing existing tool call - stream argument updates
-                            existing_args = gathered_response.tool_calls[i].get(
-                                "args", {}
-                            )
-                            new_args = tool_call.get("args", {})
-
-                            # Only stream meaningful deltas
-                            if new_args and new_args != existing_args:
-                                # Convert to string for delta streaming
-                                try:
-                                    delta_str = json.dumps(
-                                        new_args, separators=(",", ":")
-                                    )
-                                    yield stream.tool_input_delta(
-                                        tool_call_id=tool_call["id"],
-                                        input_text_delta=delta_str,
-                                    )
-                                except (TypeError, ValueError) as e:
-                                    logger.warning(
-                                        f"Could not serialize tool args for streaming: {e}"
-                                    )
-                        else:
-                            # New tool call
-                            logger.info(f"New tool call detected: {tool_call['name']}")
-                            yield stream.tool_input_start(
-                                tool_call_id=tool_call["id"],
-                                tool_name=tool_call["name"],
-                            )
+                # Handle tool call chunks - these are fragments of the args JSON that come in separate chunks
+                if hasattr(chunk, 'tool_call_chunks') and chunk.tool_call_chunks:
+                    for tool_chunk in chunk.tool_call_chunks:
+                        try:
+                            # Extract the tool call ID
+                            tool_id = None
+                            if hasattr(tool_chunk, 'id') and tool_chunk.id:
+                                tool_id = tool_chunk.id
+                            elif isinstance(tool_chunk, dict) and 'id' in tool_chunk and tool_chunk['id']:
+                                tool_id = tool_chunk['id']
+                            
+                            # Skip chunks without a valid ID but log this issue
+                            if not tool_id:
+                                logger.warning("Tool chunk missing ID, trying to find a valid ID")
+                                # As fallback, try to use ID from the first tool call in this chunk
+                                if chunk.tool_calls and len(chunk.tool_calls) > 0:
+                                    tool_id = chunk.tool_calls[0].get("id")
+                                    logger.debug(f"Using fallback ID: {tool_id}")
+                                
+                                # If still no ID and we have existing tool calls, use the first one
+                                if not tool_id and gathered_response.tool_calls:
+                                    tool_id = gathered_response.tool_calls[0].get("id")
+                                    logger.debug(f"Using existing tool call ID: {tool_id}")
+                                    
+                                # Still no ID? Skip this chunk
+                                if not tool_id:
+                                    logger.warning("Cannot find a valid tool call ID, skipping chunk")
+                                    continue
+                            
+                            # Get the args content (this is the actual JSON fragment)
+                            args_content = None
+                            if hasattr(tool_chunk, 'args'):
+                                args_content = tool_chunk.args
+                            elif isinstance(tool_chunk, dict) and 'args' in tool_chunk:
+                                args_content = tool_chunk['args']
+                            
+                            # Stream the fragment if it's valid
+                            if args_content and isinstance(args_content, str) and len(args_content) > 0:
+                                logger.debug(f"Streaming tool input delta for {tool_id}: {args_content}")
+                                yield stream.tool_input_delta(
+                                    tool_call_id=tool_id,
+                                    input_text_delta=args_content,
+                                )
+                        except Exception as e:
+                            logger.warning(f"Error processing tool call chunk: {e}")
 
                 # Handle regular content
                 if chunk.content:

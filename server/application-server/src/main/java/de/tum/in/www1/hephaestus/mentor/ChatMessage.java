@@ -5,6 +5,8 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
+import de.tum.in.www1.hephaestus.intelligenceservice.model.UIMessage;
+import de.tum.in.www1.hephaestus.intelligenceservice.model.UIMessagePartsInner;
 import io.hypersistence.utils.hibernate.type.json.JsonType;
 import io.micrometer.common.lang.Nullable;
 import jakarta.persistence.*;
@@ -334,6 +336,27 @@ public class ChatMessage {
         }
 
         return messageJson;
+    }
+
+    /**
+     * Convert this message to a UIMessage model object
+     */
+    public UIMessage toUIMessage() {
+        UIMessage uiMessage = new UIMessage();
+        uiMessage.setId(id.toString());
+        uiMessage.setRole(UIMessage.RoleEnum.fromValue(role.getValue()));
+
+        if (metadata != null) {
+            uiMessage.setMetadata(metadata);
+        }
+
+        // Convert each message part to a UIMessagePartsInner object
+        List<UIMessagePartsInner> partsList = parts.stream()
+            .map(ChatMessagePart::toUIMessagePart)
+            .collect(Collectors.toList());
+        uiMessage.setParts(partsList);
+
+        return uiMessage;
     }
 
     /**

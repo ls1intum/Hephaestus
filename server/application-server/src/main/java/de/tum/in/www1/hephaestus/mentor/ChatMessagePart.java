@@ -2,6 +2,8 @@ package de.tum.in.www1.hephaestus.mentor;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import de.tum.in.www1.hephaestus.intelligenceservice.model.UIMessagePartsInner;
 import io.hypersistence.utils.hibernate.type.json.JsonType;
 import jakarta.persistence.*;
 import java.util.UUID;
@@ -25,6 +27,8 @@ import org.springframework.lang.NonNull;
 @ToString
 @EqualsAndHashCode(onlyExplicitlyIncluded = true)
 public class ChatMessagePart {
+
+    private static final ObjectMapper objectMapper = new ObjectMapper();
 
     @EmbeddedId
     @EqualsAndHashCode.Include
@@ -138,6 +142,13 @@ public class ChatMessagePart {
         return null;
     }
 
+    public String getToolCallId() {
+        if (type == PartType.TOOL && content != null && content.has("toolCallId")) {
+            return content.get("toolCallId").asText();
+        }
+        return null;
+    }
+
     /**
      * Get the specific data type if this is a data part
      * @return Data type or null if this isn't a data part
@@ -195,5 +206,30 @@ public class ChatMessagePart {
     public void setOrderIndex(Integer orderIndex) {
         UUID currentMessageId = this.id != null ? this.id.getMessageId() : null;
         this.id = new ChatMessagePartId(currentMessageId, orderIndex);
+    }
+
+    /**
+     * Convert this message part to a UIMessagePartsInner object.
+     * Uses ObjectMapper to convert the content JSON to the appropriate UI model.
+     * 
+     * @return A UIMessagePartsInner representation of this message part
+     */
+    public UIMessagePartsInner toUIMessagePart() {    
+        try {
+            // Start with a copy of the content as the base
+            UIMessagePartsInner uiPart = objectMapper.treeToValue(content, UIMessagePartsInner.class);
+            
+            // Ensure the type is set correctly
+            // Use originalType if available, otherwise use the canonical type value
+            String partType = originalType != null ? originalType : type.getValue();
+            uiPart.setType(partType);
+            
+            return uiPart;
+        } catch (Exception e) {
+            // If conversion fails, create a new instance with just the type
+            UIMessagePartsInner uiPart = new UIMessagePartsInner();
+            uiPart.setType(originalType != null ? originalType : type.getValue());
+            return uiPart;
+        }
     }
 }

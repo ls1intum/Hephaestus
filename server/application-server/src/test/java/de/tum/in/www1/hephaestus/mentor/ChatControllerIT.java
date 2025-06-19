@@ -2,13 +2,18 @@ package de.tum.in.www1.hephaestus.mentor;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import de.tum.in.www1.hephaestus.intelligenceservice.model.*;
 import de.tum.in.www1.hephaestus.testconfig.BaseIntegrationTest;
 import de.tum.in.www1.hephaestus.testconfig.TestAuthUtils;
 import de.tum.in.www1.hephaestus.testconfig.WithMentorUser;
+import de.tum.in.www1.hephaestus.gitprovider.user.User;
+import de.tum.in.www1.hephaestus.gitprovider.user.UserRepository;
 import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.reactive.AutoConfigureWebTestClient;
 import org.springframework.http.MediaType;
@@ -27,9 +32,15 @@ public class ChatControllerIT extends BaseIntegrationTest {
 
     @Autowired
     private ChatThreadRepository chatThreadRepository;
-
+    
     @Autowired
     private ChatMessageRepository chatMessageRepository;
+    
+    @Autowired
+    private UserRepository userRepository;
+    
+    @Autowired
+    private ObjectMapper objectMapper;
 
     @Test
     void testUnauthenticatedRequestShouldBeRejected() {
@@ -51,10 +62,11 @@ public class ChatControllerIT extends BaseIntegrationTest {
 
     @Test
     @WithMentorUser
-    void testShouldPersistTextMessageStream() {
-        // Given
+    void testBasicUserAssistantTextConversationIsPersisted() {
+        // Given: A new chat with a single user text message
         var request = createChatRequest();
         String responseMessageId = UUID.randomUUID().toString();
+        
         mockResponseHolder.setStreamParts(
             request.messages().getLast().getId(),
             List.of(
@@ -70,12 +82,12 @@ public class ChatControllerIT extends BaseIntegrationTest {
             )
         );
 
-        // When
+        // When: The AI responds with a simple text response
         var response = performChatRequest(request);
-
-        // Then
+        
+        // Then: The thread contains both messages in the correct order with proper parent-child relationships
         StepVerifier.create(response).expectComplete();
-
+        
         // Thread should have been created with the request ID
         ChatThread thread = chatThreadRepository
             .findById(UUID.fromString(request.id()))
@@ -113,20 +125,521 @@ public class ChatControllerIT extends BaseIntegrationTest {
         assertThat(thread.getSelectedLeafMessage()).isEqualTo(assistantMessage);
     }
 
-    private ChatRequestDTO createChatRequest() {
+    @Test
+    @WithMentorUser
+    void testContinueExistingChatThreadWithNewMessages() {
+        // Given: An existing chat thread with previous messages
+        var existingThread = new ChatThread();
+        existingThread.setId(UUID.randomUUID());
+        existingThread.setUser(createTestUser());
+        existingThread.setTitle("Existing chat");
+        existingThread = chatThreadRepository.save(existingThread);
+
+        var existingUserMessage = createMessageInThread(existingThread, ChatMessage.Role.USER, "What is 1+1?", null);
+        var existingAssistantMessage = createMessageInThread(existingThread, ChatMessage.Role.ASSISTANT, "1+1 is 2", existingUserMessage);
+
+        existingThread.setSelectedLeafMessage(existingAssistantMessage);
+        chatThreadRepository.save(existingThread);
+
+        String responseMessageId = UUID.randomUUID().toString();
+        
+        var followUpMessage = new UIMessage();
+        followUpMessage.setId(UUID.randomUUID().toString());
+        followUpMessage.setRole(UIMessage.RoleEnum.USER);
+        followUpMessage.addPartsItem(new UIMessagePartsInner().type("text").text("Follow-up question, what is 1+2?"));
+        
+        var request = new ChatRequestDTO(existingThread.getId().toString(), 
+            List.of(
+                existingUserMessage.toUIMessage(),
+                existingAssistantMessage.toUIMessage(),
+                followUpMessage
+            )
+        );
+
+        mockResponseHolder.setStreamParts(
+            followUpMessage.getId().toString(),
+            List.of(
+                new StreamStartPart().messageId(responseMessageId),
+                new StreamStepStartPart(),
+                new StreamTextPart().text("Thank you for the follow-up. "),
+                new StreamTextPart().text("This builds on our previous conversation. "),
+                new StreamTextPart().text("Now, 1+2 is 3."),
+                new StreamStepFinishPart(),
+                new StreamFinishPart()
+            )
+        );
+
+        // When: A new user message is sent and AI responds
+        var response = performChatRequest(request);
+        
+        // Then: New messages are added to the existing thread with correct linking
+        StepVerifier.create(response).expectComplete();
+        
+        var refreshedThread = chatThreadRepository.findById(existingThread.getId()).orElseThrow();
+        assertThat(refreshedThread.getAllMessages()).hasSize(4); // 2 existing + 2 new
+        
+        var newUserMessage = chatMessageRepository.findById(UUID.fromString(followUpMessage.getId())).orElseThrow();
+        assertThat(newUserMessage.getThread()).isEqualTo(refreshedThread);
+        assertThat(newUserMessage.getParentMessage().getId()).isEqualTo(existingAssistantMessage.getId());
+        assertThat(newUserMessage.getParts()).hasSize(1);
+        assertThat(newUserMessage.getParts().get(0).getContent().asText())
+            .isEqualTo("Follow-up question, what is 1+2?");
+        
+        var newAssistantMessage = chatMessageRepository.findById(UUID.fromString(responseMessageId)).orElseThrow();
+        assertThat(newAssistantMessage.getThread()).isEqualTo(refreshedThread);
+        assertThat(newAssistantMessage.getParentMessage().getId()).isEqualTo(existingUserMessage.getId());
+        assertThat(newAssistantMessage.getParts()).hasSize(1);
+        assertThat(newAssistantMessage.getParts().get(0).getContent().asText())
+            .isEqualTo("Thank you for the follow-up. This builds on our previous conversation. Now, 1+2 is 3.");
+
+        assertThat(refreshedThread.getSelectedLeafMessage()).isEqualTo(newAssistantMessage);
+    }
+
+    @Test
+    @WithMentorUser
+    void testReasoningPartPersistence() {
+        // Given: A chat with a user question requiring explanation
+        var request = createChatRequest();
+        String responseMessageId = UUID.randomUUID().toString();
+        
+        mockResponseHolder.setStreamParts(
+            request.messages().getLast().getId(),
+            List.of(
+                new StreamStartPart().messageId(responseMessageId),
+                new StreamStepStartPart(),
+                new StreamReasoningPart().text("Let me think about this step by step. "),
+                new StreamReasoningPart().text("First, I need to analyze the problem. "),
+                new StreamReasoningPart().text("Then I'll provide a solution."),
+                new StreamReasoningFinishPart(),
+                new StreamTextPart().text("Based on my analysis, "),
+                new StreamTextPart().text("here's the answer."),
+                new StreamStepFinishPart(),
+                new StreamFinishPart()
+            )
+        );
+
+        // When: The AI responds with reasoning parts along with text
+        var response = performChatRequest(request);
+        
+        // Then: Both reasoning and text parts are persisted with proper types and ordering
+        StepVerifier.create(response).expectComplete();
+        
+        var assistantMessage = chatMessageRepository.findById(UUID.fromString(responseMessageId)).orElseThrow();
+        assertThat(assistantMessage.getParts()).hasSize(2);
+        
+        var parts = assistantMessage.getParts();
+        // Verify reasoning part
+        assertThat(parts.get(0).getType()).isEqualTo(ChatMessagePart.PartType.REASONING);
+        assertThat(parts.get(0).getContent().asText())
+            .isEqualTo("Let me think about this step by step. First, I need to analyze the problem. Then I'll provide a solution.");
+        
+        // Verify text part
+        assertThat(parts.get(1).getType()).isEqualTo(ChatMessagePart.PartType.TEXT);
+        assertThat(parts.get(1).getContent().asText()).isEqualTo("Based on my analysis, here's the answer.");
+    }
+
+    @Test
+    @WithMentorUser
+    void testToolCallAndToolResultPersistence() {
+        // Given: A user message requesting weather information
+        var request = createChatRequest();
+        String responseMessageId = "0ea53ae4-a149-4428-8d56-b76a872b4678";
+        String toolCallId = "call_dGexcNCb8AVioJpEN7U8L8KE";
+        
+        mockResponseHolder.setStreamParts(
+            request.messages().getLast().getId(),
+            List.of(
+                // Initial message and first text part
+                new StreamStartPart().messageId(responseMessageId),
+                new StreamStepStartPart(),
+                new StreamTextPart().text("Let me check the current weather "),
+                new StreamTextPart().text("for your location in Munich."),
+
+                // Tool call - Weather API - Input
+                new StreamToolInputStartPart().toolCallId(toolCallId).toolName("get_weather"),
+                new StreamToolInputDeltaPart().toolCallId(toolCallId).inputTextDelta("{\""),
+                new StreamToolInputDeltaPart().toolCallId(toolCallId).inputTextDelta("latitude"),
+                new StreamToolInputDeltaPart().toolCallId(toolCallId).inputTextDelta("\":"),
+                new StreamToolInputDeltaPart().toolCallId(toolCallId).inputTextDelta("48"),
+                new StreamToolInputDeltaPart().toolCallId(toolCallId).inputTextDelta("."),
+                new StreamToolInputDeltaPart().toolCallId(toolCallId).inputTextDelta("137"),
+                new StreamToolInputDeltaPart().toolCallId(toolCallId).inputTextDelta("154"),
+                new StreamToolInputDeltaPart().toolCallId(toolCallId).inputTextDelta(",\""),
+                new StreamToolInputDeltaPart().toolCallId(toolCallId).inputTextDelta("longitude"),
+                new StreamToolInputDeltaPart().toolCallId(toolCallId).inputTextDelta("\":"),
+                new StreamToolInputDeltaPart().toolCallId(toolCallId).inputTextDelta("11"),
+                new StreamToolInputDeltaPart().toolCallId(toolCallId).inputTextDelta("."),
+                new StreamToolInputDeltaPart().toolCallId(toolCallId).inputTextDelta("576"),
+                new StreamToolInputDeltaPart().toolCallId(toolCallId).inputTextDelta("124"),
+                new StreamToolInputDeltaPart().toolCallId(toolCallId).inputTextDelta("}"),
+                
+                // Complete tool input and output
+                new StreamToolInputAvailablePart()
+                    .toolCallId(toolCallId)
+                    .toolName("get_weather")
+                    .input("{\"latitude\": 48.137154, \"longitude\": 11.576124}"),
+                    
+                new StreamToolOutputAvailablePart()
+                    .toolCallId(toolCallId)
+                    .output("{\"location\": {\"latitude\": 48.137154, \"longitude\": 11.576124, \"timezone\": \"Europe/Berlin\"}, " +
+                           "\"current\": {\"temperature\": 26.8, \"temperature_unit\": \"°C\", \"feels_like\": 25.5, " +
+                           "\"humidity\": 35, \"wind_speed\": 9.4, \"wind_direction\": 18, \"pressure\": 1020.4, " +
+                           "\"cloud_cover\": 0, \"precipitation\": 0.0, \"weather_code\": 1, \"is_day\": true}, " +
+                           "\"daily\": {\"sunrise\": \"2025-06-19T05:13\", \"sunset\": \"2025-06-19T21:16\", " +
+                           "\"temperature_max\": 28.0, \"temperature_min\": 16.1}, " +
+                           "\"timestamp\": \"2025-06-19T19:30\"}"),
+                
+                // Final text response after processing tool output
+                new StreamTextPart().text("The current weather in Munich is sunny with"),
+                new StreamTextPart().text(" with a temperature of 26.8°C, feeling like 25.5°C."),
+                new StreamStepFinishPart(),
+                new StreamFinishPart()
+            )
+        );
+
+        // When: AI responds with weather tool call and result
+        var response = performChatRequest(request);
+        
+        // Then: Tool call, result, and text parts are persisted with proper payloads and relationships
+        StepVerifier.create(response).expectComplete();
+        
+        var assistantMessage = chatMessageRepository.findById(UUID.fromString(responseMessageId)).orElseThrow();
+        
+        // Verify message has exactly 3 parts (initial text, tool call+result, final text)
+        assertThat(assistantMessage.getParts()).hasSize(3);
+        
+        // Verify parts are in correct order
+        var parts = assistantMessage.getParts();
+        
+        // First part: Initial text
+        assertThat(parts.get(0).getType()).isEqualTo(ChatMessagePart.PartType.TEXT);
+        assertThat(parts.get(0).getContent().asText())
+            .isEqualTo("Let me check the current weather for your location in Munich.");
+        
+        // Second part: Tool call
+        var toolCallPart = parts.get(1);
+        assertThat(toolCallPart.getType()).isEqualTo(ChatMessagePart.PartType.TOOL);
+        assertThat(toolCallPart.getToolName()).isEqualTo("get_weather");
+        assertThat(toolCallPart.getToolCallId()).isEqualTo(toolCallId);
+
+        // Verify tool input is stored
+        var toolCallContent = toolCallPart.getContent();
+        assertThat(toolCallContent.has("input")).isTrue();
+        var toolInput = toolCallContent.get("input");
+        assertThat(toolInput.has("latitude")).isTrue();
+        assertThat(toolInput.get("latitude").asDouble()).isEqualTo(48.137154);
+        assertThat(toolInput.get("longitude").asDouble()).isEqualTo(11.576124);
+
+        // Verify tool output is stored
+        assertThat(toolCallContent.has("output")).isTrue();
+        var toolOutput = toolCallContent.get("output");
+        
+        // Verify specific data points from weather result
+        assertThat(toolOutput.get("location").get("timezone").asText()).isEqualTo("Europe/Berlin");
+        assertThat(toolOutput.get("current").get("temperature").asDouble()).isEqualTo(26.8);
+        assertThat(toolOutput.get("current").get("humidity").asInt()).isEqualTo(35);
+        assertThat(toolOutput.get("daily").get("temperature_max").asDouble()).isEqualTo(28.0);
+        
+        // Third part: Final text response
+        assertThat(parts.get(2).getType()).isEqualTo(ChatMessagePart.PartType.TEXT);
+        assertThat(parts.get(2).getContent().asText())
+            .isEqualTo("The current weather in Munich is sunny with a temperature of 26.8°C, feeling like 25.5°C.");
+    }
+
+    @Test
+    @WithMentorUser
+    void testSourceCitationPersistence() {
+        // Given: A user asking for information with sources
+        var request = createChatRequest();
+        String responseMessageId = UUID.randomUUID().toString();
+        
+        mockResponseHolder.setStreamParts(
+            request.messages().getLast().getId(),
+            List.of(
+                new StreamStartPart().messageId(responseMessageId),
+                new StreamStepStartPart(),
+                new StreamTextPart().text("According to recent research, "),
+                new StreamSourceUrlPart().url("https://example.com/research").title("Research Paper"),
+                new StreamTextPart().text("the findings show that "),
+                new StreamSourceDocumentPart().sourceId("doc-123").title("Internal Document"),
+                new StreamTextPart().text("we can conclude the following."),
+                new StreamStepFinishPart(),
+                new StreamFinishPart()
+            )
+        );
+
+        // When: AI responds with text and source citations
+        var response = performChatRequest(request);
+        
+        // Then: Source URL and source document parts are correctly persisted with their metadata
+        StepVerifier.create(response).expectComplete();
+        
+        var assistantMessage = chatMessageRepository.findById(UUID.fromString(responseMessageId)).orElseThrow();
+        assertThat(assistantMessage.getParts()).hasSize(5); // 3 text parts + 2 source parts
+        
+        var parts = assistantMessage.getParts();
+
+        // Verify part: 0 - text
+        assertThat(parts.get(0).getType()).isEqualTo(ChatMessagePart.PartType.TEXT);
+        assertThat(parts.get(0).getContent().asText()).isEqualTo("According to recent research, ");
+
+        // Verify part: 1 - source URL
+        assertThat(parts.get(1).getType()).isEqualTo(ChatMessagePart.PartType.SOURCE_URL);
+        assertThat(parts.get(1).getContent().get("url").asText()).isEqualTo("https://example.com/research");
+        assertThat(parts.get(1).getContent().get("title").asText()).isEqualTo("Research Paper");
+
+        // Verify part: 2 - text
+        assertThat(parts.get(2).getType()).isEqualTo(ChatMessagePart.PartType.TEXT);
+        assertThat(parts.get(2).getContent().asText()).isEqualTo("the findings show that ");
+
+        // Verify part: 3 - source document
+        assertThat(parts.get(3).getType()).isEqualTo(ChatMessagePart.PartType.SOURCE_DOCUMENT);
+        assertThat(parts.get(3).getContent().get("sourceId").asText()).isEqualTo("doc-123");
+        assertThat(parts.get(3).getContent().get("title").asText()).isEqualTo("Internal Document");
+
+        // Verify part: 4 - text
+        assertThat(parts.get(4).getType()).isEqualTo(ChatMessagePart.PartType.TEXT);
+        assertThat(parts.get(4).getContent().asText()).isEqualTo("we can conclude the following.");
+    }
+
+    @Test
+    @WithMentorUser
+    void testFileAttachmentPersistence() {
+        // Given: A chat where the AI generates a file
+        var request = createChatRequest();
+        String responseMessageId = UUID.randomUUID().toString();
+        String fileUrl = "https://example.com/files/example.txt";
+        
+        mockResponseHolder.setStreamParts(
+            request.messages().getLast().getId(),
+            List.of(
+                new StreamStartPart().messageId(responseMessageId),
+                new StreamStepStartPart(),
+                new StreamTextPart().text("I've created a file for you:"),
+                new StreamFilePart().url(fileUrl).mediaType("text/plain"),
+                new StreamTextPart().text("Please review the contents."),
+                new StreamStepFinishPart(),
+                new StreamFinishPart()
+            )
+        );
+
+        // When: The file is included in the response stream
+        var response = performChatRequest(request);
+        
+        // Then: The file part is persisted with correct metadata and retrievable content
+        StepVerifier.create(response).expectComplete();
+        
+        var assistantMessage = chatMessageRepository.findById(UUID.fromString(responseMessageId)).orElseThrow();
+        assertThat(assistantMessage.getParts()).hasSize(3);
+        
+        // Verify part: 0 - text
+        assertThat(assistantMessage.getParts().get(0).getType()).isEqualTo(ChatMessagePart.PartType.TEXT);
+        assertThat(assistantMessage.getParts().get(0).getContent().asText())
+            .isEqualTo("I've created a file for you:");
+
+        // Verify part: 1 - file 
+        assertThat(assistantMessage.getParts().get(1).getType()).isEqualTo(ChatMessagePart.PartType.FILE);
+        assertThat(assistantMessage.getParts().get(1).getContent().get("url").asText()).isEqualTo(fileUrl);
+        assertThat(assistantMessage.getParts().get(1).getContent().get("mediaType").asText()).isEqualTo("text/plain");
+    
+        // Verify part: 2 - text
+        assertThat(assistantMessage.getParts().get(2).getType()).isEqualTo(ChatMessagePart.PartType.TEXT);
+        assertThat(assistantMessage.getParts().get(2).getContent().asText())
+            .isEqualTo("Please review the contents.");
+    }
+
+    @Test
+    @WithMentorUser
+    void testDataPersistence() {
+        // Given: A chat where the AI generates a data part
+        var request = createChatRequest();
+        String responseMessageId = UUID.randomUUID().toString();
+        
+        mockResponseHolder.setStreamParts(
+            request.messages().getLast().getId(),
+            List.of(
+                new StreamStartPart().messageId(responseMessageId),
+                new StreamStepStartPart(),
+                new StreamTextPart().text("Here's the analysis data:"),
+                new StreamDataPart().type("data-chart").data("{\"type\": \"bar\", \"values\": [1,2,3]}"),
+                new StreamTextPart().text("The chart shows the trends."),
+                new StreamStepFinishPart(),
+                new StreamFinishPart()
+            )
+        );
+
+        // When: The data part is included in the response stream
+        var response = performChatRequest(request);
+        
+        // Then: The data part is persisted correctly
+        StepVerifier.create(response).expectComplete();
+        
+        var assistantMessage = chatMessageRepository.findById(UUID.fromString(responseMessageId)).orElseThrow();
+        assertThat(assistantMessage.getParts()).hasSize(3);
+        
+        // Verify part: 0 - text
+        assertThat(assistantMessage.getParts().get(0).getType()).isEqualTo(ChatMessagePart.PartType.TEXT);
+        assertThat(assistantMessage.getParts().get(0).getContent().asText())
+            .isEqualTo("Here's the analysis data:");
+
+        // Verify part: 1 - data
+        assertThat(assistantMessage.getParts().get(1).getType()).isEqualTo(ChatMessagePart.PartType.DATA);
+        assertThat(assistantMessage.getParts().get(1).getContent().get("type").asText()).isEqualTo("data-chart");
+        assertThat(assistantMessage.getParts().get(1).getContent().get("data").asText())
+            .isEqualTo("{\"type\": \"bar\", \"values\": [1,2,3]}");
+
+        // Verify part: 2 - text
+        assertThat(assistantMessage.getParts().get(2).getType()).isEqualTo(ChatMessagePart.PartType.TEXT);
+        assertThat(assistantMessage.getParts().get(2).getContent().asText())
+            .isEqualTo("The chart shows the trends.");
+    }
+
+    @Test
+    @WithMentorUser
+    void testMultiStepResponsePersistence() {
+        // Given: A complex user query requiring multiple steps
+        var request = createChatRequest();
+        String responseMessageId = UUID.randomUUID().toString();
+        
+        mockResponseHolder.setStreamParts(
+            request.messages().getLast().getId(),
+            List.of(
+                new StreamStartPart().messageId(responseMessageId),
+                new StreamStepStartPart(),
+                new StreamReasoningPart().text("I need to search for "),
+                new StreamReasoningPart().text("information related to the user's query."),
+                new StreamReasoningFinishPart(),
+                new StreamTextPart().text("Let me start by "),
+                new StreamTextPart().text("searching for relevant data."),
+                new StreamStepFinishPart(),
+                new StreamStepStartPart(),
+                new StreamTextPart().text("Here are"),
+                new StreamTextPart().text(" the results I found:"),
+                new StreamDataPart().type("data-chart").data("{\"type\": \"bar\", \"values\": [1,2,3]}"),
+                new StreamStepFinishPart(),
+                new StreamStepStartPart(),
+                new StreamReasoningPart().text("Now I'll analyze the results."),
+                new StreamReasoningFinishPart(),
+                new StreamTextPart().text("Based on the search, "),
+                new StreamTextPart().text("here's the conclusion."),
+                new StreamStepFinishPart(),
+                new StreamFinishPart()
+            )
+        );
+
+        // When: AI responds with multiple step-start/step-finish blocks
+        var response = performChatRequest(request);
+        
+        // Then: Steps are preserved as distinct groups in the persistence layer
+        StepVerifier.create(response).expectComplete();
+        
+        var assistantMessage = chatMessageRepository.findById(UUID.fromString(responseMessageId)).orElseThrow();
+        
+        // Verify we have parts from multiple steps
+        assertThat(assistantMessage.getParts().size()).isEqualTo(6); // We will ignore step-start for now
+        
+        var parts = assistantMessage.getParts();
+        // Verify part: 0 - reasoning
+        assertThat(parts.get(0).getType()).isEqualTo(ChatMessagePart.PartType.REASONING);
+        assertThat(parts.get(0).getContent().asText())
+            .isEqualTo("I need to search for information related to the user's query.");
+        // Verify part: 1 - text
+        assertThat(parts.get(1).getType()).isEqualTo(ChatMessagePart.PartType.TEXT);
+        assertThat(parts.get(1).getContent().asText())
+            .isEqualTo("Let me start by searching for relevant data."); 
+        // Verify part: 2 - text
+        assertThat(parts.get(2).getType()).isEqualTo(ChatMessagePart.PartType.TEXT);
+        assertThat(parts.get(2).getContent().asText())
+            .isEqualTo("Here are the results I found:");
+        // Verify part: 3 - data
+        assertThat(parts.get(3).getType()).isEqualTo(ChatMessagePart.PartType.DATA);
+        assertThat(parts.get(3).getContent().get("type").asText()).isEqualTo("data-chart");
+        assertThat(parts.get(3).getContent().get("data").asText())
+            .isEqualTo("{\"type\": \"bar\", \"values\": [1,2,3]}");
+        // Verify part: 4 - reasoning
+        assertThat(parts.get(4).getType()).isEqualTo(ChatMessagePart.PartType.REASONING);
+        assertThat(parts.get(4).getContent().asText())
+            .isEqualTo("Now I'll analyze the results.");
+        // Verify part: 5 - text
+        assertThat(parts.get(5).getType()).isEqualTo(ChatMessagePart.PartType.TEXT);
+        assertThat(parts.get(5).getContent().asText())
+            .isEqualTo("Based on the search, here's the conclusion.");
+    }
+
+      @Test
+    @WithMentorUser
+    void testMultipleAssistantMessagePersistence() {
+        // Given: A the assistant responds with multiple start messageId parts
+        var request = createChatRequest();
+        String responseMessageId1 = UUID.randomUUID().toString();
+        String responseMessageId2 = UUID.randomUUID().toString();
+        
+        mockResponseHolder.setStreamParts(
+            request.messages().getLast().getId(),
+            List.of(
+                new StreamStartPart().messageId(responseMessageId1),
+                new StreamStepStartPart(),
+                new StreamTextPart().text("This is the "),
+                new StreamTextPart().text("first message."),
+                new StreamStepFinishPart(),
+                new StreamStartPart().messageId(responseMessageId2),
+                new StreamStepStartPart(),
+                new StreamTextPart().text("This is the "),
+                new StreamTextPart().text("second message."),
+                new StreamStepFinishPart(),
+                new StreamFinishPart()
+            )
+        );
+
+        // When: AI responds with multiple step-start/step-finish blocks
+        var response = performChatRequest(request);
+        
+        // Then: Steps are preserved as distinct groups in the persistence layer
+        StepVerifier.create(response).expectComplete();
+        
+        var thread = chatThreadRepository.findById(UUID.fromString(request.id())).orElseThrow();
+        var userMessage = chatMessageRepository.findById(UUID.fromString(request.messages().getLast().getId())).orElseThrow();
+        var assistantMessage1 = chatMessageRepository.findById(UUID.fromString(responseMessageId1)).orElseThrow();
+        var assistantMessage2 = chatMessageRepository.findById(UUID.fromString(responseMessageId2)).orElseThrow();
+
+        // Verify first assistant message
+        assertThat(assistantMessage1.getParts()).hasSize(1);
+        assertThat(assistantMessage1.getParts().get(0).getType()).isEqualTo(ChatMessagePart.PartType.TEXT);
+        assertThat(assistantMessage1.getParts().get(0).getContent().asText())
+            .isEqualTo("This is the first message.");
+
+        // Verify second assistant message
+        assertThat(assistantMessage2.getParts()).hasSize(1);
+        assertThat(assistantMessage2.getParts().get(0).getType()).isEqualTo(ChatMessagePart.PartType.TEXT);
+        assertThat(assistantMessage2.getParts().get(0).getContent().asText())
+            .isEqualTo("This is the second message.");
+
+        // Verify relationships
+        assertThat(assistantMessage1.getThread()).isEqualTo(thread);
+        assertThat(assistantMessage2.getThread()).isEqualTo(thread);
+        assertThat(assistantMessage1.getParentMessage()).isEqualTo(userMessage);
+        assertThat(assistantMessage2.getParentMessage()).isEqualTo(assistantMessage1);
+        assertThat(thread.getSelectedLeafMessage()).isEqualTo(assistantMessage2);
+    }
+
+    @Test
+    @WithMentorUser
+    void testVeryLargeUserRequestsAreRejected() {
+        // Given: A user request sends an extremely long message (>20000 characters)
+        var largeContent = "x".repeat(25000); // 25,000 characters
         UUID requestThreadId = UUID.randomUUID();
         UUID requestMessageId = UUID.randomUUID();
 
         var message = new UIMessage();
         message.setId(requestMessageId.toString());
         message.setRole(UIMessage.RoleEnum.USER);
-        message.addPartsItem(new UIMessagePartsInner().type("text").text("Hello, World!"));
+        message.addPartsItem(new UIMessagePartsInner().type("text").text(largeContent));
 
-        return new ChatRequestDTO(requestThreadId.toString(), List.of(message));
-    }
+        var request = new ChatRequestDTO(requestThreadId.toString(), List.of(message));
 
-    private Flux<String> performChatRequest(ChatRequestDTO request) {
-        return webTestClient
+        // When: The request is processed by the chat service
+        // Then: The request is rejected with an appropriate error message
+        var responseBody = webTestClient
             .post()
             .uri("/mentor/chat")
             .headers(TestAuthUtils.withCurrentUser())
@@ -135,7 +648,158 @@ public class ChatControllerIT extends BaseIntegrationTest {
             .accept(MediaType.TEXT_EVENT_STREAM)
             .exchange()
             .expectStatus()
-            .isOk()
+            .isBadRequest()
+            .expectBody(String.class)
+            .returnResult()
+            .getResponseBody();
+            
+        // Verify that the error message explains the reason for rejection
+        assertThat(responseBody).isNotNull();
+        assertThat(responseBody).containsIgnoringCase("message too large");
+        
+        // Verify no messages were persisted
+        var threadOptional = chatThreadRepository.findById(requestThreadId);
+        assertThat(threadOptional).isEmpty();
+    }
+
+    @Test
+    @WithMentorUser
+    @ParameterizedTest
+    @ValueSource(strings = {"", "   ", "\n\t  "})
+    void testHandlingEmptyOrWhitespaceOnlyMessages(String messageContent) {
+        // Given: A user sends an empty message or a message with only whitespace
+        UUID requestThreadId = UUID.randomUUID();
+        UUID requestMessageId = UUID.randomUUID();
+
+        var emptyMessage = new UIMessage();
+        emptyMessage.setId(requestMessageId.toString());
+        emptyMessage.setRole(UIMessage.RoleEnum.USER);
+        emptyMessage.addPartsItem(new UIMessagePartsInner().type("text").text(messageContent));
+
+        var request = new ChatRequestDTO(requestThreadId.toString(), List.of(emptyMessage));
+
+        // When: The message is processed
+        // Then: The system does not persist the message and returns an appropriate error response
+        var response = webTestClient
+            .post()
+            .uri("/mentor/chat")
+            .headers(TestAuthUtils.withCurrentUser())
+            .contentType(MediaType.APPLICATION_JSON)
+            .bodyValue(request)
+            .accept(MediaType.TEXT_EVENT_STREAM)
+            .exchange()
+            .expectStatus()
+            .isBadRequest()
+            .expectBody(String.class)
+            .returnResult()
+            .getResponseBody();
+        
+        assertThat(response).isNotNull();
+        assertThat(response).containsIgnoringCase("empty message");
+        
+        // Verify no messages were persisted
+        var threadOptional = chatThreadRepository.findById(requestThreadId);
+        var messageOptional = chatMessageRepository.findById(requestMessageId);
+        
+        assertThat(threadOptional).isEmpty();
+        assertThat(messageOptional).isEmpty();
+    }
+
+    @Test
+    @WithMentorUser
+    void testMessageMetadataIsPersisted() {
+        // Given: A chat request and a response with message metadata
+        var request = createChatRequest();
+        String responseMessageId = UUID.randomUUID().toString();
+        String metadataJson = "{\"modelName\": \"gpt-4\", \"finishReason\": \"complete\", \"tokens\": {\"prompt\": 45, \"completion\": 78}}";
+
+        mockResponseHolder.setStreamParts(
+            request.messages().getLast().getId(),
+            List.of(
+                new StreamStartPart().messageId(responseMessageId),
+                new StreamMessageMetadataPart().messageMetadata(metadataJson),
+                new StreamStepStartPart(),
+                new StreamTextPart().text("Here's your response with metadata."),
+                new StreamStepFinishPart(),
+                new StreamFinishPart()
+            )
+        );
+
+        // When: The message with metadata is processed
+        var response = performChatRequest(request);
+        
+        // Then: The metadata is correctly persisted along with the message
+        StepVerifier.create(response).expectComplete();
+        
+        // Retrieve the message from the repository
+        var assistantMessage = chatMessageRepository.findById(UUID.fromString(responseMessageId)).orElseThrow();
+        
+        // Check the message has metadata associated with it
+        assertThat(assistantMessage.getMetadata()).isNotNull();
+        var metadata = assistantMessage.getMetadata();
+        
+        // Verify specific metadata fields
+        assertThat(metadata.get("modelName").asText()).isEqualTo("gpt-4");
+        assertThat(metadata.get("finishReason").asText()).isEqualTo("complete");
+        assertThat(metadata.get("tokens").get("prompt").asInt()).isEqualTo(45);
+        assertThat(metadata.get("tokens").get("completion").asInt()).isEqualTo(78);
+        
+        // Ensure the text response is also properly saved
+        var textPart = assistantMessage.getParts().stream()
+            .filter(part -> part.getType() == ChatMessagePart.PartType.TEXT)
+            .findFirst().orElseThrow();
+        assertThat(textPart.getContent().asText()).isEqualTo("Here's your response with metadata.");
+    }
+
+    // Helper methods
+    private User createTestUser() {
+        // Fetch the "mentor" user that was seeded by TestUserConfig
+        return userRepository.findByLogin("mentor")
+            .orElseThrow(() -> new IllegalStateException("Test mentor user not found in database"));
+    }
+    
+    private ChatMessage createMessageInThread(ChatThread thread, ChatMessage.Role role, String content, ChatMessage parent) {
+        var message = new ChatMessage();
+        message.setId(UUID.randomUUID());
+        message.setThread(thread);
+        message.setRole(role);
+        if (parent != null) {
+            message.setParentMessage(parent);
+        }
+
+        var part = new ChatMessagePart();
+        part.setId(new ChatMessagePartId(message.getId(), 0));
+        part.setMessage(message);
+        part.setType(ChatMessagePart.PartType.TEXT);
+        part.setContent(objectMapper.createObjectNode().put("text", content));
+        
+        message.setParts(List.of(part));
+        return chatMessageRepository.save(message);
+    }
+
+    private ChatRequestDTO createChatRequest() {
+        UUID requestThreadId = UUID.randomUUID();
+        UUID requestMessageId = UUID.randomUUID();
+        
+        var message = new UIMessage();
+        message.setId(requestMessageId.toString());
+        message.setRole(UIMessage.RoleEnum.USER);
+        message.addPartsItem(new UIMessagePartsInner().type("text").text("Hello, World!"));
+        
+        return new ChatRequestDTO(requestThreadId.toString(), List.of(message));
+    }
+    
+    private Flux<String> performChatRequest(ChatRequestDTO request) {
+        // This will return the response Flux for assertions
+        return webTestClient
+            .post()
+            .uri("/mentor/chat")
+            .headers(TestAuthUtils.withCurrentUser())
+            .contentType(MediaType.APPLICATION_JSON)
+            .bodyValue(request)
+            .accept(MediaType.TEXT_EVENT_STREAM)
+            .exchange()
+            .expectStatus().isOk()
             .returnResult(String.class)
             .getResponseBody();
     }
