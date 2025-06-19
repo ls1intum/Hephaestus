@@ -23,6 +23,7 @@ class ChatRequest(BaseModel):
 
 class ChatResponse(RootModel[StreamPart]):
     """Response model for chat streaming."""
+
     model_config = ConfigDict(title="StreamPart")
     ...
 
