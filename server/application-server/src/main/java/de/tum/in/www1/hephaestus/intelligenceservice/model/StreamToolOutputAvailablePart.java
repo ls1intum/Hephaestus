@@ -29,28 +29,57 @@ import com.fasterxml.jackson.annotation.JsonTypeName;
 import org.hibernate.validator.constraints.*;
 
 /**
- * A reasoning part of a message.
+ * Tool output available event.
  */
 @JsonPropertyOrder({
-  ReasoningUIPart.JSON_PROPERTY_PROVIDER_METADATA,
-  ReasoningUIPart.JSON_PROPERTY_TEXT,
-  ReasoningUIPart.JSON_PROPERTY_TYPE
+  StreamToolOutputAvailablePart.JSON_PROPERTY_OUTPUT,
+  StreamToolOutputAvailablePart.JSON_PROPERTY_PROVIDER_METADATA,
+  StreamToolOutputAvailablePart.JSON_PROPERTY_TOOL_CALL_ID,
+  StreamToolOutputAvailablePart.JSON_PROPERTY_TYPE
 })
 @jakarta.annotation.Generated(value = "org.openapitools.codegen.languages.JavaClientCodegen", comments = "Generator version: 7.7.0")
-public class ReasoningUIPart {
+public class StreamToolOutputAvailablePart {
+  public static final String JSON_PROPERTY_OUTPUT = "output";
+  private Object output = null;
+
   public static final String JSON_PROPERTY_PROVIDER_METADATA = "providerMetadata";
   private JsonNullable<Object> providerMetadata = JsonNullable.<Object>undefined();
 
-  public static final String JSON_PROPERTY_TEXT = "text";
-  private String text;
+  public static final String JSON_PROPERTY_TOOL_CALL_ID = "toolCallId";
+  private String toolCallId;
 
   public static final String JSON_PROPERTY_TYPE = "type";
-  private String type = "reasoning";
+  private String type = "tool-output-available";
 
-  public ReasoningUIPart() {
+  public StreamToolOutputAvailablePart() {
   }
 
-  public ReasoningUIPart providerMetadata(Object providerMetadata) {
+  public StreamToolOutputAvailablePart output(Object output) {
+    
+    this.output = output;
+    return this;
+  }
+
+  /**
+   * Get output
+   * @return output
+   */
+  @jakarta.annotation.Nullable
+  @JsonProperty(JSON_PROPERTY_OUTPUT)
+  @JsonInclude(value = JsonInclude.Include.ALWAYS)
+
+  public Object getOutput() {
+    return output;
+  }
+
+
+  @JsonProperty(JSON_PROPERTY_OUTPUT)
+  @JsonInclude(value = JsonInclude.Include.ALWAYS)
+  public void setOutput(Object output) {
+    this.output = output;
+  }
+
+  public StreamToolOutputAvailablePart providerMetadata(Object providerMetadata) {
     this.providerMetadata = JsonNullable.<Object>of(providerMetadata);
     
     return this;
@@ -83,32 +112,32 @@ public class ReasoningUIPart {
     this.providerMetadata = JsonNullable.<Object>of(providerMetadata);
   }
 
-  public ReasoningUIPart text(String text) {
+  public StreamToolOutputAvailablePart toolCallId(String toolCallId) {
     
-    this.text = text;
+    this.toolCallId = toolCallId;
     return this;
   }
 
   /**
-   * Get text
-   * @return text
+   * Get toolCallId
+   * @return toolCallId
    */
   @jakarta.annotation.Nonnull
-  @JsonProperty(JSON_PROPERTY_TEXT)
+  @JsonProperty(JSON_PROPERTY_TOOL_CALL_ID)
   @JsonInclude(value = JsonInclude.Include.ALWAYS)
 
-  public String getText() {
-    return text;
+  public String getToolCallId() {
+    return toolCallId;
   }
 
 
-  @JsonProperty(JSON_PROPERTY_TEXT)
+  @JsonProperty(JSON_PROPERTY_TOOL_CALL_ID)
   @JsonInclude(value = JsonInclude.Include.ALWAYS)
-  public void setText(String text) {
-    this.text = text;
+  public void setToolCallId(String toolCallId) {
+    this.toolCallId = toolCallId;
   }
 
-  public ReasoningUIPart type(String type) {
+  public StreamToolOutputAvailablePart type(String type) {
     
     this.type = type;
     return this;
@@ -141,10 +170,11 @@ public class ReasoningUIPart {
     if (o == null || getClass() != o.getClass()) {
       return false;
     }
-    ReasoningUIPart reasoningUIPart = (ReasoningUIPart) o;
-    return equalsNullable(this.providerMetadata, reasoningUIPart.providerMetadata) &&
-        Objects.equals(this.text, reasoningUIPart.text) &&
-        Objects.equals(this.type, reasoningUIPart.type);
+    StreamToolOutputAvailablePart streamToolOutputAvailablePart = (StreamToolOutputAvailablePart) o;
+    return Objects.equals(this.output, streamToolOutputAvailablePart.output) &&
+        equalsNullable(this.providerMetadata, streamToolOutputAvailablePart.providerMetadata) &&
+        Objects.equals(this.toolCallId, streamToolOutputAvailablePart.toolCallId) &&
+        Objects.equals(this.type, streamToolOutputAvailablePart.type);
   }
 
   private static <T> boolean equalsNullable(JsonNullable<T> a, JsonNullable<T> b) {
@@ -153,7 +183,7 @@ public class ReasoningUIPart {
 
   @Override
   public int hashCode() {
-    return Objects.hash(hashCodeNullable(providerMetadata), text, type);
+    return Objects.hash(output, hashCodeNullable(providerMetadata), toolCallId, type);
   }
 
   private static <T> int hashCodeNullable(JsonNullable<T> a) {
@@ -166,9 +196,10 @@ public class ReasoningUIPart {
   @Override
   public String toString() {
     StringBuilder sb = new StringBuilder();
-    sb.append("class ReasoningUIPart {\n");
+    sb.append("class StreamToolOutputAvailablePart {\n");
+    sb.append("    output: ").append(toIndentedString(output)).append("\n");
     sb.append("    providerMetadata: ").append(toIndentedString(providerMetadata)).append("\n");
-    sb.append("    text: ").append(toIndentedString(text)).append("\n");
+    sb.append("    toolCallId: ").append(toIndentedString(toolCallId)).append("\n");
     sb.append("    type: ").append(toIndentedString(type)).append("\n");
     sb.append("}");
     return sb.toString();

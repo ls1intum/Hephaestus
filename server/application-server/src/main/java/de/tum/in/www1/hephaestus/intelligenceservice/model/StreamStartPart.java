@@ -29,86 +29,94 @@ import com.fasterxml.jackson.annotation.JsonTypeName;
 import org.hibernate.validator.constraints.*;
 
 /**
- * A reasoning part of a message.
+ * Start of stream event.
  */
 @JsonPropertyOrder({
-  ReasoningUIPart.JSON_PROPERTY_PROVIDER_METADATA,
-  ReasoningUIPart.JSON_PROPERTY_TEXT,
-  ReasoningUIPart.JSON_PROPERTY_TYPE
+  StreamStartPart.JSON_PROPERTY_MESSAGE_ID,
+  StreamStartPart.JSON_PROPERTY_MESSAGE_METADATA,
+  StreamStartPart.JSON_PROPERTY_TYPE
 })
 @jakarta.annotation.Generated(value = "org.openapitools.codegen.languages.JavaClientCodegen", comments = "Generator version: 7.7.0")
-public class ReasoningUIPart {
-  public static final String JSON_PROPERTY_PROVIDER_METADATA = "providerMetadata";
-  private JsonNullable<Object> providerMetadata = JsonNullable.<Object>undefined();
+public class StreamStartPart {
+  public static final String JSON_PROPERTY_MESSAGE_ID = "messageId";
+  private JsonNullable<String> messageId = JsonNullable.<String>undefined();
 
-  public static final String JSON_PROPERTY_TEXT = "text";
-  private String text;
+  public static final String JSON_PROPERTY_MESSAGE_METADATA = "messageMetadata";
+  private JsonNullable<Object> messageMetadata = JsonNullable.<Object>undefined();
 
   public static final String JSON_PROPERTY_TYPE = "type";
-  private String type = "reasoning";
+  private String type = "start";
 
-  public ReasoningUIPart() {
+  public StreamStartPart() {
   }
 
-  public ReasoningUIPart providerMetadata(Object providerMetadata) {
-    this.providerMetadata = JsonNullable.<Object>of(providerMetadata);
+  public StreamStartPart messageId(String messageId) {
+    this.messageId = JsonNullable.<String>of(messageId);
     
     return this;
   }
 
   /**
-   * Get providerMetadata
-   * @return providerMetadata
+   * Get messageId
+   * @return messageId
    */
   @jakarta.annotation.Nullable
   @JsonIgnore
 
-  public Object getProviderMetadata() {
-        return providerMetadata.orElse(null);
+  public String getMessageId() {
+        return messageId.orElse(null);
   }
 
-  @JsonProperty(JSON_PROPERTY_PROVIDER_METADATA)
+  @JsonProperty(JSON_PROPERTY_MESSAGE_ID)
   @JsonInclude(value = JsonInclude.Include.USE_DEFAULTS)
 
-  public JsonNullable<Object> getProviderMetadata_JsonNullable() {
-    return providerMetadata;
+  public JsonNullable<String> getMessageId_JsonNullable() {
+    return messageId;
   }
   
-  @JsonProperty(JSON_PROPERTY_PROVIDER_METADATA)
-  public void setProviderMetadata_JsonNullable(JsonNullable<Object> providerMetadata) {
-    this.providerMetadata = providerMetadata;
+  @JsonProperty(JSON_PROPERTY_MESSAGE_ID)
+  public void setMessageId_JsonNullable(JsonNullable<String> messageId) {
+    this.messageId = messageId;
   }
 
-  public void setProviderMetadata(Object providerMetadata) {
-    this.providerMetadata = JsonNullable.<Object>of(providerMetadata);
+  public void setMessageId(String messageId) {
+    this.messageId = JsonNullable.<String>of(messageId);
   }
 
-  public ReasoningUIPart text(String text) {
+  public StreamStartPart messageMetadata(Object messageMetadata) {
+    this.messageMetadata = JsonNullable.<Object>of(messageMetadata);
     
-    this.text = text;
     return this;
   }
 
   /**
-   * Get text
-   * @return text
+   * Get messageMetadata
+   * @return messageMetadata
    */
-  @jakarta.annotation.Nonnull
-  @JsonProperty(JSON_PROPERTY_TEXT)
-  @JsonInclude(value = JsonInclude.Include.ALWAYS)
+  @jakarta.annotation.Nullable
+  @JsonIgnore
 
-  public String getText() {
-    return text;
+  public Object getMessageMetadata() {
+        return messageMetadata.orElse(null);
   }
 
+  @JsonProperty(JSON_PROPERTY_MESSAGE_METADATA)
+  @JsonInclude(value = JsonInclude.Include.USE_DEFAULTS)
 
-  @JsonProperty(JSON_PROPERTY_TEXT)
-  @JsonInclude(value = JsonInclude.Include.ALWAYS)
-  public void setText(String text) {
-    this.text = text;
+  public JsonNullable<Object> getMessageMetadata_JsonNullable() {
+    return messageMetadata;
+  }
+  
+  @JsonProperty(JSON_PROPERTY_MESSAGE_METADATA)
+  public void setMessageMetadata_JsonNullable(JsonNullable<Object> messageMetadata) {
+    this.messageMetadata = messageMetadata;
   }
 
-  public ReasoningUIPart type(String type) {
+  public void setMessageMetadata(Object messageMetadata) {
+    this.messageMetadata = JsonNullable.<Object>of(messageMetadata);
+  }
+
+  public StreamStartPart type(String type) {
     
     this.type = type;
     return this;
@@ -141,10 +149,10 @@ public class ReasoningUIPart {
     if (o == null || getClass() != o.getClass()) {
       return false;
     }
-    ReasoningUIPart reasoningUIPart = (ReasoningUIPart) o;
-    return equalsNullable(this.providerMetadata, reasoningUIPart.providerMetadata) &&
-        Objects.equals(this.text, reasoningUIPart.text) &&
-        Objects.equals(this.type, reasoningUIPart.type);
+    StreamStartPart streamStartPart = (StreamStartPart) o;
+    return equalsNullable(this.messageId, streamStartPart.messageId) &&
+        equalsNullable(this.messageMetadata, streamStartPart.messageMetadata) &&
+        Objects.equals(this.type, streamStartPart.type);
   }
 
   private static <T> boolean equalsNullable(JsonNullable<T> a, JsonNullable<T> b) {
@@ -153,7 +161,7 @@ public class ReasoningUIPart {
 
   @Override
   public int hashCode() {
-    return Objects.hash(hashCodeNullable(providerMetadata), text, type);
+    return Objects.hash(hashCodeNullable(messageId), hashCodeNullable(messageMetadata), type);
   }
 
   private static <T> int hashCodeNullable(JsonNullable<T> a) {
@@ -166,9 +174,9 @@ public class ReasoningUIPart {
   @Override
   public String toString() {
     StringBuilder sb = new StringBuilder();
-    sb.append("class ReasoningUIPart {\n");
-    sb.append("    providerMetadata: ").append(toIndentedString(providerMetadata)).append("\n");
-    sb.append("    text: ").append(toIndentedString(text)).append("\n");
+    sb.append("class StreamStartPart {\n");
+    sb.append("    messageId: ").append(toIndentedString(messageId)).append("\n");
+    sb.append("    messageMetadata: ").append(toIndentedString(messageMetadata)).append("\n");
     sb.append("    type: ").append(toIndentedString(type)).append("\n");
     sb.append("}");
     return sb.toString();

@@ -20,55 +20,25 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonTypeName;
 import com.fasterxml.jackson.annotation.JsonValue;
-import de.tum.in.www1.hephaestus.intelligenceservice.model.Toolinvocation;
 import com.fasterxml.jackson.annotation.JsonPropertyOrder;
 import com.fasterxml.jackson.annotation.JsonTypeName;
 import org.hibernate.validator.constraints.*;
 
 /**
- * A tool invocation part of a message.
+ * Reasoning finish event.
  */
 @JsonPropertyOrder({
-  ToolInvocationUIPart.JSON_PROPERTY_TOOL_INVOCATION,
-  ToolInvocationUIPart.JSON_PROPERTY_TYPE
+  StreamReasoningFinishPart.JSON_PROPERTY_TYPE
 })
 @jakarta.annotation.Generated(value = "org.openapitools.codegen.languages.JavaClientCodegen", comments = "Generator version: 7.7.0")
-public class ToolInvocationUIPart {
-  public static final String JSON_PROPERTY_TOOL_INVOCATION = "toolInvocation";
-  private Toolinvocation toolInvocation;
-
+public class StreamReasoningFinishPart {
   public static final String JSON_PROPERTY_TYPE = "type";
-  private String type = "tool-invocation";
+  private String type = "reasoning-part-finish";
 
-  public ToolInvocationUIPart() {
+  public StreamReasoningFinishPart() {
   }
 
-  public ToolInvocationUIPart toolInvocation(Toolinvocation toolInvocation) {
-    
-    this.toolInvocation = toolInvocation;
-    return this;
-  }
-
-  /**
-   * Get toolInvocation
-   * @return toolInvocation
-   */
-  @jakarta.annotation.Nonnull
-  @JsonProperty(JSON_PROPERTY_TOOL_INVOCATION)
-  @JsonInclude(value = JsonInclude.Include.ALWAYS)
-
-  public Toolinvocation getToolInvocation() {
-    return toolInvocation;
-  }
-
-
-  @JsonProperty(JSON_PROPERTY_TOOL_INVOCATION)
-  @JsonInclude(value = JsonInclude.Include.ALWAYS)
-  public void setToolInvocation(Toolinvocation toolInvocation) {
-    this.toolInvocation = toolInvocation;
-  }
-
-  public ToolInvocationUIPart type(String type) {
+  public StreamReasoningFinishPart type(String type) {
     
     this.type = type;
     return this;
@@ -101,21 +71,19 @@ public class ToolInvocationUIPart {
     if (o == null || getClass() != o.getClass()) {
       return false;
     }
-    ToolInvocationUIPart toolInvocationUIPart = (ToolInvocationUIPart) o;
-    return Objects.equals(this.toolInvocation, toolInvocationUIPart.toolInvocation) &&
-        Objects.equals(this.type, toolInvocationUIPart.type);
+    StreamReasoningFinishPart streamReasoningFinishPart = (StreamReasoningFinishPart) o;
+    return Objects.equals(this.type, streamReasoningFinishPart.type);
   }
 
   @Override
   public int hashCode() {
-    return Objects.hash(toolInvocation, type);
+    return Objects.hash(type);
   }
 
   @Override
   public String toString() {
     StringBuilder sb = new StringBuilder();
-    sb.append("class ToolInvocationUIPart {\n");
-    sb.append("    toolInvocation: ").append(toIndentedString(toolInvocation)).append("\n");
+    sb.append("class StreamReasoningFinishPart {\n");
     sb.append("    type: ").append(toIndentedString(type)).append("\n");
     sb.append("}");
     return sb.toString();

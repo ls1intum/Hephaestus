@@ -1,15 +1,13 @@
 import asyncio
-from collections import defaultdict
 import inspect
 import uuid
 import json
-from typing import AsyncGenerator, Callable, List, Literal, Optional, Any, Dict, Union
-from pydantic import BaseModel, Field, field_validator
+from typing import Annotated, AsyncGenerator, Callable, List, Literal, Optional, Any, Dict, Union
+from pydantic import BaseModel, ConfigDict, Field, RootModel
 from fastapi import APIRouter
 from fastapi.responses import StreamingResponse
 from langchain_core.messages import HumanMessage, AIMessage, SystemMessage, AIMessageChunk, ToolMessage
 from langchain_core.tools import tool
-from langchain_core.runnables import RunnableConfig
 import requests
 from app.models import get_model
 from app.settings import settings
@@ -76,15 +74,9 @@ class StepStartUIPart(BasePart):
 
 class ToolPartBase(BasePart):
     """Base class for tool parts."""
-    type: str  # Will be in format 'tool-{NAME}'
+    type: Annotated[str, Field(pattern=r"^tool-.*")]  # Will be in format 'tool-{NAME}'
     toolCallId: str
 
-    @field_validator('type')
-    @classmethod
-    def validate_tool_type_prefix(cls, v: str) -> str:
-        if not v.startswith("tool-"):
-            raise ValueError(f"Tool type must start with 'tool-', got {v}")
-        return v
 
 class ToolInputStreamingPart(ToolPartBase):
     """Tool part with input being streamed."""
@@ -107,16 +99,10 @@ class ToolOutputAvailablePart(ToolPartBase):
 
 class DataUIPart(BasePart):
     """A data part with dynamic type."""
-    type: str  # Will be in format 'data-{NAME}'
+    type: Annotated[str, Field(pattern=r"^data-.*")]  # Will be in format 'data-{NAME}'
     id: Optional[str] = None
     data: Any
 
-    @field_validator('type')
-    @classmethod
-    def validate_data_type_prefix(cls, v: str) -> str:
-        if not v.startswith("data-"):
-            raise ValueError(f"Data type must start with 'data-', got {v}")
-        return v
 
 # Define the union of all possible UI parts
 UIMessagePart = Union[
@@ -233,16 +219,9 @@ class StreamFilePart(BasePart):
 
 class StreamDataPart(BasePart):
     """Data part with dynamic type."""
-    type: str  # Will be in format 'data-{NAME}'
+    type: Annotated[str, Field(pattern=r"^data-.*")]  # Will be in format 'data-{NAME}'
     id: Optional[str] = None
     data: Any
-
-    @field_validator('type')
-    @classmethod
-    def validate_data_type_prefix(cls, v: str) -> str:
-        if not v.startswith("data-"):
-            raise ValueError(f"Data type must start with 'data-', got {v}")
-        return v
 
 
 class StreamStepStartPart(BasePart):
@@ -275,7 +254,7 @@ class StreamMessageMetadataPart(BasePart):
     messageMetadata: Dict[str, Any]
 
 
-StreamPart = Union[
+StreamPartUnion = Union[
     StreamTextPart,
     StreamErrorPart,
     StreamToolInputStartPart,
@@ -343,7 +322,7 @@ class StreamGenerator:
     def __init__(self, message_id: str = None):
         self.message_id = message_id or str(uuid.uuid4())
     
-    def format_event(self, part: StreamPart) -> str:
+    def format_event(self, part: StreamPartUnion) -> str:
         """Convert a StreamPart to a text/event-stream format."""
         return f'data: {json.dumps(part.model_dump())}\n\n'
     
@@ -665,18 +644,24 @@ async def generate_response(messages, stream: StreamGenerator):
         yield stream.error(f"Error generating response: {str(e)}")
 
 
+class StreamPart(RootModel[StreamPartUnion]):
+    """Stream part model."""
+    model_config = ConfigDict(title="StreamPart")
+
+
 @router.post(
     "/chat",
+    response_class=StreamingResponse,
+    response_model=StreamPart,
     responses={
-        200: {
-            "description": "Data stream for AI SDK",
+         200: {
+            "description": "Event stream of chat updates.",
             "content": {
                 "text/event-stream": {
+                    "schema": {"$ref": "#/components/schemas/StreamPart"},
                     "examples": {
-                        "first-chunk": {
-                            "summary": "Typical event stream frame",
-                            "value": 'data: {"type":"text","text":"Hello"}\n\n',
-                        }
+                        "text":   {"value": {"type": "text",   "text": "Hello"}},
+                        "error":  {"value": {"type": "error",  "errorText": "oops"}}
                     }
                 }
             },

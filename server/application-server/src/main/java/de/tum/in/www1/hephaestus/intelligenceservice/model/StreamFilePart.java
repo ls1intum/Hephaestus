@@ -20,28 +20,20 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonTypeName;
 import com.fasterxml.jackson.annotation.JsonValue;
-import org.openapitools.jackson.nullable.JsonNullable;
-import com.fasterxml.jackson.annotation.JsonIgnore;
-import org.openapitools.jackson.nullable.JsonNullable;
-import java.util.NoSuchElementException;
 import com.fasterxml.jackson.annotation.JsonPropertyOrder;
 import com.fasterxml.jackson.annotation.JsonTypeName;
 import org.hibernate.validator.constraints.*;
 
 /**
- * A file part of a message.
+ * File part of a message.
  */
 @JsonPropertyOrder({
-  FileUIPart.JSON_PROPERTY_FILENAME,
-  FileUIPart.JSON_PROPERTY_MEDIA_TYPE,
-  FileUIPart.JSON_PROPERTY_TYPE,
-  FileUIPart.JSON_PROPERTY_URL
+  StreamFilePart.JSON_PROPERTY_MEDIA_TYPE,
+  StreamFilePart.JSON_PROPERTY_TYPE,
+  StreamFilePart.JSON_PROPERTY_URL
 })
 @jakarta.annotation.Generated(value = "org.openapitools.codegen.languages.JavaClientCodegen", comments = "Generator version: 7.7.0")
-public class FileUIPart {
-  public static final String JSON_PROPERTY_FILENAME = "filename";
-  private JsonNullable<String> filename = JsonNullable.<String>undefined();
-
+public class StreamFilePart {
   public static final String JSON_PROPERTY_MEDIA_TYPE = "mediaType";
   private String mediaType;
 
@@ -51,43 +43,10 @@ public class FileUIPart {
   public static final String JSON_PROPERTY_URL = "url";
   private String url;
 
-  public FileUIPart() {
+  public StreamFilePart() {
   }
 
-  public FileUIPart filename(String filename) {
-    this.filename = JsonNullable.<String>of(filename);
-    
-    return this;
-  }
-
-  /**
-   * Get filename
-   * @return filename
-   */
-  @jakarta.annotation.Nullable
-  @JsonIgnore
-
-  public String getFilename() {
-        return filename.orElse(null);
-  }
-
-  @JsonProperty(JSON_PROPERTY_FILENAME)
-  @JsonInclude(value = JsonInclude.Include.USE_DEFAULTS)
-
-  public JsonNullable<String> getFilename_JsonNullable() {
-    return filename;
-  }
-  
-  @JsonProperty(JSON_PROPERTY_FILENAME)
-  public void setFilename_JsonNullable(JsonNullable<String> filename) {
-    this.filename = filename;
-  }
-
-  public void setFilename(String filename) {
-    this.filename = JsonNullable.<String>of(filename);
-  }
-
-  public FileUIPart mediaType(String mediaType) {
+  public StreamFilePart mediaType(String mediaType) {
     
     this.mediaType = mediaType;
     return this;
@@ -112,7 +71,7 @@ public class FileUIPart {
     this.mediaType = mediaType;
   }
 
-  public FileUIPart type(String type) {
+  public StreamFilePart type(String type) {
     
     this.type = type;
     return this;
@@ -137,7 +96,7 @@ public class FileUIPart {
     this.type = type;
   }
 
-  public FileUIPart url(String url) {
+  public StreamFilePart url(String url) {
     
     this.url = url;
     return this;
@@ -170,34 +129,21 @@ public class FileUIPart {
     if (o == null || getClass() != o.getClass()) {
       return false;
     }
-    FileUIPart fileUIPart = (FileUIPart) o;
-    return equalsNullable(this.filename, fileUIPart.filename) &&
-        Objects.equals(this.mediaType, fileUIPart.mediaType) &&
-        Objects.equals(this.type, fileUIPart.type) &&
-        Objects.equals(this.url, fileUIPart.url);
-  }
-
-  private static <T> boolean equalsNullable(JsonNullable<T> a, JsonNullable<T> b) {
-    return a == b || (a != null && b != null && a.isPresent() && b.isPresent() && Objects.deepEquals(a.get(), b.get()));
+    StreamFilePart streamFilePart = (StreamFilePart) o;
+    return Objects.equals(this.mediaType, streamFilePart.mediaType) &&
+        Objects.equals(this.type, streamFilePart.type) &&
+        Objects.equals(this.url, streamFilePart.url);
   }
 
   @Override
   public int hashCode() {
-    return Objects.hash(hashCodeNullable(filename), mediaType, type, url);
-  }
-
-  private static <T> int hashCodeNullable(JsonNullable<T> a) {
-    if (a == null) {
-      return 1;
-    }
-    return a.isPresent() ? Arrays.deepHashCode(new Object[]{a.get()}) : 31;
+    return Objects.hash(mediaType, type, url);
   }
 
   @Override
   public String toString() {
     StringBuilder sb = new StringBuilder();
-    sb.append("class FileUIPart {\n");
-    sb.append("    filename: ").append(toIndentedString(filename)).append("\n");
+    sb.append("class StreamFilePart {\n");
     sb.append("    mediaType: ").append(toIndentedString(mediaType)).append("\n");
     sb.append("    type: ").append(toIndentedString(type)).append("\n");
     sb.append("    url: ").append(toIndentedString(url)).append("\n");

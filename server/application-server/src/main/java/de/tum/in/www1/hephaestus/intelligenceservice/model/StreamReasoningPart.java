@@ -20,65 +20,70 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonTypeName;
 import com.fasterxml.jackson.annotation.JsonValue;
-import de.tum.in.www1.hephaestus.intelligenceservice.model.ReasoningOpenDetail;
-import de.tum.in.www1.hephaestus.intelligenceservice.model.ReasoningRedactedDetail;
+import org.openapitools.jackson.nullable.JsonNullable;
+import com.fasterxml.jackson.annotation.JsonIgnore;
+import org.openapitools.jackson.nullable.JsonNullable;
+import java.util.NoSuchElementException;
 import com.fasterxml.jackson.annotation.JsonPropertyOrder;
 import com.fasterxml.jackson.annotation.JsonTypeName;
 import org.hibernate.validator.constraints.*;
 
 /**
- * ReasoningUIPartDetailsInner
+ * Reasoning part of a message.
  */
 @JsonPropertyOrder({
-  ReasoningUIPartDetailsInner.JSON_PROPERTY_SIGNATURE,
-  ReasoningUIPartDetailsInner.JSON_PROPERTY_TEXT,
-  ReasoningUIPartDetailsInner.JSON_PROPERTY_TYPE,
-  ReasoningUIPartDetailsInner.JSON_PROPERTY_DATA
+  StreamReasoningPart.JSON_PROPERTY_PROVIDER_METADATA,
+  StreamReasoningPart.JSON_PROPERTY_TEXT,
+  StreamReasoningPart.JSON_PROPERTY_TYPE
 })
-@JsonTypeName("ReasoningUIPart_details_inner")
 @jakarta.annotation.Generated(value = "org.openapitools.codegen.languages.JavaClientCodegen", comments = "Generator version: 7.7.0")
-public class ReasoningUIPartDetailsInner {
-  public static final String JSON_PROPERTY_SIGNATURE = "signature";
-  private String signature;
+public class StreamReasoningPart {
+  public static final String JSON_PROPERTY_PROVIDER_METADATA = "providerMetadata";
+  private JsonNullable<Object> providerMetadata = JsonNullable.<Object>undefined();
 
   public static final String JSON_PROPERTY_TEXT = "text";
   private String text;
 
   public static final String JSON_PROPERTY_TYPE = "type";
-  private String type = "redacted";
+  private String type = "reasoning";
 
-  public static final String JSON_PROPERTY_DATA = "data";
-  private String data;
-
-  public ReasoningUIPartDetailsInner() {
+  public StreamReasoningPart() {
   }
 
-  public ReasoningUIPartDetailsInner signature(String signature) {
+  public StreamReasoningPart providerMetadata(Object providerMetadata) {
+    this.providerMetadata = JsonNullable.<Object>of(providerMetadata);
     
-    this.signature = signature;
     return this;
   }
 
   /**
-   * Get signature
-   * @return signature
+   * Get providerMetadata
+   * @return providerMetadata
    */
   @jakarta.annotation.Nullable
-  @JsonProperty(JSON_PROPERTY_SIGNATURE)
-  @JsonInclude(value = JsonInclude.Include.USE_DEFAULTS)
+  @JsonIgnore
 
-  public String getSignature() {
-    return signature;
+  public Object getProviderMetadata() {
+        return providerMetadata.orElse(null);
   }
 
-
-  @JsonProperty(JSON_PROPERTY_SIGNATURE)
+  @JsonProperty(JSON_PROPERTY_PROVIDER_METADATA)
   @JsonInclude(value = JsonInclude.Include.USE_DEFAULTS)
-  public void setSignature(String signature) {
-    this.signature = signature;
+
+  public JsonNullable<Object> getProviderMetadata_JsonNullable() {
+    return providerMetadata;
+  }
+  
+  @JsonProperty(JSON_PROPERTY_PROVIDER_METADATA)
+  public void setProviderMetadata_JsonNullable(JsonNullable<Object> providerMetadata) {
+    this.providerMetadata = providerMetadata;
   }
 
-  public ReasoningUIPartDetailsInner text(String text) {
+  public void setProviderMetadata(Object providerMetadata) {
+    this.providerMetadata = JsonNullable.<Object>of(providerMetadata);
+  }
+
+  public StreamReasoningPart text(String text) {
     
     this.text = text;
     return this;
@@ -103,7 +108,7 @@ public class ReasoningUIPartDetailsInner {
     this.text = text;
   }
 
-  public ReasoningUIPartDetailsInner type(String type) {
+  public StreamReasoningPart type(String type) {
     
     this.type = type;
     return this;
@@ -128,31 +133,6 @@ public class ReasoningUIPartDetailsInner {
     this.type = type;
   }
 
-  public ReasoningUIPartDetailsInner data(String data) {
-    
-    this.data = data;
-    return this;
-  }
-
-  /**
-   * Get data
-   * @return data
-   */
-  @jakarta.annotation.Nonnull
-  @JsonProperty(JSON_PROPERTY_DATA)
-  @JsonInclude(value = JsonInclude.Include.ALWAYS)
-
-  public String getData() {
-    return data;
-  }
-
-
-  @JsonProperty(JSON_PROPERTY_DATA)
-  @JsonInclude(value = JsonInclude.Include.ALWAYS)
-  public void setData(String data) {
-    this.data = data;
-  }
-
   @Override
   public boolean equals(Object o) {
     if (this == o) {
@@ -161,26 +141,35 @@ public class ReasoningUIPartDetailsInner {
     if (o == null || getClass() != o.getClass()) {
       return false;
     }
-    ReasoningUIPartDetailsInner reasoningUIPartDetailsInner = (ReasoningUIPartDetailsInner) o;
-    return Objects.equals(this.signature, reasoningUIPartDetailsInner.signature) &&
-        Objects.equals(this.text, reasoningUIPartDetailsInner.text) &&
-        Objects.equals(this.type, reasoningUIPartDetailsInner.type) &&
-        Objects.equals(this.data, reasoningUIPartDetailsInner.data);
+    StreamReasoningPart streamReasoningPart = (StreamReasoningPart) o;
+    return equalsNullable(this.providerMetadata, streamReasoningPart.providerMetadata) &&
+        Objects.equals(this.text, streamReasoningPart.text) &&
+        Objects.equals(this.type, streamReasoningPart.type);
+  }
+
+  private static <T> boolean equalsNullable(JsonNullable<T> a, JsonNullable<T> b) {
+    return a == b || (a != null && b != null && a.isPresent() && b.isPresent() && Objects.deepEquals(a.get(), b.get()));
   }
 
   @Override
   public int hashCode() {
-    return Objects.hash(signature, text, type, data);
+    return Objects.hash(hashCodeNullable(providerMetadata), text, type);
+  }
+
+  private static <T> int hashCodeNullable(JsonNullable<T> a) {
+    if (a == null) {
+      return 1;
+    }
+    return a.isPresent() ? Arrays.deepHashCode(new Object[]{a.get()}) : 31;
   }
 
   @Override
   public String toString() {
     StringBuilder sb = new StringBuilder();
-    sb.append("class ReasoningUIPartDetailsInner {\n");
-    sb.append("    signature: ").append(toIndentedString(signature)).append("\n");
+    sb.append("class StreamReasoningPart {\n");
+    sb.append("    providerMetadata: ").append(toIndentedString(providerMetadata)).append("\n");
     sb.append("    text: ").append(toIndentedString(text)).append("\n");
     sb.append("    type: ").append(toIndentedString(type)).append("\n");
-    sb.append("    data: ").append(toIndentedString(data)).append("\n");
     sb.append("}");
     return sb.toString();
   }

@@ -20,10 +20,6 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonTypeName;
 import com.fasterxml.jackson.annotation.JsonValue;
-import de.tum.in.www1.hephaestus.intelligenceservice.model.UIMessage;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.List;
 import org.openapitools.jackson.nullable.JsonNullable;
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import org.openapitools.jackson.nullable.JsonNullable;
@@ -33,28 +29,53 @@ import com.fasterxml.jackson.annotation.JsonTypeName;
 import org.hibernate.validator.constraints.*;
 
 /**
- * Chat request model.
+ * A data part with dynamic type.
  */
 @JsonPropertyOrder({
-  ChatRequest.JSON_PROPERTY_ID,
-  ChatRequest.JSON_PROPERTY_MESSAGES,
-  ChatRequest.JSON_PROPERTY_METADATA
+  DataUIPart.JSON_PROPERTY_DATA,
+  DataUIPart.JSON_PROPERTY_ID,
+  DataUIPart.JSON_PROPERTY_TYPE
 })
 @jakarta.annotation.Generated(value = "org.openapitools.codegen.languages.JavaClientCodegen", comments = "Generator version: 7.7.0")
-public class ChatRequest {
+public class DataUIPart {
+  public static final String JSON_PROPERTY_DATA = "data";
+  private Object data = null;
+
   public static final String JSON_PROPERTY_ID = "id";
   private JsonNullable<String> id = JsonNullable.<String>undefined();
 
-  public static final String JSON_PROPERTY_MESSAGES = "messages";
-  private List<UIMessage> messages = new ArrayList<>();
+  public static final String JSON_PROPERTY_TYPE = "type";
+  private String type;
 
-  public static final String JSON_PROPERTY_METADATA = "metadata";
-  private JsonNullable<Object> metadata = JsonNullable.<Object>undefined();
-
-  public ChatRequest() {
+  public DataUIPart() {
   }
 
-  public ChatRequest id(String id) {
+  public DataUIPart data(Object data) {
+    
+    this.data = data;
+    return this;
+  }
+
+  /**
+   * Get data
+   * @return data
+   */
+  @jakarta.annotation.Nullable
+  @JsonProperty(JSON_PROPERTY_DATA)
+  @JsonInclude(value = JsonInclude.Include.ALWAYS)
+
+  public Object getData() {
+    return data;
+  }
+
+
+  @JsonProperty(JSON_PROPERTY_DATA)
+  @JsonInclude(value = JsonInclude.Include.ALWAYS)
+  public void setData(Object data) {
+    this.data = data;
+  }
+
+  public DataUIPart id(String id) {
     this.id = JsonNullable.<String>of(id);
     
     return this;
@@ -87,70 +108,29 @@ public class ChatRequest {
     this.id = JsonNullable.<String>of(id);
   }
 
-  public ChatRequest messages(List<UIMessage> messages) {
+  public DataUIPart type(String type) {
     
-    this.messages = messages;
-    return this;
-  }
-
-  public ChatRequest addMessagesItem(UIMessage messagesItem) {
-    if (this.messages == null) {
-      this.messages = new ArrayList<>();
-    }
-    this.messages.add(messagesItem);
+    this.type = type;
     return this;
   }
 
   /**
-   * Get messages
-   * @return messages
+   * Get type
+   * @return type
    */
   @jakarta.annotation.Nonnull
-  @JsonProperty(JSON_PROPERTY_MESSAGES)
+  @JsonProperty(JSON_PROPERTY_TYPE)
   @JsonInclude(value = JsonInclude.Include.ALWAYS)
 
-  public List<UIMessage> getMessages() {
-    return messages;
+  public String getType() {
+    return type;
   }
 
 
-  @JsonProperty(JSON_PROPERTY_MESSAGES)
+  @JsonProperty(JSON_PROPERTY_TYPE)
   @JsonInclude(value = JsonInclude.Include.ALWAYS)
-  public void setMessages(List<UIMessage> messages) {
-    this.messages = messages;
-  }
-
-  public ChatRequest metadata(Object metadata) {
-    this.metadata = JsonNullable.<Object>of(metadata);
-    
-    return this;
-  }
-
-  /**
-   * Get metadata
-   * @return metadata
-   */
-  @jakarta.annotation.Nullable
-  @JsonIgnore
-
-  public Object getMetadata() {
-        return metadata.orElse(null);
-  }
-
-  @JsonProperty(JSON_PROPERTY_METADATA)
-  @JsonInclude(value = JsonInclude.Include.USE_DEFAULTS)
-
-  public JsonNullable<Object> getMetadata_JsonNullable() {
-    return metadata;
-  }
-  
-  @JsonProperty(JSON_PROPERTY_METADATA)
-  public void setMetadata_JsonNullable(JsonNullable<Object> metadata) {
-    this.metadata = metadata;
-  }
-
-  public void setMetadata(Object metadata) {
-    this.metadata = JsonNullable.<Object>of(metadata);
+  public void setType(String type) {
+    this.type = type;
   }
 
   @Override
@@ -161,10 +141,10 @@ public class ChatRequest {
     if (o == null || getClass() != o.getClass()) {
       return false;
     }
-    ChatRequest chatRequest = (ChatRequest) o;
-    return equalsNullable(this.id, chatRequest.id) &&
-        Objects.equals(this.messages, chatRequest.messages) &&
-        equalsNullable(this.metadata, chatRequest.metadata);
+    DataUIPart dataUIPart = (DataUIPart) o;
+    return Objects.equals(this.data, dataUIPart.data) &&
+        equalsNullable(this.id, dataUIPart.id) &&
+        Objects.equals(this.type, dataUIPart.type);
   }
 
   private static <T> boolean equalsNullable(JsonNullable<T> a, JsonNullable<T> b) {
@@ -173,7 +153,7 @@ public class ChatRequest {
 
   @Override
   public int hashCode() {
-    return Objects.hash(hashCodeNullable(id), messages, hashCodeNullable(metadata));
+    return Objects.hash(data, hashCodeNullable(id), type);
   }
 
   private static <T> int hashCodeNullable(JsonNullable<T> a) {
@@ -186,10 +166,10 @@ public class ChatRequest {
   @Override
   public String toString() {
     StringBuilder sb = new StringBuilder();
-    sb.append("class ChatRequest {\n");
+    sb.append("class DataUIPart {\n");
+    sb.append("    data: ").append(toIndentedString(data)).append("\n");
     sb.append("    id: ").append(toIndentedString(id)).append("\n");
-    sb.append("    messages: ").append(toIndentedString(messages)).append("\n");
-    sb.append("    metadata: ").append(toIndentedString(metadata)).append("\n");
+    sb.append("    type: ").append(toIndentedString(type)).append("\n");
     sb.append("}");
     return sb.toString();
   }

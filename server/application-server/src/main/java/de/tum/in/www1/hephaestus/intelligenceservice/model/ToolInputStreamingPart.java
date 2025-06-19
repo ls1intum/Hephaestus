@@ -20,6 +20,7 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonTypeName;
 import com.fasterxml.jackson.annotation.JsonValue;
+import de.tum.in.www1.hephaestus.intelligenceservice.model.AnyOf;
 import org.openapitools.jackson.nullable.JsonNullable;
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import org.openapitools.jackson.nullable.JsonNullable;
@@ -29,61 +30,65 @@ import com.fasterxml.jackson.annotation.JsonTypeName;
 import org.hibernate.validator.constraints.*;
 
 /**
- * ToolCall
+ * Tool part with input being streamed.
  */
 @JsonPropertyOrder({
-  ToolCall.JSON_PROPERTY_ARGS,
-  ToolCall.JSON_PROPERTY_STATE,
-  ToolCall.JSON_PROPERTY_STEP,
-  ToolCall.JSON_PROPERTY_TOOL_CALL_ID,
-  ToolCall.JSON_PROPERTY_TOOL_NAME
+  ToolInputStreamingPart.JSON_PROPERTY_INPUT,
+  ToolInputStreamingPart.JSON_PROPERTY_STATE,
+  ToolInputStreamingPart.JSON_PROPERTY_TOOL_CALL_ID,
+  ToolInputStreamingPart.JSON_PROPERTY_TYPE
 })
 @jakarta.annotation.Generated(value = "org.openapitools.codegen.languages.JavaClientCodegen", comments = "Generator version: 7.7.0")
-public class ToolCall {
-  public static final String JSON_PROPERTY_ARGS = "args";
-  private Object args;
+public class ToolInputStreamingPart {
+  public static final String JSON_PROPERTY_INPUT = "input";
+  private JsonNullable<AnyOf> input = JsonNullable.<AnyOf>undefined();
 
   public static final String JSON_PROPERTY_STATE = "state";
-  private String state = "call";
-
-  public static final String JSON_PROPERTY_STEP = "step";
-  private JsonNullable<Integer> step = JsonNullable.<Integer>undefined();
+  private String state = "input-streaming";
 
   public static final String JSON_PROPERTY_TOOL_CALL_ID = "toolCallId";
   private String toolCallId;
 
-  public static final String JSON_PROPERTY_TOOL_NAME = "toolName";
-  private String toolName;
+  public static final String JSON_PROPERTY_TYPE = "type";
+  private String type;
 
-  public ToolCall() {
+  public ToolInputStreamingPart() {
   }
 
-  public ToolCall args(Object args) {
+  public ToolInputStreamingPart input(AnyOf input) {
+    this.input = JsonNullable.<AnyOf>of(input);
     
-    this.args = args;
     return this;
   }
 
   /**
-   * Get args
-   * @return args
+   * Get input
+   * @return input
    */
-  @jakarta.annotation.Nonnull
-  @JsonProperty(JSON_PROPERTY_ARGS)
-  @JsonInclude(value = JsonInclude.Include.ALWAYS)
+  @jakarta.annotation.Nullable
+  @JsonIgnore
 
-  public Object getArgs() {
-    return args;
+  public AnyOf getInput() {
+        return input.orElse(null);
   }
 
+  @JsonProperty(JSON_PROPERTY_INPUT)
+  @JsonInclude(value = JsonInclude.Include.USE_DEFAULTS)
 
-  @JsonProperty(JSON_PROPERTY_ARGS)
-  @JsonInclude(value = JsonInclude.Include.ALWAYS)
-  public void setArgs(Object args) {
-    this.args = args;
+  public JsonNullable<AnyOf> getInput_JsonNullable() {
+    return input;
+  }
+  
+  @JsonProperty(JSON_PROPERTY_INPUT)
+  public void setInput_JsonNullable(JsonNullable<AnyOf> input) {
+    this.input = input;
   }
 
-  public ToolCall state(String state) {
+  public void setInput(AnyOf input) {
+    this.input = JsonNullable.<AnyOf>of(input);
+  }
+
+  public ToolInputStreamingPart state(String state) {
     
     this.state = state;
     return this;
@@ -108,40 +113,7 @@ public class ToolCall {
     this.state = state;
   }
 
-  public ToolCall step(Integer step) {
-    this.step = JsonNullable.<Integer>of(step);
-    
-    return this;
-  }
-
-  /**
-   * Get step
-   * @return step
-   */
-  @jakarta.annotation.Nullable
-  @JsonIgnore
-
-  public Integer getStep() {
-        return step.orElse(null);
-  }
-
-  @JsonProperty(JSON_PROPERTY_STEP)
-  @JsonInclude(value = JsonInclude.Include.USE_DEFAULTS)
-
-  public JsonNullable<Integer> getStep_JsonNullable() {
-    return step;
-  }
-  
-  @JsonProperty(JSON_PROPERTY_STEP)
-  public void setStep_JsonNullable(JsonNullable<Integer> step) {
-    this.step = step;
-  }
-
-  public void setStep(Integer step) {
-    this.step = JsonNullable.<Integer>of(step);
-  }
-
-  public ToolCall toolCallId(String toolCallId) {
+  public ToolInputStreamingPart toolCallId(String toolCallId) {
     
     this.toolCallId = toolCallId;
     return this;
@@ -166,29 +138,29 @@ public class ToolCall {
     this.toolCallId = toolCallId;
   }
 
-  public ToolCall toolName(String toolName) {
+  public ToolInputStreamingPart type(String type) {
     
-    this.toolName = toolName;
+    this.type = type;
     return this;
   }
 
   /**
-   * Get toolName
-   * @return toolName
+   * Get type
+   * @return type
    */
   @jakarta.annotation.Nonnull
-  @JsonProperty(JSON_PROPERTY_TOOL_NAME)
+  @JsonProperty(JSON_PROPERTY_TYPE)
   @JsonInclude(value = JsonInclude.Include.ALWAYS)
 
-  public String getToolName() {
-    return toolName;
+  public String getType() {
+    return type;
   }
 
 
-  @JsonProperty(JSON_PROPERTY_TOOL_NAME)
+  @JsonProperty(JSON_PROPERTY_TYPE)
   @JsonInclude(value = JsonInclude.Include.ALWAYS)
-  public void setToolName(String toolName) {
-    this.toolName = toolName;
+  public void setType(String type) {
+    this.type = type;
   }
 
   @Override
@@ -199,12 +171,11 @@ public class ToolCall {
     if (o == null || getClass() != o.getClass()) {
       return false;
     }
-    ToolCall toolCall = (ToolCall) o;
-    return Objects.equals(this.args, toolCall.args) &&
-        Objects.equals(this.state, toolCall.state) &&
-        equalsNullable(this.step, toolCall.step) &&
-        Objects.equals(this.toolCallId, toolCall.toolCallId) &&
-        Objects.equals(this.toolName, toolCall.toolName);
+    ToolInputStreamingPart toolInputStreamingPart = (ToolInputStreamingPart) o;
+    return equalsNullable(this.input, toolInputStreamingPart.input) &&
+        Objects.equals(this.state, toolInputStreamingPart.state) &&
+        Objects.equals(this.toolCallId, toolInputStreamingPart.toolCallId) &&
+        Objects.equals(this.type, toolInputStreamingPart.type);
   }
 
   private static <T> boolean equalsNullable(JsonNullable<T> a, JsonNullable<T> b) {
@@ -213,7 +184,7 @@ public class ToolCall {
 
   @Override
   public int hashCode() {
-    return Objects.hash(args, state, hashCodeNullable(step), toolCallId, toolName);
+    return Objects.hash(hashCodeNullable(input), state, toolCallId, type);
   }
 
   private static <T> int hashCodeNullable(JsonNullable<T> a) {
@@ -226,12 +197,11 @@ public class ToolCall {
   @Override
   public String toString() {
     StringBuilder sb = new StringBuilder();
-    sb.append("class ToolCall {\n");
-    sb.append("    args: ").append(toIndentedString(args)).append("\n");
+    sb.append("class ToolInputStreamingPart {\n");
+    sb.append("    input: ").append(toIndentedString(input)).append("\n");
     sb.append("    state: ").append(toIndentedString(state)).append("\n");
-    sb.append("    step: ").append(toIndentedString(step)).append("\n");
     sb.append("    toolCallId: ").append(toIndentedString(toolCallId)).append("\n");
-    sb.append("    toolName: ").append(toIndentedString(toolName)).append("\n");
+    sb.append("    type: ").append(toIndentedString(type)).append("\n");
     sb.append("}");
     return sb.toString();
   }

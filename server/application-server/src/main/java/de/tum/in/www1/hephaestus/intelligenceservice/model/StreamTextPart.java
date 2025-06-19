@@ -20,70 +20,29 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonTypeName;
 import com.fasterxml.jackson.annotation.JsonValue;
-import org.openapitools.jackson.nullable.JsonNullable;
-import com.fasterxml.jackson.annotation.JsonIgnore;
-import org.openapitools.jackson.nullable.JsonNullable;
-import java.util.NoSuchElementException;
 import com.fasterxml.jackson.annotation.JsonPropertyOrder;
 import com.fasterxml.jackson.annotation.JsonTypeName;
 import org.hibernate.validator.constraints.*;
 
 /**
- * A reasoning part of a message.
+ * Text stream part.
  */
 @JsonPropertyOrder({
-  ReasoningUIPart.JSON_PROPERTY_PROVIDER_METADATA,
-  ReasoningUIPart.JSON_PROPERTY_TEXT,
-  ReasoningUIPart.JSON_PROPERTY_TYPE
+  StreamTextPart.JSON_PROPERTY_TEXT,
+  StreamTextPart.JSON_PROPERTY_TYPE
 })
 @jakarta.annotation.Generated(value = "org.openapitools.codegen.languages.JavaClientCodegen", comments = "Generator version: 7.7.0")
-public class ReasoningUIPart {
-  public static final String JSON_PROPERTY_PROVIDER_METADATA = "providerMetadata";
-  private JsonNullable<Object> providerMetadata = JsonNullable.<Object>undefined();
-
+public class StreamTextPart {
   public static final String JSON_PROPERTY_TEXT = "text";
   private String text;
 
   public static final String JSON_PROPERTY_TYPE = "type";
-  private String type = "reasoning";
+  private String type = "text";
 
-  public ReasoningUIPart() {
+  public StreamTextPart() {
   }
 
-  public ReasoningUIPart providerMetadata(Object providerMetadata) {
-    this.providerMetadata = JsonNullable.<Object>of(providerMetadata);
-    
-    return this;
-  }
-
-  /**
-   * Get providerMetadata
-   * @return providerMetadata
-   */
-  @jakarta.annotation.Nullable
-  @JsonIgnore
-
-  public Object getProviderMetadata() {
-        return providerMetadata.orElse(null);
-  }
-
-  @JsonProperty(JSON_PROPERTY_PROVIDER_METADATA)
-  @JsonInclude(value = JsonInclude.Include.USE_DEFAULTS)
-
-  public JsonNullable<Object> getProviderMetadata_JsonNullable() {
-    return providerMetadata;
-  }
-  
-  @JsonProperty(JSON_PROPERTY_PROVIDER_METADATA)
-  public void setProviderMetadata_JsonNullable(JsonNullable<Object> providerMetadata) {
-    this.providerMetadata = providerMetadata;
-  }
-
-  public void setProviderMetadata(Object providerMetadata) {
-    this.providerMetadata = JsonNullable.<Object>of(providerMetadata);
-  }
-
-  public ReasoningUIPart text(String text) {
+  public StreamTextPart text(String text) {
     
     this.text = text;
     return this;
@@ -108,7 +67,7 @@ public class ReasoningUIPart {
     this.text = text;
   }
 
-  public ReasoningUIPart type(String type) {
+  public StreamTextPart type(String type) {
     
     this.type = type;
     return this;
@@ -141,33 +100,20 @@ public class ReasoningUIPart {
     if (o == null || getClass() != o.getClass()) {
       return false;
     }
-    ReasoningUIPart reasoningUIPart = (ReasoningUIPart) o;
-    return equalsNullable(this.providerMetadata, reasoningUIPart.providerMetadata) &&
-        Objects.equals(this.text, reasoningUIPart.text) &&
-        Objects.equals(this.type, reasoningUIPart.type);
-  }
-
-  private static <T> boolean equalsNullable(JsonNullable<T> a, JsonNullable<T> b) {
-    return a == b || (a != null && b != null && a.isPresent() && b.isPresent() && Objects.deepEquals(a.get(), b.get()));
+    StreamTextPart streamTextPart = (StreamTextPart) o;
+    return Objects.equals(this.text, streamTextPart.text) &&
+        Objects.equals(this.type, streamTextPart.type);
   }
 
   @Override
   public int hashCode() {
-    return Objects.hash(hashCodeNullable(providerMetadata), text, type);
-  }
-
-  private static <T> int hashCodeNullable(JsonNullable<T> a) {
-    if (a == null) {
-      return 1;
-    }
-    return a.isPresent() ? Arrays.deepHashCode(new Object[]{a.get()}) : 31;
+    return Objects.hash(text, type);
   }
 
   @Override
   public String toString() {
     StringBuilder sb = new StringBuilder();
-    sb.append("class ReasoningUIPart {\n");
-    sb.append("    providerMetadata: ").append(toIndentedString(providerMetadata)).append("\n");
+    sb.append("class StreamTextPart {\n");
     sb.append("    text: ").append(toIndentedString(text)).append("\n");
     sb.append("    type: ").append(toIndentedString(type)).append("\n");
     sb.append("}");

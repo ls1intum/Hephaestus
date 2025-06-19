@@ -29,28 +29,98 @@ import com.fasterxml.jackson.annotation.JsonTypeName;
 import org.hibernate.validator.constraints.*;
 
 /**
- * A reasoning part of a message.
+ * A document source part of a message.
  */
 @JsonPropertyOrder({
-  ReasoningUIPart.JSON_PROPERTY_PROVIDER_METADATA,
-  ReasoningUIPart.JSON_PROPERTY_TEXT,
-  ReasoningUIPart.JSON_PROPERTY_TYPE
+  SourceDocumentUIPart.JSON_PROPERTY_FILENAME,
+  SourceDocumentUIPart.JSON_PROPERTY_MEDIA_TYPE,
+  SourceDocumentUIPart.JSON_PROPERTY_PROVIDER_METADATA,
+  SourceDocumentUIPart.JSON_PROPERTY_SOURCE_ID,
+  SourceDocumentUIPart.JSON_PROPERTY_TITLE,
+  SourceDocumentUIPart.JSON_PROPERTY_TYPE
 })
 @jakarta.annotation.Generated(value = "org.openapitools.codegen.languages.JavaClientCodegen", comments = "Generator version: 7.7.0")
-public class ReasoningUIPart {
+public class SourceDocumentUIPart {
+  public static final String JSON_PROPERTY_FILENAME = "filename";
+  private JsonNullable<String> filename = JsonNullable.<String>undefined();
+
+  public static final String JSON_PROPERTY_MEDIA_TYPE = "mediaType";
+  private String mediaType;
+
   public static final String JSON_PROPERTY_PROVIDER_METADATA = "providerMetadata";
   private JsonNullable<Object> providerMetadata = JsonNullable.<Object>undefined();
 
-  public static final String JSON_PROPERTY_TEXT = "text";
-  private String text;
+  public static final String JSON_PROPERTY_SOURCE_ID = "sourceId";
+  private String sourceId;
+
+  public static final String JSON_PROPERTY_TITLE = "title";
+  private String title;
 
   public static final String JSON_PROPERTY_TYPE = "type";
-  private String type = "reasoning";
+  private String type = "source-document";
 
-  public ReasoningUIPart() {
+  public SourceDocumentUIPart() {
   }
 
-  public ReasoningUIPart providerMetadata(Object providerMetadata) {
+  public SourceDocumentUIPart filename(String filename) {
+    this.filename = JsonNullable.<String>of(filename);
+    
+    return this;
+  }
+
+  /**
+   * Get filename
+   * @return filename
+   */
+  @jakarta.annotation.Nullable
+  @JsonIgnore
+
+  public String getFilename() {
+        return filename.orElse(null);
+  }
+
+  @JsonProperty(JSON_PROPERTY_FILENAME)
+  @JsonInclude(value = JsonInclude.Include.USE_DEFAULTS)
+
+  public JsonNullable<String> getFilename_JsonNullable() {
+    return filename;
+  }
+  
+  @JsonProperty(JSON_PROPERTY_FILENAME)
+  public void setFilename_JsonNullable(JsonNullable<String> filename) {
+    this.filename = filename;
+  }
+
+  public void setFilename(String filename) {
+    this.filename = JsonNullable.<String>of(filename);
+  }
+
+  public SourceDocumentUIPart mediaType(String mediaType) {
+    
+    this.mediaType = mediaType;
+    return this;
+  }
+
+  /**
+   * Get mediaType
+   * @return mediaType
+   */
+  @jakarta.annotation.Nonnull
+  @JsonProperty(JSON_PROPERTY_MEDIA_TYPE)
+  @JsonInclude(value = JsonInclude.Include.ALWAYS)
+
+  public String getMediaType() {
+    return mediaType;
+  }
+
+
+  @JsonProperty(JSON_PROPERTY_MEDIA_TYPE)
+  @JsonInclude(value = JsonInclude.Include.ALWAYS)
+  public void setMediaType(String mediaType) {
+    this.mediaType = mediaType;
+  }
+
+  public SourceDocumentUIPart providerMetadata(Object providerMetadata) {
     this.providerMetadata = JsonNullable.<Object>of(providerMetadata);
     
     return this;
@@ -83,32 +153,57 @@ public class ReasoningUIPart {
     this.providerMetadata = JsonNullable.<Object>of(providerMetadata);
   }
 
-  public ReasoningUIPart text(String text) {
+  public SourceDocumentUIPart sourceId(String sourceId) {
     
-    this.text = text;
+    this.sourceId = sourceId;
     return this;
   }
 
   /**
-   * Get text
-   * @return text
+   * Get sourceId
+   * @return sourceId
    */
   @jakarta.annotation.Nonnull
-  @JsonProperty(JSON_PROPERTY_TEXT)
+  @JsonProperty(JSON_PROPERTY_SOURCE_ID)
   @JsonInclude(value = JsonInclude.Include.ALWAYS)
 
-  public String getText() {
-    return text;
+  public String getSourceId() {
+    return sourceId;
   }
 
 
-  @JsonProperty(JSON_PROPERTY_TEXT)
+  @JsonProperty(JSON_PROPERTY_SOURCE_ID)
   @JsonInclude(value = JsonInclude.Include.ALWAYS)
-  public void setText(String text) {
-    this.text = text;
+  public void setSourceId(String sourceId) {
+    this.sourceId = sourceId;
   }
 
-  public ReasoningUIPart type(String type) {
+  public SourceDocumentUIPart title(String title) {
+    
+    this.title = title;
+    return this;
+  }
+
+  /**
+   * Get title
+   * @return title
+   */
+  @jakarta.annotation.Nonnull
+  @JsonProperty(JSON_PROPERTY_TITLE)
+  @JsonInclude(value = JsonInclude.Include.ALWAYS)
+
+  public String getTitle() {
+    return title;
+  }
+
+
+  @JsonProperty(JSON_PROPERTY_TITLE)
+  @JsonInclude(value = JsonInclude.Include.ALWAYS)
+  public void setTitle(String title) {
+    this.title = title;
+  }
+
+  public SourceDocumentUIPart type(String type) {
     
     this.type = type;
     return this;
@@ -141,10 +236,13 @@ public class ReasoningUIPart {
     if (o == null || getClass() != o.getClass()) {
       return false;
     }
-    ReasoningUIPart reasoningUIPart = (ReasoningUIPart) o;
-    return equalsNullable(this.providerMetadata, reasoningUIPart.providerMetadata) &&
-        Objects.equals(this.text, reasoningUIPart.text) &&
-        Objects.equals(this.type, reasoningUIPart.type);
+    SourceDocumentUIPart sourceDocumentUIPart = (SourceDocumentUIPart) o;
+    return equalsNullable(this.filename, sourceDocumentUIPart.filename) &&
+        Objects.equals(this.mediaType, sourceDocumentUIPart.mediaType) &&
+        equalsNullable(this.providerMetadata, sourceDocumentUIPart.providerMetadata) &&
+        Objects.equals(this.sourceId, sourceDocumentUIPart.sourceId) &&
+        Objects.equals(this.title, sourceDocumentUIPart.title) &&
+        Objects.equals(this.type, sourceDocumentUIPart.type);
   }
 
   private static <T> boolean equalsNullable(JsonNullable<T> a, JsonNullable<T> b) {
@@ -153,7 +251,7 @@ public class ReasoningUIPart {
 
   @Override
   public int hashCode() {
-    return Objects.hash(hashCodeNullable(providerMetadata), text, type);
+    return Objects.hash(hashCodeNullable(filename), mediaType, hashCodeNullable(providerMetadata), sourceId, title, type);
   }
 
   private static <T> int hashCodeNullable(JsonNullable<T> a) {
@@ -166,9 +264,12 @@ public class ReasoningUIPart {
   @Override
   public String toString() {
     StringBuilder sb = new StringBuilder();
-    sb.append("class ReasoningUIPart {\n");
+    sb.append("class SourceDocumentUIPart {\n");
+    sb.append("    filename: ").append(toIndentedString(filename)).append("\n");
+    sb.append("    mediaType: ").append(toIndentedString(mediaType)).append("\n");
     sb.append("    providerMetadata: ").append(toIndentedString(providerMetadata)).append("\n");
-    sb.append("    text: ").append(toIndentedString(text)).append("\n");
+    sb.append("    sourceId: ").append(toIndentedString(sourceId)).append("\n");
+    sb.append("    title: ").append(toIndentedString(title)).append("\n");
     sb.append("    type: ").append(toIndentedString(type)).append("\n");
     sb.append("}");
     return sb.toString();

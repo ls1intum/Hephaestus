@@ -20,55 +20,54 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonTypeName;
 import com.fasterxml.jackson.annotation.JsonValue;
-import de.tum.in.www1.hephaestus.intelligenceservice.model.Source;
 import com.fasterxml.jackson.annotation.JsonPropertyOrder;
 import com.fasterxml.jackson.annotation.JsonTypeName;
 import org.hibernate.validator.constraints.*;
 
 /**
- * A source part of a message.
+ * Message metadata part.
  */
 @JsonPropertyOrder({
-  SourceUIPart.JSON_PROPERTY_SOURCE,
-  SourceUIPart.JSON_PROPERTY_TYPE
+  StreamMessageMetadataPart.JSON_PROPERTY_MESSAGE_METADATA,
+  StreamMessageMetadataPart.JSON_PROPERTY_TYPE
 })
 @jakarta.annotation.Generated(value = "org.openapitools.codegen.languages.JavaClientCodegen", comments = "Generator version: 7.7.0")
-public class SourceUIPart {
-  public static final String JSON_PROPERTY_SOURCE = "source";
-  private Source source;
+public class StreamMessageMetadataPart {
+  public static final String JSON_PROPERTY_MESSAGE_METADATA = "messageMetadata";
+  private Object messageMetadata;
 
   public static final String JSON_PROPERTY_TYPE = "type";
-  private String type = "source";
+  private String type = "message-metadata";
 
-  public SourceUIPart() {
+  public StreamMessageMetadataPart() {
   }
 
-  public SourceUIPart source(Source source) {
+  public StreamMessageMetadataPart messageMetadata(Object messageMetadata) {
     
-    this.source = source;
+    this.messageMetadata = messageMetadata;
     return this;
   }
 
   /**
-   * The source.
-   * @return source
+   * Get messageMetadata
+   * @return messageMetadata
    */
   @jakarta.annotation.Nonnull
-  @JsonProperty(JSON_PROPERTY_SOURCE)
+  @JsonProperty(JSON_PROPERTY_MESSAGE_METADATA)
   @JsonInclude(value = JsonInclude.Include.ALWAYS)
 
-  public Source getSource() {
-    return source;
+  public Object getMessageMetadata() {
+    return messageMetadata;
   }
 
 
-  @JsonProperty(JSON_PROPERTY_SOURCE)
+  @JsonProperty(JSON_PROPERTY_MESSAGE_METADATA)
   @JsonInclude(value = JsonInclude.Include.ALWAYS)
-  public void setSource(Source source) {
-    this.source = source;
+  public void setMessageMetadata(Object messageMetadata) {
+    this.messageMetadata = messageMetadata;
   }
 
-  public SourceUIPart type(String type) {
+  public StreamMessageMetadataPart type(String type) {
     
     this.type = type;
     return this;
@@ -101,21 +100,21 @@ public class SourceUIPart {
     if (o == null || getClass() != o.getClass()) {
       return false;
     }
-    SourceUIPart sourceUIPart = (SourceUIPart) o;
-    return Objects.equals(this.source, sourceUIPart.source) &&
-        Objects.equals(this.type, sourceUIPart.type);
+    StreamMessageMetadataPart streamMessageMetadataPart = (StreamMessageMetadataPart) o;
+    return Objects.equals(this.messageMetadata, streamMessageMetadataPart.messageMetadata) &&
+        Objects.equals(this.type, streamMessageMetadataPart.type);
   }
 
   @Override
   public int hashCode() {
-    return Objects.hash(source, type);
+    return Objects.hash(messageMetadata, type);
   }
 
   @Override
   public String toString() {
     StringBuilder sb = new StringBuilder();
-    sb.append("class SourceUIPart {\n");
-    sb.append("    source: ").append(toIndentedString(source)).append("\n");
+    sb.append("class StreamMessageMetadataPart {\n");
+    sb.append("    messageMetadata: ").append(toIndentedString(messageMetadata)).append("\n");
     sb.append("    type: ").append(toIndentedString(type)).append("\n");
     sb.append("}");
     return sb.toString();

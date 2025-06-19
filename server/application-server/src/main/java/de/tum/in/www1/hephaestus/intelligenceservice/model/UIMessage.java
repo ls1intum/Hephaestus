@@ -20,7 +20,7 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonTypeName;
 import com.fasterxml.jackson.annotation.JsonValue;
-import de.tum.in.www1.hephaestus.intelligenceservice.model.MessagePartsInner;
+import de.tum.in.www1.hephaestus.intelligenceservice.model.UIMessagePartsInner;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
@@ -33,94 +33,69 @@ import com.fasterxml.jackson.annotation.JsonTypeName;
 import org.hibernate.validator.constraints.*;
 
 /**
- * Message
+ * Message model that matches the TypeScript interface.
  */
 @JsonPropertyOrder({
-  Message.JSON_PROPERTY_CONTENT,
-  Message.JSON_PROPERTY_CREATED_AT,
-  Message.JSON_PROPERTY_ID,
-  Message.JSON_PROPERTY_PARTS,
-  Message.JSON_PROPERTY_ROLE
+  UIMessage.JSON_PROPERTY_ID,
+  UIMessage.JSON_PROPERTY_METADATA,
+  UIMessage.JSON_PROPERTY_PARTS,
+  UIMessage.JSON_PROPERTY_ROLE
 })
 @jakarta.annotation.Generated(value = "org.openapitools.codegen.languages.JavaClientCodegen", comments = "Generator version: 7.7.0")
-public class Message {
-  public static final String JSON_PROPERTY_CONTENT = "content";
-  private String content;
-
-  public static final String JSON_PROPERTY_CREATED_AT = "createdAt";
-  private JsonNullable<String> createdAt = JsonNullable.<String>undefined();
-
+public class UIMessage {
   public static final String JSON_PROPERTY_ID = "id";
   private String id;
 
+  public static final String JSON_PROPERTY_METADATA = "metadata";
+  private JsonNullable<Object> metadata = JsonNullable.<Object>undefined();
+
   public static final String JSON_PROPERTY_PARTS = "parts";
-  private List<MessagePartsInner> parts = new ArrayList<>();
+  private List<UIMessagePartsInner> parts = new ArrayList<>();
+
+  /**
+   * Gets or Sets role
+   */
+  public enum RoleEnum {
+    SYSTEM("system"),
+    
+    USER("user"),
+    
+    ASSISTANT("assistant");
+
+    private String value;
+
+    RoleEnum(String value) {
+      this.value = value;
+    }
+
+    @JsonValue
+    public String getValue() {
+      return value;
+    }
+
+    @Override
+    public String toString() {
+      return String.valueOf(value);
+    }
+
+    @JsonCreator
+    public static RoleEnum fromValue(String value) {
+      for (RoleEnum b : RoleEnum.values()) {
+        if (b.value.equals(value)) {
+          return b;
+        }
+      }
+      throw new IllegalArgumentException("Unexpected value '" + value + "'");
+    }
+  }
 
   public static final String JSON_PROPERTY_ROLE = "role";
-  private String role;
+  private RoleEnum role;
 
-  public Message() {
+  public UIMessage() {
   }
 
-  public Message content(String content) {
-    
-    this.content = content;
-    return this;
-  }
-
-  /**
-   * Text content of the message. Important: Use parts when possible. This is a fallback for compatibility with AI SDK.
-   * @return content
-   */
-  @jakarta.annotation.Nonnull
-  @JsonProperty(JSON_PROPERTY_CONTENT)
-  @JsonInclude(value = JsonInclude.Include.ALWAYS)
-
-  public String getContent() {
-    return content;
-  }
-
-
-  @JsonProperty(JSON_PROPERTY_CONTENT)
-  @JsonInclude(value = JsonInclude.Include.ALWAYS)
-  public void setContent(String content) {
-    this.content = content;
-  }
-
-  public Message createdAt(String createdAt) {
-    this.createdAt = JsonNullable.<String>of(createdAt);
-    
-    return this;
-  }
-
-  /**
-   * Get createdAt
-   * @return createdAt
-   */
-  @jakarta.annotation.Nullable
-  @JsonIgnore
-
-  public String getCreatedAt() {
-        return createdAt.orElse(null);
-  }
-
-  @JsonProperty(JSON_PROPERTY_CREATED_AT)
-  @JsonInclude(value = JsonInclude.Include.USE_DEFAULTS)
-
-  public JsonNullable<String> getCreatedAt_JsonNullable() {
-    return createdAt;
-  }
-  
-  @JsonProperty(JSON_PROPERTY_CREATED_AT)
-  public void setCreatedAt_JsonNullable(JsonNullable<String> createdAt) {
-    this.createdAt = createdAt;
-  }
-
-  public void setCreatedAt(String createdAt) {
-    this.createdAt = JsonNullable.<String>of(createdAt);
-  }
-
-  public Message id(String id) {
+  public UIMessage id(String id) {
     
     this.id = id;
     return this;
@@ -145,13 +120,46 @@ public class Message {
     this.id = id;
   }
 
-  public Message parts(List<MessagePartsInner> parts) {
+  public UIMessage metadata(Object metadata) {
+    this.metadata = JsonNullable.<Object>of(metadata);
+    
+    return this;
+  }
+
+  /**
+   * Get metadata
+   * @return metadata
+   */
+  @jakarta.annotation.Nullable
+  @JsonIgnore
+
+  public Object getMetadata() {
+        return metadata.orElse(null);
+  }
+
+  @JsonProperty(JSON_PROPERTY_METADATA)
+  @JsonInclude(value = JsonInclude.Include.USE_DEFAULTS)
+
+  public JsonNullable<Object> getMetadata_JsonNullable() {
+    return metadata;
+  }
+  
+  @JsonProperty(JSON_PROPERTY_METADATA)
+  public void setMetadata_JsonNullable(JsonNullable<Object> metadata) {
+    this.metadata = metadata;
+  }
+
+  public void setMetadata(Object metadata) {
+    this.metadata = JsonNullable.<Object>of(metadata);
+  }
+
+  public UIMessage parts(List<UIMessagePartsInner> parts) {
     
     this.parts = parts;
     return this;
   }
 
-  public Message addPartsItem(MessagePartsInner partsItem) {
+  public UIMessage addPartsItem(UIMessagePartsInner partsItem) {
     if (this.parts == null) {
       this.parts = new ArrayList<>();
     }
@@ -160,46 +168,46 @@ public class Message {
   }
 
   /**
-   * The parts of the message. Use this for rendering the message in the UI.  Assistant messages can have text, reasoning, and tool invocation parts. User messages can have text parts.
+   * Get parts
    * @return parts
    */
-  @jakarta.annotation.Nullable
+  @jakarta.annotation.Nonnull
   @JsonProperty(JSON_PROPERTY_PARTS)
-  @JsonInclude(value = JsonInclude.Include.USE_DEFAULTS)
+  @JsonInclude(value = JsonInclude.Include.ALWAYS)
 
-  public List<MessagePartsInner> getParts() {
+  public List<UIMessagePartsInner> getParts() {
     return parts;
   }
 
 
   @JsonProperty(JSON_PROPERTY_PARTS)
-  @JsonInclude(value = JsonInclude.Include.USE_DEFAULTS)
-  public void setParts(List<MessagePartsInner> parts) {
+  @JsonInclude(value = JsonInclude.Include.ALWAYS)
+  public void setParts(List<UIMessagePartsInner> parts) {
     this.parts = parts;
   }
 
-  public Message role(String role) {
+  public UIMessage role(RoleEnum role) {
     
     this.role = role;
     return this;
   }
 
   /**
-   * The role of the message sender: &#39;user&#39;, &#39;assistant&#39;, &#39;system&#39;.
+   * Get role
    * @return role
    */
   @jakarta.annotation.Nonnull
   @JsonProperty(JSON_PROPERTY_ROLE)
   @JsonInclude(value = JsonInclude.Include.ALWAYS)
 
-  public String getRole() {
+  public RoleEnum getRole() {
     return role;
   }
 
 
   @JsonProperty(JSON_PROPERTY_ROLE)
   @JsonInclude(value = JsonInclude.Include.ALWAYS)
-  public void setRole(String role) {
+  public void setRole(RoleEnum role) {
     this.role = role;
   }
 
@@ -211,12 +219,11 @@ public class Message {
     if (o == null || getClass() != o.getClass()) {
       return false;
     }
-    Message message = (Message) o;
-    return Objects.equals(this.content, message.content) &&
-        equalsNullable(this.createdAt, message.createdAt) &&
-        Objects.equals(this.id, message.id) &&
-        Objects.equals(this.parts, message.parts) &&
-        Objects.equals(this.role, message.role);
+    UIMessage uiMessage = (UIMessage) o;
+    return Objects.equals(this.id, uiMessage.id) &&
+        equalsNullable(this.metadata, uiMessage.metadata) &&
+        Objects.equals(this.parts, uiMessage.parts) &&
+        Objects.equals(this.role, uiMessage.role);
   }
 
   private static <T> boolean equalsNullable(JsonNullable<T> a, JsonNullable<T> b) {
@@ -225,7 +232,7 @@ public class Message {
 
   @Override
   public int hashCode() {
-    return Objects.hash(content, hashCodeNullable(createdAt), id, parts, role);
+    return Objects.hash(id, hashCodeNullable(metadata), parts, role);
   }
 
   private static <T> int hashCodeNullable(JsonNullable<T> a) {
@@ -238,10 +245,9 @@ public class Message {
   @Override
   public String toString() {
     StringBuilder sb = new StringBuilder();
-    sb.append("class Message {\n");
-    sb.append("    content: ").append(toIndentedString(content)).append("\n");
-    sb.append("    createdAt: ").append(toIndentedString(createdAt)).append("\n");
+    sb.append("class UIMessage {\n");
     sb.append("    id: ").append(toIndentedString(id)).append("\n");
+    sb.append("    metadata: ").append(toIndentedString(metadata)).append("\n");
     sb.append("    parts: ").append(toIndentedString(parts)).append("\n");
     sb.append("    role: ").append(toIndentedString(role)).append("\n");
     sb.append("}");

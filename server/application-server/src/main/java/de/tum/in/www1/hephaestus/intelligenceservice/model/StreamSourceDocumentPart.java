@@ -29,32 +29,40 @@ import com.fasterxml.jackson.annotation.JsonTypeName;
 import org.hibernate.validator.constraints.*;
 
 /**
- * A file part of a message.
+ * Source document part of a message.
  */
 @JsonPropertyOrder({
-  FileUIPart.JSON_PROPERTY_FILENAME,
-  FileUIPart.JSON_PROPERTY_MEDIA_TYPE,
-  FileUIPart.JSON_PROPERTY_TYPE,
-  FileUIPart.JSON_PROPERTY_URL
+  StreamSourceDocumentPart.JSON_PROPERTY_FILENAME,
+  StreamSourceDocumentPart.JSON_PROPERTY_MEDIA_TYPE,
+  StreamSourceDocumentPart.JSON_PROPERTY_PROVIDER_METADATA,
+  StreamSourceDocumentPart.JSON_PROPERTY_SOURCE_ID,
+  StreamSourceDocumentPart.JSON_PROPERTY_TITLE,
+  StreamSourceDocumentPart.JSON_PROPERTY_TYPE
 })
 @jakarta.annotation.Generated(value = "org.openapitools.codegen.languages.JavaClientCodegen", comments = "Generator version: 7.7.0")
-public class FileUIPart {
+public class StreamSourceDocumentPart {
   public static final String JSON_PROPERTY_FILENAME = "filename";
   private JsonNullable<String> filename = JsonNullable.<String>undefined();
 
   public static final String JSON_PROPERTY_MEDIA_TYPE = "mediaType";
   private String mediaType;
 
+  public static final String JSON_PROPERTY_PROVIDER_METADATA = "providerMetadata";
+  private JsonNullable<Object> providerMetadata = JsonNullable.<Object>undefined();
+
+  public static final String JSON_PROPERTY_SOURCE_ID = "sourceId";
+  private String sourceId;
+
+  public static final String JSON_PROPERTY_TITLE = "title";
+  private String title;
+
   public static final String JSON_PROPERTY_TYPE = "type";
-  private String type = "file";
+  private String type = "source-document";
 
-  public static final String JSON_PROPERTY_URL = "url";
-  private String url;
-
-  public FileUIPart() {
+  public StreamSourceDocumentPart() {
   }
 
-  public FileUIPart filename(String filename) {
+  public StreamSourceDocumentPart filename(String filename) {
     this.filename = JsonNullable.<String>of(filename);
     
     return this;
@@ -87,7 +95,7 @@ public class FileUIPart {
     this.filename = JsonNullable.<String>of(filename);
   }
 
-  public FileUIPart mediaType(String mediaType) {
+  public StreamSourceDocumentPart mediaType(String mediaType) {
     
     this.mediaType = mediaType;
     return this;
@@ -112,7 +120,90 @@ public class FileUIPart {
     this.mediaType = mediaType;
   }
 
-  public FileUIPart type(String type) {
+  public StreamSourceDocumentPart providerMetadata(Object providerMetadata) {
+    this.providerMetadata = JsonNullable.<Object>of(providerMetadata);
+    
+    return this;
+  }
+
+  /**
+   * Get providerMetadata
+   * @return providerMetadata
+   */
+  @jakarta.annotation.Nullable
+  @JsonIgnore
+
+  public Object getProviderMetadata() {
+        return providerMetadata.orElse(null);
+  }
+
+  @JsonProperty(JSON_PROPERTY_PROVIDER_METADATA)
+  @JsonInclude(value = JsonInclude.Include.USE_DEFAULTS)
+
+  public JsonNullable<Object> getProviderMetadata_JsonNullable() {
+    return providerMetadata;
+  }
+  
+  @JsonProperty(JSON_PROPERTY_PROVIDER_METADATA)
+  public void setProviderMetadata_JsonNullable(JsonNullable<Object> providerMetadata) {
+    this.providerMetadata = providerMetadata;
+  }
+
+  public void setProviderMetadata(Object providerMetadata) {
+    this.providerMetadata = JsonNullable.<Object>of(providerMetadata);
+  }
+
+  public StreamSourceDocumentPart sourceId(String sourceId) {
+    
+    this.sourceId = sourceId;
+    return this;
+  }
+
+  /**
+   * Get sourceId
+   * @return sourceId
+   */
+  @jakarta.annotation.Nonnull
+  @JsonProperty(JSON_PROPERTY_SOURCE_ID)
+  @JsonInclude(value = JsonInclude.Include.ALWAYS)
+
+  public String getSourceId() {
+    return sourceId;
+  }
+
+
+  @JsonProperty(JSON_PROPERTY_SOURCE_ID)
+  @JsonInclude(value = JsonInclude.Include.ALWAYS)
+  public void setSourceId(String sourceId) {
+    this.sourceId = sourceId;
+  }
+
+  public StreamSourceDocumentPart title(String title) {
+    
+    this.title = title;
+    return this;
+  }
+
+  /**
+   * Get title
+   * @return title
+   */
+  @jakarta.annotation.Nonnull
+  @JsonProperty(JSON_PROPERTY_TITLE)
+  @JsonInclude(value = JsonInclude.Include.ALWAYS)
+
+  public String getTitle() {
+    return title;
+  }
+
+
+  @JsonProperty(JSON_PROPERTY_TITLE)
+  @JsonInclude(value = JsonInclude.Include.ALWAYS)
+  public void setTitle(String title) {
+    this.title = title;
+  }
+
+  public StreamSourceDocumentPart type(String type) {
     
     this.type = type;
     return this;
@@ -137,31 +228,6 @@ public class FileUIPart {
     this.type = type;
   }
 
-  public FileUIPart url(String url) {
-    
-    this.url = url;
-    return this;
-  }
-
-  /**
-   * Get url
-   * @return url
-   */
-  @jakarta.annotation.Nonnull
-  @JsonProperty(JSON_PROPERTY_URL)
-  @JsonInclude(value = JsonInclude.Include.ALWAYS)
-
-  public String getUrl() {
-    return url;
-  }
-
-
-  @JsonProperty(JSON_PROPERTY_URL)
-  @JsonInclude(value = JsonInclude.Include.ALWAYS)
-  public void setUrl(String url) {
-    this.url = url;
-  }
-
   @Override
   public boolean equals(Object o) {
     if (this == o) {
@@ -170,11 +236,13 @@ public class FileUIPart {
     if (o == null || getClass() != o.getClass()) {
       return false;
     }
-    FileUIPart fileUIPart = (FileUIPart) o;
-    return equalsNullable(this.filename, fileUIPart.filename) &&
-        Objects.equals(this.mediaType, fileUIPart.mediaType) &&
-        Objects.equals(this.type, fileUIPart.type) &&
-        Objects.equals(this.url, fileUIPart.url);
+    StreamSourceDocumentPart streamSourceDocumentPart = (StreamSourceDocumentPart) o;
+    return equalsNullable(this.filename, streamSourceDocumentPart.filename) &&
+        Objects.equals(this.mediaType, streamSourceDocumentPart.mediaType) &&
+        equalsNullable(this.providerMetadata, streamSourceDocumentPart.providerMetadata) &&
+        Objects.equals(this.sourceId, streamSourceDocumentPart.sourceId) &&
+        Objects.equals(this.title, streamSourceDocumentPart.title) &&
+        Objects.equals(this.type, streamSourceDocumentPart.type);
   }
 
   private static <T> boolean equalsNullable(JsonNullable<T> a, JsonNullable<T> b) {
@@ -183,7 +251,7 @@ public class FileUIPart {
 
   @Override
   public int hashCode() {
-    return Objects.hash(hashCodeNullable(filename), mediaType, type, url);
+    return Objects.hash(hashCodeNullable(filename), mediaType, hashCodeNullable(providerMetadata), sourceId, title, type);
   }
 
   private static <T> int hashCodeNullable(JsonNullable<T> a) {
@@ -196,11 +264,13 @@ public class FileUIPart {
   @Override
   public String toString() {
     StringBuilder sb = new StringBuilder();
-    sb.append("class FileUIPart {\n");
+    sb.append("class StreamSourceDocumentPart {\n");
     sb.append("    filename: ").append(toIndentedString(filename)).append("\n");
     sb.append("    mediaType: ").append(toIndentedString(mediaType)).append("\n");
+    sb.append("    providerMetadata: ").append(toIndentedString(providerMetadata)).append("\n");
+    sb.append("    sourceId: ").append(toIndentedString(sourceId)).append("\n");
+    sb.append("    title: ").append(toIndentedString(title)).append("\n");
     sb.append("    type: ").append(toIndentedString(type)).append("\n");
-    sb.append("    url: ").append(toIndentedString(url)).append("\n");
     sb.append("}");
     return sb.toString();
   }

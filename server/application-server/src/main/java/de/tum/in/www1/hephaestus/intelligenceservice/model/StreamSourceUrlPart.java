@@ -29,63 +29,38 @@ import com.fasterxml.jackson.annotation.JsonTypeName;
 import org.hibernate.validator.constraints.*;
 
 /**
- * Source
+ * Source URL part of a message.
  */
 @JsonPropertyOrder({
-  Source.JSON_PROPERTY_ID,
-  Source.JSON_PROPERTY_PROVIDER_METADATA,
-  Source.JSON_PROPERTY_SOURCE_TYPE,
-  Source.JSON_PROPERTY_TITLE,
-  Source.JSON_PROPERTY_URL
+  StreamSourceUrlPart.JSON_PROPERTY_PROVIDER_METADATA,
+  StreamSourceUrlPart.JSON_PROPERTY_SOURCE_ID,
+  StreamSourceUrlPart.JSON_PROPERTY_TITLE,
+  StreamSourceUrlPart.JSON_PROPERTY_TYPE,
+  StreamSourceUrlPart.JSON_PROPERTY_URL
 })
 @jakarta.annotation.Generated(value = "org.openapitools.codegen.languages.JavaClientCodegen", comments = "Generator version: 7.7.0")
-public class Source {
-  public static final String JSON_PROPERTY_ID = "id";
-  private String id;
-
+public class StreamSourceUrlPart {
   public static final String JSON_PROPERTY_PROVIDER_METADATA = "providerMetadata";
-  private Object providerMetadata;
+  private JsonNullable<Object> providerMetadata = JsonNullable.<Object>undefined();
 
-  public static final String JSON_PROPERTY_SOURCE_TYPE = "sourceType";
-  private String sourceType = "url";
+  public static final String JSON_PROPERTY_SOURCE_ID = "sourceId";
+  private String sourceId;
 
   public static final String JSON_PROPERTY_TITLE = "title";
   private JsonNullable<String> title = JsonNullable.<String>undefined();
 
+  public static final String JSON_PROPERTY_TYPE = "type";
+  private String type = "source-url";
+
   public static final String JSON_PROPERTY_URL = "url";
   private String url;
 
-  public Source() {
+  public StreamSourceUrlPart() {
   }
 
-  public Source id(String id) {
+  public StreamSourceUrlPart providerMetadata(Object providerMetadata) {
+    this.providerMetadata = JsonNullable.<Object>of(providerMetadata);
     
-    this.id = id;
-    return this;
-  }
-
-  /**
-   * The ID of the source.
-   * @return id
-   */
-  @jakarta.annotation.Nonnull
-  @JsonProperty(JSON_PROPERTY_ID)
-  @JsonInclude(value = JsonInclude.Include.ALWAYS)
-
-  public String getId() {
-    return id;
-  }
-
-
-  @JsonProperty(JSON_PROPERTY_ID)
-  @JsonInclude(value = JsonInclude.Include.ALWAYS)
-  public void setId(String id) {
-    this.id = id;
-  }
-
-  public Source providerMetadata(Object providerMetadata) {
-    
-    this.providerMetadata = providerMetadata;
     return this;
   }
 
@@ -94,46 +69,54 @@ public class Source {
    * @return providerMetadata
    */
   @jakarta.annotation.Nullable
-  @JsonProperty(JSON_PROPERTY_PROVIDER_METADATA)
-  @JsonInclude(value = JsonInclude.Include.ALWAYS)
+  @JsonIgnore
 
   public Object getProviderMetadata() {
-    return providerMetadata;
+        return providerMetadata.orElse(null);
   }
 
-
   @JsonProperty(JSON_PROPERTY_PROVIDER_METADATA)
-  @JsonInclude(value = JsonInclude.Include.ALWAYS)
-  public void setProviderMetadata(Object providerMetadata) {
+  @JsonInclude(value = JsonInclude.Include.USE_DEFAULTS)
+
+  public JsonNullable<Object> getProviderMetadata_JsonNullable() {
+    return providerMetadata;
+  }
+  
+  @JsonProperty(JSON_PROPERTY_PROVIDER_METADATA)
+  public void setProviderMetadata_JsonNullable(JsonNullable<Object> providerMetadata) {
     this.providerMetadata = providerMetadata;
   }
 
-  public Source sourceType(String sourceType) {
+  public void setProviderMetadata(Object providerMetadata) {
+    this.providerMetadata = JsonNullable.<Object>of(providerMetadata);
+  }
+
+  public StreamSourceUrlPart sourceId(String sourceId) {
     
-    this.sourceType = sourceType;
+    this.sourceId = sourceId;
     return this;
   }
 
   /**
-   * Get sourceType
-   * @return sourceType
+   * Get sourceId
+   * @return sourceId
    */
-  @jakarta.annotation.Nullable
-  @JsonProperty(JSON_PROPERTY_SOURCE_TYPE)
-  @JsonInclude(value = JsonInclude.Include.USE_DEFAULTS)
+  @jakarta.annotation.Nonnull
+  @JsonProperty(JSON_PROPERTY_SOURCE_ID)
+  @JsonInclude(value = JsonInclude.Include.ALWAYS)
 
-  public String getSourceType() {
-    return sourceType;
+  public String getSourceId() {
+    return sourceId;
   }
 
 
-  @JsonProperty(JSON_PROPERTY_SOURCE_TYPE)
-  @JsonInclude(value = JsonInclude.Include.USE_DEFAULTS)
-  public void setSourceType(String sourceType) {
-    this.sourceType = sourceType;
+  @JsonProperty(JSON_PROPERTY_SOURCE_ID)
+  @JsonInclude(value = JsonInclude.Include.ALWAYS)
+  public void setSourceId(String sourceId) {
+    this.sourceId = sourceId;
   }
 
-  public Source title(String title) {
+  public StreamSourceUrlPart title(String title) {
     this.title = JsonNullable.<String>of(title);
     
     return this;
@@ -166,14 +149,39 @@ public class Source {
     this.title = JsonNullable.<String>of(title);
   }
 
-  public Source url(String url) {
+  public StreamSourceUrlPart type(String type) {
+    
+    this.type = type;
+    return this;
+  }
+
+  /**
+   * Get type
+   * @return type
+   */
+  @jakarta.annotation.Nullable
+  @JsonProperty(JSON_PROPERTY_TYPE)
+  @JsonInclude(value = JsonInclude.Include.USE_DEFAULTS)
+
+  public String getType() {
+    return type;
+  }
+
+
+  @JsonProperty(JSON_PROPERTY_TYPE)
+  @JsonInclude(value = JsonInclude.Include.USE_DEFAULTS)
+  public void setType(String type) {
+    this.type = type;
+  }
+
+  public StreamSourceUrlPart url(String url) {
     
     this.url = url;
     return this;
   }
 
   /**
-   * The URL of the source.
+   * Get url
    * @return url
    */
   @jakarta.annotation.Nonnull
@@ -199,12 +207,12 @@ public class Source {
     if (o == null || getClass() != o.getClass()) {
       return false;
     }
-    Source source = (Source) o;
-    return Objects.equals(this.id, source.id) &&
-        Objects.equals(this.providerMetadata, source.providerMetadata) &&
-        Objects.equals(this.sourceType, source.sourceType) &&
-        equalsNullable(this.title, source.title) &&
-        Objects.equals(this.url, source.url);
+    StreamSourceUrlPart streamSourceUrlPart = (StreamSourceUrlPart) o;
+    return equalsNullable(this.providerMetadata, streamSourceUrlPart.providerMetadata) &&
+        Objects.equals(this.sourceId, streamSourceUrlPart.sourceId) &&
+        equalsNullable(this.title, streamSourceUrlPart.title) &&
+        Objects.equals(this.type, streamSourceUrlPart.type) &&
+        Objects.equals(this.url, streamSourceUrlPart.url);
   }
 
   private static <T> boolean equalsNullable(JsonNullable<T> a, JsonNullable<T> b) {
@@ -213,7 +221,7 @@ public class Source {
 
   @Override
   public int hashCode() {
-    return Objects.hash(id, providerMetadata, sourceType, hashCodeNullable(title), url);
+    return Objects.hash(hashCodeNullable(providerMetadata), sourceId, hashCodeNullable(title), type, url);
   }
 
   private static <T> int hashCodeNullable(JsonNullable<T> a) {
@@ -226,11 +234,11 @@ public class Source {
   @Override
   public String toString() {
     StringBuilder sb = new StringBuilder();
-    sb.append("class Source {\n");
-    sb.append("    id: ").append(toIndentedString(id)).append("\n");
+    sb.append("class StreamSourceUrlPart {\n");
     sb.append("    providerMetadata: ").append(toIndentedString(providerMetadata)).append("\n");
-    sb.append("    sourceType: ").append(toIndentedString(sourceType)).append("\n");
+    sb.append("    sourceId: ").append(toIndentedString(sourceId)).append("\n");
     sb.append("    title: ").append(toIndentedString(title)).append("\n");
+    sb.append("    type: ").append(toIndentedString(type)).append("\n");
     sb.append("    url: ").append(toIndentedString(url)).append("\n");
     sb.append("}");
     return sb.toString();

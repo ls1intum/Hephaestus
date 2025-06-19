@@ -20,29 +20,37 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonTypeName;
 import com.fasterxml.jackson.annotation.JsonValue;
+import org.openapitools.jackson.nullable.JsonNullable;
+import com.fasterxml.jackson.annotation.JsonIgnore;
+import org.openapitools.jackson.nullable.JsonNullable;
+import java.util.NoSuchElementException;
 import com.fasterxml.jackson.annotation.JsonPropertyOrder;
 import com.fasterxml.jackson.annotation.JsonTypeName;
 import org.hibernate.validator.constraints.*;
 
 /**
- * ReasoningRedactedDetail
+ * Data part with dynamic type.
  */
 @JsonPropertyOrder({
-  ReasoningRedactedDetail.JSON_PROPERTY_DATA,
-  ReasoningRedactedDetail.JSON_PROPERTY_TYPE
+  StreamDataPart.JSON_PROPERTY_DATA,
+  StreamDataPart.JSON_PROPERTY_ID,
+  StreamDataPart.JSON_PROPERTY_TYPE
 })
 @jakarta.annotation.Generated(value = "org.openapitools.codegen.languages.JavaClientCodegen", comments = "Generator version: 7.7.0")
-public class ReasoningRedactedDetail {
+public class StreamDataPart {
   public static final String JSON_PROPERTY_DATA = "data";
-  private String data;
+  private Object data = null;
+
+  public static final String JSON_PROPERTY_ID = "id";
+  private JsonNullable<String> id = JsonNullable.<String>undefined();
 
   public static final String JSON_PROPERTY_TYPE = "type";
-  private String type = "redacted";
+  private String type;
 
-  public ReasoningRedactedDetail() {
+  public StreamDataPart() {
   }
 
-  public ReasoningRedactedDetail data(String data) {
+  public StreamDataPart data(Object data) {
     
     this.data = data;
     return this;
@@ -52,22 +60,55 @@ public class ReasoningRedactedDetail {
    * Get data
    * @return data
    */
-  @jakarta.annotation.Nonnull
+  @jakarta.annotation.Nullable
   @JsonProperty(JSON_PROPERTY_DATA)
   @JsonInclude(value = JsonInclude.Include.ALWAYS)
 
-  public String getData() {
+  public Object getData() {
     return data;
   }
 
 
   @JsonProperty(JSON_PROPERTY_DATA)
   @JsonInclude(value = JsonInclude.Include.ALWAYS)
-  public void setData(String data) {
+  public void setData(Object data) {
     this.data = data;
   }
 
-  public ReasoningRedactedDetail type(String type) {
+  public StreamDataPart id(String id) {
+    this.id = JsonNullable.<String>of(id);
+    
+    return this;
+  }
+
+  /**
+   * Get id
+   * @return id
+   */
+  @jakarta.annotation.Nullable
+  @JsonIgnore
+
+  public String getId() {
+        return id.orElse(null);
+  }
+
+  @JsonProperty(JSON_PROPERTY_ID)
+  @JsonInclude(value = JsonInclude.Include.USE_DEFAULTS)
+
+  public JsonNullable<String> getId_JsonNullable() {
+    return id;
+  }
+  
+  @JsonProperty(JSON_PROPERTY_ID)
+  public void setId_JsonNullable(JsonNullable<String> id) {
+    this.id = id;
+  }
+
+  public void setId(String id) {
+    this.id = JsonNullable.<String>of(id);
+  }
+
+  public StreamDataPart type(String type) {
     
     this.type = type;
     return this;
@@ -77,9 +118,9 @@ public class ReasoningRedactedDetail {
    * Get type
    * @return type
    */
-  @jakarta.annotation.Nullable
+  @jakarta.annotation.Nonnull
   @JsonProperty(JSON_PROPERTY_TYPE)
-  @JsonInclude(value = JsonInclude.Include.USE_DEFAULTS)
+  @JsonInclude(value = JsonInclude.Include.ALWAYS)
 
   public String getType() {
     return type;
@@ -87,7 +128,7 @@ public class ReasoningRedactedDetail {
 
 
   @JsonProperty(JSON_PROPERTY_TYPE)
-  @JsonInclude(value = JsonInclude.Include.USE_DEFAULTS)
+  @JsonInclude(value = JsonInclude.Include.ALWAYS)
   public void setType(String type) {
     this.type = type;
   }
@@ -100,21 +141,34 @@ public class ReasoningRedactedDetail {
     if (o == null || getClass() != o.getClass()) {
       return false;
     }
-    ReasoningRedactedDetail reasoningRedactedDetail = (ReasoningRedactedDetail) o;
-    return Objects.equals(this.data, reasoningRedactedDetail.data) &&
-        Objects.equals(this.type, reasoningRedactedDetail.type);
+    StreamDataPart streamDataPart = (StreamDataPart) o;
+    return Objects.equals(this.data, streamDataPart.data) &&
+        equalsNullable(this.id, streamDataPart.id) &&
+        Objects.equals(this.type, streamDataPart.type);
+  }
+
+  private static <T> boolean equalsNullable(JsonNullable<T> a, JsonNullable<T> b) {
+    return a == b || (a != null && b != null && a.isPresent() && b.isPresent() && Objects.deepEquals(a.get(), b.get()));
   }
 
   @Override
   public int hashCode() {
-    return Objects.hash(data, type);
+    return Objects.hash(data, hashCodeNullable(id), type);
+  }
+
+  private static <T> int hashCodeNullable(JsonNullable<T> a) {
+    if (a == null) {
+      return 1;
+    }
+    return a.isPresent() ? Arrays.deepHashCode(new Object[]{a.get()}) : 31;
   }
 
   @Override
   public String toString() {
     StringBuilder sb = new StringBuilder();
-    sb.append("class ReasoningRedactedDetail {\n");
+    sb.append("class StreamDataPart {\n");
     sb.append("    data: ").append(toIndentedString(data)).append("\n");
+    sb.append("    id: ").append(toIndentedString(id)).append("\n");
     sb.append("    type: ").append(toIndentedString(type)).append("\n");
     sb.append("}");
     return sb.toString();

@@ -29,86 +29,57 @@ import com.fasterxml.jackson.annotation.JsonTypeName;
 import org.hibernate.validator.constraints.*;
 
 /**
- * ReasoningOpenDetail
+ * End of stream event.
  */
 @JsonPropertyOrder({
-  ReasoningOpenDetail.JSON_PROPERTY_SIGNATURE,
-  ReasoningOpenDetail.JSON_PROPERTY_TEXT,
-  ReasoningOpenDetail.JSON_PROPERTY_TYPE
+  StreamFinishPart.JSON_PROPERTY_MESSAGE_METADATA,
+  StreamFinishPart.JSON_PROPERTY_TYPE
 })
 @jakarta.annotation.Generated(value = "org.openapitools.codegen.languages.JavaClientCodegen", comments = "Generator version: 7.7.0")
-public class ReasoningOpenDetail {
-  public static final String JSON_PROPERTY_SIGNATURE = "signature";
-  private JsonNullable<String> signature = JsonNullable.<String>undefined();
-
-  public static final String JSON_PROPERTY_TEXT = "text";
-  private String text;
+public class StreamFinishPart {
+  public static final String JSON_PROPERTY_MESSAGE_METADATA = "messageMetadata";
+  private JsonNullable<Object> messageMetadata = JsonNullable.<Object>undefined();
 
   public static final String JSON_PROPERTY_TYPE = "type";
-  private String type = "text";
+  private String type = "finish";
 
-  public ReasoningOpenDetail() {
+  public StreamFinishPart() {
   }
 
-  public ReasoningOpenDetail signature(String signature) {
-    this.signature = JsonNullable.<String>of(signature);
+  public StreamFinishPart messageMetadata(Object messageMetadata) {
+    this.messageMetadata = JsonNullable.<Object>of(messageMetadata);
     
     return this;
   }
 
   /**
-   * Get signature
-   * @return signature
+   * Get messageMetadata
+   * @return messageMetadata
    */
   @jakarta.annotation.Nullable
   @JsonIgnore
 
-  public String getSignature() {
-        return signature.orElse(null);
+  public Object getMessageMetadata() {
+        return messageMetadata.orElse(null);
   }
 
-  @JsonProperty(JSON_PROPERTY_SIGNATURE)
+  @JsonProperty(JSON_PROPERTY_MESSAGE_METADATA)
   @JsonInclude(value = JsonInclude.Include.USE_DEFAULTS)
 
-  public JsonNullable<String> getSignature_JsonNullable() {
-    return signature;
+  public JsonNullable<Object> getMessageMetadata_JsonNullable() {
+    return messageMetadata;
   }
   
-  @JsonProperty(JSON_PROPERTY_SIGNATURE)
-  public void setSignature_JsonNullable(JsonNullable<String> signature) {
-    this.signature = signature;
+  @JsonProperty(JSON_PROPERTY_MESSAGE_METADATA)
+  public void setMessageMetadata_JsonNullable(JsonNullable<Object> messageMetadata) {
+    this.messageMetadata = messageMetadata;
   }
 
-  public void setSignature(String signature) {
-    this.signature = JsonNullable.<String>of(signature);
+  public void setMessageMetadata(Object messageMetadata) {
+    this.messageMetadata = JsonNullable.<Object>of(messageMetadata);
   }
 
-  public ReasoningOpenDetail text(String text) {
-    
-    this.text = text;
-    return this;
-  }
-
-  /**
-   * Get text
-   * @return text
-   */
-  @jakarta.annotation.Nonnull
-  @JsonProperty(JSON_PROPERTY_TEXT)
-  @JsonInclude(value = JsonInclude.Include.ALWAYS)
-
-  public String getText() {
-    return text;
-  }
-
-
-  @JsonProperty(JSON_PROPERTY_TEXT)
-  @JsonInclude(value = JsonInclude.Include.ALWAYS)
-  public void setText(String text) {
-    this.text = text;
-  }
-
-  public ReasoningOpenDetail type(String type) {
+  public StreamFinishPart type(String type) {
     
     this.type = type;
     return this;
@@ -141,10 +112,9 @@ public class ReasoningOpenDetail {
     if (o == null || getClass() != o.getClass()) {
       return false;
     }
-    ReasoningOpenDetail reasoningOpenDetail = (ReasoningOpenDetail) o;
-    return equalsNullable(this.signature, reasoningOpenDetail.signature) &&
-        Objects.equals(this.text, reasoningOpenDetail.text) &&
-        Objects.equals(this.type, reasoningOpenDetail.type);
+    StreamFinishPart streamFinishPart = (StreamFinishPart) o;
+    return equalsNullable(this.messageMetadata, streamFinishPart.messageMetadata) &&
+        Objects.equals(this.type, streamFinishPart.type);
   }
 
   private static <T> boolean equalsNullable(JsonNullable<T> a, JsonNullable<T> b) {
@@ -153,7 +123,7 @@ public class ReasoningOpenDetail {
 
   @Override
   public int hashCode() {
-    return Objects.hash(hashCodeNullable(signature), text, type);
+    return Objects.hash(hashCodeNullable(messageMetadata), type);
   }
 
   private static <T> int hashCodeNullable(JsonNullable<T> a) {
@@ -166,9 +136,8 @@ public class ReasoningOpenDetail {
   @Override
   public String toString() {
     StringBuilder sb = new StringBuilder();
-    sb.append("class ReasoningOpenDetail {\n");
-    sb.append("    signature: ").append(toIndentedString(signature)).append("\n");
-    sb.append("    text: ").append(toIndentedString(text)).append("\n");
+    sb.append("class StreamFinishPart {\n");
+    sb.append("    messageMetadata: ").append(toIndentedString(messageMetadata)).append("\n");
     sb.append("    type: ").append(toIndentedString(type)).append("\n");
     sb.append("}");
     return sb.toString();

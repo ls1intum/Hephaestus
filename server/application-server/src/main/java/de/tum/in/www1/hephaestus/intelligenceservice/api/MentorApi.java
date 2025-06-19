@@ -5,6 +5,7 @@ import de.tum.in.www1.hephaestus.intelligenceservice.BaseApi;
 
 import de.tum.in.www1.hephaestus.intelligenceservice.model.ChatRequest;
 import de.tum.in.www1.hephaestus.intelligenceservice.model.HTTPValidationError;
+import de.tum.in.www1.hephaestus.intelligenceservice.model.StreamPart;
 
 import java.util.Collections;
 import java.util.HashMap;
@@ -39,33 +40,33 @@ public class MentorApi extends BaseApi {
     }
 
     /**
-     * Handle Chat Data
+     * Handle Chat
      * 
-     * <p><b>200</b> - Data stream for Vercel AI SDK
+     * <p><b>200</b> - Event stream of chat updates.
      * <p><b>422</b> - Validation Error
      * @param chatRequest  (required)
-     * @return Object
+     * @return StreamPart
      * @throws RestClientException if an error occurs while attempting to invoke the API
      */
-    public Object handleChatDataMentorChatPost(ChatRequest chatRequest) throws RestClientException {
-        return handleChatDataMentorChatPostWithHttpInfo(chatRequest).getBody();
+    public StreamPart handleChatMentorChatPost(ChatRequest chatRequest) throws RestClientException {
+        return handleChatMentorChatPostWithHttpInfo(chatRequest).getBody();
     }
 
     /**
-     * Handle Chat Data
+     * Handle Chat
      * 
-     * <p><b>200</b> - Data stream for Vercel AI SDK
+     * <p><b>200</b> - Event stream of chat updates.
      * <p><b>422</b> - Validation Error
      * @param chatRequest  (required)
-     * @return ResponseEntity&lt;Object&gt;
+     * @return ResponseEntity&lt;StreamPart&gt;
      * @throws RestClientException if an error occurs while attempting to invoke the API
      */
-    public ResponseEntity<Object> handleChatDataMentorChatPostWithHttpInfo(ChatRequest chatRequest) throws RestClientException {
+    public ResponseEntity<StreamPart> handleChatMentorChatPostWithHttpInfo(ChatRequest chatRequest) throws RestClientException {
         Object localVarPostBody = chatRequest;
         
         // verify the required parameter 'chatRequest' is set
         if (chatRequest == null) {
-            throw new HttpClientErrorException(HttpStatus.BAD_REQUEST, "Missing the required parameter 'chatRequest' when calling handleChatDataMentorChatPost");
+            throw new HttpClientErrorException(HttpStatus.BAD_REQUEST, "Missing the required parameter 'chatRequest' when calling handleChatMentorChatPost");
         }
         
 
@@ -75,7 +76,7 @@ public class MentorApi extends BaseApi {
         final MultiValueMap<String, Object> localVarFormParams = new LinkedMultiValueMap<String, Object>();
 
         final String[] localVarAccepts = { 
-            "application/json", "text/plain"
+            "text/event-stream", "application/json"
          };
         final List<MediaType> localVarAccept = apiClient.selectHeaderAccept(localVarAccepts);
         final String[] localVarContentTypes = { 
@@ -85,7 +86,7 @@ public class MentorApi extends BaseApi {
 
         String[] localVarAuthNames = new String[] {  };
 
-        ParameterizedTypeReference<Object> localReturnType = new ParameterizedTypeReference<Object>() {};
+        ParameterizedTypeReference<StreamPart> localReturnType = new ParameterizedTypeReference<StreamPart>() {};
         return apiClient.invokeAPI("/mentor/chat", HttpMethod.POST, Collections.<String, Object>emptyMap(), localVarQueryParams, localVarPostBody, localVarHeaderParams, localVarCookieParams, localVarFormParams, localVarAccept, localVarContentType, localVarAuthNames, localReturnType);
     }
 
@@ -101,7 +102,7 @@ public class MentorApi extends BaseApi {
         final MultiValueMap<String, Object> localVarFormParams = new LinkedMultiValueMap<String, Object>();
 
         final String[] localVarAccepts = { 
-            "application/json", "text/plain"
+            "text/event-stream", "application/json"
          };
         final List<MediaType> localVarAccept = apiClient.selectHeaderAccept(localVarAccepts);
         final String[] localVarContentTypes = { 

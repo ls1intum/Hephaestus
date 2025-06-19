@@ -32,14 +32,45 @@ components:
       title: BadPracticeStatus
       type: string
     ChatRequest:
+      description: Chat request model.
       properties:
+        id:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Id
         messages:
-          description: A list of messages in the chat conversation
           items:
-            $ref: '#/components/schemas/Message'
+            $ref: '#/components/schemas/UIMessage'
           title: Messages
           type: array
+        metadata:
+          anyOf:
+          - type: object
+          - type: 'null'
+          title: Metadata
+      required:
+      - messages
       title: ChatRequest
+      type: object
+    DataUIPart:
+      description: A data part with dynamic type.
+      properties:
+        data:
+          title: Data
+        id:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Id
+        type:
+          pattern: ^data-.*
+          title: Type
+          type: string
+      required:
+      - type
+      - data
+      title: DataUIPart
       type: object
     DetectorRequest:
       properties:
@@ -102,20 +133,25 @@ components:
     FileUIPart:
       description: A file part of a message.
       properties:
-        data:
-          title: Data
-          type: string
-        mimeType:
-          title: Mimetype
+        filename:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Filename
+        mediaType:
+          title: Mediatype
           type: string
         type:
           const: file
           default: file
           title: Type
           type: string
+        url:
+          title: Url
+          type: string
       required:
-      - mimeType
-      - data
+      - mediaType
+      - url
       title: FileUIPart
       type: object
     HTTPValidationError:
@@ -137,97 +173,16 @@ components:
           type: string
       title: HealthCheck
       type: object
-    Message:
-      properties:
-        content:
-          description: 'Text content of the message. Important: Use parts when possible.
-            This is a fallback for compatibility with AI SDK.'
-          title: Content
-          type: string
-        createdAt:
-          anyOf:
-          - type: string
-          - type: 'null'
-          description: The timestamp of the message
-          title: Createdat
-        id:
-          description: A unique identifier for the message
-          title: Id
-          type: string
-        parts:
-          description: 'The parts of the message. Use this for rendering the message
-            in the UI.
-
-
-            Assistant messages can have text, reasoning, and tool invocation parts.
-
-            User messages can have text parts.'
-          items:
-            anyOf:
-            - $ref: '#/components/schemas/TextUIPart'
-            - $ref: '#/components/schemas/ReasoningUIPart'
-            - $ref: '#/components/schemas/ToolInvocationUIPart'
-            - $ref: '#/components/schemas/SourceUIPart'
-            - $ref: '#/components/schemas/FileUIPart'
-            - $ref: '#/components/schemas/StepStartUIPart'
-          title: Parts
-          type: array
-        role:
-          description: 'The role of the message sender: ''user'', ''assistant'', ''system''.'
-          title: Role
-          type: string
-      required:
-      - id
-      - content
-      - role
-      title: Message
-      type: object
-    ReasoningOpenDetail:
-      properties:
-        signature:
-          anyOf:
-          - type: string
-          - type: 'null'
-          title: Signature
-        text:
-          title: Text
-          type: string
-        type:
-          const: text
-          default: text
-          title: Type
-          type: string
-      required:
-      - text
-      title: ReasoningOpenDetail
-      type: object
-    ReasoningRedactedDetail:
-      properties:
-        data:
-          title: Data
-          type: string
-        type:
-          const: redacted
-          default: redacted
-          title: Type
-          type: string
-      required:
-      - data
-      title: ReasoningRedactedDetail
-      type: object
     ReasoningUIPart:
       description: A reasoning part of a message.
       properties:
-        details:
-          items:
-            anyOf:
-            - $ref: '#/components/schemas/ReasoningOpenDetail'
-            - $ref: '#/components/schemas/ReasoningRedactedDetail'
-          title: Details
-          type: array
-        reasoning:
-          description: The reasoning text
-          title: Reasoning
+        providerMetadata:
+          anyOf:
+          - type: object
+          - type: 'null'
+          title: Providermetadata
+        text:
+          title: Text
           type: string
         type:
           const: reasoning
@@ -235,56 +190,70 @@ components:
           title: Type
           type: string
       required:
-      - reasoning
+      - text
       title: ReasoningUIPart
       type: object
-    Source:
+    SourceDocumentUIPart:
+      description: A document source part of a message.
       properties:
-        id:
-          description: The ID of the source.
-          title: Id
+        filename:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Filename
+        mediaType:
+          title: Mediatype
           type: string
         providerMetadata:
           anyOf:
           - type: object
           - type: 'null'
-          description: Additional provider metadata for the source.
           title: Providermetadata
-        sourceType:
-          const: url
-          default: url
-          title: Sourcetype
+        sourceId:
+          title: Sourceid
+          type: string
+        title:
+          title: Title
+          type: string
+        type:
+          const: source-document
+          default: source-document
+          title: Type
+          type: string
+      required:
+      - sourceId
+      - mediaType
+      - title
+      title: SourceDocumentUIPart
+      type: object
+    SourceUrlUIPart:
+      description: A URL source part of a message.
+      properties:
+        providerMetadata:
+          anyOf:
+          - type: object
+          - type: 'null'
+          title: Providermetadata
+        sourceId:
+          title: Sourceid
           type: string
         title:
           anyOf:
           - type: string
           - type: 'null'
-          description: The title of the source.
           title: Title
+        type:
+          const: source-url
+          default: source-url
+          title: Type
+          type: string
         url:
-          description: The URL of the source.
           title: Url
           type: string
       required:
-      - id
+      - sourceId
       - url
-      - providerMetadata
-      title: Source
-      type: object
-    SourceUIPart:
-      description: A source part of a message.
-      properties:
-        source:
-          $ref: '#/components/schemas/Source'
-          description: The source.
-        type:
-          const: source
-          default: source
-          title: Type
-          type: string
-      required:
-      - source
-      title: SourceUIPart
+      title: SourceUrlUIPart
       type: object
     StepStartUIPart:
       description: A step boundary part of a message.
@@ -295,6 +264,340 @@ components:
           title: Type
           type: string
       title: StepStartUIPart
+      type: object
+    StreamDataPart:
+      description: Data part with dynamic type.
+      properties:
+        data:
+          title: Data
+        id:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Id
+        type:
+          pattern: ^data-.*
+          title: Type
+          type: string
+      required:
+      - type
+      - data
+      title: StreamDataPart
+      type: object
+    StreamErrorPart:
+      description: Error stream part.
+      properties:
+        errorText:
+          title: Errortext
+          type: string
+        type:
+          const: error
+          default: error
+          title: Type
+          type: string
+      required:
+      - errorText
+      title: StreamErrorPart
+      type: object
+    StreamFilePart:
+      description: File part of a message.
+      properties:
+        mediaType:
+          title: Mediatype
+          type: string
+        type:
+          const: file
+          default: file
+          title: Type
+          type: string
+        url:
+          title: Url
+          type: string
+      required:
+      - url
+      - mediaType
+      title: StreamFilePart
+      type: object
+    StreamFinishPart:
+      description: End of stream event.
+      properties:
+        messageMetadata:
+          anyOf:
+          - type: object
+          - type: 'null'
+          title: Messagemetadata
+        type:
+          const: finish
+          default: finish
+          title: Type
+          type: string
+      title: StreamFinishPart
+      type: object
+    StreamMessageMetadataPart:
+      description: Message metadata part.
+      properties:
+        messageMetadata:
+          title: Messagemetadata
+          type: object
+        type:
+          const: message-metadata
+          default: message-metadata
+          title: Type
+          type: string
+      required:
+      - messageMetadata
+      title: StreamMessageMetadataPart
+      type: object
+    StreamPart:
+      anyOf:
+      - $ref: '#/components/schemas/StreamTextPart'
+      - $ref: '#/components/schemas/StreamErrorPart'
+      - $ref: '#/components/schemas/StreamToolInputStartPart'
+      - $ref: '#/components/schemas/StreamToolInputDeltaPart'
+      - $ref: '#/components/schemas/StreamToolInputAvailablePart'
+      - $ref: '#/components/schemas/StreamToolOutputAvailablePart'
+      - $ref: '#/components/schemas/StreamReasoningPart'
+      - $ref: '#/components/schemas/StreamReasoningFinishPart'
+      - $ref: '#/components/schemas/StreamSourceUrlPart'
+      - $ref: '#/components/schemas/StreamSourceDocumentPart'
+      - $ref: '#/components/schemas/StreamFilePart'
+      - $ref: '#/components/schemas/StreamDataPart'
+      - $ref: '#/components/schemas/StreamStepStartPart'
+      - $ref: '#/components/schemas/StreamStepFinishPart'
+      - $ref: '#/components/schemas/StreamStartPart'
+      - $ref: '#/components/schemas/StreamFinishPart'
+      - $ref: '#/components/schemas/StreamMessageMetadataPart'
+      description: Stream part model.
+      title: StreamPart
+    StreamReasoningFinishPart:
+      description: Reasoning finish event.
+      properties:
+        type:
+          const: reasoning-part-finish
+          default: reasoning-part-finish
+          title: Type
+          type: string
+      title: StreamReasoningFinishPart
+      type: object
+    StreamReasoningPart:
+      description: Reasoning part of a message.
+      properties:
+        providerMetadata:
+          anyOf:
+          - type: object
+          - type: 'null'
+          title: Providermetadata
+        text:
+          title: Text
+          type: string
+        type:
+          const: reasoning
+          default: reasoning
+          title: Type
+          type: string
+      required:
+      - text
+      title: StreamReasoningPart
+      type: object
+    StreamSourceDocumentPart:
+      description: Source document part of a message.
+      properties:
+        filename:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Filename
+        mediaType:
+          title: Mediatype
+          type: string
+        providerMetadata:
+          anyOf:
+          - type: object
+          - type: 'null'
+          title: Providermetadata
+        sourceId:
+          title: Sourceid
+          type: string
+        title:
+          title: Title
+          type: string
+        type:
+          const: source-document
+          default: source-document
+          title: Type
+          type: string
+      required:
+      - sourceId
+      - mediaType
+      - title
+      title: StreamSourceDocumentPart
+      type: object
+    StreamSourceUrlPart:
+      description: Source URL part of a message.
+      properties:
+        providerMetadata:
+          anyOf:
+          - type: object
+          - type: 'null'
+          title: Providermetadata
+        sourceId:
+          title: Sourceid
+          type: string
+        title:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Title
+        type:
+          const: source-url
+          default: source-url
+          title: Type
+          type: string
+        url:
+          title: Url
+          type: string
+      required:
+      - sourceId
+      - url
+      title: StreamSourceUrlPart
+      type: object
+    StreamStartPart:
+      description: Start of stream event.
+      properties:
+        messageId:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Messageid
+        messageMetadata:
+          anyOf:
+          - type: object
+          - type: 'null'
+          title: Messagemetadata
+        type:
+          const: start
+          default: start
+          title: Type
+          type: string
+      title: StreamStartPart
+      type: object
+    StreamStepFinishPart:
+      description: Step finish event.
+      properties:
+        type:
+          const: finish-step
+          default: finish-step
+          title: Type
+          type: string
+      title: StreamStepFinishPart
+      type: object
+    StreamStepStartPart:
+      description: Step start event.
+      properties:
+        type:
+          const: start-step
+          default: start-step
+          title: Type
+          type: string
+      title: StreamStepStartPart
+      type: object
+    StreamTextPart:
+      description: Text stream part.
+      properties:
+        text:
+          title: Text
+          type: string
+        type:
+          const: text
+          default: text
+          title: Type
+          type: string
+      required:
+      - text
+      title: StreamTextPart
+      type: object
+    StreamToolInputAvailablePart:
+      description: Tool input available event.
+      properties:
+        input:
+          title: Input
+        toolCallId:
+          title: Toolcallid
+          type: string
+        toolName:
+          title: Toolname
+          type: string
+        type:
+          const: tool-input-available
+          default: tool-input-available
+          title: Type
+          type: string
+      required:
+      - toolCallId
+      - toolName
+      - input
+      title: StreamToolInputAvailablePart
+      type: object
+    StreamToolInputDeltaPart:
+      description: Tool input delta event.
+      properties:
+        inputTextDelta:
+          title: Inputtextdelta
+          type: string
+        toolCallId:
+          title: Toolcallid
+          type: string
+        type:
+          const: tool-input-delta
+          default: tool-input-delta
+          title: Type
+          type: string
+      required:
+      - toolCallId
+      - inputTextDelta
+      title: StreamToolInputDeltaPart
+      type: object
+    StreamToolInputStartPart:
+      description: Tool input start event.
+      properties:
+        toolCallId:
+          title: Toolcallid
+          type: string
+        toolName:
+          title: Toolname
+          type: string
+        type:
+          const: tool-input-start
+          default: tool-input-start
+          title: Type
+          type: string
+      required:
+      - toolCallId
+      - toolName
+      title: StreamToolInputStartPart
+      type: object
+    StreamToolOutputAvailablePart:
+      description: Tool output available event.
+      properties:
+        output:
+          title: Output
+        providerMetadata:
+          anyOf:
+          - type: object
+          - type: 'null'
+          title: Providermetadata
+        toolCallId:
+          title: Toolcallid
+          type: string
+        type:
+          const: tool-output-available
+          default: tool-output-available
+          title: Type
+          type: string
+      required:
+      - toolCallId
+      - output
+      title: StreamToolOutputAvailablePart
       type: object
     TextUIPart:
       description: A text part of a message.
@@ -311,81 +614,119 @@ components:
       - text
       title: TextUIPart
       type: object
-    ToolCall:
+    ToolInputAvailablePart:
+      description: Tool part with input available.
       properties:
-        args:
-          title: Args
-          type: object
+        input:
+          title: Input
         state:
-          const: call
-          default: call
+          const: input-available
+          default: input-available
           title: State
           type: string
-        step:
-          anyOf:
-          - type: integer
-          - type: 'null'
-          title: Step
         toolCallId:
           title: Toolcallid
           type: string
-        toolName:
-          title: Toolname
-          type: string
-      required:
-      - toolCallId
-      - toolName
-      - args
-      title: ToolCall
-      type: object
-    ToolInvocationUIPart:
-      description: A tool invocation part of a message.
-      properties:
-        toolInvocation:
-          anyOf:
-          - $ref: '#/components/schemas/ToolCall'
-          - $ref: '#/components/schemas/ToolResult'
-          description: The tool invocation
-          title: Toolinvocation
         type:
-          const: tool-invocation
-          default: tool-invocation
+          pattern: ^tool-.*
           title: Type
           type: string
       required:
-      - toolInvocation
-      title: ToolInvocationUIPart
+      - type
+      - toolCallId
+      - input
+      title: ToolInputAvailablePart
       type: object
-    ToolResult:
+    ToolInputStreamingPart:
+      description: Tool part with input being streamed.
       properties:
-        args:
-          title: Args
-          type: object
-        result:
-          title: Result
-          type: object
+        input:
+          anyOf:
+          - {}
+          - type: 'null'
+          title: Input
         state:
-          const: result
-          default: result
+          const: input-streaming
+          default: input-streaming
           title: State
           type: string
-        step:
-          anyOf:
-          - type: integer
-          - type: 'null'
-          title: Step
         toolCallId:
           title: Toolcallid
           type: string
-        toolName:
-          title: Toolname
+        type:
+          pattern: ^tool-.*
+          title: Type
           type: string
       required:
+      - type
       - toolCallId
-      - toolName
-      - args
-      - result
-      title: ToolResult
+      title: ToolInputStreamingPart
+      type: object
+    ToolOutputAvailablePart:
+      description: Tool part with output available.
+      properties:
+        input:
+          title: Input
+        output:
+          title: Output
+        state:
+          const: output-available
+          default: output-available
+          title: State
+          type: string
+        toolCallId:
+          title: Toolcallid
+          type: string
+        type:
+          pattern: ^tool-.*
+          title: Type
+          type: string
+      required:
+      - type
+      - toolCallId
+      - input
+      - output
+      title: ToolOutputAvailablePart
+      type: object
+    UIMessage:
+      description: Message model that matches the TypeScript interface.
+      properties:
+        id:
+          description: A unique identifier for the message
+          title: Id
+          type: string
+        metadata:
+          anyOf:
+          - type: object
+          - type: 'null'
+          title: Metadata
+        parts:
+          items:
+            anyOf:
+            - $ref: '#/components/schemas/TextUIPart'
+            - $ref: '#/components/schemas/ReasoningUIPart'
+            - $ref: '#/components/schemas/ToolInputStreamingPart'
+            - $ref: '#/components/schemas/ToolInputAvailablePart'
+            - $ref: '#/components/schemas/ToolOutputAvailablePart'
+            - $ref: '#/components/schemas/SourceUrlUIPart'
+            - $ref: '#/components/schemas/SourceDocumentUIPart'
+            - $ref: '#/components/schemas/FileUIPart'
+            - $ref: '#/components/schemas/DataUIPart'
+            - $ref: '#/components/schemas/StepStartUIPart'
+          title: Parts
+          type: array
+        role:
+          enum:
+          - system
+          - user
+          - assistant
+          title: Role
+          type: string
+      required:
+      - id
+      - role
+      - parts
+      title: UIMessage
       type: object
     ValidationError:
       properties:
@@ -463,7 +804,7 @@ paths:
       - healthcheck
   /mentor/chat:
     post:
-      operationId: handle_chat_data_mentor_chat_post
+      operationId: handle_chat_mentor_chat_post
       requestBody:
         content:
           application/json:
@@ -473,26 +814,25 @@ paths:
       responses:
         '200':
           content:
-            application/json:
-              schema: {}
-            text/plain:
+            text/event-stream:
               examples:
-                first-chunk:
-                  summary: Typical data stream frame
-                  value: 0:"Hello World!"
-          description: Data stream for Vercel AI SDK
-          headers:
-            x-vercel-ai-data-stream:
-              description: Protocol version for Vercel AI streaming
+                error:
+                  value:
+                    errorText: oops
+                    type: error
+                text:
+                  value:
+                    text: Hello
+                    type: text
               schema:
-                example: v1
-                type: string
+                $ref: '#/components/schemas/StreamPart'
+          description: Event stream of chat updates.
         '422':
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/HTTPValidationError'
           description: Validation Error
-      summary: Handle Chat Data
+      summary: Handle Chat
       tags:
       - mentor

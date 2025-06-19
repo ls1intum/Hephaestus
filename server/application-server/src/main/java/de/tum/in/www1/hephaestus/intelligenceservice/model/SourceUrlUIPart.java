@@ -29,28 +29,36 @@ import com.fasterxml.jackson.annotation.JsonTypeName;
 import org.hibernate.validator.constraints.*;
 
 /**
- * A reasoning part of a message.
+ * A URL source part of a message.
  */
 @JsonPropertyOrder({
-  ReasoningUIPart.JSON_PROPERTY_PROVIDER_METADATA,
-  ReasoningUIPart.JSON_PROPERTY_TEXT,
-  ReasoningUIPart.JSON_PROPERTY_TYPE
+  SourceUrlUIPart.JSON_PROPERTY_PROVIDER_METADATA,
+  SourceUrlUIPart.JSON_PROPERTY_SOURCE_ID,
+  SourceUrlUIPart.JSON_PROPERTY_TITLE,
+  SourceUrlUIPart.JSON_PROPERTY_TYPE,
+  SourceUrlUIPart.JSON_PROPERTY_URL
 })
 @jakarta.annotation.Generated(value = "org.openapitools.codegen.languages.JavaClientCodegen", comments = "Generator version: 7.7.0")
-public class ReasoningUIPart {
+public class SourceUrlUIPart {
   public static final String JSON_PROPERTY_PROVIDER_METADATA = "providerMetadata";
   private JsonNullable<Object> providerMetadata = JsonNullable.<Object>undefined();
 
-  public static final String JSON_PROPERTY_TEXT = "text";
-  private String text;
+  public static final String JSON_PROPERTY_SOURCE_ID = "sourceId";
+  private String sourceId;
+
+  public static final String JSON_PROPERTY_TITLE = "title";
+  private JsonNullable<String> title = JsonNullable.<String>undefined();
 
   public static final String JSON_PROPERTY_TYPE = "type";
-  private String type = "reasoning";
+  private String type = "source-url";
 
-  public ReasoningUIPart() {
+  public static final String JSON_PROPERTY_URL = "url";
+  private String url;
+
+  public SourceUrlUIPart() {
   }
 
-  public ReasoningUIPart providerMetadata(Object providerMetadata) {
+  public SourceUrlUIPart providerMetadata(Object providerMetadata) {
     this.providerMetadata = JsonNullable.<Object>of(providerMetadata);
     
     return this;
@@ -83,32 +91,65 @@ public class ReasoningUIPart {
     this.providerMetadata = JsonNullable.<Object>of(providerMetadata);
   }
 
-  public ReasoningUIPart text(String text) {
+  public SourceUrlUIPart sourceId(String sourceId) {
     
-    this.text = text;
+    this.sourceId = sourceId;
     return this;
   }
 
   /**
-   * Get text
-   * @return text
+   * Get sourceId
+   * @return sourceId
    */
   @jakarta.annotation.Nonnull
-  @JsonProperty(JSON_PROPERTY_TEXT)
+  @JsonProperty(JSON_PROPERTY_SOURCE_ID)
   @JsonInclude(value = JsonInclude.Include.ALWAYS)
 
-  public String getText() {
-    return text;
+  public String getSourceId() {
+    return sourceId;
   }
 
 
-  @JsonProperty(JSON_PROPERTY_TEXT)
+  @JsonProperty(JSON_PROPERTY_SOURCE_ID)
   @JsonInclude(value = JsonInclude.Include.ALWAYS)
-  public void setText(String text) {
-    this.text = text;
+  public void setSourceId(String sourceId) {
+    this.sourceId = sourceId;
   }
 
-  public ReasoningUIPart type(String type) {
+  public SourceUrlUIPart title(String title) {
+    this.title = JsonNullable.<String>of(title);
+    
+    return this;
+  }
+
+  /**
+   * Get title
+   * @return title
+   */
+  @jakarta.annotation.Nullable
+  @JsonIgnore
+
+  public String getTitle() {
+        return title.orElse(null);
+  }
+
+  @JsonProperty(JSON_PROPERTY_TITLE)
+  @JsonInclude(value = JsonInclude.Include.USE_DEFAULTS)
+
+  public JsonNullable<String> getTitle_JsonNullable() {
+    return title;
+  }
+  
+  @JsonProperty(JSON_PROPERTY_TITLE)
+  public void setTitle_JsonNullable(JsonNullable<String> title) {
+    this.title = title;
+  }
+
+  public void setTitle(String title) {
+    this.title = JsonNullable.<String>of(title);
+  }
+
+  public SourceUrlUIPart type(String type) {
     
     this.type = type;
     return this;
@@ -133,6 +174,31 @@ public class ReasoningUIPart {
     this.type = type;
   }
 
+  public SourceUrlUIPart url(String url) {
+    
+    this.url = url;
+    return this;
+  }
+
+  /**
+   * Get url
+   * @return url
+   */
+  @jakarta.annotation.Nonnull
+  @JsonProperty(JSON_PROPERTY_URL)
+  @JsonInclude(value = JsonInclude.Include.ALWAYS)
+
+  public String getUrl() {
+    return url;
+  }
+
+
+  @JsonProperty(JSON_PROPERTY_URL)
+  @JsonInclude(value = JsonInclude.Include.ALWAYS)
+  public void setUrl(String url) {
+    this.url = url;
+  }
+
   @Override
   public boolean equals(Object o) {
     if (this == o) {
@@ -141,10 +207,12 @@ public class ReasoningUIPart {
     if (o == null || getClass() != o.getClass()) {
       return false;
     }
-    ReasoningUIPart reasoningUIPart = (ReasoningUIPart) o;
-    return equalsNullable(this.providerMetadata, reasoningUIPart.providerMetadata) &&
-        Objects.equals(this.text, reasoningUIPart.text) &&
-        Objects.equals(this.type, reasoningUIPart.type);
+    SourceUrlUIPart sourceUrlUIPart = (SourceUrlUIPart) o;
+    return equalsNullable(this.providerMetadata, sourceUrlUIPart.providerMetadata) &&
+        Objects.equals(this.sourceId, sourceUrlUIPart.sourceId) &&
+        equalsNullable(this.title, sourceUrlUIPart.title) &&
+        Objects.equals(this.type, sourceUrlUIPart.type) &&
+        Objects.equals(this.url, sourceUrlUIPart.url);
   }
 
   private static <T> boolean equalsNullable(JsonNullable<T> a, JsonNullable<T> b) {
@@ -153,7 +221,7 @@ public class ReasoningUIPart {
 
   @Override
   public int hashCode() {
-    return Objects.hash(hashCodeNullable(providerMetadata), text, type);
+    return Objects.hash(hashCodeNullable(providerMetadata), sourceId, hashCodeNullable(title), type, url);
   }
 
   private static <T> int hashCodeNullable(JsonNullable<T> a) {
@@ -166,10 +234,12 @@ public class ReasoningUIPart {
   @Override
   public String toString() {
     StringBuilder sb = new StringBuilder();
-    sb.append("class ReasoningUIPart {\n");
+    sb.append("class SourceUrlUIPart {\n");
     sb.append("    providerMetadata: ").append(toIndentedString(providerMetadata)).append("\n");
-    sb.append("    text: ").append(toIndentedString(text)).append("\n");
+    sb.append("    sourceId: ").append(toIndentedString(sourceId)).append("\n");
+    sb.append("    title: ").append(toIndentedString(title)).append("\n");
     sb.append("    type: ").append(toIndentedString(type)).append("\n");
+    sb.append("    url: ").append(toIndentedString(url)).append("\n");
     sb.append("}");
     return sb.toString();
   }
