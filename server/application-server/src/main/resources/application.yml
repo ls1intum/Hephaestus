@@ -1,7 +1,7 @@
 spring:
     application:
         name: Hephaestus
-        version: "0.7.2"
+        version: "0.9.0-rc.5"
 
     datasource:
         url: jdbc:postgresql://localhost:5432/hephaestus
@@ -16,7 +16,6 @@ spring:
         # show-sql: "true"
         properties:
             hibernate:
-                dialect: org.hibernate.dialect.PostgreSQLDialect
                 integrator_provider: de.tum.in.www1.hephaestus.ClassImportIntegratorIntegratorProvider
                 format_sql: "true"
 

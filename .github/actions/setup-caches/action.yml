@@ -1,0 +1,85 @@
+name: 'Setup Advanced Caches'
+description: 'Sets up intelligent caching for CI/CD pipeline optimization'
+inputs:
+  cache-type:
+    description: 'Type of cache to setup'
+    required: true
+  os:
+    description: 'Operating system for cache key'
+    required: false
+    default: 'ubuntu-latest'
+
+runs:
+  using: "composite"
+  steps:
+    # Node.js caching
+    - name: Setup Node.js
+      if: contains(fromJSON('["application-server-quality", "webapp-quality", "webapp-visual", "openapi-validation"]'), inputs.cache-type)
+      uses: actions/setup-node@v4
+      with:
+        node-version: 22
+        cache: "npm"
+
+    - name: Cache Node.js dependencies
+      if: contains(fromJSON('["application-server-quality", "webapp-quality", "webapp-visual", "openapi-validation"]'), inputs.cache-type)
+      uses: actions/cache@v4
+      with:
+        path: |
+          ~/.npm
+          webapp-react/node_modules
+          node_modules
+        key: ${{ inputs.os }}-node-${{ hashFiles('package-lock.json', 'webapp-react/package-lock.json', 'webapp-react/biome.json', 'webapp-react/tsconfig.json', 'webapp-react/vite.config.js', 'webapp-react/components.json') }}-${{ inputs.cache-type }}
+        restore-keys: |
+          ${{ inputs.os }}-node-${{ hashFiles('package-lock.json', 'webapp-react/package-lock.json', 'webapp-react/biome.json', 'webapp-react/tsconfig.json', 'webapp-react/vite.config.js', 'webapp-react/components.json') }}-
+          ${{ inputs.os }}-node-${{ hashFiles('package-lock.json', 'webapp-react/package-lock.json') }}-
+          ${{ inputs.os }}-node-
+
+
+    # Java/Maven caching
+    - name: Set up JDK 21
+      if: contains(fromJSON('["application-server-unit", "application-server-integration", "application-server-architecture", "application-server-quality", "openapi-validation", "database-schema-validation", "database-documentation-validation"]'), inputs.cache-type)
+      uses: actions/setup-java@v4
+      with:
+        distribution: 'temurin'
+        java-version: '21'
+        cache: maven
+
+    - name: Cache Maven dependencies
+      if: contains(fromJSON('["application-server-unit", "application-server-integration", "application-server-architecture", "application-server-quality", "openapi-validation", "database-schema-validation", "database-documentation-validation"]'), inputs.cache-type)
+      uses: actions/cache@v4
+      with:
+        path: |
+          ~/.m2/repository
+          server/application-server/target
+        key: ${{ inputs.os }}-maven-${{ hashFiles('server/application-server/pom.xml') || 'no-pom' }}-${{ inputs.cache-type }}
+        restore-keys: |
+          ${{ inputs.os }}-maven-${{ hashFiles('server/application-server/pom.xml') || 'no-pom' }}-
+          ${{ inputs.os }}-maven-
+
+    # Python/Poetry caching
+    - name: Set up Python 3.13
+      if: contains(fromJSON('["intelligence-service-quality", "webhook-ingest-quality", "openapi-validation", "database-schema-validation", "database-documentation-validation"]'), inputs.cache-type)
+      uses: actions/setup-python@v4
+      with:
+        python-version: 3.13
+        
+    - name: Install Poetry
+      if: contains(fromJSON('["intelligence-service-quality", "webhook-ingest-quality", "openapi-validation", "database-schema-validation", "database-documentation-validation"]'), inputs.cache-type)
+      uses: snok/install-poetry@v1
+      with:
+        version: 2.1.1
+        virtualenvs-create: true
+        virtualenvs-in-project: true
+
+    - name: Cache Poetry dependencies
+      if: contains(fromJSON('["intelligence-service-quality", "webhook-ingest-quality", "openapi-validation", "database-schema-validation", "database-documentation-validation"]'), inputs.cache-type)
+      uses: actions/cache@v4
+      with:
+        path: |
+          ~/.cache/pypoetry
+          server/intelligence-service/.venv
+          server/webhook-ingest/.venv
+        key: ${{ inputs.os }}-poetry-${{ hashFiles('server/intelligence-service/poetry.lock', 'server/webhook-ingest/poetry.lock') || 'no-poetry-lock' }}-${{ inputs.cache-type }}
+        restore-keys: |
+          ${{ inputs.os }}-poetry-${{ hashFiles('server/intelligence-service/poetry.lock', 'server/webhook-ingest/poetry.lock') || 'no-poetry-lock' }}-
+          ${{ inputs.os }}-poetry-

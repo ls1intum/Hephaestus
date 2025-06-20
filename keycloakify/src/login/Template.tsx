@@ -176,7 +176,7 @@ export default function Template(props: TemplateProps<KcContext, I18n>) {
                     <p className="text-balance text-center text-sm leading-loose text-muted-foreground md:text-right flex-1">
                         Built by{" "}
                         <a href="https://github.com/ls1intum" target="_blank" rel="noreferrer" className="font-medium underline underline-offset-4">
-                            LS1 Team
+                            AET Team
                         </a>{" "}
                         at{" "}
                         <a href="https://www.tum.de/en/" target="_blank" rel="noreferrer" className="font-medium underline underline-offset-4">
