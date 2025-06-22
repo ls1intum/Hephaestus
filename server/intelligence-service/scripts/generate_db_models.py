@@ -28,8 +28,8 @@ def generate_db_models(output_file: Path) -> None:
 
     database_url = get_database_url()
 
-    # Prepare sqlacodegen command
-    cmd = ["sqlacodegen", "--generator", "declarative", database_url]
+    # Prepare sqlacodegen command using poetry run to ensure it's in the virtual environment
+    cmd = ["poetry", "run", "sqlacodegen", "--generator", "declarative", database_url]
 
     print(f"🔧 Generating models from database: {database_url}")
 
