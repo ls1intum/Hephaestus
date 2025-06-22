@@ -10,6 +10,7 @@ import de.tum.in.www1.hephaestus.testconfig.WithMentorUser;
 import de.tum.in.www1.hephaestus.gitprovider.user.User;
 import de.tum.in.www1.hephaestus.gitprovider.user.UserRepository;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -112,14 +113,14 @@ public class ChatControllerIT extends BaseIntegrationTest {
             .orElseThrow(() -> new AssertionError("No assistant message found"));
         assertThat(assistantMessage.getRole()).isEqualTo(ChatMessage.Role.ASSISTANT);
         
-        // Verify we have the expected parts: step-start + text (AI SDK expects step-start to be persisted)
+        // Verify we have the expected parts per AI SDK structure: step-start + text
         assertThat(assistantMessage.getParts()).hasSize(2);
         var parts = assistantMessage.getParts();
         
-        // First part should be step-start
+        // First part should be step-start (AI SDK expects these to be persisted)
         assertThat(parts.get(0).getType()).isEqualTo(ChatMessagePart.PartType.STEP_START);
         
-        // Second part should be the combined text
+        // Second part should be the accumulated text content
         assertThat(parts.get(1).getType()).isEqualTo(ChatMessagePart.PartType.TEXT);
         assertThat(parts.get(1).getContent().asText()).isEqualTo("Hello, this is a test!");
 
@@ -798,6 +799,381 @@ public class ChatControllerIT extends BaseIntegrationTest {
             .filter(part -> part.getType() == ChatMessagePart.PartType.TEXT)
             .findFirst().orElseThrow();
         assertThat(textPart.getContent().asText()).isEqualTo("Here's your response with metadata.");
+    }
+
+    @Test
+    @WithMentorUser
+    void testMultipleStepsWithTextResponsePersistence() {
+        // Given: A chat that will have multiple steps (like AI SDK server-side tool roundtrip)
+        var request = createChatRequest();
+        String responseMessageId = UUID.randomUUID().toString();
+        
+        mockResponseHolder.setStreamParts(
+            request.messages().getLast().getId(),
+            List.of(
+                new StreamStartPart().messageId(responseMessageId),
+                // First step with tool call
+                new StreamStepStartPart(),
+                new StreamToolInputAvailablePart()
+                    .toolCallId("tool-call-id")
+                    .toolName("weather")
+                    .input("{\"city\": \"London\"}"),
+                new StreamToolOutputAvailablePart()
+                    .toolCallId("tool-call-id")
+                    .output("{\"weather\": \"sunny\"}"),
+                new StreamStepFinishPart(),
+                // Second step with text response  
+                new StreamStepStartPart(),
+                new StreamTextPart().text("The weather in London is sunny."),
+                new StreamStepFinishPart(),
+                new StreamFinishPart()
+            )
+        );
+
+        // When: The AI responds with multiple steps
+        var response = performChatRequest(request);
+        
+        // Then: Message should have proper structure matching AI SDK expectations
+        StepVerifier.create(response).expectComplete();
+        
+        var assistantMessage = chatMessageRepository.findById(UUID.fromString(responseMessageId)).orElseThrow();
+        var parts = assistantMessage.getParts();
+        
+        // Should have 4 parts: step-start + tool + step-start + text (per AI SDK structure)
+        assertThat(parts).hasSize(4);
+        
+        // First step-start
+        assertThat(parts.get(0).getType()).isEqualTo(ChatMessagePart.PartType.STEP_START);
+        
+        // Tool part with proper AI SDK structure
+        var toolPart = parts.get(1);
+        assertThat(toolPart.getType()).isEqualTo(ChatMessagePart.PartType.TOOL);
+        assertThat(toolPart.getContent().get("toolCallId").asText()).isEqualTo("tool-call-id");
+        assertThat(toolPart.getContent().get("type").asText()).isEqualTo("tool-weather");
+        assertThat(toolPart.getContent().get("state").asText()).isEqualTo("output-available");
+        assertThat(toolPart.getContent().get("input").get("city").asText()).isEqualTo("London");
+        assertThat(toolPart.getContent().get("output").get("weather").asText()).isEqualTo("sunny");
+        
+        // Second step-start
+        assertThat(parts.get(2).getType()).isEqualTo(ChatMessagePart.PartType.STEP_START);
+        
+        // Final text response
+        assertThat(parts.get(3).getType()).isEqualTo(ChatMessagePart.PartType.TEXT);
+        assertThat(parts.get(3).getContent().asText()).isEqualTo("The weather in London is sunny.");
+    }
+
+    @Test
+    @WithMentorUser  
+    void testToolCallErrorHandlingPersistence() {
+        // Given: A tool call that will result in an error
+        var request = createChatRequest();
+        String responseMessageId = UUID.randomUUID().toString();
+        String toolCallId = "error-tool-call";
+        
+        mockResponseHolder.setStreamParts(
+            request.messages().getLast().getId(),
+            List.of(
+                new StreamStartPart().messageId(responseMessageId),
+                new StreamStepStartPart(),
+                new StreamToolInputAvailablePart()
+                    .toolCallId(toolCallId)
+                    .toolName("broken_tool")
+                    .input("{\"query\": \"test\"}"),
+                new StreamToolOutputErrorPart()
+                    .toolCallId(toolCallId)
+                    .errorText("Tool execution failed: Network timeout"),
+                new StreamTextPart().text("I apologize, but I encountered an error while trying to fetch that information."),
+                new StreamStepFinishPart(),
+                new StreamFinishPart()
+            )
+        );
+
+        // When: The AI responds with a tool error
+        var response = performChatRequest(request);
+        
+        // Then: Tool error should be properly persisted with AI SDK structure
+        StepVerifier.create(response).expectComplete();
+        
+        var assistantMessage = chatMessageRepository.findById(UUID.fromString(responseMessageId)).orElseThrow();
+        var parts = assistantMessage.getParts();
+        
+        // Should have 3 parts: step-start + tool-error + text
+        assertThat(parts).hasSize(3);
+        
+        // Tool part should have error state
+        var toolPart = parts.get(1);
+        assertThat(toolPart.getType()).isEqualTo(ChatMessagePart.PartType.TOOL);
+        assertThat(toolPart.getContent().get("state").asText()).isEqualTo("output-error");
+        assertThat(toolPart.getContent().get("errorText").asText()).isEqualTo("Tool execution failed: Network timeout");
+        assertThat(toolPart.getContent().get("output").isNull()).isTrue();
+    }
+
+    @Test
+    @WithMentorUser
+    void testStartAndFinishMetadataMergingPersistence() {
+        // Given: A chat with metadata in both start and finish parts
+        var request = createChatRequest();
+        String responseMessageId = UUID.randomUUID().toString();
+        
+        // Create metadata objects
+        var startMetadata = Map.of(
+            "provider", "openai",
+            "model", "gpt-4",
+            "usage", Map.of("prompt_tokens", 10)
+        );
+        
+        var finishMetadata = Map.of(
+            "usage", Map.of(
+                "prompt_tokens", 10,
+                "completion_tokens", 25,
+                "total_tokens", 35
+            ),
+            "finish_reason", "stop"
+        );
+        
+        mockResponseHolder.setStreamParts(
+            request.messages().getLast().getId(),
+            List.of(
+                new StreamStartPart().messageId(responseMessageId).messageMetadata(startMetadata),
+                new StreamStepStartPart(),
+                new StreamTextPart().text("Here's a response with comprehensive metadata."),
+                new StreamStepFinishPart(),
+                new StreamFinishPart().messageMetadata(finishMetadata)
+            )
+        );
+
+        // When: The AI responds with metadata in start and finish
+        var response = performChatRequest(request);
+        
+        // Then: Metadata should be properly merged per AI SDK expectations
+        StepVerifier.create(response).expectComplete();
+        
+        var assistantMessage = chatMessageRepository.findById(UUID.fromString(responseMessageId)).orElseThrow();
+        
+        // Verify merged metadata
+        var metadata = assistantMessage.getMetadata();
+        assertThat(metadata).isNotNull();
+        assertThat(metadata.get("provider").asText()).isEqualTo("openai");
+        assertThat(metadata.get("model").asText()).isEqualTo("gpt-4");
+        assertThat(metadata.get("finish_reason").asText()).isEqualTo("stop");
+        
+        // Usage should be merged with finish taking precedence
+        var usage = metadata.get("usage");
+        assertThat(usage.get("prompt_tokens").asInt()).isEqualTo(10);
+        assertThat(usage.get("completion_tokens").asInt()).isEqualTo(25);
+        assertThat(usage.get("total_tokens").asInt()).isEqualTo(35);
+    }
+
+    @Test
+    @WithMentorUser
+    void testFilePartPersistence() {
+        // Given: A response that includes file attachments
+        var request = createChatRequest();
+        String responseMessageId = UUID.randomUUID().toString();
+        
+        mockResponseHolder.setStreamParts(
+            request.messages().getLast().getId(),
+            List.of(
+                new StreamStartPart().messageId(responseMessageId),
+                new StreamStepStartPart(),
+                new StreamTextPart().text("Here's the file you requested: "),
+                new StreamFilePart()
+                    .url("https://example.com/document.pdf")
+                    .mediaType("application/pdf"),
+                new StreamTextPart().text(" Please review it carefully."),
+                new StreamStepFinishPart(),
+                new StreamFinishPart()
+            )
+        );
+
+        // When: The AI responds with file parts
+        var response = performChatRequest(request);
+        
+        // Then: File parts should be properly persisted
+        StepVerifier.create(response).expectComplete();
+        
+        var assistantMessage = chatMessageRepository.findById(UUID.fromString(responseMessageId)).orElseThrow();
+        var parts = assistantMessage.getParts();
+        
+        // Should have 4 parts: step-start + text + file + text
+        assertThat(parts).hasSize(4);
+        
+        var filePart = parts.get(2);
+        assertThat(filePart.getType()).isEqualTo(ChatMessagePart.PartType.FILE);
+        assertThat(filePart.getContent().get("url").asText()).isEqualTo("https://example.com/document.pdf");
+        assertThat(filePart.getContent().get("mediaType").asText()).isEqualTo("application/pdf");
+    }
+
+    @Test
+    @WithMentorUser
+    void testDataPartsWithReplacementUpdatesPersistence() {
+        // Given: A response with data parts that have ID-based updates (per AI SDK pattern)
+        var request = createChatRequest();
+        String responseMessageId = UUID.randomUUID().toString();
+        String dataId = "chart-data-1";
+        
+        mockResponseHolder.setStreamParts(
+            request.messages().getLast().getId(),
+            List.of(
+                new StreamStartPart().messageId(responseMessageId),
+                new StreamStepStartPart(),
+                new StreamTextPart().text("Creating your chart: "),
+                // Initial data part
+                new StreamDataPart()
+                    .id(dataId)
+                    .type("data-chart")
+                    .data("{\"type\": \"bar\", \"data\": {\"labels\": [\"A\"], \"values\": [10]}}"),
+                // Updated data part (should replace the previous one)  
+                new StreamDataPart()
+                    .id(dataId)
+                    .type("data-chart")
+                    .data("{\"type\": \"bar\", \"data\": {\"labels\": [\"A\", \"B\"], \"values\": [10, 20]}}"),
+                new StreamTextPart().text(" Chart completed!"),
+                new StreamStepFinishPart(),
+                new StreamFinishPart()
+            )
+        );
+
+        // When: The AI responds with updating data parts
+        var response = performChatRequest(request);
+        
+        // Then: Only the final state of the data part should be persisted
+        StepVerifier.create(response).expectComplete();
+        
+        var assistantMessage = chatMessageRepository.findById(UUID.fromString(responseMessageId)).orElseThrow();
+        var parts = assistantMessage.getParts();
+        
+        // Should have 4 parts: step-start + text + data + text (updated data part should replace original)
+        assertThat(parts).hasSize(4);
+        
+        var dataPart = parts.get(2);
+        assertThat(dataPart.getType()).isEqualTo(ChatMessagePart.PartType.DATA);
+        assertThat(dataPart.getContent().get("id").asText()).isEqualTo(dataId);
+        assertThat(dataPart.getContent().get("type").asText()).isEqualTo("data-chart");
+        
+        // Should have the final updated data
+        var chartData = dataPart.getContent().get("data");
+        assertThat(chartData.get("data").get("labels")).hasSize(2);
+        assertThat(chartData.get("data").get("values").get(0).asInt()).isEqualTo(10);
+        assertThat(chartData.get("data").get("values").get(1).asInt()).isEqualTo(20);
+    }
+
+    @Test
+    @WithMentorUser
+    void testComplexReasoningWorkflowPersistence() {
+        // Given: A complex reasoning workflow (similar to AI SDK reasoning tests)
+        var request = createChatRequest();
+        String responseMessageId = UUID.randomUUID().toString();
+        
+        mockResponseHolder.setStreamParts(
+            request.messages().getLast().getId(),
+            List.of(
+                new StreamStartPart().messageId(responseMessageId),
+                new StreamStepStartPart(),
+                // Reasoning phase
+                new StreamReasoningPart().text("Let me think about this problem step by step. "),
+                new StreamReasoningPart().text("First, I need to understand what you're asking. "),
+                new StreamReasoningPart().text("The question involves multiple components that I should analyze separately. "),
+                new StreamReasoningPart().text("After careful consideration, I can provide a comprehensive answer."),
+                new StreamReasoningFinishPart(),
+                // Response phase with sources
+                new StreamTextPart().text("Based on my analysis, "),
+                new StreamSourceUrlPart()
+                    .url("https://research.example.com/study")
+                    .title("Research Study on the Topic"),
+                new StreamTextPart().text(" and internal documentation "),
+                new StreamSourceDocumentPart()
+                    .sourceId("internal-doc-456")
+                    .title("Internal Knowledge Base"),
+                new StreamTextPart().text(", I can conclude that the answer is complex but achievable."),
+                new StreamStepFinishPart(),
+                new StreamFinishPart()
+            )
+        );
+
+        // When: The AI responds with reasoning and sources
+        var response = performChatRequest(request);
+        
+        // Then: All parts should be properly structured and persisted
+        StepVerifier.create(response).expectComplete();
+        
+        var assistantMessage = chatMessageRepository.findById(UUID.fromString(responseMessageId)).orElseThrow();
+        var parts = assistantMessage.getParts();
+        
+        // Should have 7 parts: step-start + reasoning + text + source-url + text + source-doc + text  
+        assertThat(parts).hasSize(7);
+        
+        // Verify step-start part
+        assertThat(parts.get(0).getType()).isEqualTo(ChatMessagePart.PartType.STEP_START);
+        
+        // Verify reasoning part (accumulated from multiple chunks)
+        var reasoningPart = parts.get(1);
+        assertThat(reasoningPart.getType()).isEqualTo(ChatMessagePart.PartType.REASONING);
+        String expectedReasoning = "Let me think about this problem step by step. " +
+                                 "First, I need to understand what you're asking. " +
+                                 "The question involves multiple components that I should analyze separately. " +
+                                 "After careful consideration, I can provide a comprehensive answer.";
+        assertThat(reasoningPart.getContent().asText()).isEqualTo(expectedReasoning);
+        
+        // Verify first text part
+        assertThat(parts.get(2).getType()).isEqualTo(ChatMessagePart.PartType.TEXT);
+        assertThat(parts.get(2).getContent().asText()).isEqualTo("Based on my analysis, ");
+        
+        // Verify source URL part
+        var sourceUrlPart = parts.get(3);
+        assertThat(sourceUrlPart.getType()).isEqualTo(ChatMessagePart.PartType.SOURCE_URL);
+        assertThat(sourceUrlPart.getContent().get("url").asText()).isEqualTo("https://research.example.com/study");
+        assertThat(sourceUrlPart.getContent().get("title").asText()).isEqualTo("Research Study on the Topic");
+        
+        // Verify second text part  
+        assertThat(parts.get(4).getType()).isEqualTo(ChatMessagePart.PartType.TEXT);
+        assertThat(parts.get(4).getContent().asText()).isEqualTo(" and internal documentation ");
+        
+        // Verify source document part
+        var sourceDocPart = parts.get(5);
+        assertThat(sourceDocPart.getType()).isEqualTo(ChatMessagePart.PartType.SOURCE_DOCUMENT);
+        assertThat(sourceDocPart.getContent().get("sourceId").asText()).isEqualTo("internal-doc-456");
+        assertThat(sourceDocPart.getContent().get("title").asText()).isEqualTo("Internal Knowledge Base");
+        
+        // Verify final text part
+        assertThat(parts.get(6).getType()).isEqualTo(ChatMessagePart.PartType.TEXT);
+        assertThat(parts.get(6).getContent().asText()).isEqualTo(", I can conclude that the answer is complex but achievable.");
+    }
+
+    @Test
+    @WithMentorUser
+    void testStreamErrorRecoveryPersistence() {
+        // Given: A stream that encounters an error mid-way
+        var request = createChatRequest();
+        String responseMessageId = UUID.randomUUID().toString();
+        
+        mockResponseHolder.setStreamParts(
+            request.messages().getLast().getId(),
+            List.of(
+                new StreamStartPart().messageId(responseMessageId),
+                new StreamStepStartPart(),
+                new StreamTextPart().text("I'm processing your request... "),
+                new StreamErrorPart().errorText("Network connection timeout"),
+                new StreamFinishPart()
+            )
+        );
+
+        // When: The AI stream encounters an error
+        var response = performChatRequest(request);
+        
+        // Then: Error should be handled gracefully and persisted
+        StepVerifier.create(response).expectComplete();
+        
+        var assistantMessage = chatMessageRepository.findById(UUID.fromString(responseMessageId)).orElseThrow();
+        var parts = assistantMessage.getParts();
+        
+        // Should have 3 parts: step-start + text + error-text
+        assertThat(parts).hasSize(3);
+        
+        // Verify error is captured as text part
+        var errorPart = parts.get(2);
+        assertThat(errorPart.getType()).isEqualTo(ChatMessagePart.PartType.TEXT);
+        assertThat(errorPart.getContent().asText()).contains("Network connection timeout");
     }
 
     // Helper methods
