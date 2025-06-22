@@ -49,6 +49,9 @@ components:
           - type: object
           - type: 'null'
           title: Metadata
+        user_id:
+          title: User Id
+          type: integer
       required:
       - messages
       title: ChatRequest

@@ -116,8 +116,8 @@ class StreamGenerator:
         """Wrap any sync- or async-generator in a start/finish boundary."""
         yield self.start_step()
         try:
-            kwargs["stream"] = self  # Pass the stream to the generator
-            gen = generator_func(*args, **kwargs)
+            # Pass the stream to the generator along with additional args
+            gen = generator_func(*args, stream=self, **kwargs)
             # If it's an async-generator…
             if inspect.isasyncgen(gen):
                 async for chunk in gen:

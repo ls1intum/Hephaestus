@@ -38,7 +38,8 @@ import org.hibernate.validator.constraints.*;
 @JsonPropertyOrder({
   ChatRequest.JSON_PROPERTY_ID,
   ChatRequest.JSON_PROPERTY_MESSAGES,
-  ChatRequest.JSON_PROPERTY_METADATA
+  ChatRequest.JSON_PROPERTY_METADATA,
+  ChatRequest.JSON_PROPERTY_USER_ID
 })
 @jakarta.annotation.Generated(value = "org.openapitools.codegen.languages.JavaClientCodegen", comments = "Generator version: 7.7.0")
 public class ChatRequest {
@@ -50,6 +51,9 @@ public class ChatRequest {
 
   public static final String JSON_PROPERTY_METADATA = "metadata";
   private JsonNullable<Object> metadata = JsonNullable.<Object>undefined();
+
+  public static final String JSON_PROPERTY_USER_ID = "user_id";
+  private Integer userId;
 
   public ChatRequest() {
   }
@@ -153,6 +157,31 @@ public class ChatRequest {
     this.metadata = JsonNullable.<Object>of(metadata);
   }
 
+  public ChatRequest userId(Integer userId) {
+    
+    this.userId = userId;
+    return this;
+  }
+
+  /**
+   * Get userId
+   * @return userId
+   */
+  @jakarta.annotation.Nullable
+  @JsonProperty(JSON_PROPERTY_USER_ID)
+  @JsonInclude(value = JsonInclude.Include.USE_DEFAULTS)
+
+  public Integer getUserId() {
+    return userId;
+  }
+
+
+  @JsonProperty(JSON_PROPERTY_USER_ID)
+  @JsonInclude(value = JsonInclude.Include.USE_DEFAULTS)
+  public void setUserId(Integer userId) {
+    this.userId = userId;
+  }
+
   @Override
   public boolean equals(Object o) {
     if (this == o) {
@@ -164,7 +193,8 @@ public class ChatRequest {
     ChatRequest chatRequest = (ChatRequest) o;
     return equalsNullable(this.id, chatRequest.id) &&
         Objects.equals(this.messages, chatRequest.messages) &&
-        equalsNullable(this.metadata, chatRequest.metadata);
+        equalsNullable(this.metadata, chatRequest.metadata) &&
+        Objects.equals(this.userId, chatRequest.userId);
   }
 
   private static <T> boolean equalsNullable(JsonNullable<T> a, JsonNullable<T> b) {
@@ -173,7 +203,7 @@ public class ChatRequest {
 
   @Override
   public int hashCode() {
-    return Objects.hash(hashCodeNullable(id), messages, hashCodeNullable(metadata));
+    return Objects.hash(hashCodeNullable(id), messages, hashCodeNullable(metadata), userId);
   }
 
   private static <T> int hashCodeNullable(JsonNullable<T> a) {
@@ -190,6 +220,7 @@ public class ChatRequest {
     sb.append("    id: ").append(toIndentedString(id)).append("\n");
     sb.append("    messages: ").append(toIndentedString(messages)).append("\n");
     sb.append("    metadata: ").append(toIndentedString(metadata)).append("\n");
+    sb.append("    userId: ").append(toIndentedString(userId)).append("\n");
     sb.append("}");
     return sb.toString();
   }

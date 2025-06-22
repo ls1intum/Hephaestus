@@ -19,6 +19,7 @@ class ChatRequest(BaseModel):
     id: Optional[str] = None
     messages: List[UIMessage]
     metadata: Optional[Dict[str, Any]] = None
+    user_id: int = None
 
 
 class ChatResponse(RootModel[StreamPart]):
@@ -48,7 +49,7 @@ class ChatResponse(RootModel[StreamPart]):
 )
 async def handle_chat(request: ChatRequest):
     stream = StreamGenerator()
-    logger.info(f"Processing chat request with message ID: {stream.message_id}")
+    logger.info(f"Processing chat request with message ID: {stream.message_id}, user_id: {request.user_id}")
 
     async def generate():
         try:
@@ -56,7 +57,7 @@ async def handle_chat(request: ChatRequest):
 
             langchain_messages = convert_to_langchain_messages(request.messages)
 
-            async for chunk in stream.run_step(generate_response, langchain_messages):
+            async for chunk in stream.run_step(generate_response, langchain_messages, request.user_id):
                 yield chunk
 
             yield stream.finish_message()

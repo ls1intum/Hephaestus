@@ -76,6 +76,7 @@ public class ChatController {
 
         ChatRequest intelligenceRequest = new ChatRequest();
         intelligenceRequest.setMessages(chatRequest.messages());
+        intelligenceRequest.setUserId(user.getId().intValue());
 
         // Use the enhanced streaming with persistence callbacks
         return intelligenceServiceWebClient.streamChat(intelligenceRequest, processor);
