@@ -373,6 +373,11 @@ jobs:
         run: |
           echo "🔍 Validating SQLAlchemy models match committed migrations..."
 
+          # Install npm dependencies for db scripts
+          if [ ! -d "node_modules" ]; then
+            npm ci --prefer-offline --no-audit
+          fi
+
           # Start PostgreSQL service for model operations
           echo "🐘 Starting PostgreSQL service..."
           docker run -d \
@@ -407,14 +412,6 @@ jobs:
             exit 1
           fi
           cd ../..
-
-          # Run database migrations to get current schema
-          echo "🚀 Running database migrations..."
-          if ! scripts/db-utils.sh migrate; then
-            echo "❌ Failed to run database migrations"
-            docker stop postgres-models && docker rm postgres-models
-            exit 1
-          fi
 
           # Generate SQLAlchemy models for intelligence service
           echo "📊 Generating SQLAlchemy models for intelligence service..."
