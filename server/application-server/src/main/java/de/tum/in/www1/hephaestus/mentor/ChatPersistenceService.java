@@ -2,10 +2,12 @@ package de.tum.in.www1.hephaestus.mentor;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import de.tum.in.www1.hephaestus.gitprovider.user.User;
 import de.tum.in.www1.hephaestus.intelligenceservice.model.*;
 import java.util.List;
 import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.locks.ReentrantLock;
 import org.slf4j.Logger;
@@ -79,6 +81,9 @@ public class ChatPersistenceService {
         // Track the current tool part being processed for input/output combination
         private ChatMessagePart currentToolPart = null;
         private String currentToolCallId = null;
+        
+        // Track data parts by ID for replacement/merge updates
+        private final ConcurrentHashMap<String, ChatMessagePart> dataPartsById = new ConcurrentHashMap<>();
 
         public ChatStreamProcessor(User user, ChatThread thread, ChatMessage parentMessage) {
             this.user = user;
@@ -103,6 +108,25 @@ public class ChatPersistenceService {
                 currentMessage.setThread(thread);
                 currentMessage.setParentMessage(parentMessage);
                 currentMessage.setRole(ChatMessage.Role.ASSISTANT);
+
+                // Handle start message metadata - the AI SDK expects this to be merged
+                if (startPart.getMessageMetadata() != null) {
+                    try {
+                        Object metadata = startPart.getMessageMetadata();
+                        JsonNode metadataNode;
+                        
+                        if (metadata instanceof String metadataStr) {
+                            metadataNode = objectMapper.readTree(metadataStr);
+                        } else {
+                            metadataNode = objectMapper.valueToTree(metadata);
+                        }
+                        
+                        currentMessage.setMetadata(metadataNode);
+                        logger.debug("Set start metadata for messageId={}", currentMessage.getId());
+                    } catch (Exception e) {
+                        logger.error("Failed to process start metadata: {}", e.getMessage(), e);
+                    }
+                }
 
                 // Persist immediately for referential integrity
                 chatMessageRepository.save(currentMessage);
@@ -174,9 +198,12 @@ public class ChatPersistenceService {
                 toolPart.setType(ChatMessagePart.PartType.TOOL);
                 toolPart.setOriginalType("tool-" + toolInput.getToolName()); // Set originalType for getToolName() to work
 
-                // Create content with tool call ID and input
+                // Create content with tool call ID, input, and state following AI SDK format
                 var toolContent = objectMapper.createObjectNode();
                 toolContent.put("toolCallId", toolInput.getToolCallId());
+                toolContent.put("type", "tool-" + toolInput.getToolName());
+                toolContent.put("state", "input-available");
+                toolContent.put("errorText", (String) null);
                 
                 // Handle input - if it's a string, parse it; otherwise use as-is
                 Object input = toolInput.getInput();
@@ -193,10 +220,13 @@ public class ChatPersistenceService {
                     toolContent.set("input", objectMapper.valueToTree(input));
                 }
                 
+                // Initialize output as null
+                toolContent.put("output", (String) null);
+                
                 toolPart.setContent(toolContent);
 
                 chatMessagePartRepository.save(toolPart);
-                logger.debug("Saved tool input part: messageId={}, toolCallId={}", 
+                logger.debug("Saved tool input part: messageId={}, toolCallId={}, state=input-available", 
                     currentMessage.getId(), toolInput.getToolCallId());
                 
                 // Store reference to this tool part for output update
@@ -220,13 +250,16 @@ public class ChatPersistenceService {
 
                 // Update the current tool part with output if it matches the tool call ID
                 if (currentToolPart != null && toolOutput.getToolCallId().equals(currentToolCallId)) {
-                    var existingContent = (com.fasterxml.jackson.databind.node.ObjectNode) currentToolPart.getContent();
+                    var existingContent = (ObjectNode) currentToolPart.getContent();
+                    
+                    // Update state to output-available
+                    existingContent.put("state", "output-available");
                     
                     // Handle output - if it's a string, parse it; otherwise use as-is
                     Object output = toolOutput.getOutput();
                     if (output instanceof String outputStr) {
                         try {
-                            com.fasterxml.jackson.databind.JsonNode outputNode = objectMapper.readTree(outputStr);
+                            JsonNode outputNode = objectMapper.readTree(outputStr);
                             existingContent.set("output", outputNode);
                         } catch (Exception e) {
                             logger.warn("Failed to parse tool output JSON, storing as string: {}", e.getMessage());
@@ -238,7 +271,7 @@ public class ChatPersistenceService {
                     }
                     
                     chatMessagePartRepository.save(currentToolPart);
-                    logger.debug("Updated tool part with output: messageId={}, toolCallId={}", 
+                    logger.debug("Updated tool part with output: messageId={}, toolCallId={}, state=output-available", 
                         currentMessage.getId(), toolOutput.getToolCallId());
                     
                     // Clear the reference since this tool call is complete
@@ -269,12 +302,14 @@ public class ChatPersistenceService {
 
                 // Update the current tool part with error if it matches the tool call ID
                 if (currentToolPart != null && toolCallId.equals(currentToolCallId)) {
-                    var existingContent = (com.fasterxml.jackson.databind.node.ObjectNode) currentToolPart.getContent();
+                    var existingContent = (ObjectNode) currentToolPart.getContent();
                     existingContent.put("errorText", errorText);
                     existingContent.put("state", "output-error");
-                    // Don't add output field when there's an error
+                    // Set output to undefined (null) when there's an error, as per AI SDK
+                    existingContent.put("output", (String) null);
+                    
                     chatMessagePartRepository.save(currentToolPart);
-                    logger.debug("Updated tool part with error: messageId={}, toolCallId={}, error={}", 
+                    logger.debug("Updated tool part with error: messageId={}, toolCallId={}, error={}, state=output-error", 
                         currentMessage.getId(), toolCallId, errorText);
                     
                     // Clear the reference since this tool call is complete (with error)
@@ -298,6 +333,27 @@ public class ChatPersistenceService {
                 if (currentMessage == null) {
                     logger.warn("Received finish without message start");
                     return;
+                }
+
+                // Handle finish metadata - the AI SDK expects this to be merged last
+                if (finishPart.getMessageMetadata() != null) {
+                    try {
+                        Object metadata = finishPart.getMessageMetadata();
+                        JsonNode newMetadataNode;
+                        
+                        if (metadata instanceof String metadataStr) {
+                            newMetadataNode = objectMapper.readTree(metadataStr);
+                        } else {
+                            newMetadataNode = objectMapper.valueToTree(metadata);
+                        }
+                        
+                        // Merge with existing metadata
+                        JsonNode mergedMetadata = mergeMetadata(currentMessage.getMetadata(), newMetadataNode);
+                        currentMessage.setMetadata(mergedMetadata);
+                        logger.debug("Merged finish metadata for messageId={}", currentMessage.getId());
+                    } catch (Exception e) {
+                        logger.error("Failed to process finish metadata: {}", e.getMessage(), e);
+                    }
                 }
 
                 // Flush any remaining accumulated text
@@ -325,14 +381,65 @@ public class ChatPersistenceService {
             }
         }
 
+        /**
+         * Merges two JsonNode objects deeply, following AI SDK metadata merge semantics.
+         * The newMetadata takes precedence over existing metadata for conflicting keys.
+         */
+        private JsonNode mergeMetadata(JsonNode existingMetadata, JsonNode newMetadata) {
+            if (existingMetadata == null) {
+                return newMetadata;
+            }
+            if (newMetadata == null) {
+                return existingMetadata;
+            }
+            
+            if (!existingMetadata.isObject() || !newMetadata.isObject()) {
+                // If either is not an object, new metadata replaces existing
+                return newMetadata;
+            }
+            
+            // Deep merge objects
+            ObjectNode merged = (ObjectNode) existingMetadata.deepCopy();
+            ObjectNode newObjectNode = (ObjectNode) newMetadata;
+            
+            newObjectNode.fieldNames().forEachRemaining(fieldName -> {
+                JsonNode newValue = newObjectNode.get(fieldName);
+                
+                if (merged.has(fieldName) && merged.get(fieldName).isObject() && newValue.isObject()) {
+                    // Recursively merge nested objects
+                    merged.set(fieldName, mergeMetadata(merged.get(fieldName), newValue));
+                } else {
+                    // Replace or add new value
+                    merged.set(fieldName, newValue);
+                }
+            });
+            
+            return merged;
+        }
+
         @Override
         public void onStreamError(StreamErrorPart errorPart) {
             lock.lock();
             try {
-                logger.error("Stream error occurred");
+                logger.error("Stream error occurred: {}", errorPart);
 
                 if (currentMessage != null) {
-                    createMessagePart(ChatMessagePart.PartType.TEXT, errorPart);
+                    // Flush any accumulated text before creating error part
+                    flushAccumulatedText();
+                    
+                    // Create error part directly using specialized approach
+                    ChatMessagePart errorMessagePart = new ChatMessagePart();
+                    ChatMessagePartId partId = new ChatMessagePartId(
+                        currentMessage.getId(),
+                        partOrder.incrementAndGet()
+                    );
+                    errorMessagePart.setId(partId);
+                    errorMessagePart.setMessage(currentMessage);
+                    errorMessagePart.setType(ChatMessagePart.PartType.TEXT);
+                    errorMessagePart.setContent(objectMapper.valueToTree("Error: " + errorPart.toString()));
+
+                    chatMessagePartRepository.save(errorMessagePart);
+                    logger.debug("Saved error part: messageId={}", currentMessage.getId());
                 }
             } catch (Exception e) {
                 logger.error("Failed to process stream error: {}", e.getMessage(), e);
@@ -366,146 +473,52 @@ public class ChatPersistenceService {
             }
         }
 
-        /**
-         * Creates and persists a message part with proper sequencing.
-         */
-        private void createMessagePart(ChatMessagePart.PartType type, Object streamPart) {
-            if (currentMessage == null) return;
-
-            try {
-                ChatMessagePart part = new ChatMessagePart();
-
-                ChatMessagePartId partId = new ChatMessagePartId(currentMessage.getId(), partOrder.incrementAndGet());
-                part.setId(partId);
-
-                part.setMessage(currentMessage);
-                part.setType(type);
-
-                // Handle specific stream part content structure based on type
-                switch (type) {
-                    case TEXT -> {
-                        if (streamPart instanceof StreamTextPart textPart) {
-                            part.setContent(objectMapper.valueToTree(textPart.getText()));
-                        } else {
-                            part.setContent(objectMapper.valueToTree(streamPart));
-                        }
-                    }
-                    case TOOL -> {
-                        // Handle tool parts with input/output structure
-                        if (streamPart instanceof StreamToolInputAvailablePart toolInput) {
-                            var toolContent = objectMapper.createObjectNode();
-                            toolContent.set("input", objectMapper.valueToTree(toolInput.getInput()));
-                            part.setContent(toolContent);
-                        } else if (streamPart instanceof StreamToolOutputAvailablePart toolOutput) {
-                            // Find existing tool part and update with output
-                            var existingToolPart = currentMessage.getParts().stream()
-                                .filter(p -> p.getType() == ChatMessagePart.PartType.TOOL && 
-                                    toolOutput.getToolCallId().equals(p.getContent().get("toolCallId")))
-                                .findFirst();
-                            
-                            if (existingToolPart.isPresent()) {
-                                var existingPart = existingToolPart.get();
-                                var existingContent = existingPart.getContent();
-                                if (existingContent.isObject()) {
-                                    ((com.fasterxml.jackson.databind.node.ObjectNode) existingContent)
-                                        .set("output", objectMapper.valueToTree(toolOutput.getOutput()));
-                                    chatMessagePartRepository.save(existingPart);
-                                    return; // Don't create a new part, just update existing
-                                }
-                            }
-                        }
-                        // Default tool handling for other tool parts
-                        var toolContent = objectMapper.createObjectNode();
-                        if (streamPart instanceof StreamToolInputAvailablePart toolInput) {
-                            toolContent.put("toolName", toolInput.getToolName());
-                            toolContent.put("toolCallId", toolInput.getToolCallId());
-                            toolContent.set("input", objectMapper.valueToTree(toolInput.getInput()));
-                        } else if (streamPart instanceof StreamToolOutputAvailablePart toolOutput) {
-                            toolContent.put("toolCallId", toolOutput.getToolCallId());
-                            toolContent.set("output", objectMapper.valueToTree(toolOutput.getOutput()));
-                        }
-                        part.setContent(toolContent);
-                    }
-                    case SOURCE_URL -> {
-                        if (streamPart instanceof StreamSourceUrlPart sourceUrl) {
-                            var sourceContent = objectMapper.createObjectNode();
-                            sourceContent.put("url", sourceUrl.getUrl());
-                            sourceContent.put("title", sourceUrl.getTitle());
-                            part.setContent(sourceContent);
-                        }
-                    }
-                    case SOURCE_DOCUMENT -> {
-                        if (streamPart instanceof StreamSourceDocumentPart sourceDoc) {
-                            var sourceContent = objectMapper.createObjectNode();
-                            sourceContent.put("sourceId", sourceDoc.getSourceId());
-                            sourceContent.put("title", sourceDoc.getTitle());
-                            part.setContent(sourceContent);
-                        }
-                    }
-                    case FILE -> {
-                        if (streamPart instanceof StreamFilePart filePart) {
-                            var fileContent = objectMapper.createObjectNode();
-                            fileContent.put("url", filePart.getUrl());
-                            fileContent.put("mediaType", filePart.getMediaType());
-                            part.setContent(fileContent);
-                        }
-                    }
-                    case DATA -> {
-                        if (streamPart instanceof StreamDataPart dataPart) {
-                            part.setOriginalType(dataPart.getType()); // Set originalType for data parts
-                            var dataContent = objectMapper.createObjectNode();
-                            dataContent.put("type", dataPart.getType());
-                            
-                            // Handle data - if it's a string, parse it; otherwise use as-is
-                            Object data = dataPart.getData();
-                            if (data instanceof String dataStr) {
-                                try {
-                                    com.fasterxml.jackson.databind.JsonNode dataNode = objectMapper.readTree(dataStr);
-                                    dataContent.set("data", dataNode);
-                                } catch (Exception e) {
-                                    logger.warn("Failed to parse data JSON, storing as string: {}", e.getMessage());
-                                    dataContent.put("data", dataStr);
-                                }
-                            } else {
-                                // Data is already an object, convert to JsonNode
-                                dataContent.set("data", objectMapper.valueToTree(data));
-                            }
-                            
-                            part.setContent(dataContent);
-                        }
-                    }
-                    default -> part.setContent(objectMapper.valueToTree(streamPart));
-                }
-
-                // Ensure the message is properly attached and persisted
-                chatMessageRepository.save(currentMessage);
-                chatMessagePartRepository.save(part);
-                // Don't add to the collection here since we're using lazy loading
-                // The parts will be loaded when needed from the database
-                
-                logger.debug("Saved message part: type={}, messageId={}, partId={}", 
-                    type, currentMessage.getId(), part.getId());
-            } catch (Exception e) {
-                logger.error("Failed to create message part: {}", e.getMessage(), e);
-                throw new RuntimeException("Message part persistence failed", e);
-            }
-        }
-
         // Implement remaining StreamPartProcessor methods...
         @Override
         public void onStepStart(StreamStepStartPart stepStart) {
-            // Flush any accumulated text at step boundaries to maintain proper ordering
-            flushAccumulatedText();
-            // Step start/finish are flow control markers, not persisted as parts
-            logger.debug("Step started for message: {}", currentMessage != null ? currentMessage.getId() : "null");
+            lock.lock();
+            try {
+                // Flush any accumulated text at step boundaries to maintain proper ordering
+                flushAccumulatedText();
+                
+                if (currentMessage == null) {
+                    logger.warn("Received step start without message start");
+                    return;
+                }
+                
+                // Step start parts should be persisted as actual parts according to AI SDK
+                ChatMessagePart stepPart = new ChatMessagePart();
+                ChatMessagePartId partId = new ChatMessagePartId(
+                    currentMessage.getId(),
+                    partOrder.incrementAndGet()
+                );
+                stepPart.setId(partId);
+                stepPart.setMessage(currentMessage);
+                stepPart.setType(ChatMessagePart.PartType.STEP_START);
+                stepPart.setContent(objectMapper.createObjectNode()); // Empty content for step-start
+
+                chatMessagePartRepository.save(stepPart);
+                logger.debug("Saved step-start part: messageId={}", currentMessage.getId());
+            } catch (Exception e) {
+                logger.error("Failed to process step start: {}", e.getMessage(), e);
+            } finally {
+                lock.unlock();
+            }
         }
 
         @Override
         public void onStepFinish(StreamStepFinishPart stepFinish) {
-            // Flush any accumulated text at step boundaries to maintain proper ordering
-            flushAccumulatedText();
-            // Step start/finish are flow control markers, not persisted as parts
-            logger.debug("Step finished for message: {}", currentMessage != null ? currentMessage.getId() : "null");
+            lock.lock();
+            try {
+                // Flush any accumulated text at step boundaries to maintain proper ordering
+                flushAccumulatedText();
+                // Step finish parts are flow control markers, not persisted as parts in AI SDK
+                logger.debug("Step finished for message: {}", currentMessage != null ? currentMessage.getId() : "null");
+            } catch (Exception e) {
+                logger.error("Failed to process step finish: {}", e.getMessage(), e);
+            } finally {
+                lock.unlock();
+            }
         }
 
         @Override
@@ -567,54 +580,236 @@ public class ChatPersistenceService {
 
         @Override
         public void onSourceUrl(StreamSourceUrlPart sourceUrl) {
-            // Flush any accumulated text before creating source part to maintain proper ordering
-            flushAccumulatedText();
-            createMessagePart(ChatMessagePart.PartType.SOURCE_URL, sourceUrl);
+            lock.lock();
+            try {
+                // Flush any accumulated text before creating source part to maintain proper ordering
+                flushAccumulatedText();
+                
+                if (currentMessage == null) {
+                    logger.warn("Received source URL part without message start");
+                    return;
+                }
+
+                ChatMessagePart sourcePart = new ChatMessagePart();
+                ChatMessagePartId partId = new ChatMessagePartId(
+                    currentMessage.getId(),
+                    partOrder.incrementAndGet()
+                );
+                sourcePart.setId(partId);
+                sourcePart.setMessage(currentMessage);
+                sourcePart.setType(ChatMessagePart.PartType.SOURCE_URL);
+                
+                var sourceContent = objectMapper.createObjectNode();
+                sourceContent.put("url", sourceUrl.getUrl());
+                sourceContent.put("title", sourceUrl.getTitle());
+                sourcePart.setContent(sourceContent);
+
+                chatMessagePartRepository.save(sourcePart);
+                logger.debug("Saved source URL part: messageId={}, url={}", 
+                    currentMessage.getId(), sourceUrl.getUrl());
+            } catch (Exception e) {
+                logger.error("Failed to process source URL part: {}", e.getMessage(), e);
+            } finally {
+                lock.unlock();
+            }
         }
 
         @Override
         public void onSourceDocument(StreamSourceDocumentPart sourceDocument) {
-            // Flush any accumulated text before creating source part to maintain proper ordering
-            flushAccumulatedText();
-            createMessagePart(ChatMessagePart.PartType.SOURCE_DOCUMENT, sourceDocument);
+            lock.lock();
+            try {
+                // Flush any accumulated text before creating source part to maintain proper ordering
+                flushAccumulatedText();
+                
+                if (currentMessage == null) {
+                    logger.warn("Received source document part without message start");
+                    return;
+                }
+
+                ChatMessagePart sourcePart = new ChatMessagePart();
+                ChatMessagePartId partId = new ChatMessagePartId(
+                    currentMessage.getId(),
+                    partOrder.incrementAndGet()
+                );
+                sourcePart.setId(partId);
+                sourcePart.setMessage(currentMessage);
+                sourcePart.setType(ChatMessagePart.PartType.SOURCE_DOCUMENT);
+                
+                var sourceContent = objectMapper.createObjectNode();
+                sourceContent.put("sourceId", sourceDocument.getSourceId());
+                sourceContent.put("title", sourceDocument.getTitle());
+                sourcePart.setContent(sourceContent);
+
+                chatMessagePartRepository.save(sourcePart);
+                logger.debug("Saved source document part: messageId={}, sourceId={}", 
+                    currentMessage.getId(), sourceDocument.getSourceId());
+            } catch (Exception e) {
+                logger.error("Failed to process source document part: {}", e.getMessage(), e);
+            } finally {
+                lock.unlock();
+            }
         }
 
         @Override
         public void onFile(StreamFilePart filePart) {
-            // Flush any accumulated text before creating file part to maintain proper ordering
-            flushAccumulatedText();
-            createMessagePart(ChatMessagePart.PartType.FILE, filePart);
+            lock.lock();
+            try {
+                // Flush any accumulated text before creating file part to maintain proper ordering
+                flushAccumulatedText();
+                
+                if (currentMessage == null) {
+                    logger.warn("Received file part without message start");
+                    return;
+                }
+
+                ChatMessagePart fileMessagePart = new ChatMessagePart();
+                ChatMessagePartId partId = new ChatMessagePartId(
+                    currentMessage.getId(),
+                    partOrder.incrementAndGet()
+                );
+                fileMessagePart.setId(partId);
+                fileMessagePart.setMessage(currentMessage);
+                fileMessagePart.setType(ChatMessagePart.PartType.FILE);
+                
+                var fileContent = objectMapper.createObjectNode();
+                fileContent.put("url", filePart.getUrl());
+                fileContent.put("mediaType", filePart.getMediaType());
+                fileMessagePart.setContent(fileContent);
+
+                chatMessagePartRepository.save(fileMessagePart);
+                logger.debug("Saved file part: messageId={}, url={}, mediaType={}", 
+                    currentMessage.getId(), filePart.getUrl(), filePart.getMediaType());
+            } catch (Exception e) {
+                logger.error("Failed to process file part: {}", e.getMessage(), e);
+            } finally {
+                lock.unlock();
+            }
         }
 
         @Override
         public void onDataPart(StreamDataPart dataPart) {
-            // Flush any accumulated text before creating data part to maintain proper ordering
-            flushAccumulatedText();
-            createMessagePart(ChatMessagePart.PartType.DATA, dataPart);
+            lock.lock();
+            try {
+                // Flush any accumulated text before creating data part to maintain proper ordering
+                flushAccumulatedText();
+                
+                if (currentMessage == null) {
+                    logger.warn("Received data part without message start");
+                    return;
+                }
+
+                // Check if this data part has an ID for replacement/merge updates
+                String dataId = dataPart.getId();
+                if (dataId != null && dataPartsById.containsKey(dataId)) {
+                    // Update existing data part
+                    ChatMessagePart existingPart = dataPartsById.get(dataId);
+                    updateDataPartContent(existingPart, dataPart);
+                    chatMessagePartRepository.save(existingPart);
+                    logger.debug("Updated existing data part: messageId={}, dataId={}, type={}", 
+                        currentMessage.getId(), dataId, dataPart.getType());
+                } else {
+                    // Create new data part
+                    ChatMessagePart newDataPart = createDataPart(dataPart);
+                    chatMessagePartRepository.save(newDataPart);
+                    
+                    // Track by ID if provided
+                    if (dataId != null) {
+                        dataPartsById.put(dataId, newDataPart);
+                    }
+                    
+                    logger.debug("Created new data part: messageId={}, dataId={}, type={}", 
+                        currentMessage.getId(), dataId, dataPart.getType());
+                }
+            } catch (Exception e) {
+                logger.error("Failed to process data part: {}", e.getMessage(), e);
+            } finally {
+                lock.unlock();
+            }
+        }
+
+        /**
+         * Creates a new data part from a StreamDataPart
+         */
+        private ChatMessagePart createDataPart(StreamDataPart dataPart) {
+            ChatMessagePart part = new ChatMessagePart();
+            ChatMessagePartId partId = new ChatMessagePartId(
+                currentMessage.getId(),
+                partOrder.incrementAndGet()
+            );
+            part.setId(partId);
+            part.setMessage(currentMessage);
+            part.setType(ChatMessagePart.PartType.DATA);
+            part.setOriginalType(dataPart.getType()); // Set originalType for data parts
+            
+            updateDataPartContent(part, dataPart);
+            return part;
+        }
+
+        /**
+         * Updates the content of a data part, handling both replacement and merge scenarios
+         */
+        private void updateDataPartContent(ChatMessagePart part, StreamDataPart dataPart) {
+            var dataContent = objectMapper.createObjectNode();
+            dataContent.put("type", dataPart.getType());
+            
+            // Add ID if present
+            if (dataPart.getId() != null) {
+                dataContent.put("id", dataPart.getId());
+            }
+            
+            // Handle data - if it's a string, try to parse it as JSON first, otherwise store as string
+            Object data = dataPart.getData();
+            if (data instanceof String dataStr) {
+                if (dataStr.trim().startsWith("{") || dataStr.trim().startsWith("[")) {
+                    try {
+                        JsonNode dataNode = objectMapper.readTree(dataStr);
+                        dataContent.set("data", dataNode);
+                    } catch (Exception e) {
+                        logger.warn("Failed to parse data JSON, storing as string: {}", e.getMessage());
+                        dataContent.put("data", dataStr);
+                    }
+                } else {
+                    // Not JSON, store as string directly
+                    dataContent.put("data", dataStr);
+                }
+            } else {
+                // Data is already an object, convert to JsonNode
+                dataContent.set("data", objectMapper.valueToTree(data));
+            }
+            
+            part.setContent(dataContent);
         }
 
         @Override
         public void onMessageMetadata(StreamMessageMetadataPart messageMetadata) {
-            // Handle message metadata
-            if (currentMessage != null) {
-                try {
-                    Object metadata = messageMetadata.getMessageMetadata();
-                    com.fasterxml.jackson.databind.JsonNode metadataNode;
-                    
-                    if (metadata instanceof String metadataStr) {
-                        // Parse JSON string into JsonNode
-                        metadataNode = objectMapper.readTree(metadataStr);
-                    } else {
-                        // Convert object to JsonNode
-                        metadataNode = objectMapper.valueToTree(metadata);
-                    }
-                    
-                    currentMessage.setMetadata(metadataNode);
-                    chatMessageRepository.save(currentMessage);
-                    logger.debug("Updated message metadata for messageId={}", currentMessage.getId());
-                } catch (Exception e) {
-                    logger.error("Failed to process message metadata: {}", e.getMessage(), e);
+            lock.lock();
+            try {
+                if (currentMessage == null) {
+                    logger.warn("Received message metadata without message start");
+                    return;
                 }
+                
+                // Handle message metadata - this should be merged with existing metadata
+                Object metadata = messageMetadata.getMessageMetadata();
+                JsonNode newMetadataNode;
+                
+                if (metadata instanceof String metadataStr) {
+                    // Parse JSON string into JsonNode
+                    newMetadataNode = objectMapper.readTree(metadataStr);
+                } else {
+                    // Convert object to JsonNode
+                    newMetadataNode = objectMapper.valueToTree(metadata);
+                }
+                
+                // Merge with existing metadata
+                JsonNode mergedMetadata = mergeMetadata(currentMessage.getMetadata(), newMetadataNode);
+                currentMessage.setMetadata(mergedMetadata);
+                chatMessageRepository.save(currentMessage);
+                logger.debug("Merged message metadata for messageId={}", currentMessage.getId());
+            } catch (Exception e) {
+                logger.error("Failed to process message metadata: {}", e.getMessage(), e);
+            } finally {
+                lock.unlock();
             }
         }
 

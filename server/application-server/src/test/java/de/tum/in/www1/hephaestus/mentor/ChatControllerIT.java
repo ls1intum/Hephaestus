@@ -111,10 +111,17 @@ public class ChatControllerIT extends BaseIntegrationTest {
             .findById(UUID.fromString(responseMessageId))
             .orElseThrow(() -> new AssertionError("No assistant message found"));
         assertThat(assistantMessage.getRole()).isEqualTo(ChatMessage.Role.ASSISTANT);
-        assertThat(assistantMessage.getParts()).hasSize(1); // Text chunks should be combined into one part
-        ChatMessagePart assistantPart = assistantMessage.getParts().get(0);
-        assertThat(assistantPart.getType()).isEqualTo(ChatMessagePart.PartType.TEXT);
-        assertThat(assistantPart.getContent().asText()).isEqualTo("Hello, this is a test!");
+        
+        // Verify we have the expected parts: step-start + text (AI SDK expects step-start to be persisted)
+        assertThat(assistantMessage.getParts()).hasSize(2);
+        var parts = assistantMessage.getParts();
+        
+        // First part should be step-start
+        assertThat(parts.get(0).getType()).isEqualTo(ChatMessagePart.PartType.STEP_START);
+        
+        // Second part should be the combined text
+        assertThat(parts.get(1).getType()).isEqualTo(ChatMessagePart.PartType.TEXT);
+        assertThat(parts.get(1).getContent().asText()).isEqualTo("Hello, this is a test!");
 
         // Relationships should be established
         assertThat(assistantMessage.getThread()).isEqualTo(thread);
@@ -188,8 +195,10 @@ public class ChatControllerIT extends BaseIntegrationTest {
         var newAssistantMessage = chatMessageRepository.findById(UUID.fromString(responseMessageId)).orElseThrow();
         assertThat(newAssistantMessage.getThread()).isEqualTo(refreshedThread);
         assertThat(newAssistantMessage.getParentMessage().getId()).isEqualTo(newUserMessage.getId());
-        assertThat(newAssistantMessage.getParts()).hasSize(1);
-        assertThat(newAssistantMessage.getParts().get(0).getContent().asText())
+        assertThat(newAssistantMessage.getParts()).hasSize(2); // step-start + text
+        assertThat(newAssistantMessage.getParts().get(0).getType()).isEqualTo(ChatMessagePart.PartType.STEP_START);
+        assertThat(newAssistantMessage.getParts().get(1).getType()).isEqualTo(ChatMessagePart.PartType.TEXT);
+        assertThat(newAssistantMessage.getParts().get(1).getContent().asText())
             .isEqualTo("Thank you for the follow-up. This builds on our previous conversation. Now, 1+2 is 3.");
 
         assertThat(refreshedThread.getSelectedLeafMessage()).isEqualTo(newAssistantMessage);
@@ -227,16 +236,20 @@ public class ChatControllerIT extends BaseIntegrationTest {
         var assistantMessage = chatMessageRepository.findById(UUID.fromString(responseMessageId)).orElseThrow();
         var parts = assistantMessage.getParts();
         
-        // Verify message has exactly 2 parts (reasoning + text)
-        assertThat(parts).hasSize(2);
+        // Verify message has exactly 3 parts (step-start + reasoning + text)
+        assertThat(parts).hasSize(3);
+        
+        // Verify step-start part
+        assertThat(parts.get(0).getType()).isEqualTo(ChatMessagePart.PartType.STEP_START);
+        
         // Verify reasoning part
-        assertThat(parts.get(0).getType()).isEqualTo(ChatMessagePart.PartType.REASONING);
-        assertThat(parts.get(0).getContent().asText())
+        assertThat(parts.get(1).getType()).isEqualTo(ChatMessagePart.PartType.REASONING);
+        assertThat(parts.get(1).getContent().asText())
             .isEqualTo("Let me think about this step by step. First, I need to analyze the problem. Then I'll provide a solution.");
         
         // Verify text part
-        assertThat(parts.get(1).getType()).isEqualTo(ChatMessagePart.PartType.TEXT);
-        assertThat(parts.get(1).getContent().asText()).isEqualTo("Based on my analysis, here's the answer.");
+        assertThat(parts.get(2).getType()).isEqualTo(ChatMessagePart.PartType.TEXT);
+        assertThat(parts.get(2).getContent().asText()).isEqualTo("Based on my analysis, here's the answer.");
     }
 
     @Test
@@ -306,25 +319,34 @@ public class ChatControllerIT extends BaseIntegrationTest {
         
         var assistantMessage = chatMessageRepository.findById(UUID.fromString(responseMessageId)).orElseThrow();
         
-        // Verify message has exactly 3 parts (initial text, tool call+result, final text)
-        assertThat(assistantMessage.getParts()).hasSize(3);
+        // Verify message has exactly 4 parts (step-start, initial text, tool call+result, final text)
+        assertThat(assistantMessage.getParts()).hasSize(4);
         
         // Verify parts are in correct order
         var parts = assistantMessage.getParts();
         
-        // First part: Initial text
-        assertThat(parts.get(0).getType()).isEqualTo(ChatMessagePart.PartType.TEXT);
-        assertThat(parts.get(0).getContent().asText())
+        // First part: Step start
+        assertThat(parts.get(0).getType()).isEqualTo(ChatMessagePart.PartType.STEP_START);
+        
+        // Second part: Initial text
+        assertThat(parts.get(1).getType()).isEqualTo(ChatMessagePart.PartType.TEXT);
+        assertThat(parts.get(1).getContent().asText())
             .isEqualTo("Let me check the current weather for your location in Munich.");
         
-        // Second part: Tool call
-        var toolCallPart = parts.get(1);
+        // Third part: Tool call with AI SDK-compatible structure
+        var toolCallPart = parts.get(2);
         assertThat(toolCallPart.getType()).isEqualTo(ChatMessagePart.PartType.TOOL);
         assertThat(toolCallPart.getToolName()).isEqualTo("get_weather");
         assertThat(toolCallPart.getToolCallId()).isEqualTo(toolCallId);
 
-        // Verify tool input is stored
+        // Verify tool part content matches AI SDK format
         var toolCallContent = toolCallPart.getContent();
+        assertThat(toolCallContent.get("toolCallId").asText()).isEqualTo(toolCallId);
+        assertThat(toolCallContent.get("type").asText()).isEqualTo("tool-get_weather");
+        assertThat(toolCallContent.get("state").asText()).isEqualTo("output-available");
+        assertThat(toolCallContent.get("errorText").isNull()).isTrue();
+
+        // Verify tool input is stored
         assertThat(toolCallContent.has("input")).isTrue();
         var toolInput = toolCallContent.get("input");
         assertThat(toolInput.has("latitude")).isTrue();
@@ -341,9 +363,9 @@ public class ChatControllerIT extends BaseIntegrationTest {
         assertThat(toolOutput.get("current").get("humidity").asInt()).isEqualTo(35);
         assertThat(toolOutput.get("daily").get("temperature_max").asDouble()).isEqualTo(28.0);
         
-        // Third part: Final text response
-        assertThat(parts.get(2).getType()).isEqualTo(ChatMessagePart.PartType.TEXT);
-        assertThat(parts.get(2).getContent().asText())
+        // Fourth part: Final text response
+        assertThat(parts.get(3).getType()).isEqualTo(ChatMessagePart.PartType.TEXT);
+        assertThat(parts.get(3).getContent().asText())
             .isEqualTo("The current weather in Munich is sunny with a temperature of 26.8°C, feeling like 25.5°C.");
     }
 
@@ -376,31 +398,34 @@ public class ChatControllerIT extends BaseIntegrationTest {
         StepVerifier.create(response).expectComplete();
         
         var assistantMessage = chatMessageRepository.findById(UUID.fromString(responseMessageId)).orElseThrow();
-        assertThat(assistantMessage.getParts()).hasSize(5); // 3 text parts + 2 source parts
+        assertThat(assistantMessage.getParts()).hasSize(6); // step-start + 3 text parts + 2 source parts
         
         var parts = assistantMessage.getParts();
 
-        // Verify part: 0 - text
-        assertThat(parts.get(0).getType()).isEqualTo(ChatMessagePart.PartType.TEXT);
-        assertThat(parts.get(0).getContent().asText()).isEqualTo("According to recent research, ");
+        // Verify part: 0 - step-start
+        assertThat(parts.get(0).getType()).isEqualTo(ChatMessagePart.PartType.STEP_START);
 
-        // Verify part: 1 - source URL
-        assertThat(parts.get(1).getType()).isEqualTo(ChatMessagePart.PartType.SOURCE_URL);
-        assertThat(parts.get(1).getContent().get("url").asText()).isEqualTo("https://example.com/research");
-        assertThat(parts.get(1).getContent().get("title").asText()).isEqualTo("Research Paper");
+        // Verify part: 1 - text
+        assertThat(parts.get(1).getType()).isEqualTo(ChatMessagePart.PartType.TEXT);
+        assertThat(parts.get(1).getContent().asText()).isEqualTo("According to recent research, ");
 
-        // Verify part: 2 - text
-        assertThat(parts.get(2).getType()).isEqualTo(ChatMessagePart.PartType.TEXT);
-        assertThat(parts.get(2).getContent().asText()).isEqualTo("the findings show that ");
+        // Verify part: 2 - source URL
+        assertThat(parts.get(2).getType()).isEqualTo(ChatMessagePart.PartType.SOURCE_URL);
+        assertThat(parts.get(2).getContent().get("url").asText()).isEqualTo("https://example.com/research");
+        assertThat(parts.get(2).getContent().get("title").asText()).isEqualTo("Research Paper");
 
-        // Verify part: 3 - source document
-        assertThat(parts.get(3).getType()).isEqualTo(ChatMessagePart.PartType.SOURCE_DOCUMENT);
-        assertThat(parts.get(3).getContent().get("sourceId").asText()).isEqualTo("doc-123");
-        assertThat(parts.get(3).getContent().get("title").asText()).isEqualTo("Internal Document");
+        // Verify part: 3 - text
+        assertThat(parts.get(3).getType()).isEqualTo(ChatMessagePart.PartType.TEXT);
+        assertThat(parts.get(3).getContent().asText()).isEqualTo("the findings show that ");
 
-        // Verify part: 4 - text
-        assertThat(parts.get(4).getType()).isEqualTo(ChatMessagePart.PartType.TEXT);
-        assertThat(parts.get(4).getContent().asText()).isEqualTo("we can conclude the following.");
+        // Verify part: 4 - source document
+        assertThat(parts.get(4).getType()).isEqualTo(ChatMessagePart.PartType.SOURCE_DOCUMENT);
+        assertThat(parts.get(4).getContent().get("sourceId").asText()).isEqualTo("doc-123");
+        assertThat(parts.get(4).getContent().get("title").asText()).isEqualTo("Internal Document");
+
+        // Verify part: 5 - text
+        assertThat(parts.get(5).getType()).isEqualTo(ChatMessagePart.PartType.TEXT);
+        assertThat(parts.get(5).getContent().asText()).isEqualTo("we can conclude the following.");
     }
 
     @Test
@@ -431,68 +456,86 @@ public class ChatControllerIT extends BaseIntegrationTest {
         StepVerifier.create(response).expectComplete();
         
         var assistantMessage = chatMessageRepository.findById(UUID.fromString(responseMessageId)).orElseThrow();
-        assertThat(assistantMessage.getParts()).hasSize(3);
+        assertThat(assistantMessage.getParts()).hasSize(4); // step-start + text + file + text
         
-        // Verify part: 0 - text
-        assertThat(assistantMessage.getParts().get(0).getType()).isEqualTo(ChatMessagePart.PartType.TEXT);
-        assertThat(assistantMessage.getParts().get(0).getContent().asText())
+        var parts = assistantMessage.getParts();
+        
+        // Verify part: 0 - step-start
+        assertThat(parts.get(0).getType()).isEqualTo(ChatMessagePart.PartType.STEP_START);
+
+        // Verify part: 1 - text
+        assertThat(parts.get(1).getType()).isEqualTo(ChatMessagePart.PartType.TEXT);
+        assertThat(parts.get(1).getContent().asText())
             .isEqualTo("I've created a file for you:");
 
-        // Verify part: 1 - file 
-        assertThat(assistantMessage.getParts().get(1).getType()).isEqualTo(ChatMessagePart.PartType.FILE);
-        assertThat(assistantMessage.getParts().get(1).getContent().get("url").asText()).isEqualTo(fileUrl);
-        assertThat(assistantMessage.getParts().get(1).getContent().get("mediaType").asText()).isEqualTo("text/plain");
+        // Verify part: 2 - file 
+        assertThat(parts.get(2).getType()).isEqualTo(ChatMessagePart.PartType.FILE);
+        assertThat(parts.get(2).getContent().get("url").asText()).isEqualTo(fileUrl);
+        assertThat(parts.get(2).getContent().get("mediaType").asText()).isEqualTo("text/plain");
     
-        // Verify part: 2 - text
-        assertThat(assistantMessage.getParts().get(2).getType()).isEqualTo(ChatMessagePart.PartType.TEXT);
-        assertThat(assistantMessage.getParts().get(2).getContent().asText())
+        // Verify part: 3 - text
+        assertThat(parts.get(3).getType()).isEqualTo(ChatMessagePart.PartType.TEXT);
+        assertThat(parts.get(3).getContent().asText())
             .isEqualTo("Please review the contents.");
     }
 
     @Test
     @WithMentorUser
-    void testDataPersistence() {
-        // Given: A chat where the AI generates a data part
+    void testDataPartWithIdReplacementUpdate() {
+        // Given: A chat where the AI generates a data part with ID that gets replaced
         var request = createChatRequest();
         String responseMessageId = UUID.randomUUID().toString();
+        String dataId = "chart-123";
         
         mockResponseHolder.setStreamParts(
             request.messages().getLast().getId(),
             List.of(
                 new StreamStartPart().messageId(responseMessageId),
                 new StreamStepStartPart(),
-                new StreamTextPart().text("Here's the analysis data:"),
-                new StreamDataPart().type("data-chart").data("{\"type\": \"bar\", \"values\": [1,2,3]}"),
-                new StreamTextPart().text("The chart shows the trends."),
+                new StreamTextPart().text("Generating chart:"),
+                new StreamDataPart().type("data-chart").id(dataId).data("{\"type\": \"bar\", \"values\": [1,2,3]}"),
+                new StreamDataPart().type("data-chart").id(dataId).data("{\"type\": \"line\", \"values\": [4,5,6]}"), // Replacement
+                new StreamTextPart().text("Chart completed."),
                 new StreamStepFinishPart(),
                 new StreamFinishPart()
             )
         );
 
-        // When: The data part is included in the response stream
+        // When: AI generates data part with same ID (replacement pattern)
         var response = performChatRequest(request);
         
-        // Then: The data part is persisted correctly
+        // Then: The data part is replaced, not duplicated
         StepVerifier.create(response).expectComplete();
         
         var assistantMessage = chatMessageRepository.findById(UUID.fromString(responseMessageId)).orElseThrow();
-        assertThat(assistantMessage.getParts()).hasSize(3);
+        assertThat(assistantMessage.getParts()).hasSize(4); // step-start + text + data (replaced) + text
         
-        // Verify part: 0 - text
-        assertThat(assistantMessage.getParts().get(0).getType()).isEqualTo(ChatMessagePart.PartType.TEXT);
-        assertThat(assistantMessage.getParts().get(0).getContent().asText())
-            .isEqualTo("Here's the analysis data:");
+        var parts = assistantMessage.getParts();
+        
+        // Verify part: 0 - step-start
+        assertThat(parts.get(0).getType()).isEqualTo(ChatMessagePart.PartType.STEP_START);
 
-        // Verify part: 1 - data
-        assertThat(assistantMessage.getParts().get(1).getType()).isEqualTo(ChatMessagePart.PartType.DATA);
-        assertThat(assistantMessage.getParts().get(1).getContent().get("type").asText()).isEqualTo("data-chart");
-        assertThat(assistantMessage.getParts().get(1).getContent().get("data").asText())
-            .isEqualTo("{\"type\": \"bar\", \"values\": [1,2,3]}");
+        // Verify part: 1 - text
+        assertThat(parts.get(1).getType()).isEqualTo(ChatMessagePart.PartType.TEXT);
+        assertThat(parts.get(1).getContent().asText()).isEqualTo("Generating chart:");
 
-        // Verify part: 2 - text
-        assertThat(assistantMessage.getParts().get(2).getType()).isEqualTo(ChatMessagePart.PartType.TEXT);
-        assertThat(assistantMessage.getParts().get(2).getContent().asText())
-            .isEqualTo("The chart shows the trends.");
+        // Verify part: 2 - data (should be replaced content)
+        assertThat(parts.get(2).getType()).isEqualTo(ChatMessagePart.PartType.DATA);
+        assertThat(parts.get(2).getOriginalType()).isEqualTo("data-chart");
+        assertThat(parts.get(2).getContent().get("type").asText()).isEqualTo("data-chart");
+        assertThat(parts.get(2).getContent().get("id").asText()).isEqualTo(dataId);
+        
+        // Check if data field exists and verify it's the replacement data
+        assertThat(parts.get(2).getContent().has("data")).isTrue();
+        var dataField = parts.get(2).getContent().get("data");
+        
+        // Since JSON data is parsed, check the structure
+        assertThat(dataField.get("type").asText()).isEqualTo("line");
+        assertThat(dataField.get("values").toString()).isEqualTo("[4,5,6]");
+
+        // Verify part: 3 - text
+        assertThat(parts.get(3).getType()).isEqualTo(ChatMessagePart.PartType.TEXT);
+        assertThat(parts.get(3).getContent().asText()).isEqualTo("Chart completed.");
     }
 
     @Test
@@ -536,38 +579,55 @@ public class ChatControllerIT extends BaseIntegrationTest {
         
         var assistantMessage = chatMessageRepository.findById(UUID.fromString(responseMessageId)).orElseThrow();
         
-        // Verify we have parts from multiple steps
-        assertThat(assistantMessage.getParts().size()).isEqualTo(6); // We will ignore step-start for now
+        // Verify we have parts from multiple steps with step-start markers
+        assertThat(assistantMessage.getParts().size()).isEqualTo(9);
         
         var parts = assistantMessage.getParts();
-        // Verify part: 0 - reasoning
-        assertThat(parts.get(0).getType()).isEqualTo(ChatMessagePart.PartType.REASONING);
-        assertThat(parts.get(0).getContent().asText())
-            .isEqualTo("I need to search for information related to the user's query.");
-        // Verify part: 1 - text
-        assertThat(parts.get(1).getType()).isEqualTo(ChatMessagePart.PartType.TEXT);
+        
+        // Verify part: 0 - step-start (first step)
+        assertThat(parts.get(0).getType()).isEqualTo(ChatMessagePart.PartType.STEP_START);
+        
+        // Verify part: 1 - reasoning
+        assertThat(parts.get(1).getType()).isEqualTo(ChatMessagePart.PartType.REASONING);
         assertThat(parts.get(1).getContent().asText())
-            .isEqualTo("Let me start by searching for relevant data."); 
+            .isEqualTo("I need to search for information related to the user's query.");
+            
         // Verify part: 2 - text
         assertThat(parts.get(2).getType()).isEqualTo(ChatMessagePart.PartType.TEXT);
         assertThat(parts.get(2).getContent().asText())
-            .isEqualTo("Here are the results I found:");
-        // Verify part: 3 - data
-        assertThat(parts.get(3).getType()).isEqualTo(ChatMessagePart.PartType.DATA);
-        assertThat(parts.get(3).getContent().get("type").asText()).isEqualTo("data-chart");
-        assertThat(parts.get(3).getContent().get("data").asText())
-            .isEqualTo("{\"type\": \"bar\", \"values\": [1,2,3]}");
-        // Verify part: 4 - reasoning
-        assertThat(parts.get(4).getType()).isEqualTo(ChatMessagePart.PartType.REASONING);
+            .isEqualTo("Let me start by searching for relevant data.");
+        
+        // Verify part: 3 - step-start (second step)
+        assertThat(parts.get(3).getType()).isEqualTo(ChatMessagePart.PartType.STEP_START);
+        
+        // Verify part: 4 - text
+        assertThat(parts.get(4).getType()).isEqualTo(ChatMessagePart.PartType.TEXT);
         assertThat(parts.get(4).getContent().asText())
+            .isEqualTo("Here are the results I found:");
+            
+        // Verify part: 5 - data
+        assertThat(parts.get(5).getType()).isEqualTo(ChatMessagePart.PartType.DATA);
+        assertThat(parts.get(5).getContent().get("type").asText()).isEqualTo("data-chart");
+        // Check that data field is parsed JSON object
+        var dataField = parts.get(5).getContent().get("data");
+        assertThat(dataField.get("type").asText()).isEqualTo("bar");
+        assertThat(dataField.get("values").toString()).isEqualTo("[1,2,3]");
+        
+        // Verify part: 6 - step-start (third step)
+        assertThat(parts.get(6).getType()).isEqualTo(ChatMessagePart.PartType.STEP_START);
+        
+        // Verify part: 7 - reasoning
+        assertThat(parts.get(7).getType()).isEqualTo(ChatMessagePart.PartType.REASONING);
+        assertThat(parts.get(7).getContent().asText())
             .isEqualTo("Now I'll analyze the results.");
-        // Verify part: 5 - text
-        assertThat(parts.get(5).getType()).isEqualTo(ChatMessagePart.PartType.TEXT);
-        assertThat(parts.get(5).getContent().asText())
+            
+        // Verify part: 8 - text
+        assertThat(parts.get(8).getType()).isEqualTo(ChatMessagePart.PartType.TEXT);
+        assertThat(parts.get(8).getContent().asText())
             .isEqualTo("Based on the search, here's the conclusion.");
     }
 
-      @Test
+    @Test
     @WithMentorUser
     void testMultipleAssistantMessagePersistence() {
         // Given: A the assistant responds with multiple start messageId parts
@@ -603,16 +663,18 @@ public class ChatControllerIT extends BaseIntegrationTest {
         var assistantMessage1 = chatMessageRepository.findById(UUID.fromString(responseMessageId1)).orElseThrow();
         var assistantMessage2 = chatMessageRepository.findById(UUID.fromString(responseMessageId2)).orElseThrow();
 
-        // Verify first assistant message
-        assertThat(assistantMessage1.getParts()).hasSize(1);
-        assertThat(assistantMessage1.getParts().get(0).getType()).isEqualTo(ChatMessagePart.PartType.TEXT);
-        assertThat(assistantMessage1.getParts().get(0).getContent().asText())
+        // Verify first assistant message has step-start + text
+        assertThat(assistantMessage1.getParts()).hasSize(2);
+        assertThat(assistantMessage1.getParts().get(0).getType()).isEqualTo(ChatMessagePart.PartType.STEP_START);
+        assertThat(assistantMessage1.getParts().get(1).getType()).isEqualTo(ChatMessagePart.PartType.TEXT);
+        assertThat(assistantMessage1.getParts().get(1).getContent().asText())
             .isEqualTo("This is the first message.");
 
-        // Verify second assistant message
-        assertThat(assistantMessage2.getParts()).hasSize(1);
-        assertThat(assistantMessage2.getParts().get(0).getType()).isEqualTo(ChatMessagePart.PartType.TEXT);
-        assertThat(assistantMessage2.getParts().get(0).getContent().asText())
+        // Verify second assistant message has step-start + text
+        assertThat(assistantMessage2.getParts()).hasSize(2);
+        assertThat(assistantMessage2.getParts().get(0).getType()).isEqualTo(ChatMessagePart.PartType.STEP_START);
+        assertThat(assistantMessage2.getParts().get(1).getType()).isEqualTo(ChatMessagePart.PartType.TEXT);
+        assertThat(assistantMessage2.getParts().get(1).getContent().asText())
             .isEqualTo("This is the second message.");
 
         // Verify relationships
