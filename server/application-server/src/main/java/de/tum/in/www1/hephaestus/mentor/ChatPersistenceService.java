@@ -256,6 +256,42 @@ public class ChatPersistenceService {
         }
 
         @Override
+        public void onToolOutputError(StreamToolOutputErrorPart errorPart) {
+            lock.lock();
+            try {
+                if (currentMessage == null) {
+                    logger.warn("Received tool output error without message start");
+                    return;
+                }
+
+                String toolCallId = errorPart.getToolCallId();
+                String errorText = errorPart.getErrorText();
+
+                // Update the current tool part with error if it matches the tool call ID
+                if (currentToolPart != null && toolCallId.equals(currentToolCallId)) {
+                    var existingContent = (com.fasterxml.jackson.databind.node.ObjectNode) currentToolPart.getContent();
+                    existingContent.put("errorText", errorText);
+                    existingContent.put("state", "output-error");
+                    // Don't add output field when there's an error
+                    chatMessagePartRepository.save(currentToolPart);
+                    logger.debug("Updated tool part with error: messageId={}, toolCallId={}, error={}", 
+                        currentMessage.getId(), toolCallId, errorText);
+                    
+                    // Clear the reference since this tool call is complete (with error)
+                    currentToolPart = null;
+                    currentToolCallId = null;
+                } else {
+                    logger.warn("Received tool output error for unmatched tool call: expected={}, received={}", 
+                        currentToolCallId, toolCallId);
+                }
+            } catch (Exception e) {
+                logger.error("Failed to process tool output error: {}", e.getMessage(), e);
+            } finally {
+                lock.unlock();
+            }
+        }
+
+        @Override
         public void onStreamFinish(StreamFinishPart finishPart) {
             lock.lock();
             try {
@@ -416,9 +452,25 @@ public class ChatPersistenceService {
                     }
                     case DATA -> {
                         if (streamPart instanceof StreamDataPart dataPart) {
+                            part.setOriginalType(dataPart.getType()); // Set originalType for data parts
                             var dataContent = objectMapper.createObjectNode();
                             dataContent.put("type", dataPart.getType());
-                            dataContent.set("data", objectMapper.valueToTree(dataPart.getData()));
+                            
+                            // Handle data - if it's a string, parse it; otherwise use as-is
+                            Object data = dataPart.getData();
+                            if (data instanceof String dataStr) {
+                                try {
+                                    com.fasterxml.jackson.databind.JsonNode dataNode = objectMapper.readTree(dataStr);
+                                    dataContent.set("data", dataNode);
+                                } catch (Exception e) {
+                                    logger.warn("Failed to parse data JSON, storing as string: {}", e.getMessage());
+                                    dataContent.put("data", dataStr);
+                                }
+                            } else {
+                                // Data is already an object, convert to JsonNode
+                                dataContent.set("data", objectMapper.valueToTree(data));
+                            }
+                            
                             part.setContent(dataContent);
                         }
                     }

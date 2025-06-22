@@ -175,6 +175,14 @@ class StreamToolOutputAvailablePart(BasePart):
     providerMetadata: Optional[Dict[str, Any]] = None
 
 
+class StreamToolOutputErrorPart(BasePart):
+    """Tool output error event."""
+
+    type: Literal["tool-output-error"] = "tool-output-error"
+    toolCallId: str
+    errorText: str
+
+
 class StreamReasoningPart(BasePart):
     """Reasoning part of a message."""
 
@@ -267,6 +275,7 @@ StreamPart = Union[
     StreamToolInputDeltaPart,
     StreamToolInputAvailablePart,
     StreamToolOutputAvailablePart,
+    StreamToolOutputErrorPart,
     StreamReasoningPart,
     StreamReasoningFinishPart,
     StreamSourceUrlPart,

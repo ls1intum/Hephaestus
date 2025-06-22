@@ -55,6 +55,7 @@ public class StreamPartProcessorUtils {
             case "tool-input-delta" -> clazz = StreamToolInputDeltaPart.class;
             case "tool-input-available" -> clazz = StreamToolInputAvailablePart.class;
             case "tool-output-available" -> clazz = StreamToolOutputAvailablePart.class;
+            case "tool-output-error" -> clazz = StreamToolOutputErrorPart.class; // Added this case
             case "reasoning" -> clazz = StreamReasoningPart.class;
             case "reasoning-finish", "reasoning-part-finish" -> clazz = StreamReasoningFinishPart.class;
             case "source-url" -> clazz = StreamSourceUrlPart.class;
@@ -100,6 +101,7 @@ public class StreamPartProcessorUtils {
                 case StreamToolInputDeltaPart toolDelta -> processor.onToolInputDelta(toolDelta);
                 case StreamToolInputAvailablePart toolInput -> processor.onToolInputAvailable(toolInput);
                 case StreamToolOutputAvailablePart toolOutput -> processor.onToolOutputAvailable(toolOutput);
+                case StreamToolOutputErrorPart errorPart -> processor.onToolOutputError(errorPart);
                 case StreamReasoningPart reasoning -> processor.onReasoningChunk(reasoning);
                 case StreamReasoningFinishPart reasoningFinish -> processor.onReasoningFinish(reasoningFinish);
                 case StreamSourceUrlPart sourceUrl -> processor.onSourceUrl(sourceUrl);

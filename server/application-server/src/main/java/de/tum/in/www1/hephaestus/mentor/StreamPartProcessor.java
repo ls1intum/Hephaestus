@@ -44,6 +44,12 @@ public interface StreamPartProcessor {
     default void onToolOutputAvailable(StreamToolOutputAvailablePart toolOutputPart) {}
 
     /**
+     * Called when tool output has an error.
+     * @param errorPart The tool output error part
+     */
+    default void onToolOutputError(StreamToolOutputErrorPart errorPart) {}
+
+    /**
      * Called for reasoning chunks.
      * @param reasoningPart The reasoning stream part
      */

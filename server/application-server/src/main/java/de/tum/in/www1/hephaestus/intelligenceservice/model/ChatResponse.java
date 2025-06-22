@@ -37,6 +37,7 @@ import de.tum.in.www1.hephaestus.intelligenceservice.model.StreamToolInputAvaila
 import de.tum.in.www1.hephaestus.intelligenceservice.model.StreamToolInputDeltaPart;
 import de.tum.in.www1.hephaestus.intelligenceservice.model.StreamToolInputStartPart;
 import de.tum.in.www1.hephaestus.intelligenceservice.model.StreamToolOutputAvailablePart;
+import de.tum.in.www1.hephaestus.intelligenceservice.model.StreamToolOutputErrorPart;
 import com.fasterxml.jackson.annotation.JsonPropertyOrder;
 import com.fasterxml.jackson.annotation.JsonTypeName;
 import org.hibernate.validator.constraints.*;

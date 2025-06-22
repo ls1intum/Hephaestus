@@ -61,6 +61,7 @@ components:
       - $ref: '#/components/schemas/StreamToolInputDeltaPart'
       - $ref: '#/components/schemas/StreamToolInputAvailablePart'
       - $ref: '#/components/schemas/StreamToolOutputAvailablePart'
+      - $ref: '#/components/schemas/StreamToolOutputErrorPart'
       - $ref: '#/components/schemas/StreamReasoningPart'
       - $ref: '#/components/schemas/StreamReasoningFinishPart'
       - $ref: '#/components/schemas/StreamSourceUrlPart'
@@ -602,6 +603,25 @@ components:
       - toolCallId
       - output
       title: StreamToolOutputAvailablePart
+      type: object
+    StreamToolOutputErrorPart:
+      description: Tool output error event.
+      properties:
+        errorText:
+          title: Errortext
+          type: string
+        toolCallId:
+          title: Toolcallid
+          type: string
+        type:
+          const: tool-output-error
+          default: tool-output-error
+          title: Type
+          type: string
+      required:
+      - toolCallId
+      - errorText
+      title: StreamToolOutputErrorPart
       type: object
     TextUIPart:
       description: A text part of a message.
