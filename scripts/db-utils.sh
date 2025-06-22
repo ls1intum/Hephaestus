@@ -185,6 +185,12 @@ generate_intelligence_service_models() {
     
     cd "$intelligence_service_dir"
     
+    # Ensure Poetry dependencies are installed
+    if [[ ! -d ".venv" ]] || ! poetry run python -c "import sqlacodegen" 2>/dev/null; then
+        log_info "Installing Poetry dependencies..."
+        poetry install --no-interaction --no-root
+    fi
+    
     # Use poetry to run the generation script
     poetry run python scripts/generate_db_models.py
     poetry run black app/db/models_gen.py
