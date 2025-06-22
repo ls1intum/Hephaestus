@@ -4,8 +4,9 @@
 # Provides modular database operations for development workflow
 # Usage: ./db-utils.sh [command]
 # Commands:
-#   generate-erd    - Generate ERD documentation only
-#   draft-changelog - Generate changelog diff only
+#   generate-erd                         - Generate ERD documentation only
+#   draft-changelog                      - Generate changelog diff only
+#   generate-models-intelligence-service - Generate SQLAlchemy models for intelligence service
 
 set -e  # Exit on any error
 
@@ -163,6 +164,34 @@ generate_erd() {
     log_success "ERD documentation updated at 'docs/dev/database/schema.mmd'"
 }
 
+# Generate SQLAlchemy models for intelligence service
+generate_intelligence_service_models() {
+    log_info "Generating SQLAlchemy models for intelligence service..."
+    
+    local intelligence_service_dir="$PROJECT_ROOT/server/intelligence-service"
+    local generate_script="$intelligence_service_dir/scripts/generate_db_models.py"
+    
+    # Check if intelligence service directory exists
+    if [[ ! -d "$intelligence_service_dir" ]]; then
+        log_error "Intelligence service directory not found at: $intelligence_service_dir"
+        exit 1
+    fi
+    
+    # Check if generation script exists
+    if [[ ! -f "$generate_script" ]]; then
+        log_error "Model generation script not found at: $generate_script"
+        exit 1
+    fi
+    
+    cd "$intelligence_service_dir"
+    
+    # Use poetry to run the generation script
+    poetry run python scripts/generate_db_models.py
+    poetry run black app/db/models_gen.py
+    
+    log_success "SQLAlchemy models generated for intelligence service"
+}
+
 # Generate changelog diff with database backup/restore
 generate_changelog_diff() {
     log_info "Generating changelog diff..."
@@ -235,6 +264,25 @@ cmd_draft_changelog() {
     log_success "🎉 Changelog diff process completed!"
 }
 
+# Generate SQLAlchemy models for intelligence service
+cmd_generate_db_models_intelligence_service() {
+    log_info "🚀 Starting SQLAlchemy model generation for intelligence service..."
+    check_environment
+    
+    # Ensure PostgreSQL is running
+    cd "$APP_SERVER_DIR"
+    if ! docker compose ps postgres | grep -q "Up"; then
+        log_warning "PostgreSQL is not running. Starting it now..."
+        start_postgres
+    fi
+    
+    # Always ensure schema is up-to-date
+    apply_migrations
+    
+    generate_intelligence_service_models
+    log_success "🎉 SQLAlchemy model generation completed successfully!"
+}
+
 # Show usage information
 show_usage() {
     cat << EOF
@@ -243,13 +291,15 @@ Database Utilities Script
 Usage: $0 [command]
 
 Commands:
-  generate-erd    Generate ERD documentation only (requires running database)
-  draft-changelog Generate changelog diff only
-  help           Show this help message
+  generate-erd                      Generate ERD documentation only (requires running database)
+  draft-changelog                   Generate changelog diff only
+  generate-models-intelligence-service  Generate SQLAlchemy models for intelligence service
+  help                             Show this help message
 
 Examples:
-  $0 generate-erd    # Quick ERD generation during development
-  $0 draft-changelog # Generate migration before PR
+  $0 generate-erd                        # Quick ERD generation during development
+  $0 draft-changelog                     # Generate migration before PR
+  $0 generate-models-intelligence-service  # Generate SQLAlchemy models from current schema
 
 EOF
 }
@@ -262,6 +312,9 @@ main() {
             ;;
         "draft-changelog")
             cmd_draft_changelog
+            ;;
+        "generate-models-intelligence-service")
+            cmd_generate_db_models_intelligence_service
             ;;
         "help"|"-h"|"--help")
             show_usage

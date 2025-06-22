@@ -15,7 +15,7 @@ jobs:
     name: ${{ matrix.check }}
     runs-on: ubuntu-latest
     if: inputs.should_skip != 'true'
-    timeout-minutes: ${{ contains(fromJSON('["database-schema-validation", "database-documentation-validation"]'), matrix.check) && 20 || 15 }}
+    timeout-minutes: ${{ contains(fromJSON('["database-schema-validation", "database-documentation-validation", "database-models-validation"]'), matrix.check) && 20 || 15 }}
     strategy:
       fail-fast: false
       matrix:
@@ -28,6 +28,7 @@ jobs:
             openapi-validation,
             database-schema-validation,
             database-documentation-validation,
+            database-models-validation,
           ]
     steps:
       - name: Checkout repository
@@ -364,4 +365,76 @@ jobs:
             exit 1
           else
             echo "✅ ERD documentation validation passed (up-to-date with committed migrations)"
+          fi
+
+      # Database models validation - SQLAlchemy models match committed migrations
+      - name: Database models validation
+        if: matrix.check == 'database-models-validation'
+        run: |
+          echo "🔍 Validating SQLAlchemy models match committed migrations..."
+
+          # Start PostgreSQL service for model operations
+          echo "🐘 Starting PostgreSQL service..."
+          docker run -d \
+            --name postgres-models \
+            -e POSTGRES_DB=hephaestus \
+            -e POSTGRES_PASSWORD=root \
+            -e POSTGRES_USER=root \
+            -p 5432:5432 \
+            --health-cmd="pg_isready" \
+            --health-interval=10s \
+            --health-timeout=5s \
+            --health-retries=5 \
+            postgres:16
+
+          # Wait for PostgreSQL to be ready
+          echo "⏳ Waiting for PostgreSQL..."
+          until docker exec postgres-models pg_isready -U root -d hephaestus; do
+            sleep 2
+          done
+
+          # Set environment variables for database connection
+          export SPRING_DATASOURCE_URL="jdbc:postgresql://localhost:5432/hephaestus"
+          export SPRING_DATASOURCE_USERNAME="root"
+          export SPRING_DATASOURCE_PASSWORD="root"
+
+          # Build application-server for schema operations
+          echo "🏗️ Building application-server..."
+          cd server/application-server
+          if ! mvn compile -DskipTests --quiet; then
+            echo "❌ Failed to build application-server"
+            docker stop postgres-models && docker rm postgres-models
+            exit 1
+          fi
+          cd ../..
+
+          # Run database migrations to get current schema
+          echo "🚀 Running database migrations..."
+          if ! scripts/db-utils.sh migrate; then
+            echo "❌ Failed to run database migrations"
+            docker stop postgres-models && docker rm postgres-models
+            exit 1
+          fi
+
+          # Generate SQLAlchemy models for intelligence service
+          echo "📊 Generating SQLAlchemy models for intelligence service..."
+          if ! npm run db:generate-models:intelligence-service; then
+            echo "❌ Failed to generate SQLAlchemy models"
+            docker stop postgres-models && docker rm postgres-models
+            exit 1
+          fi
+
+          # Clean up PostgreSQL container
+          docker stop postgres-models && docker rm postgres-models
+
+          # Check if generated models match committed versions
+          if ! git diff --quiet server/intelligence-service/app/db/models_gen.py; then
+            echo "❌ SQLAlchemy models validation failed - models are out of sync"
+            echo "Generated models differ from committed version:"
+            git diff server/intelligence-service/app/db/models_gen.py
+            echo ""
+            echo "Fix: npm run db:generate-models:intelligence-service"
+            exit 1
+          else
+            echo "✅ SQLAlchemy models validation passed (models are up-to-date)"
           fi

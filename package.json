@@ -21,7 +21,8 @@
     "format:webhook-ingest:check": "cd server/webhook-ingest/ && poetry run black --check .",
     "format:webhook-ingest:write": "cd server/webhook-ingest/ && poetry run black .",
     "db:draft-changelog": "scripts/db-utils.sh draft-changelog",
-    "db:generate-erd-docs": "scripts/db-utils.sh generate-erd"
+    "db:generate-erd-docs": "scripts/db-utils.sh generate-erd",
+    "db:generate-models:intelligence-service": "scripts/db-utils.sh generate-models-intelligence-service"
   },
   "devDependencies": {
     "@openapitools/openapi-generator-cli": "2.16.3",
