@@ -31,19 +31,18 @@ def generate_db_models(output_file: Path) -> None:
     # Get the intelligence service directory (parent of scripts directory)
     intelligence_service_dir = Path(__file__).parent.parent
     
-    # Prepare sqlacodegen command using poetry run to ensure it's in the virtual environment
-    cmd = ["poetry", "run", "sqlacodegen", "--generator", "declarative", database_url]
+    # Prepare sqlacodegen command - we're already running inside poetry environment
+    cmd = ["sqlacodegen", "--generator", "declarative", database_url]
 
     print(f"🔧 Generating models from database: {database_url}")
 
     try:
-        # Run sqlacodegen and capture output, ensuring we're in the intelligence service directory
+        # Run sqlacodegen and capture output
         result = subprocess.run(
             cmd, 
             capture_output=True, 
             text=True, 
-            check=True,
-            cwd=intelligence_service_dir
+            check=True
         )
 
         # File header
