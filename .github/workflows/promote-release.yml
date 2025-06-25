@@ -1,0 +1,19 @@
+name: Promote Release
+
+on:
+  workflow_dispatch:
+
+jobs:
+  promote:
+    runs-on: ubuntu-latest
+    environment: "protected-branch"
+    permissions:
+      contents: write
+    
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: develop
+          token: ${{ secrets.GH_PAT }}
+
+      - run: git push origin +develop:main

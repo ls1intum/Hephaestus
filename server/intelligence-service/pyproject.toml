@@ -1,6 +1,6 @@
 [project]
 name = "intelligence-service"
-version = "0.7.2"
+version = "0.9.0-rc.5"
 description = "A FastAPI service for interfacing with machine learning models."
 authors = [
     { name = "Felix T.J. Dietrich", email = "felixtj.dietrich@tum.de"},
@@ -10,7 +10,7 @@ readme = "README.md"
 requires-python = ">=3.13,<4.0.0"
 
 dependencies = [
-    "fastapi[standard] == 0.115.9",
+    "fastapi[standard] == 0.115.12",
     "pydantic-settings == 2.8.1",
     "langchain == 0.3.19",
     "langchain-core == 0.3.40",
@@ -37,7 +37,7 @@ openapi = "app.export_openapi_specs:run"
 
 [tool.poetry.group.dev.dependencies]
 black = "25.1.0"
-flake8 = "7.1.2"
+flake8 = "7.2.0"
 
 [virtualenvs]
 create = true

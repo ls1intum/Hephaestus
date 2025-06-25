@@ -24,8 +24,8 @@ public class GitHubConfig {
 
     @Bean
     public GitHub gitHubClient() {
-        if (environment.matchesProfiles("specs")) {
-            logger.info("GitHub client is disabled in specs profile");
+        if (environment.matchesProfiles("specs", "test")) {
+            logger.info("GitHub client is disabled in specs/test profile");
             return GitHub.offline();
         }
 
