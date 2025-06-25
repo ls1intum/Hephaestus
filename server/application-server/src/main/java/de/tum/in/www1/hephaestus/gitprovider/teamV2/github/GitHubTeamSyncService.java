@@ -66,7 +66,7 @@ public class GitHubTeamSyncService {
                 }
             });
         // parent relationships
-        for (GHTeam parent: teams) {
+        for (GHTeam parent : teams) {
             applyParentLinks(parent);
         }
     }
@@ -103,16 +103,18 @@ public class GitHubTeamSyncService {
         try {
             Long parentId = parent.getId();
 
-            for (GHTeam ghChild: parent.listChildTeams()) {
+            for (GHTeam ghChild : parent.listChildTeams()) {
                 long childId = ghChild.getId();
 
-                teamRepository.findById(childId).ifPresent(child -> {
-                    if (!Objects.equals(child.getParentId(), parentId)) {
-                        child.setParentId(parentId);
-                        teamRepository.save(child);
-                        log.info("Linked parent team '{}' → child team '{}'", parent.getSlug(), child.getSlug());
-                    }
-                });
+                teamRepository
+                    .findById(childId)
+                    .ifPresent(child -> {
+                        if (!Objects.equals(child.getParentId(), parentId)) {
+                            child.setParentId(parentId);
+                            teamRepository.save(child);
+                            log.info("Linked parent team '{}' → child team '{}'", parent.getSlug(), child.getSlug());
+                        }
+                    });
             }
         } catch (IOException e) {
             log.warn("Could not list child teams for {}: {}", parent.getSlug(), e.getMessage());
