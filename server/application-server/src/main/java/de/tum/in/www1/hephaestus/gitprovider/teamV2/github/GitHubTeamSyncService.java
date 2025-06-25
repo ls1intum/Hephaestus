@@ -66,9 +66,7 @@ public class GitHubTeamSyncService {
                 }
             });
         // parent relationships
-        for (GHTeam parent : teams) {
-            applyParentLinks(parent);
-        }
+        teams.parallelStream().forEach(this::applyParentLinks);
     }
 
     @Transactional
