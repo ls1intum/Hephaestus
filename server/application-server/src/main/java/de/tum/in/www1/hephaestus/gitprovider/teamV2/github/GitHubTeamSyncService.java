@@ -7,7 +7,6 @@ import de.tum.in.www1.hephaestus.gitprovider.teamV2.membership.TeamMembership;
 import de.tum.in.www1.hephaestus.gitprovider.teamV2.permission.*;
 import de.tum.in.www1.hephaestus.gitprovider.user.*;
 import java.io.IOException;
-import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -54,8 +53,9 @@ public class GitHubTeamSyncService {
         List<GHTeam> teams = org.listTeams().withPageSize(100).toList();
 
         teams
+            .parallelStream()
             .forEach(ghTeam -> {
-                // must call via the proxy (self) to trigger @Transactional on processTeam
+                // must call via the proxy (self) to trigger @Transactional on processTeam()
                 TeamV2 saved = self.processTeam(ghTeam);
                 if (saved == null) {
                     log.warn(
@@ -65,6 +65,10 @@ public class GitHubTeamSyncService {
                     );
                 }
             });
+        // parent relationships
+        for (GHTeam parent: teams) {
+            applyParentLinks(parent);
+        }
     }
 
     @Transactional
@@ -88,8 +92,6 @@ public class GitHubTeamSyncService {
                 team.getRepoPermissions().size()
             );
 
-            linkChildren(ghTeam, saved.getId());
-
             return saved;
         } catch (IOException e) {
             log.error("Failed to process team {}: {}", ghTeam.getId(), e.getMessage());
@@ -97,30 +99,23 @@ public class GitHubTeamSyncService {
         }
     }
 
-    private void linkChildren(GHTeam parentGh, long parentId) {
+    private void applyParentLinks(GHTeam parent) {
         try {
-            for (GHTeam ghChild : parentGh.listChildTeams()) {
+            Long parentId = parent.getId();
+
+            for (GHTeam ghChild: parent.listChildTeams()) {
                 long childId = ghChild.getId();
 
-                TeamV2 child = teamRepository
-                    .findById(childId)
-                    // child not in DB? -> create shell
-                    .orElseGet(() -> {
-                        TeamV2 shell = teamConverter.convert(ghChild);
-                        // no heavy fetch yet
-                        shell.setRepoPermissions(Collections.emptySet());
-                        shell.setMemberships(Collections.emptySet());
-
-                        return shell;
-                    });
-
-                if (!Objects.equals(child.getParentId(), parentId)) {
-                    child.setParentId(parentId);
-                }
-                teamRepository.save(child);
+                teamRepository.findById(childId).ifPresent(child -> {
+                    if (!Objects.equals(child.getParentId(), parentId)) {
+                        child.setParentId(parentId);
+                        teamRepository.save(child);
+                        log.info("Linked parent team '{}' → child team '{}'", parent.getSlug(), child.getSlug());
+                    }
+                });
             }
         } catch (IOException e) {
-            log.warn("Could not list child teams for {}: {}", parentGh.getSlug(), e.getMessage());
+            log.warn("Could not list child teams for {}: {}", parent.getSlug(), e.getMessage());
         }
     }
 
