@@ -2,7 +2,7 @@
 <databaseChangeLog xmlns="http://www.liquibase.org/xml/ns/dbchangelog" xmlns:ext="http://www.liquibase.org/xml/ns/dbchangelog-ext" xmlns:pro="http://www.liquibase.org/xml/ns/pro" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog-ext http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-ext.xsd http://www.liquibase.org/xml/ns/pro http://www.liquibase.org/xml/ns/pro/liquibase-pro-latest.xsd http://www.liquibase.org/xml/ns/dbchangelog http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
     <changeSet author="ddmukh" id="1750847942385-1">
         <createTable tableName="team_v2">
-            <column name="id" type="BIGINT">
+            <column name="id" type="BIGINT GENERATED ALWAYS AS IDENTITY">
                 <constraints nullable="false" primaryKey="true" primaryKeyName="team_v2PK"/>
             </column>
             <column name="created_at" type="TIMESTAMP(6) WITH TIME ZONE"/>
@@ -56,5 +56,8 @@
     </changeSet>
     <changeSet author="ddmukh" id="1750847942385-8">
         <addForeignKeyConstraint baseColumnNames="team_id" baseTableName="team_v2_membership" constraintName="FKqx9knktjv7ep34em8xxj22im0" deferrable="false" initiallyDeferred="false" referencedColumnNames="id" referencedTableName="team_v2" validate="true"/>
+    </changeSet>
+    <changeSet author="ddmukh" id="1750847942385-9">
+        <addForeignKeyConstraint baseTableName="team_v2" baseColumnNames="parent_id" referencedTableName="team_v2" referencedColumnNames="id" constraintName="FK_team_v2_parent" deferrable="false" initiallyDeferred="false" onDelete="SET NULL" validate="true"/>
     </changeSet>
 </databaseChangeLog>
