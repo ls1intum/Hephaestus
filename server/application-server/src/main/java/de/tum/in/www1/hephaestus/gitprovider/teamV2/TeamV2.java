@@ -74,9 +74,8 @@ public class TeamV2 extends BaseGitServiceEntity {
         /** Only organization members can view or request access. */
         SECRET,
         /** Visible to all members of the organization. */
-        CLOSED
+        CLOSED,
     }
-
     // Ignored GitHub properties:
     // - apiUrl               (API URL for this team)
     // - members_url       (templated URL for member listing)

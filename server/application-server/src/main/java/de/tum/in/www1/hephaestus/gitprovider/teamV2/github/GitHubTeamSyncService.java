@@ -60,7 +60,11 @@ public class GitHubTeamSyncService {
                 // must call via the proxy (self) to trigger @Transactional on processTeam
                 TeamV2 saved = self.processTeam(ghTeam);
                 if (saved == null) {
-                    log.warn("Skipped team {} with following id: {} due to an error:", ghTeam.getSlug(), ghTeam.getId());
+                    log.warn(
+                        "Skipped team {} with following id: {} due to an error:",
+                        ghTeam.getSlug(),
+                        ghTeam.getId()
+                    );
                 }
             });
     }
@@ -100,16 +104,17 @@ public class GitHubTeamSyncService {
             for (GHTeam ghChild : parentGh.listChildTeams()) {
                 long childId = ghChild.getId();
 
-                TeamV2 child = teamRepository.findById(childId)
-                        // child not in DB? -> create shell
-                        .orElseGet(() -> {
-                            TeamV2 shell = teamConverter.convert(ghChild);
-                            // no heavy fetch yet
-                            shell.setRepoPermissions(Collections.emptySet());
-                            shell.setMemberships(Collections.emptySet());
+                TeamV2 child = teamRepository
+                    .findById(childId)
+                    // child not in DB? -> create shell
+                    .orElseGet(() -> {
+                        TeamV2 shell = teamConverter.convert(ghChild);
+                        // no heavy fetch yet
+                        shell.setRepoPermissions(Collections.emptySet());
+                        shell.setMemberships(Collections.emptySet());
 
-                            return shell;
-                        });
+                        return shell;
+                    });
 
                 if (!Objects.equals(child.getParentId(), parentId)) {
                     child.setParentId(parentId);
@@ -123,7 +128,6 @@ public class GitHubTeamSyncService {
             log.warn("Child team already created concurrently: {}", dup.getMessage());
         }
     }
-
 
     private void syncMemberships(GHTeam ghTeam, TeamV2 team) throws IOException {
         Set<Long> maintainerIds = ghTeam

@@ -1,7 +1,7 @@
 package de.tum.in.www1.hephaestus.gitprovider.teamV2;
 
-import de.tum.in.www1.hephaestus.gitprovider.teamV2.TeamV2.Privacy;
 import com.fasterxml.jackson.annotation.JsonInclude;
+import de.tum.in.www1.hephaestus.gitprovider.teamV2.TeamV2.Privacy;
 import java.time.OffsetDateTime;
 import org.springframework.lang.NonNull;
 
