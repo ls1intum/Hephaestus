@@ -19,7 +19,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Lazy;
-import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -55,7 +54,6 @@ public class GitHubTeamSyncService {
         List<GHTeam> teams = org.listTeams().withPageSize(100).toList();
 
         teams
-            .parallelStream()
             .forEach(ghTeam -> {
                 // must call via the proxy (self) to trigger @Transactional on processTeam
                 TeamV2 saved = self.processTeam(ghTeam);
@@ -123,9 +121,6 @@ public class GitHubTeamSyncService {
             }
         } catch (IOException e) {
             log.warn("Could not list child teams for {}: {}", parentGh.getSlug(), e.getMessage());
-        } catch (DataIntegrityViolationException dup) {
-            // race-condition safety when two parallel threads insert the same shell
-            log.warn("Child team already created concurrently: {}", dup.getMessage());
         }
     }
 
