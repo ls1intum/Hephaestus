@@ -1,5 +1,6 @@
 package de.tum.in.www1.hephaestus.gitprovider.teamV2;
 
+import de.tum.in.www1.hephaestus.gitprovider.teamV2.TeamV2.Privacy;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import java.time.OffsetDateTime;
 import org.springframework.lang.NonNull;
@@ -10,10 +11,10 @@ public record TeamV2InfoDTO(
     @NonNull String nodeId,
     @NonNull String slug,
     @NonNull String name,
+    Long parentId,
     String description,
-    String privacy,
+    Privacy privacy,
     String organization,
-    String apiUrl,
     String htmlUrl,
     OffsetDateTime lastSyncedAt,
     int membershipCount,

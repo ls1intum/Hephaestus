@@ -27,7 +27,7 @@ public class TeamRepositoryPermission {
     private Repository repository;
 
     @Enumerated(EnumType.STRING)
-    @Column(nullable = false)
+    @Column(nullable = false, length = 32)
     private PermissionLevel permission;
 
     public TeamRepositoryPermission(TeamV2 team, Repository repository, PermissionLevel permission) {

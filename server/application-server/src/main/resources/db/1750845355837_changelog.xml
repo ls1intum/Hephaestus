@@ -1,23 +1,26 @@
 <?xml version="1.1" encoding="UTF-8" standalone="no"?>
 <databaseChangeLog xmlns="http://www.liquibase.org/xml/ns/dbchangelog" xmlns:ext="http://www.liquibase.org/xml/ns/dbchangelog-ext" xmlns:pro="http://www.liquibase.org/xml/ns/pro" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog-ext http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-ext.xsd http://www.liquibase.org/xml/ns/pro http://www.liquibase.org/xml/ns/pro/liquibase-pro-latest.xsd http://www.liquibase.org/xml/ns/dbchangelog http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
-    <changeSet author="ddmukh" id="1748795051079-1">
+    <changeSet author="ddmukh" id="1750845355837-1">
         <createTable tableName="team_v2">
             <column name="id" type="BIGINT">
                 <constraints nullable="false" primaryKey="true" primaryKeyName="team_v2PK"/>
             </column>
             <column name="created_at" type="TIMESTAMP(6) WITH TIME ZONE"/>
             <column name="updated_at" type="TIMESTAMP(6) WITH TIME ZONE"/>
-            <column name="description" type="VARCHAR(255)"/>
-            <column name="github_organization" type="VARCHAR(255)"/>
+            <column name="description" type="TEXT"/>
+            <column name="html_url" type="TEXT"/>
             <column name="last_synced_at" type="TIMESTAMP(6) WITH TIME ZONE"/>
             <column name="name" type="VARCHAR(255)"/>
-            <column name="privacy" type="VARCHAR(255)"/>
+            <column name="node_id" type="VARCHAR(255)"/>
+            <column name="organization" type="VARCHAR(255)"/>
+            <column name="parent_id" type="BIGINT"/>
+            <column name="privacy" type="VARCHAR(32)"/>
             <column name="slug" type="VARCHAR(255)"/>
         </createTable>
     </changeSet>
-    <changeSet author="ddmukh" id="1748795051079-2">
+    <changeSet author="ddmukh" id="1750845355837-2">
         <createTable tableName="team_v2_membership">
-            <column name="role" type="VARCHAR(255)"/>
+            <column name="role" type="VARCHAR(32)"/>
             <column name="user_id" type="BIGINT">
                 <constraints nullable="false"/>
             </column>
@@ -26,9 +29,11 @@
             </column>
         </createTable>
     </changeSet>
-    <changeSet author="ddmukh" id="1748795051079-3">
+    <changeSet author="ddmukh" id="1750845355837-3">
         <createTable tableName="team_v2_repository_permission">
-            <column name="permission" type="VARCHAR(255)"/>
+            <column name="permission" type="VARCHAR(32)">
+                <constraints nullable="false"/>
+            </column>
             <column name="repository_id" type="BIGINT">
                 <constraints nullable="false" primaryKey="true" primaryKeyName="team_v2_repository_permissionPK"/>
             </column>
@@ -37,19 +42,19 @@
             </column>
         </createTable>
     </changeSet>
-    <changeSet author="ddmukh" id="1748795051079-4">
+    <changeSet author="ddmukh" id="1750845355837-4">
         <addPrimaryKey columnNames="team_id, user_id" constraintName="team_v2_membershipPK" tableName="team_v2_membership"/>
     </changeSet>
-    <changeSet author="ddmukh" id="1748795051079-5">
+    <changeSet author="ddmukh" id="1750845355837-5">
         <addForeignKeyConstraint baseColumnNames="user_id" baseTableName="team_v2_membership" constraintName="FK72jl22tdts2ia0icqa5qot044" deferrable="false" initiallyDeferred="false" referencedColumnNames="id" referencedTableName="user" validate="true"/>
     </changeSet>
-    <changeSet author="ddmukh" id="1748795051079-6">
+    <changeSet author="ddmukh" id="1750845355837-6">
         <addForeignKeyConstraint baseColumnNames="team_id" baseTableName="team_v2_repository_permission" constraintName="FK803huikp5crsrk7v28kv09vmi" deferrable="false" initiallyDeferred="false" referencedColumnNames="id" referencedTableName="team_v2" validate="true"/>
     </changeSet>
-    <changeSet author="ddmukh" id="1748795051079-7">
+    <changeSet author="ddmukh" id="1750845355837-7">
         <addForeignKeyConstraint baseColumnNames="repository_id" baseTableName="team_v2_repository_permission" constraintName="FKkkg4iyyc4nn31erml7j72u6cl" deferrable="false" initiallyDeferred="false" referencedColumnNames="id" referencedTableName="repository" validate="true"/>
     </changeSet>
-    <changeSet author="ddmukh" id="1748795051079-8">
+    <changeSet author="ddmukh" id="1750845355837-8">
         <addForeignKeyConstraint baseColumnNames="team_id" baseTableName="team_v2_membership" constraintName="FKqx9knktjv7ep34em8xxj22im0" deferrable="false" initiallyDeferred="false" referencedColumnNames="id" referencedTableName="team_v2" validate="true"/>
     </changeSet>
 </databaseChangeLog>

@@ -24,17 +24,21 @@ public class TeamV2 extends BaseGitServiceEntity {
 
     private String slug;
 
+    @Column(columnDefinition = "TEXT")
     private String description;
 
-    private String privacy;
+    @Column(length = 32)
+    @Enumerated(EnumType.STRING)
+    private Privacy privacy;
 
     private String organization;
 
     private String nodeId;
 
-    private String apiUrl;
-
+    @Column(columnDefinition = "TEXT")
     private String htmlUrl;
+
+    private Long parentId;
 
     private OffsetDateTime lastSyncedAt;
 
@@ -65,10 +69,16 @@ public class TeamV2 extends BaseGitServiceEntity {
         repoPermissions.clear();
         fresh.forEach(this::addRepoPermission);
     }
+
+    public enum Privacy {
+        /** Only organization members can view or request access. */
+        SECRET,
+        /** Visible to all members of the organization. */
+        CLOSED
+    }
+
     // Ignored GitHub properties:
-    // - node_id           (internal GraphQL/REST node identifier)
-    // - url               (API URL for this team)
-    // - html_url          (web URL for team page; we derive slug+org)
+    // - apiUrl               (API URL for this team)
     // - members_url       (templated URL for member listing)
     // - repositories_url  (templated URL for repos listing)
     // - parent            (if this team has a parent team)

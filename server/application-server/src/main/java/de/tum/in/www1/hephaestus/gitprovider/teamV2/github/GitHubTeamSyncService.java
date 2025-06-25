@@ -7,6 +7,7 @@ import de.tum.in.www1.hephaestus.gitprovider.teamV2.membership.TeamMembership;
 import de.tum.in.www1.hephaestus.gitprovider.teamV2.permission.*;
 import de.tum.in.www1.hephaestus.gitprovider.user.*;
 import java.io.IOException;
+import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -18,6 +19,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Lazy;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -58,7 +60,7 @@ public class GitHubTeamSyncService {
                 // must call via the proxy (self) to trigger @Transactional on processTeam
                 TeamV2 saved = self.processTeam(ghTeam);
                 if (saved == null) {
-                    log.warn("Skipped team {} with following id: {} due to error", ghTeam.getSlug(), ghTeam.getId());
+                    log.warn("Skipped team {} with following id: {} due to an error:", ghTeam.getSlug(), ghTeam.getId());
                 }
             });
     }
@@ -84,12 +86,44 @@ public class GitHubTeamSyncService {
                 team.getRepoPermissions().size()
             );
 
+            linkChildren(ghTeam, saved.getId());
+
             return saved;
         } catch (IOException e) {
             log.error("Failed to process team {}: {}", ghTeam.getId(), e.getMessage());
             return null;
         }
     }
+
+    private void linkChildren(GHTeam parentGh, long parentId) {
+        try {
+            for (GHTeam ghChild : parentGh.listChildTeams()) {
+                long childId = ghChild.getId();
+
+                TeamV2 child = teamRepository.findById(childId)
+                        // child not in DB? -> create shell
+                        .orElseGet(() -> {
+                            TeamV2 shell = teamConverter.convert(ghChild);
+                            // no heavy fetch yet
+                            shell.setRepoPermissions(Collections.emptySet());
+                            shell.setMemberships(Collections.emptySet());
+
+                            return shell;
+                        });
+
+                if (!Objects.equals(child.getParentId(), parentId)) {
+                    child.setParentId(parentId);
+                }
+                teamRepository.save(child);
+            }
+        } catch (IOException e) {
+            log.warn("Could not list child teams for {}: {}", parentGh.getSlug(), e.getMessage());
+        } catch (DataIntegrityViolationException dup) {
+            // race-condition safety when two parallel threads insert the same shell
+            log.warn("Child team already created concurrently: {}", dup.getMessage());
+        }
+    }
+
 
     private void syncMemberships(GHTeam ghTeam, TeamV2 team) throws IOException {
         Set<Long> maintainerIds = ghTeam
