@@ -1,4 +1,6 @@
+import { getGroupedThreadsOptions } from "@/api/@tanstack/react-query.gen";
 import type { QueryClient } from "@tanstack/react-query";
+import { useQuery } from "@tanstack/react-query";
 import {
 	Link,
 	Outlet,
@@ -92,13 +94,23 @@ function AppSidebarContainer() {
 	const { pathname } = useLocation();
 	const { isAuthenticated, username, hasRole } = useAuth();
 
-	if (pathname === "/landing" || !isAuthenticated || username === undefined) {
-		return null;
-	}
-
 	const sidebarContext: SidebarContext = pathname.startsWith("/mentor")
 		? "mentor"
 		: "main";
+
+	// Always call useQuery but only enable when in mentor context and authenticated
+	const {
+		data: threadGroups,
+		isLoading: mentorThreadsLoading,
+		error: mentorThreadsError,
+	} = useQuery({
+		...getGroupedThreadsOptions(),
+		enabled: sidebarContext === "mentor" && isAuthenticated,
+	});
+
+	if (pathname === "/landing" || !isAuthenticated || username === undefined) {
+		return null;
+	}
 
 	return (
 		<AppSidebar
@@ -106,6 +118,17 @@ function AppSidebarContainer() {
 			isAdmin={hasRole("admin")}
 			hasMentorAccess={hasRole("mentor_access")}
 			context={sidebarContext}
+			mentorThreadGroups={
+				sidebarContext === "mentor" ? threadGroups : undefined
+			}
+			mentorThreadsLoading={
+				sidebarContext === "mentor" ? mentorThreadsLoading : undefined
+			}
+			mentorThreadsError={
+				sidebarContext === "mentor" && mentorThreadsError
+					? "Failed to load threads"
+					: undefined
+			}
 		/>
 	);
 }

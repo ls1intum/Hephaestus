@@ -38,7 +38,8 @@ const meta: Meta<typeof Chat> = {
 		layout: "fullscreen",
 		docs: {
 			description: {
-				component: "Complete chat interface with AI Mentor. Features professional header, message display with avatars, auto-scrolling, loading states, error handling, and message regeneration capabilities.",
+				component:
+					"Complete chat interface with AI Mentor. Features professional header, message display with avatars, auto-scrolling, loading states, error handling, and message regeneration capabilities.",
 			},
 		},
 	},
@@ -55,7 +56,7 @@ const meta: Meta<typeof Chat> = {
 			description: "Called when user stops message generation",
 		},
 		onRegenerate: {
-			action: "regenerate", 
+			action: "regenerate",
 			description: "Called when user regenerates last assistant message",
 		},
 		isLoading: {
@@ -81,11 +82,12 @@ const meta: Meta<typeof Chat> = {
 		isLoading: false,
 		error: null,
 		disabled: false,
-		placeholder: "Ask me anything about software development, best practices, or technical concepts...",
+		placeholder:
+			"Ask me anything about software development, best practices, or technical concepts...",
 	},
 	decorators: [
 		(Story) => (
-<div className="h-[700px] w-full max-w-4xl mx-auto">
+			<div className="h-[700px] w-full max-w-4xl mx-auto">
 				<Story />
 			</div>
 		),
@@ -151,7 +153,9 @@ export const WithError: Story = {
 				],
 			},
 		],
-		error: new Error("Network connection failed. Please check your internet connection and try again."),
+		error: new Error(
+			"Network connection failed. Please check your internet connection and try again.",
+		),
 	},
 };
 
@@ -170,7 +174,7 @@ export const InteractiveChat: Story = {
 				parts: [{ type: "text", text }],
 			};
 
-			setMessages(prev => [...prev, userMessage]);
+			setMessages((prev) => [...prev, userMessage]);
 			setIsLoading(true);
 
 			// Simulate AI response
@@ -187,15 +191,18 @@ export const InteractiveChat: Story = {
 					],
 				};
 
-				setMessages(prev => [...prev, assistantMessage]);
+				setMessages((prev) => [...prev, assistantMessage]);
 				setIsLoading(false);
 			}, 2000);
 		};
 
 		const handleRegenerate = () => {
-			if (messages.length > 0 && messages[messages.length - 1].role === "assistant") {
+			if (
+				messages.length > 0 &&
+				messages[messages.length - 1].role === "assistant"
+			) {
 				setIsLoading(true);
-				
+
 				setTimeout(() => {
 					const newResponse: UIMessage = {
 						...messages[messages.length - 1],
@@ -209,14 +216,14 @@ export const InteractiveChat: Story = {
 						],
 					};
 
-					setMessages(prev => [...prev.slice(0, -1), newResponse]);
+					setMessages((prev) => [...prev.slice(0, -1), newResponse]);
 					setIsLoading(false);
 				}, 1500);
 			}
 		};
 
 		return (
-<Chat
+			<Chat
 				{...args}
 				messages={messages}
 				onSendMessage={handleSendMessage}

@@ -1,3 +1,4 @@
+import type { ChatThreadGroup } from "@/api/types.gen";
 import { SidebarProvider } from "@/components/ui/sidebar";
 import type { Meta, StoryObj } from "@storybook/react";
 import { AppSidebar } from "./AppSidebar";
@@ -47,13 +48,76 @@ type Story = StoryObj<typeof meta>;
 /**
  * Regular user sidebar without administrative privileges.
  */
-export const RegularUser: Story = {};
+export const RegularUser: Story = {
+	args: {
+		username: "johndoe",
+		isAdmin: false,
+		hasMentorAccess: false,
+		context: "main",
+	},
+};
 
 /**
  * Admin user sidebar with administrative privileges.
  */
 export const AdminUser: Story = {
 	args: {
+		username: "admin",
 		isAdmin: true,
+		hasMentorAccess: true,
+		context: "main",
+	},
+};
+
+/**
+ * Mentor sidebar context with grouped threads.
+ */
+export const MentorContext: Story = {
+	args: {
+		username: "mentor",
+		isAdmin: false,
+		hasMentorAccess: true,
+		context: "mentor",
+		mentorThreadGroups: [
+			{
+				groupName: "Today",
+				threads: [
+					{
+						id: "1",
+						title: "React Hooks Best Practices",
+						createdAt: new Date(),
+					},
+					{
+						id: "2",
+						title: "TypeScript Generic Types",
+						createdAt: new Date(),
+					},
+				],
+			},
+			{
+				groupName: "Yesterday",
+				threads: [
+					{
+						id: "3",
+						title: "API Architecture Review",
+						createdAt: new Date(Date.now() - 24 * 60 * 60 * 1000),
+					},
+				],
+			},
+		] as ChatThreadGroup[],
+		mentorThreadsLoading: false,
+	},
+};
+
+/**
+ * Mentor sidebar with loading state.
+ */
+export const MentorLoading: Story = {
+	args: {
+		username: "mentor",
+		isAdmin: false,
+		hasMentorAccess: true,
+		context: "mentor",
+		mentorThreadsLoading: true,
 	},
 };

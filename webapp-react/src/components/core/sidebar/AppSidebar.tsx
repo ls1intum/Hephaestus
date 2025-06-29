@@ -1,3 +1,4 @@
+import type { ChatThreadGroup } from "@/api/types.gen";
 import {
 	Sidebar,
 	SidebarContent,
@@ -28,17 +29,31 @@ const data = {
 
 export type SidebarContext = "main" | "mentor";
 
-export function AppSidebar({
-	...props
-}: React.ComponentProps<typeof Sidebar> & {
+export interface AppSidebarProps extends React.ComponentProps<typeof Sidebar> {
 	username: string;
 	isAdmin: boolean;
 	hasMentorAccess: boolean;
 	context: SidebarContext;
-}) {
+	// Optional mentor thread data - using API types directly
+	mentorThreadGroups?: ChatThreadGroup[];
+	mentorThreadsLoading?: boolean;
+	mentorThreadsError?: string;
+}
+
+export function AppSidebar({
+	username,
+	isAdmin,
+	hasMentorAccess,
+	context,
+	mentorThreadGroups,
+	mentorThreadsLoading,
+	mentorThreadsError,
+	...props
+}: AppSidebarProps) {
 	let contextHeader: JSX.Element | undefined;
 	let sidebarContent: JSX.Element;
-	if (props.context === "mentor") {
+
+	if (context === "mentor") {
 		contextHeader = (
 			<NavContextHeader title="Mentor">
 				<SidebarMenuButton asChild>
@@ -49,23 +64,26 @@ export function AppSidebar({
 				</SidebarMenuButton>
 			</NavContextHeader>
 		);
-		sidebarContent = <NavMentorThreads />;
+		sidebarContent = (
+			<NavMentorThreads
+				threadGroups={mentorThreadGroups ?? []}
+				isLoading={mentorThreadsLoading}
+				error={mentorThreadsError}
+			/>
+		);
 	} else {
 		contextHeader = undefined;
 		sidebarContent = (
 			<>
-				<NavDashboards username={props.username} />
-				{props.hasMentorAccess && <NavMentor />}
-				{props.isAdmin && <NavAdmin />}
+				<NavDashboards username={username} />
+				{hasMentorAccess && <NavMentor />}
+				{isAdmin && <NavAdmin />}
 			</>
 		);
 	}
 
 	return (
-		<Sidebar
-			collapsible={props.context === "main" ? "icon" : "offcanvas"}
-			{...props}
-		>
+		<Sidebar collapsible={context === "main" ? "icon" : "offcanvas"} {...props}>
 			<SidebarHeader>
 				<WorkspaceSwitcher
 					workspaces={data.workspaces}

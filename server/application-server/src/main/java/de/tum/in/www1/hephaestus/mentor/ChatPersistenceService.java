@@ -5,6 +5,8 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import de.tum.in.www1.hephaestus.gitprovider.user.User;
 import de.tum.in.www1.hephaestus.intelligenceservice.model.*;
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
@@ -950,7 +952,12 @@ public class ChatPersistenceService {
                 ChatThread newThread = new ChatThread();
                 newThread.setId(threadUuid);
                 newThread.setUser(user);
-                newThread.setTitle("New chat"); // Set title as expected by test
+                
+                // Format current date/time as thread title
+                LocalDateTime now = LocalDateTime.now();
+                String formattedTitle = now.format(DateTimeFormatter.ofPattern("MMM d, yyyy 'at' h:mm a"));
+                newThread.setTitle(formattedTitle);
+                
                 return chatThreadRepository.save(newThread);
             });
     }

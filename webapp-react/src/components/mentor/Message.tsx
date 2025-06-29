@@ -117,7 +117,11 @@ function Message({
 					}
 
 					// Handle data parts (source documents, URLs)
-					if (part.type.startsWith("data-") || part.type === "source-url" || part.type === "source-document") {
+					if (
+						part.type.startsWith("data-") ||
+						part.type === "source-url" ||
+						part.type === "source-document"
+					) {
 						return (
 							<div
 								key={partKey}

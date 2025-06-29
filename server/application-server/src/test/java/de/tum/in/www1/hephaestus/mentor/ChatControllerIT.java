@@ -134,7 +134,7 @@ public class ChatControllerIT extends BaseIntegrationTest {
             .findById(UUID.fromString(request.id()))
             .orElseThrow(() -> new AssertionError("No chat thread found"));
         assertThat(thread.getUser().getLogin()).isEqualTo("mentor");
-        assertThat(thread.getTitle()).isEqualTo("New chat");
+        assertThat(thread.getTitle()).isNotEmpty(); // Title should be a formatted date/time, not empty
 
         // User message should have been created with the request ID
         ChatMessage userMessage = chatMessageRepository

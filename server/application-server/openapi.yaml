@@ -12,6 +12,11 @@ info:
 servers:
 - url: /
   description: Default Server URL
+tags:
+- name: chat-controller
+  description: |-
+    REST controller for the chat functionality.
+     Handles streaming chat responses, message persistence, and thread management.
 paths:
   /workspace/user/{login}/team/{teamId}:
     put:
@@ -499,6 +504,89 @@ paths:
                 type: array
                 items:
                   $ref: "#/components/schemas/Contributor"
+  /mentor/threads:
+    get:
+      tags:
+      - chat
+      summary: Get user's chat threads
+      description: Retrieve all chat threads for the authenticated user
+      operationId: getThreads
+      responses:
+        "200":
+          description: Successfully retrieved threads
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ChatThreadSummary"
+        "401":
+          description: User not authenticated
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ChatThreadSummary"
+  /mentor/threads/grouped:
+    get:
+      tags:
+      - chat
+      summary: Get user's grouped chat threads
+      description: Retrieve all chat threads for the authenticated user grouped by
+        time periods
+      operationId: getGroupedThreads
+      responses:
+        "200":
+          description: Successfully retrieved grouped threads
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ChatThreadGroup"
+        "401":
+          description: User not authenticated
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ChatThreadGroup"
+  /mentor/thread/{threadId}:
+    get:
+      tags:
+      - chat
+      summary: Get chat thread detail
+      description: Retrieve a specific chat thread with all messages
+      operationId: getThread
+      parameters:
+      - name: threadId
+        in: path
+        description: Thread ID
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        "200":
+          description: Successfully retrieved thread
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ChatThreadDetail"
+        "401":
+          description: User not authenticated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ChatThreadDetail"
+        "404":
+          description: Thread not found or not owned by user
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ChatThreadDetail"
   /activity/{login}:
     get:
       tags:
@@ -571,72 +659,47 @@ paths:
           description: OK
 components:
   schemas:
-    PullRequestInfo:
+    UIMessage:
       type: object
+      description: Message model that matches the TypeScript interface.
       properties:
         id:
-          type: integer
-          format: int64
-        number:
-          type: integer
-          format: int32
-        title:
           type: string
-        state:
+          description: A unique identifier for the message
+          title: Id
+        metadata:
+          anyOf:
+          - type: object
+          - type: "null"
+          title: Metadata
+        parts:
+          type: array
+          items:
+            anyOf:
+            - $ref: "#/components/schemas/TextUIPart"
+            - $ref: "#/components/schemas/ReasoningUIPart"
+            - $ref: "#/components/schemas/ToolInputStreamingPart"
+            - $ref: "#/components/schemas/ToolInputAvailablePart"
+            - $ref: "#/components/schemas/ToolOutputAvailablePart"
+            - $ref: "#/components/schemas/ToolOutputErrorPart"
+            - $ref: "#/components/schemas/SourceUrlUIPart"
+            - $ref: "#/components/schemas/SourceDocumentUIPart"
+            - $ref: "#/components/schemas/FileUIPart"
+            - $ref: "#/components/schemas/DataUIPart"
+            - $ref: "#/components/schemas/StepStartUIPart"
+          title: Parts
+        role:
           type: string
           enum:
-          - OPEN
-          - CLOSED
-        isDraft:
-          type: boolean
-        isMerged:
-          type: boolean
-        commentsCount:
-          type: integer
-          format: int32
-        author:
-          $ref: "#/components/schemas/UserInfo"
-        labels:
-          type: array
-          items:
-            $ref: "#/components/schemas/LabelInfo"
-        assignees:
-          type: array
-          items:
-            $ref: "#/components/schemas/UserInfo"
-        repository:
-          $ref: "#/components/schemas/RepositoryInfo"
-        additions:
-          type: integer
-          format: int32
-        deletions:
-          type: integer
-          format: int32
-        mergedAt:
-          type: string
-          format: date-time
-        closedAt:
-          type: string
-          format: date-time
-        htmlUrl:
-          type: string
-        createdAt:
-          type: string
-          format: date-time
-        updatedAt:
-          type: string
-          format: date-time
+          - system
+          - user
+          - assistant
+          title: Role
       required:
-      - additions
-      - commentsCount
-      - deletions
-      - htmlUrl
       - id
-      - isDraft
-      - isMerged
-      - number
-      - state
-      - title
+      - parts
+      - role
+      title: UIMessage
     UserProfile:
       type: object
       properties:
@@ -661,30 +724,6 @@ components:
       - contributedRepositories
       - firstContribution
       - userInfo
-    RepositoryInfo:
-      type: object
-      properties:
-        id:
-          type: integer
-          format: int64
-        name:
-          type: string
-        nameWithOwner:
-          type: string
-        description:
-          type: string
-        htmlUrl:
-          type: string
-      required:
-      - htmlUrl
-      - id
-      - name
-      - nameWithOwner
-    UserSettings:
-      type: object
-      properties:
-        receiveNotifications:
-          type: boolean
     UserTeams:
       type: object
       properties:
@@ -708,73 +747,6 @@ components:
       - name
       - teams
       - url
-    PullRequestWithBadPractices:
-      type: object
-      properties:
-        id:
-          type: integer
-          format: int64
-        number:
-          type: integer
-          format: int32
-        title:
-          type: string
-        state:
-          type: string
-          enum:
-          - OPEN
-          - CLOSED
-        isDraft:
-          type: boolean
-        isMerged:
-          type: boolean
-        labels:
-          type: array
-          items:
-            $ref: "#/components/schemas/LabelInfo"
-        repository:
-          $ref: "#/components/schemas/RepositoryInfo"
-        additions:
-          type: integer
-          format: int32
-        deletions:
-          type: integer
-          format: int32
-        htmlUrl:
-          type: string
-        createdAt:
-          type: string
-          format: date-time
-        updatedAt:
-          type: string
-          format: date-time
-        badPracticeSummary:
-          type: string
-        badPractices:
-          type: array
-          items:
-            $ref: "#/components/schemas/PullRequestBadPractice"
-        oldBadPractices:
-          type: array
-          items:
-            $ref: "#/components/schemas/PullRequestBadPractice"
-      required:
-      - additions
-      - badPracticeSummary
-      - badPractices
-      - createdAt
-      - deletions
-      - htmlUrl
-      - id
-      - isDraft
-      - isMerged
-      - labels
-      - number
-      - oldBadPractices
-      - repository
-      - state
-      - title
-      - updatedAt
     PullRequestBaseInfo:
       type: object
       properties:
@@ -864,63 +836,16 @@ components:
       - id
       - login
       - name
-    TeamInfo:
+    StepStartUIPart:
       type: object
+      description: A step boundary part of a message.
       properties:
-        id:
-          type: integer
-          format: int64
-        name:
+        type:
           type: string
-        color:
-          type: string
-        repositories:
-          type: array
-          items:
-            $ref: "#/components/schemas/RepositoryInfo"
-        labels:
-          type: array
-          items:
-            $ref: "#/components/schemas/LabelInfo"
-        members:
-          type: array
-          items:
-            $ref: "#/components/schemas/UserInfo"
-        hidden:
-          type: boolean
-      required:
-      - color
-      - hidden
-      - id
-      - labels
-      - members
-      - name
-      - repositories
-    PullRequestBadPractice:
-      type: object
-      properties:
-        id:
-          type: integer
-          format: int64
-        title:
-          type: string
-        description:
-          type: string
-        state:
-          type: string
-          enum:
-          - GOOD_PRACTICE
-          - FIXED
-          - CRITICAL_ISSUE
-          - NORMAL_ISSUE
-          - MINOR_ISSUE
-          - WONT_FIX
-          - WRONG
-      required:
-      - description
-      - id
-      - state
-      - title
+          const: step-start
+          default: step-start
+          title: Type
+      title: StepStartUIPart
     LeagueChange:
       type: object
       properties:
@@ -948,6 +873,27 @@ components:
       - color
       - id
       - name
+    ChatThreadSummary:
+      type: object
+      description: |-
+        DTO for chat thread summary information.
+         Used for listing threads without loading full message content.
+      properties:
+        id:
+          type: string
+          format: uuid
+          description: Unique identifier for the thread
+        title:
+          type: string
+          description: Thread title (may be null for untitled threads)
+        createdAt:
+          type: string
+          format: date-time
+          description: When the thread was created
+      required:
+      - createdAt
+      - id
+      - title
     BadPracticeFeedback:
       type: object
       properties:
@@ -958,43 +904,6 @@ components:
       required:
       - explanation
       - type
-    PullRequestReviewInfo:
-      type: object
-      properties:
-        id:
-          type: integer
-          format: int64
-        isDismissed:
-          type: boolean
-        state:
-          type: string
-          enum:
-          - COMMENTED
-          - APPROVED
-          - CHANGES_REQUESTED
-          - UNKNOWN
-        codeComments:
-          type: integer
-          format: int32
-        author:
-          $ref: "#/components/schemas/UserInfo"
-        pullRequest:
-          $ref: "#/components/schemas/PullRequestBaseInfo"
-        htmlUrl:
-          type: string
-        score:
-          type: integer
-          format: int32
-        submittedAt:
-          type: string
-          format: date-time
-      required:
-      - codeComments
-      - htmlUrl
-      - id
-      - isDismissed
-      - score
-      - state
     MetaData:
       type: object
       properties:
@@ -1010,6 +919,78 @@ components:
       - scheduledDay
       - scheduledTime
       - teams
+    SourceUrlUIPart:
+      type: object
+      description: A URL source part of a message.
+      properties:
+        providerMetadata:
+          anyOf:
+          - type: object
+          - type: "null"
+          title: Providermetadata
+        sourceId:
+          type: string
+          title: Sourceid
+        title:
+          anyOf:
+          - type: string
+          - type: "null"
+          title: Title
+        type:
+          type: string
+          const: source-url
+          default: source-url
+          title: Type
+        url:
+          type: string
+          title: Url
+      required:
+      - sourceId
+      - url
+      title: SourceUrlUIPart
+    DataUIPart:
+      type: object
+      description: A data part with dynamic type.
+      properties:
+        data:
+          type: object
+          title: Data
+        id:
+          anyOf:
+          - type: string
+          - type: "null"
+          title: Id
+        type:
+          type: string
+          pattern: ^data-.*
+          title: Type
+      required:
+      - data
+      - type
+      title: DataUIPart
+    TextUIPart:
+      type: object
+      description: A text part of a message.
+      properties:
+        state:
+          anyOf:
+          - type: string
+            enum:
+            - streaming
+            - done
+          - type: "null"
+          title: State
+        text:
+          type: string
+          title: Text
+        type:
+          type: string
+          const: text
+          default: text
+          title: Type
+      required:
+      - text
+      title: TextUIPart
     LeaderboardEntry:
       type: object
       properties:
@@ -1054,3 +1035,511 @@ components:
       - reviewedPullRequests
       - score
       - user
+    ToolInputStreamingPart:
+      type: object
+      description: Tool part with input being streamed.
+      properties:
+        input:
+          anyOf:
+          - type: object
+          - type: "null"
+          title: Input
+        providerExecuted:
+          anyOf:
+          - type: boolean
+          - type: "null"
+          title: Providerexecuted
+        state:
+          type: string
+          const: input-streaming
+          default: input-streaming
+          title: State
+        toolCallId:
+          type: string
+          title: Toolcallid
+        type:
+          type: string
+          pattern: ^tool-.*
+          title: Type
+      required:
+      - toolCallId
+      - type
+      title: ToolInputStreamingPart
+    PullRequestInfo:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+        number:
+          type: integer
+          format: int32
+        title:
+          type: string
+        state:
+          type: string
+          enum:
+          - OPEN
+          - CLOSED
+        isDraft:
+          type: boolean
+        isMerged:
+          type: boolean
+        commentsCount:
+          type: integer
+          format: int32
+        author:
+          $ref: "#/components/schemas/UserInfo"
+        labels:
+          type: array
+          items:
+            $ref: "#/components/schemas/LabelInfo"
+        assignees:
+          type: array
+          items:
+            $ref: "#/components/schemas/UserInfo"
+        repository:
+          $ref: "#/components/schemas/RepositoryInfo"
+        additions:
+          type: integer
+          format: int32
+        deletions:
+          type: integer
+          format: int32
+        mergedAt:
+          type: string
+          format: date-time
+        closedAt:
+          type: string
+          format: date-time
+        htmlUrl:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+      required:
+      - additions
+      - commentsCount
+      - deletions
+      - htmlUrl
+      - id
+      - isDraft
+      - isMerged
+      - number
+      - state
+      - title
+    RepositoryInfo:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+        name:
+          type: string
+        nameWithOwner:
+          type: string
+        description:
+          type: string
+        htmlUrl:
+          type: string
+      required:
+      - htmlUrl
+      - id
+      - name
+      - nameWithOwner
+    UserSettings:
+      type: object
+      properties:
+        receiveNotifications:
+          type: boolean
+    ChatThreadGroup:
+      type: object
+      description: |-
+        DTO for grouped chat threads.
+         Used for organizing threads by time periods (today, yesterday, etc.).
+      properties:
+        groupName:
+          type: string
+          description: "Group name (e.g., \"Today\", \"Yesterday\", \"Last 7 Days\"\
+            , \"Last 30 Days\")"
+        threads:
+          type: array
+          description: List of thread summaries in this group
+          items:
+            $ref: "#/components/schemas/ChatThreadSummary"
+      required:
+      - groupName
+      - threads
+    PullRequestWithBadPractices:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+        number:
+          type: integer
+          format: int32
+        title:
+          type: string
+        state:
+          type: string
+          enum:
+          - OPEN
+          - CLOSED
+        isDraft:
+          type: boolean
+        isMerged:
+          type: boolean
+        labels:
+          type: array
+          items:
+            $ref: "#/components/schemas/LabelInfo"
+        repository:
+          $ref: "#/components/schemas/RepositoryInfo"
+        additions:
+          type: integer
+          format: int32
+        deletions:
+          type: integer
+          format: int32
+        htmlUrl:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+        badPracticeSummary:
+          type: string
+        badPractices:
+          type: array
+          items:
+            $ref: "#/components/schemas/PullRequestBadPractice"
+        oldBadPractices:
+          type: array
+          items:
+            $ref: "#/components/schemas/PullRequestBadPractice"
+      required:
+      - additions
+      - badPracticeSummary
+      - badPractices
+      - createdAt
+      - deletions
+      - htmlUrl
+      - id
+      - isDraft
+      - isMerged
+      - labels
+      - number
+      - oldBadPractices
+      - repository
+      - state
+      - title
+      - updatedAt
+    ToolOutputErrorPart:
+      type: object
+      description: Tool part with output error.
+      properties:
+        errorText:
+          type: string
+          title: Errortext
+        input:
+          type: object
+          title: Input
+        providerExecuted:
+          anyOf:
+          - type: boolean
+          - type: "null"
+          title: Providerexecuted
+        state:
+          type: string
+          const: output-error
+          default: output-error
+          title: State
+        toolCallId:
+          type: string
+          title: Toolcallid
+        type:
+          type: string
+          pattern: ^tool-.*
+          title: Type
+      required:
+      - errorText
+      - input
+      - toolCallId
+      - type
+      title: ToolOutputErrorPart
+    TeamInfo:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+        name:
+          type: string
+        color:
+          type: string
+        repositories:
+          type: array
+          items:
+            $ref: "#/components/schemas/RepositoryInfo"
+        labels:
+          type: array
+          items:
+            $ref: "#/components/schemas/LabelInfo"
+        members:
+          type: array
+          items:
+            $ref: "#/components/schemas/UserInfo"
+        hidden:
+          type: boolean
+      required:
+      - color
+      - hidden
+      - id
+      - labels
+      - members
+      - name
+      - repositories
+    ToolOutputAvailablePart:
+      type: object
+      description: Tool part with output available.
+      properties:
+        input:
+          type: object
+          title: Input
+        output:
+          type: object
+          title: Output
+        providerExecuted:
+          anyOf:
+          - type: boolean
+          - type: "null"
+          title: Providerexecuted
+        state:
+          type: string
+          const: output-available
+          default: output-available
+          title: State
+        toolCallId:
+          type: string
+          title: Toolcallid
+        type:
+          type: string
+          pattern: ^tool-.*
+          title: Type
+      required:
+      - input
+      - output
+      - toolCallId
+      - type
+      title: ToolOutputAvailablePart
+    PullRequestBadPractice:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+        title:
+          type: string
+        description:
+          type: string
+        state:
+          type: string
+          enum:
+          - GOOD_PRACTICE
+          - FIXED
+          - CRITICAL_ISSUE
+          - NORMAL_ISSUE
+          - MINOR_ISSUE
+          - WONT_FIX
+          - WRONG
+      required:
+      - description
+      - id
+      - state
+      - title
+    FileUIPart:
+      type: object
+      description: A file part of a message.
+      properties:
+        filename:
+          anyOf:
+          - type: string
+          - type: "null"
+          title: Filename
+        mediaType:
+          type: string
+          title: Mediatype
+        type:
+          type: string
+          const: file
+          default: file
+          title: Type
+        url:
+          type: string
+          title: Url
+      required:
+      - mediaType
+      - url
+      title: FileUIPart
+    PullRequestReviewInfo:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+        isDismissed:
+          type: boolean
+        state:
+          type: string
+          enum:
+          - COMMENTED
+          - APPROVED
+          - CHANGES_REQUESTED
+          - UNKNOWN
+        codeComments:
+          type: integer
+          format: int32
+        author:
+          $ref: "#/components/schemas/UserInfo"
+        pullRequest:
+          $ref: "#/components/schemas/PullRequestBaseInfo"
+        htmlUrl:
+          type: string
+        score:
+          type: integer
+          format: int32
+        submittedAt:
+          type: string
+          format: date-time
+      required:
+      - codeComments
+      - htmlUrl
+      - id
+      - isDismissed
+      - score
+      - state
+    SourceDocumentUIPart:
+      type: object
+      description: A document source part of a message.
+      properties:
+        filename:
+          anyOf:
+          - type: string
+          - type: "null"
+          title: Filename
+        mediaType:
+          type: string
+          title: Mediatype
+        providerMetadata:
+          anyOf:
+          - type: object
+          - type: "null"
+          title: Providermetadata
+        sourceId:
+          type: string
+          title: Sourceid
+        title:
+          type: string
+          title: Title
+        type:
+          type: string
+          const: source-document
+          default: source-document
+          title: Type
+      required:
+      - mediaType
+      - sourceId
+      - title
+      title: SourceDocumentUIPart
+    ReasoningUIPart:
+      type: object
+      description: A reasoning part of a message.
+      properties:
+        providerMetadata:
+          anyOf:
+          - type: object
+          - type: "null"
+          title: Providermetadata
+        state:
+          anyOf:
+          - type: string
+            enum:
+            - streaming
+            - done
+          - type: "null"
+          title: State
+        text:
+          type: string
+          title: Text
+        type:
+          type: string
+          const: reasoning
+          default: reasoning
+          title: Type
+      required:
+      - text
+      title: ReasoningUIPart
+    ToolInputAvailablePart:
+      type: object
+      description: Tool part with input available.
+      properties:
+        input:
+          type: object
+          title: Input
+        providerExecuted:
+          anyOf:
+          - type: boolean
+          - type: "null"
+          title: Providerexecuted
+        state:
+          type: string
+          const: input-available
+          default: input-available
+          title: State
+        toolCallId:
+          type: string
+          title: Toolcallid
+        type:
+          type: string
+          pattern: ^tool-.*
+          title: Type
+      required:
+      - input
+      - toolCallId
+      - type
+      title: ToolInputAvailablePart
+    ChatThreadDetail:
+      type: object
+      description: |-
+        DTO for chat thread with full message content.
+         Used for initializing useChat in the frontend.
+      properties:
+        id:
+          type: string
+          format: uuid
+          description: Unique identifier for the thread
+        title:
+          type: string
+          description: Thread title (may be null for untitled threads)
+        createdAt:
+          type: string
+          format: date-time
+          description: When the thread was created
+        messages:
+          type: array
+          description: |-
+            All messages in the conversation path (as JSON objects for useChat initialization)
+             As exception, we do not use a DTO here since we included those intelligece-service models in the OpenAPI spec.
+          items:
+            $ref: "#/components/schemas/UIMessage"
+        selectedLeafMessageId:
+          type: string
+          format: uuid
+          description: ID of the currently selected leaf message (end of active conversation
+            path)
