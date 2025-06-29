@@ -25,20 +25,49 @@ import com.fasterxml.jackson.annotation.JsonTypeName;
 import org.hibernate.validator.constraints.*;
 
 /**
- * Reasoning finish event.
+ * Text stream start part.
  */
 @JsonPropertyOrder({
-  StreamReasoningFinishPart.JSON_PROPERTY_TYPE
+  StreamTextStartPart.JSON_PROPERTY_ID,
+  StreamTextStartPart.JSON_PROPERTY_TYPE
 })
 @jakarta.annotation.Generated(value = "org.openapitools.codegen.languages.JavaClientCodegen", comments = "Generator version: 7.7.0")
-public class StreamReasoningFinishPart {
-  public static final String JSON_PROPERTY_TYPE = "type";
-  private String type = "reasoning-part-finish";
+public class StreamTextStartPart {
+  public static final String JSON_PROPERTY_ID = "id";
+  private String id;
 
-  public StreamReasoningFinishPart() {
+  public static final String JSON_PROPERTY_TYPE = "type";
+  private String type = "text-start";
+
+  public StreamTextStartPart() {
   }
 
-  public StreamReasoningFinishPart type(String type) {
+  public StreamTextStartPart id(String id) {
+    
+    this.id = id;
+    return this;
+  }
+
+  /**
+   * Get id
+   * @return id
+   */
+  @jakarta.annotation.Nonnull
+  @JsonProperty(JSON_PROPERTY_ID)
+  @JsonInclude(value = JsonInclude.Include.ALWAYS)
+
+  public String getId() {
+    return id;
+  }
+
+
+  @JsonProperty(JSON_PROPERTY_ID)
+  @JsonInclude(value = JsonInclude.Include.ALWAYS)
+  public void setId(String id) {
+    this.id = id;
+  }
+
+  public StreamTextStartPart type(String type) {
     
     this.type = type;
     return this;
@@ -71,19 +100,21 @@ public class StreamReasoningFinishPart {
     if (o == null || getClass() != o.getClass()) {
       return false;
     }
-    StreamReasoningFinishPart streamReasoningFinishPart = (StreamReasoningFinishPart) o;
-    return Objects.equals(this.type, streamReasoningFinishPart.type);
+    StreamTextStartPart streamTextStartPart = (StreamTextStartPart) o;
+    return Objects.equals(this.id, streamTextStartPart.id) &&
+        Objects.equals(this.type, streamTextStartPart.type);
   }
 
   @Override
   public int hashCode() {
-    return Objects.hash(type);
+    return Objects.hash(id, type);
   }
 
   @Override
   public String toString() {
     StringBuilder sb = new StringBuilder();
-    sb.append("class StreamReasoningFinishPart {\n");
+    sb.append("class StreamTextStartPart {\n");
+    sb.append("    id: ").append(toIndentedString(id)).append("\n");
     sb.append("    type: ").append(toIndentedString(type)).append("\n");
     sb.append("}");
     return sb.toString();

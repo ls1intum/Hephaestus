@@ -1,9 +1,18 @@
+// Core Chat Components
 export { Chat } from "./Chat";
-export { Message, messageVariants } from "./Message";
-export { MessageComposer } from "./MessageComposer";
-export { MessagesContainer } from "./MessagesContainer";
+export { ChatInput, type ChatInputRef } from "./ChatInput";
+export {
+	ChatMessages,
+	ChatMessagesEmpty,
+	ChatMessagesLoading,
+	ChatMessagesError,
+} from "./ChatMessages";
+export { Message } from "./Message";
+export { MessageActions } from "./MessageActions";
 
+// Component Types
 export type { ChatProps } from "./Chat";
-export type { MessageProps, MessagePart } from "./Message";
-export type { MessageComposerProps } from "./MessageComposer";
-export type { MessagesContainerProps, ChatMessage } from "./MessagesContainer";
+export type { ChatInputProps } from "./ChatInput";
+export type { ChatMessagesProps } from "./ChatMessages";
+export type { MessageProps } from "./Message";
+export type { MessageActionsProps } from "./MessageActions";

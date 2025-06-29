@@ -29,121 +29,86 @@ import com.fasterxml.jackson.annotation.JsonTypeName;
 import org.hibernate.validator.constraints.*;
 
 /**
- * A text part of a message.
+ * Reasoning stream end part.
  */
 @JsonPropertyOrder({
-  TextUIPart.JSON_PROPERTY_STATE,
-  TextUIPart.JSON_PROPERTY_TEXT,
-  TextUIPart.JSON_PROPERTY_TYPE
+  StreamReasoningEndPart.JSON_PROPERTY_ID,
+  StreamReasoningEndPart.JSON_PROPERTY_PROVIDER_METADATA,
+  StreamReasoningEndPart.JSON_PROPERTY_TYPE
 })
 @jakarta.annotation.Generated(value = "org.openapitools.codegen.languages.JavaClientCodegen", comments = "Generator version: 7.7.0")
-public class TextUIPart {
-  /**
-   * Gets or Sets state
-   */
-  public enum StateEnum {
-    STREAMING("streaming"),
-    
-    DONE("done");
+public class StreamReasoningEndPart {
+  public static final String JSON_PROPERTY_ID = "id";
+  private String id;
 
-    private String value;
-
-    StateEnum(String value) {
-      this.value = value;
-    }
-
-    @JsonValue
-    public String getValue() {
-      return value;
-    }
-
-    @Override
-    public String toString() {
-      return String.valueOf(value);
-    }
-
-    @JsonCreator
-    public static StateEnum fromValue(String value) {
-      for (StateEnum b : StateEnum.values()) {
-        if (b.value.equals(value)) {
-          return b;
-        }
-      }
-      return null;
-    }
-  }
-
-  public static final String JSON_PROPERTY_STATE = "state";
-  private JsonNullable<StateEnum> state = JsonNullable.<StateEnum>undefined();
-
-  public static final String JSON_PROPERTY_TEXT = "text";
-  private String text;
+  public static final String JSON_PROPERTY_PROVIDER_METADATA = "providerMetadata";
+  private JsonNullable<Object> providerMetadata = JsonNullable.<Object>undefined();
 
   public static final String JSON_PROPERTY_TYPE = "type";
-  private String type = "text";
+  private String type = "reasoning-end";
 
-  public TextUIPart() {
+  public StreamReasoningEndPart() {
   }
 
-  public TextUIPart state(StateEnum state) {
-    this.state = JsonNullable.<StateEnum>of(state);
+  public StreamReasoningEndPart id(String id) {
+    
+    this.id = id;
+    return this;
+  }
+
+  /**
+   * Get id
+   * @return id
+   */
+  @jakarta.annotation.Nonnull
+  @JsonProperty(JSON_PROPERTY_ID)
+  @JsonInclude(value = JsonInclude.Include.ALWAYS)
+
+  public String getId() {
+    return id;
+  }
+
+
+  @JsonProperty(JSON_PROPERTY_ID)
+  @JsonInclude(value = JsonInclude.Include.ALWAYS)
+  public void setId(String id) {
+    this.id = id;
+  }
+
+  public StreamReasoningEndPart providerMetadata(Object providerMetadata) {
+    this.providerMetadata = JsonNullable.<Object>of(providerMetadata);
     
     return this;
   }
 
   /**
-   * Get state
-   * @return state
+   * Get providerMetadata
+   * @return providerMetadata
    */
   @jakarta.annotation.Nullable
   @JsonIgnore
 
-  public StateEnum getState() {
-        return state.orElse(null);
+  public Object getProviderMetadata() {
+        return providerMetadata.orElse(null);
   }
 
-  @JsonProperty(JSON_PROPERTY_STATE)
+  @JsonProperty(JSON_PROPERTY_PROVIDER_METADATA)
   @JsonInclude(value = JsonInclude.Include.USE_DEFAULTS)
 
-  public JsonNullable<StateEnum> getState_JsonNullable() {
-    return state;
+  public JsonNullable<Object> getProviderMetadata_JsonNullable() {
+    return providerMetadata;
   }
   
-  @JsonProperty(JSON_PROPERTY_STATE)
-  public void setState_JsonNullable(JsonNullable<StateEnum> state) {
-    this.state = state;
+  @JsonProperty(JSON_PROPERTY_PROVIDER_METADATA)
+  public void setProviderMetadata_JsonNullable(JsonNullable<Object> providerMetadata) {
+    this.providerMetadata = providerMetadata;
   }
 
-  public void setState(StateEnum state) {
-    this.state = JsonNullable.<StateEnum>of(state);
+  public void setProviderMetadata(Object providerMetadata) {
+    this.providerMetadata = JsonNullable.<Object>of(providerMetadata);
   }
 
-  public TextUIPart text(String text) {
-    
-    this.text = text;
-    return this;
-  }
-
-  /**
-   * Get text
-   * @return text
-   */
-  @jakarta.annotation.Nonnull
-  @JsonProperty(JSON_PROPERTY_TEXT)
-  @JsonInclude(value = JsonInclude.Include.ALWAYS)
-
-  public String getText() {
-    return text;
-  }
-
-
-  @JsonProperty(JSON_PROPERTY_TEXT)
-  @JsonInclude(value = JsonInclude.Include.ALWAYS)
-  public void setText(String text) {
-    this.text = text;
-  }
-
-  public TextUIPart type(String type) {
+  public StreamReasoningEndPart type(String type) {
     
     this.type = type;
     return this;
@@ -176,10 +141,10 @@ public class TextUIPart {
     if (o == null || getClass() != o.getClass()) {
       return false;
     }
-    TextUIPart textUIPart = (TextUIPart) o;
-    return equalsNullable(this.state, textUIPart.state) &&
-        Objects.equals(this.text, textUIPart.text) &&
-        Objects.equals(this.type, textUIPart.type);
+    StreamReasoningEndPart streamReasoningEndPart = (StreamReasoningEndPart) o;
+    return Objects.equals(this.id, streamReasoningEndPart.id) &&
+        equalsNullable(this.providerMetadata, streamReasoningEndPart.providerMetadata) &&
+        Objects.equals(this.type, streamReasoningEndPart.type);
   }
 
   private static <T> boolean equalsNullable(JsonNullable<T> a, JsonNullable<T> b) {
@@ -188,7 +153,7 @@ public class TextUIPart {
 
   @Override
   public int hashCode() {
-    return Objects.hash(hashCodeNullable(state), text, type);
+    return Objects.hash(id, hashCodeNullable(providerMetadata), type);
   }
 
   private static <T> int hashCodeNullable(JsonNullable<T> a) {
@@ -201,9 +166,9 @@ public class TextUIPart {
   @Override
   public String toString() {
     StringBuilder sb = new StringBuilder();
-    sb.append("class TextUIPart {\n");
-    sb.append("    state: ").append(toIndentedString(state)).append("\n");
-    sb.append("    text: ").append(toIndentedString(text)).append("\n");
+    sb.append("class StreamReasoningEndPart {\n");
+    sb.append("    id: ").append(toIndentedString(id)).append("\n");
+    sb.append("    providerMetadata: ").append(toIndentedString(providerMetadata)).append("\n");
     sb.append("    type: ").append(toIndentedString(type)).append("\n");
     sb.append("}");
     return sb.toString();

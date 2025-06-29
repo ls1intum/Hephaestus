@@ -7,6 +7,8 @@ from app.logger import logger
 from app.db.service import IssueDatabaseService
 from app.mentor.state import MentorState
 
+logger = logger.getChild(__name__)
+
 
 @tool
 def get_weather(latitude: float, longitude: float) -> dict:
@@ -73,15 +75,16 @@ def get_weather(latitude: float, longitude: float) -> dict:
 
 @tool
 def get_user_issues(state: Annotated[MentorState, InjectedState]) -> List[Dict[str, Any]]:
-    """Get issues created by the user."""
+    """Get issues assigned to the user."""
+    logger.debug("Fetching issues assigned to user with ID: %s", state.get("user_id"))
     try:
         user_id = state.get("user_id")
         if not user_id:
             logger.error("User ID not found in state.")
             return []
         limit = state.get("limit", 50)
-
         issues = IssueDatabaseService.get_issues_assigned_to_user(user_id, limit)
+        logger.debug("Retrieved %d issues from database", len(issues))
 
         formatted_issues = []
         for issue in issues:

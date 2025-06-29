@@ -1,49 +1,91 @@
 import type { Meta, StoryObj } from "@storybook/react";
 import { fn } from "@storybook/test";
+import { useState } from "react";
+
+import type { UIMessage } from "@ai-sdk/react";
 import { Chat } from "./Chat";
 
-/**
- * Complete chat interface combining messages display and input composer.
- * Provides a full-featured chat experience with streaming support and error handling.
- */
-const meta = {
+const sampleMessages: UIMessage[] = [
+	{
+		id: "1",
+		role: "user",
+		parts: [
+			{
+				type: "text",
+				text: "What are the key principles of clean code?",
+			},
+		],
+	},
+	{
+		id: "2",
+		role: "assistant",
+		parts: [
+			{
+				type: "step-start",
+			},
+			{
+				type: "text",
+				text: "Clean code is essential for maintainable software. Here are the key principles:\n\n**1. Readability First**\n- Code should read like well-written prose\n- Use meaningful variable and function names\n- Keep functions small and focused\n\n**2. Single Responsibility Principle**\n- Each function should do one thing well\n- Classes should have only one reason to change\n\n**3. DRY (Don't Repeat Yourself)**\n- Eliminate code duplication\n- Extract common functionality into reusable components\n\n**4. Consistent Formatting**\n- Use consistent indentation and spacing\n- Follow team coding standards\n- Use automated formatting tools\n\n**5. Meaningful Comments**\n- Explain 'why', not 'what'\n- Keep comments up-to-date with code changes\n- Remove obsolete comments\n\nWould you like me to elaborate on any of these principles?",
+			},
+		],
+	},
+];
+
+const meta: Meta<typeof Chat> = {
+	title: "Components/Mentor/Chat",
 	component: Chat,
-	parameters: { layout: "centered" },
-	tags: ["autodocs"],
+	parameters: {
+		layout: "fullscreen",
+		docs: {
+			description: {
+				component: "Complete chat interface with AI Mentor. Features professional header, message display with avatars, auto-scrolling, loading states, error handling, and message regeneration capabilities.",
+			},
+		},
+	},
 	argTypes: {
-		isStreaming: {
+		messages: {
+			description: "Array of UIMessage objects for the conversation",
+		},
+		onSendMessage: {
+			action: "sendMessage",
+			description: "Called when user sends a new message",
+		},
+		onStop: {
+			action: "stop",
+			description: "Called when user stops message generation",
+		},
+		onRegenerate: {
+			action: "regenerate", 
+			description: "Called when user regenerates last assistant message",
+		},
+		isLoading: {
 			control: "boolean",
-			description: "Shows streaming state and thinking indicator",
+			description: "Whether AI is currently generating a response",
+		},
+		error: {
+			description: "Error object to display error state",
 		},
 		disabled: {
 			control: "boolean",
-			description: "Disables message input",
+			description: "Whether the input is disabled",
 		},
 		placeholder: {
 			control: "text",
-			description: "Custom placeholder for message input",
-		},
-		onMessageSubmit: {
-			action: "message submitted",
-			description: "Called when user sends a message",
-		},
-		onStop: {
-			action: "generation stopped",
-			description: "Called when user stops generation",
-		},
-		onRetry: {
-			action: "retry clicked",
-			description: "Called when user clicks retry after error",
+			description: "Placeholder text for the input",
 		},
 	},
 	args: {
-		onMessageSubmit: fn(),
+		onSendMessage: fn(),
 		onStop: fn(),
-		onRetry: fn(),
+		onRegenerate: fn(),
+		isLoading: false,
+		error: null,
+		disabled: false,
+		placeholder: "Ask me anything about software development, best practices, or technical concepts...",
 	},
 	decorators: [
 		(Story) => (
-			<div className="h-[600px] w-[800px]">
+<div className="h-[700px] w-full max-w-4xl mx-auto">
 				<Story />
 			</div>
 		),
@@ -54,7 +96,7 @@ export default meta;
 type Story = StoryObj<typeof meta>;
 
 /**
- * Empty chat ready for the first message.
+ * Empty chat state with welcoming message and suggested topics.
  */
 export const Empty: Story = {
 	args: {
@@ -63,9 +105,18 @@ export const Empty: Story = {
 };
 
 /**
- * Active conversation between user and AI mentor.
+ * Basic conversation demonstrating user and assistant messages.
  */
-export const WithConversation: Story = {
+export const BasicConversation: Story = {
+	args: {
+		messages: sampleMessages,
+	},
+};
+
+/**
+ * Chat in loading state while AI generates response.
+ */
+export const Loading: Story = {
 	args: {
 		messages: [
 			{
@@ -74,65 +125,17 @@ export const WithConversation: Story = {
 				parts: [
 					{
 						type: "text",
-						text: "What are React hooks and why should I use them?",
-					},
-				],
-			},
-			{
-				id: "2",
-				role: "assistant",
-				parts: [
-					{
-						type: "text",
-						text: "React hooks are functions that let you use state and lifecycle features in functional components. They were introduced in React 16.8 and offer several advantages:\n\n**Benefits:**\n1. **Simpler code** - No need for class components\n2. **Better reusability** - Custom hooks can be shared\n3. **Easier testing** - Functions are easier to test than classes\n4. **Better performance** - Smaller bundle size\n\n**Most common hooks:**\n- `useState` - for managing state\n- `useEffect` - for side effects\n- `useContext` - for consuming context\n\nWould you like me to show you some examples?",
-					},
-				],
-			},
-			{
-				id: "3",
-				role: "user",
-				parts: [
-					{ type: "text", text: "Yes, please show me a useState example!" },
-				],
-			},
-		],
-	},
-};
-
-/**
- * AI is currently generating a response.
- */
-export const Streaming: Story = {
-	args: {
-		messages: [
-			{
-				id: "1",
-				role: "user",
-				parts: [
-					{
-						type: "text",
-						text: "Can you explain useState with a practical example?",
-					},
-				],
-			},
-			{
-				id: "2",
-				role: "assistant",
-				parts: [
-					{
-						type: "text",
-						text: "Here's a practical useState example - a simple counter component:\n\n```jsx\nimport { useState } from 'react';\n\nfunction Counter() {\n  const [count, setCount] = useState(0);\n\n  return (\n    <div>\n      <p>Count: {count}</p>\n      <button onClick={() => setCount(count + 1)}>\n        Increment\n      </button>\n      <button onClick={() => setCount(count - 1)}>\n        Decrement\n      </button>\n      <button onClick={() => setCount(0)}>\n        Reset\n      </button>\n    </div>\n  );\n}\n```\n\n**Key points:**\n- `useState(0)` initializes count to 0\n- Returns array with current value and setter function\n- `setCount` triggers re-render when called\n- State updates are",
+						text: "Can you explain dependency injection in TypeScript?",
 					},
 				],
 			},
 		],
-		isStreaming: true,
-		streamingMessageId: "2",
+		isLoading: true,
 	},
 };
 
 /**
- * Error state with retry option.
+ * Chat showing an error state with retry option.
  */
 export const WithError: Story = {
 	args: {
@@ -140,116 +143,87 @@ export const WithError: Story = {
 			{
 				id: "1",
 				role: "user",
-				parts: [{ type: "text", text: "Explain the useEffect hook to me" }],
+				parts: [
+					{
+						type: "text",
+						text: "What are the best practices for React testing?",
+					},
+				],
 			},
 		],
-		error: new Error("Network connection failed"),
+		error: new Error("Network connection failed. Please check your internet connection and try again."),
 	},
 };
 
 /**
- * Disabled state during processing.
+ * Interactive chat simulation demonstrating full conversation flow.
  */
-export const Disabled: Story = {
-	args: {
-		messages: [
-			{
-				id: "1",
-				role: "user",
-				parts: [{ type: "text", text: "What is TypeScript?" }],
-			},
-			{
-				id: "2",
-				role: "assistant",
-				parts: [
-					{
-						type: "text",
-						text: "TypeScript is a programming language developed by Microsoft that builds on JavaScript by adding static type definitions.",
-					},
-				],
-			},
-		],
-		disabled: true,
-		placeholder: "Processing your request...",
-	},
-};
+export const InteractiveChat: Story = {
+	render: (args) => {
+		const [messages, setMessages] = useState<UIMessage[]>([]);
+		const [isLoading, setIsLoading] = useState(false);
 
-/**
- * Long conversation showcasing scroll behavior.
- */
-export const LongConversation: Story = {
-	args: {
-		messages: [
-			{
-				id: "1",
+		const handleSendMessage = (text: string) => {
+			const userMessage: UIMessage = {
+				id: Date.now().toString(),
 				role: "user",
-				parts: [
-					{
-						type: "text",
-						text: "What are the key differences between React and Vue?",
-					},
-				],
-			},
-			{
-				id: "2",
-				role: "assistant",
-				parts: [
-					{
-						type: "text",
-						text: "Great question! Here are the key differences between React and Vue:\n\n**React:**\n- Created by Facebook, more mature ecosystem\n- Uses JSX (JavaScript + HTML-like syntax)\n- More flexible but requires more decisions\n- Larger learning curve\n- Better for large, complex applications\n\n**Vue:**\n- More opinionated, easier to get started\n- Uses template syntax (closer to HTML)\n- Built-in state management and routing\n- Gentler learning curve\n- Great for rapid prototyping",
-					},
-				],
-			},
-			{
-				id: "3",
-				role: "user",
-				parts: [
-					{
-						type: "text",
-						text: "Which one should I choose for my first project?",
-					},
-				],
-			},
-			{
-				id: "4",
-				role: "assistant",
-				parts: [
-					{
-						type: "text",
-						text: "For your first project, I'd recommend considering:\n\n**Choose Vue if:**\n- You're new to frontend frameworks\n- You want to get productive quickly\n- You prefer template-based syntax\n- You're building a small to medium project\n\n**Choose React if:**\n- You want to learn the most popular framework\n- You plan to work at larger companies\n- You enjoy more flexibility in your tools\n- You're comfortable with a steeper learning curve\n\nWhat type of project are you planning to build?",
-					},
-				],
-			},
-			{
-				id: "5",
-				role: "user",
-				parts: [
-					{
-						type: "text",
-						text: "I want to build a personal portfolio website",
-					},
-				],
-			},
-			{
-				id: "6",
-				role: "assistant",
-				parts: [
-					{
-						type: "text",
-						text: "Perfect! For a personal portfolio website, I'd actually recommend React for these reasons:\n\n1. **Job Market** - React skills are highly valued by employers\n2. **Portfolio Value** - Shows you can handle the most popular framework\n3. **Ecosystem** - Excellent tools like Next.js for static sites\n4. **Learning Investment** - Time spent learning React pays off long-term\n\n**Recommended Stack:**\n- Next.js (React framework)\n- Tailwind CSS (styling)\n- Vercel (hosting)\n- MDX (blog posts if needed)\n\nThis combination is perfect for portfolios and will showcase modern development skills to potential employers.",
-					},
-				],
-			},
-			{
-				id: "7",
-				role: "user",
-				parts: [
-					{
-						type: "text",
-						text: "That sounds great! Can you help me get started with Next.js?",
-					},
-				],
-			},
-		],
+				parts: [{ type: "text", text }],
+			};
+
+			setMessages(prev => [...prev, userMessage]);
+			setIsLoading(true);
+
+			// Simulate AI response
+			setTimeout(() => {
+				const assistantMessage: UIMessage = {
+					id: (Date.now() + 1).toString(),
+					role: "assistant",
+					parts: [
+						{ type: "step-start" },
+						{
+							type: "text",
+							text: `Great question about "${text}"! This is a simulated AI response demonstrating how the chat interface handles real-time conversations with proper message formatting and structure.`,
+						},
+					],
+				};
+
+				setMessages(prev => [...prev, assistantMessage]);
+				setIsLoading(false);
+			}, 2000);
+		};
+
+		const handleRegenerate = () => {
+			if (messages.length > 0 && messages[messages.length - 1].role === "assistant") {
+				setIsLoading(true);
+				
+				setTimeout(() => {
+					const newResponse: UIMessage = {
+						...messages[messages.length - 1],
+						id: Date.now().toString(),
+						parts: [
+							{ type: "step-start" },
+							{
+								type: "text",
+								text: "Here's a regenerated response with different phrasing and approach. This demonstrates the regeneration functionality working smoothly.",
+							},
+						],
+					};
+
+					setMessages(prev => [...prev.slice(0, -1), newResponse]);
+					setIsLoading(false);
+				}, 1500);
+			}
+		};
+
+		return (
+<Chat
+				{...args}
+				messages={messages}
+				onSendMessage={handleSendMessage}
+				onRegenerate={handleRegenerate}
+				onStop={() => setIsLoading(false)}
+				isLoading={isLoading}
+			/>
+		);
 	},
 };

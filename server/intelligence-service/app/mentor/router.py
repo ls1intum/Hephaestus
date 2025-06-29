@@ -19,7 +19,7 @@ class ChatRequest(BaseModel):
     id: Optional[str] = None
     messages: List[UIMessage]
     metadata: Optional[Dict[str, Any]] = None
-    user_id: int = None
+    user_id: int
 
 
 class ChatResponse(RootModel[StreamPart]):

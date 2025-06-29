@@ -2,7 +2,8 @@
 LangGraph-based response generation with proper streaming using astream_events.
 """
 import json
-from typing import AsyncGenerator, Dict, Any
+import uuid
+from typing import AsyncGenerator
 from langchain_core.messages import BaseMessage
 from langchain_core.runnables import RunnableConfig
 
@@ -49,6 +50,8 @@ async def generate_response(
         # Track tool calls for proper streaming
         active_tool_calls = {}
         tool_call_to_id = {}  # Map tool names to their call IDs for tracking
+        text_stream_id = None
+        text_streaming_active = False
         
         # Stream events from the graph
         async for event in mentor_graph.astream_events(
@@ -67,9 +70,16 @@ async def generate_response(
             if event_type == "on_chat_model_stream" and node_name == "agent":
                 chunk = data.get("chunk")
                 if chunk:
-                    # Handle text content
+                    # Handle text content with ID-based streaming
                     if hasattr(chunk, 'content') and chunk.content:
-                        yield stream.text(chunk.content)
+                        # Start text streaming if not already active
+                        if not text_streaming_active:
+                            text_stream_id = str(uuid.uuid4())
+                            yield stream.text_start(text_stream_id)
+                            text_streaming_active = True
+                        
+                        # Send text delta
+                        yield stream.text_delta(text_stream_id, chunk.content)
                     
                     # Handle tool calls
                     if hasattr(chunk, 'tool_calls') and chunk.tool_calls:
@@ -119,6 +129,12 @@ async def generate_response(
             
             # Handle when chat model finishes (tool calls are complete)
             elif event_type == "on_chat_model_end" and node_name == "agent":
+                # End text streaming if it was active
+                if text_streaming_active and text_stream_id:
+                    yield stream.text_end(text_stream_id)
+                    text_streaming_active = False
+                    text_stream_id = None
+                
                 output = data.get("output")
                 if output and hasattr(output, 'tool_calls') and output.tool_calls:
                     for tool_call in output.tool_calls:

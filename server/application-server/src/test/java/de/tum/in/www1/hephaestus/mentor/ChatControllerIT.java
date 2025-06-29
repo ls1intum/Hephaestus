@@ -9,6 +9,7 @@ import de.tum.in.www1.hephaestus.testconfig.TestAuthUtils;
 import de.tum.in.www1.hephaestus.testconfig.WithMentorUser;
 import de.tum.in.www1.hephaestus.gitprovider.user.User;
 import de.tum.in.www1.hephaestus.gitprovider.user.UserRepository;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -43,6 +44,42 @@ public class ChatControllerIT extends BaseIntegrationTest {
     @Autowired
     private ObjectMapper objectMapper;
 
+    /**
+     * Helper method to create text streaming parts in AI SDK v5 format.
+     * @param textSegments Array of text segments to stream
+     * @return List of streaming parts (start, deltas, end)
+     */
+    private List<Object> createTextStreamParts(String... textSegments) {
+        String textId = UUID.randomUUID().toString();
+        List<Object> parts = new ArrayList<>();
+        
+        parts.add(new StreamTextStartPart().id(textId));
+        for (String segment : textSegments) {
+            parts.add(new StreamTextDeltaPart().id(textId).delta(segment));
+        }
+        parts.add(new StreamTextEndPart().id(textId));
+        
+        return parts;
+    }
+
+    /**
+     * Helper method to create reasoning streaming parts in AI SDK v5 format.
+     * @param reasoningSegments Array of reasoning segments to stream
+     * @return List of streaming parts (start, deltas, end)
+     */
+    private List<Object> createReasoningStreamParts(String... reasoningSegments) {
+        String reasoningId = UUID.randomUUID().toString();
+        List<Object> parts = new ArrayList<>();
+        
+        parts.add(new StreamReasoningStartPart().id(reasoningId));
+        for (String segment : reasoningSegments) {
+            parts.add(new StreamReasoningDeltaPart().id(reasoningId).delta(segment));
+        }
+        parts.add(new StreamReasoningEndPart().id(reasoningId));
+        
+        return parts;
+    }
+
     @Test
     void testUnauthenticatedRequestShouldBeRejected() {
         // Given
@@ -67,17 +104,20 @@ public class ChatControllerIT extends BaseIntegrationTest {
         // Given: A new chat with a single user text message
         var request = createChatRequest();
         String responseMessageId = UUID.randomUUID().toString();
+        String textId = UUID.randomUUID().toString();
         
         mockResponseHolder.setStreamParts(
             request.messages().getLast().getId(),
             List.of(
                 new StreamStartPart().messageId(responseMessageId),
                 new StreamStepStartPart(),
-                new StreamTextPart().text("Hello,"),
-                new StreamTextPart().text(" this"),
-                new StreamTextPart().text(" is"),
-                new StreamTextPart().text(" a"),
-                new StreamTextPart().text(" test!"),
+                new StreamTextStartPart().id(textId),
+                new StreamTextDeltaPart().id(textId).delta("Hello,"),
+                new StreamTextDeltaPart().id(textId).delta(" this"),
+                new StreamTextDeltaPart().id(textId).delta(" is"),
+                new StreamTextDeltaPart().id(textId).delta(" a"),
+                new StreamTextDeltaPart().id(textId).delta(" test!"),
+                new StreamTextEndPart().id(textId),
                 new StreamStepFinishPart(),
                 new StreamFinishPart()
             )
@@ -164,17 +204,16 @@ public class ChatControllerIT extends BaseIntegrationTest {
             )
         );
 
+        List<Object> streamParts = new ArrayList<>();
+        streamParts.add(new StreamStartPart().messageId(responseMessageId));
+        streamParts.add(new StreamStepStartPart());
+        streamParts.addAll(createTextStreamParts("Thank you for the follow-up. ", "This builds on our previous conversation. ", "Now, 1+2 is 3."));
+        streamParts.add(new StreamStepFinishPart());
+        streamParts.add(new StreamFinishPart());
+
         mockResponseHolder.setStreamParts(
             followUpMessage.getId().toString(),
-            List.of(
-                new StreamStartPart().messageId(responseMessageId),
-                new StreamStepStartPart(),
-                new StreamTextPart().text("Thank you for the follow-up. "),
-                new StreamTextPart().text("This builds on our previous conversation. "),
-                new StreamTextPart().text("Now, 1+2 is 3."),
-                new StreamStepFinishPart(),
-                new StreamFinishPart()
-            )
+            streamParts
         );
 
         // When: A new user message is sent and AI responds
@@ -212,20 +251,17 @@ public class ChatControllerIT extends BaseIntegrationTest {
         var request = createChatRequest();
         String responseMessageId = UUID.randomUUID().toString();
         
+        List<Object> streamParts = new ArrayList<>();
+        streamParts.add(new StreamStartPart().messageId(responseMessageId));
+        streamParts.add(new StreamStepStartPart());
+        streamParts.addAll(createReasoningStreamParts("Let me think about this step by step. ", "First, I need to analyze the problem. ", "Then I'll provide a solution."));
+        streamParts.addAll(createTextStreamParts("Based on my analysis, ", "here's the answer."));
+        streamParts.add(new StreamStepFinishPart());
+        streamParts.add(new StreamFinishPart());
+        
         mockResponseHolder.setStreamParts(
             request.messages().getLast().getId(),
-            List.of(
-                new StreamStartPart().messageId(responseMessageId),
-                new StreamStepStartPart(),
-                new StreamReasoningPart().text("Let me think about this step by step. "),
-                new StreamReasoningPart().text("First, I need to analyze the problem. "),
-                new StreamReasoningPart().text("Then I'll provide a solution."),
-                new StreamReasoningFinishPart(),
-                new StreamTextPart().text("Based on my analysis, "),
-                new StreamTextPart().text("here's the answer."),
-                new StreamStepFinishPart(),
-                new StreamFinishPart()
-            )
+            streamParts
         );
 
         // When: The AI responds with reasoning parts along with text
@@ -261,55 +297,53 @@ public class ChatControllerIT extends BaseIntegrationTest {
         String responseMessageId = "0ea53ae4-a149-4428-8d56-b76a872b4678";
         String toolCallId = "call_dGexcNCb8AVioJpEN7U8L8KE";
         
+        List<Object> streamParts = new ArrayList<>();
+        streamParts.add(new StreamStartPart().messageId(responseMessageId));
+        streamParts.add(new StreamStepStartPart());
+        streamParts.addAll(createTextStreamParts("Let me check the current weather ", "for your location in Munich."));
+        
+        // Tool call - Weather API - Input
+        streamParts.add(new StreamToolInputStartPart().toolCallId(toolCallId).toolName("get_weather"));
+        streamParts.add(new StreamToolInputDeltaPart().toolCallId(toolCallId).inputTextDelta("{\""));
+        streamParts.add(new StreamToolInputDeltaPart().toolCallId(toolCallId).inputTextDelta("latitude"));
+        streamParts.add(new StreamToolInputDeltaPart().toolCallId(toolCallId).inputTextDelta("\":"));
+        streamParts.add(new StreamToolInputDeltaPart().toolCallId(toolCallId).inputTextDelta("48"));
+        streamParts.add(new StreamToolInputDeltaPart().toolCallId(toolCallId).inputTextDelta("."));
+        streamParts.add(new StreamToolInputDeltaPart().toolCallId(toolCallId).inputTextDelta("137"));
+        streamParts.add(new StreamToolInputDeltaPart().toolCallId(toolCallId).inputTextDelta("154"));
+        streamParts.add(new StreamToolInputDeltaPart().toolCallId(toolCallId).inputTextDelta(",\""));
+        streamParts.add(new StreamToolInputDeltaPart().toolCallId(toolCallId).inputTextDelta("longitude"));
+        streamParts.add(new StreamToolInputDeltaPart().toolCallId(toolCallId).inputTextDelta("\":"));
+        streamParts.add(new StreamToolInputDeltaPart().toolCallId(toolCallId).inputTextDelta("11"));
+        streamParts.add(new StreamToolInputDeltaPart().toolCallId(toolCallId).inputTextDelta("."));
+        streamParts.add(new StreamToolInputDeltaPart().toolCallId(toolCallId).inputTextDelta("576"));
+        streamParts.add(new StreamToolInputDeltaPart().toolCallId(toolCallId).inputTextDelta("124"));
+        streamParts.add(new StreamToolInputDeltaPart().toolCallId(toolCallId).inputTextDelta("}"));
+        
+        // Complete tool input and output
+        streamParts.add(new StreamToolInputAvailablePart()
+            .toolCallId(toolCallId)
+            .toolName("get_weather")
+            .input("{\"latitude\": 48.137154, \"longitude\": 11.576124}"));
+            
+        streamParts.add(new StreamToolOutputAvailablePart()
+            .toolCallId(toolCallId)
+            .output("{\"location\": {\"latitude\": 48.137154, \"longitude\": 11.576124, \"timezone\": \"Europe/Berlin\"}, " +
+                   "\"current\": {\"temperature\": 26.8, \"temperature_unit\": \"°C\", \"feels_like\": 25.5, " +
+                   "\"humidity\": 35, \"wind_speed\": 9.4, \"wind_direction\": 18, \"pressure\": 1020.4, " +
+                   "\"cloud_cover\": 0, \"precipitation\": 0.0, \"weather_code\": 1, \"is_day\": true}, " +
+                   "\"daily\": {\"sunrise\": \"2025-06-19T05:13\", \"sunset\": \"2025-06-19T21:16\", " +
+                   "\"temperature_max\": 28.0, \"temperature_min\": 16.1}, " +
+                   "\"timestamp\": \"2025-06-19T19:30\"}"));
+        
+        // Final text response after processing tool output
+        streamParts.addAll(createTextStreamParts("The current weather in Munich is sunny with", " a temperature of 26.8°C, feeling like 25.5°C."));
+        streamParts.add(new StreamStepFinishPart());
+        streamParts.add(new StreamFinishPart());
+        
         mockResponseHolder.setStreamParts(
             request.messages().getLast().getId(),
-            List.of(
-                // Initial message and first text part
-                new StreamStartPart().messageId(responseMessageId),
-                new StreamStepStartPart(),
-                new StreamTextPart().text("Let me check the current weather "),
-                new StreamTextPart().text("for your location in Munich."),
-
-                // Tool call - Weather API - Input
-                new StreamToolInputStartPart().toolCallId(toolCallId).toolName("get_weather"),
-                new StreamToolInputDeltaPart().toolCallId(toolCallId).inputTextDelta("{\""),
-                new StreamToolInputDeltaPart().toolCallId(toolCallId).inputTextDelta("latitude"),
-                new StreamToolInputDeltaPart().toolCallId(toolCallId).inputTextDelta("\":"),
-                new StreamToolInputDeltaPart().toolCallId(toolCallId).inputTextDelta("48"),
-                new StreamToolInputDeltaPart().toolCallId(toolCallId).inputTextDelta("."),
-                new StreamToolInputDeltaPart().toolCallId(toolCallId).inputTextDelta("137"),
-                new StreamToolInputDeltaPart().toolCallId(toolCallId).inputTextDelta("154"),
-                new StreamToolInputDeltaPart().toolCallId(toolCallId).inputTextDelta(",\""),
-                new StreamToolInputDeltaPart().toolCallId(toolCallId).inputTextDelta("longitude"),
-                new StreamToolInputDeltaPart().toolCallId(toolCallId).inputTextDelta("\":"),
-                new StreamToolInputDeltaPart().toolCallId(toolCallId).inputTextDelta("11"),
-                new StreamToolInputDeltaPart().toolCallId(toolCallId).inputTextDelta("."),
-                new StreamToolInputDeltaPart().toolCallId(toolCallId).inputTextDelta("576"),
-                new StreamToolInputDeltaPart().toolCallId(toolCallId).inputTextDelta("124"),
-                new StreamToolInputDeltaPart().toolCallId(toolCallId).inputTextDelta("}"),
-                
-                // Complete tool input and output
-                new StreamToolInputAvailablePart()
-                    .toolCallId(toolCallId)
-                    .toolName("get_weather")
-                    .input("{\"latitude\": 48.137154, \"longitude\": 11.576124}"),
-                    
-                new StreamToolOutputAvailablePart()
-                    .toolCallId(toolCallId)
-                    .output("{\"location\": {\"latitude\": 48.137154, \"longitude\": 11.576124, \"timezone\": \"Europe/Berlin\"}, " +
-                           "\"current\": {\"temperature\": 26.8, \"temperature_unit\": \"°C\", \"feels_like\": 25.5, " +
-                           "\"humidity\": 35, \"wind_speed\": 9.4, \"wind_direction\": 18, \"pressure\": 1020.4, " +
-                           "\"cloud_cover\": 0, \"precipitation\": 0.0, \"weather_code\": 1, \"is_day\": true}, " +
-                           "\"daily\": {\"sunrise\": \"2025-06-19T05:13\", \"sunset\": \"2025-06-19T21:16\", " +
-                           "\"temperature_max\": 28.0, \"temperature_min\": 16.1}, " +
-                           "\"timestamp\": \"2025-06-19T19:30\"}"),
-                
-                // Final text response after processing tool output
-                new StreamTextPart().text("The current weather in Munich is sunny with"),
-                new StreamTextPart().text(" a temperature of 26.8°C, feeling like 25.5°C."),
-                new StreamStepFinishPart(),
-                new StreamFinishPart()
-            )
+            streamParts
         );
 
         // When: AI responds with weather tool call and result
@@ -377,19 +411,20 @@ public class ChatControllerIT extends BaseIntegrationTest {
         var request = createChatRequest();
         String responseMessageId = UUID.randomUUID().toString();
         
+        List<Object> streamParts = new ArrayList<>();
+        streamParts.add(new StreamStartPart().messageId(responseMessageId));
+        streamParts.add(new StreamStepStartPart());
+        streamParts.addAll(createTextStreamParts("According to recent research, "));
+        streamParts.add(new StreamSourceUrlPart().url("https://example.com/research").title("Research Paper"));
+        streamParts.addAll(createTextStreamParts("the findings show that "));
+        streamParts.add(new StreamSourceDocumentPart().sourceId("doc-123").title("Internal Document"));
+        streamParts.addAll(createTextStreamParts("we can conclude the following."));
+        streamParts.add(new StreamStepFinishPart());
+        streamParts.add(new StreamFinishPart());
+        
         mockResponseHolder.setStreamParts(
             request.messages().getLast().getId(),
-            List.of(
-                new StreamStartPart().messageId(responseMessageId),
-                new StreamStepStartPart(),
-                new StreamTextPart().text("According to recent research, "),
-                new StreamSourceUrlPart().url("https://example.com/research").title("Research Paper"),
-                new StreamTextPart().text("the findings show that "),
-                new StreamSourceDocumentPart().sourceId("doc-123").title("Internal Document"),
-                new StreamTextPart().text("we can conclude the following."),
-                new StreamStepFinishPart(),
-                new StreamFinishPart()
-            )
+            streamParts
         );
 
         // When: AI responds with text and source citations
@@ -437,17 +472,18 @@ public class ChatControllerIT extends BaseIntegrationTest {
         String responseMessageId = UUID.randomUUID().toString();
         String fileUrl = "https://example.com/files/example.txt";
         
+        List<Object> streamParts = new ArrayList<>();
+        streamParts.add(new StreamStartPart().messageId(responseMessageId));
+        streamParts.add(new StreamStepStartPart());
+        streamParts.addAll(createTextStreamParts("I've created a file for you:"));
+        streamParts.add(new StreamFilePart().url(fileUrl).mediaType("text/plain"));
+        streamParts.addAll(createTextStreamParts("Please review the contents."));
+        streamParts.add(new StreamStepFinishPart());
+        streamParts.add(new StreamFinishPart());
+        
         mockResponseHolder.setStreamParts(
             request.messages().getLast().getId(),
-            List.of(
-                new StreamStartPart().messageId(responseMessageId),
-                new StreamStepStartPart(),
-                new StreamTextPart().text("I've created a file for you:"),
-                new StreamFilePart().url(fileUrl).mediaType("text/plain"),
-                new StreamTextPart().text("Please review the contents."),
-                new StreamStepFinishPart(),
-                new StreamFinishPart()
-            )
+            streamParts
         );
 
         // When: The file is included in the response stream
@@ -488,18 +524,19 @@ public class ChatControllerIT extends BaseIntegrationTest {
         String responseMessageId = UUID.randomUUID().toString();
         String dataId = "chart-123";
         
+        List<Object> streamParts = new ArrayList<>();
+        streamParts.add(new StreamStartPart().messageId(responseMessageId));
+        streamParts.add(new StreamStepStartPart());
+        streamParts.addAll(createTextStreamParts("Generating chart:"));
+        streamParts.add(new StreamDataPart().type("data-chart").id(dataId).data("{\"type\": \"bar\", \"values\": [1,2,3]}"));
+        streamParts.add(new StreamDataPart().type("data-chart").id(dataId).data("{\"type\": \"line\", \"values\": [4,5,6]}")); // Replacement
+        streamParts.addAll(createTextStreamParts("Chart completed."));
+        streamParts.add(new StreamStepFinishPart());
+        streamParts.add(new StreamFinishPart());
+        
         mockResponseHolder.setStreamParts(
             request.messages().getLast().getId(),
-            List.of(
-                new StreamStartPart().messageId(responseMessageId),
-                new StreamStepStartPart(),
-                new StreamTextPart().text("Generating chart:"),
-                new StreamDataPart().type("data-chart").id(dataId).data("{\"type\": \"bar\", \"values\": [1,2,3]}"),
-                new StreamDataPart().type("data-chart").id(dataId).data("{\"type\": \"line\", \"values\": [4,5,6]}"), // Replacement
-                new StreamTextPart().text("Chart completed."),
-                new StreamStepFinishPart(),
-                new StreamFinishPart()
-            )
+            streamParts
         );
 
         // When: AI generates data part with same ID (replacement pattern)
@@ -546,30 +583,25 @@ public class ChatControllerIT extends BaseIntegrationTest {
         var request = createChatRequest();
         String responseMessageId = UUID.randomUUID().toString();
         
+        List<Object> streamParts = new ArrayList<>();
+        streamParts.add(new StreamStartPart().messageId(responseMessageId));
+        streamParts.add(new StreamStepStartPart());
+        streamParts.addAll(createReasoningStreamParts("I need to search for ", "information related to the user's query."));
+        streamParts.addAll(createTextStreamParts("Let me start by ", "searching for relevant data."));
+        streamParts.add(new StreamStepFinishPart());
+        streamParts.add(new StreamStepStartPart());
+        streamParts.addAll(createTextStreamParts("Here are", " the results I found:"));
+        streamParts.add(new StreamDataPart().type("data-chart").data("{\"type\": \"bar\", \"values\": [1,2,3]}"));
+        streamParts.add(new StreamStepFinishPart());
+        streamParts.add(new StreamStepStartPart());
+        streamParts.addAll(createReasoningStreamParts("Now I'll analyze the results."));
+        streamParts.addAll(createTextStreamParts("Based on the search, ", "here's the conclusion."));
+        streamParts.add(new StreamStepFinishPart());
+        streamParts.add(new StreamFinishPart());
+        
         mockResponseHolder.setStreamParts(
             request.messages().getLast().getId(),
-            List.of(
-                new StreamStartPart().messageId(responseMessageId),
-                new StreamStepStartPart(),
-                new StreamReasoningPart().text("I need to search for "),
-                new StreamReasoningPart().text("information related to the user's query."),
-                new StreamReasoningFinishPart(),
-                new StreamTextPart().text("Let me start by "),
-                new StreamTextPart().text("searching for relevant data."),
-                new StreamStepFinishPart(),
-                new StreamStepStartPart(),
-                new StreamTextPart().text("Here are"),
-                new StreamTextPart().text(" the results I found:"),
-                new StreamDataPart().type("data-chart").data("{\"type\": \"bar\", \"values\": [1,2,3]}"),
-                new StreamStepFinishPart(),
-                new StreamStepStartPart(),
-                new StreamReasoningPart().text("Now I'll analyze the results."),
-                new StreamReasoningFinishPart(),
-                new StreamTextPart().text("Based on the search, "),
-                new StreamTextPart().text("here's the conclusion."),
-                new StreamStepFinishPart(),
-                new StreamFinishPart()
-            )
+            streamParts
         );
 
         // When: AI responds with multiple step-start/step-finish blocks
@@ -636,21 +668,20 @@ public class ChatControllerIT extends BaseIntegrationTest {
         String responseMessageId1 = UUID.randomUUID().toString();
         String responseMessageId2 = UUID.randomUUID().toString();
         
+        List<Object> streamParts = new ArrayList<>();
+        streamParts.add(new StreamStartPart().messageId(responseMessageId1));
+        streamParts.add(new StreamStepStartPart());
+        streamParts.addAll(createTextStreamParts("This is the ", "first message."));
+        streamParts.add(new StreamStepFinishPart());
+        streamParts.add(new StreamStartPart().messageId(responseMessageId2));
+        streamParts.add(new StreamStepStartPart());
+        streamParts.addAll(createTextStreamParts("This is the ", "second message."));
+        streamParts.add(new StreamStepFinishPart());
+        streamParts.add(new StreamFinishPart());
+        
         mockResponseHolder.setStreamParts(
             request.messages().getLast().getId(),
-            List.of(
-                new StreamStartPart().messageId(responseMessageId1),
-                new StreamStepStartPart(),
-                new StreamTextPart().text("This is the "),
-                new StreamTextPart().text("first message."),
-                new StreamStepFinishPart(),
-                new StreamStartPart().messageId(responseMessageId2),
-                new StreamStepStartPart(),
-                new StreamTextPart().text("This is the "),
-                new StreamTextPart().text("second message."),
-                new StreamStepFinishPart(),
-                new StreamFinishPart()
-            )
+            streamParts
         );
 
         // When: AI responds with multiple step-start/step-finish blocks
@@ -763,16 +794,17 @@ public class ChatControllerIT extends BaseIntegrationTest {
         String responseMessageId = UUID.randomUUID().toString();
         String metadataJson = "{\"modelName\": \"gpt-4\", \"finishReason\": \"complete\", \"tokens\": {\"prompt\": 45, \"completion\": 78}}";
 
+        List<Object> streamParts = new ArrayList<>();
+        streamParts.add(new StreamStartPart().messageId(responseMessageId));
+        streamParts.add(new StreamMessageMetadataPart().messageMetadata(metadataJson));
+        streamParts.add(new StreamStepStartPart());
+        streamParts.addAll(createTextStreamParts("Here's your response with metadata."));
+        streamParts.add(new StreamStepFinishPart());
+        streamParts.add(new StreamFinishPart());
+        
         mockResponseHolder.setStreamParts(
             request.messages().getLast().getId(),
-            List.of(
-                new StreamStartPart().messageId(responseMessageId),
-                new StreamMessageMetadataPart().messageMetadata(metadataJson),
-                new StreamStepStartPart(),
-                new StreamTextPart().text("Here's your response with metadata."),
-                new StreamStepFinishPart(),
-                new StreamFinishPart()
-            )
+            streamParts
         );
 
         // When: The message with metadata is processed
@@ -808,26 +840,27 @@ public class ChatControllerIT extends BaseIntegrationTest {
         var request = createChatRequest();
         String responseMessageId = UUID.randomUUID().toString();
         
+        List<Object> streamParts = new ArrayList<>();
+        streamParts.add(new StreamStartPart().messageId(responseMessageId));
+        // First step with tool call
+        streamParts.add(new StreamStepStartPart());
+        streamParts.add(new StreamToolInputAvailablePart()
+            .toolCallId("tool-call-id")
+            .toolName("weather")
+            .input("{\"city\": \"London\"}"));
+        streamParts.add(new StreamToolOutputAvailablePart()
+            .toolCallId("tool-call-id")
+            .output("{\"weather\": \"sunny\"}"));
+        streamParts.add(new StreamStepFinishPart());
+        // Second step with text response  
+        streamParts.add(new StreamStepStartPart());
+        streamParts.addAll(createTextStreamParts("The weather in London is sunny."));
+        streamParts.add(new StreamStepFinishPart());
+        streamParts.add(new StreamFinishPart());
+        
         mockResponseHolder.setStreamParts(
             request.messages().getLast().getId(),
-            List.of(
-                new StreamStartPart().messageId(responseMessageId),
-                // First step with tool call
-                new StreamStepStartPart(),
-                new StreamToolInputAvailablePart()
-                    .toolCallId("tool-call-id")
-                    .toolName("weather")
-                    .input("{\"city\": \"London\"}"),
-                new StreamToolOutputAvailablePart()
-                    .toolCallId("tool-call-id")
-                    .output("{\"weather\": \"sunny\"}"),
-                new StreamStepFinishPart(),
-                // Second step with text response  
-                new StreamStepStartPart(),
-                new StreamTextPart().text("The weather in London is sunny."),
-                new StreamStepFinishPart(),
-                new StreamFinishPart()
-            )
+            streamParts
         );
 
         // When: The AI responds with multiple steps
@@ -870,22 +903,23 @@ public class ChatControllerIT extends BaseIntegrationTest {
         String responseMessageId = UUID.randomUUID().toString();
         String toolCallId = "error-tool-call";
         
+        List<Object> streamParts = new ArrayList<>();
+        streamParts.add(new StreamStartPart().messageId(responseMessageId));
+        streamParts.add(new StreamStepStartPart());
+        streamParts.add(new StreamToolInputAvailablePart()
+            .toolCallId(toolCallId)
+            .toolName("broken_tool")
+            .input("{\"query\": \"test\"}"));
+        streamParts.add(new StreamToolOutputErrorPart()
+            .toolCallId(toolCallId)
+            .errorText("Tool execution failed: Network timeout"));
+        streamParts.addAll(createTextStreamParts("I apologize, but I encountered an error while trying to fetch that information."));
+        streamParts.add(new StreamStepFinishPart());
+        streamParts.add(new StreamFinishPart());
+        
         mockResponseHolder.setStreamParts(
             request.messages().getLast().getId(),
-            List.of(
-                new StreamStartPart().messageId(responseMessageId),
-                new StreamStepStartPart(),
-                new StreamToolInputAvailablePart()
-                    .toolCallId(toolCallId)
-                    .toolName("broken_tool")
-                    .input("{\"query\": \"test\"}"),
-                new StreamToolOutputErrorPart()
-                    .toolCallId(toolCallId)
-                    .errorText("Tool execution failed: Network timeout"),
-                new StreamTextPart().text("I apologize, but I encountered an error while trying to fetch that information."),
-                new StreamStepFinishPart(),
-                new StreamFinishPart()
-            )
+            streamParts
         );
 
         // When: The AI responds with a tool error
@@ -931,15 +965,16 @@ public class ChatControllerIT extends BaseIntegrationTest {
             "finish_reason", "stop"
         );
         
+        List<Object> streamParts = new ArrayList<>();
+        streamParts.add(new StreamStartPart().messageId(responseMessageId).messageMetadata(startMetadata));
+        streamParts.add(new StreamStepStartPart());
+        streamParts.addAll(createTextStreamParts("Here's a response with comprehensive metadata."));
+        streamParts.add(new StreamStepFinishPart());
+        streamParts.add(new StreamFinishPart().messageMetadata(finishMetadata));
+        
         mockResponseHolder.setStreamParts(
             request.messages().getLast().getId(),
-            List.of(
-                new StreamStartPart().messageId(responseMessageId).messageMetadata(startMetadata),
-                new StreamStepStartPart(),
-                new StreamTextPart().text("Here's a response with comprehensive metadata."),
-                new StreamStepFinishPart(),
-                new StreamFinishPart().messageMetadata(finishMetadata)
-            )
+            streamParts
         );
 
         // When: The AI responds with metadata in start and finish
@@ -971,19 +1006,20 @@ public class ChatControllerIT extends BaseIntegrationTest {
         var request = createChatRequest();
         String responseMessageId = UUID.randomUUID().toString();
         
+        List<Object> streamParts = new ArrayList<>();
+        streamParts.add(new StreamStartPart().messageId(responseMessageId));
+        streamParts.add(new StreamStepStartPart());
+        streamParts.addAll(createTextStreamParts("Here's the file you requested: "));
+        streamParts.add(new StreamFilePart()
+            .url("https://example.com/document.pdf")
+            .mediaType("application/pdf"));
+        streamParts.addAll(createTextStreamParts(" Please review it carefully."));
+        streamParts.add(new StreamStepFinishPart());
+        streamParts.add(new StreamFinishPart());
+        
         mockResponseHolder.setStreamParts(
             request.messages().getLast().getId(),
-            List.of(
-                new StreamStartPart().messageId(responseMessageId),
-                new StreamStepStartPart(),
-                new StreamTextPart().text("Here's the file you requested: "),
-                new StreamFilePart()
-                    .url("https://example.com/document.pdf")
-                    .mediaType("application/pdf"),
-                new StreamTextPart().text(" Please review it carefully."),
-                new StreamStepFinishPart(),
-                new StreamFinishPart()
-            )
+            streamParts
         );
 
         // When: The AI responds with file parts
@@ -1012,26 +1048,27 @@ public class ChatControllerIT extends BaseIntegrationTest {
         String responseMessageId = UUID.randomUUID().toString();
         String dataId = "chart-data-1";
         
+        List<Object> streamParts = new ArrayList<>();
+        streamParts.add(new StreamStartPart().messageId(responseMessageId));
+        streamParts.add(new StreamStepStartPart());
+        streamParts.addAll(createTextStreamParts("Creating your chart: "));
+        // Initial data part
+        streamParts.add(new StreamDataPart()
+            .id(dataId)
+            .type("data-chart")
+            .data("{\"type\": \"bar\", \"data\": {\"labels\": [\"A\"], \"values\": [10]}}"));
+        // Updated data part (should replace the previous one)  
+        streamParts.add(new StreamDataPart()
+            .id(dataId)
+            .type("data-chart")
+            .data("{\"type\": \"bar\", \"data\": {\"labels\": [\"A\", \"B\"], \"values\": [10, 20]}}"));
+        streamParts.addAll(createTextStreamParts(" Chart completed!"));
+        streamParts.add(new StreamStepFinishPart());
+        streamParts.add(new StreamFinishPart());
+        
         mockResponseHolder.setStreamParts(
             request.messages().getLast().getId(),
-            List.of(
-                new StreamStartPart().messageId(responseMessageId),
-                new StreamStepStartPart(),
-                new StreamTextPart().text("Creating your chart: "),
-                // Initial data part
-                new StreamDataPart()
-                    .id(dataId)
-                    .type("data-chart")
-                    .data("{\"type\": \"bar\", \"data\": {\"labels\": [\"A\"], \"values\": [10]}}"),
-                // Updated data part (should replace the previous one)  
-                new StreamDataPart()
-                    .id(dataId)
-                    .type("data-chart")
-                    .data("{\"type\": \"bar\", \"data\": {\"labels\": [\"A\", \"B\"], \"values\": [10, 20]}}"),
-                new StreamTextPart().text(" Chart completed!"),
-                new StreamStepFinishPart(),
-                new StreamFinishPart()
-            )
+            streamParts
         );
 
         // When: The AI responds with updating data parts
@@ -1065,30 +1102,27 @@ public class ChatControllerIT extends BaseIntegrationTest {
         var request = createChatRequest();
         String responseMessageId = UUID.randomUUID().toString();
         
+        List<Object> streamParts = new ArrayList<>();
+        streamParts.add(new StreamStartPart().messageId(responseMessageId));
+        streamParts.add(new StreamStepStartPart());
+        // Reasoning phase
+        streamParts.addAll(createReasoningStreamParts("Let me think about this problem step by step. ", "First, I need to understand what you're asking. ", "The question involves multiple components that I should analyze separately. ", "After careful consideration, I can provide a comprehensive answer."));
+        // Response phase with sources
+        streamParts.addAll(createTextStreamParts("Based on my analysis, "));
+        streamParts.add(new StreamSourceUrlPart()
+            .url("https://research.example.com/study")
+            .title("Research Study on the Topic"));
+        streamParts.addAll(createTextStreamParts(" and internal documentation "));
+        streamParts.add(new StreamSourceDocumentPart()
+            .sourceId("internal-doc-456")
+            .title("Internal Knowledge Base"));
+        streamParts.addAll(createTextStreamParts(", I can conclude that the answer is complex but achievable."));
+        streamParts.add(new StreamStepFinishPart());
+        streamParts.add(new StreamFinishPart());
+        
         mockResponseHolder.setStreamParts(
             request.messages().getLast().getId(),
-            List.of(
-                new StreamStartPart().messageId(responseMessageId),
-                new StreamStepStartPart(),
-                // Reasoning phase
-                new StreamReasoningPart().text("Let me think about this problem step by step. "),
-                new StreamReasoningPart().text("First, I need to understand what you're asking. "),
-                new StreamReasoningPart().text("The question involves multiple components that I should analyze separately. "),
-                new StreamReasoningPart().text("After careful consideration, I can provide a comprehensive answer."),
-                new StreamReasoningFinishPart(),
-                // Response phase with sources
-                new StreamTextPart().text("Based on my analysis, "),
-                new StreamSourceUrlPart()
-                    .url("https://research.example.com/study")
-                    .title("Research Study on the Topic"),
-                new StreamTextPart().text(" and internal documentation "),
-                new StreamSourceDocumentPart()
-                    .sourceId("internal-doc-456")
-                    .title("Internal Knowledge Base"),
-                new StreamTextPart().text(", I can conclude that the answer is complex but achievable."),
-                new StreamStepFinishPart(),
-                new StreamFinishPart()
-            )
+            streamParts
         );
 
         // When: The AI responds with reasoning and sources
@@ -1147,15 +1181,16 @@ public class ChatControllerIT extends BaseIntegrationTest {
         var request = createChatRequest();
         String responseMessageId = UUID.randomUUID().toString();
         
+        List<Object> streamParts = new ArrayList<>();
+        streamParts.add(new StreamStartPart().messageId(responseMessageId));
+        streamParts.add(new StreamStepStartPart());
+        streamParts.addAll(createTextStreamParts("I'm processing your request... "));
+        streamParts.add(new StreamErrorPart().errorText("Network connection timeout"));
+        streamParts.add(new StreamFinishPart());
+        
         mockResponseHolder.setStreamParts(
             request.messages().getLast().getId(),
-            List.of(
-                new StreamStartPart().messageId(responseMessageId),
-                new StreamStepStartPart(),
-                new StreamTextPart().text("I'm processing your request... "),
-                new StreamErrorPart().errorText("Network connection timeout"),
-                new StreamFinishPart()
-            )
+            streamParts
         );
 
         // When: The AI stream encounters an error

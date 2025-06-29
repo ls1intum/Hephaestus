@@ -8,7 +8,7 @@ import { useChat } from "@ai-sdk/react";
 import { createFileRoute } from "@tanstack/react-router";
 import { DefaultChatTransport } from "ai";
 
-export const Route = createFileRoute("/_authenticated/mentor")({
+export const Route = createFileRoute("/_authenticated/mentor/")({
 	component: RouteComponent,
 });
 
@@ -29,15 +29,16 @@ function RouteComponent() {
 /**
  * AI Mentor route component providing a professional chat interface.
  *
- * This route integrates the AI SDK with our custom Chat components to provide:
+ * This route integrates the AI SDK v5 with our enhanced Chat components to provide:
  * - Real-time message streaming with proper UX indicators
- * - Professional message formatting and layout
+ * - Professional message formatting and layout with avatars
  * - Error handling with retry capabilities
- * - Responsive design with scroll management
+ * - Message regeneration for improved user experience
+ * - Responsive design with intelligent auto-scroll
  * - Proper separation of smart (data) and presentational (UI) concerns
  */
 function MentorContainer() {
-	const { error, status, sendMessage, messages, reload, stop } = useChat({
+	const { error, status, sendMessage, messages, regenerate, stop } = useChat({
 		generateId: () => uuidv4(),
 		transport: new DefaultChatTransport({
 			api: `${environment.serverUrl}/mentor/chat`,
@@ -47,19 +48,9 @@ function MentorContainer() {
 		}),
 	});
 
-	// Transform AI SDK messages to our chat format
-	const chatMessages = messages.map((message) => ({
-		id: message.id,
-		role: message.role as "user" | "assistant",
-		parts: message.parts,
-	}));
+	const isLoading = status === "streaming" || status === "submitted";
 
-	const isStreaming = status === "streaming" || status === "submitted";
-	const currentStreamingId = isStreaming
-		? messages[messages.length - 1]?.id
-		: undefined;
-
-	const handleMessageSubmit = (text: string) => {
+	const handleSendMessage = (text: string) => {
 		sendMessage({ text });
 	};
 
@@ -67,22 +58,22 @@ function MentorContainer() {
 		stop();
 	};
 
-	const handleRetry = () => {
-		reload();
+	const handleRegenerate = () => {
+		regenerate();
 	};
 
 	return (
-		<div className="h-[calc(100vh-4rem)] max-w-4xl mx-auto p-4">
+		<div className="h-[calc(100vh-4rem)] max-w-5xl mx-auto p-6">
 			<Chat
-				messages={chatMessages}
-				onMessageSubmit={handleMessageSubmit}
+				messages={messages}
+				onSendMessage={handleSendMessage}
 				onStop={handleStop}
-				onRetry={handleRetry}
-				isStreaming={isStreaming}
-				streamingMessageId={currentStreamingId}
+				onRegenerate={handleRegenerate}
+				isLoading={isLoading}
 				error={error}
 				disabled={status === "submitted"}
 				placeholder="Ask me anything about software development, best practices, or technical concepts..."
+				className="h-full"
 			/>
 		</div>
 	);

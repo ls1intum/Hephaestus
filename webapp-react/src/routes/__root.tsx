@@ -11,7 +11,10 @@ import TanstackQueryLayout from "../integrations/tanstack-query/layout";
 
 import Footer from "@/components/core/Footer";
 import Header from "@/components/core/Header";
-import { AppSidebar } from "@/components/core/sidebar/AppSidebar";
+import {
+	AppSidebar,
+	type SidebarContext,
+} from "@/components/core/sidebar/AppSidebar";
 import {
 	SidebarInset,
 	SidebarProvider,
@@ -93,5 +96,16 @@ function AppSidebarContainer() {
 		return null;
 	}
 
-	return <AppSidebar username={username} isAdmin={hasRole("admin")} />;
+	const sidebarContext: SidebarContext = pathname.startsWith("/mentor")
+		? "mentor"
+		: "main";
+
+	return (
+		<AppSidebar
+			username={username}
+			isAdmin={hasRole("admin")}
+			hasMentorAccess={hasRole("mentor_access")}
+			context={sidebarContext}
+		/>
+	);
 }

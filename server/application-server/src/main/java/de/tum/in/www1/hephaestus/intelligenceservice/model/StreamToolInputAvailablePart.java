@@ -20,6 +20,10 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonTypeName;
 import com.fasterxml.jackson.annotation.JsonValue;
+import org.openapitools.jackson.nullable.JsonNullable;
+import com.fasterxml.jackson.annotation.JsonIgnore;
+import org.openapitools.jackson.nullable.JsonNullable;
+import java.util.NoSuchElementException;
 import com.fasterxml.jackson.annotation.JsonPropertyOrder;
 import com.fasterxml.jackson.annotation.JsonTypeName;
 import org.hibernate.validator.constraints.*;
@@ -29,6 +33,7 @@ import org.hibernate.validator.constraints.*;
  */
 @JsonPropertyOrder({
   StreamToolInputAvailablePart.JSON_PROPERTY_INPUT,
+  StreamToolInputAvailablePart.JSON_PROPERTY_PROVIDER_EXECUTED,
   StreamToolInputAvailablePart.JSON_PROPERTY_TOOL_CALL_ID,
   StreamToolInputAvailablePart.JSON_PROPERTY_TOOL_NAME,
   StreamToolInputAvailablePart.JSON_PROPERTY_TYPE
@@ -37,6 +42,9 @@ import org.hibernate.validator.constraints.*;
 public class StreamToolInputAvailablePart {
   public static final String JSON_PROPERTY_INPUT = "input";
   private Object input;
+
+  public static final String JSON_PROPERTY_PROVIDER_EXECUTED = "providerExecuted";
+  private JsonNullable<Boolean> providerExecuted = JsonNullable.<Boolean>undefined();
 
   public static final String JSON_PROPERTY_TOOL_CALL_ID = "toolCallId";
   private String toolCallId;
@@ -73,6 +81,39 @@ public class StreamToolInputAvailablePart {
   @JsonInclude(value = JsonInclude.Include.ALWAYS)
   public void setInput(Object input) {
     this.input = input;
+  }
+
+  public StreamToolInputAvailablePart providerExecuted(Boolean providerExecuted) {
+    this.providerExecuted = JsonNullable.<Boolean>of(providerExecuted);
+    
+    return this;
+  }
+
+  /**
+   * Get providerExecuted
+   * @return providerExecuted
+   */
+  @jakarta.annotation.Nullable
+  @JsonIgnore
+
+  public Boolean getProviderExecuted() {
+        return providerExecuted.orElse(null);
+  }
+
+  @JsonProperty(JSON_PROPERTY_PROVIDER_EXECUTED)
+  @JsonInclude(value = JsonInclude.Include.USE_DEFAULTS)
+
+  public JsonNullable<Boolean> getProviderExecuted_JsonNullable() {
+    return providerExecuted;
+  }
+  
+  @JsonProperty(JSON_PROPERTY_PROVIDER_EXECUTED)
+  public void setProviderExecuted_JsonNullable(JsonNullable<Boolean> providerExecuted) {
+    this.providerExecuted = providerExecuted;
+  }
+
+  public void setProviderExecuted(Boolean providerExecuted) {
+    this.providerExecuted = JsonNullable.<Boolean>of(providerExecuted);
   }
 
   public StreamToolInputAvailablePart toolCallId(String toolCallId) {
@@ -160,14 +201,26 @@ public class StreamToolInputAvailablePart {
     }
     StreamToolInputAvailablePart streamToolInputAvailablePart = (StreamToolInputAvailablePart) o;
     return Objects.equals(this.input, streamToolInputAvailablePart.input) &&
+        equalsNullable(this.providerExecuted, streamToolInputAvailablePart.providerExecuted) &&
         Objects.equals(this.toolCallId, streamToolInputAvailablePart.toolCallId) &&
         Objects.equals(this.toolName, streamToolInputAvailablePart.toolName) &&
         Objects.equals(this.type, streamToolInputAvailablePart.type);
   }
 
+  private static <T> boolean equalsNullable(JsonNullable<T> a, JsonNullable<T> b) {
+    return a == b || (a != null && b != null && a.isPresent() && b.isPresent() && Objects.deepEquals(a.get(), b.get()));
+  }
+
   @Override
   public int hashCode() {
-    return Objects.hash(input, toolCallId, toolName, type);
+    return Objects.hash(input, hashCodeNullable(providerExecuted), toolCallId, toolName, type);
+  }
+
+  private static <T> int hashCodeNullable(JsonNullable<T> a) {
+    if (a == null) {
+      return 1;
+    }
+    return a.isPresent() ? Arrays.deepHashCode(new Object[]{a.get()}) : 31;
   }
 
   @Override
@@ -175,6 +228,7 @@ public class StreamToolInputAvailablePart {
     StringBuilder sb = new StringBuilder();
     sb.append("class StreamToolInputAvailablePart {\n");
     sb.append("    input: ").append(toIndentedString(input)).append("\n");
+    sb.append("    providerExecuted: ").append(toIndentedString(providerExecuted)).append("\n");
     sb.append("    toolCallId: ").append(toIndentedString(toolCallId)).append("\n");
     sb.append("    toolName: ").append(toIndentedString(toolName)).append("\n");
     sb.append("    type: ").append(toIndentedString(type)).append("\n");

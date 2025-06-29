@@ -20,6 +20,10 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonTypeName;
 import com.fasterxml.jackson.annotation.JsonValue;
+import org.openapitools.jackson.nullable.JsonNullable;
+import com.fasterxml.jackson.annotation.JsonIgnore;
+import org.openapitools.jackson.nullable.JsonNullable;
+import java.util.NoSuchElementException;
 import com.fasterxml.jackson.annotation.JsonPropertyOrder;
 import com.fasterxml.jackson.annotation.JsonTypeName;
 import org.hibernate.validator.constraints.*;
@@ -29,6 +33,7 @@ import org.hibernate.validator.constraints.*;
  */
 @JsonPropertyOrder({
   StreamToolOutputErrorPart.JSON_PROPERTY_ERROR_TEXT,
+  StreamToolOutputErrorPart.JSON_PROPERTY_PROVIDER_EXECUTED,
   StreamToolOutputErrorPart.JSON_PROPERTY_TOOL_CALL_ID,
   StreamToolOutputErrorPart.JSON_PROPERTY_TYPE
 })
@@ -36,6 +41,9 @@ import org.hibernate.validator.constraints.*;
 public class StreamToolOutputErrorPart {
   public static final String JSON_PROPERTY_ERROR_TEXT = "errorText";
   private String errorText;
+
+  public static final String JSON_PROPERTY_PROVIDER_EXECUTED = "providerExecuted";
+  private JsonNullable<Boolean> providerExecuted = JsonNullable.<Boolean>undefined();
 
   public static final String JSON_PROPERTY_TOOL_CALL_ID = "toolCallId";
   private String toolCallId;
@@ -69,6 +77,39 @@ public class StreamToolOutputErrorPart {
   @JsonInclude(value = JsonInclude.Include.ALWAYS)
   public void setErrorText(String errorText) {
     this.errorText = errorText;
+  }
+
+  public StreamToolOutputErrorPart providerExecuted(Boolean providerExecuted) {
+    this.providerExecuted = JsonNullable.<Boolean>of(providerExecuted);
+    
+    return this;
+  }
+
+  /**
+   * Get providerExecuted
+   * @return providerExecuted
+   */
+  @jakarta.annotation.Nullable
+  @JsonIgnore
+
+  public Boolean getProviderExecuted() {
+        return providerExecuted.orElse(null);
+  }
+
+  @JsonProperty(JSON_PROPERTY_PROVIDER_EXECUTED)
+  @JsonInclude(value = JsonInclude.Include.USE_DEFAULTS)
+
+  public JsonNullable<Boolean> getProviderExecuted_JsonNullable() {
+    return providerExecuted;
+  }
+  
+  @JsonProperty(JSON_PROPERTY_PROVIDER_EXECUTED)
+  public void setProviderExecuted_JsonNullable(JsonNullable<Boolean> providerExecuted) {
+    this.providerExecuted = providerExecuted;
+  }
+
+  public void setProviderExecuted(Boolean providerExecuted) {
+    this.providerExecuted = JsonNullable.<Boolean>of(providerExecuted);
   }
 
   public StreamToolOutputErrorPart toolCallId(String toolCallId) {
@@ -131,13 +172,25 @@ public class StreamToolOutputErrorPart {
     }
     StreamToolOutputErrorPart streamToolOutputErrorPart = (StreamToolOutputErrorPart) o;
     return Objects.equals(this.errorText, streamToolOutputErrorPart.errorText) &&
+        equalsNullable(this.providerExecuted, streamToolOutputErrorPart.providerExecuted) &&
         Objects.equals(this.toolCallId, streamToolOutputErrorPart.toolCallId) &&
         Objects.equals(this.type, streamToolOutputErrorPart.type);
   }
 
+  private static <T> boolean equalsNullable(JsonNullable<T> a, JsonNullable<T> b) {
+    return a == b || (a != null && b != null && a.isPresent() && b.isPresent() && Objects.deepEquals(a.get(), b.get()));
+  }
+
   @Override
   public int hashCode() {
-    return Objects.hash(errorText, toolCallId, type);
+    return Objects.hash(errorText, hashCodeNullable(providerExecuted), toolCallId, type);
+  }
+
+  private static <T> int hashCodeNullable(JsonNullable<T> a) {
+    if (a == null) {
+      return 1;
+    }
+    return a.isPresent() ? Arrays.deepHashCode(new Object[]{a.get()}) : 31;
   }
 
   @Override
@@ -145,6 +198,7 @@ public class StreamToolOutputErrorPart {
     StringBuilder sb = new StringBuilder();
     sb.append("class StreamToolOutputErrorPart {\n");
     sb.append("    errorText: ").append(toIndentedString(errorText)).append("\n");
+    sb.append("    providerExecuted: ").append(toIndentedString(providerExecuted)).append("\n");
     sb.append("    toolCallId: ").append(toIndentedString(toolCallId)).append("\n");
     sb.append("    type: ").append(toIndentedString(type)).append("\n");
     sb.append("}");

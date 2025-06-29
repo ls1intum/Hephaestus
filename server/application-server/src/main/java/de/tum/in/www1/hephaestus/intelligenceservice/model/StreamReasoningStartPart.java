@@ -29,28 +29,53 @@ import com.fasterxml.jackson.annotation.JsonTypeName;
 import org.hibernate.validator.constraints.*;
 
 /**
- * Reasoning part of a message.
+ * Reasoning stream start part.
  */
 @JsonPropertyOrder({
-  StreamReasoningPart.JSON_PROPERTY_PROVIDER_METADATA,
-  StreamReasoningPart.JSON_PROPERTY_TEXT,
-  StreamReasoningPart.JSON_PROPERTY_TYPE
+  StreamReasoningStartPart.JSON_PROPERTY_ID,
+  StreamReasoningStartPart.JSON_PROPERTY_PROVIDER_METADATA,
+  StreamReasoningStartPart.JSON_PROPERTY_TYPE
 })
 @jakarta.annotation.Generated(value = "org.openapitools.codegen.languages.JavaClientCodegen", comments = "Generator version: 7.7.0")
-public class StreamReasoningPart {
+public class StreamReasoningStartPart {
+  public static final String JSON_PROPERTY_ID = "id";
+  private String id;
+
   public static final String JSON_PROPERTY_PROVIDER_METADATA = "providerMetadata";
   private JsonNullable<Object> providerMetadata = JsonNullable.<Object>undefined();
 
-  public static final String JSON_PROPERTY_TEXT = "text";
-  private String text;
-
   public static final String JSON_PROPERTY_TYPE = "type";
-  private String type = "reasoning";
+  private String type = "reasoning-start";
 
-  public StreamReasoningPart() {
+  public StreamReasoningStartPart() {
   }
 
-  public StreamReasoningPart providerMetadata(Object providerMetadata) {
+  public StreamReasoningStartPart id(String id) {
+    
+    this.id = id;
+    return this;
+  }
+
+  /**
+   * Get id
+   * @return id
+   */
+  @jakarta.annotation.Nonnull
+  @JsonProperty(JSON_PROPERTY_ID)
+  @JsonInclude(value = JsonInclude.Include.ALWAYS)
+
+  public String getId() {
+    return id;
+  }
+
+
+  @JsonProperty(JSON_PROPERTY_ID)
+  @JsonInclude(value = JsonInclude.Include.ALWAYS)
+  public void setId(String id) {
+    this.id = id;
+  }
+
+  public StreamReasoningStartPart providerMetadata(Object providerMetadata) {
     this.providerMetadata = JsonNullable.<Object>of(providerMetadata);
     
     return this;
@@ -83,32 +108,7 @@ public class StreamReasoningPart {
     this.providerMetadata = JsonNullable.<Object>of(providerMetadata);
   }
 
-  public StreamReasoningPart text(String text) {
-    
-    this.text = text;
-    return this;
-  }
-
-  /**
-   * Get text
-   * @return text
-   */
-  @jakarta.annotation.Nonnull
-  @JsonProperty(JSON_PROPERTY_TEXT)
-  @JsonInclude(value = JsonInclude.Include.ALWAYS)
-
-  public String getText() {
-    return text;
-  }
-
-
-  @JsonProperty(JSON_PROPERTY_TEXT)
-  @JsonInclude(value = JsonInclude.Include.ALWAYS)
-  public void setText(String text) {
-    this.text = text;
-  }
-
-  public StreamReasoningPart type(String type) {
+  public StreamReasoningStartPart type(String type) {
     
     this.type = type;
     return this;
@@ -141,10 +141,10 @@ public class StreamReasoningPart {
     if (o == null || getClass() != o.getClass()) {
       return false;
     }
-    StreamReasoningPart streamReasoningPart = (StreamReasoningPart) o;
-    return equalsNullable(this.providerMetadata, streamReasoningPart.providerMetadata) &&
-        Objects.equals(this.text, streamReasoningPart.text) &&
-        Objects.equals(this.type, streamReasoningPart.type);
+    StreamReasoningStartPart streamReasoningStartPart = (StreamReasoningStartPart) o;
+    return Objects.equals(this.id, streamReasoningStartPart.id) &&
+        equalsNullable(this.providerMetadata, streamReasoningStartPart.providerMetadata) &&
+        Objects.equals(this.type, streamReasoningStartPart.type);
   }
 
   private static <T> boolean equalsNullable(JsonNullable<T> a, JsonNullable<T> b) {
@@ -153,7 +153,7 @@ public class StreamReasoningPart {
 
   @Override
   public int hashCode() {
-    return Objects.hash(hashCodeNullable(providerMetadata), text, type);
+    return Objects.hash(id, hashCodeNullable(providerMetadata), type);
   }
 
   private static <T> int hashCodeNullable(JsonNullable<T> a) {
@@ -166,9 +166,9 @@ public class StreamReasoningPart {
   @Override
   public String toString() {
     StringBuilder sb = new StringBuilder();
-    sb.append("class StreamReasoningPart {\n");
+    sb.append("class StreamReasoningStartPart {\n");
+    sb.append("    id: ").append(toIndentedString(id)).append("\n");
     sb.append("    providerMetadata: ").append(toIndentedString(providerMetadata)).append("\n");
-    sb.append("    text: ").append(toIndentedString(text)).append("\n");
     sb.append("    type: ").append(toIndentedString(type)).append("\n");
     sb.append("}");
     return sb.toString();

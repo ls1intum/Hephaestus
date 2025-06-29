@@ -67,16 +67,16 @@ public class ChatMessagePart {
     private JsonNode content;
 
     /**
-     * Enum representing all possible message part types from the AI SDK UI message system.
-     * Maps directly to the TypeScript union type UIMessagePart.
+     * Enum representing all possible message part types from the AI SDK v5 UI message system.
+     * Maps directly to the database constraint values and Python models.py.
      */
     public enum PartType {
         // Core message part types
         TEXT("text"),
         REASONING("reasoning"),
 
-        // Tool-related parts
-        TOOL("tool"), // Generic type for tool-{name}
+        // Tool-related parts - single "tool" type with states in content
+        TOOL("tool"),  // For tool-{name} with states: input-streaming, input-available, output-available, output-error
 
         // Source reference parts
         SOURCE_URL("source-url"),
@@ -85,8 +85,8 @@ public class ChatMessagePart {
         // File part
         FILE("file"),
 
-        // Data part
-        DATA("data"), // Generic type for data-{type}
+        // Data part - for data-{type} pattern
+        DATA("data"), 
 
         // Step control
         STEP_START("step-start");
@@ -102,8 +102,8 @@ public class ChatMessagePart {
         }
 
         /**
-         * Parse a type string from the UI system into our enum
-         * Handles special cases like tool-{name} and data-{type}
+         * Parse a type string from the UI system into our enum.
+         * Handles special cases like tool-{name} and data-{type}.
          */
         public static PartType fromValue(String typeString) {
             if (typeString == null) {
@@ -136,14 +136,14 @@ public class ChatMessagePart {
      * @return Tool name or null if this isn't a tool part
      */
     public String getToolName() {
-        if (type == PartType.TOOL && originalType != null && originalType.startsWith("tool-")) {
+        if (isToolPart() && originalType != null && originalType.startsWith("tool-")) {
             return originalType.substring(5);
         }
         return null;
     }
 
     public String getToolCallId() {
-        if (type == PartType.TOOL && content != null && content.has("toolCallId")) {
+        if (isToolPart() && content != null && content.has("toolCallId")) {
             return content.get("toolCallId").asText();
         }
         return null;
@@ -162,10 +162,10 @@ public class ChatMessagePart {
 
     /**
      * Get the tool state if this is a tool part
-     * @return "partial-call", "call", or "result" if this is a tool part, null otherwise
+     * @return tool state if this is a tool part, null otherwise
      */
     public String getToolState() {
-        if (type == PartType.TOOL && content != null && content.has("state")) {
+        if (isToolPart() && content != null && content.has("state")) {
             return content.get("state").asText();
         }
         return null;
@@ -175,7 +175,14 @@ public class ChatMessagePart {
      * Convenience method to check if this part contains a tool call result
      */
     public boolean isToolResult() {
-        return type == PartType.TOOL && "result".equals(getToolState());
+        return type == PartType.TOOL && "output-available".equals(getToolState());
+    }
+    
+    /**
+     * Helper method to check if this is any kind of tool part
+     */
+    public boolean isToolPart() {
+        return type == PartType.TOOL;
     }
 
     /**

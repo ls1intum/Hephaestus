@@ -20,6 +20,10 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonTypeName;
 import com.fasterxml.jackson.annotation.JsonValue;
+import org.openapitools.jackson.nullable.JsonNullable;
+import com.fasterxml.jackson.annotation.JsonIgnore;
+import org.openapitools.jackson.nullable.JsonNullable;
+import java.util.NoSuchElementException;
 import com.fasterxml.jackson.annotation.JsonPropertyOrder;
 import com.fasterxml.jackson.annotation.JsonTypeName;
 import org.hibernate.validator.constraints.*;
@@ -30,6 +34,7 @@ import org.hibernate.validator.constraints.*;
 @JsonPropertyOrder({
   ToolOutputAvailablePart.JSON_PROPERTY_INPUT,
   ToolOutputAvailablePart.JSON_PROPERTY_OUTPUT,
+  ToolOutputAvailablePart.JSON_PROPERTY_PROVIDER_EXECUTED,
   ToolOutputAvailablePart.JSON_PROPERTY_STATE,
   ToolOutputAvailablePart.JSON_PROPERTY_TOOL_CALL_ID,
   ToolOutputAvailablePart.JSON_PROPERTY_TYPE
@@ -41,6 +46,9 @@ public class ToolOutputAvailablePart {
 
   public static final String JSON_PROPERTY_OUTPUT = "output";
   private Object output;
+
+  public static final String JSON_PROPERTY_PROVIDER_EXECUTED = "providerExecuted";
+  private JsonNullable<Boolean> providerExecuted = JsonNullable.<Boolean>undefined();
 
   public static final String JSON_PROPERTY_STATE = "state";
   private String state = "output-available";
@@ -102,6 +110,39 @@ public class ToolOutputAvailablePart {
   @JsonInclude(value = JsonInclude.Include.ALWAYS)
   public void setOutput(Object output) {
     this.output = output;
+  }
+
+  public ToolOutputAvailablePart providerExecuted(Boolean providerExecuted) {
+    this.providerExecuted = JsonNullable.<Boolean>of(providerExecuted);
+    
+    return this;
+  }
+
+  /**
+   * Get providerExecuted
+   * @return providerExecuted
+   */
+  @jakarta.annotation.Nullable
+  @JsonIgnore
+
+  public Boolean getProviderExecuted() {
+        return providerExecuted.orElse(null);
+  }
+
+  @JsonProperty(JSON_PROPERTY_PROVIDER_EXECUTED)
+  @JsonInclude(value = JsonInclude.Include.USE_DEFAULTS)
+
+  public JsonNullable<Boolean> getProviderExecuted_JsonNullable() {
+    return providerExecuted;
+  }
+  
+  @JsonProperty(JSON_PROPERTY_PROVIDER_EXECUTED)
+  public void setProviderExecuted_JsonNullable(JsonNullable<Boolean> providerExecuted) {
+    this.providerExecuted = providerExecuted;
+  }
+
+  public void setProviderExecuted(Boolean providerExecuted) {
+    this.providerExecuted = JsonNullable.<Boolean>of(providerExecuted);
   }
 
   public ToolOutputAvailablePart state(String state) {
@@ -190,14 +231,26 @@ public class ToolOutputAvailablePart {
     ToolOutputAvailablePart toolOutputAvailablePart = (ToolOutputAvailablePart) o;
     return Objects.equals(this.input, toolOutputAvailablePart.input) &&
         Objects.equals(this.output, toolOutputAvailablePart.output) &&
+        equalsNullable(this.providerExecuted, toolOutputAvailablePart.providerExecuted) &&
         Objects.equals(this.state, toolOutputAvailablePart.state) &&
         Objects.equals(this.toolCallId, toolOutputAvailablePart.toolCallId) &&
         Objects.equals(this.type, toolOutputAvailablePart.type);
   }
 
+  private static <T> boolean equalsNullable(JsonNullable<T> a, JsonNullable<T> b) {
+    return a == b || (a != null && b != null && a.isPresent() && b.isPresent() && Objects.deepEquals(a.get(), b.get()));
+  }
+
   @Override
   public int hashCode() {
-    return Objects.hash(input, output, state, toolCallId, type);
+    return Objects.hash(input, output, hashCodeNullable(providerExecuted), state, toolCallId, type);
+  }
+
+  private static <T> int hashCodeNullable(JsonNullable<T> a) {
+    if (a == null) {
+      return 1;
+    }
+    return a.isPresent() ? Arrays.deepHashCode(new Object[]{a.get()}) : 31;
   }
 
   @Override
@@ -206,6 +259,7 @@ public class ToolOutputAvailablePart {
     sb.append("class ToolOutputAvailablePart {\n");
     sb.append("    input: ").append(toIndentedString(input)).append("\n");
     sb.append("    output: ").append(toIndentedString(output)).append("\n");
+    sb.append("    providerExecuted: ").append(toIndentedString(providerExecuted)).append("\n");
     sb.append("    state: ").append(toIndentedString(state)).append("\n");
     sb.append("    toolCallId: ").append(toIndentedString(toolCallId)).append("\n");
     sb.append("    type: ").append(toIndentedString(type)).append("\n");

@@ -8,16 +8,25 @@ from app.mentor.models import (
     StreamErrorPart,
     StreamFinishPart,
     StreamPart,
-    StreamReasoningFinishPart,
-    StreamReasoningPart,
-    StreamStartPart,
+    StreamReasoningStartPart,
+    StreamReasoningDeltaPart,
+    StreamReasoningEndPart,
     StreamStepFinishPart,
     StreamStepStartPart,
-    StreamTextPart,
+    StreamTextStartPart,
+    StreamTextDeltaPart,
+    StreamTextEndPart,
     StreamToolInputAvailablePart,
     StreamToolInputDeltaPart,
     StreamToolInputStartPart,
     StreamToolOutputAvailablePart,
+    StreamToolOutputErrorPart,
+    StreamStartPart,
+    StreamMessageMetadataPart,
+    StreamSourceUrlPart,
+    StreamSourceDocumentPart,
+    StreamFilePart,
+    StreamDataPart,
 )
 
 
@@ -29,7 +38,7 @@ class StreamGenerator:
 
     def format_event(self, part: StreamPart) -> str:
         """Convert a StreamPart to a text/event-stream format."""
-        return f"data: {json.dumps(part.model_dump())}\n\n"
+        return f"data: {json.dumps(part.model_dump(exclude_none=True))}\n\n"
 
     def start_message(self, metadata: Optional[Dict[str, Any]] = None) -> str:
         """Start a message stream."""
@@ -49,19 +58,35 @@ class StreamGenerator:
         """Finish a step in the stream."""
         return self.format_event(StreamStepFinishPart())
 
-    def text(self, text: str) -> str:
-        """Send text content."""
-        return self.format_event(StreamTextPart(text=text))
+    def text_start(self, text_id: str) -> str:
+        """Start text content with ID."""
+        return self.format_event(StreamTextStartPart(id=text_id))
 
-    def reasoning(self, text: str, metadata: Optional[Dict[str, Any]] = None) -> str:
-        """Send reasoning content."""
+    def text_delta(self, text_id: str, delta: str) -> str:
+        """Send text content delta."""
+        return self.format_event(StreamTextDeltaPart(id=text_id, delta=delta))
+
+    def text_end(self, text_id: str) -> str:
+        """End text content."""
+        return self.format_event(StreamTextEndPart(id=text_id))
+
+    def reasoning_start(self, reasoning_id: str, metadata: Optional[Dict[str, Any]] = None) -> str:
+        """Start reasoning content with ID."""
         return self.format_event(
-            StreamReasoningPart(text=text, providerMetadata=metadata)
+            StreamReasoningStartPart(id=reasoning_id, providerMetadata=metadata)
         )
 
-    def reasoning_finish(self) -> str:
-        """Finish reasoning section."""
-        return self.format_event(StreamReasoningFinishPart())
+    def reasoning_delta(self, reasoning_id: str, delta: str, metadata: Optional[Dict[str, Any]] = None) -> str:
+        """Send reasoning content delta."""
+        return self.format_event(
+            StreamReasoningDeltaPart(id=reasoning_id, delta=delta, providerMetadata=metadata)
+        )
+
+    def reasoning_end(self, reasoning_id: str, metadata: Optional[Dict[str, Any]] = None) -> str:
+        """End reasoning content."""
+        return self.format_event(
+            StreamReasoningEndPart(id=reasoning_id, providerMetadata=metadata)
+        )
 
     def error(self, error_text: str) -> str:
         """Send an error."""
@@ -95,14 +120,104 @@ class StreamGenerator:
         self,
         tool_call_id: str,
         output_data: Any,
-        provider_metadata: Optional[Dict[str, Any]] = None,
+        provider_executed: Optional[bool] = None,
     ) -> str:
         """Signal that tool output is available."""
         return self.format_event(
             StreamToolOutputAvailablePart(
                 toolCallId=tool_call_id,
                 output=output_data,
+                providerExecuted=provider_executed,
+            )
+        )
+
+    def tool_output_error(
+        self,
+        tool_call_id: str,
+        error_text: str,
+        provider_executed: Optional[bool] = None,
+    ) -> str:
+        """Signal that tool output has an error."""
+        return self.format_event(
+            StreamToolOutputErrorPart(
+                toolCallId=tool_call_id,
+                errorText=error_text,
+                providerExecuted=provider_executed,
+            )
+        )
+
+    def source_url(
+        self,
+        source_id: str,
+        url: str,
+        title: Optional[str] = None,
+        provider_metadata: Optional[Dict[str, Any]] = None,
+    ) -> str:
+        """Signal a URL source."""
+        return self.format_event(
+            StreamSourceUrlPart(
+                sourceId=source_id,
+                url=url,
+                title=title,
                 providerMetadata=provider_metadata,
+            )
+        )
+
+    def source_document(
+        self,
+        source_id: str,
+        media_type: str,
+        title: str,
+        filename: Optional[str] = None,
+        provider_metadata: Optional[Dict[str, Any]] = None,
+    ) -> str:
+        """Signal a document source."""
+        return self.format_event(
+            StreamSourceDocumentPart(
+                sourceId=source_id,
+                mediaType=media_type,
+                title=title,
+                filename=filename,
+                providerMetadata=provider_metadata,
+            )
+        )
+
+    def file(
+        self,
+        url: str,
+        media_type: str,
+    ) -> str:
+        """Signal a file attachment."""
+        return self.format_event(
+            StreamFilePart(
+                url=url,
+                mediaType=media_type,
+            )
+        )
+
+    def data(
+        self,
+        data_type: str,
+        data_content: Any,
+        data_id: Optional[str] = None,
+    ) -> str:
+        """Signal custom data."""
+        return self.format_event(
+            StreamDataPart(
+                type=f"data-{data_type}",
+                data=data_content,
+                id=data_id,
+            )
+        )
+
+    def message_metadata(
+        self,
+        metadata: Dict[str, Any],
+    ) -> str:
+        """Update message metadata."""
+        return self.format_event(
+            StreamMessageMetadataPart(
+                messageMetadata=metadata,
             )
         )
 

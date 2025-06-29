@@ -33,7 +33,7 @@ import org.hibernate.validator.constraints.*;
  */
 @JsonPropertyOrder({
   StreamToolOutputAvailablePart.JSON_PROPERTY_OUTPUT,
-  StreamToolOutputAvailablePart.JSON_PROPERTY_PROVIDER_METADATA,
+  StreamToolOutputAvailablePart.JSON_PROPERTY_PROVIDER_EXECUTED,
   StreamToolOutputAvailablePart.JSON_PROPERTY_TOOL_CALL_ID,
   StreamToolOutputAvailablePart.JSON_PROPERTY_TYPE
 })
@@ -42,8 +42,8 @@ public class StreamToolOutputAvailablePart {
   public static final String JSON_PROPERTY_OUTPUT = "output";
   private Object output;
 
-  public static final String JSON_PROPERTY_PROVIDER_METADATA = "providerMetadata";
-  private JsonNullable<Object> providerMetadata = JsonNullable.<Object>undefined();
+  public static final String JSON_PROPERTY_PROVIDER_EXECUTED = "providerExecuted";
+  private JsonNullable<Boolean> providerExecuted = JsonNullable.<Boolean>undefined();
 
   public static final String JSON_PROPERTY_TOOL_CALL_ID = "toolCallId";
   private String toolCallId;
@@ -79,37 +79,37 @@ public class StreamToolOutputAvailablePart {
     this.output = output;
   }
 
-  public StreamToolOutputAvailablePart providerMetadata(Object providerMetadata) {
-    this.providerMetadata = JsonNullable.<Object>of(providerMetadata);
+  public StreamToolOutputAvailablePart providerExecuted(Boolean providerExecuted) {
+    this.providerExecuted = JsonNullable.<Boolean>of(providerExecuted);
     
     return this;
   }
 
   /**
-   * Get providerMetadata
-   * @return providerMetadata
+   * Get providerExecuted
+   * @return providerExecuted
    */
   @jakarta.annotation.Nullable
   @JsonIgnore
 
-  public Object getProviderMetadata() {
-        return providerMetadata.orElse(null);
+  public Boolean getProviderExecuted() {
+        return providerExecuted.orElse(null);
   }
 
-  @JsonProperty(JSON_PROPERTY_PROVIDER_METADATA)
+  @JsonProperty(JSON_PROPERTY_PROVIDER_EXECUTED)
   @JsonInclude(value = JsonInclude.Include.USE_DEFAULTS)
 
-  public JsonNullable<Object> getProviderMetadata_JsonNullable() {
-    return providerMetadata;
+  public JsonNullable<Boolean> getProviderExecuted_JsonNullable() {
+    return providerExecuted;
   }
   
-  @JsonProperty(JSON_PROPERTY_PROVIDER_METADATA)
-  public void setProviderMetadata_JsonNullable(JsonNullable<Object> providerMetadata) {
-    this.providerMetadata = providerMetadata;
+  @JsonProperty(JSON_PROPERTY_PROVIDER_EXECUTED)
+  public void setProviderExecuted_JsonNullable(JsonNullable<Boolean> providerExecuted) {
+    this.providerExecuted = providerExecuted;
   }
 
-  public void setProviderMetadata(Object providerMetadata) {
-    this.providerMetadata = JsonNullable.<Object>of(providerMetadata);
+  public void setProviderExecuted(Boolean providerExecuted) {
+    this.providerExecuted = JsonNullable.<Boolean>of(providerExecuted);
   }
 
   public StreamToolOutputAvailablePart toolCallId(String toolCallId) {
@@ -172,7 +172,7 @@ public class StreamToolOutputAvailablePart {
     }
     StreamToolOutputAvailablePart streamToolOutputAvailablePart = (StreamToolOutputAvailablePart) o;
     return Objects.equals(this.output, streamToolOutputAvailablePart.output) &&
-        equalsNullable(this.providerMetadata, streamToolOutputAvailablePart.providerMetadata) &&
+        equalsNullable(this.providerExecuted, streamToolOutputAvailablePart.providerExecuted) &&
         Objects.equals(this.toolCallId, streamToolOutputAvailablePart.toolCallId) &&
         Objects.equals(this.type, streamToolOutputAvailablePart.type);
   }
@@ -183,7 +183,7 @@ public class StreamToolOutputAvailablePart {
 
   @Override
   public int hashCode() {
-    return Objects.hash(output, hashCodeNullable(providerMetadata), toolCallId, type);
+    return Objects.hash(output, hashCodeNullable(providerExecuted), toolCallId, type);
   }
 
   private static <T> int hashCodeNullable(JsonNullable<T> a) {
@@ -198,7 +198,7 @@ public class StreamToolOutputAvailablePart {
     StringBuilder sb = new StringBuilder();
     sb.append("class StreamToolOutputAvailablePart {\n");
     sb.append("    output: ").append(toIndentedString(output)).append("\n");
-    sb.append("    providerMetadata: ").append(toIndentedString(providerMetadata)).append("\n");
+    sb.append("    providerExecuted: ").append(toIndentedString(providerExecuted)).append("\n");
     sb.append("    toolCallId: ").append(toIndentedString(toolCallId)).append("\n");
     sb.append("    type: ").append(toIndentedString(type)).append("\n");
     sb.append("}");

@@ -54,19 +54,23 @@ components:
           type: integer
       required:
       - messages
+      - user_id
       title: ChatRequest
       type: object
     ChatResponse:
       anyOf:
-      - $ref: '#/components/schemas/StreamTextPart'
+      - $ref: '#/components/schemas/StreamTextStartPart'
+      - $ref: '#/components/schemas/StreamTextDeltaPart'
+      - $ref: '#/components/schemas/StreamTextEndPart'
+      - $ref: '#/components/schemas/StreamReasoningStartPart'
+      - $ref: '#/components/schemas/StreamReasoningDeltaPart'
+      - $ref: '#/components/schemas/StreamReasoningEndPart'
       - $ref: '#/components/schemas/StreamErrorPart'
       - $ref: '#/components/schemas/StreamToolInputStartPart'
       - $ref: '#/components/schemas/StreamToolInputDeltaPart'
       - $ref: '#/components/schemas/StreamToolInputAvailablePart'
       - $ref: '#/components/schemas/StreamToolOutputAvailablePart'
       - $ref: '#/components/schemas/StreamToolOutputErrorPart'
-      - $ref: '#/components/schemas/StreamReasoningPart'
-      - $ref: '#/components/schemas/StreamReasoningFinishPart'
       - $ref: '#/components/schemas/StreamSourceUrlPart'
       - $ref: '#/components/schemas/StreamSourceDocumentPart'
       - $ref: '#/components/schemas/StreamFilePart'
@@ -207,6 +211,14 @@ components:
           - type: object
           - type: 'null'
           title: Providermetadata
+        state:
+          anyOf:
+          - enum:
+            - streaming
+            - done
+            type: string
+          - type: 'null'
+          title: State
         text:
           title: Text
           type: string
@@ -375,35 +387,69 @@ components:
       - messageMetadata
       title: StreamMessageMetadataPart
       type: object
-    StreamReasoningFinishPart:
-      description: Reasoning finish event.
+    StreamReasoningDeltaPart:
+      description: Reasoning stream delta part.
       properties:
-        type:
-          const: reasoning-part-finish
-          default: reasoning-part-finish
-          title: Type
+        delta:
+          title: Delta
           type: string
-      title: StreamReasoningFinishPart
-      type: object
-    StreamReasoningPart:
-      description: Reasoning part of a message.
-      properties:
+        id:
+          title: Id
+          type: string
         providerMetadata:
           anyOf:
           - type: object
           - type: 'null'
           title: Providermetadata
-        text:
-          title: Text
-          type: string
         type:
-          const: reasoning
-          default: reasoning
+          const: reasoning-delta
+          default: reasoning-delta
           title: Type
           type: string
       required:
-      - text
-      title: StreamReasoningPart
+      - id
+      - delta
+      title: StreamReasoningDeltaPart
+      type: object
+    StreamReasoningEndPart:
+      description: Reasoning stream end part.
+      properties:
+        id:
+          title: Id
+          type: string
+        providerMetadata:
+          anyOf:
+          - type: object
+          - type: 'null'
+          title: Providermetadata
+        type:
+          const: reasoning-end
+          default: reasoning-end
+          title: Type
+          type: string
+      required:
+      - id
+      title: StreamReasoningEndPart
+      type: object
+    StreamReasoningStartPart:
+      description: Reasoning stream start part.
+      properties:
+        id:
+          title: Id
+          type: string
+        providerMetadata:
+          anyOf:
+          - type: object
+          - type: 'null'
+          title: Providermetadata
+        type:
+          const: reasoning-start
+          default: reasoning-start
+          title: Type
+          type: string
+      required:
+      - id
+      title: StreamReasoningStartPart
       type: object
     StreamSourceDocumentPart:
       description: Source document part of a message.
@@ -507,20 +553,54 @@ components:
           type: string
       title: StreamStepStartPart
       type: object
-    StreamTextPart:
-      description: Text stream part.
+    StreamTextDeltaPart:
+      description: Text stream delta part.
       properties:
-        text:
-          title: Text
+        delta:
+          title: Delta
+          type: string
+        id:
+          title: Id
           type: string
         type:
-          const: text
-          default: text
+          const: text-delta
+          default: text-delta
           title: Type
           type: string
       required:
-      - text
-      title: StreamTextPart
+      - id
+      - delta
+      title: StreamTextDeltaPart
+      type: object
+    StreamTextEndPart:
+      description: Text stream end part.
+      properties:
+        id:
+          title: Id
+          type: string
+        type:
+          const: text-end
+          default: text-end
+          title: Type
+          type: string
+      required:
+      - id
+      title: StreamTextEndPart
+      type: object
+    StreamTextStartPart:
+      description: Text stream start part.
+      properties:
+        id:
+          title: Id
+          type: string
+        type:
+          const: text-start
+          default: text-start
+          title: Type
+          type: string
+      required:
+      - id
+      title: StreamTextStartPart
       type: object
     StreamToolInputAvailablePart:
       description: Tool input available event.
@@ -528,6 +608,11 @@ components:
         input:
           title: Input
           type: object
+        providerExecuted:
+          anyOf:
+          - type: boolean
+          - type: 'null'
+          title: Providerexecuted
         toolCallId:
           title: Toolcallid
           type: string
@@ -567,6 +652,11 @@ components:
     StreamToolInputStartPart:
       description: Tool input start event.
       properties:
+        providerExecuted:
+          anyOf:
+          - type: boolean
+          - type: 'null'
+          title: Providerexecuted
         toolCallId:
           title: Toolcallid
           type: string
@@ -589,11 +679,11 @@ components:
         output:
           title: Output
           type: object
-        providerMetadata:
+        providerExecuted:
           anyOf:
-          - type: object
+          - type: boolean
           - type: 'null'
-          title: Providermetadata
+          title: Providerexecuted
         toolCallId:
           title: Toolcallid
           type: string
@@ -613,6 +703,11 @@ components:
         errorText:
           title: Errortext
           type: string
+        providerExecuted:
+          anyOf:
+          - type: boolean
+          - type: 'null'
+          title: Providerexecuted
         toolCallId:
           title: Toolcallid
           type: string
@@ -629,6 +724,14 @@ components:
     TextUIPart:
       description: A text part of a message.
       properties:
+        state:
+          anyOf:
+          - enum:
+            - streaming
+            - done
+            type: string
+          - type: 'null'
+          title: State
         text:
           title: Text
           type: string
@@ -647,6 +750,11 @@ components:
         input:
           title: Input
           type: object
+        providerExecuted:
+          anyOf:
+          - type: boolean
+          - type: 'null'
+          title: Providerexecuted
         state:
           const: input-available
           default: input-available
@@ -673,6 +781,11 @@ components:
           - type: object
           - type: 'null'
           title: Input
+        providerExecuted:
+          anyOf:
+          - type: boolean
+          - type: 'null'
+          title: Providerexecuted
         state:
           const: input-streaming
           default: input-streaming
@@ -699,6 +812,11 @@ components:
         output:
           title: Output
           type: object
+        providerExecuted:
+          anyOf:
+          - type: boolean
+          - type: 'null'
+          title: Providerexecuted
         state:
           const: output-available
           default: output-available
@@ -717,6 +835,39 @@ components:
       - input
       - output
       title: ToolOutputAvailablePart
+      type: object
+    ToolOutputErrorPart:
+      description: Tool part with output error.
+      properties:
+        errorText:
+          title: Errortext
+          type: string
+        input:
+          title: Input
+          type: object
+        providerExecuted:
+          anyOf:
+          - type: boolean
+          - type: 'null'
+          title: Providerexecuted
+        state:
+          const: output-error
+          default: output-error
+          title: State
+          type: string
+        toolCallId:
+          title: Toolcallid
+          type: string
+        type:
+          pattern: ^tool-.*
+          title: Type
+          type: string
+      required:
+      - type
+      - toolCallId
+      - input
+      - errorText
+      title: ToolOutputErrorPart
       type: object
     UIMessage:
       description: Message model that matches the TypeScript interface.
@@ -738,6 +889,7 @@ components:
             - $ref: '#/components/schemas/ToolInputStreamingPart'
             - $ref: '#/components/schemas/ToolInputAvailablePart'
             - $ref: '#/components/schemas/ToolOutputAvailablePart'
+            - $ref: '#/components/schemas/ToolOutputErrorPart'
             - $ref: '#/components/schemas/SourceUrlUIPart'
             - $ref: '#/components/schemas/SourceDocumentUIPart'
             - $ref: '#/components/schemas/FileUIPart'

@@ -29,67 +29,82 @@ import com.fasterxml.jackson.annotation.JsonTypeName;
 import org.hibernate.validator.constraints.*;
 
 /**
- * A reasoning part of a message.
+ * Reasoning stream delta part.
  */
 @JsonPropertyOrder({
-  ReasoningUIPart.JSON_PROPERTY_PROVIDER_METADATA,
-  ReasoningUIPart.JSON_PROPERTY_STATE,
-  ReasoningUIPart.JSON_PROPERTY_TEXT,
-  ReasoningUIPart.JSON_PROPERTY_TYPE
+  StreamReasoningDeltaPart.JSON_PROPERTY_DELTA,
+  StreamReasoningDeltaPart.JSON_PROPERTY_ID,
+  StreamReasoningDeltaPart.JSON_PROPERTY_PROVIDER_METADATA,
+  StreamReasoningDeltaPart.JSON_PROPERTY_TYPE
 })
 @jakarta.annotation.Generated(value = "org.openapitools.codegen.languages.JavaClientCodegen", comments = "Generator version: 7.7.0")
-public class ReasoningUIPart {
+public class StreamReasoningDeltaPart {
+  public static final String JSON_PROPERTY_DELTA = "delta";
+  private String delta;
+
+  public static final String JSON_PROPERTY_ID = "id";
+  private String id;
+
   public static final String JSON_PROPERTY_PROVIDER_METADATA = "providerMetadata";
   private JsonNullable<Object> providerMetadata = JsonNullable.<Object>undefined();
 
-  /**
-   * Gets or Sets state
-   */
-  public enum StateEnum {
-    STREAMING("streaming"),
-    
-    DONE("done");
-
-    private String value;
-
-    StateEnum(String value) {
-      this.value = value;
-    }
-
-    @JsonValue
-    public String getValue() {
-      return value;
-    }
-
-    @Override
-    public String toString() {
-      return String.valueOf(value);
-    }
-
-    @JsonCreator
-    public static StateEnum fromValue(String value) {
-      for (StateEnum b : StateEnum.values()) {
-        if (b.value.equals(value)) {
-          return b;
-        }
-      }
-      return null;
-    }
-  }
-
-  public static final String JSON_PROPERTY_STATE = "state";
-  private JsonNullable<StateEnum> state = JsonNullable.<StateEnum>undefined();
-
-  public static final String JSON_PROPERTY_TEXT = "text";
-  private String text;
-
   public static final String JSON_PROPERTY_TYPE = "type";
-  private String type = "reasoning";
+  private String type = "reasoning-delta";
 
-  public ReasoningUIPart() {
+  public StreamReasoningDeltaPart() {
   }
 
-  public ReasoningUIPart providerMetadata(Object providerMetadata) {
+  public StreamReasoningDeltaPart delta(String delta) {
+    
+    this.delta = delta;
+    return this;
+  }
+
+  /**
+   * Get delta
+   * @return delta
+   */
+  @jakarta.annotation.Nonnull
+  @JsonProperty(JSON_PROPERTY_DELTA)
+  @JsonInclude(value = JsonInclude.Include.ALWAYS)
+
+  public String getDelta() {
+    return delta;
+  }
+
+
+  @JsonProperty(JSON_PROPERTY_DELTA)
+  @JsonInclude(value = JsonInclude.Include.ALWAYS)
+  public void setDelta(String delta) {
+    this.delta = delta;
+  }
+
+  public StreamReasoningDeltaPart id(String id) {
+    
+    this.id = id;
+    return this;
+  }
+
+  /**
+   * Get id
+   * @return id
+   */
+  @jakarta.annotation.Nonnull
+  @JsonProperty(JSON_PROPERTY_ID)
+  @JsonInclude(value = JsonInclude.Include.ALWAYS)
+
+  public String getId() {
+    return id;
+  }
+
+
+  @JsonProperty(JSON_PROPERTY_ID)
+  @JsonInclude(value = JsonInclude.Include.ALWAYS)
+  public void setId(String id) {
+    this.id = id;
+  }
+
+  public StreamReasoningDeltaPart providerMetadata(Object providerMetadata) {
     this.providerMetadata = JsonNullable.<Object>of(providerMetadata);
     
     return this;
@@ -122,65 +137,7 @@ public class ReasoningUIPart {
     this.providerMetadata = JsonNullable.<Object>of(providerMetadata);
   }
 
-  public ReasoningUIPart state(StateEnum state) {
-    this.state = JsonNullable.<StateEnum>of(state);
-    
-    return this;
-  }
-
-  /**
-   * Get state
-   * @return state
-   */
-  @jakarta.annotation.Nullable
-  @JsonIgnore
-
-  public StateEnum getState() {
-        return state.orElse(null);
-  }
-
-  @JsonProperty(JSON_PROPERTY_STATE)
-  @JsonInclude(value = JsonInclude.Include.USE_DEFAULTS)
-
-  public JsonNullable<StateEnum> getState_JsonNullable() {
-    return state;
-  }
-  
-  @JsonProperty(JSON_PROPERTY_STATE)
-  public void setState_JsonNullable(JsonNullable<StateEnum> state) {
-    this.state = state;
-  }
-
-  public void setState(StateEnum state) {
-    this.state = JsonNullable.<StateEnum>of(state);
-  }
-
-  public ReasoningUIPart text(String text) {
-    
-    this.text = text;
-    return this;
-  }
-
-  /**
-   * Get text
-   * @return text
-   */
-  @jakarta.annotation.Nonnull
-  @JsonProperty(JSON_PROPERTY_TEXT)
-  @JsonInclude(value = JsonInclude.Include.ALWAYS)
-
-  public String getText() {
-    return text;
-  }
-
-
-  @JsonProperty(JSON_PROPERTY_TEXT)
-  @JsonInclude(value = JsonInclude.Include.ALWAYS)
-  public void setText(String text) {
-    this.text = text;
-  }
-
-  public ReasoningUIPart type(String type) {
+  public StreamReasoningDeltaPart type(String type) {
     
     this.type = type;
     return this;
@@ -213,11 +170,11 @@ public class ReasoningUIPart {
     if (o == null || getClass() != o.getClass()) {
       return false;
     }
-    ReasoningUIPart reasoningUIPart = (ReasoningUIPart) o;
-    return equalsNullable(this.providerMetadata, reasoningUIPart.providerMetadata) &&
-        equalsNullable(this.state, reasoningUIPart.state) &&
-        Objects.equals(this.text, reasoningUIPart.text) &&
-        Objects.equals(this.type, reasoningUIPart.type);
+    StreamReasoningDeltaPart streamReasoningDeltaPart = (StreamReasoningDeltaPart) o;
+    return Objects.equals(this.delta, streamReasoningDeltaPart.delta) &&
+        Objects.equals(this.id, streamReasoningDeltaPart.id) &&
+        equalsNullable(this.providerMetadata, streamReasoningDeltaPart.providerMetadata) &&
+        Objects.equals(this.type, streamReasoningDeltaPart.type);
   }
 
   private static <T> boolean equalsNullable(JsonNullable<T> a, JsonNullable<T> b) {
@@ -226,7 +183,7 @@ public class ReasoningUIPart {
 
   @Override
   public int hashCode() {
-    return Objects.hash(hashCodeNullable(providerMetadata), hashCodeNullable(state), text, type);
+    return Objects.hash(delta, id, hashCodeNullable(providerMetadata), type);
   }
 
   private static <T> int hashCodeNullable(JsonNullable<T> a) {
@@ -239,10 +196,10 @@ public class ReasoningUIPart {
   @Override
   public String toString() {
     StringBuilder sb = new StringBuilder();
-    sb.append("class ReasoningUIPart {\n");
+    sb.append("class StreamReasoningDeltaPart {\n");
+    sb.append("    delta: ").append(toIndentedString(delta)).append("\n");
+    sb.append("    id: ").append(toIndentedString(id)).append("\n");
     sb.append("    providerMetadata: ").append(toIndentedString(providerMetadata)).append("\n");
-    sb.append("    state: ").append(toIndentedString(state)).append("\n");
-    sb.append("    text: ").append(toIndentedString(text)).append("\n");
     sb.append("    type: ").append(toIndentedString(type)).append("\n");
     sb.append("}");
     return sb.toString();

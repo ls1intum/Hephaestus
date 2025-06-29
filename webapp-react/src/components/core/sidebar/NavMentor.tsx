@@ -6,8 +6,7 @@ import {
 	SidebarMenuItem,
 } from "@/components/ui/sidebar";
 import { Link } from "@tanstack/react-router";
-import { BotMessageSquare } from "lucide-react";
-import { Badge } from "../../ui/badge";
+import { BotMessageSquare, ChevronRight } from "lucide-react";
 
 export function NavMentor() {
 	return (
@@ -16,10 +15,12 @@ export function NavMentor() {
 			<SidebarMenu>
 				<SidebarMenuItem>
 					<SidebarMenuButton asChild tooltip="Mentor">
-						<Link to="/mentor">
+						<Link to="/mentor" className="group/mentor">
 							<BotMessageSquare />
 							<span>Mentor</span>
-							<Badge variant="outline">Coming Soon!</Badge>
+							<div className="flex justify-end w-full">
+								<ChevronRight className="h-4 w-4 opacity-0 group-hover/mentor:opacity-100 transition-opacity" />
+							</div>
 						</Link>
 					</SidebarMenuButton>
 				</SidebarMenuItem>

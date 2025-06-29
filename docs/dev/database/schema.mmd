@@ -25,6 +25,31 @@ erDiagram
         TIMESTAMPTZ creation_time
     }
 
+    ChatMessage {
+        UUID id PK
+        TIMESTAMPTZ created_at "NOT NULL"
+        JSONB metadata
+        VARCHAR(16) role "NOT NULL"
+        UUID parent_message_id FK
+        UUID thread_id FK "NOT NULL"
+    }
+
+    ChatMessagePart {
+        UUID message_id PK,FK
+        INTEGER order_index PK
+        JSONB content
+        VARCHAR(128) original_type
+        VARCHAR(32) type "NOT NULL"
+    }
+
+    ChatThread {
+        UUID id PK
+        TIMESTAMPTZ created_at "NOT NULL"
+        TEXT title
+        UUID selected_leaf_message_id FK,UK
+        BIGINT user_id FK
+    }
+
     Issue {
         VARCHAR(31) issue_type "NOT NULL"
         BIGINT id PK
@@ -86,15 +111,6 @@ erDiagram
         VARCHAR(255) description
         VARCHAR(255) name
         BIGINT repository_id FK
-    }
-
-    Message {
-        BIGINT id PK
-        VARCHAR(32767) content
-        VARCHAR(255) sender
-        TIMESTAMP sent_at
-        BIGINT session_id FK "NOT NULL"
-        INTEGER messages_order
     }
 
     Milestone {
@@ -199,13 +215,6 @@ erDiagram
         BIGINT workspace_id FK
     }
 
-    Session {
-        BIGINT id PK
-        TIMESTAMP created_at
-        BIGINT user_id FK
-        BOOLEAN is_closed "NOT NULL"
-    }
-
     Team {
         BIGINT id PK
         VARCHAR(255) color
@@ -254,9 +263,16 @@ erDiagram
     }
 
     %% Relationships
+    %% One-to-One relationships
+    ChatMessage ||--|| ChatMessagePart : has
+    ChatMessage ||--|| ChatThread : references
+
     %% One-to-Many relationships
     Issue ||--o{ BadPracticeDetection : references
     PullRequestBadPractice ||--o{ BadPracticeFeedback : references
+    ChatMessage ||--o{ ChatMessage : references
+    ChatThread ||--o{ ChatMessage : has
+    User ||--o{ ChatThread : has
     User ||--o{ Issue : authored_by
     User ||--o{ Issue : merged_by
     Milestone ||--o{ Issue : has
@@ -264,7 +280,6 @@ erDiagram
     User ||--o{ IssueComment : commented_on
     Issue ||--o{ IssueComment : commented_on
     Repository ||--o{ Label : labeled
-    Session ||--o{ Message : has
     User ||--o{ Milestone : created_by
     Repository ||--o{ Milestone : has
     User ||--o{ PullRequestReview : reviewed
@@ -275,7 +290,6 @@ erDiagram
     BadPracticeDetection ||--o{ PullRequestBadPractice : has
     Issue ||--o{ PullRequestBadPractice : references
     Workspace ||--o{ RepositoryToMonitor : monitors
-    User ||--o{ Session : has
 
     %% Many-to-Many relationships
     Issue }o--o{ IssueAssignee : assigned_to
@@ -300,12 +314,10 @@ erDiagram
     class IssueAssignee associationEntity
     class IssueLabel associationEntity
     class Label primaryEntity
-    class Message metadataEntity
     class Milestone primaryEntity
     class PullRequestRequestedReviewer associationEntity
     class Repository primaryEntity
     class RepositoryToMonitor metadataEntity
-    class Session metadataEntity
     class Team primaryEntity
     class TeamLabel associationEntity
     class TeamMember associationEntity

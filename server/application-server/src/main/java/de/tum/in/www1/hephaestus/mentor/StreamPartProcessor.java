@@ -14,10 +14,22 @@ public interface StreamPartProcessor {
     default void onStreamStart(StreamStartPart startPart) {}
 
     /**
-     * Called for each text chunk.
-     * @param textPart The text stream part
+     * Called when text streaming starts.
+     * @param textStartPart The text start stream part
      */
-    default void onTextChunk(StreamTextPart textPart) {}
+    default void onTextStart(StreamTextStartPart textStartPart) {}
+
+    /**
+     * Called for each text delta.
+     * @param textDeltaPart The text delta stream part
+     */
+    default void onTextDelta(StreamTextDeltaPart textDeltaPart) {}
+
+    /**
+     * Called when text streaming ends.
+     * @param textEndPart The text end stream part
+     */
+    default void onTextEnd(StreamTextEndPart textEndPart) {}
 
     /**
      * Called when a tool input starts.
@@ -50,16 +62,22 @@ public interface StreamPartProcessor {
     default void onToolOutputError(StreamToolOutputErrorPart errorPart) {}
 
     /**
-     * Called for reasoning chunks.
-     * @param reasoningPart The reasoning stream part
+     * Called when reasoning streaming starts.
+     * @param reasoningStartPart The reasoning start stream part
      */
-    default void onReasoningChunk(StreamReasoningPart reasoningPart) {}
+    default void onReasoningStart(StreamReasoningStartPart reasoningStartPart) {}
 
     /**
-     * Called when reasoning finishes.
-     * @param reasoningFinishPart The reasoning finish part
+     * Called for each reasoning delta.
+     * @param reasoningDeltaPart The reasoning delta stream part
      */
-    default void onReasoningFinish(StreamReasoningFinishPart reasoningFinishPart) {}
+    default void onReasoningDelta(StreamReasoningDeltaPart reasoningDeltaPart) {}
+
+    /**
+     * Called when reasoning streaming ends.
+     * @param reasoningEndPart The reasoning end stream part
+     */
+    default void onReasoningEnd(StreamReasoningEndPart reasoningEndPart) {}
 
     /**
      * Called for source URL parts.

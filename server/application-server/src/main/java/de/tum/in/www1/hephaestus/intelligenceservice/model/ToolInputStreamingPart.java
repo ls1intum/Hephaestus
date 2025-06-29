@@ -33,6 +33,7 @@ import org.hibernate.validator.constraints.*;
  */
 @JsonPropertyOrder({
   ToolInputStreamingPart.JSON_PROPERTY_INPUT,
+  ToolInputStreamingPart.JSON_PROPERTY_PROVIDER_EXECUTED,
   ToolInputStreamingPart.JSON_PROPERTY_STATE,
   ToolInputStreamingPart.JSON_PROPERTY_TOOL_CALL_ID,
   ToolInputStreamingPart.JSON_PROPERTY_TYPE
@@ -41,6 +42,9 @@ import org.hibernate.validator.constraints.*;
 public class ToolInputStreamingPart {
   public static final String JSON_PROPERTY_INPUT = "input";
   private JsonNullable<Object> input = JsonNullable.<Object>undefined();
+
+  public static final String JSON_PROPERTY_PROVIDER_EXECUTED = "providerExecuted";
+  private JsonNullable<Boolean> providerExecuted = JsonNullable.<Boolean>undefined();
 
   public static final String JSON_PROPERTY_STATE = "state";
   private String state = "input-streaming";
@@ -85,6 +89,39 @@ public class ToolInputStreamingPart {
 
   public void setInput(Object input) {
     this.input = JsonNullable.<Object>of(input);
+  }
+
+  public ToolInputStreamingPart providerExecuted(Boolean providerExecuted) {
+    this.providerExecuted = JsonNullable.<Boolean>of(providerExecuted);
+    
+    return this;
+  }
+
+  /**
+   * Get providerExecuted
+   * @return providerExecuted
+   */
+  @jakarta.annotation.Nullable
+  @JsonIgnore
+
+  public Boolean getProviderExecuted() {
+        return providerExecuted.orElse(null);
+  }
+
+  @JsonProperty(JSON_PROPERTY_PROVIDER_EXECUTED)
+  @JsonInclude(value = JsonInclude.Include.USE_DEFAULTS)
+
+  public JsonNullable<Boolean> getProviderExecuted_JsonNullable() {
+    return providerExecuted;
+  }
+  
+  @JsonProperty(JSON_PROPERTY_PROVIDER_EXECUTED)
+  public void setProviderExecuted_JsonNullable(JsonNullable<Boolean> providerExecuted) {
+    this.providerExecuted = providerExecuted;
+  }
+
+  public void setProviderExecuted(Boolean providerExecuted) {
+    this.providerExecuted = JsonNullable.<Boolean>of(providerExecuted);
   }
 
   public ToolInputStreamingPart state(String state) {
@@ -172,6 +209,7 @@ public class ToolInputStreamingPart {
     }
     ToolInputStreamingPart toolInputStreamingPart = (ToolInputStreamingPart) o;
     return equalsNullable(this.input, toolInputStreamingPart.input) &&
+        equalsNullable(this.providerExecuted, toolInputStreamingPart.providerExecuted) &&
         Objects.equals(this.state, toolInputStreamingPart.state) &&
         Objects.equals(this.toolCallId, toolInputStreamingPart.toolCallId) &&
         Objects.equals(this.type, toolInputStreamingPart.type);
@@ -183,7 +221,7 @@ public class ToolInputStreamingPart {
 
   @Override
   public int hashCode() {
-    return Objects.hash(hashCodeNullable(input), state, toolCallId, type);
+    return Objects.hash(hashCodeNullable(input), hashCodeNullable(providerExecuted), state, toolCallId, type);
   }
 
   private static <T> int hashCodeNullable(JsonNullable<T> a) {
@@ -198,6 +236,7 @@ public class ToolInputStreamingPart {
     StringBuilder sb = new StringBuilder();
     sb.append("class ToolInputStreamingPart {\n");
     sb.append("    input: ").append(toIndentedString(input)).append("\n");
+    sb.append("    providerExecuted: ").append(toIndentedString(providerExecuted)).append("\n");
     sb.append("    state: ").append(toIndentedString(state)).append("\n");
     sb.append("    toolCallId: ").append(toIndentedString(toolCallId)).append("\n");
     sb.append("    type: ").append(toIndentedString(type)).append("\n");

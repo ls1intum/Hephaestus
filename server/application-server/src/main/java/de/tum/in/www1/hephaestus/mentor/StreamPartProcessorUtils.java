@@ -48,16 +48,19 @@ public class StreamPartProcessorUtils {
         Class<?> clazz = null;
         switch (type) {
             case "start" -> clazz = StreamStartPart.class;
-            case "text" -> clazz = StreamTextPart.class;
+            case "text-start" -> clazz = StreamTextStartPart.class;
+            case "text-delta" -> clazz = StreamTextDeltaPart.class;
+            case "text-end" -> clazz = StreamTextEndPart.class;
             case "finish" -> clazz = StreamFinishPart.class;
             case "error" -> clazz = StreamErrorPart.class;
             case "tool-input-start" -> clazz = StreamToolInputStartPart.class;
             case "tool-input-delta" -> clazz = StreamToolInputDeltaPart.class;
             case "tool-input-available" -> clazz = StreamToolInputAvailablePart.class;
             case "tool-output-available" -> clazz = StreamToolOutputAvailablePart.class;
-            case "tool-output-error" -> clazz = StreamToolOutputErrorPart.class; // Added this case
-            case "reasoning" -> clazz = StreamReasoningPart.class;
-            case "reasoning-finish", "reasoning-part-finish" -> clazz = StreamReasoningFinishPart.class;
+            case "tool-output-error" -> clazz = StreamToolOutputErrorPart.class;
+            case "reasoning-start" -> clazz = StreamReasoningStartPart.class;
+            case "reasoning-delta" -> clazz = StreamReasoningDeltaPart.class;
+            case "reasoning-end" -> clazz = StreamReasoningEndPart.class;
             case "source-url" -> clazz = StreamSourceUrlPart.class;
             case "source-document" -> clazz = StreamSourceDocumentPart.class;
             case "file" -> clazz = StreamFilePart.class;
@@ -94,7 +97,9 @@ public class StreamPartProcessorUtils {
         try {
             switch (streamPart) {
                 case StreamStartPart start -> processor.onStreamStart(start);
-                case StreamTextPart text -> processor.onTextChunk(text);
+                case StreamTextStartPart textStart -> processor.onTextStart(textStart);
+                case StreamTextDeltaPart textDelta -> processor.onTextDelta(textDelta);
+                case StreamTextEndPart textEnd -> processor.onTextEnd(textEnd);
                 case StreamErrorPart error -> processor.onStreamError(error);
                 case StreamFinishPart finish -> processor.onStreamFinish(finish);
                 case StreamToolInputStartPart toolStart -> processor.onToolInputStart(toolStart);
@@ -102,8 +107,9 @@ public class StreamPartProcessorUtils {
                 case StreamToolInputAvailablePart toolInput -> processor.onToolInputAvailable(toolInput);
                 case StreamToolOutputAvailablePart toolOutput -> processor.onToolOutputAvailable(toolOutput);
                 case StreamToolOutputErrorPart errorPart -> processor.onToolOutputError(errorPart);
-                case StreamReasoningPart reasoning -> processor.onReasoningChunk(reasoning);
-                case StreamReasoningFinishPart reasoningFinish -> processor.onReasoningFinish(reasoningFinish);
+                case StreamReasoningStartPart reasoningStart -> processor.onReasoningStart(reasoningStart);
+                case StreamReasoningDeltaPart reasoningDelta -> processor.onReasoningDelta(reasoningDelta);
+                case StreamReasoningEndPart reasoningEnd -> processor.onReasoningEnd(reasoningEnd);
                 case StreamSourceUrlPart sourceUrl -> processor.onSourceUrl(sourceUrl);
                 case StreamSourceDocumentPart sourceDocument -> processor.onSourceDocument(sourceDocument);
                 case StreamFilePart file -> processor.onFile(file);

@@ -29,17 +29,21 @@ import com.fasterxml.jackson.annotation.JsonTypeName;
 import org.hibernate.validator.constraints.*;
 
 /**
- * Tool part with input available.
+ * Tool part with output error.
  */
 @JsonPropertyOrder({
-  ToolInputAvailablePart.JSON_PROPERTY_INPUT,
-  ToolInputAvailablePart.JSON_PROPERTY_PROVIDER_EXECUTED,
-  ToolInputAvailablePart.JSON_PROPERTY_STATE,
-  ToolInputAvailablePart.JSON_PROPERTY_TOOL_CALL_ID,
-  ToolInputAvailablePart.JSON_PROPERTY_TYPE
+  ToolOutputErrorPart.JSON_PROPERTY_ERROR_TEXT,
+  ToolOutputErrorPart.JSON_PROPERTY_INPUT,
+  ToolOutputErrorPart.JSON_PROPERTY_PROVIDER_EXECUTED,
+  ToolOutputErrorPart.JSON_PROPERTY_STATE,
+  ToolOutputErrorPart.JSON_PROPERTY_TOOL_CALL_ID,
+  ToolOutputErrorPart.JSON_PROPERTY_TYPE
 })
 @jakarta.annotation.Generated(value = "org.openapitools.codegen.languages.JavaClientCodegen", comments = "Generator version: 7.7.0")
-public class ToolInputAvailablePart {
+public class ToolOutputErrorPart {
+  public static final String JSON_PROPERTY_ERROR_TEXT = "errorText";
+  private String errorText;
+
   public static final String JSON_PROPERTY_INPUT = "input";
   private Object input;
 
@@ -47,7 +51,7 @@ public class ToolInputAvailablePart {
   private JsonNullable<Boolean> providerExecuted = JsonNullable.<Boolean>undefined();
 
   public static final String JSON_PROPERTY_STATE = "state";
-  private String state = "input-available";
+  private String state = "output-error";
 
   public static final String JSON_PROPERTY_TOOL_CALL_ID = "toolCallId";
   private String toolCallId;
@@ -55,10 +59,35 @@ public class ToolInputAvailablePart {
   public static final String JSON_PROPERTY_TYPE = "type";
   private String type;
 
-  public ToolInputAvailablePart() {
+  public ToolOutputErrorPart() {
   }
 
-  public ToolInputAvailablePart input(Object input) {
+  public ToolOutputErrorPart errorText(String errorText) {
+    
+    this.errorText = errorText;
+    return this;
+  }
+
+  /**
+   * Get errorText
+   * @return errorText
+   */
+  @jakarta.annotation.Nonnull
+  @JsonProperty(JSON_PROPERTY_ERROR_TEXT)
+  @JsonInclude(value = JsonInclude.Include.ALWAYS)
+
+  public String getErrorText() {
+    return errorText;
+  }
+
+
+  @JsonProperty(JSON_PROPERTY_ERROR_TEXT)
+  @JsonInclude(value = JsonInclude.Include.ALWAYS)
+  public void setErrorText(String errorText) {
+    this.errorText = errorText;
+  }
+
+  public ToolOutputErrorPart input(Object input) {
     
     this.input = input;
     return this;
@@ -83,7 +112,7 @@ public class ToolInputAvailablePart {
     this.input = input;
   }
 
-  public ToolInputAvailablePart providerExecuted(Boolean providerExecuted) {
+  public ToolOutputErrorPart providerExecuted(Boolean providerExecuted) {
     this.providerExecuted = JsonNullable.<Boolean>of(providerExecuted);
     
     return this;
@@ -116,7 +145,7 @@ public class ToolInputAvailablePart {
     this.providerExecuted = JsonNullable.<Boolean>of(providerExecuted);
   }
 
-  public ToolInputAvailablePart state(String state) {
+  public ToolOutputErrorPart state(String state) {
     
     this.state = state;
     return this;
@@ -141,7 +170,7 @@ public class ToolInputAvailablePart {
     this.state = state;
   }
 
-  public ToolInputAvailablePart toolCallId(String toolCallId) {
+  public ToolOutputErrorPart toolCallId(String toolCallId) {
     
     this.toolCallId = toolCallId;
     return this;
@@ -166,7 +195,7 @@ public class ToolInputAvailablePart {
     this.toolCallId = toolCallId;
   }
 
-  public ToolInputAvailablePart type(String type) {
+  public ToolOutputErrorPart type(String type) {
     
     this.type = type;
     return this;
@@ -199,12 +228,13 @@ public class ToolInputAvailablePart {
     if (o == null || getClass() != o.getClass()) {
       return false;
     }
-    ToolInputAvailablePart toolInputAvailablePart = (ToolInputAvailablePart) o;
-    return Objects.equals(this.input, toolInputAvailablePart.input) &&
-        equalsNullable(this.providerExecuted, toolInputAvailablePart.providerExecuted) &&
-        Objects.equals(this.state, toolInputAvailablePart.state) &&
-        Objects.equals(this.toolCallId, toolInputAvailablePart.toolCallId) &&
-        Objects.equals(this.type, toolInputAvailablePart.type);
+    ToolOutputErrorPart toolOutputErrorPart = (ToolOutputErrorPart) o;
+    return Objects.equals(this.errorText, toolOutputErrorPart.errorText) &&
+        Objects.equals(this.input, toolOutputErrorPart.input) &&
+        equalsNullable(this.providerExecuted, toolOutputErrorPart.providerExecuted) &&
+        Objects.equals(this.state, toolOutputErrorPart.state) &&
+        Objects.equals(this.toolCallId, toolOutputErrorPart.toolCallId) &&
+        Objects.equals(this.type, toolOutputErrorPart.type);
   }
 
   private static <T> boolean equalsNullable(JsonNullable<T> a, JsonNullable<T> b) {
@@ -213,7 +243,7 @@ public class ToolInputAvailablePart {
 
   @Override
   public int hashCode() {
-    return Objects.hash(input, hashCodeNullable(providerExecuted), state, toolCallId, type);
+    return Objects.hash(errorText, input, hashCodeNullable(providerExecuted), state, toolCallId, type);
   }
 
   private static <T> int hashCodeNullable(JsonNullable<T> a) {
@@ -226,7 +256,8 @@ public class ToolInputAvailablePart {
   @Override
   public String toString() {
     StringBuilder sb = new StringBuilder();
-    sb.append("class ToolInputAvailablePart {\n");
+    sb.append("class ToolOutputErrorPart {\n");
+    sb.append("    errorText: ").append(toIndentedString(errorText)).append("\n");
     sb.append("    input: ").append(toIndentedString(input)).append("\n");
     sb.append("    providerExecuted: ").append(toIndentedString(providerExecuted)).append("\n");
     sb.append("    state: ").append(toIndentedString(state)).append("\n");

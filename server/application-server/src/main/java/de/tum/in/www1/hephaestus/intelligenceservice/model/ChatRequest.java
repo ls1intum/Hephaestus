@@ -167,9 +167,9 @@ public class ChatRequest {
    * Get userId
    * @return userId
    */
-  @jakarta.annotation.Nullable
+  @jakarta.annotation.Nonnull
   @JsonProperty(JSON_PROPERTY_USER_ID)
-  @JsonInclude(value = JsonInclude.Include.USE_DEFAULTS)
+  @JsonInclude(value = JsonInclude.Include.ALWAYS)
 
   public Integer getUserId() {
     return userId;
@@ -177,7 +177,7 @@ public class ChatRequest {
 
 
   @JsonProperty(JSON_PROPERTY_USER_ID)
-  @JsonInclude(value = JsonInclude.Include.USE_DEFAULTS)
+  @JsonInclude(value = JsonInclude.Include.ALWAYS)
   public void setUserId(Integer userId) {
     this.userId = userId;
   }

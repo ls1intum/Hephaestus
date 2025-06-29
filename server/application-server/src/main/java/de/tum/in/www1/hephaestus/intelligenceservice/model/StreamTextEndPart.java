@@ -25,49 +25,49 @@ import com.fasterxml.jackson.annotation.JsonTypeName;
 import org.hibernate.validator.constraints.*;
 
 /**
- * Text stream part.
+ * Text stream end part.
  */
 @JsonPropertyOrder({
-  StreamTextPart.JSON_PROPERTY_TEXT,
-  StreamTextPart.JSON_PROPERTY_TYPE
+  StreamTextEndPart.JSON_PROPERTY_ID,
+  StreamTextEndPart.JSON_PROPERTY_TYPE
 })
 @jakarta.annotation.Generated(value = "org.openapitools.codegen.languages.JavaClientCodegen", comments = "Generator version: 7.7.0")
-public class StreamTextPart {
-  public static final String JSON_PROPERTY_TEXT = "text";
-  private String text;
+public class StreamTextEndPart {
+  public static final String JSON_PROPERTY_ID = "id";
+  private String id;
 
   public static final String JSON_PROPERTY_TYPE = "type";
-  private String type = "text";
+  private String type = "text-end";
 
-  public StreamTextPart() {
+  public StreamTextEndPart() {
   }
 
-  public StreamTextPart text(String text) {
+  public StreamTextEndPart id(String id) {
     
-    this.text = text;
+    this.id = id;
     return this;
   }
 
   /**
-   * Get text
-   * @return text
+   * Get id
+   * @return id
    */
   @jakarta.annotation.Nonnull
-  @JsonProperty(JSON_PROPERTY_TEXT)
+  @JsonProperty(JSON_PROPERTY_ID)
   @JsonInclude(value = JsonInclude.Include.ALWAYS)
 
-  public String getText() {
-    return text;
+  public String getId() {
+    return id;
   }
 
 
-  @JsonProperty(JSON_PROPERTY_TEXT)
+  @JsonProperty(JSON_PROPERTY_ID)
   @JsonInclude(value = JsonInclude.Include.ALWAYS)
-  public void setText(String text) {
-    this.text = text;
+  public void setId(String id) {
+    this.id = id;
   }
 
-  public StreamTextPart type(String type) {
+  public StreamTextEndPart type(String type) {
     
     this.type = type;
     return this;
@@ -100,21 +100,21 @@ public class StreamTextPart {
     if (o == null || getClass() != o.getClass()) {
       return false;
     }
-    StreamTextPart streamTextPart = (StreamTextPart) o;
-    return Objects.equals(this.text, streamTextPart.text) &&
-        Objects.equals(this.type, streamTextPart.type);
+    StreamTextEndPart streamTextEndPart = (StreamTextEndPart) o;
+    return Objects.equals(this.id, streamTextEndPart.id) &&
+        Objects.equals(this.type, streamTextEndPart.type);
   }
 
   @Override
   public int hashCode() {
-    return Objects.hash(text, type);
+    return Objects.hash(id, type);
   }
 
   @Override
   public String toString() {
     StringBuilder sb = new StringBuilder();
-    sb.append("class StreamTextPart {\n");
-    sb.append("    text: ").append(toIndentedString(text)).append("\n");
+    sb.append("class StreamTextEndPart {\n");
+    sb.append("    id: ").append(toIndentedString(id)).append("\n");
     sb.append("    type: ").append(toIndentedString(type)).append("\n");
     sb.append("}");
     return sb.toString();
