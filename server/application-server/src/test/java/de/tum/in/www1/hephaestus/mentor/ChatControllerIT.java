@@ -80,6 +80,26 @@ public class ChatControllerIT extends BaseIntegrationTest {
         return parts;
     }
 
+    /**
+     * Helper method to extract text content from a part that uses structured content format.
+     * For text parts, this will extract the "text" field from the structured JSON.
+     * For reasoning parts, this will extract the reasoning content appropriately.
+     * For backward compatibility during the test migration period.
+     */
+    private String extractTextContent(ChatMessagePart part) {
+        if (part.getType() == ChatMessagePart.PartType.TEXT) {
+            var uiPart = part.toUIMessagePart();
+            return uiPart.getText();
+        } else if (part.getType() == ChatMessagePart.PartType.REASONING) {
+            // For reasoning parts, the content might be stored differently
+            // Let's try to convert and extract appropriately
+            return part.getContent().asText();
+        } else {
+            // For non-text parts, fallback to raw content
+            return part.getContent().asText();
+        }
+    }
+
     @Test
     void testUnauthenticatedRequestShouldBeRejected() {
         // Given
@@ -145,7 +165,10 @@ public class ChatControllerIT extends BaseIntegrationTest {
 
         ChatMessagePart userPart = userMessage.getParts().get(0);
         assertThat(userPart.getType()).isEqualTo(ChatMessagePart.PartType.TEXT);
-        assertThat(userPart.getContent().asText()).isEqualTo("Hello, World!");
+        
+        // With our new structured content format, extract text from the structured content
+        var userPartContent = userPart.toUIMessagePart();
+        assertThat(userPartContent.getText()).isEqualTo("Hello, World!");
 
         // Assistant message should have been created with the response ID
         ChatMessage assistantMessage = chatMessageRepository
@@ -162,7 +185,10 @@ public class ChatControllerIT extends BaseIntegrationTest {
         
         // Second part should be the accumulated text content
         assertThat(parts.get(1).getType()).isEqualTo(ChatMessagePart.PartType.TEXT);
-        assertThat(parts.get(1).getContent().asText()).isEqualTo("Hello, this is a test!");
+        
+        // With our new structured content format, extract text from the structured content
+        var assistantTextPart = parts.get(1).toUIMessagePart();
+        assertThat(assistantTextPart.getText()).isEqualTo("Hello, this is a test!");
 
         // Relationships should be established
         assertThat(assistantMessage.getThread()).isEqualTo(thread);
@@ -229,8 +255,10 @@ public class ChatControllerIT extends BaseIntegrationTest {
         assertThat(newUserMessage.getThread()).isEqualTo(refreshedThread);
         assertThat(newUserMessage.getParentMessage().getId()).isEqualTo(existingAssistantMessage.getId());
         assertThat(newUserMessage.getParts()).hasSize(1);
-        assertThat(newUserMessage.getParts().get(0).getContent().asText())
-            .isEqualTo("Follow-up question, what is 1+2?");
+        
+        // With our new structured content format, extract text from the structured content
+        var newUserPartContent = newUserMessage.getParts().get(0).toUIMessagePart();
+        assertThat(newUserPartContent.getText()).isEqualTo("Follow-up question, what is 1+2?");
         
         var newAssistantMessage = chatMessageRepository.findById(UUID.fromString(responseMessageId)).orElseThrow();
         assertThat(newAssistantMessage.getThread()).isEqualTo(refreshedThread);
@@ -238,7 +266,10 @@ public class ChatControllerIT extends BaseIntegrationTest {
         assertThat(newAssistantMessage.getParts()).hasSize(2); // step-start + text
         assertThat(newAssistantMessage.getParts().get(0).getType()).isEqualTo(ChatMessagePart.PartType.STEP_START);
         assertThat(newAssistantMessage.getParts().get(1).getType()).isEqualTo(ChatMessagePart.PartType.TEXT);
-        assertThat(newAssistantMessage.getParts().get(1).getContent().asText())
+        
+        // With our new structured content format, extract text from the structured content
+        var newAssistantPartContent = newAssistantMessage.getParts().get(1).toUIMessagePart();
+        assertThat(newAssistantPartContent.getText())
             .isEqualTo("Thank you for the follow-up. This builds on our previous conversation. Now, 1+2 is 3.");
 
         assertThat(refreshedThread.getSelectedLeafMessage()).isEqualTo(newAssistantMessage);
@@ -286,7 +317,7 @@ public class ChatControllerIT extends BaseIntegrationTest {
         
         // Verify text part
         assertThat(parts.get(2).getType()).isEqualTo(ChatMessagePart.PartType.TEXT);
-        assertThat(parts.get(2).getContent().asText()).isEqualTo("Based on my analysis, here's the answer.");
+        assertThat(extractTextContent(parts.get(2))).isEqualTo("Based on my analysis, here's the answer.");
     }
 
     @Test
@@ -365,7 +396,7 @@ public class ChatControllerIT extends BaseIntegrationTest {
         
         // Second part: Initial text
         assertThat(parts.get(1).getType()).isEqualTo(ChatMessagePart.PartType.TEXT);
-        assertThat(parts.get(1).getContent().asText())
+        assertThat(extractTextContent(parts.get(1)))
             .isEqualTo("Let me check the current weather for your location in Munich.");
         
         // Third part: Tool call with AI SDK-compatible structure
@@ -400,7 +431,7 @@ public class ChatControllerIT extends BaseIntegrationTest {
         
         // Fourth part: Final text response
         assertThat(parts.get(3).getType()).isEqualTo(ChatMessagePart.PartType.TEXT);
-        assertThat(parts.get(3).getContent().asText())
+        assertThat(extractTextContent(parts.get(3)))
             .isEqualTo("The current weather in Munich is sunny with a temperature of 26.8°C, feeling like 25.5°C.");
     }
 
@@ -443,7 +474,7 @@ public class ChatControllerIT extends BaseIntegrationTest {
 
         // Verify part: 1 - text
         assertThat(parts.get(1).getType()).isEqualTo(ChatMessagePart.PartType.TEXT);
-        assertThat(parts.get(1).getContent().asText()).isEqualTo("According to recent research, ");
+        assertThat(extractTextContent(parts.get(1))).isEqualTo("According to recent research, ");
 
         // Verify part: 2 - source URL
         assertThat(parts.get(2).getType()).isEqualTo(ChatMessagePart.PartType.SOURCE_URL);
@@ -452,7 +483,7 @@ public class ChatControllerIT extends BaseIntegrationTest {
 
         // Verify part: 3 - text
         assertThat(parts.get(3).getType()).isEqualTo(ChatMessagePart.PartType.TEXT);
-        assertThat(parts.get(3).getContent().asText()).isEqualTo("the findings show that ");
+        assertThat(extractTextContent(parts.get(3))).isEqualTo("the findings show that ");
 
         // Verify part: 4 - source document
         assertThat(parts.get(4).getType()).isEqualTo(ChatMessagePart.PartType.SOURCE_DOCUMENT);
@@ -461,7 +492,7 @@ public class ChatControllerIT extends BaseIntegrationTest {
 
         // Verify part: 5 - text
         assertThat(parts.get(5).getType()).isEqualTo(ChatMessagePart.PartType.TEXT);
-        assertThat(parts.get(5).getContent().asText()).isEqualTo("we can conclude the following.");
+        assertThat(extractTextContent(parts.get(5))).isEqualTo("we can conclude the following.");
     }
 
     @Test
@@ -502,7 +533,7 @@ public class ChatControllerIT extends BaseIntegrationTest {
 
         // Verify part: 1 - text
         assertThat(parts.get(1).getType()).isEqualTo(ChatMessagePart.PartType.TEXT);
-        assertThat(parts.get(1).getContent().asText())
+        assertThat(extractTextContent(parts.get(1)))
             .isEqualTo("I've created a file for you:");
 
         // Verify part: 2 - file 
@@ -512,7 +543,7 @@ public class ChatControllerIT extends BaseIntegrationTest {
     
         // Verify part: 3 - text
         assertThat(parts.get(3).getType()).isEqualTo(ChatMessagePart.PartType.TEXT);
-        assertThat(parts.get(3).getContent().asText())
+        assertThat(extractTextContent(parts.get(3)))
             .isEqualTo("Please review the contents.");
     }
 
@@ -555,7 +586,7 @@ public class ChatControllerIT extends BaseIntegrationTest {
 
         // Verify part: 1 - text
         assertThat(parts.get(1).getType()).isEqualTo(ChatMessagePart.PartType.TEXT);
-        assertThat(parts.get(1).getContent().asText()).isEqualTo("Generating chart:");
+        assertThat(extractTextContent(parts.get(1))).isEqualTo("Generating chart:");
 
         // Verify part: 2 - data (should be replaced content)
         assertThat(parts.get(2).getType()).isEqualTo(ChatMessagePart.PartType.DATA);
@@ -573,7 +604,7 @@ public class ChatControllerIT extends BaseIntegrationTest {
 
         // Verify part: 3 - text
         assertThat(parts.get(3).getType()).isEqualTo(ChatMessagePart.PartType.TEXT);
-        assertThat(parts.get(3).getContent().asText()).isEqualTo("Chart completed.");
+        assertThat(extractTextContent(parts.get(3))).isEqualTo("Chart completed.");
     }
 
     @Test
@@ -627,7 +658,7 @@ public class ChatControllerIT extends BaseIntegrationTest {
             
         // Verify part: 2 - text
         assertThat(parts.get(2).getType()).isEqualTo(ChatMessagePart.PartType.TEXT);
-        assertThat(parts.get(2).getContent().asText())
+        assertThat(extractTextContent(parts.get(2)))
             .isEqualTo("Let me start by searching for relevant data.");
         
         // Verify part: 3 - step-start (second step)
@@ -635,7 +666,7 @@ public class ChatControllerIT extends BaseIntegrationTest {
         
         // Verify part: 4 - text
         assertThat(parts.get(4).getType()).isEqualTo(ChatMessagePart.PartType.TEXT);
-        assertThat(parts.get(4).getContent().asText())
+        assertThat(extractTextContent(parts.get(4)))
             .isEqualTo("Here are the results I found:");
             
         // Verify part: 5 - data
@@ -651,12 +682,12 @@ public class ChatControllerIT extends BaseIntegrationTest {
         
         // Verify part: 7 - reasoning
         assertThat(parts.get(7).getType()).isEqualTo(ChatMessagePart.PartType.REASONING);
-        assertThat(parts.get(7).getContent().asText())
+        assertThat(extractTextContent(parts.get(7)))
             .isEqualTo("Now I'll analyze the results.");
             
         // Verify part: 8 - text
         assertThat(parts.get(8).getType()).isEqualTo(ChatMessagePart.PartType.TEXT);
-        assertThat(parts.get(8).getContent().asText())
+        assertThat(extractTextContent(parts.get(8)))
             .isEqualTo("Based on the search, here's the conclusion.");
     }
 
@@ -699,14 +730,14 @@ public class ChatControllerIT extends BaseIntegrationTest {
         assertThat(assistantMessage1.getParts()).hasSize(2);
         assertThat(assistantMessage1.getParts().get(0).getType()).isEqualTo(ChatMessagePart.PartType.STEP_START);
         assertThat(assistantMessage1.getParts().get(1).getType()).isEqualTo(ChatMessagePart.PartType.TEXT);
-        assertThat(assistantMessage1.getParts().get(1).getContent().asText())
+        assertThat(extractTextContent(assistantMessage1.getParts().get(1)))
             .isEqualTo("This is the first message.");
 
         // Verify second assistant message has step-start + text
         assertThat(assistantMessage2.getParts()).hasSize(2);
         assertThat(assistantMessage2.getParts().get(0).getType()).isEqualTo(ChatMessagePart.PartType.STEP_START);
         assertThat(assistantMessage2.getParts().get(1).getType()).isEqualTo(ChatMessagePart.PartType.TEXT);
-        assertThat(assistantMessage2.getParts().get(1).getContent().asText())
+        assertThat(extractTextContent(assistantMessage2.getParts().get(1)))
             .isEqualTo("This is the second message.");
 
         // Verify relationships
@@ -830,7 +861,7 @@ public class ChatControllerIT extends BaseIntegrationTest {
         var textPart = assistantMessage.getParts().stream()
             .filter(part -> part.getType() == ChatMessagePart.PartType.TEXT)
             .findFirst().orElseThrow();
-        assertThat(textPart.getContent().asText()).isEqualTo("Here's your response with metadata.");
+        assertThat(extractTextContent(textPart)).isEqualTo("Here's your response with metadata.");
     }
 
     @Test
@@ -892,7 +923,7 @@ public class ChatControllerIT extends BaseIntegrationTest {
         
         // Final text response
         assertThat(parts.get(3).getType()).isEqualTo(ChatMessagePart.PartType.TEXT);
-        assertThat(parts.get(3).getContent().asText()).isEqualTo("The weather in London is sunny.");
+        assertThat(extractTextContent(parts.get(3))).isEqualTo("The weather in London is sunny.");
     }
 
     @Test
@@ -1147,11 +1178,11 @@ public class ChatControllerIT extends BaseIntegrationTest {
                                  "First, I need to understand what you're asking. " +
                                  "The question involves multiple components that I should analyze separately. " +
                                  "After careful consideration, I can provide a comprehensive answer.";
-        assertThat(reasoningPart.getContent().asText()).isEqualTo(expectedReasoning);
+        assertThat(extractTextContent(reasoningPart)).isEqualTo(expectedReasoning);
         
         // Verify first text part
         assertThat(parts.get(2).getType()).isEqualTo(ChatMessagePart.PartType.TEXT);
-        assertThat(parts.get(2).getContent().asText()).isEqualTo("Based on my analysis, ");
+        assertThat(extractTextContent(parts.get(2))).isEqualTo("Based on my analysis, ");
         
         // Verify source URL part
         var sourceUrlPart = parts.get(3);
@@ -1161,7 +1192,7 @@ public class ChatControllerIT extends BaseIntegrationTest {
         
         // Verify second text part  
         assertThat(parts.get(4).getType()).isEqualTo(ChatMessagePart.PartType.TEXT);
-        assertThat(parts.get(4).getContent().asText()).isEqualTo(" and internal documentation ");
+        assertThat(extractTextContent(parts.get(4))).isEqualTo(" and internal documentation ");
         
         // Verify source document part
         var sourceDocPart = parts.get(5);
@@ -1171,7 +1202,7 @@ public class ChatControllerIT extends BaseIntegrationTest {
         
         // Verify final text part
         assertThat(parts.get(6).getType()).isEqualTo(ChatMessagePart.PartType.TEXT);
-        assertThat(parts.get(6).getContent().asText()).isEqualTo(", I can conclude that the answer is complex but achievable.");
+        assertThat(extractTextContent(parts.get(6))).isEqualTo(", I can conclude that the answer is complex but achievable.");
     }
 
     @Test

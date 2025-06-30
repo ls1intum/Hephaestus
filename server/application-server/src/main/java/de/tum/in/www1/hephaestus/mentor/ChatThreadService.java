@@ -24,7 +24,6 @@ import java.util.stream.Collectors;
 @Service
 @RequiredArgsConstructor
 @Slf4j
-@Transactional(readOnly = true)
 public class ChatThreadService {
 
     private final ChatThreadRepository chatThreadRepository;
@@ -119,12 +118,35 @@ public class ChatThreadService {
      * @param user the authenticated user
      * @return Optional containing the thread detail if found and belongs to user
      */
+    @Transactional(readOnly = true)
     public Optional<ChatThreadDetailDTO> getThreadDetailForUser(UUID threadId, User user) {
         log.debug("Getting thread detail {} for user: {}", threadId, user.getLogin());
         
-        Optional<ChatThread> threadOpt = chatThreadRepository.findByIdAndUserWithMessagesAndParts(threadId, user);
+        // Fetch thread with messages first
+        Optional<ChatThread> threadOpt = chatThreadRepository.findByIdAndUserWithMessages(threadId, user);
         
-        return threadOpt.map(this::convertToDetailDTO);
+        if (threadOpt.isEmpty()) {
+            return Optional.empty();
+        }
+        
+        ChatThread thread = threadOpt.get();
+        
+        // Force lazy loading of message parts for all messages within transaction
+        for (ChatMessage message : thread.getAllMessages()) {
+            // Force initialization of the parts collection
+            var parts = message.getParts();
+            parts.size(); // Trigger lazy loading
+            
+            // Additionally, access each part to ensure they're fully loaded
+            for (ChatMessagePart part : parts) {
+                // Access part properties to ensure they're loaded
+                part.getType();
+                part.getContent();
+                part.getOriginalType();
+            }
+        }
+        
+        return Optional.of(convertToDetailDTO(thread));
     }
 
     /**

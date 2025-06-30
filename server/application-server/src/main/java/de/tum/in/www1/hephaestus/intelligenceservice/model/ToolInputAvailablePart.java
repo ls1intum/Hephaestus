@@ -47,7 +47,7 @@ public class ToolInputAvailablePart {
   private JsonNullable<Boolean> providerExecuted = JsonNullable.<Boolean>undefined();
 
   public static final String JSON_PROPERTY_STATE = "state";
-  private String state = "input-available";
+  private String state;
 
   public static final String JSON_PROPERTY_TOOL_CALL_ID = "toolCallId";
   private String toolCallId;
@@ -126,9 +126,9 @@ public class ToolInputAvailablePart {
    * Get state
    * @return state
    */
-  @jakarta.annotation.Nullable
+  @jakarta.annotation.Nonnull
   @JsonProperty(JSON_PROPERTY_STATE)
-  @JsonInclude(value = JsonInclude.Include.USE_DEFAULTS)
+  @JsonInclude(value = JsonInclude.Include.ALWAYS)
 
   public String getState() {
     return state;
@@ -136,7 +136,7 @@ public class ToolInputAvailablePart {
 
 
   @JsonProperty(JSON_PROPERTY_STATE)
-  @JsonInclude(value = JsonInclude.Include.USE_DEFAULTS)
+  @JsonInclude(value = JsonInclude.Include.ALWAYS)
   public void setState(String state) {
     this.state = state;
   }

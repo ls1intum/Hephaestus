@@ -60,7 +60,7 @@ import org.hibernate.validator.constraints.*;
 @jakarta.annotation.Generated(value = "org.openapitools.codegen.languages.JavaClientCodegen", comments = "Generator version: 7.7.0")
 public class UIMessagePartsInner {
   public static final String JSON_PROPERTY_STATE = "state";
-  private String state = "output-error";
+  private String state;
 
   public static final String JSON_PROPERTY_TEXT = "text";
   private String text;
@@ -120,9 +120,9 @@ public class UIMessagePartsInner {
    * Get state
    * @return state
    */
-  @jakarta.annotation.Nullable
+  @jakarta.annotation.Nonnull
   @JsonProperty(JSON_PROPERTY_STATE)
-  @JsonInclude(value = JsonInclude.Include.USE_DEFAULTS)
+  @JsonInclude(value = JsonInclude.Include.ALWAYS)
 
   public String getState() {
     return state;
@@ -130,7 +130,7 @@ public class UIMessagePartsInner {
 
 
   @JsonProperty(JSON_PROPERTY_STATE)
-  @JsonInclude(value = JsonInclude.Include.USE_DEFAULTS)
+  @JsonInclude(value = JsonInclude.Include.ALWAYS)
   public void setState(String state) {
     this.state = state;
   }

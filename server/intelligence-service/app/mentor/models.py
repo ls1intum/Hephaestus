@@ -83,7 +83,7 @@ class ToolPartBase(BasePart):
 class ToolInputStreamingPart(ToolPartBase):
     """Tool part with input being streamed."""
 
-    state: Literal["input-streaming"] = "input-streaming"
+    state: Literal["input-streaming"]
     input: Optional[Dict[str, Any]] = None
     providerExecuted: Optional[bool] = None
 
@@ -91,7 +91,7 @@ class ToolInputStreamingPart(ToolPartBase):
 class ToolInputAvailablePart(ToolPartBase):
     """Tool part with input available."""
 
-    state: Literal["input-available"] = "input-available"
+    state: Literal["input-available"]
     input: Dict[str, Any]
     providerExecuted: Optional[bool] = None
 
@@ -99,7 +99,7 @@ class ToolInputAvailablePart(ToolPartBase):
 class ToolOutputAvailablePart(ToolPartBase):
     """Tool part with output available."""
 
-    state: Literal["output-available"] = "output-available"
+    state: Literal["output-available"]
     input: Dict[str, Any]
     output: Dict[str, Any]
     providerExecuted: Optional[bool] = None
@@ -108,7 +108,7 @@ class ToolOutputAvailablePart(ToolPartBase):
 class ToolOutputErrorPart(ToolPartBase):
     """Tool part with output error."""
 
-    state: Literal["output-error"] = "output-error"
+    state: Literal["output-error"]
     input: Dict[str, Any]
     errorText: str
     providerExecuted: Optional[bool] = None

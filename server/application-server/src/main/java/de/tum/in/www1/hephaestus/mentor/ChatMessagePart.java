@@ -6,6 +6,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import de.tum.in.www1.hephaestus.intelligenceservice.model.UIMessagePartsInner;
 import io.hypersistence.utils.hibernate.type.json.JsonType;
 import jakarta.persistence.*;
+import java.util.HashMap;
 import java.util.UUID;
 import lombok.EqualsAndHashCode;
 import lombok.Getter;
@@ -27,8 +28,6 @@ import org.springframework.lang.NonNull;
 @ToString
 @EqualsAndHashCode(onlyExplicitlyIncluded = true)
 public class ChatMessagePart {
-
-    private static final ObjectMapper objectMapper = new ObjectMapper();
 
     @EmbeddedId
     @EqualsAndHashCode.Include
@@ -217,25 +216,226 @@ public class ChatMessagePart {
 
     /**
      * Convert this message part to a UIMessagePartsInner object.
-     * Uses ObjectMapper to convert the content JSON to the appropriate UI model.
+     * Handles the mapping from internal JSON structure to the UI model.
      * 
      * @return A UIMessagePartsInner representation of this message part
      */
     public UIMessagePartsInner toUIMessagePart() {    
         try {
-            // Start with a copy of the content as the base
-            UIMessagePartsInner uiPart = objectMapper.treeToValue(content, UIMessagePartsInner.class);
+            // Handle null content
+            if (content == null) {
+                UIMessagePartsInner uiPart = new UIMessagePartsInner();
+                uiPart.setType(originalType != null ? originalType : type.getValue());
+                // Clear default values that shouldn't be set
+                uiPart.setState(null);
+                return uiPart;
+            }
             
-            // Ensure the type is set correctly
-            // Use originalType if available, otherwise use the canonical type value
+            // Create the UI part manually to handle field mapping correctly
+            UIMessagePartsInner uiPart = new UIMessagePartsInner();
+            
+            // Set the type correctly
             String partType = originalType != null ? originalType : type.getValue();
             uiPart.setType(partType);
             
+            // Handle different part types
+            if (type == PartType.TEXT || type == PartType.REASONING) {
+                // For text and reasoning parts
+                if (content.has("text")) {
+                    uiPart.setText(content.get("text").asText());
+                }
+                uiPart.setState(null); // Clear default state for text/reasoning parts
+                
+            } else if (type == PartType.TOOL) {
+                // For tool parts, handle the state and data fields correctly
+                String toolState = null;
+                if (content.has("state")) {
+                    toolState = content.get("state").asText();
+                    uiPart.setState(toolState);
+                }
+                
+                if (content.has("toolCallId")) {
+                    uiPart.setToolCallId(content.get("toolCallId").asText());
+                }
+                
+                // Handle fields based on the specific tool state to match Python model requirements
+                if ("input-streaming".equals(toolState)) {
+                    // ToolInputStreamingPart: input (optional), providerExecuted (optional)
+                    if (content.has("input") && !content.get("input").isNull()) {
+                        try {
+                            ObjectMapper mapper = new ObjectMapper();
+                            Object inputValue = mapper.treeToValue(content.get("input"), Object.class);
+                            uiPart.setInput(inputValue);
+                        } catch (Exception e) {
+                            // Keep input as null for input-streaming if conversion fails
+                        }
+                    }
+                    
+                } else if ("input-available".equals(toolState)) {
+                    // ToolInputAvailablePart: input (required), providerExecuted (optional)
+                    Object inputValue = null;
+                    if (content.has("args") && !content.get("args").isNull()) {
+                        try {
+                            ObjectMapper mapper = new ObjectMapper();
+                            inputValue = mapper.treeToValue(content.get("args"), Object.class);
+                        } catch (Exception e) {
+                            inputValue = new HashMap<>();
+                        }
+                    } else if (content.has("input") && !content.get("input").isNull()) {
+                        try {
+                            ObjectMapper mapper = new ObjectMapper();
+                            inputValue = mapper.treeToValue(content.get("input"), Object.class);
+                        } catch (Exception e) {
+                            inputValue = new HashMap<>();
+                        }
+                    } else {
+                        inputValue = new HashMap<>(); // Required field
+                    }
+                    uiPart.setInput(inputValue);
+                    
+                } else if ("output-available".equals(toolState)) {
+                    // ToolOutputAvailablePart: input (required), output (required), providerExecuted (optional)
+                    
+                    // Handle required input field
+                    Object inputValue = null;
+                    if (content.has("args") && !content.get("args").isNull()) {
+                        try {
+                            ObjectMapper mapper = new ObjectMapper();
+                            inputValue = mapper.treeToValue(content.get("args"), Object.class);
+                        } catch (Exception e) {
+                            inputValue = new HashMap<>();
+                        }
+                    } else if (content.has("input") && !content.get("input").isNull()) {
+                        try {
+                            ObjectMapper mapper = new ObjectMapper();
+                            inputValue = mapper.treeToValue(content.get("input"), Object.class);
+                        } catch (Exception e) {
+                            inputValue = new HashMap<>();
+                        }
+                    } else {
+                        inputValue = new HashMap<>(); // Required field
+                    }
+                    uiPart.setInput(inputValue);
+                    
+                    // Handle required output field
+                    Object outputValue = null;
+                    if (content.has("result") && !content.get("result").isNull()) {
+                        try {
+                            ObjectMapper mapper = new ObjectMapper();
+                            outputValue = mapper.treeToValue(content.get("result"), Object.class);
+                        } catch (Exception e) {
+                            outputValue = new HashMap<>();
+                        }
+                    } else if (content.has("output") && !content.get("output").isNull()) {
+                        try {
+                            ObjectMapper mapper = new ObjectMapper();
+                            outputValue = mapper.treeToValue(content.get("output"), Object.class);
+                        } catch (Exception e) {
+                            outputValue = new HashMap<>();
+                        }
+                    } else {
+                        outputValue = new HashMap<>(); // Required field
+                    }
+                    uiPart.setOutput(outputValue);
+                    
+                } else if ("output-error".equals(toolState)) {
+                    // ToolOutputErrorPart: input (required), errorText (required), providerExecuted (optional)
+                    
+                    // Handle required input field
+                    Object inputValue = null;
+                    if (content.has("args") && !content.get("args").isNull()) {
+                        try {
+                            ObjectMapper mapper = new ObjectMapper();
+                            inputValue = mapper.treeToValue(content.get("args"), Object.class);
+                        } catch (Exception e) {
+                            inputValue = new HashMap<>();
+                        }
+                    } else if (content.has("input") && !content.get("input").isNull()) {
+                        try {
+                            ObjectMapper mapper = new ObjectMapper();
+                            inputValue = mapper.treeToValue(content.get("input"), Object.class);
+                        } catch (Exception e) {
+                            inputValue = new HashMap<>();
+                        }
+                    } else {
+                        inputValue = new HashMap<>(); // Required field
+                    }
+                    uiPart.setInput(inputValue);
+                    
+                    // Handle required errorText field
+                    if (content.has("errorText") && !content.get("errorText").isNull()) {
+                        uiPart.setErrorText(content.get("errorText").asText());
+                    } else {
+                        uiPart.setErrorText("An error occurred during tool execution"); // Required field
+                    }
+                }
+                
+                // Handle providerExecuted if present (optional for all tool states)
+                if (content.has("providerExecuted") && !content.get("providerExecuted").isNull()) {
+                    uiPart.setProviderExecuted(content.get("providerExecuted").asBoolean());
+                }
+                
+            } else if (type == PartType.FILE) {
+                // For file parts
+                if (content.has("mediaType")) {
+                    uiPart.setMediaType(content.get("mediaType").asText());
+                }
+                if (content.has("url")) {
+                    uiPart.setUrl(content.get("url").asText());
+                }
+                if (content.has("filename")) {
+                    uiPart.setFilename(content.get("filename").asText());
+                }
+                uiPart.setState(null); // Clear default state
+                
+            } else if (type == PartType.DATA) {
+                // For data parts
+                if (content.has("data")) {
+                    uiPart.setData(content.get("data"));
+                }
+                if (content.has("id")) {
+                    uiPart.setId(content.get("id").asText());
+                }
+                uiPart.setState(null); // Clear default state
+                
+            } else {
+                // For other part types, try to convert safely
+                uiPart.setState(null); // Clear default state
+                
+                // Copy over common fields if they exist
+                if (content.has("text")) {
+                    uiPart.setText(content.get("text").asText());
+                }
+                if (content.has("state")) {
+                    uiPart.setState(content.get("state").asText());
+                }
+            }
+            
+            // Copy over provider metadata if present
+            if (content.has("providerMetadata")) {
+                uiPart.setProviderMetadata(content.get("providerMetadata"));
+            }
+            
             return uiPart;
+            
         } catch (Exception e) {
-            // If conversion fails, create a new instance with just the type
+            // Log the conversion error for debugging
+            System.err.println("Failed to convert ChatMessagePart to UIMessagePart: " + e.getMessage());
+            System.err.println("Content: " + content);
+            System.err.println("Type: " + type + ", OriginalType: " + originalType);
+            e.printStackTrace();
+            
+            // Create a fallback instance
             UIMessagePartsInner uiPart = new UIMessagePartsInner();
-            uiPart.setType(originalType != null ? originalType : type.getValue());
+            String partType = originalType != null ? originalType : type.getValue();
+            uiPart.setType(partType);
+            uiPart.setState(null); // Clear default state
+            
+            // For text parts, try to extract the text directly from content
+            if (content != null && content.has("text")) {
+                uiPart.setText(content.get("text").asText());
+            }
+            
             return uiPart;
         }
     }

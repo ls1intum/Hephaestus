@@ -37,15 +37,14 @@ public interface ChatThreadRepository extends JpaRepository<ChatThread, UUID> {
     Optional<ChatThread> findByIdAndUserId(@Param("id") UUID id, @Param("userId") Long userId);
 
     /**
-     * Find a thread with all its messages and message parts eagerly fetched
+     * Find a thread with its messages eagerly fetched
      */
     @Query(
         "SELECT DISTINCT t FROM ChatThread t " +
-        "LEFT JOIN FETCH t.allMessages m " +
-        "LEFT JOIN FETCH m.parts " +
+        "LEFT JOIN FETCH t.allMessages " +
         "WHERE t.id = :id AND t.user = :user"
     )
-    Optional<ChatThread> findByIdAndUserWithMessagesAndParts(@Param("id") UUID id, @Param("user") User user);
+    Optional<ChatThread> findByIdAndUserWithMessages(@Param("id") UUID id, @Param("user") User user);
 
     @Override
     @EntityGraph(attributePaths = { "user", "allMessages", "allMessages.parts", "selectedLeafMessage" })

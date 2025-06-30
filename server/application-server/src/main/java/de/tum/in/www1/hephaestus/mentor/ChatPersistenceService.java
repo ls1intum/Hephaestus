@@ -1,10 +1,12 @@
 package de.tum.in.www1.hephaestus.mentor;
 
+import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import de.tum.in.www1.hephaestus.gitprovider.user.User;
 import de.tum.in.www1.hephaestus.intelligenceservice.model.*;
+import java.lang.reflect.Method;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
@@ -27,7 +29,9 @@ import org.springframework.transaction.annotation.Transactional;
 public class ChatPersistenceService {
 
     private static final Logger logger = LoggerFactory.getLogger(ChatPersistenceService.class);
-    private static final ObjectMapper objectMapper = new ObjectMapper();
+
+    @Autowired
+    private ObjectMapper objectMapper;
 
     @Autowired
     private ChatThreadRepository chatThreadRepository;
@@ -113,7 +117,38 @@ public class ChatPersistenceService {
             part.setId(partId);
             part.setMessage(currentMessage);
             part.setType(type);
-            part.setContent(objectMapper.valueToTree(initialContent));
+            
+            // Create structured content based on part type
+            if (type == ChatMessagePart.PartType.TEXT) {
+                var structuredContent = objectMapper.createObjectNode();
+                structuredContent.put("type", "text");
+                structuredContent.put("text", initialContent);
+                part.setContent(structuredContent);
+            } else {
+                // For non-text parts, store as simple string initially
+                part.setContent(objectMapper.valueToTree(initialContent));
+            }
+            
+            return part;
+        }
+
+        /**
+         * Helper method that creates and saves a message part with originalType, adding it to the current message.
+         * Use this when you want to create and immediately persist a part with a specific originalType.
+         */
+        private ChatMessagePart createAndSaveMessagePart(ChatMessagePart.PartType type, String initialContent, String originalType) {
+            ChatMessagePart part = createMessagePart(type, initialContent);
+            
+            // Set originalType if provided
+            if (originalType != null) {
+                part.setOriginalType(originalType);
+            }
+            
+            // Save the part to database
+            chatMessagePartRepository.save(part);
+            
+            // Add to message's parts collection for JPA relationship
+            currentMessage.getParts().add(part);
             
             return part;
         }
@@ -183,10 +218,7 @@ public class ChatPersistenceService {
 
                 // Create part immediately when streaming starts
                 String textId = textStartPart.getId();
-                ChatMessagePart textPart = createMessagePart(ChatMessagePart.PartType.TEXT, "");
-                
-                // Save immediately to establish correct part ordering
-                chatMessagePartRepository.save(textPart);
+                ChatMessagePart textPart = createAndSaveMessagePart(ChatMessagePart.PartType.TEXT, "", "text");
                 
                 // Track for updates during streaming
                 activeTextParts.put(textId, textPart);
@@ -223,8 +255,13 @@ public class ChatPersistenceService {
                 // Accumulate delta
                 buffer.append(textDeltaPart.getDelta());
                 
-                // Update the database part with current accumulated content
-                textPart.setContent(objectMapper.valueToTree(buffer.toString()));
+                // Create structured content with type and text fields for proper conversion
+                var structuredContent = objectMapper.createObjectNode();
+                structuredContent.put("type", "text");
+                structuredContent.put("text", buffer.toString());
+                
+                // Update the database part with structured content
+                textPart.setContent(structuredContent);
                 chatMessagePartRepository.save(textPart);
             } catch (Exception e) {
                 logger.error("Failed to process text delta: {}", e.getMessage(), e);
@@ -278,10 +315,7 @@ public class ChatPersistenceService {
                 String toolName = toolInputStart.getToolName();
                 
                 // Use the correct tool type for input-streaming state
-                ChatMessagePart toolPart = createMessagePart(ChatMessagePart.PartType.TOOL, "");
-                
-                // Set the original type for tool name extraction
-                toolPart.setOriginalType("tool-" + toolName);
+                ChatMessagePart toolPart = createAndSaveMessagePart(ChatMessagePart.PartType.TOOL, "", "tool-" + toolName);
                 
                 // Create initial tool part content in AI SDK v5 format
                 var toolContent = objectMapper.createObjectNode();
@@ -293,7 +327,7 @@ public class ChatPersistenceService {
                 toolContent.put("errorText", (String) null);
                 toolPart.setContent(toolContent);
                 
-                // Save immediately to establish correct part ordering
+                // Update content in database since createMessagePart already saved it
                 chatMessagePartRepository.save(toolPart);
                 
                 // Track for updates
@@ -330,8 +364,7 @@ public class ChatPersistenceService {
                 if (toolPart == null) {
                     // ⚠️ Edge case: Input available without prior start - create tool part immediately
                     logger.warn("Received tool input available without prior start for toolCallId: {} - creating tool part", toolCallId);
-                    toolPart = createMessagePart(ChatMessagePart.PartType.TOOL, "");
-                    toolPart.setOriginalType("tool-" + toolInput.getToolName());
+                    toolPart = createAndSaveMessagePart(ChatMessagePart.PartType.TOOL, "", "tool-" + toolInput.getToolName());
                     
                     // Create initial tool part content
                     var toolContent = objectMapper.createObjectNode();
@@ -343,6 +376,7 @@ public class ChatPersistenceService {
                     toolContent.put("errorText", (String) null);
                     toolPart.setContent(toolContent);
                     
+                    // Update content in database since createAndSaveMessagePart already saved it
                     chatMessagePartRepository.save(toolPart);
                     toolPartsById.put(toolCallId, toolPart);
                 }
@@ -447,8 +481,7 @@ public class ChatPersistenceService {
                 if (toolPart == null) {
                     // ⚠️ Edge case: Tool error without prior start - create tool part for error
                     logger.warn("Received tool output error without prior tool part for toolCallId: {} - creating error tool part", toolCallId);
-                    toolPart = createMessagePart(ChatMessagePart.PartType.TOOL, "");
-                    toolPart.setOriginalType("tool-error"); // Mark as error tool
+                    toolPart = createAndSaveMessagePart(ChatMessagePart.PartType.TOOL, "", "tool-error");
                     
                     // Create tool part content with error state
                     var toolContent = objectMapper.createObjectNode();
@@ -460,6 +493,7 @@ public class ChatPersistenceService {
                     toolContent.put("errorText", errorText);
                     toolPart.setContent(toolContent);
                     
+                    // Update content in database since createAndSaveMessagePart already saved it
                     chatMessagePartRepository.save(toolPart);
                     toolPartsById.put(toolCallId, toolPart);
                 } else {
@@ -655,10 +689,7 @@ public class ChatPersistenceService {
 
                 // Create reasoning part immediately when streaming starts
                 String reasoningId = reasoningStartPart.getId();
-                ChatMessagePart reasoningPart = createMessagePart(ChatMessagePart.PartType.REASONING, "");
-                
-                // Save immediately to establish correct part ordering
-                chatMessagePartRepository.save(reasoningPart);
+                ChatMessagePart reasoningPart = createAndSaveMessagePart(ChatMessagePart.PartType.REASONING, "", "reasoning");
                 
                 // Track for updates during streaming
                 activeReasoningParts.put(reasoningId, reasoningPart);
@@ -744,7 +775,7 @@ public class ChatPersistenceService {
                 }
 
                 // Create source URL part immediately
-                ChatMessagePart sourcePart = createMessagePart(ChatMessagePart.PartType.SOURCE_URL, sourceUrl.getUrl());
+                ChatMessagePart sourcePart = createAndSaveMessagePart(ChatMessagePart.PartType.SOURCE_URL, sourceUrl.getUrl(), "source-url");
                 
                 // Add additional source metadata
                 var sourceContent = objectMapper.createObjectNode();
@@ -752,6 +783,7 @@ public class ChatPersistenceService {
                 sourceContent.put("title", sourceUrl.getTitle());
                 sourcePart.setContent(sourceContent);
 
+                // Update content in database
                 chatMessagePartRepository.save(sourcePart);
                 logger.debug("Created source URL part: messageId={}, url={}", 
                     currentMessage.getId(), sourceUrl.getUrl());
@@ -772,7 +804,7 @@ public class ChatPersistenceService {
                 }
 
                 // Create source document part immediately  
-                ChatMessagePart sourcePart = createMessagePart(ChatMessagePart.PartType.SOURCE_DOCUMENT, sourceDocument.getTitle());
+                ChatMessagePart sourcePart = createAndSaveMessagePart(ChatMessagePart.PartType.SOURCE_DOCUMENT, sourceDocument.getTitle(), "source-document");
                 
                 var sourceContent = objectMapper.createObjectNode();
                 sourceContent.put("sourceId", sourceDocument.getSourceId());
@@ -799,13 +831,14 @@ public class ChatPersistenceService {
                 }
 
                 // Create file part immediately
-                ChatMessagePart fileMessagePart = createMessagePart(ChatMessagePart.PartType.FILE, filePart.getUrl());
+                ChatMessagePart fileMessagePart = createAndSaveMessagePart(ChatMessagePart.PartType.FILE, filePart.getUrl(), "file");
                 
                 var fileContent = objectMapper.createObjectNode();
                 fileContent.put("url", filePart.getUrl());
                 fileContent.put("mediaType", filePart.getMediaType());
                 fileMessagePart.setContent(fileContent);
 
+                // Update content in database
                 chatMessagePartRepository.save(fileMessagePart);
                 logger.debug("Created file part: messageId={}, url={}", currentMessage.getId(), filePart.getUrl());
             } catch (Exception e) {
@@ -1019,20 +1052,112 @@ public class ChatPersistenceService {
         messagePart.setId(partId);
         messagePart.setMessage(message);
         messagePart.setType(ChatMessagePart.PartType.fromValue(part.getType()));
+        messagePart.setOriginalType(part.getType());
 
-        // Set content based on part type
-        if ("text".equals(part.getType()) && part.getText() != null) {
-            // For text parts, store just the text content as a simple string
-            messagePart.setContent(objectMapper.valueToTree(part.getText()));
-        } else {
-            // For other parts, store the entire part object
-            messagePart.setContent(objectMapper.valueToTree(part));
-        }
+        // Create clean content with only non-null fields to avoid storing null values
+        // Use reflection to dynamically get all properties and filter out nulls
+        messagePart.setContent(createCleanJsonNode(part));
 
         // Save the part
         chatMessagePartRepository.save(messagePart);
 
         // Add to message's parts collection
         message.getParts().add(messagePart);
+    }
+
+    /**
+     * Creates a clean JsonNode from an object, including only non-null properties.
+     * Uses reflection to dynamically get all getter methods and their @JsonProperty annotations.
+     * Filters out default/irrelevant values for cleaner storage.
+     */
+    private JsonNode createCleanJsonNode(Object object) {
+        ObjectNode content = objectMapper.createObjectNode();
+        String messageType = null;
+        
+        try {
+            Class<?> clazz = object.getClass();
+            Method[] methods = clazz.getMethods();
+            
+            // First pass: get the type to help with relevance filtering
+            for (Method method : methods) {
+                if (method.getName().equals("getType") && 
+                    method.getParameterCount() == 0 && 
+                    method.isAnnotationPresent(JsonProperty.class)) {
+                    try {
+                        Object typeValue = method.invoke(object);
+                        if (typeValue instanceof String) {
+                            messageType = (String) typeValue;
+                        }
+                    } catch (Exception e) {
+                        logger.warn("Failed to get type for relevance filtering: {}", e.getMessage());
+                    }
+                    break;
+                }
+            }
+            
+            // Second pass: process all properties with type-aware filtering
+            for (Method method : methods) {
+                // Look for getter methods with @JsonProperty annotation
+                if (method.getName().startsWith("get") && 
+                    method.getParameterCount() == 0 && 
+                    method.isAnnotationPresent(JsonProperty.class)) {
+                    
+                    JsonProperty jsonProperty = method.getAnnotation(JsonProperty.class);
+                    String propertyName = jsonProperty.value();
+                    
+                    try {
+                        Object value = method.invoke(object);
+                        if (value != null && isRelevantValue(propertyName, value, messageType)) {
+                            if (value instanceof String) {
+                                content.put(propertyName, (String) value);
+                            } else if (value instanceof Boolean) {
+                                content.put(propertyName, (Boolean) value);
+                            } else if (value instanceof Integer) {
+                                content.put(propertyName, (Integer) value);
+                            } else if (value instanceof Long) {
+                                content.put(propertyName, (Long) value);
+                            } else if (value instanceof Double) {
+                                content.put(propertyName, (Double) value);
+                            } else {
+                                // For complex objects, convert to JsonNode
+                                content.set(propertyName, objectMapper.valueToTree(value));
+                            }
+                        }
+                    } catch (Exception e) {
+                        logger.warn("Failed to get property value for {}: {}", propertyName, e.getMessage());
+                    }
+                }
+            }
+        } catch (Exception e) {
+            logger.error("Failed to create clean JsonNode: {}", e.getMessage(), e);
+            // Fallback to direct conversion
+            return objectMapper.valueToTree(object);
+        }
+        
+        return content;
+    }
+
+    /**
+     * Determines if a property value is relevant and should be included in the stored content.
+     * Filters out default/irrelevant values that don't add meaningful information.
+     */
+    private boolean isRelevantValue(String propertyName, Object value, String messageType) {
+        // Always include type as it's essential
+        if ("type".equals(propertyName)) {
+            return true;
+        }
+        
+        // For tool calls, include state if it's relevant
+        if ("state".equals(propertyName)) {
+            return "tool".equals(messageType);
+        }
+        
+        // For string values, exclude empty strings
+        if (value instanceof String) {
+            return !((String) value).trim().isEmpty();
+        }
+        
+        // Include all other non-null values
+        return true;
     }
 }
