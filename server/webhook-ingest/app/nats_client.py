@@ -3,6 +3,7 @@ from nats.aio.client import Client as NATS
 from app.config import settings
 from app.logger import logger, uvicorn_error
 
+
 class NATSClient:
     MAX_RETRIES = 10
     RETRY_BACKOFF_FACTOR = 2
@@ -12,16 +13,16 @@ class NATSClient:
 
     async def connect(self):
         async def error_cb(e):
-            logger.error(f'There was an error: {e}')
+            logger.error(f"There was an error: {e}")
 
         async def disconnected_cb():
-            logger.info('NATS got disconnected!')
-        
+            logger.info("NATS got disconnected!")
+
         async def reconnected_cb():
-            logger.info(f'NATS got reconnected to {self.nc.connected_url.netloc}')
+            logger.info(f"NATS got reconnected to {self.nc.connected_url.netloc}")
 
         async def closed_cb():
-            logger.info('NATS connection is closed')
+            logger.info("NATS connection is closed")
 
         await self.nc.connect(
             servers=settings.NATS_URL,
@@ -48,12 +49,19 @@ class NATSClient:
                 ack = await self.publish(subject, message)
                 return ack  # Successfully published, return the ack
             except Exception as e:
-                uvicorn_error.error(f"NATS request failed: {e}, retrying in {wait_time} seconds... (Attempt {attempt + 1}/{self.MAX_RETRIES})")
-                wait_time = self.RETRY_BACKOFF_FACTOR ** attempt
+                wait_time = self.RETRY_BACKOFF_FACTOR**attempt
+                uvicorn_error.error(
+                    f"NATS request failed: {e}, retrying in {wait_time} seconds... "
+                    f"(Attempt {attempt + 1}/{self.MAX_RETRIES})"
+                )
                 await asyncio.sleep(wait_time)
 
-        uvicorn_error.error(f"Failed to publish to {subject} after {self.MAX_RETRIES} attempts")
-        raise Exception(f"Failed to publish to {subject} after {self.MAX_RETRIES} attempts")
+        uvicorn_error.error(
+            f"Failed to publish to {subject} after {self.MAX_RETRIES} attempts"
+        )
+        raise Exception(
+            f"Failed to publish to {subject} after {self.MAX_RETRIES} attempts"
+        )
 
     async def close(self):
         await self.nc.close()
