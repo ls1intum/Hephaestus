@@ -60,7 +60,7 @@ public class GitHubTeamSyncService {
                 if (saved == null) {
                     log.warn(
                         "Skipped team {} with following id: {} due to an error:",
-                        ghTeam.getSlug(),
+                        ghTeam.getName(),
                         ghTeam.getId()
                     );
                 }
@@ -85,7 +85,7 @@ public class GitHubTeamSyncService {
             TeamV2 saved = teamRepository.save(team);
             log.info(
                 "Processed team={}, having {} members with {} repository permissions",
-                team.getSlug(),
+                team.getName(),
                 team.getMemberships().size(),
                 team.getRepoPermissions().size()
             );
@@ -110,12 +110,12 @@ public class GitHubTeamSyncService {
                         if (!Objects.equals(child.getParentId(), parentId)) {
                             child.setParentId(parentId);
                             teamRepository.save(child);
-                            log.info("Linked parent team '{}' → child team '{}'", parent.getSlug(), child.getSlug());
+                            log.info("Linked parent team '{}' → child team '{}'", parent.getName(), child.getName());
                         }
                     });
             }
         } catch (IOException e) {
-            log.warn("Could not list child teams for {}: {}", parent.getSlug(), e.getMessage());
+            log.warn("Could not list child teams for {}: {}", parent.getName(), e.getMessage());
         }
     }
 

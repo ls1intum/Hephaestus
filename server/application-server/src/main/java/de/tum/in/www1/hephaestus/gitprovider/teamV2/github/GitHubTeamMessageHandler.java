@@ -53,4 +53,9 @@ public class GitHubTeamMessageHandler extends GitHubMessageHandler<GHEventPayloa
     protected GHEvent getHandlerEvent() {
         return GHEvent.TEAM;
     }
+
+    @Override
+    public boolean isOrganizationEvent() {
+        return true;
+    }
 }

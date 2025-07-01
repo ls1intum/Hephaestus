@@ -6,9 +6,7 @@ import de.tum.in.www1.hephaestus.workspace.RepositoryToMonitor;
 import io.nats.client.Connection;
 import io.nats.client.ConsumerContext;
 import io.nats.client.JetStreamApiException;
-import io.nats.client.JetStreamManagement;
 import io.nats.client.Message;
-import io.nats.client.MessageHandler;
 import io.nats.client.Nats;
 import io.nats.client.Options;
 import io.nats.client.StreamContext;
@@ -36,8 +34,8 @@ import org.springframework.stereotype.Service;
 public class NatsConsumerService {
 
     private static final Logger logger = LoggerFactory.getLogger(NatsConsumerService.class);
-
     private static final int INITIAL_RECONNECT_DELAY_SECONDS = 2;
+    private static final int RECONNECT_SLEEP_MS = 2000;
 
     @Value("${nats.enabled}")
     private boolean isNatsEnabled;
@@ -52,9 +50,7 @@ public class NatsConsumerService {
     private String durableConsumerName;
 
     private Connection natsConnection;
-
-    private Map<Long, ConsumerContext> repositoryToMonitorIdToConsumerContext = new HashMap<>();
-
+    private final Map<String, ConsumerContext> repositoryToMonitorIdToConsumerContext = new HashMap<>();
     private final GitHubMessageHandlerRegistry handlerRegistry;
 
     public NatsConsumerService(GitHubMessageHandlerRegistry handlerRegistry) {
@@ -99,39 +95,52 @@ public class NatsConsumerService {
     }
 
     @Async
-    public void startConsumingRepositoryToMonitorAsync(RepositoryToMonitor repositoryToMonitor) {
-        while (true) {
-            if (natsConnection == null || natsConnection.getStatus() != Connection.Status.CONNECTED) {
-                logger.info("NATS connection is not connected. Attempting to connect...");
+    public void startConsumingOrganizationAsync(String owner) {
+        startConsuming(
+            () -> {
                 try {
-                    natsConnection = Nats.connect(buildNatsOptions());
-                    logger.info("Connected to NATS server.");
-                } catch (IOException | InterruptedException e) {
-                    logger.error("Failed to connect to NATS server: {}", e.getMessage(), e);
+                    setupOrganizationConsumer(natsConnection, owner);
+                } catch (IOException e) {
+                    throw new RuntimeException(e);
                 }
-            }
+            },
+            String.format("organization: %s", owner)
+        );
+    }
 
+    @Async
+    public void startConsumingRepositoryToMonitorAsync(RepositoryToMonitor repositoryToMonitor) {
+        startConsuming(
+            () -> {
+                try {
+                    setupRepositoryConsumer(natsConnection, repositoryToMonitor);
+                } catch (IOException e) {
+                    throw new RuntimeException(e);
+                }
+            },
+            String.format(
+                "repository: %s with monitoring ID: %s",
+                repositoryToMonitor.getNameWithOwner(),
+                repositoryToMonitor.getId()
+            )
+        );
+    }
+
+    private void startConsuming(Runnable setupConsumer, String consumerName) {
+        while (true) {
+            ensureNatsConnectionEstablished();
             if (natsConnection != null && natsConnection.getStatus() == Connection.Status.CONNECTED) {
                 try {
-                    setupConsumer(natsConnection, repositoryToMonitor);
-                    logger.info(
-                        "Consumer setup successful for repository: {} with monitoring ID: {}",
-                        repositoryToMonitor.getNameWithOwner(),
-                        repositoryToMonitor.getId()
-                    );
+                    setupConsumer.run();
+                    logger.info("Consumer setup successful for {}", consumerName);
                     break;
-                } catch (IOException | InterruptedException e) {
-                    logger.error(
-                        "Failed to set up consumer for repository: {} with monitoring ID: {} - {}",
-                        repositoryToMonitor.getNameWithOwner(),
-                        repositoryToMonitor.getId(),
-                        e.getMessage()
-                    );
+                } catch (Exception e) {
+                    logger.error("Failed to set up consumer for {} - {}", consumerName, e.getMessage());
                 }
             }
 
             try {
-                Thread.sleep(2000);
+                Thread.sleep(RECONNECT_SLEEP_MS);
             } catch (InterruptedException e) {
                 Thread.currentThread().interrupt();
                 logger.error("Thread interrupted during sleep: {}", e.getMessage());
@@ -140,26 +149,47 @@ public class NatsConsumerService {
         }
     }
 
-    private void setupConsumer(Connection connection, RepositoryToMonitor repositoryToMonitor)
-        throws IOException, InterruptedException {
+    private void ensureNatsConnectionEstablished() {
+        if (natsConnection == null || natsConnection.getStatus() != Connection.Status.CONNECTED) {
+            logger.info("NATS connection is not connected. Attempting to connect...");
+            try {
+                natsConnection = Nats.connect(buildNatsOptions());
+                logger.info("Connected to NATS server.");
+            } catch (IOException | InterruptedException e) {
+                logger.error("Failed to connect to NATS server: {}", e.getMessage(), e);
+            }
+        }
+    }
+
+    private void setupRepositoryConsumer(Connection connection, RepositoryToMonitor repositoryToMonitor)
+        throws IOException {
+        setupConsumer(
+            connection,
+            repositoryToMonitor.getNameWithOwner(),
+            repositoryToMonitor.getId().toString(),
+            getRepositorySubjects(repositoryToMonitor.getNameWithOwner())
+        );
+    }
+
+    private void setupOrganizationConsumer(Connection connection, String owner) throws IOException {
+        setupConsumer(connection, owner, owner, getOrganizationSubjects(owner));
+    }
+
+    private void setupConsumer(Connection connection, String name, String id, String[] subjects) throws IOException {
         try {
             StreamContext streamContext = connection.getStreamContext("github");
             ConsumerContext consumerContext = null;
-            var subjects = getSubjects(repositoryToMonitor.getNameWithOwner());
 
-            String repositoryDurableConsumerName = "";
-            if (durableConsumerName != null && !durableConsumerName.isEmpty()) {
-                repositoryDurableConsumerName = durableConsumerName + "-" + repositoryToMonitor.getId();
-            }
+            String fullDurableName = durableConsumerName != null && !durableConsumerName.isEmpty()
+                ? durableConsumerName + "-" + id
+                : "";
 
-            // Check if consumer already exists
-            if (!repositoryDurableConsumerName.isEmpty()) {
+            if (!fullDurableName.isEmpty()) {
                 try {
-                    consumerContext = streamContext.getConsumerContext(repositoryDurableConsumerName);
-
+                    consumerContext = streamContext.getConsumerContext(fullDurableName);
                     var config = consumerContext.getConsumerInfo().getConsumerConfiguration();
                     var filterSubjects = config.getFilterSubjects();
-                    var filterMatches = new HashSet<>(filterSubjects).containsAll(Arrays.asList(subjects)) &&
+                    boolean filterMatches = new HashSet<>(filterSubjects).containsAll(Arrays.asList(subjects)) &&
                     filterSubjects.size() == subjects.length;
                     if (!filterMatches) {
                         logger.info("Consumer exists but with different subjects. Updating consumer.");
@@ -169,9 +199,9 @@ public class NatsConsumerService {
                     }
                 } catch (JetStreamApiException e) {
                     logger.error(
-                        "Failed to get consumer context for repository: {} with monitoring ID: {} - {}",
-                        repositoryToMonitor.getNameWithOwner(),
-                        repositoryToMonitor.getId(),
+                        "Failed to get consumer context for name: {} with monitoring ID: {} - {}",
+                        name,
+                        id,
                         e.getMessage()
                     );
                 }
@@ -179,30 +209,24 @@ public class NatsConsumerService {
 
             if (consumerContext == null) {
                 logger.info("Setting up consumer for subjects: {}", Arrays.toString(subjects));
-                ConsumerConfiguration.Builder consumerConfigBuilder = ConsumerConfiguration.builder()
+                ConsumerConfiguration.Builder configBuilder = ConsumerConfiguration.builder()
                     .filterSubjects(subjects)
                     .deliverPolicy(DeliverPolicy.ByStartTime)
                     .startTime(ZonedDateTime.now().minusDays(timeframe));
 
-                if (!repositoryDurableConsumerName.isEmpty()) {
-                    consumerConfigBuilder.durable(repositoryDurableConsumerName);
+                if (!fullDurableName.isEmpty()) {
+                    configBuilder.durable(fullDurableName);
                 }
 
-                ConsumerConfiguration consumerConfig = consumerConfigBuilder.build();
-                consumerContext = streamContext.createOrUpdateConsumer(consumerConfig);
+                consumerContext = streamContext.createOrUpdateConsumer(configBuilder.build());
             } else {
                 logger.info("Consumer already exists. Skipping consumer setup.");
             }
 
-            repositoryToMonitorIdToConsumerContext.put(repositoryToMonitor.getId(), consumerContext);
+            repositoryToMonitorIdToConsumerContext.put(id, consumerContext);
+            consumerContext.consume(this::handleMessage);
 
-            MessageHandler handler = this::handleMessage;
-            consumerContext.consume(handler);
-            logger.info(
-                "Successfully started consuming messages for repository: {} with monitoring ID: {}",
-                repositoryToMonitor.getNameWithOwner(),
-                repositoryToMonitor.getId()
-            );
+            logger.info("Successfully started consuming messages for name: {} with monitoring ID: {}", name, id);
         } catch (JetStreamApiException e) {
             logger.error("JetStream API exception: {}", e.getMessage(), e);
             throw new IOException("Failed to set up consumer.", e);
@@ -234,19 +258,19 @@ public class NatsConsumerService {
 
     private void cleanupConsumer(RepositoryToMonitor repositoryToMonitor) throws IOException {
         try {
-            ConsumerContext consumerContext = repositoryToMonitorIdToConsumerContext.get(repositoryToMonitor.getId());
-            if (consumerContext == null) {
+            String id = repositoryToMonitor.getId().toString();
+            ConsumerContext context = repositoryToMonitorIdToConsumerContext.get(id);
+            if (context == null) {
                 logger.info(
                     "No consumer context found for repository: {} with monitoring ID: {}",
                     repositoryToMonitor.getNameWithOwner(),
-                    repositoryToMonitor.getId()
+                    id
                 );
                 return;
             }
 
-            JetStreamManagement jsm = natsConnection.jetStreamManagement();
-            jsm.deleteConsumer("github", consumerContext.getConsumerName());
-            repositoryToMonitorIdToConsumerContext.remove(repositoryToMonitor.getId());
+            natsConnection.jetStreamManagement().deleteConsumer("github", context.getConsumerName());
+            repositoryToMonitorIdToConsumerContext.remove(id);
         } catch (JetStreamApiException e) {
             logger.error("JetStream API exception: {}", e.getMessage(), e);
             throw new IOException("Failed to clean up consumer or consumer does not exist.", e);
@@ -277,45 +301,26 @@ public class NatsConsumerService {
         }
     }
 
-    /**
-     * Subjects to monitor.
-     *
-     * @return The subjects to monitor.
-     */
-    private String[] getSubjects(String nameWithOwner) {
-        String repoPrefix = getSubjectPrefix(nameWithOwner);
-
-        String[] parts = nameWithOwner.split("/");
-        if (parts.length != 2) {
-            throw new IllegalArgumentException(
-                "Invalid repository format '" + nameWithOwner + "', expected 'org/repo'"
-            );
-        }
-        String orgWildcardPrefix = "github." + parts[0] + ".*";
-
+    private String[] getOrganizationSubjects(String owner) {
         return handlerRegistry
-            .getSupportedEvents()
+            .getSupportedOrganizationEvents()
             .stream()
-            .map(ev -> {
-                String evt = ev.name().toLowerCase();
-                if (ev == GHEvent.TEAM) {
-                    // only a single wildcard subscription for team events
-                    return orgWildcardPrefix + "." + evt;
-                }
-                // everything else is repo‐specific
-                return repoPrefix + "." + evt;
-            })
+            .map(GHEvent::name)
+            .map(String::toLowerCase)
+            .map(event -> getSubjectPrefix(owner + "/?") + "." + event)
             .toArray(String[]::new);
     }
 
-    /**
-     * Get subject prefix from ownerWithName for the given repository.
-     *
-     * @param nameWithOwner The owner and name of the repository, i.e. "owner/name".
-     * @return The subject prefix, i.e. "github.owner.name" sanitized.
-     * @throws IllegalArgumentException if the repository string is improperly
-     *                                  formatted.
-     */
+    private String[] getRepositorySubjects(String nameWithOwner) {
+        return handlerRegistry
+            .getSupportedRepositoryEvents()
+            .stream()
+            .map(GHEvent::name)
+            .map(String::toLowerCase)
+            .map(event -> getSubjectPrefix(nameWithOwner) + "." + event)
+            .toArray(String[]::new);
+    }
+
     private String getSubjectPrefix(String nameWithOwner) {
         if (nameWithOwner == null || nameWithOwner.trim().isEmpty()) {
             throw new IllegalArgumentException("Repository identifier cannot be null or empty.");

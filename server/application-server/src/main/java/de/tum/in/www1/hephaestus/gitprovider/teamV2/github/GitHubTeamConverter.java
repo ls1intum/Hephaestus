@@ -22,10 +22,8 @@ public class GitHubTeamConverter extends BaseGitServiceEntityConverter<GHTeam, T
     public TeamV2 update(@NonNull GHTeam source, @NonNull TeamV2 team) {
         convertBaseFields(source, team);
         team.setName(source.getName());
-        team.setSlug(source.getSlug());
         team.setDescription(source.getDescription());
         team.setPrivacy(source.getPrivacy() == null ? null : TeamV2.Privacy.valueOf(source.getPrivacy().name()));
-        team.setNodeId(source.getNodeId());
         team.setHtmlUrl(source.getHtmlUrl().toString());
         team.setLastSyncedAt(OffsetDateTime.now());
         String organization = null;

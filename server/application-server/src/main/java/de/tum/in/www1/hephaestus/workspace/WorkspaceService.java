@@ -78,6 +78,9 @@ public class WorkspaceService {
     @Value("${hephaestus.workspace.init-default}")
     private boolean initDefaultWorkspace;
 
+    @Value("${hephaestus.workspace.default.organization}")
+    private String defaultOrganization;
+
     @Value("${hephaestus.workspace.default.repositories-to-monitor}")
     private String[] defaultRepositoriesToMonitor;
 
@@ -93,6 +96,7 @@ public class WorkspaceService {
             repositoriesToMonitor.forEach(repositoryToMonitor ->
                 natsConsumerService.startConsumingRepositoryToMonitorAsync(repositoryToMonitor)
             );
+            natsConsumerService.startConsumingOrganizationAsync(defaultOrganization);
         }
 
         if (runMonitoringOnStartup) {

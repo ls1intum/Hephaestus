@@ -8,8 +8,6 @@ import org.springframework.lang.NonNull;
 @JsonInclude(JsonInclude.Include.NON_EMPTY)
 public record TeamV2InfoDTO(
     @NonNull Long id,
-    @NonNull String nodeId,
-    @NonNull String slug,
     @NonNull String name,
     Long parentId,
     String description,

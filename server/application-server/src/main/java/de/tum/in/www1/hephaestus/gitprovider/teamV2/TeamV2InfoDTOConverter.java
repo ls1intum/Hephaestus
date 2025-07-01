@@ -11,8 +11,6 @@ public class TeamV2InfoDTOConverter implements Converter<TeamV2, TeamV2InfoDTO> 
     public TeamV2InfoDTO convert(@NonNull TeamV2 source) {
         return new TeamV2InfoDTO(
             source.getId(),
-            source.getNodeId(),
-            source.getSlug(),
             source.getName(),
             source.getParentId(),
             source.getDescription(),

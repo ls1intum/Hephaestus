@@ -11,11 +11,9 @@
             <column name="html_url" type="TEXT"/>
             <column name="last_synced_at" type="TIMESTAMP(6) WITH TIME ZONE"/>
             <column name="name" type="VARCHAR(255)"/>
-            <column name="node_id" type="VARCHAR(255)"/>
             <column name="organization" type="VARCHAR(255)"/>
             <column name="parent_id" type="BIGINT"/>
             <column name="privacy" type="VARCHAR(32)"/>
-            <column name="slug" type="VARCHAR(255)"/>
         </createTable>
     </changeSet>
     <changeSet author="ddmukh" id="1750847942385-2">

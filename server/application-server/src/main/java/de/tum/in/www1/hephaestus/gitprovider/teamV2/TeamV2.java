@@ -22,8 +22,6 @@ public class TeamV2 extends BaseGitServiceEntity {
 
     private String name;
 
-    private String slug;
-
     @Column(columnDefinition = "TEXT")
     private String description;
 
@@ -32,8 +30,6 @@ public class TeamV2 extends BaseGitServiceEntity {
     private Privacy privacy;
 
     private String organization;
-
-    private String nodeId;
 
     @Column(columnDefinition = "TEXT")
     private String htmlUrl;
@@ -77,6 +73,8 @@ public class TeamV2 extends BaseGitServiceEntity {
         CLOSED,
     }
     // Ignored GitHub properties:
+    // - nodeId
+    // - slug
     // - apiUrl               (API URL for this team)
     // - members_url       (templated URL for member listing)
     // - repositories_url  (templated URL for repos listing)
