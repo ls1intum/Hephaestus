@@ -5,7 +5,6 @@ import { useState } from "react";
 import { ChatInput } from "./ChatInput";
 
 const meta: Meta<typeof ChatInput> = {
-	title: "Components/Mentor/ChatInput",
 	component: ChatInput,
 	parameters: {
 		layout: "padded",

@@ -64,6 +64,9 @@ code {
 	--league-gold: oklch(0.83 0.1694 90.75);
 	--league-diamond: oklch(0.52 0.206 265.51);
 	--league-master: oklch(0.73 0.1946 351.86);
+
+	--mentor: oklch(0.623 0.214 259.815);
+	--mentor-foreground: oklch(0.97 0.014 254.604);
 }
 
 .dark {
@@ -106,6 +109,9 @@ code {
 	--league-gold: oklch(0.83 0.1694 90.75);
 	--league-diamond: oklch(0.52 0.206 265.51);
 	--league-master: oklch(0.73 0.1946 351.86);
+
+	--mentor: oklch(0.546 0.245 262.881);
+	--mentor-foreground: oklch(0.379 0.146 265.522);
 }
 
 @theme inline {
@@ -192,6 +198,9 @@ code {
 	--color-league-gold: var(--league-gold);
 	--color-league-diamond: var(--league-diamond);
 	--color-league-master: var(--league-master);
+
+	--color-mentor: var(--mentor);
+	--color-mentor-foreground: var(--mentor-foreground);
 }
 
 @layer base {

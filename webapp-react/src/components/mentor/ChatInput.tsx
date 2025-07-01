@@ -169,7 +169,7 @@ const ChatInput = forwardRef<ChatInputRef, ChatInputProps>(
 							disabled={disabled}
 							maxLength={maxLength}
 							className={cn(
-								"resize-none border rounded-2xl px-4 py-3 min-h-[56px] max-h-32 overflow-y-auto",
+								"resize-none border rounded-2xl px-4 py-3 pb-8 min-h-[56px] max-h-32 overflow-y-auto",
 								"focus:ring-2 focus:ring-primary/20 focus:border-primary",
 								"disabled:opacity-50 disabled:cursor-not-allowed",
 								"transition-all duration-200",
@@ -180,8 +180,8 @@ const ChatInput = forwardRef<ChatInputRef, ChatInputProps>(
 							aria-label="Chat message input"
 						/>
 
-						{/* Character counter */}
-						<div className="absolute bottom-2 right-3 text-xs text-muted-foreground pointer-events-none select-none">
+						{/* Character counter - positioned to avoid text overlap */}
+						<div className="absolute bottom-2 right-3 text-xs text-muted-foreground pointer-events-none select-none bg-background/80 px-1 rounded">
 							{input.length}/{maxLength}
 						</div>
 					</div>

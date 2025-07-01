@@ -66,9 +66,9 @@ declare module "@tanstack/react-router" {
 		router: typeof router;
 	}
 
-  interface HistoryState {
-    pendingMentorMessage?: string;
-  }
+	interface HistoryState {
+		pendingMentorMessage?: string;
+	}
 }
 
 function WrappedRouterProvider() {

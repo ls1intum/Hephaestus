@@ -94,7 +94,6 @@ const longConversationMessages: UIMessage[] = [
 ];
 
 const meta: Meta<typeof ChatMessages> = {
-	title: "Components/Mentor/ChatMessages",
 	component: ChatMessages,
 	parameters: {
 		layout: "padded",
@@ -137,18 +136,7 @@ export default meta;
 type Story = StoryObj<typeof meta>;
 
 /**
- * Empty chat state with welcoming message and suggested topics.
- */
-export const Empty: Story = {
-	args: {
-		messages: [],
-		isLoading: false,
-		error: null,
-	},
-};
-
-/**
- * Short conversation demonstrating message formatting and avatars.
+ * Short conversation demonstrating message formatting and minimal styling.
  */
 export const ShortConversation: Story = {
 	args: {

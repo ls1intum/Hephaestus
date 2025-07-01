@@ -1,6 +1,9 @@
-import { getGroupedThreadsQueryKey, getThreadOptions } from "@/api/@tanstack/react-query.gen";
+import {
+	getGroupedThreadsQueryKey,
+	getThreadOptions,
+} from "@/api/@tanstack/react-query.gen";
 import type { ChatThreadDetail } from "@/api/types.gen";
-import { Chat } from "@/components/mentor";
+import { Chat } from "@/components/mentor/Chat";
 import environment from "@/environment";
 import { keycloakService } from "@/integrations/auth";
 import { v4 as uuidv4 } from "uuid";
@@ -85,7 +88,9 @@ function ChatContainer({
 	threadDetail: ChatThreadDetail;
 }) {
 	const queryClient = useQueryClient();
-	const pendingMessage = useRouterState({ select: s => s.location.state.pendingMentorMessage });
+	const pendingMessage = useRouterState({
+		select: (s) => s.location.state.pendingMentorMessage,
+	});
 	const sentPendingMessage = useRef(false);
 
 	// Initialize useChat for new messages in this thread
@@ -104,18 +109,22 @@ function ChatContainer({
 			queryClient.invalidateQueries({
 				queryKey: getGroupedThreadsQueryKey(),
 			});
-		}
+		},
 	});
 
 	useEffect(() => {
 		// If there's a pending message from navigation state, add it to the chat
-		if (pendingMessage && !sentPendingMessage.current && messages.length === 0) {
+		if (
+			pendingMessage &&
+			!sentPendingMessage.current &&
+			messages.length === 0
+		) {
 			sendMessage({ text: pendingMessage });
 			sentPendingMessage.current = true; // Prevent sending it again
 		}
 	});
 
-	const isStreaming = status === "streaming" || status === "submitted";
+	const isLoading = status !== "streaming" && status === "submitted" || messages.length === 0;
 
 	const handleSendMessage = (text: string) => {
 		sendMessage({ text });
@@ -135,7 +144,7 @@ function ChatContainer({
 			onSendMessage={handleSendMessage}
 			onStop={handleStop}
 			onRegenerate={handleRegenerate}
-			isLoading={isStreaming}
+			isLoading={isLoading}
 			error={error}
 			disabled={status === "submitted"}
 			placeholder="Continue the conversation..."

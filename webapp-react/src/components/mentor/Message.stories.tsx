@@ -1,17 +1,12 @@
-import type { Meta, StoryObj } from "@storybook/react";
-
 import type { UIMessage } from "@ai-sdk/react";
+import type { Meta, StoryObj } from "@storybook/react";
+import { fn } from "@storybook/test";
 import { Message } from "./Message";
 
 const userMessage: UIMessage = {
 	id: "1",
 	role: "user",
-	parts: [
-		{
-			type: "text",
-			text: "What are the key principles of clean code?",
-		},
-	],
+	parts: [{ type: "text", text: "How do I write effective pull request descriptions?" }],
 };
 
 const shortAssistantMessage: UIMessage = {
@@ -19,12 +14,8 @@ const shortAssistantMessage: UIMessage = {
 	role: "assistant",
 	parts: [
 		{
-			type: "step-start",
-		},
-		{
 			type: "text",
-			text: "Clean code should be readable, maintainable, and simple. Focus on clear naming, small functions, and consistent formatting.",
-			state: "done",
+			text: "Great question! **Clear PR descriptions** help reviewers understand your changes quickly. Include the **why** behind your changes, not just the what.",
 		},
 	],
 };
@@ -34,91 +25,81 @@ const longAssistantMessage: UIMessage = {
 	role: "assistant",
 	parts: [
 		{
-			type: "step-start",
-		},
-		{
 			type: "text",
-			text: "Clean code is essential for maintainable software. Here are the key principles:\n\n**1. Readability First**\n- Code should read like well-written prose\n- Use meaningful variable and function names\n- Keep functions small and focused\n\n**2. Single Responsibility Principle**\n- Each function should do one thing well\n- Classes should have only one reason to change\n\n**3. DRY (Don't Repeat Yourself)**\n- Eliminate code duplication\n- Extract common functionality into reusable components\n\n**4. Consistent Formatting**\n- Use consistent indentation and spacing\n- Follow team coding standards\n- Use automated formatting tools\n\n**5. Meaningful Comments**\n- Explain 'why', not 'what'\n- Keep comments up-to-date with code changes\n- Remove obsolete comments\n\nRemember: clean code is not just about following rules, it's about making your code easy for other developers (including your future self) to understand and modify.",
-			state: "done",
+			text: `Here's how to write PR descriptions that get reviewed faster:
+
+## 1. Start with the Why
+Explain the problem you're solving or the feature you're adding. Context helps reviewers understand the motivation.
+
+## 2. Describe What Changed
+Highlight the key changes without going into every line detail:
+
+- Added user authentication middleware
+- Updated database schema for new user fields
+- Fixed edge case in password validation
+
+## 3. Include Testing Notes
+Let reviewers know how to test your changes:
+
+\`\`\`bash
+# Test the new authentication flow
+npm run test:auth
+
+# Verify the UI changes
+npm run dev
+# Navigate to /login and test different scenarios
+\`\`\`
+
+## 4. Call Out Breaking Changes
+If your PR includes breaking changes, make them **very obvious**:
+
+⚠️ **BREAKING CHANGE**: Updated API endpoint from \`/api/users\` to \`/api/v2/users\`
+
+## 5. Link Related Issues
+Reference the ticket or issue this PR addresses:
+
+Closes #123
+Related to #456
+
+This approach helps your team review faster and reduces back-and-forth questions!`,
 		},
 	],
 };
 
-const codeExampleMessage: UIMessage = {
-	id: "4",
-	role: "assistant",
-	parts: [
-		{
-			type: "step-start",
-		},
-		{
-			type: "text",
-			text: "Here's a practical example of refactoring code to be cleaner:\n\n**Before (messy code):**\n```javascript\nfunction calc(a, b, c) {\n  if (c == 1) {\n    return a + b;\n  } else if (c == 2) {\n    return a - b;\n  } else if (c == 3) {\n    return a * b;\n  } else {\n    return a / b;\n  }\n}\n```\n\n**After (clean code):**\n```javascript\nconst Operations = {\n  ADD: 1,\n  SUBTRACT: 2,\n  MULTIPLY: 3,\n  DIVIDE: 4\n};\n\nfunction calculate(firstNumber, secondNumber, operation) {\n  switch (operation) {\n    case Operations.ADD:\n      return add(firstNumber, secondNumber);\n    case Operations.SUBTRACT:\n      return subtract(firstNumber, secondNumber);\n    case Operations.MULTIPLY:\n      return multiply(firstNumber, secondNumber);\n    case Operations.DIVIDE:\n      return divide(firstNumber, secondNumber);\n    default:\n      throw new Error(`Unsupported operation: ${operation}`);\n  }\n}\n\nfunction add(a, b) { return a + b; }\nfunction subtract(a, b) { return a - b; }\nfunction multiply(a, b) { return a * b; }\nfunction divide(a, b) {\n  if (b === 0) throw new Error('Division by zero');\n  return a / b;\n}\n```\n\n**Improvements made:**\n- Descriptive function and variable names\n- Separated each operation into its own function\n- Added error handling\n- Used constants for operation types\n- Clear, readable structure",
-			state: "done",
-		},
-	],
-};
-
-const streamingMessage: UIMessage = {
-	id: "5",
-	role: "assistant",
-	parts: [
-		{
-			type: "step-start",
-		},
-		{
-			type: "text",
-			text: "Let me explain the difference between composition and inheritance in object-oriented programming...",
-			state: "streaming",
-		},
-	],
-};
-
-const multiPartMessage: UIMessage = {
-	id: "6",
-	role: "assistant",
-	parts: [
-		{
-			type: "step-start",
-		},
-		{
-			type: "text",
-			text: "I'll help you understand React hooks. Let me break this down:",
-			state: "done",
-		},
-		{
-			type: "text",
-			text: "\n\n**useState** is for managing component state:\n```jsx\nconst [count, setCount] = useState(0);\n```",
-			state: "done",
-		},
-		{
-			type: "text",
-			text: "\n\n**useEffect** is for side effects:\n```jsx\nuseEffect(() => {\n  // Effect logic here\n}, [dependencies]);\n```",
-			state: "done",
-		},
-	],
-};
-
-const meta: Meta<typeof Message> = {
-	title: "Components/Mentor/Message",
+/**
+ * Message component for displaying chat messages, loading states, and error states.
+ * Supports user messages, assistant messages with markdown, loading indicators, and error handling.
+ */
+const meta = {
 	component: Message,
-	parameters: {
-		layout: "padded",
+	parameters: { 
+		layout: "centered",
 		docs: {
 			description: {
-				component:
-					"Individual message component displaying user or assistant messages with proper avatars, formatting, and support for various AI SDK v5 message part types.",
+				component: "Versatile message component that handles chat messages, loading states, and error states with consistent styling.",
 			},
 		},
 	},
+	tags: ["autodocs"],
 	argTypes: {
+		type: {
+			control: "select",
+			options: ["message", "loading", "error"],
+			description: "Type of message to display",
+		},
 		message: {
-			description: "UIMessage object containing the message data",
+			description: "UIMessage object for regular messages",
+		},
+		error: {
+			description: "Error object for error states",
+		},
+		onRetry: {
+			description: "Callback function for retry action in error state",
 		},
 	},
 	decorators: [
 		(Story) => (
-			<div className="max-w-4xl mx-auto space-y-4 p-4">
+			<div className="max-w-4xl w-full p-6 bg-background">
 				<Story />
 			</div>
 		),
@@ -129,132 +110,80 @@ export default meta;
 type Story = StoryObj<typeof meta>;
 
 /**
- * Basic user message showing how user input is displayed.
+ * User message showing a process-related question.
  */
 export const UserMessage: Story = {
 	args: {
+		type: "message",
 		message: userMessage,
 	},
 };
 
 /**
- * Short assistant response with AI mentor avatar.
+ * Short assistant response with basic markdown formatting.
  */
 export const ShortAssistantMessage: Story = {
 	args: {
+		type: "message", 
 		message: shortAssistantMessage,
 	},
 };
 
 /**
- * Long assistant message with markdown formatting and structure.
+ * Long assistant message demonstrating comprehensive markdown rendering.
  */
 export const LongAssistantMessage: Story = {
 	args: {
+		type: "message",
 		message: longAssistantMessage,
 	},
 };
 
 /**
- * Assistant message containing code examples and technical explanations.
+ * Loading state while AI is processing.
  */
-export const CodeExampleMessage: Story = {
+export const Loading: Story = {
 	args: {
-		message: codeExampleMessage,
+		type: "loading",
 	},
 };
 
 /**
- * Message currently being streamed from the AI (in progress).
+ * Error state with retry functionality.
  */
-export const StreamingMessage: Story = {
+export const ErrorWithRetry: Story = {
 	args: {
-		message: streamingMessage,
+		type: "error",
+		error: new Error("Unable to connect to AI service. Please check your connection and try again."),
+		onRetry: fn(),
 	},
 };
 
 /**
- * Message with multiple text parts showing complex responses.
+ * Error state without retry option.
  */
-export const MultiPartMessage: Story = {
+export const ErrorWithoutRetry: Story = {
 	args: {
-		message: multiPartMessage,
+		type: "error",
+		error: new Error("Rate limit exceeded. Please wait a moment before trying again."),
 	},
 };
 
 /**
- * Comparison of user and assistant messages side by side.
+ * Conversation flow showing multiple message types.
  */
-export const MessageComparison: Story = {
+export const ConversationFlow: Story = {
 	render: () => (
 		<div className="space-y-6">
-			<div>
-				<h3 className="text-sm font-medium text-muted-foreground mb-2">
-					User Message
-				</h3>
-				<Message message={userMessage} />
-			</div>
-
-			<div>
-				<h3 className="text-sm font-medium text-muted-foreground mb-2">
-					Assistant Response
-				</h3>
-				<Message message={shortAssistantMessage} />
-			</div>
+			<Message type="message" message={userMessage} />
+			<Message type="loading" />
 		</div>
 	),
-};
-
-/**
- * Various message lengths to test layout behavior.
- */
-export const MessageLengthVariations: Story = {
-	render: () => (
-		<div className="space-y-6">
-			<div>
-				<h3 className="text-sm font-medium text-muted-foreground mb-2">
-					Very Short Question
-				</h3>
-				<Message
-					message={{
-						id: "short",
-						role: "user",
-						parts: [{ type: "text", text: "Why?" }],
-					}}
-				/>
-			</div>
-
-			<div>
-				<h3 className="text-sm font-medium text-muted-foreground mb-2">
-					Medium Question
-				</h3>
-				<Message message={userMessage} />
-			</div>
-
-			<div>
-				<h3 className="text-sm font-medium text-muted-foreground mb-2">
-					Long Technical Question
-				</h3>
-				<Message
-					message={{
-						id: "long-question",
-						role: "user",
-						parts: [
-							{
-								type: "text",
-								text: "I'm working on a React application and I'm trying to understand the difference between useCallback and useMemo hooks. I've read the documentation but I'm still confused about when to use each one. Can you provide practical examples showing the differences and explain the performance implications of each? Also, how do they relate to React's reconciliation process and when should I avoid using them?",
-							},
-						],
-					}}
-				/>
-			</div>
-
-			<div>
-				<h3 className="text-sm font-medium text-muted-foreground mb-2">
-					Comprehensive Answer
-				</h3>
-				<Message message={longAssistantMessage} />
-			</div>
-		</div>
-	),
+	parameters: {
+		docs: {
+			description: {
+				story: "Shows how loading state appears in a conversation context.",
+			},
+		},
+	},
 };

@@ -1,12 +1,9 @@
-import { Bot } from "lucide-react";
 import { useCallback, useRef } from "react";
 
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { cn } from "@/lib/utils";
 import type { UIMessage } from "@ai-sdk/react";
 import { ChatInput, type ChatInputRef } from "./ChatInput";
 import { ChatMessages } from "./ChatMessages";
-import { MessageActions } from "./MessageActions";
 
 interface ChatProps extends React.ComponentProps<"div"> {
 	messages: UIMessage[];
@@ -21,12 +18,12 @@ interface ChatProps extends React.ComponentProps<"div"> {
 }
 
 /**
- * Complete chat interface component with modern design patterns.
- * Provides a professional, full-featured chat experience with AI SDK v5 compatibility.
+ * Minimal chat interface component focused on messaging without visual clutter.
+ * Provides a clean, distraction-free chat experience with AI SDK v5 compatibility.
  *
  * Features:
- * - Professional header with AI Mentor branding
- * - Enhanced messages display with avatars and proper styling
+ * - Clean, minimal design without borders or headers
+ * - Enhanced messages display with proper styling
  * - Auto-scrolling message container
  * - Loading states and error handling
  * - Message regeneration for the last assistant message
@@ -70,38 +67,9 @@ function Chat({
 	return (
 		<div
 			data-testid="chat"
-			className={cn(
-				"flex flex-col h-full bg-background border rounded-lg overflow-hidden shadow-sm",
-				className,
-			)}
+			className={cn("flex flex-col h-full", className)}
 			{...props}
 		>
-			{/* Header */}
-			<div className="border-b bg-muted/30 px-6 py-4">
-				<div className="flex items-center gap-3">
-					<Avatar className="h-10 w-10">
-						<AvatarFallback className="bg-primary/10 text-primary">
-							<Bot className="h-5 w-5" />
-						</AvatarFallback>
-					</Avatar>
-
-					<div className="flex-1">
-						<h2 className="text-lg font-semibold text-foreground">AI Mentor</h2>
-						<p className="text-sm text-muted-foreground">
-							Your friendly software development companion
-						</p>
-					</div>
-
-					{/* Status indicator */}
-					{isLoading && (
-						<div className="flex items-center gap-2 text-sm text-muted-foreground">
-							<div className="w-2 h-2 bg-green-500 rounded-full animate-pulse" />
-							<span>Thinking...</span>
-						</div>
-					)}
-				</div>
-			</div>
-
 			{/* Messages */}
 			<ChatMessages
 				messages={messages}
@@ -125,8 +93,4 @@ function Chat({
 	);
 }
 
-export {
-	Chat,
-	type ChatProps,
-	MessageActions, // Re-export for potential future use
-};
+export { Chat, type ChatProps };

@@ -1,4 +1,5 @@
-import { Chat } from "@/components/mentor";
+import { Welcome } from "@/components/mentor/Welcome";
+import { ChatInput } from "@/components/mentor/ChatInput";
 import { v4 as uuidv4 } from "uuid";
 
 import {
@@ -19,13 +20,13 @@ function MentorContainer() {
 
 	const handleSendMessage = (text: string) => {
 		const threadId = uuidv4();
-		
+
 		// Optimistically update the thread detail cache
 		queryClient.setQueryData(getThreadQueryKey({ path: { threadId } }), {
 			id: threadId,
 			messages: [],
 		} satisfies ChatThreadDetail);
-		
+
 		// Optimistically update the grouped threads cache
 		const previousGroupedThreads: Array<ChatThreadGroup> | undefined =
 			queryClient.getQueryData(getGroupedThreadsQueryKey());
@@ -36,7 +37,7 @@ function MentorContainer() {
 			createdAt: new Date(),
 		};
 		if (previousGroupedThreads) {
-			if (previousGroupedThreads[0].groupName === "Today") {
+			if (previousGroupedThreads[0]?.groupName === "Today") {
 				nextGroupThreads = [
 					{
 						groupName: "Today",
@@ -62,7 +63,7 @@ function MentorContainer() {
 			];
 		}
 		queryClient.setQueryData(getGroupedThreadsQueryKey(), nextGroupThreads);
-		
+
 		navigate({
 			to: "/mentor/$threadId",
 			params: { threadId },
@@ -71,13 +72,17 @@ function MentorContainer() {
 	};
 
 	return (
-		<div className="h-[calc(100vh-4rem)] max-w-5xl mx-auto p-6">
-			<Chat
-				messages={[]}
-				onSendMessage={handleSendMessage}
-				placeholder="Ask me anything about software development, best practices, or technical concepts..."
-				className="h-full"
-			/>
+		<div className="h-[calc(100vh-4rem)] max-w-5xl mx-auto p-6 flex flex-col">
+			<div className="flex-1 flex items-center justify-center">
+				<Welcome />
+			</div>
+			<div className="mt-6">
+				<ChatInput
+					onSubmit={handleSendMessage}
+					placeholder="Ask me anything about software development, best practices, or technical concepts..."
+					autoFocus
+				/>
+			</div>
 		</div>
 	);
 }
