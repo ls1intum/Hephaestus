@@ -1,5 +1,5 @@
-import { Welcome } from "@/components/mentor/Welcome";
 import { ChatInput } from "@/components/mentor/ChatInput";
+import { Welcome } from "@/components/mentor/Welcome";
 import { v4 as uuidv4 } from "uuid";
 
 import {

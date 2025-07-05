@@ -1,5 +1,5 @@
 """
-LangGraph-based mentor implementation.
+LangGraph-based mentor implementation with comprehensive development assistance tools.
 """
 import json
 from typing import Dict, Any, List
@@ -8,7 +8,14 @@ from langgraph.graph import StateGraph, START, END
 from langgraph.prebuilt import tools_condition
 from langchain_core.runnables import RunnableConfig
 
-from app.mentor.tools import get_weather, get_user_issues
+from app.mentor.tools import (
+    get_weather, 
+    get_issues, 
+    get_pull_requests,
+    get_issue_details,
+    get_pull_request_details,
+    get_pull_request_bad_practices,
+)
 from app.models import get_model
 from app.settings import settings
 from app.logger import logger
@@ -20,38 +27,81 @@ from langgraph.prebuilt import ToolNode
 ChatModel = get_model(settings.MODEL_NAME)
 model = ChatModel(temperature=0.7, max_tokens=4096)
 
-# System prompt for the mentor
+# Enhanced system prompt for the comprehensive mentor
 SYSTEM_PROMPT = """\
-You are a helpful development mentor. I can assist you with:
+You are an experienced software development mentor and coach, designed to help development teams work more effectively. Your role is to:
 
-- Development questions and code reviews
-- Your current issues and pull requests 
-- Weather information (you're located in Munich, Germany)
-- Technical guidance and best practices
+🎯 **CORE MISSION**: Help developers and teams break down complex work into manageable, deliverable chunks while maintaining high code quality and following best practices.
 
-After using a tool, NEVER repeat the output of the last message.
+🛠️ **CAPABILITIES**:
+- **Project Guidance**: Help break down large features into smaller, implementable tasks
+- **Code Quality**: Analyze pull requests for best practices and potential issues  
+- **Issue Management**: Review and prioritize bugs, features, and technical debt
+- **Team Coaching**: Provide guidance on development workflows and collaboration
+- **Weather Info**: Check weather conditions (you're located in Munich, Germany)
+
+📋 **AVAILABLE TOOLS**: Strongly consider making use of them, think how we could help the user:
+- `get_issues()` - Fetch regular GitHub issues (bugs, features, tasks)
+- `get_pull_requests()` - Fetch pull requests for code review and analysis
+- `get_issue_details(issue_ids)` - Get detailed info for specific issues
+- `get_pull_request_details(pr_ids)` - Get detailed info for specific PRs  
+- `get_pull_request_bad_practices(pr_id)` - Analyze bad practices in pull requests
+- `get_weather()` - Weather information
+
+🎨 **COMMUNICATION STYLE**:
+Think of yourself as a friendly, knowledgeable senior engineer who is:
+- **Clear and supportive** in guidance
+- **Encouraging and playful** when celebrating progress  
+- **Always approachable** to make learning fun
+- **Practical and actionable** in suggestions
+
+🔄 **WORKFLOW APPROACH**:
+1. **Assess Current State**: What are you working on? What's blocking you?
+2. **Break Down Complexity**: Help identify smaller, manageable pieces
+3. **Prioritize Value**: Focus on what delivers value to users quickly
+4. **Quality Checks**: Ensure code quality and best practices
+5. **Celebrate Progress**: Acknowledge wins and improvements
+
+Remember: The goal is continuous delivery of value, not perfection. Help teams make steady progress while building good habits.
+
+After using a tool, provide insights and next steps rather than just repeating the tool output.
 """
 
 
 def create_mentor_graph():
-    """Create a LangGraph for mentor interactions."""
+    """Create a LangGraph for mentor interactions with comprehensive tools."""
     
-    # Available tools
-    tools = [get_weather, get_user_issues]
-    model_with_tools = model.bind_tools(tools)
+    # All available tools for the mentor
+    tools = [
+        get_weather, 
+        get_issues, 
+        get_pull_requests,
+        get_issue_details,
+        get_pull_request_details,
+        get_pull_request_bad_practices,
+    ]
+    model_with_tools = model.bind_tools(tools, tool_choice="auto")
     
     def call_model(state: MentorState, config: RunnableConfig):
-        """Call the language model."""
+        """Call the language model with enhanced context awareness."""
         messages = state["messages"]
                 
         # Add system prompt if not present
         if not messages or not isinstance(messages[0], SystemMessage):
             messages = [SystemMessage(content=SYSTEM_PROMPT)] + messages
         
-        if not messages or not isinstance(messages[-1], HumanMessage):
-            messages.append(HumanMessage(content="The reponse above is shown to the user in the UI. Please do not repeat it. Instead, stear the conversation towards the next step."))
+        # Add user context if available
+        user_id = state.get('user_id')
+        if user_id and len(messages) == 1:  # Only system message, first interaction
+            context_msg = HumanMessage(
+                content=f"User ID: {user_id}. Please introduce yourself and offer to help with their development work."
+            )
+            messages.append(context_msg)
         
-        logger.debug(json.dumps([msg.model_dump() for msg in messages], indent=2, ensure_ascii=False))
+        logger.debug(json.dumps([{
+            "type": msg.__class__.__name__,
+            "content": msg.content[:200] + "..." if len(str(msg.content)) > 200 else str(msg.content)
+        } for msg in messages], indent=2, ensure_ascii=False))
         
         logger.info(f"Calling model with {len(messages)} messages for user {state.get('user_id')}")
         response = model_with_tools.invoke(messages, config)

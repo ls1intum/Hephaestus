@@ -124,7 +124,8 @@ function ChatContainer({
 		}
 	});
 
-	const isLoading = status !== "streaming" && status === "submitted" || messages.length === 0;
+	const isLoading =
+		(status !== "streaming" && status === "submitted") || messages.length === 0;
 
 	const handleSendMessage = (text: string) => {
 		sendMessage({ text });

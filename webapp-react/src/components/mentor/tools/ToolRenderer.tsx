@@ -14,6 +14,14 @@ function ToolRenderer({ part }: ToolRenderProps) {
 			<div className="text-xs font-medium text-blue-800 mb-1">
 				Tool: {part.type}
 			</div>
+			<details className="mt-2">
+				<summary className="text-xs text-gray-600 cursor-pointer">
+					Debug info
+				</summary>
+				<pre className="text-xs text-gray-600 mt-1 whitespace-pre-wrap">
+					{JSON.stringify(part, null, 2)}
+				</pre>
+			</details>
 		</div>
 	);
 }
