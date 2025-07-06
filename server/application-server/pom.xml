@@ -414,6 +414,9 @@
 					<perCoreThreadCount>true</perCoreThreadCount>
 					<!-- Fail fast on errors -->
 					<skipAfterFailureCount>5</skipAfterFailureCount>
+					<!-- Forked JVM timeout settings to prevent hanging -->
+					<forkedProcessTimeoutInSeconds>60</forkedProcessTimeoutInSeconds>
+					<forkedProcessExitTimeoutInSeconds>10</forkedProcessExitTimeoutInSeconds>
 				</configuration>
 			</plugin>
 			

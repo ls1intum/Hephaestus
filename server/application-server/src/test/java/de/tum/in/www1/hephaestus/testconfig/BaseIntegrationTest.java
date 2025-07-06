@@ -29,5 +29,15 @@ public abstract class BaseIntegrationTest {
         registry.add("spring.datasource.url", postgres::getJdbcUrl);
         registry.add("spring.datasource.username", postgres::getUsername);
         registry.add("spring.datasource.password", postgres::getPassword);
+        
+        // HikariCP configuration optimized for tests to prevent connection warnings
+        registry.add("spring.datasource.hikari.maximum-pool-size", () -> "5");
+        registry.add("spring.datasource.hikari.minimum-idle", () -> "1");
+        registry.add("spring.datasource.hikari.max-lifetime", () -> "300000");  // 5 minutes
+        registry.add("spring.datasource.hikari.connection-timeout", () -> "10000");  // 10 seconds
+        registry.add("spring.datasource.hikari.idle-timeout", () -> "60000");  // 1 minute
+        registry.add("spring.datasource.hikari.validation-timeout", () -> "5000");  // 5 seconds
+        registry.add("spring.datasource.hikari.leak-detection-threshold", () -> "10000");  // 10 seconds
+        registry.add("spring.datasource.hikari.connection-test-query", () -> "SELECT 1");
     }
 }
