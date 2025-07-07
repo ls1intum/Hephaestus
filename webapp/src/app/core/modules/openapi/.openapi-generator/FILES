@@ -13,6 +13,8 @@ api/meta.service.ts
 api/meta.serviceInterface.ts
 api/session.service.ts
 api/session.serviceInterface.ts
+api/team-v2.service.ts
+api/team-v2.serviceInterface.ts
 api/team.service.ts
 api/team.serviceInterface.ts
 api/user.service.ts
@@ -40,6 +42,7 @@ model/pull-request-with-bad-practices.ts
 model/repository-info.ts
 model/session.ts
 model/team-info.ts
+model/team-v2-info.ts
 model/user-info.ts
 model/user-profile.ts
 model/user-settings.ts
