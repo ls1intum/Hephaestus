@@ -67,6 +67,7 @@ hephaestus:
     workspace:
         init-default: true
         default:
+            organization: ls1intum
             repositories-to-monitor: ls1intum/Hephaestus
     
     intelligence-service:

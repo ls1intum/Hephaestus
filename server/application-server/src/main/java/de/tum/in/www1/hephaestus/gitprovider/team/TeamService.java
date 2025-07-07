@@ -25,8 +25,7 @@ public class TeamService {
     private LabelRepository labelRepository;
 
     public List<TeamInfoDTO> getAllTeams() {
-        List<TeamInfoDTO> teams = teamRepository.findAll().stream().map(TeamInfoDTO::fromTeam).toList();
-        return teams;
+        return teamRepository.findAll().stream().map(TeamInfoDTO::fromTeam).toList();
     }
 
     public TeamInfoDTO hideTeam(Long id, Boolean hidden) {
