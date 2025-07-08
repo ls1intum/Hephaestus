@@ -17,6 +17,10 @@ tags:
   description: |-
     REST controller for the chat functionality.
      Handles streaming chat responses, message persistence, and thread management.
+- name: Documents
+  description: Document management with versioning support
+- name: Chat Message Voting
+  description: Vote on chat messages (upvote/downvote)
 paths:
   /workspace/user/{login}/team/{teamId}:
     put:
@@ -99,6 +103,83 @@ paths:
       responses:
         "200":
           description: OK
+  /api/documents/{id}:
+    get:
+      tags: []
+      summary: Get latest version of a document
+      operationId: getDocument
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        "200":
+          description: Document retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Document"
+        "404":
+          description: Document not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Document"
+    put:
+      tags: []
+      summary: Update a document (creates new version)
+      operationId: updateDocument
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateDocumentRequest"
+        required: true
+      responses:
+        "200":
+          description: Document updated successfully
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Document"
+        "404":
+          description: Document not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Document"
+        "400":
+          description: Invalid request data
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Document"
+    delete:
+      tags: []
+      summary: Delete a document and all its versions
+      operationId: deleteDocument
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        "204":
+          description: Document deleted successfully
+        "404":
+          description: Document not found
   /workspace/team/{teamId}/repository/{repositoryOwner}/{repositoryName}:
     post:
       tags:
@@ -340,6 +421,68 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/LeagueChange"
+  /api/documents:
+    get:
+      tags: []
+      summary: Get all user documents (latest versions only)
+      operationId: getUserDocuments
+      parameters:
+      - name: page
+        in: query
+        required: false
+        schema:
+          type: integer
+          format: int32
+          default: 0
+      - name: size
+        in: query
+        required: false
+        schema:
+          type: integer
+          format: int32
+          default: 20
+      - name: sortBy
+        in: query
+        required: false
+        schema:
+          type: string
+          default: createdAt
+      - name: sortDir
+        in: query
+        required: false
+        schema:
+          type: string
+          default: desc
+      responses:
+        "200":
+          description: Documents retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PageDocumentSummary"
+    post:
+      tags: []
+      summary: Create a new document
+      operationId: createDocument
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateDocumentRequest"
+        required: true
+      responses:
+        "201":
+          description: Document created successfully
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Document"
+        "400":
+          description: Invalid request data
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Document"
   /activity/user/{login}/badpractices:
     post:
       tags:
@@ -418,6 +561,46 @@ paths:
       responses:
         "200":
           description: OK
+  /api/chat/messages/{messageId}/vote:
+    patch:
+      tags:
+      - Chat Mes
+      summary: Vote on a message
+      description: Cast an upvote or downvote on a chat message
+      operationId: voteMessage
+      parameters:
+      - name: messageId
+        in: path
+        description: Message ID to vote on
+        required: true
+        schema:
+          type: string
+          format: uuid
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/VoteMessageRequest"
+        required: true
+      responses:
+        "200":
+          description: Vote successfully recorded
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ChatMessageVote"
+        "400":
+          description: Invalid vote type or message not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ChatMessageVote"
+        "404":
+          description: Message not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ChatMessageVote"
   /workspace/users:
     get:
       tags:
@@ -587,6 +770,118 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/ChatThreadDetail"
+  /api/documents/{id}/versions:
+    get:
+      tags: []
+      summary: Get all versions of a document
+      operationId: getDocumentVersions
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      - name: page
+        in: query
+        required: false
+        schema:
+          type: integer
+          format: int32
+          default: 0
+      - name: size
+        in: query
+        required: false
+        schema:
+          type: integer
+          format: int32
+          default: 20
+      responses:
+        "200":
+          description: Document versions retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PageDocument"
+        "404":
+          description: Document not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PageDocument"
+    delete:
+      tags: []
+      summary: Delete document versions after specified timestamp
+      operationId: deleteVersionsAfterTimestamp
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      - name: after
+        in: query
+        required: true
+        schema:
+          type: string
+          format: date-time
+      responses:
+        "200":
+          description: Document versions deleted successfully
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Document"
+        "404":
+          description: Document not found
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Document"
+        "400":
+          description: Invalid timestamp parameter
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Document"
+  /api/documents/{id}/versions/{timestamp}:
+    get:
+      tags: []
+      summary: Get specific version of a document by timestamp
+      operationId: getDocumentVersion
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      - name: timestamp
+        in: path
+        required: true
+        schema:
+          type: string
+          format: date-time
+      responses:
+        "200":
+          description: Document version retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Document"
+        "404":
+          description: Document version not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Document"
   /activity/{login}:
     get:
       tags:
@@ -659,6 +954,24 @@ paths:
           description: OK
 components:
   schemas:
+    PageableObject:
+      type: object
+      properties:
+        sort:
+          $ref: "#/components/schemas/SortObject"
+        paged:
+          type: boolean
+        pageNumber:
+          type: integer
+          format: int32
+        pageSize:
+          type: integer
+          format: int32
+        unpaged:
+          type: boolean
+        offset:
+          type: integer
+          format: int64
     UIMessage:
       type: object
       description: Message model that matches the TypeScript interface.
@@ -724,6 +1037,58 @@ components:
       - contributedRepositories
       - firstContribution
       - userInfo
+    PageDocument:
+      type: object
+      properties:
+        totalElements:
+          type: integer
+          format: int64
+        totalPages:
+          type: integer
+          format: int32
+        sort:
+          $ref: "#/components/schemas/SortObject"
+        pageable:
+          $ref: "#/components/schemas/PageableObject"
+        first:
+          type: boolean
+        last:
+          type: boolean
+        numberOfElements:
+          type: integer
+          format: int32
+        size:
+          type: integer
+          format: int32
+        content:
+          type: array
+          items:
+            $ref: "#/components/schemas/Document"
+        number:
+          type: integer
+          format: int32
+        empty:
+          type: boolean
+    CreateDocumentRequest:
+      type: object
+      description: |-
+        DTO for creating a new document.
+         Server generates UUID and timestamps.
+      properties:
+        title:
+          type: string
+          maxLength: 255
+          minLength: 0
+        content:
+          type: string
+        kind:
+          type: string
+          enum:
+          - TEXT
+      required:
+      - content
+      - kind
+      - title
     UserTeams:
       type: object
       properties:
@@ -846,6 +1211,43 @@ components:
           default: step-start
           title: Type
       title: StepStartUIPart
+    Document:
+      type: object
+      description: |-
+        DTO for complete document responses.
+         Used when returning full document details (includes content).
+      properties:
+        id:
+          type: string
+          format: uuid
+        createdAt:
+          type: string
+          format: date-time
+        title:
+          type: string
+        content:
+          type: string
+        kind:
+          type: string
+          enum:
+          - TEXT
+        userId:
+          type: string
+      required:
+      - content
+      - createdAt
+      - id
+      - kind
+      - title
+      - userId
+    VoteMessageRequest:
+      type: object
+      description: Request DTO for voting on a message.
+      properties:
+        isUpvoted:
+          type: boolean
+      required:
+      - isUpvoted
     LeagueChange:
       type: object
       properties:
@@ -948,6 +1350,26 @@ components:
       - sourceId
       - url
       title: SourceUrlUIPart
+    UpdateDocumentRequest:
+      type: object
+      description: |-
+        DTO for updating an existing document.
+         Creates a new version with the updated content.
+      properties:
+        title:
+          type: string
+          maxLength: 255
+          minLength: 0
+        content:
+          type: string
+        kind:
+          type: string
+          enum:
+          - TEXT
+      required:
+      - content
+      - kind
+      - title
     DataUIPart:
       type: object
       description: A data part with dynamic type.
@@ -991,6 +1413,38 @@ components:
       required:
       - text
       title: TextUIPart
+    PageDocumentSummary:
+      type: object
+      properties:
+        totalElements:
+          type: integer
+          format: int64
+        totalPages:
+          type: integer
+          format: int32
+        sort:
+          $ref: "#/components/schemas/SortObject"
+        pageable:
+          $ref: "#/components/schemas/PageableObject"
+        first:
+          type: boolean
+        last:
+          type: boolean
+        numberOfElements:
+          type: integer
+          format: int32
+        size:
+          type: integer
+          format: int32
+        content:
+          type: array
+          items:
+            $ref: "#/components/schemas/DocumentSummary"
+        number:
+          type: integer
+          format: int32
+        empty:
+          type: boolean
     LeaderboardEntry:
       type: object
       properties:
@@ -1052,7 +1506,6 @@ components:
         state:
           type: string
           const: input-streaming
-          default: input-streaming
           title: State
         toolCallId:
           type: string
@@ -1062,6 +1515,7 @@ components:
           pattern: ^tool-.*
           title: Type
       required:
+      - state
       - toolCallId
       - type
       title: ToolInputStreamingPart
@@ -1240,6 +1694,15 @@ components:
       - state
       - title
       - updatedAt
+    SortObject:
+      type: object
+      properties:
+        sorted:
+          type: boolean
+        unsorted:
+          type: boolean
+        empty:
+          type: boolean
     ToolOutputErrorPart:
       type: object
       description: Tool part with output error.
@@ -1258,7 +1721,6 @@ components:
         state:
           type: string
           const: output-error
-          default: output-error
           title: State
         toolCallId:
           type: string
@@ -1270,6 +1732,7 @@ components:
       required:
       - errorText
       - input
+      - state
       - toolCallId
       - type
       title: ToolOutputErrorPart
@@ -1323,7 +1786,6 @@ components:
         state:
           type: string
           const: output-available
-          default: output-available
           title: State
         toolCallId:
           type: string
@@ -1335,6 +1797,7 @@ components:
       required:
       - input
       - output
+      - state
       - toolCallId
       - type
       title: ToolOutputAvailablePart
@@ -1363,6 +1826,21 @@ components:
       - id
       - state
       - title
+    ChatMessageVote:
+      type: object
+      description: DTO for returning vote information.
+      properties:
+        messageId:
+          type: string
+          format: uuid
+        isUpvoted:
+          type: boolean
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
     FileUIPart:
       type: object
       description: A file part of a message.
@@ -1500,7 +1978,6 @@ components:
         state:
           type: string
           const: input-available
-          default: input-available
           title: State
         toolCallId:
           type: string
@@ -1511,6 +1988,7 @@ components:
           title: Type
       required:
       - input
+      - state
       - toolCallId
       - type
       title: ToolInputAvailablePart
@@ -1543,3 +2021,29 @@ components:
           format: uuid
           description: ID of the currently selected leaf message (end of active conversation
             path)
+    DocumentSummary:
+      type: object
+      description: |-
+        DTO for document summary in list views.
+         Excludes content for performance - only metadata.
+      properties:
+        id:
+          type: string
+          format: uuid
+        title:
+          type: string
+        kind:
+          type: string
+          enum:
+          - TEXT
+        createdAt:
+          type: string
+          format: date-time
+        userId:
+          type: string
+      required:
+      - createdAt
+      - id
+      - kind
+      - title
+      - userId

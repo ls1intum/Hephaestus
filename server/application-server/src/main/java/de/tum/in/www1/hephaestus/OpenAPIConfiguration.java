@@ -43,6 +43,13 @@ public class OpenAPIConfiguration {
         "ToolOutputErrorPart", "SourceUrlUIPart", "SourceDocumentUIPart",
         "FileUIPart", "DataUIPart", "StepStartUIPart"
     );
+    
+    /**
+     * List of domain object names that should be included in the schema even though they don't end with DTO.
+     */
+    private static final List<String> ALLOWED_DOMAIN_OBJECTS = List.of(
+        "PageableObject", "SortObject"
+    );
 
     @Bean
     public OpenApiCustomizer schemaCustomizer() {
@@ -50,8 +57,12 @@ public class OpenAPIConfiguration {
             var components = openApi.getComponents();
 
             if (components != null && components.getSchemas() != null) {
-                // Only include schemas with DTO suffix and remove the suffix
-                var schemas = components
+                // Create a new map to hold filtered schemas
+                @SuppressWarnings("rawtypes")
+                Map<String, Schema> filteredSchemas = new HashMap<>();
+                
+                // Include schemas with DTO suffix and remove the suffix
+                var dtoSchemas = components
                     .getSchemas()
                     .entrySet()
                     .stream()
@@ -66,11 +77,26 @@ public class OpenAPIConfiguration {
                             }
                         )
                     );
+                
+                filteredSchemas.putAll(dtoSchemas);
+                
+                // Include allowed domain objects (PageableObject, SortObject)
+                var allowedDomainObjects = components
+                    .getSchemas()
+                    .entrySet()
+                    .stream()
+                    .filter(entry -> ALLOWED_DOMAIN_OBJECTS.contains(entry.getKey()))
+                    .collect(Collectors.toMap(
+                        Map.Entry::getKey,
+                        Map.Entry::getValue
+                    ));
+                
+                filteredSchemas.putAll(allowedDomainObjects);
 
-                // Remove DTO suffix from attribute names
-                schemas.forEach((key, value) -> {
-                    @SuppressWarnings("unchecked")
-                    Map<String, Schema<?>> properties = value.getProperties();
+                // Remove DTO suffix from attribute names in all schemas
+                filteredSchemas.forEach((key, value) -> {
+                    @SuppressWarnings({"rawtypes", "unchecked"})
+                    Map<String, Schema> properties = value.getProperties();
                     if (properties != null) {
                         properties.forEach((propertyKey, propertyValue) -> {
                             removeDTOSuffixesFromSchemaRecursively(propertyValue);
@@ -78,12 +104,12 @@ public class OpenAPIConfiguration {
                     }
                 });
 
-                components.setSchemas(schemas);
+                components.setSchemas(filteredSchemas);
                 
                 // Load and add intelligence service schemas (UIMessage, UIMessagePart, etc.)
                 Map<String, Schema<?>> intelligenceSchemas = loadIntelligenceServiceUISchemas();
                 if (!intelligenceSchemas.isEmpty()) {
-                    schemas.putAll(intelligenceSchemas);
+                    filteredSchemas.putAll(intelligenceSchemas);
                     logger.info("Added {} intelligence service schemas to OpenAPI spec", intelligenceSchemas.size());
                 }
             } else {
