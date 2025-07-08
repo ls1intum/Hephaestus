@@ -57,4 +57,8 @@ public abstract class GitHubMessageHandler<T extends GHEventPayload> implements 
      * @return The GHEvent.
      */
     protected abstract GHEvent getHandlerEvent();
+
+    protected boolean isOrganizationEvent() {
+        return false;
+    }
 }

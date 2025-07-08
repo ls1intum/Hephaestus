@@ -8,7 +8,7 @@ info:
   license:
     name: MIT License
     url: https://github.com/ls1intum/Hephaestus/blob/develop/LICENSE
-  version: 0.9.0-rc.5
+  version: 0.9.0-rc.7
 servers:
 - url: /
   description: Default Server URL
@@ -581,6 +581,39 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/Session"
+  /api/teamsV2:
+    get:
+      tags:
+      - team-v-2
+      operationId: getAll
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/TeamV2Info"
+  /api/teamsV2/{id}:
+    get:
+      tags:
+      - team-v-2
+      operationId: getById
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: integer
+          format: int64
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TeamV2Info"
   /activity/{login}:
     get:
       tags:
@@ -1053,6 +1086,40 @@ components:
           $ref: "#/components/schemas/RepositoryInfo"
       required:
       - color
+      - id
+      - name
+    TeamV2Info:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+        name:
+          type: string
+        parentId:
+          type: integer
+          format: int64
+        description:
+          type: string
+        privacy:
+          type: string
+          enum:
+          - SECRET
+          - CLOSED
+        organization:
+          type: string
+        htmlUrl:
+          type: string
+        lastSyncedAt:
+          type: string
+          format: date-time
+        membershipCount:
+          type: integer
+          format: int32
+        repoPermissionCount:
+          type: integer
+          format: int32
+      required:
       - id
       - name
     BadPracticeFeedback:

@@ -139,6 +139,19 @@ export type LabelInfo = {
     repository?: RepositoryInfo;
 };
 
+export type TeamV2Info = {
+    id: number;
+    name: string;
+    parentId?: number;
+    description?: string;
+    privacy?: 'SECRET' | 'CLOSED';
+    organization?: string;
+    htmlUrl?: string;
+    lastSyncedAt?: Date;
+    membershipCount?: number;
+    repoPermissionCount?: number;
+};
+
 export type BadPracticeFeedback = {
     type: string;
     explanation: string;
@@ -693,6 +706,40 @@ export type GetLastSessionResponses = {
 };
 
 export type GetLastSessionResponse = GetLastSessionResponses[keyof GetLastSessionResponses];
+
+export type GetAllData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/teamsV2';
+};
+
+export type GetAllResponses = {
+    /**
+     * OK
+     */
+    200: Array<TeamV2Info>;
+};
+
+export type GetAllResponse = GetAllResponses[keyof GetAllResponses];
+
+export type GetByIdData = {
+    body?: never;
+    path: {
+        id: number;
+    };
+    query?: never;
+    url: '/api/teamsV2/{id}';
+};
+
+export type GetByIdResponses = {
+    /**
+     * OK
+     */
+    200: TeamV2Info;
+};
+
+export type GetByIdResponse = GetByIdResponses[keyof GetByIdResponses];
 
 export type GetActivityByUserData = {
     body?: never;

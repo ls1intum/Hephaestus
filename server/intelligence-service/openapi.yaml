@@ -182,7 +182,7 @@ info:
     name: Felix T.J. Dietrich
   description: API documentation for the Hephaestus Intelligence Service.
   title: Hephaestus Intelligence Service API
-  version: 0.9.0-rc.5
+  version: 0.9.0-rc.7
 openapi: 3.1.0
 paths:
   /detector/:

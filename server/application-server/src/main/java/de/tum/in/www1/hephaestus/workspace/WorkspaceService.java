@@ -78,6 +78,9 @@ public class WorkspaceService {
     @Value("${hephaestus.workspace.init-default}")
     private boolean initDefaultWorkspace;
 
+    @Value("${hephaestus.workspace.default.organization}")
+    private String defaultOrganization;
+
     @Value("${hephaestus.workspace.default.repositories-to-monitor}")
     private String[] defaultRepositoriesToMonitor;
 
@@ -90,31 +93,52 @@ public class WorkspaceService {
         Set<RepositoryToMonitor> repositoriesToMonitor = workspace.getRepositoriesToMonitor();
 
         if (isNatsEnabled) {
-            repositoriesToMonitor.forEach(repositoryToMonitor -> {
-                natsConsumerService.startConsumingRepositoryToMonitorAsync(repositoryToMonitor);
-            });
+            repositoriesToMonitor.forEach(repositoryToMonitor ->
+                natsConsumerService.startConsumingRepositoryToMonitorAsync(repositoryToMonitor)
+            );
+            natsConsumerService.startConsumingOrganizationAsync(defaultOrganization);
         }
 
         if (runMonitoringOnStartup) {
             logger.info("Running monitoring on startup");
 
             // Run all repository syncs asynchronously
-            CompletableFuture<?>[] futures = repositoriesToMonitor
+            CompletableFuture<?>[] repoFutures = repositoriesToMonitor
                 .stream()
                 .map(repo -> CompletableFuture.runAsync(() -> gitHubDataSyncService.syncRepositoryToMonitor(repo)))
                 .toArray(CompletableFuture[]::new);
+            CompletableFuture<Void> reposDone = CompletableFuture.allOf(repoFutures);
 
             // When all repository syncs complete, then sync users
-            CompletableFuture.allOf(futures).thenRun(() -> {
-                logger.info("All repositories synced, now syncing users");
-                gitHubDataSyncService.syncUsers(workspace);
-                logger.info("Finished running monitoring on startup");
+            CompletableFuture<Void> usersFuture = reposDone
+                .thenRunAsync(() -> {
+                    logger.info("All repositories synced, now syncing users");
+                    gitHubDataSyncService.syncUsers(workspace);
+                })
+                .exceptionally(ex -> {
+                    logger.error("Error during syncUsers: {}", ex.getMessage(), ex);
+                    return null;
+                });
 
+            // When all users syncs complete, then sync teams
+            CompletableFuture<Void> teamsFuture = usersFuture
+                .thenRunAsync(() -> {
+                    logger.info("Syncing teams");
+                    gitHubDataSyncService.syncTeams(workspace);
+                })
+                .exceptionally(ex -> {
+                    logger.error("Error during syncTeams: {}", ex.getMessage(), ex);
+                    return null;
+                });
+
+            CompletableFuture.allOf(teamsFuture).thenRun(() -> {
+                //TODO: to be removed after teamV2 is released
                 if (initDefaultWorkspace) {
                     // Setup default teams
                     logger.info("Setting up default teams");
                     teamService.setupDefaultTeams();
                 }
+                logger.info("Finished running monitoring on startup");
             });
         }
     }
@@ -206,7 +230,7 @@ public class WorkspaceService {
             return;
         }
 
-        repository.get().getLabels().forEach(label -> label.removeAllTeams());
+        repository.get().getLabels().forEach(Label::removeAllTeams);
         repository.get().removeAllTeams();
         repositoryRepository.delete(repository.get());
 

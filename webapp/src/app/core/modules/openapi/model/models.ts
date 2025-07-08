@@ -14,6 +14,7 @@ export * from './pull-request-with-bad-practices';
 export * from './repository-info';
 export * from './session';
 export * from './team-info';
+export * from './team-v2-info';
 export * from './user-info';
 export * from './user-profile';
 export * from './user-settings';
