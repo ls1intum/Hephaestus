@@ -163,7 +163,9 @@ public class GitHubIssueSyncService {
                 try {
                     if (
                         issue.getUpdatedAt() == null ||
-                        issue.getUpdatedAt().isBefore(DateUtil.convertToOffsetDateTime(Date.from(ghIssue.getUpdatedAt())))
+                        issue
+                            .getUpdatedAt()
+                            .isBefore(DateUtil.convertToOffsetDateTime(Date.from(ghIssue.getUpdatedAt())))
                     ) {
                         return issueConverter.update(ghIssue, issue);
                     }

@@ -4,7 +4,6 @@ import de.tum.in.www1.hephaestus.gitprovider.pullrequestreview.PullRequestReview
 import java.io.IOException;
 import java.time.ZoneOffset;
 import java.util.Date;
-
 import org.kohsuke.github.GHPullRequestReview;
 import org.kohsuke.github.GHPullRequestReviewState;
 import org.slf4j.Logger;

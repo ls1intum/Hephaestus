@@ -3,12 +3,11 @@ package de.tum.in.www1.hephaestus.gitprovider.issue.github;
 import de.tum.in.www1.hephaestus.gitprovider.common.BaseGitServiceEntityConverter;
 import de.tum.in.www1.hephaestus.gitprovider.common.DateUtil;
 import de.tum.in.www1.hephaestus.gitprovider.issue.Issue;
+import java.util.Date;
 import org.kohsuke.github.GHIssue;
 import org.kohsuke.github.GHIssueState;
 import org.springframework.lang.NonNull;
 import org.springframework.stereotype.Component;
-
-import java.util.Date;
 
 @Component
 public class GitHubIssueConverter extends BaseGitServiceEntityConverter<GHIssue, Issue> {

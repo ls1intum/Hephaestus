@@ -3,14 +3,13 @@ package de.tum.in.www1.hephaestus.gitprovider.repository.github;
 import de.tum.in.www1.hephaestus.gitprovider.common.BaseGitServiceEntityConverter;
 import de.tum.in.www1.hephaestus.gitprovider.common.DateUtil;
 import de.tum.in.www1.hephaestus.gitprovider.repository.Repository;
+import java.util.Date;
 import org.kohsuke.github.GHRepository;
 import org.kohsuke.github.GHRepository.Visibility;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.lang.NonNull;
 import org.springframework.stereotype.Component;
-
-import java.util.Date;
 
 @Component
 public class GitHubRepositoryConverter extends BaseGitServiceEntityConverter<GHRepository, Repository> {

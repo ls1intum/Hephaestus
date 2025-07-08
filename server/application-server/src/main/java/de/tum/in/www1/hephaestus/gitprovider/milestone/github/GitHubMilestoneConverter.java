@@ -3,14 +3,13 @@ package de.tum.in.www1.hephaestus.gitprovider.milestone.github;
 import de.tum.in.www1.hephaestus.gitprovider.common.BaseGitServiceEntityConverter;
 import de.tum.in.www1.hephaestus.gitprovider.common.DateUtil;
 import de.tum.in.www1.hephaestus.gitprovider.milestone.Milestone;
+import java.util.Date;
 import org.kohsuke.github.GHMilestone;
 import org.kohsuke.github.GHMilestoneState;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.lang.NonNull;
 import org.springframework.stereotype.Component;
-
-import java.util.Date;
 
 @Component
 public class GitHubMilestoneConverter extends BaseGitServiceEntityConverter<GHMilestone, Milestone> {

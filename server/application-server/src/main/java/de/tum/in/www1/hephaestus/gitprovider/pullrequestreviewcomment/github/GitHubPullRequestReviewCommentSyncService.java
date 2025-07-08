@@ -92,7 +92,9 @@ public class GitHubPullRequestReviewCommentSyncService {
                         pullRequestReviewComment.getUpdatedAt() == null ||
                         pullRequestReviewComment
                             .getUpdatedAt()
-                            .isBefore(DateUtil.convertToOffsetDateTime(Date.from(ghPullRequestReviewComment.getUpdatedAt())))
+                            .isBefore(
+                                DateUtil.convertToOffsetDateTime(Date.from(ghPullRequestReviewComment.getUpdatedAt()))
+                            )
                     ) {
                         return pullRequestReviewCommentConverter.update(
                             ghPullRequestReviewComment,
