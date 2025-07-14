@@ -224,6 +224,22 @@ code {
 	}
 }
 
+.shiki {
+	@apply text-sm bg-card text-card-foreground rounded-xl border p-4;
+}
+
+.shiki code {
+	@apply whitespace-pre-wrap break-words;
+	background: transparent !important;
+}
+
+/* Override any theme background for consistency */
+.shiki pre {
+	background: transparent !important;
+	margin: 0;
+	padding: 0;
+}
+
 /* Animation classes */
 .accordion-down {
 	animation: accordion-down 0.2s ease-out;

@@ -6,7 +6,12 @@ import { Message } from "./Message";
 const userMessage: UIMessage = {
 	id: "1",
 	role: "user",
-	parts: [{ type: "text", text: "How do I write effective pull request descriptions?" }],
+	parts: [
+		{
+			type: "text",
+			text: "How do I write effective pull request descriptions?",
+		},
+	],
 };
 
 const shortAssistantMessage: UIMessage = {
@@ -72,11 +77,12 @@ This approach helps your team review faster and reduces back-and-forth questions
  */
 const meta = {
 	component: Message,
-	parameters: { 
+	parameters: {
 		layout: "centered",
 		docs: {
 			description: {
-				component: "Versatile message component that handles chat messages, loading states, and error states with consistent styling.",
+				component:
+					"Versatile message component that handles chat messages, loading states, and error states with consistent styling.",
 			},
 		},
 	},
@@ -124,7 +130,7 @@ export const UserMessage: Story = {
  */
 export const ShortAssistantMessage: Story = {
 	args: {
-		type: "message", 
+		type: "message",
 		message: shortAssistantMessage,
 	},
 };
@@ -154,7 +160,9 @@ export const Loading: Story = {
 export const ErrorWithRetry: Story = {
 	args: {
 		type: "error",
-		error: new Error("Unable to connect to AI service. Please check your connection and try again."),
+		error: new Error(
+			"Unable to connect to AI service. Please check your connection and try again.",
+		),
 		onRetry: fn(),
 	},
 };
@@ -165,7 +173,9 @@ export const ErrorWithRetry: Story = {
 export const ErrorWithoutRetry: Story = {
 	args: {
 		type: "error",
-		error: new Error("Rate limit exceeded. Please wait a moment before trying again."),
+		error: new Error(
+			"Rate limit exceeded. Please wait a moment before trying again.",
+		),
 	},
 };
 

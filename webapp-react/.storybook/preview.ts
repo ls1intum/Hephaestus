@@ -1,4 +1,4 @@
-import { withThemeByClassName, withThemeByDataAttribute } from '@storybook/addon-themes';
+import { withThemeFromJSXProvider, withThemeByClassName } from '@storybook/addon-themes';
 import type { Decorator, Preview } from '@storybook/react'
 import { RouterProvider, createRootRoute, createRouter } from "@tanstack/react-router";
 import React from "react";
@@ -13,15 +13,53 @@ const RouterDecorator: Decorator = (Story) => {
   return React.createElement(RouterProvider, { router });
 };
 
-// Create a Theme Provider decorator - fixed to properly include children prop
-const ThemeDecorator: Decorator = (Story, context) => {
+// CSS injection for docs background theming
+const injectDocsThemeCSS = () => {
+  if (typeof document !== 'undefined') {
+    const styleId = 'storybook-docs-theme';
+    let style = document.getElementById(styleId);
+    
+    if (!style) {
+      style = document.createElement('style');
+      style.id = styleId;
+      document.head.appendChild(style);
+    }
+    
+    style.textContent = `
+      /* Ensure docs background respects theme */
+      .docs-story {
+        background-color: var(--background) !important;
+        color: var(--foreground) !important;
+      }
+      
+      /* Theme-aware iframe styling */
+      html.dark .docs-story {
+        background-color: var(--background) !important;
+        color: var(--foreground) !important;
+      }
+    `;
+  }
+};
+
+// Theme decorator that handles CSS injection
+const ThemeDecorator: Decorator = (Story) => {
+  React.useEffect(() => {
+    injectDocsThemeCSS();
+  }, []);
+  
+  return React.createElement(Story);
+};
+
+// Custom Theme Provider wrapper that only provides React context
+const StorybookThemeProvider = ({ theme, children }: { theme: string; children: React.ReactNode }) => {
+  // Force re-render when theme changes by using key
   return React.createElement(
     ThemeProvider,
     { 
-      defaultTheme: "light", 
-      storageKey: "theme", 
-      // biome-ignore lint/correctness/noChildrenProp: Fine to pass children here
-      children: React.createElement(Story, context.args) 
+      key: theme, // Force re-mount when theme changes
+      defaultTheme: theme as "light" | "dark",
+      storageKey: "storybook-theme",
+      children: children
     }
   );
 };
@@ -37,6 +75,12 @@ const preview: Preview = {
     options: {
       storySort: {
         order: ['core', 'shared'],
+      },
+    },
+    // Ensure docs pages also get themed
+    docs: {
+      story: {
+        inline: true,
       },
     },
     // Chromatic configuration for optimal visual testing
@@ -73,20 +117,24 @@ const preview: Preview = {
   decorators: [
     RouterDecorator,
     ThemeDecorator,
+    // Apply CSS classes to both canvas and docs
     withThemeByClassName({
       themes: {
-        light: 'scroll-smooth',
-        dark: 'dark bg-background scroll-smooth'
-      },
-      defaultTheme: 'light'
-    }),
-    withThemeByDataAttribute({
-      attributeName: 'data-color-mode',
-      themes: {
         light: 'light',
-        dark: 'dark'
+        dark: 'dark',
       },
-      defaultTheme: 'light'
+      defaultTheme: 'light',
+      parentSelector: 'html', // Apply to both canvas and docs iframe
+    }),
+    // Provide React context
+    withThemeFromJSXProvider({
+      themes: {
+        light: { name: 'light' },
+        dark: { name: 'dark' },
+      },
+      defaultTheme: 'light',
+      Provider: ({ theme, children }) => 
+        React.createElement(StorybookThemeProvider, { theme: theme.name, children }),
     }),
   ],
 };
