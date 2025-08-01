@@ -1,0 +1,18 @@
+<p th:inline="text">
+    Hi [[${user.name}]],
+</p>
+Hephaestus has detected [[${goodPracticeString}]] in your pull request '[[${pullRequest.title}]]' on [[${repository}]] <a target="_blank" rel="noopener noreferrer nofollow" th:href="${pullRequest.htmlUrl}">#[[${pullRequest.number}]]</a>:
+<br>
+<ul>
+    <li th:each="goodPractice : ${goodPractices}">
+        <strong th:text="${goodPractice.title}">Good Practice Title</strong>: [[${goodPractice.state.getValue()}]]<br />
+        <span th:text="${goodPractice.description}">Good Practice Description</span>
+    </li>
+</ul>
+Good Job! Keep up the good work and continue to follow best practices in your code.
+You can review the good practices on <a target="_blank" rel="noopener noreferrer nofollow" th:href="${config.clientHost + '/best-practices'}">Hephaestus</a>.
+<br>
+<hr />
+<div style="text-align: center;font-size: 10px">
+    Manage your notification settings <a th:href="${config.clientHost + '/settings'}">here</a>
+</div>

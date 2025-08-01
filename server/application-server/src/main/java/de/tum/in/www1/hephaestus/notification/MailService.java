@@ -57,7 +57,7 @@ public class MailService {
 
         String subject =
             "Hephaestus: " +
-            getBadPracticeString(badPractices) +
+                    getGoodOrBadPracticeString(badPractices, "bad") +
             " detected in your pull request #" +
             pullRequest.getNumber();
 
@@ -66,18 +66,55 @@ public class MailService {
             .fillPlaceholder(user, "user")
             .fillPlaceholder(pullRequest, "pullRequest")
             .fillPlaceholder(badPractices, "badPractices")
-            .fillPlaceholder(getBadPracticeString(badPractices), "badPracticeString")
+            .fillPlaceholder(getGoodOrBadPracticeString(badPractices,"bad"), "badPracticeString")
             .fillPlaceholder(pullRequest.getRepository().getName(), "repository")
             .send(javaMailSender);
     }
 
-    private String getBadPracticeString(List<PullRequestBadPractice> badPractices) {
+    public void sendGoodPracticesDetectedInPullRequestEmail(
+        User user,
+        PullRequest pullRequest,
+        List<PullRequestBadPractice> badPractices
+    ) {
+        logger.info("Sending good practice detected email to user: {}", user.getLogin());
+        String email;
+
+        try {
+            UserRepresentation keyCloakUser = keycloak
+                .realm(realm)
+                .users()
+                .searchByUsername(user.getLogin(), true)
+                .getFirst();
+
+            email = keyCloakUser.getEmail();
+        } catch (Exception e) {
+            logger.error("Failed to find user in Keycloak: {}", user.getLogin(), e);
+            return;
+        }
+
+        String subject =
+            "Hephaestus: " +
+                    getGoodOrBadPracticeString(badPractices,"good") +
+            " detected in your pull request #" +
+            pullRequest.getNumber();
+
+        MailBuilder mailBuilder = new MailBuilder(mailConfig, user, email, subject, "good-practices-detected");
+        mailBuilder
+            .fillPlaceholder(user, "user")
+            .fillPlaceholder(pullRequest, "pullRequest")
+            .fillPlaceholder(badPractices, "goodPractices")
+            .fillPlaceholder(getGoodOrBadPracticeString(badPractices,"good"), "goodPracticeString")
+            .fillPlaceholder(pullRequest.getRepository().getName(), "repository")
+            .send(javaMailSender);
+    }
+
+    private String getGoodOrBadPracticeString(List<PullRequestBadPractice> badPractices, String goodOrBad) {
         if (badPractices.size() == 1) {
-            return "1 bad practice";
+            return "1 " + goodOrBad + " practice";
         } else if (badPractices.size() > 1) {
-            return badPractices.size() + " bad practices";
+            return badPractices.size() + " " + goodOrBad + " practices";
         } else {
-            return "no bad practices";
+            return "no " + goodOrBad + " practices";
         }
     }
 }
