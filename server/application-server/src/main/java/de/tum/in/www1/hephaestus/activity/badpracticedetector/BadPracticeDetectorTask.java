@@ -42,9 +42,14 @@ public class BadPracticeDetectorTask implements Runnable {
             .filter(badPractice -> !(badPractice.getState() == PullRequestBadPracticeState.GOOD_PRACTICE))
             .toList();
 
+        List<PullRequestBadPractice> goodPractices = badPractices
+            .stream()
+            .filter(badPractice -> badPractice.getState() == PullRequestBadPracticeState.GOOD_PRACTICE)
+            .toList();
+
         if (sendBadPracticeDetectionEmail && !unResolvedBadPractices.isEmpty()) {
             for (User user : pullRequest.getAssignees()) {
-                mailService.sendBadPracticesDetectedInPullRequestEmail(user, pullRequest, unResolvedBadPractices);
+                mailService.sendBadPracticesDetectedInPullRequestEmail(user, pullRequest, unResolvedBadPractices, goodPractices);
             }
         }
     }
