@@ -1,10 +1,5 @@
 # Notes
 
-## markdown.tsx
-
-- [x] Already copied over
-- [ ] Storybook story
-
 ## greeting.tsx
 
 - [ ] Copy over as is
@@ -125,6 +120,11 @@ diffview.tsx
 
 - [x] Replace current with this and have option to disable attachments (for now the default)
 - [x] Change component API to be less smart
+- [x] Storybook story
+
+### markdown.tsx
+
+- [x] Already copied over
 - [x] Storybook story
 
 ## Not needed
