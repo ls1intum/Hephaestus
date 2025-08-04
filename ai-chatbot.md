@@ -81,7 +81,9 @@ diffview.tsx
 
 ### lib/types.ts
 
-## Done
+- [ ] Typesafe tools
+
+## DONE!!!!!!!!!!!
 
 ### code-block.tsx
 
