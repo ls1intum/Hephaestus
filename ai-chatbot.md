@@ -1,10 +1,5 @@
 # Notes
 
-## multimodal-input.tsx
-
-- [ ] Replace current with this and have option to disable attachments (for now the default)
-- [ ] Storybook story
-
 ## markdown.tsx
 
 - [x] Already copied over
@@ -124,6 +119,12 @@ diffview.tsx
 ### preview-attachment.tsx
 
 - [x] Copy over as is, also the loading spinner / icons
+- [x] Storybook story
+
+### multimodal-input.tsx
+
+- [x] Replace current with this and have option to disable attachments (for now the default)
+- [x] Change component API to be less smart
 - [x] Storybook story
 
 ## Not needed

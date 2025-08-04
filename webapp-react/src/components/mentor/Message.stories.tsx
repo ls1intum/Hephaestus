@@ -3,6 +3,24 @@ import type { Meta, StoryObj } from "@storybook/react";
 import { fn } from "@storybook/test";
 import { Message } from "./Message";
 
+// Define the union type for better TypeScript inference
+type MessageArgs =
+	| {
+			type: "message";
+			message: UIMessage;
+			className?: string;
+	  }
+	| {
+			type: "loading";
+			className?: string;
+	  }
+	| {
+			type: "error";
+			error: Error;
+			onRetry?: () => void;
+			className?: string;
+	  };
+
 const userMessage: UIMessage = {
 	id: "1",
 	role: "user",
@@ -103,6 +121,11 @@ const meta = {
 			description: "Callback function for retry action in error state",
 		},
 	},
+	// For union types, we need to provide a default args structure
+	args: {
+		type: "message" as const,
+		message: userMessage,
+	},
 	decorators: [
 		(Story) => (
 			<div className="max-w-4xl w-full p-6 bg-background">
@@ -110,10 +133,11 @@ const meta = {
 			</div>
 		),
 	],
-} satisfies Meta<typeof Message>;
+} satisfies Meta<MessageArgs>;
 
 export default meta;
-type Story = StoryObj<typeof meta>;
+// biome-ignore lint/suspicious/noExplicitAny: Complex union type requires any for Storybook compatibility
+type Story = StoryObj<any>;
 
 /**
  * User message showing a process-related question.
@@ -183,6 +207,10 @@ export const ErrorWithoutRetry: Story = {
  * Conversation flow showing multiple message types.
  */
 export const ConversationFlow: Story = {
+	args: {
+		type: "message" as const,
+		message: userMessage,
+	},
 	render: () => (
 		<div className="space-y-6">
 			<Message type="message" message={userMessage} />
