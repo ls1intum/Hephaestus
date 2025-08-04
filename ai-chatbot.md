@@ -1,10 +1,5 @@
 # Notes
 
-## message-editor.tsx
-
-- [ ] Copy over as is
-- [ ] Storybook story
-
 ## message-reasoning.tsx
 
 - [ ] Copy over as is
@@ -83,7 +78,7 @@ diffview.tsx
 
 - [ ] Typesafe tools
 
-## DONE!!!!!!!!!!!
+## DONE
 
 ### code-block.tsx
 
@@ -127,6 +122,12 @@ diffview.tsx
 Copy button with upvote / downvote
 
 - [x] Copy over as is
+- [x] Storybook story
+
+### message-editor.tsx
+
+- [x] Copy over as is
+- [x] Change to be purely presentational
 - [x] Storybook story
 
 ## Not needed

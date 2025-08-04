@@ -1,4 +1,3 @@
-import cx from "classnames";
 import type React from "react";
 import {
 	type ChangeEvent,
@@ -14,6 +13,7 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { useScrollToBottom } from "@/hooks/use-scroll-to-bottom";
 import type { Attachment } from "@/lib/types";
+import { cn } from "@/lib/utils";
 import { AnimatePresence, motion } from "framer-motion";
 import { ArrowDown } from "lucide-react";
 import { ArrowUp, Paperclip, Square } from "lucide-react";
@@ -236,56 +236,66 @@ function PureMultimodalInput({
 				</div>
 			)}
 
-			<Textarea
-				data-testid="multimodal-input"
-				ref={textareaRef}
-				placeholder={placeholder}
-				value={input}
-				onChange={handleInput}
-				readOnly={readonly}
-				className={cx(
-					"min-h-[24px] max-h-[calc(75dvh)] overflow-hidden resize-none rounded-2xl !text-base bg-muted pb-10 dark:border-zinc-700",
+			<div
+				className={cn(
+					// Base textarea styling - exact copy from ui/textarea with focus-within
+					"border-input placeholder:text-muted-foreground focus-within:border-ring focus-within:ring-ring/50 aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 aria-invalid:border-destructive dark:bg-input/30 flex field-sizing-content min-h-16 w-full rounded-xl border bg-transparent px-3 py-2 text-base shadow-xs transition-[color,box-shadow] outline-none focus-within:ring-[3px] disabled:cursor-not-allowed disabled:opacity-50 md:text-sm",
+					// Custom layout styling
+					"flex-col gap-3",
 					readonly && "cursor-not-allowed opacity-60",
 					className,
 				)}
-				rows={2}
-				autoFocus={!readonly}
-				onKeyDown={(event) => {
-					if (
-						event.key === "Enter" &&
-						!event.shiftKey &&
-						!event.nativeEvent.isComposing
-					) {
-						event.preventDefault();
+			>
+				<div className="flex-1">
+					<Textarea
+						data-testid="multimodal-input"
+						ref={textareaRef}
+						placeholder={placeholder}
+						value={input}
+						onChange={handleInput}
+						readOnly={readonly}
+						className="border-0 bg-transparent outline-none overflow-hidden resize-none !text-base w-full p-0 shadow-none focus-visible:ring-0 min-h-0"
+						rows={2}
+						autoFocus={!readonly}
+						onKeyDown={(event) => {
+							if (
+								event.key === "Enter" &&
+								!event.shiftKey &&
+								!event.nativeEvent.isComposing
+							) {
+								event.preventDefault();
 
-						if (status !== "ready") {
-							// Let parent handle status messages
-							return;
-						}
+								if (status !== "ready") {
+									// Let parent handle status messages
+									return;
+								}
 
-						if (canSubmit) {
-							submitForm();
-						}
-					}
-				}}
-			/>
-
-			<div className="absolute bottom-0 p-2 w-fit flex flex-row justify-start">
-				{!disableAttachments && (
-					<AttachmentsButton
-						fileInputRef={fileInputRef}
-						status={status}
-						readonly={readonly}
+								if (canSubmit) {
+									submitForm();
+								}
+							}
+						}}
 					/>
-				)}
-			</div>
+				</div>
 
-			<div className="absolute bottom-0 right-0 p-2 w-fit flex flex-row justify-end">
-				{status === "submitted" ? (
-					<StopButton onStop={onStop} />
-				) : (
-					<SendButton onSubmit={submitForm} disabled={!canSubmit} />
-				)}
+				<div className="flex gap-2 justify-between">
+					<div className="flex gap-2">
+						{!disableAttachments && (
+							<AttachmentsButton
+								fileInputRef={fileInputRef}
+								status={status}
+								readonly={readonly}
+							/>
+						)}
+					</div>
+					<div>
+						{status === "submitted" ? (
+							<StopButton onStop={onStop} />
+						) : (
+							<SendButton onSubmit={submitForm} disabled={!canSubmit} />
+						)}
+					</div>
+				</div>
 			</div>
 		</div>
 	);
@@ -327,7 +337,7 @@ function PureAttachmentsButton({
 			}}
 			disabled={status !== "ready" || readonly}
 			variant="ghost"
-      size="icon"
+			size="icon"
 		>
 			<Paperclip size={14} />
 		</Button>
