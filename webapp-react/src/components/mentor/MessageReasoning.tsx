@@ -40,17 +40,22 @@ export function MessageReasoning({
 					</div>
 				</div>
 			) : (
-					<button
-						data-testid="message-reasoning-toggle"
-						type="button"
-						className="cursor-pointer flex flex-row gap-1 items-center"
-						onClick={() => {
-              setIsExpanded(!isExpanded);
-						}}
+				<button
+					data-testid="message-reasoning-toggle"
+					type="button"
+					className="cursor-pointer flex flex-row gap-1 items-center"
+					onClick={() => {
+						setIsExpanded(!isExpanded);
+					}}
+				>
+					<div className="font-medium">Reasoned for a few seconds</div>
+					<motion.div
+						animate={{ rotate: isExpanded ? 180 : 0 }}
+						transition={{ duration: 0.2, ease: "easeInOut" }}
 					>
-            <div className="font-medium">Reasoned for a few seconds</div>
 						<ChevronDown size={20} />
-					</button>
+					</motion.div>
+				</button>
 			)}
 
 			<AnimatePresence initial={false}>
