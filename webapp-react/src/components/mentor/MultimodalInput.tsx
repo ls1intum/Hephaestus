@@ -16,7 +16,7 @@ import { useScrollToBottom } from "@/hooks/use-scroll-to-bottom";
 import type { Attachment } from "@/lib/types";
 import { AnimatePresence, motion } from "framer-motion";
 import { ArrowDown } from "lucide-react";
-import { ArrowUpIcon, PaperclipIcon, StopIcon } from "./Icons";
+import { ArrowUp, Paperclip, Square } from "lucide-react";
 import { PreviewAttachment } from "./PreviewAttachment";
 import { SuggestedActions } from "./SuggestedActions";
 
@@ -320,15 +320,16 @@ function PureAttachmentsButton({
 	return (
 		<Button
 			data-testid="attachments-button"
-			className="rounded-md rounded-bl-lg p-[7px] h-fit dark:border-zinc-700 hover:dark:bg-zinc-900 hover:bg-zinc-200"
+			className="rounded-md rounded-bl-lg p-[7px] dark:border-zinc-700 hover:dark:bg-zinc-900 hover:bg-zinc-200"
 			onClick={(event) => {
 				event.preventDefault();
 				fileInputRef.current?.click();
 			}}
 			disabled={status !== "ready" || readonly}
 			variant="ghost"
+      size="icon"
 		>
-			<PaperclipIcon size={14} />
+			<Paperclip size={14} />
 		</Button>
 	);
 }
@@ -350,7 +351,7 @@ function PureStopButton({
 			}}
 			size="icon"
 		>
-			<StopIcon size={14} />
+			<Square fill="currentColor" strokeWidth={0} />
 		</Button>
 	);
 }
@@ -375,7 +376,7 @@ function PureSendButton({
 			disabled={disabled}
 			size="icon"
 		>
-			<ArrowUpIcon size={14} />
+			<ArrowUp size={14} strokeWidth={3} />
 		</Button>
 	);
 }
