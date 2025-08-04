@@ -1,7 +1,7 @@
-// import { DiffView } from '@/components/diffview';
-// import { DocumentSkeleton } from '@/components/document-skeleton';
 // import { Editor } from '@/components/text-editor';
 import { toast } from "sonner";
+// import { DiffView } from '@/components/diffview';
+import { DocumentSkeleton } from '../DocumentSkeleton';
 import {
 	ClockRewind,
 	CopyIcon,
@@ -47,7 +47,7 @@ export const textArtifact = new Artifact<"text", TextArtifactMetadata>({
 		metadata,
 	}) => {
 		if (isLoading) {
-			return null; // <DocumentSkeleton artifactKind="text" />;
+			return <DocumentSkeleton artifactKind="text" />;
 		}
 
 		if (mode === "diff") {
