@@ -1,10 +1,5 @@
 # Notes
 
-## greeting.tsx
-
-- [ ] Copy over as is
-- [ ] Storybook story
-
 ## message-actions.tsx
 
 Copy button with upvote / downvote
@@ -125,6 +120,11 @@ diffview.tsx
 ### markdown.tsx
 
 - [x] Already copied over
+- [x] Storybook story
+
+### greeting.tsx
+
+- [x] Copy over as is
 - [x] Storybook story
 
 ## Not needed
