@@ -1,5 +1,5 @@
 import type { Attachment } from "@/lib/types";
-import { Loader } from "lucide-react";
+import { LoaderIcon } from "./Icons";
 
 export const PreviewAttachment = ({
 	attachment,
@@ -33,7 +33,7 @@ export const PreviewAttachment = ({
 						data-testid="input-attachment-loader"
 						className="animate-spin absolute text-zinc-500"
 					>
-						<Loader />
+						<LoaderIcon />
 					</div>
 				)}
 			</div>
