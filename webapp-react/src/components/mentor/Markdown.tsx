@@ -33,33 +33,43 @@ const components: Partial<Components> = {
 	},
 	li: ({ node, children, ...props }) => {
 		// Check if this is a task list item
-		const isTaskListItem = (props as { className?: string })?.className?.includes('task-list-item');
-		
+		const isTaskListItem = (
+			props as { className?: string }
+		)?.className?.includes("task-list-item");
+
 		if (isTaskListItem) {
 			// Find the checkbox input in children
 			const childArray = Array.isArray(children) ? children : [children];
 			let checkboxChecked = false;
 			let hasCheckbox = false;
-			
+
 			// Look for input checkbox in children
-			const processedChildren = childArray.map((child: unknown, index: number) => {
-				const element = child as { type?: string; props?: { type?: string; checked?: boolean } };
-				if (element?.type === 'input' && element?.props?.type === 'checkbox') {
-					hasCheckbox = true;
-					checkboxChecked = element.props.checked || false;
-					// Replace with Shadcn checkbox
-					return (
-						<Checkbox
-							key={`checkbox-${index}-${checkboxChecked}`}
-							checked={checkboxChecked}
-							disabled
-							className="mr-1"
-						/>
-					);
-				}
-				return child;
-			}) as React.ReactNode[];
-			
+			const processedChildren = childArray.map(
+				(child: unknown, index: number) => {
+					const element = child as {
+						type?: string;
+						props?: { type?: string; checked?: boolean };
+					};
+					if (
+						element?.type === "input" &&
+						element?.props?.type === "checkbox"
+					) {
+						hasCheckbox = true;
+						checkboxChecked = element.props.checked || false;
+						// Replace with Shadcn checkbox
+						return (
+							<Checkbox
+								key={`checkbox-${index}-${checkboxChecked}`}
+								checked={checkboxChecked}
+								disabled
+								className="mr-1"
+							/>
+						);
+					}
+					return child;
+				},
+			) as React.ReactNode[];
+
 			if (hasCheckbox) {
 				return (
 					<li className="flex items-start py-1 list-none" {...props}>
@@ -68,7 +78,7 @@ const components: Partial<Components> = {
 				);
 			}
 		}
-		
+
 		// Regular list item
 		return (
 			<li className="py-1" {...props}>

@@ -22,7 +22,7 @@ const messageVariants = cva("", {
 });
 
 // Union type for all possible message states
-type MessageProps = 
+type MessageProps =
 	| {
 			type: "message";
 			message: UIMessage;
@@ -64,18 +64,18 @@ function MessageWrapper({
 			{/* Avatar - only for assistant messages */}
 			{!isUser && (
 				<Avatar className="h-8 w-8 shrink-0">
-					<AvatarFallback 
+					<AvatarFallback
 						className={cn(
-							avatarVariant === "error" 
-								? "bg-destructive/10 text-destructive" 
-								: "bg-mentor/10 text-mentor"
+							avatarVariant === "error"
+								? "bg-destructive/10 text-destructive"
+								: "bg-mentor/10 text-mentor",
 						)}
 					>
 						<Bot className="h-4 w-4" />
 					</AvatarFallback>
 				</Avatar>
 			)}
-			
+
 			{children}
 		</div>
 	);
@@ -96,7 +96,7 @@ function Message(props: MessageProps) {
 							<div className="w-2 h-2 bg-current rounded-full animate-pulse" />
 							<div className="w-2 h-2 bg-current rounded-full animate-pulse [animation-delay:0.2s]" />
 							<div className="w-2 h-2 bg-current rounded-full animate-pulse [animation-delay:0.4s]" />
-						</div>					
+						</div>
 					</div>
 				</div>
 			</MessageWrapper>
@@ -112,7 +112,8 @@ function Message(props: MessageProps) {
 					<div>
 						<p className="text-sm font-medium">Something went wrong</p>
 						<p className="text-xs text-muted-foreground mt-1">
-							{error.message || "An unexpected error occurred. Please try again."}
+							{error.message ||
+								"An unexpected error occurred. Please try again."}
 						</p>
 					</div>
 					{onRetry && (
@@ -133,7 +134,7 @@ function Message(props: MessageProps) {
 
 	// Handle regular message
 	const { message, className } = props;
-	
+
 	if (message.role === "system") {
 		return null; // Skip system messages
 	}
@@ -149,10 +150,10 @@ function Message(props: MessageProps) {
 					// Handle text parts
 					if (part.type === "text") {
 						return (
-							<MemoizedMarkdown 
+							<MemoizedMarkdown
 								key={partKey}
 								content={part.text}
-								id={`${message.id}-${index}`} 
+								id={`${message.id}-${index}`}
 							/>
 						);
 					}
