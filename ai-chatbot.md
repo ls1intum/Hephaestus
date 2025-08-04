@@ -1,14 +1,5 @@
 # Notes
 
-## icons.tsx
-
-- Use for reference and do nothing!
-
-## suggested-actions.tsx
-
-- [ ] Starer actions for the chat
-- [ ] Storybook story
-
 ## preview-attachment.tsx
 
 - [ ] Copy over as is, also the loading spinner / icons
@@ -129,6 +120,12 @@ diffview.tsx
 ### weather.tsx
 
 - [x] Copied over
+- [x] Storybook story
+
+### suggested-actions.tsx
+
+- [x] Starter actions for the chat
+- [x] Change to presentational component
 - [x] Storybook story
 
 ## Not needed
