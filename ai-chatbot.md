@@ -1,36 +1,5 @@
 # Notes
 
-## message-reasoning.tsx
-
-- [ ] Copy over as is
-- [ ] Storybook story
-
-## app-sidebar.tsx
-
-Nothing to do
-
-## sidebar-history.tsx
-
-- [ ] Remove grouping on server side
-- [ ] Regenerate API client npm run generate:api:application-server
-- [ ] groupChatsByDate on the client side
-- [ ] Paginate history items
-- [ ] Delete chat option
-- [ ] Storybook story?
-
-## sidebar-history-item.tsx
-
-- [ ] Have a similar item
-- [ ] Storybook story
-
-## sidebar-user-nav.tsx
-
-Nothing to do
-
-## sidebar-toggle.tsx
-
-Nothing to do
-
 ## document.tsx
 
 ## document-skeleton.tsx
@@ -64,6 +33,20 @@ Nothing to do
 text-editor.tsx
 toolbar.tsx
 version-footer.tsx
+
+## sidebar-history.tsx
+
+- [ ] Remove grouping on server side
+- [ ] Regenerate API client npm run generate:api:application-server
+- [ ] groupChatsByDate on the client side
+- [ ] Paginate history items
+- [ ] Delete chat option
+- [ ] Storybook story?
+
+## sidebar-history-item.tsx
+
+- [ ] Have a similar item
+- [ ] Storybook story
 
 ## Extensions
 
@@ -129,6 +112,23 @@ Copy button with upvote / downvote
 - [x] Copy over as is
 - [x] Change to be purely presentational
 - [x] Storybook story
+
+### message-reasoning.tsx
+
+- [x] Copy over as is
+- [x] Storybook story
+
+### app-sidebar.tsx
+
+Nothing to do
+
+### sidebar-user-nav.tsx
+
+Nothing to do
+
+### sidebar-toggle.tsx
+
+Nothing to do
 
 ## Not needed
 
