@@ -1,13 +1,6 @@
 # Notes
 
-## preview-attachment.tsx
-
-- [ ] Copy over as is, also the loading spinner / icons
-- [ ] Storybook story
-
 ## multimodal-input.tsx
-
-// Depends on suggested-actions.tsx and preview-attachment.tsx
 
 - [ ] Replace current with this and have option to disable attachments (for now the default)
 - [ ] Storybook story
@@ -126,6 +119,11 @@ diffview.tsx
 
 - [x] Starter actions for the chat
 - [x] Change to presentational component
+- [x] Storybook story
+
+### preview-attachment.tsx
+
+- [x] Copy over as is, also the loading spinner / icons
 - [x] Storybook story
 
 ## Not needed
