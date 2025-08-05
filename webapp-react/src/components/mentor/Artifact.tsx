@@ -6,7 +6,7 @@ import { formatDistance } from "date-fns";
 import equal from "fast-deep-equal";
 import { AnimatePresence, motion } from "framer-motion";
 import { memo } from "react";
-import { useWindowSize } from "usehooks-ts";
+import { useDebounceCallback, useWindowSize } from "usehooks-ts";
 import { type ArtifactAction, ArtifactActions } from "./ArtifactActions";
 import { ArtifactCloseButton } from "./ArtifactCloseButton";
 import { Messages } from "./Messages";
@@ -67,7 +67,7 @@ export interface ArtifactProps {
 	/** Handler for closing the artifact */
 	onClose: () => void;
 	/** Handler for saving content changes */
-	onContentSave: (content: string, debounce: boolean) => void;
+	onContentSave: (content: string) => void;
 	/** Handler for version navigation */
 	onVersionChange: (type: "next" | "prev" | "toggle" | "latest") => void;
 	/** Handler for message submission */
@@ -136,6 +136,9 @@ function PureArtifact({
 		if (!documents || !documents[index]) return "";
 		return documents[index].content ?? "";
 	};
+
+	// Debounced content change handler
+	const debouncedOnContentSave = useDebounceCallback(onContentSave, 2000);
 
 	const handleMultimodalSubmit = (data: {
 		text: string;
@@ -356,7 +359,7 @@ function PureArtifact({
 								mode={mode}
 								status={artifact.status}
 								currentVersionIndex={currentVersionIndex}
-								onSaveContent={onContentSave}
+								onSaveContent={debouncedOnContentSave}
 								isInline={false}
 								isCurrentVersion={isCurrentVersion}
 								getDocumentContentById={getDocumentContentById}
