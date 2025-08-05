@@ -1,9 +1,5 @@
 # Notes
 
-## document.tsx
-
-## document-skeleton.tsx
-
 ## document-preview.tsx
 
 ## data-stream-provider.tsx
@@ -117,6 +113,13 @@ Copy button with upvote / downvote
 
 - [x] Copy over as is
 - [x] Storybook story
+
+### document.tsx
+
+- [x] Reworked and combined tool call with result
+- [x] Renamed to DocumentTool
+
+### document-skeleton.tsx
 
 ### app-sidebar.tsx
 

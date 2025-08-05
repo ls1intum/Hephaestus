@@ -1,5 +1,5 @@
 import type { Meta, StoryObj } from "@storybook/react";
-import { Weather } from "./Weather";
+import { WeatherTool } from "./WeatherTool";
 
 /**
  * Weather component for displaying current conditions and hourly forecast.
@@ -7,7 +7,7 @@ import { Weather } from "./Weather";
  * Perfect for contextual information in mentorship interfaces.
  */
 const meta = {
-	component: Weather,
+	component: WeatherTool,
 	tags: ["autodocs"],
 	argTypes: {
 		weatherAtLocation: {
@@ -20,7 +20,7 @@ const meta = {
 		// Default sample data from the component
 		weatherAtLocation: undefined, // Uses component's built-in SAMPLE
 	},
-} satisfies Meta<typeof Weather>;
+} satisfies Meta<typeof WeatherTool>;
 
 export default meta;
 type Story = StoryObj<typeof meta>;

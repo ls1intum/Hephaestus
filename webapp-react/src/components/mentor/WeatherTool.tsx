@@ -199,7 +199,7 @@ function n(num: number): number {
 	return Math.ceil(num);
 }
 
-export function Weather({
+export function WeatherTool({
 	weatherAtLocation = SAMPLE,
 }: {
 	weatherAtLocation?: WeatherAtLocation;
