@@ -73,7 +73,7 @@ function PureMessages({
 					"min-w-0 gap-2 flex-1 pt-4 relative": !isArtifact,
 					"gap-6": !isArtifact && readonly,
 					// Artifact layout
-					"gap-4 h-full px-0 pt-4": isArtifact,
+					"gap-2 h-full px-0 pt-4": isArtifact,
 				},
 				className,
 			)}

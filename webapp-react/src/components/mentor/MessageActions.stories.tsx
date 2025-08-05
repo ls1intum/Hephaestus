@@ -39,6 +39,11 @@ const meta = {
 			description: "Whether the message is in edit mode",
 			control: "boolean",
 		},
+		variant: {
+			description: "Layout variant for different contexts",
+			control: "select",
+			options: ["default", "artifact"],
+		},
 		onCopy: {
 			description: "Callback when copy action is triggered",
 			control: false,
@@ -61,6 +66,7 @@ const meta = {
 		messageRole: "assistant",
 		isLoading: false,
 		isInEditMode: false,
+		variant: "default",
 		onCopy: fn(),
 		onVote: fn(),
 		onEdit: fn(),
@@ -174,5 +180,20 @@ And here's a list:
 3. Third item
 
 This comprehensive message shows how the MessageActions component handles longer content while maintaining clean, accessible interactions.`,
+	},
+};
+
+/**
+ * MessageActions with artifact variant styling for better contrast in artifact contexts.
+ */
+export const ArtifactVariant: Story = {
+	args: {
+		variant: "artifact",
+		messageRole: "assistant",
+	},
+	parameters: {
+		backgrounds: {
+			default: "light",
+		},
 	},
 };

@@ -355,6 +355,7 @@ const PurePreviewMessage = ({
 								vote={vote}
 								isLoading={isLoading}
 								isInEditMode={mode === "edit"}
+								variant={variant}
 								onCopy={(text) => {
 									onCopy?.(text);
 								}}

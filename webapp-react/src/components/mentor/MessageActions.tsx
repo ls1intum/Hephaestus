@@ -23,6 +23,8 @@ interface MessageActionsProps {
 	isLoading?: boolean;
 	/** Whether the message is in edit mode */
 	isInEditMode?: boolean;
+	/** Layout variant for different contexts */
+	variant?: "default" | "artifact";
 	/** Callback when copy action is triggered */
 	onCopy: (text: string) => void;
 	/** Callback when vote action is triggered (assistant messages only) */
@@ -38,6 +40,7 @@ function PureMessageActions({
 	vote,
 	isLoading = false,
 	isInEditMode = false,
+	variant = "default",
 	onCopy,
 	onVote,
 	onEdit,
@@ -48,6 +51,12 @@ function PureMessageActions({
 
 	const isUserMessage = messageRole === "user";
 	const isAssistantMessage = messageRole === "assistant";
+
+	// Different button styling for artifact context
+	const buttonClasses =
+		variant === "artifact"
+			? "text-muted-foreground hover:text-foreground hover:bg-primary/5"
+			: "text-muted-foreground hover:text-foreground";
 
 	// For user messages, align actions to the right
 	const containerClassName = cn(
@@ -66,7 +75,7 @@ function PureMessageActions({
 				<Tooltip>
 					<TooltipTrigger asChild>
 						<Button
-							className="text-muted-foreground hover:text-foreground"
+							className={buttonClasses}
 							variant="ghost"
 							size="icon"
 							onClick={() => onCopy(messageContentToCopy)}
@@ -82,7 +91,7 @@ function PureMessageActions({
 					<Tooltip>
 						<TooltipTrigger asChild>
 							<Button
-								className="text-muted-foreground hover:text-foreground"
+								className={buttonClasses}
 								variant="ghost"
 								size="icon"
 								onClick={onEdit}
