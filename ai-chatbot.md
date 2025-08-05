@@ -1,7 +1,5 @@
 # Notes
 
-## document-preview.tsx
-
 ## data-stream-provider.tsx
 
 ## message.tsx
@@ -122,6 +120,8 @@ Copy button with upvote / downvote
 - [x] Renamed to DocumentTool
 
 ### document-skeleton.tsx
+
+### document-preview.tsx
 
 ### text-editor.tsx
 
