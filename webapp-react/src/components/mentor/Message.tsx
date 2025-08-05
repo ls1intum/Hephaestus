@@ -74,7 +74,7 @@ const PurePreviewMessage = ({
 			<motion.div
 				data-testid={`message-${message.role}`}
 				className={cn(
-					"w-full mx-auto max-w-3xl px-4 group/message",
+					"w-full max-w-3xl px-4 group/message",
 					{
 						"pl-16": isArtifact && message.role === "user" && mode !== "edit",
 					},

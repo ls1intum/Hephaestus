@@ -17,6 +17,7 @@ function PureArtifactCloseButton() {
 	return (
 		<Button
 			data-testid="artifact-close-button"
+			className="dark:border-primary/10 dark:hover:bg-primary/10"
 			variant="outline"
 			size="icon"
 			onClick={() => {

@@ -67,13 +67,13 @@ function PureMessages({
 		<div
 			ref={containerRef}
 			className={cn(
-				"flex flex-col overflow-y-scroll",
+				"flex flex-col w-full overflow-y-scroll",
 				{
 					// Default layout
 					"min-w-0 gap-2 flex-1 pt-4 relative": !isArtifact,
-					"gap-6": !isArtifact && readonly,
 					// Artifact layout
 					"gap-2 h-full px-0 pt-4": isArtifact,
+					"gap-6": readonly,
 				},
 				className,
 			)}
@@ -106,7 +106,7 @@ function PureMessages({
 
 			<motion.div
 				ref={endRef}
-				className="shrink-0 min-w-[24px] min-h-[48px]"
+				className="shrink-0 min-w-[12px] min-h-[12px]"
 				data-testid="scroll-anchor"
 			/>
 		</div>

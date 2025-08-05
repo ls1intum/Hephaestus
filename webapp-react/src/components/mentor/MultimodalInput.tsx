@@ -50,6 +50,8 @@ export interface MultimodalInputProps {
 	isAtBottom?: boolean;
 	/** Function to scroll to bottom of the chat */
 	scrollToBottom?: () => void;
+	/** Whether viewing an old version (affects button styling) */
+	isCurrentVersion?: boolean;
 }
 
 function PureMultimodalInput({
@@ -68,6 +70,7 @@ function PureMultimodalInput({
 	disableAttachments = false,
 	isAtBottom = true,
 	scrollToBottom,
+	isCurrentVersion = true,
 }: MultimodalInputProps) {
 	const textareaRef = useRef<HTMLTextAreaElement>(null);
 	const fileInputRef = useRef<HTMLInputElement>(null);
@@ -177,17 +180,17 @@ function PureMultimodalInput({
 	return (
 		<div className="relative w-full flex flex-col gap-4">
 			<AnimatePresence>
-				{!isAtBottom && (
+				{!isAtBottom && isCurrentVersion && (
 					<motion.div
 						initial={{ opacity: 0, y: 10 }}
 						animate={{ opacity: 1, y: 0 }}
 						exit={{ opacity: 0, y: 10 }}
 						transition={{ type: "spring", stiffness: 300, damping: 20 }}
-						className="absolute left-1/2 -top-12 -translate-x-1/2 z-50"
+						className="absolute left-1/2 -top-12 -translate-x-1/2 z-[70] backdrop-blur-sm rounded-full"
 					>
 						<Button
 							data-testid="scroll-to-bottom-button"
-							className="rounded-full bg-background/90 dark:bg-background/90 backdrop-blur-sm border-border/50 shadow-lg hover:bg-background dark:hover:bg-background"
+							className="rounded-full bg-background/90 border-border/50 shadow-lg hover:bg-background dark:hover:bg-background"
 							size="icon"
 							variant="outline"
 							onClick={(event) => {
@@ -318,6 +321,7 @@ export const MultimodalInput = memo(
 		if (prevProps.disableAttachments !== nextProps.disableAttachments)
 			return false;
 		if (prevProps.isAtBottom !== nextProps.isAtBottom) return false;
+		if (prevProps.isCurrentVersion !== nextProps.isCurrentVersion) return false;
 		return true;
 	},
 );

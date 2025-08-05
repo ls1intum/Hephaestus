@@ -250,6 +250,7 @@ function PureArtifact({
 										readonly={readonly}
 										isAtBottom={isAtBottom}
 										scrollToBottom={scrollToBottom}
+										isCurrentVersion={isCurrentVersion}
 									/>
 								</div>
 							</div>
