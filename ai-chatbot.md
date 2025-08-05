@@ -24,11 +24,9 @@
 
 ## chat.tsx
 
-## Artifact stuff
+## toolbar.tsx
 
-text-editor.tsx
-toolbar.tsx
-version-footer.tsx
+## version-footer.tsx
 
 ## sidebar-history.tsx
 
@@ -56,6 +54,10 @@ diffview.tsx
 ### lib/types.ts
 
 - [ ] Typesafe tools
+
+### DocumentSkeleton
+
+- [ ] Merge into one component with inline prop
 
 ## DONE
 
@@ -120,6 +122,8 @@ Copy button with upvote / downvote
 - [x] Renamed to DocumentTool
 
 ### document-skeleton.tsx
+
+### text-editor.tsx
 
 ### app-sidebar.tsx
 
