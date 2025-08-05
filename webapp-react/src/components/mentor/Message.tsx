@@ -7,8 +7,8 @@ import { AnimatePresence, motion } from "framer-motion";
 import { memo, useState } from "react";
 import { DocumentPreview } from "./DocumentPreview";
 import { DocumentTool } from "./DocumentTool";
-import { SparklesIcon } from "./Icons";
 import { Markdown } from "./Markdown";
+import { MentorAvatar } from "./MentorAvatar";
 import { MessageActions } from "./MessageActions";
 import { MessageEditor } from "./MessageEditor";
 import { MessageReasoning } from "./MessageReasoning";
@@ -82,13 +82,7 @@ const PurePreviewMessage = ({
 						},
 					)}
 				>
-					{message.role === "assistant" && (
-						<div className="size-8 flex items-center rounded-full justify-center ring-1 shrink-0 ring-border bg-background">
-							<div className="translate-y-px">
-								<SparklesIcon size={14} />
-							</div>
-						</div>
-					)}
+					{message.role === "assistant" && <MentorAvatar />}
 
 					<div
 						className={cn("flex flex-col gap-4 w-full", {
@@ -411,9 +405,7 @@ export const ThinkingMessage = () => {
 					},
 				)}
 			>
-				<div className="size-8 flex items-center rounded-full justify-center ring-1 shrink-0 ring-border">
-					<SparklesIcon size={14} />
-				</div>
+				<MentorAvatar />
 
 				<div className="flex flex-col gap-2 w-full">
 					<div className="flex flex-col gap-4 text-muted-foreground">
