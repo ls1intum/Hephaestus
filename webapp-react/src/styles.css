@@ -277,3 +277,20 @@ code {
 		rgba(0, 0, 0, 0)
 	);
 }
+
+/* ProseMirror editor styles */
+.ProseMirror {
+	outline: none !important;
+	border: none !important;
+	box-shadow: none !important;
+	padding: 1.5rem;
+	width: 100%;
+	height: 100%;
+	min-height: 100%;
+}
+
+.ProseMirror:focus {
+	outline: none !important;
+	border: none !important;
+	box-shadow: none !important;
+}

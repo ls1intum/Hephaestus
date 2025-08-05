@@ -346,7 +346,6 @@ function PureArtifact({
 								isStreaming={artifact.status === "streaming"}
 							/>
 						</div>
-
 						<div className="dark:bg-muted bg-background h-full overflow-y-scroll !max-w-full items-center">
 							<artifactDefinition.content
 								title={artifact.title}
@@ -376,7 +375,6 @@ function PureArtifact({
 								}}
 							/>
 						</div>
-
 						<AnimatePresence>
 							{!isCurrentVersion && (
 								<VersionFooter
