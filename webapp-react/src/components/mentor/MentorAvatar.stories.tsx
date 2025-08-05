@@ -2,7 +2,7 @@ import type { Meta, StoryObj } from "@storybook/react";
 import { MentorAvatar } from "./MentorAvatar";
 
 /**
- * AssistantAvatar component displays the AI assistant's avatar using a Bot icon.
+ * MentorAvatar component displays the AI assistant's avatar using a Bot icon.
  * Designed to provide visual consistency across the mentor interface.
  */
 const meta = {
@@ -22,6 +22,6 @@ export default meta;
 type Story = StoryObj<typeof meta>;
 
 /**
- * Default assistant avatar used in most message contexts.
+ * Default mentor avatar used in most message contexts.
  */
 export const Default: Story = {};
