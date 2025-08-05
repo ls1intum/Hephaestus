@@ -96,14 +96,12 @@ function PureMessages({
 					requiresScrollPadding={
 						requiresScrollPadding && index === messages.length - 1
 					}
+					variant={variant}
 					onMessageEdit={onMessageEdit}
 					onCopy={onCopy}
 					onVote={onVote}
 					onDocumentClick={onDocumentClick}
 					onDocumentSave={onDocumentSave}
-					className={cn({
-						"pl-20": isArtifact && message.role === "user",
-					})}
 				/>
 			))}
 

@@ -26,6 +26,8 @@ export interface MessageProps {
 	readonly?: boolean;
 	/** Whether to add extra padding for smooth scrolling */
 	requiresScrollPadding?: boolean;
+	/** Layout variant for different contexts */
+	variant?: "default" | "artifact";
 	/** Handler for message editing submission */
 	onMessageEdit?: (messageId: string, newContent: string) => void;
 	/** Handler for copying message content */
@@ -48,6 +50,7 @@ const PurePreviewMessage = ({
 	isLoading = false,
 	readonly = false,
 	requiresScrollPadding = false,
+	variant = "default",
 	onMessageEdit,
 	onCopy,
 	onVote,
@@ -64,11 +67,19 @@ const PurePreviewMessage = ({
 		(part) => part.type === "file",
 	);
 
+	const isArtifact = variant === "artifact";
+
 	return (
 		<AnimatePresence>
 			<motion.div
 				data-testid={`message-${message.role}`}
-				className={cn("w-full mx-auto max-w-3xl px-4 group/message", className)}
+				className={cn(
+					"w-full mx-auto max-w-3xl px-4 group/message",
+					{
+						"pl-16": isArtifact && message.role === "user" && mode !== "edit",
+					},
+					className,
+				)}
 				initial={{ y: 5, opacity: 0 }}
 				animate={{ y: 0, opacity: 1 }}
 				data-role={message.role}
@@ -378,6 +389,7 @@ export const PreviewMessage = memo(
 		if (prevProps.requiresScrollPadding !== nextProps.requiresScrollPadding)
 			return false;
 		if (prevProps.readonly !== nextProps.readonly) return false;
+		if (prevProps.variant !== nextProps.variant) return false;
 		if (prevProps.initialEditMode !== nextProps.initialEditMode) return false;
 		if (!equal(prevProps.message.parts, nextProps.message.parts)) return false;
 		if (!equal(prevProps.vote, nextProps.vote)) return false;
