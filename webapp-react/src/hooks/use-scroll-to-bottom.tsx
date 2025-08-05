@@ -1,4 +1,4 @@
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 type ScrollBehavior = "auto" | "smooth";
 
@@ -14,13 +14,30 @@ export function useScrollToBottom() {
 		endRef.current?.scrollIntoView({ behavior });
 	}, []);
 
-	// Viewport intersection callbacks
-	const onViewportEnter = useCallback(() => {
-		setIsAtBottom(true);
-	}, []);
+	// Add scroll detection
+	useEffect(() => {
+		const container = containerRef.current;
+		if (!container) {
+			return;
+		}
 
-	const onViewportLeave = useCallback(() => {
-		setIsAtBottom(false);
+		const handleScroll = () => {
+			const { scrollTop, scrollHeight, clientHeight } = container;
+			const distanceFromBottom = scrollHeight - scrollTop - clientHeight;
+			const atBottom = distanceFromBottom <= 5;
+
+			setIsAtBottom(atBottom);
+		};
+
+		// Initial check
+		handleScroll();
+
+		// Add scroll listener
+		container.addEventListener("scroll", handleScroll, { passive: true });
+
+		return () => {
+			container.removeEventListener("scroll", handleScroll);
+		};
 	}, []);
 
 	return {
@@ -28,7 +45,5 @@ export function useScrollToBottom() {
 		endRef,
 		isAtBottom,
 		scrollToBottom,
-		onViewportEnter,
-		onViewportLeave,
 	};
 }

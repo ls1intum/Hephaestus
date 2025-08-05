@@ -1,4 +1,5 @@
 import type { ChatMessageVote, Document } from "@/api/types.gen";
+import { useScrollToBottom } from "@/hooks/use-scroll-to-bottom";
 import type { Attachment, ChatMessage } from "@/lib/types";
 import { cn } from "@/lib/utils";
 import type { UseChatHelpers } from "@ai-sdk/react";
@@ -123,6 +124,10 @@ function PureArtifact({
 }: ArtifactProps) {
 	const { width: windowWidth, height: windowHeight } = useWindowSize();
 
+	// Scroll management for the chat sidebar
+	const { containerRef, endRef, isAtBottom, scrollToBottom } =
+		useScrollToBottom();
+
 	const artifactDefinition = artifactDefinitions.find(
 		(definition) => definition.kind === artifact.kind,
 	);
@@ -224,6 +229,8 @@ function PureArtifact({
 									status={status}
 									readonly={readonly}
 									variant="artifact"
+									containerRef={containerRef}
+									endRef={endRef}
 									onMessageEdit={onMessageEdit}
 									onCopy={onCopy}
 									onVote={onVote}
@@ -241,6 +248,8 @@ function PureArtifact({
 										onSubmit={handleMultimodalSubmit}
 										className="bg-background dark:bg-muted"
 										readonly={readonly}
+										isAtBottom={isAtBottom}
+										scrollToBottom={scrollToBottom}
 									/>
 								</div>
 							</div>

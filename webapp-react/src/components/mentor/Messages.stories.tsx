@@ -53,8 +53,6 @@ const meta = {
 		onVote: fn(),
 		onDocumentClick: fn(),
 		onDocumentSave: fn(),
-		onViewportEnter: fn(),
-		onViewportLeave: fn(),
 	},
 } satisfies Meta<typeof Messages>;
 

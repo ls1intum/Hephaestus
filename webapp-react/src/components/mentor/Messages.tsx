@@ -26,13 +26,9 @@ export interface MessagesProps {
 	/** Layout variant for different contexts */
 	variant?: "default" | "artifact";
 	/** Container ref for scroll management */
-	containerRef?: RefObject<HTMLDivElement>;
+	containerRef?: RefObject<HTMLDivElement | null>;
 	/** End ref for scroll management */
-	endRef?: RefObject<HTMLDivElement>;
-	/** Handler for viewport enter events */
-	onViewportEnter?: () => void;
-	/** Handler for viewport leave events */
-	onViewportLeave?: () => void;
+	endRef?: RefObject<HTMLDivElement | null>;
 	/** Handler for message editing */
 	onMessageEdit?: (messageId: string, newContent: string) => void;
 	/** Handler for copying message content */
@@ -58,8 +54,6 @@ function PureMessages({
 	variant = "default",
 	containerRef,
 	endRef,
-	onViewportEnter,
-	onViewportLeave,
 	onMessageEdit,
 	onCopy,
 	onVote,
@@ -112,9 +106,8 @@ function PureMessages({
 
 			<motion.div
 				ref={endRef}
-				className="shrink-0 min-w-[24px] min-h-[24px]"
-				onViewportLeave={onViewportLeave}
-				onViewportEnter={onViewportEnter}
+				className="shrink-0 min-w-[24px] min-h-[48px]"
+				data-testid="scroll-anchor"
 			/>
 		</div>
 	);

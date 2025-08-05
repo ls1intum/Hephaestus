@@ -11,7 +11,6 @@ import { useWindowSize } from "usehooks-ts";
 
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
-import { useScrollToBottom } from "@/hooks/use-scroll-to-bottom";
 import type { Attachment } from "@/lib/types";
 import { cn } from "@/lib/utils";
 import { AnimatePresence, motion } from "framer-motion";
@@ -47,6 +46,10 @@ export interface MultimodalInputProps {
 	readonly?: boolean;
 	/** Whether to disable attachment functionality */
 	disableAttachments?: boolean;
+	/** Whether the scroll container is at the bottom (for scroll button visibility) */
+	isAtBottom?: boolean;
+	/** Function to scroll to bottom of the chat */
+	scrollToBottom?: () => void;
 }
 
 function PureMultimodalInput({
@@ -63,6 +66,8 @@ function PureMultimodalInput({
 	initialInput = "",
 	readonly = false,
 	disableAttachments = false,
+	isAtBottom = true,
+	scrollToBottom,
 }: MultimodalInputProps) {
 	const textareaRef = useRef<HTMLTextAreaElement>(null);
 	const fileInputRef = useRef<HTMLInputElement>(null);
@@ -160,10 +165,8 @@ function PureMultimodalInput({
 		[attachments, onAttachmentsChange, onFileUpload],
 	);
 
-	const { isAtBottom, scrollToBottom } = useScrollToBottom();
-
 	useEffect(() => {
-		if (status === "submitted") {
+		if (status === "submitted" && scrollToBottom) {
 			scrollToBottom();
 		}
 	}, [status, scrollToBottom]);
@@ -189,7 +192,7 @@ function PureMultimodalInput({
 							variant="outline"
 							onClick={(event) => {
 								event.preventDefault();
-								scrollToBottom();
+								scrollToBottom?.();
 							}}
 						>
 							<ArrowDown />
@@ -314,6 +317,7 @@ export const MultimodalInput = memo(
 		if (prevProps.readonly !== nextProps.readonly) return false;
 		if (prevProps.disableAttachments !== nextProps.disableAttachments)
 			return false;
+		if (prevProps.isAtBottom !== nextProps.isAtBottom) return false;
 		return true;
 	},
 );
