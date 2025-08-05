@@ -21,6 +21,10 @@ export interface MessagesProps {
 	showThinking?: boolean;
 	/** Whether to add padding to the last message for smooth scrolling */
 	requiresScrollPadding?: boolean;
+	/** Whether to show greeting when no messages */
+	showGreeting?: boolean;
+	/** Layout variant for different contexts */
+	variant?: "default" | "artifact";
 	/** Container ref for scroll management */
 	containerRef?: RefObject<HTMLDivElement>;
 	/** End ref for scroll management */
@@ -50,6 +54,8 @@ function PureMessages({
 	readonly = false,
 	showThinking = true,
 	requiresScrollPadding = false,
+	showGreeting = true,
+	variant = "default",
 	containerRef,
 	endRef,
 	onViewportEnter,
@@ -61,18 +67,24 @@ function PureMessages({
 	onDocumentSave,
 	className,
 }: MessagesProps) {
+	const isArtifact = variant === "artifact";
+
 	return (
 		<div
 			ref={containerRef}
 			className={cn(
-				"flex flex-col min-w-0 gap-2 flex-1 overflow-y-scroll pt-4 relative",
+				"flex flex-col overflow-y-scroll",
 				{
-					"gap-6": readonly,
+					// Default layout
+					"min-w-0 gap-2 flex-1 pt-4 relative": !isArtifact,
+					"gap-6": !isArtifact && readonly,
+					// Artifact layout
+					"gap-4 h-full px-0 pt-4": isArtifact,
 				},
 				className,
 			)}
 		>
-			{messages.length === 0 && <Greeting />}
+			{messages.length === 0 && showGreeting && <Greeting />}
 
 			{messages.map((message, index) => (
 				<PreviewMessage
@@ -89,6 +101,9 @@ function PureMessages({
 					onVote={onVote}
 					onDocumentClick={onDocumentClick}
 					onDocumentSave={onDocumentSave}
+					className={cn({
+						"pl-20": isArtifact && message.role === "user",
+					})}
 				/>
 			))}
 
@@ -111,6 +126,8 @@ export const Messages = memo(PureMessages, (prevProps, nextProps) => {
 	if (prevProps.status !== nextProps.status) return false;
 	if (prevProps.readonly !== nextProps.readonly) return false;
 	if (prevProps.showThinking !== nextProps.showThinking) return false;
+	if (prevProps.showGreeting !== nextProps.showGreeting) return false;
+	if (prevProps.variant !== nextProps.variant) return false;
 	if (prevProps.requiresScrollPadding !== nextProps.requiresScrollPadding)
 		return false;
 	if (prevProps.messages.length !== nextProps.messages.length) return false;

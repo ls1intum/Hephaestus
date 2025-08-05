@@ -33,10 +33,21 @@ const meta = {
 			description: "Whether to show thinking message for submissions",
 			control: "boolean",
 		},
+		showGreeting: {
+			description: "Whether to show greeting when no messages",
+			control: "boolean",
+		},
+		variant: {
+			description: "Layout variant for different contexts",
+			control: "select",
+			options: ["default", "artifact"],
+		},
 	},
 	args: {
 		readonly: false,
 		showThinking: true,
+		showGreeting: true,
+		variant: "default",
 		onMessageEdit: fn(),
 		onCopy: fn(),
 		onVote: fn(),
@@ -353,4 +364,70 @@ export const Readonly: Story = {
 		status: "ready",
 		readonly: true,
 	},
+};
+
+/**
+ * Artifact variant - specialized layout for artifact context.
+ */
+export const ArtifactVariant: Story = {
+	args: {
+		messages: multiTurnMessages,
+		status: "ready",
+		variant: "artifact",
+		showGreeting: false,
+	},
+	parameters: {
+		layout: "centered",
+	},
+	decorators: [
+		(Story) => (
+			<div className="h-[600px] w-[500px] border border-border rounded-lg bg-background overflow-hidden">
+				<Story />
+			</div>
+		),
+	],
+};
+
+/**
+ * Artifact variant with empty state.
+ */
+export const ArtifactEmpty: Story = {
+	args: {
+		messages: [],
+		status: "ready",
+		variant: "artifact",
+		showGreeting: false,
+	},
+	parameters: {
+		layout: "centered",
+	},
+	decorators: [
+		(Story) => (
+			<div className="h-[400px] w-[400px] border border-border rounded-lg bg-background overflow-hidden">
+				<Story />
+			</div>
+		),
+	],
+};
+
+/**
+ * Artifact variant streaming state.
+ */
+export const ArtifactStreaming: Story = {
+	args: {
+		messages: multiTurnMessages.slice(0, 2), // Use first 2 messages for a cleaner demo
+		status: "streaming",
+		variant: "artifact",
+		showGreeting: false,
+	},
+	parameters: {
+		layout: "centered",
+	},
+	decorators: [
+		(Story) => (
+			<div className="h-[600px] w-[500px] border border-border rounded-lg bg-background overflow-hidden">
+				<Story />
+			</div>
+		),
+	],
 };

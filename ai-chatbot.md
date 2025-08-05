@@ -6,13 +6,13 @@
 
 ## chat-header.tsx
 
-## artifact-messages.tsx
-
 ## artifact.tsx
 
 ## chat.tsx
 
 ## toolbar.tsx
+
+Bottom right thingy in artifact
 
 ## version-footer.tsx
 
@@ -124,6 +124,10 @@ Copy button with upvote / downvote
 ### artifact-actions.tsx
 
 ### artifact-close-button.tsx
+
+## artifact-messages.tsx
+
+Incorporated into Messages.tsx
 
 ### app-sidebar.tsx
 

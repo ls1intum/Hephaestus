@@ -18,7 +18,7 @@ function PureArtifactCloseButton() {
 		<Button
 			data-testid="artifact-close-button"
 			variant="outline"
-      size="icon"
+			size="icon"
 			onClick={() => {
 				setArtifact((currentArtifact) =>
 					currentArtifact.status === "streaming"
