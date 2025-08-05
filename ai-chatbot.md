@@ -10,12 +10,6 @@
 
 ## chat.tsx
 
-## toolbar.tsx
-
-Bottom right thingy in artifact
-
-## version-footer.tsx
-
 ## sidebar-history.tsx
 
 - [ ] Remove grouping on server side
@@ -36,6 +30,7 @@ suggestion.tsx // inline artifact suggestions
 model-selector.tsx // potentially at some later point, similar to profiles, could be just for admin only
 image-editor.tsx // at least we would have some mermaid js viewer
 diffview.tsx
+toolbar.tsx // Bottom right thingy in artifact
 
 ## TODO
 
@@ -124,6 +119,8 @@ Copy button with upvote / downvote
 ### artifact-actions.tsx
 
 ### artifact-close-button.tsx
+
+### version-footer.tsx
 
 ## artifact-messages.tsx
 
