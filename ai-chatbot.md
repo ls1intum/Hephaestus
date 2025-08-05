@@ -4,8 +4,6 @@
 
 ## data-stream-handler.tsx
 
-## messages.tsx
-
 ## chat-header.tsx
 
 ## artifact-messages.tsx
@@ -123,7 +121,9 @@ Copy button with upvote / downvote
 
 ### text-editor.tsx
 
-## message.tsx
+### message.tsx
+
+### messages.tsx
 
 ### app-sidebar.tsx
 
