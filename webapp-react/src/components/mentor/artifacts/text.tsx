@@ -1,7 +1,6 @@
-// import { Editor } from '@/components/text-editor';
 import { toast } from "sonner";
 // import { DiffView } from '@/components/diffview';
-import { DocumentSkeleton } from '../DocumentSkeleton';
+import { DocumentSkeleton } from "../DocumentSkeleton";
 import {
 	ClockRewind,
 	CopyIcon,
@@ -10,6 +9,7 @@ import {
 	RedoIcon,
 	UndoIcon,
 } from "../Icons";
+import { TextEditor } from '../TextEditor';
 import { Artifact } from "./create-artifact";
 
 // biome-ignore lint/suspicious/noEmptyInterface: Empty interface is used for metadata
@@ -59,13 +59,13 @@ export const textArtifact = new Artifact<"text", TextArtifactMetadata>({
 
 		return (
 			<div className="flex flex-row py-8 md:p-20 px-4">
-				{/* <Editor
+				<TextEditor
 					content={content}
 					isCurrentVersion={isCurrentVersion}
 					currentVersionIndex={currentVersionIndex}
 					status={status}
 					onSaveContent={onSaveContent}
-				/> */}
+				/>
 			</div>
 		);
 	},

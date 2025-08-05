@@ -26,7 +26,7 @@ function PureTextEditor({ content, onSaveContent, status }: TextEditorProps) {
 	const containerRef = useRef<HTMLDivElement>(null);
 	const editorRef = useRef<EditorView | null>(null);
 
-  // biome-ignore lint/correctness/useExhaustiveDependencies: We only want to run this once
+	// biome-ignore lint/correctness/useExhaustiveDependencies: We only want to run this once
 	useEffect(() => {
 		if (containerRef.current && !editorRef.current) {
 			const state = EditorState.create({
