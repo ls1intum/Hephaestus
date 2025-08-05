@@ -108,7 +108,6 @@ function PureArtifact({
 	status,
 	attachments,
 	metadata = {},
-	// onClose, // TODO: Connect to ArtifactCloseButton when it supports external handlers
 	onContentSave,
 	onVersionChange,
 	onMessageSubmit,
