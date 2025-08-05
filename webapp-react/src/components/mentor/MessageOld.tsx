@@ -22,7 +22,7 @@ const messageVariants = cva("", {
 });
 
 // Union type for all possible message states
-type MessageProps =
+type MessageOldProps =
 	| {
 			type: "message";
 			message: UIMessage;
@@ -85,7 +85,7 @@ function MessageWrapper({
  * Message component for displaying chat messages, loading states, and error states.
  * Handles all message types with consistent styling and proper state management.
  */
-function Message(props: MessageProps) {
+function MessageOld(props: MessageOldProps) {
 	// Handle loading state
 	if (props.type === "loading") {
 		return (
@@ -171,4 +171,4 @@ function Message(props: MessageProps) {
 	);
 }
 
-export { Message, type MessageProps };
+export { MessageOld, type MessageOldProps };

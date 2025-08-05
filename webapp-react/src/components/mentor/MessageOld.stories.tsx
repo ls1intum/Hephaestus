@@ -1,7 +1,7 @@
 import type { UIMessage } from "@ai-sdk/react";
 import type { Meta, StoryObj } from "@storybook/react";
 import { fn } from "@storybook/test";
-import { Message } from "./Message";
+import { MessageOld } from "./MessageOld";
 
 // Define the union type for better TypeScript inference
 type MessageArgs =
@@ -94,7 +94,7 @@ This approach helps your team review faster and reduces back-and-forth questions
  * Supports user messages, assistant messages with markdown, loading indicators, and error handling.
  */
 const meta = {
-	component: Message,
+	component: MessageOld,
 	parameters: {
 		layout: "centered",
 		docs: {
@@ -213,8 +213,8 @@ export const ConversationFlow: Story = {
 	},
 	render: () => (
 		<div className="space-y-6">
-			<Message type="message" message={userMessage} />
-			<Message type="loading" />
+			<MessageOld type="message" message={userMessage} />
+			<MessageOld type="loading" />
 		</div>
 	),
 	parameters: {

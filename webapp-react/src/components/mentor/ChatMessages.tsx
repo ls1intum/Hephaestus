@@ -3,7 +3,7 @@ import { useEffect, useRef } from "react";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { cn } from "@/lib/utils";
 import type { UIMessage } from "@ai-sdk/react";
-import { Message } from "./Message";
+import { MessageOld } from "./MessageOld";
 
 interface ChatMessagesProps extends Omit<React.ComponentProps<"div">, "dir"> {
 	messages: UIMessage[];
@@ -77,15 +77,15 @@ function ChatMessages({
 				<div className="space-y-6 p-4">
 					{/* Render regular messages */}
 					{messages.map((message) => (
-						<Message key={message.id} type="message" message={message} />
+						<MessageOld key={message.id} type="message" message={message} />
 					))}
 
 					{/* Show loading state */}
-					{isLoading && <Message type="loading" />}
+					{isLoading && <MessageOld type="loading" />}
 
 					{/* Show error state */}
 					{error && !isLoading && (
-						<Message type="error" error={error} onRetry={onRegenerate} />
+						<MessageOld type="error" error={error} onRetry={onRegenerate} />
 					)}
 				</div>
 			</ScrollArea>
