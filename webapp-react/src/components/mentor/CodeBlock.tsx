@@ -23,7 +23,6 @@ export function CodeBlock({
 	...props
 }: CodeBlockProps) {
 	const [highlightedCode, setHighlightedCode] = useState<string>("");
-	const [isLoading, setIsLoading] = useState(false);
 	const { theme } = useTheme();
 
 	const codeString = String(children).replace(/\n$/, "");
@@ -32,27 +31,24 @@ export function CodeBlock({
 	useEffect(() => {
 		// Only highlight code blocks (not inline code) and when we have actual code
 		if (!inline && codeString && language !== "text") {
-			setIsLoading(true);
-
 			codeToHtml(codeString, {
 				lang: language,
 				theme: theme === "light" ? "github-light" : "github-dark",
 			})
 				.then((html) => {
 					setHighlightedCode(html);
-					setIsLoading(false);
 				})
 				.catch((error) => {
 					console.warn("Failed to highlight code:", error);
 					setHighlightedCode("");
-					setIsLoading(false);
 				});
 		}
 	}, [codeString, language, inline, theme]);
 
 	if (!inline) {
 		// For code blocks, use Shiki if available, otherwise fallback to plain
-		if (highlightedCode && !isLoading) {
+		// Always show highlighted version when available to prevent background flickering
+		if (highlightedCode) {
 			return (
 				<div
 					className="not-prose flex flex-col"
@@ -62,7 +58,7 @@ export function CodeBlock({
 			);
 		}
 
-		// Fallback for unsupported languages or while loading
+		// Fallback for unsupported languages or when no highlighting available yet
 		return (
 			<div className="not-prose flex flex-col">
 				<pre
