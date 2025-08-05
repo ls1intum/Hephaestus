@@ -190,7 +190,7 @@ function PureMultimodalInput({
 					>
 						<Button
 							data-testid="scroll-to-bottom-button"
-							className="rounded-full bg-background/90 border-border/50 shadow-lg hover:bg-background dark:hover:bg-background"
+							className="rounded-full bg-background/80 dark:bg-background/80 border-border/50 shadow-lg hover:bg-background/90 dark:hover:bg-background/90"
 							size="icon"
 							variant="outline"
 							onClick={(event) => {
