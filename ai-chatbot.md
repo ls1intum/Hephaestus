@@ -2,8 +2,6 @@
 
 ## data-stream-provider.tsx
 
-## message.tsx
-
 ## data-stream-handler.tsx
 
 ## messages.tsx
@@ -124,6 +122,8 @@ Copy button with upvote / downvote
 ### document-preview.tsx
 
 ### text-editor.tsx
+
+## message.tsx
 
 ### app-sidebar.tsx
 

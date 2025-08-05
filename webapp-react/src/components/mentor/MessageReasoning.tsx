@@ -50,7 +50,7 @@ export function MessageReasoning({
 				>
 					<div className="font-medium">Reasoned for a few seconds</div>
 					<motion.div
-						animate={{ rotate: isExpanded ? 180 : 0 }}
+						animate={{ rotate: isExpanded ?  0 : -90 }}
 						transition={{ duration: 0.2, ease: "easeInOut" }}
 					>
 						<ChevronDown size={20} />

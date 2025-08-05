@@ -1,10 +1,4 @@
 import type { ChatMessageVote, Document } from "@/api/types.gen";
-import { Button } from "@/components/ui/button";
-import {
-	Tooltip,
-	TooltipContent,
-	TooltipTrigger,
-} from "@/components/ui/tooltip";
 import type { ChatMessage } from "@/lib/types";
 import { cn, sanitizeText } from "@/lib/utils";
 import cx from "classnames";
@@ -13,7 +7,7 @@ import { AnimatePresence, motion } from "framer-motion";
 import { memo, useState } from "react";
 import { DocumentPreview } from "./DocumentPreview";
 import { DocumentTool } from "./DocumentTool";
-import { PencilEditIcon, SparklesIcon } from "./Icons";
+import { SparklesIcon } from "./Icons";
 import { Markdown } from "./Markdown";
 import { MessageActions } from "./MessageActions";
 import { MessageEditor } from "./MessageEditor";
@@ -136,34 +130,15 @@ const PurePreviewMessage = ({
 							if (type === "text") {
 								if (mode === "view") {
 									return (
-										<div key={key} className="flex flex-row gap-2 items-start">
-											{message.role === "user" && !readonly && (
-												<Tooltip>
-													<TooltipTrigger asChild>
-														<Button
-															data-testid="message-edit-button"
-															variant="ghost"
-															className="px-2 h-fit rounded-full text-muted-foreground opacity-0 group-hover/message:opacity-100"
-															onClick={() => {
-																setMode("edit");
-															}}
-														>
-															<PencilEditIcon />
-														</Button>
-													</TooltipTrigger>
-													<TooltipContent>Edit message</TooltipContent>
-												</Tooltip>
-											)}
-
-											<div
-												data-testid="message-content"
-												className={cn("flex flex-col gap-4", {
-													"bg-primary text-primary-foreground px-3 py-2 rounded-xl":
-														message.role === "user",
-												})}
-											>
-												<Markdown>{sanitizeText(part.text)}</Markdown>
-											</div>
+										<div
+											key={key}
+											data-testid="message-content"
+											className={cn("flex flex-col gap-4", {
+												"bg-primary text-primary-foreground px-3 py-2 rounded-xl":
+													message.role === "user",
+											})}
+										>
+											<Markdown>{sanitizeText(part.text)}</Markdown>
 										</div>
 									);
 								}
@@ -365,19 +340,33 @@ const PurePreviewMessage = ({
 
 						{!readonly && (
 							<MessageActions
+								className="-mt-3"
 								key={`action-${message.id}`}
 								messageContentToCopy={message.parts
 									.filter((part) => part.type === "text")
 									.map((part) => part.text)
 									.join("\n")}
+								messageRole={message.role}
 								vote={vote}
 								isLoading={isLoading}
+								isInEditMode={mode === "edit"}
 								onCopy={(text) => {
 									onCopy?.(text);
 								}}
-								onVote={(isUpvote) => {
-									onVote?.(message.id, isUpvote);
-								}}
+								onVote={
+									message.role === "assistant"
+										? (isUpvote) => {
+												onVote?.(message.id, isUpvote);
+											}
+										: undefined
+								}
+								onEdit={
+									message.role === "user"
+										? () => {
+												setMode("edit");
+											}
+										: undefined
+								}
 							/>
 						)}
 					</div>

@@ -9,7 +9,7 @@ import {
 	RedoIcon,
 	UndoIcon,
 } from "../Icons";
-import { TextEditor } from '../TextEditor';
+import { TextEditor } from "../TextEditor";
 import { Artifact } from "./create-artifact";
 
 // biome-ignore lint/suspicious/noEmptyInterface: Empty interface is used for metadata

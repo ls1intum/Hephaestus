@@ -3,8 +3,9 @@ import { fn } from "@storybook/test";
 import { MessageActions } from "./MessageActions";
 
 /**
- * MessageActions component provides copy, upvote, and downvote actions for chat messages.
- * Pure component that delegates all actions to parent through callbacks.
+ * MessageActions component provides contextual actions for chat messages.
+ * Shows different actions based on message type: edit/copy for user messages, copy/vote for assistant messages.
+ * Features hover-based visibility and proper vote state management.
  */
 const meta = {
 	component: MessageActions,
@@ -13,9 +14,18 @@ const meta = {
 	},
 	tags: ["autodocs"],
 	argTypes: {
+		className: {
+			description: "Optional CSS class name",
+			control: "text",
+		},
 		messageContentToCopy: {
 			description: "The text content to copy",
 			control: "text",
+		},
+		messageRole: {
+			description: "The role of the message (user or assistant)",
+			control: "select",
+			options: ["user", "assistant", "system"],
 		},
 		vote: {
 			description: "Current vote state for the message",
@@ -25,53 +35,102 @@ const meta = {
 			description: "Whether actions are currently loading",
 			control: "boolean",
 		},
+		isInEditMode: {
+			description: "Whether the message is in edit mode",
+			control: "boolean",
+		},
 		onCopy: {
 			description: "Callback when copy action is triggered",
 			control: false,
 		},
 		onVote: {
-			description: "Callback when vote action is triggered (isUpvote: boolean)",
+			description:
+				"Callback when vote action is triggered (assistant messages only)",
+			control: false,
+		},
+		onEdit: {
+			description:
+				"Callback when edit action is triggered (user messages only)",
 			control: false,
 		},
 	},
 	args: {
+		className: undefined,
 		messageContentToCopy:
-			"This is a sample message that can be copied, upvoted, or downvoted.",
+			"This is a sample message that demonstrates the action buttons.",
+		messageRole: "assistant",
 		isLoading: false,
+		isInEditMode: false,
 		onCopy: fn(),
 		onVote: fn(),
+		onEdit: fn(),
 	},
+	decorators: [
+		(Story) => (
+			<div className="max-w-md p-4 border rounded-lg group/message">
+				<div className="mb-2 text-sm text-muted-foreground">
+					Hover to see actions
+				</div>
+				<Story />
+			</div>
+		),
+	],
 } satisfies Meta<typeof MessageActions>;
 
 export default meta;
 type Story = StoryObj<typeof meta>;
 
 /**
- * Default message actions with no vote state.
+ * Default assistant message actions with copy and vote buttons.
  */
-export const Default: Story = {};
+export const AssistantMessage: Story = {};
 
 /**
- * Message actions with an upvote.
+ * User message actions with copy and edit buttons.
  */
-export const Upvoted: Story = {
+export const UserMessage: Story = {
+	args: {
+		messageRole: "user",
+		onVote: undefined, // User messages don't have vote functionality
+	},
+};
+
+/**
+ * Assistant message with an upvote applied.
+ */
+export const AssistantUpvoted: Story = {
 	args: {
 		vote: {
 			messageId: "msg-1",
 			isUpvoted: true,
+			createdAt: new Date(),
+			updatedAt: new Date(),
 		},
 	},
 };
 
 /**
- * Message actions with a downvote.
+ * Assistant message with a downvote applied.
  */
-export const Downvoted: Story = {
+export const AssistantDownvoted: Story = {
 	args: {
 		vote: {
 			messageId: "msg-1",
 			isUpvoted: false,
+			createdAt: new Date(),
+			updatedAt: new Date(),
 		},
+	},
+};
+
+/**
+ * User message in edit mode - actions are hidden.
+ */
+export const UserMessageInEditMode: Story = {
+	args: {
+		messageRole: "user",
+		isInEditMode: true,
+		onVote: undefined,
 	},
 };
 
