@@ -54,7 +54,7 @@ function PureArtifactActions({
 								"p-2": !action.label,
 								"py-1.5 px-2": action.label,
 							})}
-              size={action.label ? "default" : "icon"}
+							size={action.label ? "default" : "icon"}
 							onClick={action.onClick}
 							disabled={isLoading || isStreaming || action.disabled}
 						>
