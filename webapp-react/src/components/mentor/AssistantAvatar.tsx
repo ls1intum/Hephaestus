@@ -9,7 +9,9 @@ interface AssistantAvatarProps {
 	className?: string;
 }
 
-export function MentorAvatar({ className }: AssistantAvatarProps) {
+export function MentorAvatar({
+	className,
+}: AssistantAvatarProps) {
 	return (
 		<Avatar className={cn("size-8", className)}>
 			<AvatarFallback className="bg-background">

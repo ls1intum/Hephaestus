@@ -8,11 +8,7 @@
 
 ## artifact-messages.tsx
 
-## artifact-actions.tsx
-
 ## artifact-close-button.tsx
-
-## create-artifact.tsx
 
 ## artifact.tsx
 
@@ -124,6 +120,10 @@ Copy button with upvote / downvote
 ### message.tsx
 
 ### messages.tsx
+
+### create-artifact.tsx
+
+### artifact-actions.tsx
 
 ### app-sidebar.tsx
 
