@@ -5,9 +5,10 @@ import { fn } from "@storybook/test";
 import { Artifact } from "./Artifact";
 
 /**
- * Artifact component provides a full-screen overlay for displaying and editing documents
- * generated during conversations. Features a chat sidebar for continued interaction
- * and a main content area with version management, editing capabilities, and document actions.
+ * Full-screen artifact overlay for immersive document editing experiences.
+ * Combines a chat sidebar for continued conversation with a main content area
+ * featuring version management, real-time editing, and document actions.
+ * Supports streaming content updates and collaborative features.
  */
 const meta = {
 	component: Artifact,
@@ -16,8 +17,11 @@ const meta = {
 		docs: {
 			description: {
 				component:
-					"The Artifact component creates immersive document editing experiences with integrated chat functionality.",
+					"The Artifact component creates immersive document editing experiences with integrated chat functionality, version control, and real-time collaboration features.",
 			},
+		},
+		viewport: {
+			defaultViewport: "responsive",
 		},
 	},
 	tags: ["autodocs"],
@@ -25,50 +29,124 @@ const meta = {
 		artifact: {
 			description:
 				"Core artifact data including content, title, and display properties",
+			control: "object",
+			table: {
+				type: { summary: "UIArtifact" },
+			},
 		},
 		documents: {
 			description: "Array of document versions for version management",
+			control: "object",
+			table: {
+				type: { summary: "Document[]" },
+				defaultValue: { summary: "[]" },
+			},
 		},
 		currentDocument: {
 			description: "Currently displayed document version",
+			control: "object",
+			table: {
+				type: { summary: "Document | undefined" },
+			},
 		},
 		isVisible: {
-			control: "boolean",
 			description: "Whether the artifact overlay is visible",
+			control: "boolean",
+			table: {
+				type: { summary: "boolean" },
+				defaultValue: { summary: "true" },
+			},
 		},
 		readonly: {
-			control: "boolean",
 			description: "Whether the artifact is in readonly mode",
+			control: "boolean",
+			table: {
+				type: { summary: "boolean" },
+				defaultValue: { summary: "false" },
+			},
 		},
 		mode: {
-			control: { type: "radio" },
-			options: ["edit", "diff"],
 			description: "Display mode for the artifact content",
+			control: "select",
+			options: ["edit", "diff"],
+			table: {
+				type: { summary: "'edit' | 'diff'" },
+				defaultValue: { summary: "'edit'" },
+			},
 		},
 		isCurrentVersion: {
-			control: "boolean",
 			description: "Whether viewing the latest version of the document",
+			control: "boolean",
+			table: {
+				type: { summary: "boolean" },
+				defaultValue: { summary: "true" },
+			},
 		},
 		isContentDirty: {
-			control: "boolean",
 			description: "Whether there are unsaved changes",
+			control: "boolean",
+			table: {
+				type: { summary: "boolean" },
+				defaultValue: { summary: "false" },
+			},
 		},
 		status: {
-			control: { type: "radio" },
-			options: ["idle", "streaming", "ready"],
-			description: "Current chat status",
+			description: "Current chat status affecting the interface state",
+			control: "select",
+			options: ["ready", "streaming", "submitted"],
+			table: {
+				type: { summary: "UseChatHelpers['status']" },
+				defaultValue: { summary: "'ready'" },
+			},
+		},
+		isMobile: {
+			description: "Whether the interface should use mobile layout",
+			control: "boolean",
+			table: {
+				type: { summary: "boolean" },
+				defaultValue: { summary: "false" },
+			},
+		},
+		messages: {
+			description: "Chat messages to display in the sidebar",
+			control: "object",
+			table: {
+				type: { summary: "ChatMessage[]" },
+			},
 		},
 		onClose: {
 			description: "Handler called when artifact is closed",
+			action: "artifact closed",
+			table: {
+				type: { summary: "() => void" },
+			},
 		},
 		onContentSave: {
-			description: "Handler for saving content changes with debounce option",
+			description:
+				"Handler for saving content changes (debounced automatically)",
+			action: "content saved",
+			table: {
+				type: { summary: "(content: string) => void" },
+			},
 		},
 		onVersionChange: {
 			description: "Handler for navigating between document versions",
+			action: "version changed",
+			table: {
+				type: {
+					summary: "(type: 'next' | 'prev' | 'toggle' | 'latest') => void",
+				},
+			},
 		},
 		onMessageSubmit: {
 			description: "Handler for submitting new chat messages",
+			action: "message submitted",
+			table: {
+				type: {
+					summary:
+						"(data: { text: string; attachments: Attachment[] }) => void",
+				},
+			},
 		},
 	},
 	args: {
@@ -77,7 +155,7 @@ const meta = {
 		mode: "edit",
 		isCurrentVersion: true,
 		isContentDirty: false,
-		status: "streaming" as const,
+		status: "ready" as const,
 		isMobile: false,
 		attachments: [],
 		metadata: {},
@@ -99,7 +177,7 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-// Mock data
+// Mock data - externalized and organized
 const mockArtifact = {
 	title: "Project Planning Document",
 	documentId: "doc-123",
@@ -140,12 +218,7 @@ This document outlines the key milestones and deliverables for our upcoming proj
 - Scope creep is a potential concern`,
 	isVisible: true,
 	status: "idle" as const,
-	boundingBox: {
-		top: 100,
-		left: 200,
-		width: 300,
-		height: 200,
-	},
+	boundingBox: { top: 100, left: 200, width: 300, height: 200 },
 };
 
 const mockMessages: ChatMessage[] = [
@@ -212,16 +285,12 @@ const mockDocuments: Document[] = [
 ];
 
 const mockVotes: ChatMessageVote[] = [
-	{
-		messageId: "msg-2",
-		isUpvoted: true,
-		createdAt: new Date(),
-	},
+	{ messageId: "msg-2", isUpvoted: true, createdAt: new Date() },
 ];
 
 /**
- * Default artifact view showing a text document with full editing capabilities.
- * Demonstrates the standard layout with chat sidebar and document editing area.
+ * Standard artifact editing experience with full chat sidebar and document editing capabilities.
+ * Demonstrates the default state with version management and interactive content editing.
  */
 export const Default: Story = {
 	args: {
@@ -235,8 +304,8 @@ export const Default: Story = {
 };
 
 /**
- * Streaming state showing real-time content generation.
- * The artifact displays with streaming status and appropriate UI feedback.
+ * Real-time streaming content generation showing dynamic updates.
+ * Displays the artifact receiving live content updates with appropriate UI feedback.
  */
 export const Streaming: Story = {
 	args: {
@@ -253,10 +322,10 @@ export const Streaming: Story = {
 };
 
 /**
- * Historical version view showing previous document state.
- * Demonstrates version navigation and comparison capabilities.
+ * Version comparison mode for reviewing document history.
+ * Shows how users can navigate between different document versions and compare changes.
  */
-export const HistoricalVersion: Story = {
+export const VersionHistory: Story = {
 	args: {
 		...Default.args,
 		currentVersionIndex: 0,
@@ -270,8 +339,8 @@ export const HistoricalVersion: Story = {
 };
 
 /**
- * Readonly mode preventing any edits or interactions.
- * Useful for viewing completed documents or when permissions are restricted.
+ * Read-only view preventing any edits or interactions.
+ * Useful for sharing documents or when user permissions restrict editing.
  */
 export const Readonly: Story = {
 	args: {
@@ -281,8 +350,8 @@ export const Readonly: Story = {
 };
 
 /**
- * Mobile responsive layout optimized for smaller screens.
- * Shows how the component adapts its layout for mobile devices.
+ * Mobile-optimized layout for smaller screens.
+ * Demonstrates responsive design adaptations for mobile devices.
  */
 export const Mobile: Story = {
 	args: {
@@ -290,17 +359,21 @@ export const Mobile: Story = {
 		isMobile: true,
 	},
 	parameters: {
-		viewport: {
-			defaultViewport: "mobile2",
+		viewport: { defaultViewport: "mobile2" },
+		docs: {
+			description: {
+				story:
+					"Mobile layout removes the sidebar and optimizes the interface for touch interactions.",
+			},
 		},
 	},
 };
 
 /**
- * Empty state with minimal content to test loading and initial states.
- * Demonstrates how the component handles sparse content.
+ * Minimal content state for testing empty or loading scenarios.
+ * Shows how the component handles sparse content and initial document creation.
  */
-export const MinimalContent: Story = {
+export const EmptyDocument: Story = {
 	args: {
 		...Default.args,
 		artifact: {
@@ -320,34 +393,21 @@ export const MinimalContent: Story = {
 };
 
 /**
- * Diff mode showing changes between document versions.
- * Highlights the difference viewing capability for version comparison.
- */
-export const DiffMode: Story = {
-	args: {
-		...Default.args,
-		mode: "diff",
-		currentVersionIndex: 0,
-		isCurrentVersion: false,
-	},
-};
-
-/**
- * Long conversation with extensive chat history.
- * Tests the component's performance with substantial message data.
+ * Extended conversation with substantial message history.
+ * Tests performance and UI behavior with large amounts of chat data.
  */
 export const ExtensiveChat: Story = {
 	args: {
 		...Default.args,
 		messages: [
 			...mockMessages,
-			...Array.from({ length: 10 }, (_, i) => ({
+			...Array.from({ length: 8 }, (_, i) => ({
 				id: `msg-extra-${i}`,
 				role: (i % 2 === 0 ? "user" : "assistant") as "user" | "assistant",
 				parts: [
 					{
 						type: "text" as const,
-						text: `This is message ${i + 5} in our conversation about the project planning document. ${i % 2 === 0 ? `What about adding more details to section ${i + 1}?` : "Great suggestion! I've updated the document to include more comprehensive information about that topic."}`,
+						text: `Message ${i + 5}: ${i % 2 === 0 ? `Can you add more details about section ${i + 1}?` : "I've updated the document with more comprehensive information about that topic."}`,
 					},
 				],
 			})),
