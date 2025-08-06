@@ -6,8 +6,6 @@
 
 ## chat-header.tsx
 
-## artifact.tsx
-
 ## chat.tsx
 
 ## sidebar-history.tsx
@@ -122,7 +120,9 @@ Copy button with upvote / downvote
 
 ### version-footer.tsx
 
-## artifact-messages.tsx
+### artifact.tsx
+
+### artifact-messages.tsx
 
 Incorporated into Messages.tsx
 
