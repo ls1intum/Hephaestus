@@ -83,7 +83,9 @@ function PureMessageActions({
 							<Copy />
 						</Button>
 					</TooltipTrigger>
-					<TooltipContent side="bottom">Copy</TooltipContent>
+					<TooltipContent side={isAssistantMessage ? "top" : "bottom"}>
+						Copy
+					</TooltipContent>
 				</Tooltip>
 
 				{/* Edit button for user messages only */}
@@ -125,7 +127,7 @@ function PureMessageActions({
 									<ThumbsUp size={14} />
 								</Button>
 							</TooltipTrigger>
-							<TooltipContent side="bottom">Good response</TooltipContent>
+							<TooltipContent side="top">Good response</TooltipContent>
 						</Tooltip>
 
 						<Tooltip>
@@ -147,7 +149,7 @@ function PureMessageActions({
 									<ThumbsDown size={14} />
 								</Button>
 							</TooltipTrigger>
-							<TooltipContent side="bottom">Bad response</TooltipContent>
+							<TooltipContent side="top">Bad response</TooltipContent>
 						</Tooltip>
 					</>
 				)}
