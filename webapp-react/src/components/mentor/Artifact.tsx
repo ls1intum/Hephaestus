@@ -277,7 +277,7 @@ function PureArtifact({
 									onDocumentSave={onDocumentSave}
 								/>
 
-								<div className="flex flex-row gap-2 relative items-end w-full px-4 pb-4 shrink-0">
+								<div className="flex flex-row gap-2 items-end w-full px-4 pb-4 -mt-20 relative z-10 bg-gradient-to-t from-muted dark:from-background/50 from-60% to-transparent pt-8">
 									<MultimodalInput
 										status={status === "streaming" ? "submitted" : "ready"}
 										onStop={onStop}

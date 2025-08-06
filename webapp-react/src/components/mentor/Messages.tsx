@@ -65,10 +65,13 @@ function PureMessages({
 	const isArtifact = variant === "artifact";
 
 	return (
-		<ScrollArea className="flex flex-col w-full flex-1 min-h-0" ref={containerRef}>
+		<ScrollArea
+			className="flex flex-col w-full flex-1 min-h-0"
+			ref={containerRef}
+		>
 			<div
 				className={cn(
-					"flex flex-col w-full",
+					"flex flex-col w-full pb-16",
 					{
 						// Default layout
 						"min-w-0 gap-2 flex-1 pt-4 relative": !isArtifact,
