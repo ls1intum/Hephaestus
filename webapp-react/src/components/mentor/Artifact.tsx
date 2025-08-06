@@ -6,6 +6,7 @@ import type { UseChatHelpers } from "@ai-sdk/react";
 import { formatDistance } from "date-fns";
 import equal from "fast-deep-equal";
 import { AnimatePresence, motion } from "framer-motion";
+import { Copy, History, Redo2, Undo2 } from "lucide-react";
 import { memo } from "react";
 import { useDebounceCallback, useWindowSize } from "usehooks-ts";
 import { type ArtifactAction, ArtifactActions } from "./ArtifactActions";
@@ -156,9 +157,47 @@ function PureArtifact({
 		// Could add handler if needed for internal attachment state
 	};
 
-	// Create simplified actions for ArtifactActions
+	// Create artifact actions for version navigation and copy functionality
 	const actions: ArtifactAction[] = [
-		// Add basic actions here if needed - keeping minimal for now
+		// View changes/diff toggle
+		{
+			id: "view-changes",
+			icon: <History size={16} />,
+			description: mode === "edit" ? "View changes" : "View content",
+			disabled: !documents || documents.length <= 1,
+			onClick: () => onVersionChange("toggle"),
+		},
+		// Previous version navigation
+		{
+			id: "prev-version",
+			icon: <Undo2 size={16} />,
+			description: "View previous version",
+			disabled: !documents || documents.length <= 1 || currentVersionIndex <= 0,
+			onClick: () => onVersionChange("prev"),
+		},
+		// Next version navigation
+		{
+			id: "next-version",
+			icon: <Redo2 size={16} />,
+			description: "View next version",
+			disabled:
+				!documents ||
+				documents.length <= 1 ||
+				currentVersionIndex >= documents.length - 1,
+			onClick: () => onVersionChange("next"),
+		},
+		// Copy to clipboard action
+		{
+			id: "copy",
+			icon: <Copy size={16} />,
+			description: "Copy content to clipboard",
+			onClick: () => {
+				const content = isCurrentVersion
+					? artifact.content
+					: getDocumentContentById(currentVersionIndex);
+				onCopy?.(content);
+			},
+		},
 	];
 
 	return (

@@ -50,7 +50,7 @@ function PureArtifactActions({
 					<TooltipTrigger asChild>
 						<Button
 							variant="outline"
-							className={cn("dark:hover:bg-zinc-700", {
+							className={cn("dark:border-primary/10 dark:hover:bg-primary/10", {
 								"p-2": !action.label,
 								"py-1.5 px-2": action.label,
 							})}
