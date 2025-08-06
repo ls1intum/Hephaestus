@@ -206,7 +206,7 @@ function PureArtifact({
 					key="artifact-container" // Stable key - doesn't change when switching documents
 					data-testid="artifact"
 					className={cn(
-						"flex flex-row h-dvh w-dvw fixed top-0 left-0 z-50 bg-transparent",
+						"flex flex-row h-dvh w-dvw fixed top-0 left-0 z-100 bg-transparent",
 						className,
 					)}
 					initial={{ opacity: 1 }}
@@ -269,7 +269,7 @@ function PureArtifact({
 							<AnimatePresence>
 								{!isCurrentVersion && (
 									<motion.div
-										className="left-0 absolute h-dvh w-[400px] top-0 bg-zinc-900/50 z-50"
+										className="left-0 absolute h-dvh w-[400px] top-0 bg-zinc-900/50 z-[100]"
 										initial={{ opacity: 0 }}
 										animate={{ opacity: 1 }}
 										exit={{ opacity: 0 }}

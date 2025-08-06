@@ -5,6 +5,7 @@ import { cn } from "@/lib/utils";
 import type { UseChatHelpers } from "@ai-sdk/react";
 import equal from "fast-deep-equal";
 import { memo, useCallback, useState } from "react";
+import { createPortal } from "react-dom";
 import { useWindowSize } from "usehooks-ts";
 import { Artifact } from "./Artifact";
 import type { UIArtifact } from "./Artifact";
@@ -291,37 +292,39 @@ function PureChat({
 				</div>
 			</div>
 
-			{artifact && (
-				<Artifact
-					artifact={artifact}
-					documents={documents}
-					currentDocument={currentDocument}
-					currentVersionIndex={currentVersionIndex}
-					isCurrentVersion={isCurrentVersion}
-					isContentDirty={isContentDirty}
-					mode={artifactMode}
-					isVisible={artifact.isVisible}
-					isMobile={isMobile}
-					readonly={readonly}
-					messages={messages}
-					votes={votes}
-					status={status}
-					attachments={attachments}
-					metadata={{}}
-					onClose={handleArtifactClose}
-					onContentSave={handleArtifactContentSave}
-					onVersionChange={handleArtifactVersionChange}
-					onMessageSubmit={onMessageSubmit}
-					onStop={onStop}
-					onFileUpload={onFileUpload}
-					onMessageEdit={onMessageEdit}
-					onCopy={onCopy}
-					onVote={onVote}
-					onDocumentClick={handleDocumentClickById}
-					onDocumentSave={handleArtifactContentSave}
-					onMetadataUpdate={() => {}}
-				/>
-			)}
+			{artifact &&
+				createPortal(
+					<Artifact
+						artifact={artifact}
+						documents={documents}
+						currentDocument={currentDocument}
+						currentVersionIndex={currentVersionIndex}
+						isCurrentVersion={isCurrentVersion}
+						isContentDirty={isContentDirty}
+						mode={artifactMode}
+						isVisible={artifact.isVisible}
+						isMobile={isMobile}
+						readonly={readonly}
+						messages={messages}
+						votes={votes}
+						status={status}
+						attachments={attachments}
+						metadata={{}}
+						onClose={handleArtifactClose}
+						onContentSave={handleArtifactContentSave}
+						onVersionChange={handleArtifactVersionChange}
+						onMessageSubmit={onMessageSubmit}
+						onStop={onStop}
+						onFileUpload={onFileUpload}
+						onMessageEdit={onMessageEdit}
+						onCopy={onCopy}
+						onVote={onVote}
+						onDocumentClick={handleDocumentClickById}
+						onDocumentSave={handleArtifactContentSave}
+						onMetadataUpdate={() => {}}
+					/>,
+					document.body,
+				)}
 		</>
 	);
 }

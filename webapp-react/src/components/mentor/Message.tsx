@@ -133,9 +133,7 @@ const PurePreviewMessage = ({
 				>
 					{message.role === "assistant" && <MentorAvatar />}
 
-					<div
-						className="flex flex-col gap-4 w-full"
-					>
+					<div className="flex flex-col gap-4 w-full">
 						{attachmentsFromMessage.length > 0 && (
 							<div
 								data-testid="message-attachments"
