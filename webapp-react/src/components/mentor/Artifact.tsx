@@ -4,10 +4,8 @@ import type { Attachment, ChatMessage } from "@/lib/types";
 import { cn } from "@/lib/utils";
 import type { UseChatHelpers } from "@ai-sdk/react";
 import { formatDistance } from "date-fns";
-import equal from "fast-deep-equal";
 import { AnimatePresence, motion } from "framer-motion";
 import { Copy, History, Redo2, Undo2 } from "lucide-react";
-import { memo } from "react";
 import { useDebounceCallback, useWindowSize } from "usehooks-ts";
 import { type ArtifactAction, ArtifactActions } from "./ArtifactActions";
 import { ArtifactCloseButton } from "./ArtifactCloseButton";
@@ -202,9 +200,10 @@ function PureArtifact({
 	];
 
 	return (
-		<AnimatePresence>
+		<AnimatePresence mode="wait">
 			{isVisible && (
 				<motion.div
+					key={`artifact-${artifact.documentId}`}
 					data-testid="artifact"
 					className={cn(
 						"flex flex-row h-dvh w-dvw fixed top-0 left-0 z-50 bg-transparent",
@@ -212,7 +211,14 @@ function PureArtifact({
 					)}
 					initial={{ opacity: 1 }}
 					animate={{ opacity: 1 }}
-					exit={{ opacity: 0, transition: { delay: 0.4 } }}
+					exit={{
+						opacity: 0,
+						transition: {
+							delay: 0.3,
+							duration: 0.2,
+							ease: "easeInOut",
+						},
+					}}
 				>
 					{!isMobile && (
 						<motion.div
@@ -221,10 +227,17 @@ function PureArtifact({
 								width: windowWidth,
 								right: 0,
 							}}
-							animate={{ width: windowWidth, right: 0 }}
+							animate={{
+								width: windowWidth,
+								right: 0,
+							}}
 							exit={{
 								width: windowWidth,
 								right: 0,
+								transition: {
+									duration: 0.3,
+									ease: [0.32, 0.72, 0, 1],
+								},
 							}}
 						/>
 					)}
@@ -246,9 +259,11 @@ function PureArtifact({
 							}}
 							exit={{
 								opacity: 0,
-								x: 0,
-								scale: 1,
-								transition: { duration: 0 },
+								scale: 0.95,
+								transition: {
+									duration: 0.3,
+									ease: [0.32, 0.72, 0, 1],
+								},
 							}}
 						>
 							<AnimatePresence>
@@ -355,12 +370,11 @@ function PureArtifact({
 						}
 						exit={{
 							opacity: 0,
-							scale: 0.5,
+							scale: 0.95,
 							transition: {
-								delay: 0.1,
-								type: "spring",
-								stiffness: 600,
-								damping: 30,
+								duration: 0.35,
+								ease: [0.32, 0.72, 0, 1],
+								delay: 0.05,
 							},
 						}}
 					>
@@ -440,12 +454,4 @@ function PureArtifact({
 	);
 }
 
-export const Artifact = memo(PureArtifact, (prevProps, nextProps) => {
-	if (prevProps.status !== nextProps.status) return false;
-	if (!equal(prevProps.votes, nextProps.votes)) return false;
-	if (prevProps.artifact.content !== nextProps.artifact.content) return false;
-	if (prevProps.messages.length !== nextProps.messages.length) return false;
-	if (!equal(prevProps.messages, nextProps.messages)) return false;
-
-	return true;
-});
+export const Artifact = PureArtifact;

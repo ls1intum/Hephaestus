@@ -120,11 +120,17 @@ function PureChat({
 
 	// Handle artifact closing
 	const handleArtifactClose = useCallback(() => {
-		setArtifact(null);
-		setDocuments([]);
-		setCurrentVersionIndex(-1);
-		setIsContentDirty(false);
-		setArtifactMode("edit");
+		// First, trigger the exit animation
+		setArtifact((prev) => (prev ? { ...prev, isVisible: false } : null));
+
+		// After animation completes, clean up the state
+		setTimeout(() => {
+			setArtifact(null);
+			setDocuments([]);
+			setCurrentVersionIndex(-1);
+			setIsContentDirty(false);
+			setArtifactMode("edit");
+		}, 600); // Wait for animation to complete
 	}, []);
 
 	// Handle artifact content saving
@@ -216,7 +222,7 @@ function PureChat({
 				</form>
 			</div>
 
-			{artifact?.isVisible && (
+			{artifact && (
 				<Artifact
 					artifact={artifact}
 					documents={documents}
