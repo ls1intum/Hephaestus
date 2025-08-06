@@ -55,7 +55,7 @@ function PureMessageActions({
 	// Different button styling for artifact context
 	const buttonClasses =
 		variant === "artifact"
-			? "text-muted-foreground hover:text-foreground hover:bg-primary/5"
+			? "touch:w-10 size-8 text-muted-foreground hover:text-foreground hover:bg-primary/5"
 			: "text-muted-foreground hover:text-foreground";
 
 	// For user messages, align actions to the right
@@ -80,7 +80,7 @@ function PureMessageActions({
 							size="icon"
 							onClick={() => onCopy(messageContentToCopy)}
 						>
-							<Copy size={14} />
+							<Copy />
 						</Button>
 					</TooltipTrigger>
 					<TooltipContent side="bottom">Copy</TooltipContent>
@@ -111,7 +111,7 @@ function PureMessageActions({
 								<Button
 									data-testid="message-upvote"
 									className={cn(
-										"text-muted-foreground hover:text-github-success-foreground hover:bg-github-success-foreground/10",
+										"touch:w-10 size-8 text-muted-foreground hover:text-github-success-foreground hover:bg-github-success-foreground/10",
 										{
 											"text-github-success-foreground":
 												vote?.isUpvoted === true,
@@ -133,7 +133,7 @@ function PureMessageActions({
 								<Button
 									data-testid="message-downvote"
 									className={cn(
-										"text-muted-foreground hover:text-github-danger-foreground hover:bg-github-danger-foreground/10",
+										"touch:w-10 size-8 text-muted-foreground hover:text-github-danger-foreground hover:bg-github-danger-foreground/10",
 										{
 											"text-github-danger-foreground":
 												vote?.isUpvoted === false,

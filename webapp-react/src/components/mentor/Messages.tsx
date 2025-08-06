@@ -71,10 +71,10 @@ function PureMessages({
 					"flex flex-col w-full",
 					{
 						// Default layout
-						"min-w-0 gap-2 flex-1 pt-4 relative": !isArtifact,
+						"min-w-0 gap-1 flex-1 pt-4 relative": !isArtifact,
 						// Artifact layout
-						"gap-2 flex-1 px-0 pt-4": isArtifact,
-						"gap-6": readonly,
+						"gap-1 flex-1 px-0 pt-4": isArtifact,
+						"gap-4": readonly,
 					},
 					className,
 				)}
