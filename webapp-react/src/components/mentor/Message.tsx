@@ -24,8 +24,6 @@ export interface MessageProps {
 	isLoading?: boolean;
 	/** Whether the message is in readonly mode (disables actions) */
 	readonly?: boolean;
-	/** Whether to add extra padding for smooth scrolling */
-	requiresScrollPadding?: boolean;
 	/** Layout variant for different contexts */
 	variant?: "default" | "artifact";
 	/** Handler for message editing submission */
@@ -49,7 +47,6 @@ const PurePreviewMessage = ({
 	vote,
 	isLoading = false,
 	readonly = false,
-	requiresScrollPadding = false,
 	variant = "default",
 	onMessageEdit,
 	onCopy,
@@ -137,9 +134,7 @@ const PurePreviewMessage = ({
 					{message.role === "assistant" && <MentorAvatar />}
 
 					<div
-						className={cn("flex flex-col gap-4 w-full", {
-							"min-h-96": message.role === "assistant" && requiresScrollPadding,
-						})}
+						className="flex flex-col gap-4 w-full"
 					>
 						{attachmentsFromMessage.length > 0 && (
 							<div
@@ -411,8 +406,6 @@ export const PreviewMessage = memo(
 	(prevProps, nextProps) => {
 		if (prevProps.isLoading !== nextProps.isLoading) return false;
 		if (prevProps.message.id !== nextProps.message.id) return false;
-		if (prevProps.requiresScrollPadding !== nextProps.requiresScrollPadding)
-			return false;
 		if (prevProps.readonly !== nextProps.readonly) return false;
 		if (prevProps.variant !== nextProps.variant) return false;
 		if (prevProps.initialEditMode !== nextProps.initialEditMode) return false;

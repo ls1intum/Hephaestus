@@ -1,4 +1,5 @@
 import type { ChatMessageVote, Document } from "@/api/types.gen";
+import { useScrollToBottom } from "@/hooks/use-scroll-to-bottom";
 import type { Attachment, ChatMessage } from "@/lib/types";
 import { cn } from "@/lib/utils";
 import type { UseChatHelpers } from "@ai-sdk/react";
@@ -60,8 +61,8 @@ function PureChat({
 	votes,
 	status,
 	readonly = false,
-	isAtBottom = true,
-	scrollToBottom,
+	isAtBottom: parentIsAtBottom = true,
+	scrollToBottom: parentScrollToBottom,
 	attachments,
 	onMessageSubmit,
 	onStop,
@@ -79,6 +80,14 @@ function PureChat({
 }: ChatProps) {
 	const { width } = useWindowSize();
 	const isMobile = width ? width < 768 : false;
+
+	// Internal scroll management for the chat container
+	const { containerRef, endRef, isAtBottom, scrollToBottom } =
+		useScrollToBottom();
+
+	// Use internal scroll management if parent doesn't provide it
+	const actualIsAtBottom = parentScrollToBottom ? parentIsAtBottom : isAtBottom;
+	const actualScrollToBottom = parentScrollToBottom || scrollToBottom;
 
 	// Internal artifact state management - completely self-contained
 	const [artifact, setArtifact] = useState<UIArtifact | null>(null);
@@ -223,6 +232,10 @@ function PureChat({
 	const currentDocument = documents[currentVersionIndex] || documents[0];
 	const isCurrentVersion = currentVersionIndex === documents.length - 1;
 
+	// Suggested actions should only show when there are no messages and explicitly enabled
+	const shouldShowSuggestedActions =
+		showSuggestedActions && messages.length === 0;
+
 	return (
 		<>
 			<div
@@ -234,9 +247,10 @@ function PureChat({
 					status={status}
 					readonly={readonly}
 					showThinking={status === "submitted"}
-					requiresScrollPadding={true}
 					showGreeting={messages.length === 0}
 					variant="default"
+					containerRef={containerRef}
+					endRef={endRef}
 					onMessageEdit={onMessageEdit}
 					onCopy={onCopy}
 					onVote={onVote}
@@ -244,32 +258,37 @@ function PureChat({
 					onDocumentSave={handleArtifactContentSave}
 				/>
 
-				<form className="flex mx-auto px-4 bg-background pb-4 md:pb-6 gap-2 w-full md:max-w-3xl">
-					{!readonly && (
-						<MultimodalInput
-							status={
-								status === "submitted"
-									? "submitted"
-									: status === "error"
-										? "error"
-										: "ready"
-							}
-							onStop={onStop}
-							attachments={attachments}
-							onAttachmentsChange={onAttachmentsChange}
-							onFileUpload={onFileUpload}
-							onSubmit={onMessageSubmit}
-							onSuggestedAction={onSuggestedAction}
-							placeholder={inputPlaceholder}
-							showSuggestedActions={showSuggestedActions}
-							readonly={readonly}
-							disableAttachments={disableAttachments}
-							isAtBottom={isAtBottom}
-							scrollToBottom={scrollToBottom}
-							isCurrentVersion={isCurrentVersion}
-						/>
-					)}
-				</form>
+				<div className="relative">
+					<div className="flex flex-row gap-2 items-end w-full px-4 pb-4 md:pb-6 -mt-20 relative z-10 bg-gradient-to-t from-muted dark:from-background/30 from-60% to-transparent pt-8">
+						<div className="flex mx-auto gap-2 w-full md:max-w-3xl">
+							{!readonly && (
+								<MultimodalInput
+									status={
+										status === "submitted"
+											? "submitted"
+											: status === "error"
+												? "error"
+												: "ready"
+									}
+									onStop={onStop}
+									attachments={attachments}
+									onAttachmentsChange={onAttachmentsChange}
+									onFileUpload={onFileUpload}
+									onSubmit={onMessageSubmit}
+									onSuggestedAction={onSuggestedAction}
+									placeholder={inputPlaceholder}
+									showSuggestedActions={shouldShowSuggestedActions}
+									readonly={readonly}
+									disableAttachments={disableAttachments}
+									isAtBottom={actualIsAtBottom}
+									scrollToBottom={actualScrollToBottom}
+									isCurrentVersion={isCurrentVersion}
+									className="bg-background dark:bg-muted"
+								/>
+							)}
+						</div>
+					</div>
+				</div>
 			</div>
 
 			{artifact && (

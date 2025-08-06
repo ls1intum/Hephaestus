@@ -29,10 +29,6 @@ const meta = {
 			description: "Whether the message is in readonly mode (disables actions)",
 			control: "boolean",
 		},
-		requiresScrollPadding: {
-			description: "Whether to add extra padding for smooth scrolling",
-			control: "boolean",
-		},
 		initialEditMode: {
 			description: "Whether to show the edit mode initially",
 			control: "boolean",
@@ -65,7 +61,6 @@ const meta = {
 	args: {
 		isLoading: false,
 		readonly: false,
-		requiresScrollPadding: false,
 		initialEditMode: false,
 		onMessageEdit: fn(),
 		onCopy: fn(),
@@ -323,18 +318,6 @@ export const EditModeMessage: Story = {
 			"How do I optimize React performance in large applications?",
 		),
 		initialEditMode: true,
-	},
-};
-
-/**
- * Message with extra scroll padding for smooth scrolling.
- */
-export const MessageWithScrollPadding: Story = {
-	args: {
-		message: createAssistantMessage(
-			"This message includes extra padding to ensure smooth scrolling behavior when it's the last message in a conversation.",
-		),
-		requiresScrollPadding: true,
 	},
 };
 

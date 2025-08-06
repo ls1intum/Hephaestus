@@ -20,8 +20,6 @@ export interface MessagesProps {
 	readonly?: boolean;
 	/** Whether to show thinking message for submissions */
 	showThinking?: boolean;
-	/** Whether to add padding to the last message for smooth scrolling */
-	requiresScrollPadding?: boolean;
 	/** Whether to show greeting when no messages */
 	showGreeting?: boolean;
 	/** Layout variant for different contexts */
@@ -50,7 +48,6 @@ function PureMessages({
 	status,
 	readonly = false,
 	showThinking = true,
-	requiresScrollPadding = false,
 	showGreeting = true,
 	variant = "default",
 	containerRef,
@@ -73,8 +70,9 @@ function PureMessages({
 				className={cn(
 					"flex flex-col w-full pb-16",
 					{
-						// Default layout
-						"min-w-0 gap-2 flex-1 pt-4 relative": !isArtifact,
+						// Default layout - centered like the input
+						"min-w-0 gap-2 flex-1 pt-4 relative mx-auto px-4 md:max-w-3xl":
+							!isArtifact,
 						// Artifact layout
 						"gap-2 flex-1 px-0 pt-4": isArtifact,
 						"gap-4": readonly,
@@ -91,9 +89,6 @@ function PureMessages({
 						isLoading={status === "streaming" && messages.length - 1 === index}
 						vote={votes?.find((vote) => vote.messageId === message.id)}
 						readonly={readonly}
-						requiresScrollPadding={
-							requiresScrollPadding && index === messages.length - 1
-						}
 						variant={variant}
 						onMessageEdit={onMessageEdit}
 						onCopy={onCopy}
@@ -124,8 +119,6 @@ export const Messages = memo(PureMessages, (prevProps, nextProps) => {
 	if (prevProps.showThinking !== nextProps.showThinking) return false;
 	if (prevProps.showGreeting !== nextProps.showGreeting) return false;
 	if (prevProps.variant !== nextProps.variant) return false;
-	if (prevProps.requiresScrollPadding !== nextProps.requiresScrollPadding)
-		return false;
 	if (prevProps.messages.length !== nextProps.messages.length) return false;
 	if (!equal(prevProps.messages, nextProps.messages)) return false;
 	if (!equal(prevProps.votes, nextProps.votes)) return false;
