@@ -1,3 +1,4 @@
+import { ScrollArea } from "@/components/ui/scroll-area";
 import { toast } from "sonner";
 // import { DiffView } from '@/components/diffview';
 import { DocumentSkeleton } from "../DocumentSkeleton";
@@ -58,15 +59,40 @@ export const textArtifact = new Artifact<"text", TextArtifactMetadata>({
 		}
 
 		return (
-			<div className="flex flex-col h-full px-4 py-8 md:px-10">
-				<TextEditor
-					content={content}
-					isCurrentVersion={isCurrentVersion}
-					currentVersionIndex={currentVersionIndex}
-					status={status}
-					onSaveContent={onSaveContent}
-				/>
-			</div>
+			<ScrollArea className="h-full">
+				<div
+					className="flex flex-col px-4 py-8 md:px-10 cursor-text"
+					style={{ minHeight: "92dvh" }}
+					onClick={(e) => {
+						// Focus the editor when clicking in the content area
+						const editorElement = e.currentTarget.querySelector(".ProseMirror");
+						if (editorElement) {
+							(editorElement as HTMLElement).focus();
+						}
+					}}
+					onKeyDown={(e) => {
+						// Handle keyboard activation (Enter or Space) only if editor is not focused
+						if (e.key === "Enter" || e.key === " ") {
+							const editorElement =
+								e.currentTarget.querySelector(".ProseMirror");
+							if (editorElement && document.activeElement !== editorElement) {
+								e.preventDefault();
+								(editorElement as HTMLElement).focus();
+							}
+						}
+					}}
+					// Use presentation role since this is just a click target for the editor
+					role="presentation"
+				>
+					<TextEditor
+						content={content}
+						isCurrentVersion={isCurrentVersion}
+						currentVersionIndex={currentVersionIndex}
+						status={status}
+						onSaveContent={onSaveContent}
+					/>
+				</div>
+			</ScrollArea>
 		);
 	},
 	actions: [

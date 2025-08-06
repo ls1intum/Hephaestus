@@ -110,12 +110,10 @@ function PureTextEditor({ content, onSaveContent, status }: TextEditorProps) {
 	}, [content, status]);
 
 	return (
-		<div>
-			<div
-				className="relative w-full h-full prose dark:prose-invert max-w-none prose-lg"
-				ref={containerRef}
-			/>
-		</div>
+		<div
+			className="relative w-full h-full prose dark:prose-invert max-w-none prose-lg"
+			ref={containerRef}
+		/>
 	);
 }
 

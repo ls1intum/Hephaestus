@@ -261,7 +261,7 @@ function PureArtifact({
 								)}
 							</AnimatePresence>
 
-							<div className="flex flex-col h-full justify-between items-center">
+							<div className="flex flex-col h-full">
 								<Messages
 									messages={messages}
 									votes={votes}
@@ -277,7 +277,7 @@ function PureArtifact({
 									onDocumentSave={onDocumentSave}
 								/>
 
-								<div className="flex flex-row gap-2 relative items-end w-full px-4 pb-4">
+								<div className="flex flex-row gap-2 relative items-end w-full px-4 pb-4 shrink-0">
 									<MultimodalInput
 										status={status === "streaming" ? "submitted" : "ready"}
 										onStop={onStop}
@@ -297,7 +297,7 @@ function PureArtifact({
 					)}
 
 					<motion.div
-						className="fixed dark:bg-muted bg-background h-dvh flex flex-col overflow-y-scroll md:border-l dark:border-zinc-700 border-zinc-200"
+						className="fixed dark:bg-muted bg-background h-dvh flex flex-col md:border-l dark:border-zinc-700 border-zinc-200"
 						initial={
 							isMobile
 								? {
@@ -395,7 +395,7 @@ function PureArtifact({
 								isStreaming={artifact.status === "streaming"}
 							/>
 						</div>
-						<div className="dark:bg-muted bg-background h-full overflow-y-scroll !max-w-full items-center">
+						<div className="flex-1 min-h-0 h-full overflow-hidden">
 							<artifactDefinition.content
 								title={artifact.title}
 								content={

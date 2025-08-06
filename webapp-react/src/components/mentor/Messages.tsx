@@ -1,4 +1,5 @@
 import type { ChatMessageVote, Document } from "@/api/types.gen";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import type { ChatMessage } from "@/lib/types";
 import { cn } from "@/lib/utils";
 import type { UseChatHelpers } from "@ai-sdk/react";
@@ -64,52 +65,53 @@ function PureMessages({
 	const isArtifact = variant === "artifact";
 
 	return (
-		<div
-			ref={containerRef}
-			className={cn(
-				"flex flex-col w-full overflow-y-scroll",
-				{
-					// Default layout
-					"min-w-0 gap-2 flex-1 pt-4 relative": !isArtifact,
-					// Artifact layout
-					"gap-2 h-full px-0 pt-4": isArtifact,
-					"gap-6": readonly,
-				},
-				className,
-			)}
-		>
-			{messages.length === 0 && showGreeting && <Greeting />}
+		<ScrollArea className="flex flex-col w-full flex-1 min-h-0" ref={containerRef}>
+			<div
+				className={cn(
+					"flex flex-col w-full",
+					{
+						// Default layout
+						"min-w-0 gap-2 flex-1 pt-4 relative": !isArtifact,
+						// Artifact layout
+						"gap-2 flex-1 px-0 pt-4": isArtifact,
+						"gap-6": readonly,
+					},
+					className,
+				)}
+			>
+				{messages.length === 0 && showGreeting && <Greeting />}
 
-			{messages.map((message, index) => (
-				<PreviewMessage
-					key={message.id}
-					message={message}
-					isLoading={status === "streaming" && messages.length - 1 === index}
-					vote={votes?.find((vote) => vote.messageId === message.id)}
-					readonly={readonly}
-					requiresScrollPadding={
-						requiresScrollPadding && index === messages.length - 1
-					}
-					variant={variant}
-					onMessageEdit={onMessageEdit}
-					onCopy={onCopy}
-					onVote={onVote}
-					onDocumentClick={onDocumentClick}
-					onDocumentSave={onDocumentSave}
+				{messages.map((message, index) => (
+					<PreviewMessage
+						key={message.id}
+						message={message}
+						isLoading={status === "streaming" && messages.length - 1 === index}
+						vote={votes?.find((vote) => vote.messageId === message.id)}
+						readonly={readonly}
+						requiresScrollPadding={
+							requiresScrollPadding && index === messages.length - 1
+						}
+						variant={variant}
+						onMessageEdit={onMessageEdit}
+						onCopy={onCopy}
+						onVote={onVote}
+						onDocumentClick={onDocumentClick}
+						onDocumentSave={onDocumentSave}
+					/>
+				))}
+
+				{showThinking &&
+					status === "submitted" &&
+					messages.length > 0 &&
+					messages[messages.length - 1].role === "user" && <ThinkingMessage />}
+
+				<motion.div
+					ref={endRef}
+					className="shrink-0 min-w-[12px] min-h-[12px]"
+					data-testid="scroll-anchor"
 				/>
-			))}
-
-			{showThinking &&
-				status === "submitted" &&
-				messages.length > 0 &&
-				messages[messages.length - 1].role === "user" && <ThinkingMessage />}
-
-			<motion.div
-				ref={endRef}
-				className="shrink-0 min-w-[12px] min-h-[12px]"
-				data-testid="scroll-anchor"
-			/>
-		</div>
+			</div>
+		</ScrollArea>
 	);
 }
 
