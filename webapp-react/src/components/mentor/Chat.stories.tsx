@@ -1,80 +1,126 @@
-import type { ChatMessageVote, Document } from "@/api/types.gen";
+import type { ChatMessageVote } from "@/api/types.gen";
 import type { ChatMessage } from "@/lib/types";
 import type { Meta, StoryObj } from "@storybook/react";
 import { fn } from "@storybook/test";
 import { Chat } from "./Chat";
 
 /**
- * Chat component providing a complete conversational interface with artifact support.
- * Handles message display, input, file attachments, and seamlessly switches between
- * standard chat view and artifact mode when documents are clicked. Self-contained
- * artifact state management with clean external API for data fetching.
+ * Chat component providing a complete conversational AI interface with advanced artifact support.
+ *
+ * Features comprehensive message handling, real-time input capabilities, file attachment support,
+ * and seamless transitions between standard chat and artifact modes. The component manages its
+ * internal artifact state while providing clean external APIs for data integration and user actions.
+ *
+ * Key capabilities:
+ * - Multi-modal message rendering (text, files, tool outputs)
+ * - Real-time streaming with status indicators
+ * - Interactive document artifacts with click-to-expand functionality
+ * - Voting and feedback mechanisms
+ * - Comprehensive accessibility support
+ * - Flexible layout modes (standard, readonly, fullscreen)
  */
 const meta = {
 	component: Chat,
 	parameters: {
-		layout: "centered",
+		layout: "fullscreen",
+		docs: {
+			description: {
+				component:
+					"Primary conversational interface for AI-powered interactions with support for artifacts, attachments, and real-time streaming.",
+			},
+		},
 	},
 	tags: ["autodocs"],
 	argTypes: {
 		id: {
-			description: "Unique identifier for the chat session",
+			description:
+				"Unique identifier for the chat session, used for persistence and analytics",
 			control: "text",
 		},
 		messages: {
-			description: "Array of chat messages to display",
+			description:
+				"Chronologically ordered array of chat messages with full conversation history",
 			control: "object",
 		},
 		votes: {
-			description: "Array of votes for messages",
+			description:
+				"User feedback votes associated with specific messages for quality improvement",
 			control: "object",
 		},
 		status: {
-			description: "Current chat status",
+			description: "Current operational state of the chat interface",
 			control: "select",
 			options: ["submitted", "streaming", "ready", "error"],
 		},
 		readonly: {
-			description: "Whether the interface is in readonly mode",
+			description:
+				"Disables input interface for viewing historical conversations",
 			control: "boolean",
 		},
 		attachments: {
-			description: "Current input attachments",
+			description:
+				"Currently attached files awaiting submission with the next message",
 			control: "object",
 		},
 		showSuggestedActions: {
-			description: "Whether to show suggested actions in input",
+			description:
+				"Displays contextual suggested actions to guide user interaction",
 			control: "boolean",
 		},
 		inputPlaceholder: {
-			description: "Placeholder text for input",
+			description: "Instructional text displayed in the message input field",
 			control: "text",
 		},
 		disableAttachments: {
-			description: "Whether to disable attachment functionality",
+			description:
+				"Removes file attachment functionality for security-restricted environments",
 			control: "boolean",
 		},
 	},
 	args: {
-		id: "chat-demo",
+		id: "demo-chat-session",
 		messages: [],
 		votes: [],
 		status: "ready",
 		readonly: false,
 		isAtBottom: true,
 		attachments: [],
-		onMessageSubmit: fn(),
-		onStop: fn(),
-		onFileUpload: fn(async () => []),
-		onAttachmentsChange: fn(),
-		onMessageEdit: fn(),
-		onCopy: fn(),
-		onVote: fn(),
-		onSuggestedAction: fn(),
-		onDocumentClick: fn(),
-		scrollToBottom: fn(),
+		// Event handlers with realistic implementations for demo purposes
+		onMessageSubmit: fn((data: { text: string; attachments: unknown[] }) =>
+			console.log(
+				"Message submitted:",
+				data.text,
+				"with attachments:",
+				data.attachments,
+			),
+		),
+		onStop: fn(() => console.log("Streaming stopped by user")),
+		onFileUpload: fn(async (files: File[]) => {
+			console.log(
+				"Files uploaded:",
+				files.map((f) => f.name),
+			);
+			return [];
+		}),
+		onAttachmentsChange: fn((attachments: unknown[]) =>
+			console.log("Attachments changed:", attachments),
+		),
+		onMessageEdit: fn((messageId: string, newContent: string) =>
+			console.log("Message edited:", messageId, newContent),
+		),
+		onCopy: fn((content: string) => console.log("Content copied:", content)),
+		onVote: fn((messageId: string, isUpvoted: boolean) =>
+			console.log("Vote cast:", messageId, isUpvoted ? "upvote" : "downvote"),
+		),
+		onSuggestedAction: fn((action: string) =>
+			console.log("Suggested action selected:", action),
+		),
+		onDocumentClick: fn((documentId: string, boundingRect: DOMRect) =>
+			console.log("Document artifact clicked:", documentId, boundingRect),
+		),
+		scrollToBottom: fn(() => console.log("Scroll to bottom triggered")),
 		showSuggestedActions: true,
-		inputPlaceholder: "Send a message...",
+		inputPlaceholder: "Ask me anything...",
 		disableAttachments: false,
 	},
 } satisfies Meta<typeof Chat>;
@@ -82,15 +128,23 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-// Mock data for comprehensive demo
-const mockMessages: ChatMessage[] = [
+// =============================================================================
+// MOCK DATA
+// =============================================================================
+
+/**
+ * Realistic conversation data demonstrating the chat's artifact creation and editing capabilities.
+ * This scenario shows a parent planning their child's birthday, showcasing multiple document types
+ * and the iterative improvement process typical in real AI conversations.
+ */
+const CONVERSATION_MESSAGES: ChatMessage[] = [
 	{
 		id: "msg-1",
 		role: "user",
 		parts: [
 			{
 				type: "text",
-				text: "Can you help me create a React component for displaying user profiles?",
+				text: "I need help writing a poem for my daughter's birthday. She's turning 8 and loves unicorns and rainbows.",
 			},
 		],
 		metadata: {
@@ -103,101 +157,37 @@ const mockMessages: ChatMessage[] = [
 		parts: [
 			{
 				type: "text",
-				text: "I'll help you create a React component for displaying user profiles. Let me create a comprehensive component with TypeScript support.",
+				text: "What a special milestone! I'd love to help you create a magical birthday poem for your daughter. Let me craft something that captures her love for unicorns and rainbows.",
 			},
 			{
 				type: "tool-createDocument",
 				toolCallId: "tool-1",
 				state: "output-available",
 				input: {
-					title: "UserProfile.tsx",
+					title: "Birthday Poem for Emma",
 					kind: "text" as const,
 				},
 				output: {
 					id: "doc-1",
-					title: "UserProfile.tsx",
-					content: `import React from 'react';
-import { cn } from '@/lib/utils';
+					title: "Birthday Poem for Emma",
+					content: `Eight Candles Bright
 
-interface User {
-  id: string;
-  name: string;
-  email: string;
-  avatar?: string;
-  bio?: string;
-  location?: string;
-  joinedAt: Date;
-}
+Today you turn eight, our shining star,
+With dreams that travel oh so far.
+Like unicorns with silky manes,
+Dancing through the rainbow lanes.
 
-interface UserProfileProps {
-  user: User;
-  showEmail?: boolean;
-  variant?: 'default' | 'compact' | 'detailed';
-  className?: string;
-}
+Your laughter sparkles, pure and true,
+A magic only found in you.
+Eight years of joy, eight years of light,
+Making every day so bright.
 
-export const UserProfile: React.FC<UserProfileProps> = ({
-  user,
-  showEmail = false,
-  variant = 'default',
-  className,
-}) => {
-  return (
-    <div className={cn(
-      'flex items-center space-x-4 p-4 rounded-lg border',
-      {
-        'flex-col space-x-0 space-y-2': variant === 'compact',
-        'flex-col lg:flex-row lg:space-y-0 lg:space-x-6': variant === 'detailed',
-      },
-      className
-    )}>
-      <div className="flex-shrink-0">
-        {user.avatar ? (
-          <img
-            src={user.avatar}
-            alt={user.name}
-            className="w-12 h-12 rounded-full object-cover"
-          />
-        ) : (
-          <div className="w-12 h-12 rounded-full bg-gray-200 flex items-center justify-center">
-            <span className="text-gray-600 font-medium">
-              {user.name.charAt(0).toUpperCase()}
-            </span>
-          </div>
-        )}
-      </div>
-      
-      <div className="flex-1 min-w-0">
-        <h3 className="text-lg font-semibold text-gray-900 truncate">
-          {user.name}
-        </h3>
-        
-        {showEmail && (
-          <p className="text-sm text-gray-600 truncate">
-            {user.email}
-          </p>
-        )}
-        
-        {user.bio && variant === 'detailed' && (
-          <p className="text-sm text-gray-700 mt-2">
-            {user.bio}
-          </p>
-        )}
-        
-        <div className="flex items-center text-xs text-gray-500 mt-1">
-          {user.location && (
-            <span className="mr-2">📍 {user.location}</span>
-          )}
-          <span>
-            Joined {user.joinedAt.toLocaleDateString()}
-          </span>
-        </div>
-      </div>
-    </div>
-  );
-};
+So blow your candles, make a wish,
+For all the dreams upon your list.
+Our little unicorn so dear,
+We celebrate another year!
 
-export default UserProfile;`,
+Happy 8th Birthday! 🦄🌈`,
 					kind: "TEXT" as const,
 					createdAt: new Date().toISOString(),
 					updatedAt: new Date().toISOString(),
@@ -214,7 +204,7 @@ export default UserProfile;`,
 		parts: [
 			{
 				type: "text",
-				text: "This looks great! Can you also add a stories file for this component?",
+				text: "This is beautiful! Could you also create a simple birthday card message that I can write inside her card?",
 			},
 		],
 		metadata: {
@@ -227,113 +217,33 @@ export default UserProfile;`,
 		parts: [
 			{
 				type: "text",
-				text: "Absolutely! I'll create a comprehensive Storybook stories file that demonstrates all the variants and features of the UserProfile component.",
+				text: "Absolutely! Let me create a sweet and simple birthday message that would be perfect for the inside of her birthday card.",
 			},
 			{
 				type: "tool-createDocument",
 				toolCallId: "tool-2",
 				state: "output-available",
 				input: {
-					title: "UserProfile.stories.tsx",
+					title: "Birthday Card Message",
 					kind: "text" as const,
 				},
 				output: {
 					id: "doc-2",
-					title: "UserProfile.stories.tsx",
-					content: `import type { Meta, StoryObj } from '@storybook/react';
-import { UserProfile } from './UserProfile';
+					title: "Birthday Card Message",
+					content: `Dear Emma,
 
-/**
- * UserProfile component for displaying user information in various formats.
- * Supports different variants and customization options for different contexts.
- */
-const meta = {
-  component: UserProfile,
-  parameters: {
-    layout: 'centered',
-  },
-  tags: ['autodocs'],
-  argTypes: {
-    user: {
-      description: 'User data object',
-      control: 'object',
-    },
-    showEmail: {
-      description: 'Whether to display the user email',
-      control: 'boolean',
-    },
-    variant: {
-      description: 'Display variant',
-      control: 'select',
-      options: ['default', 'compact', 'detailed'],
-    },
-  },
-  args: {
-    user: {
-      id: '1',
-      name: 'Sarah Wilson',
-      email: 'sarah.wilson@example.com',
-      avatar: 'https://i.pravatar.cc/150?img=1',
-      bio: 'Frontend developer passionate about creating accessible and beautiful user interfaces.',
-      location: 'San Francisco, CA',
-      joinedAt: new Date('2023-01-15'),
-    },
-    showEmail: false,
-    variant: 'default',
-  },
-  decorators: [
-    (Story) => (
-      <div className="max-w-md p-6">
-        <Story />
-      </div>
-    ),
-  ],
-} satisfies Meta<typeof UserProfile>;
+Happy 8th Birthday to our amazing little girl!
 
-export default meta;
-type Story = StoryObj<typeof meta>;
+You bring so much joy and magic into our lives every single day. Watching you grow into such a kind, creative, and wonderful person has been the greatest gift.
 
-/**
- * Default user profile display.
- */
-export const Default: Story = {};
+May this new year be filled with unicorn adventures, rainbow discoveries, and all the happiness your heart can hold.
 
-/**
- * Compact variant for smaller spaces or lists.
- */
-export const Compact: Story = {
-  args: {
-    variant: 'compact',
-  },
-};
+We love you to the moon and back!
 
-/**
- * Detailed variant with bio and additional information.
- */
-export const Detailed: Story = {
-  args: {
-    variant: 'detailed',
-    showEmail: true,
-  },
-};
+With all our love,
+Mom & Dad 💕
 
-/**
- * User profile without avatar image.
- */
-export const WithoutAvatar: Story = {
-  args: {
-    user: {
-      id: '2',
-      name: 'John Doe',
-      email: 'john.doe@example.com',
-      bio: 'Backend engineer specializing in scalable systems.',
-      location: 'New York, NY',
-      joinedAt: new Date('2022-08-20'),
-    },
-    variant: 'detailed',
-    showEmail: true,
-  },
-};`,
+P.S. Don't forget to make a special wish when you blow out your candles! 🎂✨`,
 					kind: "TEXT" as const,
 					createdAt: new Date().toISOString(),
 					updatedAt: new Date().toISOString(),
@@ -349,14 +259,8 @@ export const WithoutAvatar: Story = {
 		role: "user",
 		parts: [
 			{
-				type: "file",
-				filename: "design-system.png",
-				mediaType: "image/png",
-				url: "https://picsum.photos/400/300?random=1",
-			},
-			{
 				type: "text",
-				text: "Here's our design system reference. Can you update the component to match these styles?",
+				text: "Perfect! One more thing - could you update the poem to mention that she's starting 3rd grade soon? I think that would make it even more special.",
 			},
 		],
 		metadata: {
@@ -369,7 +273,7 @@ export const WithoutAvatar: Story = {
 		parts: [
 			{
 				type: "text",
-				text: "Perfect! I can see your design system. Let me update the UserProfile component to align with these visual guidelines and color scheme.",
+				text: "What a great idea! Adding that milestone will make the poem even more personal and meaningful. Let me update it to celebrate both her birthday and this exciting new chapter.",
 			},
 			{
 				type: "tool-updateDocument",
@@ -377,166 +281,34 @@ export const WithoutAvatar: Story = {
 				state: "output-available",
 				input: {
 					id: "doc-1",
-					description: "Update component styling to match design system",
+					description: "Add reference to starting 3rd grade",
 				},
 				output: {
 					id: "doc-1",
-					title: "UserProfile.tsx",
-					content: `import React from 'react';
-import { cn } from '@/lib/utils';
+					title: "Birthday Poem for Emma",
+					content: `Eight Candles Bright
 
-interface User {
-  id: string;
-  name: string;
-  email: string;
-  avatar?: string;
-  bio?: string;
-  location?: string;
-  joinedAt: Date;
-  status?: 'online' | 'offline' | 'away';
-}
+Today you turn eight, our shining star,
+With dreams that travel oh so far.
+Like unicorns with silky manes,
+Dancing through the rainbow lanes.
 
-interface UserProfileProps {
-  user: User;
-  showEmail?: boolean;
-  showStatus?: boolean;
-  variant?: 'default' | 'compact' | 'detailed';
-  className?: string;
-  onClick?: () => void;
-}
+Third grade awaits with books to read,
+New friends to meet, new goals to lead.
+Your laughter sparkles, pure and true,
+A magic only found in you.
 
-export const UserProfile: React.FC<UserProfileProps> = ({
-  user,
-  showEmail = false,
-  showStatus = false,
-  variant = 'default',
-  className,
-  onClick,
-}) => {
-  const getStatusColor = (status?: string) => {
-    switch (status) {
-      case 'online': return 'bg-green-500';
-      case 'away': return 'bg-yellow-500';
-      case 'offline': return 'bg-gray-400';
-      default: return 'bg-gray-400';
-    }
-  };
+Eight years of joy, eight years of light,
+Making every day so bright.
+Growing bigger, growing smart,
+With such a loving, caring heart.
 
-  return (
-    <div 
-      className={cn(
-        'group flex items-center space-x-4 p-6 rounded-xl',
-        'bg-white border border-gray-200 shadow-sm',
-        'hover:shadow-md hover:border-gray-300 transition-all duration-200',
-        {
-          'flex-col space-x-0 space-y-3 p-4': variant === 'compact',
-          'flex-col lg:flex-row lg:space-y-0 lg:space-x-6 p-8': variant === 'detailed',
-          'cursor-pointer': onClick,
-        },
-        className
-      )}
-      onClick={onClick}
-    >
-      <div className="relative flex-shrink-0">
-        {user.avatar ? (
-          <img
-            src={user.avatar}
-            alt={user.name}
-            className={cn(
-              'rounded-full object-cover ring-2 ring-gray-100',
-              {
-                'w-10 h-10': variant === 'compact',
-                'w-12 h-12': variant === 'default',
-                'w-16 h-16': variant === 'detailed',
-              }
-            )}
-          />
-        ) : (
-          <div className={cn(
-            'rounded-full bg-gradient-to-br from-blue-500 to-purple-600',
-            'flex items-center justify-center text-white font-semibold',
-            {
-              'w-10 h-10 text-sm': variant === 'compact',
-              'w-12 h-12 text-base': variant === 'default',
-              'w-16 h-16 text-lg': variant === 'detailed',
-            }
-          )}>
-            {user.name.charAt(0).toUpperCase()}
-          </div>
-        )}
-        
-        {showStatus && user.status && (
-          <div className={cn(
-            'absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full border-2 border-white',
-            getStatusColor(user.status)
-          )} />
-        )}
-      </div>
-      
-      <div className="flex-1 min-w-0">
-        <div className="flex items-center space-x-2">
-          <h3 className={cn(
-            'font-semibold text-gray-900 truncate',
-            {
-              'text-sm': variant === 'compact',
-              'text-base': variant === 'default',
-              'text-lg': variant === 'detailed',
-            }
-          )}>
-            {user.name}
-          </h3>
-          
-          {showStatus && user.status && (
-            <span className={cn(
-              'inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium',
-              {
-                'bg-green-100 text-green-800': user.status === 'online',
-                'bg-yellow-100 text-yellow-800': user.status === 'away',
-                'bg-gray-100 text-gray-800': user.status === 'offline',
-              }
-            )}>
-              {user.status}
-            </span>
-          )}
-        </div>
-        
-        {showEmail && (
-          <p className="text-sm text-gray-600 truncate mt-0.5">
-            {user.email}
-          </p>
-        )}
-        
-        {user.bio && variant === 'detailed' && (
-          <p className="text-sm text-gray-700 mt-2 leading-relaxed">
-            {user.bio}
-          </p>
-        )}
-        
-        <div className="flex items-center text-xs text-gray-500 mt-2">
-          {user.location && (
-            <span className="inline-flex items-center mr-3">
-              <svg className="w-3 h-3 mr-1" fill="currentColor" viewBox="0 0 20 20">
-                <path fillRule="evenodd" d="M5.05 4.05a7 7 0 119.9 9.9L10 18.9l-4.95-4.95a7 7 0 010-9.9zM10 11a2 2 0 100-4 2 2 0 000 4z" clipRule="evenodd" />
-              </svg>
-              {user.location}
-            </span>
-          )}
-          <span className="inline-flex items-center">
-            <svg className="w-3 h-3 mr-1" fill="currentColor" viewBox="0 0 20 20">
-              <path fillRule="evenodd" d="M6 2a1 1 0 00-1 1v1H4a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V6a2 2 0 00-2-2h-1V3a1 1 0 10-2 0v1H7V3a1 1 0 00-1-1zm0 5a1 1 0 000 2h8a1 1 0 100-2H6z" clipRule="evenodd" />
-            </svg>
-            Joined {user.joinedAt.toLocaleDateString('en-US', { 
-              month: 'short', 
-              year: 'numeric' 
-            })}
-          </span>
-        </div>
-      </div>
-    </div>
-  );
-};
+So blow your candles, make a wish,
+For all the dreams upon your list.
+Our little unicorn so dear,
+We celebrate another year!
 
-export default UserProfile;`,
+Happy 8th Birthday! 🦄🌈📚`,
 					kind: "TEXT" as const,
 					createdAt: new Date().toISOString(),
 					updatedAt: new Date().toISOString(),
@@ -547,49 +319,187 @@ export default UserProfile;`,
 			createdAt: new Date().toISOString(),
 		},
 	},
+	{
+		id: "msg-7",
+		role: "user",
+		parts: [
+			{
+				type: "text",
+				text: "Wonderful! One last request - can you help me create a simple shopping list for her party? We're having about 10 kids over.",
+			},
+		],
+		metadata: {
+			createdAt: new Date().toISOString(),
+		},
+	},
+	{
+		id: "msg-8",
+		role: "assistant",
+		parts: [
+			{
+				type: "text",
+				text: "Of course! Let me create a practical shopping list for a fun 8th birthday party with 10 kids. I'll include everything from decorations to food and party favors.",
+			},
+			{
+				type: "tool-createDocument",
+				toolCallId: "tool-4",
+				state: "output-available",
+				input: {
+					title: "Birthday Party Shopping List",
+					kind: "text" as const,
+				},
+				output: {
+					id: "doc-3",
+					title: "Birthday Party Shopping List",
+					content: `Emma's 8th Birthday Party Shopping List
+🦄 For 10 kids + family 🌈
+
+## DECORATIONS
+- [ ] Unicorn/rainbow themed tablecloth
+- [ ] Colorful balloons (pink, purple, blue, rainbow)
+- [ ] Birthday banner
+- [ ] Paper plates and cups (unicorn theme)
+- [ ] Napkins
+- [ ] Plastic forks and spoons
+
+## FOOD & DRINKS
+- [ ] Birthday cake (or ingredients to make one)
+- [ ] Juice boxes or punch
+- [ ] Pizza (2-3 large pizzas)
+- [ ] Fresh fruit (strawberries, grapes, watermelon)
+- [ ] Veggie tray with ranch dip
+- [ ] Chips and pretzels
+- [ ] Ice cream (vanilla and chocolate)
+
+## PARTY ACTIVITIES
+- [ ] Party games supplies
+- [ ] Craft materials (if doing a craft activity)
+- [ ] Music playlist ready
+
+## PARTY FAVORS
+- [ ] Small gift bags
+- [ ] Stickers (unicorn/rainbow theme)
+- [ ] Small toys or trinkets
+- [ ] Candy or small treats
+
+## DON'T FORGET
+- [ ] Candles (number 8!)
+- [ ] Lighter/matches
+- [ ] Camera for photos
+- [ ] Thank you cards
+
+**Budget estimate: $80-120 for everything!** 🎉`,
+					kind: "TEXT" as const,
+					createdAt: new Date().toISOString(),
+					updatedAt: new Date().toISOString(),
+				},
+			},
+		],
+		metadata: {
+			createdAt: new Date().toISOString(),
+		},
+	},
+	{
+		id: "msg-9",
+		role: "user",
+		parts: [
+			{
+				type: "text",
+				text: "This is so helpful! Thank you for making Emma's birthday planning so much easier. You've created everything I need! 🎉",
+			},
+		],
+		metadata: {
+			createdAt: new Date().toISOString(),
+		},
+	},
+	{
+		id: "msg-10",
+		role: "assistant",
+		parts: [
+			{
+				type: "text",
+				text: "You're so welcome! I'm thrilled I could help make Emma's 8th birthday extra special. She's going to love the personalized poem, and it sounds like you have everything planned for a magical celebration. I hope she has the most wonderful day filled with unicorns, rainbows, and lots of birthday joy! 🦄🌈🎂✨",
+			},
+		],
+		metadata: {
+			createdAt: new Date().toISOString(),
+		},
+	},
 ];
 
-const mockVotes: ChatMessageVote[] = [
+/**
+ * User feedback votes demonstrating the voting system on helpful responses.
+ * Typically votes are cast on messages that provide significant value or solve problems effectively.
+ */
+const CONVERSATION_VOTES: ChatMessageVote[] = [
 	{
 		messageId: "msg-2",
 		isUpvoted: true,
 	},
 	{
-		messageId: "msg-4",
+		messageId: "msg-6",
+		isUpvoted: true,
+	},
+	{
+		messageId: "msg-8",
 		isUpvoted: true,
 	},
 ];
 
-const mockAttachments = [
+/**
+ * Sample file attachments for testing upload and display functionality.
+ * Represents typical files users might attach to provide context for their requests.
+ */
+const SAMPLE_ATTACHMENTS = [
 	{
-		name: "component-spec.md",
-		url: "https://example.com/spec.md",
+		name: "party-requirements.md",
+		url: "https://example.com/party-requirements.md",
 		contentType: "text/markdown",
+	},
+	{
+		name: "budget-constraints.pdf",
+		url: "https://example.com/budget.pdf",
+		contentType: "application/pdf",
 	},
 ];
 
+// =============================================================================
+// STORIES
+// =============================================================================
+
 /**
- * Complete chat experience showing the full conversation flow with artifact switching.
- * Click on any document preview to open it in artifact mode. This demonstrates
- * how the component seamlessly transitions between chat and artifact views.
+ * Complete conversational experience demonstrating end-to-end functionality.
+ *
+ * This story showcases a realistic AI-assisted creative planning session, featuring:
+ * - Multi-turn conversation with natural flow and context retention
+ * - Document artifact creation (poems, messages, lists) with real-world utility
+ * - Document editing and iteration based on user feedback
+ * - User voting on helpful responses to demonstrate feedback mechanisms
+ * - Click-to-expand artifact functionality for detailed document interaction
+ *
+ * Click on any document preview to trigger artifact mode and explore the full content.
+ * This demonstrates the seamless transition between conversational and document-focused views.
  */
-export const ComprehensiveDemo: Story = {
+export const FullConversationDemo: Story = {
 	args: {
-		messages: mockMessages,
-		votes: mockVotes,
+		messages: CONVERSATION_MESSAGES,
+		votes: CONVERSATION_VOTES,
 		attachments: [],
-		onDocumentClick: fn((document: Document, boundingBox: DOMRect) => {
-			console.log("Document clicked:", document.title, boundingBox);
-			// In a real app, this would trigger external data fetching
-			// The component handles the artifact state internally
+		onDocumentClick: fn((documentId: string, boundingBox: DOMRect) => {
+			console.log("Document clicked:", documentId, boundingBox);
+			// In production, this would trigger external data fetching
+			// The component manages artifact state transitions internally
 		}),
 	},
 };
 
 /**
- * Empty chat state showing the greeting and input interface.
+ * Clean slate interface for new conversations.
+ *
+ * Demonstrates the initial state with welcome messaging and input readiness.
+ * Perfect for testing onboarding experience and first-time user interactions.
  */
-export const EmptyChat: Story = {
+export const EmptyState: Story = {
 	args: {
 		messages: [],
 		attachments: [],
@@ -597,29 +507,35 @@ export const EmptyChat: Story = {
 };
 
 /**
- * Chat with current input attachments ready to send.
+ * Active conversation with pending file attachments.
+ *
+ * Shows the interface state when users have attached files but haven't sent the message yet.
+ * Useful for testing attachment display, removal, and submission workflows.
  */
-export const WithAttachments: Story = {
+export const WithPendingAttachments: Story = {
 	args: {
-		messages: mockMessages.slice(0, 2),
-		attachments: mockAttachments,
+		messages: CONVERSATION_MESSAGES.slice(0, 2),
+		attachments: SAMPLE_ATTACHMENTS,
 	},
 };
 
 /**
- * Chat in streaming state with thinking indicator.
+ * Real-time streaming response in progress.
+ *
+ * Demonstrates the interface during active AI response generation with streaming indicators.
+ * Critical for testing loading states, stop functionality, and real-time message updates.
  */
-export const Streaming: Story = {
+export const StreamingResponse: Story = {
 	args: {
 		messages: [
-			...mockMessages.slice(0, 3),
+			...CONVERSATION_MESSAGES.slice(0, 3),
 			{
 				id: "msg-streaming",
 				role: "assistant",
 				parts: [
 					{
 						type: "text",
-						text: "I'm analyzing your design system and updating the component...",
+						text: "I'm crafting a personalized birthday card message that will capture your daughter's special day...",
 					},
 				],
 				metadata: {
@@ -632,23 +548,31 @@ export const Streaming: Story = {
 };
 
 /**
- * Readonly chat view - no input interface, used for historical conversations.
+ * Archive view for completed conversations.
+ *
+ * Read-only mode without input interface, ideal for viewing conversation history,
+ * customer service transcripts, or educational content. Maintains full voting and
+ * artifact functionality while preventing new message creation.
  */
-export const ReadonlyMode: Story = {
+export const ReadOnlyArchive: Story = {
 	args: {
-		messages: mockMessages,
-		votes: mockVotes,
+		messages: CONVERSATION_MESSAGES,
+		votes: CONVERSATION_VOTES,
 		readonly: true,
 	},
 };
 
 /**
- * Chat with disabled attachments for restricted environments.
+ * Security-restricted environment configuration.
+ *
+ * Demonstrates the interface with file attachments disabled for compliance with
+ * enterprise security policies or environments where file uploads are prohibited.
+ * Input remains fully functional for text-based interactions.
  */
-export const NoAttachments: Story = {
+export const SecureMode: Story = {
 	args: {
-		messages: mockMessages.slice(0, 4),
+		messages: CONVERSATION_MESSAGES.slice(0, 4),
 		disableAttachments: true,
-		inputPlaceholder: "Send a message (attachments disabled)...",
+		inputPlaceholder: "Send a message (file attachments disabled)...",
 	},
 };
