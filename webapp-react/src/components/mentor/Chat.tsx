@@ -3,7 +3,7 @@ import type { Attachment, ChatMessage } from "@/lib/types";
 import { cn } from "@/lib/utils";
 import type { UseChatHelpers } from "@ai-sdk/react";
 import equal from "fast-deep-equal";
-import { memo } from "react";
+import { memo, useCallback, useState } from "react";
 import { useWindowSize } from "usehooks-ts";
 import { Artifact } from "./Artifact";
 import type { UIArtifact } from "./Artifact";
@@ -25,22 +25,6 @@ export interface ChatProps {
 	isAtBottom?: boolean;
 	/** Function to scroll to bottom of the chat */
 	scrollToBottom?: () => void;
-	/** Current artifact state */
-	artifact?: UIArtifact;
-	/** Array of document versions for the artifact */
-	documents?: Document[];
-	/** Current document being displayed in artifact */
-	currentDocument?: Document;
-	/** Index of current version being viewed in artifact */
-	currentVersionIndex?: number;
-	/** Whether viewing the latest version of the artifact */
-	isCurrentVersion?: boolean;
-	/** Whether artifact content has unsaved changes */
-	isContentDirty?: boolean;
-	/** Display mode for artifact content */
-	artifactMode?: "edit" | "diff";
-	/** Metadata for artifact rendering */
-	artifactMetadata?: Record<string, unknown>;
 	/** Current input attachments */
 	attachments: Attachment[];
 	/** Handler for message submission */
@@ -57,22 +41,10 @@ export interface ChatProps {
 	onCopy?: (content: string) => void;
 	/** Handler for voting on messages */
 	onVote?: (messageId: string, isUpvote: boolean) => void;
-	/** Handler for document interactions in messages */
-	onDocumentClick?: (document: Document, boundingBox: DOMRect) => void;
-	/** Handler for document content changes in messages */
-	onDocumentSave?: (documentId: string, content: string) => void;
-	/** Handler for artifact content saving */
-	onArtifactContentSave?: (content: string) => void;
-	/** Handler for artifact version navigation */
-	onArtifactVersionChange?: (
-		type: "next" | "prev" | "toggle" | "latest",
-	) => void;
-	/** Handler for closing the artifact */
-	onArtifactClose?: () => void;
-	/** Handler for artifact metadata updates */
-	onArtifactMetadataUpdate?: (metadata: Record<string, unknown>) => void;
 	/** Handler for suggested action clicks */
 	onSuggestedAction?: (actionMessage: string) => void;
+	/** Handler called when document preview is clicked */
+	onDocumentClick?: (document: Document, boundingBox: DOMRect) => void;
 	/** Whether to show suggested actions in input */
 	showSuggestedActions?: boolean;
 	/** Placeholder text for input */
@@ -90,14 +62,6 @@ function PureChat({
 	readonly = false,
 	isAtBottom = true,
 	scrollToBottom,
-	artifact,
-	documents,
-	currentDocument,
-	currentVersionIndex = -1,
-	isCurrentVersion = true,
-	isContentDirty = false,
-	artifactMode = "edit",
-	artifactMetadata = {},
 	attachments,
 	onMessageSubmit,
 	onStop,
@@ -106,13 +70,8 @@ function PureChat({
 	onMessageEdit,
 	onCopy,
 	onVote,
-	onDocumentClick,
-	onDocumentSave,
-	onArtifactContentSave,
-	onArtifactVersionChange,
-	onArtifactClose,
-	onArtifactMetadataUpdate,
 	onSuggestedAction,
+	onDocumentClick,
 	showSuggestedActions = false,
 	inputPlaceholder = "Send a message...",
 	disableAttachments = false,
@@ -120,6 +79,93 @@ function PureChat({
 }: ChatProps) {
 	const { width } = useWindowSize();
 	const isMobile = width ? width < 768 : false;
+
+	// Internal artifact state management - completely self-contained
+	const [artifact, setArtifact] = useState<UIArtifact | null>(null);
+	const [documents, setDocuments] = useState<Document[]>([]);
+	const [currentVersionIndex, setCurrentVersionIndex] = useState(-1);
+	const [isContentDirty, setIsContentDirty] = useState(false);
+	const [artifactMode, setArtifactMode] = useState<"edit" | "diff">("edit");
+
+	// Handle document clicks from messages - convert to artifact opening
+	const handleDocumentClick = useCallback(
+		(document: Document, boundingBox: DOMRect) => {
+			// Create artifact state from document
+			const newArtifact: UIArtifact = {
+				title: document.title,
+				documentId: document.id,
+				kind: document.kind === "TEXT" ? "text" : "text", // Map API types to artifact types
+				content: document.content || "",
+				isVisible: true,
+				status: "idle",
+				boundingBox: {
+					top: boundingBox.top,
+					left: boundingBox.left,
+					width: boundingBox.width,
+					height: boundingBox.height,
+				},
+			};
+
+			setArtifact(newArtifact);
+			setDocuments([document]); // Start with the clicked document
+			setCurrentVersionIndex(0);
+			setIsContentDirty(false);
+			setArtifactMode("edit");
+
+			// Call external handler for side effects (fetching more versions, etc.)
+			onDocumentClick?.(document, boundingBox);
+		},
+		[onDocumentClick],
+	);
+
+	// Handle artifact closing
+	const handleArtifactClose = useCallback(() => {
+		setArtifact(null);
+		setDocuments([]);
+		setCurrentVersionIndex(-1);
+		setIsContentDirty(false);
+		setArtifactMode("edit");
+	}, []);
+
+	// Handle artifact content saving
+	const handleArtifactContentSave = useCallback(
+		(content: string) => {
+			if (artifact) {
+				setArtifact((prev) => (prev ? { ...prev, content } : null));
+				setIsContentDirty(true);
+			}
+		},
+		[artifact],
+	);
+
+	// Handle artifact version navigation
+	const handleArtifactVersionChange = useCallback(
+		(type: "next" | "prev" | "toggle" | "latest") => {
+			switch (type) {
+				case "next":
+					setCurrentVersionIndex((prev) =>
+						Math.min(prev + 1, documents.length - 1),
+					);
+					break;
+				case "prev":
+					setCurrentVersionIndex((prev) => Math.max(prev - 1, 0));
+					break;
+				case "toggle":
+					setArtifactMode((prev) => (prev === "edit" ? "diff" : "edit"));
+					break;
+				case "latest":
+					setCurrentVersionIndex(documents.length - 1);
+					break;
+			}
+		},
+		[documents.length],
+	);
+
+	// API for external components to control artifact state (can be used by parent containers)
+	// These are kept for potential future use but not exposed in props to keep API clean
+
+	const currentDocument = documents[currentVersionIndex] || documents[0];
+	const isCurrentVersion = currentVersionIndex === documents.length - 1;
 
 	return (
 		<>
@@ -138,8 +184,8 @@ function PureChat({
 					onMessageEdit={onMessageEdit}
 					onCopy={onCopy}
 					onVote={onVote}
-					onDocumentClick={onDocumentClick}
-					onDocumentSave={onDocumentSave}
+					onDocumentClick={handleDocumentClick}
+					onDocumentSave={handleArtifactContentSave}
 				/>
 
 				<form className="flex mx-auto px-4 bg-background pb-4 md:pb-6 gap-2 w-full md:max-w-3xl">
@@ -170,7 +216,7 @@ function PureChat({
 				</form>
 			</div>
 
-			{artifact?.isVisible && onArtifactClose && (
+			{artifact?.isVisible && (
 				<Artifact
 					artifact={artifact}
 					documents={documents}
@@ -186,19 +232,19 @@ function PureChat({
 					votes={votes}
 					status={status}
 					attachments={attachments}
-					metadata={artifactMetadata}
-					onClose={onArtifactClose}
-					onContentSave={onArtifactContentSave || (() => {})}
-					onVersionChange={onArtifactVersionChange || (() => {})}
+					metadata={{}}
+					onClose={handleArtifactClose}
+					onContentSave={handleArtifactContentSave}
+					onVersionChange={handleArtifactVersionChange}
 					onMessageSubmit={onMessageSubmit}
 					onStop={onStop}
 					onFileUpload={onFileUpload}
 					onMessageEdit={onMessageEdit}
 					onCopy={onCopy}
 					onVote={onVote}
-					onDocumentClick={onDocumentClick}
-					onDocumentSave={onDocumentSave}
-					onMetadataUpdate={onArtifactMetadataUpdate}
+					onDocumentClick={handleDocumentClick}
+					onDocumentSave={handleArtifactContentSave}
+					onMetadataUpdate={() => {}}
 				/>
 			)}
 		</>
@@ -218,24 +264,11 @@ export const Chat = memo(PureChat, (prevProps, nextProps) => {
 	// Compare status
 	if (prevProps.status !== nextProps.status) return false;
 
-	// Compare artifact state
-	if (!equal(prevProps.artifact, nextProps.artifact)) return false;
-
-	// Compare documents arrays
-	if (!equal(prevProps.documents, nextProps.documents)) return false;
-
 	// Compare readonly state
 	if (prevProps.readonly !== nextProps.readonly) return false;
 
 	// Compare scroll state
 	if (prevProps.isAtBottom !== nextProps.isAtBottom) return false;
-
-	// Compare artifact-related props
-	if (prevProps.currentVersionIndex !== nextProps.currentVersionIndex)
-		return false;
-	if (prevProps.isCurrentVersion !== nextProps.isCurrentVersion) return false;
-	if (prevProps.isContentDirty !== nextProps.isContentDirty) return false;
-	if (prevProps.artifactMode !== nextProps.artifactMode) return false;
 
 	// Compare configuration props
 	if (prevProps.showSuggestedActions !== nextProps.showSuggestedActions)
@@ -243,6 +276,13 @@ export const Chat = memo(PureChat, (prevProps, nextProps) => {
 	if (prevProps.disableAttachments !== nextProps.disableAttachments)
 		return false;
 	if (prevProps.inputPlaceholder !== nextProps.inputPlaceholder) return false;
+
+	// Compare function handlers (by reference - they should be stable)
+	if (prevProps.onMessageSubmit !== nextProps.onMessageSubmit) return false;
+	if (prevProps.onStop !== nextProps.onStop) return false;
+	if (prevProps.onFileUpload !== nextProps.onFileUpload) return false;
+	if (prevProps.onAttachmentsChange !== nextProps.onAttachmentsChange)
+		return false;
 
 	// If all comparisons pass, component should not re-render
 	return true;
