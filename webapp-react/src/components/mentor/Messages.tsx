@@ -71,7 +71,7 @@ function PureMessages({
 					"flex flex-col w-full pb-16",
 					{
 						// Default layout - centered like the input
-						"min-w-0 gap-2 flex-1 pt-4 relative mx-auto px-4 md:max-w-3xl":
+						"min-w-0 gap-2 flex-1 pt-4 relative mx-auto md:max-w-3xl":
 							!isArtifact,
 						// Artifact layout
 						"gap-2 flex-1 px-0 pt-4": isArtifact,

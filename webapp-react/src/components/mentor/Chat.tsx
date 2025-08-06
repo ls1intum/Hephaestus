@@ -259,8 +259,8 @@ function PureChat({
 				/>
 
 				<div className="relative">
-					<div className="flex flex-row gap-2 items-end w-full px-4 pb-4 md:pb-6 -mt-20 relative z-10 bg-gradient-to-t from-muted dark:from-background/30 from-60% to-transparent pt-8">
-						<div className="flex mx-auto gap-2 w-full md:max-w-3xl">
+					<div className="flex flex-row gap-2 items-end w-full pb-4 md:pb-6 -mt-20 relative z-10 bg-gradient-to-t from-muted dark:from-background/30 from-60% to-transparent pt-8">
+						<div className="flex mx-auto px-4 gap-2 w-full md:max-w-3xl">
 							{!readonly && (
 								<MultimodalInput
 									status={
