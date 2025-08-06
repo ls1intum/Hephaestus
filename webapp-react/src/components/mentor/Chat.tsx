@@ -44,7 +44,7 @@ export interface ChatProps {
 	/** Handler for suggested action clicks */
 	onSuggestedAction?: (actionMessage: string) => void;
 	/** Handler called when document preview is clicked */
-	onDocumentClick?: (document: Document, boundingBox: DOMRect) => void;
+	onDocumentClick?: (documentId: string, boundingBox: DOMRect) => void;
 	/** Whether to show suggested actions in input */
 	showSuggestedActions?: boolean;
 	/** Placeholder text for input */
@@ -90,32 +90,82 @@ function PureChat({
 	// Handle document clicks from messages - convert to artifact opening
 	const handleDocumentClick = useCallback(
 		(document: Document, boundingBox: DOMRect) => {
-			// Create artifact state from document
-			const newArtifact: UIArtifact = {
-				title: document.title,
-				documentId: document.id,
-				kind: document.kind === "TEXT" ? "text" : "text", // Map API types to artifact types
-				content: document.content || "",
-				isVisible: true,
-				status: "idle",
-				boundingBox: {
-					top: boundingBox.top,
-					left: boundingBox.left,
-					width: boundingBox.width,
-					height: boundingBox.height,
-				},
-			};
+			if (artifact?.isVisible) {
+				// Artifact is already open - just switch to the new document (no animation)
+				setArtifact((prev) =>
+					prev
+						? {
+								...prev,
+								title: document.title,
+								documentId: document.id,
+								content: document.content || "",
+								// Keep existing boundingBox and isVisible to prevent re-animation
+							}
+						: null,
+				);
+				setDocuments([document]);
+				setCurrentVersionIndex(0);
+				setIsContentDirty(false);
+				setArtifactMode("edit");
+			} else {
+				// No artifact open - create new one with opening animation
+				const newArtifact: UIArtifact = {
+					title: document.title,
+					documentId: document.id,
+					kind: document.kind === "TEXT" ? "text" : "text",
+					content: document.content || "",
+					isVisible: true,
+					status: "idle",
+					boundingBox: {
+						top: boundingBox.top,
+						left: boundingBox.left,
+						width: boundingBox.width,
+						height: boundingBox.height,
+					},
+				};
 
-			setArtifact(newArtifact);
-			setDocuments([document]); // Start with the clicked document
-			setCurrentVersionIndex(0);
-			setIsContentDirty(false);
-			setArtifactMode("edit");
+				setArtifact(newArtifact);
+				setDocuments([document]);
+				setCurrentVersionIndex(0);
+				setIsContentDirty(false);
+				setArtifactMode("edit");
+			}
 
 			// Call external handler for side effects (fetching more versions, etc.)
-			onDocumentClick?.(document, boundingBox);
+			onDocumentClick?.(document.id, boundingBox);
 		},
-		[onDocumentClick],
+		[onDocumentClick, artifact],
+	);
+
+	// Handle document clicks by ID (from DocumentTool components)
+	const handleDocumentClickById = useCallback(
+		(documentId: string, boundingBox: DOMRect) => {
+			// Look up the document from the messages
+			let foundDocument: Document | null = null;
+
+			for (const message of messages) {
+				for (const part of message.parts) {
+					if (
+						(part.type === "tool-createDocument" ||
+							part.type === "tool-updateDocument" ||
+							part.type === "tool-requestSuggestions") &&
+						part.state === "output-available"
+					) {
+						const doc = part.output as Document;
+						if (doc.id === documentId) {
+							foundDocument = doc;
+							break;
+						}
+					}
+				}
+				if (foundDocument) break;
+			}
+
+			if (foundDocument) {
+				handleDocumentClick(foundDocument, boundingBox);
+			}
+		},
+		[messages, handleDocumentClick],
 	);
 
 	// Handle artifact closing
@@ -190,7 +240,7 @@ function PureChat({
 					onMessageEdit={onMessageEdit}
 					onCopy={onCopy}
 					onVote={onVote}
-					onDocumentClick={handleDocumentClick}
+					onDocumentClick={handleDocumentClickById}
 					onDocumentSave={handleArtifactContentSave}
 				/>
 
@@ -248,7 +298,7 @@ function PureChat({
 					onMessageEdit={onMessageEdit}
 					onCopy={onCopy}
 					onVote={onVote}
-					onDocumentClick={handleDocumentClick}
+					onDocumentClick={handleDocumentClickById}
 					onDocumentSave={handleArtifactContentSave}
 					onMetadataUpdate={() => {}}
 				/>

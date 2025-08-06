@@ -1,4 +1,4 @@
-import type { ChatMessageVote, Document } from "@/api/types.gen";
+import type { ChatMessageVote } from "@/api/types.gen";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import type { ChatMessage } from "@/lib/types";
 import { cn } from "@/lib/utils";
@@ -37,7 +37,7 @@ export interface MessagesProps {
 	/** Handler for voting on messages */
 	onVote?: (messageId: string, isUpvote: boolean) => void;
 	/** Handler for document interactions */
-	onDocumentClick?: (document: Document, boundingBox: DOMRect) => void;
+	onDocumentClick?: (documentId: string, boundingBox: DOMRect) => void;
 	/** Handler for document content changes */
 	onDocumentSave?: (documentId: string, content: string) => void;
 	/** Optional CSS class name */

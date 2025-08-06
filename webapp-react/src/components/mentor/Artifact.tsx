@@ -83,7 +83,7 @@ export interface ArtifactProps {
 	/** Handler for voting on messages */
 	onVote?: (messageId: string, isUpvote: boolean) => void;
 	/** Handler for document interactions */
-	onDocumentClick?: (document: Document, boundingBox: DOMRect) => void;
+	onDocumentClick?: (documentId: string, boundingBox: DOMRect) => void;
 	/** Handler for document save operations */
 	onDocumentSave?: (documentId: string, content: string) => void;
 	/** Handler for metadata updates */
@@ -203,7 +203,7 @@ function PureArtifact({
 		<AnimatePresence mode="wait">
 			{isVisible && (
 				<motion.div
-					key={`artifact-${artifact.documentId}`}
+					key="artifact-container" // Stable key - doesn't change when switching documents
 					data-testid="artifact"
 					className={cn(
 						"flex flex-row h-dvh w-dvw fixed top-0 left-0 z-50 bg-transparent",

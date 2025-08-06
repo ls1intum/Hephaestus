@@ -1,6 +1,6 @@
 import { memo } from "react";
 
-import { useArtifact } from "@/hooks/use-artifact";
+import type { Document } from "@/api/types.gen";
 import type { ArtifactKind } from "./Artifact";
 import { FileIcon, LoaderIcon, MessageIcon, PencilEditIcon } from "./Icons";
 
@@ -34,6 +34,8 @@ interface DocumentToolProps {
 		| { title: string; kind: ArtifactKind } // for create
 		| { id: string; description: string } // for update
 		| { documentId: string }; // for request-suggestions
+	/** Handler for document clicks - receives document ID and rect */
+	onDocumentClick?: (documentId: string, boundingBox: DOMRect) => void;
 }
 
 function PureDocumentTool({
@@ -41,37 +43,17 @@ function PureDocumentTool({
 	isLoading = false,
 	result,
 	args,
+	onDocumentClick,
 }: DocumentToolProps) {
-	const { setArtifact } = useArtifact();
-
 	const handleClick = (event: React.MouseEvent<HTMLButtonElement>) => {
 		const rect = event.currentTarget.getBoundingClientRect();
-		const boundingBox = {
-			top: rect.top,
-			left: rect.left,
-			width: rect.width,
-			height: rect.height,
-		};
 
 		if (result) {
-			// Completed operation - set artifact with result data
-			setArtifact({
-				documentId: result.id,
-				kind: result.kind,
-				content: "",
-				title: result.title,
-				isVisible: true,
-				status: "idle",
-				boundingBox,
-			});
-		} else {
-			// In-progress operation - just show the artifact panel
-			setArtifact((currentArtifact) => ({
-				...currentArtifact,
-				isVisible: true,
-				boundingBox,
-			}));
+			// Just pass the document ID and let parent handle the rest
+			onDocumentClick?.(result.id, rect as DOMRect);
 		}
+		// For in-progress operations, we don't need to do anything
+		// The loading state is already shown via isLoading prop
 	};
 
 	// Display text logic

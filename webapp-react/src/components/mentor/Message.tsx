@@ -35,7 +35,7 @@ export interface MessageProps {
 	/** Handler for voting on messages */
 	onVote?: (messageId: string, isUpvote: boolean) => void;
 	/** Handler for document interactions */
-	onDocumentClick?: (document: Document, boundingBox: DOMRect) => void;
+	onDocumentClick?: (documentId: string, boundingBox: DOMRect) => void;
 	/** Handler for document content changes */
 	onDocumentSave?: (documentId: string, content: string) => void;
 	/** Optional CSS class name */
@@ -68,6 +68,42 @@ const PurePreviewMessage = ({
 	);
 
 	const isArtifact = variant === "artifact";
+
+	// Helper function to render document based on context
+	const renderDocument = (
+		document: Document,
+		toolType: "create" | "update" | "request-suggestions",
+		toolCallId: string,
+	) => {
+		if (isArtifact) {
+			return (
+				<DocumentTool
+					type={toolType}
+					result={{
+						id: document.id,
+						title: document.title,
+						kind: document.kind === "TEXT" ? "text" : "text",
+					}}
+					onDocumentClick={onDocumentClick}
+				/>
+			);
+		}
+
+		return (
+			<DocumentPreview
+				document={document}
+				isLoading={false}
+				isStreaming={false}
+				onDocumentClick={(doc, boundingBox) => {
+					// DocumentPreview still uses old interface, adapt it
+					onDocumentClick?.(doc.id, boundingBox);
+				}}
+				onSaveContent={(content) => {
+					onDocumentSave?.(document.id, content);
+				}}
+			/>
+		);
+	};
 
 	return (
 		<AnimatePresence>
@@ -202,6 +238,7 @@ const PurePreviewMessage = ({
 												type="create"
 												isLoading={true}
 												args={input as { title: string; kind: "text" }}
+												onDocumentClick={onDocumentClick}
 											/>
 										</div>
 									);
@@ -227,15 +264,7 @@ const PurePreviewMessage = ({
 
 									return (
 										<div key={toolCallId}>
-											<DocumentPreview
-												document={output as Document}
-												isLoading={false}
-												isStreaming={false}
-												onDocumentClick={onDocumentClick}
-												onSaveContent={(content) => {
-													onDocumentSave?.((output as Document).id, content);
-												}}
-											/>
+											{renderDocument(output as Document, "create", toolCallId)}
 										</div>
 									);
 								}
@@ -253,6 +282,7 @@ const PurePreviewMessage = ({
 												type="update"
 												isLoading={true}
 												args={input as { id: string; description: string }}
+												onDocumentClick={onDocumentClick}
 											/>
 										</div>
 									);
@@ -278,15 +308,7 @@ const PurePreviewMessage = ({
 
 									return (
 										<div key={toolCallId}>
-											<DocumentPreview
-												document={output as Document}
-												isLoading={false}
-												isStreaming={false}
-												onDocumentClick={onDocumentClick}
-												onSaveContent={(content) => {
-													onDocumentSave?.((output as Document).id, content);
-												}}
-											/>
+											{renderDocument(output as Document, "update", toolCallId)}
 										</div>
 									);
 								}
@@ -303,6 +325,7 @@ const PurePreviewMessage = ({
 												type="request-suggestions"
 												isLoading={true}
 												args={input as { documentId: string }}
+												onDocumentClick={onDocumentClick}
 											/>
 										</div>
 									);
@@ -328,15 +351,11 @@ const PurePreviewMessage = ({
 
 									return (
 										<div key={toolCallId}>
-											<DocumentPreview
-												document={output as Document}
-												isLoading={false}
-												isStreaming={false}
-												onDocumentClick={onDocumentClick}
-												onSaveContent={(content) => {
-													onDocumentSave?.((output as Document).id, content);
-												}}
-											/>
+											{renderDocument(
+												output as Document,
+												"request-suggestions",
+												toolCallId,
+											)}
 										</div>
 									);
 								}
