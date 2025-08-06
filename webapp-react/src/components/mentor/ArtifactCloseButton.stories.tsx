@@ -1,10 +1,10 @@
 import type { Meta, StoryObj } from "@storybook/react";
+import { fn } from "@storybook/test";
 import { ArtifactCloseButton } from "./ArtifactCloseButton";
 
 /**
- * ArtifactCloseButton provides a close button for artifacts with smart state management.
- * This component directly manages artifact visibility and handles different close behaviors
- * based on the current artifact status (streaming vs idle).
+ * ArtifactCloseButton provides a close button for artifacts.
+ * Always requires an explicit onClose handler to be provided.
  */
 const meta = {
 	component: ArtifactCloseButton,
@@ -13,16 +13,13 @@ const meta = {
 	},
 	tags: ["autodocs"],
 	argTypes: {
-		className: {
-			description: "Additional CSS classes for styling",
-		},
-		iconSize: {
-			control: { type: "number", min: 12, max: 32, step: 2 },
-			description: "Size of the close icon in pixels",
+		onClose: {
+			description: "Handler for closing the artifact",
+			control: false,
 		},
 	},
 	args: {
-		iconSize: 18,
+		onClose: fn(),
 	},
 } satisfies Meta<typeof ArtifactCloseButton>;
 
@@ -30,6 +27,6 @@ export default meta;
 type Story = StoryObj<typeof meta>;
 
 /**
- * Default close button as used in artifact panels.
+ * Default close button with handler.
  */
 export const Default: Story = {};

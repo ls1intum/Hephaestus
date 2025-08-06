@@ -121,6 +121,7 @@ function PureArtifact({
 	onDocumentClick,
 	onDocumentSave,
 	onMetadataUpdate,
+	onClose,
 	className,
 }: ArtifactProps) {
 	const { width: windowWidth, height: windowHeight } = useWindowSize();
@@ -365,11 +366,10 @@ function PureArtifact({
 					>
 						<div className="p-2 flex flex-row justify-between items-start">
 							<div className="flex flex-row gap-4 items-start">
-								<ArtifactCloseButton />
+								<ArtifactCloseButton onClose={onClose} />
 
 								<div className="flex flex-col">
-									<div className="font-medium">{artifact.title}</div>
-
+									<div className="font-medium">{artifact.title}</div>{" "}
 									{isContentDirty ? (
 										<div className="text-sm text-muted-foreground">
 											Saving changes...
