@@ -69,38 +69,43 @@ const PurePreviewMessage = ({
 
 	const isArtifact = variant === "artifact";
 
-	// Helper function to render document based on context
+	// Helper function to render document based on context and document lifecycle
 	const renderDocument = (
 		document: Document,
 		toolType: "create" | "update" | "request-suggestions",
 		toolCallId: string,
 	) => {
-		if (isArtifact) {
+		// Design principle: Show full preview only for document creation,
+		// use compact tool for updates/suggestions to reduce visual noise
+		const shouldShowFullPreview = toolType === "create" && !isArtifact;
+
+		if (shouldShowFullPreview) {
 			return (
-				<DocumentTool
-					type={toolType}
-					result={{
-						id: document.id,
-						title: document.title,
-						kind: document.kind === "TEXT" ? "text" : "text",
+				<DocumentPreview
+					document={document}
+					isLoading={false}
+					isStreaming={false}
+					onDocumentClick={(doc, boundingBox) => {
+						// DocumentPreview still uses old interface, adapt it
+						onDocumentClick?.(doc.id, boundingBox);
 					}}
-					onDocumentClick={onDocumentClick}
+					onSaveContent={(content) => {
+						onDocumentSave?.(document.id, content);
+					}}
 				/>
 			);
 		}
 
+		// For all other cases: use compact DocumentTool
 		return (
-			<DocumentPreview
-				document={document}
-				isLoading={false}
-				isStreaming={false}
-				onDocumentClick={(doc, boundingBox) => {
-					// DocumentPreview still uses old interface, adapt it
-					onDocumentClick?.(doc.id, boundingBox);
+			<DocumentTool
+				type={toolType}
+				result={{
+					id: document.id,
+					title: document.title,
+					kind: document.kind === "TEXT" ? "text" : "text",
 				}}
-				onSaveContent={(content) => {
-					onDocumentSave?.(document.id, content);
-				}}
+				onDocumentClick={onDocumentClick}
 			/>
 		);
 	};
