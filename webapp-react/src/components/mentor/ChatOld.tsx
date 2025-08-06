@@ -29,7 +29,7 @@ interface ChatProps extends React.ComponentProps<"div"> {
  * - Message regeneration for the last assistant message
  * - Modern input with auto-resize and keyboard shortcuts
  */
-function Chat({
+function ChatOld({
 	className,
 	messages,
 	onSendMessage,
@@ -93,4 +93,4 @@ function Chat({
 	);
 }
 
-export { Chat, type ChatProps };
+export { ChatOld, type ChatProps };

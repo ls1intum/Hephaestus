@@ -2,7 +2,7 @@ import type { Meta, StoryObj } from "@storybook/react";
 import { fn } from "@storybook/test";
 
 import type { UIMessage } from "@ai-sdk/react";
-import { Chat } from "./Chat";
+import { ChatOld } from "./ChatOld";
 
 const sampleMessages: UIMessage[] = [
 	{
@@ -31,8 +31,8 @@ const sampleMessages: UIMessage[] = [
  * Minimal chat interface for AI Mentor conversations.
  * Clean design focused on the conversation without visual clutter.
  */
-const meta: Meta<typeof Chat> = {
-	component: Chat,
+const meta: Meta<typeof ChatOld> = {
+	component: ChatOld,
 	parameters: {
 		layout: "fullscreen",
 	},
@@ -82,7 +82,7 @@ const meta: Meta<typeof Chat> = {
 			</div>
 		),
 	],
-} satisfies Meta<typeof Chat>;
+} satisfies Meta<typeof ChatOld>;
 
 export default meta;
 type Story = StoryObj<typeof meta>;

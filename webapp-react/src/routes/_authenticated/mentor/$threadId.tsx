@@ -3,7 +3,7 @@ import {
 	getThreadOptions,
 } from "@/api/@tanstack/react-query.gen";
 import type { ChatThreadDetail } from "@/api/types.gen";
-import { Chat } from "@/components/mentor/Chat";
+import { ChatOld } from "@/components/mentor/ChatOld";
 import environment from "@/environment";
 import { keycloakService } from "@/integrations/auth";
 import { v4 as uuidv4 } from "uuid";
@@ -140,7 +140,7 @@ function ChatContainer({
 	};
 
 	return (
-		<Chat
+		<ChatOld
 			messages={messages}
 			onSendMessage={handleSendMessage}
 			onStop={handleStop}
