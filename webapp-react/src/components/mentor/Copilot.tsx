@@ -5,7 +5,7 @@ import {
 	PopoverTrigger,
 } from "@/components/ui/popover";
 import { cn } from "@/lib/utils";
-import { BotMessageSquare, X } from "lucide-react";
+import { BotIcon, BotMessageSquare, X } from "lucide-react";
 import { memo, useCallback, useState } from "react";
 
 export interface CopilotProps {
@@ -52,16 +52,17 @@ function PureCopilot({
 						onClick={handleTriggerClick}
 						className="size-16 rounded-full shadow-lg hover:shadow-xl transition-all duration-200 active:scale-95"
 						size="icon"
-						aria-label="Open AI Assistant"
+						aria-label="Open AI Mentor"
 					>
 						<BotMessageSquare className="size-8" />
 					</Button>
 				</PopoverTrigger>
 
 				<PopoverContent
-					className="p-0 w-96 h-[600px] rounded-2xl overflow-hidden shadow-2xl border-0"
+					className="p-0 w-[calc(100vw-3rem)] max-w-lg h-[calc(100dvh-10rem)] rounded-2xl overflow-hidden shadow-2xl border-0 md:w-full"
 					side="top"
 					align="end"
+					alignOffset={0}
 					sideOffset={8}
 					onInteractOutside={(e) => {
 						e.preventDefault();
@@ -70,18 +71,18 @@ function PureCopilot({
 				>
 					<div className="flex flex-col w-full h-full bg-background rounded-2xl overflow-hidden">
 						{/* Header with close button */}
-						<div className="flex items-center justify-between p-3 border-b">
-							<h3 className="text-sm font-medium text-muted-foreground">
-								AI Assistant
+						<div className="flex items-center justify-between p-2 pl-4 border-b">
+							<h3 className="text-sm font-medium text-muted-foreground flex items-center gap-1">
+								<BotIcon />
+								AI Mentor
 							</h3>
 							<Button
 								variant="ghost"
 								size="icon"
-								className="h-6 w-6 rounded-sm opacity-70 hover:opacity-100 focus:opacity-100"
 								onClick={handleClose}
-								aria-label="Close AI Assistant"
+								aria-label="Close AI Mentor"
 							>
-								<X className="h-4 w-4" />
+								<X />
 							</Button>
 						</div>
 
