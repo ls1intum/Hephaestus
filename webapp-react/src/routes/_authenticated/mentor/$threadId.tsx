@@ -41,6 +41,16 @@ function ThreadContainer() {
 		});
 	}, []);
 
+	const handleMessageEdit = useCallback(
+		(messageId: string, content: string) => {
+			const idx = mentorChat.messages.findIndex((m) => m.id === messageId);
+			if (idx === -1) return;
+			mentorChat.setMessages(mentorChat.messages.slice(0, idx));
+			mentorChat.sendMessage(content);
+		},
+		[mentorChat.messages, mentorChat.setMessages, mentorChat.sendMessage],
+	);
+
 	// Show loading state while fetching thread
 	if (mentorChat.isThreadLoading) {
 		return (
@@ -90,6 +100,7 @@ function ThreadContainer() {
 				readonly={false}
 				attachments={[]} // Empty since attachments are disabled
 				onMessageSubmit={handleMessageSubmit}
+				onMessageEdit={handleMessageEdit}
 				onStop={mentorChat.stop}
 				onFileUpload={() => Promise.resolve([])} // No-op since attachments are disabled
 				onAttachmentsChange={() => {}} // No-op since attachments are disabled

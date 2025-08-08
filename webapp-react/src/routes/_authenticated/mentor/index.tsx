@@ -38,6 +38,16 @@ function MentorContainer() {
 		[mentorChat.voteMessage], // Only depend on the specific function
 	);
 
+	const handleMessageEdit = useCallback(
+		(messageId: string, content: string) => {
+			const idx = mentorChat.messages.findIndex((m) => m.id === messageId);
+			if (idx === -1) return;
+			mentorChat.setMessages(mentorChat.messages.slice(0, idx));
+			mentorChat.sendMessage(content);
+		},
+		[mentorChat.messages, mentorChat.setMessages, mentorChat.sendMessage],
+	);
+
 	return (
 		<div className="flex flex-col flex-1 min-h-0">
 			<Chat
@@ -47,6 +57,7 @@ function MentorContainer() {
 				readonly={false}
 				attachments={[]} // Empty since attachments are disabled
 				onMessageSubmit={handleMessageSubmit}
+				onMessageEdit={handleMessageEdit}
 				onStop={mentorChat.stop}
 				onFileUpload={() => Promise.resolve([])} // No-op since attachments are disabled
 				onAttachmentsChange={() => {}} // No-op since attachments are disabled

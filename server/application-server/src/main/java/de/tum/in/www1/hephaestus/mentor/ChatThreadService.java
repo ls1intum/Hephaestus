@@ -26,6 +26,7 @@ import org.springframework.transaction.annotation.Transactional;
 public class ChatThreadService {
 
     private final ChatThreadRepository chatThreadRepository;
+    private final ChatMessageRepository chatMessageRepository;
 
     /**
      * Get thread summaries for a specific user.
@@ -144,6 +145,37 @@ public class ChatThreadService {
         }
 
         return Optional.of(convertToDetailDTO(thread));
+    }
+
+    /**
+     * Build the conversation path up to and including the specified message, ensuring the message belongs to the user.
+     * This is used for message editing to reconstruct context based on previousMessageId rather than the selected leaf.
+     */
+    @Transactional(readOnly = true)
+    public List<UIMessage> getConversationPathForMessage(UUID messageId, User user) {
+        var messageOpt = chatMessageRepository.findById(messageId);
+        if (messageOpt.isEmpty()) {
+            return new ArrayList<>();
+        }
+        ChatMessage target = messageOpt.get();
+        if (target.getThread() == null || target.getThread().getUser() == null || !user.getId().equals(target.getThread().getUser().getId())) {
+            // Not owned by user or invalid thread association
+            return new ArrayList<>();
+        }
+
+    // Use entity helper to get path from root to the target message
+    List<ChatMessage> path = target.getPathFromRoot();
+
+        // Convert to UIMessage list
+        List<UIMessage> result = new ArrayList<>();
+        for (ChatMessage m : path) {
+            try {
+                result.add(m.toUIMessage());
+            } catch (Exception e) {
+                log.error("Failed to convert message {} to UIMessage: {}", m.getId(), e.getMessage(), e);
+            }
+        }
+        return result;
     }
 
     /**

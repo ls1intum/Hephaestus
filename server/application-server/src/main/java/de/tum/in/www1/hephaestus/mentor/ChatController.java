@@ -96,8 +96,12 @@ public class ChatController {
             Optional<ChatThreadDetailDTO> threadDetail = chatThreadService.getThreadDetailForUser(threadUuid, user);
 
             if (threadDetail.isPresent() && threadDetail.get().getMessages() != null) {
-                // Start with the persisted conversation path
-                fullMessages = new java.util.ArrayList<>(threadDetail.get().getMessages());
+                // If editing (previousMessageId provided), build path up to that message; if null, start from scratch
+                if (chatRequest.previousMessageId() != null) {
+                    fullMessages = new java.util.ArrayList<>(chatThreadService.getConversationPathForMessage(chatRequest.previousMessageId(), user));
+                } else {
+                    fullMessages = new java.util.ArrayList<>();
+                }
             } else {
                 fullMessages = new java.util.ArrayList<>();
             }
