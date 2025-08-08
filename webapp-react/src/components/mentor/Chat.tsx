@@ -242,7 +242,7 @@ function PureChat({
 						votes={votes}
 						status={status}
 						readonly={readonly}
-						showThinking={status === "submitted"}
+						showThinking={status === "submitted" || status === "streaming"}
 						showGreeting={messages.length === 0}
 						variant="default"
 						containerRef={containerRef}

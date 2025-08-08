@@ -61,6 +61,24 @@ function PureMessages({
 }: MessagesProps) {
 	const isArtifact = variant === "artifact";
 
+	// Determine if a message currently renders any visible content
+	const hasVisibleContent = (message: ChatMessage): boolean => {
+		const parts = message?.parts ?? [];
+		if (parts.length === 0) return false;
+		for (const p of parts) {
+			if (p.type === "text" && (p.text ?? "").trim().length > 0) return true;
+			if (p.type === "reasoning" && (p.text ?? "").trim().length > 0)
+				return true;
+			if (p.type === "file") return true;
+			if (typeof p.type === "string" && p.type.startsWith("tool-")) {
+				const state = (p as { state?: string }).state;
+				if (state === "input-available" || state === "output-available")
+					return true;
+			}
+		}
+		return false;
+	};
+
 	return (
 		<ScrollArea
 			className="flex flex-col w-full flex-1 min-h-0"
@@ -82,26 +100,46 @@ function PureMessages({
 			>
 				{messages.length === 0 && showGreeting && <Greeting />}
 
-				{messages.map((message, index) => (
-					<PreviewMessage
-						key={message.id}
-						message={message}
-						isLoading={status === "streaming" && messages.length - 1 === index}
-						vote={votes?.find((vote) => vote.messageId === message.id)}
-						readonly={readonly}
-						variant={variant}
-						onMessageEdit={onMessageEdit}
-						onCopy={onCopy}
-						onVote={onVote}
-						onDocumentClick={onDocumentClick}
-						onDocumentSave={onDocumentSave}
-					/>
-				))}
+				{messages.map((message, index) => {
+					const isLast = index === messages.length - 1;
+					const hideEmptyAssistantPlaceholder =
+						isLast &&
+						message.role === "assistant" &&
+						!hasVisibleContent(message) &&
+						showThinking &&
+						(status === "submitted" || status === "streaming");
+
+					if (hideEmptyAssistantPlaceholder) return null;
+
+					return (
+						<PreviewMessage
+							key={message.id}
+							message={message}
+							isLoading={
+								status === "streaming" && messages.length - 1 === index
+							}
+							vote={votes?.find((vote) => vote.messageId === message.id)}
+							readonly={readonly}
+							variant={variant}
+							onMessageEdit={onMessageEdit}
+							onCopy={onCopy}
+							onVote={onVote}
+							onDocumentClick={onDocumentClick}
+							onDocumentSave={onDocumentSave}
+						/>
+					);
+				})}
 
 				{showThinking &&
-					status === "submitted" &&
-					messages.length > 0 &&
-					messages[messages.length - 1].role === "user" && <ThinkingMessage />}
+					(status === "submitted" || status === "streaming") &&
+					(() => {
+						if (messages.length === 0) return <ThinkingMessage />;
+						const last = messages[messages.length - 1];
+						const isUser = last.role === "user";
+						const assistantHasVisible =
+							last.role === "assistant" && hasVisibleContent(last);
+						return isUser || !assistantHasVisible ? <ThinkingMessage /> : null;
+					})()}
 
 				<motion.div
 					ref={endRef}

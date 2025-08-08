@@ -17,7 +17,7 @@ export function NavMentor() {
 			<SidebarGroupLabel>Mentor</SidebarGroupLabel>
 			<SidebarMenu>
 				<SidebarMenuItem>
-					<SidebarMenuButton asChild tooltip="Mentor">
+					<SidebarMenuButton asChild tooltip="Heph - AI Mentor">
 						<Link to="/mentor" className="group/mentor items-center gap-2">
 							<MentorIcon
 								className="-mx-1.5"

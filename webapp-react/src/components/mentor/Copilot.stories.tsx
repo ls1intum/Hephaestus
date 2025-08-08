@@ -200,7 +200,7 @@ export const Default: Story = {
 				</div>
 			</div>
 
-			<Copilot>
+			<Copilot onNewChat={fn()} onOpenFullChat={fn()}>
 				<Chat
 					id="copilot-empty"
 					messages={[]}
@@ -263,7 +263,7 @@ export const WithConversation: Story = {
 				</div>
 			</div>
 
-			<Copilot>
+			<Copilot onNewChat={fn()} onOpenFullChat={fn()}>
 				<Chat
 					id="copilot-conversation"
 					messages={CONVERSATION_MESSAGES}

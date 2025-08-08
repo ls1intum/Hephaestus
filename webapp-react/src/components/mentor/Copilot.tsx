@@ -5,8 +5,14 @@ import {
 	PopoverContent,
 	PopoverTrigger,
 } from "@/components/ui/popover";
+import {
+	Tooltip,
+	TooltipContent,
+	TooltipProvider,
+	TooltipTrigger,
+} from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
-import { Sparkles, X } from "lucide-react";
+import { Sparkles, SquareArrowOutUpRight, SquarePen, X } from "lucide-react";
 import { memo, useCallback, useEffect, useRef, useState } from "react";
 import { MentorIcon } from "./MentorIcon";
 
@@ -21,6 +27,12 @@ export interface CopilotProps {
 	onOpenChange?: (open: boolean) => void;
 	/** Optional CSS class name for the container */
 	className?: string;
+	/** Trigger starting a fresh chat session */
+	onNewChat?: () => void;
+	/** Open the current chat in the full mentor route */
+	onOpenFullChat?: () => void;
+	/** Whether there are any messages in the current conversation */
+	hasMessages?: boolean;
 }
 
 function PureCopilot({
@@ -29,6 +41,9 @@ function PureCopilot({
 	open: controlledOpen,
 	onOpenChange,
 	className,
+	onNewChat,
+	onOpenFullChat,
+	hasMessages = false,
 }: CopilotProps) {
 	const [internalOpen, setInternalOpen] = useState(defaultOpen);
 
@@ -93,7 +108,7 @@ function PureCopilot({
 					</Button>
 				</PopoverTrigger>
 				<PopoverContent
-					className="p-0 w-[calc(100vw-3rem)] max-w-lg h-[calc(100dvh-10rem)] rounded-2xl overflow-hidden shadow-2xl border-1 md:w-full overscroll-contain"
+					className="p-0 h-[calc(100dvh-10rem)] rounded-2xl overflow-hidden shadow-2xl border-1 overscroll-contain w-[calc(100vw-3rem)] sm:w-[28rem] md:w-[32rem] max-w-[32rem]"
 					side="top"
 					align="end"
 					alignOffset={0}
@@ -119,14 +134,55 @@ function PureCopilot({
 									<Sparkles /> AI Mentor
 								</Badge>
 							</h3>
-							<Button
-								variant="ghost"
-								size="icon"
-								onClick={handleClose}
-								aria-label="Close Heph - AI Mentor"
-							>
-								<X />
-							</Button>
+							<TooltipProvider delayDuration={0}>
+								<div className="flex items-center gap-1">
+									{onOpenFullChat && (
+										<Tooltip>
+											<TooltipTrigger asChild>
+												<Button
+													variant="outline"
+													size="icon"
+													onClick={onOpenFullChat}
+													aria-label="Open in mentor view"
+													disabled={!hasMessages}
+												>
+													<SquareArrowOutUpRight />
+												</Button>
+											</TooltipTrigger>
+											<TooltipContent>Open in full screen</TooltipContent>
+										</Tooltip>
+									)}
+									{onNewChat && (
+										<Tooltip>
+											<TooltipTrigger asChild>
+												<Button
+													variant="outline"
+													size="icon"
+													onClick={onNewChat}
+													aria-label="Start new chat"
+													disabled={!hasMessages}
+												>
+													<SquarePen />
+												</Button>
+											</TooltipTrigger>
+											<TooltipContent>New chat</TooltipContent>
+										</Tooltip>
+									)}
+									<Tooltip>
+										<TooltipTrigger asChild>
+											<Button
+												variant="outline"
+												size="icon"
+												onClick={handleClose}
+												aria-label="Close Heph - AI Mentor"
+											>
+												<X />
+											</Button>
+										</TooltipTrigger>
+										<TooltipContent>Close</TooltipContent>
+									</Tooltip>
+								</div>
+							</TooltipProvider>
 						</div>
 						<div className="flex-1 min-h-0 overscroll-contain">{children}</div>
 					</div>

@@ -29,6 +29,7 @@ import { useMentorChat } from "@/hooks/useMentorChat";
 import { type AuthContextType, useAuth } from "@/integrations/auth/AuthContext";
 import { useTheme } from "@/integrations/theme";
 import type { ChatMessage } from "@/lib/types";
+import { useRouter } from "@tanstack/react-router";
 import { useCallback } from "react";
 import { Toaster } from "sonner";
 
@@ -105,6 +106,8 @@ function GlobalCopilot() {
 		},
 	});
 
+	const router = useRouter();
+
 	const handleMessageSubmit = useCallback(
 		({ text }: { text: string }) => {
 			if (!text.trim()) return;
@@ -127,7 +130,19 @@ function GlobalCopilot() {
 	}, []);
 
 	return (
-		<Copilot>
+		<Copilot
+			hasMessages={(mentorChat.messages?.length ?? 0) > 0}
+			onNewChat={() => {
+				// Reset to a fresh session by clearing messages; useMentorChat will keep a new id.
+				mentorChat.setMessages([]);
+			}}
+			onOpenFullChat={() => {
+				const threadId = mentorChat.currentThreadId || mentorChat.id;
+				if (threadId) {
+					router.navigate({ to: "/mentor/$threadId", params: { threadId } });
+				}
+			}}
+		>
 			<Chat
 				id={mentorChat.currentThreadId || mentorChat.id}
 				messages={mentorChat.messages as ChatMessage[]}
