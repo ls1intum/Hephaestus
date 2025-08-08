@@ -112,9 +112,6 @@ const meta = {
 		onVote: fn((messageId: string, isUpvoted: boolean) =>
 			console.log("Vote cast:", messageId, isUpvoted ? "upvote" : "downvote"),
 		),
-		onSuggestedAction: fn((action: string) =>
-			console.log("Suggested action selected:", action),
-		),
 		onDocumentClick: fn((documentId: string, boundingRect: DOMRect) =>
 			console.log("Document artifact clicked:", documentId, boundingRect),
 		),

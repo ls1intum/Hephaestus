@@ -43,8 +43,6 @@ export interface ChatProps {
 	onCopy?: (content: string) => void;
 	/** Handler for voting on messages */
 	onVote?: (messageId: string, isUpvote: boolean) => void;
-	/** Handler for suggested action clicks */
-	onSuggestedAction?: (actionMessage: string) => void;
 	/** Handler called when document preview is clicked */
 	onDocumentClick?: (documentId: string, boundingBox: DOMRect) => void;
 	/** Whether to show suggested actions in input */
@@ -72,7 +70,6 @@ function PureChat({
 	onMessageEdit,
 	onCopy,
 	onVote,
-	onSuggestedAction,
 	onDocumentClick,
 	showSuggestedActions = false,
 	inputPlaceholder = "Send a message...",
@@ -238,7 +235,7 @@ function PureChat({
 
 	return (
 		<>
-			<div className={cn("relative h-dvh shrink-0", className)}>
+			<div className={cn("relative h-full", className)}>
 				<div className="flex flex-col h-full">
 					<Messages
 						messages={messages}
@@ -274,7 +271,6 @@ function PureChat({
 									onAttachmentsChange={onAttachmentsChange}
 									onFileUpload={onFileUpload}
 									onSubmit={onMessageSubmit}
-									onSuggestedAction={onSuggestedAction}
 									placeholder={inputPlaceholder}
 									showSuggestedActions={shouldShowSuggestedActions}
 									readonly={readonly}
@@ -288,8 +284,7 @@ function PureChat({
 						)}
 						{/* AI Disclaimer */}
 						<p className="text-center text-balance text-xs text-muted-foreground px-4">
-							Heph can make mistakes. Consider verifying important
-							information.
+							Heph can make mistakes. Consider verifying important information.
 						</p>
 					</div>
 				</div>

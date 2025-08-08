@@ -32,8 +32,6 @@ export interface MultimodalInputProps {
 	onFileUpload: (files: File[]) => Promise<Array<Attachment | undefined>>;
 	/** Handler for form submission with text and attachments */
 	onSubmit: (data: { text: string; attachments: Array<Attachment> }) => void;
-	/** Handler for suggested action clicks */
-	onSuggestedAction?: (actionMessage: string) => void;
 	/** Optional CSS class name */
 	className?: string;
 	/** Placeholder text for textarea */
@@ -61,7 +59,6 @@ function PureMultimodalInput({
 	onAttachmentsChange,
 	onFileUpload,
 	onSubmit,
-	onSuggestedAction,
 	className,
 	placeholder = "Send a message...",
 	showSuggestedActions,
@@ -85,9 +82,8 @@ function PureMultimodalInput({
 		setInput(initialInput);
 	}, [initialInput]);
 
-	// Show suggested actions if explicitly enabled, handler provided, and not readonly
-	const shouldShowSuggestedActions =
-		showSuggestedActions && onSuggestedAction !== undefined && !readonly;
+	// Show suggested actions if explicitly enabled and not readonly
+	const shouldShowSuggestedActions = showSuggestedActions && !readonly;
 
 	const adjustHeight = useCallback(() => {
 		if (textareaRef.current) {
@@ -98,8 +94,8 @@ function PureMultimodalInput({
 
 	const resetHeight = useCallback(() => {
 		if (textareaRef.current) {
+			// Let the browser recalc to the intrinsic content height
 			textareaRef.current.style.height = "auto";
-			textareaRef.current.style.height = "98px";
 		}
 	}, []);
 
@@ -121,10 +117,20 @@ function PureMultimodalInput({
 
 	const handleSuggestedAction = useCallback(
 		(actionText: string) => {
-			setInput(actionText);
-			onSuggestedAction?.(actionText);
+			// Send immediately when a suggested action is clicked
+			onSubmit({ text: actionText, attachments });
+			// Reset UI state after submission
+			setInput("");
+			resetHeight();
+			// After the state flush, adjust to minimal height again
+			requestAnimationFrame(() => {
+				adjustHeight();
+			});
+			if (width && width > 768) {
+				textareaRef.current?.focus();
+			}
 		},
-		[onSuggestedAction],
+		[onSubmit, attachments, resetHeight, width, adjustHeight],
 	);
 
 	const submitForm = useCallback(() => {

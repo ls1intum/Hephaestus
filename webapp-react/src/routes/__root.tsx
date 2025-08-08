@@ -17,14 +17,19 @@ import {
 	AppSidebar,
 	type SidebarContext,
 } from "@/components/core/sidebar/AppSidebar";
+import { Chat } from "@/components/mentor/Chat";
+import { Copilot } from "@/components/mentor/Copilot";
 import {
 	SidebarInset,
 	SidebarProvider,
 	SidebarTrigger,
 } from "@/components/ui/sidebar";
 import environment from "@/environment";
+import { useMentorChat } from "@/hooks/useMentorChat";
 import { type AuthContextType, useAuth } from "@/integrations/auth/AuthContext";
 import { useTheme } from "@/integrations/theme";
+import type { ChatMessage } from "@/lib/types";
+import { useCallback } from "react";
 import { Toaster } from "sonner";
 
 interface MyRouterContext {
@@ -36,7 +41,20 @@ export const Route = createRootRouteWithContext<MyRouterContext>()({
 	component: () => {
 		const { theme } = useTheme();
 		const { pathname } = useLocation();
+		const { isAuthenticated, hasRole } = useAuth();
 		const isMentorRoute = pathname.startsWith("/mentor");
+
+		// Exclude routes where Copilot should not appear
+		const isExcludedRoute =
+			isMentorRoute ||
+			pathname.startsWith("/admin") ||
+			pathname.startsWith("/settings") ||
+			pathname.startsWith("/legal") ||
+			pathname === "/imprint" ||
+			pathname === "/privacy";
+
+		const showCopilot =
+			isAuthenticated && hasRole("mentor_access") && !isExcludedRoute;
 
 		return (
 			<>
@@ -59,6 +77,8 @@ export const Route = createRootRouteWithContext<MyRouterContext>()({
 				<Toaster theme={theme} />
 				<TanStackRouterDevtools />
 				<TanstackQueryLayout />
+
+				{showCopilot && <GlobalCopilot />}
 			</>
 		);
 	},
@@ -76,6 +96,58 @@ export const Route = createRootRouteWithContext<MyRouterContext>()({
 		</div>
 	),
 });
+
+function GlobalCopilot() {
+	// Independent chat state for the copilot widget
+	const mentorChat = useMentorChat({
+		onError: (error: Error) => {
+			console.error("Copilot chat error:", error);
+		},
+	});
+
+	const handleMessageSubmit = useCallback(
+		({ text }: { text: string }) => {
+			if (!text.trim()) return;
+			mentorChat.sendMessage(text);
+		},
+		[mentorChat.sendMessage],
+	);
+
+	const handleVote = useCallback(
+		(messageId: string, isUpvote: boolean) => {
+			mentorChat.voteMessage(messageId, isUpvote);
+		},
+		[mentorChat.voteMessage],
+	);
+
+	const handleCopy = useCallback((content: string) => {
+		navigator.clipboard.writeText(content).catch((error) => {
+			console.error("Failed to copy to clipboard:", error);
+		});
+	}, []);
+
+	return (
+		<Copilot>
+			<Chat
+				id={mentorChat.currentThreadId || mentorChat.id}
+				messages={mentorChat.messages as ChatMessage[]}
+				status={mentorChat.status}
+				readonly={false}
+				attachments={[]}
+				onMessageSubmit={handleMessageSubmit}
+				onStop={mentorChat.stop}
+				onFileUpload={() => Promise.resolve([])}
+				onAttachmentsChange={() => {}}
+				onCopy={handleCopy}
+				onVote={handleVote}
+				showSuggestedActions={true}
+				inputPlaceholder="Ask me anything..."
+				disableAttachments={true}
+				className="h-full max-h-none"
+			/>
+		</Copilot>
+	);
+}
 
 function HeaderContainer() {
 	const { pathname } = useLocation();

@@ -36,10 +36,6 @@ const meta = {
 			description: "Handler for form submission with text and attachments",
 			control: false,
 		},
-		onSuggestedAction: {
-			description: "Handler for suggested action clicks",
-			control: false,
-		},
 		placeholder: {
 			description: "Placeholder text for textarea",
 			control: "text",
@@ -69,7 +65,7 @@ const meta = {
 		onAttachmentsChange: fn(),
 		onFileUpload: fn(async () => []),
 		onSubmit: fn(),
-		onSuggestedAction: fn(), // This needs to be provided for suggested actions to show
+		// Suggested actions send immediately via onSubmit; no handler required
 		placeholder: "Send a message...",
 		showSuggestedActions: true, // Explicitly enable suggested actions
 		initialInput: "",
@@ -98,9 +94,6 @@ export const Default: Story = {};
  */
 export const WithSuggestedActions: Story = {
 	args: {
-		onSuggestedAction: fn((action) => {
-			console.log("Suggested action clicked:", action);
-		}),
 		showSuggestedActions: true,
 	},
 };
@@ -157,7 +150,6 @@ export const CustomPlaceholder: Story = {
  */
 export const NoSuggestedActions: Story = {
 	args: {
-		onSuggestedAction: undefined, // No handler provided
 		showSuggestedActions: false,
 	},
 };
