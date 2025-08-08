@@ -1,11 +1,13 @@
-import type { /* InferUITool, */ UIMessage } from "ai";
+import type {
+	CreateDocumentInput,
+	CreateDocumentOutput,
+	GetWeatherInput,
+	GetWeatherOutput,
+	UpdateDocumentInput,
+	UpdateDocumentOutput,
+} from "@/api/types.gen";
+import type { UIMessage } from "ai";
 import { z } from "zod";
-// import type { createDocument } from './ai/tools/create-document';
-// import type { getWeather } from './ai/tools/get-weather';
-// import type { requestSuggestions } from './ai/tools/request-suggestions';
-// import type { updateDocument } from './ai/tools/update-document';
-
-// import type { ArtifactKind } from '@/components/artifact';
 
 export type DataPart = { type: "append-message"; message: string };
 
@@ -14,16 +16,6 @@ export const messageMetadataSchema = z.object({
 });
 
 export type MessageMetadata = z.infer<typeof messageMetadataSchema>;
-
-// type weatherTool = InferUITool<typeof getWeather>;
-// type createDocumentTool = InferUITool<ReturnType<typeof createDocument>>;
-// type updateDocumentTool = InferUITool<ReturnType<typeof updateDocument>>;
-
-// export type ChatTools = {
-//   getWeather: weatherTool;
-//   createDocument: createDocumentTool;
-//   updateDocument: updateDocumentTool;
-// };
 
 export type CustomUIDataTypes = {
 	textDelta: string;
@@ -38,10 +30,26 @@ export type CustomUIDataTypes = {
 	finish: null;
 };
 
+// Typed tools mapping for automatic tool part typing in UIMessage
+export type ChatTools = {
+	getWeather: {
+		input: GetWeatherInput;
+		output: GetWeatherOutput;
+	};
+	createDocument: {
+		input: CreateDocumentInput;
+		output: CreateDocumentOutput;
+	};
+	updateDocument: {
+		input: UpdateDocumentInput;
+		output: UpdateDocumentOutput;
+	};
+};
+
 export type ChatMessage = UIMessage<
 	MessageMetadata,
-	CustomUIDataTypes //,
-	// ChatTools
+	CustomUIDataTypes,
+	ChatTools
 >;
 
 export interface Attachment {

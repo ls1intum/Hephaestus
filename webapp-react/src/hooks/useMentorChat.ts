@@ -1,6 +1,6 @@
 import { useChat } from "@ai-sdk/react";
-import type { UIMessage } from "@ai-sdk/react";
 import type { UseChatHelpers } from "@ai-sdk/react";
+import type { ChatMessage } from "@/lib/types";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { DefaultChatTransport } from "ai";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -19,13 +19,13 @@ import { keycloakService } from "@/integrations/auth";
 
 interface UseMentorChatOptions {
 	threadId?: string;
-	initialMessages?: UIMessage[];
+	initialMessages?: ChatMessage[];
 	onFinish?: () => void;
 	onError?: (error: Error) => void;
 }
 
 interface UseMentorChatReturn
-	extends Omit<UseChatHelpers<UIMessage>, "sendMessage"> {
+	extends Omit<UseChatHelpers<ChatMessage>, "sendMessage"> {
 	sendMessage: (text: string) => void;
 	threadDetail: ChatThreadDetail | undefined;
 	isThreadLoading: boolean;
@@ -92,7 +92,7 @@ export function useMentorChat({
 
 	// Create stable onFinish callback
 	const stableOnFinish = useCallback(
-		(_options: { message: UIMessage }) => {
+		(_options: { message: ChatMessage }) => {
 			queryClient.invalidateQueries({ queryKey: getGroupedThreadsQueryKey() });
 			if (threadId || stableThreadId) {
 				queryClient.invalidateQueries({
@@ -125,7 +125,7 @@ export function useMentorChat({
 		resumeStream,
 		addToolResult,
 		id,
-	} = useChat({
+	} = useChat<ChatMessage>({
 		id: stableThreadId, // Use stable ID that never changes
 		messages: initialMessages, // Start with initial messages only - backend will provide thread history
 		generateId: () => uuidv4(), // Generate UUID for all messages
@@ -147,7 +147,7 @@ export function useMentorChat({
 		if (status === "streaming" || status === "submitted") return;
 
 		// Replace the local chat state with server messages
-		setMessages(threadDetail.messages as unknown as UIMessage[]);
+	setMessages(threadDetail.messages as unknown as ChatMessage[]);
 		hydratedRef.current = threadId;
 		// eslint-disable-next-line react-hooks/exhaustive-deps
 	}, [threadId, threadDetail?.messages, status, setMessages]);

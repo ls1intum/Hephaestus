@@ -1,5 +1,4 @@
 import type { ChatMessageVote, Document } from "@/api/types.gen";
-import type { GetWeatherOutput } from "@/api/types.gen";
 import type { ChatMessage } from "@/lib/types";
 import { cn, sanitizeText } from "@/lib/utils";
 import cx from "classnames";
@@ -221,7 +220,7 @@ const PurePreviewMessage = ({
 								if (state === "output-available") {
 									return (
 										<div key={toolCallId}>
-											<WeatherTool weatherAtLocation={part.output as GetWeatherOutput} />
+											<WeatherTool weatherAtLocation={part.output} />
 										</div>
 									);
 								}
@@ -232,12 +231,13 @@ const PurePreviewMessage = ({
 
 								if (state === "input-available") {
 									const { input } = part;
+									const args = { title: input.title, kind: input.kind } as const;
 									return (
 										<div key={toolCallId}>
 											<DocumentTool
 												type="create"
 												isLoading={true}
-												args={input as { title: string; kind: "text" }}
+												args={args}
 												onDocumentClick={onDocumentClick}
 											/>
 										</div>
@@ -246,22 +246,6 @@ const PurePreviewMessage = ({
 
 								if (state === "output-available") {
 									const { output } = part;
-
-									if (
-										output &&
-										typeof output === "object" &&
-										"error" in output
-									) {
-										return (
-											<div
-												key={toolCallId}
-												className="text-red-500 p-2 border rounded"
-											>
-												Error: {String(output.error)}
-											</div>
-										);
-									}
-
 									return (
 										<div key={toolCallId}>
 											{renderDocument(output as Document, "create")}
@@ -275,13 +259,13 @@ const PurePreviewMessage = ({
 
 								if (state === "input-available") {
 									const { input } = part;
-
+									const args = { id: input.id, title: input.title, content: input.content, kind: input.kind } as const;
 									return (
 										<div key={toolCallId}>
 											<DocumentTool
 												type="update"
 												isLoading={true}
-												args={input as { id: string; description: string }}
+												args={args}
 												onDocumentClick={onDocumentClick}
 											/>
 										</div>
@@ -290,71 +274,10 @@ const PurePreviewMessage = ({
 
 								if (state === "output-available") {
 									const { output } = part;
-
-									if (
-										output &&
-										typeof output === "object" &&
-										"error" in output
-									) {
-										return (
-											<div
-												key={toolCallId}
-												className="text-red-500 p-2 border rounded"
-											>
-												Error: {String(output.error)}
-											</div>
-										);
-									}
 
 									return (
 										<div key={toolCallId}>
 											{renderDocument(output as Document, "update")}
-										</div>
-									);
-								}
-							}
-
-							if (type === "tool-requestSuggestions") {
-								const { toolCallId, state } = part;
-
-								if (state === "input-available") {
-									const { input } = part;
-									return (
-										<div key={toolCallId}>
-											<DocumentTool
-												type="request-suggestions"
-												isLoading={true}
-												args={input as { documentId: string }}
-												onDocumentClick={onDocumentClick}
-											/>
-										</div>
-									);
-								}
-
-								if (state === "output-available") {
-									const { output } = part;
-
-									if (
-										output &&
-										typeof output === "object" &&
-										"error" in output
-									) {
-										return (
-											<div
-												key={toolCallId}
-												className="text-red-500 p-2 border rounded"
-											>
-												Error: {String(output.error)}
-											</div>
-										);
-									}
-
-									return (
-										<div key={toolCallId}>
-											{renderDocument(
-												output as Document,
-												"request-suggestions",
-											)}
 										</div>
 									);
 								}
