@@ -112,7 +112,8 @@ export function MessageReasoning({
 			const sections: Section[] = [];
 			if (!text) return sections;
 			const heads = parseHeadings(text);
-			if (heads.length === 0) return [{ body: text }];
+			if (heads.length === 0)
+				return [{ title: "Thinking for a few seconds", body: text }];
 			// Preamble before first heading
 			if (heads[0].index > 0) {
 				sections.push({ body: text.slice(0, heads[0].index).trim() });
