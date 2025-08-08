@@ -17,7 +17,7 @@ const FEATURES_DATA: FeatureData[] = [
 		title: "AI-Powered Mentorship",
 		description: "Your team's personalized guide",
 		content:
-			"Receive contextual guidance through our AI mentor that provides personalized feedback, identifies growth opportunities, and helps team members develop their skills with practical insights that lead to measurable improvement.",
+			"Receive contextual guidance through Heph—our AI mentor—that provides personalized feedback, identifies growth opportunities, and helps team members develop their skills with practical insights that lead to measurable improvement.",
 	},
 ];
 

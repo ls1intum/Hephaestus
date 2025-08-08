@@ -1,3 +1,4 @@
+import { MentorIcon } from "@/components/mentor/MentorIcon";
 import { Badge } from "@/components/ui/badge";
 import {
 	Card,
@@ -6,7 +7,7 @@ import {
 	CardHeader,
 	CardTitle,
 } from "@/components/ui/card";
-import { BotMessageSquare, CheckCheck, Trophy } from "lucide-react";
+import { CheckCheck, Trophy } from "lucide-react";
 
 export function LandingFeaturesSection() {
 	return (
@@ -56,8 +57,8 @@ export function LandingFeaturesSection() {
 
 					<Card>
 						<CardHeader>
-							<div className="flex items-center gap-2 mb-2">
-								<BotMessageSquare className="h-5 w-5 text-cyan-500" />
+							<div className="flex items-center gap-2 mb-2 text-muted-foreground">
+								<MentorIcon className="-m-2" size={32} pad={4} />
 							</div>
 							<CardTitle>AI-Powered Mentorship</CardTitle>
 							<CardDescription>
