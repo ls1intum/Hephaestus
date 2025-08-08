@@ -1,88 +1,62 @@
-import { ChatInput } from "@/components/mentor/ChatInput";
-import { Welcome } from "@/components/mentor/Welcome";
-import { v4 as uuidv4 } from "uuid";
+import { Chat } from "@/components/mentor/Chat";
+import { useMentorChat } from "@/hooks/useMentorChat";
+import type { ChatMessage } from "@/lib/types";
+import { useCallback } from "react";
 
-import {
-	getGroupedThreadsQueryKey,
-	getThreadQueryKey,
-} from "@/api/@tanstack/react-query.gen";
-import type { ChatThreadDetail, ChatThreadGroup } from "@/api/types.gen";
-import { useQueryClient } from "@tanstack/react-query";
-import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { createFileRoute } from "@tanstack/react-router";
 
 export const Route = createFileRoute("/_authenticated/mentor/")({
 	component: MentorContainer,
 });
 
 function MentorContainer() {
-	const navigate = useNavigate();
-	const queryClient = useQueryClient();
+	// Initialize mentor chat hook for new conversations
+	const mentorChat = useMentorChat({
+		onError: (error: Error) => {
+			console.error("Chat error:", error);
+		},
+	});
 
-	const handleSendMessage = (text: string) => {
-		const threadId = uuidv4();
+	const handleMessageSubmit = useCallback(
+		({ text }: { text: string }) => {
+			if (!text.trim()) return;
+			mentorChat.sendMessage(text);
+		},
+		[mentorChat.sendMessage], // Only depend on the specific function
+	);
 
-		// Optimistically update the thread detail cache
-		queryClient.setQueryData(getThreadQueryKey({ path: { threadId } }), {
-			id: threadId,
-			messages: [],
-		} satisfies ChatThreadDetail);
-
-		// Optimistically update the grouped threads cache
-		const previousGroupedThreads: Array<ChatThreadGroup> | undefined =
-			queryClient.getQueryData(getGroupedThreadsQueryKey());
-		let nextGroupThreads: Array<ChatThreadGroup> = [];
-		const threadSummary = {
-			id: threadId,
-			title: "New chat",
-			createdAt: new Date(),
-		};
-		if (previousGroupedThreads) {
-			if (previousGroupedThreads[0]?.groupName === "Today") {
-				nextGroupThreads = [
-					{
-						groupName: "Today",
-						threads: [threadSummary, ...previousGroupedThreads[0].threads],
-					},
-					...previousGroupedThreads.slice(1),
-				];
-			} else {
-				nextGroupThreads = [
-					{
-						groupName: "Today",
-						threads: [threadSummary],
-					},
-					...previousGroupedThreads,
-				];
-			}
-		} else {
-			nextGroupThreads = [
-				{
-					groupName: "Today",
-					threads: [threadSummary],
-				},
-			];
-		}
-		queryClient.setQueryData(getGroupedThreadsQueryKey(), nextGroupThreads);
-
-		navigate({
-			to: "/mentor/$threadId",
-			params: { threadId },
-			state: { pendingMentorMessage: text },
+	const handleCopy = useCallback((content: string) => {
+		navigator.clipboard.writeText(content).catch((error) => {
+			console.error("Failed to copy to clipboard:", error);
 		});
-	};
+	}, []);
+
+	const handleVote = useCallback(
+		(messageId: string, isUpvote: boolean) => {
+			mentorChat.voteMessage(messageId, isUpvote);
+		},
+		[mentorChat.voteMessage], // Only depend on the specific function
+	);
 
 	return (
-		<div className="h-[calc(100vh-4rem)] max-w-5xl mx-auto p-6 flex flex-col">
-			<div className="flex-1 flex items-center justify-center">
-				<Welcome />
-			</div>
-			<div className="mt-6">
-				<ChatInput
-					onSubmit={handleSendMessage}
-					placeholder="Ask me anything about software development, best practices, or technical concepts..."
-					autoFocus
-				/>
-			</div>
+			<div className="flex flex-col flex-1 min-h-0">
+				<Chat
+				id={mentorChat.currentThreadId || mentorChat.id}
+				messages={mentorChat.messages as ChatMessage[]} // Use UIMessage directly - they're compatible
+				status={mentorChat.status}
+				readonly={false}
+				attachments={[]} // Empty since attachments are disabled
+				onMessageSubmit={handleMessageSubmit}
+				onStop={mentorChat.stop}
+				onFileUpload={() => Promise.resolve([])} // No-op since attachments are disabled
+				onAttachmentsChange={() => {}} // No-op since attachments are disabled
+				onCopy={handleCopy}
+				onVote={handleVote}
+				showSuggestedActions={true}
+				inputPlaceholder="Ask me anything about software development, best practices, or agile concepts..."
+				disableAttachments={true}
+				className="h-[calc(100dvh-4rem)]"
+			/>
 		</div>
 	);
 }

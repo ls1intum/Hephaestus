@@ -24,7 +24,7 @@ interface VersionFooterProps {
 export const VersionFooter = ({
 	handleVersionChange,
 	documents,
-	currentVersionIndex,
+	currentVersionIndex: _currentVersionIndex,
 	isRestoring = false,
 	onRestore,
 	className,

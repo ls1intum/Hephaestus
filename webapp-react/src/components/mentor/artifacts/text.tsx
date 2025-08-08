@@ -43,19 +43,16 @@ export const textArtifact = new Artifact<"text", TextArtifactMetadata>({
 		isCurrentVersion,
 		currentVersionIndex,
 		onSaveContent,
-		getDocumentContentById,
+		getDocumentContentById: _getDocumentContentById,
 		isLoading,
-		metadata,
 	}) => {
 		if (isLoading) {
 			return <DocumentSkeleton artifactKind="text" />;
 		}
 
 		if (mode === "diff") {
-			const oldContent = getDocumentContentById(currentVersionIndex - 1);
-			const newContent = getDocumentContentById(currentVersionIndex);
-
-			return null; // <DiffView oldContent={oldContent} newContent={newContent} />;
+			// Diff view not implemented yet
+			return null; // <DiffView oldContent={old} newContent={new} />
 		}
 
 		return (
@@ -102,7 +99,7 @@ export const textArtifact = new Artifact<"text", TextArtifactMetadata>({
 			onClick: ({ handleVersionChange }) => {
 				handleVersionChange("toggle");
 			},
-			isDisabled: ({ currentVersionIndex, setMetadata }) => {
+			isDisabled: ({ currentVersionIndex }) => {
 				if (currentVersionIndex === 0) {
 					return true;
 				}

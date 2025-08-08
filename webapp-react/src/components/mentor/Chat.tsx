@@ -240,29 +240,33 @@ function PureChat({
 	return (
 		<>
 			<div
-				className={cn("flex flex-col min-w-0 h-dvh bg-background", className)}
+				className={cn(
+					"relative h-dvh shrink-0",
+					className,
+				)}
 			>
-				<Messages
-					messages={messages}
-					votes={votes}
-					status={status}
-					readonly={readonly}
-					showThinking={status === "submitted"}
-					showGreeting={messages.length === 0}
-					variant="default"
-					containerRef={containerRef}
-					endRef={endRef}
-					onMessageEdit={onMessageEdit}
-					onCopy={onCopy}
-					onVote={onVote}
-					onDocumentClick={handleDocumentClickById}
-					onDocumentSave={handleArtifactContentSave}
-				/>
+				<div className="flex flex-col h-full">
+					<Messages
+						messages={messages}
+						votes={votes}
+						status={status}
+						readonly={readonly}
+						showThinking={status === "submitted"}
+						showGreeting={messages.length === 0}
+						variant="default"
+						containerRef={containerRef}
+						endRef={endRef}
+						onMessageEdit={onMessageEdit}
+						onCopy={onCopy}
+						onVote={onVote}
+						onDocumentClick={handleDocumentClickById}
+						onDocumentSave={handleArtifactContentSave}
+					/>
 
-				<div className="relative">
-					<div className="flex flex-row gap-2 items-end w-full pb-4 md:pb-6 -mt-20 relative z-10 bg-gradient-to-t from-muted dark:from-background/30 from-60% to-transparent pt-8">
-						<div className="flex mx-auto px-4 gap-2 w-full md:max-w-3xl">
-							{!readonly && (
+					{/* Absolutely anchored input at the bottom of SidebarInset content area */}
+					<div className="flex flex-col gap-2 items-center w-full px-4 pb-2 -mt-20 relative z-10 bg-gradient-to-t from-muted dark:from-background/30 from-60% to-transparent pt-8">
+						{!readonly && (
+							<div className="w-full max-w-3xl">
 								<MultimodalInput
 									status={
 										status === "submitted"
@@ -286,8 +290,13 @@ function PureChat({
 									isCurrentVersion={isCurrentVersion}
 									className="bg-background dark:bg-muted"
 								/>
-							)}
-						</div>
+							</div>
+						)}
+						{/* AI Disclaimer */}
+						<p className="text-center text-balance text-xs text-muted-foreground px-4">
+							Hephaestus can make mistakes. Consider verifying important
+							information.
+						</p>
 					</div>
 				</div>
 			</div>

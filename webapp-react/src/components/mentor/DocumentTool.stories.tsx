@@ -20,15 +20,10 @@ const meta = {
 				"Whether the operation is in progress (shows loading spinner)",
 			control: "boolean",
 		},
-		isReadonly: {
-			description: "Whether the document is in readonly mode",
-			control: "boolean",
-		},
 	},
 	args: {
 		type: "create",
 		isLoading: false,
-		isReadonly: false,
 	},
 } satisfies Meta<typeof DocumentTool>;
 

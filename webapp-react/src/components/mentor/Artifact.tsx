@@ -293,7 +293,7 @@ function PureArtifact({
 									onDocumentSave={onDocumentSave}
 								/>
 
-								<div className="flex flex-row gap-2 items-end w-full px-4 pb-4 -mt-20 relative z-10 bg-gradient-to-t from-muted dark:from-background/30 from-60% to-transparent pt-8">
+								<div className="flex flex-col gap-1 items-center w-full px-4 pb-2 -mt-20 relative z-10 bg-gradient-to-t from-muted dark:from-background/30 from-60% to-transparent pt-8">
 									<MultimodalInput
 										status={status === "streaming" ? "submitted" : "ready"}
 										onStop={onStop}
@@ -307,6 +307,10 @@ function PureArtifact({
 										scrollToBottom={scrollToBottom}
 										isCurrentVersion={isCurrentVersion}
 									/>
+									{/* AI Disclaimer */}
+									<p className="text-center text-balance text-xs text-muted-foreground px-4">
+										Hephaestus can make mistakes. 
+									</p>
 								</div>
 							</div>
 						</motion.div>

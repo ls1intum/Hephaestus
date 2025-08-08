@@ -1,7 +1,7 @@
 import type { ArtifactKind } from "./Artifact";
 
 export const DocumentSkeleton = ({
-	artifactKind,
+	artifactKind: _artifactKind,
 }: {
 	artifactKind: ArtifactKind;
 }) => {

@@ -8,17 +8,22 @@ import {
 	TableHeader,
 	TableRow,
 } from "@/components/ui/table";
-import { memo } from "react";
+import { memo, useEffect, useState } from "react";
 import ReactMarkdown, { type Components } from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { CodeBlock } from "./CodeBlock";
+import styles from "./Markdown.module.css";
 
 const components: Partial<Components> = {
 	code: ({ children, className, ...props }) => {
 		// Check if this is inline code (no className means inline code)
 		const isInline = !className || !className.startsWith("language-");
 		return (
-			<CodeBlock inline={isInline} className={className || ""} {...props}>
+			<CodeBlock
+				inline={isInline}
+				className={`${styles.noFade} ${className || ""}`}
+				{...props}
+			>
 				{children}
 			</CodeBlock>
 		);
@@ -173,15 +178,70 @@ const components: Partial<Components> = {
 
 const remarkPlugins = [remarkGfm];
 
-const NonMemoizedMarkdown = ({ children }: { children: string }) => {
+// Streaming fade duration in milliseconds (similar to GitHub's implementation)
+const STREAMING_FADE_DURATION_MS = 750;
+
+interface MarkdownProps {
+	children: string;
+	isStreaming?: boolean;
+}
+
+const NonMemoizedMarkdown = ({
+	children,
+	isStreaming = false,
+}: MarkdownProps) => {
+	// Track the content hash to detect actual content changes vs re-renders
+	const [lastContentHash, setLastContentHash] = useState<string>("");
+	const [isAnimating, setIsAnimating] = useState(false);
+
+	// Create a simple hash of the content to detect real changes
+	const contentHash = children.length.toString() + children.slice(-50);
+
+	useEffect(() => {
+		if (isStreaming && contentHash !== lastContentHash) {
+			// Content actually changed during streaming - trigger animation
+			setIsAnimating(true);
+			setLastContentHash(contentHash);
+
+			// Remove animation class after animation completes
+			const timeout = setTimeout(() => {
+				setIsAnimating(false);
+			}, STREAMING_FADE_DURATION_MS);
+
+			return () => clearTimeout(timeout);
+		}
+
+		if (!isStreaming && isAnimating) {
+			// Streaming stopped - clean up animation immediately
+			setIsAnimating(false);
+		}
+	}, [isStreaming, contentHash, lastContentHash, isAnimating]);
+
+	const containerClassName = [
+		styles.markdownContainer,
+		isAnimating && isStreaming ? styles.streamingFadeIn : "",
+	]
+		.filter(Boolean)
+		.join(" ");
+
 	return (
-		<ReactMarkdown remarkPlugins={remarkPlugins} components={components}>
-			{children}
-		</ReactMarkdown>
+		<div className={containerClassName}>
+			<ReactMarkdown remarkPlugins={remarkPlugins} components={components}>
+				{children}
+			</ReactMarkdown>
+		</div>
 	);
 };
 
-export const Markdown = memo(
-	NonMemoizedMarkdown,
-	(prevProps, nextProps) => prevProps.children === nextProps.children,
-);
+export const Markdown = memo(NonMemoizedMarkdown, (prevProps, nextProps) => {
+	// During streaming, allow re-renders to show new content
+	if (nextProps.isStreaming || prevProps.isStreaming) {
+		return (
+			prevProps.children === nextProps.children &&
+			prevProps.isStreaming === nextProps.isStreaming
+		);
+	}
+
+	// When not streaming, only re-render if content actually changed
+	return prevProps.children === nextProps.children;
+});

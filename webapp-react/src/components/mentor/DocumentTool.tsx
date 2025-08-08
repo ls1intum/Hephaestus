@@ -1,6 +1,4 @@
 import { memo } from "react";
-
-import type { Document } from "@/api/types.gen";
 import type { ArtifactKind } from "./Artifact";
 import { FileIcon, LoaderIcon, MessageIcon, PencilEditIcon } from "./Icons";
 

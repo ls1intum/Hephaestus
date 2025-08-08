@@ -168,7 +168,7 @@ const CONVERSATION_VOTES: ChatMessageVote[] = [
  */
 export const Default: Story = {
 	render: () => (
-		<div className="h-screen w-full bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-900 dark:to-slate-800 relative">
+		<div className="h-screen w-full bg-background relative">
 			<div className="p-8">
 				<h1 className="text-2xl font-bold mb-4">Copilot Widget - New Chat</h1>
 				<p className="text-muted-foreground mb-8 max-w-2xl">
@@ -230,7 +230,7 @@ export const Default: Story = {
  */
 export const WithConversation: Story = {
 	render: () => (
-		<div className="h-screen w-full bg-gradient-to-br from-blue-50 to-blue-100 dark:from-blue-950 dark:to-blue-900 relative">
+		<div className="h-screen w-full bg-background relative">
 			<div className="p-8">
 				<h1 className="text-2xl font-bold mb-4">
 					Copilot Widget - Active Conversation

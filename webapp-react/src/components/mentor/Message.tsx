@@ -70,7 +70,6 @@ const PurePreviewMessage = ({
 	const renderDocument = (
 		document: Document,
 		toolType: "create" | "update" | "request-suggestions",
-		toolCallId: string,
 	) => {
 		// Design principle: Show full preview only for document creation,
 		// use compact tool for updates/suggestions to reduce visual noise
@@ -177,7 +176,11 @@ const PurePreviewMessage = ({
 													message.role === "user",
 											})}
 										>
-											<Markdown>{sanitizeText(part.text)}</Markdown>
+											<Markdown
+												isStreaming={isLoading && message.role === "assistant"}
+											>
+												{sanitizeText(part.text)}
+											</Markdown>
 										</div>
 									);
 								}
@@ -262,7 +265,7 @@ const PurePreviewMessage = ({
 
 									return (
 										<div key={toolCallId}>
-											{renderDocument(output as Document, "create", toolCallId)}
+											{renderDocument(output as Document, "create")}
 										</div>
 									);
 								}
@@ -306,7 +309,7 @@ const PurePreviewMessage = ({
 
 									return (
 										<div key={toolCallId}>
-											{renderDocument(output as Document, "update", toolCallId)}
+											{renderDocument(output as Document, "update")}
 										</div>
 									);
 								}
@@ -352,7 +355,6 @@ const PurePreviewMessage = ({
 											{renderDocument(
 												output as Document,
 												"request-suggestions",
-												toolCallId,
 											)}
 										</div>
 									);
@@ -402,6 +404,11 @@ const PurePreviewMessage = ({
 export const PreviewMessage = memo(
 	PurePreviewMessage,
 	(prevProps, nextProps) => {
+		// During streaming, allow re-renders for loading messages
+		if (nextProps.isLoading || prevProps.isLoading) {
+			return false;
+		}
+
 		if (prevProps.isLoading !== nextProps.isLoading) return false;
 		if (prevProps.message.id !== nextProps.message.id) return false;
 		if (prevProps.readonly !== nextProps.readonly) return false;

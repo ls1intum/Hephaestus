@@ -5,8 +5,9 @@ import {
 	PopoverTrigger,
 } from "@/components/ui/popover";
 import { cn } from "@/lib/utils";
-import { BotIcon, BotMessageSquare, X } from "lucide-react";
+import { X } from "lucide-react";
 import { memo, useCallback, useState } from "react";
+import { MentorIcon } from "./MentorIcon";
 
 export interface CopilotProps {
 	/** Content to display in the popover (typically Chat component) */
@@ -54,12 +55,12 @@ function PureCopilot({
 						size="icon"
 						aria-label="Open AI Mentor"
 					>
-						<BotMessageSquare className="size-8" />
+						<MentorIcon className="size-12" />
 					</Button>
 				</PopoverTrigger>
 
 				<PopoverContent
-					className="p-0 w-[calc(100vw-3rem)] max-w-lg h-[calc(100dvh-10rem)] rounded-2xl overflow-hidden shadow-2xl border-0 md:w-full"
+					className="p-0 w-[calc(100vw-3rem)] max-w-lg h-[calc(100dvh-10rem)] rounded-2xl overflow-hidden shadow-2xl border-1 md:w-full"
 					side="top"
 					align="end"
 					alignOffset={0}
@@ -73,7 +74,7 @@ function PureCopilot({
 						{/* Header with close button */}
 						<div className="flex items-center justify-between p-2 pl-4 border-b">
 							<h3 className="text-sm font-medium text-muted-foreground flex items-center gap-1">
-								<BotIcon />
+								<MentorIcon className="size-8" />
 								AI Mentor
 							</h3>
 							<Button

@@ -35,16 +35,25 @@ interface MyRouterContext {
 export const Route = createRootRouteWithContext<MyRouterContext>()({
 	component: () => {
 		const { theme } = useTheme();
+		const { pathname } = useLocation();
+		const isMentorRoute = pathname.startsWith("/mentor");
+
 		return (
 			<>
 				<SidebarProvider>
 					<AppSidebarContainer />
 					<SidebarInset>
 						<HeaderContainer />
-						<main className="flex-grow p-4">
-							<Outlet />
-						</main>
-						<Footer />
+						<div className="min-h-[calc(100dvh-4rem)] flex flex-col">
+							<main className={`${isMentorRoute ? "" : "p-4"}`}>
+								<Outlet />
+							</main>
+							{!isMentorRoute && (
+								<div className="flex justify-end flex-col h-full">
+									<Footer />
+								</div>
+							)}
+						</div>
 					</SidebarInset>
 				</SidebarProvider>
 				<Toaster theme={theme} />

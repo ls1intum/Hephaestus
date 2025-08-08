@@ -114,14 +114,24 @@ function PureMessages({
 }
 
 export const Messages = memo(PureMessages, (prevProps, nextProps) => {
+	// Only memoize when NOT streaming to allow real-time updates
+	if (nextProps.status === "streaming" || prevProps.status === "streaming") {
+		return false; // Always re-render during streaming
+	}
+
+	// For non-streaming states, use deep comparison
 	if (prevProps.status !== nextProps.status) return false;
+	if (prevProps.messages.length !== nextProps.messages.length) return false;
+
+	// Deep compare messages content only when not streaming
+	if (!equal(prevProps.messages, nextProps.messages)) return false;
+	if (!equal(prevProps.votes, nextProps.votes)) return false;
+
+	// Other props comparison
 	if (prevProps.readonly !== nextProps.readonly) return false;
 	if (prevProps.showThinking !== nextProps.showThinking) return false;
 	if (prevProps.showGreeting !== nextProps.showGreeting) return false;
 	if (prevProps.variant !== nextProps.variant) return false;
-	if (prevProps.messages.length !== nextProps.messages.length) return false;
-	if (!equal(prevProps.messages, nextProps.messages)) return false;
-	if (!equal(prevProps.votes, nextProps.votes)) return false;
 
 	return true;
 });
