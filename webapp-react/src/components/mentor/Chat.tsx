@@ -157,8 +157,7 @@ function PureChat({
 				for (const part of message.parts) {
 					if (
 						(part.type === "tool-createDocument" ||
-							part.type === "tool-updateDocument" ||
-							part.type === "tool-requestSuggestions") &&
+							part.type === "tool-updateDocument") &&
 						part.state === "output-available"
 					) {
 						const doc = part.output as Document;
@@ -289,7 +288,7 @@ function PureChat({
 						)}
 						{/* AI Disclaimer */}
 						<p className="text-center text-balance text-xs text-muted-foreground px-4">
-							Hephaestus can make mistakes. Consider verifying important
+							Heph can make mistakes. Consider verifying important
 							information.
 						</p>
 					</div>

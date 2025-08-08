@@ -15,7 +15,7 @@ export const Greeting = () => {
 					exit={{ opacity: 0, scale: 0.8 }}
 					transition={{ delay: 0.3 }}
 				>
-					<MentorIcon className="size-20" />
+					<MentorIcon size={80} />
 				</motion.div>
 				<div className="flex flex-col">
 					<motion.div

@@ -1,3 +1,4 @@
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
 	Popover,
@@ -5,7 +6,7 @@ import {
 	PopoverTrigger,
 } from "@/components/ui/popover";
 import { cn } from "@/lib/utils";
-import { X } from "lucide-react";
+import { Sparkles, X } from "lucide-react";
 import { memo, useCallback, useState } from "react";
 import { MentorIcon } from "./MentorIcon";
 
@@ -53,7 +54,7 @@ function PureCopilot({
 						onClick={handleTriggerClick}
 						className="size-16 rounded-full shadow-lg hover:shadow-xl transition-all duration-200 active:scale-95"
 						size="icon"
-						aria-label="Open AI Mentor"
+						aria-label="Open Heph - AI Mentor"
 					>
 						<MentorIcon className="size-12" />
 					</Button>
@@ -73,15 +74,18 @@ function PureCopilot({
 					<div className="flex flex-col w-full h-full bg-background rounded-2xl overflow-hidden">
 						{/* Header with close button */}
 						<div className="flex items-center justify-between p-2 pl-4 border-b">
-							<h3 className="text-sm font-medium text-muted-foreground flex items-center gap-1">
+							<h3 className="text-sm font-medium text-muted-foreground flex items-center gap-2">
 								<MentorIcon className="size-8" />
-								AI Mentor
+								Heph{" "}
+								<Badge variant="outline" className="text-muted-foreground">
+									<Sparkles /> AI Mentor
+								</Badge>
 							</h3>
 							<Button
 								variant="ghost"
 								size="icon"
 								onClick={handleClose}
-								aria-label="Close AI Mentor"
+								aria-label="Close Heph - AI Mentor"
 							>
 								<X />
 							</Button>

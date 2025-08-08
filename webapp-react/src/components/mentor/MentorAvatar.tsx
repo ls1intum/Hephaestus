@@ -7,13 +7,18 @@ interface MentorAvatarProps {
 	size?: "default" | "sm" | "lg";
 	/** Optional CSS class name */
 	className?: string;
+	/** Whether the assistant is currently streaming */
+	streaming?: boolean;
 }
 
-export function MentorAvatar({ className }: MentorAvatarProps) {
+export function MentorAvatar({
+	className,
+	streaming = false,
+}: MentorAvatarProps) {
 	return (
 		<Avatar className={cn("size-16 -m-4", className)}>
 			<AvatarFallback className="bg-transparent text-muted-foreground size-16">
-				<MentorIcon className="size-16" pad={8} />
+				<MentorIcon size={64} pad={8} streaming={streaming} />
 			</AvatarFallback>
 		</Avatar>
 	);

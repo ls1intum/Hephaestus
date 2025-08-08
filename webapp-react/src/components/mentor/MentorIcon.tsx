@@ -1,21 +1,32 @@
+import { memo, useMemo } from "react";
+
 interface MentorIconProps {
 	/** Size of the icon */
 	size?: number;
+	/** Stroke width of the icon */
+	strokeWidth?: number;
 	/** Padding around the icon to ensure it fits well in various contexts */
 	pad?: number;
 	/** Whether to enable animations */
 	animated?: boolean;
+	/** Highlight streaming state: faster & larger blue antenna ping */
+	streaming?: boolean;
 	/** Optional CSS class name */
 	className?: string;
 }
 
-export const MentorIcon = ({
+const MentorIconComponent = ({
 	size = 16,
+	strokeWidth = 2,
 	pad = 2,
 	animated = true,
+	streaming = false,
 	className,
 }: MentorIconProps) => {
-	const uniqueId = `mentor-icon-${Math.random().toString(36).substr(2, 9)}`;
+	const uniqueId = useMemo(
+		() => `mentor-icon-${Math.random().toString(36).substr(2, 9)}`,
+		[],
+	);
 
 	return (
 		<svg
@@ -25,21 +36,23 @@ export const MentorIcon = ({
 			viewBox={`-${pad} -${pad} ${24 + pad * 2} ${24 + pad * 2}`}
 			fill="none"
 			stroke="currentColor"
-			strokeWidth="2"
+			strokeWidth={strokeWidth}
 			strokeLinecap="round"
 			strokeLinejoin="round"
 			style={
 				{
 					color: "currentColor",
+					height: size,
+					width: size,
 					// Theme-aware CSS custom properties
 					"--mentor-shadow-opacity": "0.08",
 					"--mentor-blush-opacity": "0.25",
 				} as React.CSSProperties
 			}
 			role="img"
-			aria-label="Mentor bot"
+			aria-label="Heph - AI Mentor"
 		>
-			<title>Mentor</title>
+			<title>Heph - AI Mentor</title>
 
 			{animated && (
 				<style>
@@ -56,6 +69,11 @@ export const MentorIcon = ({
 							opacity: 0.5; 
 							transform-origin: 12px 3px; 
 							animation: mentor-ping-${uniqueId} 2.2s ease-out infinite; 
+						}
+						.mentor-ping-fast-${uniqueId} { 
+							opacity: 0.7; 
+							transform-origin: 12px 3px; 
+							animation: mentor-ping-fast-${uniqueId} 1.2s ease-out infinite; 
 						}
 						.mentor-eyes-${uniqueId} { 
 							transform-origin: 12px 13.5px; 
@@ -79,6 +97,10 @@ export const MentorIcon = ({
 						@keyframes mentor-ping-${uniqueId} { 
 							0% { transform: scale(0.6); opacity: 0.45; } 
 							70%, 100% { transform: scale(1.9); opacity: 0; } 
+						}
+						@keyframes mentor-ping-fast-${uniqueId} { 
+							0% { transform: scale(0.6); opacity: 0.6; } 
+							70%, 100% { transform: scale(2.4); opacity: 0; } 
 						}
 						@keyframes mentor-blink-${uniqueId} { 
 							0%, 86%, 92%, 100% { transform: scaleY(1); } 
@@ -136,12 +158,17 @@ export const MentorIcon = ({
 					<line x1="12" y1="7.2" x2="12" y2="3.6" />
 					<circle cx="12" cy="2.8" r="1" fill="currentColor" />
 					<circle
-						className={animated ? `mentor-ping-${uniqueId}` : undefined}
+						className={
+							animated
+								? `${streaming ? `mentor-ping-fast-${uniqueId}` : `mentor-ping-${uniqueId}`}`
+								: undefined
+						}
 						cx="12"
 						cy="2.8"
-						r="1.6"
+						r={streaming ? 4 : 1.6}
 						fill="none"
-						opacity={animated ? "0.5" : "0"}
+						style={{ color: streaming ? "#3B82F6" : undefined }}
+						opacity={animated ? (streaming ? "1" : "0.5") : "0"}
 					/>
 
 					{/* Body: slightly softer corners for friendliness */}
@@ -180,3 +207,5 @@ export const MentorIcon = ({
 		</svg>
 	);
 };
+
+export const MentorIcon = memo(MentorIconComponent);

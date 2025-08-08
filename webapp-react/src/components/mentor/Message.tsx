@@ -130,7 +130,11 @@ const PurePreviewMessage = ({
 						},
 					)}
 				>
-					{message.role === "assistant" && <MentorAvatar />}
+					{message.role === "assistant" && (
+						<MentorAvatar
+							streaming={isLoading && message.role === "assistant"}
+						/>
+					)}
 
 					<div className="flex flex-col gap-4 w-full">
 						{attachmentsFromMessage.length > 0 && (
@@ -373,7 +377,7 @@ export const ThinkingMessage = () => {
 					},
 				)}
 			>
-				<MentorAvatar />
+				<MentorAvatar streaming={true} />
 
 				<div className="flex flex-col gap-2 w-full">
 					<div className="flex flex-col gap-4 text-muted-foreground">
