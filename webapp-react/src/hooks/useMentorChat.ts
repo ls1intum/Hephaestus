@@ -1,6 +1,6 @@
+import type { ChatMessage } from "@/lib/types";
 import { useChat } from "@ai-sdk/react";
 import type { UseChatHelpers } from "@ai-sdk/react";
-import type { ChatMessage } from "@/lib/types";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { DefaultChatTransport } from "ai";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -147,7 +147,7 @@ export function useMentorChat({
 		if (status === "streaming" || status === "submitted") return;
 
 		// Replace the local chat state with server messages
-	setMessages(threadDetail.messages as unknown as ChatMessage[]);
+		setMessages(threadDetail.messages as unknown as ChatMessage[]);
 		hydratedRef.current = threadId;
 		// eslint-disable-next-line react-hooks/exhaustive-deps
 	}, [threadId, threadDetail?.messages, status, setMessages]);
@@ -201,7 +201,7 @@ export function useMentorChat({
 		threadError,
 		groupedThreads,
 		isGroupedThreadsLoading,
-	currentThreadId: threadId || id,
+		currentThreadId: threadId || id,
 
 		// Voting
 		voteMessage,

@@ -309,7 +309,7 @@ function PureArtifact({
 									/>
 									{/* AI Disclaimer */}
 									<p className="text-center text-balance text-xs text-muted-foreground px-4">
-										Hephaestus can make mistakes. 
+										Hephaestus can make mistakes.
 									</p>
 								</div>
 							</div>

@@ -9,7 +9,7 @@ export const Greeting = () => {
 		>
 			<div className="flex items-center gap-4 mb-4">
 				<motion.div
-				  className="text-muted-foreground"
+					className="text-muted-foreground"
 					initial={{ opacity: 0, scale: 0.8 }}
 					animate={{ opacity: 1, scale: 1 }}
 					exit={{ opacity: 0, scale: 0.8 }}

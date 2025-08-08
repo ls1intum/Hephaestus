@@ -209,7 +209,10 @@ const PurePreviewMessage = ({
 
 								if (state === "input-available") {
 									return (
-										<div key={toolCallId} className="flex flex-col gap-2 p-4 rounded-xl border">
+										<div
+											key={toolCallId}
+											className="flex flex-col gap-2 p-4 rounded-xl border"
+										>
 											<div className="h-4 w-28 bg-muted animate-pulse rounded" />
 											<div className="h-6 w-52 bg-muted animate-pulse rounded" />
 											<div className="h-3 w-80 bg-muted animate-pulse rounded" />
@@ -231,7 +234,10 @@ const PurePreviewMessage = ({
 
 								if (state === "input-available") {
 									const { input } = part;
-									const args = { title: input.title, kind: input.kind } as const;
+									const args = {
+										title: input.title,
+										kind: input.kind,
+									} as const;
 									return (
 										<div key={toolCallId}>
 											<DocumentTool
@@ -259,7 +265,12 @@ const PurePreviewMessage = ({
 
 								if (state === "input-available") {
 									const { input } = part;
-									const args = { id: input.id, title: input.title, content: input.content, kind: input.kind } as const;
+									const args = {
+										id: input.id,
+										title: input.title,
+										content: input.content,
+										kind: input.kind,
+									} as const;
 									return (
 										<div key={toolCallId}>
 											<DocumentTool

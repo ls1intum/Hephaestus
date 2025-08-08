@@ -39,8 +39,8 @@ function MentorContainer() {
 	);
 
 	return (
-			<div className="flex flex-col flex-1 min-h-0">
-				<Chat
+		<div className="flex flex-col flex-1 min-h-0">
+			<Chat
 				id={mentorChat.currentThreadId || mentorChat.id}
 				messages={mentorChat.messages as ChatMessage[]} // Use UIMessage directly - they're compatible
 				status={mentorChat.status}

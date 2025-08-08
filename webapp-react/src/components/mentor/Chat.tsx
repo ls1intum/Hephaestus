@@ -239,12 +239,7 @@ function PureChat({
 
 	return (
 		<>
-			<div
-				className={cn(
-					"relative h-dvh shrink-0",
-					className,
-				)}
-			>
+			<div className={cn("relative h-dvh shrink-0", className)}>
 				<div className="flex flex-col h-full">
 					<Messages
 						messages={messages}

@@ -20,14 +20,20 @@ function ThreadContainer() {
 		},
 	});
 
-	const handleMessageSubmit = useCallback(({ text }: { text: string }) => {
-		if (!text.trim()) return;
-		mentorChat.sendMessage(text);
-	}, [mentorChat.sendMessage]);
+	const handleMessageSubmit = useCallback(
+		({ text }: { text: string }) => {
+			if (!text.trim()) return;
+			mentorChat.sendMessage(text);
+		},
+		[mentorChat.sendMessage],
+	);
 
-	const handleVote = useCallback((messageId: string, isUpvote: boolean) => {
-		mentorChat.voteMessage(messageId, isUpvote);
-	}, [mentorChat.voteMessage]);
+	const handleVote = useCallback(
+		(messageId: string, isUpvote: boolean) => {
+			mentorChat.voteMessage(messageId, isUpvote);
+		},
+		[mentorChat.voteMessage],
+	);
 
 	const handleCopy = useCallback((content: string) => {
 		navigator.clipboard.writeText(content).catch((error) => {
@@ -76,8 +82,8 @@ function ThreadContainer() {
 	}
 
 	return (
-			<div className="flex flex-col flex-1 min-h-0">
-				<Chat
+		<div className="flex flex-col flex-1 min-h-0">
+			<Chat
 				id={mentorChat.currentThreadId || threadId}
 				messages={mentorChat.messages as unknown as ChatMessage[]}
 				status={mentorChat.status}
