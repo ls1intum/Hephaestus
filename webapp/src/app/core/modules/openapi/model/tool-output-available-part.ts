@@ -9,14 +9,16 @@
  * https://openapi-generator.tech
  * Do not edit the class manually.
  */
+import { Input } from './input';
+import { Output } from './output';
 
 
 /**
  * Tool part with output available.
  */
 export interface ToolOutputAvailablePart { 
-    input: object;
-    output: object;
+    input: Input;
+    output: Output;
     providerExecuted?: boolean | null;
     state: string;
     toolCallId: string;

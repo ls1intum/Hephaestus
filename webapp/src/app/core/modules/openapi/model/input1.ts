@@ -9,17 +9,17 @@
  * https://openapi-generator.tech
  * Do not edit the class manually.
  */
-import { Input } from './input';
+import { GetWeatherInput } from './get-weather-input';
+import { UpdateDocumentInput } from './update-document-input';
+import { CreateDocumentInput } from './create-document-input';
 
 
-/**
- * Tool part with input available.
- */
-export interface ToolInputAvailablePart { 
-    input: Input;
-    providerExecuted?: boolean | null;
-    state: string;
-    toolCallId: string;
-    type: string;
+export interface Input1 { 
+    content: string;
+    kind: string;
+    title: string;
+    id: string;
+    latitude: number;
+    longitude: number;
 }
 

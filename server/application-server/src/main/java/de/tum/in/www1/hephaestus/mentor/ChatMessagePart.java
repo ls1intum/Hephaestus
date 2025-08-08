@@ -4,9 +4,10 @@ import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import de.tum.in.www1.hephaestus.intelligenceservice.model.UIMessagePartsInner;
+import de.tum.in.www1.hephaestus.intelligenceservice.model.Input;
+import de.tum.in.www1.hephaestus.intelligenceservice.model.Output;
 import io.hypersistence.utils.hibernate.type.json.JsonType;
 import jakarta.persistence.*;
-import java.util.HashMap;
 import java.util.UUID;
 import lombok.EqualsAndHashCode;
 import lombok.Getter;
@@ -264,7 +265,7 @@ public class ChatMessagePart {
                     if (content.has("input") && !content.get("input").isNull()) {
                         try {
                             ObjectMapper mapper = new ObjectMapper();
-                            Object inputValue = mapper.treeToValue(content.get("input"), Object.class);
+                            Input inputValue = mapper.treeToValue(content.get("input"), Input.class);
                             uiPart.setInput(inputValue);
                         } catch (Exception e) {
                             // Keep input as null for input-streaming if conversion fails
@@ -273,23 +274,23 @@ public class ChatMessagePart {
                     
                 } else if ("input-available".equals(toolState)) {
                     // ToolInputAvailablePart: input (required), providerExecuted (optional)
-                    Object inputValue = null;
+                    Input inputValue = null;
                     if (content.has("args") && !content.get("args").isNull()) {
                         try {
                             ObjectMapper mapper = new ObjectMapper();
-                            inputValue = mapper.treeToValue(content.get("args"), Object.class);
+                            inputValue = mapper.treeToValue(content.get("args"), Input.class);
                         } catch (Exception e) {
-                            inputValue = new HashMap<>();
+                            inputValue = new Input();
                         }
                     } else if (content.has("input") && !content.get("input").isNull()) {
                         try {
                             ObjectMapper mapper = new ObjectMapper();
-                            inputValue = mapper.treeToValue(content.get("input"), Object.class);
+                            inputValue = mapper.treeToValue(content.get("input"), Input.class);
                         } catch (Exception e) {
-                            inputValue = new HashMap<>();
+                            inputValue = new Input();
                         }
                     } else {
-                        inputValue = new HashMap<>(); // Required field
+                        inputValue = new Input(); // Required field
                     }
                     uiPart.setInput(inputValue);
                     
@@ -297,44 +298,44 @@ public class ChatMessagePart {
                     // ToolOutputAvailablePart: input (required), output (required), providerExecuted (optional)
                     
                     // Handle required input field
-                    Object inputValue = null;
+                    Input inputValue = null;
                     if (content.has("args") && !content.get("args").isNull()) {
                         try {
                             ObjectMapper mapper = new ObjectMapper();
-                            inputValue = mapper.treeToValue(content.get("args"), Object.class);
+                            inputValue = mapper.treeToValue(content.get("args"), Input.class);
                         } catch (Exception e) {
-                            inputValue = new HashMap<>();
+                            inputValue = new Input();
                         }
                     } else if (content.has("input") && !content.get("input").isNull()) {
                         try {
                             ObjectMapper mapper = new ObjectMapper();
-                            inputValue = mapper.treeToValue(content.get("input"), Object.class);
+                            inputValue = mapper.treeToValue(content.get("input"), Input.class);
                         } catch (Exception e) {
-                            inputValue = new HashMap<>();
+                            inputValue = new Input();
                         }
                     } else {
-                        inputValue = new HashMap<>(); // Required field
+                        inputValue = new Input(); // Required field
                     }
                     uiPart.setInput(inputValue);
                     
                     // Handle required output field
-                    Object outputValue = null;
+                    Output outputValue = null;
                     if (content.has("result") && !content.get("result").isNull()) {
                         try {
                             ObjectMapper mapper = new ObjectMapper();
-                            outputValue = mapper.treeToValue(content.get("result"), Object.class);
+                            outputValue = mapper.treeToValue(content.get("result"), Output.class);
                         } catch (Exception e) {
-                            outputValue = new HashMap<>();
+                            outputValue = new Output();
                         }
                     } else if (content.has("output") && !content.get("output").isNull()) {
                         try {
                             ObjectMapper mapper = new ObjectMapper();
-                            outputValue = mapper.treeToValue(content.get("output"), Object.class);
+                            outputValue = mapper.treeToValue(content.get("output"), Output.class);
                         } catch (Exception e) {
-                            outputValue = new HashMap<>();
+                            outputValue = new Output();
                         }
                     } else {
-                        outputValue = new HashMap<>(); // Required field
+                        outputValue = new Output(); // Required field
                     }
                     uiPart.setOutput(outputValue);
                     
@@ -342,23 +343,23 @@ public class ChatMessagePart {
                     // ToolOutputErrorPart: input (required), errorText (required), providerExecuted (optional)
                     
                     // Handle required input field
-                    Object inputValue = null;
+                    Input inputValue = null;
                     if (content.has("args") && !content.get("args").isNull()) {
                         try {
                             ObjectMapper mapper = new ObjectMapper();
-                            inputValue = mapper.treeToValue(content.get("args"), Object.class);
+                            inputValue = mapper.treeToValue(content.get("args"), Input.class);
                         } catch (Exception e) {
-                            inputValue = new HashMap<>();
+                            inputValue = new Input();
                         }
                     } else if (content.has("input") && !content.get("input").isNull()) {
                         try {
                             ObjectMapper mapper = new ObjectMapper();
-                            inputValue = mapper.treeToValue(content.get("input"), Object.class);
+                            inputValue = mapper.treeToValue(content.get("input"), Input.class);
                         } catch (Exception e) {
-                            inputValue = new HashMap<>();
+                            inputValue = new Input();
                         }
                     } else {
-                        inputValue = new HashMap<>(); // Required field
+                        inputValue = new Input(); // Required field
                     }
                     uiPart.setInput(inputValue);
                     

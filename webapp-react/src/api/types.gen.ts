@@ -19,9 +19,9 @@ export type PageDocument = {
     totalPages?: number;
     pageable?: PageableObject;
     sort?: SortObject;
-    numberOfElements?: number;
     first?: boolean;
     last?: boolean;
+    numberOfElements?: number;
     size?: number;
     content?: Array<Document>;
     number?: number;
@@ -464,8 +464,8 @@ export type PageableObject = {
     paged?: boolean;
     pageNumber?: number;
     pageSize?: number;
-    sort?: SortObject;
     unpaged?: boolean;
+    sort?: SortObject;
     offset?: number;
 };
 
@@ -713,9 +713,9 @@ export type PageDocumentSummary = {
     totalPages?: number;
     pageable?: PageableObject;
     sort?: SortObject;
-    numberOfElements?: number;
     first?: boolean;
     last?: boolean;
+    numberOfElements?: number;
     size?: number;
     content?: Array<DocumentSummary>;
     number?: number;

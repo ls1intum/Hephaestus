@@ -7,9 +7,12 @@ from langchain_core.messages import SystemMessage, HumanMessage, AIMessage, Tool
 from langgraph.graph import StateGraph, START, END
 from langgraph.prebuilt import tools_condition
 from langchain_core.runnables import RunnableConfig
+from langchain.chat_models import init_chat_model
 
 from app.mentor.tools import (
     get_weather, 
+    create_document,
+    update_document,
     get_issues, 
     get_pull_requests,
     get_issue_details,
@@ -25,7 +28,7 @@ from langgraph.prebuilt import ToolNode
 
 # Get the chat model
 ChatModel = get_model(settings.MODEL_NAME)
-model = ChatModel(temperature=0.7, max_tokens=4096)
+model = init_chat_model(settings.MODEL_NAME, reasoning={ "summary": "auto" })
 
 # Enhanced system prompt for the comprehensive mentor
 SYSTEM_PROMPT = """\
@@ -74,6 +77,8 @@ def create_mentor_graph():
     # All available tools for the mentor
     tools = [
         get_weather, 
+        create_document,
+        update_document,
         get_issues, 
         get_pull_requests,
         get_issue_details,

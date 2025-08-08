@@ -9,13 +9,14 @@
  * https://openapi-generator.tech
  * Do not edit the class manually.
  */
+import { Input1 } from './input1';
 
 
 /**
  * Tool part with input being streamed.
  */
 export interface ToolInputStreamingPart { 
-    input?: object | null;
+    input?: Input1 | null;
     providerExecuted?: boolean | null;
     state: string;
     toolCallId: string;

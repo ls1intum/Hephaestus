@@ -1,77 +1,110 @@
-import requests
 import json
-from typing import Annotated, List, Dict, Any
+import requests
+from typing import Annotated, List, Dict, Any, Literal
 from langchain_core.tools import tool
 from langgraph.prebuilt import InjectedState
 
 from app.logger import logger
 from app.db.service import IssueDatabaseService
 from app.mentor.state import MentorState
+from app.mentor.models import (
+    CreateDocumentInput,
+    UpdateDocumentInput,
+    GetWeatherInput,
+    CreateDocumentOutput,
+    UpdateDocumentOutput,
+    GetWeatherOutput,
+)
 
 logger = logger.getChild(__name__)
 
 
-@tool
-def get_weather(latitude: float, longitude: float) -> dict:
+@tool("getWeather", args_schema=GetWeatherInput)
+def get_weather(latitude: float, longitude: float) -> Dict[str, Any]:
     """Get the current weather at a specific location.
 
     Args:
         latitude: The latitude coordinate of the location
         longitude: The longitude coordinate of the location
-
-    Returns:
-        A dictionary containing current weather information including temperature,
-        humidity, wind speed, and weather conditions.
     """
     try:
-        url = f"https://api.open-meteo.com/v1/forecast?latitude={latitude}&longitude={longitude}&current=temperature_2m,relative_humidity_2m,apparent_temperature,is_day,precipitation,rain,showers,snowfall,weather_code,cloud_cover,pressure_msl,surface_pressure,wind_speed_10m,wind_direction_10m,wind_gusts_10m&hourly=temperature_2m,relative_humidity_2m,precipitation_probability&daily=sunrise,sunset,temperature_2m_max,temperature_2m_min&timezone=auto&forecast_days=1"
-
+        url = (
+            "https://api.open-meteo.com/v1/forecast?"
+            f"latitude={latitude}&longitude={longitude}"
+            "&timeformat=iso8601"
+            "&current=temperature_2m,relative_humidity_2m,wind_speed_10m,weather_code"
+            "&hourly=temperature_2m"
+            "&daily=sunrise,sunset"
+            "&forecast_days=3"
+            "&timezone=auto"
+        )
         response = requests.get(url, timeout=10)
         response.raise_for_status()
-        data = response.json()
+        data = response.json() or {}
 
-        # Extract and format the most relevant information
-        current = data.get("current", {})
-        daily = data.get("daily", {})
-
-        formatted_weather = {
-            "location": {
-                "latitude": latitude,
-                "longitude": longitude,
-                "timezone": data.get("timezone", "Unknown"),
-            },
-            "current": {
-                "temperature": current.get("temperature_2m"),
-                "temperature_unit": data.get("current_units", {}).get(
-                    "temperature_2m", "°C"
-                ),
-                "feels_like": current.get("apparent_temperature"),
-                "humidity": current.get("relative_humidity_2m"),
-                "wind_speed": current.get("wind_speed_10m"),
-                "wind_direction": current.get("wind_direction_10m"),
-                "pressure": current.get("pressure_msl"),
-                "cloud_cover": current.get("cloud_cover"),
-                "precipitation": current.get("precipitation", 0),
-                "weather_code": current.get("weather_code"),
-                "is_day": current.get("is_day", 1) == 1,
-            },
-            "daily": {
-                "sunrise": daily.get("sunrise", [None])[0],
-                "sunset": daily.get("sunset", [None])[0],
-                "temperature_max": daily.get("temperature_2m_max", [None])[0],
-                "temperature_min": daily.get("temperature_2m_min", [None])[0],
-            },
-            "timestamp": current.get("time"),
-        }
-
-        return formatted_weather
-
+        # Map selected fields to our output shape
+        output = GetWeatherOutput(
+            latitude=latitude,
+            longitude=longitude,
+            generationtime_ms=data.get("generationtime_ms"),
+            utc_offset_seconds=data.get("utc_offset_seconds"),
+            timezone=data.get("timezone"),
+            timezone_abbreviation=data.get("timezone_abbreviation"),
+            elevation=data.get("elevation"),
+            current_units=data.get("current_units"),
+            current=data.get("current"),
+            hourly_units=data.get("hourly_units"),
+            hourly=data.get("hourly"),
+            daily_units=data.get("daily_units"),
+            daily=data.get("daily"),
+        )
+        # Return a JSON string to ensure ToolMessage.content is valid JSON
+        return output.model_dump(exclude_none=True)
     except requests.RequestException as e:
-        logger.error(f"Error fetching weather data: {e}")
-        return {"error": f"Failed to fetch weather data: {str(e)}"}
+        logger.warning("getWeather: Weather API error: %s", e)
+        # Return an empty JSON object string on error
+        return {}
     except Exception as e:
-        logger.error(f"Unexpected error in get_weather: {e}")
-        return {"error": f"Unexpected error: {str(e)}"}
+        logger.exception("getWeather: unexpected error: %s", e)
+        return {}
+
+
+@tool("createDocument", args_schema=CreateDocumentInput)
+def create_document(title: str, content: str, kind: Literal["text"]) -> Dict[str, Any]:
+    """Create a new text document for the current user.
+
+    IMPORTANT: This tool signals an intent to create a document. The actual creation
+    is executed by the application server to preserve auth and ownership semantics.
+
+    Args:
+        title: Title of the document (<=255 chars)
+        content: Text content of the document
+        kind: Document kind, currently only "text" is supported
+
+    Returns:
+        Acknowledgement payload; the server will provide the concrete output via streaming.
+    """
+    # Return the input for transparency; server will execute and stream the real result
+    return {"accepted": True, "input": {"title": title, "content": content, "kind": kind}}
+
+
+@tool("updateDocument", args_schema=UpdateDocumentInput)
+def update_document(id: str, title: str, content: str, kind: Literal["text"]) -> Dict[str, Any]:
+    """Update an existing text document by creating a new version.
+
+    IMPORTANT: This tool signals an intent to update a document. The actual update
+    is executed by the application server to preserve auth and ownership semantics.
+
+    Args:
+        id: Document UUID
+        title: New title for the document
+        content: New text content
+        kind: Document kind, currently only "text" is supported
+
+    Returns:
+        Acknowledgement payload; the server will provide the concrete output via streaming.
+    """
+    return {"accepted": True, "input": {"id": id, "title": title, "content": content, "kind": kind}}
 
 
 @tool

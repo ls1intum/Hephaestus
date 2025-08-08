@@ -19,9 +19,9 @@ export interface PageDocument {
     totalPages?: number;
     pageable?: PageableObject;
     sort?: SortObject;
-    numberOfElements?: number;
     first?: boolean;
     last?: boolean;
+    numberOfElements?: number;
     size?: number;
     content?: Array<Document>;
     number?: number;

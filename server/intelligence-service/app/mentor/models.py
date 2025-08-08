@@ -1,4 +1,6 @@
+from __future__ import annotations
 from typing import Annotated, List, Literal, Optional, Any, Dict, Union
+from datetime import datetime
 from pydantic import BaseModel, Field, ConfigDict, field_validator
 import logging
 
@@ -84,7 +86,7 @@ class ToolInputStreamingPart(ToolPartBase):
     """Tool part with input being streamed."""
 
     state: Literal["input-streaming"]
-    input: Optional[Dict[str, Any]] = None
+    input: Optional[ToolInputUnion] = None
     providerExecuted: Optional[bool] = None
 
 
@@ -92,7 +94,7 @@ class ToolInputAvailablePart(ToolPartBase):
     """Tool part with input available."""
 
     state: Literal["input-available"]
-    input: Dict[str, Any]
+    input: ToolInputUnion
     providerExecuted: Optional[bool] = None
 
 
@@ -100,8 +102,8 @@ class ToolOutputAvailablePart(ToolPartBase):
     """Tool part with output available."""
 
     state: Literal["output-available"]
-    input: Dict[str, Any]
-    output: Dict[str, Any]
+    input: ToolInputUnion
+    output: ToolOutputUnion
     providerExecuted: Optional[bool] = None
 
 
@@ -109,7 +111,7 @@ class ToolOutputErrorPart(ToolPartBase):
     """Tool part with output error."""
 
     state: Literal["output-error"]
-    input: Dict[str, Any]
+    input: ToolInputUnion
     errorText: str
     providerExecuted: Optional[bool] = None
 
@@ -518,3 +520,111 @@ StreamPart = Union[
     StreamFinishPart,
     StreamMessageMetadataPart,
 ]
+
+# --- Tool-specific input/output models for OpenAPI typing ---
+
+class CreateDocumentInput(BaseModel):
+    """Input for createDocument tool."""
+
+    title: str
+    content: str
+    kind: Literal["text"]
+
+
+class UpdateDocumentInput(BaseModel):
+    """Input for updateDocument tool."""
+
+    id: str  # UUID string
+    title: str
+    content: str
+    kind: Literal["text"]
+
+
+class BaseDocumentOutput(BaseModel):
+    """Base output payload returned by document tools."""
+
+    id: str
+    createdAt: datetime
+    title: str
+    content: str
+    kind: Literal["TEXT"]
+    userId: str
+
+
+class CreateDocumentOutput(BaseDocumentOutput):
+    """Output for createDocument tool."""
+
+
+class UpdateDocumentOutput(BaseDocumentOutput):
+    """Output for updateDocument tool."""
+
+
+class GetWeatherInput(BaseModel):
+    """Input for getWeather tool."""
+
+    latitude: float
+    longitude: float
+
+
+class WeatherCurrentUnits(BaseModel):
+    time: Optional[str] = None
+    interval: Optional[str] = None
+    temperature_2m: Optional[str] = None
+
+
+class WeatherCurrent(BaseModel):
+    time: Optional[str] = None
+    interval: Optional[int] = None
+    temperature_2m: Optional[float] = None
+
+
+class WeatherHourlyUnits(BaseModel):
+    time: Optional[str] = None
+    temperature_2m: Optional[str] = None
+
+
+class WeatherHourly(BaseModel):
+    time: List[str] = []
+    temperature_2m: List[float] = []
+
+
+class WeatherDailyUnits(BaseModel):
+    time: Optional[str] = None
+    sunrise: Optional[str] = None
+    sunset: Optional[str] = None
+
+
+class WeatherDaily(BaseModel):
+    time: List[str] = []
+    sunrise: List[str] = []
+    sunset: List[str] = []
+
+
+class GetWeatherOutput(BaseModel):
+    """Output for getWeather tool, aligned with WeatherTool.tsx expectations."""
+
+    latitude: Optional[float] = None
+    longitude: Optional[float] = None
+    generationtime_ms: Optional[float] = None
+    utc_offset_seconds: Optional[int] = None
+    timezone: Optional[str] = None
+    timezone_abbreviation: Optional[str] = None
+    elevation: Optional[float] = None
+
+    current_units: Optional[WeatherCurrentUnits] = None
+    current: Optional[WeatherCurrent] = None
+    hourly_units: Optional[WeatherHourlyUnits] = None
+    hourly: Optional[WeatherHourly] = None
+    daily_units: Optional[WeatherDailyUnits] = None
+    daily: Optional[WeatherDaily] = None
+
+
+# Unions used by the tool UI parts
+ToolInputUnion = Union[CreateDocumentInput, UpdateDocumentInput, GetWeatherInput]
+ToolOutputUnion = Union[CreateDocumentOutput, UpdateDocumentOutput, GetWeatherOutput]
+
+# Resolve forward references for OpenAPI
+ToolInputStreamingPart.model_rebuild()
+ToolInputAvailablePart.model_rebuild()
+ToolOutputAvailablePart.model_rebuild()
+ToolOutputErrorPart.model_rebuild()

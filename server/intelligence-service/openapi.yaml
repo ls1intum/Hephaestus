@@ -82,6 +82,57 @@ components:
       - $ref: '#/components/schemas/StreamMessageMetadataPart'
       description: Response model for chat streaming.
       title: StreamPart
+    CreateDocumentInput:
+      description: Input for createDocument tool.
+      properties:
+        content:
+          title: Content
+          type: string
+        kind:
+          const: text
+          title: Kind
+          type: string
+        title:
+          title: Title
+          type: string
+      required:
+      - title
+      - content
+      - kind
+      title: CreateDocumentInput
+      type: object
+    CreateDocumentOutput:
+      description: Output for createDocument tool.
+      properties:
+        content:
+          title: Content
+          type: string
+        createdAt:
+          format: date-time
+          title: Createdat
+          type: string
+        id:
+          title: Id
+          type: string
+        kind:
+          const: TEXT
+          title: Kind
+          type: string
+        title:
+          title: Title
+          type: string
+        userId:
+          title: Userid
+          type: string
+      required:
+      - id
+      - createdAt
+      - title
+      - content
+      - kind
+      - userId
+      title: CreateDocumentOutput
+      type: object
     DataUIPart:
       description: A data part with dynamic type.
       properties:
@@ -183,6 +234,84 @@ components:
       - mediaType
       - url
       title: FileUIPart
+      type: object
+    GetWeatherInput:
+      description: Input for getWeather tool.
+      properties:
+        latitude:
+          title: Latitude
+          type: number
+        longitude:
+          title: Longitude
+          type: number
+      required:
+      - latitude
+      - longitude
+      title: GetWeatherInput
+      type: object
+    GetWeatherOutput:
+      description: Output for getWeather tool, aligned with WeatherTool.tsx expectations.
+      properties:
+        current:
+          anyOf:
+          - $ref: '#/components/schemas/WeatherCurrent'
+          - type: 'null'
+        current_units:
+          anyOf:
+          - $ref: '#/components/schemas/WeatherCurrentUnits'
+          - type: 'null'
+        daily:
+          anyOf:
+          - $ref: '#/components/schemas/WeatherDaily'
+          - type: 'null'
+        daily_units:
+          anyOf:
+          - $ref: '#/components/schemas/WeatherDailyUnits'
+          - type: 'null'
+        elevation:
+          anyOf:
+          - type: number
+          - type: 'null'
+          title: Elevation
+        generationtime_ms:
+          anyOf:
+          - type: number
+          - type: 'null'
+          title: Generationtime Ms
+        hourly:
+          anyOf:
+          - $ref: '#/components/schemas/WeatherHourly'
+          - type: 'null'
+        hourly_units:
+          anyOf:
+          - $ref: '#/components/schemas/WeatherHourlyUnits'
+          - type: 'null'
+        latitude:
+          anyOf:
+          - type: number
+          - type: 'null'
+          title: Latitude
+        longitude:
+          anyOf:
+          - type: number
+          - type: 'null'
+          title: Longitude
+        timezone:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Timezone
+        timezone_abbreviation:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Timezone Abbreviation
+        utc_offset_seconds:
+          anyOf:
+          - type: integer
+          - type: 'null'
+          title: Utc Offset Seconds
+      title: GetWeatherOutput
       type: object
     HTTPValidationError:
       properties:
@@ -748,8 +877,11 @@ components:
       description: Tool part with input available.
       properties:
         input:
+          anyOf:
+          - $ref: '#/components/schemas/CreateDocumentInput'
+          - $ref: '#/components/schemas/UpdateDocumentInput'
+          - $ref: '#/components/schemas/GetWeatherInput'
           title: Input
-          type: object
         providerExecuted:
           anyOf:
           - type: boolean
@@ -778,7 +910,9 @@ components:
       properties:
         input:
           anyOf:
-          - type: object
+          - $ref: '#/components/schemas/CreateDocumentInput'
+          - $ref: '#/components/schemas/UpdateDocumentInput'
+          - $ref: '#/components/schemas/GetWeatherInput'
           - type: 'null'
           title: Input
         providerExecuted:
@@ -807,11 +941,17 @@ components:
       description: Tool part with output available.
       properties:
         input:
+          anyOf:
+          - $ref: '#/components/schemas/CreateDocumentInput'
+          - $ref: '#/components/schemas/UpdateDocumentInput'
+          - $ref: '#/components/schemas/GetWeatherInput'
           title: Input
-          type: object
         output:
+          anyOf:
+          - $ref: '#/components/schemas/CreateDocumentOutput'
+          - $ref: '#/components/schemas/UpdateDocumentOutput'
+          - $ref: '#/components/schemas/GetWeatherOutput'
           title: Output
-          type: object
         providerExecuted:
           anyOf:
           - type: boolean
@@ -843,8 +983,11 @@ components:
           title: Errortext
           type: string
         input:
+          anyOf:
+          - $ref: '#/components/schemas/CreateDocumentInput'
+          - $ref: '#/components/schemas/UpdateDocumentInput'
+          - $ref: '#/components/schemas/GetWeatherInput'
           title: Input
-          type: object
         providerExecuted:
           anyOf:
           - type: boolean
@@ -910,6 +1053,61 @@ components:
       - parts
       title: UIMessage
       type: object
+    UpdateDocumentInput:
+      description: Input for updateDocument tool.
+      properties:
+        content:
+          title: Content
+          type: string
+        id:
+          title: Id
+          type: string
+        kind:
+          const: text
+          title: Kind
+          type: string
+        title:
+          title: Title
+          type: string
+      required:
+      - id
+      - title
+      - content
+      - kind
+      title: UpdateDocumentInput
+      type: object
+    UpdateDocumentOutput:
+      description: Output for updateDocument tool.
+      properties:
+        content:
+          title: Content
+          type: string
+        createdAt:
+          format: date-time
+          title: Createdat
+          type: string
+        id:
+          title: Id
+          type: string
+        kind:
+          const: TEXT
+          title: Kind
+          type: string
+        title:
+          title: Title
+          type: string
+        userId:
+          title: Userid
+          type: string
+      required:
+      - id
+      - createdAt
+      - title
+      - content
+      - kind
+      - userId
+      title: UpdateDocumentOutput
+      type: object
     ValidationError:
       properties:
         loc:
@@ -930,6 +1128,115 @@ components:
       - msg
       - type
       title: ValidationError
+      type: object
+    WeatherCurrent:
+      properties:
+        interval:
+          anyOf:
+          - type: integer
+          - type: 'null'
+          title: Interval
+        temperature_2m:
+          anyOf:
+          - type: number
+          - type: 'null'
+          title: Temperature 2M
+        time:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Time
+      title: WeatherCurrent
+      type: object
+    WeatherCurrentUnits:
+      properties:
+        interval:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Interval
+        temperature_2m:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Temperature 2M
+        time:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Time
+      title: WeatherCurrentUnits
+      type: object
+    WeatherDaily:
+      properties:
+        sunrise:
+          default: []
+          items:
+            type: string
+          title: Sunrise
+          type: array
+        sunset:
+          default: []
+          items:
+            type: string
+          title: Sunset
+          type: array
+        time:
+          default: []
+          items:
+            type: string
+          title: Time
+          type: array
+      title: WeatherDaily
+      type: object
+    WeatherDailyUnits:
+      properties:
+        sunrise:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Sunrise
+        sunset:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Sunset
+        time:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Time
+      title: WeatherDailyUnits
+      type: object
+    WeatherHourly:
+      properties:
+        temperature_2m:
+          default: []
+          items:
+            type: number
+          title: Temperature 2M
+          type: array
+        time:
+          default: []
+          items:
+            type: string
+          title: Time
+          type: array
+      title: WeatherHourly
+      type: object
+    WeatherHourlyUnits:
+      properties:
+        temperature_2m:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Temperature 2M
+        time:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Time
+      title: WeatherHourlyUnits
       type: object
 info:
   contact:

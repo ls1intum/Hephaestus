@@ -9,6 +9,7 @@
  * https://openapi-generator.tech
  * Do not edit the class manually.
  */
+import { Input } from './input';
 
 
 /**
@@ -16,7 +17,7 @@
  */
 export interface ToolOutputErrorPart { 
     errorText: string;
-    input: object;
+    input: Input;
     providerExecuted?: boolean | null;
     state: string;
     toolCallId: string;

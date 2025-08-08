@@ -9,16 +9,18 @@
  * https://openapi-generator.tech
  * Do not edit the class manually.
  */
-import { FileUIPart } from './file-ui-part';
-import { SourceUrlUIPart } from './source-url-ui-part';
 import { ToolOutputErrorPart } from './tool-output-error-part';
+import { StepStartUIPart } from './step-start-ui-part';
+import { ToolOutputAvailablePart } from './tool-output-available-part';
+import { FileUIPart } from './file-ui-part';
+import { Input } from './input';
+import { Output } from './output';
+import { SourceUrlUIPart } from './source-url-ui-part';
 import { SourceDocumentUIPart } from './source-document-ui-part';
 import { DataUIPart } from './data-ui-part';
-import { StepStartUIPart } from './step-start-ui-part';
 import { ReasoningUIPart } from './reasoning-ui-part';
 import { TextUIPart } from './text-ui-part';
 import { ToolInputAvailablePart } from './tool-input-available-part';
-import { ToolOutputAvailablePart } from './tool-output-available-part';
 import { ToolInputStreamingPart } from './tool-input-streaming-part';
 
 
@@ -27,10 +29,10 @@ export interface UIMessagePartsInner {
     text: string;
     type: string;
     providerMetadata?: object;
-    input: object;
+    input: Input;
     providerExecuted?: boolean;
     toolCallId: string;
-    output: object;
+    output: Output;
     errorText: string;
     sourceId: string;
     title: string;

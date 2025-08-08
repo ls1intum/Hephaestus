@@ -1,5 +1,6 @@
 import json
 from typing import List
+from pydantic import BaseModel
 from langchain_core.messages import HumanMessage, AIMessage, SystemMessage, ToolMessage
 
 from app.mentor.models import (
@@ -36,7 +37,20 @@ def convert_to_langchain_messages(messages: List[UIMessage]):
                 # Handle tool results for tool messages
                 elif isinstance(part, ToolOutputAvailablePart):
                     tool_call_id = part.toolCallId
-                    content = json.dumps(part.output) if part.output else ""
+                    output = part.output
+                    # Normalize output to a JSON string for ToolMessage.content
+                    if output is None:
+                        content = ""
+                    elif isinstance(output, BaseModel):
+                        content = json.dumps(output.model_dump(exclude_none=True))
+                    elif isinstance(output, (dict, list)):
+                        content = json.dumps(output)
+                    elif isinstance(output, str):
+                        # Assume it's already a JSON string from the tool
+                        content = output
+                    else:
+                        # Fallback to string representation
+                        content = json.dumps({"result": str(output)})
 
         if msg.role == "user":
             langchain_messages.append(HumanMessage(content=content))

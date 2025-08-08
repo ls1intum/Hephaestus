@@ -9,8 +9,11 @@ import io.swagger.v3.oas.models.media.Schema;
 import io.swagger.v3.parser.OpenAPIV3Parser;
 import java.io.File;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
+import java.util.LinkedHashSet;
 import java.util.stream.Collectors;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -42,6 +45,7 @@ public class OpenAPIConfiguration {
         "ToolInputStreamingPart", "ToolInputAvailablePart", "ToolOutputAvailablePart",
         "ToolOutputErrorPart", "SourceUrlUIPart", "SourceDocumentUIPart",
         "FileUIPart", "DataUIPart", "StepStartUIPart"
+        // Nested tool input / output schemas are automatically included
     );
     
     /**
@@ -119,7 +123,7 @@ public class OpenAPIConfiguration {
             var paths = openApi.getPaths();
             if (paths != null) {
                 paths.forEach((path, pathItem) -> {
-                    logger.info("Processing path: {}", path);
+                    logger.debug("Processing path: {}", path);
                     pathItem
                         .readOperations()
                         .forEach(operation -> {
@@ -198,15 +202,18 @@ public class OpenAPIConfiguration {
                     intelligenceOpenApi.getComponents() != null && 
                     intelligenceOpenApi.getComponents().getSchemas() != null) {
                     
-                    // Include UI* and Stream* schemas that we need
-                    intelligenceOpenApi.getComponents().getSchemas().entrySet().stream()
-                        .filter(entry -> INTELLIGENCE_SERVICE_MODELS.contains(entry.getKey()))
-                        .forEach(entry -> {
-                            intelligenceSchemas.put(entry.getKey(), entry.getValue());
-                            logger.debug("Loaded intelligence service schema: {}", entry.getKey());
-                        });
-                        
-                    logger.info("Loaded {} schemas from intelligence service", intelligenceSchemas.size());
+                    @SuppressWarnings("unchecked")
+                    Map<String, Schema<?>> allSchemas = (Map<String, Schema<?>>) (Map<?, ?>) intelligenceOpenApi.getComponents().getSchemas();
+
+                    // Seed with explicitly requested models, then include all referenced schemas recursively
+                    Set<String> toInclude = new LinkedHashSet<>(INTELLIGENCE_SERVICE_MODELS);
+                    Set<String> visited = new HashSet<>();
+
+                    for (String name : new LinkedHashSet<>(toInclude)) {
+                        includeSchemaWithReferences(name, allSchemas, intelligenceSchemas, toInclude, visited);
+                    }
+
+                    logger.info("Loaded {} schemas (including nested references) from intelligence service", intelligenceSchemas.size());
                 } else {
                     logger.warn("Could not load schemas from intelligence service OpenAPI spec");
                 }
@@ -218,6 +225,81 @@ public class OpenAPIConfiguration {
         }
         
         return intelligenceSchemas;
+    }
+
+    /**
+     * Include a schema by name and all of its referenced component schemas recursively.
+     */
+    private void includeSchemaWithReferences(
+        String name,
+        Map<String, Schema<?>> allSchemas,
+        Map<String, Schema<?>> out,
+        Set<String> toInclude,
+        Set<String> visited
+    ) {
+        if (name == null || visited.contains(name)) {
+            return;
+        }
+        Schema<?> schema = allSchemas.get(name);
+        if (schema == null) {
+            return;
+        }
+        visited.add(name);
+        out.put(name, schema);
+        logger.debug("Loaded intelligence service schema: {}", name);
+
+        // Discover referenced component schema names and include them as well.
+        Set<String> refs = new HashSet<>();
+        collectRefs(schema, refs);
+        for (String refName : refs) {
+            if (!visited.contains(refName)) {
+                toInclude.add(refName);
+                includeSchemaWithReferences(refName, allSchemas, out, toInclude, visited);
+            }
+        }
+    }
+
+    /**
+     * Collect component schema names referenced via $ref recursively within the given schema.
+     */
+    @SuppressWarnings({"rawtypes", "unchecked"})
+    private void collectRefs(Schema schema, Set<String> out) {
+        if (schema == null) {
+            return;
+        }
+        // Direct $ref
+        if (schema.get$ref() != null) {
+            String ref = schema.get$ref();
+            String name = ref.substring(ref.lastIndexOf('/') + 1);
+            out.add(name);
+        }
+        // Properties
+        Map<String, Schema> props = (Map<String, Schema>) schema.getProperties();
+        if (props != null) {
+            for (Schema prop : props.values()) {
+                collectRefs(prop, out);
+            }
+        }
+        // Items (arrays)
+        if (schema.getItems() != null) {
+            collectRefs(schema.getItems(), out);
+        }
+        // Composed schemas: allOf, anyOf, oneOf
+        if (schema.getAllOf() != null) {
+            for (Object s : schema.getAllOf()) {
+                collectRefs((Schema) s, out);
+            }
+        }
+        if (schema.getAnyOf() != null) {
+            for (Object s : schema.getAnyOf()) {
+                collectRefs((Schema) s, out);
+            }
+        }
+        if (schema.getOneOf() != null) {
+            for (Object s : schema.getOneOf()) {
+                collectRefs((Schema) s, out);
+            }
+        }
     }
 
     private void removeDTOSuffixesFromSchemaRecursively(Schema<?> schema) {

@@ -20,6 +20,7 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonTypeName;
 import com.fasterxml.jackson.annotation.JsonValue;
+import de.tum.in.www1.hephaestus.intelligenceservice.model.Input;
 import org.openapitools.jackson.nullable.JsonNullable;
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import org.openapitools.jackson.nullable.JsonNullable;
@@ -41,7 +42,7 @@ import org.hibernate.validator.constraints.*;
 @jakarta.annotation.Generated(value = "org.openapitools.codegen.languages.JavaClientCodegen", comments = "Generator version: 7.7.0")
 public class ToolInputAvailablePart {
   public static final String JSON_PROPERTY_INPUT = "input";
-  private Object input;
+  private Input input;
 
   public static final String JSON_PROPERTY_PROVIDER_EXECUTED = "providerExecuted";
   private JsonNullable<Boolean> providerExecuted = JsonNullable.<Boolean>undefined();
@@ -58,7 +59,7 @@ public class ToolInputAvailablePart {
   public ToolInputAvailablePart() {
   }
 
-  public ToolInputAvailablePart input(Object input) {
+  public ToolInputAvailablePart input(Input input) {
     
     this.input = input;
     return this;
@@ -72,14 +73,14 @@ public class ToolInputAvailablePart {
   @JsonProperty(JSON_PROPERTY_INPUT)
   @JsonInclude(value = JsonInclude.Include.ALWAYS)
 
-  public Object getInput() {
+  public Input getInput() {
     return input;
   }
 
 
   @JsonProperty(JSON_PROPERTY_INPUT)
   @JsonInclude(value = JsonInclude.Include.ALWAYS)
-  public void setInput(Object input) {
+  public void setInput(Input input) {
     this.input = input;
   }
 

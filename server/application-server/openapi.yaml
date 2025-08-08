@@ -954,6 +954,670 @@ paths:
           description: OK
 components:
   schemas:
+    WeatherHourly:
+      type: object
+      properties:
+        temperature_2m:
+          type: array
+          default: []
+          items:
+            type: number
+          title: Temperature 2M
+        time:
+          type: array
+          default: []
+          items:
+            type: string
+          title: Time
+      title: WeatherHourly
+    PageDocument:
+      type: object
+      properties:
+        totalElements:
+          type: integer
+          format: int64
+        totalPages:
+          type: integer
+          format: int32
+        pageable:
+          $ref: "#/components/schemas/PageableObject"
+        sort:
+          $ref: "#/components/schemas/SortObject"
+        first:
+          type: boolean
+        last:
+          type: boolean
+        numberOfElements:
+          type: integer
+          format: int32
+        size:
+          type: integer
+          format: int32
+        content:
+          type: array
+          items:
+            $ref: "#/components/schemas/Document"
+        number:
+          type: integer
+          format: int32
+        empty:
+          type: boolean
+    WeatherCurrent:
+      type: object
+      properties:
+        interval:
+          anyOf:
+          - type: integer
+          - type: "null"
+          title: Interval
+        temperature_2m:
+          anyOf:
+          - type: number
+          - type: "null"
+          title: Temperature 2M
+        time:
+          anyOf:
+          - type: string
+          - type: "null"
+          title: Time
+      title: WeatherCurrent
+    CreateDocumentRequest:
+      type: object
+      description: |-
+        DTO for creating a new document.
+         Server generates UUID and timestamps.
+      properties:
+        title:
+          type: string
+          maxLength: 255
+          minLength: 0
+        content:
+          type: string
+        kind:
+          type: string
+          enum:
+          - TEXT
+      required:
+      - content
+      - kind
+      - title
+    UserTeams:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+        login:
+          type: string
+        name:
+          type: string
+        url:
+          type: string
+        teams:
+          type: array
+          items:
+            $ref: "#/components/schemas/TeamInfo"
+          uniqueItems: true
+      required:
+      - id
+      - login
+      - name
+      - teams
+      - url
+    Activity:
+      type: object
+      properties:
+        pullRequests:
+          type: array
+          items:
+            $ref: "#/components/schemas/PullRequestWithBadPractices"
+      required:
+      - pullRequests
+    Document:
+      type: object
+      description: |-
+        DTO for complete document responses.
+         Used when returning full document details (includes content).
+      properties:
+        id:
+          type: string
+          format: uuid
+        createdAt:
+          type: string
+          format: date-time
+        title:
+          type: string
+        content:
+          type: string
+        kind:
+          type: string
+          enum:
+          - TEXT
+        userId:
+          type: string
+      required:
+      - content
+      - createdAt
+      - id
+      - kind
+      - title
+      - userId
+    LeagueChange:
+      type: object
+      properties:
+        login:
+          type: string
+        leaguePointsChange:
+          type: integer
+          format: int32
+      required:
+      - leaguePointsChange
+      - login
+    WeatherDailyUnits:
+      type: object
+      properties:
+        sunrise:
+          anyOf:
+          - type: string
+          - type: "null"
+          title: Sunrise
+        sunset:
+          anyOf:
+          - type: string
+          - type: "null"
+          title: Sunset
+        time:
+          anyOf:
+          - type: string
+          - type: "null"
+          title: Time
+      title: WeatherDailyUnits
+    LabelInfo:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+        name:
+          type: string
+        color:
+          type: string
+        repository:
+          $ref: "#/components/schemas/RepositoryInfo"
+      required:
+      - color
+      - id
+      - name
+    ChatThreadSummary:
+      type: object
+      description: |-
+        DTO for chat thread summary information.
+         Used for listing threads without loading full message content.
+      properties:
+        id:
+          type: string
+          format: uuid
+          description: Unique identifier for the thread
+        title:
+          type: string
+          description: Thread title (may be null for untitled threads)
+        createdAt:
+          type: string
+          format: date-time
+          description: When the thread was created
+      required:
+      - createdAt
+      - id
+      - title
+    MetaData:
+      type: object
+      properties:
+        teams:
+          type: array
+          items:
+            $ref: "#/components/schemas/TeamInfo"
+        scheduledDay:
+          type: string
+        scheduledTime:
+          type: string
+      required:
+      - scheduledDay
+      - scheduledTime
+      - teams
+    WeatherDaily:
+      type: object
+      properties:
+        sunrise:
+          type: array
+          default: []
+          items:
+            type: string
+          title: Sunrise
+        sunset:
+          type: array
+          default: []
+          items:
+            type: string
+          title: Sunset
+        time:
+          type: array
+          default: []
+          items:
+            type: string
+          title: Time
+      title: WeatherDaily
+    DataUIPart:
+      type: object
+      description: A data part with dynamic type.
+      properties:
+        data:
+          type: object
+          title: Data
+        id:
+          anyOf:
+          - type: string
+          - type: "null"
+          title: Id
+        type:
+          type: string
+          pattern: ^data-.*
+          title: Type
+      required:
+      - data
+      - type
+      title: DataUIPart
+    TextUIPart:
+      type: object
+      description: A text part of a message.
+      properties:
+        state:
+          anyOf:
+          - type: string
+            enum:
+            - streaming
+            - done
+          - type: "null"
+          title: State
+        text:
+          type: string
+          title: Text
+        type:
+          type: string
+          const: text
+          default: text
+          title: Type
+      required:
+      - text
+      title: TextUIPart
+    CreateDocumentInput:
+      type: object
+      description: Input for createDocument tool.
+      properties:
+        content:
+          type: string
+          title: Content
+        kind:
+          type: string
+          const: text
+          title: Kind
+        title:
+          type: string
+          title: Title
+      required:
+      - content
+      - kind
+      - title
+      title: CreateDocumentInput
+    PullRequestInfo:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+        number:
+          type: integer
+          format: int32
+        title:
+          type: string
+        state:
+          type: string
+          enum:
+          - OPEN
+          - CLOSED
+        isDraft:
+          type: boolean
+        isMerged:
+          type: boolean
+        commentsCount:
+          type: integer
+          format: int32
+        author:
+          $ref: "#/components/schemas/UserInfo"
+        labels:
+          type: array
+          items:
+            $ref: "#/components/schemas/LabelInfo"
+        assignees:
+          type: array
+          items:
+            $ref: "#/components/schemas/UserInfo"
+        repository:
+          $ref: "#/components/schemas/RepositoryInfo"
+        additions:
+          type: integer
+          format: int32
+        deletions:
+          type: integer
+          format: int32
+        mergedAt:
+          type: string
+          format: date-time
+        closedAt:
+          type: string
+          format: date-time
+        htmlUrl:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+      required:
+      - additions
+      - commentsCount
+      - deletions
+      - htmlUrl
+      - id
+      - isDraft
+      - isMerged
+      - number
+      - state
+      - title
+    UserSettings:
+      type: object
+      properties:
+        receiveNotifications:
+          type: boolean
+    ChatThreadGroup:
+      type: object
+      description: |-
+        DTO for grouped chat threads.
+         Used for organizing threads by time periods (today, yesterday, etc.).
+      properties:
+        groupName:
+          type: string
+          description: "Group name (e.g., \"Today\", \"Yesterday\", \"Last 7 Days\"\
+            , \"Last 30 Days\")"
+        threads:
+          type: array
+          description: List of thread summaries in this group
+          items:
+            $ref: "#/components/schemas/ChatThreadSummary"
+      required:
+      - groupName
+      - threads
+    ToolOutputErrorPart:
+      type: object
+      description: Tool part with output error.
+      properties:
+        errorText:
+          type: string
+          title: Errortext
+        input:
+          anyOf:
+          - $ref: "#/components/schemas/CreateDocumentInput"
+          - $ref: "#/components/schemas/UpdateDocumentInput"
+          - $ref: "#/components/schemas/GetWeatherInput"
+          title: Input
+        providerExecuted:
+          anyOf:
+          - type: boolean
+          - type: "null"
+          title: Providerexecuted
+        state:
+          type: string
+          const: output-error
+          title: State
+        toolCallId:
+          type: string
+          title: Toolcallid
+        type:
+          type: string
+          pattern: ^tool-.*
+          title: Type
+      required:
+      - errorText
+      - input
+      - state
+      - toolCallId
+      - type
+      title: ToolOutputErrorPart
+    CreateDocumentOutput:
+      type: object
+      description: Output for createDocument tool.
+      properties:
+        content:
+          type: string
+          title: Content
+        createdAt:
+          type: string
+          format: date-time
+          title: Createdat
+        id:
+          type: string
+          title: Id
+        kind:
+          type: string
+          const: TEXT
+          title: Kind
+        title:
+          type: string
+          title: Title
+        userId:
+          type: string
+          title: Userid
+      required:
+      - content
+      - createdAt
+      - id
+      - kind
+      - title
+      - userId
+      title: CreateDocumentOutput
+    TeamInfo:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+        name:
+          type: string
+        color:
+          type: string
+        repositories:
+          type: array
+          items:
+            $ref: "#/components/schemas/RepositoryInfo"
+        labels:
+          type: array
+          items:
+            $ref: "#/components/schemas/LabelInfo"
+        members:
+          type: array
+          items:
+            $ref: "#/components/schemas/UserInfo"
+        hidden:
+          type: boolean
+      required:
+      - color
+      - hidden
+      - id
+      - labels
+      - members
+      - name
+      - repositories
+    PullRequestBadPractice:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+        title:
+          type: string
+        description:
+          type: string
+        state:
+          type: string
+          enum:
+          - GOOD_PRACTICE
+          - FIXED
+          - CRITICAL_ISSUE
+          - NORMAL_ISSUE
+          - MINOR_ISSUE
+          - WONT_FIX
+          - WRONG
+      required:
+      - description
+      - id
+      - state
+      - title
+    GetWeatherInput:
+      type: object
+      description: Input for getWeather tool.
+      properties:
+        latitude:
+          type: number
+          title: Latitude
+        longitude:
+          type: number
+          title: Longitude
+      required:
+      - latitude
+      - longitude
+      title: GetWeatherInput
+    SourceDocumentUIPart:
+      type: object
+      description: A document source part of a message.
+      properties:
+        filename:
+          anyOf:
+          - type: string
+          - type: "null"
+          title: Filename
+        mediaType:
+          type: string
+          title: Mediatype
+        providerMetadata:
+          anyOf:
+          - type: object
+          - type: "null"
+          title: Providermetadata
+        sourceId:
+          type: string
+          title: Sourceid
+        title:
+          type: string
+          title: Title
+        type:
+          type: string
+          const: source-document
+          default: source-document
+          title: Type
+      required:
+      - mediaType
+      - sourceId
+      - title
+      title: SourceDocumentUIPart
+    ReasoningUIPart:
+      type: object
+      description: A reasoning part of a message.
+      properties:
+        providerMetadata:
+          anyOf:
+          - type: object
+          - type: "null"
+          title: Providermetadata
+        state:
+          anyOf:
+          - type: string
+            enum:
+            - streaming
+            - done
+          - type: "null"
+          title: State
+        text:
+          type: string
+          title: Text
+        type:
+          type: string
+          const: reasoning
+          default: reasoning
+          title: Type
+      required:
+      - text
+      title: ReasoningUIPart
+    ToolInputAvailablePart:
+      type: object
+      description: Tool part with input available.
+      properties:
+        input:
+          anyOf:
+          - $ref: "#/components/schemas/CreateDocumentInput"
+          - $ref: "#/components/schemas/UpdateDocumentInput"
+          - $ref: "#/components/schemas/GetWeatherInput"
+          title: Input
+        providerExecuted:
+          anyOf:
+          - type: boolean
+          - type: "null"
+          title: Providerexecuted
+        state:
+          type: string
+          const: input-available
+          title: State
+        toolCallId:
+          type: string
+          title: Toolcallid
+        type:
+          type: string
+          pattern: ^tool-.*
+          title: Type
+      required:
+      - input
+      - state
+      - toolCallId
+      - type
+      title: ToolInputAvailablePart
+    ChatThreadDetail:
+      type: object
+      description: |-
+        DTO for chat thread with full message content.
+         Used for initializing useChat in the frontend.
+      properties:
+        id:
+          type: string
+          format: uuid
+          description: Unique identifier for the thread
+        title:
+          type: string
+          description: Thread title (may be null for untitled threads)
+        createdAt:
+          type: string
+          format: date-time
+          description: When the thread was created
+        messages:
+          type: array
+          description: |-
+            All messages in the conversation path (as JSON objects for useChat initialization)
+             As exception, we do not use a DTO here since we included those intelligece-service models in the OpenAPI spec.
+          items:
+            $ref: "#/components/schemas/UIMessage"
+        selectedLeafMessageId:
+          type: string
+          format: uuid
+          description: ID of the currently selected leaf message (end of active conversation
+            path)
     PageableObject:
       type: object
       properties:
@@ -965,10 +1629,10 @@ components:
         pageSize:
           type: integer
           format: int32
-        sort:
-          $ref: "#/components/schemas/SortObject"
         unpaged:
           type: boolean
+        sort:
+          $ref: "#/components/schemas/SortObject"
         offset:
           type: integer
           format: int64
@@ -1037,81 +1701,6 @@ components:
       - contributedRepositories
       - firstContribution
       - userInfo
-    PageDocument:
-      type: object
-      properties:
-        totalElements:
-          type: integer
-          format: int64
-        totalPages:
-          type: integer
-          format: int32
-        pageable:
-          $ref: "#/components/schemas/PageableObject"
-        sort:
-          $ref: "#/components/schemas/SortObject"
-        numberOfElements:
-          type: integer
-          format: int32
-        first:
-          type: boolean
-        last:
-          type: boolean
-        size:
-          type: integer
-          format: int32
-        content:
-          type: array
-          items:
-            $ref: "#/components/schemas/Document"
-        number:
-          type: integer
-          format: int32
-        empty:
-          type: boolean
-    CreateDocumentRequest:
-      type: object
-      description: |-
-        DTO for creating a new document.
-         Server generates UUID and timestamps.
-      properties:
-        title:
-          type: string
-          maxLength: 255
-          minLength: 0
-        content:
-          type: string
-        kind:
-          type: string
-          enum:
-          - TEXT
-      required:
-      - content
-      - kind
-      - title
-    UserTeams:
-      type: object
-      properties:
-        id:
-          type: integer
-          format: int64
-        login:
-          type: string
-        name:
-          type: string
-        url:
-          type: string
-        teams:
-          type: array
-          items:
-            $ref: "#/components/schemas/TeamInfo"
-          uniqueItems: true
-      required:
-      - id
-      - login
-      - name
-      - teams
-      - url
     PullRequestBaseInfo:
       type: object
       properties:
@@ -1167,15 +1756,6 @@ components:
       - id
       - login
       - name
-    Activity:
-      type: object
-      properties:
-        pullRequests:
-          type: array
-          items:
-            $ref: "#/components/schemas/PullRequestWithBadPractices"
-      required:
-      - pullRequests
     UserInfo:
       type: object
       properties:
@@ -1211,35 +1791,6 @@ components:
           default: step-start
           title: Type
       title: StepStartUIPart
-    Document:
-      type: object
-      description: |-
-        DTO for complete document responses.
-         Used when returning full document details (includes content).
-      properties:
-        id:
-          type: string
-          format: uuid
-        createdAt:
-          type: string
-          format: date-time
-        title:
-          type: string
-        content:
-          type: string
-        kind:
-          type: string
-          enum:
-          - TEXT
-        userId:
-          type: string
-      required:
-      - content
-      - createdAt
-      - id
-      - kind
-      - title
-      - userId
     VoteMessageRequest:
       type: object
       description: Request DTO for voting on a message.
@@ -1248,54 +1799,102 @@ components:
           type: boolean
       required:
       - isUpvoted
-    LeagueChange:
+    GetWeatherOutput:
       type: object
+      description: "Output for getWeather tool, aligned with WeatherTool.tsx expectations."
       properties:
-        login:
-          type: string
-        leaguePointsChange:
-          type: integer
-          format: int32
-      required:
-      - leaguePointsChange
-      - login
-    LabelInfo:
+        current:
+          anyOf:
+          - $ref: "#/components/schemas/WeatherCurrent"
+          - type: "null"
+        current_units:
+          anyOf:
+          - $ref: "#/components/schemas/WeatherCurrentUnits"
+          - type: "null"
+        daily:
+          anyOf:
+          - $ref: "#/components/schemas/WeatherDaily"
+          - type: "null"
+        daily_units:
+          anyOf:
+          - $ref: "#/components/schemas/WeatherDailyUnits"
+          - type: "null"
+        elevation:
+          anyOf:
+          - type: number
+          - type: "null"
+          title: Elevation
+        generationtime_ms:
+          anyOf:
+          - type: number
+          - type: "null"
+          title: Generationtime Ms
+        hourly:
+          anyOf:
+          - $ref: "#/components/schemas/WeatherHourly"
+          - type: "null"
+        hourly_units:
+          anyOf:
+          - $ref: "#/components/schemas/WeatherHourlyUnits"
+          - type: "null"
+        latitude:
+          anyOf:
+          - type: number
+          - type: "null"
+          title: Latitude
+        longitude:
+          anyOf:
+          - type: number
+          - type: "null"
+          title: Longitude
+        timezone:
+          anyOf:
+          - type: string
+          - type: "null"
+          title: Timezone
+        timezone_abbreviation:
+          anyOf:
+          - type: string
+          - type: "null"
+          title: Timezone Abbreviation
+        utc_offset_seconds:
+          anyOf:
+          - type: integer
+          - type: "null"
+          title: Utc Offset Seconds
+      title: GetWeatherOutput
+    UpdateDocumentOutput:
       type: object
+      description: Output for updateDocument tool.
       properties:
-        id:
-          type: integer
-          format: int64
-        name:
+        content:
           type: string
-        color:
-          type: string
-        repository:
-          $ref: "#/components/schemas/RepositoryInfo"
-      required:
-      - color
-      - id
-      - name
-    ChatThreadSummary:
-      type: object
-      description: |-
-        DTO for chat thread summary information.
-         Used for listing threads without loading full message content.
-      properties:
-        id:
-          type: string
-          format: uuid
-          description: Unique identifier for the thread
-        title:
-          type: string
-          description: Thread title (may be null for untitled threads)
+          title: Content
         createdAt:
           type: string
           format: date-time
-          description: When the thread was created
+          title: Createdat
+        id:
+          type: string
+          title: Id
+        kind:
+          type: string
+          const: TEXT
+          title: Kind
+        title:
+          type: string
+          title: Title
+        userId:
+          type: string
+          title: Userid
       required:
+      - content
       - createdAt
       - id
+      - kind
       - title
+      - userId
+      title: UpdateDocumentOutput
     BadPracticeFeedback:
       type: object
       properties:
@@ -1306,21 +1905,6 @@ components:
       required:
       - explanation
       - type
-    MetaData:
-      type: object
-      properties:
-        teams:
-          type: array
-          items:
-            $ref: "#/components/schemas/TeamInfo"
-        scheduledDay:
-          type: string
-        scheduledTime:
-          type: string
-      required:
-      - scheduledDay
-      - scheduledTime
-      - teams
     SourceUrlUIPart:
       type: object
       description: A URL source part of a message.
@@ -1370,49 +1954,48 @@ components:
       - content
       - kind
       - title
-    DataUIPart:
+    WeatherCurrentUnits:
       type: object
-      description: A data part with dynamic type.
       properties:
-        data:
-          type: object
-          title: Data
+        interval:
+          anyOf:
+          - type: string
+          - type: "null"
+          title: Interval
+        temperature_2m:
+          anyOf:
+          - type: string
+          - type: "null"
+          title: Temperature 2M
+        time:
+          anyOf:
+          - type: string
+          - type: "null"
+          title: Time
+      title: WeatherCurrentUnits
+    UpdateDocumentInput:
+      type: object
+      description: Input for updateDocument tool.
+      properties:
+        content:
+          type: string
+          title: Content
         id:
-          anyOf:
-          - type: string
-          - type: "null"
+          type: string
           title: Id
-        type:
-          type: string
-          pattern: ^data-.*
-          title: Type
-      required:
-      - data
-      - type
-      title: DataUIPart
-    TextUIPart:
-      type: object
-      description: A text part of a message.
-      properties:
-        state:
-          anyOf:
-          - type: string
-            enum:
-            - streaming
-            - done
-          - type: "null"
-          title: State
-        text:
-          type: string
-          title: Text
-        type:
+        kind:
           type: string
           const: text
-          default: text
-          title: Type
+          title: Kind
+        title:
+          type: string
+          title: Title
       required:
-      - text
-      title: TextUIPart
+      - content
+      - id
+      - kind
+      - title
+      title: UpdateDocumentInput
     PageDocumentSummary:
       type: object
       properties:
@@ -1426,13 +2009,13 @@ components:
           $ref: "#/components/schemas/PageableObject"
         sort:
           $ref: "#/components/schemas/SortObject"
-        numberOfElements:
-          type: integer
-          format: int32
         first:
           type: boolean
         last:
           type: boolean
+        numberOfElements:
+          type: integer
+          format: int32
         size:
           type: integer
           format: int32
@@ -1495,7 +2078,9 @@ components:
       properties:
         input:
           anyOf:
-          - type: object
+          - $ref: "#/components/schemas/CreateDocumentInput"
+          - $ref: "#/components/schemas/UpdateDocumentInput"
+          - $ref: "#/components/schemas/GetWeatherInput"
           - type: "null"
           title: Input
         providerExecuted:
@@ -1519,72 +2104,6 @@ components:
       - toolCallId
       - type
       title: ToolInputStreamingPart
-    PullRequestInfo:
-      type: object
-      properties:
-        id:
-          type: integer
-          format: int64
-        number:
-          type: integer
-          format: int32
-        title:
-          type: string
-        state:
-          type: string
-          enum:
-          - OPEN
-          - CLOSED
-        isDraft:
-          type: boolean
-        isMerged:
-          type: boolean
-        commentsCount:
-          type: integer
-          format: int32
-        author:
-          $ref: "#/components/schemas/UserInfo"
-        labels:
-          type: array
-          items:
-            $ref: "#/components/schemas/LabelInfo"
-        assignees:
-          type: array
-          items:
-            $ref: "#/components/schemas/UserInfo"
-        repository:
-          $ref: "#/components/schemas/RepositoryInfo"
-        additions:
-          type: integer
-          format: int32
-        deletions:
-          type: integer
-          format: int32
-        mergedAt:
-          type: string
-          format: date-time
-        closedAt:
-          type: string
-          format: date-time
-        htmlUrl:
-          type: string
-        createdAt:
-          type: string
-          format: date-time
-        updatedAt:
-          type: string
-          format: date-time
-      required:
-      - additions
-      - commentsCount
-      - deletions
-      - htmlUrl
-      - id
-      - isDraft
-      - isMerged
-      - number
-      - state
-      - title
     RepositoryInfo:
       type: object
       properties:
@@ -1604,29 +2123,6 @@ components:
       - id
       - name
       - nameWithOwner
-    UserSettings:
-      type: object
-      properties:
-        receiveNotifications:
-          type: boolean
-    ChatThreadGroup:
-      type: object
-      description: |-
-        DTO for grouped chat threads.
-         Used for organizing threads by time periods (today, yesterday, etc.).
-      properties:
-        groupName:
-          type: string
-          description: "Group name (e.g., \"Today\", \"Yesterday\", \"Last 7 Days\"\
-            , \"Last 30 Days\")"
-        threads:
-          type: array
-          description: List of thread summaries in this group
-          items:
-            $ref: "#/components/schemas/ChatThreadSummary"
-      required:
-      - groupName
-      - threads
     PullRequestWithBadPractices:
       type: object
       properties:
@@ -1703,80 +2199,21 @@ components:
           type: boolean
         empty:
           type: boolean
-    ToolOutputErrorPart:
-      type: object
-      description: Tool part with output error.
-      properties:
-        errorText:
-          type: string
-          title: Errortext
-        input:
-          type: object
-          title: Input
-        providerExecuted:
-          anyOf:
-          - type: boolean
-          - type: "null"
-          title: Providerexecuted
-        state:
-          type: string
-          const: output-error
-          title: State
-        toolCallId:
-          type: string
-          title: Toolcallid
-        type:
-          type: string
-          pattern: ^tool-.*
-          title: Type
-      required:
-      - errorText
-      - input
-      - state
-      - toolCallId
-      - type
-      title: ToolOutputErrorPart
-    TeamInfo:
-      type: object
-      properties:
-        id:
-          type: integer
-          format: int64
-        name:
-          type: string
-        color:
-          type: string
-        repositories:
-          type: array
-          items:
-            $ref: "#/components/schemas/RepositoryInfo"
-        labels:
-          type: array
-          items:
-            $ref: "#/components/schemas/LabelInfo"
-        members:
-          type: array
-          items:
-            $ref: "#/components/schemas/UserInfo"
-        hidden:
-          type: boolean
-      required:
-      - color
-      - hidden
-      - id
-      - labels
-      - members
-      - name
-      - repositories
     ToolOutputAvailablePart:
       type: object
       description: Tool part with output available.
       properties:
         input:
-          type: object
+          anyOf:
+          - $ref: "#/components/schemas/CreateDocumentInput"
+          - $ref: "#/components/schemas/UpdateDocumentInput"
+          - $ref: "#/components/schemas/GetWeatherInput"
           title: Input
         output:
-          type: object
+          anyOf:
+          - $ref: "#/components/schemas/CreateDocumentOutput"
+          - $ref: "#/components/schemas/UpdateDocumentOutput"
+          - $ref: "#/components/schemas/GetWeatherOutput"
           title: Output
         providerExecuted:
           anyOf:
@@ -1801,31 +2238,20 @@ components:
       - toolCallId
       - type
       title: ToolOutputAvailablePart
-    PullRequestBadPractice:
+    WeatherHourlyUnits:
       type: object
       properties:
-        id:
-          type: integer
-          format: int64
-        title:
-          type: string
-        description:
-          type: string
-        state:
-          type: string
-          enum:
-          - GOOD_PRACTICE
-          - FIXED
-          - CRITICAL_ISSUE
-          - NORMAL_ISSUE
-          - MINOR_ISSUE
-          - WONT_FIX
-          - WRONG
-      required:
-      - description
-      - id
-      - state
-      - title
+        temperature_2m:
+          anyOf:
+          - type: string
+          - type: "null"
+          title: Temperature 2M
+        time:
+          anyOf:
+          - type: string
+          - type: "null"
+          title: Time
+      title: WeatherHourlyUnits
     ChatMessageVote:
       type: object
       description: DTO for returning vote information.
@@ -1902,125 +2328,6 @@ components:
       - isDismissed
       - score
       - state
-    SourceDocumentUIPart:
-      type: object
-      description: A document source part of a message.
-      properties:
-        filename:
-          anyOf:
-          - type: string
-          - type: "null"
-          title: Filename
-        mediaType:
-          type: string
-          title: Mediatype
-        providerMetadata:
-          anyOf:
-          - type: object
-          - type: "null"
-          title: Providermetadata
-        sourceId:
-          type: string
-          title: Sourceid
-        title:
-          type: string
-          title: Title
-        type:
-          type: string
-          const: source-document
-          default: source-document
-          title: Type
-      required:
-      - mediaType
-      - sourceId
-      - title
-      title: SourceDocumentUIPart
-    ReasoningUIPart:
-      type: object
-      description: A reasoning part of a message.
-      properties:
-        providerMetadata:
-          anyOf:
-          - type: object
-          - type: "null"
-          title: Providermetadata
-        state:
-          anyOf:
-          - type: string
-            enum:
-            - streaming
-            - done
-          - type: "null"
-          title: State
-        text:
-          type: string
-          title: Text
-        type:
-          type: string
-          const: reasoning
-          default: reasoning
-          title: Type
-      required:
-      - text
-      title: ReasoningUIPart
-    ToolInputAvailablePart:
-      type: object
-      description: Tool part with input available.
-      properties:
-        input:
-          type: object
-          title: Input
-        providerExecuted:
-          anyOf:
-          - type: boolean
-          - type: "null"
-          title: Providerexecuted
-        state:
-          type: string
-          const: input-available
-          title: State
-        toolCallId:
-          type: string
-          title: Toolcallid
-        type:
-          type: string
-          pattern: ^tool-.*
-          title: Type
-      required:
-      - input
-      - state
-      - toolCallId
-      - type
-      title: ToolInputAvailablePart
-    ChatThreadDetail:
-      type: object
-      description: |-
-        DTO for chat thread with full message content.
-         Used for initializing useChat in the frontend.
-      properties:
-        id:
-          type: string
-          format: uuid
-          description: Unique identifier for the thread
-        title:
-          type: string
-          description: Thread title (may be null for untitled threads)
-        createdAt:
-          type: string
-          format: date-time
-          description: When the thread was created
-        messages:
-          type: array
-          description: |-
-            All messages in the conversation path (as JSON objects for useChat initialization)
-             As exception, we do not use a DTO here since we included those intelligece-service models in the OpenAPI spec.
-          items:
-            $ref: "#/components/schemas/UIMessage"
-        selectedLeafMessageId:
-          type: string
-          format: uuid
-          description: ID of the currently selected leaf message (end of active conversation
-            path)
     DocumentSummary:
       type: object
       description: |-

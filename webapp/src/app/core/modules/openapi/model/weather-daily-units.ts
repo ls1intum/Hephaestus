@@ -9,17 +9,11 @@
  * https://openapi-generator.tech
  * Do not edit the class manually.
  */
-import { Input } from './input';
 
 
-/**
- * Tool part with input available.
- */
-export interface ToolInputAvailablePart { 
-    input: Input;
-    providerExecuted?: boolean | null;
-    state: string;
-    toolCallId: string;
-    type: string;
+export interface WeatherDailyUnits { 
+    sunrise?: string | null;
+    sunset?: string | null;
+    time?: string | null;
 }
 

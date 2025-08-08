@@ -9,17 +9,17 @@
  * https://openapi-generator.tech
  * Do not edit the class manually.
  */
-import { Input } from './input';
 
 
 /**
- * Tool part with input available.
+ * Output for updateDocument tool.
  */
-export interface ToolInputAvailablePart { 
-    input: Input;
-    providerExecuted?: boolean | null;
-    state: string;
-    toolCallId: string;
-    type: string;
+export interface UpdateDocumentOutput { 
+    content: string;
+    createdAt: string;
+    id: string;
+    kind: string;
+    title: string;
+    userId: string;
 }
 
