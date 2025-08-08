@@ -94,25 +94,35 @@ if (rootElement && !rootElement.innerHTML) {
 		// Callback called when React automatically recovers from errors.
 		onRecoverableError: Sentry.reactErrorHandler(),
 	});
-	root.render(
-		<StrictMode>
-			<PostHogProvider
-				apiKey={environment.posthog.projectApiKey}
-				options={{
-					api_host: environment.posthog.apiHost,
-					cross_subdomain_cookie: false,
-				}}
-			>
-				<TanstackQuery.Provider>
-					<AuthProvider>
-						<ThemeProvider defaultTheme="dark" storageKey="theme">
-							<WrappedRouterProvider />
-						</ThemeProvider>
-					</AuthProvider>
-				</TanstackQuery.Provider>
-			</PostHogProvider>
-		</StrictMode>,
-	);
+		root.render(
+			<StrictMode>
+				{environment.posthog?.projectApiKey ? (
+					<PostHogProvider
+						apiKey={environment.posthog.projectApiKey}
+						options={{
+							api_host: environment.posthog.apiHost,
+							cross_subdomain_cookie: false,
+						}}
+					>
+						<TanstackQuery.Provider>
+							<AuthProvider>
+								<ThemeProvider defaultTheme="dark" storageKey="theme">
+									<WrappedRouterProvider />
+								</ThemeProvider>
+							</AuthProvider>
+						</TanstackQuery.Provider>
+					</PostHogProvider>
+				) : (
+					<TanstackQuery.Provider>
+						<AuthProvider>
+							<ThemeProvider defaultTheme="dark" storageKey="theme">
+								<WrappedRouterProvider />
+							</ThemeProvider>
+						</AuthProvider>
+					</TanstackQuery.Provider>
+				)}
+			</StrictMode>,
+		);
 }
 
 // If you want to start measuring performance in your app, pass a function

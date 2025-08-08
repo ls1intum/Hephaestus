@@ -1,44 +1,7 @@
+import type { GetWeatherOutput } from "@/api/types.gen";
 import cx from "classnames";
 import { format, isWithinInterval } from "date-fns";
 import { useEffect, useState } from "react";
-
-interface WeatherAtLocation {
-	latitude: number;
-	longitude: number;
-	generationtime_ms: number;
-	utc_offset_seconds: number;
-	timezone: string;
-	timezone_abbreviation: string;
-	elevation: number;
-	current_units: {
-		time: string;
-		interval: string;
-		temperature_2m: string;
-	};
-	current: {
-		time: string;
-		interval: number;
-		temperature_2m: number;
-	};
-	hourly_units: {
-		time: string;
-		temperature_2m: string;
-	};
-	hourly: {
-		time: string[];
-		temperature_2m: number[];
-	};
-	daily_units: {
-		time: string;
-		sunrise: string;
-		sunset: string;
-	};
-	daily: {
-		time: string[];
-		sunrise: string[];
-		sunset: string[];
-	};
-}
 
 const SAMPLE = {
 	latitude: 37.763283,
@@ -200,21 +163,24 @@ function n(num: number): number {
 }
 
 export function WeatherTool({
-	weatherAtLocation = SAMPLE,
+	weatherAtLocation = SAMPLE as unknown as GetWeatherOutput,
 }: {
-	weatherAtLocation?: WeatherAtLocation;
+	weatherAtLocation?: GetWeatherOutput;
 }) {
 	const currentHigh = Math.max(
-		...weatherAtLocation.hourly.temperature_2m.slice(0, 24),
+		...(weatherAtLocation?.hourly?.temperature_2m?.slice(0, 24) ?? SAMPLE.hourly.temperature_2m.slice(0, 24)),
 	);
 	const currentLow = Math.min(
-		...weatherAtLocation.hourly.temperature_2m.slice(0, 24),
+		...(weatherAtLocation?.hourly?.temperature_2m?.slice(0, 24) ?? SAMPLE.hourly.temperature_2m.slice(0, 24)),
 	);
 
-	const isDay = isWithinInterval(new Date(weatherAtLocation.current.time), {
-		start: new Date(weatherAtLocation.daily.sunrise[0]),
-		end: new Date(weatherAtLocation.daily.sunset[0]),
-	});
+	const isDay = isWithinInterval(
+		new Date(weatherAtLocation?.current?.time ?? SAMPLE.current.time),
+		{
+			start: new Date(weatherAtLocation?.daily?.sunrise?.[0] ?? SAMPLE.daily.sunrise[0]),
+			end: new Date(weatherAtLocation?.daily?.sunset?.[0] ?? SAMPLE.daily.sunset[0]),
+		},
+	);
 
 	const [isMobile, setIsMobile] = useState(false);
 
@@ -232,16 +198,16 @@ export function WeatherTool({
 	const hoursToShow = isMobile ? 5 : 6;
 
 	// Find the index of the current time or the next closest time
-	const currentTimeIndex = weatherAtLocation.hourly.time.findIndex(
-		(time) => new Date(time) >= new Date(weatherAtLocation.current.time),
+	const currentTimeIndex = (weatherAtLocation?.hourly?.time ?? SAMPLE.hourly.time).findIndex(
+		(time) => new Date(time) >= new Date(weatherAtLocation?.current?.time ?? SAMPLE.current.time),
 	);
 
 	// Slice the arrays to get the desired number of items
-	const displayTimes = weatherAtLocation.hourly.time.slice(
+	const displayTimes = (weatherAtLocation?.hourly?.time ?? SAMPLE.hourly.time).slice(
 		currentTimeIndex,
 		currentTimeIndex + hoursToShow,
 	);
-	const displayTemperatures = weatherAtLocation.hourly.temperature_2m.slice(
+	const displayTemperatures = (weatherAtLocation?.hourly?.temperature_2m ?? SAMPLE.hourly.temperature_2m).slice(
 		currentTimeIndex,
 		currentTimeIndex + hoursToShow,
 	);
@@ -272,8 +238,8 @@ export function WeatherTool({
 						)}
 					/>
 					<div className="text-4xl font-medium text-blue-50">
-						{n(weatherAtLocation.current.temperature_2m)}
-						{weatherAtLocation.current_units.temperature_2m}
+						{n((weatherAtLocation?.current?.temperature_2m ?? SAMPLE.current.temperature_2m) as number)}
+						{weatherAtLocation?.current_units?.temperature_2m ?? SAMPLE.current_units.temperature_2m}
 					</div>
 				</div>
 
@@ -299,7 +265,7 @@ export function WeatherTool({
 						/>
 						<div className="text-blue-50 text-sm">
 							{n(displayTemperatures[index])}
-							{weatherAtLocation.hourly_units.temperature_2m}
+							{weatherAtLocation?.hourly_units?.temperature_2m ?? SAMPLE.hourly_units.temperature_2m}
 						</div>
 					</div>
 				))}

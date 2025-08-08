@@ -1,4 +1,5 @@
 import type { ChatMessageVote, Document } from "@/api/types.gen";
+import type { GetWeatherOutput } from "@/api/types.gen";
 import type { ChatMessage } from "@/lib/types";
 import { cn, sanitizeText } from "@/lib/utils";
 import cx from "classnames";
@@ -209,20 +210,18 @@ const PurePreviewMessage = ({
 
 								if (state === "input-available") {
 									return (
-										<div key={toolCallId} className="skeleton">
-											<WeatherTool />
+										<div key={toolCallId} className="flex flex-col gap-2 p-4 rounded-xl border">
+											<div className="h-4 w-28 bg-muted animate-pulse rounded" />
+											<div className="h-6 w-52 bg-muted animate-pulse rounded" />
+											<div className="h-3 w-80 bg-muted animate-pulse rounded" />
 										</div>
 									);
 								}
 
 								if (state === "output-available") {
-									const { output } = part;
-									// TODO: Fix WeatherTool type integration
 									return (
 										<div key={toolCallId}>
-											<div className="p-4 border rounded">
-												Weather data: {JSON.stringify(output)}
-											</div>
+											<WeatherTool weatherAtLocation={part.output as GetWeatherOutput} />
 										</div>
 									);
 								}
