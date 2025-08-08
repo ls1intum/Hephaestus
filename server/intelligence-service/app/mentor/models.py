@@ -9,11 +9,8 @@ logger = logging.getLogger(__name__)
 
 class BasePart(BaseModel):
     """Base class for UIMessage and Stream parts."""
-    
-    model_config = ConfigDict(
-        extra='ignore',
-        exclude_none=True
-    )
+
+    model_config = ConfigDict(extra="ignore", exclude_none=True)
 
     type: str
 
@@ -146,180 +143,194 @@ class UIMessage(BaseModel):
     role: Literal["system", "user", "assistant"]
     metadata: Optional[Dict[str, Any]] = None
     parts: List[UIMessagePart]
-    
-    @field_validator('parts', mode='before')
+
+    @field_validator("parts", mode="before")
     @classmethod
     def validate_parts(cls, v):
         """Custom validator to handle Java serialization format more flexibly."""
         if not isinstance(v, list):
             return v
-        
+
         logger.debug(f"🔍 Validating {len(v)} message parts")
         validated_parts = []
-        
+
         for i, part in enumerate(v):
             if not isinstance(part, dict):
                 logger.debug(f"Part {i}: Non-dict part, keeping as-is")
                 validated_parts.append(part)
                 continue
-                
+
             # Extract only the necessary fields based on type
-            part_type = part.get('type')
-            logger.debug(f"Part {i}: Processing type='{part_type}' with keys: {list(part.keys())}")
-            
-            if part_type == 'text':
+            part_type = part.get("type")
+            logger.debug(
+                f"Part {i}: Processing type='{part_type}' with keys: {list(part.keys())}"
+            )
+
+            if part_type == "text":
                 # Create a clean TextUIPart with only the required fields
                 clean_part = {
-                    'type': 'text',
-                    'text': part.get('text', ''),  # Required field
+                    "type": "text",
+                    "text": part.get("text", ""),  # Required field
                 }
                 # Only add state if it's valid
-                if 'state' in part and part['state'] in ['streaming', 'done']:
-                    clean_part['state'] = part['state']
+                if "state" in part and part["state"] in ["streaming", "done"]:
+                    clean_part["state"] = part["state"]
                     logger.debug(f"Part {i}: Added valid state: {part['state']}")
-                elif 'state' in part:
+                elif "state" in part:
                     logger.debug(f"Part {i}: Skipped invalid state: {part['state']}")
                 validated_parts.append(clean_part)
                 logger.debug(f"Part {i}: ✅ Created TextUIPart: {clean_part}")
-                
-            elif part_type == 'reasoning':
+
+            elif part_type == "reasoning":
                 clean_part = {
-                    'type': 'reasoning',
-                    'text': part.get('text', ''),  # Required field
+                    "type": "reasoning",
+                    "text": part.get("text", ""),  # Required field
                 }
                 # Only add state if it's valid
-                if 'state' in part and part['state'] in ['streaming', 'done']:
-                    clean_part['state'] = part['state']
-                if 'providerMetadata' in part and part['providerMetadata'] is not None:
-                    clean_part['providerMetadata'] = part['providerMetadata']
+                if "state" in part and part["state"] in ["streaming", "done"]:
+                    clean_part["state"] = part["state"]
+                if "providerMetadata" in part and part["providerMetadata"] is not None:
+                    clean_part["providerMetadata"] = part["providerMetadata"]
                 validated_parts.append(clean_part)
                 logger.debug(f"Part {i}: ✅ Created ReasoningUIPart: {clean_part}")
-                
-            elif part_type and part_type.startswith('tool-') and part.get('toolCallId'):
+
+            elif part_type and part_type.startswith("tool-") and part.get("toolCallId"):
                 # ✅ Only process tool parts if they have valid toolCallId and proper type pattern
-                tool_call_id = part.get('toolCallId')
-                if not tool_call_id or tool_call_id == 'null':
-                    logger.debug(f"Part {i}: ❌ Skipped tool part - invalid toolCallId: {tool_call_id}")
+                tool_call_id = part.get("toolCallId")
+                if not tool_call_id or tool_call_id == "null":
+                    logger.debug(
+                        f"Part {i}: ❌ Skipped tool part - invalid toolCallId: {tool_call_id}"
+                    )
                     continue
-                    
+
                 clean_part = {
-                    'type': part_type,
-                    'toolCallId': tool_call_id,
+                    "type": part_type,
+                    "toolCallId": tool_call_id,
                 }
-                
-                state = part.get('state')
-                if state == 'input-streaming':
-                    clean_part['state'] = 'input-streaming'
-                    if 'input' in part and part['input'] is not None:
-                        clean_part['input'] = part['input']
-                elif state == 'input-available':
-                    clean_part['state'] = 'input-available'
-                    clean_part['input'] = part.get('input', {})  # Required for this state
-                elif state == 'output-available':
-                    clean_part['state'] = 'output-available'
-                    clean_part['input'] = part.get('input', {})    # Required
-                    clean_part['output'] = part.get('output', {})  # Required
-                elif state == 'output-error':
-                    clean_part['state'] = 'output-error'
-                    clean_part['input'] = part.get('input', {})      # Required
-                    clean_part['errorText'] = part.get('errorText', '')  # Required
+
+                state = part.get("state")
+                if state == "input-streaming":
+                    clean_part["state"] = "input-streaming"
+                    if "input" in part and part["input"] is not None:
+                        clean_part["input"] = part["input"]
+                elif state == "input-available":
+                    clean_part["state"] = "input-available"
+                    clean_part["input"] = part.get(
+                        "input", {}
+                    )  # Required for this state
+                elif state == "output-available":
+                    clean_part["state"] = "output-available"
+                    clean_part["input"] = part.get("input", {})  # Required
+                    clean_part["output"] = part.get("output", {})  # Required
+                elif state == "output-error":
+                    clean_part["state"] = "output-error"
+                    clean_part["input"] = part.get("input", {})  # Required
+                    clean_part["errorText"] = part.get("errorText", "")  # Required
                 else:
-                    logger.debug(f"Part {i}: ❌ Skipped tool part - invalid state: {state}")
+                    logger.debug(
+                        f"Part {i}: ❌ Skipped tool part - invalid state: {state}"
+                    )
                     continue
-                
-                if 'providerExecuted' in part and part['providerExecuted'] is not None:
-                    clean_part['providerExecuted'] = part['providerExecuted']
+
+                if "providerExecuted" in part and part["providerExecuted"] is not None:
+                    clean_part["providerExecuted"] = part["providerExecuted"]
                 validated_parts.append(clean_part)
                 logger.debug(f"Part {i}: ✅ Created tool part: {clean_part}")
-                
-            elif part_type == 'source-url':
-                source_id = part.get('sourceId')
-                url = part.get('url')
+
+            elif part_type == "source-url":
+                source_id = part.get("sourceId")
+                url = part.get("url")
                 if not source_id or not url:
-                    logger.debug(f"Part {i}: ❌ Skipped source-url - missing required fields")
+                    logger.debug(
+                        f"Part {i}: ❌ Skipped source-url - missing required fields"
+                    )
                     continue
                 clean_part = {
-                    'type': 'source-url',
-                    'sourceId': source_id,  # Required
-                    'url': url,             # Required
+                    "type": "source-url",
+                    "sourceId": source_id,  # Required
+                    "url": url,  # Required
                 }
-                if 'title' in part and part['title'] is not None:
-                    clean_part['title'] = part['title']
-                if 'providerMetadata' in part and part['providerMetadata'] is not None:
-                    clean_part['providerMetadata'] = part['providerMetadata']
+                if "title" in part and part["title"] is not None:
+                    clean_part["title"] = part["title"]
+                if "providerMetadata" in part and part["providerMetadata"] is not None:
+                    clean_part["providerMetadata"] = part["providerMetadata"]
                 validated_parts.append(clean_part)
                 logger.debug(f"Part {i}: ✅ Created SourceUrlUIPart: {clean_part}")
-                
-            elif part_type == 'source-document':
-                source_id = part.get('sourceId')
-                media_type = part.get('mediaType')
-                title = part.get('title')
+
+            elif part_type == "source-document":
+                source_id = part.get("sourceId")
+                media_type = part.get("mediaType")
+                title = part.get("title")
                 if not source_id or not media_type or not title:
-                    logger.debug(f"Part {i}: ❌ Skipped source-document - missing required fields")
+                    logger.debug(
+                        f"Part {i}: ❌ Skipped source-document - missing required fields"
+                    )
                     continue
                 clean_part = {
-                    'type': 'source-document',
-                    'sourceId': source_id,    # Required
-                    'mediaType': media_type,  # Required
-                    'title': title,           # Required
+                    "type": "source-document",
+                    "sourceId": source_id,  # Required
+                    "mediaType": media_type,  # Required
+                    "title": title,  # Required
                 }
-                if 'filename' in part and part['filename'] is not None:
-                    clean_part['filename'] = part['filename']
-                if 'providerMetadata' in part and part['providerMetadata'] is not None:
-                    clean_part['providerMetadata'] = part['providerMetadata']
+                if "filename" in part and part["filename"] is not None:
+                    clean_part["filename"] = part["filename"]
+                if "providerMetadata" in part and part["providerMetadata"] is not None:
+                    clean_part["providerMetadata"] = part["providerMetadata"]
                 validated_parts.append(clean_part)
                 logger.debug(f"Part {i}: ✅ Created SourceDocumentUIPart: {clean_part}")
-                
-            elif part_type == 'file':
-                media_type = part.get('mediaType')
-                url = part.get('url')
+
+            elif part_type == "file":
+                media_type = part.get("mediaType")
+                url = part.get("url")
                 if not media_type or not url:
                     logger.debug(f"Part {i}: ❌ Skipped file - missing required fields")
                     continue
                 clean_part = {
-                    'type': 'file',
-                    'mediaType': media_type,  # Required
-                    'url': url,               # Required
+                    "type": "file",
+                    "mediaType": media_type,  # Required
+                    "url": url,  # Required
                 }
-                if 'filename' in part and part['filename'] is not None:
-                    clean_part['filename'] = part['filename']
+                if "filename" in part and part["filename"] is not None:
+                    clean_part["filename"] = part["filename"]
                 validated_parts.append(clean_part)
                 logger.debug(f"Part {i}: ✅ Created FileUIPart: {clean_part}")
-                
-            elif part_type and part_type.startswith('data-'):
-                data = part.get('data')
+
+            elif part_type and part_type.startswith("data-"):
+                data = part.get("data")
                 if not isinstance(data, dict):
                     logger.debug(f"Part {i}: ❌ Skipped data part - invalid data field")
                     continue
                 clean_part = {
-                    'type': part_type,
-                    'data': data,  # Required and must be dict
+                    "type": part_type,
+                    "data": data,  # Required and must be dict
                 }
-                if 'id' in part and part['id'] is not None:
-                    clean_part['id'] = part['id']
+                if "id" in part and part["id"] is not None:
+                    clean_part["id"] = part["id"]
                 validated_parts.append(clean_part)
                 logger.debug(f"Part {i}: ✅ Created DataUIPart: {clean_part}")
-                
-            elif part_type == 'step-start':
-                clean_part = {'type': 'step-start'}
+
+            elif part_type == "step-start":
+                clean_part = {"type": "step-start"}
                 validated_parts.append(clean_part)
                 logger.debug(f"Part {i}: ✅ Created StepStartUIPart: {clean_part}")
-                
+
             else:
                 # For unrecognized types, only keep if it's a basic valid structure
-                if part_type and isinstance(part.get('type'), str):
+                if part_type and isinstance(part.get("type"), str):
                     # Keep the original part but strip out obviously invalid fields
-                    clean_part = {'type': part_type}
+                    clean_part = {"type": part_type}
                     # Only copy fields that aren't null/None
                     for key, value in part.items():
-                        if key != 'type' and value is not None and value != 'null':
+                        if key != "type" and value is not None and value != "null":
                             clean_part[key] = value
                     validated_parts.append(clean_part)
                     logger.debug(f"Part {i}: ⚠️ Kept unrecognized part: {clean_part}")
                 else:
                     logger.debug(f"Part {i}: ❌ Completely invalid part, skipping")
-                
-        logger.debug(f"🎯 Validation complete: {len(validated_parts)}/{len(v)} parts validated successfully")
+
+        logger.debug(
+            f"🎯 Validation complete: {len(validated_parts)}/{len(v)} parts validated successfully"
+        )
         return validated_parts
 
 
@@ -522,6 +533,7 @@ StreamPart = Union[
 ]
 
 # --- Tool-specific input/output models for OpenAPI typing ---
+
 
 class CreateDocumentInput(BaseModel):
     """Input for createDocument tool."""

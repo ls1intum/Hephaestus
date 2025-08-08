@@ -1,10 +1,10 @@
 package de.tum.in.www1.hephaestus.mentor;
 
+import java.util.List;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 import org.springframework.lang.NonNull;
-import java.util.List;
 
 /**
  * DTO for grouped chat threads.
@@ -14,13 +14,13 @@ import java.util.List;
 @NoArgsConstructor
 @AllArgsConstructor
 public class ChatThreadGroupDTO {
-    
+
     /**
      * Group name (e.g., "Today", "Yesterday", "Last 7 Days", "Last 30 Days")
      */
     @NonNull
     private String groupName;
-    
+
     /**
      * List of thread summaries in this group
      */

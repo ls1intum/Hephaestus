@@ -1,7 +1,6 @@
 package de.tum.in.www1.hephaestus.mentor.document;
 
 import jakarta.validation.constraints.NotNull;
-
 import java.time.Instant;
 import java.util.UUID;
 

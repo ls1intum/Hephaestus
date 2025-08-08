@@ -1,11 +1,11 @@
 package de.tum.in.www1.hephaestus.mentor;
 
+import java.time.Instant;
+import java.util.UUID;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 import org.springframework.lang.NonNull;
-import java.time.Instant;
-import java.util.UUID;
 
 /**
  * DTO for chat thread summary information.
@@ -15,19 +15,19 @@ import java.util.UUID;
 @NoArgsConstructor
 @AllArgsConstructor
 public class ChatThreadSummaryDTO {
-    
+
     /**
      * Unique identifier for the thread
      */
     @NonNull
     private UUID id;
-    
+
     /**
      * Thread title (may be null for untitled threads)
      */
     @NonNull
     private String title;
-    
+
     /**
      * When the thread was created
      */

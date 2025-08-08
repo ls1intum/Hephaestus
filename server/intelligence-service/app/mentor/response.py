@@ -1,6 +1,7 @@
 """
 LangGraph-based response generation with proper streaming using astream_events.
 """
+
 import json
 import uuid
 from typing import AsyncGenerator
@@ -70,7 +71,9 @@ async def generate_response(
                 # Keep detailed chunk logs at debug to avoid noisy production logs
                 try:
                     if chunk is not None and hasattr(chunk, "model_dump"):
-                        logger.debug(f"Chat model stream chunk: {json.dumps(chunk.model_dump(), indent=2)}")
+                        logger.debug(
+                            f"Chat model stream chunk: {json.dumps(chunk.model_dump(), indent=2)}"
+                        )
                 except Exception:
                     pass
                 if chunk:
@@ -81,7 +84,9 @@ async def generate_response(
                         if isinstance(reasoning, dict):
                             # Start reasoning stream if not active
                             if not reasoning_streaming_active:
-                                reasoning_stream_id = reasoning.get("id") or str(uuid.uuid4())
+                                reasoning_stream_id = reasoning.get("id") or str(
+                                    uuid.uuid4()
+                                )
                                 yield stream.reasoning_start(reasoning_stream_id)
                                 reasoning_streaming_active = True
                             # Stream reasoning summary deltas (provider specific incremental tokens)
@@ -95,7 +100,9 @@ async def generate_response(
                                         if isinstance(t, str) and t:
                                             parts.append(t)
                                 if parts:
-                                    yield stream.reasoning_delta(reasoning_stream_id, "".join(parts))
+                                    yield stream.reasoning_delta(
+                                        reasoning_stream_id, "".join(parts)
+                                    )
                     except Exception:
                         # Never fail due to optional reasoning handling
                         pass
@@ -108,7 +115,10 @@ async def generate_response(
                         elif isinstance(chunk.content, list):
                             # Collect 'text' from content parts
                             for part in chunk.content:
-                                if isinstance(part, dict) and part.get("type") == "text":
+                                if (
+                                    isinstance(part, dict)
+                                    and part.get("type") == "text"
+                                ):
                                     part_text = part.get("text")
                                     if isinstance(part_text, str):
                                         text_delta += part_text
@@ -134,10 +144,15 @@ async def generate_response(
                                         "started": False,
                                     }
                                     if tool_name:
-                                        q = tool_call_queue_by_name.setdefault(tool_name, deque())
+                                        q = tool_call_queue_by_name.setdefault(
+                                            tool_name, deque()
+                                        )
                                         q.append(tool_call_id)
 
-                                if not active_tool_calls[tool_call_id]["started"] and tool_name:
+                                if (
+                                    not active_tool_calls[tool_call_id]["started"]
+                                    and tool_name
+                                ):
                                     yield stream.tool_input_start(
                                         tool_call_id=tool_call_id,
                                         tool_name=tool_name,
@@ -146,8 +161,12 @@ async def generate_response(
 
                                 current_args = active_tool_calls[tool_call_id]["args"]
                                 if tool_args != current_args:
-                                    new_args_json = json.dumps(tool_args, separators=(",", ":"))
-                                    current_args_json = json.dumps(current_args, separators=(",", ":"))
+                                    new_args_json = json.dumps(
+                                        tool_args, separators=(",", ":")
+                                    )
+                                    current_args_json = json.dumps(
+                                        current_args, separators=(",", ":")
+                                    )
                                     if len(new_args_json) > len(current_args_json):
                                         delta = new_args_json[len(current_args_json) :]
                                         if delta:

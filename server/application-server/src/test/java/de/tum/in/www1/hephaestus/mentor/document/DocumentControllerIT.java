@@ -1,10 +1,15 @@
 package de.tum.in.www1.hephaestus.mentor.document;
 
+import static org.assertj.core.api.Assertions.assertThat;
+
 import de.tum.in.www1.hephaestus.gitprovider.user.User;
 import de.tum.in.www1.hephaestus.gitprovider.user.UserRepository;
 import de.tum.in.www1.hephaestus.testconfig.BaseIntegrationTest;
 import de.tum.in.www1.hephaestus.testconfig.TestAuthUtils;
 import de.tum.in.www1.hephaestus.testconfig.WithMentorUser;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -12,18 +17,13 @@ import org.springframework.boot.test.autoconfigure.web.reactive.AutoConfigureWeb
 import org.springframework.http.MediaType;
 import org.springframework.test.web.reactive.server.WebTestClient;
 import org.springframework.transaction.annotation.Transactional;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.UUID;
-
-import static org.assertj.core.api.Assertions.assertThat;
 
 /**
  * Perfect API Design Integration Tests following industry best practices.
- * 
+ *
  * API Design Principles:
  * ✅ RESTful resource-oriented URLs
- * ✅ Proper HTTP verbs and status codes  
+ * ✅ Proper HTTP verbs and status codes
  * ✅ Consistent request/response patterns
  * ✅ Clear separation of concerns
  * ✅ Intuitive endpoint naming
@@ -38,11 +38,11 @@ public class DocumentControllerIT extends BaseIntegrationTest {
     @Autowired
     private DocumentRepository documentRepository;
 
-    @Autowired 
+    @Autowired
     private UserRepository userRepository;
 
     private User testUser;
-    
+
     @BeforeEach
     void setup() {
         testUser = userRepository.findByLogin("mentor").orElseThrow();
@@ -54,20 +54,18 @@ public class DocumentControllerIT extends BaseIntegrationTest {
     @WithMentorUser
     void shouldCreateDocumentSuccessfully() {
         // Arrange
-        var request = new CreateDocumentRequestDTO(
-            "My First Document",
-            "This is the content", 
-            DocumentKind.TEXT
-        );
+        var request = new CreateDocumentRequestDTO("My First Document", "This is the content", DocumentKind.TEXT);
 
         // Act & Assert
-        webTestClient.post()
-            .uri("/api/documents")  // Plural resource name
+        webTestClient
+            .post()
+            .uri("/api/documents") // Plural resource name
             .headers(TestAuthUtils.withCurrentUser())
             .contentType(MediaType.APPLICATION_JSON)
             .bodyValue(request)
             .exchange()
-            .expectStatus().isCreated()  // 201 for creation
+            .expectStatus()
+            .isCreated() // 201 for creation
             .expectBody(DocumentDTO.class)
             .value(response -> {
                 assertThat(response.id()).isNotNull();
@@ -85,11 +83,13 @@ public class DocumentControllerIT extends BaseIntegrationTest {
         UUID documentId = createTestDocument("Test Document", "Test content");
 
         // Act & Assert
-        webTestClient.get()
-            .uri("/api/documents/{id}", documentId)  // Path parameter
+        webTestClient
+            .get()
+            .uri("/api/documents/{id}", documentId) // Path parameter
             .headers(TestAuthUtils.withCurrentUser())
             .exchange()
-            .expectStatus().isOk()
+            .expectStatus()
+            .isOk()
             .expectBody(DocumentDTO.class)
             .value(response -> {
                 assertThat(response.id()).isEqualTo(documentId);
@@ -103,21 +103,19 @@ public class DocumentControllerIT extends BaseIntegrationTest {
     void shouldUpdateDocumentSuccessfully() {
         // Arrange - Create document first
         UUID documentId = createTestDocument("Original Title", "Original content");
-        
-        var updateRequest = new UpdateDocumentRequestDTO(
-            "Updated Title",
-            "Updated content",
-            DocumentKind.TEXT
-        );
+
+        var updateRequest = new UpdateDocumentRequestDTO("Updated Title", "Updated content", DocumentKind.TEXT);
 
         // Act & Assert
-        webTestClient.put()
-            .uri("/api/documents/{id}", documentId)  // PUT for updates
+        webTestClient
+            .put()
+            .uri("/api/documents/{id}", documentId) // PUT for updates
             .headers(TestAuthUtils.withCurrentUser())
             .contentType(MediaType.APPLICATION_JSON)
             .bodyValue(updateRequest)
             .exchange()
-            .expectStatus().isOk()
+            .expectStatus()
+            .isOk()
             .expectBody(DocumentDTO.class)
             .value(response -> {
                 assertThat(response.id()).isEqualTo(documentId);
@@ -140,11 +138,13 @@ public class DocumentControllerIT extends BaseIntegrationTest {
         UUID documentId = createTestDocument("To Delete", "Content");
 
         // Act & Assert
-        webTestClient.delete()
+        webTestClient
+            .delete()
             .uri("/api/documents/{id}", documentId)
             .headers(TestAuthUtils.withCurrentUser())
             .exchange()
-            .expectStatus().isNoContent();  // 204 for successful deletion
+            .expectStatus()
+            .isNoContent(); // 204 for successful deletion
 
         // Assert - Document should be gone
         var documents = documentRepository.findByIdAndUser(documentId, testUser);
@@ -158,23 +158,26 @@ public class DocumentControllerIT extends BaseIntegrationTest {
         String uniqueId = UUID.randomUUID().toString().substring(0, 8);
         String doc1Title = "UniqueDoc1_" + uniqueId;
         String doc2Title = "UniqueDoc2_" + uniqueId;
-        
+
         createTestDocument(doc1Title, "Content 1");
         createTestDocument(doc2Title, "Content 2");
 
         // Act & Assert - Use proper DTO and filter our test data
-        webTestClient.get()
+        webTestClient
+            .get()
             .uri("/api/documents")
             .headers(TestAuthUtils.withCurrentUser())
             .exchange()
-            .expectStatus().isOk()
+            .expectStatus()
+            .isOk()
             .expectBody()
-            .jsonPath("$.content").isArray()
+            .jsonPath("$.content")
+            .isArray()
             .consumeWith(result -> {
                 // Extract the page content and verify our documents are there
                 var body = result.getResponseBody();
                 assertThat(body).isNotNull();
-                
+
                 // Parse and verify our specific documents exist
                 // Use simple existence checks to avoid test pollution issues
                 var bodyStr = new String(body);
@@ -194,16 +197,18 @@ public class DocumentControllerIT extends BaseIntegrationTest {
         updateTestDocument(documentId, "Version 2", "Content 2");
 
         // Act & Assert - Use proper DTO types for paginated response
-        webTestClient.get()
+        webTestClient
+            .get()
             .uri("/api/documents/{id}/versions?page=0&size=10", documentId)
             .headers(TestAuthUtils.withCurrentUser())
             .exchange()
-            .expectStatus().isOk()
+            .expectStatus()
+            .isOk()
             .expectBody()
             .consumeWith(result -> {
                 var body = result.getResponseBody();
                 assertThat(body).isNotNull();
-                
+
                 // Verify the response contains our version data
                 var bodyStr = new String(body);
                 assertThat(bodyStr).contains("Version 1");
@@ -220,15 +225,17 @@ public class DocumentControllerIT extends BaseIntegrationTest {
         // Arrange - Create document with multiple versions
         UUID documentId = createTestDocument("Version 1", "Content 1");
         var firstVersion = documentRepository.findFirstByIdAndUserOrderByCreatedAtDesc(documentId, testUser).get();
-        
+
         updateTestDocument(documentId, "Version 2", "Content 2");
 
         // Act & Assert - Get specific version by timestamp
-        webTestClient.get()
+        webTestClient
+            .get()
             .uri("/api/documents/{id}/versions/{timestamp}", documentId, firstVersion.getCreatedAt())
             .headers(TestAuthUtils.withCurrentUser())
             .exchange()
-            .expectStatus().isOk()
+            .expectStatus()
+            .isOk()
             .expectBody(DocumentDTO.class)
             .value(response -> {
                 assertThat(response.title()).isEqualTo("Version 1");
@@ -242,24 +249,31 @@ public class DocumentControllerIT extends BaseIntegrationTest {
     void shouldDeleteVersionsAfterTimestampSuccessfully() {
         // Arrange - Create multiple versions
         UUID documentId = createTestDocument("Version 1", "Content 1");
-        var firstVersionTime = documentRepository.findFirstByIdAndUserOrderByCreatedAtDesc(documentId, testUser)
-            .get().getCreatedAt();
-        
+        var firstVersionTime = documentRepository
+            .findFirstByIdAndUserOrderByCreatedAtDesc(documentId, testUser)
+            .get()
+            .getCreatedAt();
+
         // Wait and create more versions
-        try { Thread.sleep(10); } catch (InterruptedException e) {}
+        try {
+            Thread.sleep(10);
+        } catch (InterruptedException e) {}
         updateTestDocument(documentId, "Version 2", "Content 2");
         updateTestDocument(documentId, "Version 3", "Content 3");
 
         // Act & Assert
-        webTestClient.delete()
+        webTestClient
+            .delete()
             .uri("/api/documents/{id}/versions?after={timestamp}", documentId, firstVersionTime.plusMillis(1))
             .headers(TestAuthUtils.withCurrentUser())
             .exchange()
-            .expectStatus().isOk()
+            .expectStatus()
+            .isOk()
             .expectBodyList(DocumentDTO.class)
             .value(deletedVersions -> {
                 assertThat(deletedVersions).hasSize(2); // Deleted v2 and v3
-                assertThat(deletedVersions).extracting(DocumentDTO::title)
+                assertThat(deletedVersions)
+                    .extracting(DocumentDTO::title)
                     .containsExactlyInAnyOrder("Version 2", "Version 3");
             });
 
@@ -275,31 +289,31 @@ public class DocumentControllerIT extends BaseIntegrationTest {
     @WithMentorUser
     void shouldReturn404ForNonExistentDocument() {
         // Act & Assert
-        webTestClient.get()
+        webTestClient
+            .get()
             .uri("/api/documents/{id}", UUID.randomUUID())
             .headers(TestAuthUtils.withCurrentUser())
             .exchange()
-            .expectStatus().isNotFound();
+            .expectStatus()
+            .isNotFound();
     }
 
     @Test
     @WithMentorUser
     void shouldReturn404WhenUpdatingNonExistentDocument() {
         // Arrange
-        var updateRequest = new UpdateDocumentRequestDTO(
-            "Updated Title",
-            "Updated content", 
-            DocumentKind.TEXT
-        );
+        var updateRequest = new UpdateDocumentRequestDTO("Updated Title", "Updated content", DocumentKind.TEXT);
 
         // Act & Assert
-        webTestClient.put()
+        webTestClient
+            .put()
             .uri("/api/documents/{id}", UUID.randomUUID())
             .headers(TestAuthUtils.withCurrentUser())
             .contentType(MediaType.APPLICATION_JSON)
             .bodyValue(updateRequest)
             .exchange()
-            .expectStatus().isNotFound();
+            .expectStatus()
+            .isNotFound();
     }
 
     @Test
@@ -313,13 +327,15 @@ public class DocumentControllerIT extends BaseIntegrationTest {
         );
 
         // Act & Assert
-        webTestClient.post()
+        webTestClient
+            .post()
             .uri("/api/documents")
             .headers(TestAuthUtils.withCurrentUser())
             .contentType(MediaType.APPLICATION_JSON)
             .bodyValue(invalidRequest)
             .exchange()
-            .expectStatus().isBadRequest();
+            .expectStatus()
+            .isBadRequest();
     }
 
     // ==================== Pagination Tests ====================
@@ -330,7 +346,7 @@ public class DocumentControllerIT extends BaseIntegrationTest {
         // Arrange - Create documents with unique prefix to avoid conflicts
         String uniqueId = UUID.randomUUID().toString().substring(0, 8);
         List<String> docTitles = new ArrayList<>();
-        
+
         for (int i = 1; i <= 5; i++) {
             String title = "PaginationDoc" + i + "_" + uniqueId;
             docTitles.add(title);
@@ -338,16 +354,18 @@ public class DocumentControllerIT extends BaseIntegrationTest {
         }
 
         // Act & Assert - Test pagination structure without relying on absolute counts
-        webTestClient.get()
+        webTestClient
+            .get()
             .uri("/api/documents?page=0&size=2")
             .headers(TestAuthUtils.withCurrentUser())
             .exchange()
-            .expectStatus().isOk()
+            .expectStatus()
+            .isOk()
             .expectBody()
             .consumeWith(result -> {
                 var body = result.getResponseBody();
                 assertThat(body).isNotNull();
-                
+
                 var bodyStr = new String(body);
                 // Verify pagination structure exists
                 assertThat(bodyStr).contains("\"content\":");
@@ -355,7 +373,7 @@ public class DocumentControllerIT extends BaseIntegrationTest {
                 assertThat(bodyStr).contains("\"totalElements\":");
                 assertThat(bodyStr).contains("\"numberOfElements\":");
                 assertThat(bodyStr).contains("\"first\":true");
-                
+
                 // Verify our test documents are present somewhere in the paginated results
                 assertThat(bodyStr).contains(uniqueId);
             });
@@ -371,29 +389,36 @@ public class DocumentControllerIT extends BaseIntegrationTest {
         }
 
         // Act & Assert
-        webTestClient.get()
+        webTestClient
+            .get()
             .uri("/api/documents/{id}/versions?page=0&size=2", documentId)
             .headers(TestAuthUtils.withCurrentUser())
             .exchange()
-            .expectStatus().isOk()
+            .expectStatus()
+            .isOk()
             .expectBody()
-            .jsonPath("$.content").isArray()
-            .jsonPath("$.content.length()").isEqualTo(2)
-            .jsonPath("$.totalElements").isEqualTo(5);
+            .jsonPath("$.content")
+            .isArray()
+            .jsonPath("$.content.length()")
+            .isEqualTo(2)
+            .jsonPath("$.totalElements")
+            .isEqualTo(5);
     }
 
     // ==================== Helper Methods ====================
 
     private UUID createTestDocument(String title, String content) {
         var request = new CreateDocumentRequestDTO(title, content, DocumentKind.TEXT);
-        
-        return webTestClient.post()
+
+        return webTestClient
+            .post()
             .uri("/api/documents")
             .headers(TestAuthUtils.withCurrentUser())
             .contentType(MediaType.APPLICATION_JSON)
             .bodyValue(request)
             .exchange()
-            .expectStatus().isCreated()
+            .expectStatus()
+            .isCreated()
             .expectBody(DocumentDTO.class)
             .returnResult()
             .getResponseBody()
@@ -402,13 +427,15 @@ public class DocumentControllerIT extends BaseIntegrationTest {
 
     private void updateTestDocument(UUID documentId, String title, String content) {
         var updateRequest = new UpdateDocumentRequestDTO(title, content, DocumentKind.TEXT);
-        
-        webTestClient.put()
+
+        webTestClient
+            .put()
             .uri("/api/documents/{id}", documentId)
             .headers(TestAuthUtils.withCurrentUser())
             .contentType(MediaType.APPLICATION_JSON)
             .bodyValue(updateRequest)
             .exchange()
-            .expectStatus().isOk();
+            .expectStatus()
+            .isOk();
     }
 }

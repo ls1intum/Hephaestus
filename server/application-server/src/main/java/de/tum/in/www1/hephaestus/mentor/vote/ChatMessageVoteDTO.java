@@ -6,13 +6,7 @@ import java.util.UUID;
 /**
  * DTO for returning vote information.
  */
-public record ChatMessageVoteDTO(
-    UUID messageId,
-    Boolean isUpvoted,
-    Instant createdAt,
-    Instant updatedAt
-) {
-    
+public record ChatMessageVoteDTO(UUID messageId, Boolean isUpvoted, Instant createdAt, Instant updatedAt) {
     /**
      * Create DTO from entity
      */

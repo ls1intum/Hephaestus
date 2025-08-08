@@ -10,10 +10,10 @@ import io.swagger.v3.parser.OpenAPIV3Parser;
 import java.io.File;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.LinkedHashSet;
 import java.util.stream.Collectors;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -35,25 +35,32 @@ import org.springframework.context.annotation.Configuration;
 public class OpenAPIConfiguration {
 
     private static final Logger logger = LoggerFactory.getLogger(OpenAPIConfiguration.class);
-    
+
     /**
      * List of intelligence service model names that should be imported from the intelligence service OpenAPI spec
      * and should preserve their DTO suffix in schema references.
      */
     private static final List<String> INTELLIGENCE_SERVICE_MODELS = List.of(
-        "UIMessage", "UIMessagePart", "TextUIPart", "ReasoningUIPart",
-        "ToolInputStreamingPart", "ToolInputAvailablePart", "ToolOutputAvailablePart",
-        "ToolOutputErrorPart", "SourceUrlUIPart", "SourceDocumentUIPart",
-        "FileUIPart", "DataUIPart", "StepStartUIPart"
+        "UIMessage",
+        "UIMessagePart",
+        "TextUIPart",
+        "ReasoningUIPart",
+        "ToolInputStreamingPart",
+        "ToolInputAvailablePart",
+        "ToolOutputAvailablePart",
+        "ToolOutputErrorPart",
+        "SourceUrlUIPart",
+        "SourceDocumentUIPart",
+        "FileUIPart",
+        "DataUIPart",
+        "StepStartUIPart"
         // Nested tool input / output schemas are automatically included
     );
-    
+
     /**
      * List of domain object names that should be included in the schema even though they don't end with DTO.
      */
-    private static final List<String> ALLOWED_DOMAIN_OBJECTS = List.of(
-        "PageableObject", "SortObject"
-    );
+    private static final List<String> ALLOWED_DOMAIN_OBJECTS = List.of("PageableObject", "SortObject");
 
     @Bean
     public OpenApiCustomizer schemaCustomizer() {
@@ -64,7 +71,7 @@ public class OpenAPIConfiguration {
                 // Create a new map to hold filtered schemas
                 @SuppressWarnings("rawtypes")
                 Map<String, Schema> filteredSchemas = new HashMap<>();
-                
+
                 // Include schemas with DTO suffix and remove the suffix
                 var dtoSchemas = components
                     .getSchemas()
@@ -81,25 +88,22 @@ public class OpenAPIConfiguration {
                             }
                         )
                     );
-                
+
                 filteredSchemas.putAll(dtoSchemas);
-                
+
                 // Include allowed domain objects (PageableObject, SortObject)
                 var allowedDomainObjects = components
                     .getSchemas()
                     .entrySet()
                     .stream()
                     .filter(entry -> ALLOWED_DOMAIN_OBJECTS.contains(entry.getKey()))
-                    .collect(Collectors.toMap(
-                        Map.Entry::getKey,
-                        Map.Entry::getValue
-                    ));
-                
+                    .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
+
                 filteredSchemas.putAll(allowedDomainObjects);
 
                 // Remove DTO suffix from attribute names in all schemas
                 filteredSchemas.forEach((key, value) -> {
-                    @SuppressWarnings({"rawtypes", "unchecked"})
+                    @SuppressWarnings({ "rawtypes", "unchecked" })
                     Map<String, Schema> properties = value.getProperties();
                     if (properties != null) {
                         properties.forEach((propertyKey, propertyValue) -> {
@@ -109,7 +113,7 @@ public class OpenAPIConfiguration {
                 });
 
                 components.setSchemas(filteredSchemas);
-                
+
                 // Load and add intelligence service schemas (UIMessage, UIMessagePart, etc.)
                 Map<String, Schema<?>> intelligenceSchemas = loadIntelligenceServiceUISchemas();
                 if (!intelligenceSchemas.isEmpty()) {
@@ -194,16 +198,19 @@ public class OpenAPIConfiguration {
         try {
             // Path to the intelligence service OpenAPI spec
             File intelligenceSpecFile = new File("../intelligence-service/openapi.yaml");
-            
+
             if (intelligenceSpecFile.exists()) {
                 var intelligenceOpenApi = new OpenAPIV3Parser().read(intelligenceSpecFile.getAbsolutePath());
-                
-                if (intelligenceOpenApi != null && 
-                    intelligenceOpenApi.getComponents() != null && 
-                    intelligenceOpenApi.getComponents().getSchemas() != null) {
-                    
+
+                if (
+                    intelligenceOpenApi != null &&
+                    intelligenceOpenApi.getComponents() != null &&
+                    intelligenceOpenApi.getComponents().getSchemas() != null
+                ) {
                     @SuppressWarnings("unchecked")
-                    Map<String, Schema<?>> allSchemas = (Map<String, Schema<?>>) (Map<?, ?>) intelligenceOpenApi.getComponents().getSchemas();
+                    Map<String, Schema<?>> allSchemas = (Map<String, Schema<?>>) (Map<?, ?>) intelligenceOpenApi
+                        .getComponents()
+                        .getSchemas();
 
                     // Seed with explicitly requested models, then include all referenced schemas recursively
                     Set<String> toInclude = new LinkedHashSet<>(INTELLIGENCE_SERVICE_MODELS);
@@ -213,17 +220,23 @@ public class OpenAPIConfiguration {
                         includeSchemaWithReferences(name, allSchemas, intelligenceSchemas, toInclude, visited);
                     }
 
-                    logger.info("Loaded {} schemas (including nested references) from intelligence service", intelligenceSchemas.size());
+                    logger.info(
+                        "Loaded {} schemas (including nested references) from intelligence service",
+                        intelligenceSchemas.size()
+                    );
                 } else {
                     logger.warn("Could not load schemas from intelligence service OpenAPI spec");
                 }
             } else {
-                logger.warn("Intelligence service OpenAPI spec not found at: {}", intelligenceSpecFile.getAbsolutePath());
+                logger.warn(
+                    "Intelligence service OpenAPI spec not found at: {}",
+                    intelligenceSpecFile.getAbsolutePath()
+                );
             }
         } catch (Exception e) {
             logger.error("Error loading intelligence service schemas: {}", e.getMessage(), e);
         }
-        
+
         return intelligenceSchemas;
     }
 
@@ -262,7 +275,7 @@ public class OpenAPIConfiguration {
     /**
      * Collect component schema names referenced via $ref recursively within the given schema.
      */
-    @SuppressWarnings({"rawtypes", "unchecked"})
+    @SuppressWarnings({ "rawtypes", "unchecked" })
     private void collectRefs(Schema schema, Set<String> out) {
         if (schema == null) {
             return;
@@ -310,7 +323,7 @@ public class OpenAPIConfiguration {
         if (schema.get$ref() != null && schema.get$ref().endsWith("DTO")) {
             String originalRef = schema.get$ref();
             String schemaName = originalRef.substring(originalRef.lastIndexOf("/") + 1);
-            
+
             // Check if this is an intelligence service model (without DTO suffix)
             String nameWithoutDTO = schemaName.substring(0, schemaName.length() - 3);
             if (INTELLIGENCE_SERVICE_MODELS.contains(nameWithoutDTO)) {

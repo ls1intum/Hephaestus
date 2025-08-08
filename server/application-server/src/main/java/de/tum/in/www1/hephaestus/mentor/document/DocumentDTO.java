@@ -1,7 +1,6 @@
 package de.tum.in.www1.hephaestus.mentor.document;
 
 import jakarta.validation.constraints.NotNull;
-
 import java.time.Instant;
 import java.util.UUID;
 
@@ -13,7 +12,7 @@ public record DocumentDTO(
     @NotNull UUID id,
     @NotNull Instant createdAt,
     @NotNull String title,
-    @NotNull String content,  // Always present in full document view
+    @NotNull String content, // Always present in full document view
     @NotNull DocumentKind kind,
     @NotNull String userId
 ) {

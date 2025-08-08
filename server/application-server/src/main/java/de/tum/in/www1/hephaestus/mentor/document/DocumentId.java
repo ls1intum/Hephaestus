@@ -1,10 +1,9 @@
 package de.tum.in.www1.hephaestus.mentor.document;
 
-import lombok.*;
-
 import java.io.Serializable;
 import java.time.Instant;
 import java.util.UUID;
+import lombok.*;
 
 /**
  * Composite primary key for Document entity.
@@ -13,6 +12,7 @@ import java.util.UUID;
 @NoArgsConstructor
 @AllArgsConstructor
 public class DocumentId implements Serializable {
+
     private UUID id;
     private Instant createdAt;
 }

@@ -85,11 +85,16 @@ def create_document(title: str, content: str, kind: Literal["text"]) -> Dict[str
         Acknowledgement payload; the server will provide the concrete output via streaming.
     """
     # Return the input for transparency; server will execute and stream the real result
-    return {"accepted": True, "input": {"title": title, "content": content, "kind": kind}}
+    return {
+        "accepted": True,
+        "input": {"title": title, "content": content, "kind": kind},
+    }
 
 
 @tool("updateDocument", args_schema=UpdateDocumentInput)
-def update_document(id: str, title: str, content: str, kind: Literal["text"]) -> Dict[str, Any]:
+def update_document(
+    id: str, title: str, content: str, kind: Literal["text"]
+) -> Dict[str, Any]:
     """Update an existing text document by creating a new version.
 
     IMPORTANT: This tool signals an intent to update a document. The actual update
@@ -104,16 +109,21 @@ def update_document(id: str, title: str, content: str, kind: Literal["text"]) ->
     Returns:
         Acknowledgement payload; the server will provide the concrete output via streaming.
     """
-    return {"accepted": True, "input": {"id": id, "title": title, "content": content, "kind": kind}}
+    return {
+        "accepted": True,
+        "input": {"id": id, "title": title, "content": content, "kind": kind},
+    }
 
 
 @tool
-def get_issues(state: Annotated[MentorState, InjectedState], limit: int = 20) -> List[Dict[str, Any]]:
+def get_issues(
+    state: Annotated[MentorState, InjectedState], limit: int = 20
+) -> List[Dict[str, Any]]:
     """Get issues (not pull requests) assigned to the user.
-    
+
     Args:
         limit: Maximum number of issues to return (default: 20, max: 50)
-    
+
     Returns:
         List of issues with their details.
     """
@@ -123,7 +133,7 @@ def get_issues(state: Annotated[MentorState, InjectedState], limit: int = 20) ->
         if not user_id:
             logger.error("User ID not found in state.")
             return []
-            
+
         limit = min(limit, 50)  # Cap at 50 for performance
         issues = IssueDatabaseService.get_issues_assigned_to_user(user_id, limit)
         logger.debug("Retrieved %d issues from database", len(issues))
@@ -137,8 +147,12 @@ def get_issues(state: Annotated[MentorState, InjectedState], limit: int = 20) ->
                 "state": issue.state,
                 "body": issue.body,
                 "html_url": issue.html_url,
-                "created_at": issue.created_at.isoformat() if issue.created_at else None,
-                "updated_at": issue.updated_at.isoformat() if issue.updated_at else None,
+                "created_at": (
+                    issue.created_at.isoformat() if issue.created_at else None
+                ),
+                "updated_at": (
+                    issue.updated_at.isoformat() if issue.updated_at else None
+                ),
                 "closed_at": issue.closed_at.isoformat() if issue.closed_at else None,
                 "comments_count": issue.comments_count,
                 "is_locked": issue.is_locked,
@@ -155,24 +169,30 @@ def get_issues(state: Annotated[MentorState, InjectedState], limit: int = 20) ->
 
 
 @tool
-def get_pull_requests(state: Annotated[MentorState, InjectedState], limit: int = 20) -> List[Dict[str, Any]]:
+def get_pull_requests(
+    state: Annotated[MentorState, InjectedState], limit: int = 20
+) -> List[Dict[str, Any]]:
     """Get pull requests assigned to the user.
-    
+
     Args:
         limit: Maximum number of pull requests to return (default: 20, max: 50)
-    
+
     Returns:
         List of pull requests with their details.
     """
-    logger.debug("Fetching pull requests assigned to user with ID: %s", state.get("user_id"))
+    logger.debug(
+        "Fetching pull requests assigned to user with ID: %s", state.get("user_id")
+    )
     try:
         user_id = state.get("user_id")
         if not user_id:
             logger.error("User ID not found in state.")
             return []
-            
+
         limit = min(limit, 50)  # Cap at 50 for performance
-        pull_requests = IssueDatabaseService.get_pull_requests_assigned_to_user(user_id, limit)
+        pull_requests = IssueDatabaseService.get_pull_requests_assigned_to_user(
+            user_id, limit
+        )
         logger.debug("Retrieved %d pull requests from database", len(pull_requests))
 
         formatted_prs = []
@@ -200,7 +220,11 @@ def get_pull_requests(state: Annotated[MentorState, InjectedState], limit: int =
                 "is_merged": pr.is_merged,
                 "mergeable_state": pr.mergeable_state,
                 "bad_practice_summary": pr.bad_practice_summary,
-                "last_detection_time": pr.last_detection_time.isoformat() if pr.last_detection_time else None,
+                "last_detection_time": (
+                    pr.last_detection_time.isoformat()
+                    if pr.last_detection_time
+                    else None
+                ),
             }
             formatted_prs.append(formatted_pr)
 
@@ -214,10 +238,10 @@ def get_pull_requests(state: Annotated[MentorState, InjectedState], limit: int =
 @tool
 def get_issue_details(issue_ids: List[int]) -> List[Dict[str, Any]]:
     """Get detailed information for specific issues by their IDs.
-    
+
     Args:
         issue_ids: List of issue IDs to retrieve details for
-    
+
     Returns:
         List of issues with detailed information.
     """
@@ -225,7 +249,7 @@ def get_issue_details(issue_ids: List[int]) -> List[Dict[str, Any]]:
     try:
         if not issue_ids:
             return []
-            
+
         # Limit to reasonable batch size
         issue_ids = issue_ids[:20]
         issues = IssueDatabaseService.get_issues_by_ids(issue_ids)
@@ -240,8 +264,12 @@ def get_issue_details(issue_ids: List[int]) -> List[Dict[str, Any]]:
                 "state": issue.state,
                 "body": issue.body,
                 "html_url": issue.html_url,
-                "created_at": issue.created_at.isoformat() if issue.created_at else None,
-                "updated_at": issue.updated_at.isoformat() if issue.updated_at else None,
+                "created_at": (
+                    issue.created_at.isoformat() if issue.created_at else None
+                ),
+                "updated_at": (
+                    issue.updated_at.isoformat() if issue.updated_at else None
+                ),
                 "closed_at": issue.closed_at.isoformat() if issue.closed_at else None,
                 "comments_count": issue.comments_count,
                 "is_locked": issue.is_locked,
@@ -260,10 +288,10 @@ def get_issue_details(issue_ids: List[int]) -> List[Dict[str, Any]]:
 @tool
 def get_pull_request_details(pr_ids: List[int]) -> List[Dict[str, Any]]:
     """Get detailed information for specific pull requests by their IDs.
-    
+
     Args:
         pr_ids: List of pull request IDs to retrieve details for
-    
+
     Returns:
         List of pull requests with detailed information.
     """
@@ -271,7 +299,7 @@ def get_pull_request_details(pr_ids: List[int]) -> List[Dict[str, Any]]:
     try:
         if not pr_ids:
             return []
-            
+
         # Limit to reasonable batch size
         pr_ids = pr_ids[:20]
         pull_requests = IssueDatabaseService.get_pull_requests_by_ids(pr_ids)
@@ -302,7 +330,11 @@ def get_pull_request_details(pr_ids: List[int]) -> List[Dict[str, Any]]:
                 "is_merged": pr.is_merged,
                 "mergeable_state": pr.mergeable_state,
                 "bad_practice_summary": pr.bad_practice_summary,
-                "last_detection_time": pr.last_detection_time.isoformat() if pr.last_detection_time else None,
+                "last_detection_time": (
+                    pr.last_detection_time.isoformat()
+                    if pr.last_detection_time
+                    else None
+                ),
             }
             formatted_prs.append(formatted_pr)
 
@@ -316,25 +348,25 @@ def get_pull_request_details(pr_ids: List[int]) -> List[Dict[str, Any]]:
 @tool
 def get_pull_request_bad_practices(pr_id: int) -> Dict[str, Any]:
     """Get bad practices detected for a specific pull request.
-    
+
     Args:
         pr_id: The ID of the pull request
-    
+
     Returns:
         Dictionary containing bad practices information including summary and individual practices.
     """
     logger.debug("Fetching bad practices for pull request ID: %s", pr_id)
     try:
         bad_practices = IssueDatabaseService.get_pull_request_bad_practices(pr_id)
-        
+
         # Get PR details for context
         pr_details = IssueDatabaseService.get_pull_requests_by_ids([pr_id])
         pr_summary = ""
         if pr_details:
             pr_summary = pr_details[0].bad_practice_summary or ""
-        
+
         logger.debug("Retrieved %d bad practices for PR %d", len(bad_practices), pr_id)
-        
+
         return {
             "pull_request_id": pr_id,
             "summary": pr_summary,
@@ -349,5 +381,5 @@ def get_pull_request_bad_practices(pr_id: int) -> Dict[str, Any]:
             "summary": "",
             "bad_practices": [],
             "total_count": 0,
-            "error": str(e)
+            "error": str(e),
         }

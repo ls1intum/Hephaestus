@@ -30,7 +30,7 @@ def generate_db_models(output_file: Path) -> None:
 
     # Get the intelligence service directory (parent of scripts directory)
     intelligence_service_dir = Path(__file__).parent.parent
-    
+
     # Prepare sqlacodegen command - we're already running inside poetry environment
     cmd = ["sqlacodegen", "--generator", "declarative", database_url]
 
@@ -38,12 +38,7 @@ def generate_db_models(output_file: Path) -> None:
 
     try:
         # Run sqlacodegen and capture output
-        result = subprocess.run(
-            cmd, 
-            capture_output=True, 
-            text=True, 
-            check=True
-        )
+        result = subprocess.run(cmd, capture_output=True, text=True, check=True)
 
         # File header
         header = '''# coding: utf-8

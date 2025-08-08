@@ -2,11 +2,10 @@ package de.tum.in.www1.hephaestus.mentor.document;
 
 import de.tum.in.www1.hephaestus.gitprovider.user.User;
 import jakarta.persistence.*;
-import lombok.*;
-import org.springframework.lang.NonNull;
-
 import java.time.Instant;
 import java.util.UUID;
+import lombok.*;
+import org.springframework.lang.NonNull;
 
 /**
  * Document entity representing a versioned document.
@@ -14,11 +13,14 @@ import java.util.UUID;
  * Each save creates a new version with the same id but different createdAt.
  */
 @Entity
-@Table(name = "document", indexes = {
-    @Index(name = "idx_document_id", columnList = "id"),
-    @Index(name = "idx_document_user_id", columnList = "user_id"),
-    @Index(name = "idx_document_created_at", columnList = "created_at")
-})
+@Table(
+    name = "document",
+    indexes = {
+        @Index(name = "idx_document_id", columnList = "id"),
+        @Index(name = "idx_document_user_id", columnList = "user_id"),
+        @Index(name = "idx_document_created_at", columnList = "created_at"),
+    }
+)
 @IdClass(DocumentId.class)
 @Getter
 @Setter

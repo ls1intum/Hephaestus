@@ -7,6 +7,9 @@ import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
+import java.time.Instant;
+import java.util.List;
+import java.util.UUID;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.data.domain.Page;
@@ -17,13 +20,9 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
-import java.time.Instant;
-import java.util.List;
-import java.util.UUID;
-
 /**
  * Perfect Document API Controller following industry best practices
- * 
+ *
  * ✅ RESTful resource-oriented design
  * ✅ Proper HTTP verbs and status codes
  * ✅ Consistent request/response patterns
@@ -34,12 +33,12 @@ import java.util.UUID;
  * ✅ Production-ready logging
  */
 @RestController
-@RequestMapping("/api/documents")  // Plural resource name - industry standard
+@RequestMapping("/api/documents") // Plural resource name - industry standard
 @Tag(name = "Documents", description = "Document management with versioning support")
 public class DocumentController {
 
     private static final Logger logger = LoggerFactory.getLogger(DocumentController.class);
-    
+
     private final DocumentService documentService;
     private final UserRepository userRepository;
 
@@ -54,11 +53,11 @@ public class DocumentController {
     @ApiResponse(responseCode = "400", description = "Invalid request data")
     public ResponseEntity<DocumentDTO> createDocument(@Valid @RequestBody CreateDocumentRequestDTO request) {
         logger.info("Creating new document: {}", request.title());
-        
+
         User user = userRepository.getCurrentUserElseThrow();
         DocumentDTO response = documentService.createDocument(request, user);
-        
-        return ResponseEntity.status(HttpStatus.CREATED).body(response);  // 201 for creation
+
+        return ResponseEntity.status(HttpStatus.CREATED).body(response); // 201 for creation
     }
 
     @GetMapping("/{id}")
@@ -67,7 +66,7 @@ public class DocumentController {
     @ApiResponse(responseCode = "404", description = "Document not found")
     public ResponseEntity<DocumentDTO> getDocument(@PathVariable UUID id) {
         logger.debug("Fetching document: {}", id);
-        
+
         User user = userRepository.getCurrentUserElseThrow();
         try {
             DocumentDTO response = documentService.getLatestDocument(id, user);
@@ -84,11 +83,11 @@ public class DocumentController {
     @ApiResponse(responseCode = "404", description = "Document not found")
     @ApiResponse(responseCode = "400", description = "Invalid request data")
     public ResponseEntity<DocumentDTO> updateDocument(
-            @PathVariable UUID id,
-            @Valid @RequestBody UpdateDocumentRequestDTO request) {
-        
+        @PathVariable UUID id,
+        @Valid @RequestBody UpdateDocumentRequestDTO request
+    ) {
         logger.info("Updating document: {}", id);
-        
+
         User user = userRepository.getCurrentUserElseThrow();
         try {
             DocumentDTO response = documentService.updateDocument(id, request, user);
@@ -105,11 +104,11 @@ public class DocumentController {
     @ApiResponse(responseCode = "404", description = "Document not found")
     public ResponseEntity<Void> deleteDocument(@PathVariable UUID id) {
         logger.info("Deleting document: {}", id);
-        
+
         User user = userRepository.getCurrentUserElseThrow();
         try {
             documentService.deleteDocument(id, user);
-            return ResponseEntity.noContent().build();  // 204 for successful deletion
+            return ResponseEntity.noContent().build(); // 204 for successful deletion
         } catch (EntityNotFoundException e) {
             logger.debug("Document not found for deletion: {}", id);
             return ResponseEntity.notFound().build();
@@ -120,24 +119,21 @@ public class DocumentController {
     @Operation(summary = "Get all user documents (latest versions only)")
     @ApiResponse(responseCode = "200", description = "Documents retrieved successfully")
     public ResponseEntity<Page<DocumentSummaryDTO>> getUserDocuments(
-            @RequestParam(defaultValue = "0") int page,
-            @RequestParam(defaultValue = "20") int size,
-            @RequestParam(defaultValue = "createdAt") String sortBy,
-            @RequestParam(defaultValue = "desc") String sortDir) {
-        
+        @RequestParam(defaultValue = "0") int page,
+        @RequestParam(defaultValue = "20") int size,
+        @RequestParam(defaultValue = "createdAt") String sortBy,
+        @RequestParam(defaultValue = "desc") String sortDir
+    ) {
         logger.debug("Fetching user documents - page: {}, size: {}", page, size);
-        
+
         User user = userRepository.getCurrentUserElseThrow();
-        
+
         // Create sort
-        Sort sort = Sort.by(
-            sortDir.equalsIgnoreCase("desc") ? Sort.Direction.DESC : Sort.Direction.ASC,
-            sortBy
-        );
-        
+        Sort sort = Sort.by(sortDir.equalsIgnoreCase("desc") ? Sort.Direction.DESC : Sort.Direction.ASC, sortBy);
+
         Pageable pageable = PageRequest.of(page, size, sort);
         Page<DocumentSummaryDTO> documents = documentService.getDocumentsByUser(user, pageable);
-        
+
         return ResponseEntity.ok(documents);
     }
 
@@ -146,12 +142,12 @@ public class DocumentController {
     @ApiResponse(responseCode = "200", description = "Document versions retrieved successfully")
     @ApiResponse(responseCode = "404", description = "Document not found")
     public ResponseEntity<Page<DocumentDTO>> getDocumentVersions(
-            @PathVariable UUID id,
-            @RequestParam(defaultValue = "0") int page,
-            @RequestParam(defaultValue = "20") int size) {
-        
+        @PathVariable UUID id,
+        @RequestParam(defaultValue = "0") int page,
+        @RequestParam(defaultValue = "20") int size
+    ) {
         logger.debug("Fetching versions for document: {}", id);
-        
+
         User user = userRepository.getCurrentUserElseThrow();
         try {
             // Always sort versions by createdAt DESC (latest first)
@@ -168,12 +164,9 @@ public class DocumentController {
     @Operation(summary = "Get specific version of a document by timestamp")
     @ApiResponse(responseCode = "200", description = "Document version retrieved successfully")
     @ApiResponse(responseCode = "404", description = "Document version not found")
-    public ResponseEntity<DocumentDTO> getDocumentVersion(
-            @PathVariable UUID id,
-            @PathVariable Instant timestamp) {
-        
+    public ResponseEntity<DocumentDTO> getDocumentVersion(@PathVariable UUID id, @PathVariable Instant timestamp) {
         logger.debug("Fetching document version: {} at {}", id, timestamp);
-        
+
         User user = userRepository.getCurrentUserElseThrow();
         try {
             DocumentDTO response = documentService.getDocumentVersion(id, timestamp, user);
@@ -190,11 +183,11 @@ public class DocumentController {
     @ApiResponse(responseCode = "404", description = "Document not found")
     @ApiResponse(responseCode = "400", description = "Invalid timestamp parameter")
     public ResponseEntity<List<DocumentDTO>> deleteVersionsAfterTimestamp(
-            @PathVariable UUID id,
-            @RequestParam Instant after) {
-        
+        @PathVariable UUID id,
+        @RequestParam Instant after
+    ) {
         logger.info("Deleting versions of document {} after timestamp: {}", id, after);
-        
+
         User user = userRepository.getCurrentUserElseThrow();
         try {
             List<DocumentDTO> deletedVersions = documentService.deleteDocumentsAfterTimestamp(id, after, user);

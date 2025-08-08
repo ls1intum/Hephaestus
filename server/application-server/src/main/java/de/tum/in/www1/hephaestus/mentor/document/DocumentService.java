@@ -2,6 +2,9 @@ package de.tum.in.www1.hephaestus.mentor.document;
 
 import de.tum.in.www1.hephaestus.core.exception.EntityNotFoundException;
 import de.tum.in.www1.hephaestus.gitprovider.user.User;
+import java.time.Instant;
+import java.util.List;
+import java.util.UUID;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -9,10 +12,6 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-
-import java.time.Instant;
-import java.util.List;
-import java.util.UUID;
 
 /**
  * Service for managing documents with versioning.
@@ -26,27 +25,21 @@ public class DocumentService {
     private DocumentRepository documentRepository;
 
     /**
-     * Create a new document 
+     * Create a new document
      */
     @Transactional
     public DocumentDTO createDocument(CreateDocumentRequestDTO request, User user) {
         logger.info("Creating new document: {} for user: {}", request.title(), user.getId());
-        
+
         // Generate new UUID for document
         UUID documentId = UUID.randomUUID();
-        
+
         // Create new document
-        Document document = new Document(
-            documentId,
-            request.title(),
-            request.content(),
-            request.kind(),
-            user
-        );
-        
+        Document document = new Document(documentId, request.title(), request.content(), request.kind(), user);
+
         Document savedDocument = documentRepository.save(document);
         logger.info("Document created successfully with ID: {}", savedDocument.getId());
-        
+
         return DocumentDTO.from(savedDocument);
     }
 
@@ -56,24 +49,18 @@ public class DocumentService {
     @Transactional
     public DocumentDTO updateDocument(UUID id, UpdateDocumentRequestDTO request, User user) {
         logger.info("Updating document: {} for user: {}", id, user.getId());
-        
+
         // Verify document exists and belongs to user
         if (!documentRepository.existsByIdAndUser(id, user)) {
             throw new EntityNotFoundException("Document", id.toString());
         }
-        
+
         // Create new version
-        Document document = new Document(
-            id,
-            request.title(),
-            request.content(),
-            request.kind(),
-            user
-        );
-        
+        Document document = new Document(id, request.title(), request.content(), request.kind(), user);
+
         Document savedDocument = documentRepository.save(document);
         logger.info("Document updated successfully: {}", id);
-        
+
         return DocumentDTO.from(savedDocument);
     }
 
@@ -83,12 +70,10 @@ public class DocumentService {
     @Transactional(readOnly = true)
     public List<DocumentDTO> getDocumentsById(UUID id, User user) {
         logger.debug("Getting all versions of document ID: {} for user: {}", id, user.getId());
-        
+
         List<Document> documents = documentRepository.findByIdAndUserOrderByCreatedAtDesc(id, user);
-        
-        return documents.stream()
-            .map(DocumentDTO::from)
-            .toList();
+
+        return documents.stream().map(DocumentDTO::from).toList();
     }
 
     /**
@@ -97,8 +82,9 @@ public class DocumentService {
     @Transactional(readOnly = true)
     public DocumentDTO getLatestDocument(UUID id, User user) {
         logger.debug("Getting latest document ID: {} for user: {}", id, user.getId());
-        
-        return documentRepository.findFirstByIdAndUserOrderByCreatedAtDesc(id, user)
+
+        return documentRepository
+            .findFirstByIdAndUserOrderByCreatedAtDesc(id, user)
             .map(DocumentDTO::from)
             .orElseThrow(() -> new EntityNotFoundException("Document", id.toString()));
     }
@@ -108,22 +94,27 @@ public class DocumentService {
      */
     @Transactional
     public List<DocumentDTO> deleteDocumentsAfterTimestamp(UUID id, Instant timestamp, User user) {
-        logger.info("Deleting document versions for ID: {} after timestamp: {} for user: {}", 
-            id, timestamp, user.getId());
-        
+        logger.info(
+            "Deleting document versions for ID: {} after timestamp: {} for user: {}",
+            id,
+            timestamp,
+            user.getId()
+        );
+
         // Verify user has access to the document
         if (!documentRepository.existsByIdAndUser(id, user)) {
             throw new EntityNotFoundException("Document", id.toString());
         }
-        
+
         List<Document> deletedDocuments = documentRepository.findByIdAndUserAndCreatedAtAfterOrderByCreatedAtDesc(
-            id, user, timestamp);
-        
+            id,
+            user,
+            timestamp
+        );
+
         documentRepository.deleteByIdAndUserAndCreatedAtAfter(id, user, timestamp);
-        
-        return deletedDocuments.stream()
-            .map(DocumentDTO::from)
-            .toList();
+
+        return deletedDocuments.stream().map(DocumentDTO::from).toList();
     }
 
     /**
@@ -132,12 +123,13 @@ public class DocumentService {
     @Transactional(readOnly = true)
     public List<DocumentSummaryDTO> getDocumentsByUser(User user) {
         logger.debug("Getting all documents for user: {}", user.getId());
-        
+
         // Get latest version of each document
         List<Document> documents = documentRepository.findLatestVersionsByUser(user);
-        
-        return documents.stream()
-            .map(DocumentSummaryDTO::from)  // Use summary DTO for lists
+
+        return documents
+            .stream()
+            .map(DocumentSummaryDTO::from) // Use summary DTO for lists
             .toList();
     }
 
@@ -147,12 +139,12 @@ public class DocumentService {
     @Transactional
     public void deleteDocument(UUID id, User user) {
         logger.info("Deleting document: {} for user: {}", id, user.getId());
-        
+
         List<Document> documents = documentRepository.findByIdAndUser(id, user);
         if (documents.isEmpty()) {
             throw new EntityNotFoundException("Document", id.toString());
         }
-        
+
         documentRepository.deleteAll(documents);
         logger.info("Deleted {} versions of document: {}", documents.size(), id);
     }
@@ -162,12 +154,12 @@ public class DocumentService {
      */
     public Page<DocumentDTO> getDocumentVersions(UUID id, User user, Pageable pageable) {
         logger.info("Getting versions for document: {} for user: {}", id, user.getId());
-        
+
         Page<Document> documents = documentRepository.findByIdAndUser(id, user, pageable);
         if (documents.isEmpty()) {
             throw new EntityNotFoundException("Document", id.toString());
         }
-        
+
         return documents.map(this::mapToResponseDTO);
     }
 
@@ -176,10 +168,11 @@ public class DocumentService {
      */
     public DocumentDTO getDocumentVersion(UUID id, Instant timestamp, User user) {
         logger.info("Getting document version: {} at {} for user: {}", id, timestamp, user.getId());
-        
-        Document document = documentRepository.findByIdAndUserAndCreatedAt(id, user, timestamp)
+
+        Document document = documentRepository
+            .findByIdAndUserAndCreatedAt(id, user, timestamp)
             .orElseThrow(() -> new EntityNotFoundException("Document version", id + " at " + timestamp));
-        
+
         return mapToResponseDTO(document);
     }
 
@@ -188,9 +181,9 @@ public class DocumentService {
      */
     public Page<DocumentSummaryDTO> getDocumentsByUser(User user, Pageable pageable) {
         logger.debug("Getting documents for user: {} with pagination", user.getId());
-        
+
         Page<Document> latestDocuments = documentRepository.findLatestVersionsByUser(user, pageable);
-        return latestDocuments.map(DocumentSummaryDTO::from);  // Use summary DTO for lists
+        return latestDocuments.map(DocumentSummaryDTO::from); // Use summary DTO for lists
     }
 
     private DocumentDTO mapToResponseDTO(Document document) {

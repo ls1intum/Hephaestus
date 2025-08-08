@@ -76,10 +76,17 @@ export function useMentorChat({
 				// Always attach a fresh token per request
 				prepareSendMessagesRequest: ({ id, messages }) => {
 					const effectiveId = id || stableThreadId;
+					// Only send the latest message; backend reconstructs context from thread ID
+					const lastMessage = messages.at(-1);
+					// Determine previous message ID from current local state (selected leaf or last message)
+					const prev = (messages.length > 1 ? messages[messages.length - 2]?.id : undefined) ||
+						(threadDetail?.selectedLeafMessageId as unknown as string | undefined) ||
+						(undefined as string | undefined);
 					return {
 						body: {
 							id: effectiveId,
-							messages,
+							message: lastMessage,
+							previousMessageId: prev,
 						},
 						headers: {
 							Authorization: `Bearer ${keycloakService.getToken()}`,
@@ -87,7 +94,7 @@ export function useMentorChat({
 					};
 				},
 			}),
-		[stableThreadId],
+		[stableThreadId, threadDetail?.selectedLeafMessageId],
 	);
 
 	// Create stable onFinish callback

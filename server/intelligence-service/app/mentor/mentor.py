@@ -1,19 +1,26 @@
 """
 LangGraph-based mentor implementation with comprehensive development assistance tools.
 """
+
 import json
 from typing import Dict, Any, List
-from langchain_core.messages import SystemMessage, HumanMessage, AIMessage, ToolMessage, BaseMessage
+from langchain_core.messages import (
+    SystemMessage,
+    HumanMessage,
+    AIMessage,
+    ToolMessage,
+    BaseMessage,
+)
 from langgraph.graph import StateGraph, START, END
 from langgraph.prebuilt import tools_condition
 from langchain_core.runnables import RunnableConfig
 from langchain.chat_models import init_chat_model
 
 from app.mentor.tools import (
-    get_weather, 
+    get_weather,
     create_document,
     update_document,
-    get_issues, 
+    get_issues,
     get_pull_requests,
     get_issue_details,
     get_pull_request_details,
@@ -28,7 +35,7 @@ from langgraph.prebuilt import ToolNode
 
 # Get the chat model
 ChatModel = get_model(settings.MODEL_NAME)
-model = init_chat_model(settings.MODEL_NAME, reasoning={ "summary": "auto" })
+model = init_chat_model(settings.MODEL_NAME, reasoning={"summary": "auto"})
 
 # Enhanced system prompt for the comprehensive mentor
 SYSTEM_PROMPT = """\
@@ -73,69 +80,86 @@ After using a tool, provide insights and next steps rather than just repeating t
 
 def create_mentor_graph():
     """Create a LangGraph for mentor interactions with comprehensive tools."""
-    
+
     # All available tools for the mentor
     tools = [
-        get_weather, 
+        get_weather,
         create_document,
         update_document,
-        get_issues, 
+        get_issues,
         get_pull_requests,
         get_issue_details,
         get_pull_request_details,
         get_pull_request_bad_practices,
     ]
     model_with_tools = model.bind_tools(tools, tool_choice="auto")
-    
+
     def call_model(state: MentorState, config: RunnableConfig):
         """Call the language model with enhanced context awareness."""
         messages = state["messages"]
-                
+
         # Add system prompt if not present
         if not messages or not isinstance(messages[0], SystemMessage):
             messages = [SystemMessage(content=SYSTEM_PROMPT)] + messages
-        
+
         # Add user context if available
-        user_id = state.get('user_id')
+        user_id = state.get("user_id")
         if user_id and len(messages) == 1:  # Only system message, first interaction
             context_msg = HumanMessage(
                 content=f"User ID: {user_id}. Please introduce yourself and offer to help with their development work."
             )
             messages.append(context_msg)
-        
-        logger.debug(json.dumps([{
-            "type": msg.__class__.__name__,
-            "content": msg.content[:200] + "..." if len(str(msg.content)) > 200 else str(msg.content)
-        } for msg in messages], indent=2, ensure_ascii=False))
-        
-        logger.info(f"Calling model with {len(messages)} messages for user {state.get('user_id')}")
+
+        logger.debug(
+            json.dumps(
+                [
+                    {
+                        "type": msg.__class__.__name__,
+                        "content": (
+                            msg.content[:200] + "..."
+                            if len(str(msg.content)) > 200
+                            else str(msg.content)
+                        ),
+                    }
+                    for msg in messages
+                ],
+                indent=2,
+                ensure_ascii=False,
+            )
+        )
+
+        logger.info(
+            f"Calling model with {len(messages)} messages for user {state.get('user_id')}"
+        )
         response = model_with_tools.invoke(messages, config)
         return {"messages": [response]}
-    
+
     def should_continue(state: MentorState):
         """Decide whether to continue to tools or end."""
         messages = state["messages"]
         last_message = messages[-1]
-        
+
         # If the last message has tool calls, continue to tools
-        if hasattr(last_message, 'tool_calls') and last_message.tool_calls:
+        if hasattr(last_message, "tool_calls") and last_message.tool_calls:
             return "tools"
-        
+
         # Otherwise, end
         return END
-    
+
     # Create the graph
     workflow = StateGraph(MentorState)
-    
+
     # Add nodes
     workflow.add_node("agent", call_model)
     workflow.add_node("tools", ToolNode(tools))
-    
+
     # Add edges
     workflow.add_edge(START, "agent")
-    workflow.add_conditional_edges("agent", should_continue, {"tools": "tools", END: END})
+    workflow.add_conditional_edges(
+        "agent", should_continue, {"tools": "tools", END: END}
+    )
     workflow.add_edge("tools", "agent")
-    
+
     return workflow.compile()
 
 

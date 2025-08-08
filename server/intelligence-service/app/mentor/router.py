@@ -49,7 +49,49 @@ class ChatResponse(RootModel[StreamPart]):
 )
 async def handle_chat(request: ChatRequest):
     stream = StreamGenerator()
-    logger.info(f"Processing chat request with message ID: {stream.message_id}, user_id: {request.user_id}")
+    # Log basic payload summary for traceability
+    try:
+        first_role = request.messages[0].role if request.messages else None
+        last_role = request.messages[-1].role if request.messages else None
+        first_text = (
+            next(
+                (
+                    p.text
+                    for p in (request.messages[0].parts or [])
+                    if getattr(p, "type", None) == "text" and getattr(p, "text", None)
+                ),
+                None,
+            )
+            if request.messages
+            else None
+        )
+        last_text = (
+            next(
+                (
+                    p.text
+                    for p in (request.messages[-1].parts or [])
+                    if getattr(p, "type", None) == "text" and getattr(p, "text", None)
+                ),
+                None,
+            )
+            if request.messages
+            else None
+        )
+        logger.info(
+            "Processing chat request: user_id=%s, messages=%s, firstRole=%s, lastRole=%s, firstText=%s, lastText=%s",
+            request.user_id,
+            len(request.messages or []),
+            first_role,
+            last_role,
+            (
+                (first_text[:80] + "…")
+                if first_text and len(first_text) > 80
+                else first_text
+            ),
+            (last_text[:80] + "…") if last_text and len(last_text) > 80 else last_text,
+        )
+    except Exception:
+        logger.warning("Failed to summarize chat request for logging")
 
     async def generate():
         try:
@@ -57,12 +99,15 @@ async def handle_chat(request: ChatRequest):
 
             langchain_messages = convert_to_langchain_messages(request.messages)
 
-            async for chunk in stream.run_step(generate_response, langchain_messages, request.user_id):
+            async for chunk in stream.run_step(
+                generate_response, langchain_messages, request.user_id
+            ):
                 yield chunk
 
             yield stream.finish_message()
         except Exception as e:
-            logger.error(f"Error generating response: {str(e)}")
+            # Log full exception info with traceback for diagnostics
+            logger.exception("Error generating response")
             yield stream.error(f"An error occurred: {str(e)}")
 
         yield stream.done()

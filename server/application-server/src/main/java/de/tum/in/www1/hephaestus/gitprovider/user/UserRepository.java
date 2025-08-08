@@ -104,7 +104,6 @@ public interface UserRepository extends JpaRepository<User, Long> {
      * @return existing user object by current user login
      */
     default User getCurrentUserElseThrow() {
-        return getCurrentUser()
-            .orElseThrow(() -> new EntityNotFoundException("User", "current authenticated user"));
+        return getCurrentUser().orElseThrow(() -> new EntityNotFoundException("User", "current authenticated user"));
     }
 }

@@ -12,12 +12,10 @@ public record CreateDocumentRequestDTO(
     @NotBlank(message = "Title is required")
     @Size(max = 255, message = "Title must not exceed 255 characters")
     String title,
-    
-    @NotNull(message = "Content is required")
-    String content,
-    
-    @NotNull(message = "Kind is required")
-    DocumentKind kind
+
+    @NotNull(message = "Content is required") String content,
+
+    @NotNull(message = "Kind is required") DocumentKind kind
 ) {
     // Bean Validation handles all validation - no constructor needed
 }

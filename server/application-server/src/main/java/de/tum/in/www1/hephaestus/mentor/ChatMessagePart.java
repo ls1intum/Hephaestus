@@ -3,9 +3,9 @@ package de.tum.in.www1.hephaestus.mentor;
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import de.tum.in.www1.hephaestus.intelligenceservice.model.UIMessagePartsInner;
 import de.tum.in.www1.hephaestus.intelligenceservice.model.Input;
 import de.tum.in.www1.hephaestus.intelligenceservice.model.Output;
+import de.tum.in.www1.hephaestus.intelligenceservice.model.UIMessagePartsInner;
 import io.hypersistence.utils.hibernate.type.json.JsonType;
 import jakarta.persistence.*;
 import java.util.UUID;
@@ -76,7 +76,7 @@ public class ChatMessagePart {
         REASONING("reasoning"),
 
         // Tool-related parts - single "tool" type with states in content
-        TOOL("tool"),  // For tool-{name} with states: input-streaming, input-available, output-available, output-error
+        TOOL("tool"), // For tool-{name} with states: input-streaming, input-available, output-available, output-error
 
         // Source reference parts
         SOURCE_URL("source-url"),
@@ -86,7 +86,7 @@ public class ChatMessagePart {
         FILE("file"),
 
         // Data part - for data-{type} pattern
-        DATA("data"), 
+        DATA("data"),
 
         // Step control
         STEP_START("step-start");
@@ -177,7 +177,7 @@ public class ChatMessagePart {
     public boolean isToolResult() {
         return type == PartType.TOOL && "output-available".equals(getToolState());
     }
-    
+
     /**
      * Helper method to check if this is any kind of tool part
      */
@@ -218,10 +218,10 @@ public class ChatMessagePart {
     /**
      * Convert this message part to a UIMessagePartsInner object.
      * Handles the mapping from internal JSON structure to the UI model.
-     * 
+     *
      * @return A UIMessagePartsInner representation of this message part
      */
-    public UIMessagePartsInner toUIMessagePart() {    
+    public UIMessagePartsInner toUIMessagePart() {
         try {
             // Handle null content
             if (content == null) {
@@ -231,14 +231,14 @@ public class ChatMessagePart {
                 uiPart.setState(null);
                 return uiPart;
             }
-            
+
             // Create the UI part manually to handle field mapping correctly
             UIMessagePartsInner uiPart = new UIMessagePartsInner();
-            
+
             // Set the type correctly
             String partType = originalType != null ? originalType : type.getValue();
             uiPart.setType(partType);
-            
+
             // Handle different part types
             if (type == PartType.TEXT || type == PartType.REASONING) {
                 // For text and reasoning parts
@@ -246,7 +246,6 @@ public class ChatMessagePart {
                     uiPart.setText(content.get("text").asText());
                 }
                 uiPart.setState(null); // Clear default state for text/reasoning parts
-                
             } else if (type == PartType.TOOL) {
                 // For tool parts, handle the state and data fields correctly
                 String toolState = null;
@@ -254,11 +253,11 @@ public class ChatMessagePart {
                     toolState = content.get("state").asText();
                     uiPart.setState(toolState);
                 }
-                
+
                 if (content.has("toolCallId")) {
                     uiPart.setToolCallId(content.get("toolCallId").asText());
                 }
-                
+
                 // Handle fields based on the specific tool state to match Python model requirements
                 if ("input-streaming".equals(toolState)) {
                     // ToolInputStreamingPart: input (optional), providerExecuted (optional)
@@ -271,7 +270,6 @@ public class ChatMessagePart {
                             // Keep input as null for input-streaming if conversion fails
                         }
                     }
-                    
                 } else if ("input-available".equals(toolState)) {
                     // ToolInputAvailablePart: input (required), providerExecuted (optional)
                     Input inputValue = null;
@@ -293,10 +291,9 @@ public class ChatMessagePart {
                         inputValue = new Input(); // Required field
                     }
                     uiPart.setInput(inputValue);
-                    
                 } else if ("output-available".equals(toolState)) {
                     // ToolOutputAvailablePart: input (required), output (required), providerExecuted (optional)
-                    
+
                     // Handle required input field
                     Input inputValue = null;
                     if (content.has("args") && !content.get("args").isNull()) {
@@ -317,7 +314,7 @@ public class ChatMessagePart {
                         inputValue = new Input(); // Required field
                     }
                     uiPart.setInput(inputValue);
-                    
+
                     // Handle required output field
                     Output outputValue = null;
                     if (content.has("result") && !content.get("result").isNull()) {
@@ -338,10 +335,9 @@ public class ChatMessagePart {
                         outputValue = new Output(); // Required field
                     }
                     uiPart.setOutput(outputValue);
-                    
                 } else if ("output-error".equals(toolState)) {
                     // ToolOutputErrorPart: input (required), errorText (required), providerExecuted (optional)
-                    
+
                     // Handle required input field
                     Input inputValue = null;
                     if (content.has("args") && !content.get("args").isNull()) {
@@ -362,7 +358,7 @@ public class ChatMessagePart {
                         inputValue = new Input(); // Required field
                     }
                     uiPart.setInput(inputValue);
-                    
+
                     // Handle required errorText field
                     if (content.has("errorText") && !content.get("errorText").isNull()) {
                         uiPart.setErrorText(content.get("errorText").asText());
@@ -370,12 +366,11 @@ public class ChatMessagePart {
                         uiPart.setErrorText("An error occurred during tool execution"); // Required field
                     }
                 }
-                
+
                 // Handle providerExecuted if present (optional for all tool states)
                 if (content.has("providerExecuted") && !content.get("providerExecuted").isNull()) {
                     uiPart.setProviderExecuted(content.get("providerExecuted").asBoolean());
                 }
-                
             } else if (type == PartType.FILE) {
                 // For file parts
                 if (content.has("mediaType")) {
@@ -388,7 +383,6 @@ public class ChatMessagePart {
                     uiPart.setFilename(content.get("filename").asText());
                 }
                 uiPart.setState(null); // Clear default state
-                
             } else if (type == PartType.DATA) {
                 // For data parts
                 if (content.has("data")) {
@@ -398,11 +392,10 @@ public class ChatMessagePart {
                     uiPart.setId(content.get("id").asText());
                 }
                 uiPart.setState(null); // Clear default state
-                
             } else {
                 // For other part types, try to convert safely
                 uiPart.setState(null); // Clear default state
-                
+
                 // Copy over common fields if they exist
                 if (content.has("text")) {
                     uiPart.setText(content.get("text").asText());
@@ -411,32 +404,31 @@ public class ChatMessagePart {
                     uiPart.setState(content.get("state").asText());
                 }
             }
-            
+
             // Copy over provider metadata if present
             if (content.has("providerMetadata")) {
                 uiPart.setProviderMetadata(content.get("providerMetadata"));
             }
-            
+
             return uiPart;
-            
         } catch (Exception e) {
             // Log the conversion error for debugging
             System.err.println("Failed to convert ChatMessagePart to UIMessagePart: " + e.getMessage());
             System.err.println("Content: " + content);
             System.err.println("Type: " + type + ", OriginalType: " + originalType);
             e.printStackTrace();
-            
+
             // Create a fallback instance
             UIMessagePartsInner uiPart = new UIMessagePartsInner();
             String partType = originalType != null ? originalType : type.getValue();
             uiPart.setType(partType);
             uiPart.setState(null); // Clear default state
-            
+
             // For text parts, try to extract the text directly from content
             if (content != null && content.has("text")) {
                 uiPart.setText(content.get("text").asText());
             }
-            
+
             return uiPart;
         }
     }

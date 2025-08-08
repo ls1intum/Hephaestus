@@ -351,7 +351,8 @@ public class ChatMessage {
         }
 
         // Convert each message part to a UIMessagePartsInner object
-        List<UIMessagePartsInner> partsList = parts.stream()
+        List<UIMessagePartsInner> partsList = parts
+            .stream()
             .map(ChatMessagePart::toUIMessagePart)
             .collect(Collectors.toList());
         uiMessage.setParts(partsList);

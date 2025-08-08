@@ -70,19 +70,27 @@ class StreamGenerator:
         """End text content."""
         return self.format_event(StreamTextEndPart(id=text_id))
 
-    def reasoning_start(self, reasoning_id: str, metadata: Optional[Dict[str, Any]] = None) -> str:
+    def reasoning_start(
+        self, reasoning_id: str, metadata: Optional[Dict[str, Any]] = None
+    ) -> str:
         """Start reasoning content with ID."""
         return self.format_event(
             StreamReasoningStartPart(id=reasoning_id, providerMetadata=metadata)
         )
 
-    def reasoning_delta(self, reasoning_id: str, delta: str, metadata: Optional[Dict[str, Any]] = None) -> str:
+    def reasoning_delta(
+        self, reasoning_id: str, delta: str, metadata: Optional[Dict[str, Any]] = None
+    ) -> str:
         """Send reasoning content delta."""
         return self.format_event(
-            StreamReasoningDeltaPart(id=reasoning_id, delta=delta, providerMetadata=metadata)
+            StreamReasoningDeltaPart(
+                id=reasoning_id, delta=delta, providerMetadata=metadata
+            )
         )
 
-    def reasoning_end(self, reasoning_id: str, metadata: Optional[Dict[str, Any]] = None) -> str:
+    def reasoning_end(
+        self, reasoning_id: str, metadata: Optional[Dict[str, Any]] = None
+    ) -> str:
         """End reasoning content."""
         return self.format_event(
             StreamReasoningEndPart(id=reasoning_id, providerMetadata=metadata)

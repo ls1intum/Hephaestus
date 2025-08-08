@@ -7,7 +7,13 @@ Simple service for accessing issue and pull request data from the application-se
 from typing import List, Optional, Dict, Any
 from sqlalchemy import select, desc, and_
 
-from .models_gen import Issue, User, Repository, Pullrequestbadpractice, BadPracticeDetection
+from .models_gen import (
+    Issue,
+    User,
+    Repository,
+    Pullrequestbadpractice,
+    BadPracticeDetection,
+)
 from .config import DatabaseSession
 
 
@@ -24,7 +30,7 @@ class IssueDatabaseService:
                     .where(
                         and_(
                             Issue.author_id == user_id,
-                            Issue.issue_type == "ISSUE",   
+                            Issue.issue_type == "ISSUE",
                         )
                     )
                     .order_by(desc(Issue.created_at))
@@ -33,7 +39,9 @@ class IssueDatabaseService:
             )
 
     @staticmethod
-    def get_pull_requests_assigned_to_user(user_id: int, limit: int = 50) -> List[Issue]:
+    def get_pull_requests_assigned_to_user(
+        user_id: int, limit: int = 50
+    ) -> List[Issue]:
         """Get pull requests assigned to a specific user, ordered by creation time."""
         with DatabaseSession() as session:
             return list(
@@ -58,10 +66,7 @@ class IssueDatabaseService:
                 session.execute(
                     select(Issue)
                     .where(
-                        and_(
-                            Issue.id.in_(issue_ids),
-                            Issue.has_pull_request == False
-                        )
+                        and_(Issue.id.in_(issue_ids), Issue.has_pull_request == False)
                     )
                     .order_by(desc(Issue.created_at))
                 ).scalars()
@@ -74,12 +79,7 @@ class IssueDatabaseService:
             return list(
                 session.execute(
                     select(Issue)
-                    .where(
-                        and_(
-                            Issue.id.in_(pr_ids),
-                            Issue.has_pull_request == True
-                        )
-                    )
+                    .where(and_(Issue.id.in_(pr_ids), Issue.has_pull_request == True))
                     .order_by(desc(Issue.created_at))
                 ).scalars()
             )
@@ -95,30 +95,45 @@ class IssueDatabaseService:
                 .order_by(desc(BadPracticeDetection.detection_time))
                 .limit(1)
             ).scalar_one_or_none()
-            
+
             if not latest_detection:
                 return []
-            
+
             # Get bad practices for this detection
-            bad_practices = session.execute(
-                select(Pullrequestbadpractice)
-                .where(Pullrequestbadpractice.bad_practice_detection_id == latest_detection.id)
-                .order_by(Pullrequestbadpractice.detection_time)
-            ).scalars().all()
-            
+            bad_practices = (
+                session.execute(
+                    select(Pullrequestbadpractice)
+                    .where(
+                        Pullrequestbadpractice.bad_practice_detection_id
+                        == latest_detection.id
+                    )
+                    .order_by(Pullrequestbadpractice.detection_time)
+                )
+                .scalars()
+                .all()
+            )
+
             result = []
             for bp in bad_practices:
-                result.append({
-                    "id": bp.id,
-                    "title": bp.title,
-                    "description": bp.description,
-                    "state": bp.state,
-                    "user_state": bp.user_state,
-                    "detection_time": bp.detection_time.isoformat() if bp.detection_time else None,
-                    "last_update_time": bp.last_update_time.isoformat() if bp.last_update_time else None,
-                    "detection_trace_id": bp.detection_trace_id,
-                })
-            
+                result.append(
+                    {
+                        "id": bp.id,
+                        "title": bp.title,
+                        "description": bp.description,
+                        "state": bp.state,
+                        "user_state": bp.user_state,
+                        "detection_time": (
+                            bp.detection_time.isoformat() if bp.detection_time else None
+                        ),
+                        "last_update_time": (
+                            bp.last_update_time.isoformat()
+                            if bp.last_update_time
+                            else None
+                        ),
+                        "detection_trace_id": bp.detection_trace_id,
+                    }
+                )
+
             return result
 
     @staticmethod

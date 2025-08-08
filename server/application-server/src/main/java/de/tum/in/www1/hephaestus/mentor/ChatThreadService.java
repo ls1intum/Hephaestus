@@ -2,11 +2,6 @@ package de.tum.in.www1.hephaestus.mentor;
 
 import de.tum.in.www1.hephaestus.gitprovider.user.User;
 import de.tum.in.www1.hephaestus.intelligenceservice.model.UIMessage;
-import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
-import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
-
 import java.time.LocalDate;
 import java.time.ZoneId;
 import java.util.ArrayList;
@@ -16,6 +11,10 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 import java.util.stream.Collectors;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 /**
  * Service for managing chat threads.
@@ -37,12 +36,10 @@ public class ChatThreadService {
      */
     public List<ChatThreadSummaryDTO> getThreadSummariesForUser(User user) {
         log.debug("Getting thread summaries for user: {}", user.getLogin());
-        
+
         List<ChatThread> threads = chatThreadRepository.findByUserOrderByCreatedAtDesc(user);
-        
-        return threads.stream()
-                .map(this::convertToSummaryDTO)
-                .collect(Collectors.toList());
+
+        return threads.stream().map(this::convertToSummaryDTO).collect(Collectors.toList());
     }
 
     /**
@@ -54,29 +51,29 @@ public class ChatThreadService {
      */
     public List<ChatThreadGroupDTO> getGroupedThreadSummariesForUser(User user) {
         log.debug("Getting grouped thread summaries for user: {}", user.getLogin());
-        
+
         // Get all threads for the user in a single query, ordered by creation date
         List<ChatThread> threads = chatThreadRepository.findByUserOrderByCreatedAtDesc(user);
-        
+
         if (threads.isEmpty()) {
             return new ArrayList<>();
         }
-        
+
         // Group threads by time periods in memory (single pass)
         Map<String, List<ChatThreadSummaryDTO>> groupedThreads = new LinkedHashMap<>();
-        
+
         // Define time boundaries once
         LocalDate today = LocalDate.now(ZoneId.systemDefault());
         LocalDate yesterday = today.minusDays(1);
         LocalDate sevenDaysAgo = today.minusDays(7);
         LocalDate thirtyDaysAgo = today.minusDays(30);
         LocalDate ninetyDaysAgo = today.minusDays(90);
-        
+
         // Single pass through threads to group them
         for (ChatThread thread : threads) {
             ChatThreadSummaryDTO summaryDTO = convertToSummaryDTO(thread);
             LocalDate threadDate = thread.getCreatedAt().atZone(ZoneId.systemDefault()).toLocalDate();
-            
+
             String groupName;
             if (threadDate.equals(today)) {
                 groupName = "Today";
@@ -91,21 +88,21 @@ public class ChatThreadService {
             } else {
                 groupName = "Older";
             }
-            
+
             groupedThreads.computeIfAbsent(groupName, k -> new ArrayList<>()).add(summaryDTO);
         }
-        
+
         // Convert to DTOs in the correct order, excluding empty groups
         List<ChatThreadGroupDTO> result = new ArrayList<>();
-        String[] groupOrder = {"Today", "Yesterday", "Last 7 Days", "Last 30 Days", "Last 90 Days", "Older"};
-        
+        String[] groupOrder = { "Today", "Yesterday", "Last 7 Days", "Last 30 Days", "Last 90 Days", "Older" };
+
         for (String groupName : groupOrder) {
             List<ChatThreadSummaryDTO> groupThreads = groupedThreads.get(groupName);
             if (groupThreads != null && !groupThreads.isEmpty()) {
                 result.add(new ChatThreadGroupDTO(groupName, groupThreads));
             }
         }
-        
+
         log.debug("Found {} thread groups for user: {}", result.size(), user.getLogin());
         return result;
     }
@@ -121,22 +118,22 @@ public class ChatThreadService {
     @Transactional(readOnly = true)
     public Optional<ChatThreadDetailDTO> getThreadDetailForUser(UUID threadId, User user) {
         log.debug("Getting thread detail {} for user: {}", threadId, user.getLogin());
-        
+
         // Fetch thread with messages first
         Optional<ChatThread> threadOpt = chatThreadRepository.findByIdAndUserWithMessages(threadId, user);
-        
+
         if (threadOpt.isEmpty()) {
             return Optional.empty();
         }
-        
+
         ChatThread thread = threadOpt.get();
-        
+
         // Force lazy loading of message parts for all messages within transaction
         for (ChatMessage message : thread.getAllMessages()) {
             // Force initialization of the parts collection
             var parts = message.getParts();
             parts.size(); // Trigger lazy loading
-            
+
             // Additionally, access each part to ensure they're fully loaded
             for (ChatMessagePart part : parts) {
                 // Access part properties to ensure they're loaded
@@ -145,13 +142,13 @@ public class ChatThreadService {
                 part.getOriginalType();
             }
         }
-        
+
         return Optional.of(convertToDetailDTO(thread));
     }
 
     /**
      * Check if a thread exists and is owned by the user.
-     * 
+     *
      * @param threadId the thread ID
      * @param user the authenticated user
      * @return true if thread exists and is owned by user
@@ -164,11 +161,7 @@ public class ChatThreadService {
      * Convert a ChatThread to a summary DTO.
      */
     private ChatThreadSummaryDTO convertToSummaryDTO(ChatThread thread) {
-        return new ChatThreadSummaryDTO(
-                thread.getId(),
-                thread.getTitle(),
-                thread.getCreatedAt()
-        );
+        return new ChatThreadSummaryDTO(thread.getId(), thread.getTitle(), thread.getCreatedAt());
     }
 
     /**
@@ -177,40 +170,40 @@ public class ChatThreadService {
     private ChatThreadDetailDTO convertToDetailDTO(ChatThread thread) {
         // Get the conversation path from the selected leaf message
         List<UIMessage> conversationPath = getConversationPathAsUIMessages(thread);
-        
+
         return new ChatThreadDetailDTO(
-                thread.getId(),
-                thread.getTitle(),
-                thread.getCreatedAt(),
-                conversationPath,
-                thread.getSelectedLeafMessage() != null ? thread.getSelectedLeafMessage().getId() : null
+            thread.getId(),
+            thread.getTitle(),
+            thread.getCreatedAt(),
+            conversationPath,
+            thread.getSelectedLeafMessage() != null ? thread.getSelectedLeafMessage().getId() : null
         );
     }
 
     /**
      * Extract the conversation path from the thread's selected leaf message as UIMessage objects.
      * Traverses the parent chain to build the full conversation history.
-     * 
+     *
      * @param thread The thread with eagerly loaded messages
      * @return List of UIMessage objects representing the conversation path for frontend consumption
      */
     private List<UIMessage> getConversationPathAsUIMessages(ChatThread thread) {
         List<UIMessage> messages = new ArrayList<>();
-        
+
         if (thread.getSelectedLeafMessage() == null) {
             log.debug("No selected leaf message for thread {}", thread.getId());
             return messages;
         }
-        
+
         // Build the path by traversing from leaf to root
         ChatMessage currentMessage = thread.getSelectedLeafMessage();
         List<ChatMessage> path = new ArrayList<>();
-        
+
         while (currentMessage != null) {
             path.add(0, currentMessage); // Add at beginning to maintain order
             currentMessage = currentMessage.getParentMessage();
         }
-        
+
         // Convert to UIMessage objects
         for (ChatMessage message : path) {
             try {
@@ -221,7 +214,7 @@ public class ChatThreadService {
                 // Continue with other messages rather than failing completely
             }
         }
-        
+
         log.debug("Built conversation path with {} messages for thread {}", messages.size(), thread.getId());
         return messages;
     }
