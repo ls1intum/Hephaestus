@@ -143,6 +143,11 @@ const chatThreadDetailSchemaResponseTransformer = (data: any) => {
     if (data.createdAt) {
         data.createdAt = new Date(data.createdAt);
     }
+    if (data.votes) {
+        data.votes = data.votes.map((item: any) => {
+            return chatMessageVoteSchemaResponseTransformer(item);
+        });
+    }
     return data;
 };
 

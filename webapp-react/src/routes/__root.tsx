@@ -159,6 +159,7 @@ function GlobalCopilot() {
 			<Chat
 				id={mentorChat.currentThreadId || mentorChat.id}
 				messages={mentorChat.messages as ChatMessage[]}
+				votes={mentorChat.votes}
 				status={mentorChat.status}
 				readonly={false}
 				attachments={[]}

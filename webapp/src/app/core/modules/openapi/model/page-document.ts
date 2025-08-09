@@ -17,11 +17,11 @@ import { Document } from './document';
 export interface PageDocument { 
     totalElements?: number;
     totalPages?: number;
+    numberOfElements?: number;
     pageable?: PageableObject;
     sort?: SortObject;
     first?: boolean;
     last?: boolean;
-    numberOfElements?: number;
     size?: number;
     content?: Array<Document>;
     number?: number;

@@ -63,7 +63,7 @@ public class ChatPersistenceService {
                 parent = null;
             }
         }
-    // If no explicit parent provided, start a new branch from root (no parent)
+        // If no explicit parent provided, start a new branch from root (no parent)
 
         // Persist single user message and link to parent explicitly
         ChatMessage parentMessage = persistUserMessage(chatRequest.message(), thread, parent);

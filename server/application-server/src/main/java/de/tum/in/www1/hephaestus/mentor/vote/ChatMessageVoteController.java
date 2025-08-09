@@ -1,5 +1,6 @@
 package de.tum.in.www1.hephaestus.mentor.vote;
 
+import de.tum.in.www1.hephaestus.SecurityUtils;
 import de.tum.in.www1.hephaestus.mentor.ChatMessageRepository;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
@@ -40,7 +41,7 @@ public class ChatMessageVoteController {
             @ApiResponse(responseCode = "404", description = "Message not found"),
         }
     )
-    @PatchMapping("/{messageId}/vote")
+    @PostMapping("/{messageId}/vote")
     public ResponseEntity<ChatMessageVoteDTO> voteMessage(
         @Parameter(description = "Message ID to vote on") @PathVariable UUID messageId,
         @Valid @RequestBody VoteMessageRequestDTO request
@@ -52,6 +53,22 @@ public class ChatMessageVoteController {
         if (messageOptional.isEmpty()) {
             logger.warn("Message not found: {}", messageId);
             return ResponseEntity.notFound().build();
+        }
+
+        // Authorization: only the owner of the thread may vote on their messages
+        try {
+            var currentUserLogin = SecurityUtils.getCurrentUserLoginOrThrow();
+            var message = messageOptional.get();
+            var ownerLogin = message.getThread() != null && message.getThread().getUser() != null
+                ? message.getThread().getUser().getLogin().toLowerCase()
+                : null;
+            if (ownerLogin == null || !ownerLogin.equals(currentUserLogin)) {
+                logger.warn("User {} attempted to vote on message {} not owned by them", currentUserLogin, messageId);
+                return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
+            }
+        } catch (Exception e) {
+            logger.error("Failed to resolve current user during vote: {}", e.getMessage());
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
         }
 
         try {

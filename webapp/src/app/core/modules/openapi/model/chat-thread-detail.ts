@@ -10,6 +10,7 @@
  * Do not edit the class manually.
  */
 import { UIMessage } from './ui-message';
+import { ChatMessageVote } from './chat-message-vote';
 
 
 /**
@@ -36,5 +37,9 @@ export interface ChatThreadDetail {
      * ID of the currently selected leaf message (end of active conversation path)
      */
     selectedLeafMessageId?: string;
+    /**
+     * Votes for messages in this thread
+     */
+    votes?: Array<ChatMessageVote>;
 }
 

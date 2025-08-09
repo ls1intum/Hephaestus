@@ -2,6 +2,8 @@ package de.tum.in.www1.hephaestus.mentor;
 
 import de.tum.in.www1.hephaestus.gitprovider.user.User;
 import de.tum.in.www1.hephaestus.intelligenceservice.model.UIMessage;
+import de.tum.in.www1.hephaestus.mentor.vote.ChatMessageVoteDTO;
+import de.tum.in.www1.hephaestus.mentor.vote.ChatMessageVoteService;
 import java.time.LocalDate;
 import java.time.ZoneId;
 import java.util.ArrayList;
@@ -27,6 +29,7 @@ public class ChatThreadService {
 
     private final ChatThreadRepository chatThreadRepository;
     private final ChatMessageRepository chatMessageRepository;
+    private final ChatMessageVoteService voteService;
 
     /**
      * Get thread summaries for a specific user.
@@ -158,13 +161,17 @@ public class ChatThreadService {
             return new ArrayList<>();
         }
         ChatMessage target = messageOpt.get();
-        if (target.getThread() == null || target.getThread().getUser() == null || !user.getId().equals(target.getThread().getUser().getId())) {
+        if (
+            target.getThread() == null ||
+            target.getThread().getUser() == null ||
+            !user.getId().equals(target.getThread().getUser().getId())
+        ) {
             // Not owned by user or invalid thread association
             return new ArrayList<>();
         }
 
-    // Use entity helper to get path from root to the target message
-    List<ChatMessage> path = target.getPathFromRoot();
+        // Use entity helper to get path from root to the target message
+        List<ChatMessage> path = target.getPathFromRoot();
 
         // Convert to UIMessage list
         List<UIMessage> result = new ArrayList<>();
@@ -202,13 +209,17 @@ public class ChatThreadService {
     private ChatThreadDetailDTO convertToDetailDTO(ChatThread thread) {
         // Get the conversation path from the selected leaf message
         List<UIMessage> conversationPath = getConversationPathAsUIMessages(thread);
+        // Load votes only for the conversation path to keep payload lean
+        List<UUID> pathMessageIds = getConversationPathMessageIds(thread);
+        var votes = pathMessageIds.isEmpty() ? List.<ChatMessageVoteDTO>of() : voteService.getVotes(pathMessageIds);
 
         return new ChatThreadDetailDTO(
             thread.getId(),
             thread.getTitle(),
             thread.getCreatedAt(),
             conversationPath,
-            thread.getSelectedLeafMessage() != null ? thread.getSelectedLeafMessage().getId() : null
+            thread.getSelectedLeafMessage() != null ? thread.getSelectedLeafMessage().getId() : null,
+            votes
         );
     }
 
@@ -249,5 +260,25 @@ public class ChatThreadService {
 
         log.debug("Built conversation path with {} messages for thread {}", messages.size(), thread.getId());
         return messages;
+    }
+
+    /**
+     * Extract the conversation path message IDs from the thread's selected leaf.
+     */
+    private List<UUID> getConversationPathMessageIds(ChatThread thread) {
+        List<UUID> ids = new ArrayList<>();
+        if (thread.getSelectedLeafMessage() == null) {
+            return ids;
+        }
+        ChatMessage currentMessage = thread.getSelectedLeafMessage();
+        List<ChatMessage> path = new ArrayList<>();
+        while (currentMessage != null) {
+            path.add(0, currentMessage);
+            currentMessage = currentMessage.getParentMessage();
+        }
+        for (ChatMessage message : path) {
+            ids.add(message.getId());
+        }
+        return ids;
     }
 }

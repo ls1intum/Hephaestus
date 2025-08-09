@@ -17,11 +17,11 @@ import { DocumentSummary } from './document-summary';
 export interface PageDocumentSummary { 
     totalElements?: number;
     totalPages?: number;
+    numberOfElements?: number;
     pageable?: PageableObject;
     sort?: SortObject;
     first?: boolean;
     last?: boolean;
-    numberOfElements?: number;
     size?: number;
     content?: Array<DocumentSummary>;
     number?: number;

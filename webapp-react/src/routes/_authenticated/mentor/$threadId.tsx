@@ -96,6 +96,7 @@ function ThreadContainer() {
 			<Chat
 				id={mentorChat.currentThreadId || threadId}
 				messages={mentorChat.messages as unknown as ChatMessage[]}
+				votes={mentorChat.votes}
 				status={mentorChat.status}
 				readonly={false}
 				attachments={[]} // Empty since attachments are disabled

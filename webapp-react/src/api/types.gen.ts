@@ -17,11 +17,11 @@ export type WeatherHourly = {
 export type PageDocument = {
     totalElements?: number;
     totalPages?: number;
+    numberOfElements?: number;
     pageable?: PageableObject;
     sort?: SortObject;
     first?: boolean;
     last?: boolean;
-    numberOfElements?: number;
     size?: number;
     content?: Array<Document>;
     number?: number;
@@ -458,6 +458,10 @@ export type ChatThreadDetail = {
      * ID of the currently selected leaf message (end of active conversation path)
      */
     selectedLeafMessageId?: string;
+    /**
+     * Votes for messages in this thread
+     */
+    votes?: Array<ChatMessageVote>;
 };
 
 export type PageableObject = {
@@ -711,11 +715,11 @@ export type UpdateDocumentInput = {
 export type PageDocumentSummary = {
     totalElements?: number;
     totalPages?: number;
+    numberOfElements?: number;
     pageable?: PageableObject;
     sort?: SortObject;
     first?: boolean;
     last?: boolean;
-    numberOfElements?: number;
     size?: number;
     content?: Array<DocumentSummary>;
     number?: number;
@@ -1291,6 +1295,40 @@ export type CreateDocumentResponses = {
 
 export type CreateDocumentResponse = CreateDocumentResponses[keyof CreateDocumentResponses];
 
+export type VoteMessageData = {
+    body: VoteMessageRequest;
+    path: {
+        /**
+         * Message ID to vote on
+         */
+        messageId: string;
+    };
+    query?: never;
+    url: '/api/chat/messages/{messageId}/vote';
+};
+
+export type VoteMessageErrors = {
+    /**
+     * Invalid vote type or message not found
+     */
+    400: ChatMessageVote;
+    /**
+     * Message not found
+     */
+    404: ChatMessageVote;
+};
+
+export type VoteMessageError = VoteMessageErrors[keyof VoteMessageErrors];
+
+export type VoteMessageResponses = {
+    /**
+     * Vote successfully recorded
+     */
+    200: ChatMessageVote;
+};
+
+export type VoteMessageResponse = VoteMessageResponses[keyof VoteMessageResponses];
+
 export type DetectBadPracticesByUserData = {
     body?: never;
     path: {
@@ -1356,40 +1394,6 @@ export type ProvideFeedbackForBadPracticeResponses = {
      */
     200: unknown;
 };
-
-export type VoteMessageData = {
-    body: VoteMessageRequest;
-    path: {
-        /**
-         * Message ID to vote on
-         */
-        messageId: string;
-    };
-    query?: never;
-    url: '/api/chat/messages/{messageId}/vote';
-};
-
-export type VoteMessageErrors = {
-    /**
-     * Invalid vote type or message not found
-     */
-    400: ChatMessageVote;
-    /**
-     * Message not found
-     */
-    404: ChatMessageVote;
-};
-
-export type VoteMessageError = VoteMessageErrors[keyof VoteMessageErrors];
-
-export type VoteMessageResponses = {
-    /**
-     * Vote successfully recorded
-     */
-    200: ChatMessageVote;
-};
-
-export type VoteMessageResponse = VoteMessageResponses[keyof VoteMessageResponses];
 
 export type GetUsersWithTeamsData = {
     body?: never;

@@ -35,19 +35,23 @@ public class ChatMessageVoteService {
         logger.debug("Processing vote for message: {} with vote: {}", messageId, isUpvoted);
 
         // Validate message exists
-        if (!messageRepository.existsById(messageId)) {
+        var messageOpt = messageRepository.findById(messageId);
+        if (messageOpt.isEmpty()) {
             throw new IllegalArgumentException("Message not found: " + messageId);
         }
-
-        // Upsert: find existing or create new
-        ChatMessageVote vote = voteRepository.findById(messageId).orElse(new ChatMessageVote(messageId, isUpvoted));
-
-        vote.setIsUpvoted(isUpvoted);
-
-        ChatMessageVote savedVote = voteRepository.save(vote);
+        // Update existing first
+        int updated = voteRepository.updateVote(messageId, Boolean.TRUE.equals(isUpvoted));
+        if (updated == 0) {
+            // Insert if absent, deriving thread_id from chat_message
+            voteRepository.insertVoteIfAbsent(messageId, Boolean.TRUE.equals(isUpvoted));
+        }
+        // Load and return
+        ChatMessageVote persisted = voteRepository
+            .findById(messageId)
+            .orElse(new ChatMessageVote(messageId, isUpvoted));
+        persisted.setIsUpvoted(isUpvoted);
         logger.debug("Saved vote for message: {} as {}", messageId, isUpvoted ? "upvote" : "downvote");
-
-        return ChatMessageVoteDTO.from(savedVote);
+        return ChatMessageVoteDTO.from(persisted);
     }
 
     /**

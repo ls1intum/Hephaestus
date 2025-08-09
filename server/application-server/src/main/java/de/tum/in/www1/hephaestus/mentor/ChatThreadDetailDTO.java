@@ -1,6 +1,7 @@
 package de.tum.in.www1.hephaestus.mentor;
 
 import de.tum.in.www1.hephaestus.intelligenceservice.model.UIMessage;
+import de.tum.in.www1.hephaestus.mentor.vote.ChatMessageVoteDTO;
 import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
@@ -42,4 +43,9 @@ public class ChatThreadDetailDTO {
      * ID of the currently selected leaf message (end of active conversation path)
      */
     private UUID selectedLeafMessageId;
+
+    /**
+     * Votes for messages in this thread
+     */
+    private List<ChatMessageVoteDTO> votes;
 }

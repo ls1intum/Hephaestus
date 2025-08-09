@@ -1,4 +1,5 @@
 import type { ChatMessage } from "@/lib/types";
+import type { ChatMessageVote } from "@/api/types.gen";
 import { useChat } from "@ai-sdk/react";
 import type { UseChatHelpers } from "@ai-sdk/react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -35,6 +36,7 @@ interface UseMentorChatReturn
 	isLoading: boolean;
 	currentThreadId: string | undefined;
 	voteMessage: (messageId: string, isUpvoted: boolean) => void;
+	votes: ChatMessageVote[];
 }
 
 export function useMentorChat({
@@ -68,6 +70,17 @@ export function useMentorChat({
 	// Vote message mutation
 	const voteMessageMut = useMutation(voteMessageMutation());
 
+	// Optimistic votes state: messageId -> isUpvoted
+	const [voteState, setVoteState] = useState<
+		Record<string, boolean | undefined>
+	>({});
+	const votes: ChatMessageVote[] = useMemo(() => {
+		return Object.entries(voteState).map(([messageId, isUpvoted]) => ({
+			messageId,
+			isUpvoted,
+		}));
+	}, [voteState]);
+
 	// Create stable transport configuration
 	const stableTransport = useMemo(
 		() =>
@@ -79,7 +92,8 @@ export function useMentorChat({
 					// Only send the latest message; backend reconstructs context from thread ID
 					const lastMessage = messages.at(-1);
 					// Determine previous message ID from current local state (selected leaf or last message)
-					const prev = messages.length > 1 ? messages[messages.length - 2]?.id : undefined;
+					const prev =
+						messages.length > 1 ? messages[messages.length - 2]?.id : undefined;
 					return {
 						body: {
 							id: effectiveId,
@@ -157,6 +171,27 @@ export function useMentorChat({
 		// eslint-disable-next-line react-hooks/exhaustive-deps
 	}, [threadId, threadDetail?.messages, status, setMessages]);
 
+	// Hydrate votes from server thread detail when available
+	const hydratedVotesRef = useRef<string | null>(null);
+	useEffect(() => {
+		if (!threadId) return; // only hydrate for existing threads
+		// We rely on the backend including votes in the thread detail DTO
+		const serverVotes = (
+			threadDetail as unknown as {
+				votes?: Array<{ messageId?: string; isUpvoted?: boolean }>;
+			}
+		)?.votes;
+		if (!serverVotes) return;
+		if (hydratedVotesRef.current === threadId) return;
+
+		const next: Record<string, boolean | undefined> = {};
+		for (const v of serverVotes) {
+			if (v?.messageId) next[v.messageId] = v.isUpvoted ?? undefined;
+		}
+		setVoteState(next);
+		hydratedVotesRef.current = threadId;
+	}, [threadId, threadDetail]);
+
 	// Send message function
 	const sendMessage = useCallback(
 		(text: string) => {
@@ -170,12 +205,35 @@ export function useMentorChat({
 	); // Vote message function
 	const voteMessage = useCallback(
 		(messageId: string, isUpvoted: boolean) => {
-			voteMessageMut.mutate({
-				path: { messageId },
-				body: { isUpvoted },
-			});
+			// Optimistically set local vote state
+			setVoteState((prev) => ({ ...prev, [messageId]: isUpvoted }));
+			voteMessageMut.mutate(
+				{
+					path: { messageId },
+					body: { isUpvoted },
+				},
+				{
+					onError: () => {
+						// Rollback optimistic update on error
+						setVoteState((prev) => {
+							const next = { ...prev };
+							delete next[messageId];
+							return next;
+						});
+					},
+					onSettled: () => {
+						if (threadId || stableThreadId) {
+							queryClient.invalidateQueries({
+								queryKey: getThreadQueryKey({
+									path: { threadId: threadId || stableThreadId || "" },
+								}),
+							});
+						}
+					},
+				},
+			);
 		},
-		[voteMessageMut],
+		[voteMessageMut, queryClient, threadId, stableThreadId],
 	);
 
 	// Compute loading states
@@ -210,6 +268,7 @@ export function useMentorChat({
 
 		// Voting
 		voteMessage,
+		votes,
 
 		// Loading state
 		isLoading,

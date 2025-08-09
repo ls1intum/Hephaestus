@@ -483,6 +483,46 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/Document"
+  /api/chat/messages/{messageId}/vote:
+    post:
+      tags:
+      - Chat Mes
+      summary: Vote on a message
+      description: Cast an upvote or downvote on a chat message
+      operationId: voteMessage
+      parameters:
+      - name: messageId
+        in: path
+        description: Message ID to vote on
+        required: true
+        schema:
+          type: string
+          format: uuid
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/VoteMessageRequest"
+        required: true
+      responses:
+        "200":
+          description: Vote successfully recorded
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ChatMessageVote"
+        "400":
+          description: Invalid vote type or message not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ChatMessageVote"
+        "404":
+          description: Message not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ChatMessageVote"
   /activity/user/{login}/badpractices:
     post:
       tags:
@@ -561,46 +601,6 @@ paths:
       responses:
         "200":
           description: OK
-  /api/chat/messages/{messageId}/vote:
-    patch:
-      tags:
-      - Chat Mes
-      summary: Vote on a message
-      description: Cast an upvote or downvote on a chat message
-      operationId: voteMessage
-      parameters:
-      - name: messageId
-        in: path
-        description: Message ID to vote on
-        required: true
-        schema:
-          type: string
-          format: uuid
-      requestBody:
-        content:
-          application/json:
-            schema:
-              $ref: "#/components/schemas/VoteMessageRequest"
-        required: true
-      responses:
-        "200":
-          description: Vote successfully recorded
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ChatMessageVote"
-        "400":
-          description: Invalid vote type or message not found
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ChatMessageVote"
-        "404":
-          description: Message not found
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ChatMessageVote"
   /workspace/users:
     get:
       tags:
@@ -979,6 +979,9 @@ components:
         totalPages:
           type: integer
           format: int32
+        numberOfElements:
+          type: integer
+          format: int32
         pageable:
           $ref: "#/components/schemas/PageableObject"
         sort:
@@ -987,9 +990,6 @@ components:
           type: boolean
         last:
           type: boolean
-        numberOfElements:
-          type: integer
-          format: int32
         size:
           type: integer
           format: int32
@@ -1618,6 +1618,11 @@ components:
           format: uuid
           description: ID of the currently selected leaf message (end of active conversation
             path)
+        votes:
+          type: array
+          description: Votes for messages in this thread
+          items:
+            $ref: "#/components/schemas/ChatMessageVote"
     PageableObject:
       type: object
       properties:
@@ -2005,6 +2010,9 @@ components:
         totalPages:
           type: integer
           format: int32
+        numberOfElements:
+          type: integer
+          format: int32
         pageable:
           $ref: "#/components/schemas/PageableObject"
         sort:
@@ -2013,9 +2021,6 @@ components:
           type: boolean
         last:
           type: boolean
-        numberOfElements:
-          type: integer
-          format: int32
         size:
           type: integer
           format: int32

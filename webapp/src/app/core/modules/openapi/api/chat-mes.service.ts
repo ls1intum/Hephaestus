@@ -162,7 +162,7 @@ export class ChatMesService implements ChatMesServiceInterface {
         }
 
         let localVarPath = `/api/chat/messages/${this.configuration.encodeParam({name: "messageId", value: messageId, in: "path", style: "simple", explode: false, dataType: "string", dataFormat: "uuid"})}/vote`;
-        return this.httpClient.request<ChatMessageVote>('patch', `${this.configuration.basePath}${localVarPath}`,
+        return this.httpClient.request<ChatMessageVote>('post', `${this.configuration.basePath}${localVarPath}`,
             {
                 context: localVarHttpContext,
                 body: voteMessageRequest,
