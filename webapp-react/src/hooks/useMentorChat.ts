@@ -1,5 +1,5 @@
-import type { ChatMessage } from "@/lib/types";
 import type { ChatMessageVote } from "@/api/types.gen";
+import type { ChatMessage } from "@/lib/types";
 import { useChat } from "@ai-sdk/react";
 import type { UseChatHelpers } from "@ai-sdk/react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -166,6 +166,7 @@ export function useMentorChat({
 		if (status === "streaming" || status === "submitted") return;
 
 		// Replace the local chat state with server messages
+		// No transformation needed since backend now uses direct JsonNode objects
 		setMessages(threadDetail.messages as unknown as ChatMessage[]);
 		hydratedRef.current = threadId;
 		// eslint-disable-next-line react-hooks/exhaustive-deps
@@ -242,6 +243,8 @@ export function useMentorChat({
 		(status === "streaming" && messages.length === 0) ||
 		(!!threadId && isThreadLoading);
 
+	console.log("messages:", messages);
+	
 	// Return object without memoization to avoid dependency issues
 	const result = {
 		// Core chat functionality

@@ -87,13 +87,9 @@ public class ChatControllerIT extends BaseIntegrationTest {
      * For backward compatibility during the test migration period.
      */
     private String extractTextContent(ChatMessagePart part) {
-        if (part.getType() == ChatMessagePart.PartType.TEXT) {
+        if (part.getType() == ChatMessagePart.PartType.TEXT || part.getType() == ChatMessagePart.PartType.REASONING) {
             var uiPart = part.toUIMessagePart();
             return uiPart.getText();
-        } else if (part.getType() == ChatMessagePart.PartType.REASONING) {
-            // For reasoning parts, the content might be stored differently
-            // Let's try to convert and extract appropriately
-            return part.getContent().asText();
         } else {
             // For non-text parts, fallback to raw content
             return part.getContent().asText();
@@ -322,7 +318,7 @@ public class ChatControllerIT extends BaseIntegrationTest {
 
         // Verify reasoning part
         assertThat(parts.get(1).getType()).isEqualTo(ChatMessagePart.PartType.REASONING);
-        assertThat(parts.get(1).getContent().asText()).isEqualTo(
+        assertThat(extractTextContent(parts.get(1))).isEqualTo(
             "Let me think about this step by step. First, I need to analyze the problem. Then I'll provide a solution."
         );
 
@@ -666,7 +662,7 @@ public class ChatControllerIT extends BaseIntegrationTest {
 
         // Verify part: 1 - reasoning
         assertThat(parts.get(1).getType()).isEqualTo(ChatMessagePart.PartType.REASONING);
-        assertThat(parts.get(1).getContent().asText()).isEqualTo(
+        assertThat(extractTextContent(parts.get(1))).isEqualTo(
             "I need to search for information related to the user's query."
         );
 

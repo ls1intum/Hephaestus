@@ -37,25 +37,66 @@ public class OpenAPIConfiguration {
     private static final Logger logger = LoggerFactory.getLogger(OpenAPIConfiguration.class);
 
     /**
-     * List of intelligence service model names that should be imported from the intelligence service OpenAPI spec
-     * and should preserve their DTO suffix in schema references.
+     * Auto-discover intelligence service model names from the OpenAPI spec.
+     * This automatically includes all UI parts and tool input/output models.
      */
-    private static final List<String> INTELLIGENCE_SERVICE_MODELS = List.of(
-        "UIMessage",
-        "UIMessagePart",
-        "TextUIPart",
-        "ReasoningUIPart",
-        "ToolInputStreamingPart",
-        "ToolInputAvailablePart",
-        "ToolOutputAvailablePart",
-        "ToolOutputErrorPart",
-        "SourceUrlUIPart",
-        "SourceDocumentUIPart",
-        "FileUIPart",
-        "DataUIPart",
-        "StepStartUIPart"
-        // Nested tool input / output schemas are automatically included
-    );
+    private Set<String> discoverIntelligenceServiceModels(Map<String, Schema<?>> allSchemas) {
+        Set<String> discoveredModels = new HashSet<>();
+        
+        for (Map.Entry<String, Schema<?>> entry : allSchemas.entrySet()) {
+            String schemaName = entry.getKey();
+            Schema<?> schema = entry.getValue();
+            
+            // Auto-discover UI parts (models ending with "UIPart" or "Part")
+            if (schemaName.endsWith("UIPart") || 
+                schemaName.endsWith("Part") ||
+                schemaName.equals("UIMessage") ||
+                schemaName.equals("UIMessagePart")) {
+                discoveredModels.add(schemaName);
+                continue;
+            }
+            
+            // Auto-discover tool models by checking for our custom tag
+            if (isToolModelByTag(schema)) {
+                discoveredModels.add(schemaName);
+            }
+        }
+        
+        logger.info("Auto-discovered {} intelligence service models: {}", 
+                   discoveredModels.size(), 
+                   discoveredModels.stream().sorted().collect(Collectors.joining(", ")));
+        
+        return discoveredModels;
+    }
+    
+    /**
+     * Check if a schema is tagged as a tool model by the intelligence service.
+     * This is much cleaner than analyzing schema content.
+     */
+    private boolean isToolModelByTag(Schema<?> schema) {
+        if (schema == null || schema.getExtensions() == null) {
+            return false;
+        }
+        
+        // Check for our custom tag
+        Object toolModelTag = schema.getExtensions().get("x-hephaestus-tool-model");
+        return Boolean.TRUE.equals(toolModelTag);
+    }
+    
+    /**
+     * Check if a schema name represents an intelligence service model.
+     * This is used for preserving DTO suffixes in schema references.
+     */
+    private boolean isIntelligenceServiceModel(String schemaName) {
+        // Intelligence service model patterns - these should preserve their references
+        return schemaName.endsWith("UIPart") || 
+               schemaName.endsWith("Part") ||
+               schemaName.equals("UIMessage") ||
+               schemaName.equals("UIMessagePart") ||
+               // All tool models (they will have the tag, but we can identify by name pattern too)
+               schemaName.endsWith("Input") ||
+               schemaName.endsWith("Output");
+    }
 
     /**
      * List of domain object names that should be included in the schema even though they don't end with DTO.
@@ -212,8 +253,8 @@ public class OpenAPIConfiguration {
                         .getComponents()
                         .getSchemas();
 
-                    // Seed with explicitly requested models, then include all referenced schemas recursively
-                    Set<String> toInclude = new LinkedHashSet<>(INTELLIGENCE_SERVICE_MODELS);
+                    // Auto-discover intelligence service models instead of hardcoding them
+                    Set<String> toInclude = discoverIntelligenceServiceModels(allSchemas);
                     Set<String> visited = new HashSet<>();
 
                     for (String name : new LinkedHashSet<>(toInclude)) {
@@ -324,9 +365,9 @@ public class OpenAPIConfiguration {
             String originalRef = schema.get$ref();
             String schemaName = originalRef.substring(originalRef.lastIndexOf("/") + 1);
 
-            // Check if this is an intelligence service model (without DTO suffix)
+            // Check if this is an intelligence service model by checking naming patterns
             String nameWithoutDTO = schemaName.substring(0, schemaName.length() - 3);
-            if (INTELLIGENCE_SERVICE_MODELS.contains(nameWithoutDTO)) {
+            if (isIntelligenceServiceModel(nameWithoutDTO)) {
                 // Keep the original reference with DTO suffix for intelligence service models
                 logger.debug("Preserving intelligence service model reference: {}", originalRef);
             } else {

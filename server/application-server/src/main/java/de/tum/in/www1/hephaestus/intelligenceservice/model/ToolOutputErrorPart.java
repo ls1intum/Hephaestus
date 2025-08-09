@@ -20,7 +20,6 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonTypeName;
 import com.fasterxml.jackson.annotation.JsonValue;
-import de.tum.in.www1.hephaestus.intelligenceservice.model.Input;
 import org.openapitools.jackson.nullable.JsonNullable;
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import org.openapitools.jackson.nullable.JsonNullable;
@@ -46,7 +45,7 @@ public class ToolOutputErrorPart {
   private String errorText;
 
   public static final String JSON_PROPERTY_INPUT = "input";
-  private Input input;
+  private Object input;
 
   public static final String JSON_PROPERTY_PROVIDER_EXECUTED = "providerExecuted";
   private JsonNullable<Boolean> providerExecuted = JsonNullable.<Boolean>undefined();
@@ -88,7 +87,7 @@ public class ToolOutputErrorPart {
     this.errorText = errorText;
   }
 
-  public ToolOutputErrorPart input(Input input) {
+  public ToolOutputErrorPart input(Object input) {
     
     this.input = input;
     return this;
@@ -102,14 +101,14 @@ public class ToolOutputErrorPart {
   @JsonProperty(JSON_PROPERTY_INPUT)
   @JsonInclude(value = JsonInclude.Include.ALWAYS)
 
-  public Input getInput() {
+  public Object getInput() {
     return input;
   }
 
 
   @JsonProperty(JSON_PROPERTY_INPUT)
   @JsonInclude(value = JsonInclude.Include.ALWAYS)
-  public void setInput(Input input) {
+  public void setInput(Object input) {
     this.input = input;
   }
 

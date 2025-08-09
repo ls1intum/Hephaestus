@@ -3,8 +3,6 @@ package de.tum.in.www1.hephaestus.mentor;
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import de.tum.in.www1.hephaestus.intelligenceservice.model.Input;
-import de.tum.in.www1.hephaestus.intelligenceservice.model.Output;
 import de.tum.in.www1.hephaestus.intelligenceservice.model.UIMessagePartsInner;
 import io.hypersistence.utils.hibernate.type.json.JsonType;
 import jakarta.persistence.*;
@@ -244,6 +242,9 @@ public class ChatMessagePart {
                 // For text and reasoning parts
                 if (content.has("text")) {
                     uiPart.setText(content.get("text").asText());
+                } else if (content.isTextual()) {
+                    // Fallback for legacy records where content was stored as a plain string
+                    uiPart.setText(content.asText());
                 }
                 uiPart.setState(null); // Clear default state for text/reasoning parts
             } else if (type == PartType.TOOL) {
@@ -259,103 +260,68 @@ public class ChatMessagePart {
                 }
 
                 // Handle fields based on the specific tool state to match Python model requirements
+                ObjectMapper mapper = new ObjectMapper();
                 if ("input-streaming".equals(toolState)) {
                     // ToolInputStreamingPart: input (optional), providerExecuted (optional)
                     if (content.has("input") && !content.get("input").isNull()) {
-                        try {
-                            ObjectMapper mapper = new ObjectMapper();
-                            Input inputValue = mapper.treeToValue(content.get("input"), Input.class);
-                            uiPart.setInput(inputValue);
-                        } catch (Exception e) {
-                            // Keep input as null for input-streaming if conversion fails
-                        }
+                        // Store the input directly as JsonNode - now works with Object type
+                        uiPart.setInput(content.get("input"));
                     }
                 } else if ("input-available".equals(toolState)) {
                     // ToolInputAvailablePart: input (required), providerExecuted (optional)
-                    Input inputValue = null;
+                    JsonNode inputValue;
                     if (content.has("args") && !content.get("args").isNull()) {
-                        try {
-                            ObjectMapper mapper = new ObjectMapper();
-                            inputValue = mapper.treeToValue(content.get("args"), Input.class);
-                        } catch (Exception e) {
-                            inputValue = new Input();
-                        }
+                        inputValue = content.get("args");
                     } else if (content.has("input") && !content.get("input").isNull()) {
-                        try {
-                            ObjectMapper mapper = new ObjectMapper();
-                            inputValue = mapper.treeToValue(content.get("input"), Input.class);
-                        } catch (Exception e) {
-                            inputValue = new Input();
-                        }
+                        inputValue = content.get("input");
                     } else {
-                        inputValue = new Input(); // Required field
+                        inputValue = mapper.createObjectNode(); // Empty object for required field
                     }
                     uiPart.setInput(inputValue);
-                } else if ("output-available".equals(toolState)) {
+                } else if ("call".equals(toolState) || "partial-call".equals(toolState)) {
+                    // Map args -> input for call and partial-call states
+                    JsonNode inputValue;
+                    if (content.has("args") && !content.get("args").isNull()) {
+                        inputValue = content.get("args");
+                    } else {
+                        inputValue = mapper.createObjectNode(); // Empty object
+                    }
+                    uiPart.setInput(inputValue);
+                } else if ("output-available".equals(toolState) || "result".equals(toolState)) {
                     // ToolOutputAvailablePart: input (required), output (required), providerExecuted (optional)
 
                     // Handle required input field
-                    Input inputValue = null;
+                    JsonNode inputValue;
                     if (content.has("args") && !content.get("args").isNull()) {
-                        try {
-                            ObjectMapper mapper = new ObjectMapper();
-                            inputValue = mapper.treeToValue(content.get("args"), Input.class);
-                        } catch (Exception e) {
-                            inputValue = new Input();
-                        }
+                        inputValue = content.get("args");
                     } else if (content.has("input") && !content.get("input").isNull()) {
-                        try {
-                            ObjectMapper mapper = new ObjectMapper();
-                            inputValue = mapper.treeToValue(content.get("input"), Input.class);
-                        } catch (Exception e) {
-                            inputValue = new Input();
-                        }
+                        inputValue = content.get("input");
                     } else {
-                        inputValue = new Input(); // Required field
+                        inputValue = mapper.createObjectNode(); // Empty object for required field
                     }
                     uiPart.setInput(inputValue);
 
                     // Handle required output field
-                    Output outputValue = null;
+                    JsonNode outputValue;
                     if (content.has("result") && !content.get("result").isNull()) {
-                        try {
-                            ObjectMapper mapper = new ObjectMapper();
-                            outputValue = mapper.treeToValue(content.get("result"), Output.class);
-                        } catch (Exception e) {
-                            outputValue = new Output();
-                        }
+                        outputValue = content.get("result");
                     } else if (content.has("output") && !content.get("output").isNull()) {
-                        try {
-                            ObjectMapper mapper = new ObjectMapper();
-                            outputValue = mapper.treeToValue(content.get("output"), Output.class);
-                        } catch (Exception e) {
-                            outputValue = new Output();
-                        }
+                        outputValue = content.get("output");
                     } else {
-                        outputValue = new Output(); // Required field
+                        outputValue = mapper.createObjectNode(); // Empty object for required field
                     }
                     uiPart.setOutput(outputValue);
                 } else if ("output-error".equals(toolState)) {
                     // ToolOutputErrorPart: input (required), errorText (required), providerExecuted (optional)
 
                     // Handle required input field
-                    Input inputValue = null;
+                    JsonNode inputValue;
                     if (content.has("args") && !content.get("args").isNull()) {
-                        try {
-                            ObjectMapper mapper = new ObjectMapper();
-                            inputValue = mapper.treeToValue(content.get("args"), Input.class);
-                        } catch (Exception e) {
-                            inputValue = new Input();
-                        }
+                        inputValue = content.get("args");
                     } else if (content.has("input") && !content.get("input").isNull()) {
-                        try {
-                            ObjectMapper mapper = new ObjectMapper();
-                            inputValue = mapper.treeToValue(content.get("input"), Input.class);
-                        } catch (Exception e) {
-                            inputValue = new Input();
-                        }
+                        inputValue = content.get("input");
                     } else {
-                        inputValue = new Input(); // Required field
+                        inputValue = mapper.createObjectNode(); // Empty object for required field
                     }
                     uiPart.setInput(inputValue);
 

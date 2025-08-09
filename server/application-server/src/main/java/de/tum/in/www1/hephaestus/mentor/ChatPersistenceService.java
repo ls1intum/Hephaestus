@@ -139,6 +139,11 @@ public class ChatPersistenceService {
                 structuredContent.put("type", "text");
                 structuredContent.put("text", initialContent);
                 part.setContent(structuredContent);
+            } else if (type == ChatMessagePart.PartType.REASONING) {
+                var structuredContent = objectMapper.createObjectNode();
+                structuredContent.put("type", "reasoning");
+                structuredContent.put("text", initialContent);
+                part.setContent(structuredContent);
             } else {
                 // For non-text parts, store as simple string initially
                 part.setContent(objectMapper.valueToTree(initialContent));
@@ -781,8 +786,16 @@ public class ChatPersistenceService {
                 // Accumulate delta
                 buffer.append(reasoningDeltaPart.getDelta());
 
-                // Update the database part with current accumulated content
-                reasoningPart.setContent(objectMapper.valueToTree(buffer.toString()));
+                // Update the database part with current accumulated content in structured form
+                com.fasterxml.jackson.databind.node.ObjectNode structured;
+                if (reasoningPart.getContent() != null && reasoningPart.getContent().isObject()) {
+                    structured = (com.fasterxml.jackson.databind.node.ObjectNode) reasoningPart.getContent();
+                } else {
+                    structured = objectMapper.createObjectNode();
+                    structured.put("type", "reasoning");
+                }
+                structured.put("text", buffer.toString());
+                reasoningPart.setContent(structured);
                 chatMessagePartRepository.save(reasoningPart);
             } catch (Exception e) {
                 logger.error("Failed to process reasoning delta: {}", e.getMessage(), e);

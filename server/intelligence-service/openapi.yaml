@@ -31,6 +31,39 @@ components:
       - Wrong
       title: BadPracticeStatus
       type: string
+    BaseDocumentOutput:
+      description: Base output payload returned by document tools.
+      properties:
+        content:
+          title: Content
+          type: string
+        createdAt:
+          format: date-time
+          title: Createdat
+          type: string
+        id:
+          title: Id
+          type: string
+        kind:
+          const: TEXT
+          title: Kind
+          type: string
+        title:
+          title: Title
+          type: string
+        userId:
+          title: Userid
+          type: string
+      required:
+      - id
+      - createdAt
+      - title
+      - content
+      - kind
+      - userId
+      title: BaseDocumentOutput
+      type: object
+      x-hephaestus-tool-model: true
     ChatRequest:
       description: Chat request model.
       properties:
@@ -101,6 +134,7 @@ components:
       - kind
       title: CreateDocumentInput
       type: object
+      x-hephaestus-tool-model: true
     CreateDocumentOutput:
       description: Output for createDocument tool.
       properties:
@@ -133,6 +167,7 @@ components:
       - userId
       title: CreateDocumentOutput
       type: object
+      x-hephaestus-tool-model: true
     DataUIPart:
       description: A data part with dynamic type.
       properties:
@@ -249,6 +284,7 @@ components:
       - longitude
       title: GetWeatherInput
       type: object
+      x-hephaestus-tool-model: true
     GetWeatherOutput:
       description: Output for getWeather tool, aligned with WeatherTool.tsx expectations.
       properties:
@@ -256,63 +292,77 @@ components:
           anyOf:
           - $ref: '#/components/schemas/WeatherCurrent'
           - type: 'null'
+          default: null
         current_units:
           anyOf:
           - $ref: '#/components/schemas/WeatherCurrentUnits'
           - type: 'null'
+          default: null
         daily:
           anyOf:
           - $ref: '#/components/schemas/WeatherDaily'
           - type: 'null'
+          default: null
         daily_units:
           anyOf:
           - $ref: '#/components/schemas/WeatherDailyUnits'
           - type: 'null'
+          default: null
         elevation:
           anyOf:
           - type: number
           - type: 'null'
+          default: null
           title: Elevation
         generationtime_ms:
           anyOf:
           - type: number
           - type: 'null'
+          default: null
           title: Generationtime Ms
         hourly:
           anyOf:
           - $ref: '#/components/schemas/WeatherHourly'
           - type: 'null'
+          default: null
         hourly_units:
           anyOf:
           - $ref: '#/components/schemas/WeatherHourlyUnits'
           - type: 'null'
+          default: null
         latitude:
           anyOf:
           - type: number
           - type: 'null'
+          default: null
           title: Latitude
         longitude:
           anyOf:
           - type: number
           - type: 'null'
+          default: null
           title: Longitude
         timezone:
           anyOf:
           - type: string
           - type: 'null'
+          default: null
           title: Timezone
         timezone_abbreviation:
           anyOf:
           - type: string
           - type: 'null'
+          default: null
           title: Timezone Abbreviation
         utc_offset_seconds:
           anyOf:
           - type: integer
           - type: 'null'
+          default: null
           title: Utc Offset Seconds
       title: GetWeatherOutput
       type: object
+      x-hephaestus-tool-model: true
     HTTPValidationError:
       properties:
         detail:
@@ -877,11 +927,8 @@ components:
       description: Tool part with input available.
       properties:
         input:
-          anyOf:
-          - $ref: '#/components/schemas/CreateDocumentInput'
-          - $ref: '#/components/schemas/UpdateDocumentInput'
-          - $ref: '#/components/schemas/GetWeatherInput'
           title: Input
+          type: object
         providerExecuted:
           anyOf:
           - type: boolean
@@ -910,9 +957,7 @@ components:
       properties:
         input:
           anyOf:
-          - $ref: '#/components/schemas/CreateDocumentInput'
-          - $ref: '#/components/schemas/UpdateDocumentInput'
-          - $ref: '#/components/schemas/GetWeatherInput'
+          - type: object
           - type: 'null'
           title: Input
         providerExecuted:
@@ -941,17 +986,11 @@ components:
       description: Tool part with output available.
       properties:
         input:
-          anyOf:
-          - $ref: '#/components/schemas/CreateDocumentInput'
-          - $ref: '#/components/schemas/UpdateDocumentInput'
-          - $ref: '#/components/schemas/GetWeatherInput'
           title: Input
+          type: object
         output:
-          anyOf:
-          - $ref: '#/components/schemas/CreateDocumentOutput'
-          - $ref: '#/components/schemas/UpdateDocumentOutput'
-          - $ref: '#/components/schemas/GetWeatherOutput'
           title: Output
+          type: object
         providerExecuted:
           anyOf:
           - type: boolean
@@ -983,11 +1022,8 @@ components:
           title: Errortext
           type: string
         input:
-          anyOf:
-          - $ref: '#/components/schemas/CreateDocumentInput'
-          - $ref: '#/components/schemas/UpdateDocumentInput'
-          - $ref: '#/components/schemas/GetWeatherInput'
           title: Input
+          type: object
         providerExecuted:
           anyOf:
           - type: boolean
@@ -1076,6 +1112,7 @@ components:
       - kind
       title: UpdateDocumentInput
       type: object
+      x-hephaestus-tool-model: true
     UpdateDocumentOutput:
       description: Output for updateDocument tool.
       properties:
@@ -1108,6 +1145,7 @@ components:
       - userId
       title: UpdateDocumentOutput
       type: object
+      x-hephaestus-tool-model: true
     ValidationError:
       properties:
         loc:
@@ -1135,16 +1173,19 @@ components:
           anyOf:
           - type: integer
           - type: 'null'
+          default: null
           title: Interval
         temperature_2m:
           anyOf:
           - type: number
           - type: 'null'
+          default: null
           title: Temperature 2M
         time:
           anyOf:
           - type: string
           - type: 'null'
+          default: null
           title: Time
       title: WeatherCurrent
       type: object
@@ -1154,16 +1195,19 @@ components:
           anyOf:
           - type: string
           - type: 'null'
+          default: null
           title: Interval
         temperature_2m:
           anyOf:
           - type: string
           - type: 'null'
+          default: null
           title: Temperature 2M
         time:
           anyOf:
           - type: string
           - type: 'null'
+          default: null
           title: Time
       title: WeatherCurrentUnits
       type: object
@@ -1195,16 +1239,19 @@ components:
           anyOf:
           - type: string
           - type: 'null'
+          default: null
           title: Sunrise
         sunset:
           anyOf:
           - type: string
           - type: 'null'
+          default: null
           title: Sunset
         time:
           anyOf:
           - type: string
           - type: 'null'
+          default: null
           title: Time
       title: WeatherDailyUnits
       type: object
@@ -1230,11 +1277,13 @@ components:
           anyOf:
           - type: string
           - type: 'null'
+          default: null
           title: Temperature 2M
         time:
           anyOf:
           - type: string
           - type: 'null'
+          default: null
           title: Time
       title: WeatherHourlyUnits
       type: object

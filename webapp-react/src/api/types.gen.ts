@@ -17,11 +17,11 @@ export type WeatherHourly = {
 export type PageDocument = {
     totalElements?: number;
     totalPages?: number;
-    numberOfElements?: number;
     pageable?: PageableObject;
     sort?: SortObject;
     first?: boolean;
     last?: boolean;
+    numberOfElements?: number;
     size?: number;
     content?: Array<Document>;
     number?: number;
@@ -265,7 +265,9 @@ export type ToolOutputErrorPart = {
     /**
      * Input
      */
-    input: CreateDocumentInput | UpdateDocumentInput | GetWeatherInput;
+    input: {
+        [key: string]: unknown;
+    };
     /**
      * Providerexecuted
      */
@@ -413,7 +415,9 @@ export type ToolInputAvailablePart = {
     /**
      * Input
      */
-    input: CreateDocumentInput | UpdateDocumentInput | GetWeatherInput;
+    input: {
+        [key: string]: unknown;
+    };
     /**
      * Providerexecuted
      */
@@ -715,11 +719,11 @@ export type UpdateDocumentInput = {
 export type PageDocumentSummary = {
     totalElements?: number;
     totalPages?: number;
-    numberOfElements?: number;
     pageable?: PageableObject;
     sort?: SortObject;
     first?: boolean;
     last?: boolean;
+    numberOfElements?: number;
     size?: number;
     content?: Array<DocumentSummary>;
     number?: number;
@@ -747,7 +751,9 @@ export type ToolInputStreamingPart = {
     /**
      * Input
      */
-    input?: CreateDocumentInput | UpdateDocumentInput | GetWeatherInput | null;
+    input?: {
+        [key: string]: unknown;
+    } | null;
     /**
      * Providerexecuted
      */
@@ -807,11 +813,15 @@ export type ToolOutputAvailablePart = {
     /**
      * Input
      */
-    input: CreateDocumentInput | UpdateDocumentInput | GetWeatherInput;
+    input: {
+        [key: string]: unknown;
+    };
     /**
      * Output
      */
-    output: CreateDocumentOutput | UpdateDocumentOutput | GetWeatherOutput;
+    output: {
+        [key: string]: unknown;
+    };
     /**
      * Providerexecuted
      */

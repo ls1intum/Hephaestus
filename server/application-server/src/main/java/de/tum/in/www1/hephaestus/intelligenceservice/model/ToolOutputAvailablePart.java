@@ -20,8 +20,6 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonTypeName;
 import com.fasterxml.jackson.annotation.JsonValue;
-import de.tum.in.www1.hephaestus.intelligenceservice.model.Input;
-import de.tum.in.www1.hephaestus.intelligenceservice.model.Output;
 import org.openapitools.jackson.nullable.JsonNullable;
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import org.openapitools.jackson.nullable.JsonNullable;
@@ -44,10 +42,10 @@ import org.hibernate.validator.constraints.*;
 @jakarta.annotation.Generated(value = "org.openapitools.codegen.languages.JavaClientCodegen", comments = "Generator version: 7.7.0")
 public class ToolOutputAvailablePart {
   public static final String JSON_PROPERTY_INPUT = "input";
-  private Input input;
+  private Object input;
 
   public static final String JSON_PROPERTY_OUTPUT = "output";
-  private Output output;
+  private Object output;
 
   public static final String JSON_PROPERTY_PROVIDER_EXECUTED = "providerExecuted";
   private JsonNullable<Boolean> providerExecuted = JsonNullable.<Boolean>undefined();
@@ -64,7 +62,7 @@ public class ToolOutputAvailablePart {
   public ToolOutputAvailablePart() {
   }
 
-  public ToolOutputAvailablePart input(Input input) {
+  public ToolOutputAvailablePart input(Object input) {
     
     this.input = input;
     return this;
@@ -78,18 +76,18 @@ public class ToolOutputAvailablePart {
   @JsonProperty(JSON_PROPERTY_INPUT)
   @JsonInclude(value = JsonInclude.Include.ALWAYS)
 
-  public Input getInput() {
+  public Object getInput() {
     return input;
   }
 
 
   @JsonProperty(JSON_PROPERTY_INPUT)
   @JsonInclude(value = JsonInclude.Include.ALWAYS)
-  public void setInput(Input input) {
+  public void setInput(Object input) {
     this.input = input;
   }
 
-  public ToolOutputAvailablePart output(Output output) {
+  public ToolOutputAvailablePart output(Object output) {
     
     this.output = output;
     return this;
@@ -103,14 +101,14 @@ public class ToolOutputAvailablePart {
   @JsonProperty(JSON_PROPERTY_OUTPUT)
   @JsonInclude(value = JsonInclude.Include.ALWAYS)
 
-  public Output getOutput() {
+  public Object getOutput() {
     return output;
   }
 
 
   @JsonProperty(JSON_PROPERTY_OUTPUT)
   @JsonInclude(value = JsonInclude.Include.ALWAYS)
-  public void setOutput(Output output) {
+  public void setOutput(Object output) {
     this.output = output;
   }
 

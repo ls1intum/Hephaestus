@@ -22,8 +22,6 @@ import com.fasterxml.jackson.annotation.JsonTypeName;
 import com.fasterxml.jackson.annotation.JsonValue;
 import de.tum.in.www1.hephaestus.intelligenceservice.model.DataUIPart;
 import de.tum.in.www1.hephaestus.intelligenceservice.model.FileUIPart;
-import de.tum.in.www1.hephaestus.intelligenceservice.model.Input;
-import de.tum.in.www1.hephaestus.intelligenceservice.model.Output;
 import de.tum.in.www1.hephaestus.intelligenceservice.model.ReasoningUIPart;
 import de.tum.in.www1.hephaestus.intelligenceservice.model.SourceDocumentUIPart;
 import de.tum.in.www1.hephaestus.intelligenceservice.model.SourceUrlUIPart;
@@ -74,7 +72,7 @@ public class UIMessagePartsInner {
   private Object providerMetadata;
 
   public static final String JSON_PROPERTY_INPUT = "input";
-  private Input input;
+  private Object input;
 
   public static final String JSON_PROPERTY_PROVIDER_EXECUTED = "providerExecuted";
   private Boolean providerExecuted;
@@ -83,7 +81,7 @@ public class UIMessagePartsInner {
   private String toolCallId;
 
   public static final String JSON_PROPERTY_OUTPUT = "output";
-  private Output output;
+  private Object output;
 
   public static final String JSON_PROPERTY_ERROR_TEXT = "errorText";
   private String errorText;
@@ -212,7 +210,7 @@ public class UIMessagePartsInner {
     this.providerMetadata = providerMetadata;
   }
 
-  public UIMessagePartsInner input(Input input) {
+  public UIMessagePartsInner input(Object input) {
     
     this.input = input;
     return this;
@@ -226,14 +224,14 @@ public class UIMessagePartsInner {
   @JsonProperty(JSON_PROPERTY_INPUT)
   @JsonInclude(value = JsonInclude.Include.ALWAYS)
 
-  public Input getInput() {
+  public Object getInput() {
     return input;
   }
 
 
   @JsonProperty(JSON_PROPERTY_INPUT)
   @JsonInclude(value = JsonInclude.Include.ALWAYS)
-  public void setInput(Input input) {
+  public void setInput(Object input) {
     this.input = input;
   }
 
@@ -287,7 +285,7 @@ public class UIMessagePartsInner {
     this.toolCallId = toolCallId;
   }
 
-  public UIMessagePartsInner output(Output output) {
+  public UIMessagePartsInner output(Object output) {
     
     this.output = output;
     return this;
@@ -301,14 +299,14 @@ public class UIMessagePartsInner {
   @JsonProperty(JSON_PROPERTY_OUTPUT)
   @JsonInclude(value = JsonInclude.Include.ALWAYS)
 
-  public Output getOutput() {
+  public Object getOutput() {
     return output;
   }
 
 
   @JsonProperty(JSON_PROPERTY_OUTPUT)
   @JsonInclude(value = JsonInclude.Include.ALWAYS)
-  public void setOutput(Output output) {
+  public void setOutput(Object output) {
     this.output = output;
   }
 

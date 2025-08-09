@@ -83,7 +83,7 @@ class ToolInputStreamingPart(ToolPartBase):
     """Tool part with input being streamed."""
 
     state: Literal["input-streaming"]
-    input: Optional[ToolInputUnion] = None
+    input: Optional[Dict[str, Any]] = None
     providerExecuted: Optional[bool] = None
 
 
@@ -91,7 +91,7 @@ class ToolInputAvailablePart(ToolPartBase):
     """Tool part with input available."""
 
     state: Literal["input-available"]
-    input: ToolInputUnion
+    input: Dict[str, Any]
     providerExecuted: Optional[bool] = None
 
 
@@ -99,8 +99,8 @@ class ToolOutputAvailablePart(ToolPartBase):
     """Tool part with output available."""
 
     state: Literal["output-available"]
-    input: ToolInputUnion
-    output: ToolOutputUnion
+    input: Dict[str, Any]
+    output: Dict[str, Any]
     providerExecuted: Optional[bool] = None
 
 
@@ -108,7 +108,7 @@ class ToolOutputErrorPart(ToolPartBase):
     """Tool part with output error."""
 
     state: Literal["output-error"]
-    input: ToolInputUnion
+    input: Dict[str, Any]
     errorText: str
     providerExecuted: Optional[bool] = None
 
@@ -535,7 +535,17 @@ StreamPart = Union[
 # --- Tool-specific input/output models for OpenAPI typing ---
 
 
-class CreateDocumentInput(BaseModel):
+class ToolInputBase(BaseModel):
+    """Base class for all tool input models. Used for auto-discovery in OpenAPI generation."""
+    pass
+
+
+class ToolOutputBase(BaseModel):
+    """Base class for all tool output models. Used for auto-discovery in OpenAPI generation."""
+    pass
+
+
+class CreateDocumentInput(ToolInputBase):
     """Input for createDocument tool."""
 
     title: str
@@ -543,7 +553,7 @@ class CreateDocumentInput(BaseModel):
     kind: Literal["text"]
 
 
-class UpdateDocumentInput(BaseModel):
+class UpdateDocumentInput(ToolInputBase):
     """Input for updateDocument tool."""
 
     id: str  # UUID string
@@ -552,7 +562,7 @@ class UpdateDocumentInput(BaseModel):
     kind: Literal["text"]
 
 
-class BaseDocumentOutput(BaseModel):
+class BaseDocumentOutput(ToolOutputBase):
     """Base output payload returned by document tools."""
 
     id: str
@@ -571,7 +581,7 @@ class UpdateDocumentOutput(BaseDocumentOutput):
     """Output for updateDocument tool."""
 
 
-class GetWeatherInput(BaseModel):
+class GetWeatherInput(ToolInputBase):
     """Input for getWeather tool."""
 
     latitude: float
@@ -612,7 +622,7 @@ class WeatherDaily(BaseModel):
     sunset: List[str] = []
 
 
-class GetWeatherOutput(BaseModel):
+class GetWeatherOutput(ToolOutputBase):
     """Output for getWeather tool, aligned with WeatherTool.tsx expectations."""
 
     latitude: Optional[float] = None

@@ -20,30 +20,32 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonTypeName;
 import com.fasterxml.jackson.annotation.JsonValue;
-import de.tum.in.www1.hephaestus.intelligenceservice.model.CreateDocumentInput;
-import de.tum.in.www1.hephaestus.intelligenceservice.model.GetWeatherInput;
-import de.tum.in.www1.hephaestus.intelligenceservice.model.UpdateDocumentInput;
-import java.math.BigDecimal;
+import java.time.OffsetDateTime;
 import com.fasterxml.jackson.annotation.JsonPropertyOrder;
 import com.fasterxml.jackson.annotation.JsonTypeName;
 import org.hibernate.validator.constraints.*;
 
 /**
- * Input1
+ * Base output payload returned by document tools.
  */
 @JsonPropertyOrder({
-  Input1.JSON_PROPERTY_CONTENT,
-  Input1.JSON_PROPERTY_KIND,
-  Input1.JSON_PROPERTY_TITLE,
-  Input1.JSON_PROPERTY_ID,
-  Input1.JSON_PROPERTY_LATITUDE,
-  Input1.JSON_PROPERTY_LONGITUDE
+  BaseDocumentOutput.JSON_PROPERTY_CONTENT,
+  BaseDocumentOutput.JSON_PROPERTY_CREATED_AT,
+  BaseDocumentOutput.JSON_PROPERTY_ID,
+  BaseDocumentOutput.JSON_PROPERTY_KIND,
+  BaseDocumentOutput.JSON_PROPERTY_TITLE,
+  BaseDocumentOutput.JSON_PROPERTY_USER_ID
 })
-@JsonTypeName("Input_1")
 @jakarta.annotation.Generated(value = "org.openapitools.codegen.languages.JavaClientCodegen", comments = "Generator version: 7.7.0")
-public class Input1 {
+public class BaseDocumentOutput {
   public static final String JSON_PROPERTY_CONTENT = "content";
   private String content;
+
+  public static final String JSON_PROPERTY_CREATED_AT = "createdAt";
+  private OffsetDateTime createdAt;
+
+  public static final String JSON_PROPERTY_ID = "id";
+  private String id;
 
   public static final String JSON_PROPERTY_KIND = "kind";
   private String kind;
@@ -51,19 +53,13 @@ public class Input1 {
   public static final String JSON_PROPERTY_TITLE = "title";
   private String title;
 
-  public static final String JSON_PROPERTY_ID = "id";
-  private String id;
+  public static final String JSON_PROPERTY_USER_ID = "userId";
+  private String userId;
 
-  public static final String JSON_PROPERTY_LATITUDE = "latitude";
-  private BigDecimal latitude;
-
-  public static final String JSON_PROPERTY_LONGITUDE = "longitude";
-  private BigDecimal longitude;
-
-  public Input1() {
+  public BaseDocumentOutput() {
   }
 
-  public Input1 content(String content) {
+  public BaseDocumentOutput content(String content) {
     
     this.content = content;
     return this;
@@ -88,57 +84,32 @@ public class Input1 {
     this.content = content;
   }
 
-  public Input1 kind(String kind) {
+  public BaseDocumentOutput createdAt(OffsetDateTime createdAt) {
     
-    this.kind = kind;
+    this.createdAt = createdAt;
     return this;
   }
 
   /**
-   * Get kind
-   * @return kind
+   * Get createdAt
+   * @return createdAt
    */
   @jakarta.annotation.Nonnull
-  @JsonProperty(JSON_PROPERTY_KIND)
+  @JsonProperty(JSON_PROPERTY_CREATED_AT)
   @JsonInclude(value = JsonInclude.Include.ALWAYS)
 
-  public String getKind() {
-    return kind;
+  public OffsetDateTime getCreatedAt() {
+    return createdAt;
   }
 
 
-  @JsonProperty(JSON_PROPERTY_KIND)
+  @JsonProperty(JSON_PROPERTY_CREATED_AT)
   @JsonInclude(value = JsonInclude.Include.ALWAYS)
-  public void setKind(String kind) {
-    this.kind = kind;
+  public void setCreatedAt(OffsetDateTime createdAt) {
+    this.createdAt = createdAt;
   }
 
-  public Input1 title(String title) {
-    
-    this.title = title;
-    return this;
-  }
-
-  /**
-   * Get title
-   * @return title
-   */
-  @jakarta.annotation.Nonnull
-  @JsonProperty(JSON_PROPERTY_TITLE)
-  @JsonInclude(value = JsonInclude.Include.ALWAYS)
-
-  public String getTitle() {
-    return title;
-  }
-
-
-  @JsonProperty(JSON_PROPERTY_TITLE)
-  @JsonInclude(value = JsonInclude.Include.ALWAYS)
-  public void setTitle(String title) {
-    this.title = title;
-  }
-
-  public Input1 id(String id) {
+  public BaseDocumentOutput id(String id) {
     
     this.id = id;
     return this;
@@ -163,54 +134,79 @@ public class Input1 {
     this.id = id;
   }
 
-  public Input1 latitude(BigDecimal latitude) {
+  public BaseDocumentOutput kind(String kind) {
     
-    this.latitude = latitude;
+    this.kind = kind;
     return this;
   }
 
   /**
-   * Get latitude
-   * @return latitude
+   * Get kind
+   * @return kind
    */
   @jakarta.annotation.Nonnull
-  @JsonProperty(JSON_PROPERTY_LATITUDE)
+  @JsonProperty(JSON_PROPERTY_KIND)
   @JsonInclude(value = JsonInclude.Include.ALWAYS)
 
-  public BigDecimal getLatitude() {
-    return latitude;
+  public String getKind() {
+    return kind;
   }
 
 
-  @JsonProperty(JSON_PROPERTY_LATITUDE)
+  @JsonProperty(JSON_PROPERTY_KIND)
   @JsonInclude(value = JsonInclude.Include.ALWAYS)
-  public void setLatitude(BigDecimal latitude) {
-    this.latitude = latitude;
+  public void setKind(String kind) {
+    this.kind = kind;
   }
 
-  public Input1 longitude(BigDecimal longitude) {
+  public BaseDocumentOutput title(String title) {
     
-    this.longitude = longitude;
+    this.title = title;
     return this;
   }
 
   /**
-   * Get longitude
-   * @return longitude
+   * Get title
+   * @return title
    */
   @jakarta.annotation.Nonnull
-  @JsonProperty(JSON_PROPERTY_LONGITUDE)
+  @JsonProperty(JSON_PROPERTY_TITLE)
   @JsonInclude(value = JsonInclude.Include.ALWAYS)
 
-  public BigDecimal getLongitude() {
-    return longitude;
+  public String getTitle() {
+    return title;
   }
 
 
-  @JsonProperty(JSON_PROPERTY_LONGITUDE)
+  @JsonProperty(JSON_PROPERTY_TITLE)
   @JsonInclude(value = JsonInclude.Include.ALWAYS)
-  public void setLongitude(BigDecimal longitude) {
-    this.longitude = longitude;
+  public void setTitle(String title) {
+    this.title = title;
+  }
+
+  public BaseDocumentOutput userId(String userId) {
+    
+    this.userId = userId;
+    return this;
+  }
+
+  /**
+   * Get userId
+   * @return userId
+   */
+  @jakarta.annotation.Nonnull
+  @JsonProperty(JSON_PROPERTY_USER_ID)
+  @JsonInclude(value = JsonInclude.Include.ALWAYS)
+
+  public String getUserId() {
+    return userId;
+  }
+
+
+  @JsonProperty(JSON_PROPERTY_USER_ID)
+  @JsonInclude(value = JsonInclude.Include.ALWAYS)
+  public void setUserId(String userId) {
+    this.userId = userId;
   }
 
   @Override
@@ -221,30 +217,30 @@ public class Input1 {
     if (o == null || getClass() != o.getClass()) {
       return false;
     }
-    Input1 input1 = (Input1) o;
-    return Objects.equals(this.content, input1.content) &&
-        Objects.equals(this.kind, input1.kind) &&
-        Objects.equals(this.title, input1.title) &&
-        Objects.equals(this.id, input1.id) &&
-        Objects.equals(this.latitude, input1.latitude) &&
-        Objects.equals(this.longitude, input1.longitude);
+    BaseDocumentOutput baseDocumentOutput = (BaseDocumentOutput) o;
+    return Objects.equals(this.content, baseDocumentOutput.content) &&
+        Objects.equals(this.createdAt, baseDocumentOutput.createdAt) &&
+        Objects.equals(this.id, baseDocumentOutput.id) &&
+        Objects.equals(this.kind, baseDocumentOutput.kind) &&
+        Objects.equals(this.title, baseDocumentOutput.title) &&
+        Objects.equals(this.userId, baseDocumentOutput.userId);
   }
 
   @Override
   public int hashCode() {
-    return Objects.hash(content, kind, title, id, latitude, longitude);
+    return Objects.hash(content, createdAt, id, kind, title, userId);
   }
 
   @Override
   public String toString() {
     StringBuilder sb = new StringBuilder();
-    sb.append("class Input1 {\n");
+    sb.append("class BaseDocumentOutput {\n");
     sb.append("    content: ").append(toIndentedString(content)).append("\n");
+    sb.append("    createdAt: ").append(toIndentedString(createdAt)).append("\n");
+    sb.append("    id: ").append(toIndentedString(id)).append("\n");
     sb.append("    kind: ").append(toIndentedString(kind)).append("\n");
     sb.append("    title: ").append(toIndentedString(title)).append("\n");
-    sb.append("    id: ").append(toIndentedString(id)).append("\n");
-    sb.append("    latitude: ").append(toIndentedString(latitude)).append("\n");
-    sb.append("    longitude: ").append(toIndentedString(longitude)).append("\n");
+    sb.append("    userId: ").append(toIndentedString(userId)).append("\n");
     sb.append("}");
     return sb.toString();
   }

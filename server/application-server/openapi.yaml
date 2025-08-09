@@ -979,9 +979,6 @@ components:
         totalPages:
           type: integer
           format: int32
-        numberOfElements:
-          type: integer
-          format: int32
         pageable:
           $ref: "#/components/schemas/PageableObject"
         sort:
@@ -990,6 +987,9 @@ components:
           type: boolean
         last:
           type: boolean
+        numberOfElements:
+          type: integer
+          format: int32
         size:
           type: integer
           format: int32
@@ -1365,10 +1365,7 @@ components:
           type: string
           title: Errortext
         input:
-          anyOf:
-          - $ref: "#/components/schemas/CreateDocumentInput"
-          - $ref: "#/components/schemas/UpdateDocumentInput"
-          - $ref: "#/components/schemas/GetWeatherInput"
+          type: object
           title: Input
         providerExecuted:
           anyOf:
@@ -1562,10 +1559,7 @@ components:
       description: Tool part with input available.
       properties:
         input:
-          anyOf:
-          - $ref: "#/components/schemas/CreateDocumentInput"
-          - $ref: "#/components/schemas/UpdateDocumentInput"
-          - $ref: "#/components/schemas/GetWeatherInput"
+          type: object
           title: Input
         providerExecuted:
           anyOf:
@@ -1812,60 +1806,73 @@ components:
           anyOf:
           - $ref: "#/components/schemas/WeatherCurrent"
           - type: "null"
+          default: null
         current_units:
           anyOf:
           - $ref: "#/components/schemas/WeatherCurrentUnits"
           - type: "null"
+          default: null
         daily:
           anyOf:
           - $ref: "#/components/schemas/WeatherDaily"
           - type: "null"
+          default: null
         daily_units:
           anyOf:
           - $ref: "#/components/schemas/WeatherDailyUnits"
           - type: "null"
+          default: null
         elevation:
           anyOf:
           - type: number
           - type: "null"
+          default: null
           title: Elevation
         generationtime_ms:
           anyOf:
           - type: number
           - type: "null"
+          default: null
           title: Generationtime Ms
         hourly:
           anyOf:
           - $ref: "#/components/schemas/WeatherHourly"
           - type: "null"
+          default: null
         hourly_units:
           anyOf:
           - $ref: "#/components/schemas/WeatherHourlyUnits"
           - type: "null"
+          default: null
         latitude:
           anyOf:
           - type: number
           - type: "null"
+          default: null
           title: Latitude
         longitude:
           anyOf:
           - type: number
           - type: "null"
+          default: null
           title: Longitude
         timezone:
           anyOf:
           - type: string
           - type: "null"
+          default: null
           title: Timezone
         timezone_abbreviation:
           anyOf:
           - type: string
           - type: "null"
+          default: null
           title: Timezone Abbreviation
         utc_offset_seconds:
           anyOf:
           - type: integer
           - type: "null"
+          default: null
           title: Utc Offset Seconds
       title: GetWeatherOutput
     UpdateDocumentOutput:
@@ -2010,9 +2017,6 @@ components:
         totalPages:
           type: integer
           format: int32
-        numberOfElements:
-          type: integer
-          format: int32
         pageable:
           $ref: "#/components/schemas/PageableObject"
         sort:
@@ -2021,6 +2025,9 @@ components:
           type: boolean
         last:
           type: boolean
+        numberOfElements:
+          type: integer
+          format: int32
         size:
           type: integer
           format: int32
@@ -2083,9 +2090,7 @@ components:
       properties:
         input:
           anyOf:
-          - $ref: "#/components/schemas/CreateDocumentInput"
-          - $ref: "#/components/schemas/UpdateDocumentInput"
-          - $ref: "#/components/schemas/GetWeatherInput"
+          - type: object
           - type: "null"
           title: Input
         providerExecuted:
@@ -2209,16 +2214,10 @@ components:
       description: Tool part with output available.
       properties:
         input:
-          anyOf:
-          - $ref: "#/components/schemas/CreateDocumentInput"
-          - $ref: "#/components/schemas/UpdateDocumentInput"
-          - $ref: "#/components/schemas/GetWeatherInput"
+          type: object
           title: Input
         output:
-          anyOf:
-          - $ref: "#/components/schemas/CreateDocumentOutput"
-          - $ref: "#/components/schemas/UpdateDocumentOutput"
-          - $ref: "#/components/schemas/GetWeatherOutput"
+          type: object
           title: Output
         providerExecuted:
           anyOf:
