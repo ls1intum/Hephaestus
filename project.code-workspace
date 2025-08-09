@@ -27,15 +27,6 @@
 		{
 			"name": "docs",
 			"path": "./docs"
-		},
-		{
-			"path": "../ai-chatbot"
-		},
-		{
-			"path": "../ai"
-		},
-		{
-			"path": "../github.com"
 		}
 	],
 	"settings": {
