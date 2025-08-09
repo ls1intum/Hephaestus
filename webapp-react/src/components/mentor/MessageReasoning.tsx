@@ -145,6 +145,8 @@ export function MessageReasoning({
 	);
 	const headerText = isLoading
 		? lastHeading || "Thinking"
+		: elapsedMs <= 10  // If 1 second or less (including 0), show generic message
+		? "Reasoned for some time"
 		: `Thought for ${formatDuration(elapsedMs)}`;
 
 	return (
@@ -193,13 +195,13 @@ export function MessageReasoning({
 									const k = `${s.title ?? "_"}-${(s.body ?? "").slice(0, 24)}-${idx}`;
 									return (
 										<div key={k} className="relative">
-											<span className="absolute -left-[18.5px] top-2.5 h-1 w-1 rounded-full bg-zinc-400 ring-10 ring-background" />
+											<span className="absolute -left-[19.5px] top-2.5 h-1.5 w-1.5 rounded-full bg-zinc-400 ring-12 ring-background" />
 											{s.body && <Markdown>{s.body}</Markdown>}
 										</div>
 									);
 								})}
 								<div className="relative pt-1">
-									<span className="absolute -left-[22.5px] top-2 text-zinc-400 bg-background ring-4 ring-background rounded-full">
+									<span className="absolute -left-[22.5px] top-2 text-zinc-400 bg-background ring-12 ring-background rounded-full">
 										<CheckCircle2 className="size-3" />
 									</span>
 									<div className="text-sm text-muted-foreground">Done</div>

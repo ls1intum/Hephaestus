@@ -242,3 +242,22 @@ CREATE INDEX idx_orders_user_created ON orders(user_id, created_at);
 This should reduce query time from ~2000ms to ~50ms.`,
 	},
 };
+
+/**
+ * Shows "Reasoned for a while" when no timing information is available.
+ * This simulates loading a message from the database without timing data.
+ */
+export const ReasonedForAWhile: Story = {
+	args: {
+		reasoning: `Simple response: The answer is 42.
+
+This was a quick calculation that didn't require extensive reasoning.`,
+	},
+	parameters: {
+		docs: {
+			description: {
+				story: 'When timing information is not available (e.g., loading from database), the component shows "Reasoned for a while" instead of trying to calculate duration.',
+			},
+		},
+	},
+};
