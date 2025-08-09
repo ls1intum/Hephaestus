@@ -1,9 +1,9 @@
 import { Chat } from "@/components/mentor/Chat";
 import { useMentorChat } from "@/hooks/useMentorChat";
 import type { ChatMessage } from "@/lib/types";
-import { useCallback } from "react";
+import { useCallback, useEffect, useMemo, useRef } from "react";
 
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, useLocation, useNavigate } from "@tanstack/react-router";
 
 export const Route = createFileRoute("/_authenticated/mentor/$threadId")({
 	component: ThreadContainer,
@@ -11,6 +11,8 @@ export const Route = createFileRoute("/_authenticated/mentor/$threadId")({
 
 function ThreadContainer() {
 	const { threadId } = Route.useParams();
+	const { state } = useLocation();
+	const navigate = useNavigate();
 
 	// Initialize mentor chat hook for existing thread
 	const mentorChat = useMentorChat({
@@ -19,6 +21,32 @@ function ThreadContainer() {
 			console.error("Chat error:", error);
 		},
 	});
+
+	// Detect initial message passed via navigation state and send it once
+	const initialMessage: string | undefined = useMemo(() => {
+		// Expect shape: { initialMessage?: string, optimistic?: boolean }
+		try {
+			return (state as { initialMessage?: string } | undefined)?.initialMessage?.trim();
+		} catch {
+			return undefined;
+		}
+	}, [state]);
+	const initialDispatchedRef = useRef(false);
+	useEffect(() => {
+		if (initialDispatchedRef.current) return;
+		if (initialMessage && initialMessage.length > 0) {
+			initialDispatchedRef.current = true;
+			mentorChat.sendMessage(initialMessage);
+			// Clear navigation state to avoid re-sending on back/forward
+			navigate({
+				to: Route.fullPath,
+				params: { threadId },
+				replace: true,
+				state: undefined,
+			});
+		}
+		// eslint-disable-next-line react-hooks/exhaustive-deps
+	}, [initialMessage, mentorChat.sendMessage, threadId, navigate]);
 
 	const handleMessageSubmit = useCallback(
 		({ text }: { text: string }) => {
@@ -54,10 +82,27 @@ function ThreadContainer() {
 	// Show loading state while fetching thread
 	if (mentorChat.isThreadLoading) {
 		return (
-			<div className="h-full flex items-center justify-center p-6">
-				<div className="text-center">
-					<div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4" />
-					<p className="text-muted-foreground">Loading conversation...</p>
+			<div className="h-full p-4 sm:p-6">
+				<div className="max-w-3xl mx-auto space-y-4">
+					<div className="animate-pulse space-y-3">
+						<div className="h-4 w-24 bg-muted rounded" />
+						<div className="h-20 bg-muted rounded-xl" />
+					</div>
+					<div className="animate-pulse flex gap-3">
+						<div className="h-8 w-8 rounded-full bg-muted" />
+						<div className="flex-1 space-y-2">
+							<div className="h-4 w-3/5 bg-muted rounded" />
+							<div className="h-4 w-4/5 bg-muted rounded" />
+							<div className="h-4 w-2/5 bg-muted rounded" />
+						</div>
+					</div>
+					<div className="animate-pulse flex gap-3 justify-end">
+						<div className="flex-1 space-y-2 max-w-[70%]">
+							<div className="h-4 w-full bg-muted rounded" />
+							<div className="h-4 w-2/3 bg-muted rounded" />
+						</div>
+						<div className="h-8 w-8 rounded-full bg-muted" />
+					</div>
 				</div>
 			</div>
 		);
