@@ -256,7 +256,8 @@ This was a quick calculation that didn't require extensive reasoning.`,
 	parameters: {
 		docs: {
 			description: {
-				story: 'When timing information is not available (e.g., loading from database), the component shows "Reasoned for a while" instead of trying to calculate duration.',
+				story:
+					'When timing information is not available (e.g., loading from database), the component shows "Reasoned for a while" instead of trying to calculate duration.',
 			},
 		},
 	},

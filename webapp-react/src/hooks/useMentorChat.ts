@@ -243,8 +243,6 @@ export function useMentorChat({
 		(status === "streaming" && messages.length === 0) ||
 		(!!threadId && isThreadLoading);
 
-	console.log("messages:", messages);
-	
 	// Return object without memoization to avoid dependency issues
 	const result = {
 		// Core chat functionality

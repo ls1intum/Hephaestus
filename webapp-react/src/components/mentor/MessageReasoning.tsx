@@ -145,9 +145,9 @@ export function MessageReasoning({
 	);
 	const headerText = isLoading
 		? lastHeading || "Thinking"
-		: elapsedMs <= 10  // If 1 second or less (including 0), show generic message
-		? "Reasoned for some time"
-		: `Thought for ${formatDuration(elapsedMs)}`;
+		: elapsedMs <= 10 // If 10ms or less (including 0), show generic message
+			? "Reasoned for some time"
+			: `Thought for ${formatDuration(elapsedMs)}`;
 
 	return (
 		<div className="flex flex-col">

@@ -42,33 +42,37 @@ public class OpenAPIConfiguration {
      */
     private Set<String> discoverIntelligenceServiceModels(Map<String, Schema<?>> allSchemas) {
         Set<String> discoveredModels = new HashSet<>();
-        
+
         for (Map.Entry<String, Schema<?>> entry : allSchemas.entrySet()) {
             String schemaName = entry.getKey();
             Schema<?> schema = entry.getValue();
-            
+
             // Auto-discover UI parts (models ending with "UIPart" or "Part")
-            if (schemaName.endsWith("UIPart") || 
+            if (
+                schemaName.endsWith("UIPart") ||
                 schemaName.endsWith("Part") ||
                 schemaName.equals("UIMessage") ||
-                schemaName.equals("UIMessagePart")) {
+                schemaName.equals("UIMessagePart")
+            ) {
                 discoveredModels.add(schemaName);
                 continue;
             }
-            
+
             // Auto-discover tool models by checking for our custom tag
             if (isToolModelByTag(schema)) {
                 discoveredModels.add(schemaName);
             }
         }
-        
-        logger.info("Auto-discovered {} intelligence service models: {}", 
-                   discoveredModels.size(), 
-                   discoveredModels.stream().sorted().collect(Collectors.joining(", ")));
-        
+
+        logger.info(
+            "Auto-discovered {} intelligence service models: {}",
+            discoveredModels.size(),
+            discoveredModels.stream().sorted().collect(Collectors.joining(", "))
+        );
+
         return discoveredModels;
     }
-    
+
     /**
      * Check if a schema is tagged as a tool model by the intelligence service.
      * This is much cleaner than analyzing schema content.
@@ -77,25 +81,27 @@ public class OpenAPIConfiguration {
         if (schema == null || schema.getExtensions() == null) {
             return false;
         }
-        
+
         // Check for our custom tag
         Object toolModelTag = schema.getExtensions().get("x-hephaestus-tool-model");
         return Boolean.TRUE.equals(toolModelTag);
     }
-    
+
     /**
      * Check if a schema name represents an intelligence service model.
      * This is used for preserving DTO suffixes in schema references.
      */
     private boolean isIntelligenceServiceModel(String schemaName) {
         // Intelligence service model patterns - these should preserve their references
-        return schemaName.endsWith("UIPart") || 
-               schemaName.endsWith("Part") ||
-               schemaName.equals("UIMessage") ||
-               schemaName.equals("UIMessagePart") ||
-               // All tool models (they will have the tag, but we can identify by name pattern too)
-               schemaName.endsWith("Input") ||
-               schemaName.endsWith("Output");
+        return (
+            schemaName.endsWith("UIPart") ||
+            schemaName.endsWith("Part") ||
+            schemaName.equals("UIMessage") ||
+            schemaName.equals("UIMessagePart") ||
+            // All tool models (they will have the tag, but we can identify by name pattern too)
+            schemaName.endsWith("Input") ||
+            schemaName.endsWith("Output")
+        );
     }
 
     /**

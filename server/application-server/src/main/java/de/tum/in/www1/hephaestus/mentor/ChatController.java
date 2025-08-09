@@ -6,12 +6,13 @@ import de.tum.in.www1.hephaestus.intelligenceservice.model.ChatRequest;
 import de.tum.in.www1.hephaestus.intelligenceservice.model.StreamErrorPart;
 import de.tum.in.www1.hephaestus.intelligenceservice.model.StreamFinishPart;
 import de.tum.in.www1.hephaestus.intelligenceservice.model.UIMessage;
-import de.tum.in.www1.hephaestus.intelligenceservice.model.UIMessagePartsInner;
 import io.swagger.v3.oas.annotations.Hidden;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
+import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -50,7 +51,7 @@ public class ChatController {
     @Hidden
     @PostMapping(value = "/chat", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
     public Flux<String> chat(@RequestBody ChatRequestDTO chatRequest) {
-        logger.info("Processing chat request with 1 messages");
+        logger.info("Processing chat request");
 
         // Validate message size and content
         try {
@@ -98,14 +99,14 @@ public class ChatController {
             if (threadDetail.isPresent() && threadDetail.get().getMessages() != null) {
                 // If editing (previousMessageId provided), build path up to that message; if null, start from scratch
                 if (chatRequest.previousMessageId() != null) {
-                    fullMessages = new java.util.ArrayList<>(
+                    fullMessages = new ArrayList<>(
                         chatThreadService.getConversationPathForMessage(chatRequest.previousMessageId(), user)
                     );
                 } else {
-                    fullMessages = new java.util.ArrayList<>();
+                    fullMessages = new ArrayList<>();
                 }
             } else {
-                fullMessages = new java.util.ArrayList<>();
+                fullMessages = new ArrayList<>();
             }
 
             // Append the new user message from the request
@@ -115,9 +116,7 @@ public class ChatController {
         } catch (IllegalArgumentException e) {
             // If the ID is not a valid UUID (e.g., brand-new client-generated), fall back to request messages only
             logger.warn("Invalid thread UUID '{}', using request messages only: {}", chatRequest.id(), e.getMessage());
-            fullMessages = chatRequest.message() != null
-                ? java.util.List.of(chatRequest.message())
-                : java.util.List.of();
+            fullMessages = chatRequest.message() != null ? List.of(chatRequest.message()) : List.of();
             isValidThreadId = false;
         }
 
@@ -125,23 +124,21 @@ public class ChatController {
         // If threadId was invalid, create a new request with a generated UUID for persistence
         ChatRequestDTO effectiveRequest = chatRequest;
         if (!isValidThreadId) {
-            String newId = java.util.UUID.randomUUID().toString();
+            String newId = UUID.randomUUID().toString();
             effectiveRequest = new ChatRequestDTO(newId, chatRequest.message(), chatRequest.previousMessageId());
             logger.debug("Generated new thread ID {} for invalid request id '{}'", newId, chatRequest.id());
         }
 
         StreamPartProcessor processor = chatPersistenceService.createProcessorForRequest(user, effectiveRequest);
 
-        // Sanitize messages: keep only text parts with non-empty content; drop empty messages
-        List<UIMessage> sanitizedMessages = sanitizeMessages(fullMessages);
-
         ChatRequest intelligenceRequest = new ChatRequest();
-        intelligenceRequest.setMessages(sanitizedMessages);
+        // Forward full message history as-is (including tool parts) to the intelligence service
+        intelligenceRequest.setMessages(fullMessages);
         intelligenceRequest.setUserId(user.getId().intValue());
 
         // Debug: Log context being sent to intelligence service
         try {
-            List<UIMessage> dbgList = sanitizedMessages != null ? sanitizedMessages : java.util.Collections.emptyList();
+            List<UIMessage> dbgList = fullMessages != null ? fullMessages : Collections.emptyList();
             int count = dbgList.size();
             String firstRole = count > 0 ? String.valueOf(dbgList.get(0).getRole()) : "none";
             String lastRole = count > 0 ? String.valueOf(dbgList.get(count - 1).getRole()) : "none";
@@ -183,47 +180,6 @@ public class ChatController {
 
         // Use the enhanced streaming with persistence callbacks
         return intelligenceServiceWebClient.streamChat(intelligenceRequest, processor);
-    }
-
-    /**
-     * Sanitize UI messages to match intelligence-service schema expectations:
-     * - Keep only text parts with non-empty text
-     * - Drop messages that end up with no valid parts
-     */
-    private List<UIMessage> sanitizeMessages(List<UIMessage> messages) {
-        if (messages == null || messages.isEmpty()) return java.util.Collections.emptyList();
-
-        List<UIMessage> result = new java.util.ArrayList<>();
-        for (UIMessage m : messages) {
-            if (m == null) continue;
-            List<UIMessagePartsInner> parts = m.getParts();
-            if (parts == null || parts.isEmpty()) continue;
-
-            List<UIMessagePartsInner> newParts = new java.util.ArrayList<>();
-            for (UIMessagePartsInner p : parts) {
-                String type = p.getType();
-                String text = p.getText();
-                if ("text".equals(type) && text != null && !text.trim().isEmpty()) {
-                    UIMessagePartsInner textPart = new UIMessagePartsInner();
-                    textPart.setType("text");
-                    textPart.setText(text.trim());
-                    // Optional but safe: mark as done to avoid streaming states
-                    textPart.setState("done");
-                    newParts.add(textPart);
-                }
-            }
-
-            if (!newParts.isEmpty()) {
-                UIMessage copy = new UIMessage();
-                copy.setId(m.getId());
-                copy.setRole(m.getRole());
-                copy.setMetadata(m.getMetadata());
-                copy.setParts(newParts);
-                result.add(copy);
-            }
-        }
-
-        return result;
     }
 
     /**
