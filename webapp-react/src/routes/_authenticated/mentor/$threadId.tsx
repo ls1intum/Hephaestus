@@ -3,7 +3,11 @@ import { useMentorChat } from "@/hooks/useMentorChat";
 import type { ChatMessage } from "@/lib/types";
 import { useCallback, useEffect, useMemo, useRef } from "react";
 
-import { createFileRoute, useLocation, useNavigate } from "@tanstack/react-router";
+import {
+	createFileRoute,
+	useLocation,
+	useNavigate,
+} from "@tanstack/react-router";
 
 export const Route = createFileRoute("/_authenticated/mentor/$threadId")({
 	component: ThreadContainer,
@@ -26,7 +30,9 @@ function ThreadContainer() {
 	const initialMessage: string | undefined = useMemo(() => {
 		// Expect shape: { initialMessage?: string, optimistic?: boolean }
 		try {
-			return (state as { initialMessage?: string } | undefined)?.initialMessage?.trim();
+			return (
+				state as { initialMessage?: string } | undefined
+			)?.initialMessage?.trim();
 		} catch {
 			return undefined;
 		}

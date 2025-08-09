@@ -537,11 +537,13 @@ StreamPart = Union[
 
 class ToolInputBase(BaseModel):
     """Base class for all tool input models. Used for auto-discovery in OpenAPI generation."""
+
     pass
 
 
 class ToolOutputBase(BaseModel):
     """Base class for all tool output models. Used for auto-discovery in OpenAPI generation."""
+
     pass
 
 

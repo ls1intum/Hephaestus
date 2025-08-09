@@ -11,6 +11,7 @@ from app.mentor.models import (
 )
 from app.logger import logger
 
+
 def convert_to_langchain_messages(messages: List[UIMessage]):
     """Convert UIMessage objects to LangChain message objects.
 
@@ -61,7 +62,9 @@ def convert_to_langchain_messages(messages: List[UIMessage]):
             nonlocal pending_tool_calls
             if pending_tool_calls:
                 # content can be empty when tool_calls are present
-                langchain_messages.append(AIMessage(content="", tool_calls=pending_tool_calls))
+                langchain_messages.append(
+                    AIMessage(content="", tool_calls=pending_tool_calls)
+                )
                 # track emitted ids
                 for tc in pending_tool_calls:
                     tc_id = tc.get("id")
@@ -133,7 +136,9 @@ def convert_to_langchain_messages(messages: List[UIMessage]):
                     # If we haven't seen a prior tool_call for this id, synthesize one now
                     if not tool_call_id:
                         # Synthesize a stable id from name+args to keep pairing deterministic
-                        synth_id = f"synth_{tool_name}_" + json.dumps(tool_args, sort_keys=True)
+                        synth_id = f"synth_{tool_name}_" + json.dumps(
+                            tool_args, sort_keys=True
+                        )
                         tool_call_id = synth_id
                     if str(tool_call_id) not in emitted_tool_call_ids:
                         langchain_messages.append(
@@ -151,7 +156,9 @@ def convert_to_langchain_messages(messages: List[UIMessage]):
                         )
                         emitted_tool_call_ids.add(str(tool_call_id))
                     content = _normalize_tool_output(tool_output)
-                    langchain_messages.append(ToolMessage(content=content, tool_call_id=str(tool_call_id)))
+                    langchain_messages.append(
+                        ToolMessage(content=content, tool_call_id=str(tool_call_id))
+                    )
 
                 continue
 

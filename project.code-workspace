@@ -2,31 +2,40 @@
 	"folders": [
 		{
 			"name": "Hephaestus",
-			"path": "./",
+			"path": "./"
 		},
 		{
 			"name": "webapp",
-			"path": "./webapp",
+			"path": "./webapp"
 		},
 		{
 			"name": "webapp-react",
-			"path": "./webapp-react",
+			"path": "./webapp-react"
 		},
 		{
 			"name": "server/application-server",
-			"path": "./server/application-server",
+			"path": "./server/application-server"
 		},
 		{
 			"name": "server/intelligence-service",
-			"path": "./server/intelligence-service",
+			"path": "./server/intelligence-service"
 		},
 		{
 			"name": "server/webhook-ingest",
-			"path": "./server/webhook-ingest",
+			"path": "./server/webhook-ingest"
 		},
 		{
 			"name": "docs",
-			"path": "./docs",
+			"path": "./docs"
+		},
+		{
+			"path": "../ai-chatbot"
+		},
+		{
+			"path": "../ai"
+		},
+		{
+			"path": "../github.com"
 		}
 	],
 	"settings": {

@@ -51,7 +51,9 @@ export function useMentorChat({
 	const [stableThreadId] = useState(() => threadId || uuidv4());
 
 	// Fetch thread detail if threadId is provided; avoid immediate refetch on mount
-	const threadQueryKey = getThreadQueryKey({ path: { threadId: threadId || "" } });
+	const threadQueryKey = getThreadQueryKey({
+		path: { threadId: threadId || "" },
+	});
 	const threadQuery = useQuery({
 		...getThreadOptions({ path: { threadId: threadId || "" } }),
 		enabled: !!threadId,
@@ -70,15 +72,17 @@ export function useMentorChat({
 	} = threadQuery;
 
 	// Fetch grouped threads for sidebar/navigation; avoid immediate refetch on mount
-	const { data: groupedThreads, isLoading: isGroupedThreadsLoading } = useQuery({
-		...getGroupedThreadsOptions(),
-		initialData: () => queryClient.getQueryData(getGroupedThreadsQueryKey()),
-		initialDataUpdatedAt: Date.now(),
-		staleTime: 60_000,
-		refetchOnMount: false,
-		refetchOnWindowFocus: false,
-		refetchOnReconnect: false,
-	});
+	const { data: groupedThreads, isLoading: isGroupedThreadsLoading } = useQuery(
+		{
+			...getGroupedThreadsOptions(),
+			initialData: () => queryClient.getQueryData(getGroupedThreadsQueryKey()),
+			initialDataUpdatedAt: Date.now(),
+			staleTime: 60_000,
+			refetchOnMount: false,
+			refetchOnWindowFocus: false,
+			refetchOnReconnect: false,
+		},
+	);
 
 	// Vote message mutation
 	const voteMessageMut = useMutation(voteMessageMutation());
