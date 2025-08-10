@@ -1,12 +1,9 @@
-import type { ChatMessageVote } from "@/api/types.gen";
-import type { ChatMessage } from "@/lib/types";
-import { useChat } from "@ai-sdk/react";
 import type { UseChatHelpers } from "@ai-sdk/react";
+import { useChat } from "@ai-sdk/react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { DefaultChatTransport } from "ai";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { v4 as uuidv4 } from "uuid";
-
 import {
 	getGroupedThreadsOptions,
 	getGroupedThreadsQueryKey,
@@ -14,9 +11,10 @@ import {
 	getThreadQueryKey,
 	voteMessageMutation,
 } from "@/api/@tanstack/react-query.gen";
-import type { ChatThreadDetail, ChatThreadGroup } from "@/api/types.gen";
+import type { ChatMessageVote, ChatThreadDetail, ChatThreadGroup } from "@/api/types.gen";
 import environment from "@/environment";
 import { keycloakService } from "@/integrations/auth";
+import type { ChatMessage } from "@/lib/types";
 
 interface UseMentorChatOptions {
 	threadId?: string;
@@ -165,7 +163,7 @@ export function useMentorChat({
 		id: stableThreadId, // Use stable ID that never changes
 		messages: initialMessages, // Start with initial messages only - backend will provide thread history
 		generateId: () => uuidv4(), // Generate UUID for all messages
-		// experimental_throttle: 100, // Add throttling for smoother streaming
+		experimental_throttle: 100, // Add throttling for smoother streaming
 		transport: stableTransport,
 		onFinish: stableOnFinish,
 		onError: stableOnError,
