@@ -68,8 +68,8 @@ jobs:
             npm ci --prefer-offline --no-audit
           fi
 
-          if ! npm run format:application-server:check; then
-            echo "❌ application-server formatting failed. Run: npm run format:application-server:write"
+          if ! npm run format:java; then
+            echo "❌ application-server formatting failed. Run: npm run format:java"
             exit 1
           fi
 

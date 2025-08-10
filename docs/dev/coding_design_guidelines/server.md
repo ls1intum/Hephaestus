@@ -164,4 +164,4 @@ export github.auth.token="..."
 ### Best Practices
 
 - **Avoid Transactional**: Use the `@Transactional` annotation sparingly. It is useful for operations that span multiple database queries, but is very performance-intensive and generally can be solved differently. Good read: https://codete.com/blog/5-common-spring-transactional-pitfalls/
-- **Format using Prettier**: We use Prettier as code formatter. The npm setup of the main Hephaestus folder can be used to format the Java code. The commands `npm run format:application-server:check` and `npm run format:application-server:write` can be used to check and format the Java code, respectively. Make sure to run these scripts regularly to avoid formatting issues. 
+- **Format using Prettier**: We use Prettier as code formatter. The npm setup of the main Hephaestus folder can be used to format the Java code. The command `npm run format:java` can be used to format the Java code. Make sure to run this script regularly to avoid formatting issues. 
