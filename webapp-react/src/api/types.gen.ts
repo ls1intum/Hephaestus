@@ -42,11 +42,11 @@ export type WeatherHourly = {
 export type PageDocument = {
     totalPages?: number;
     totalElements?: number;
-    sort?: SortObject;
     pageable?: PageableObject;
-    numberOfElements?: number;
     first?: boolean;
     last?: boolean;
+    numberOfElements?: number;
+    sort?: SortObject;
     size?: number;
     content?: Array<Document>;
     number?: number;
@@ -297,45 +297,10 @@ export type TextUiPart = {
 };
 
 /**
- * BaseDocumentOutput
- * Base output payload returned by document tools.
- */
-export type BaseDocumentOutput = {
-    /**
-     * Content
-     */
-    content: string;
-    /**
-     * Createdat
-     */
-    createdAt: Date;
-    /**
-     * Id
-     */
-    id: string;
-    /**
-     * Kind
-     */
-    kind: 'TEXT';
-    /**
-     * Title
-     */
-    title: string;
-    /**
-     * Userid
-     */
-    userId: string;
-};
-
-/**
  * CreateDocumentInput
  * Input for createDocument tool.
  */
 export type CreateDocumentInput = {
-    /**
-     * Content
-     */
-    content: string;
     /**
      * Kind
      */
@@ -475,10 +440,6 @@ export type CreateDocumentOutput = {
      */
     content: string;
     /**
-     * Createdat
-     */
-    createdAt: Date;
-    /**
      * Id
      */
     id: string;
@@ -490,10 +451,6 @@ export type CreateDocumentOutput = {
      * Title
      */
     title: string;
-    /**
-     * Userid
-     */
-    userId: string;
 };
 
 /**
@@ -561,6 +518,19 @@ export type PullRequestBadPractice = {
     title: string;
     description: string;
     state: 'GOOD_PRACTICE' | 'FIXED' | 'CRITICAL_ISSUE' | 'NORMAL_ISSUE' | 'MINOR_ISSUE' | 'WONT_FIX' | 'WRONG';
+};
+
+export type TeamV2Info = {
+    id: number;
+    name: string;
+    parentId?: number;
+    description?: string;
+    privacy?: 'SECRET' | 'CLOSED';
+    organization?: string;
+    htmlUrl?: string;
+    lastSyncedAt?: Date;
+    membershipCount?: number;
+    repoPermissionCount?: number;
 };
 
 /**
@@ -786,11 +756,11 @@ export type StreamStepStartPart = {
 };
 
 export type PageableObject = {
-    sort?: SortObject;
     unpaged?: boolean;
     paged?: boolean;
     pageNumber?: number;
     pageSize?: number;
+    sort?: SortObject;
     offset?: number;
 };
 
@@ -963,10 +933,6 @@ export type UpdateDocumentOutput = {
      */
     content: string;
     /**
-     * Createdat
-     */
-    createdAt: Date;
-    /**
      * Id
      */
     id: string;
@@ -978,10 +944,6 @@ export type UpdateDocumentOutput = {
      * Title
      */
     title: string;
-    /**
-     * Userid
-     */
-    userId: string;
 };
 
 /**
@@ -1148,31 +1110,25 @@ export type StreamToolOutputErrorPart = {
  */
 export type UpdateDocumentInput = {
     /**
-     * Content
+     * Description
+     * The description of changes that need to be made
      */
-    content: string;
+    description: string;
     /**
      * Id
+     * The ID of the document to update
      */
     id: string;
-    /**
-     * Kind
-     */
-    kind: 'text';
-    /**
-     * Title
-     */
-    title: string;
 };
 
 export type PageDocumentSummary = {
     totalPages?: number;
     totalElements?: number;
-    sort?: SortObject;
     pageable?: PageableObject;
-    numberOfElements?: number;
     first?: boolean;
     last?: boolean;
+    numberOfElements?: number;
+    sort?: SortObject;
     size?: number;
     content?: Array<DocumentSummary>;
     number?: number;
@@ -2174,6 +2130,40 @@ export type GetThreadResponses = {
 };
 
 export type GetThreadResponse = GetThreadResponses[keyof GetThreadResponses];
+
+export type GetAllData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/teamsV2';
+};
+
+export type GetAllResponses = {
+    /**
+     * OK
+     */
+    200: Array<TeamV2Info>;
+};
+
+export type GetAllResponse = GetAllResponses[keyof GetAllResponses];
+
+export type GetByIdData = {
+    body?: never;
+    path: {
+        id: number;
+    };
+    query?: never;
+    url: '/api/teamsV2/{id}';
+};
+
+export type GetByIdResponses = {
+    /**
+     * OK
+     */
+    200: TeamV2Info;
+};
+
+export type GetByIdResponse = GetByIdResponses[keyof GetByIdResponses];
 
 export type DeleteVersionsAfterTimestampData = {
     body?: never;

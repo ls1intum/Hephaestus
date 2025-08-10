@@ -8,7 +8,7 @@ info:
   license:
     name: MIT License
     url: https://github.com/ls1intum/Hephaestus/blob/develop/LICENSE
-  version: 0.9.0-rc.5
+  version: 0.9.0-rc.8
 servers:
 - url: /
   description: Default Server URL
@@ -770,6 +770,39 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/ChatThreadDetail"
+  /api/teamsV2:
+    get:
+      tags:
+      - team-v-2
+      operationId: getAll
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/TeamV2Info"
+  /api/teamsV2/{id}:
+    get:
+      tags:
+      - team-v-2
+      operationId: getById
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: integer
+          format: int64
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TeamV2Info"
   /api/documents/{id}/versions:
     get:
       tags: []
@@ -1003,17 +1036,17 @@ components:
         totalElements:
           type: integer
           format: int64
-        sort:
-          $ref: "#/components/schemas/SortObject"
         pageable:
           $ref: "#/components/schemas/PageableObject"
-        numberOfElements:
-          type: integer
-          format: int32
         first:
           type: boolean
         last:
           type: boolean
+        numberOfElements:
+          type: integer
+          format: int32
+        sort:
+          $ref: "#/components/schemas/SortObject"
         size:
           type: integer
           format: int32
@@ -1351,47 +1384,11 @@ components:
       required:
       - text
       title: TextUIPart
-    BaseDocumentOutput:
-      type: object
-      description: Base output payload returned by document tools.
-      x-hephaestus-tool-model: true
-      properties:
-        content:
-          type: string
-          title: Content
-        createdAt:
-          type: string
-          format: date-time
-          title: Createdat
-        id:
-          type: string
-          title: Id
-        kind:
-          type: string
-          const: TEXT
-          title: Kind
-        title:
-          type: string
-          title: Title
-        userId:
-          type: string
-          title: Userid
-      required:
-      - content
-      - createdAt
-      - id
-      - kind
-      - title
-      - userId
-      title: BaseDocumentOutput
     CreateDocumentInput:
       type: object
       description: Input for createDocument tool.
       x-hephaestus-tool-model: true
       properties:
-        content:
-          type: string
-          title: Content
         kind:
           type: string
           const: text
@@ -1400,7 +1397,6 @@ components:
           type: string
           title: Title
       required:
-      - content
       - kind
       - title
       title: CreateDocumentInput
@@ -1578,10 +1574,6 @@ components:
         content:
           type: string
           title: Content
-        createdAt:
-          type: string
-          format: date-time
-          title: Createdat
         id:
           type: string
           title: Id
@@ -1592,16 +1584,11 @@ components:
         title:
           type: string
           title: Title
-        userId:
-          type: string
-          title: Userid
       required:
       - content
-      - createdAt
       - id
       - kind
       - title
-      - userId
       title: CreateDocumentOutput
     StreamFinishPart:
       type: object
@@ -1708,6 +1695,40 @@ components:
       - id
       - state
       - title
+    TeamV2Info:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+        name:
+          type: string
+        parentId:
+          type: integer
+          format: int64
+        description:
+          type: string
+        privacy:
+          type: string
+          enum:
+          - SECRET
+          - CLOSED
+        organization:
+          type: string
+        htmlUrl:
+          type: string
+        lastSyncedAt:
+          type: string
+          format: date-time
+        membershipCount:
+          type: integer
+          format: int32
+        repoPermissionCount:
+          type: integer
+          format: int32
+      required:
+      - id
+      - name
     StreamStartPart:
       type: object
       description: Start of stream event.
@@ -1934,8 +1955,6 @@ components:
     PageableObject:
       type: object
       properties:
-        sort:
-          $ref: "#/components/schemas/SortObject"
         unpaged:
           type: boolean
         paged:
@@ -1946,6 +1965,8 @@ components:
         pageSize:
           type: integer
           format: int32
+        sort:
+          $ref: "#/components/schemas/SortObject"
         offset:
           type: integer
           format: int64
@@ -2233,10 +2254,6 @@ components:
         content:
           type: string
           title: Content
-        createdAt:
-          type: string
-          format: date-time
-          title: Createdat
         id:
           type: string
           title: Id
@@ -2247,16 +2264,11 @@ components:
         title:
           type: string
           title: Title
-        userId:
-          type: string
-          title: Userid
       required:
       - content
-      - createdAt
       - id
       - kind
       - title
-      - userId
       title: UpdateDocumentOutput
     StreamToolInputErrorPart:
       type: object
@@ -2439,24 +2451,17 @@ components:
       description: Input for updateDocument tool.
       x-hephaestus-tool-model: true
       properties:
-        content:
+        description:
           type: string
-          title: Content
+          description: The description of changes that need to be made
+          title: Description
         id:
           type: string
+          description: The ID of the document to update
           title: Id
-        kind:
-          type: string
-          const: text
-          title: Kind
-        title:
-          type: string
-          title: Title
       required:
-      - content
+      - description
       - id
-      - kind
-      - title
       title: UpdateDocumentInput
     PageDocumentSummary:
       type: object
@@ -2467,17 +2472,17 @@ components:
         totalElements:
           type: integer
           format: int64
-        sort:
-          $ref: "#/components/schemas/SortObject"
         pageable:
           $ref: "#/components/schemas/PageableObject"
-        numberOfElements:
-          type: integer
-          format: int32
         first:
           type: boolean
         last:
           type: boolean
+        numberOfElements:
+          type: integer
+          format: int32
+        sort:
+          $ref: "#/components/schemas/SortObject"
         size:
           type: integer
           format: int32

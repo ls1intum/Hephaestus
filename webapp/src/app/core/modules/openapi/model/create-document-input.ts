@@ -15,7 +15,6 @@
  * Input for createDocument tool.
  */
 export interface CreateDocumentInput { 
-    content: string;
     kind: string;
     title: string;
 }

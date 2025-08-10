@@ -28,15 +28,11 @@ import org.hibernate.validator.constraints.*;
  * Input for createDocument tool.
  */
 @JsonPropertyOrder({
-  CreateDocumentInput.JSON_PROPERTY_CONTENT,
   CreateDocumentInput.JSON_PROPERTY_KIND,
   CreateDocumentInput.JSON_PROPERTY_TITLE
 })
 @jakarta.annotation.Generated(value = "org.openapitools.codegen.languages.JavaClientCodegen", comments = "Generator version: 7.7.0")
 public class CreateDocumentInput {
-  public static final String JSON_PROPERTY_CONTENT = "content";
-  private String content;
-
   public static final String JSON_PROPERTY_KIND = "kind";
   private String kind;
 
@@ -44,31 +40,6 @@ public class CreateDocumentInput {
   private String title;
 
   public CreateDocumentInput() {
-  }
-
-  public CreateDocumentInput content(String content) {
-    
-    this.content = content;
-    return this;
-  }
-
-  /**
-   * Get content
-   * @return content
-   */
-  @jakarta.annotation.Nonnull
-  @JsonProperty(JSON_PROPERTY_CONTENT)
-  @JsonInclude(value = JsonInclude.Include.ALWAYS)
-
-  public String getContent() {
-    return content;
-  }
-
-
-  @JsonProperty(JSON_PROPERTY_CONTENT)
-  @JsonInclude(value = JsonInclude.Include.ALWAYS)
-  public void setContent(String content) {
-    this.content = content;
   }
 
   public CreateDocumentInput kind(String kind) {
@@ -130,21 +101,19 @@ public class CreateDocumentInput {
       return false;
     }
     CreateDocumentInput createDocumentInput = (CreateDocumentInput) o;
-    return Objects.equals(this.content, createDocumentInput.content) &&
-        Objects.equals(this.kind, createDocumentInput.kind) &&
+    return Objects.equals(this.kind, createDocumentInput.kind) &&
         Objects.equals(this.title, createDocumentInput.title);
   }
 
   @Override
   public int hashCode() {
-    return Objects.hash(content, kind, title);
+    return Objects.hash(kind, title);
   }
 
   @Override
   public String toString() {
     StringBuilder sb = new StringBuilder();
     sb.append("class CreateDocumentInput {\n");
-    sb.append("    content: ").append(toIndentedString(content)).append("\n");
     sb.append("    kind: ").append(toIndentedString(kind)).append("\n");
     sb.append("    title: ").append(toIndentedString(title)).append("\n");
     sb.append("}");

@@ -31,39 +31,6 @@ components:
       - Wrong
       title: BadPracticeStatus
       type: string
-    BaseDocumentOutput:
-      description: Base output payload returned by document tools.
-      properties:
-        content:
-          title: Content
-          type: string
-        createdAt:
-          format: date-time
-          title: Createdat
-          type: string
-        id:
-          title: Id
-          type: string
-        kind:
-          const: TEXT
-          title: Kind
-          type: string
-        title:
-          title: Title
-          type: string
-        userId:
-          title: Userid
-          type: string
-      required:
-      - id
-      - createdAt
-      - title
-      - content
-      - kind
-      - userId
-      title: BaseDocumentOutput
-      type: object
-      x-hephaestus-tool-model: true
     ChatRequest:
       description: Chat request model.
       properties:
@@ -119,9 +86,6 @@ components:
     CreateDocumentInput:
       description: Input for createDocument tool.
       properties:
-        content:
-          title: Content
-          type: string
         kind:
           const: text
           title: Kind
@@ -131,7 +95,6 @@ components:
           type: string
       required:
       - title
-      - content
       - kind
       title: CreateDocumentInput
       type: object
@@ -141,10 +104,6 @@ components:
       properties:
         content:
           title: Content
-          type: string
-        createdAt:
-          format: date-time
-          title: Createdat
           type: string
         id:
           title: Id
@@ -156,16 +115,11 @@ components:
         title:
           title: Title
           type: string
-        userId:
-          title: Userid
-          type: string
       required:
       - id
-      - createdAt
       - title
-      - content
       - kind
-      - userId
+      - content
       title: CreateDocumentOutput
       type: object
       x-hephaestus-tool-model: true
@@ -1228,24 +1182,17 @@ components:
     UpdateDocumentInput:
       description: Input for updateDocument tool.
       properties:
-        content:
-          title: Content
+        description:
+          description: The description of changes that need to be made
+          title: Description
           type: string
         id:
+          description: The ID of the document to update
           title: Id
-          type: string
-        kind:
-          const: text
-          title: Kind
-          type: string
-        title:
-          title: Title
           type: string
       required:
       - id
-      - title
-      - content
-      - kind
+      - description
       title: UpdateDocumentInput
       type: object
       x-hephaestus-tool-model: true
@@ -1254,10 +1201,6 @@ components:
       properties:
         content:
           title: Content
-          type: string
-        createdAt:
-          format: date-time
-          title: Createdat
           type: string
         id:
           title: Id
@@ -1269,16 +1212,11 @@ components:
         title:
           title: Title
           type: string
-        userId:
-          title: Userid
-          type: string
       required:
       - id
-      - createdAt
       - title
-      - content
       - kind
-      - userId
+      - content
       title: UpdateDocumentOutput
       type: object
       x-hephaestus-tool-model: true
