@@ -1,4 +1,4 @@
-from typing import List, Any, Optional
+from typing import List, Any
 
 from langchain_core.language_models.fake_chat_models import FakeChatModel
 from langchain_core.language_models.chat_models import BaseChatModel

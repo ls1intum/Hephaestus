@@ -18,16 +18,6 @@ import org.springframework.http.MediaType;
 import org.springframework.test.web.reactive.server.WebTestClient;
 import org.springframework.transaction.annotation.Transactional;
 
-/**
- * Perfect API Design Integration Tests following industry best practices.
- *
- * API Design Principles:
- * ✅ RESTful resource-oriented URLs
- * ✅ Proper HTTP verbs and status codes
- * ✅ Consistent request/response patterns
- * ✅ Clear separation of concerns
- * ✅ Intuitive endpoint naming
- */
 @AutoConfigureWebTestClient
 @Transactional
 public class DocumentControllerIT extends BaseIntegrationTest {

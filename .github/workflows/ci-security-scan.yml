@@ -55,10 +55,10 @@ jobs:
           
           # Node.js build 
           cd ../../webapp-react
-          
+
           # Always install to avoid half-restored caches
           npm ci --prefer-offline --no-audit
-          
+
           npm run build
 
           # Python dependencies
