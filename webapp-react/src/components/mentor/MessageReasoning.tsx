@@ -143,19 +143,36 @@ export function MessageReasoning({
 				: null,
 		[sections],
 	);
+	const hasTiming = startRef.current != null && endRef.current != null;
 	const headerText = isLoading
 		? lastHeading || "Thinking"
-		: elapsedMs <= 10 // If 10ms or less (including 0), show generic message
-			? "Reasoned for some time"
-			: `Thought for ${formatDuration(elapsedMs)}`;
+		: hasTiming
+			? `Thought for ${formatDuration(elapsedMs)}`
+			: lastHeading || "Reasoning details";
 
 	return (
 		<div className="flex flex-col">
 			{isLoading && !hasContent ? (
 				// Loading, but no content yet: static header with shimmer
 				<div className="flex flex-col gap-1">
-					<div className="font-medium text-muted-foreground">Thinking</div>
-					<div className="h-1.5 w-24 rounded-full skeleton-div" />
+					{/* Embed keyframes locally so Storybook always has them */}
+					<style>{`
+						@keyframes message-reasoning-shimmer { from { background-position-x: -200%; } to { background-position-x: 200%; } }
+						@media (prefers-reduced-motion: reduce) { .mr-shimmer { animation: none !important; } }
+					`}</style>
+					<div className="font-medium text-muted-foreground relative inline-block align-middle">
+						<span>{"Thinking"}</span>
+						<span
+							aria-hidden
+							className="absolute inset-0 pointer-events-none opacity-70 mr-shimmer"
+							style={{
+								background:
+									"linear-gradient(90deg, transparent 45%, rgba(255,255,255,0.6) 50%, transparent 55%)",
+								backgroundSize: "200% 100%",
+								animation: "message-reasoning-shimmer 1.4s linear infinite reverse",
+							}}
+						/>
+					</div>
 				</div>
 			) : (
 				// Either not loading, or loading with some content: clickable header (no chevron/spinner)
@@ -170,10 +187,26 @@ export function MessageReasoning({
 						setIsExpanded(!isExpanded);
 					}}
 				>
-					<div className="font-medium">{headerText}</div>
-					{isLoading && (
-						<div className="h-1.5 w-24 rounded-full skeleton-div" />
-					)}
+					<div className="font-medium relative inline-block align-middle">
+						{/* Embed keyframes locally so Storybook always has them */}
+						<style>{`
+							@keyframes message-reasoning-shimmer { from { background-position-x: -200%; } to { background-position-x: 200%; } }
+							@media (prefers-reduced-motion: reduce) { .mr-shimmer { animation: none !important; } }
+						`}</style>
+						<span>{headerText}</span>
+						{isLoading && (
+							<span
+								aria-hidden
+								className="absolute inset-0 pointer-events-none opacity-70 mr-shimmer"
+								style={{
+									background:
+										"linear-gradient(90deg, transparent 20%, rgba(255,255,255,0.6) 50%, transparent 55%)",
+									backgroundSize: "200% 100%",
+									animation: "message-reasoning-shimmer 2s linear infinite reverse",
+								}}
+							/>
+						)}
+					</div>
 				</button>
 			)}
 

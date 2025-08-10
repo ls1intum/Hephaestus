@@ -294,3 +294,30 @@ code {
 	border: none !important;
 	box-shadow: none !important;
 }
+
+/* Shimmer overlay utilities */
+@keyframes shimmer-glide {
+	from { background-position-x: -200%; }
+	to { background-position-x: 200%; }
+}
+
+.shimmer-overlay {
+	position: relative;
+}
+
+.shimmer-overlay::after {
+	content: "";
+	position: absolute;
+	inset: 0;
+	background: linear-gradient(90deg, transparent, rgba(255,255,255,0.5), transparent);
+	background-size: 200% 100%;
+	animation: shimmer-glide 1.4s linear infinite;
+	pointer-events: none;
+	border-radius: 0.25rem;
+}
+
+@media (prefers-reduced-motion: reduce) {
+	.shimmer-overlay::after {
+		animation: none !important;
+	}
+}

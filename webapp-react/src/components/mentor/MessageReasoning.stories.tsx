@@ -20,23 +20,20 @@ const meta = {
 	},
 	args: {
 		isLoading: false,
-		reasoning: `I need to analyze this problem step by step:
+		reasoning: `**Goal**
+Build components that are easy to reason about and change.
+Minimize implicit behavior and side-effects.
+Favor obvious data flow and clear ownership.
 
-## Problem Analysis
-The user is asking about React component design patterns. This requires understanding:
+**Plan**
+Compose small parts with simple contracts.
+Keep props minimal but expressive, with sensible defaults.
+Introduce error boundaries where the blast radius is smallest.
+Document intent alongside edge cases.
 
-1. **Component composition** - How to structure components for reusability
-2. **State management** - Where and how to manage component state  
-3. **Props design** - Creating clean, intuitive component APIs
-
-## Approach
-I'll recommend following these principles:
-- Keep components focused and single-purpose
-- Use composition over inheritance
-- Design clear prop interfaces
-- Implement proper error boundaries
-
-This approach will result in maintainable, testable components.`,
+**Outcome**
+Predictable, testable components that fail gracefully.
+Lower cognitive load for future contributors.`,
 	},
 	decorators: [
 		(Story) => (
@@ -60,8 +57,10 @@ export const Default: Story = {};
  */
 export const Loading: Story = {
 	args: {
-		isLoading: true,
-		reasoning: "", // No content while loading
+	isLoading: true,
+	reasoning: `**Analyzing context**
+Collecting signals from prior messages and metadata.
+Estimating ambiguity and selecting a suitable approach.`,
 	},
 };
 
@@ -70,8 +69,14 @@ export const Loading: Story = {
  */
 export const ShortReasoning: Story = {
 	args: {
-		reasoning:
-			"Quick analysis: This is a straightforward question about JavaScript fundamentals. The user needs a clear explanation of closures and their practical applications.",
+	reasoning: `**Question**
+What is a closure and why is it useful?
+Provide a concrete example.
+
+**Answer**
+A closure is a function that captures variables from its outer scope.
+It enables encapsulation and factories by retaining state across calls.
+E.g., a counter function that remembers its internal value.`,
 	},
 };
 
@@ -80,47 +85,26 @@ export const ShortReasoning: Story = {
  */
 export const ComplexReasoning: Story = {
 	args: {
-		reasoning: `# Comprehensive Analysis
+	reasoning: `**Context**
+TypeScript generics provide flexibility while preserving type safety.
+They allow APIs to work across many types without resorting to any.
+Good generic design keeps call sites readable.
 
-This question requires a multi-faceted approach to provide a complete answer.
+**Core concepts**
+Type parameters with constraints define legal shapes.
+Conditional and mapped types model transformations succinctly.
+Inference often removes the need to specify T explicitly.
 
-## Technical Context
-The user is asking about TypeScript generics, which involves:
-
-### Core Concepts
-1. **Type Parameters** - How to define flexible type constraints
-2. **Generic Functions** - Creating reusable function signatures
-3. **Generic Classes** - Building type-safe class hierarchies
-4. **Conditional Types** - Advanced type manipulation
-
-### Code Example
-\`\`\`typescript
-interface Repository<T> {
-  findById(id: string): Promise<T | null>;
-  save(entity: T): Promise<T>;
-  delete(id: string): Promise<void>;
-}
-
-class UserRepository implements Repository<User> {
-  async findById(id: string): Promise<User | null> {
-    // Implementation details
-    return await db.users.findUnique({ where: { id } });
-  }
-}
+**Example**
+\`\`\`ts
+function wrap<T>(v: T): { value: T } { return { value: v } }
 \`\`\`
+This preserves the exact type of v for downstream consumers.
 
-## Best Practices
-- Use meaningful constraint names
-- Provide default type parameters when appropriate
-- Document generic constraints clearly
-- Consider variance and type compatibility
-
-## Common Pitfalls
-- Over-constraining type parameters
-- Not providing sufficient type information
-- Mixing runtime and compile-time concerns
-
-This comprehensive approach ensures the user understands both theory and practical application.`,
+**Best practices**
+Prefer fewer, well-named type parameters.
+Document constraints and default types.
+Avoid over-generalization that harms ergonomics.`,
 	},
 };
 
@@ -129,33 +113,22 @@ This comprehensive approach ensures the user understands both theory and practic
  */
 export const StructuredReasoning: Story = {
 	args: {
-		reasoning: `## Problem Breakdown
+	reasoning: `**Hook rules**
+Call hooks at the top level of React functions only.
+Never call hooks conditionally; guard inside the effect or callback.
+Rely on the ESLint plugin to enforce best practices.
 
-The user's question about React hooks requires addressing several key areas:
+**Common patterns**
+useState for local state; useEffect for side-effects.
+useMemo and useCallback to memoize expensive work or stable refs.
 
-### 1. Hook Rules
-- Only call hooks at the top level
-- Only call hooks from React functions
-- Use ESLint plugin for enforcement
+**Custom hooks**
+Extract reusable, stateful logic behind a descriptive API.
+Test the hook in isolation to validate behavior.
 
-### 2. Common Patterns
-- **useState**: Local component state
-- **useEffect**: Side effects and lifecycle
-- **useContext**: Consuming context values
-- **useCallback**: Memoizing functions
-- **useMemo**: Memoizing expensive calculations
-
-### 3. Custom Hooks
-Benefits of creating custom hooks:
-- Reusable stateful logic
-- Better separation of concerns
-- Easier testing
-- Cleaner component code
-
-### 4. Performance Considerations
-> Important: Not all hooks need optimization. Profile first, optimize second.
-
-The recommendation should focus on practical examples and common use cases.`,
+**Performance**
+Measure first; only memoize where it matters.
+Prefer algorithmic wins over micro-optimizations.`,
 	},
 };
 
@@ -164,30 +137,16 @@ The recommendation should focus on practical examples and common use cases.`,
  */
 export const MathematicalReasoning: Story = {
 	args: {
-		reasoning: `## Mathematical Approach
+	reasoning: `**Time**
+Hash map approach is O(n) due to single pass and O(1) average lookup.
+Sorting-based approach is O(n log n) primarily due to the sort.
 
-To solve this algorithm problem, I need to consider the computational complexity:
+**Space**
+Hash map uses O(n) additional memory for visited elements.
+Two-pointer on sorted data can be O(1) extra space.
 
-### Time Complexity Analysis
-- **Brute Force**: O(n²) - checking every pair
-- **Hash Map**: O(n) - single pass with lookup
-- **Sorted Array**: O(n log n) - due to sorting step
-
-### Space Complexity
-- Hash map approach uses O(n) additional space
-- Two-pointer technique uses O(1) space
-
-### Optimal Solution
-Given the constraints (n ≤ 10⁴), the hash map approach is most efficient:
-
-1. **Initialize** empty hash map
-2. **Iterate** through array once
-3. **Check** if complement exists in map
-4. **Return** indices when found
-
-Expected time: O(n), worst case: O(n)
-
-This balances readability with performance for the given constraints.`,
+**Pick**
+Given large n and one pass constraints, choose hashing for speed.`,
 	},
 };
 
@@ -205,41 +164,19 @@ export const EmptyReasoning: Story = {
  */
 export const TechnicalReasoning: Story = {
 	args: {
-		reasoning: `## Database Query Optimization
+	reasoning: `**Query issues**
+SELECT * inflates payload and blocks index-only scans.
+Missing composite indexes cause full scans on high-cardinality columns.
+No LIMIT hurts p99 latency for large result sets.
 
-The user's performance issue requires analyzing the SQL query execution plan.
+**Fix**
+Select only required columns; push predicates into WHERE.
+Add pagination (LIMIT/OFFSET or keyset) to bound work.
 
-### Current Query Issues
-\`\`\`sql
-SELECT * FROM users u
-JOIN orders o ON u.id = o.user_id
-WHERE u.created_at > '2024-01-01'
-ORDER BY o.created_at DESC;
-\`\`\`
-
-**Problems identified:**
-- Missing index on \`users.created_at\`
-- SELECT * pulls unnecessary columns
-- No limit clause for pagination
-
-### Optimized Solution
-\`\`\`sql
-SELECT u.id, u.name, o.id as order_id, o.total
-FROM users u
-JOIN orders o ON u.id = o.user_id
-WHERE u.created_at > '2024-01-01'
-  AND u.status = 'active'
-ORDER BY o.created_at DESC
-LIMIT 50 OFFSET 0;
-\`\`\`
-
-### Required Indexes
-\`\`\`sql
-CREATE INDEX idx_users_created_status ON users(created_at, status);
-CREATE INDEX idx_orders_user_created ON orders(user_id, created_at);
-\`\`\`
-
-This should reduce query time from ~2000ms to ~50ms.`,
+**Indexes**
+\`CREATE INDEX idx_users_created_status ON users(created_at, status);\`
+\`CREATE INDEX idx_orders_user_created ON orders(user_id, created_at);\`
+These enable selective filters and efficient ordering.`,
 	},
 };
 
@@ -249,15 +186,15 @@ This should reduce query time from ~2000ms to ~50ms.`,
  */
 export const ReasonedForAWhile: Story = {
 	args: {
-		reasoning: `Simple response: The answer is 42.
-
-This was a quick calculation that didn't require extensive reasoning.`,
+	reasoning: `**Summary**
+Answer is 42 based on the problem constraints.
+The calculation is straightforward and needs no deeper derivation.`,
 	},
 	parameters: {
 		docs: {
 			description: {
-				story:
-					'When timing information is not available (e.g., loading from database), the component shows "Reasoned for a while" instead of trying to calculate duration.',
+		story:
+		    "When timing isn't available, the header uses the last heading (e.g., 'Summary') instead of a duration.",
 			},
 		},
 	},
