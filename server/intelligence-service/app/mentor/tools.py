@@ -1,8 +1,12 @@
-import json
+import asyncio
 import requests
+from uuid import uuid4
 from typing import Annotated, List, Dict, Any, Literal
 from langchain_core.tools import tool
 from langgraph.prebuilt import InjectedState
+from langchain_core.runnables import RunnableConfig
+from langchain.chat_models import init_chat_model
+from app.settings import settings
 
 from app.logger import logger
 from app.db.service import IssueDatabaseService
@@ -15,8 +19,33 @@ from app.mentor.models import (
     UpdateDocumentOutput,
     GetWeatherOutput,
 )
+from typing import Any, Optional
+from langchain_core.runnables import RunnableConfig
+from langchain_core.callbacks.manager import adispatch_custom_event
+
 
 logger = logger.getChild(__name__)
+
+model = init_chat_model(settings.MODEL_NAME, reasoning={"summary": "auto"})
+
+# Helper function to emit data events
+async def emit_data(
+    *,
+    config: RunnableConfig,
+    type_name: str,
+    data: Any,
+    transient: bool = True,
+    id: Optional[str] = None,
+) -> None:
+    """Emit a custom event named data-<type_name> with a standardized payload.
+
+    Payload shape: {"data": <data>, "transient": <bool>, (optional) "id": <str>}
+    """
+    payload: dict[str, Any] = {"data": data, "transient": transient}
+    # Careful, this will replace the data part of with the last id equal to id
+    if id is not None:
+        payload["id"] = id
+    await adispatch_custom_event(f"data-{type_name}", payload, config=config)
 
 
 @tool("getWeather", args_schema=GetWeatherInput)
@@ -70,31 +99,66 @@ def get_weather(latitude: float, longitude: float) -> Dict[str, Any]:
 
 
 @tool("createDocument", args_schema=CreateDocumentInput)
-def create_document(title: str, content: str, kind: Literal["text"]) -> Dict[str, Any]:
-    """Signal creation of a document. The app server performs the actual write.
+async def create_document(
+    title: str,
+    kind: Literal["text"],
+    *,
+    config: RunnableConfig,
+) -> Dict[str, Any]:
+    """Create a document for a writing or content creation activities. This tool will call other functions that will generate the contents of the document based on the title and kind."""
 
-    Returns an acknowledgement envelope mirroring the reference AI SDK v5 behavior. The
-    server consumes the tool input and streams data-* UI parts as the document is created.
-    """
-    try:
-        return {
-            "accepted": True,
-            "input": {"title": title, "content": content, "kind": kind},
-        }
-    except Exception as e:
-        logger.exception("create_document: unexpected error: %s", e)
-        return {"accepted": False, "error": str(e)}
+    document_id = str(uuid4())
+
+    await emit_data(config=config, type_name="kind", data=kind, transient=True)
+    await emit_data(config=config, type_name="id", data=document_id, transient=True)
+    await emit_data(config=config, type_name="title", data=title, transient=True)
+    await emit_data(config=config, type_name="clear", data=None, transient=True)
+
+    msgs = [
+        {"role": "system", "content": "Write a short markdown intro for the doc."},
+        {"role": "user", "content": f"Title: {title}"}
+    ]
+    async for chunk in model.astream(msgs, config=config):
+        textDelta = chunk.text()
+        if textDelta:
+            await emit_data(config=config, type_name="textDelta", data=textDelta, transient=True)
+
+    await emit_data(config=config, type_name="finish", data=None, transient=True)
+
+    return {"id": document_id, "title": title, "kind": kind, "content": "A document was created and is now visible to the user."}
 
 
 @tool("updateDocument", args_schema=UpdateDocumentInput)
-def update_document(
-    id: str, title: str, content: str, kind: Literal["text"]
+async def update_document(
+    id: str,
+    title: str,
+    content: str,
+    kind: Literal["text"],
+    *,
+    config: RunnableConfig,
 ) -> Dict[str, Any]:
     """Signal update of a document. The app server performs the actual write.
 
     Returns an acknowledgement envelope; the server streams the concrete result.
     """
     try:
+        # Clear preview (transient)
+        await emit_data(config=config, type_name="clear", data=None, transient=True)
+
+        # Ask inner LLM to propose updates; stream tokens will be forwarded via config
+        prompt = (
+            f"Update the {kind} document '{title}'. "
+            "Generate revised content based on the user's edits and suggestions."
+        )
+        msgs = [
+            {"role": "system", "content": "Generate concise markdown patch sections."},
+            {"role": "user", "content": prompt},
+        ]
+        try:
+            await _inner_llm.ainvoke(msgs, config=config)
+        except Exception:
+            logger.debug("Inner LLM call in updateDocument did not stream or failed; continuing")
+
         return {
             "accepted": True,
             "input": {"id": id, "title": title, "content": content, "kind": kind},

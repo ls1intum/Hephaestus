@@ -603,7 +603,6 @@ class CreateDocumentInput(ToolInputBase):
     """Input for createDocument tool."""
 
     title: str
-    content: str
     kind: Literal["text"]
 
 
