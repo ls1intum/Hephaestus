@@ -113,10 +113,7 @@ async def generate_response(
                     elif isinstance(chunk.content, list):
                         # Collect 'text' from content parts
                         for part in chunk.content:
-                            if (
-                                isinstance(part, dict)
-                                and part.get("type") == "text"
-                            ):
+                            if isinstance(part, dict) and part.get("type") == "text":
                                 part_text = part.get("text")
                                 if isinstance(part_text, str):
                                     text_delta += part_text
@@ -187,7 +184,11 @@ async def generate_response(
                             pass
 
                 # Fallback: derive deltas from aggregated tool_call args if no chunks provided
-                if not used_tool_call_chunks and hasattr(chunk, "tool_calls") and chunk.tool_calls:
+                if (
+                    not used_tool_call_chunks
+                    and hasattr(chunk, "tool_calls")
+                    and chunk.tool_calls
+                ):
                     for tool_call in chunk.tool_calls:
                         tool_call_id = tool_call.get("id")
                         tool_name = tool_call.get("name")
@@ -334,14 +335,14 @@ async def generate_response(
                         transient=transient,
                         data_id=data_id,
                     )
-                
-                logger.debug(
-                    f"on_custom_event event: {json.dumps(event, indent=2)}"
-                )
+
+                logger.debug(f"on_custom_event event: {json.dumps(event, indent=2)}")
 
             # Handle any errors
             elif event_type == "on_chain_error":
-                error_msg = f"Error in {name}: {event_data.get('error', 'Unknown error')}"
+                error_msg = (
+                    f"Error in {name}: {event_data.get('error', 'Unknown error')}"
+                )
                 logger.error(error_msg)
                 yield stream.error(error_msg)
 

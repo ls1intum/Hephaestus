@@ -28,6 +28,7 @@ logger = logger.getChild(__name__)
 
 model = init_chat_model(settings.MODEL_NAME, reasoning={"summary": "auto"})
 
+
 # Helper function to emit data events
 async def emit_data(
     *,
@@ -115,57 +116,68 @@ async def create_document(
     await emit_data(config=config, type_name="clear", data=None, transient=True)
 
     msgs = [
-        {"role": "system", "content": "Write a short markdown intro for the doc."},
-        {"role": "user", "content": f"Title: {title}"}
+        {
+            "role": "system",
+            "content": "Write about the given topic. Markdown is supported. Use headings wherever appropriate.",
+        },
+        {"role": "user", "content": title},
     ]
     async for chunk in model.astream(msgs, config=config):
         textDelta = chunk.text()
         if textDelta:
-            await emit_data(config=config, type_name="textDelta", data=textDelta, transient=True)
+            await emit_data(
+                config=config, type_name="textDelta", data=textDelta, transient=True
+            )
 
     await emit_data(config=config, type_name="finish", data=None, transient=True)
 
-    return {"id": document_id, "title": title, "kind": kind, "content": "A document was created and is now visible to the user."}
+    return {
+        "id": document_id,
+        "title": title,
+        "kind": kind,
+        "content": "A document was created and is now visible to the user.",
+    }
 
 
 @tool("updateDocument", args_schema=UpdateDocumentInput)
 async def update_document(
     id: str,
-    title: str,
-    content: str,
-    kind: Literal["text"],
+    description: str,
     *,
     config: RunnableConfig,
 ) -> Dict[str, Any]:
-    """Signal update of a document. The app server performs the actual write.
+    """Update a document with the given description."""
 
-    Returns an acknowledgement envelope; the server streams the concrete result.
-    """
-    try:
-        # Clear preview (transient)
-        await emit_data(config=config, type_name="clear", data=None, transient=True)
+    # Retrieve document, if not found -> error with Document not found
+    # TODO: Retrieve document from db
+    # TODO: Figure out exception handling
 
-        # Ask inner LLM to propose updates; stream tokens will be forwarded via config
-        prompt = (
-            f"Update the {kind} document '{title}'. "
-            "Generate revised content based on the user's edits and suggestions."
-        )
-        msgs = [
-            {"role": "system", "content": "Generate concise markdown patch sections."},
-            {"role": "user", "content": prompt},
-        ]
-        try:
-            await _inner_llm.ainvoke(msgs, config=config)
-        except Exception:
-            logger.debug("Inner LLM call in updateDocument did not stream or failed; continuing")
+    # Clear preview (transient)
+    await emit_data(config=config, type_name="clear", data=None, transient=True)
 
-        return {
-            "accepted": True,
-            "input": {"id": id, "title": title, "content": content, "kind": kind},
-        }
-    except Exception as e:
-        logger.exception("update_document: unexpected error: %s", e)
-        return {"accepted": False, "error": str(e)}
+    # TODO: currentContent placeholder
+    msgs = [
+        {
+            "role": "system",
+            "content": "Improve the following contents of the document based on the given prompt.\n\n{currentContent}",
+        },
+        {"role": "user", "content": description},
+    ]
+    async for chunk in model.astream(msgs, config=config):
+        textDelta = chunk.text()
+        if textDelta:
+            await emit_data(
+                config=config, type_name="textDelta", data=textDelta, transient=True
+            )
+
+    await emit_data(config=config, type_name="finish", data=None, transient=True)
+
+    return {
+        "id": id,
+        "title": "",  # TODO: document.title
+        "kind": "",  # TODO: document.kind
+        "content": "The document has been updated successfully.",
+    }
 
 
 @tool

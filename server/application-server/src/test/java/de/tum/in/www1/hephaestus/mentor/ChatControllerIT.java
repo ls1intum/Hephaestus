@@ -104,11 +104,7 @@ public class ChatControllerIT extends BaseIntegrationTest {
         streamParts.add(new StreamStepStartPart());
         streamParts.add(new StreamSourceUrlPart().sourceId(sourceId).url(url).title(title));
         streamParts.add(
-            new StreamSourceDocumentPart()
-                .sourceId(docSourceId)
-                .mediaType(mediaType)
-                .title(docTitle)
-                .filename(filename)
+            new StreamSourceDocumentPart().sourceId(docSourceId).mediaType(mediaType).title(docTitle).filename(filename)
         );
         streamParts.add(new StreamFilePart().url(fileUrl).mediaType(fileMediaType));
         streamParts.add(new StreamStepFinishPart());
@@ -122,8 +118,7 @@ public class ChatControllerIT extends BaseIntegrationTest {
         // Then
         StepVerifier.create(response).expectComplete();
 
-        var assistantMessage =
-            chatMessageRepository.findById(UUID.fromString(responseMessageId)).orElseThrow();
+        var assistantMessage = chatMessageRepository.findById(UUID.fromString(responseMessageId)).orElseThrow();
         var parts = assistantMessage.getParts();
 
         assertThat(parts).hasSize(4);
@@ -178,8 +173,7 @@ public class ChatControllerIT extends BaseIntegrationTest {
         // Then
         StepVerifier.create(response).expectComplete();
 
-        var assistantMessage =
-            chatMessageRepository.findById(UUID.fromString(responseMessageId)).orElseThrow();
+        var assistantMessage = chatMessageRepository.findById(UUID.fromString(responseMessageId)).orElseThrow();
         var parts = assistantMessage.getParts();
 
         // Only step-start should have been persisted

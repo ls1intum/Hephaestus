@@ -609,29 +609,28 @@ class CreateDocumentInput(ToolInputBase):
 class UpdateDocumentInput(ToolInputBase):
     """Input for updateDocument tool."""
 
-    id: str  # UUID string
-    title: str
-    content: str
-    kind: Literal["text"]
+    id: str = Field(..., description="The ID of the document to update")
+    description: str = Field(
+        ..., description="The description of changes that need to be made"
+    )
 
 
-class BaseDocumentOutput(ToolOutputBase):
-    """Base output payload returned by document tools."""
-
-    id: str
-    createdAt: datetime
-    title: str
-    content: str
-    kind: Literal["TEXT"]
-    userId: str
-
-
-class CreateDocumentOutput(BaseDocumentOutput):
+class CreateDocumentOutput(ToolOutputBase):
     """Output for createDocument tool."""
 
+    id: str
+    title: str
+    kind: Literal["TEXT"]
+    content: str
 
-class UpdateDocumentOutput(BaseDocumentOutput):
+
+class UpdateDocumentOutput(ToolOutputBase):
     """Output for updateDocument tool."""
+
+    id: str
+    title: str
+    kind: Literal["TEXT"]
+    content: str
 
 
 class GetWeatherInput(ToolInputBase):
