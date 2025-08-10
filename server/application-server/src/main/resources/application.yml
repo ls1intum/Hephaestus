@@ -1,7 +1,7 @@
 spring:
     application:
         name: Hephaestus
-        version: "0.9.0-rc.5"
+        version: "0.9.0-rc.8"
 
     datasource:
         url: jdbc:postgresql://localhost:5432/hephaestus
@@ -67,6 +67,7 @@ hephaestus:
     workspace:
         init-default: true
         default:
+            organization: ls1intum
             repositories-to-monitor: ls1intum/Hephaestus
     
     intelligence-service:
