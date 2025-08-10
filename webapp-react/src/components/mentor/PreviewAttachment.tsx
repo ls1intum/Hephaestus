@@ -1,5 +1,5 @@
 import type { Attachment } from "@/lib/types";
-import { LoaderIcon } from "./Icons";
+import { LoaderIcon } from "./LoaderIcon";
 
 export const PreviewAttachment = ({
 	attachment,

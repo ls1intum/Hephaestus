@@ -1,8 +1,9 @@
+import { FileText, Maximize } from "lucide-react";
 import { type MouseEvent, memo, useCallback } from "react";
 import type { Document } from "@/api/types.gen";
 import { cn } from "@/lib/utils";
 import { InlineDocumentSkeleton } from "./DocumentSkeleton";
-import { FileIcon, FullscreenIcon, LoaderIcon } from "./Icons";
+import { LoaderIcon } from "./LoaderIcon";
 import { TextEditor } from "./TextEditor";
 
 interface DocumentPreviewProps {
@@ -74,7 +75,7 @@ const LoadingSkeleton = () => (
 				<div className="h-4 w-32 bg-muted-foreground/20 rounded animate-pulse" />
 			</div>
 			<div className="text-muted-foreground">
-				<FullscreenIcon />
+				<Maximize />
 			</div>
 		</div>
 		<div className="overflow-y-scroll border rounded-b-2xl p-8 pt-4 bg-muted border-t-0 dark:border-zinc-700">
@@ -95,8 +96,8 @@ const PureHitboxLayer = ({ onClick }: HitboxLayerProps) => (
 		aria-label="Open document in full view"
 	>
 		<div className="w-full p-4 flex justify-end items-center">
-			<div className="absolute right-[9px] top-[13px] p-2 hover:dark:bg-zinc-700 rounded-md hover:bg-zinc-100">
-				<FullscreenIcon />
+			<div className="absolute right-[10px] top-[10px] p-2 hover:dark:bg-zinc-700 rounded-md hover:bg-zinc-100">
+				<Maximize />
 			</div>
 		</div>
 	</button>
@@ -118,7 +119,7 @@ const PureDocumentHeader = ({ title, isStreaming }: DocumentHeaderProps) => (
 						<LoaderIcon />
 					</div>
 				) : (
-					<FileIcon />
+					<FileText />
 				)}
 			</div>
 			<div className="-translate-y-1 sm:translate-y-0 font-medium">{title}</div>

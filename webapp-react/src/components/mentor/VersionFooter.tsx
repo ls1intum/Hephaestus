@@ -4,7 +4,7 @@ import { useWindowSize } from "usehooks-ts";
 import type { Document } from "@/api/types.gen";
 
 import { Button } from "@/components/ui/button";
-import { LoaderIcon } from "./Icons";
+import { LoaderIcon } from "./LoaderIcon";
 
 interface VersionFooterProps {
 	/** Handler for version navigation */

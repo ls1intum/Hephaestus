@@ -1,6 +1,7 @@
+import { FileText, MessageCircle, PenLine } from "lucide-react";
 import { memo } from "react";
 import type { ArtifactKind } from "./Artifact";
-import { FileIcon, LoaderIcon, MessageIcon, PencilEditIcon } from "./Icons";
+import { LoaderIcon } from "./LoaderIcon";
 
 const getActionText = (
 	type: "create" | "update" | "request-suggestions",
@@ -76,20 +77,20 @@ function PureDocumentTool({
 	// Icon logic
 	let icon: React.ReactNode;
 	if (type === "create") {
-		icon = <FileIcon />;
+		icon = <FileText />;
 	} else if (type === "update") {
-		icon = <PencilEditIcon />;
+		icon = <PenLine />;
 	} else if (type === "request-suggestions") {
-		icon = <MessageIcon />;
+		icon = <MessageCircle />;
 	}
 
 	return (
 		<button
 			type="button"
-			className="bg-background cursor-pointer border py-2 px-3 rounded-xl w-fit flex flex-row gap-3 items-start"
+			className="bg-background cursor-pointer border py-2 px-3 rounded-xl w-fit flex flex-row gap-3 items-center"
 			onClick={handleClick}
 		>
-			<div className="text-muted-foreground mt-1">{icon}</div>
+			<div className="text-muted-foreground">{icon}</div>
 			<div className="text-left flex-1">{displayText}</div>
 			{isLoading && (
 				<div className="animate-spin mt-1">

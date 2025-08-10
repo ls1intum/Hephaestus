@@ -1,15 +1,8 @@
+import { Copy, History, MessageCircle, Pen, Redo2, Undo2 } from "lucide-react";
 import { toast } from "sonner";
 import { ScrollArea } from "@/components/ui/scroll-area";
 // import { DiffView } from '@/components/diffview';
 import { DocumentSkeleton } from "../DocumentSkeleton";
-import {
-	ClockRewind,
-	CopyIcon,
-	MessageIcon,
-	PenIcon,
-	RedoIcon,
-	UndoIcon,
-} from "../Icons";
 import { TextEditor } from "../TextEditor";
 import { Artifact } from "./create-artifact";
 
@@ -95,7 +88,7 @@ export const textArtifact = new Artifact<"text", TextArtifactMetadata>({
 	},
 	actions: [
 		{
-			icon: <ClockRewind size={18} />,
+			icon: <History size={18} />,
 			description: "View changes",
 			onClick: ({ handleVersionChange }) => {
 				handleVersionChange("toggle");
@@ -109,7 +102,7 @@ export const textArtifact = new Artifact<"text", TextArtifactMetadata>({
 			},
 		},
 		{
-			icon: <UndoIcon size={18} />,
+			icon: <Undo2 size={18} />,
 			description: "View Previous version",
 			onClick: ({ handleVersionChange }) => {
 				handleVersionChange("prev");
@@ -123,7 +116,7 @@ export const textArtifact = new Artifact<"text", TextArtifactMetadata>({
 			},
 		},
 		{
-			icon: <RedoIcon size={18} />,
+			icon: <Redo2 size={18} />,
 			description: "View Next version",
 			onClick: ({ handleVersionChange }) => {
 				handleVersionChange("next");
@@ -137,7 +130,7 @@ export const textArtifact = new Artifact<"text", TextArtifactMetadata>({
 			},
 		},
 		{
-			icon: <CopyIcon size={18} />,
+			icon: <Copy size={18} />,
 			description: "Copy to clipboard",
 			onClick: ({ content }) => {
 				navigator.clipboard.writeText(content);
@@ -147,7 +140,7 @@ export const textArtifact = new Artifact<"text", TextArtifactMetadata>({
 	],
 	toolbar: [
 		{
-			icon: <PenIcon />,
+			icon: <Pen />,
 			description: "Add final polish",
 			onClick: ({ sendMessage }) => {
 				sendMessage({
@@ -162,7 +155,7 @@ export const textArtifact = new Artifact<"text", TextArtifactMetadata>({
 			},
 		},
 		{
-			icon: <MessageIcon />,
+			icon: <MessageCircle />,
 			description: "Request suggestions",
 			onClick: ({ sendMessage }) => {
 				sendMessage({
