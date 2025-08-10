@@ -8,10 +8,12 @@ from typing import Any, List, Optional
 from sqlalchemy import (
     BigInteger,
     Boolean,
+    CheckConstraint,
     Column,
     DateTime,
     ForeignKeyConstraint,
     Identity,
+    Index,
     Integer,
     PrimaryKeyConstraint,
     SmallInteger,
@@ -35,15 +37,19 @@ class Base(DeclarativeBase):
 class ChatMessage(Base):
     __tablename__ = "chat_message"
     __table_args__ = (
+        CheckConstraint(
+            "role::text = ANY (ARRAY['USER'::character varying, 'ASSISTANT'::character varying, 'SYSTEM'::character varying]::text[])",
+            name="chat_message_role_check",
+        ),
         ForeignKeyConstraint(
             ["parent_message_id"],
             ["chat_message.id"],
-            name="FKd0fewjs0l68rq2bww9h8o4cmb",
+            name="fkd0fewjs0l68rq2bww9h8o4cmb",
         ),
         ForeignKeyConstraint(
-            ["thread_id"], ["chat_thread.id"], name="FK8s34d909gxc4xrlvml8gag9kh"
+            ["thread_id"], ["chat_thread.id"], name="fk8s34d909gxc4xrlvml8gag9kh"
         ),
-        PrimaryKeyConstraint("id", name="chat_messagePK"),
+        PrimaryKeyConstraint("id", name="chat_message_pkey"),
     )
     id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True)
     created_at: Mapped[datetime.datetime] = mapped_column(TIMESTAMP(True, 6))
@@ -71,21 +77,31 @@ class ChatMessage(Base):
     )
 
 
+class ChatMessageVote(Base):
+    __tablename__ = "chat_message_vote"
+    __table_args__ = (
+        PrimaryKeyConstraint("message_id", name="chat_message_vote_pkey"),
+    )
+    message_id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True)
+    created_at: Mapped[datetime.datetime] = mapped_column(TIMESTAMP(True, 6))
+    is_upvoted: Mapped[bool] = mapped_column(Boolean)
+    updated_at: Mapped[datetime.datetime] = mapped_column(TIMESTAMP(True, 6))
+
+
 class ChatThread(Base):
     __tablename__ = "chat_thread"
     __table_args__ = (
         ForeignKeyConstraint(
             ["selected_leaf_message_id"],
             ["chat_message.id"],
-            name="FK34beodgwi0g7kn66svlk4hlfr",
+            name="fk34beodgwi0g7kn66svlk4hlfr",
         ),
         ForeignKeyConstraint(
-            ["user_id"], ["user.id"], name="FKikdxlx9viomcwrgxj7fbyfsew"
+            ["user_id"], ["user.id"], name="fkikdxlx9viomcwrgxj7fbyfsew"
         ),
-        PrimaryKeyConstraint("id", name="chat_threadPK"),
+        PrimaryKeyConstraint("id", name="chat_thread_pkey"),
         UniqueConstraint(
-            "selected_leaf_message_id",
-            name="uc_chat_threadselected_leaf_message_id_col",
+            "selected_leaf_message_id", name="ukqfddr5kwxeylcr8qlfshtgkdn"
         ),
     )
     id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True)
@@ -133,6 +149,28 @@ class Databasechangeloglock(Base):
     lockedby: Mapped[Optional[str]] = mapped_column(String(255))
 
 
+class Message(Base):
+    __tablename__ = "message"
+    __table_args__ = (PrimaryKeyConstraint("id", name="messagePK"),)
+    id: Mapped[int] = mapped_column(
+        BigInteger,
+        Identity(
+            start=1,
+            increment=1,
+            minvalue=1,
+            maxvalue=9223372036854775807,
+            cycle=False,
+            cache=1,
+        ),
+        primary_key=True,
+    )
+    session_id: Mapped[int] = mapped_column(BigInteger)
+    content: Mapped[Optional[str]] = mapped_column(String(32767))
+    sender: Mapped[Optional[str]] = mapped_column(String(255))
+    sent_at: Mapped[Optional[datetime.datetime]] = mapped_column(TIMESTAMP(precision=6))
+    messages_order: Mapped[Optional[int]] = mapped_column(Integer)
+
+
 class Repository(Base):
     __tablename__ = "repository"
     __table_args__ = (PrimaryKeyConstraint("id", name="repository_pkey"),)
@@ -162,7 +200,32 @@ class Repository(Base):
     milestone: Mapped[List["Milestone"]] = relationship(
         "Milestone", back_populates="repository"
     )
+    team_v2_repository_permission: Mapped[List["TeamV2RepositoryPermission"]] = (
+        relationship("TeamV2RepositoryPermission", back_populates="repository")
+    )
     issue: Mapped[List["Issue"]] = relationship("Issue", back_populates="repository")
+
+
+class Session(Base):
+    __tablename__ = "session"
+    __table_args__ = (PrimaryKeyConstraint("id", name="sessionPK"),)
+    id: Mapped[int] = mapped_column(
+        BigInteger,
+        Identity(
+            start=1,
+            increment=1,
+            minvalue=1,
+            maxvalue=9223372036854775807,
+            cycle=False,
+            cache=1,
+        ),
+        primary_key=True,
+    )
+    is_closed: Mapped[bool] = mapped_column(Boolean, server_default=text("false"))
+    created_at: Mapped[Optional[datetime.datetime]] = mapped_column(
+        TIMESTAMP(precision=6)
+    )
+    user_id: Mapped[Optional[int]] = mapped_column(BigInteger)
 
 
 class Team(Base):
@@ -194,6 +257,29 @@ class Team(Base):
     )
 
 
+class TeamV2(Base):
+    __tablename__ = "team_v2"
+    __table_args__ = (PrimaryKeyConstraint("id", name="team_v2PK"),)
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
+    created_at: Mapped[Optional[datetime.datetime]] = mapped_column(TIMESTAMP(True, 6))
+    updated_at: Mapped[Optional[datetime.datetime]] = mapped_column(TIMESTAMP(True, 6))
+    description: Mapped[Optional[str]] = mapped_column(Text)
+    html_url: Mapped[Optional[str]] = mapped_column(Text)
+    last_synced_at: Mapped[Optional[datetime.datetime]] = mapped_column(
+        TIMESTAMP(True, 6)
+    )
+    name: Mapped[Optional[str]] = mapped_column(String(255))
+    organization: Mapped[Optional[str]] = mapped_column(String(255))
+    parent_id: Mapped[Optional[int]] = mapped_column(BigInteger)
+    privacy: Mapped[Optional[str]] = mapped_column(String(32))
+    team_v2_membership: Mapped[List["TeamV2Membership"]] = relationship(
+        "TeamV2Membership", back_populates="team"
+    )
+    team_v2_repository_permission: Mapped[List["TeamV2RepositoryPermission"]] = (
+        relationship("TeamV2RepositoryPermission", back_populates="team")
+    )
+
+
 class User(Base):
     __tablename__ = "user"
     __table_args__ = (PrimaryKeyConstraint("id", name="user_pkey"),)
@@ -222,8 +308,12 @@ class User(Base):
     team: Mapped[List["Team"]] = relationship(
         "Team", secondary="team_members", back_populates="user"
     )
+    document: Mapped[List["Document"]] = relationship("Document", back_populates="user")
     milestone: Mapped[List["Milestone"]] = relationship(
         "Milestone", back_populates="creator"
+    )
+    team_v2_membership: Mapped[List["TeamV2Membership"]] = relationship(
+        "TeamV2Membership", back_populates="user"
     )
     issue: Mapped[List["Issue"]] = relationship(
         "Issue", foreign_keys="[Issue.author_id]", back_populates="author"
@@ -274,19 +364,51 @@ class Workspace(Base):
 class ChatMessagePart(Base):
     __tablename__ = "chat_message_part"
     __table_args__ = (
-        ForeignKeyConstraint(
-            ["message_id"], ["chat_message.id"], name="FKkfle3niou3f9r63mc3u8vi1na"
+        CheckConstraint(
+            "type::text = ANY (ARRAY['TEXT'::character varying, 'REASONING'::character varying, 'TOOL'::character varying, 'SOURCE_URL'::character varying, 'SOURCE_DOCUMENT'::character varying, 'FILE'::character varying, 'DATA'::character varying, 'STEP_START'::character varying]::text[])",
+            name="chat_message_part_type_check",
         ),
-        PrimaryKeyConstraint("message_id", "order_index", name="chat_message_partPK"),
+        ForeignKeyConstraint(
+            ["message_id"], ["chat_message.id"], name="fkkfle3niou3f9r63mc3u8vi1na"
+        ),
+        PrimaryKeyConstraint(
+            "message_id", "order_index", name="chat_message_part_pkey"
+        ),
     )
     message_id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True)
     order_index: Mapped[int] = mapped_column(Integer, primary_key=True)
     type: Mapped[str] = mapped_column(String(32))
     content: Mapped[Optional[dict]] = mapped_column(JSONB)
     original_type: Mapped[Optional[str]] = mapped_column(String(128))
+    duration_ms: Mapped[Optional[int]] = mapped_column(BigInteger)
+    finished_at: Mapped[Optional[datetime.datetime]] = mapped_column(TIMESTAMP(True, 6))
+    started_at: Mapped[Optional[datetime.datetime]] = mapped_column(TIMESTAMP(True, 6))
     message: Mapped["ChatMessage"] = relationship(
         "ChatMessage", back_populates="chat_message_part"
     )
+
+
+class Document(Base):
+    __tablename__ = "document"
+    __table_args__ = (
+        CheckConstraint("kind::text = 'TEXT'::text", name="document_kind_check"),
+        ForeignKeyConstraint(
+            ["user_id"], ["user.id"], name="fkjhdxdv9sijhujiynqbb5jc010"
+        ),
+        PrimaryKeyConstraint("created_at", "id", name="document_pkey"),
+        Index("idx_document_created_at", "created_at"),
+        Index("idx_document_id", "id"),
+        Index("idx_document_user_id", "user_id"),
+    )
+    created_at: Mapped[datetime.datetime] = mapped_column(
+        TIMESTAMP(True, 6), primary_key=True
+    )
+    id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True)
+    kind: Mapped[str] = mapped_column(String(255))
+    title: Mapped[str] = mapped_column(String(255))
+    user_id: Mapped[int] = mapped_column(BigInteger)
+    content: Mapped[Optional[str]] = mapped_column(Text)
+    user: Mapped["User"] = relationship("User", back_populates="document")
 
 
 class Label(Base):
@@ -402,6 +524,48 @@ t_team_repositories = Table(
     ForeignKeyConstraint(["team_id"], ["team.id"], name="FKip72ume6ebpeowoopiylw3gib"),
     PrimaryKeyConstraint("team_id", "repository_id", name="team_repositoriesPK"),
 )
+
+
+class TeamV2Membership(Base):
+    __tablename__ = "team_v2_membership"
+    __table_args__ = (
+        ForeignKeyConstraint(
+            ["team_id"], ["team_v2.id"], name="FKqx9knktjv7ep34em8xxj22im0"
+        ),
+        ForeignKeyConstraint(
+            ["user_id"], ["user.id"], name="FK72jl22tdts2ia0icqa5qot044"
+        ),
+        PrimaryKeyConstraint("team_id", "user_id", name="team_v2_membershipPK"),
+    )
+    user_id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
+    team_id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
+    role: Mapped[Optional[str]] = mapped_column(String(32))
+    team: Mapped["TeamV2"] = relationship("TeamV2", back_populates="team_v2_membership")
+    user: Mapped["User"] = relationship("User", back_populates="team_v2_membership")
+
+
+class TeamV2RepositoryPermission(Base):
+    __tablename__ = "team_v2_repository_permission"
+    __table_args__ = (
+        ForeignKeyConstraint(
+            ["repository_id"], ["repository.id"], name="FKkkg4iyyc4nn31erml7j72u6cl"
+        ),
+        ForeignKeyConstraint(
+            ["team_id"], ["team_v2.id"], name="FK803huikp5crsrk7v28kv09vmi"
+        ),
+        PrimaryKeyConstraint(
+            "repository_id", "team_id", name="team_v2_repository_permissionPK"
+        ),
+    )
+    permission: Mapped[str] = mapped_column(String(32))
+    repository_id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
+    team_id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
+    repository: Mapped["Repository"] = relationship(
+        "Repository", back_populates="team_v2_repository_permission"
+    )
+    team: Mapped["TeamV2"] = relationship(
+        "TeamV2", back_populates="team_v2_repository_permission"
+    )
 
 
 class Issue(Base):

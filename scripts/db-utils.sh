@@ -254,10 +254,13 @@ cmd_generate_erd() {
         log_warning "PostgreSQL is not running. Starting it now..."
         start_postgres
     fi
-    
-    # Always ensure schema is up-to-date
-    apply_migrations
-    
+    # In CI, ensure schema is applied; locally assume DB is already migrated
+    if [[ "${CI:-false}" == "true" ]]; then
+        apply_migrations
+    else
+        log_info "Skipping migrations in local mode (assuming DB is up-to-date)"
+    fi
+
     generate_erd
     log_success "🎉 ERD generation completed successfully!"
 }
@@ -282,8 +285,12 @@ cmd_generate_db_models_intelligence_service() {
         start_postgres
     fi
     
-    # Always ensure schema is up-to-date
-    apply_migrations
+    # In CI, ensure schema is applied; locally assume DB is already migrated
+    if [[ "${CI:-false}" == "true" ]]; then
+        apply_migrations
+    else
+        log_info "Skipping migrations in local mode (assuming DB is up-to-date)"
+    fi
     
     generate_intelligence_service_models
     log_success "🎉 SQLAlchemy model generation completed successfully!"

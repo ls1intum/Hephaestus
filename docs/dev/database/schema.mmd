@@ -40,6 +40,16 @@ erDiagram
         JSONB content
         VARCHAR(128) original_type
         VARCHAR(32) type "NOT NULL"
+        BIGINT duration_ms
+        TIMESTAMPTZ finished_at
+        TIMESTAMPTZ started_at
+    }
+
+    ChatMessageVote {
+        UUID message_id PK
+        TIMESTAMPTZ created_at "NOT NULL"
+        BOOLEAN is_upvoted "NOT NULL"
+        TIMESTAMPTZ updated_at "NOT NULL"
     }
 
     ChatThread {
@@ -48,6 +58,15 @@ erDiagram
         TEXT title
         UUID selected_leaf_message_id FK,UK
         BIGINT user_id FK
+    }
+
+    Document {
+        TIMESTAMPTZ created_at PK
+        UUID id PK
+        TEXT content
+        VARCHAR(255) kind "NOT NULL"
+        VARCHAR(255) title "NOT NULL"
+        BIGINT user_id FK "NOT NULL"
     }
 
     Issue {
@@ -111,6 +130,15 @@ erDiagram
         VARCHAR(255) description
         VARCHAR(255) name
         BIGINT repository_id FK
+    }
+
+    Message {
+        BIGINT id PK
+        VARCHAR(32767) content
+        VARCHAR(255) sender
+        TIMESTAMP sent_at
+        BIGINT session_id "NOT NULL"
+        INTEGER messages_order
     }
 
     Milestone {
@@ -215,6 +243,13 @@ erDiagram
         BIGINT workspace_id FK
     }
 
+    Session {
+        BIGINT id PK
+        TIMESTAMP created_at
+        BIGINT user_id
+        BOOLEAN is_closed "NOT NULL"
+    }
+
     Team {
         BIGINT id PK
         VARCHAR(255) color
@@ -298,6 +333,7 @@ erDiagram
     ChatMessage ||--o{ ChatMessage : references
     ChatThread ||--o{ ChatMessage : has
     User ||--o{ ChatThread : has
+    User ||--o{ Document : has
     User ||--o{ Issue : authored_by
     User ||--o{ Issue : merged_by
     Milestone ||--o{ Issue : has
@@ -343,10 +379,12 @@ erDiagram
     class IssueAssignee associationEntity
     class IssueLabel associationEntity
     class Label primaryEntity
+    class Message metadataEntity
     class Milestone primaryEntity
     class PullRequestRequestedReviewer associationEntity
     class Repository primaryEntity
     class RepositoryToMonitor metadataEntity
+    class Session metadataEntity
     class Team primaryEntity
     class TeamLabel associationEntity
     class TeamMember associationEntity
