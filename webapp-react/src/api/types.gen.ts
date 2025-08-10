@@ -40,13 +40,13 @@ export type WeatherHourly = {
 };
 
 export type PageDocument = {
-    totalPages?: number;
     totalElements?: number;
+    totalPages?: number;
     pageable?: PageableObject;
+    sort?: SortObject;
+    numberOfElements?: number;
     first?: boolean;
     last?: boolean;
-    numberOfElements?: number;
-    sort?: SortObject;
     size?: number;
     content?: Array<Document>;
     number?: number;
@@ -1122,13 +1122,13 @@ export type UpdateDocumentInput = {
 };
 
 export type PageDocumentSummary = {
-    totalPages?: number;
     totalElements?: number;
+    totalPages?: number;
     pageable?: PageableObject;
+    sort?: SortObject;
+    numberOfElements?: number;
     first?: boolean;
     last?: boolean;
-    numberOfElements?: number;
-    sort?: SortObject;
     size?: number;
     content?: Array<DocumentSummary>;
     number?: number;
