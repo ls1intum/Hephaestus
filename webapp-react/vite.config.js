@@ -21,9 +21,7 @@ export default defineConfig(({ command, mode }) => {
 				}),
 		].filter(Boolean), // Filter out falsy values
 		optimizeDeps: {
-			exclude: [
-				"storybook-static",
-			],
+			exclude: ["storybook-static"],
 		},
 		test: {
 			globals: true,

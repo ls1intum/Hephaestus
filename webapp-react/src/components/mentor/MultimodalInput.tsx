@@ -374,11 +374,7 @@ function PureAttachmentsButton({
 
 const AttachmentsButton = memo(PureAttachmentsButton);
 
-function PureStopButton({
-	onStop,
-}: {
-	onStop: () => void;
-}) {
+function PureStopButton({ onStop }: { onStop: () => void }) {
 	return (
 		<Button
 			data-testid="stop-button"

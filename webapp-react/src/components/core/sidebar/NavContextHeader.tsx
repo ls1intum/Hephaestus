@@ -9,7 +9,10 @@ import { SidebarMenuButton, SidebarSeparator } from "@/components/ui/sidebar";
 export function NavContextHeader({
 	title,
 	children,
-}: { title: string; children?: React.ReactNode }) {
+}: {
+	title: string;
+	children?: React.ReactNode;
+}) {
 	return (
 		<>
 			<SidebarMenuButton asChild>
