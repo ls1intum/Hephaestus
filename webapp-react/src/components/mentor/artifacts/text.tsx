@@ -13,6 +13,29 @@ export const textArtifact = new Artifact<"text", TextArtifactMetadata>({
 	kind: "text",
 	description: "Useful for text content, like drafting essays and emails.",
 	onStreamPart: ({ streamPart, setArtifact }) => {
+		const part = streamPart as unknown as { type: string; data: unknown };
+		// Handle generic data stream parts from tools
+		if (part.type === "data-id") {
+			setArtifact((draft) => ({ ...draft, documentId: String(part.data ?? ""), status: "streaming" }));
+			return;
+		}
+		if (part.type === "data-title") {
+			setArtifact((draft) => ({ ...draft, title: String(part.data ?? ""), status: "streaming" }));
+			return;
+		}
+		if (part.type === "data-kind") {
+			// no-op for text artifact; ensure status reflects streaming
+			setArtifact((draft) => ({ ...draft, status: "streaming" }));
+			return;
+		}
+		if (part.type === "data-clear") {
+			setArtifact((draft) => ({ ...draft, content: "", status: "streaming" }));
+			return;
+		}
+		if (part.type === "data-finish") {
+			setArtifact((draft) => ({ ...draft, status: "idle" }));
+			return;
+		}
 		if (streamPart.type === "data-textDelta") {
 			setArtifact((draftArtifact) => {
 				return {
