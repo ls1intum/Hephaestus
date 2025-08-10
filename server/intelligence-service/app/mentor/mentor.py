@@ -9,8 +9,7 @@ from langchain_core.messages import (
 )
 from langgraph.graph import StateGraph, START, END
 from langchain_core.runnables import RunnableConfig
-from langchain.chat_models import init_chat_model
-
+from app.models import init_hephaestus_chat_model
 from app.mentor.tools import (
     get_weather,
     create_document,
@@ -21,7 +20,6 @@ from app.mentor.tools import (
     get_pull_request_details,
     get_pull_request_bad_practices,
 )
-from app.models import get_model
 from app.settings import settings
 from app.logger import logger
 from app.mentor.state import MentorState
@@ -29,8 +27,7 @@ from langgraph.prebuilt import ToolNode
 
 
 # Get the chat model
-ChatModel = get_model(settings.MODEL_NAME)
-model = init_chat_model(settings.MODEL_NAME, reasoning={"summary": "auto"})
+model = init_hephaestus_chat_model(settings.MODEL_NAME, reasoning={"summary": "auto"})
 
 # Enhanced system prompt for the comprehensive mentor
 SYSTEM_PROMPT = """\

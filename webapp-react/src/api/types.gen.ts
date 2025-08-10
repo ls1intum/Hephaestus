@@ -40,13 +40,13 @@ export type WeatherHourly = {
 };
 
 export type PageDocument = {
-    totalPages?: number;
     totalElements?: number;
-    pageable?: PageableObject;
+    totalPages?: number;
+    sort?: SortObject;
     first?: boolean;
     last?: boolean;
     numberOfElements?: number;
-    sort?: SortObject;
+    pageable?: PageableObject;
     size?: number;
     content?: Array<Document>;
     number?: number;
@@ -756,11 +756,11 @@ export type StreamStepStartPart = {
 };
 
 export type PageableObject = {
+    sort?: SortObject;
     unpaged?: boolean;
     paged?: boolean;
     pageNumber?: number;
     pageSize?: number;
-    sort?: SortObject;
     offset?: number;
 };
 
@@ -1122,13 +1122,13 @@ export type UpdateDocumentInput = {
 };
 
 export type PageDocumentSummary = {
-    totalPages?: number;
     totalElements?: number;
-    pageable?: PageableObject;
+    totalPages?: number;
+    sort?: SortObject;
     first?: boolean;
     last?: boolean;
     numberOfElements?: number;
-    sort?: SortObject;
+    pageable?: PageableObject;
     size?: number;
     content?: Array<DocumentSummary>;
     number?: number;

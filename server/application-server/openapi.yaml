@@ -1030,14 +1030,14 @@ components:
     PageDocument:
       type: object
       properties:
-        totalPages:
-          type: integer
-          format: int32
         totalElements:
           type: integer
           format: int64
-        pageable:
-          $ref: "#/components/schemas/PageableObject"
+        totalPages:
+          type: integer
+          format: int32
+        sort:
+          $ref: "#/components/schemas/SortObject"
         first:
           type: boolean
         last:
@@ -1045,8 +1045,8 @@ components:
         numberOfElements:
           type: integer
           format: int32
-        sort:
-          $ref: "#/components/schemas/SortObject"
+        pageable:
+          $ref: "#/components/schemas/PageableObject"
         size:
           type: integer
           format: int32
@@ -1955,6 +1955,8 @@ components:
     PageableObject:
       type: object
       properties:
+        sort:
+          $ref: "#/components/schemas/SortObject"
         unpaged:
           type: boolean
         paged:
@@ -1965,8 +1967,6 @@ components:
         pageSize:
           type: integer
           format: int32
-        sort:
-          $ref: "#/components/schemas/SortObject"
         offset:
           type: integer
           format: int64
@@ -2466,14 +2466,14 @@ components:
     PageDocumentSummary:
       type: object
       properties:
-        totalPages:
-          type: integer
-          format: int32
         totalElements:
           type: integer
           format: int64
-        pageable:
-          $ref: "#/components/schemas/PageableObject"
+        totalPages:
+          type: integer
+          format: int32
+        sort:
+          $ref: "#/components/schemas/SortObject"
         first:
           type: boolean
         last:
@@ -2481,8 +2481,8 @@ components:
         numberOfElements:
           type: integer
           format: int32
-        sort:
-          $ref: "#/components/schemas/SortObject"
+        pageable:
+          $ref: "#/components/schemas/PageableObject"
         size:
           type: integer
           format: int32

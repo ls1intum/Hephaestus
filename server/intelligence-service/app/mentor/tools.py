@@ -4,7 +4,7 @@ from typing import Annotated, List, Dict, Any, Literal, Optional
 from langchain_core.tools import tool
 from langgraph.prebuilt import InjectedState
 from langchain_core.runnables import RunnableConfig
-from langchain.chat_models import init_chat_model
+from app.models import init_hephaestus_chat_model
 from app.settings import settings
 
 from app.logger import logger
@@ -21,7 +21,7 @@ from langchain_core.callbacks.manager import adispatch_custom_event
 
 logger = logger.getChild(__name__)
 
-model = init_chat_model(settings.MODEL_NAME, reasoning={"summary": "auto"})
+model = init_hephaestus_chat_model(settings.MODEL_NAME, reasoning={"summary": "auto"})
 
 
 # Helper function to emit data events
