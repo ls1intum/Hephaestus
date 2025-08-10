@@ -55,9 +55,10 @@ jobs:
           
           # Node.js build 
           cd ../../webapp-react
-          if [ ! -d "node_modules" ]; then
-            npm ci --prefer-offline --no-audit --progress=false
-          fi
+          
+          # Always install to avoid half-restored caches
+          npm ci --prefer-offline --no-audit
+          
           npm run build
 
           # Python dependencies

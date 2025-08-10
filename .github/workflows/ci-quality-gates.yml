@@ -64,9 +64,8 @@ jobs:
         run: |
           echo "🔍 Checking application-server code formatting..."
 
-          if [ ! -d "node_modules" ]; then
-            npm ci --prefer-offline --no-audit
-          fi
+          # Always install to avoid half-restored caches
+          npm ci --prefer-offline --no-audit
 
           if ! npm run format:java; then
             echo "❌ application-server formatting failed. Run: npm run format:java"
@@ -209,10 +208,8 @@ jobs:
         run: |
           echo "🔍 Validating OpenAPI specifications and clients..."
 
-          # Install all dependencies
-          if [ ! -d "node_modules" ]; then
-            npm ci --prefer-offline --no-audit
-          fi
+          # Install all dependencies (always, to avoid cache drift)
+          npm ci --prefer-offline --no-audit
 
           # Setup Python environments
           cd server/intelligence-service
