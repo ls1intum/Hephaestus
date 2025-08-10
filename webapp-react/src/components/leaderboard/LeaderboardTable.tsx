@@ -1,3 +1,12 @@
+import {
+	CheckIcon,
+	ChevronLeftIcon,
+	CommentDiscussionIcon,
+	CommentIcon,
+	FileDiffIcon,
+	NoEntryIcon,
+} from "@primer/octicons-react";
+import { AwardIcon } from "lucide-react";
 import type { LeaderboardEntry, UserInfo } from "@/api/types.gen";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -15,15 +24,6 @@ import {
 	TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
-import {
-	CheckIcon,
-	ChevronLeftIcon,
-	CommentDiscussionIcon,
-	CommentIcon,
-	FileDiffIcon,
-	NoEntryIcon,
-} from "@primer/octicons-react";
-import { AwardIcon } from "lucide-react";
 import { LeagueIcon } from "./LeagueIcon";
 import { ReviewsPopover } from "./ReviewsPopover";
 

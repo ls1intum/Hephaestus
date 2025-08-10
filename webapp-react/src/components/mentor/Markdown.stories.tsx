@@ -164,8 +164,10 @@ export const CodeBlocks: Story = {
 			"}",
 			"",
 			"async function fetchUserProfile(userId: string): Promise<UserProfile> {",
+			// biome-ignore lint/suspicious/noTemplateCurlyInString: This is literal example code rendered in markdown
 			"  const response = await fetch(`/api/users/${userId}`);",
 			"  if (!response.ok) {",
+			// biome-ignore lint/suspicious/noTemplateCurlyInString: This is literal example code rendered in markdown
 			"    throw new Error(`Failed to fetch user: ${response.status}`);",
 			"  }",
 			"  return response.json();",

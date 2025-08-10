@@ -1,3 +1,5 @@
+import { Sparkles, SquareArrowOutUpRight, SquarePen, X } from "lucide-react";
+import { memo, useCallback, useEffect, useRef, useState } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -12,8 +14,6 @@ import {
 	TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
-import { Sparkles, SquareArrowOutUpRight, SquarePen, X } from "lucide-react";
-import { memo, useCallback, useEffect, useRef, useState } from "react";
 import { MentorIcon } from "./MentorIcon";
 
 export interface CopilotProps {

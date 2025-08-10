@@ -1,5 +1,5 @@
-import { Button } from "@/components/ui/button";
 import { motion } from "framer-motion";
+import { Button } from "@/components/ui/button";
 
 interface SuggestedActionsProps {
 	onAction: (actionMessage: string) => void;

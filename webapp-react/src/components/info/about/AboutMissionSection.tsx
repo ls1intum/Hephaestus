@@ -1,5 +1,5 @@
-import { Badge } from "@/components/ui/badge";
 import { Code, Sparkles } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
 import { FeatureCard, type FeatureData } from "./FeatureCard";
 
 const FEATURES_DATA: FeatureData[] = [

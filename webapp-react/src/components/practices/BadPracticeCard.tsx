@@ -1,3 +1,4 @@
+import { useState } from "react";
 import type { PullRequestBadPractice } from "@/api/types.gen";
 import { Button } from "@/components/ui/button";
 import {
@@ -32,7 +33,6 @@ import {
 	TooltipProvider,
 	TooltipTrigger,
 } from "@/components/ui/tooltip";
-import { useState } from "react";
 import { stateConfig } from "./utils";
 
 interface BadPracticeCardProps {

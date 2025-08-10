@@ -1,5 +1,5 @@
-import { DocumentTool } from "@/components/mentor/DocumentTool";
 import type { Meta, StoryObj } from "@storybook/react";
+import { DocumentTool } from "@/components/mentor/DocumentTool";
 
 /**
  * DocumentTool displays document operations in both loading and completed states.

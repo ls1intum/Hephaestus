@@ -1,5 +1,5 @@
-import environment from "@/environment";
 import * as Sentry from "@sentry/react";
+import environment from "@/environment";
 
 Sentry.init({
 	dsn: environment.sentry.dsn,

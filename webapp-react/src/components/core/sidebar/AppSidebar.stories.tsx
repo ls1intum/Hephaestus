@@ -1,6 +1,6 @@
+import type { Meta, StoryObj } from "@storybook/react";
 import type { ChatThreadGroup } from "@/api/types.gen";
 import { SidebarProvider } from "@/components/ui/sidebar";
-import type { Meta, StoryObj } from "@storybook/react";
 import { AppSidebar } from "./AppSidebar";
 
 /**

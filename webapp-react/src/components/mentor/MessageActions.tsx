@@ -1,3 +1,5 @@
+import { Copy, PencilIcon, ThumbsDown, ThumbsUp } from "lucide-react";
+import { memo } from "react";
 import type { ChatMessageVote } from "@/api/types.gen";
 import { Button } from "@/components/ui/button";
 import {
@@ -7,8 +9,6 @@ import {
 	TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
-import { Copy, PencilIcon, ThumbsDown, ThumbsUp } from "lucide-react";
-import { memo } from "react";
 
 interface MessageActionsProps {
 	/** Optional CSS class name */

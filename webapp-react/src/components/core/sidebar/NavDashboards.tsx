@@ -1,5 +1,5 @@
+import { Link } from "@tanstack/react-router";
 import { CheckCheck, Trophy, User, Users } from "lucide-react";
-
 import {
 	SidebarGroup,
 	SidebarGroupLabel,
@@ -7,7 +7,6 @@ import {
 	SidebarMenuButton,
 	SidebarMenuItem,
 } from "@/components/ui/sidebar";
-import { Link } from "@tanstack/react-router";
 
 export function NavDashboards({ username }: { username: string }) {
 	return (

@@ -1,6 +1,6 @@
-import { useTheme } from "@/integrations/theme";
 import { type ReactNode, useEffect, useState } from "react";
 import { codeToHtml } from "shiki";
+import { useTheme } from "@/integrations/theme";
 
 interface CodeBlockProps {
 	inline: boolean;

@@ -1,3 +1,5 @@
+import { AnimatePresence, motion } from "framer-motion";
+import { ArrowDown, ArrowUp, Paperclip, Square } from "lucide-react";
 import type React from "react";
 import {
 	type ChangeEvent,
@@ -8,14 +10,10 @@ import {
 	useState,
 } from "react";
 import { useWindowSize } from "usehooks-ts";
-
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import type { Attachment } from "@/lib/types";
 import { cn } from "@/lib/utils";
-import { AnimatePresence, motion } from "framer-motion";
-import { ArrowDown } from "lucide-react";
-import { ArrowUp, Paperclip, Square } from "lucide-react";
 import { PreviewAttachment } from "./PreviewAttachment";
 import { SuggestedActions } from "./SuggestedActions";
 
@@ -248,6 +246,7 @@ function PureMultimodalInput({
 				</div>
 			)}
 
+			{/* biome-ignore lint/a11y/noStaticElementInteractions: Container focuses inner textarea for better UX */}
 			<div
 				className={cn(
 					// Base textarea styling - exact copy from ui/textarea with focus-within
@@ -259,6 +258,7 @@ function PureMultimodalInput({
 					readonly && "cursor-not-allowed opacity-60",
 					className,
 				)}
+				// interactive container used to focus inner textarea
 				onClick={() => {
 					if (!readonly && textareaRef.current) {
 						textareaRef.current.focus();

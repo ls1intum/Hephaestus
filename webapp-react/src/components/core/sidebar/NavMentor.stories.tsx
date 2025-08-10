@@ -1,5 +1,5 @@
-import { SidebarProvider } from "@/components/ui/sidebar";
 import type { Meta, StoryObj } from "@storybook/react";
+import { SidebarProvider } from "@/components/ui/sidebar";
 import { NavMentor } from "./NavMentor";
 
 /**

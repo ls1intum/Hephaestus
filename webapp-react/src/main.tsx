@@ -1,5 +1,5 @@
 import * as Sentry from "@sentry/react";
-import { RouterProvider, createRouter } from "@tanstack/react-router";
+import { createRouter, RouterProvider } from "@tanstack/react-router";
 import { PostHogProvider } from "posthog-js/react";
 import ReactDOM from "react-dom/client";
 
@@ -10,12 +10,12 @@ import { client } from "@/api/client.gen";
 import { routeTree } from "./routeTree.gen";
 
 import "./styles.css";
-import reportWebVitals from "./reportWebVitals.ts";
+import { StrictMode } from "react";
 
 import environment from "@/environment";
 import { AuthProvider, keycloakService, useAuth } from "@/integrations/auth";
 import { ThemeProvider } from "@/integrations/theme";
-import { StrictMode } from "react";
+import reportWebVitals from "./reportWebVitals.ts";
 
 client.setConfig({
 	baseUrl: environment.serverUrl,

@@ -2,8 +2,8 @@ import { Zap } from "lucide-react";
 import { useState } from "react";
 
 import type { TeamInfo } from "@/api/types.gen";
-import { UsersTable } from "@/components/admin/UsersTable";
 import type { ExtendedUserTeams } from "@/components/admin/types";
+import { UsersTable } from "@/components/admin/UsersTable";
 import { Button } from "@/components/ui/button";
 import {
 	Dialog,

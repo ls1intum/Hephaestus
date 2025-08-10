@@ -1,3 +1,4 @@
+import { memo, type ReactNode } from "react";
 import { Button } from "@/components/ui/button";
 import {
 	Tooltip,
@@ -5,7 +6,6 @@ import {
 	TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
-import { type ReactNode, memo } from "react";
 
 export interface ArtifactAction {
 	/** Unique identifier for the action */

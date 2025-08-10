@@ -1,11 +1,11 @@
-import { getGroupedThreadsOptions } from "@/api/@tanstack/react-query.gen";
-import { Button } from "@/components/ui/button";
-import { ScrollArea } from "@/components/ui/scroll-area";
-import { cn } from "@/lib/utils";
 import { useQuery } from "@tanstack/react-query";
 import { Link, useParams } from "@tanstack/react-router";
 import { MessageSquare, Plus } from "lucide-react";
 import { useCallback } from "react";
+import { getGroupedThreadsOptions } from "@/api/@tanstack/react-query.gen";
+import { Button } from "@/components/ui/button";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { cn } from "@/lib/utils";
 
 interface MentorSidebarProps {
 	className?: string;

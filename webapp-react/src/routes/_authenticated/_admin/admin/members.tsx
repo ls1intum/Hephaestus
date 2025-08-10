@@ -1,3 +1,7 @@
+import type { DefaultError } from "@tanstack/query-core";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { createFileRoute } from "@tanstack/react-router";
+import { toast } from "sonner";
 import {
 	addTeamToUserMutation,
 	automaticallyAssignTeamsMutation,
@@ -9,10 +13,6 @@ import {
 import { addTeamToUser, removeUserFromTeam } from "@/api/sdk.gen";
 import { AdminMembersPage } from "@/components/admin/AdminMembersPage";
 import { adaptApiUserTeams } from "@/components/admin/types";
-import type { DefaultError } from "@tanstack/query-core";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { createFileRoute } from "@tanstack/react-router";
-import { toast } from "sonner";
 
 export const Route = createFileRoute("/_authenticated/_admin/admin/members")({
 	component: AdminMembersContainer,

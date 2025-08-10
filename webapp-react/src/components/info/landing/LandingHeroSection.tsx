@@ -1,3 +1,4 @@
+import { ArrowRight, ChevronDown } from "lucide-react";
 import type { LeaderboardEntry, PullRequestInfo } from "@/api/types.gen";
 import aliceAvatar from "@/assets/alice_developer.jpg";
 import bobAvatar from "@/assets/bob_builder.jpg";
@@ -5,7 +6,6 @@ import charlieAvatar from "@/assets/charlie_coder.jpg";
 import { LeaderboardTable } from "@/components/leaderboard/LeaderboardTable";
 import { MentorIcon } from "@/components/mentor/MentorIcon";
 import { Button } from "@/components/ui/button";
-import { ArrowRight, ChevronDown } from "lucide-react";
 
 function createMockReviewedPullRequest(amount: number) {
 	return Array.from(

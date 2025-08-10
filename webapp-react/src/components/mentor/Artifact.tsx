@@ -1,18 +1,18 @@
-import type { ChatMessageVote, Document } from "@/api/types.gen";
-import { useScrollToBottom } from "@/hooks/use-scroll-to-bottom";
-import type { Attachment, ChatMessage } from "@/lib/types";
-import { cn } from "@/lib/utils";
 import type { UseChatHelpers } from "@ai-sdk/react";
 import { formatDistance } from "date-fns";
 import { AnimatePresence, motion } from "framer-motion";
 import { Copy, History, Redo2, Undo2 } from "lucide-react";
 import { useDebounceCallback, useWindowSize } from "usehooks-ts";
+import type { ChatMessageVote, Document } from "@/api/types.gen";
+import { useScrollToBottom } from "@/hooks/use-scroll-to-bottom";
+import type { Attachment, ChatMessage } from "@/lib/types";
+import { cn } from "@/lib/utils";
 import { type ArtifactAction, ArtifactActions } from "./ArtifactActions";
 import { ArtifactCloseButton } from "./ArtifactCloseButton";
+import { textArtifact } from "./artifacts/text";
 import { Messages } from "./Messages";
 import { MultimodalInput } from "./MultimodalInput";
 import { VersionFooter } from "./VersionFooter";
-import { textArtifact } from "./artifacts/text";
 
 export const artifactDefinitions = [textArtifact];
 

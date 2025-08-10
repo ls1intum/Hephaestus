@@ -1,10 +1,10 @@
-import type { ChatMessageVote, Document } from "@/api/types.gen";
-import type { ChatMessage } from "@/lib/types";
-import { cn, sanitizeText } from "@/lib/utils";
 import cx from "classnames";
 import equal from "fast-deep-equal";
 import { AnimatePresence, motion } from "framer-motion";
 import { memo, useState } from "react";
+import type { ChatMessageVote, Document } from "@/api/types.gen";
+import type { ChatMessage } from "@/lib/types";
+import { cn, sanitizeText } from "@/lib/utils";
 import { DocumentPreview } from "./DocumentPreview";
 import { DocumentTool } from "./DocumentTool";
 import { Markdown } from "./Markdown";

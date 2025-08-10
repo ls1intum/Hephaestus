@@ -1,6 +1,6 @@
+import { type MouseEvent, memo, useCallback } from "react";
 import type { Document } from "@/api/types.gen";
 import { cn } from "@/lib/utils";
-import { type MouseEvent, memo, useCallback } from "react";
 import { InlineDocumentSkeleton } from "./DocumentSkeleton";
 import { FileIcon, FullscreenIcon, LoaderIcon } from "./Icons";
 import { TextEditor } from "./TextEditor";

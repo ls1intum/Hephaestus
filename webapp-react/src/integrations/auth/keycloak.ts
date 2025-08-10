@@ -1,5 +1,5 @@
-import environment from "@/environment";
 import Keycloak from "keycloak-js";
+import environment from "@/environment";
 
 export interface UserProfile {
 	id: string;

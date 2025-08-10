@@ -1,11 +1,3 @@
-import { Button } from "@/components/ui/button";
-import {
-	Card,
-	CardContent,
-	CardDescription,
-	CardHeader,
-	CardTitle,
-} from "@/components/ui/card";
 import {
 	CheckIcon,
 	CommentDiscussionIcon,
@@ -15,6 +7,14 @@ import {
 	InfoIcon,
 } from "@primer/octicons-react";
 import { useState } from "react";
+import { Button } from "@/components/ui/button";
+import {
+	Card,
+	CardContent,
+	CardDescription,
+	CardHeader,
+	CardTitle,
+} from "@/components/ui/card";
 import { ScoringExplanationDialog } from "./ScoringExplanationDialog";
 
 export function LeaderboardLegend() {

@@ -1,3 +1,4 @@
+import type { LucideIcon } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import {
 	Card,
@@ -6,7 +7,6 @@ import {
 	CardHeader,
 	CardTitle,
 } from "@/components/ui/card";
-import type { LucideIcon } from "lucide-react";
 
 export interface FeatureData {
 	icon: LucideIcon;

@@ -1,5 +1,5 @@
-import { ScrollArea } from "@/components/ui/scroll-area";
 import { toast } from "sonner";
+import { ScrollArea } from "@/components/ui/scroll-area";
 // import { DiffView } from '@/components/diffview';
 import { DocumentSkeleton } from "../DocumentSkeleton";
 import {
@@ -57,6 +57,7 @@ export const textArtifact = new Artifact<"text", TextArtifactMetadata>({
 
 		return (
 			<ScrollArea className="h-full">
+				{/* biome-ignore lint/a11y/noStaticElementInteractions: Container focuses inner editor for better UX */}
 				<div
 					className="flex flex-col px-4 py-8 md:px-10 cursor-text"
 					style={{ minHeight: "92dvh" }}

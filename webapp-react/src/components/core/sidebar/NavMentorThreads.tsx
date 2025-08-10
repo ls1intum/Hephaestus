@@ -1,3 +1,4 @@
+import { Link, useLocation } from "@tanstack/react-router";
 import type { ChatThreadGroup, ChatThreadSummary } from "@/api/types.gen";
 import {
 	SidebarGroup,
@@ -7,7 +8,6 @@ import {
 	SidebarMenuButton,
 	SidebarMenuItem,
 } from "@/components/ui/sidebar";
-import { Link, useLocation } from "@tanstack/react-router";
 
 export interface NavMentorThreadsProps {
 	threadGroups: ChatThreadGroup[];

@@ -1,7 +1,7 @@
+import { memo, useCallback, useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
-import { memo, useCallback, useEffect, useRef, useState } from "react";
 
 interface MessageEditorProps {
 	/** Initial text content to edit */

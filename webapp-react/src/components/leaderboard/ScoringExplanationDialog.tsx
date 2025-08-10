@@ -1,3 +1,4 @@
+import { GraphIcon } from "@primer/octicons-react";
 import {
 	Dialog,
 	DialogContent,
@@ -5,7 +6,6 @@ import {
 	DialogHeader,
 	DialogTitle,
 } from "@/components/ui/dialog";
-import { GraphIcon } from "@primer/octicons-react";
 
 interface ScoringExplanationDialogProps {
 	open: boolean;

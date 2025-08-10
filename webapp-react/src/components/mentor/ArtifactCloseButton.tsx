@@ -1,6 +1,6 @@
-import { Button } from "@/components/ui/button";
 import { X } from "lucide-react";
 import { memo } from "react";
+import { Button } from "@/components/ui/button";
 
 export interface ArtifactCloseButtonProps {
 	/** Handler for closing the artifact */

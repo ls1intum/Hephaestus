@@ -1,3 +1,6 @@
+import { Link } from "@tanstack/react-router";
+import { SquarePen } from "lucide-react";
+import type { JSX } from "react";
 import type { ChatThreadGroup } from "@/api/types.gen";
 import {
 	Sidebar,
@@ -7,9 +10,6 @@ import {
 	SidebarMenuButton,
 	SidebarRail,
 } from "@/components/ui/sidebar";
-import { Link } from "@tanstack/react-router";
-import { SquarePen } from "lucide-react";
-import type { JSX } from "react";
 import { NavAdmin } from "./NavAdmin";
 import { NavContextHeader } from "./NavContextHeader";
 import { NavDashboards } from "./NavDashboards";

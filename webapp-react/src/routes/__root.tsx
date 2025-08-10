@@ -1,16 +1,16 @@
-import { getGroupedThreadsOptions } from "@/api/@tanstack/react-query.gen";
 import type { QueryClient } from "@tanstack/react-query";
 import { useQuery } from "@tanstack/react-query";
 import {
+	createRootRouteWithContext,
 	Link,
 	Outlet,
-	createRootRouteWithContext,
 	useLocation,
+	useRouter,
 } from "@tanstack/react-router";
 import { TanStackRouterDevtools } from "@tanstack/react-router-devtools";
-
-import TanstackQueryLayout from "../integrations/tanstack-query/layout";
-
+import { useCallback } from "react";
+import { Toaster } from "sonner";
+import { getGroupedThreadsOptions } from "@/api/@tanstack/react-query.gen";
 import Footer from "@/components/core/Footer";
 import Header from "@/components/core/Header";
 import {
@@ -29,9 +29,7 @@ import { useMentorChat } from "@/hooks/useMentorChat";
 import { type AuthContextType, useAuth } from "@/integrations/auth/AuthContext";
 import { useTheme } from "@/integrations/theme";
 import type { ChatMessage } from "@/lib/types";
-import { useRouter } from "@tanstack/react-router";
-import { useCallback } from "react";
-import { Toaster } from "sonner";
+import TanstackQueryLayout from "../integrations/tanstack-query/layout";
 
 interface MyRouterContext {
 	queryClient: QueryClient;
@@ -112,11 +110,6 @@ function GlobalCopilot() {
 	const router = useRouter();
 	const { isAuthenticated, hasRole, isLoading } = useAuth();
 
-	// Enforce mentor access for Copilot as well
-	if (isLoading || !isAuthenticated || !hasRole("mentor_access")) {
-		return null;
-	}
-
 	const handleMessageSubmit = useCallback(
 		({ text }: { text: string }) => {
 			if (!text.trim()) return;
@@ -150,6 +143,10 @@ function GlobalCopilot() {
 			console.error("Failed to copy to clipboard:", error);
 		});
 	}, []);
+
+	if (isLoading || !isAuthenticated || !hasRole("mentor_access")) {
+		return null;
+	}
 
 	return (
 		<Copilot

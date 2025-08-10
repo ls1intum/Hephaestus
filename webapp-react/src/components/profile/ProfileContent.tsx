@@ -1,8 +1,8 @@
-import type { PullRequestInfo, PullRequestReviewInfo } from "@/api/types.gen";
-import { Button } from "@/components/ui/button";
 import { CodeReviewIcon, GitPullRequestIcon } from "@primer/octicons-react";
 import { Link } from "@tanstack/react-router";
 import { useMemo } from "react";
+import type { PullRequestInfo, PullRequestReviewInfo } from "@/api/types.gen";
+import { Button } from "@/components/ui/button";
 import { EmptyState } from "../shared/EmptyState";
 import { IssueCard } from "../shared/IssueCard";
 import { ReviewActivityCard } from "./ReviewActivityCard";

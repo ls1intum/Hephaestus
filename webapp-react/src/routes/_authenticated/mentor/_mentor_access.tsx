@@ -1,6 +1,6 @@
+import { createFileRoute, Outlet, redirect } from "@tanstack/react-router";
 import { Spinner } from "@/components/ui/spinner";
 import { useAuth } from "@/integrations/auth";
-import { Outlet, createFileRoute, redirect } from "@tanstack/react-router";
 
 export const Route = createFileRoute("/_authenticated/mentor/_mentor_access")({
 	component: MentorLayout,

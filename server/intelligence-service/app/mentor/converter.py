@@ -104,7 +104,7 @@ def convert_to_langchain_messages(messages: List[UIMessage]):
                 # Derive tool metadata
                 tool_name = getattr(part, "toolName", None)
                 if not tool_name and p_type and p_type.startswith("tool-"):
-                    tool_name = p_type[len("tool-"):]
+                    tool_name = p_type[len("tool-") :]
                 if not tool_name:
                     tool_name = "unknown"
 

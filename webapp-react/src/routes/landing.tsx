@@ -1,6 +1,6 @@
+import { createFileRoute } from "@tanstack/react-router";
 import { LandingPage } from "@/components/info/landing/LandingPage";
 import { useAuth } from "@/integrations/auth/AuthContext";
-import { createFileRoute } from "@tanstack/react-router";
 
 export const Route = createFileRoute("/landing")({
 	component: LandingContainer,

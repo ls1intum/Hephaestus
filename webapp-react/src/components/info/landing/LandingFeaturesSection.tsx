@@ -1,3 +1,4 @@
+import { CheckCheck, Trophy } from "lucide-react";
 import { MentorIcon } from "@/components/mentor/MentorIcon";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -7,7 +8,6 @@ import {
 	CardHeader,
 	CardTitle,
 } from "@/components/ui/card";
-import { CheckCheck, Trophy } from "lucide-react";
 
 export function LandingFeaturesSection() {
 	return (

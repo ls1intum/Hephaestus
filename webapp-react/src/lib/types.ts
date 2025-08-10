@@ -1,3 +1,5 @@
+import type { UIMessage } from "ai";
+import { z } from "zod";
 import type {
 	CreateDocumentInput,
 	CreateDocumentOutput,
@@ -6,8 +8,6 @@ import type {
 	UpdateDocumentInput,
 	UpdateDocumentOutput,
 } from "@/api/types.gen";
-import type { UIMessage } from "ai";
-import { z } from "zod";
 
 export type DataPart = { type: "append-message"; message: string };
 

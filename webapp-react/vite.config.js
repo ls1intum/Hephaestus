@@ -6,7 +6,7 @@ import { defineConfig } from "vite";
 import Terminal from "vite-plugin-terminal";
 
 // https://vitejs.dev/config/
-export default defineConfig(({ command, mode }) => {
+export default defineConfig(({ command }) => {
 	const isDevelopment = command !== "build";
 
 	return {

@@ -1,7 +1,7 @@
-import type { GetWeatherOutput } from "@/api/types.gen";
 import cx from "classnames";
 import { format, isWithinInterval } from "date-fns";
 import { useEffect, useState } from "react";
+import type { GetWeatherOutput } from "@/api/types.gen";
 
 const SAMPLE = {
 	latitude: 37.763283,

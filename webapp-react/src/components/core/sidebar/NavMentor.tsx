@@ -1,3 +1,5 @@
+import { Link } from "@tanstack/react-router";
+import { ChevronRight, Sparkles } from "lucide-react";
 import { MentorIcon } from "@/components/mentor/MentorIcon";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -7,9 +9,6 @@ import {
 	SidebarMenuButton,
 	SidebarMenuItem,
 } from "@/components/ui/sidebar";
-import { Link } from "@tanstack/react-router";
-import { Sparkles } from "lucide-react";
-import { ChevronRight } from "lucide-react";
 
 export function NavMentor() {
 	return (

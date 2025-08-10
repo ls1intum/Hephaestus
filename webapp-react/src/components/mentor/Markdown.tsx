@@ -1,3 +1,6 @@
+import { memo, useEffect, useState } from "react";
+import ReactMarkdown, { type Components } from "react-markdown";
+import remarkGfm from "remark-gfm";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
@@ -8,9 +11,6 @@ import {
 	TableHeader,
 	TableRow,
 } from "@/components/ui/table";
-import { memo, useEffect, useState } from "react";
-import ReactMarkdown, { type Components } from "react-markdown";
-import remarkGfm from "remark-gfm";
 import { CodeBlock } from "./CodeBlock";
 import styles from "./Markdown.module.css";
 

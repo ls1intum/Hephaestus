@@ -1,3 +1,9 @@
+import {
+	CheckIcon,
+	CopyIcon,
+	GitPullRequestIcon,
+} from "@primer/octicons-react";
+import { useEffect, useState } from "react";
 import type { LeaderboardEntry } from "@/api/types.gen";
 import { Button } from "@/components/ui/button";
 import { CardTitle } from "@/components/ui/card";
@@ -8,12 +14,6 @@ import {
 } from "@/components/ui/popover";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { cn } from "@/lib/utils";
-import {
-	CheckIcon,
-	CopyIcon,
-	GitPullRequestIcon,
-} from "@primer/octicons-react";
-import { useEffect, useState } from "react";
 
 export interface ReviewsPopoverProps {
 	reviewedPRs: LeaderboardEntry["reviewedPullRequests"];
@@ -70,7 +70,7 @@ export function ReviewsPopover({
 				// Fallback to plain text if html copying fails
 				navigator.clipboard.writeText(plainText);
 			});
-		} catch (e) {
+		} catch (_e) {
 			// Basic fallback for older browsers
 			navigator.clipboard.writeText(plainText);
 		}

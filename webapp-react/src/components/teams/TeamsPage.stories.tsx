@@ -1,5 +1,5 @@
-import type { TeamInfo } from "@/api/types.gen";
 import type { Meta, StoryObj } from "@storybook/react";
+import type { TeamInfo } from "@/api/types.gen";
 import { TeamsPage } from "./TeamsPage";
 
 const mockTeams: TeamInfo[] = [

@@ -1,13 +1,12 @@
-import { Chat } from "@/components/mentor/Chat";
-import { useMentorChat } from "@/hooks/useMentorChat";
-import type { ChatMessage } from "@/lib/types";
-import { useCallback, useEffect, useMemo, useRef } from "react";
-
 import {
 	createFileRoute,
 	useLocation,
 	useNavigate,
 } from "@tanstack/react-router";
+import { useCallback, useEffect, useMemo, useRef } from "react";
+import { Chat } from "@/components/mentor/Chat";
+import { useMentorChat } from "@/hooks/useMentorChat";
+import type { ChatMessage } from "@/lib/types";
 
 export const Route = createFileRoute("/_authenticated/mentor/$threadId")({
 	component: ThreadContainer,

@@ -23,18 +23,19 @@
     "lint:py:webhook-ingest": "cd server/webhook-ingest/ && poetry run flake8 .",
     "format:ts": "npm exec -w webapp-react biome format --write",
     "lint:ts": "npm exec -w webapp-react biome check",
-    "format:server": "npm run format:java && npm run format:py:intelligence-service && npm run format:py:webhook-ingest",
-    "lint:server": "npm run lint:java && npm run lint:py:intelligence-service && npm run lint:py:webhook-ingest",
+    "format:server": "run-s -c format:java format:py:intelligence-service format:py:webhook-ingest",
+    "lint:server": "run-s -c lint:java lint:py:intelligence-service lint:py:webhook-ingest",
     "format:client": "npm run format:ts",
     "lint:client": "npm run lint:ts",
     "format": "npm run format:server && npm run format:client",
-    "lint": "npm run lint:server && npm run lint:client",
+    "lint": "run-s -c lint:server lint:client",
     "db:draft-changelog": "scripts/db-utils.sh draft-changelog",
     "db:generate-erd-docs": "scripts/db-utils.sh generate-erd",
     "db:generate-models:intelligence-service": "scripts/db-utils.sh generate-models-intelligence-service"
   },
   "devDependencies": {
     "@openapitools/openapi-generator-cli": "2.16.3",
+    "npm-run-all": "^4.1.5",
     "prettier": "3.5.1",
     "prettier-plugin-java": "2.6.7"
   }

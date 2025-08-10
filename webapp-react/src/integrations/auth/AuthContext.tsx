@@ -1,3 +1,4 @@
+import type { ReactNode } from "react";
 import {
 	createContext,
 	useCallback,
@@ -5,7 +6,6 @@ import {
 	useEffect,
 	useState,
 } from "react";
-import type { ReactNode } from "react";
 import keycloakService, { type UserProfile } from "./keycloak";
 
 // Global state to prevent duplicate initialization across strict mode renders

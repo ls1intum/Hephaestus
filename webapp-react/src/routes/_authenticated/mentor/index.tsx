@@ -1,16 +1,16 @@
-import { Chat } from "@/components/mentor/Chat";
-import type { ChatProps } from "@/components/mentor/Chat";
-import type { ChatMessage } from "@/lib/types";
+import { useQueryClient } from "@tanstack/react-query";
+import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useCallback } from "react";
+import { v4 as uuidv4 } from "uuid";
 
 import {
 	getGroupedThreadsQueryKey,
 	getThreadQueryKey,
 } from "@/api/@tanstack/react-query.gen";
 import type { ChatThreadGroup, ChatThreadSummary } from "@/api/types.gen";
-import { useQueryClient } from "@tanstack/react-query";
-import { createFileRoute, useNavigate } from "@tanstack/react-router";
-import { v4 as uuidv4 } from "uuid";
+import type { ChatProps } from "@/components/mentor/Chat";
+import { Chat } from "@/components/mentor/Chat";
+import type { ChatMessage } from "@/lib/types";
 
 export const Route = createFileRoute("/_authenticated/mentor/")({
 	component: MentorContainer,

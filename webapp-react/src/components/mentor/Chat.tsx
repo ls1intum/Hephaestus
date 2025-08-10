@@ -1,14 +1,14 @@
-import type { ChatMessageVote, Document } from "@/api/types.gen";
-import { useScrollToBottom } from "@/hooks/use-scroll-to-bottom";
-import type { Attachment, ChatMessage } from "@/lib/types";
-import { cn } from "@/lib/utils";
 import type { UseChatHelpers } from "@ai-sdk/react";
 import equal from "fast-deep-equal";
 import { memo, useCallback, useState } from "react";
 import { createPortal } from "react-dom";
 import { useWindowSize } from "usehooks-ts";
-import { Artifact } from "./Artifact";
+import type { ChatMessageVote, Document } from "@/api/types.gen";
+import { useScrollToBottom } from "@/hooks/use-scroll-to-bottom";
+import type { Attachment, ChatMessage } from "@/lib/types";
+import { cn } from "@/lib/utils";
 import type { UIArtifact } from "./Artifact";
+import { Artifact } from "./Artifact";
 import { Messages } from "./Messages";
 import { MultimodalInput } from "./MultimodalInput";
 
