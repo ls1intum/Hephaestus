@@ -380,6 +380,13 @@ public class ChatPersistenceService {
                 toolContent.put("input", (String) null); // Will be updated in onToolInputAvailable
                 toolContent.put("output", (String) null);
                 toolContent.put("errorText", (String) null);
+                // Optional flags from stream start
+                if (toolInputStart.getProviderExecuted() != null) {
+                    toolContent.put("providerExecuted", toolInputStart.getProviderExecuted());
+                }
+                if (toolInputStart.getDynamic() != null) {
+                    toolContent.put("dynamic", toolInputStart.getDynamic());
+                }
                 toolPart.setContent(toolContent);
 
                 // Update content in database since createMessagePart already saved it
@@ -443,6 +450,13 @@ public class ChatPersistenceService {
                     toolContent.put("input", (String) null);
                     toolContent.put("output", (String) null);
                     toolContent.put("errorText", (String) null);
+                    // Optional flags
+                    if (toolInput.getProviderExecuted() != null) {
+                        toolContent.put("providerExecuted", toolInput.getProviderExecuted());
+                    }
+                    if (toolInput.getDynamic() != null) {
+                        toolContent.put("dynamic", toolInput.getDynamic());
+                    }
                     toolPart.setContent(toolContent);
 
                     // Update content in database since createAndSaveMessagePart already saved it
@@ -473,6 +487,9 @@ public class ChatPersistenceService {
                 // store providerExecuted if provided
                 if (toolInput.getProviderExecuted() != null) {
                     toolContent.put("providerExecuted", toolInput.getProviderExecuted());
+                }
+                if (toolInput.getDynamic() != null) {
+                    toolContent.put("dynamic", toolInput.getDynamic());
                 }
 
                 // store provider metadata if provided (map stream providerMetadata -> UI callProviderMetadata)
@@ -536,6 +553,9 @@ public class ChatPersistenceService {
                     if (toolOutput.getProviderExecuted() != null) {
                         existingContent.put("providerExecuted", toolOutput.getProviderExecuted());
                     }
+                    if (toolOutput.getDynamic() != null) {
+                        existingContent.put("dynamic", toolOutput.getDynamic());
+                    }
 
                     chatMessagePartRepository.save(toolPart);
                     logger.debug(
@@ -587,6 +607,12 @@ public class ChatPersistenceService {
                     toolContent.put("input", (String) null);
                     toolContent.put("output", (String) null);
                     toolContent.put("errorText", errorText);
+                    if (errorPart.getProviderExecuted() != null) {
+                        toolContent.put("providerExecuted", errorPart.getProviderExecuted());
+                    }
+                    if (errorPart.getDynamic() != null) {
+                        toolContent.put("dynamic", errorPart.getDynamic());
+                    }
                     toolPart.setContent(toolContent);
 
                     // Update content in database since createAndSaveMessagePart already saved it
@@ -661,6 +687,12 @@ public class ChatPersistenceService {
                         existingContent.set("callProviderMetadata", objectMapper.valueToTree(streamProviderMetadata));
                     }
                 } catch (Exception ignored) {}
+                if (inputError.getProviderExecuted() != null) {
+                    existingContent.put("providerExecuted", inputError.getProviderExecuted());
+                }
+                if (inputError.getDynamic() != null) {
+                    existingContent.put("dynamic", inputError.getDynamic());
+                }
 
                 chatMessagePartRepository.save(toolPart);
 

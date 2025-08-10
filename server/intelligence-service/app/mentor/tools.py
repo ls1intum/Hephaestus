@@ -71,48 +71,37 @@ def get_weather(latitude: float, longitude: float) -> Dict[str, Any]:
 
 @tool("createDocument", args_schema=CreateDocumentInput)
 def create_document(title: str, content: str, kind: Literal["text"]) -> Dict[str, Any]:
-    """Create a new text document for the current user.
+    """Signal creation of a document. The app server performs the actual write.
 
-    IMPORTANT: This tool signals an intent to create a document. The actual creation
-    is executed by the application server to preserve auth and ownership semantics.
-
-    Args:
-        title: Title of the document (<=255 chars)
-        content: Text content of the document
-        kind: Document kind, currently only "text" is supported
-
-    Returns:
-        Acknowledgement payload; the server will provide the concrete output via streaming.
+    Returns an acknowledgement envelope mirroring the reference AI SDK v5 behavior. The
+    server consumes the tool input and streams data-* UI parts as the document is created.
     """
-    # Return the input for transparency; server will execute and stream the real result
-    return {
-        "accepted": True,
-        "input": {"title": title, "content": content, "kind": kind},
-    }
+    try:
+        return {
+            "accepted": True,
+            "input": {"title": title, "content": content, "kind": kind},
+        }
+    except Exception as e:
+        logger.exception("create_document: unexpected error: %s", e)
+        return {"accepted": False, "error": str(e)}
 
 
 @tool("updateDocument", args_schema=UpdateDocumentInput)
 def update_document(
     id: str, title: str, content: str, kind: Literal["text"]
 ) -> Dict[str, Any]:
-    """Update an existing text document by creating a new version.
+    """Signal update of a document. The app server performs the actual write.
 
-    IMPORTANT: This tool signals an intent to update a document. The actual update
-    is executed by the application server to preserve auth and ownership semantics.
-
-    Args:
-        id: Document UUID
-        title: New title for the document
-        content: New text content
-        kind: Document kind, currently only "text" is supported
-
-    Returns:
-        Acknowledgement payload; the server will provide the concrete output via streaming.
+    Returns an acknowledgement envelope; the server streams the concrete result.
     """
-    return {
-        "accepted": True,
-        "input": {"id": id, "title": title, "content": content, "kind": kind},
-    }
+    try:
+        return {
+            "accepted": True,
+            "input": {"id": id, "title": title, "content": content, "kind": kind},
+        }
+    except Exception as e:
+        logger.exception("update_document: unexpected error: %s", e)
+        return {"accepted": False, "error": str(e)}
 
 
 @tool

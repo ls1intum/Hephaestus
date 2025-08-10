@@ -197,6 +197,7 @@ class StreamGenerator:
         tool_call_id: str,
         output_data: Any,
         provider_executed: Optional[bool] = None,
+        dynamic: Optional[bool] = None,
     ) -> str:
         """Signal that tool output is available."""
         return self.format_event(
@@ -204,6 +205,7 @@ class StreamGenerator:
                 toolCallId=tool_call_id,
                 output=output_data,
                 providerExecuted=provider_executed,
+                dynamic=dynamic,
             )
         )
 
@@ -212,6 +214,7 @@ class StreamGenerator:
         tool_call_id: str,
         error_text: str,
         provider_executed: Optional[bool] = None,
+        dynamic: Optional[bool] = None,
     ) -> str:
         """Signal that tool output has an error."""
         return self.format_event(
@@ -219,6 +222,7 @@ class StreamGenerator:
                 toolCallId=tool_call_id,
                 errorText=error_text,
                 providerExecuted=provider_executed,
+                dynamic=dynamic,
             )
         )
 
