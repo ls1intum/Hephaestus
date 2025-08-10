@@ -42,7 +42,7 @@ export const Route = createRootRouteWithContext<MyRouterContext>()({
 	component: () => {
 		const { theme } = useTheme();
 		const { pathname } = useLocation();
-		const { isAuthenticated, hasRole } = useAuth();
+		const { isAuthenticated, hasRole, isLoading } = useAuth();
 		const isMentorRoute = pathname.startsWith("/mentor");
 
 		// Exclude routes where Copilot should not appear
@@ -55,7 +55,10 @@ export const Route = createRootRouteWithContext<MyRouterContext>()({
 			pathname === "/privacy";
 
 		const showCopilot =
-			isAuthenticated && hasRole("mentor_access") && !isExcludedRoute;
+			!isLoading &&
+			isAuthenticated &&
+			hasRole("mentor_access") &&
+			!isExcludedRoute;
 
 		return (
 			<>
@@ -107,6 +110,12 @@ function GlobalCopilot() {
 	});
 
 	const router = useRouter();
+	const { isAuthenticated, hasRole, isLoading } = useAuth();
+
+	// Enforce mentor access for Copilot as well
+	if (isLoading || !isAuthenticated || !hasRole("mentor_access")) {
+		return null;
+	}
 
 	const handleMessageSubmit = useCallback(
 		({ text }: { text: string }) => {
