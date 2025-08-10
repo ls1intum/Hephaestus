@@ -248,6 +248,19 @@ public class ChatPersistenceService {
                 activeTextParts.put(textId, textPart);
                 textBuffers.put(textId, new StringBuilder());
 
+                // If provider metadata present, initialize it on content so future deltas keep it
+                if (textStartPart.getProviderMetadata() != null) {
+                    var structuredContent = objectMapper.createObjectNode();
+                    structuredContent.put("type", "text");
+                    structuredContent.put("text", "");
+                    structuredContent.set(
+                        "providerMetadata",
+                        objectMapper.valueToTree(textStartPart.getProviderMetadata())
+                    );
+                    textPart.setContent(structuredContent);
+                    chatMessagePartRepository.save(textPart);
+                }
+
                 logger.debug(
                     "Created text part immediately for ID: {} in message: {} with order: {}",
                     textId,
@@ -287,6 +300,17 @@ public class ChatPersistenceService {
                 var structuredContent = objectMapper.createObjectNode();
                 structuredContent.put("type", "text");
                 structuredContent.put("text", buffer.toString());
+
+                // If provider metadata present on this delta, merge/override
+                if (textDeltaPart.getProviderMetadata() != null) {
+                    structuredContent.set(
+                        "providerMetadata",
+                        objectMapper.valueToTree(textDeltaPart.getProviderMetadata())
+                    );
+                } else if (textPart.getContent() != null && textPart.getContent().has("providerMetadata")) {
+                    // preserve previously set providerMetadata
+                    structuredContent.set("providerMetadata", textPart.getContent().get("providerMetadata"));
+                }
 
                 // Update the database part with structured content
                 textPart.setContent(structuredContent);
@@ -446,6 +470,19 @@ public class ChatPersistenceService {
                     toolContent.set("input", objectMapper.valueToTree(input));
                 }
 
+                // store providerExecuted if provided
+                if (toolInput.getProviderExecuted() != null) {
+                    toolContent.put("providerExecuted", toolInput.getProviderExecuted());
+                }
+
+                // store provider metadata if provided (map stream providerMetadata -> UI callProviderMetadata)
+                try {
+                    Object streamProviderMetadata = toolInput.getProviderMetadata();
+                    if (streamProviderMetadata != null) {
+                        toolContent.set("callProviderMetadata", objectMapper.valueToTree(streamProviderMetadata));
+                    }
+                } catch (Exception ignored) {}
+
                 toolPart.setContent(toolContent);
                 chatMessagePartRepository.save(toolPart);
 
@@ -493,6 +530,11 @@ public class ChatPersistenceService {
                     } else {
                         // Output is already an object, convert to JsonNode
                         existingContent.set("output", objectMapper.valueToTree(output));
+                    }
+
+                    // store providerExecuted if provided
+                    if (toolOutput.getProviderExecuted() != null) {
+                        existingContent.put("providerExecuted", toolOutput.getProviderExecuted());
                     }
 
                     chatMessagePartRepository.save(toolPart);
@@ -572,6 +614,60 @@ public class ChatPersistenceService {
                 toolPartsById.remove(toolCallId);
             } catch (Exception e) {
                 logger.error("Failed to process tool output error: {}", e.getMessage(), e);
+            } finally {
+                lock.unlock();
+            }
+        }
+
+        @Override
+        public void onToolInputError(StreamToolInputErrorPart inputError) {
+            lock.lock();
+            try {
+                if (currentMessage == null) {
+                    logger.warn("Received tool input error without message start");
+                    return;
+                }
+
+                String toolCallId = inputError.getToolCallId();
+                ChatMessagePart toolPart = toolPartsById.get(toolCallId);
+
+                if (toolPart == null) {
+                    // create a tool part to reflect the error
+                    toolPart = createAndSaveMessagePart(
+                        ChatMessagePart.PartType.TOOL,
+                        "",
+                        "tool-" + inputError.getToolName()
+                    );
+                    var content = objectMapper.createObjectNode();
+                    content.put("toolCallId", toolCallId);
+                    content.put("type", "tool-" + inputError.getToolName());
+                    toolPart.setContent(content);
+                }
+
+                var existingContent = (ObjectNode) toolPart.getContent();
+                existingContent.put("state", "output-error");
+                existingContent.put("errorText", inputError.getErrorText());
+
+                // include raw input for diagnostics; map to rawInput per AI SDK client usage
+                Object input = inputError.getInput();
+                if (input != null) {
+                    existingContent.set("rawInput", objectMapper.valueToTree(input));
+                }
+
+                // store callProviderMetadata if provided (from stream providerMetadata)
+                try {
+                    Object streamProviderMetadata = inputError.getProviderMetadata();
+                    if (streamProviderMetadata != null) {
+                        existingContent.set("callProviderMetadata", objectMapper.valueToTree(streamProviderMetadata));
+                    }
+                } catch (Exception ignored) {}
+
+                chatMessagePartRepository.save(toolPart);
+
+                // complete this tool call
+                toolPartsById.remove(toolCallId);
+            } catch (Exception e) {
+                logger.error("Failed to process tool input error: {}", e.getMessage(), e);
             } finally {
                 lock.unlock();
             }
@@ -752,6 +848,17 @@ public class ChatPersistenceService {
                 activeReasoningParts.put(reasoningId, reasoningPart);
                 reasoningBuffers.put(reasoningId, new StringBuilder());
 
+                // Initialize with provider metadata if present
+                Object startProviderMetadata = reasoningStartPart.getProviderMetadata();
+                if (startProviderMetadata != null) {
+                    var structured = objectMapper.createObjectNode();
+                    structured.put("type", "reasoning");
+                    structured.put("text", "");
+                    structured.set("providerMetadata", objectMapper.valueToTree(startProviderMetadata));
+                    reasoningPart.setContent(structured);
+                    chatMessagePartRepository.save(reasoningPart);
+                }
+
                 logger.debug(
                     "Created reasoning part immediately for ID: {} in message: {}",
                     reasoningId,
@@ -795,6 +902,10 @@ public class ChatPersistenceService {
                     structured.put("type", "reasoning");
                 }
                 structured.put("text", buffer.toString());
+                Object deltaProviderMetadata = reasoningDeltaPart.getProviderMetadata();
+                if (deltaProviderMetadata != null) {
+                    structured.set("providerMetadata", objectMapper.valueToTree(deltaProviderMetadata));
+                }
                 reasoningPart.setContent(structured);
                 chatMessagePartRepository.save(reasoningPart);
             } catch (Exception e) {
@@ -854,8 +965,15 @@ public class ChatPersistenceService {
 
                 // Add additional source metadata
                 var sourceContent = objectMapper.createObjectNode();
+                // keep sourceId for traceability and parity with UI chunk schema
+                if (sourceUrl.getSourceId() != null) {
+                    sourceContent.put("sourceId", sourceUrl.getSourceId());
+                }
                 sourceContent.put("url", sourceUrl.getUrl());
                 sourceContent.put("title", sourceUrl.getTitle());
+                if (sourceUrl.getProviderMetadata() != null) {
+                    sourceContent.set("providerMetadata", objectMapper.valueToTree(sourceUrl.getProviderMetadata()));
+                }
                 sourcePart.setContent(sourceContent);
 
                 // Update content in database
@@ -891,6 +1009,16 @@ public class ChatPersistenceService {
                 var sourceContent = objectMapper.createObjectNode();
                 sourceContent.put("sourceId", sourceDocument.getSourceId());
                 sourceContent.put("title", sourceDocument.getTitle());
+                sourceContent.put("mediaType", sourceDocument.getMediaType());
+                if (sourceDocument.getFilename() != null) {
+                    sourceContent.put("filename", sourceDocument.getFilename());
+                }
+                if (sourceDocument.getProviderMetadata() != null) {
+                    sourceContent.set(
+                        "providerMetadata",
+                        objectMapper.valueToTree(sourceDocument.getProviderMetadata())
+                    );
+                }
                 sourcePart.setContent(sourceContent);
 
                 chatMessagePartRepository.save(sourcePart);
@@ -925,6 +1053,10 @@ public class ChatPersistenceService {
                 var fileContent = objectMapper.createObjectNode();
                 fileContent.put("url", filePart.getUrl());
                 fileContent.put("mediaType", filePart.getMediaType());
+                if (filePart.getProviderMetadata() != null) {
+                    // Store under providerMetadata to align with UI file part schema
+                    fileContent.set("providerMetadata", objectMapper.valueToTree(filePart.getProviderMetadata()));
+                }
                 fileMessagePart.setContent(fileContent);
 
                 // Update content in database
@@ -943,6 +1075,13 @@ public class ChatPersistenceService {
             try {
                 if (currentMessage == null) {
                     logger.warn("Received data part without message start");
+                    return;
+                }
+
+                // Do not persist transient data parts (AI SDK v5 semantics)
+                Boolean isTransient = dataPart.getTransient();
+                if (Boolean.TRUE.equals(isTransient)) {
+                    logger.debug("Skipping transient data part: type={}", dataPart.getType());
                     return;
                 }
 

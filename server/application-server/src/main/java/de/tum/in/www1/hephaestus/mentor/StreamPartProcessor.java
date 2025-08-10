@@ -50,6 +50,12 @@ public interface StreamPartProcessor {
     default void onToolInputAvailable(StreamToolInputAvailablePart toolInputPart) {}
 
     /**
+     * Called when there is an error while preparing tool input.
+     * @param toolInputErrorPart The tool input error part
+     */
+    default void onToolInputError(StreamToolInputErrorPart toolInputErrorPart) {}
+
+    /**
      * Called when tool output is available.
      * @param toolOutputPart The tool output available part
      */

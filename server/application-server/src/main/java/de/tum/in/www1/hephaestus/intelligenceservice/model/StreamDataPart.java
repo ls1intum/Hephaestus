@@ -29,20 +29,24 @@ import com.fasterxml.jackson.annotation.JsonTypeName;
 import org.hibernate.validator.constraints.*;
 
 /**
- * Data part with dynamic type.
+ * Data part with dynamic type.  AI SDK v5 stream chunks support a &#x60;transient&#x60; flag that indicates the data should not be added to the persisted message state.
  */
 @JsonPropertyOrder({
   StreamDataPart.JSON_PROPERTY_DATA,
   StreamDataPart.JSON_PROPERTY_ID,
+  StreamDataPart.JSON_PROPERTY_TRANSIENT,
   StreamDataPart.JSON_PROPERTY_TYPE
 })
 @jakarta.annotation.Generated(value = "org.openapitools.codegen.languages.JavaClientCodegen", comments = "Generator version: 7.7.0")
 public class StreamDataPart {
   public static final String JSON_PROPERTY_DATA = "data";
-  private Object data;
+  private Object data = null;
 
   public static final String JSON_PROPERTY_ID = "id";
   private JsonNullable<String> id = JsonNullable.<String>undefined();
+
+  public static final String JSON_PROPERTY_TRANSIENT = "transient";
+  private JsonNullable<Boolean> _transient = JsonNullable.<Boolean>undefined();
 
   public static final String JSON_PROPERTY_TYPE = "type";
   private String type;
@@ -60,7 +64,7 @@ public class StreamDataPart {
    * Get data
    * @return data
    */
-  @jakarta.annotation.Nonnull
+  @jakarta.annotation.Nullable
   @JsonProperty(JSON_PROPERTY_DATA)
   @JsonInclude(value = JsonInclude.Include.ALWAYS)
 
@@ -108,6 +112,39 @@ public class StreamDataPart {
     this.id = JsonNullable.<String>of(id);
   }
 
+  public StreamDataPart _transient(Boolean _transient) {
+    this._transient = JsonNullable.<Boolean>of(_transient);
+    
+    return this;
+  }
+
+  /**
+   * Get _transient
+   * @return _transient
+   */
+  @jakarta.annotation.Nullable
+  @JsonIgnore
+
+  public Boolean getTransient() {
+        return _transient.orElse(null);
+  }
+
+  @JsonProperty(JSON_PROPERTY_TRANSIENT)
+  @JsonInclude(value = JsonInclude.Include.USE_DEFAULTS)
+
+  public JsonNullable<Boolean> getTransient_JsonNullable() {
+    return _transient;
+  }
+  
+  @JsonProperty(JSON_PROPERTY_TRANSIENT)
+  public void setTransient_JsonNullable(JsonNullable<Boolean> _transient) {
+    this._transient = _transient;
+  }
+
+  public void setTransient(Boolean _transient) {
+    this._transient = JsonNullable.<Boolean>of(_transient);
+  }
+
   public StreamDataPart type(String type) {
     
     this.type = type;
@@ -144,6 +181,7 @@ public class StreamDataPart {
     StreamDataPart streamDataPart = (StreamDataPart) o;
     return Objects.equals(this.data, streamDataPart.data) &&
         equalsNullable(this.id, streamDataPart.id) &&
+        equalsNullable(this._transient, streamDataPart._transient) &&
         Objects.equals(this.type, streamDataPart.type);
   }
 
@@ -153,7 +191,7 @@ public class StreamDataPart {
 
   @Override
   public int hashCode() {
-    return Objects.hash(data, hashCodeNullable(id), type);
+    return Objects.hash(data, hashCodeNullable(id), hashCodeNullable(_transient), type);
   }
 
   private static <T> int hashCodeNullable(JsonNullable<T> a) {
@@ -169,6 +207,7 @@ public class StreamDataPart {
     sb.append("class StreamDataPart {\n");
     sb.append("    data: ").append(toIndentedString(data)).append("\n");
     sb.append("    id: ").append(toIndentedString(id)).append("\n");
+    sb.append("    _transient: ").append(toIndentedString(_transient)).append("\n");
     sb.append("    type: ").append(toIndentedString(type)).append("\n");
     sb.append("}");
     return sb.toString();

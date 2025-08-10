@@ -155,6 +155,7 @@ export function useMentorChat({
 		stop,
 		regenerate,
 		error,
+		clearError,
 		setMessages,
 		resumeStream,
 		addToolResult,
@@ -270,6 +271,7 @@ export function useMentorChat({
 		resumeStream,
 		addToolResult,
 		id,
+		clearError,
 
 		// Send function
 		sendMessage,

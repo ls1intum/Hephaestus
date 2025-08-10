@@ -80,6 +80,113 @@ public class ChatControllerIT extends BaseIntegrationTest {
         return parts;
     }
 
+    @Test
+    @WithMentorUser
+    void testSourceUrlDocumentAndFilePartsArePersisted() {
+        // Given
+        var request = createChatRequest();
+        String responseMessageId = UUID.randomUUID().toString();
+
+        String sourceId = UUID.randomUUID().toString();
+        String url = "https://example.com/resource";
+        String title = "Example Resource";
+
+        String docSourceId = UUID.randomUUID().toString();
+        String mediaType = "application/pdf";
+        String docTitle = "Specification";
+        String filename = "spec.pdf";
+
+        String fileUrl = "https://example.com/image.png";
+        String fileMediaType = "image/png";
+
+        List<Object> streamParts = new ArrayList<>();
+        streamParts.add(new StreamStartPart().messageId(responseMessageId));
+        streamParts.add(new StreamStepStartPart());
+        streamParts.add(new StreamSourceUrlPart().sourceId(sourceId).url(url).title(title));
+        streamParts.add(
+            new StreamSourceDocumentPart()
+                .sourceId(docSourceId)
+                .mediaType(mediaType)
+                .title(docTitle)
+                .filename(filename)
+        );
+        streamParts.add(new StreamFilePart().url(fileUrl).mediaType(fileMediaType));
+        streamParts.add(new StreamStepFinishPart());
+        streamParts.add(new StreamFinishPart());
+
+        mockResponseHolder.setStreamParts(request.message().getId(), streamParts);
+
+        // When
+        var response = performChatRequest(request);
+
+        // Then
+        StepVerifier.create(response).expectComplete();
+
+        var assistantMessage =
+            chatMessageRepository.findById(UUID.fromString(responseMessageId)).orElseThrow();
+        var parts = assistantMessage.getParts();
+
+        assertThat(parts).hasSize(4);
+        assertThat(parts.get(0).getType()).isEqualTo(ChatMessagePart.PartType.STEP_START);
+
+        // Source URL
+        var sourceUrlPart = parts.get(1);
+        assertThat(sourceUrlPart.getType()).isEqualTo(ChatMessagePart.PartType.SOURCE_URL);
+        var sourceUrlUi = sourceUrlPart.toUIMessagePart();
+        assertThat(sourceUrlUi.getSourceId()).isEqualTo(sourceId);
+        assertThat(sourceUrlUi.getUrl()).isEqualTo(url);
+        assertThat(sourceUrlUi.getTitle()).isEqualTo(title);
+
+        // Source Document
+        var sourceDocPart = parts.get(2);
+        assertThat(sourceDocPart.getType()).isEqualTo(ChatMessagePart.PartType.SOURCE_DOCUMENT);
+        var sourceDocUi = sourceDocPart.toUIMessagePart();
+        assertThat(sourceDocUi.getSourceId()).isEqualTo(docSourceId);
+        assertThat(sourceDocUi.getMediaType()).isEqualTo(mediaType);
+        assertThat(sourceDocUi.getTitle()).isEqualTo(docTitle);
+        assertThat(sourceDocUi.getFilename()).isEqualTo(filename);
+
+        // File
+        var filePart = parts.get(3);
+        assertThat(filePart.getType()).isEqualTo(ChatMessagePart.PartType.FILE);
+        var fileUi = filePart.toUIMessagePart();
+        assertThat(fileUi.getUrl()).isEqualTo(fileUrl);
+        assertThat(fileUi.getMediaType()).isEqualTo(fileMediaType);
+    }
+
+    @Test
+    @WithMentorUser
+    void testTransientDataPartsAreNotPersisted() {
+        // Given
+        var request = createChatRequest();
+        String responseMessageId = UUID.randomUUID().toString();
+
+        List<Object> streamParts = new ArrayList<>();
+        streamParts.add(new StreamStartPart().messageId(responseMessageId));
+        streamParts.add(new StreamStepStartPart());
+        streamParts.add(new StreamDataPart().type("data-kind").data("text")._transient(true));
+        streamParts.add(new StreamDataPart().type("data-textDelta").data("Hello ")._transient(true));
+        streamParts.add(new StreamDataPart().type("data-textDelta").data("World")._transient(true));
+        streamParts.add(new StreamStepFinishPart());
+        streamParts.add(new StreamFinishPart());
+
+        mockResponseHolder.setStreamParts(request.message().getId(), streamParts);
+
+        // When
+        var response = performChatRequest(request);
+
+        // Then
+        StepVerifier.create(response).expectComplete();
+
+        var assistantMessage =
+            chatMessageRepository.findById(UUID.fromString(responseMessageId)).orElseThrow();
+        var parts = assistantMessage.getParts();
+
+        // Only step-start should have been persisted
+        assertThat(parts).hasSize(1);
+        assertThat(parts.get(0).getType()).isEqualTo(ChatMessagePart.PartType.STEP_START);
+    }
+
     /**
      * Helper method to extract text content from a part that uses structured content format.
      * For text parts, this will extract the "text" field from the structured JSON.

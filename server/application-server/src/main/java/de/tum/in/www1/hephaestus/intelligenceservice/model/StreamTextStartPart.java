@@ -20,6 +20,10 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonTypeName;
 import com.fasterxml.jackson.annotation.JsonValue;
+import org.openapitools.jackson.nullable.JsonNullable;
+import com.fasterxml.jackson.annotation.JsonIgnore;
+import org.openapitools.jackson.nullable.JsonNullable;
+import java.util.NoSuchElementException;
 import com.fasterxml.jackson.annotation.JsonPropertyOrder;
 import com.fasterxml.jackson.annotation.JsonTypeName;
 import org.hibernate.validator.constraints.*;
@@ -29,12 +33,16 @@ import org.hibernate.validator.constraints.*;
  */
 @JsonPropertyOrder({
   StreamTextStartPart.JSON_PROPERTY_ID,
+  StreamTextStartPart.JSON_PROPERTY_PROVIDER_METADATA,
   StreamTextStartPart.JSON_PROPERTY_TYPE
 })
 @jakarta.annotation.Generated(value = "org.openapitools.codegen.languages.JavaClientCodegen", comments = "Generator version: 7.7.0")
 public class StreamTextStartPart {
   public static final String JSON_PROPERTY_ID = "id";
   private String id;
+
+  public static final String JSON_PROPERTY_PROVIDER_METADATA = "providerMetadata";
+  private JsonNullable<Object> providerMetadata = JsonNullable.<Object>undefined();
 
   public static final String JSON_PROPERTY_TYPE = "type";
   private String type = "text-start";
@@ -65,6 +73,39 @@ public class StreamTextStartPart {
   @JsonInclude(value = JsonInclude.Include.ALWAYS)
   public void setId(String id) {
     this.id = id;
+  }
+
+  public StreamTextStartPart providerMetadata(Object providerMetadata) {
+    this.providerMetadata = JsonNullable.<Object>of(providerMetadata);
+    
+    return this;
+  }
+
+  /**
+   * Get providerMetadata
+   * @return providerMetadata
+   */
+  @jakarta.annotation.Nullable
+  @JsonIgnore
+
+  public Object getProviderMetadata() {
+        return providerMetadata.orElse(null);
+  }
+
+  @JsonProperty(JSON_PROPERTY_PROVIDER_METADATA)
+  @JsonInclude(value = JsonInclude.Include.USE_DEFAULTS)
+
+  public JsonNullable<Object> getProviderMetadata_JsonNullable() {
+    return providerMetadata;
+  }
+  
+  @JsonProperty(JSON_PROPERTY_PROVIDER_METADATA)
+  public void setProviderMetadata_JsonNullable(JsonNullable<Object> providerMetadata) {
+    this.providerMetadata = providerMetadata;
+  }
+
+  public void setProviderMetadata(Object providerMetadata) {
+    this.providerMetadata = JsonNullable.<Object>of(providerMetadata);
   }
 
   public StreamTextStartPart type(String type) {
@@ -102,12 +143,24 @@ public class StreamTextStartPart {
     }
     StreamTextStartPart streamTextStartPart = (StreamTextStartPart) o;
     return Objects.equals(this.id, streamTextStartPart.id) &&
+        equalsNullable(this.providerMetadata, streamTextStartPart.providerMetadata) &&
         Objects.equals(this.type, streamTextStartPart.type);
+  }
+
+  private static <T> boolean equalsNullable(JsonNullable<T> a, JsonNullable<T> b) {
+    return a == b || (a != null && b != null && a.isPresent() && b.isPresent() && Objects.deepEquals(a.get(), b.get()));
   }
 
   @Override
   public int hashCode() {
-    return Objects.hash(id, type);
+    return Objects.hash(id, hashCodeNullable(providerMetadata), type);
+  }
+
+  private static <T> int hashCodeNullable(JsonNullable<T> a) {
+    if (a == null) {
+      return 1;
+    }
+    return a.isPresent() ? Arrays.deepHashCode(new Object[]{a.get()}) : 31;
   }
 
   @Override
@@ -115,6 +168,7 @@ public class StreamTextStartPart {
     StringBuilder sb = new StringBuilder();
     sb.append("class StreamTextStartPart {\n");
     sb.append("    id: ").append(toIndentedString(id)).append("\n");
+    sb.append("    providerMetadata: ").append(toIndentedString(providerMetadata)).append("\n");
     sb.append("    type: ").append(toIndentedString(type)).append("\n");
     sb.append("}");
     return sb.toString();

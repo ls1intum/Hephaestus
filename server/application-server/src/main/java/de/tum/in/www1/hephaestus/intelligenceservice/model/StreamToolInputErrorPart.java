@@ -29,22 +29,34 @@ import com.fasterxml.jackson.annotation.JsonTypeName;
 import org.hibernate.validator.constraints.*;
 
 /**
- * Tool input start event.
+ * Tool input error event (signals an error occurred while preparing input).  Mirrors AI SDK &#39;tool-input-error&#39; chunk. For non-dynamic tools, the server should record an &#39;output-error&#39; tool UI part where rawInput may be used for diagnostics.
  */
 @JsonPropertyOrder({
-  StreamToolInputStartPart.JSON_PROPERTY_DYNAMIC,
-  StreamToolInputStartPart.JSON_PROPERTY_PROVIDER_EXECUTED,
-  StreamToolInputStartPart.JSON_PROPERTY_TOOL_CALL_ID,
-  StreamToolInputStartPart.JSON_PROPERTY_TOOL_NAME,
-  StreamToolInputStartPart.JSON_PROPERTY_TYPE
+  StreamToolInputErrorPart.JSON_PROPERTY_DYNAMIC,
+  StreamToolInputErrorPart.JSON_PROPERTY_ERROR_TEXT,
+  StreamToolInputErrorPart.JSON_PROPERTY_INPUT,
+  StreamToolInputErrorPart.JSON_PROPERTY_PROVIDER_EXECUTED,
+  StreamToolInputErrorPart.JSON_PROPERTY_PROVIDER_METADATA,
+  StreamToolInputErrorPart.JSON_PROPERTY_TOOL_CALL_ID,
+  StreamToolInputErrorPart.JSON_PROPERTY_TOOL_NAME,
+  StreamToolInputErrorPart.JSON_PROPERTY_TYPE
 })
 @jakarta.annotation.Generated(value = "org.openapitools.codegen.languages.JavaClientCodegen", comments = "Generator version: 7.7.0")
-public class StreamToolInputStartPart {
+public class StreamToolInputErrorPart {
   public static final String JSON_PROPERTY_DYNAMIC = "dynamic";
   private JsonNullable<Boolean> dynamic = JsonNullable.<Boolean>undefined();
 
+  public static final String JSON_PROPERTY_ERROR_TEXT = "errorText";
+  private String errorText;
+
+  public static final String JSON_PROPERTY_INPUT = "input";
+  private Object input = null;
+
   public static final String JSON_PROPERTY_PROVIDER_EXECUTED = "providerExecuted";
   private JsonNullable<Boolean> providerExecuted = JsonNullable.<Boolean>undefined();
+
+  public static final String JSON_PROPERTY_PROVIDER_METADATA = "providerMetadata";
+  private JsonNullable<Object> providerMetadata = JsonNullable.<Object>undefined();
 
   public static final String JSON_PROPERTY_TOOL_CALL_ID = "toolCallId";
   private String toolCallId;
@@ -53,12 +65,12 @@ public class StreamToolInputStartPart {
   private String toolName;
 
   public static final String JSON_PROPERTY_TYPE = "type";
-  private String type = "tool-input-start";
+  private String type = "tool-input-error";
 
-  public StreamToolInputStartPart() {
+  public StreamToolInputErrorPart() {
   }
 
-  public StreamToolInputStartPart dynamic(Boolean dynamic) {
+  public StreamToolInputErrorPart dynamic(Boolean dynamic) {
     this.dynamic = JsonNullable.<Boolean>of(dynamic);
     
     return this;
@@ -91,7 +103,57 @@ public class StreamToolInputStartPart {
     this.dynamic = JsonNullable.<Boolean>of(dynamic);
   }
 
-  public StreamToolInputStartPart providerExecuted(Boolean providerExecuted) {
+  public StreamToolInputErrorPart errorText(String errorText) {
+    
+    this.errorText = errorText;
+    return this;
+  }
+
+  /**
+   * Get errorText
+   * @return errorText
+   */
+  @jakarta.annotation.Nonnull
+  @JsonProperty(JSON_PROPERTY_ERROR_TEXT)
+  @JsonInclude(value = JsonInclude.Include.ALWAYS)
+
+  public String getErrorText() {
+    return errorText;
+  }
+
+
+  @JsonProperty(JSON_PROPERTY_ERROR_TEXT)
+  @JsonInclude(value = JsonInclude.Include.ALWAYS)
+  public void setErrorText(String errorText) {
+    this.errorText = errorText;
+  }
+
+  public StreamToolInputErrorPart input(Object input) {
+    
+    this.input = input;
+    return this;
+  }
+
+  /**
+   * Get input
+   * @return input
+   */
+  @jakarta.annotation.Nullable
+  @JsonProperty(JSON_PROPERTY_INPUT)
+  @JsonInclude(value = JsonInclude.Include.ALWAYS)
+
+  public Object getInput() {
+    return input;
+  }
+
+
+  @JsonProperty(JSON_PROPERTY_INPUT)
+  @JsonInclude(value = JsonInclude.Include.ALWAYS)
+  public void setInput(Object input) {
+    this.input = input;
+  }
+
+  public StreamToolInputErrorPart providerExecuted(Boolean providerExecuted) {
     this.providerExecuted = JsonNullable.<Boolean>of(providerExecuted);
     
     return this;
@@ -124,7 +186,40 @@ public class StreamToolInputStartPart {
     this.providerExecuted = JsonNullable.<Boolean>of(providerExecuted);
   }
 
-  public StreamToolInputStartPart toolCallId(String toolCallId) {
+  public StreamToolInputErrorPart providerMetadata(Object providerMetadata) {
+    this.providerMetadata = JsonNullable.<Object>of(providerMetadata);
+    
+    return this;
+  }
+
+  /**
+   * Get providerMetadata
+   * @return providerMetadata
+   */
+  @jakarta.annotation.Nullable
+  @JsonIgnore
+
+  public Object getProviderMetadata() {
+        return providerMetadata.orElse(null);
+  }
+
+  @JsonProperty(JSON_PROPERTY_PROVIDER_METADATA)
+  @JsonInclude(value = JsonInclude.Include.USE_DEFAULTS)
+
+  public JsonNullable<Object> getProviderMetadata_JsonNullable() {
+    return providerMetadata;
+  }
+  
+  @JsonProperty(JSON_PROPERTY_PROVIDER_METADATA)
+  public void setProviderMetadata_JsonNullable(JsonNullable<Object> providerMetadata) {
+    this.providerMetadata = providerMetadata;
+  }
+
+  public void setProviderMetadata(Object providerMetadata) {
+    this.providerMetadata = JsonNullable.<Object>of(providerMetadata);
+  }
+
+  public StreamToolInputErrorPart toolCallId(String toolCallId) {
     
     this.toolCallId = toolCallId;
     return this;
@@ -149,7 +244,7 @@ public class StreamToolInputStartPart {
     this.toolCallId = toolCallId;
   }
 
-  public StreamToolInputStartPart toolName(String toolName) {
+  public StreamToolInputErrorPart toolName(String toolName) {
     
     this.toolName = toolName;
     return this;
@@ -174,7 +269,7 @@ public class StreamToolInputStartPart {
     this.toolName = toolName;
   }
 
-  public StreamToolInputStartPart type(String type) {
+  public StreamToolInputErrorPart type(String type) {
     
     this.type = type;
     return this;
@@ -207,12 +302,15 @@ public class StreamToolInputStartPart {
     if (o == null || getClass() != o.getClass()) {
       return false;
     }
-    StreamToolInputStartPart streamToolInputStartPart = (StreamToolInputStartPart) o;
-    return equalsNullable(this.dynamic, streamToolInputStartPart.dynamic) &&
-        equalsNullable(this.providerExecuted, streamToolInputStartPart.providerExecuted) &&
-        Objects.equals(this.toolCallId, streamToolInputStartPart.toolCallId) &&
-        Objects.equals(this.toolName, streamToolInputStartPart.toolName) &&
-        Objects.equals(this.type, streamToolInputStartPart.type);
+    StreamToolInputErrorPart streamToolInputErrorPart = (StreamToolInputErrorPart) o;
+    return equalsNullable(this.dynamic, streamToolInputErrorPart.dynamic) &&
+        Objects.equals(this.errorText, streamToolInputErrorPart.errorText) &&
+        Objects.equals(this.input, streamToolInputErrorPart.input) &&
+        equalsNullable(this.providerExecuted, streamToolInputErrorPart.providerExecuted) &&
+        equalsNullable(this.providerMetadata, streamToolInputErrorPart.providerMetadata) &&
+        Objects.equals(this.toolCallId, streamToolInputErrorPart.toolCallId) &&
+        Objects.equals(this.toolName, streamToolInputErrorPart.toolName) &&
+        Objects.equals(this.type, streamToolInputErrorPart.type);
   }
 
   private static <T> boolean equalsNullable(JsonNullable<T> a, JsonNullable<T> b) {
@@ -221,7 +319,7 @@ public class StreamToolInputStartPart {
 
   @Override
   public int hashCode() {
-    return Objects.hash(hashCodeNullable(dynamic), hashCodeNullable(providerExecuted), toolCallId, toolName, type);
+    return Objects.hash(hashCodeNullable(dynamic), errorText, input, hashCodeNullable(providerExecuted), hashCodeNullable(providerMetadata), toolCallId, toolName, type);
   }
 
   private static <T> int hashCodeNullable(JsonNullable<T> a) {
@@ -234,9 +332,12 @@ public class StreamToolInputStartPart {
   @Override
   public String toString() {
     StringBuilder sb = new StringBuilder();
-    sb.append("class StreamToolInputStartPart {\n");
+    sb.append("class StreamToolInputErrorPart {\n");
     sb.append("    dynamic: ").append(toIndentedString(dynamic)).append("\n");
+    sb.append("    errorText: ").append(toIndentedString(errorText)).append("\n");
+    sb.append("    input: ").append(toIndentedString(input)).append("\n");
     sb.append("    providerExecuted: ").append(toIndentedString(providerExecuted)).append("\n");
+    sb.append("    providerMetadata: ").append(toIndentedString(providerMetadata)).append("\n");
     sb.append("    toolCallId: ").append(toIndentedString(toolCallId)).append("\n");
     sb.append("    toolName: ").append(toIndentedString(toolName)).append("\n");
     sb.append("    type: ").append(toIndentedString(type)).append("\n");

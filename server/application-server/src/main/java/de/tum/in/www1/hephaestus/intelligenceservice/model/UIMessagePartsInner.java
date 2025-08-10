@@ -39,13 +39,14 @@ import org.hibernate.validator.constraints.*;
  * UIMessagePartsInner
  */
 @JsonPropertyOrder({
+  UIMessagePartsInner.JSON_PROPERTY_PROVIDER_METADATA,
   UIMessagePartsInner.JSON_PROPERTY_STATE,
   UIMessagePartsInner.JSON_PROPERTY_TEXT,
   UIMessagePartsInner.JSON_PROPERTY_TYPE,
-  UIMessagePartsInner.JSON_PROPERTY_PROVIDER_METADATA,
   UIMessagePartsInner.JSON_PROPERTY_INPUT,
   UIMessagePartsInner.JSON_PROPERTY_PROVIDER_EXECUTED,
   UIMessagePartsInner.JSON_PROPERTY_TOOL_CALL_ID,
+  UIMessagePartsInner.JSON_PROPERTY_CALL_PROVIDER_METADATA,
   UIMessagePartsInner.JSON_PROPERTY_OUTPUT,
   UIMessagePartsInner.JSON_PROPERTY_ERROR_TEXT,
   UIMessagePartsInner.JSON_PROPERTY_SOURCE_ID,
@@ -59,6 +60,9 @@ import org.hibernate.validator.constraints.*;
 @JsonTypeName("UIMessage_parts_inner")
 @jakarta.annotation.Generated(value = "org.openapitools.codegen.languages.JavaClientCodegen", comments = "Generator version: 7.7.0")
 public class UIMessagePartsInner {
+  public static final String JSON_PROPERTY_PROVIDER_METADATA = "providerMetadata";
+  private Object providerMetadata;
+
   public static final String JSON_PROPERTY_STATE = "state";
   private String state;
 
@@ -68,9 +72,6 @@ public class UIMessagePartsInner {
   public static final String JSON_PROPERTY_TYPE = "type";
   private String type = "step-start";
 
-  public static final String JSON_PROPERTY_PROVIDER_METADATA = "providerMetadata";
-  private Object providerMetadata;
-
   public static final String JSON_PROPERTY_INPUT = "input";
   private Object input;
 
@@ -79,6 +80,9 @@ public class UIMessagePartsInner {
 
   public static final String JSON_PROPERTY_TOOL_CALL_ID = "toolCallId";
   private String toolCallId;
+
+  public static final String JSON_PROPERTY_CALL_PROVIDER_METADATA = "callProviderMetadata";
+  private Object callProviderMetadata;
 
   public static final String JSON_PROPERTY_OUTPUT = "output";
   private Object output;
@@ -102,12 +106,37 @@ public class UIMessagePartsInner {
   private String mediaType;
 
   public static final String JSON_PROPERTY_DATA = "data";
-  private Object data;
+  private Object data = null;
 
   public static final String JSON_PROPERTY_ID = "id";
   private String id;
 
   public UIMessagePartsInner() {
+  }
+
+  public UIMessagePartsInner providerMetadata(Object providerMetadata) {
+    
+    this.providerMetadata = providerMetadata;
+    return this;
+  }
+
+  /**
+   * Get providerMetadata
+   * @return providerMetadata
+   */
+  @jakarta.annotation.Nullable
+  @JsonProperty(JSON_PROPERTY_PROVIDER_METADATA)
+  @JsonInclude(value = JsonInclude.Include.USE_DEFAULTS)
+
+  public Object getProviderMetadata() {
+    return providerMetadata;
+  }
+
+
+  @JsonProperty(JSON_PROPERTY_PROVIDER_METADATA)
+  @JsonInclude(value = JsonInclude.Include.USE_DEFAULTS)
+  public void setProviderMetadata(Object providerMetadata) {
+    this.providerMetadata = providerMetadata;
   }
 
   public UIMessagePartsInner state(String state) {
@@ -185,31 +214,6 @@ public class UIMessagePartsInner {
     this.type = type;
   }
 
-  public UIMessagePartsInner providerMetadata(Object providerMetadata) {
-    
-    this.providerMetadata = providerMetadata;
-    return this;
-  }
-
-  /**
-   * Get providerMetadata
-   * @return providerMetadata
-   */
-  @jakarta.annotation.Nullable
-  @JsonProperty(JSON_PROPERTY_PROVIDER_METADATA)
-  @JsonInclude(value = JsonInclude.Include.USE_DEFAULTS)
-
-  public Object getProviderMetadata() {
-    return providerMetadata;
-  }
-
-
-  @JsonProperty(JSON_PROPERTY_PROVIDER_METADATA)
-  @JsonInclude(value = JsonInclude.Include.USE_DEFAULTS)
-  public void setProviderMetadata(Object providerMetadata) {
-    this.providerMetadata = providerMetadata;
-  }
-
   public UIMessagePartsInner input(Object input) {
     
     this.input = input;
@@ -283,6 +287,31 @@ public class UIMessagePartsInner {
   @JsonInclude(value = JsonInclude.Include.ALWAYS)
   public void setToolCallId(String toolCallId) {
     this.toolCallId = toolCallId;
+  }
+
+  public UIMessagePartsInner callProviderMetadata(Object callProviderMetadata) {
+    
+    this.callProviderMetadata = callProviderMetadata;
+    return this;
+  }
+
+  /**
+   * Get callProviderMetadata
+   * @return callProviderMetadata
+   */
+  @jakarta.annotation.Nullable
+  @JsonProperty(JSON_PROPERTY_CALL_PROVIDER_METADATA)
+  @JsonInclude(value = JsonInclude.Include.USE_DEFAULTS)
+
+  public Object getCallProviderMetadata() {
+    return callProviderMetadata;
+  }
+
+
+  @JsonProperty(JSON_PROPERTY_CALL_PROVIDER_METADATA)
+  @JsonInclude(value = JsonInclude.Include.USE_DEFAULTS)
+  public void setCallProviderMetadata(Object callProviderMetadata) {
+    this.callProviderMetadata = callProviderMetadata;
   }
 
   public UIMessagePartsInner output(Object output) {
@@ -470,7 +499,7 @@ public class UIMessagePartsInner {
    * Get data
    * @return data
    */
-  @jakarta.annotation.Nonnull
+  @jakarta.annotation.Nullable
   @JsonProperty(JSON_PROPERTY_DATA)
   @JsonInclude(value = JsonInclude.Include.ALWAYS)
 
@@ -519,13 +548,14 @@ public class UIMessagePartsInner {
       return false;
     }
     UIMessagePartsInner uiMessagePartsInner = (UIMessagePartsInner) o;
-    return Objects.equals(this.state, uiMessagePartsInner.state) &&
+    return Objects.equals(this.providerMetadata, uiMessagePartsInner.providerMetadata) &&
+        Objects.equals(this.state, uiMessagePartsInner.state) &&
         Objects.equals(this.text, uiMessagePartsInner.text) &&
         Objects.equals(this.type, uiMessagePartsInner.type) &&
-        Objects.equals(this.providerMetadata, uiMessagePartsInner.providerMetadata) &&
         Objects.equals(this.input, uiMessagePartsInner.input) &&
         Objects.equals(this.providerExecuted, uiMessagePartsInner.providerExecuted) &&
         Objects.equals(this.toolCallId, uiMessagePartsInner.toolCallId) &&
+        Objects.equals(this.callProviderMetadata, uiMessagePartsInner.callProviderMetadata) &&
         Objects.equals(this.output, uiMessagePartsInner.output) &&
         Objects.equals(this.errorText, uiMessagePartsInner.errorText) &&
         Objects.equals(this.sourceId, uiMessagePartsInner.sourceId) &&
@@ -539,20 +569,21 @@ public class UIMessagePartsInner {
 
   @Override
   public int hashCode() {
-    return Objects.hash(state, text, type, providerMetadata, input, providerExecuted, toolCallId, output, errorText, sourceId, title, url, filename, mediaType, data, id);
+    return Objects.hash(providerMetadata, state, text, type, input, providerExecuted, toolCallId, callProviderMetadata, output, errorText, sourceId, title, url, filename, mediaType, data, id);
   }
 
   @Override
   public String toString() {
     StringBuilder sb = new StringBuilder();
     sb.append("class UIMessagePartsInner {\n");
+    sb.append("    providerMetadata: ").append(toIndentedString(providerMetadata)).append("\n");
     sb.append("    state: ").append(toIndentedString(state)).append("\n");
     sb.append("    text: ").append(toIndentedString(text)).append("\n");
     sb.append("    type: ").append(toIndentedString(type)).append("\n");
-    sb.append("    providerMetadata: ").append(toIndentedString(providerMetadata)).append("\n");
     sb.append("    input: ").append(toIndentedString(input)).append("\n");
     sb.append("    providerExecuted: ").append(toIndentedString(providerExecuted)).append("\n");
     sb.append("    toolCallId: ").append(toIndentedString(toolCallId)).append("\n");
+    sb.append("    callProviderMetadata: ").append(toIndentedString(callProviderMetadata)).append("\n");
     sb.append("    output: ").append(toIndentedString(output)).append("\n");
     sb.append("    errorText: ").append(toIndentedString(errorText)).append("\n");
     sb.append("    sourceId: ").append(toIndentedString(sourceId)).append("\n");

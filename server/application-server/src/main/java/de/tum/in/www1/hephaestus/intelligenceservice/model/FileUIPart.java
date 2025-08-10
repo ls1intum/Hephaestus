@@ -34,6 +34,7 @@ import org.hibernate.validator.constraints.*;
 @JsonPropertyOrder({
   FileUIPart.JSON_PROPERTY_FILENAME,
   FileUIPart.JSON_PROPERTY_MEDIA_TYPE,
+  FileUIPart.JSON_PROPERTY_PROVIDER_METADATA,
   FileUIPart.JSON_PROPERTY_TYPE,
   FileUIPart.JSON_PROPERTY_URL
 })
@@ -44,6 +45,9 @@ public class FileUIPart {
 
   public static final String JSON_PROPERTY_MEDIA_TYPE = "mediaType";
   private String mediaType;
+
+  public static final String JSON_PROPERTY_PROVIDER_METADATA = "providerMetadata";
+  private JsonNullable<Object> providerMetadata = JsonNullable.<Object>undefined();
 
   public static final String JSON_PROPERTY_TYPE = "type";
   private String type = "file";
@@ -112,6 +116,39 @@ public class FileUIPart {
     this.mediaType = mediaType;
   }
 
+  public FileUIPart providerMetadata(Object providerMetadata) {
+    this.providerMetadata = JsonNullable.<Object>of(providerMetadata);
+    
+    return this;
+  }
+
+  /**
+   * Get providerMetadata
+   * @return providerMetadata
+   */
+  @jakarta.annotation.Nullable
+  @JsonIgnore
+
+  public Object getProviderMetadata() {
+        return providerMetadata.orElse(null);
+  }
+
+  @JsonProperty(JSON_PROPERTY_PROVIDER_METADATA)
+  @JsonInclude(value = JsonInclude.Include.USE_DEFAULTS)
+
+  public JsonNullable<Object> getProviderMetadata_JsonNullable() {
+    return providerMetadata;
+  }
+  
+  @JsonProperty(JSON_PROPERTY_PROVIDER_METADATA)
+  public void setProviderMetadata_JsonNullable(JsonNullable<Object> providerMetadata) {
+    this.providerMetadata = providerMetadata;
+  }
+
+  public void setProviderMetadata(Object providerMetadata) {
+    this.providerMetadata = JsonNullable.<Object>of(providerMetadata);
+  }
+
   public FileUIPart type(String type) {
     
     this.type = type;
@@ -173,6 +210,7 @@ public class FileUIPart {
     FileUIPart fileUIPart = (FileUIPart) o;
     return equalsNullable(this.filename, fileUIPart.filename) &&
         Objects.equals(this.mediaType, fileUIPart.mediaType) &&
+        equalsNullable(this.providerMetadata, fileUIPart.providerMetadata) &&
         Objects.equals(this.type, fileUIPart.type) &&
         Objects.equals(this.url, fileUIPart.url);
   }
@@ -183,7 +221,7 @@ public class FileUIPart {
 
   @Override
   public int hashCode() {
-    return Objects.hash(hashCodeNullable(filename), mediaType, type, url);
+    return Objects.hash(hashCodeNullable(filename), mediaType, hashCodeNullable(providerMetadata), type, url);
   }
 
   private static <T> int hashCodeNullable(JsonNullable<T> a) {
@@ -199,6 +237,7 @@ public class FileUIPart {
     sb.append("class FileUIPart {\n");
     sb.append("    filename: ").append(toIndentedString(filename)).append("\n");
     sb.append("    mediaType: ").append(toIndentedString(mediaType)).append("\n");
+    sb.append("    providerMetadata: ").append(toIndentedString(providerMetadata)).append("\n");
     sb.append("    type: ").append(toIndentedString(type)).append("\n");
     sb.append("    url: ").append(toIndentedString(url)).append("\n");
     sb.append("}");

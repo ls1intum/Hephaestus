@@ -954,6 +954,30 @@ paths:
           description: OK
 components:
   schemas:
+    StreamReasoningDeltaPart:
+      type: object
+      description: Reasoning stream delta part.
+      properties:
+        delta:
+          type: string
+          title: Delta
+        id:
+          type: string
+          title: Id
+        providerMetadata:
+          anyOf:
+          - type: object
+          - type: "null"
+          title: Providermetadata
+        type:
+          type: string
+          const: reasoning-delta
+          default: reasoning-delta
+          title: Type
+      required:
+      - delta
+      - id
+      title: StreamReasoningDeltaPart
     WeatherHourly:
       type: object
       properties:
@@ -973,23 +997,23 @@ components:
     PageDocument:
       type: object
       properties:
-        totalElements:
-          type: integer
-          format: int64
         totalPages:
           type: integer
           format: int32
-        pageable:
-          $ref: "#/components/schemas/PageableObject"
+        totalElements:
+          type: integer
+          format: int64
         sort:
           $ref: "#/components/schemas/SortObject"
+        pageable:
+          $ref: "#/components/schemas/PageableObject"
+        numberOfElements:
+          type: integer
+          format: int32
         first:
           type: boolean
         last:
           type: boolean
-        numberOfElements:
-          type: integer
-          format: int32
         size:
           type: integer
           format: int32
@@ -1132,6 +1156,35 @@ components:
           - type: "null"
           title: Time
       title: WeatherDailyUnits
+    StreamSourceUrlPart:
+      type: object
+      description: Source URL part of a message.
+      properties:
+        providerMetadata:
+          anyOf:
+          - type: object
+          - type: "null"
+          title: Providermetadata
+        sourceId:
+          type: string
+          title: Sourceid
+        title:
+          anyOf:
+          - type: string
+          - type: "null"
+          title: Title
+        type:
+          type: string
+          const: source-url
+          default: source-url
+          title: Type
+        url:
+          type: string
+          title: Url
+      required:
+      - sourceId
+      - url
+      title: StreamSourceUrlPart
     LabelInfo:
       type: object
       properties:
@@ -1206,12 +1259,56 @@ components:
             type: string
           title: Time
       title: WeatherDaily
+    StreamToolInputAvailablePart:
+      type: object
+      description: |-
+        Tool input available event.
+
+        AI SDK v5 uses `providerMetadata` on the stream chunk; the UI part maps this
+        to `callProviderMetadata` when persisting tool invocation parts.
+      properties:
+        dynamic:
+          anyOf:
+          - type: boolean
+          - type: "null"
+          title: Dynamic
+        input:
+          type: object
+          title: Input
+        providerExecuted:
+          anyOf:
+          - type: boolean
+          - type: "null"
+          title: Providerexecuted
+        providerMetadata:
+          anyOf:
+          - type: object
+          - type: "null"
+          title: Providermetadata
+        toolCallId:
+          type: string
+          title: Toolcallid
+        toolName:
+          type: string
+          title: Toolname
+        type:
+          type: string
+          const: tool-input-available
+          default: tool-input-available
+          title: Type
+      required:
+      - input
+      - toolCallId
+      - toolName
+      title: StreamToolInputAvailablePart
     DataUIPart:
       type: object
-      description: A data part with dynamic type.
+      description: |-
+        A data part with dynamic type.
+
+        Note: In UI messages, data can be of any JSON type (object, array, string, number, etc.).
       properties:
         data:
-          type: object
           title: Data
         id:
           anyOf:
@@ -1230,6 +1327,11 @@ components:
       type: object
       description: A text part of a message.
       properties:
+        providerMetadata:
+          anyOf:
+          - type: object
+          - type: "null"
+          title: Providermetadata
         state:
           anyOf:
           - type: string
@@ -1249,9 +1351,43 @@ components:
       required:
       - text
       title: TextUIPart
+    BaseDocumentOutput:
+      type: object
+      description: Base output payload returned by document tools.
+      x-hephaestus-tool-model: true
+      properties:
+        content:
+          type: string
+          title: Content
+        createdAt:
+          type: string
+          format: date-time
+          title: Createdat
+        id:
+          type: string
+          title: Id
+        kind:
+          type: string
+          const: TEXT
+          title: Kind
+        title:
+          type: string
+          title: Title
+        userId:
+          type: string
+          title: Userid
+      required:
+      - content
+      - createdAt
+      - id
+      - kind
+      - title
+      - userId
+      title: BaseDocumentOutput
     CreateDocumentInput:
       type: object
       description: Input for createDocument tool.
+      x-hephaestus-tool-model: true
       properties:
         content:
           type: string
@@ -1334,6 +1470,45 @@ components:
       - number
       - state
       - title
+    StreamToolInputDeltaPart:
+      type: object
+      description: Tool input delta event.
+      properties:
+        inputTextDelta:
+          type: string
+          title: Inputtextdelta
+        toolCallId:
+          type: string
+          title: Toolcallid
+        type:
+          type: string
+          const: tool-input-delta
+          default: tool-input-delta
+          title: Type
+      required:
+      - inputTextDelta
+      - toolCallId
+      title: StreamToolInputDeltaPart
+    StreamReasoningEndPart:
+      type: object
+      description: Reasoning stream end part.
+      properties:
+        id:
+          type: string
+          title: Id
+        providerMetadata:
+          anyOf:
+          - type: object
+          - type: "null"
+          title: Providermetadata
+        type:
+          type: string
+          const: reasoning-end
+          default: reasoning-end
+          title: Type
+      required:
+      - id
+      title: StreamReasoningEndPart
     UserSettings:
       type: object
       properties:
@@ -1361,6 +1536,11 @@ components:
       type: object
       description: Tool part with output error.
       properties:
+        callProviderMetadata:
+          anyOf:
+          - type: object
+          - type: "null"
+          title: Callprovidermetadata
         errorText:
           type: string
           title: Errortext
@@ -1393,6 +1573,7 @@ components:
     CreateDocumentOutput:
       type: object
       description: Output for createDocument tool.
+      x-hephaestus-tool-model: true
       properties:
         content:
           type: string
@@ -1422,6 +1603,21 @@ components:
       - title
       - userId
       title: CreateDocumentOutput
+    StreamFinishPart:
+      type: object
+      description: End of stream event.
+      properties:
+        messageMetadata:
+          anyOf:
+          - type: object
+          - type: "null"
+          title: Messagemetadata
+        type:
+          type: string
+          const: finish
+          default: finish
+          title: Type
+      title: StreamFinishPart
     TeamInfo:
       type: object
       properties:
@@ -1454,6 +1650,39 @@ components:
       - members
       - name
       - repositories
+    StreamSourceDocumentPart:
+      type: object
+      description: Source document part of a message.
+      properties:
+        filename:
+          anyOf:
+          - type: string
+          - type: "null"
+          title: Filename
+        mediaType:
+          type: string
+          title: Mediatype
+        providerMetadata:
+          anyOf:
+          - type: object
+          - type: "null"
+          title: Providermetadata
+        sourceId:
+          type: string
+          title: Sourceid
+        title:
+          type: string
+          title: Title
+        type:
+          type: string
+          const: source-document
+          default: source-document
+          title: Type
+      required:
+      - mediaType
+      - sourceId
+      - title
+      title: StreamSourceDocumentPart
     PullRequestBadPractice:
       type: object
       properties:
@@ -1479,9 +1708,30 @@ components:
       - id
       - state
       - title
+    StreamStartPart:
+      type: object
+      description: Start of stream event.
+      properties:
+        messageId:
+          anyOf:
+          - type: string
+          - type: "null"
+          title: Messageid
+        messageMetadata:
+          anyOf:
+          - type: object
+          - type: "null"
+          title: Messagemetadata
+        type:
+          type: string
+          const: start
+          default: start
+          title: Type
+      title: StreamStartPart
     GetWeatherInput:
       type: object
       description: Input for getWeather tool.
+      x-hephaestus-tool-model: true
       properties:
         latitude:
           type: number
@@ -1526,6 +1776,55 @@ components:
       - sourceId
       - title
       title: SourceDocumentUIPart
+    StreamTextStartPart:
+      type: object
+      description: Text stream start part.
+      properties:
+        id:
+          type: string
+          title: Id
+        providerMetadata:
+          anyOf:
+          - type: object
+          - type: "null"
+          title: Providermetadata
+        type:
+          type: string
+          const: text-start
+          default: text-start
+          title: Type
+      required:
+      - id
+      title: StreamTextStartPart
+    StreamToolOutputAvailablePart:
+      type: object
+      description: Tool output available event.
+      properties:
+        dynamic:
+          anyOf:
+          - type: boolean
+          - type: "null"
+          title: Dynamic
+        output:
+          type: object
+          title: Output
+        providerExecuted:
+          anyOf:
+          - type: boolean
+          - type: "null"
+          title: Providerexecuted
+        toolCallId:
+          type: string
+          title: Toolcallid
+        type:
+          type: string
+          const: tool-output-available
+          default: tool-output-available
+          title: Type
+      required:
+      - output
+      - toolCallId
+      title: StreamToolOutputAvailablePart
     ReasoningUIPart:
       type: object
       description: A reasoning part of a message.
@@ -1558,6 +1857,11 @@ components:
       type: object
       description: Tool part with input available.
       properties:
+        callProviderMetadata:
+          anyOf:
+          - type: object
+          - type: "null"
+          title: Callprovidermetadata
         input:
           type: object
           title: Input
@@ -1617,9 +1921,23 @@ components:
           description: Votes for messages in this thread
           items:
             $ref: "#/components/schemas/ChatMessageVote"
+    StreamStepStartPart:
+      type: object
+      description: Step start event.
+      properties:
+        type:
+          type: string
+          const: start-step
+          default: start-step
+          title: Type
+      title: StreamStepStartPart
     PageableObject:
       type: object
       properties:
+        sort:
+          $ref: "#/components/schemas/SortObject"
+        unpaged:
+          type: boolean
         paged:
           type: boolean
         pageNumber:
@@ -1628,10 +1946,6 @@ components:
         pageSize:
           type: integer
           format: int32
-        unpaged:
-          type: boolean
-        sort:
-          $ref: "#/components/schemas/SortObject"
         offset:
           type: integer
           format: int64
@@ -1732,6 +2046,21 @@ components:
       - number
       - state
       - title
+    StreamErrorPart:
+      type: object
+      description: Error stream part.
+      properties:
+        errorText:
+          type: string
+          title: Errortext
+        type:
+          type: string
+          const: error
+          default: error
+          title: Type
+      required:
+      - errorText
+      title: StreamErrorPart
     Contributor:
       type: object
       properties:
@@ -1755,6 +2084,26 @@ components:
       - id
       - login
       - name
+    StreamReasoningStartPart:
+      type: object
+      description: Reasoning stream start part.
+      properties:
+        id:
+          type: string
+          title: Id
+        providerMetadata:
+          anyOf:
+          - type: object
+          - type: "null"
+          title: Providermetadata
+        type:
+          type: string
+          const: reasoning-start
+          default: reasoning-start
+          title: Type
+      required:
+      - id
+      title: StreamReasoningStartPart
     UserInfo:
       type: object
       properties:
@@ -1801,6 +2150,7 @@ components:
     GetWeatherOutput:
       type: object
       description: "Output for getWeather tool, aligned with WeatherTool.tsx expectations."
+      x-hephaestus-tool-model: true
       properties:
         current:
           anyOf:
@@ -1878,6 +2228,7 @@ components:
     UpdateDocumentOutput:
       type: object
       description: Output for updateDocument tool.
+      x-hephaestus-tool-model: true
       properties:
         content:
           type: string
@@ -1907,6 +2258,51 @@ components:
       - title
       - userId
       title: UpdateDocumentOutput
+    StreamToolInputErrorPart:
+      type: object
+      description: |-
+        Tool input error event (signals an error occurred while preparing input).
+
+        Mirrors AI SDK 'tool-input-error' chunk. For non-dynamic tools, the server should
+        record an 'output-error' tool UI part where rawInput may be used for diagnostics.
+      properties:
+        dynamic:
+          anyOf:
+          - type: boolean
+          - type: "null"
+          title: Dynamic
+        errorText:
+          type: string
+          title: Errortext
+        input:
+          title: Input
+        providerExecuted:
+          anyOf:
+          - type: boolean
+          - type: "null"
+          title: Providerexecuted
+        providerMetadata:
+          anyOf:
+          - type: object
+          - type: "null"
+          title: Providermetadata
+        toolCallId:
+          type: string
+          title: Toolcallid
+        toolName:
+          type: string
+          title: Toolname
+        type:
+          type: string
+          const: tool-input-error
+          default: tool-input-error
+          title: Type
+      required:
+      - errorText
+      - input
+      - toolCallId
+      - toolName
+      title: StreamToolInputErrorPart
     BadPracticeFeedback:
       type: object
       properties:
@@ -1966,6 +2362,30 @@ components:
       - content
       - kind
       - title
+    StreamFilePart:
+      type: object
+      description: File part of a message.
+      properties:
+        mediaType:
+          type: string
+          title: Mediatype
+        providerMetadata:
+          anyOf:
+          - type: object
+          - type: "null"
+          title: Providermetadata
+        type:
+          type: string
+          const: file
+          default: file
+          title: Type
+        url:
+          type: string
+          title: Url
+      required:
+      - mediaType
+      - url
+      title: StreamFilePart
     WeatherCurrentUnits:
       type: object
       properties:
@@ -1985,9 +2405,39 @@ components:
           - type: "null"
           title: Time
       title: WeatherCurrentUnits
+    StreamToolOutputErrorPart:
+      type: object
+      description: Tool output error event.
+      properties:
+        dynamic:
+          anyOf:
+          - type: boolean
+          - type: "null"
+          title: Dynamic
+        errorText:
+          type: string
+          title: Errortext
+        providerExecuted:
+          anyOf:
+          - type: boolean
+          - type: "null"
+          title: Providerexecuted
+        toolCallId:
+          type: string
+          title: Toolcallid
+        type:
+          type: string
+          const: tool-output-error
+          default: tool-output-error
+          title: Type
+      required:
+      - errorText
+      - toolCallId
+      title: StreamToolOutputErrorPart
     UpdateDocumentInput:
       type: object
       description: Input for updateDocument tool.
+      x-hephaestus-tool-model: true
       properties:
         content:
           type: string
@@ -2011,23 +2461,23 @@ components:
     PageDocumentSummary:
       type: object
       properties:
-        totalElements:
-          type: integer
-          format: int64
         totalPages:
           type: integer
           format: int32
-        pageable:
-          $ref: "#/components/schemas/PageableObject"
+        totalElements:
+          type: integer
+          format: int64
         sort:
           $ref: "#/components/schemas/SortObject"
+        pageable:
+          $ref: "#/components/schemas/PageableObject"
+        numberOfElements:
+          type: integer
+          format: int32
         first:
           type: boolean
         last:
           type: boolean
-        numberOfElements:
-          type: integer
-          format: int32
         size:
           type: integer
           format: int32
@@ -2114,6 +2564,30 @@ components:
       - toolCallId
       - type
       title: ToolInputStreamingPart
+    StreamTextDeltaPart:
+      type: object
+      description: Text stream delta part.
+      properties:
+        delta:
+          type: string
+          title: Delta
+        id:
+          type: string
+          title: Id
+        providerMetadata:
+          anyOf:
+          - type: object
+          - type: "null"
+          title: Providermetadata
+        type:
+          type: string
+          const: text-delta
+          default: text-delta
+          title: Type
+      required:
+      - delta
+      - id
+      title: StreamTextDeltaPart
     RepositoryInfo:
       type: object
       properties:
@@ -2133,6 +2607,16 @@ components:
       - id
       - name
       - nameWithOwner
+    StreamStepFinishPart:
+      type: object
+      description: Step finish event.
+      properties:
+        type:
+          type: string
+          const: finish-step
+          default: finish-step
+          title: Type
+      title: StreamStepFinishPart
     PullRequestWithBadPractices:
       type: object
       properties:
@@ -2203,16 +2687,50 @@ components:
     SortObject:
       type: object
       properties:
-        sorted:
-          type: boolean
         unsorted:
+          type: boolean
+        sorted:
           type: boolean
         empty:
           type: boolean
+    StreamToolInputStartPart:
+      type: object
+      description: Tool input start event.
+      properties:
+        dynamic:
+          anyOf:
+          - type: boolean
+          - type: "null"
+          title: Dynamic
+        providerExecuted:
+          anyOf:
+          - type: boolean
+          - type: "null"
+          title: Providerexecuted
+        toolCallId:
+          type: string
+          title: Toolcallid
+        toolName:
+          type: string
+          title: Toolname
+        type:
+          type: string
+          const: tool-input-start
+          default: tool-input-start
+          title: Type
+      required:
+      - toolCallId
+      - toolName
+      title: StreamToolInputStartPart
     ToolOutputAvailablePart:
       type: object
       description: Tool part with output available.
       properties:
+        callProviderMetadata:
+          anyOf:
+          - type: object
+          - type: "null"
+          title: Callprovidermetadata
         input:
           type: object
           title: Input
@@ -2256,6 +2774,21 @@ components:
           - type: "null"
           title: Time
       title: WeatherHourlyUnits
+    StreamMessageMetadataPart:
+      type: object
+      description: Message metadata part.
+      properties:
+        messageMetadata:
+          type: object
+          title: Messagemetadata
+        type:
+          type: string
+          const: message-metadata
+          default: message-metadata
+          title: Type
+      required:
+      - messageMetadata
+      title: StreamMessageMetadataPart
     ChatMessageVote:
       type: object
       description: DTO for returning vote information.
@@ -2283,6 +2816,11 @@ components:
         mediaType:
           type: string
           title: Mediatype
+        providerMetadata:
+          anyOf:
+          - type: object
+          - type: "null"
+          title: Providermetadata
         type:
           type: string
           const: file
@@ -2295,6 +2833,34 @@ components:
       - mediaType
       - url
       title: FileUIPart
+    StreamDataPart:
+      type: object
+      description: |-
+        Data part with dynamic type.
+
+        AI SDK v5 stream chunks support a `transient` flag that indicates the data
+        should not be added to the persisted message state.
+      properties:
+        data:
+          title: Data
+        id:
+          anyOf:
+          - type: string
+          - type: "null"
+          title: Id
+        transient:
+          anyOf:
+          - type: boolean
+          - type: "null"
+          title: Transient
+        type:
+          type: string
+          pattern: ^data-.*
+          title: Type
+      required:
+      - data
+      - type
+      title: StreamDataPart
     PullRequestReviewInfo:
       type: object
       properties:
@@ -2332,6 +2898,26 @@ components:
       - isDismissed
       - score
       - state
+    StreamTextEndPart:
+      type: object
+      description: Text stream end part.
+      properties:
+        id:
+          type: string
+          title: Id
+        providerMetadata:
+          anyOf:
+          - type: object
+          - type: "null"
+          title: Providermetadata
+        type:
+          type: string
+          const: text-end
+          default: text-end
+          title: Type
+      required:
+      - id
+      title: StreamTextEndPart
     DocumentSummary:
       type: object
       description: |-

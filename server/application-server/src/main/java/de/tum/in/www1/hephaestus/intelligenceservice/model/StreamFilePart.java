@@ -20,6 +20,10 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonTypeName;
 import com.fasterxml.jackson.annotation.JsonValue;
+import org.openapitools.jackson.nullable.JsonNullable;
+import com.fasterxml.jackson.annotation.JsonIgnore;
+import org.openapitools.jackson.nullable.JsonNullable;
+import java.util.NoSuchElementException;
 import com.fasterxml.jackson.annotation.JsonPropertyOrder;
 import com.fasterxml.jackson.annotation.JsonTypeName;
 import org.hibernate.validator.constraints.*;
@@ -29,6 +33,7 @@ import org.hibernate.validator.constraints.*;
  */
 @JsonPropertyOrder({
   StreamFilePart.JSON_PROPERTY_MEDIA_TYPE,
+  StreamFilePart.JSON_PROPERTY_PROVIDER_METADATA,
   StreamFilePart.JSON_PROPERTY_TYPE,
   StreamFilePart.JSON_PROPERTY_URL
 })
@@ -36,6 +41,9 @@ import org.hibernate.validator.constraints.*;
 public class StreamFilePart {
   public static final String JSON_PROPERTY_MEDIA_TYPE = "mediaType";
   private String mediaType;
+
+  public static final String JSON_PROPERTY_PROVIDER_METADATA = "providerMetadata";
+  private JsonNullable<Object> providerMetadata = JsonNullable.<Object>undefined();
 
   public static final String JSON_PROPERTY_TYPE = "type";
   private String type = "file";
@@ -69,6 +77,39 @@ public class StreamFilePart {
   @JsonInclude(value = JsonInclude.Include.ALWAYS)
   public void setMediaType(String mediaType) {
     this.mediaType = mediaType;
+  }
+
+  public StreamFilePart providerMetadata(Object providerMetadata) {
+    this.providerMetadata = JsonNullable.<Object>of(providerMetadata);
+    
+    return this;
+  }
+
+  /**
+   * Get providerMetadata
+   * @return providerMetadata
+   */
+  @jakarta.annotation.Nullable
+  @JsonIgnore
+
+  public Object getProviderMetadata() {
+        return providerMetadata.orElse(null);
+  }
+
+  @JsonProperty(JSON_PROPERTY_PROVIDER_METADATA)
+  @JsonInclude(value = JsonInclude.Include.USE_DEFAULTS)
+
+  public JsonNullable<Object> getProviderMetadata_JsonNullable() {
+    return providerMetadata;
+  }
+  
+  @JsonProperty(JSON_PROPERTY_PROVIDER_METADATA)
+  public void setProviderMetadata_JsonNullable(JsonNullable<Object> providerMetadata) {
+    this.providerMetadata = providerMetadata;
+  }
+
+  public void setProviderMetadata(Object providerMetadata) {
+    this.providerMetadata = JsonNullable.<Object>of(providerMetadata);
   }
 
   public StreamFilePart type(String type) {
@@ -131,13 +172,25 @@ public class StreamFilePart {
     }
     StreamFilePart streamFilePart = (StreamFilePart) o;
     return Objects.equals(this.mediaType, streamFilePart.mediaType) &&
+        equalsNullable(this.providerMetadata, streamFilePart.providerMetadata) &&
         Objects.equals(this.type, streamFilePart.type) &&
         Objects.equals(this.url, streamFilePart.url);
   }
 
+  private static <T> boolean equalsNullable(JsonNullable<T> a, JsonNullable<T> b) {
+    return a == b || (a != null && b != null && a.isPresent() && b.isPresent() && Objects.deepEquals(a.get(), b.get()));
+  }
+
   @Override
   public int hashCode() {
-    return Objects.hash(mediaType, type, url);
+    return Objects.hash(mediaType, hashCodeNullable(providerMetadata), type, url);
+  }
+
+  private static <T> int hashCodeNullable(JsonNullable<T> a) {
+    if (a == null) {
+      return 1;
+    }
+    return a.isPresent() ? Arrays.deepHashCode(new Object[]{a.get()}) : 31;
   }
 
   @Override
@@ -145,6 +198,7 @@ public class StreamFilePart {
     StringBuilder sb = new StringBuilder();
     sb.append("class StreamFilePart {\n");
     sb.append("    mediaType: ").append(toIndentedString(mediaType)).append("\n");
+    sb.append("    providerMetadata: ").append(toIndentedString(providerMetadata)).append("\n");
     sb.append("    type: ").append(toIndentedString(type)).append("\n");
     sb.append("    url: ").append(toIndentedString(url)).append("\n");
     sb.append("}");

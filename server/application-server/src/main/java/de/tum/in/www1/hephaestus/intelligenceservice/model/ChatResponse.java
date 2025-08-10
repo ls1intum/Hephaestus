@@ -38,6 +38,7 @@ import de.tum.in.www1.hephaestus.intelligenceservice.model.StreamTextEndPart;
 import de.tum.in.www1.hephaestus.intelligenceservice.model.StreamTextStartPart;
 import de.tum.in.www1.hephaestus.intelligenceservice.model.StreamToolInputAvailablePart;
 import de.tum.in.www1.hephaestus.intelligenceservice.model.StreamToolInputDeltaPart;
+import de.tum.in.www1.hephaestus.intelligenceservice.model.StreamToolInputErrorPart;
 import de.tum.in.www1.hephaestus.intelligenceservice.model.StreamToolInputStartPart;
 import de.tum.in.www1.hephaestus.intelligenceservice.model.StreamToolOutputAvailablePart;
 import de.tum.in.www1.hephaestus.intelligenceservice.model.StreamToolOutputErrorPart;
@@ -50,10 +51,11 @@ import org.hibernate.validator.constraints.*;
  */
 @JsonPropertyOrder({
   ChatResponse.JSON_PROPERTY_ID,
+  ChatResponse.JSON_PROPERTY_PROVIDER_METADATA,
   ChatResponse.JSON_PROPERTY_TYPE,
   ChatResponse.JSON_PROPERTY_DELTA,
-  ChatResponse.JSON_PROPERTY_PROVIDER_METADATA,
   ChatResponse.JSON_PROPERTY_ERROR_TEXT,
+  ChatResponse.JSON_PROPERTY_DYNAMIC,
   ChatResponse.JSON_PROPERTY_PROVIDER_EXECUTED,
   ChatResponse.JSON_PROPERTY_TOOL_CALL_ID,
   ChatResponse.JSON_PROPERTY_TOOL_NAME,
@@ -66,6 +68,7 @@ import org.hibernate.validator.constraints.*;
   ChatResponse.JSON_PROPERTY_FILENAME,
   ChatResponse.JSON_PROPERTY_MEDIA_TYPE,
   ChatResponse.JSON_PROPERTY_DATA,
+  ChatResponse.JSON_PROPERTY_TRANSIENT,
   ChatResponse.JSON_PROPERTY_MESSAGE_ID,
   ChatResponse.JSON_PROPERTY_MESSAGE_METADATA
 })
@@ -74,17 +77,20 @@ public class ChatResponse {
   public static final String JSON_PROPERTY_ID = "id";
   private String id;
 
+  public static final String JSON_PROPERTY_PROVIDER_METADATA = "providerMetadata";
+  private Object providerMetadata;
+
   public static final String JSON_PROPERTY_TYPE = "type";
   private String type = "message-metadata";
 
   public static final String JSON_PROPERTY_DELTA = "delta";
   private String delta;
 
-  public static final String JSON_PROPERTY_PROVIDER_METADATA = "providerMetadata";
-  private Object providerMetadata;
-
   public static final String JSON_PROPERTY_ERROR_TEXT = "errorText";
   private String errorText;
+
+  public static final String JSON_PROPERTY_DYNAMIC = "dynamic";
+  private Boolean dynamic;
 
   public static final String JSON_PROPERTY_PROVIDER_EXECUTED = "providerExecuted";
   private Boolean providerExecuted;
@@ -99,7 +105,7 @@ public class ChatResponse {
   private String inputTextDelta;
 
   public static final String JSON_PROPERTY_INPUT = "input";
-  private Object input;
+  private Object input = null;
 
   public static final String JSON_PROPERTY_OUTPUT = "output";
   private Object output;
@@ -120,7 +126,10 @@ public class ChatResponse {
   private String mediaType;
 
   public static final String JSON_PROPERTY_DATA = "data";
-  private Object data;
+  private Object data = null;
+
+  public static final String JSON_PROPERTY_TRANSIENT = "transient";
+  private Boolean _transient;
 
   public static final String JSON_PROPERTY_MESSAGE_ID = "messageId";
   private String messageId;
@@ -154,6 +163,31 @@ public class ChatResponse {
   @JsonInclude(value = JsonInclude.Include.ALWAYS)
   public void setId(String id) {
     this.id = id;
+  }
+
+  public ChatResponse providerMetadata(Object providerMetadata) {
+    
+    this.providerMetadata = providerMetadata;
+    return this;
+  }
+
+  /**
+   * Get providerMetadata
+   * @return providerMetadata
+   */
+  @jakarta.annotation.Nullable
+  @JsonProperty(JSON_PROPERTY_PROVIDER_METADATA)
+  @JsonInclude(value = JsonInclude.Include.USE_DEFAULTS)
+
+  public Object getProviderMetadata() {
+    return providerMetadata;
+  }
+
+
+  @JsonProperty(JSON_PROPERTY_PROVIDER_METADATA)
+  @JsonInclude(value = JsonInclude.Include.USE_DEFAULTS)
+  public void setProviderMetadata(Object providerMetadata) {
+    this.providerMetadata = providerMetadata;
   }
 
   public ChatResponse type(String type) {
@@ -206,31 +240,6 @@ public class ChatResponse {
     this.delta = delta;
   }
 
-  public ChatResponse providerMetadata(Object providerMetadata) {
-    
-    this.providerMetadata = providerMetadata;
-    return this;
-  }
-
-  /**
-   * Get providerMetadata
-   * @return providerMetadata
-   */
-  @jakarta.annotation.Nullable
-  @JsonProperty(JSON_PROPERTY_PROVIDER_METADATA)
-  @JsonInclude(value = JsonInclude.Include.USE_DEFAULTS)
-
-  public Object getProviderMetadata() {
-    return providerMetadata;
-  }
-
-
-  @JsonProperty(JSON_PROPERTY_PROVIDER_METADATA)
-  @JsonInclude(value = JsonInclude.Include.USE_DEFAULTS)
-  public void setProviderMetadata(Object providerMetadata) {
-    this.providerMetadata = providerMetadata;
-  }
-
   public ChatResponse errorText(String errorText) {
     
     this.errorText = errorText;
@@ -254,6 +263,31 @@ public class ChatResponse {
   @JsonInclude(value = JsonInclude.Include.ALWAYS)
   public void setErrorText(String errorText) {
     this.errorText = errorText;
+  }
+
+  public ChatResponse dynamic(Boolean dynamic) {
+    
+    this.dynamic = dynamic;
+    return this;
+  }
+
+  /**
+   * Get dynamic
+   * @return dynamic
+   */
+  @jakarta.annotation.Nullable
+  @JsonProperty(JSON_PROPERTY_DYNAMIC)
+  @JsonInclude(value = JsonInclude.Include.USE_DEFAULTS)
+
+  public Boolean getDynamic() {
+    return dynamic;
+  }
+
+
+  @JsonProperty(JSON_PROPERTY_DYNAMIC)
+  @JsonInclude(value = JsonInclude.Include.USE_DEFAULTS)
+  public void setDynamic(Boolean dynamic) {
+    this.dynamic = dynamic;
   }
 
   public ChatResponse providerExecuted(Boolean providerExecuted) {
@@ -366,7 +400,7 @@ public class ChatResponse {
    * Get input
    * @return input
    */
-  @jakarta.annotation.Nonnull
+  @jakarta.annotation.Nullable
   @JsonProperty(JSON_PROPERTY_INPUT)
   @JsonInclude(value = JsonInclude.Include.ALWAYS)
 
@@ -541,7 +575,7 @@ public class ChatResponse {
    * Get data
    * @return data
    */
-  @jakarta.annotation.Nonnull
+  @jakarta.annotation.Nullable
   @JsonProperty(JSON_PROPERTY_DATA)
   @JsonInclude(value = JsonInclude.Include.ALWAYS)
 
@@ -554,6 +588,31 @@ public class ChatResponse {
   @JsonInclude(value = JsonInclude.Include.ALWAYS)
   public void setData(Object data) {
     this.data = data;
+  }
+
+  public ChatResponse _transient(Boolean _transient) {
+    
+    this._transient = _transient;
+    return this;
+  }
+
+  /**
+   * Get _transient
+   * @return _transient
+   */
+  @jakarta.annotation.Nullable
+  @JsonProperty(JSON_PROPERTY_TRANSIENT)
+  @JsonInclude(value = JsonInclude.Include.USE_DEFAULTS)
+
+  public Boolean getTransient() {
+    return _transient;
+  }
+
+
+  @JsonProperty(JSON_PROPERTY_TRANSIENT)
+  @JsonInclude(value = JsonInclude.Include.USE_DEFAULTS)
+  public void setTransient(Boolean _transient) {
+    this._transient = _transient;
   }
 
   public ChatResponse messageId(String messageId) {
@@ -616,10 +675,11 @@ public class ChatResponse {
     }
     ChatResponse chatResponse = (ChatResponse) o;
     return Objects.equals(this.id, chatResponse.id) &&
+        Objects.equals(this.providerMetadata, chatResponse.providerMetadata) &&
         Objects.equals(this.type, chatResponse.type) &&
         Objects.equals(this.delta, chatResponse.delta) &&
-        Objects.equals(this.providerMetadata, chatResponse.providerMetadata) &&
         Objects.equals(this.errorText, chatResponse.errorText) &&
+        Objects.equals(this.dynamic, chatResponse.dynamic) &&
         Objects.equals(this.providerExecuted, chatResponse.providerExecuted) &&
         Objects.equals(this.toolCallId, chatResponse.toolCallId) &&
         Objects.equals(this.toolName, chatResponse.toolName) &&
@@ -632,13 +692,14 @@ public class ChatResponse {
         Objects.equals(this.filename, chatResponse.filename) &&
         Objects.equals(this.mediaType, chatResponse.mediaType) &&
         Objects.equals(this.data, chatResponse.data) &&
+        Objects.equals(this._transient, chatResponse._transient) &&
         Objects.equals(this.messageId, chatResponse.messageId) &&
         Objects.equals(this.messageMetadata, chatResponse.messageMetadata);
   }
 
   @Override
   public int hashCode() {
-    return Objects.hash(id, type, delta, providerMetadata, errorText, providerExecuted, toolCallId, toolName, inputTextDelta, input, output, sourceId, title, url, filename, mediaType, data, messageId, messageMetadata);
+    return Objects.hash(id, providerMetadata, type, delta, errorText, dynamic, providerExecuted, toolCallId, toolName, inputTextDelta, input, output, sourceId, title, url, filename, mediaType, data, _transient, messageId, messageMetadata);
   }
 
   @Override
@@ -646,10 +707,11 @@ public class ChatResponse {
     StringBuilder sb = new StringBuilder();
     sb.append("class ChatResponse {\n");
     sb.append("    id: ").append(toIndentedString(id)).append("\n");
+    sb.append("    providerMetadata: ").append(toIndentedString(providerMetadata)).append("\n");
     sb.append("    type: ").append(toIndentedString(type)).append("\n");
     sb.append("    delta: ").append(toIndentedString(delta)).append("\n");
-    sb.append("    providerMetadata: ").append(toIndentedString(providerMetadata)).append("\n");
     sb.append("    errorText: ").append(toIndentedString(errorText)).append("\n");
+    sb.append("    dynamic: ").append(toIndentedString(dynamic)).append("\n");
     sb.append("    providerExecuted: ").append(toIndentedString(providerExecuted)).append("\n");
     sb.append("    toolCallId: ").append(toIndentedString(toolCallId)).append("\n");
     sb.append("    toolName: ").append(toIndentedString(toolName)).append("\n");
@@ -662,6 +724,7 @@ public class ChatResponse {
     sb.append("    filename: ").append(toIndentedString(filename)).append("\n");
     sb.append("    mediaType: ").append(toIndentedString(mediaType)).append("\n");
     sb.append("    data: ").append(toIndentedString(data)).append("\n");
+    sb.append("    _transient: ").append(toIndentedString(_transient)).append("\n");
     sb.append("    messageId: ").append(toIndentedString(messageId)).append("\n");
     sb.append("    messageMetadata: ").append(toIndentedString(messageMetadata)).append("\n");
     sb.append("}");

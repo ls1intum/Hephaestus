@@ -32,6 +32,7 @@ import org.hibernate.validator.constraints.*;
  * Tool part with output error.
  */
 @JsonPropertyOrder({
+  ToolOutputErrorPart.JSON_PROPERTY_CALL_PROVIDER_METADATA,
   ToolOutputErrorPart.JSON_PROPERTY_ERROR_TEXT,
   ToolOutputErrorPart.JSON_PROPERTY_INPUT,
   ToolOutputErrorPart.JSON_PROPERTY_PROVIDER_EXECUTED,
@@ -41,6 +42,9 @@ import org.hibernate.validator.constraints.*;
 })
 @jakarta.annotation.Generated(value = "org.openapitools.codegen.languages.JavaClientCodegen", comments = "Generator version: 7.7.0")
 public class ToolOutputErrorPart {
+  public static final String JSON_PROPERTY_CALL_PROVIDER_METADATA = "callProviderMetadata";
+  private JsonNullable<Object> callProviderMetadata = JsonNullable.<Object>undefined();
+
   public static final String JSON_PROPERTY_ERROR_TEXT = "errorText";
   private String errorText;
 
@@ -60,6 +64,39 @@ public class ToolOutputErrorPart {
   private String type;
 
   public ToolOutputErrorPart() {
+  }
+
+  public ToolOutputErrorPart callProviderMetadata(Object callProviderMetadata) {
+    this.callProviderMetadata = JsonNullable.<Object>of(callProviderMetadata);
+    
+    return this;
+  }
+
+  /**
+   * Get callProviderMetadata
+   * @return callProviderMetadata
+   */
+  @jakarta.annotation.Nullable
+  @JsonIgnore
+
+  public Object getCallProviderMetadata() {
+        return callProviderMetadata.orElse(null);
+  }
+
+  @JsonProperty(JSON_PROPERTY_CALL_PROVIDER_METADATA)
+  @JsonInclude(value = JsonInclude.Include.USE_DEFAULTS)
+
+  public JsonNullable<Object> getCallProviderMetadata_JsonNullable() {
+    return callProviderMetadata;
+  }
+  
+  @JsonProperty(JSON_PROPERTY_CALL_PROVIDER_METADATA)
+  public void setCallProviderMetadata_JsonNullable(JsonNullable<Object> callProviderMetadata) {
+    this.callProviderMetadata = callProviderMetadata;
+  }
+
+  public void setCallProviderMetadata(Object callProviderMetadata) {
+    this.callProviderMetadata = JsonNullable.<Object>of(callProviderMetadata);
   }
 
   public ToolOutputErrorPart errorText(String errorText) {
@@ -229,7 +266,8 @@ public class ToolOutputErrorPart {
       return false;
     }
     ToolOutputErrorPart toolOutputErrorPart = (ToolOutputErrorPart) o;
-    return Objects.equals(this.errorText, toolOutputErrorPart.errorText) &&
+    return equalsNullable(this.callProviderMetadata, toolOutputErrorPart.callProviderMetadata) &&
+        Objects.equals(this.errorText, toolOutputErrorPart.errorText) &&
         Objects.equals(this.input, toolOutputErrorPart.input) &&
         equalsNullable(this.providerExecuted, toolOutputErrorPart.providerExecuted) &&
         Objects.equals(this.state, toolOutputErrorPart.state) &&
@@ -243,7 +281,7 @@ public class ToolOutputErrorPart {
 
   @Override
   public int hashCode() {
-    return Objects.hash(errorText, input, hashCodeNullable(providerExecuted), state, toolCallId, type);
+    return Objects.hash(hashCodeNullable(callProviderMetadata), errorText, input, hashCodeNullable(providerExecuted), state, toolCallId, type);
   }
 
   private static <T> int hashCodeNullable(JsonNullable<T> a) {
@@ -257,6 +295,7 @@ public class ToolOutputErrorPart {
   public String toString() {
     StringBuilder sb = new StringBuilder();
     sb.append("class ToolOutputErrorPart {\n");
+    sb.append("    callProviderMetadata: ").append(toIndentedString(callProviderMetadata)).append("\n");
     sb.append("    errorText: ").append(toIndentedString(errorText)).append("\n");
     sb.append("    input: ").append(toIndentedString(input)).append("\n");
     sb.append("    providerExecuted: ").append(toIndentedString(providerExecuted)).append("\n");

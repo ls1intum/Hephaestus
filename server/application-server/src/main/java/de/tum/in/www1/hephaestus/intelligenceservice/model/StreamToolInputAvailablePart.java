@@ -29,22 +29,30 @@ import com.fasterxml.jackson.annotation.JsonTypeName;
 import org.hibernate.validator.constraints.*;
 
 /**
- * Tool input available event.
+ * Tool input available event.  AI SDK v5 uses &#x60;providerMetadata&#x60; on the stream chunk; the UI part maps this to &#x60;callProviderMetadata&#x60; when persisting tool invocation parts.
  */
 @JsonPropertyOrder({
+  StreamToolInputAvailablePart.JSON_PROPERTY_DYNAMIC,
   StreamToolInputAvailablePart.JSON_PROPERTY_INPUT,
   StreamToolInputAvailablePart.JSON_PROPERTY_PROVIDER_EXECUTED,
+  StreamToolInputAvailablePart.JSON_PROPERTY_PROVIDER_METADATA,
   StreamToolInputAvailablePart.JSON_PROPERTY_TOOL_CALL_ID,
   StreamToolInputAvailablePart.JSON_PROPERTY_TOOL_NAME,
   StreamToolInputAvailablePart.JSON_PROPERTY_TYPE
 })
 @jakarta.annotation.Generated(value = "org.openapitools.codegen.languages.JavaClientCodegen", comments = "Generator version: 7.7.0")
 public class StreamToolInputAvailablePart {
+  public static final String JSON_PROPERTY_DYNAMIC = "dynamic";
+  private JsonNullable<Boolean> dynamic = JsonNullable.<Boolean>undefined();
+
   public static final String JSON_PROPERTY_INPUT = "input";
   private Object input;
 
   public static final String JSON_PROPERTY_PROVIDER_EXECUTED = "providerExecuted";
   private JsonNullable<Boolean> providerExecuted = JsonNullable.<Boolean>undefined();
+
+  public static final String JSON_PROPERTY_PROVIDER_METADATA = "providerMetadata";
+  private JsonNullable<Object> providerMetadata = JsonNullable.<Object>undefined();
 
   public static final String JSON_PROPERTY_TOOL_CALL_ID = "toolCallId";
   private String toolCallId;
@@ -56,6 +64,39 @@ public class StreamToolInputAvailablePart {
   private String type = "tool-input-available";
 
   public StreamToolInputAvailablePart() {
+  }
+
+  public StreamToolInputAvailablePart dynamic(Boolean dynamic) {
+    this.dynamic = JsonNullable.<Boolean>of(dynamic);
+    
+    return this;
+  }
+
+  /**
+   * Get dynamic
+   * @return dynamic
+   */
+  @jakarta.annotation.Nullable
+  @JsonIgnore
+
+  public Boolean getDynamic() {
+        return dynamic.orElse(null);
+  }
+
+  @JsonProperty(JSON_PROPERTY_DYNAMIC)
+  @JsonInclude(value = JsonInclude.Include.USE_DEFAULTS)
+
+  public JsonNullable<Boolean> getDynamic_JsonNullable() {
+    return dynamic;
+  }
+  
+  @JsonProperty(JSON_PROPERTY_DYNAMIC)
+  public void setDynamic_JsonNullable(JsonNullable<Boolean> dynamic) {
+    this.dynamic = dynamic;
+  }
+
+  public void setDynamic(Boolean dynamic) {
+    this.dynamic = JsonNullable.<Boolean>of(dynamic);
   }
 
   public StreamToolInputAvailablePart input(Object input) {
@@ -114,6 +155,39 @@ public class StreamToolInputAvailablePart {
 
   public void setProviderExecuted(Boolean providerExecuted) {
     this.providerExecuted = JsonNullable.<Boolean>of(providerExecuted);
+  }
+
+  public StreamToolInputAvailablePart providerMetadata(Object providerMetadata) {
+    this.providerMetadata = JsonNullable.<Object>of(providerMetadata);
+    
+    return this;
+  }
+
+  /**
+   * Get providerMetadata
+   * @return providerMetadata
+   */
+  @jakarta.annotation.Nullable
+  @JsonIgnore
+
+  public Object getProviderMetadata() {
+        return providerMetadata.orElse(null);
+  }
+
+  @JsonProperty(JSON_PROPERTY_PROVIDER_METADATA)
+  @JsonInclude(value = JsonInclude.Include.USE_DEFAULTS)
+
+  public JsonNullable<Object> getProviderMetadata_JsonNullable() {
+    return providerMetadata;
+  }
+  
+  @JsonProperty(JSON_PROPERTY_PROVIDER_METADATA)
+  public void setProviderMetadata_JsonNullable(JsonNullable<Object> providerMetadata) {
+    this.providerMetadata = providerMetadata;
+  }
+
+  public void setProviderMetadata(Object providerMetadata) {
+    this.providerMetadata = JsonNullable.<Object>of(providerMetadata);
   }
 
   public StreamToolInputAvailablePart toolCallId(String toolCallId) {
@@ -200,8 +274,10 @@ public class StreamToolInputAvailablePart {
       return false;
     }
     StreamToolInputAvailablePart streamToolInputAvailablePart = (StreamToolInputAvailablePart) o;
-    return Objects.equals(this.input, streamToolInputAvailablePart.input) &&
+    return equalsNullable(this.dynamic, streamToolInputAvailablePart.dynamic) &&
+        Objects.equals(this.input, streamToolInputAvailablePart.input) &&
         equalsNullable(this.providerExecuted, streamToolInputAvailablePart.providerExecuted) &&
+        equalsNullable(this.providerMetadata, streamToolInputAvailablePart.providerMetadata) &&
         Objects.equals(this.toolCallId, streamToolInputAvailablePart.toolCallId) &&
         Objects.equals(this.toolName, streamToolInputAvailablePart.toolName) &&
         Objects.equals(this.type, streamToolInputAvailablePart.type);
@@ -213,7 +289,7 @@ public class StreamToolInputAvailablePart {
 
   @Override
   public int hashCode() {
-    return Objects.hash(input, hashCodeNullable(providerExecuted), toolCallId, toolName, type);
+    return Objects.hash(hashCodeNullable(dynamic), input, hashCodeNullable(providerExecuted), hashCodeNullable(providerMetadata), toolCallId, toolName, type);
   }
 
   private static <T> int hashCodeNullable(JsonNullable<T> a) {
@@ -227,8 +303,10 @@ public class StreamToolInputAvailablePart {
   public String toString() {
     StringBuilder sb = new StringBuilder();
     sb.append("class StreamToolInputAvailablePart {\n");
+    sb.append("    dynamic: ").append(toIndentedString(dynamic)).append("\n");
     sb.append("    input: ").append(toIndentedString(input)).append("\n");
     sb.append("    providerExecuted: ").append(toIndentedString(providerExecuted)).append("\n");
+    sb.append("    providerMetadata: ").append(toIndentedString(providerMetadata)).append("\n");
     sb.append("    toolCallId: ").append(toIndentedString(toolCallId)).append("\n");
     sb.append("    toolName: ").append(toIndentedString(toolName)).append("\n");
     sb.append("    type: ").append(toIndentedString(type)).append("\n");

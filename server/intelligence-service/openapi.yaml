@@ -102,6 +102,7 @@ components:
       - $ref: '#/components/schemas/StreamToolInputStartPart'
       - $ref: '#/components/schemas/StreamToolInputDeltaPart'
       - $ref: '#/components/schemas/StreamToolInputAvailablePart'
+      - $ref: '#/components/schemas/StreamToolInputErrorPart'
       - $ref: '#/components/schemas/StreamToolOutputAvailablePart'
       - $ref: '#/components/schemas/StreamToolOutputErrorPart'
       - $ref: '#/components/schemas/StreamSourceUrlPart'
@@ -169,11 +170,14 @@ components:
       type: object
       x-hephaestus-tool-model: true
     DataUIPart:
-      description: A data part with dynamic type.
+      description: 'A data part with dynamic type.
+
+
+        Note: In UI messages, data can be of any JSON type (object, array, string,
+        number, etc.).'
       properties:
         data:
           title: Data
-          type: object
         id:
           anyOf:
           - type: string
@@ -257,6 +261,11 @@ components:
         mediaType:
           title: Mediatype
           type: string
+        providerMetadata:
+          anyOf:
+          - type: object
+          - type: 'null'
+          title: Providermetadata
         type:
           const: file
           default: file
@@ -483,16 +492,25 @@ components:
       title: StepStartUIPart
       type: object
     StreamDataPart:
-      description: Data part with dynamic type.
+      description: 'Data part with dynamic type.
+
+
+        AI SDK v5 stream chunks support a `transient` flag that indicates the data
+
+        should not be added to the persisted message state.'
       properties:
         data:
           title: Data
-          type: object
         id:
           anyOf:
           - type: string
           - type: 'null'
           title: Id
+        transient:
+          anyOf:
+          - type: boolean
+          - type: 'null'
+          title: Transient
         type:
           pattern: ^data-.*
           title: Type
@@ -523,6 +541,11 @@ components:
         mediaType:
           title: Mediatype
           type: string
+        providerMetadata:
+          anyOf:
+          - type: object
+          - type: 'null'
+          title: Providermetadata
         type:
           const: file
           default: file
@@ -741,6 +764,11 @@ components:
         id:
           title: Id
           type: string
+        providerMetadata:
+          anyOf:
+          - type: object
+          - type: 'null'
+          title: Providermetadata
         type:
           const: text-delta
           default: text-delta
@@ -757,6 +785,11 @@ components:
         id:
           title: Id
           type: string
+        providerMetadata:
+          anyOf:
+          - type: object
+          - type: 'null'
+          title: Providermetadata
         type:
           const: text-end
           default: text-end
@@ -772,6 +805,11 @@ components:
         id:
           title: Id
           type: string
+        providerMetadata:
+          anyOf:
+          - type: object
+          - type: 'null'
+          title: Providermetadata
         type:
           const: text-start
           default: text-start
@@ -782,8 +820,18 @@ components:
       title: StreamTextStartPart
       type: object
     StreamToolInputAvailablePart:
-      description: Tool input available event.
+      description: 'Tool input available event.
+
+
+        AI SDK v5 uses `providerMetadata` on the stream chunk; the UI part maps this
+
+        to `callProviderMetadata` when persisting tool invocation parts.'
       properties:
+        dynamic:
+          anyOf:
+          - type: boolean
+          - type: 'null'
+          title: Dynamic
         input:
           title: Input
           type: object
@@ -792,6 +840,11 @@ components:
           - type: boolean
           - type: 'null'
           title: Providerexecuted
+        providerMetadata:
+          anyOf:
+          - type: object
+          - type: 'null'
+          title: Providermetadata
         toolCallId:
           title: Toolcallid
           type: string
@@ -828,9 +881,62 @@ components:
       - inputTextDelta
       title: StreamToolInputDeltaPart
       type: object
+    StreamToolInputErrorPart:
+      description: 'Tool input error event (signals an error occurred while preparing
+        input).
+
+
+        Mirrors AI SDK ''tool-input-error'' chunk. For non-dynamic tools, the server
+        should
+
+        record an ''output-error'' tool UI part where rawInput may be used for diagnostics.'
+      properties:
+        dynamic:
+          anyOf:
+          - type: boolean
+          - type: 'null'
+          title: Dynamic
+        errorText:
+          title: Errortext
+          type: string
+        input:
+          title: Input
+        providerExecuted:
+          anyOf:
+          - type: boolean
+          - type: 'null'
+          title: Providerexecuted
+        providerMetadata:
+          anyOf:
+          - type: object
+          - type: 'null'
+          title: Providermetadata
+        toolCallId:
+          title: Toolcallid
+          type: string
+        toolName:
+          title: Toolname
+          type: string
+        type:
+          const: tool-input-error
+          default: tool-input-error
+          title: Type
+          type: string
+      required:
+      - toolCallId
+      - toolName
+      - input
+      - errorText
+      title: StreamToolInputErrorPart
+      type: object
     StreamToolInputStartPart:
       description: Tool input start event.
       properties:
+        dynamic:
+          anyOf:
+          - type: boolean
+          - type: 'null'
+          title: Dynamic
         providerExecuted:
           anyOf:
           - type: boolean
@@ -855,6 +961,11 @@ components:
     StreamToolOutputAvailablePart:
       description: Tool output available event.
       properties:
+        dynamic:
+          anyOf:
+          - type: boolean
+          - type: 'null'
+          title: Dynamic
         output:
           title: Output
           type: object
@@ -879,6 +990,11 @@ components:
     StreamToolOutputErrorPart:
       description: Tool output error event.
       properties:
+        dynamic:
+          anyOf:
+          - type: boolean
+          - type: 'null'
+          title: Dynamic
         errorText:
           title: Errortext
           type: string
@@ -903,6 +1019,11 @@ components:
     TextUIPart:
       description: A text part of a message.
       properties:
+        providerMetadata:
+          anyOf:
+          - type: object
+          - type: 'null'
+          title: Providermetadata
         state:
           anyOf:
           - enum:
@@ -926,6 +1047,11 @@ components:
     ToolInputAvailablePart:
       description: Tool part with input available.
       properties:
+        callProviderMetadata:
+          anyOf:
+          - type: object
+          - type: 'null'
+          title: Callprovidermetadata
         input:
           title: Input
           type: object
@@ -985,6 +1111,11 @@ components:
     ToolOutputAvailablePart:
       description: Tool part with output available.
       properties:
+        callProviderMetadata:
+          anyOf:
+          - type: object
+          - type: 'null'
+          title: Callprovidermetadata
         input:
           title: Input
           type: object
@@ -1018,6 +1149,11 @@ components:
     ToolOutputErrorPart:
       description: Tool part with output error.
       properties:
+        callProviderMetadata:
+          anyOf:
+          - type: object
+          - type: 'null'
+          title: Callprovidermetadata
         errorText:
           title: Errortext
           type: string

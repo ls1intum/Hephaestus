@@ -32,12 +32,16 @@ import org.hibernate.validator.constraints.*;
  * A text part of a message.
  */
 @JsonPropertyOrder({
+  TextUIPart.JSON_PROPERTY_PROVIDER_METADATA,
   TextUIPart.JSON_PROPERTY_STATE,
   TextUIPart.JSON_PROPERTY_TEXT,
   TextUIPart.JSON_PROPERTY_TYPE
 })
 @jakarta.annotation.Generated(value = "org.openapitools.codegen.languages.JavaClientCodegen", comments = "Generator version: 7.7.0")
 public class TextUIPart {
+  public static final String JSON_PROPERTY_PROVIDER_METADATA = "providerMetadata";
+  private JsonNullable<Object> providerMetadata = JsonNullable.<Object>undefined();
+
   /**
    * Gets or Sets state
    */
@@ -83,6 +87,39 @@ public class TextUIPart {
   private String type = "text";
 
   public TextUIPart() {
+  }
+
+  public TextUIPart providerMetadata(Object providerMetadata) {
+    this.providerMetadata = JsonNullable.<Object>of(providerMetadata);
+    
+    return this;
+  }
+
+  /**
+   * Get providerMetadata
+   * @return providerMetadata
+   */
+  @jakarta.annotation.Nullable
+  @JsonIgnore
+
+  public Object getProviderMetadata() {
+        return providerMetadata.orElse(null);
+  }
+
+  @JsonProperty(JSON_PROPERTY_PROVIDER_METADATA)
+  @JsonInclude(value = JsonInclude.Include.USE_DEFAULTS)
+
+  public JsonNullable<Object> getProviderMetadata_JsonNullable() {
+    return providerMetadata;
+  }
+  
+  @JsonProperty(JSON_PROPERTY_PROVIDER_METADATA)
+  public void setProviderMetadata_JsonNullable(JsonNullable<Object> providerMetadata) {
+    this.providerMetadata = providerMetadata;
+  }
+
+  public void setProviderMetadata(Object providerMetadata) {
+    this.providerMetadata = JsonNullable.<Object>of(providerMetadata);
   }
 
   public TextUIPart state(StateEnum state) {
@@ -177,7 +214,8 @@ public class TextUIPart {
       return false;
     }
     TextUIPart textUIPart = (TextUIPart) o;
-    return equalsNullable(this.state, textUIPart.state) &&
+    return equalsNullable(this.providerMetadata, textUIPart.providerMetadata) &&
+        equalsNullable(this.state, textUIPart.state) &&
         Objects.equals(this.text, textUIPart.text) &&
         Objects.equals(this.type, textUIPart.type);
   }
@@ -188,7 +226,7 @@ public class TextUIPart {
 
   @Override
   public int hashCode() {
-    return Objects.hash(hashCodeNullable(state), text, type);
+    return Objects.hash(hashCodeNullable(providerMetadata), hashCodeNullable(state), text, type);
   }
 
   private static <T> int hashCodeNullable(JsonNullable<T> a) {
@@ -202,6 +240,7 @@ public class TextUIPart {
   public String toString() {
     StringBuilder sb = new StringBuilder();
     sb.append("class TextUIPart {\n");
+    sb.append("    providerMetadata: ").append(toIndentedString(providerMetadata)).append("\n");
     sb.append("    state: ").append(toIndentedString(state)).append("\n");
     sb.append("    text: ").append(toIndentedString(text)).append("\n");
     sb.append("    type: ").append(toIndentedString(type)).append("\n");

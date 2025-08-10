@@ -337,6 +337,11 @@ public class ChatMessagePart {
                 if (content.has("providerExecuted") && !content.get("providerExecuted").isNull()) {
                     uiPart.setProviderExecuted(content.get("providerExecuted").asBoolean());
                 }
+
+                // Map callProviderMetadata if present on stored content
+                if (content.has("callProviderMetadata") && !content.get("callProviderMetadata").isNull()) {
+                    uiPart.setCallProviderMetadata(content.get("callProviderMetadata"));
+                }
             } else if (type == PartType.FILE) {
                 // For file parts
                 if (content.has("mediaType")) {
@@ -358,6 +363,33 @@ public class ChatMessagePart {
                     uiPart.setId(content.get("id").asText());
                 }
                 uiPart.setState(null); // Clear default state
+            } else if (type == PartType.SOURCE_URL) {
+                // For source-url parts
+                if (content.has("sourceId")) {
+                    uiPart.setSourceId(content.get("sourceId").asText());
+                }
+                if (content.has("url")) {
+                    uiPart.setUrl(content.get("url").asText());
+                }
+                if (content.has("title") && !content.get("title").isNull()) {
+                    uiPart.setTitle(content.get("title").asText());
+                }
+                uiPart.setState(null);
+            } else if (type == PartType.SOURCE_DOCUMENT) {
+                // For source-document parts
+                if (content.has("sourceId")) {
+                    uiPart.setSourceId(content.get("sourceId").asText());
+                }
+                if (content.has("title")) {
+                    uiPart.setTitle(content.get("title").asText());
+                }
+                if (content.has("mediaType")) {
+                    uiPart.setMediaType(content.get("mediaType").asText());
+                }
+                if (content.has("filename") && !content.get("filename").isNull()) {
+                    uiPart.setFilename(content.get("filename").asText());
+                }
+                uiPart.setState(null);
             } else {
                 // For other part types, try to convert safely
                 uiPart.setState(null); // Clear default state

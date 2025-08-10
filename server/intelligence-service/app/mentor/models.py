@@ -25,6 +25,7 @@ class TextUIPart(BasePart):
     type: Literal["text"] = "text"
     text: str
     state: Optional[Literal["streaming", "done"]] = None
+    providerMetadata: Optional[Dict[str, Any]] = None
 
 
 class ReasoningUIPart(BasePart):
@@ -64,6 +65,7 @@ class FileUIPart(BasePart):
     mediaType: str
     filename: Optional[str] = None
     url: str
+    providerMetadata: Optional[Dict[str, Any]] = None
 
 
 class StepStartUIPart(BasePart):
@@ -93,6 +95,8 @@ class ToolInputAvailablePart(ToolPartBase):
     state: Literal["input-available"]
     input: Dict[str, Any]
     providerExecuted: Optional[bool] = None
+    # Provider metadata associated with the tool call (AI SDK: callProviderMetadata on UI part)
+    callProviderMetadata: Optional[Dict[str, Any]] = None
 
 
 class ToolOutputAvailablePart(ToolPartBase):
@@ -102,6 +106,8 @@ class ToolOutputAvailablePart(ToolPartBase):
     input: Dict[str, Any]
     output: Dict[str, Any]
     providerExecuted: Optional[bool] = None
+    # Provider metadata associated with the tool call (AI SDK: callProviderMetadata on UI part)
+    callProviderMetadata: Optional[Dict[str, Any]] = None
 
 
 class ToolOutputErrorPart(ToolPartBase):
@@ -111,14 +117,19 @@ class ToolOutputErrorPart(ToolPartBase):
     input: Dict[str, Any]
     errorText: str
     providerExecuted: Optional[bool] = None
+    # Provider metadata associated with the tool call (AI SDK: callProviderMetadata on UI part)
+    callProviderMetadata: Optional[Dict[str, Any]] = None
 
 
 class DataUIPart(BasePart):
-    """A data part with dynamic type."""
+    """A data part with dynamic type.
+
+    Note: In UI messages, data can be of any JSON type (object, array, string, number, etc.).
+    """
 
     type: Annotated[str, Field(pattern=r"^data-.*")]  # Will be in format 'data-{NAME}'
     id: Optional[str] = None
-    data: Dict[str, Any]
+    data: Any
 
 
 UIMessagePart = Union[
@@ -296,13 +307,13 @@ class UIMessage(BaseModel):
                 logger.debug(f"Part {i}: ✅ Created FileUIPart: {clean_part}")
 
             elif part_type and part_type.startswith("data-"):
-                data = part.get("data")
-                if not isinstance(data, dict):
-                    logger.debug(f"Part {i}: ❌ Skipped data part - invalid data field")
+                # Accept any JSON type for data (object, array, string, number, etc.)
+                if "data" not in part:
+                    logger.debug(f"Part {i}: ❌ Skipped data part - missing data field")
                     continue
                 clean_part = {
                     "type": part_type,
-                    "data": data,  # Required and must be dict
+                    "data": part.get("data"),
                 }
                 if "id" in part and part["id"] is not None:
                     clean_part["id"] = part["id"]
@@ -343,6 +354,7 @@ class StreamTextStartPart(BasePart):
 
     type: Literal["text-start"] = "text-start"
     id: str
+    providerMetadata: Optional[Dict[str, Any]] = None
 
 
 class StreamTextDeltaPart(BasePart):
@@ -351,6 +363,7 @@ class StreamTextDeltaPart(BasePart):
     type: Literal["text-delta"] = "text-delta"
     id: str
     delta: str
+    providerMetadata: Optional[Dict[str, Any]] = None
 
 
 class StreamTextEndPart(BasePart):
@@ -358,6 +371,7 @@ class StreamTextEndPart(BasePart):
 
     type: Literal["text-end"] = "text-end"
     id: str
+    providerMetadata: Optional[Dict[str, Any]] = None
 
 
 class StreamReasoningStartPart(BasePart):
@@ -399,6 +413,8 @@ class StreamToolInputStartPart(BasePart):
     toolCallId: str
     toolName: str
     providerExecuted: Optional[bool] = None
+    # Whether this tool invocation is dynamic (name determined at runtime)
+    dynamic: Optional[bool] = None
 
 
 class StreamToolInputDeltaPart(BasePart):
@@ -410,13 +426,38 @@ class StreamToolInputDeltaPart(BasePart):
 
 
 class StreamToolInputAvailablePart(BasePart):
-    """Tool input available event."""
+    """Tool input available event.
+
+    AI SDK v5 uses `providerMetadata` on the stream chunk; the UI part maps this
+    to `callProviderMetadata` when persisting tool invocation parts.
+    """
 
     type: Literal["tool-input-available"] = "tool-input-available"
     toolCallId: str
     toolName: str
     input: Dict[str, Any]
     providerExecuted: Optional[bool] = None
+    # Provider metadata on the stream chunk (mapped to callProviderMetadata in UI parts)
+    providerMetadata: Optional[Dict[str, Any]] = None
+    # Whether this tool invocation is dynamic (name determined at runtime)
+    dynamic: Optional[bool] = None
+
+
+class StreamToolInputErrorPart(BasePart):
+    """Tool input error event (signals an error occurred while preparing input).
+
+    Mirrors AI SDK 'tool-input-error' chunk. For non-dynamic tools, the server should
+    record an 'output-error' tool UI part where rawInput may be used for diagnostics.
+    """
+
+    type: Literal["tool-input-error"] = "tool-input-error"
+    toolCallId: str
+    toolName: str
+    input: Any
+    errorText: str
+    providerExecuted: Optional[bool] = None
+    providerMetadata: Optional[Dict[str, Any]] = None
+    dynamic: Optional[bool] = None
 
 
 class StreamToolOutputAvailablePart(BasePart):
@@ -426,6 +467,8 @@ class StreamToolOutputAvailablePart(BasePart):
     toolCallId: str
     output: Dict[str, Any]
     providerExecuted: Optional[bool] = None
+    # Whether this tool invocation is dynamic (name determined at runtime)
+    dynamic: Optional[bool] = None
 
 
 class StreamToolOutputErrorPart(BasePart):
@@ -435,6 +478,8 @@ class StreamToolOutputErrorPart(BasePart):
     toolCallId: str
     errorText: str
     providerExecuted: Optional[bool] = None
+    # Whether this tool invocation is dynamic (name determined at runtime)
+    dynamic: Optional[bool] = None
 
 
 class StreamSourceUrlPart(BasePart):
@@ -464,14 +509,20 @@ class StreamFilePart(BasePart):
     type: Literal["file"] = "file"
     url: str
     mediaType: str
+    providerMetadata: Optional[Dict[str, Any]] = None
 
 
 class StreamDataPart(BasePart):
-    """Data part with dynamic type."""
+    """Data part with dynamic type.
+
+    AI SDK v5 stream chunks support a `transient` flag that indicates the data
+    should not be added to the persisted message state.
+    """
 
     type: Annotated[str, Field(pattern=r"^data-.*")]  # Will be in format 'data-{NAME}'
     id: Optional[str] = None
-    data: Dict[str, Any]
+    data: Any
+    transient: Optional[bool] = None
 
 
 class StreamStepStartPart(BasePart):
@@ -519,6 +570,7 @@ StreamPart = Union[
     StreamToolInputStartPart,
     StreamToolInputDeltaPart,
     StreamToolInputAvailablePart,
+    StreamToolInputErrorPart,
     StreamToolOutputAvailablePart,
     StreamToolOutputErrorPart,
     StreamSourceUrlPart,

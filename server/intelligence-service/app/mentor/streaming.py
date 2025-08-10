@@ -27,6 +27,7 @@ from app.mentor.models import (
     StreamSourceDocumentPart,
     StreamFilePart,
     StreamDataPart,
+    StreamToolInputErrorPart,
 )
 
 
@@ -58,17 +59,36 @@ class StreamGenerator:
         """Finish a step in the stream."""
         return self.format_event(StreamStepFinishPart())
 
-    def text_start(self, text_id: str) -> str:
+    def text_start(
+        self, text_id: str, provider_metadata: Optional[Dict[str, Any]] = None
+    ) -> str:
         """Start text content with ID."""
-        return self.format_event(StreamTextStartPart(id=text_id))
+        part = StreamTextStartPart(id=text_id)
+        # Attach provider metadata if available (SDK allows it on chunks)
+        if provider_metadata is not None:
+            setattr(part, "providerMetadata", provider_metadata)
+        return self.format_event(part)
 
-    def text_delta(self, text_id: str, delta: str) -> str:
+    def text_delta(
+        self,
+        text_id: str,
+        delta: str,
+        provider_metadata: Optional[Dict[str, Any]] = None,
+    ) -> str:
         """Send text content delta."""
-        return self.format_event(StreamTextDeltaPart(id=text_id, delta=delta))
+        part = StreamTextDeltaPart(id=text_id, delta=delta)
+        if provider_metadata is not None:
+            setattr(part, "providerMetadata", provider_metadata)
+        return self.format_event(part)
 
-    def text_end(self, text_id: str) -> str:
+    def text_end(
+        self, text_id: str, provider_metadata: Optional[Dict[str, Any]] = None
+    ) -> str:
         """End text content."""
-        return self.format_event(StreamTextEndPart(id=text_id))
+        part = StreamTextEndPart(id=text_id)
+        if provider_metadata is not None:
+            setattr(part, "providerMetadata", provider_metadata)
+        return self.format_event(part)
 
     def reasoning_start(
         self, reasoning_id: str, metadata: Optional[Dict[str, Any]] = None
@@ -100,10 +120,22 @@ class StreamGenerator:
         """Send an error."""
         return self.format_event(StreamErrorPart(errorText=error_text))
 
-    def tool_input_start(self, tool_call_id: str, tool_name: str) -> str:
+    def tool_input_start(
+        self,
+        tool_call_id: str,
+        tool_name: str,
+        *,
+        provider_executed: Optional[bool] = None,
+        dynamic: Optional[bool] = None,
+    ) -> str:
         """Signal the start of tool input."""
         return self.format_event(
-            StreamToolInputStartPart(toolCallId=tool_call_id, toolName=tool_name)
+            StreamToolInputStartPart(
+                toolCallId=tool_call_id,
+                toolName=tool_name,
+                providerExecuted=provider_executed,
+                dynamic=dynamic,
+            )
         )
 
     def tool_input_delta(self, tool_call_id: str, input_text_delta: str) -> str:
@@ -115,12 +147,48 @@ class StreamGenerator:
         )
 
     def tool_input_available(
-        self, tool_call_id: str, tool_name: str, input_data: Any
+        self,
+        tool_call_id: str,
+        tool_name: str,
+        input_data: Any,
+        *,
+        provider_executed: Optional[bool] = None,
+        provider_metadata: Optional[Dict[str, Any]] = None,
+        dynamic: Optional[bool] = None,
     ) -> str:
         """Signal that tool input is available."""
         return self.format_event(
             StreamToolInputAvailablePart(
-                toolCallId=tool_call_id, toolName=tool_name, input=input_data
+                toolCallId=tool_call_id,
+                toolName=tool_name,
+                input=input_data,
+                providerExecuted=provider_executed,
+                providerMetadata=provider_metadata,
+                dynamic=dynamic,
+            )
+        )
+
+    def tool_input_error(
+        self,
+        tool_call_id: str,
+        tool_name: str,
+        input_data: Any,
+        error_text: str,
+        *,
+        provider_executed: Optional[bool] = None,
+        provider_metadata: Optional[Dict[str, Any]] = None,
+        dynamic: Optional[bool] = None,
+    ) -> str:
+        """Signal that an error occurred while preparing tool input (AI SDK: tool-input-error)."""
+        return self.format_event(
+            StreamToolInputErrorPart(
+                toolCallId=tool_call_id,
+                toolName=tool_name,
+                input=input_data,
+                errorText=error_text,
+                providerExecuted=provider_executed,
+                providerMetadata=provider_metadata,
+                dynamic=dynamic,
             )
         )
 
@@ -194,20 +262,24 @@ class StreamGenerator:
         self,
         url: str,
         media_type: str,
+        provider_metadata: Optional[Dict[str, Any]] = None,
     ) -> str:
         """Signal a file attachment."""
-        return self.format_event(
-            StreamFilePart(
-                url=url,
-                mediaType=media_type,
-            )
+        part = StreamFilePart(
+            url=url,
+            mediaType=media_type,
         )
+        if provider_metadata is not None:
+            setattr(part, "providerMetadata", provider_metadata)
+        return self.format_event(part)
 
     def data(
         self,
         data_type: str,
         data_content: Any,
         data_id: Optional[str] = None,
+        *,
+        transient: Optional[bool] = None,
     ) -> str:
         """Signal custom data."""
         return self.format_event(
@@ -215,6 +287,7 @@ class StreamGenerator:
                 type=f"data-{data_type}",
                 data=data_content,
                 id=data_id,
+                transient=transient,
             )
         )
 

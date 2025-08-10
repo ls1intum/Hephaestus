@@ -32,6 +32,7 @@ import org.hibernate.validator.constraints.*;
  * Tool output available event.
  */
 @JsonPropertyOrder({
+  StreamToolOutputAvailablePart.JSON_PROPERTY_DYNAMIC,
   StreamToolOutputAvailablePart.JSON_PROPERTY_OUTPUT,
   StreamToolOutputAvailablePart.JSON_PROPERTY_PROVIDER_EXECUTED,
   StreamToolOutputAvailablePart.JSON_PROPERTY_TOOL_CALL_ID,
@@ -39,6 +40,9 @@ import org.hibernate.validator.constraints.*;
 })
 @jakarta.annotation.Generated(value = "org.openapitools.codegen.languages.JavaClientCodegen", comments = "Generator version: 7.7.0")
 public class StreamToolOutputAvailablePart {
+  public static final String JSON_PROPERTY_DYNAMIC = "dynamic";
+  private JsonNullable<Boolean> dynamic = JsonNullable.<Boolean>undefined();
+
   public static final String JSON_PROPERTY_OUTPUT = "output";
   private Object output;
 
@@ -52,6 +56,39 @@ public class StreamToolOutputAvailablePart {
   private String type = "tool-output-available";
 
   public StreamToolOutputAvailablePart() {
+  }
+
+  public StreamToolOutputAvailablePart dynamic(Boolean dynamic) {
+    this.dynamic = JsonNullable.<Boolean>of(dynamic);
+    
+    return this;
+  }
+
+  /**
+   * Get dynamic
+   * @return dynamic
+   */
+  @jakarta.annotation.Nullable
+  @JsonIgnore
+
+  public Boolean getDynamic() {
+        return dynamic.orElse(null);
+  }
+
+  @JsonProperty(JSON_PROPERTY_DYNAMIC)
+  @JsonInclude(value = JsonInclude.Include.USE_DEFAULTS)
+
+  public JsonNullable<Boolean> getDynamic_JsonNullable() {
+    return dynamic;
+  }
+  
+  @JsonProperty(JSON_PROPERTY_DYNAMIC)
+  public void setDynamic_JsonNullable(JsonNullable<Boolean> dynamic) {
+    this.dynamic = dynamic;
+  }
+
+  public void setDynamic(Boolean dynamic) {
+    this.dynamic = JsonNullable.<Boolean>of(dynamic);
   }
 
   public StreamToolOutputAvailablePart output(Object output) {
@@ -171,7 +208,8 @@ public class StreamToolOutputAvailablePart {
       return false;
     }
     StreamToolOutputAvailablePart streamToolOutputAvailablePart = (StreamToolOutputAvailablePart) o;
-    return Objects.equals(this.output, streamToolOutputAvailablePart.output) &&
+    return equalsNullable(this.dynamic, streamToolOutputAvailablePart.dynamic) &&
+        Objects.equals(this.output, streamToolOutputAvailablePart.output) &&
         equalsNullable(this.providerExecuted, streamToolOutputAvailablePart.providerExecuted) &&
         Objects.equals(this.toolCallId, streamToolOutputAvailablePart.toolCallId) &&
         Objects.equals(this.type, streamToolOutputAvailablePart.type);
@@ -183,7 +221,7 @@ public class StreamToolOutputAvailablePart {
 
   @Override
   public int hashCode() {
-    return Objects.hash(output, hashCodeNullable(providerExecuted), toolCallId, type);
+    return Objects.hash(hashCodeNullable(dynamic), output, hashCodeNullable(providerExecuted), toolCallId, type);
   }
 
   private static <T> int hashCodeNullable(JsonNullable<T> a) {
@@ -197,6 +235,7 @@ public class StreamToolOutputAvailablePart {
   public String toString() {
     StringBuilder sb = new StringBuilder();
     sb.append("class StreamToolOutputAvailablePart {\n");
+    sb.append("    dynamic: ").append(toIndentedString(dynamic)).append("\n");
     sb.append("    output: ").append(toIndentedString(output)).append("\n");
     sb.append("    providerExecuted: ").append(toIndentedString(providerExecuted)).append("\n");
     sb.append("    toolCallId: ").append(toIndentedString(toolCallId)).append("\n");

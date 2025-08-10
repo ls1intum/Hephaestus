@@ -29,7 +29,7 @@ import com.fasterxml.jackson.annotation.JsonTypeName;
 import org.hibernate.validator.constraints.*;
 
 /**
- * A data part with dynamic type.
+ * A data part with dynamic type.  Note: In UI messages, data can be of any JSON type (object, array, string, number, etc.).
  */
 @JsonPropertyOrder({
   DataUIPart.JSON_PROPERTY_DATA,
@@ -39,7 +39,7 @@ import org.hibernate.validator.constraints.*;
 @jakarta.annotation.Generated(value = "org.openapitools.codegen.languages.JavaClientCodegen", comments = "Generator version: 7.7.0")
 public class DataUIPart {
   public static final String JSON_PROPERTY_DATA = "data";
-  private Object data;
+  private Object data = null;
 
   public static final String JSON_PROPERTY_ID = "id";
   private JsonNullable<String> id = JsonNullable.<String>undefined();
@@ -60,7 +60,7 @@ public class DataUIPart {
    * Get data
    * @return data
    */
-  @jakarta.annotation.Nonnull
+  @jakarta.annotation.Nullable
   @JsonProperty(JSON_PROPERTY_DATA)
   @JsonInclude(value = JsonInclude.Include.ALWAYS)
 

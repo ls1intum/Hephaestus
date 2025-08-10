@@ -32,6 +32,7 @@ import org.hibernate.validator.constraints.*;
  * Tool part with output available.
  */
 @JsonPropertyOrder({
+  ToolOutputAvailablePart.JSON_PROPERTY_CALL_PROVIDER_METADATA,
   ToolOutputAvailablePart.JSON_PROPERTY_INPUT,
   ToolOutputAvailablePart.JSON_PROPERTY_OUTPUT,
   ToolOutputAvailablePart.JSON_PROPERTY_PROVIDER_EXECUTED,
@@ -41,6 +42,9 @@ import org.hibernate.validator.constraints.*;
 })
 @jakarta.annotation.Generated(value = "org.openapitools.codegen.languages.JavaClientCodegen", comments = "Generator version: 7.7.0")
 public class ToolOutputAvailablePart {
+  public static final String JSON_PROPERTY_CALL_PROVIDER_METADATA = "callProviderMetadata";
+  private JsonNullable<Object> callProviderMetadata = JsonNullable.<Object>undefined();
+
   public static final String JSON_PROPERTY_INPUT = "input";
   private Object input;
 
@@ -60,6 +64,39 @@ public class ToolOutputAvailablePart {
   private String type;
 
   public ToolOutputAvailablePart() {
+  }
+
+  public ToolOutputAvailablePart callProviderMetadata(Object callProviderMetadata) {
+    this.callProviderMetadata = JsonNullable.<Object>of(callProviderMetadata);
+    
+    return this;
+  }
+
+  /**
+   * Get callProviderMetadata
+   * @return callProviderMetadata
+   */
+  @jakarta.annotation.Nullable
+  @JsonIgnore
+
+  public Object getCallProviderMetadata() {
+        return callProviderMetadata.orElse(null);
+  }
+
+  @JsonProperty(JSON_PROPERTY_CALL_PROVIDER_METADATA)
+  @JsonInclude(value = JsonInclude.Include.USE_DEFAULTS)
+
+  public JsonNullable<Object> getCallProviderMetadata_JsonNullable() {
+    return callProviderMetadata;
+  }
+  
+  @JsonProperty(JSON_PROPERTY_CALL_PROVIDER_METADATA)
+  public void setCallProviderMetadata_JsonNullable(JsonNullable<Object> callProviderMetadata) {
+    this.callProviderMetadata = callProviderMetadata;
+  }
+
+  public void setCallProviderMetadata(Object callProviderMetadata) {
+    this.callProviderMetadata = JsonNullable.<Object>of(callProviderMetadata);
   }
 
   public ToolOutputAvailablePart input(Object input) {
@@ -229,7 +266,8 @@ public class ToolOutputAvailablePart {
       return false;
     }
     ToolOutputAvailablePart toolOutputAvailablePart = (ToolOutputAvailablePart) o;
-    return Objects.equals(this.input, toolOutputAvailablePart.input) &&
+    return equalsNullable(this.callProviderMetadata, toolOutputAvailablePart.callProviderMetadata) &&
+        Objects.equals(this.input, toolOutputAvailablePart.input) &&
         Objects.equals(this.output, toolOutputAvailablePart.output) &&
         equalsNullable(this.providerExecuted, toolOutputAvailablePart.providerExecuted) &&
         Objects.equals(this.state, toolOutputAvailablePart.state) &&
@@ -243,7 +281,7 @@ public class ToolOutputAvailablePart {
 
   @Override
   public int hashCode() {
-    return Objects.hash(input, output, hashCodeNullable(providerExecuted), state, toolCallId, type);
+    return Objects.hash(hashCodeNullable(callProviderMetadata), input, output, hashCodeNullable(providerExecuted), state, toolCallId, type);
   }
 
   private static <T> int hashCodeNullable(JsonNullable<T> a) {
@@ -257,6 +295,7 @@ public class ToolOutputAvailablePart {
   public String toString() {
     StringBuilder sb = new StringBuilder();
     sb.append("class ToolOutputAvailablePart {\n");
+    sb.append("    callProviderMetadata: ").append(toIndentedString(callProviderMetadata)).append("\n");
     sb.append("    input: ").append(toIndentedString(input)).append("\n");
     sb.append("    output: ").append(toIndentedString(output)).append("\n");
     sb.append("    providerExecuted: ").append(toIndentedString(providerExecuted)).append("\n");

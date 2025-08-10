@@ -20,6 +20,10 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonTypeName;
 import com.fasterxml.jackson.annotation.JsonValue;
+import org.openapitools.jackson.nullable.JsonNullable;
+import com.fasterxml.jackson.annotation.JsonIgnore;
+import org.openapitools.jackson.nullable.JsonNullable;
+import java.util.NoSuchElementException;
 import com.fasterxml.jackson.annotation.JsonPropertyOrder;
 import com.fasterxml.jackson.annotation.JsonTypeName;
 import org.hibernate.validator.constraints.*;
@@ -30,6 +34,7 @@ import org.hibernate.validator.constraints.*;
 @JsonPropertyOrder({
   StreamTextDeltaPart.JSON_PROPERTY_DELTA,
   StreamTextDeltaPart.JSON_PROPERTY_ID,
+  StreamTextDeltaPart.JSON_PROPERTY_PROVIDER_METADATA,
   StreamTextDeltaPart.JSON_PROPERTY_TYPE
 })
 @jakarta.annotation.Generated(value = "org.openapitools.codegen.languages.JavaClientCodegen", comments = "Generator version: 7.7.0")
@@ -39,6 +44,9 @@ public class StreamTextDeltaPart {
 
   public static final String JSON_PROPERTY_ID = "id";
   private String id;
+
+  public static final String JSON_PROPERTY_PROVIDER_METADATA = "providerMetadata";
+  private JsonNullable<Object> providerMetadata = JsonNullable.<Object>undefined();
 
   public static final String JSON_PROPERTY_TYPE = "type";
   private String type = "text-delta";
@@ -96,6 +104,39 @@ public class StreamTextDeltaPart {
     this.id = id;
   }
 
+  public StreamTextDeltaPart providerMetadata(Object providerMetadata) {
+    this.providerMetadata = JsonNullable.<Object>of(providerMetadata);
+    
+    return this;
+  }
+
+  /**
+   * Get providerMetadata
+   * @return providerMetadata
+   */
+  @jakarta.annotation.Nullable
+  @JsonIgnore
+
+  public Object getProviderMetadata() {
+        return providerMetadata.orElse(null);
+  }
+
+  @JsonProperty(JSON_PROPERTY_PROVIDER_METADATA)
+  @JsonInclude(value = JsonInclude.Include.USE_DEFAULTS)
+
+  public JsonNullable<Object> getProviderMetadata_JsonNullable() {
+    return providerMetadata;
+  }
+  
+  @JsonProperty(JSON_PROPERTY_PROVIDER_METADATA)
+  public void setProviderMetadata_JsonNullable(JsonNullable<Object> providerMetadata) {
+    this.providerMetadata = providerMetadata;
+  }
+
+  public void setProviderMetadata(Object providerMetadata) {
+    this.providerMetadata = JsonNullable.<Object>of(providerMetadata);
+  }
+
   public StreamTextDeltaPart type(String type) {
     
     this.type = type;
@@ -132,12 +173,24 @@ public class StreamTextDeltaPart {
     StreamTextDeltaPart streamTextDeltaPart = (StreamTextDeltaPart) o;
     return Objects.equals(this.delta, streamTextDeltaPart.delta) &&
         Objects.equals(this.id, streamTextDeltaPart.id) &&
+        equalsNullable(this.providerMetadata, streamTextDeltaPart.providerMetadata) &&
         Objects.equals(this.type, streamTextDeltaPart.type);
+  }
+
+  private static <T> boolean equalsNullable(JsonNullable<T> a, JsonNullable<T> b) {
+    return a == b || (a != null && b != null && a.isPresent() && b.isPresent() && Objects.deepEquals(a.get(), b.get()));
   }
 
   @Override
   public int hashCode() {
-    return Objects.hash(delta, id, type);
+    return Objects.hash(delta, id, hashCodeNullable(providerMetadata), type);
+  }
+
+  private static <T> int hashCodeNullable(JsonNullable<T> a) {
+    if (a == null) {
+      return 1;
+    }
+    return a.isPresent() ? Arrays.deepHashCode(new Object[]{a.get()}) : 31;
   }
 
   @Override
@@ -146,6 +199,7 @@ public class StreamTextDeltaPart {
     sb.append("class StreamTextDeltaPart {\n");
     sb.append("    delta: ").append(toIndentedString(delta)).append("\n");
     sb.append("    id: ").append(toIndentedString(id)).append("\n");
+    sb.append("    providerMetadata: ").append(toIndentedString(providerMetadata)).append("\n");
     sb.append("    type: ").append(toIndentedString(type)).append("\n");
     sb.append("}");
     return sb.toString();
