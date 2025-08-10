@@ -6,6 +6,9 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import de.tum.in.www1.hephaestus.gitprovider.user.User;
 import de.tum.in.www1.hephaestus.intelligenceservice.model.*;
+import de.tum.in.www1.hephaestus.mentor.document.Document;
+import de.tum.in.www1.hephaestus.mentor.document.DocumentKind;
+import de.tum.in.www1.hephaestus.mentor.document.DocumentRepository;
 import java.lang.reflect.Method;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
@@ -40,6 +43,9 @@ public class ChatPersistenceService {
 
     @Autowired
     private ChatMessagePartRepository chatMessagePartRepository;
+
+    @Autowired
+    private DocumentRepository documentRepository;
 
     /**
      * Creates a processor for a complete chat request, handling thread and user message persistence.
@@ -112,6 +118,21 @@ public class ChatPersistenceService {
 
         // Track data parts by ID for replacement/merge updates
         private final ConcurrentHashMap<String, ChatMessagePart> dataPartsById = new ConcurrentHashMap<>();
+
+        /**
+         * Accumulator for building/updating a document from transient data-* parts in the stream.
+         * "Transient" here means: not shown to the client UI as message parts, but MUST be used by the server
+         * to construct and persist document content and versions.
+         */
+        private static class DocumentBuildState {
+
+            UUID id; // Stable document ID across versions
+            DocumentKind kind = DocumentKind.TEXT;
+            String title;
+            final StringBuilder content = new StringBuilder();
+        }
+
+        private DocumentBuildState currentDocument;
 
         public ChatStreamProcessor(User user, ChatThread thread, ChatMessage parentMessage) {
             this.user = user;
@@ -1110,7 +1131,15 @@ public class ChatPersistenceService {
                     return;
                 }
 
-                // Do not persist transient data parts (AI SDK v5 semantics)
+                // Special handling for document construction via transient data-* parts
+                String partType = dataPart.getType();
+                if (partType != null && partType.startsWith("data-")) {
+                    handleDocumentDataPart(dataPart);
+                    // Never persist these as chat message parts – they are control/data signals for document ops
+                    return;
+                }
+
+                // For any other data parts: keep existing semantics
                 Boolean isTransient = dataPart.getTransient();
                 if (Boolean.TRUE.equals(isTransient)) {
                     logger.debug("Skipping transient data part: type={}", dataPart.getType());
@@ -1173,6 +1202,9 @@ public class ChatPersistenceService {
             var dataContent = objectMapper.createObjectNode();
             dataContent.put("type", dataPart.getType());
 
+            // Keep originalType in sync with the latest data-* type for UI fidelity
+            part.setOriginalType(dataPart.getType());
+
             // Add ID if present
             if (dataPart.getId() != null) {
                 dataContent.put("id", dataPart.getId());
@@ -1199,6 +1231,113 @@ public class ChatPersistenceService {
             }
 
             part.setContent(dataContent);
+        }
+
+        /**
+         * Handle server-side document building/updating from AI SDK v5 data-* transient parts.
+         * Supported control parts (type -> data expected):
+         *  - data-kind:       "text" | ... -> sets DocumentKind
+         *  - data-title:      string        -> sets title
+         *  - data-id:         UUID string   -> sets/locks the document id
+         *  - data-textDelta:  string        -> append to content buffer
+         *  - data-clear:      any           -> clears content buffer
+         *  - data-finish:     any           -> persists a new document version
+         */
+        private void handleDocumentDataPart(StreamDataPart dataPart) {
+            try {
+                String type = dataPart.getType();
+                Object data = dataPart.getData();
+
+                // Ensure we have a build state to work with
+                if (currentDocument == null) {
+                    currentDocument = new DocumentBuildState();
+                }
+
+                switch (type) {
+                    case "data-kind" -> {
+                        if (data instanceof String s && !s.isBlank()) {
+                            try {
+                                currentDocument.kind = DocumentKind.fromValue(s);
+                            } catch (IllegalArgumentException ex) {
+                                logger.warn("Unknown document kind '{}', defaulting to TEXT", s);
+                                currentDocument.kind = DocumentKind.TEXT;
+                            }
+                        }
+                    }
+                    case "data-title" -> {
+                        if (data instanceof String s) {
+                            currentDocument.title = s;
+                        }
+                    }
+                    case "data-id" -> {
+                        if (data instanceof String s && !s.isBlank()) {
+                            try {
+                                currentDocument.id = UUID.fromString(s.trim());
+                            } catch (IllegalArgumentException ex) {
+                                logger.warn("Invalid document UUID received in data-id: {}", s);
+                            }
+                        }
+                    }
+                    case "data-textDelta" -> {
+                        if (data instanceof String s) {
+                            currentDocument.content.append(s);
+                        }
+                    }
+                    case "data-clear" -> {
+                        currentDocument.content.setLength(0);
+                    }
+                    case "data-finish" -> {
+                        // On finish: persist a document version (create or update)
+                        if (currentDocument.id == null) {
+                            // If no explicit id provided so far, generate a new one for creation
+                            currentDocument.id = UUID.randomUUID();
+                        }
+
+                        // Try to reuse existing doc attributes when this is an update (id provided without title/kind)
+                        String title = currentDocument.title;
+                        DocumentKind kind = currentDocument.kind;
+
+                        var latestExisting = documentRepository.findFirstByIdAndUserOrderByCreatedAtDesc(
+                            currentDocument.id,
+                            thread.getUser()
+                        );
+                        if (latestExisting.isPresent()) {
+                            if (title == null || title.isBlank()) {
+                                title = latestExisting.get().getTitle();
+                            }
+                            if (kind == null) {
+                                kind = latestExisting.get().getKind();
+                            }
+                        }
+
+                        if (title == null || title.isBlank()) {
+                            title = "Untitled";
+                        }
+                        if (kind == null) {
+                            kind = DocumentKind.TEXT;
+                        }
+
+                        String content = currentDocument.content.toString();
+
+                        Document toSave = new Document(currentDocument.id, title, content, kind, thread.getUser());
+                        documentRepository.save(toSave);
+
+                        logger.info(
+                            "Persisted document version: id={}, title='{}', kind={}, contentLen={}",
+                            toSave.getId(),
+                            title,
+                            toSave.getKind(),
+                            content != null ? content.length() : 0
+                        );
+                        // Keep build state for potential further updates in the same stream
+                    }
+                    default -> {
+                        // For other data-* types not related to documents, ignore silently
+                    }
+                }
+            } catch (Exception e) {
+                logger.error("Failed to handle document data part {}: {}", dataPart.getType(), e.getMessage(), e);
+            }
         }
 
         @Override

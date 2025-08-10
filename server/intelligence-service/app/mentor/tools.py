@@ -8,7 +8,7 @@ from app.models import init_hephaestus_chat_model
 from app.settings import settings
 
 from app.logger import logger
-from app.db.service import IssueDatabaseService
+from app.db.service import IssueDatabaseService, DocumentDatabaseService
 from app.mentor.state import MentorState
 from app.mentor.models import (
     CreateDocumentInput,
@@ -150,38 +150,43 @@ async def update_document(
     config: RunnableConfig,
 ) -> Dict[str, Any]:
     """Update a document with the given description and stream preview changes."""
+    # Try to retrieve document details
+    document = DocumentDatabaseService.get_latest_document_by_id(id)
+    if not document:
+        return {"error": "Document not found"}
 
-    # Retrieve document, if not found -> error with Document not found
-    # TODO: Retrieve document from db
-    # TODO: Figure out exception handling
+    # Emit header info to align with client expectations
+    await emit_data(config=config, type_name="id", data=id, transient=True)
 
-    # Clear preview (transient)
+    # Stream a clean preview: clear -> deltas -> finish
     await emit_data(config=config, type_name="clear", data=None, transient=True)
 
-    # TODO: currentContent placeholder
     msgs = [
         {
             "role": "system",
             "content": (
                 "Improve the following contents of the document based on the "
-                "given prompt.\n\n{currentContent}"
+                "given prompt.\n\n" + document.content
             ),
         },
         {"role": "user", "content": description},
     ]
+
+    preview_content = []
     async for chunk in model.astream(msgs, config=config):
-        textDelta = chunk.text()
-        if textDelta:
+        text_delta = chunk.text()
+        if text_delta:
+            preview_content.append(text_delta)
             await emit_data(
-                config=config, type_name="textDelta", data=textDelta, transient=True
+                config=config, type_name="textDelta", data=text_delta, transient=True
             )
 
     await emit_data(config=config, type_name="finish", data=None, transient=True)
 
     return {
         "id": id,
-        "title": "",  # TODO: document.title
-        "kind": "",  # TODO: document.kind
+        "title": document.title,
+        "kind": document.kind,
         "content": "The document has been updated successfully.",
     }
 

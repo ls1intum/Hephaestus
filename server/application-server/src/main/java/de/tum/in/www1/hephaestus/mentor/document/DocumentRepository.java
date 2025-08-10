@@ -28,8 +28,7 @@ public interface DocumentRepository extends JpaRepository<Document, DocumentId> 
     /**
      * Find latest version of a document (most recent createdAt)
      */
-    @Query("SELECT d FROM Document d WHERE d.id = :id AND d.user = :user ORDER BY d.createdAt DESC LIMIT 1")
-    Optional<Document> findFirstByIdAndUserOrderByCreatedAtDesc(@Param("id") UUID id, @Param("user") User user);
+    Optional<Document> findFirstByIdAndUserOrderByCreatedAtDesc(UUID id, User user);
 
     /**
      * Find all versions of a document by ID and user

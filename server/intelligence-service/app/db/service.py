@@ -6,6 +6,7 @@ Simple service for accessing issue and pull request data from the application-se
 
 from typing import List, Optional, Dict, Any
 from sqlalchemy import select, desc, and_
+import uuid
 
 from .models_gen import (
     Issue,
@@ -13,6 +14,7 @@ from .models_gen import (
     Repository,
     Pullrequestbadpractice,
     BadPracticeDetection,
+    Document,
 )
 from .config import DatabaseSession
 
@@ -150,4 +152,27 @@ class IssueDatabaseService:
         with DatabaseSession() as session:
             return session.execute(
                 select(Repository).where(Repository.id == repository_id)
+            ).scalar_one_or_none()
+
+
+class DocumentDatabaseService:
+    """Read-only access to documents stored in the application-server database."""
+
+    @staticmethod
+    def get_latest_document_by_id(doc_id: str) -> Optional[Document]:
+        """Fetch the latest version of a document by its UUID string.
+
+        Returns None if the id is invalid or the document does not exist.
+        """
+        try:
+            parsed = uuid.UUID(doc_id)
+        except Exception:
+            return None
+
+        with DatabaseSession() as session:
+            return session.execute(
+                select(Document)
+                .where(Document.id == parsed)
+                .order_by(desc(Document.created_at))
+                .limit(1)
             ).scalar_one_or_none()
