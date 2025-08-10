@@ -1,7 +1,6 @@
-import asyncio
 import requests
 from uuid import uuid4
-from typing import Annotated, List, Dict, Any, Literal
+from typing import Annotated, List, Dict, Any, Literal, Optional
 from langchain_core.tools import tool
 from langgraph.prebuilt import InjectedState
 from langchain_core.runnables import RunnableConfig
@@ -15,12 +14,8 @@ from app.mentor.models import (
     CreateDocumentInput,
     UpdateDocumentInput,
     GetWeatherInput,
-    CreateDocumentOutput,
-    UpdateDocumentOutput,
     GetWeatherOutput,
 )
-from typing import Any, Optional
-from langchain_core.runnables import RunnableConfig
 from langchain_core.callbacks.manager import adispatch_custom_event
 
 
@@ -106,7 +101,12 @@ async def create_document(
     *,
     config: RunnableConfig,
 ) -> Dict[str, Any]:
-    """Create a document for a writing or content creation activities. This tool will call other functions that will generate the contents of the document based on the title and kind."""
+    """Create a document and stream preview content.
+
+    This tool emits transient header events (kind, id, title, clear) and streams
+    textDelta via an inner model to build a live preview. The final return value
+    summarizes the action; the persisted content is handled by the application server.
+    """
 
     document_id = str(uuid4())
 
@@ -118,7 +118,10 @@ async def create_document(
     msgs = [
         {
             "role": "system",
-            "content": "Write about the given topic. Markdown is supported. Use headings wherever appropriate.",
+            "content": (
+                "Write about the given topic. Markdown is supported. Use headings "
+                "wherever appropriate."
+            ),
         },
         {"role": "user", "content": title},
     ]
@@ -146,7 +149,7 @@ async def update_document(
     *,
     config: RunnableConfig,
 ) -> Dict[str, Any]:
-    """Update a document with the given description."""
+    """Update a document with the given description and stream preview changes."""
 
     # Retrieve document, if not found -> error with Document not found
     # TODO: Retrieve document from db
@@ -159,7 +162,10 @@ async def update_document(
     msgs = [
         {
             "role": "system",
-            "content": "Improve the following contents of the document based on the given prompt.\n\n{currentContent}",
+            "content": (
+                "Improve the following contents of the document based on the "
+                "given prompt.\n\n{currentContent}"
+            ),
         },
         {"role": "user", "content": description},
     ]

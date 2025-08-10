@@ -228,7 +228,7 @@ async def generate_response(
                                     current_args, separators=(",", ":")
                                 )
                                 if len(new_args_json) > len(current_args_json):
-                                    delta = new_args_json[len(current_args_json) :]
+                                    delta = new_args_json[len(current_args_json):]
                                     if delta:
                                         yield stream.tool_input_delta(
                                             tool_call_id=tool_call_id,

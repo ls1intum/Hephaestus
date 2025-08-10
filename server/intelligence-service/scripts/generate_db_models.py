@@ -28,9 +28,6 @@ def generate_db_models(output_file: Path) -> None:
 
     database_url = get_database_url()
 
-    # Get the intelligence service directory (parent of scripts directory)
-    intelligence_service_dir = Path(__file__).parent.parent
-
     # Prepare sqlacodegen command - we're already running inside poetry environment
     cmd = ["sqlacodegen", "--generator", "declarative", database_url]
 
@@ -80,7 +77,7 @@ def main():
     models_dir = script_dir.parent / "app" / "db"
     models_file = models_dir / "models_gen.py"
 
-    print(f"🚀 Starting SQLAlchemy model generation...")
+    print("🚀 Starting SQLAlchemy model generation...")
     print(f"📁 Output file: {models_file}")
 
     # Ensure output directory exists

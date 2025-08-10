@@ -66,7 +66,7 @@ class IssueDatabaseService:
                 session.execute(
                     select(Issue)
                     .where(
-                        and_(Issue.id.in_(issue_ids), Issue.has_pull_request == False)
+                        and_(Issue.id.in_(issue_ids), Issue.has_pull_request.is_(False))
                     )
                     .order_by(desc(Issue.created_at))
                 ).scalars()
@@ -79,7 +79,7 @@ class IssueDatabaseService:
             return list(
                 session.execute(
                     select(Issue)
-                    .where(and_(Issue.id.in_(pr_ids), Issue.has_pull_request == True))
+                    .where(and_(Issue.id.in_(pr_ids), Issue.has_pull_request.is_(True)))
                     .order_by(desc(Issue.created_at))
                 ).scalars()
             )

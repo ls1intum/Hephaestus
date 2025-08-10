@@ -4,7 +4,6 @@ settings.IS_GENERATING_OPENAPI = True
 
 import yaml
 import inspect
-from typing import get_origin, get_args
 from fastapi.openapi.utils import get_openapi
 from app import main
 
