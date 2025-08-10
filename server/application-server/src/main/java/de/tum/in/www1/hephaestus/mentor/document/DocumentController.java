@@ -20,20 +20,8 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
-/**
- * Perfect Document API Controller following industry best practices
- *
- * ✅ RESTful resource-oriented design
- * ✅ Proper HTTP verbs and status codes
- * ✅ Consistent request/response patterns
- * ✅ Clear separation of concerns
- * ✅ Intuitive endpoint naming
- * ✅ Comprehensive OpenAPI documentation
- * ✅ Security integration
- * ✅ Production-ready logging
- */
 @RestController
-@RequestMapping("/api/documents") // Plural resource name - industry standard
+@RequestMapping("/api/documents")
 @Tag(name = "Documents", description = "Document management with versioning support")
 public class DocumentController {
 
