@@ -40,9 +40,6 @@ erDiagram
         JSONB content
         VARCHAR(128) original_type
         VARCHAR(32) type "NOT NULL"
-        BIGINT duration_ms
-        TIMESTAMPTZ finished_at
-        TIMESTAMPTZ started_at
     }
 
     ChatMessageVote {
@@ -130,15 +127,6 @@ erDiagram
         VARCHAR(255) description
         VARCHAR(255) name
         BIGINT repository_id FK
-    }
-
-    Message {
-        BIGINT id PK
-        VARCHAR(32767) content
-        VARCHAR(255) sender
-        TIMESTAMP sent_at
-        BIGINT session_id "NOT NULL"
-        INTEGER messages_order
     }
 
     Milestone {
@@ -241,13 +229,6 @@ erDiagram
         VARCHAR(255) name_with_owner
         TIMESTAMP repository_synced_at
         BIGINT workspace_id FK
-    }
-
-    Session {
-        BIGINT id PK
-        TIMESTAMP created_at
-        BIGINT user_id
-        BOOLEAN is_closed "NOT NULL"
     }
 
     Team {
@@ -379,12 +360,10 @@ erDiagram
     class IssueAssignee associationEntity
     class IssueLabel associationEntity
     class Label primaryEntity
-    class Message metadataEntity
     class Milestone primaryEntity
     class PullRequestRequestedReviewer associationEntity
     class Repository primaryEntity
     class RepositoryToMonitor metadataEntity
-    class Session metadataEntity
     class Team primaryEntity
     class TeamLabel associationEntity
     class TeamMember associationEntity

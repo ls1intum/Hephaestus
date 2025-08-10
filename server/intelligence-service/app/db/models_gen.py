@@ -8,7 +8,6 @@ from typing import Any, List, Optional
 from sqlalchemy import (
     BigInteger,
     Boolean,
-    CheckConstraint,
     Column,
     DateTime,
     ForeignKeyConstraint,
@@ -37,19 +36,15 @@ class Base(DeclarativeBase):
 class ChatMessage(Base):
     __tablename__ = "chat_message"
     __table_args__ = (
-        CheckConstraint(
-            "role::text = ANY (ARRAY['USER'::character varying, 'ASSISTANT'::character varying, 'SYSTEM'::character varying]::text[])",
-            name="chat_message_role_check",
-        ),
         ForeignKeyConstraint(
             ["parent_message_id"],
             ["chat_message.id"],
-            name="fkd0fewjs0l68rq2bww9h8o4cmb",
+            name="FKd0fewjs0l68rq2bww9h8o4cmb",
         ),
         ForeignKeyConstraint(
-            ["thread_id"], ["chat_thread.id"], name="fk8s34d909gxc4xrlvml8gag9kh"
+            ["thread_id"], ["chat_thread.id"], name="FK8s34d909gxc4xrlvml8gag9kh"
         ),
-        PrimaryKeyConstraint("id", name="chat_message_pkey"),
+        PrimaryKeyConstraint("id", name="chat_messagePK"),
     )
     id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True)
     created_at: Mapped[datetime.datetime] = mapped_column(TIMESTAMP(True, 6))
@@ -79,9 +74,7 @@ class ChatMessage(Base):
 
 class ChatMessageVote(Base):
     __tablename__ = "chat_message_vote"
-    __table_args__ = (
-        PrimaryKeyConstraint("message_id", name="chat_message_vote_pkey"),
-    )
+    __table_args__ = (PrimaryKeyConstraint("message_id", name="chat_message_votePK"),)
     message_id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True)
     created_at: Mapped[datetime.datetime] = mapped_column(TIMESTAMP(True, 6))
     is_upvoted: Mapped[bool] = mapped_column(Boolean)
@@ -94,14 +87,15 @@ class ChatThread(Base):
         ForeignKeyConstraint(
             ["selected_leaf_message_id"],
             ["chat_message.id"],
-            name="fk34beodgwi0g7kn66svlk4hlfr",
+            name="FK34beodgwi0g7kn66svlk4hlfr",
         ),
         ForeignKeyConstraint(
-            ["user_id"], ["user.id"], name="fkikdxlx9viomcwrgxj7fbyfsew"
+            ["user_id"], ["user.id"], name="FKikdxlx9viomcwrgxj7fbyfsew"
         ),
-        PrimaryKeyConstraint("id", name="chat_thread_pkey"),
+        PrimaryKeyConstraint("id", name="chat_threadPK"),
         UniqueConstraint(
-            "selected_leaf_message_id", name="ukqfddr5kwxeylcr8qlfshtgkdn"
+            "selected_leaf_message_id",
+            name="uc_chat_threadselected_leaf_message_id_col",
         ),
     )
     id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True)
@@ -149,28 +143,6 @@ class Databasechangeloglock(Base):
     lockedby: Mapped[Optional[str]] = mapped_column(String(255))
 
 
-class Message(Base):
-    __tablename__ = "message"
-    __table_args__ = (PrimaryKeyConstraint("id", name="messagePK"),)
-    id: Mapped[int] = mapped_column(
-        BigInteger,
-        Identity(
-            start=1,
-            increment=1,
-            minvalue=1,
-            maxvalue=9223372036854775807,
-            cycle=False,
-            cache=1,
-        ),
-        primary_key=True,
-    )
-    session_id: Mapped[int] = mapped_column(BigInteger)
-    content: Mapped[Optional[str]] = mapped_column(String(32767))
-    sender: Mapped[Optional[str]] = mapped_column(String(255))
-    sent_at: Mapped[Optional[datetime.datetime]] = mapped_column(TIMESTAMP(precision=6))
-    messages_order: Mapped[Optional[int]] = mapped_column(Integer)
-
-
 class Repository(Base):
     __tablename__ = "repository"
     __table_args__ = (PrimaryKeyConstraint("id", name="repository_pkey"),)
@@ -204,28 +176,6 @@ class Repository(Base):
         relationship("TeamV2RepositoryPermission", back_populates="repository")
     )
     issue: Mapped[List["Issue"]] = relationship("Issue", back_populates="repository")
-
-
-class Session(Base):
-    __tablename__ = "session"
-    __table_args__ = (PrimaryKeyConstraint("id", name="sessionPK"),)
-    id: Mapped[int] = mapped_column(
-        BigInteger,
-        Identity(
-            start=1,
-            increment=1,
-            minvalue=1,
-            maxvalue=9223372036854775807,
-            cycle=False,
-            cache=1,
-        ),
-        primary_key=True,
-    )
-    is_closed: Mapped[bool] = mapped_column(Boolean, server_default=text("false"))
-    created_at: Mapped[Optional[datetime.datetime]] = mapped_column(
-        TIMESTAMP(precision=6)
-    )
-    user_id: Mapped[Optional[int]] = mapped_column(BigInteger)
 
 
 class Team(Base):
@@ -364,25 +314,16 @@ class Workspace(Base):
 class ChatMessagePart(Base):
     __tablename__ = "chat_message_part"
     __table_args__ = (
-        CheckConstraint(
-            "type::text = ANY (ARRAY['TEXT'::character varying, 'REASONING'::character varying, 'TOOL'::character varying, 'SOURCE_URL'::character varying, 'SOURCE_DOCUMENT'::character varying, 'FILE'::character varying, 'DATA'::character varying, 'STEP_START'::character varying]::text[])",
-            name="chat_message_part_type_check",
-        ),
         ForeignKeyConstraint(
-            ["message_id"], ["chat_message.id"], name="fkkfle3niou3f9r63mc3u8vi1na"
+            ["message_id"], ["chat_message.id"], name="FKkfle3niou3f9r63mc3u8vi1na"
         ),
-        PrimaryKeyConstraint(
-            "message_id", "order_index", name="chat_message_part_pkey"
-        ),
+        PrimaryKeyConstraint("message_id", "order_index", name="chat_message_partPK"),
     )
     message_id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True)
     order_index: Mapped[int] = mapped_column(Integer, primary_key=True)
     type: Mapped[str] = mapped_column(String(32))
     content: Mapped[Optional[dict]] = mapped_column(JSONB)
     original_type: Mapped[Optional[str]] = mapped_column(String(128))
-    duration_ms: Mapped[Optional[int]] = mapped_column(BigInteger)
-    finished_at: Mapped[Optional[datetime.datetime]] = mapped_column(TIMESTAMP(True, 6))
-    started_at: Mapped[Optional[datetime.datetime]] = mapped_column(TIMESTAMP(True, 6))
     message: Mapped["ChatMessage"] = relationship(
         "ChatMessage", back_populates="chat_message_part"
     )
@@ -391,11 +332,10 @@ class ChatMessagePart(Base):
 class Document(Base):
     __tablename__ = "document"
     __table_args__ = (
-        CheckConstraint("kind::text = 'TEXT'::text", name="document_kind_check"),
         ForeignKeyConstraint(
-            ["user_id"], ["user.id"], name="fkjhdxdv9sijhujiynqbb5jc010"
+            ["user_id"], ["user.id"], name="FKjhdxdv9sijhujiynqbb5jc010"
         ),
-        PrimaryKeyConstraint("created_at", "id", name="document_pkey"),
+        PrimaryKeyConstraint("created_at", "id", name="documentPK"),
         Index("idx_document_created_at", "created_at"),
         Index("idx_document_id", "id"),
         Index("idx_document_user_id", "user_id"),
