@@ -11,12 +11,9 @@
  */
 
 
-/**
- * Reasoning stream end part.
- */
-export interface StreamReasoningEndPart { 
-    id: string;
-    providerMetadata?: object | null;
-    type?: string;
+export interface Session { 
+    id: number;
+    createdAt: string;
+    isClosed: boolean;
 }
 

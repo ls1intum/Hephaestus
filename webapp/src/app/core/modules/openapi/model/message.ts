@@ -11,17 +11,19 @@
  */
 
 
-/**
- * Input for updateDocument tool.
- */
-export interface UpdateDocumentInput { 
-    /**
-     * The description of changes that need to be made
-     */
-    description: string;
-    /**
-     * The ID of the document to update
-     */
-    id: string;
+export interface Message { 
+    id: number;
+    sentAt: string;
+    sender: Message.SenderEnum;
+    content: string;
+    sessionId: number;
 }
+export namespace Message {
+    export type SenderEnum = 'MENTOR' | 'USER';
+    export const SenderEnum = {
+        Mentor: 'MENTOR' as SenderEnum,
+        User: 'USER' as SenderEnum
+    };
+}
+
 

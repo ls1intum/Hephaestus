@@ -13,24 +13,30 @@ import { HttpHeaders }                                       from '@angular/comm
 
 import { Observable }                                        from 'rxjs';
 
-import { ChatMessageVote } from '../model/models';
-import { VoteMessageRequest } from '../model/models';
+import { Message } from '../model/models';
 
 
 import { Configuration }                                     from '../configuration';
 
 
 
-export interface ChatMesServiceInterface {
+export interface MessageServiceInterface {
     defaultHeaders: HttpHeaders;
     configuration: Configuration;
 
     /**
-     * Vote on a message
-     * Cast an upvote or downvote on a chat message
-     * @param messageId Message ID to vote on
-     * @param voteMessageRequest 
+     * 
+     * 
+     * @param sessionId 
+     * @param body 
      */
-    voteMessage(messageId: string, voteMessageRequest: VoteMessageRequest, extraHttpRequestParams?: any): Observable<ChatMessageVote>;
+    createMessage(sessionId: number, body: string, extraHttpRequestParams?: any): Observable<Message>;
+
+    /**
+     * 
+     * 
+     * @param sessionId 
+     */
+    getMessages(sessionId: number, extraHttpRequestParams?: any): Observable<Array<Message>>;
 
 }

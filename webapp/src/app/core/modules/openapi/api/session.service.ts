@@ -19,25 +19,21 @@ import { CustomHttpParameterCodec }                          from '../encoder';
 import { Observable }                                        from 'rxjs';
 
 // @ts-ignore
-import { ChatThreadDetail } from '../model/chat-thread-detail';
-// @ts-ignore
-import { ChatThreadGroup } from '../model/chat-thread-group';
-// @ts-ignore
-import { ChatThreadSummary } from '../model/chat-thread-summary';
+import { Session } from '../model/session';
 
 // @ts-ignore
 import { BASE_PATH, COLLECTION_FORMATS }                     from '../variables';
 import { Configuration }                                     from '../configuration';
 import {
-    ChatServiceInterface
-} from './chat.serviceInterface';
+    SessionServiceInterface
+} from './session.serviceInterface';
 
 
 
 @Injectable({
   providedIn: 'root'
 })
-export class ChatService implements ChatServiceInterface {
+export class SessionService implements SessionServiceInterface {
 
     protected basePath = 'http://localhost';
     public defaultHeaders = new HttpHeaders();
@@ -100,15 +96,13 @@ export class ChatService implements ChatServiceInterface {
     }
 
     /**
-     * Get user\&#39;s grouped chat threads
-     * Retrieve all chat threads for the authenticated user grouped by time periods
      * @param observe set whether or not to return the data Observable as the body, response or events. defaults to returning the body.
      * @param reportProgress flag to report request and response progress.
      */
-    public getGroupedThreads(observe?: 'body', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<Array<ChatThreadGroup>>;
-    public getGroupedThreads(observe?: 'response', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<HttpResponse<Array<ChatThreadGroup>>>;
-    public getGroupedThreads(observe?: 'events', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<HttpEvent<Array<ChatThreadGroup>>>;
-    public getGroupedThreads(observe: any = 'body', reportProgress: boolean = false, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<any> {
+    public createNewSession(observe?: 'body', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<Session>;
+    public createNewSession(observe?: 'response', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<HttpResponse<Session>>;
+    public createNewSession(observe?: 'events', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<HttpEvent<Session>>;
+    public createNewSession(observe: any = 'body', reportProgress: boolean = false, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<any> {
 
         let localVarHeaders = this.defaultHeaders;
 
@@ -146,8 +140,8 @@ export class ChatService implements ChatServiceInterface {
             }
         }
 
-        let localVarPath = `/mentor/threads/grouped`;
-        return this.httpClient.request<Array<ChatThreadGroup>>('get', `${this.configuration.basePath}${localVarPath}`,
+        let localVarPath = `/mentor/sessions`;
+        return this.httpClient.request<Session>('post', `${this.configuration.basePath}${localVarPath}`,
             {
                 context: localVarHttpContext,
                 responseType: <any>responseType_,
@@ -161,19 +155,13 @@ export class ChatService implements ChatServiceInterface {
     }
 
     /**
-     * Get chat thread detail
-     * Retrieve a specific chat thread with all messages
-     * @param threadId Thread ID
      * @param observe set whether or not to return the data Observable as the body, response or events. defaults to returning the body.
      * @param reportProgress flag to report request and response progress.
      */
-    public getThread(threadId: string, observe?: 'body', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<ChatThreadDetail>;
-    public getThread(threadId: string, observe?: 'response', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<HttpResponse<ChatThreadDetail>>;
-    public getThread(threadId: string, observe?: 'events', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<HttpEvent<ChatThreadDetail>>;
-    public getThread(threadId: string, observe: any = 'body', reportProgress: boolean = false, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<any> {
-        if (threadId === null || threadId === undefined) {
-            throw new Error('Required parameter threadId was null or undefined when calling getThread.');
-        }
+    public getAllSessions(observe?: 'body', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<Array<Session>>;
+    public getAllSessions(observe?: 'response', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<HttpResponse<Array<Session>>>;
+    public getAllSessions(observe?: 'events', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<HttpEvent<Array<Session>>>;
+    public getAllSessions(observe: any = 'body', reportProgress: boolean = false, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<any> {
 
         let localVarHeaders = this.defaultHeaders;
 
@@ -211,8 +199,8 @@ export class ChatService implements ChatServiceInterface {
             }
         }
 
-        let localVarPath = `/mentor/thread/${this.configuration.encodeParam({name: "threadId", value: threadId, in: "path", style: "simple", explode: false, dataType: "string", dataFormat: "uuid"})}`;
-        return this.httpClient.request<ChatThreadDetail>('get', `${this.configuration.basePath}${localVarPath}`,
+        let localVarPath = `/mentor/sessions`;
+        return this.httpClient.request<Array<Session>>('get', `${this.configuration.basePath}${localVarPath}`,
             {
                 context: localVarHttpContext,
                 responseType: <any>responseType_,
@@ -226,15 +214,13 @@ export class ChatService implements ChatServiceInterface {
     }
 
     /**
-     * Get user\&#39;s chat threads
-     * Retrieve all chat threads for the authenticated user
      * @param observe set whether or not to return the data Observable as the body, response or events. defaults to returning the body.
      * @param reportProgress flag to report request and response progress.
      */
-    public getThreads(observe?: 'body', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<Array<ChatThreadSummary>>;
-    public getThreads(observe?: 'response', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<HttpResponse<Array<ChatThreadSummary>>>;
-    public getThreads(observe?: 'events', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<HttpEvent<Array<ChatThreadSummary>>>;
-    public getThreads(observe: any = 'body', reportProgress: boolean = false, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<any> {
+    public getLastSession(observe?: 'body', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<Session>;
+    public getLastSession(observe?: 'response', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<HttpResponse<Session>>;
+    public getLastSession(observe?: 'events', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<HttpEvent<Session>>;
+    public getLastSession(observe: any = 'body', reportProgress: boolean = false, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<any> {
 
         let localVarHeaders = this.defaultHeaders;
 
@@ -272,8 +258,8 @@ export class ChatService implements ChatServiceInterface {
             }
         }
 
-        let localVarPath = `/mentor/threads`;
-        return this.httpClient.request<Array<ChatThreadSummary>>('get', `${this.configuration.basePath}${localVarPath}`,
+        let localVarPath = `/mentor/sessions/last`;
+        return this.httpClient.request<Session>('get', `${this.configuration.basePath}${localVarPath}`,
             {
                 context: localVarHttpContext,
                 responseType: <any>responseType_,
