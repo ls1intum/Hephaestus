@@ -11,7 +11,11 @@ import {
 	getThreadQueryKey,
 	voteMessageMutation,
 } from "@/api/@tanstack/react-query.gen";
-import type { ChatMessageVote, ChatThreadDetail, ChatThreadGroup } from "@/api/types.gen";
+import type {
+	ChatMessageVote,
+	ChatThreadDetail,
+	ChatThreadGroup,
+} from "@/api/types.gen";
 import environment from "@/environment";
 import { keycloakService } from "@/integrations/auth";
 import type { ChatMessage } from "@/lib/types";

@@ -57,8 +57,8 @@ export const Default: Story = {};
  */
 export const Loading: Story = {
 	args: {
-	isLoading: true,
-	reasoning: `**Analyzing context**
+		isLoading: true,
+		reasoning: `**Analyzing context**
 Collecting signals from prior messages and metadata.
 Estimating ambiguity and selecting a suitable approach.`,
 	},
@@ -69,7 +69,7 @@ Estimating ambiguity and selecting a suitable approach.`,
  */
 export const ShortReasoning: Story = {
 	args: {
-	reasoning: `**Question**
+		reasoning: `**Question**
 What is a closure and why is it useful?
 Provide a concrete example.
 
@@ -85,7 +85,7 @@ E.g., a counter function that remembers its internal value.`,
  */
 export const ComplexReasoning: Story = {
 	args: {
-	reasoning: `**Context**
+		reasoning: `**Context**
 TypeScript generics provide flexibility while preserving type safety.
 They allow APIs to work across many types without resorting to any.
 Good generic design keeps call sites readable.
@@ -113,7 +113,7 @@ Avoid over-generalization that harms ergonomics.`,
  */
 export const StructuredReasoning: Story = {
 	args: {
-	reasoning: `**Hook rules**
+		reasoning: `**Hook rules**
 Call hooks at the top level of React functions only.
 Never call hooks conditionally; guard inside the effect or callback.
 Rely on the ESLint plugin to enforce best practices.
@@ -137,7 +137,7 @@ Prefer algorithmic wins over micro-optimizations.`,
  */
 export const MathematicalReasoning: Story = {
 	args: {
-	reasoning: `**Time**
+		reasoning: `**Time**
 Hash map approach is O(n) due to single pass and O(1) average lookup.
 Sorting-based approach is O(n log n) primarily due to the sort.
 
@@ -164,7 +164,7 @@ export const EmptyReasoning: Story = {
  */
 export const TechnicalReasoning: Story = {
 	args: {
-	reasoning: `**Query issues**
+		reasoning: `**Query issues**
 SELECT * inflates payload and blocks index-only scans.
 Missing composite indexes cause full scans on high-cardinality columns.
 No LIMIT hurts p99 latency for large result sets.
@@ -186,15 +186,15 @@ These enable selective filters and efficient ordering.`,
  */
 export const ReasonedForAWhile: Story = {
 	args: {
-	reasoning: `**Summary**
+		reasoning: `**Summary**
 Answer is 42 based on the problem constraints.
 The calculation is straightforward and needs no deeper derivation.`,
 	},
 	parameters: {
 		docs: {
 			description: {
-		story:
-		    "When timing isn't available, the header uses the last heading (e.g., 'Summary') instead of a duration.",
+				story:
+					"When timing isn't available, the header uses the last heading (e.g., 'Summary') instead of a duration.",
 			},
 		},
 	},

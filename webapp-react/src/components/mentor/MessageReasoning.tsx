@@ -169,7 +169,8 @@ export function MessageReasoning({
 								background:
 									"linear-gradient(90deg, transparent 45%, rgba(255,255,255,0.6) 50%, transparent 55%)",
 								backgroundSize: "200% 100%",
-								animation: "message-reasoning-shimmer 1.4s linear infinite reverse",
+								animation:
+									"message-reasoning-shimmer 1.4s linear infinite reverse",
 							}}
 						/>
 					</div>
@@ -202,7 +203,8 @@ export function MessageReasoning({
 									background:
 										"linear-gradient(90deg, transparent 20%, rgba(255,255,255,0.6) 50%, transparent 55%)",
 									backgroundSize: "200% 100%",
-									animation: "message-reasoning-shimmer 2s linear infinite reverse",
+									animation:
+										"message-reasoning-shimmer 2s linear infinite reverse",
 								}}
 							/>
 						)}
