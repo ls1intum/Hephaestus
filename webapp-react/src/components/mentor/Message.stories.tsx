@@ -394,9 +394,7 @@ export const UpdateDocumentLoadingMessage: Story = {
 					state: "input-available",
 					input: {
 						id: "doc-1",
-						title: "React Component Guidelines",
-						content: "Add section about testing best practices",
-						kind: "text",
+						description: "Add section about testing best practices",
 					},
 				},
 			],

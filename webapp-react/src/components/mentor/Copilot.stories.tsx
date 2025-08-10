@@ -61,7 +61,6 @@ const CONVERSATION_MESSAGES: ChatMessage[] = [
 				input: {
 					title: "Birthday Poem for Emma",
 					kind: "text" as const,
-					content: "",
 				},
 				output: {
 					id: "doc-1",
@@ -85,8 +84,6 @@ We celebrate another year!
 
 Happy 8th Birthday! 🦄🌈`,
 					kind: "TEXT" as const,
-					createdAt: new Date(),
-					userId: "user-1",
 				},
 			},
 		],
@@ -122,7 +119,6 @@ Happy 8th Birthday! 🦄🌈`,
 				input: {
 					title: "Birthday Card Message",
 					kind: "text" as const,
-					content: "",
 				},
 				output: {
 					id: "doc-2",
@@ -142,8 +138,6 @@ Mom & Dad 💕
 
 P.S. Don't forget to make a special wish when you blow out your candles! 🎂✨`,
 					kind: "TEXT" as const,
-					createdAt: new Date(),
-					userId: "user-1",
 				},
 			},
 		],

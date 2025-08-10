@@ -284,9 +284,7 @@ const PurePreviewMessage = ({
 									const { input } = part;
 									const args = {
 										id: input.id,
-										title: input.title,
-										content: input.content,
-										kind: input.kind,
+										description: input.description,
 									} as const;
 									return (
 										<div key={toolCallId}>

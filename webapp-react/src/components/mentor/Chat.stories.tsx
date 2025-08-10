@@ -163,7 +163,6 @@ const CONVERSATION_MESSAGES: ChatMessage[] = [
 				input: {
 					title: "Birthday Poem for Emma",
 					kind: "text" as const,
-					content: "",
 				},
 				output: {
 					id: "doc-1",
@@ -187,8 +186,6 @@ We celebrate another year!
 
 Happy 8th Birthday! 🦄🌈`,
 					kind: "TEXT" as const,
-					createdAt: new Date(),
-					userId: "user-1",
 				},
 			},
 		],
@@ -224,7 +221,6 @@ Happy 8th Birthday! 🦄🌈`,
 				input: {
 					title: "Birthday Card Message",
 					kind: "text" as const,
-					content: "",
 				},
 				output: {
 					id: "doc-2",
@@ -244,8 +240,6 @@ Mom & Dad 💕
 
 P.S. Don't forget to make a special wish when you blow out your candles! 🎂✨`,
 					kind: "TEXT" as const,
-					createdAt: new Date(),
-					userId: "user-1",
 				},
 			},
 		],
@@ -280,9 +274,7 @@ P.S. Don't forget to make a special wish when you blow out your candles! 🎂✨
 				state: "output-available",
 				input: {
 					id: "doc-1",
-					title: "Birthday Poem for Emma",
-					content: "Add reference to starting 3rd grade",
-					kind: "text",
+					description: "Add reference to starting 3rd grade",
 				},
 				output: {
 					id: "doc-1",
@@ -311,8 +303,6 @@ We celebrate another year!
 
 Happy 8th Birthday! 🦄🌈📚`,
 					kind: "TEXT" as const,
-					createdAt: new Date(),
-					userId: "user-1",
 				},
 			},
 		],
@@ -348,7 +338,6 @@ Happy 8th Birthday! 🦄🌈📚`,
 				input: {
 					title: "Birthday Party Shopping List",
 					kind: "text" as const,
-					content: "",
 				},
 				output: {
 					id: "doc-3",
@@ -392,8 +381,6 @@ Happy 8th Birthday! 🦄🌈📚`,
 
 **Budget estimate: $80-120 for everything!** 🎉`,
 					kind: "TEXT" as const,
-					createdAt: new Date(),
-					userId: "user-1",
 				},
 			},
 		],
