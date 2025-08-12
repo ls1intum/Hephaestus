@@ -35,8 +35,11 @@ public class Document {
     private UUID id;
 
     @Id
-    @Column(name = "created_at", nullable = false)
+    @Column(name = "version_number", nullable = false)
     @EqualsAndHashCode.Include
+    private Integer versionNumber;
+
+    @Column(name = "created_at", nullable = false)
     private Instant createdAt;
 
     @NonNull
@@ -57,9 +60,10 @@ public class Document {
     @ToString.Exclude
     private User user;
 
-    public Document(UUID id, String title, String content, DocumentKind kind, User user) {
+    public Document(UUID id, int versionNumber, String title, String content, DocumentKind kind, User user) {
         this.id = id;
-        this.createdAt = Instant.now(); // Manually set timestamp for versioning
+        this.versionNumber = versionNumber;
+        this.createdAt = Instant.now();
         this.title = title;
         this.content = content;
         this.kind = kind;

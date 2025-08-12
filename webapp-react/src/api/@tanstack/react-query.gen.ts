@@ -460,7 +460,7 @@ export const getDocumentVersionsInfiniteOptions = (options: Options<GetDocumentV
 export const getDocumentVersionQueryKey = (options: Options<GetDocumentVersionData>) => createQueryKey('getDocumentVersion', options);
 
 /**
- * Get specific version of a document by timestamp
+ * Get specific version of a document by version number
  */
 export const getDocumentVersionOptions = (options: Options<GetDocumentVersionData>) => {
     return queryOptions({

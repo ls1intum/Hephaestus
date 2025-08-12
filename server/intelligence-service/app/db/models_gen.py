@@ -335,15 +335,14 @@ class Document(Base):
         ForeignKeyConstraint(
             ["user_id"], ["user.id"], name="FKjhdxdv9sijhujiynqbb5jc010"
         ),
-        PrimaryKeyConstraint("created_at", "id", name="documentPK"),
+        PrimaryKeyConstraint("id", "version_number", name="documentPK"),
         Index("idx_document_created_at", "created_at"),
         Index("idx_document_id", "id"),
         Index("idx_document_user_id", "user_id"),
     )
-    created_at: Mapped[datetime.datetime] = mapped_column(
-        TIMESTAMP(True, 6), primary_key=True
-    )
     id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True)
+    version_number: Mapped[int] = mapped_column(Integer, primary_key=True)
+    created_at: Mapped[datetime.datetime] = mapped_column(TIMESTAMP(True, 6))
     kind: Mapped[str] = mapped_column(String(255))
     title: Mapped[str] = mapped_column(String(255))
     user_id: Mapped[int] = mapped_column(BigInteger)

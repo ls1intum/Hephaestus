@@ -378,7 +378,7 @@ paths:
           description: Document not found
       summary: Get all versions of a document
       tags: []
-  /api/documents/{id}/versions/{timestamp}:
+  /api/documents/{id}/versions/{versionNumber}:
     get:
       operationId: getDocumentVersion
       parameters:
@@ -389,11 +389,11 @@ paths:
           type: string
           format: uuid
       - in: path
-        name: timestamp
+        name: versionNumber
         required: true
         schema:
-          type: string
-          format: date-time
+          type: integer
+          format: int32
       responses:
         "200":
           content:
@@ -407,7 +407,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/Document"
           description: Document version not found
-      summary: Get specific version of a document by timestamp
+      summary: Get specific version of a document by version number
       tags: []
   /api/teamsV2:
     get:
@@ -1221,6 +1221,9 @@ components:
           type: string
         userId:
           type: string
+        versionNumber:
+          type: integer
+          format: int32
       required:
       - content
       - createdAt
@@ -1228,6 +1231,7 @@ components:
       - kind
       - title
       - userId
+      - versionNumber
     DocumentSummary:
       type: object
       description: |-

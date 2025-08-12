@@ -1,7 +1,6 @@
 package de.tum.in.www1.hephaestus.mentor.document;
 
 import java.io.Serializable;
-import java.time.Instant;
 import java.util.UUID;
 import lombok.*;
 
@@ -14,5 +13,5 @@ import lombok.*;
 public class DocumentId implements Serializable {
 
     private UUID id;
-    private Instant createdAt;
+    private Integer versionNumber;
 }

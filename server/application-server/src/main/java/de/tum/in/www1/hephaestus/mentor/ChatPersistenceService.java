@@ -1297,7 +1297,7 @@ public class ChatPersistenceService {
                         String title = currentDocument.title;
                         DocumentKind kind = currentDocument.kind;
 
-                        var latestExisting = documentRepository.findFirstByIdAndUserOrderByCreatedAtDesc(
+                        var latestExisting = documentRepository.findFirstByIdAndUserOrderByVersionNumberDesc(
                             currentDocument.id,
                             thread.getUser()
                         );
@@ -1319,7 +1319,15 @@ public class ChatPersistenceService {
 
                         String content = currentDocument.content.toString();
 
-                        Document toSave = new Document(currentDocument.id, title, content, kind, thread.getUser());
+                        int nextVersion = latestExisting.map(d -> d.getVersionNumber() + 1).orElse(1);
+                        Document toSave = new Document(
+                            currentDocument.id,
+                            nextVersion,
+                            title,
+                            content,
+                            kind,
+                            thread.getUser()
+                        );
                         documentRepository.save(toSave);
 
                         logger.info(

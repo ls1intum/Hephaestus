@@ -138,8 +138,8 @@ public class DocumentController {
 
         User user = userRepository.getCurrentUserElseThrow();
         try {
-            // Always sort versions by createdAt DESC (latest first)
-            Pageable pageable = PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "createdAt"));
+            // Sort versions by versionNumber DESC (latest first)
+            Pageable pageable = PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "versionNumber"));
             Page<DocumentDTO> versions = documentService.getDocumentVersions(id, user, pageable);
             return ResponseEntity.ok(versions);
         } catch (EntityNotFoundException e) {
@@ -148,19 +148,19 @@ public class DocumentController {
         }
     }
 
-    @GetMapping("/{id}/versions/{timestamp}")
-    @Operation(summary = "Get specific version of a document by timestamp")
+    @GetMapping("/{id}/versions/{versionNumber}")
+    @Operation(summary = "Get specific version of a document by version number")
     @ApiResponse(responseCode = "200", description = "Document version retrieved successfully")
     @ApiResponse(responseCode = "404", description = "Document version not found")
-    public ResponseEntity<DocumentDTO> getDocumentVersion(@PathVariable UUID id, @PathVariable Instant timestamp) {
-        logger.debug("Fetching document version: {} at {}", id, timestamp);
+    public ResponseEntity<DocumentDTO> getDocumentVersion(@PathVariable UUID id, @PathVariable Integer versionNumber) {
+        logger.debug("Fetching document version: {} #{}", id, versionNumber);
 
         User user = userRepository.getCurrentUserElseThrow();
         try {
-            DocumentDTO response = documentService.getDocumentVersion(id, timestamp, user);
+            DocumentDTO response = documentService.getDocumentVersion(id, versionNumber, user);
             return ResponseEntity.ok(response);
         } catch (EntityNotFoundException e) {
-            logger.debug("Document version not found: {} at {}", id, timestamp);
+            logger.debug("Document version not found: {} #{}", id, versionNumber);
             return ResponseEntity.notFound().build();
         }
     }

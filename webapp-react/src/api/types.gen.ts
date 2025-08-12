@@ -174,6 +174,7 @@ export type Document = {
     kind: 'TEXT';
     title: string;
     userId: string;
+    versionNumber: number;
 };
 
 /**
@@ -1769,10 +1770,10 @@ export type GetDocumentVersionData = {
     body?: never;
     path: {
         id: string;
-        timestamp: Date;
+        versionNumber: number;
     };
     query?: never;
-    url: '/api/documents/{id}/versions/{timestamp}';
+    url: '/api/documents/{id}/versions/{versionNumber}';
 };
 
 export type GetDocumentVersionErrors = {

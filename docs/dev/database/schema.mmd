@@ -58,9 +58,10 @@ erDiagram
     }
 
     Document {
-        TIMESTAMPTZ created_at PK
         UUID id PK
+        INTEGER version_number PK
         TEXT content
+        TIMESTAMPTZ created_at "NOT NULL"
         VARCHAR(255) kind "NOT NULL"
         VARCHAR(255) title "NOT NULL"
         BIGINT user_id FK "NOT NULL"

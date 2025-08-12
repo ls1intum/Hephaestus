@@ -151,11 +151,11 @@ export const getDocumentVersions = <ThrowOnError extends boolean = false>(option
 };
 
 /**
- * Get specific version of a document by timestamp
+ * Get specific version of a document by version number
  */
 export const getDocumentVersion = <ThrowOnError extends boolean = false>(options: Options<GetDocumentVersionData, ThrowOnError>) => {
     return (options.client ?? _heyApiClient).get<GetDocumentVersionResponses, GetDocumentVersionErrors, ThrowOnError>({
-        url: '/api/documents/{id}/versions/{timestamp}',
+        url: '/api/documents/{id}/versions/{versionNumber}',
         ...options
     });
 };

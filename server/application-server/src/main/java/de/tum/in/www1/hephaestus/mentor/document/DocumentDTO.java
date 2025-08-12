@@ -10,6 +10,7 @@ import java.util.UUID;
  */
 public record DocumentDTO(
     @NotNull UUID id,
+    @NotNull Integer versionNumber,
     @NotNull Instant createdAt,
     @NotNull String title,
     @NotNull String content, // Always present in full document view
@@ -22,6 +23,7 @@ public record DocumentDTO(
     public static DocumentDTO from(Document document) {
         return new DocumentDTO(
             document.getId(),
+            document.getVersionNumber(),
             document.getCreatedAt(),
             document.getTitle(),
             document.getContent(),

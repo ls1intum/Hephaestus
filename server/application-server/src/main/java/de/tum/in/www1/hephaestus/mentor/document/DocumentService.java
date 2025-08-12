@@ -34,8 +34,8 @@ public class DocumentService {
         // Generate new UUID for document
         UUID documentId = UUID.randomUUID();
 
-        // Create new document
-        Document document = new Document(documentId, request.title(), request.content(), request.kind(), user);
+        // First version is 1
+        Document document = new Document(documentId, 1, request.title(), request.content(), request.kind(), user);
 
         Document savedDocument = documentRepository.save(document);
         logger.info("Document created successfully with ID: {}", savedDocument.getId());
@@ -55,8 +55,14 @@ public class DocumentService {
             throw new EntityNotFoundException("Document", id.toString());
         }
 
+        // Determine next version number
+        int nextVersion = documentRepository
+            .findFirstByIdAndUserOrderByVersionNumberDesc(id, user)
+            .map(d -> d.getVersionNumber() + 1)
+            .orElse(1);
+
         // Create new version
-        Document document = new Document(id, request.title(), request.content(), request.kind(), user);
+        Document document = new Document(id, nextVersion, request.title(), request.content(), request.kind(), user);
 
         Document savedDocument = documentRepository.save(document);
         logger.info("Document updated successfully: {}", id);
@@ -71,7 +77,7 @@ public class DocumentService {
     public List<DocumentDTO> getDocumentsById(UUID id, User user) {
         logger.debug("Getting all versions of document ID: {} for user: {}", id, user.getId());
 
-        List<Document> documents = documentRepository.findByIdAndUserOrderByCreatedAtDesc(id, user);
+        List<Document> documents = documentRepository.findByIdAndUserOrderByVersionNumberDesc(id, user);
 
         return documents.stream().map(DocumentDTO::from).toList();
     }
@@ -84,7 +90,7 @@ public class DocumentService {
         logger.debug("Getting latest document ID: {} for user: {}", id, user.getId());
 
         return documentRepository
-            .findFirstByIdAndUserOrderByCreatedAtDesc(id, user)
+            .findFirstByIdAndUserOrderByVersionNumberDesc(id, user)
             .map(DocumentDTO::from)
             .orElseThrow(() -> new EntityNotFoundException("Document", id.toString()));
     }
@@ -106,13 +112,26 @@ public class DocumentService {
             throw new EntityNotFoundException("Document", id.toString());
         }
 
-        List<Document> deletedDocuments = documentRepository.findByIdAndUserAndCreatedAtAfterOrderByCreatedAtDesc(
-            id,
-            user,
-            timestamp
-        );
+        // Map timestamp to cutoff versionNumber (the first created after timestamp), fallback to latest
+        int cutoffVersion = documentRepository
+            .findByIdAndUserOrderByVersionNumberDesc(id, user)
+            .stream()
+            .filter(d -> d.getCreatedAt().isAfter(timestamp))
+            .map(Document::getVersionNumber)
+            .findFirst()
+            .orElse(Integer.MAX_VALUE);
 
-        documentRepository.deleteByIdAndUserAndCreatedAtAfter(id, user, timestamp);
+        List<Document> deletedDocuments = cutoffVersion == Integer.MAX_VALUE
+            ? List.of()
+            : documentRepository.findByIdAndUserAndVersionNumberGreaterThanOrderByVersionNumberDesc(
+                id,
+                user,
+                cutoffVersion - 1
+            );
+
+        if (cutoffVersion != Integer.MAX_VALUE) {
+            documentRepository.deleteByIdAndUserAndVersionNumberGreaterThan(id, user, cutoffVersion - 1);
+        }
 
         return deletedDocuments.stream().map(DocumentDTO::from).toList();
     }
@@ -166,12 +185,12 @@ public class DocumentService {
     /**
      * Get specific document version by timestamp
      */
-    public DocumentDTO getDocumentVersion(UUID id, Instant timestamp, User user) {
-        logger.info("Getting document version: {} at {} for user: {}", id, timestamp, user.getId());
+    public DocumentDTO getDocumentVersion(UUID id, Integer versionNumber, User user) {
+        logger.info("Getting document version: {} #{} for user: {}", id, versionNumber, user.getId());
 
         Document document = documentRepository
-            .findByIdAndUserAndCreatedAt(id, user, timestamp)
-            .orElseThrow(() -> new EntityNotFoundException("Document version", id + " at " + timestamp));
+            .findByIdAndUserAndVersionNumber(id, user, versionNumber)
+            .orElseThrow(() -> new EntityNotFoundException("Document version", id + " #" + versionNumber));
 
         return mapToResponseDTO(document);
     }
