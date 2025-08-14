@@ -1,4 +1,4 @@
-import { CheckCheck, Trophy, User, Users } from "lucide-react";
+import { CheckCheck, Trophy, User, Users, Crown } from "lucide-react";
 
 import {
 	SidebarGroup,
@@ -19,6 +19,14 @@ export function NavDashboards({ username }: { username: string }) {
 						<Link to="/">
 							<Trophy />
 							<span>Leaderboard</span>
+						</Link>
+					</SidebarMenuButton>
+				</SidebarMenuItem>
+				<SidebarMenuItem>
+					<SidebarMenuButton asChild tooltip="Team Leaderboard">
+						<Link to="/team-leaderboard">
+							<Crown />
+							<span>Team Leaderboard</span>
 						</Link>
 					</SidebarMenuButton>
 				</SidebarMenuItem>
