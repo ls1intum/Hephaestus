@@ -187,6 +187,16 @@ function ThreadContainer() {
 				onAttachmentsChange={() => {}} // No-op since attachments are disabled
 				onCopy={handleCopy}
 				onVote={handleVote}
+				artifact={mentorChat.artifact}
+				artifactDocuments={mentorChat.artifactDocuments}
+				artifactCurrentVersionIndex={mentorChat.artifactCurrentVersionIndex}
+				artifactIsCurrentVersion={mentorChat.artifactIsCurrentVersion}
+				artifactIsContentDirty={mentorChat.artifactIsContentDirty}
+				artifactMode={mentorChat.artifactMode}
+				onOpenArtifactById={mentorChat.openArtifactById}
+				onCloseArtifact={mentorChat.closeArtifact}
+				onSaveArtifactContent={mentorChat.saveArtifactContent}
+				onChangeArtifactVersion={mentorChat.changeArtifactVersion}
 				showSuggestedActions={false}
 				inputPlaceholder="Continue the conversation..."
 				disableAttachments={true}

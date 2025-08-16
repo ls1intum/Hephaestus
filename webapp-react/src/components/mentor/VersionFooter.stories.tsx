@@ -51,6 +51,7 @@ const sampleDocuments: Document[] = [
 		createdAt: new Date("2024-01-15T10:30:00Z"),
 		kind: "TEXT",
 		userId: "user-1",
+		versionNumber: 3,
 	},
 	{
 		id: "doc-2",
@@ -59,6 +60,7 @@ const sampleDocuments: Document[] = [
 		createdAt: new Date("2024-01-15T09:15:00Z"),
 		kind: "TEXT",
 		userId: "user-1",
+		versionNumber: 2,
 	},
 	{
 		id: "doc-3",
@@ -67,6 +69,7 @@ const sampleDocuments: Document[] = [
 		createdAt: new Date("2024-01-15T08:00:00Z"),
 		kind: "TEXT",
 		userId: "user-1",
+		versionNumber: 1,
 	},
 ];
 

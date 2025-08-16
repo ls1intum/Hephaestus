@@ -54,6 +54,7 @@ Expected completion: Q2 2024`,
 	kind: "TEXT",
 	createdAt: new Date("2024-01-15"),
 	userId: "user-456",
+	versionNumber: 1,
 };
 
 const longDocument: Document = {
@@ -122,6 +123,7 @@ The application will be deployed using Docker containers on AWS ECS.`,
 	kind: "TEXT",
 	createdAt: new Date("2024-02-01"),
 	userId: "user-789",
+	versionNumber: 1,
 };
 
 /**
@@ -177,6 +179,7 @@ export const EmptyDocument: Story = {
 			kind: "TEXT",
 			createdAt: new Date(),
 			userId: "user-123",
+			versionNumber: 1,
 		},
 	},
 };
@@ -211,6 +214,7 @@ export const MarkdownDocument: Story = {
 			kind: "TEXT",
 			createdAt: new Date("2024-03-15"),
 			userId: "user-456",
+			versionNumber: 1,
 		},
 	},
 };
@@ -258,6 +262,7 @@ The API returns standard HTTP status codes:
 			kind: "TEXT",
 			createdAt: new Date("2024-02-20"),
 			userId: "user-789",
+			versionNumber: 1,
 		},
 	},
 };

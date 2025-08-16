@@ -1,6 +1,6 @@
 import type { UseChatHelpers } from "@ai-sdk/react";
 import equal from "fast-deep-equal";
-import { memo, useCallback, useState } from "react";
+import { memo } from "react";
 import { createPortal } from "react-dom";
 import { useWindowSize } from "usehooks-ts";
 import type { ChatMessageVote, Document } from "@/api/types.gen";
@@ -53,6 +53,21 @@ export interface ChatProps {
 	disableAttachments?: boolean;
 	/** Optional CSS class name */
 	className?: string;
+	/** Artifact overlay state (from hook) */
+	artifact?: UIArtifact | null;
+	artifactDocuments?: Document[];
+	artifactCurrentVersionIndex?: number;
+	artifactIsCurrentVersion?: boolean;
+	artifactIsContentDirty?: boolean;
+	artifactMode?: "edit" | "diff";
+	/** Artifact handlers (from hook) */
+	onOpenArtifactById?: (documentId: string, boundingBox: DOMRect) => void;
+	onOpenArtifact?: (document: Document, boundingBox: DOMRect) => void;
+	onCloseArtifact?: () => void;
+	onSaveArtifactContent?: (content: string, debounce: boolean) => void;
+	onChangeArtifactVersion?: (
+		type: "next" | "prev" | "toggle" | "latest",
+	) => void;
 }
 
 function PureChat({
@@ -70,11 +85,21 @@ function PureChat({
 	onMessageEdit,
 	onCopy,
 	onVote,
-	onDocumentClick,
 	showSuggestedActions = false,
 	inputPlaceholder = "Send a message...",
 	disableAttachments = false,
 	className,
+	artifact,
+	artifactDocuments,
+	artifactCurrentVersionIndex,
+	artifactIsCurrentVersion,
+	artifactIsContentDirty,
+	artifactMode,
+	onOpenArtifactById,
+	// onOpenArtifact not yet used within Chat (artifact opens from Message -> handler)
+	onCloseArtifact,
+	onSaveArtifactContent,
+	onChangeArtifactVersion,
 }: ChatProps) {
 	const { width } = useWindowSize();
 	const isMobile = width ? width < 768 : false;
@@ -87,147 +112,14 @@ function PureChat({
 	const actualIsAtBottom = parentScrollToBottom ? parentIsAtBottom : isAtBottom;
 	const actualScrollToBottom = parentScrollToBottom || scrollToBottom;
 
-	// Internal artifact state management - completely self-contained
-	const [artifact, setArtifact] = useState<UIArtifact | null>(null);
-	const [documents, setDocuments] = useState<Document[]>([]);
-	const [currentVersionIndex, setCurrentVersionIndex] = useState(-1);
-	const [isContentDirty, setIsContentDirty] = useState(false);
-	const [artifactMode, setArtifactMode] = useState<"edit" | "diff">("edit");
-
-	// Handle document clicks from messages - convert to artifact opening
-	const handleDocumentClick = useCallback(
-		(document: Document, boundingBox: DOMRect) => {
-			if (artifact?.isVisible) {
-				// Artifact is already open - just switch to the new document (no animation)
-				setArtifact((prev) =>
-					prev
-						? {
-								...prev,
-								title: document.title,
-								documentId: document.id,
-								content: document.content || "",
-								// Keep existing boundingBox and isVisible to prevent re-animation
-							}
-						: null,
-				);
-				setDocuments([document]);
-				setCurrentVersionIndex(0);
-				setIsContentDirty(false);
-				setArtifactMode("edit");
-			} else {
-				// No artifact open - create new one with opening animation
-				const newArtifact: UIArtifact = {
-					title: document.title,
-					documentId: document.id,
-					kind: document.kind === "TEXT" ? "text" : "text",
-					content: document.content || "",
-					isVisible: true,
-					status: "idle",
-					boundingBox: {
-						top: boundingBox.top,
-						left: boundingBox.left,
-						width: boundingBox.width,
-						height: boundingBox.height,
-					},
-				};
-
-				setArtifact(newArtifact);
-				setDocuments([document]);
-				setCurrentVersionIndex(0);
-				setIsContentDirty(false);
-				setArtifactMode("edit");
-			}
-
-			// Call external handler for side effects (fetching more versions, etc.)
-			onDocumentClick?.(document.id, boundingBox);
-		},
-		[onDocumentClick, artifact],
-	);
-
-	// Handle document clicks by ID (from DocumentTool components)
-	const handleDocumentClickById = useCallback(
-		(documentId: string, boundingBox: DOMRect) => {
-			// Look up the document from the messages
-			let foundDocument: Document | null = null;
-
-			for (const message of messages) {
-				for (const part of message.parts) {
-					if (
-						(part.type === "tool-createDocument" ||
-							part.type === "tool-updateDocument") &&
-						part.state === "output-available"
-					) {
-						const doc = part.output as Document;
-						if (doc.id === documentId) {
-							foundDocument = doc;
-							break;
-						}
-					}
-				}
-				if (foundDocument) break;
-			}
-
-			if (foundDocument) {
-				handleDocumentClick(foundDocument, boundingBox);
-			}
-		},
-		[messages, handleDocumentClick],
-	);
-
-	// Handle artifact closing
-	const handleArtifactClose = useCallback(() => {
-		// First, trigger the exit animation
-		setArtifact((prev) => (prev ? { ...prev, isVisible: false } : null));
-
-		// After animation completes, clean up the state
-		setTimeout(() => {
-			setArtifact(null);
-			setDocuments([]);
-			setCurrentVersionIndex(-1);
-			setIsContentDirty(false);
-			setArtifactMode("edit");
-		}, 600); // Wait for animation to complete
-	}, []);
-
-	// Handle artifact content saving
-	const handleArtifactContentSave = useCallback(
-		(content: string) => {
-			if (artifact) {
-				setArtifact((prev) => (prev ? { ...prev, content } : null));
-				setIsContentDirty(true);
-			}
-		},
-		[artifact],
-	);
-
-	// Handle artifact version navigation
-	const handleArtifactVersionChange = useCallback(
-		(type: "next" | "prev" | "toggle" | "latest") => {
-			switch (type) {
-				case "next":
-					setCurrentVersionIndex((prev) =>
-						Math.min(prev + 1, documents.length - 1),
-					);
-					break;
-				case "prev":
-					setCurrentVersionIndex((prev) => Math.max(prev - 1, 0));
-					break;
-				case "toggle":
-					setArtifactMode((prev) => (prev === "edit" ? "diff" : "edit"));
-					break;
-				case "latest":
-					setCurrentVersionIndex(documents.length - 1);
-					break;
-			}
-		},
-		[documents.length],
-	);
-
-	// API for external components to control artifact state (can be used by parent containers)
-	// These are kept for potential future use but not exposed in props to keep API clean
-
-	const currentDocument = documents[currentVersionIndex] || documents[0];
-	const isCurrentVersion = currentVersionIndex === documents.length - 1;
+	// Derived values from provided artifact/doc state
+	const currentDocument =
+		artifactDocuments?.[artifactCurrentVersionIndex ?? -1] ||
+		artifactDocuments?.[0];
+	const isCurrentVersion =
+		artifactIsCurrentVersion ??
+		(!!artifactDocuments &&
+			(artifactCurrentVersionIndex ?? -1) === artifactDocuments.length - 1);
 
 	// Suggested actions should only show when there are no messages and explicitly enabled
 	const shouldShowSuggestedActions =
@@ -250,8 +142,8 @@ function PureChat({
 						onMessageEdit={onMessageEdit}
 						onCopy={onCopy}
 						onVote={onVote}
-						onDocumentClick={handleDocumentClickById}
-						onDocumentSave={handleArtifactContentSave}
+						onDocumentClick={onOpenArtifactById}
+						onDocumentSave={(content) => onSaveArtifactContent?.(content, true)}
 					/>
 
 					{/* Absolutely anchored input at the bottom of SidebarInset content area */}
@@ -294,12 +186,12 @@ function PureChat({
 				createPortal(
 					<Artifact
 						artifact={artifact}
-						documents={documents}
+						documents={artifactDocuments}
 						currentDocument={currentDocument}
-						currentVersionIndex={currentVersionIndex}
+						currentVersionIndex={artifactCurrentVersionIndex ?? -1}
 						isCurrentVersion={isCurrentVersion}
-						isContentDirty={isContentDirty}
-						mode={artifactMode}
+						isContentDirty={artifactIsContentDirty ?? false}
+						mode={artifactMode ?? "edit"}
 						isVisible={artifact.isVisible}
 						isMobile={isMobile}
 						readonly={readonly}
@@ -308,17 +200,19 @@ function PureChat({
 						status={status}
 						attachments={attachments}
 						metadata={{}}
-						onClose={handleArtifactClose}
-						onContentSave={handleArtifactContentSave}
-						onVersionChange={handleArtifactVersionChange}
+						onClose={onCloseArtifact ?? (() => {})}
+						onContentSave={(content: string) =>
+							onSaveArtifactContent?.(content, true)
+						}
+						onVersionChange={onChangeArtifactVersion ?? (() => {})}
 						onMessageSubmit={onMessageSubmit}
 						onStop={onStop}
 						onFileUpload={onFileUpload}
 						onMessageEdit={onMessageEdit}
 						onCopy={onCopy}
 						onVote={onVote}
-						onDocumentClick={handleDocumentClickById}
-						onDocumentSave={handleArtifactContentSave}
+						onDocumentClick={onOpenArtifactById}
+						onDocumentSave={(content) => onSaveArtifactContent?.(content, true)}
 						onMetadataUpdate={() => {}}
 					/>,
 					document.body,

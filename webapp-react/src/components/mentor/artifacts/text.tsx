@@ -1,9 +1,7 @@
 import { Copy, History, MessageCircle, Pen, Redo2, Undo2 } from "lucide-react";
 import { toast } from "sonner";
-import { ScrollArea } from "@/components/ui/scroll-area";
 // import { DiffView } from '@/components/diffview';
-import { DocumentSkeleton } from "../DocumentSkeleton";
-import { TextEditor } from "../TextEditor";
+import { TextArtifact } from "../TextArtifact";
 import { Artifact } from "./create-artifact";
 
 // biome-ignore lint/suspicious/noEmptyInterface: Empty interface is used for metadata
@@ -16,11 +14,19 @@ export const textArtifact = new Artifact<"text", TextArtifactMetadata>({
 		const part = streamPart as unknown as { type: string; data: unknown };
 		// Handle generic data stream parts from tools
 		if (part.type === "data-id") {
-			setArtifact((draft) => ({ ...draft, documentId: String(part.data ?? ""), status: "streaming" }));
+			setArtifact((draft) => ({
+				...draft,
+				documentId: String(part.data ?? ""),
+				status: "streaming",
+			}));
 			return;
 		}
 		if (part.type === "data-title") {
-			setArtifact((draft) => ({ ...draft, title: String(part.data ?? ""), status: "streaming" }));
+			setArtifact((draft) => ({
+				...draft,
+				title: String(part.data ?? ""),
+				status: "streaming",
+			}));
 			return;
 		}
 		if (part.type === "data-kind") {
@@ -61,54 +67,17 @@ export const textArtifact = new Artifact<"text", TextArtifactMetadata>({
 		onSaveContent,
 		getDocumentContentById: _getDocumentContentById,
 		isLoading,
-	}) => {
-		if (isLoading) {
-			return <DocumentSkeleton artifactKind="text" />;
-		}
-
-		if (mode === "diff") {
-			// Diff view not implemented yet
-			return null; // <DiffView oldContent={old} newContent={new} />
-		}
-
-		return (
-			<ScrollArea className="h-full">
-				{/* biome-ignore lint/a11y/noStaticElementInteractions: Container focuses inner editor for better UX */}
-				<div
-					className="flex flex-col px-4 py-8 md:px-10 cursor-text"
-					style={{ minHeight: "92dvh" }}
-					onClick={(e) => {
-						// Focus the editor when clicking in the content area
-						const editorElement = e.currentTarget.querySelector(".ProseMirror");
-						if (editorElement) {
-							(editorElement as HTMLElement).focus();
-						}
-					}}
-					onKeyDown={(e) => {
-						// Handle keyboard activation (Enter or Space) only if editor is not focused
-						if (e.key === "Enter" || e.key === " ") {
-							const editorElement =
-								e.currentTarget.querySelector(".ProseMirror");
-							if (editorElement && document.activeElement !== editorElement) {
-								e.preventDefault();
-								(editorElement as HTMLElement).focus();
-							}
-						}
-					}}
-					// Use presentation role since this is just a click target for the editor
-					role="presentation"
-				>
-					<TextEditor
-						content={content}
-						isCurrentVersion={isCurrentVersion}
-						currentVersionIndex={currentVersionIndex}
-						status={status}
-						onSaveContent={onSaveContent}
-					/>
-				</div>
-			</ScrollArea>
-		);
-	},
+	}) => (
+		<TextArtifact
+			content={content}
+			mode={mode}
+			status={status}
+			isCurrentVersion={isCurrentVersion}
+			currentVersionIndex={currentVersionIndex}
+			onSaveContent={onSaveContent}
+			isLoading={isLoading}
+		/>
+	),
 	actions: [
 		{
 			icon: <History size={18} />,

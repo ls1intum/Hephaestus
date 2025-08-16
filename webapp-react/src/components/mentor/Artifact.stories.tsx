@@ -272,6 +272,7 @@ const mockDocuments: Document[] = [
 			"# Project Planning Document\n\n## Overview\nInitial draft of the project plan...",
 		kind: "TEXT",
 		userId: "user-123",
+		versionNumber: 1,
 		createdAt: new Date(Date.now() - 3600000),
 	},
 	{
@@ -280,6 +281,7 @@ const mockDocuments: Document[] = [
 		content: mockArtifact.content,
 		kind: "TEXT",
 		userId: "user-123",
+		versionNumber: 2,
 		createdAt: new Date(Date.now() - 1800000),
 	},
 ];
