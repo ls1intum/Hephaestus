@@ -18,6 +18,7 @@ import { Route as AboutImport } from './routes/about'
 import { Route as AuthenticatedImport } from './routes/_authenticated'
 import { Route as AuthenticatedIndexImport } from './routes/_authenticated/index'
 import { Route as AuthenticatedTeamsImport } from './routes/_authenticated/teams'
+import { Route as AuthenticatedTeamLeaderboardImport } from './routes/_authenticated/team-leaderboard'
 import { Route as AuthenticatedSettingsImport } from './routes/_authenticated/settings'
 import { Route as AuthenticatedMentorImport } from './routes/_authenticated/mentor'
 import { Route as AuthenticatedBestPracticesImport } from './routes/_authenticated/best-practices'
@@ -71,6 +72,13 @@ const AuthenticatedTeamsRoute = AuthenticatedTeamsImport.update({
   path: '/teams',
   getParentRoute: () => AuthenticatedRoute,
 } as any)
+
+const AuthenticatedTeamLeaderboardRoute =
+  AuthenticatedTeamLeaderboardImport.update({
+    id: '/team-leaderboard',
+    path: '/team-leaderboard',
+    getParentRoute: () => AuthenticatedRoute,
+  } as any)
 
 const AuthenticatedSettingsRoute = AuthenticatedSettingsImport.update({
   id: '/settings',
@@ -206,6 +214,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedSettingsImport
       parentRoute: typeof AuthenticatedImport
     }
+    '/_authenticated/team-leaderboard': {
+      id: '/_authenticated/team-leaderboard'
+      path: '/team-leaderboard'
+      fullPath: '/team-leaderboard'
+      preLoaderRoute: typeof AuthenticatedTeamLeaderboardImport
+      parentRoute: typeof AuthenticatedImport
+    }
     '/_authenticated/teams': {
       id: '/_authenticated/teams'
       path: '/teams'
@@ -289,6 +304,7 @@ interface AuthenticatedRouteChildren {
   AuthenticatedBestPracticesRoute: typeof AuthenticatedBestPracticesRoute
   AuthenticatedMentorRoute: typeof AuthenticatedMentorRoute
   AuthenticatedSettingsRoute: typeof AuthenticatedSettingsRoute
+  AuthenticatedTeamLeaderboardRoute: typeof AuthenticatedTeamLeaderboardRoute
   AuthenticatedTeamsRoute: typeof AuthenticatedTeamsRoute
   AuthenticatedIndexRoute: typeof AuthenticatedIndexRoute
   AuthenticatedUserUsernameBestPracticesRoute: typeof AuthenticatedUserUsernameBestPracticesRoute
@@ -300,6 +316,7 @@ const AuthenticatedRouteChildren: AuthenticatedRouteChildren = {
   AuthenticatedBestPracticesRoute: AuthenticatedBestPracticesRoute,
   AuthenticatedMentorRoute: AuthenticatedMentorRoute,
   AuthenticatedSettingsRoute: AuthenticatedSettingsRoute,
+  AuthenticatedTeamLeaderboardRoute: AuthenticatedTeamLeaderboardRoute,
   AuthenticatedTeamsRoute: AuthenticatedTeamsRoute,
   AuthenticatedIndexRoute: AuthenticatedIndexRoute,
   AuthenticatedUserUsernameBestPracticesRoute:
@@ -320,6 +337,7 @@ export interface FileRoutesByFullPath {
   '/best-practices': typeof AuthenticatedBestPracticesRoute
   '/mentor': typeof AuthenticatedMentorRoute
   '/settings': typeof AuthenticatedSettingsRoute
+  '/team-leaderboard': typeof AuthenticatedTeamLeaderboardRoute
   '/teams': typeof AuthenticatedTeamsRoute
   '/': typeof AuthenticatedIndexRoute
   '/admin/members': typeof AuthenticatedAdminAdminMembersRoute
@@ -339,6 +357,7 @@ export interface FileRoutesByTo {
   '/best-practices': typeof AuthenticatedBestPracticesRoute
   '/mentor': typeof AuthenticatedMentorRoute
   '/settings': typeof AuthenticatedSettingsRoute
+  '/team-leaderboard': typeof AuthenticatedTeamLeaderboardRoute
   '/teams': typeof AuthenticatedTeamsRoute
   '/': typeof AuthenticatedIndexRoute
   '/admin/members': typeof AuthenticatedAdminAdminMembersRoute
@@ -360,6 +379,7 @@ export interface FileRoutesById {
   '/_authenticated/best-practices': typeof AuthenticatedBestPracticesRoute
   '/_authenticated/mentor': typeof AuthenticatedMentorRoute
   '/_authenticated/settings': typeof AuthenticatedSettingsRoute
+  '/_authenticated/team-leaderboard': typeof AuthenticatedTeamLeaderboardRoute
   '/_authenticated/teams': typeof AuthenticatedTeamsRoute
   '/_authenticated/': typeof AuthenticatedIndexRoute
   '/_authenticated/_admin/admin/members': typeof AuthenticatedAdminAdminMembersRoute
@@ -381,6 +401,7 @@ export interface FileRouteTypes {
     | '/best-practices'
     | '/mentor'
     | '/settings'
+    | '/team-leaderboard'
     | '/teams'
     | '/'
     | '/admin/members'
@@ -399,6 +420,7 @@ export interface FileRouteTypes {
     | '/best-practices'
     | '/mentor'
     | '/settings'
+    | '/team-leaderboard'
     | '/teams'
     | '/'
     | '/admin/members'
@@ -418,6 +440,7 @@ export interface FileRouteTypes {
     | '/_authenticated/best-practices'
     | '/_authenticated/mentor'
     | '/_authenticated/settings'
+    | '/_authenticated/team-leaderboard'
     | '/_authenticated/teams'
     | '/_authenticated/'
     | '/_authenticated/_admin/admin/members'
@@ -469,6 +492,7 @@ export const routeTree = rootRoute
         "/_authenticated/best-practices",
         "/_authenticated/mentor",
         "/_authenticated/settings",
+        "/_authenticated/team-leaderboard",
         "/_authenticated/teams",
         "/_authenticated/",
         "/_authenticated/user/$username/best-practices",
@@ -507,6 +531,10 @@ export const routeTree = rootRoute
     },
     "/_authenticated/settings": {
       "filePath": "_authenticated/settings.tsx",
+      "parent": "/_authenticated"
+    },
+    "/_authenticated/team-leaderboard": {
+      "filePath": "_authenticated/team-leaderboard.tsx",
       "parent": "/_authenticated"
     },
     "/_authenticated/teams": {
