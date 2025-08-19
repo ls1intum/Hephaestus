@@ -1,7 +1,46 @@
 import type { LeaderboardEntry, TeamInfo } from "@/api/types.gen";
-import { LeaderboardLegend } from "../leaderboard/LeaderboardLegend"; 
+import { LeaderboardLegend } from "../leaderboard/LeaderboardLegend";
+import { LeaderboardFilter } from "../leaderboard/LeaderboardFilter";
+import type { LeaderboardSortType } from "../leaderboard/SortFilter";
 
-export function TeamLeaderboardPage() {
+interface TeamLeaderboardPageProps {
+    teams: string[];
+    onTeamChange?: (teams: string) => void;
+    onSortChange?: (sort: LeaderboardSortType) => void;
+    onTimeframeChange?: (
+        afterDate: string,
+        beforeDate: string,
+        timeframe?: string,
+    ) => void;
+    selectedTeam?: string;
+    selectedSort?: LeaderboardSortType;
+    initialAfterDate?: string;
+    initialBeforeDate?: string;
+    leaderboardSchedule?: {
+		day: number;
+		hour: number;
+		minute: number;
+	};
+}
+
+export function TeamLeaderboardPage({
+    teams,
+    onTeamChange,
+    onSortChange,
+    onTimeframeChange,
+    selectedTeam,
+    selectedSort,
+    initialAfterDate,
+    initialBeforeDate,
+    leaderboardSchedule,
+}: TeamLeaderboardPageProps) {
+
+    const formattedSchedule = leaderboardSchedule
+		? {
+				...leaderboardSchedule,
+				formatted: `${String(leaderboardSchedule.hour).padStart(2, "0")}:${String(leaderboardSchedule.minute).padStart(2, "0")} on day ${leaderboardSchedule.day}`,
+			}
+		: undefined;
 
     return (
         <div className="flex flex-col items-center">
@@ -12,7 +51,19 @@ export function TeamLeaderboardPage() {
                 <div className="grid grid-cols-1 xl:grid-cols-4 gap-y-4 xl:gap-4">
 
                     <div className="space-y-4 col-span-1">
-                        <h2>Here is the team leaderboard options tab (but in its own container with its own styling)</h2>
+                        <div className="xl:sticky xl:top-4 xl:self-start xl:max-h-[calc(100vh-2rem)] xl:overflow-auto">
+                            <LeaderboardFilter
+                                teams={teams}
+                                onTeamChange={onTeamChange}
+                                onSortChange={onSortChange}
+                                onTimeframeChange={onTimeframeChange}
+                                selectedTeam={selectedTeam}
+                                selectedSort={selectedSort}
+                                initialAfterDate={initialAfterDate}
+                                initialBeforeDate={initialBeforeDate}
+                                leaderboardSchedule={formattedSchedule}
+                            />
+                        </div>
                     </div>
 
                     <div className="col-span-2 space-y-4">
