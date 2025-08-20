@@ -60,6 +60,7 @@ export function TeamLeaderboardPage({
                             TODO: Work in progress filter - ist nur schon mal hier für das Layout und so zum Testen
                         </h2>
                         <div className="xl:sticky xl:top-4 xl:self-start xl:max-h-[calc(100vh-2rem)] xl:overflow-auto">
+                            {/* TODO: review if TeamLeaderboardFiter is necessary or if LeaderboardFilter can be adapted accordingly */}
                             <LeaderboardFilter
                                 teams={teams}
                                 onTeamChange={onTeamChange}

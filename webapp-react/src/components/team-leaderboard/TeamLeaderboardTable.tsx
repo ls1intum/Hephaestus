@@ -20,15 +20,15 @@ import { AwardIcon } from "lucide-react";
 
 
 export interface TeamLeaderboardTableProps {
-    leaderboard?: LeaderboardEntry[]; //TODO: check if it works with that or if i need to implement a TeamLeaderboardEntry
     isLoading: boolean;
+    leaderboard?: LeaderboardEntry[]; //TODO: check if it works with that or if i need to implement a TeamLeaderboardEntry
     currentTeam?: TeamInfo;
     onTeamClick?: (teamname: string) => void;
 }
 
 export function TeamLeaderboardTable({
-    leaderboard = [],
     isLoading,
+    leaderboard = [],
     currentTeam,
     onTeamClick,
 }: TeamLeaderboardTableProps) {
@@ -42,7 +42,7 @@ export function TeamLeaderboardTable({
 				<NoEntryIcon className="h-12 w-12 text-github-danger-foreground mb-2" />
 				<h3 className="text-lg font-medium">No entries found</h3>
 				<p className="text-muted-foreground">
-					There are no leaderboard entries available.
+					There are no team leaderboard entries available.
 				</p>
 			</div>
         );
@@ -52,9 +52,10 @@ export function TeamLeaderboardTable({
         <Table>
             <TableHeader>
 				<TableRow>
+                    {/* TODO: review header spacings and tweak accordingly */}
 					<TableHead className="text-center w-10">Rank</TableHead>
 					<TableHead className="text-center w-20">League</TableHead>
-					<TableHead className="w-56">Contributor</TableHead>
+					<TableHead className="w-56">Team</TableHead>
 					<TableHead className="text-center">
 						<div className="flex justify-center items-center gap-1 text-github-done-foreground">
 							<span className="flex items-center gap-0.5">
@@ -67,6 +68,15 @@ export function TeamLeaderboardTable({
 			</TableHeader>
             <TableBody>
                 {/* TODO: Here needs to be a table body calculation like in the LeaderboardTable.tsx file for the normal Leaderboard but with teams data */}
+                {leaderboard.map((entry) => {
+                //    Decide later wether to use row styling for logged in users of a team
+                    return (
+                        <TableRow>
+
+                        </TableRow>
+                    );
+                })
+                }
             </TableBody>
         </Table>
     );
