@@ -2,8 +2,12 @@ import type { LeaderboardEntry, TeamInfo } from "@/api/types.gen";
 import { LeaderboardLegend } from "../leaderboard/LeaderboardLegend";
 import { LeaderboardFilter } from "../leaderboard/LeaderboardFilter";
 import type { LeaderboardSortType } from "../leaderboard/SortFilter";
+import { LeaderboardTable } from "../leaderboard/LeaderboardTable";
+import { IsLoading } from "../info/about/AboutPage.stories";
+import { TeamLeaderboardTable } from "./TeamLeaderboardTable";
 
 interface TeamLeaderboardPageProps {
+    isLoading: boolean;
     teams: string[];
     onTeamChange?: (teams: string) => void;
     onSortChange?: (sort: LeaderboardSortType) => void;
@@ -24,6 +28,7 @@ interface TeamLeaderboardPageProps {
 }
 
 export function TeamLeaderboardPage({
+    isLoading,
     teams,
     onTeamChange,
     onSortChange,
@@ -51,6 +56,9 @@ export function TeamLeaderboardPage({
                 <div className="grid grid-cols-1 xl:grid-cols-4 gap-y-4 xl:gap-4">
 
                     <div className="space-y-4 col-span-1">
+                        <h2 className="text-cyan-500">
+                            TODO: Work in progress filter - ist nur schon mal hier für das Layout und so zum Testen
+                        </h2>
                         <div className="xl:sticky xl:top-4 xl:self-start xl:max-h-[calc(100vh-2rem)] xl:overflow-auto">
                             <LeaderboardFilter
                                 teams={teams}
@@ -68,6 +76,11 @@ export function TeamLeaderboardPage({
 
                     <div className="col-span-2 space-y-4">
                         <h2>Here is the space for the main table on this page where you can see the different teams</h2>
+                        <div>
+                            <TeamLeaderboardTable
+                                isLoading={true}
+                            />
+                        </div>
                     </div>
 
                     <div className="col-span-1 xl:sticky xl:top-4 xl:self-start xl:max-h-[calc(100vh-2rem)] xl:overflow-auto">
