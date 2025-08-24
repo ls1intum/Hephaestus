@@ -64,7 +64,6 @@ We use automated semantic pull request validation to ensure consistent and meani
 
 ### Recommended Scopes
 
-- `webapp`: Changes to the Angular webapp
 - `webapp-react`: Changes to the React webapp
 - `application-server`: Changes to the Java application server
 - `intelligence-service`: Changes to the Python intelligence service
@@ -79,7 +78,7 @@ We use automated semantic pull request validation to ensure consistent and meani
 **Valid pull request titles:**
 
 - `fix: correct typo in user authentication`
-- `feat(webapp): add leaderboard sorting functionality`
+- `feat(webapp-react): add leaderboard sorting functionality`
 - `docs: update installation instructions`
 - `refactor(intelligence-service): improve code analysis performance`
 - `chore(deps): update dependencies to latest versions`
@@ -88,7 +87,7 @@ We use automated semantic pull request validation to ensure consistent and meani
 
 If your pull request is still in progress, you can prefix it with `[WIP]`:
 
-- `[WIP] feat(webapp): add new dashboard component`
+- `[WIP] feat(webapp-react): add new dashboard component`
 
 ### Guidelines
 

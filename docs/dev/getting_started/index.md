@@ -2,59 +2,18 @@
 
 ## Client Development
 
-### Angular: Our web framework
+### React + Vite
 
-**Angular is a web framework that empowers developers to build fast, reliable applications.**
-Maintained by a dedicated team at Google, Angular provides a broad suite of tools, APIs, and libraries to simplify and streamline your development workflow. Angular gives you a solid platform on which to build fast, reliable applications that scale with both the size of your team and the size of your codebase.
+We use React with Vite for a fast DX and modern build tooling. The app lives in `webapp-react`.
 
-```{figure} ./angular_wordmark_gradient.png
-:width: 200px
-:alt: Angular Logo
-```
-
-Get started with Angular, learn the fundamentals and explore advanced topics on the documentation website:
-
-- [Getting Started](https://angular.dev/tutorials/learn-angular): Interactive tutorial of the basics
-- [Essentials](https://angular.dev/essentials): Basics to read
-- [Angular Overview](https://angular.dev/overview): Read through what interests you
-- [Signals](https://angular.dev/guide/signals#what-are-signals): **We build signal-based!**
-- [Zoneless](https://angular.dev/guide/experimental/zoneless): We are zoneless! (requires signals)
-- [Standalone components](https://angular.dev/guide/components/importing#standalone-components): **Always standalone, avoid NgModule completely!**
-- [Animations](https://angular.dev/guide/animations)
-- [API Reference](https://angular.dev/api)
-
-```{attention}
-**We avoid decorators and use signal-based alternatives:**
-```
-
-- [input](https://angular.dev/api/core/input) instead of [@Input](https://angular.dev/api/core/Input?tab=usage-notes)! ([Angular blog on input](https://blog.angular.dev/signal-inputs-available-in-developer-preview-6a7ff1941823))
-- [output](https://angular.dev/api/core/output) instead of [@Output](https://angular.dev/api/core/Output)! ([Angular blog on output](https://blog.angular.dev/meet-angulars-new-output-api-253a41ffa13c))
-- [model](https://angular.dev/api/core/model) two way data binding combining a `input`, `output` pair
-- [viewChild](https://angular.dev/api/core/viewChild) and [viewChildren](https://angular.dev/api/core/viewChildren) instead of [@ViewChild](https://angular.dev/api/core/ViewChild) and [@ViewChildren](https://angular.dev/api/core/ViewChildren)
-- [contentChild](https://angular.dev/api/core/contentChild) and [contentChildren](https://angular.dev/api/core/contentChildren) instead of [@ContentChild](https://angular.dev/api/core/ContentChild) and [@ContentChildren](https://angular.dev/api/core/ContentChildren)
-
-```{important}
-We try to avoid [RxJS](https://rxjs.dev/guide/overview), for the most part, in favor or Angular Query and Signals!
-```
-
-### Angular Query: Powerful asynchronous state management
-
-**Angular Query**, also known as TanStack Query, is a first-class API for managing server state in Angular applications. It simplifies the challenges of fetching, caching, synchronizing, and updating server state. Learn more about its features and how it can improve the development workflow by reading through the [Angular Query Overview](https://tanstack.com/query/latest/docs/framework/angular/overview).
-
-```{figure} ./angular_query.png
-:width: 250px
-:alt: Angular Query
-```
-
-**We are using this extensively in the client to query and mutate async state, you should be very comfortable with it.**
-
-```{uml} angular_query.puml
-:caption: Sketch of query state machine in Angular Query (non-exhaustive)
-```
+- React docs: [react.dev](https://react.dev/)
+- Vite server options (ports/proxy): [vite.dev/config/server-options](https://vite.dev/config/server-options)
+- TanStack Router: [tanstack.com/router](https://tanstack.com/router/latest)
+- TanStack Query: [tanstack.com/query (React)](https://tanstack.com/query/latest/docs/framework/react/overview)
 
 ### TailwindCSS: Our Styling Framework
 
-**TailwindCSS is a utility-first CSS framework that speeds up UI development with utility classes.** It integrates seamlessly with Angular, making it easy to maintain consistency across your codebase.
+**TailwindCSS is a utility-first CSS framework that speeds up UI development with utility classes.** It integrates seamlessly with React, making it easy to maintain consistency across your codebase.
 
 ```{figure} ./tailwindcss.svg
 :width: 250px
@@ -119,12 +78,12 @@ Chromatic runs on every PR, make sure to add stories and check the visual diffs 
 ```
 
 ```{tip}
-Refer to [Shadcn/ui](https://ui.shadcn.com/) (React components) for theming and component examples. We are copying their styles and also use [Class Variance Authority](https://cva.style/docs) for our components like them. The Shadcn/ui Angular port [Spartan/ui](https://www.spartan.ng/documentation/installation) can also be used as reference, they are also using Storybook but we are not directly copying their components' code. Refer to existing components in the project for [examples](https://develop--66a8981a27ced8fef3190d41.chromatic.com/?path=/docs/ui-button--docs). For more complex components, we might want to use [Angular CDK](https://material.angular.io/cdk/categories) as a base while avoiding libraries that are not widely used or maintained.
+Refer to [Shadcn/ui](https://ui.shadcn.com/) for theming and component examples. We follow their styling approach with [Class Variance Authority](https://cva.style/docs). Check our Storybook for examples. Avoid niche UI libs; prefer headless Radix primitives.
 ```
 
 ### OpenAPI: Type-Safe API Interaction
 
-**We use a generated OpenAPI client** to ensure type-safe interactions with our server. This client simplifies communication by generating TypeScript client services from our OpenAPI specification, reducing boilerplate code and ensuring consistency.
+**We use a generated OpenAPI client** (via @hey-api/openapi-ts) to ensure type-safe interactions with our server. This client simplifies communication by generating TypeScript types and client calls from our OpenAPI specification, reducing boilerplate code and ensuring consistency.
 
 ```{figure} ./openapi.png
 :width: 200px
@@ -149,7 +108,7 @@ By leveraging OpenAPI, we enhance the reliability, maintainability, and efficien
 
 ## Intelligence Service Development
 
-### FastAPI: Intelligence Service Interaction 
+### FastAPI: Intelligence Service Interaction
 
 FastAPI provides the **API layer that connects the AI tools and core logic to the client-server**.
 ```{figure} ./fastapi.png

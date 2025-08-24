@@ -4,7 +4,7 @@ documentation:
 
 client:
   - changed-files:
-    - any-glob-to-any-file: webapp/**
+    - any-glob-to-any-file: webapp-react/**
 
 application-server:
   - changed-files:
