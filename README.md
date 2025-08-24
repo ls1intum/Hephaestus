@@ -4,7 +4,7 @@
 
 # Hephaestus — Process-Aware Mentoring for Agile Software Teams
 
-Hephaestus is an open-source platform for process-aware mentoring that scaffolds self-regulated learning and onboarding for agile, project-based student software teams (with industry transfer). The platform focuses on the software process — from issues to pull requests and team rituals — to bridge the theory–practice gap and help novices adopt industry best practices faster with less struggle. Heph is the platform’s conversational AI mentor that delivers repo-grounded guidance.
+Hephaestus is an open-source platform for process-aware mentoring that scaffolds self-regulated learning and onboarding for agile software teams. The platform focuses on the software process — from issues to pull requests and team rituals — to bridge the theory–practice gap and help novices adopt industry best practices faster with less struggle. Heph is the platform’s conversational AI mentor that delivers repo-grounded guidance.
 
 <img alt="Agile Hephaestus" height="200px" src="./docs/images/agile_hephaestus.png">
 

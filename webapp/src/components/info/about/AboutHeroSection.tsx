@@ -10,7 +10,7 @@ export function AboutHeroSection() {
 				About <span className="text-github-done-foreground">Heph</span>aestus
 			</h1>
 			<p className="text-xl text-muted-foreground max-w-2xl mx-auto">
-				Process-aware mentoring for agile student teams. Heph grounds guidance
+				Process-aware mentoring for agile software teams. Heph grounds guidance
 				in your repository flow — issues, commits, reviews, and PRs — to
 				scaffold self-regulated learning and better team habits.
 			</p>
