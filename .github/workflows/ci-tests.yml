@@ -79,6 +79,15 @@ jobs:
           npm ci --workspaces --include=dev --include=optional --no-audit --progress=false
           # Optional: report Rollup native presence (warning only)
           npm ls @rollup/rollup-linux-x64-gnu || echo "⚠️ rollup native not installed yet"
+          # Force-install platform binaries into the webapp workspace to avoid npm optional-deps flakiness
+          BIOME_VER=$(node -p "require('./webapp/package.json').devDependencies['@biomejs/biome'] || ''")
+          ROLLUP_VER=$(node -p "(function(){try{return require('rollup/package.json').version}catch(e){return ''}})()")
+          if [ -n "$BIOME_VER" ]; then
+            npm -w webapp i -D --no-save @biomejs/cli-linux-x64@${BIOME_VER}
+          fi
+          if [ -n "$ROLLUP_VER" ]; then
+            npm -w webapp i -D --no-save @rollup/rollup-linux-x64-gnu@${ROLLUP_VER}
+          fi
           cd webapp
 
           case "${{ matrix.test-type }}" in

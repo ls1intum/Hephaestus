@@ -99,18 +99,28 @@ jobs:
           # Optional: report native package presence (warnings only) at the hoist root
           npm ls @rollup/rollup-linux-x64-gnu || echo "⚠️ rollup native not installed yet"
           npm ls @biomejs/cli-linux-x64 || echo "⚠️ biome binary not installed yet (will try npx fallback)"
+
+          # Force-install platform binaries into the webapp workspace to avoid npm optional-deps flakiness
+          BIOME_VER=$(node -p "require('./webapp/package.json').devDependencies['@biomejs/biome'] || ''")
+          ROLLUP_VER=$(node -p "(function(){try{return require('rollup/package.json').version}catch(e){return ''}})()")
+          if [ -n "$BIOME_VER" ]; then
+            npm -w webapp i -D --no-save @biomejs/cli-linux-x64@${BIOME_VER}
+          fi
+          if [ -n "$ROLLUP_VER" ]; then
+            npm -w webapp i -D --no-save @rollup/rollup-linux-x64-gnu@${ROLLUP_VER}
+          fi
           cd webapp
 
           ISSUES_FOUND=()
 
           echo "🎨 Running Biome checks..."
           if ! npm run check; then
-            echo "❌ Biome checks failed (attempting npx fallback matching devDependency)..."
+            echo "❌ Biome checks failed (attempting npx fallback to platform-specific CLI)..."
             BIOME_VER=$(node -p "require('./package.json').devDependencies['@biomejs/biome'] || ''")
-            if ! npx -y @biomejs/biome@${BIOME_VER:-latest} check; then
+            if ! npx -y @biomejs/cli-linux-x64@${BIOME_VER:-latest} check; then
               ISSUES_FOUND+=("Biome checks failed. Run: npm run check -- --write")
             else
-              echo "✅ Biome checks passed via pinned npx fallback (${BIOME_VER:-latest})"
+              echo "✅ Biome checks passed via pinned platform CLI fallback (${BIOME_VER:-latest})"
             fi
           else
             echo "✅ Biome checks passed"
