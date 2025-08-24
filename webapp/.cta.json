@@ -1,7 +1,7 @@
 {
   "framework": "react",
   "typescript": true,
-  "projectName": "webapp-react",
+  "projectName": "webapp",
   "mode": "file-router",
   "tailwind": true,
   "packageManager": "npm",

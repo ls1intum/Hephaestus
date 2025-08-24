@@ -49,13 +49,13 @@ jobs:
         uses: actions/cache@v4
         with:
           path: |
-            webapp-react/dist
-            webapp-react/.vite
-            webapp-react/node_modules/.vite
-            webapp-react/node_modules/.cache
-          key: ${{ runner.os }}-webapp-build-${{ hashFiles('package-lock.json', 'webapp-react/package-lock.json', 'webapp-react/biome.json', 'webapp-react/tsconfig.json', 'webapp-react/vite.config.js', 'webapp-react/components.json') }}-${{ github.sha }}
+            webapp/dist
+            webapp/.vite
+            webapp/node_modules/.vite
+            webapp/node_modules/.cache
+          key: ${{ runner.os }}-webapp-build-${{ hashFiles('package-lock.json', 'webapp/package-lock.json', 'webapp/biome.json', 'webapp/tsconfig.json', 'webapp/vite.config.js', 'webapp/components.json') }}-${{ github.sha }}
           restore-keys: |
-            ${{ runner.os }}-webapp-build-${{ hashFiles('package-lock.json', 'webapp-react/package-lock.json', 'webapp-react/biome.json', 'webapp-react/tsconfig.json', 'webapp-react/vite.config.js', 'webapp-react/components.json') }}-
+            ${{ runner.os }}-webapp-build-${{ hashFiles('package-lock.json', 'webapp/package-lock.json', 'webapp/biome.json', 'webapp/tsconfig.json', 'webapp/vite.config.js', 'webapp/components.json') }}-
             ${{ runner.os }}-webapp-build-
 
       # application-server code quality and formatting
@@ -77,7 +77,7 @@ jobs:
       # Webapp quality checks with comprehensive validation
       - name: Webapp quality & type checking
         if: matrix.check == 'webapp-quality'
-        working-directory: ./webapp-react
+        working-directory: ./webapp
         run: |
           echo "🔍 Running webapp quality checks..."
 

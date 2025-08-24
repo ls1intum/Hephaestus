@@ -60,7 +60,7 @@ jobs:
       # Webapp tests
       - name: "Webapp ${{ matrix.test-type }} execution"
         if: startsWith(matrix.test-type, 'webapp-')
-        working-directory: webapp-react
+        working-directory: webapp
         run: |
           echo "🎨 Running webapp ${{ matrix.test-type }} tests"
           npm ci --prefer-offline --no-audit --progress=false
@@ -78,16 +78,14 @@ jobs:
         uses: chromaui/action@latest
         with:
           projectToken: ${{ secrets.CHROMATIC_PROJECT_TOKEN }}
-          workingDir: webapp-react
+          workingDir: webapp
           onlyChanged: true
           zip: true
           skip: "@(dependabot/**|renovate/**)"
           autoAcceptChanges: ${{ github.ref == 'refs/heads/main' && 'main' || '' }}
           exitZeroOnChanges: false
-          diagnostics: true
           logLevel: info
           junitReport: true
-          allowConsoleErrors: false
         env:
           CHROMATIC_BRANCH: ${{ github.head_ref || github.ref_name }}
           CHROMATIC_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
@@ -123,6 +121,6 @@ jobs:
         uses: dorny/test-reporter@v2
         with:
           name: "Test Results - ${{ matrix.test-type }}"
-          path: "webapp-react/chromatic-build-*.xml"
+          path: "webapp/chromatic-build-*.xml"
           reporter: java-junit
           fail-on-error: false
