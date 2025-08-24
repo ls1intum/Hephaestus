@@ -1,7 +1,4 @@
-import {
-	withThemeByClassName,
-	withThemeFromJSXProvider,
-} from "@storybook/addon-themes";
+import { withThemeByClassName, withThemeFromJSXProvider } from "@storybook/addon-themes";
 import type { Decorator, Preview } from "@storybook/react";
 import {
 	createRootRoute,

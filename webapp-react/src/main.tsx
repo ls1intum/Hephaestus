@@ -15,7 +15,7 @@ import { StrictMode } from "react";
 import environment from "@/environment";
 import { AuthProvider, keycloakService, useAuth } from "@/integrations/auth";
 import { ThemeProvider } from "@/integrations/theme";
-import reportWebVitals from "./reportWebVitals.ts";
+import reportWebVitals from "./reportWebVitals";
 
 client.setConfig({
 	baseUrl: environment.serverUrl,

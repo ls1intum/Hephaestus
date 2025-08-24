@@ -79,7 +79,9 @@ class KeycloakService {
 			});
 
 			this.initialized = true;
-			console.log("Keycloak initialized, authenticated:", authenticated);
+			if (process.env.NODE_ENV !== "production") {
+				console.debug("Keycloak initialized, authenticated:", authenticated);
+			}
 
 			if (authenticated) {
 				// Load user profile
@@ -152,7 +154,7 @@ class KeycloakService {
 	 * Get the current auth token
 	 */
 	public getToken(): string | undefined {
-		return this.keycloak?.token;
+		return this.keycloak?.token || undefined;
 	}
 
 	/**
