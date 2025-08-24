@@ -32,8 +32,7 @@ export function AboutMissionSection() {
 
 				<div className="space-y-6">
 					<p className="text-lg leading-relaxed">
-						We help novice developers onboard and grow in agile, project-based
-						courses by combining smart gamification with process-aware AI
+						We help novice developers onboard and grow in agile software teams by combining smart gamification with process-aware AI
 						mentoring. Our guidance is grounded in your actual repository
 						activity and supports self-regulated learning.
 					</p>
