@@ -13,19 +13,20 @@ Hephaestus /hɪˈfɛstəs/ is the Greek god of blacksmiths, craftsmen, and artis
 ## Main Features
 
 1. **Code Review Gamification**
-    - **Weekly Leaderboard:** Stay motivated with a dynamic leaderboard that updates in real time via GitHub integration. Earn points for review activity, view detailed stats, and easily copy pull request links.
 
-    - **Team Competitions:** Foster a collaborative spirit with team leaderboards spanning multiple repositories and options to filter the associated activities via labels.
+   - **Weekly Leaderboard:** Stay motivated with a dynamic leaderboard that updates in real time via GitHub integration. Earn points for review activity, view detailed stats, and easily copy pull request links.
 
-    - **Leagues:** Engage in a structured league system where consistent review efforts build an Elo-like ranking — adding a competitive edge to your code reviews.
+   - **Team Competitions:** Foster a collaborative spirit with team leaderboards spanning multiple repositories and options to filter the associated activities via labels.
 
-    - **Automated Recognition:** Celebrate excellence with weekly Slack notifications that honor the top three reviewers and link directly to the previous week's leaderboard.
+   - **Leagues:** Engage in a structured league system where consistent review efforts build an Elo-like ranking — adding a competitive edge to your code reviews.
+
+   - **Automated Recognition:** Celebrate excellence with weekly Slack notifications that honor the top three reviewers and link directly to the previous week's leaderboard.
 
 2. **Heph (Conversational AI Mentor)**
 
-- **SRL-guided reflection:** Run structured, AI-assisted sessions that support self-regulated learning (goals → strategies → reflection) tailored to agile project work.
-- **Automated standups:** Turn weekly insights into a concise standup table to streamline team communication and accountability.
-- **Repo context awareness:** Ground guidance in actual activity (issues, commits, reviews, PRs) to deliver objective, data-informed feedback and next steps.
+   - **SRL-guided reflection:** Run structured, AI-assisted sessions that support self-regulated learning (goals → strategies → reflection) tailored to agile project work.
+   - **Automated standups:** Turn weekly insights into a concise standup table to streamline team communication and accountability.
+   - **Repo context awareness:** Ground guidance in actual activity (issues, commits, reviews, PRs) to deliver objective, data-informed feedback and next steps.
 
 ## Roadmap
 
