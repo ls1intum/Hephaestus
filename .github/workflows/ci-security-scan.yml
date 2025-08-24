@@ -35,6 +35,7 @@ jobs:
         with:
           languages: java-kotlin, javascript-typescript, python
           queries: security-extended
+          build-mode: none
 
       # Setup required build tools for CodeQL
       - name: Setup build environment for CodeQL

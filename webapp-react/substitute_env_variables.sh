@@ -7,10 +7,10 @@ set -euo pipefail
 # Uncomment the following line to enable debug mode for troubleshooting
 # set -x
 
-# Directory containing the build artifacts (Angular's output directory)
+# Directory containing the built client artifacts (React build output)
 BUILD_DIR="/usr/share/nginx/html"
 
-# Prefix for environment variable placeholders in Angular code
+# Prefix for environment variable placeholders in the client code
 ENV_PREFIX="WEB_ENV_"
 
 # Regex pattern to match WEB_ENV_ variables (e.g., WEB_ENV_APPLICATION_CLIENT_URL)

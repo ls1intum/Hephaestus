@@ -45,7 +45,7 @@ UI component docs: [Storybook](https://develop--66a8981a27ced8fef3190d41.chromat
 
 ### Setup
 
-Read the [setup guide](https://ls1intum.github.io/Hephaestus/dev/setup_guide) on how to set up your local development environment.
+Read the [setup guide](https://ls1intum.github.io/Hephaestus/dev/setup_guide) for server, intelligence service, and the React client in `webapp-react`.
 
 ## Contributing
 

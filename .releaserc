@@ -161,9 +161,6 @@
       {
         "assets": [
           "package.json",
-          "webapp/package.json",
-          "webapp/package-lock.json",
-          "webapp/src/app/core/modules/openapi/**/*",
           "webapp-react/package.json",
           "webapp-react/package-lock.json",
           "webapp-react/src/api/**/*",

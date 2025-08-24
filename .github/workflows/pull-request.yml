@@ -27,7 +27,6 @@ jobs:
             chore
             revert
           scopes: |
-            webapp
             webapp-react
             application-server
             intelligence-service

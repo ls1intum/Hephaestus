@@ -11,7 +11,7 @@
 
 ### General
 
-- [ ] PR title follows semantic format: `<type>[optional scope]: <description>` (e.g., `feat(webapp): add user dashboard`)
+- [ ] PR title follows semantic format: `<type>[optional scope]: <description>` (e.g., `feat(webapp-react): add user dashboard`)
 - [ ] PR description explains the purpose and changes
 - [ ] PR description clearly indicates which acceptance criteria or requirements are implemented
 - [ ] Code follows project coding standards
