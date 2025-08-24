@@ -26,12 +26,12 @@ runs:
       with:
         path: |
           ~/.npm
-          webapp-react/node_modules
+          webapp/node_modules
           node_modules
-        key: ${{ inputs.os }}-node-${{ hashFiles('package-lock.json', 'webapp-react/package-lock.json', 'webapp-react/biome.json', 'webapp-react/tsconfig.json', 'webapp-react/vite.config.js', 'webapp-react/components.json') }}-${{ inputs.cache-type }}
+        key: ${{ inputs.os }}-node-${{ hashFiles('package-lock.json', 'webapp/package-lock.json', 'webapp/biome.json', 'webapp/tsconfig.json', 'webapp/vite.config.js', 'webapp/components.json') }}-${{ inputs.cache-type }}
         restore-keys: |
-          ${{ inputs.os }}-node-${{ hashFiles('package-lock.json', 'webapp-react/package-lock.json', 'webapp-react/biome.json', 'webapp-react/tsconfig.json', 'webapp-react/vite.config.js', 'webapp-react/components.json') }}-
-          ${{ inputs.os }}-node-${{ hashFiles('package-lock.json', 'webapp-react/package-lock.json') }}-
+          ${{ inputs.os }}-node-${{ hashFiles('package-lock.json', 'webapp/package-lock.json', 'webapp/biome.json', 'webapp/tsconfig.json', 'webapp/vite.config.js', 'webapp/components.json') }}-
+          ${{ inputs.os }}-node-${{ hashFiles('package-lock.json', 'webapp/package-lock.json') }}-
           ${{ inputs.os }}-node-
 
 

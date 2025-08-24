@@ -20,11 +20,11 @@ body:
       label: Environment
       description: |
         Please share relevant environment details:
-        - Component (webapp-react, server, etc.)
+        - Component (webapp, server, etc.)
         - Browser and version (if applicable)
         - OS (if relevant)
       placeholder: |
-        Component: webapp-react
+        Component: webapp
         Browser: Chrome 120
         OS: macOS
   - type: textarea

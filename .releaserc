@@ -161,9 +161,9 @@
       {
         "assets": [
           "package.json",
-          "webapp-react/package.json",
-          "webapp-react/package-lock.json",
-          "webapp-react/src/api/**/*",
+          "webapp/package.json",
+          "webapp/package-lock.json",
+          "webapp/src/api/**/*",
           "server/application-server/pom.xml",
           "server/application-server/src/main/java/de/tum/in/www1/hephaestus/OpenAPIConfiguration.java",
           "server/application-server/src/main/java/de/tum/in/www1/hephaestus/intelligenceservice/**/*", 

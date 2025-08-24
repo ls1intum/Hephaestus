@@ -97,7 +97,7 @@ flowchart TD
 
 | Scope                  | Description                | Example                                          |
 | ---------------------- | -------------------------- | ------------------------------------------------ |
-| `webapp-react`         | React web application      | `fix(webapp-react): resolve routing issue`       |
+| `webapp`               | React web application      | `fix(webapp): resolve routing issue`       |
 | `application-server`   | Java backend service       | `feat(application-server): add new API endpoint` |
 | `intelligence-service` | Python AI service          | `perf(intelligence-service): optimize analysis`  |
 | `webhook-ingest`       | Webhook processing service | `fix(webhook-ingest): handle invalid payloads`   |
@@ -155,7 +155,7 @@ For bypassing normal release flow during incidents:
 
 Single `update_version.sh` script updates:
 
-- Node.js package (`webapp-react/package.json`)
+- Node.js package (`webapp/package.json`)
 - Java services (`pom.xml`)
 - Python services (`pyproject.toml`)
 - OpenAPI specs

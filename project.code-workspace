@@ -5,8 +5,8 @@
 			"path": "./"
 		},
 		{
-			"name": "webapp-react",
-			"path": "./webapp-react"
+			"name": "webapp",
+			"path": "./webapp"
 		},
 		{
 			"name": "server/application-server",

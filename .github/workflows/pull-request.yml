@@ -35,7 +35,7 @@ jobs:
             chore
             revert
           scopes: |
-            webapp-react
+            webapp
             application-server
             intelligence-service
             webhook-ingest

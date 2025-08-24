@@ -8,7 +8,7 @@ set -euo pipefail
 #   Examples: 1.2.3, 1.0.0-alpha.1, 2.0.0-beta.1, 1.2.3+build.123
 #
 # This script updates the version in:
-#   - webapp-react/package.json & webapp-react/package-lock.json (for "hephaestus")
+#   - webapp/package.json & webapp/package-lock.json (for "hephaestus")
 #   - Java source: server/application-server/src/main/java/de/tum/in/www1/hephaestus/OpenAPIConfiguration.java
 #   - YAML config: server/application-server/src/main/resources/application.yml
 #   - Python projects: server/intelligence-service/pyproject.toml & server/webhook-ingest/pyproject.toml
@@ -32,10 +32,10 @@ PARAM=$1
 if [[ "$PARAM" =~ ^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z-]+(\.[0-9A-Za-z-]+)*)?(\+[0-9A-Za-z-]+(\.[0-9A-Za-z-]+)*)?$ ]]; then
     # Direct version specified (used by semantic-release)
     NEW_VERSION="$PARAM"
-    # Extract the current version from webapp-react/package.json (the authoritative version for "hephaestus")
-    CURRENT_VERSION=$(awk '/"name": "hephaestus"/ {found=1} found && /"version":/ { sub(/.*"version": "/, ""); sub(/".*/, ""); print; exit }' webapp-react/package.json)
+    # Extract the current version from webapp/package.json (the authoritative version for "hephaestus")
+    CURRENT_VERSION=$(awk '/"name": "hephaestus"/ {found=1} found && /"version":/ { sub(/.*"version": "/, ""); sub(/".*/, ""); print; exit }' webapp/package.json)
     if [[ -z "$CURRENT_VERSION" ]]; then
-        echo "Error: Could not determine current version from webapp-react/package.json"
+        echo "Error: Could not determine current version from webapp/package.json"
         exit 1
     fi
     echo "Updating version from $CURRENT_VERSION to $NEW_VERSION..."
@@ -65,11 +65,11 @@ elif [[ "$PARAM" == "major" || "$PARAM" == "minor" || "$PARAM" == "patch" ]]; th
         echo "$major.$minor.$patch"
     }
 
-    # Extract the current version from webapp-react/package.json (the authoritative version for "hephaestus")
+    # Extract the current version from webapp/package.json (the authoritative version for "hephaestus")
     # This uses awk to strip everything before/after the version string.
-    CURRENT_VERSION=$(awk '/"name": "hephaestus"/ {found=1} found && /"version":/ { sub(/.*"version": "/, ""); sub(/".*/, ""); print; exit }' webapp-react/package.json)
+    CURRENT_VERSION=$(awk '/"name": "hephaestus"/ {found=1} found && /"version":/ { sub(/.*"version": "/, ""); sub(/".*/, ""); print; exit }' webapp/package.json)
     if [[ -z "$CURRENT_VERSION" ]]; then
-        echo "Error: Could not determine current version from webapp-react/package.json"
+        echo "Error: Could not determine current version from webapp/package.json"
         exit 1
     fi
 
@@ -81,7 +81,7 @@ else
 fi
 
 
-# Update webapp-react/package.json
+# Update webapp/package.json
 awk -v old_version="$CURRENT_VERSION" -v new_version="$NEW_VERSION" '
     BEGIN {found_name = 0}
     /"name": "hephaestus"/ {found_name = 1}
@@ -90,10 +90,10 @@ awk -v old_version="$CURRENT_VERSION" -v new_version="$NEW_VERSION" '
         found_name = 0
     }
     {print}
-' webapp-react/package.json > webapp-react/package.json.tmp && mv webapp-react/package.json.tmp webapp-react/package.json
+' webapp/package.json > webapp/package.json.tmp && mv webapp/package.json.tmp webapp/package.json
 
-# Update webapp-react/package-lock.json (if it exists)
-if [[ -f webapp-react/package-lock.json ]]; then
+# Update webapp/package-lock.json (if it exists)
+if [[ -f webapp/package-lock.json ]]; then
     awk -v old_version="$CURRENT_VERSION" -v new_version="$NEW_VERSION" '
         BEGIN {found_name = 0}
         /"name": "hephaestus"/ {found_name = 1}
@@ -102,7 +102,7 @@ if [[ -f webapp-react/package-lock.json ]]; then
             found_name = 0
         }
         {print}
-    ' webapp-react/package-lock.json > webapp-react/package-lock.json.tmp && mv webapp-react/package-lock.json.tmp webapp-react/package-lock.json
+    ' webapp/package-lock.json > webapp/package-lock.json.tmp && mv webapp/package-lock.json.tmp webapp/package-lock.json
 fi
 
 # Function to perform cross-platform sed in-place editing

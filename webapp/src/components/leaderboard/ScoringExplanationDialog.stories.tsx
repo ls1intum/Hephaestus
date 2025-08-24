@@ -1,4 +1,3 @@
-// filepath: /Users/felixdietrich/Documents/Hephaestus/webapp-react/src/components/leaderboard/ScoringExplanationDialog.stories.tsx
 import type { Meta, StoryObj } from "@storybook/react";
 import { fn } from "@storybook/test";
 import { ScoringExplanationDialog } from "./ScoringExplanationDialog";

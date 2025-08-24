@@ -1,0 +1,30 @@
+{
+  "exitZeroOnChanges": false,
+  "externals": [
+  "webapp/public/**",
+  "webapp/src/assets/**",
+  "webapp/**/*.css",
+  "webapp/**/*.scss",
+  "webapp/**/*.sass",
+  "webapp/tailwind.config.*",
+  "webapp/vite.config.*",
+  "webapp/biome.json",
+  "webapp/components.json"
+  ],
+  "ignoreLastBuildOnBranch": "renovate/**",
+  "junitReport": true,
+  "onlyChanged": true,
+  "projectId": "Project:66a8981a27ced8fef3190d41",
+  "skip": "dependabot/**",
+  "storybookBaseDir": "webapp",
+  "storybookBuildDir": "storybook-static",
+  "traceChanged": "expanded",
+  "untraced": [
+    "**/*.md",
+    "**/*.stories.mdx",
+  "webapp/.storybook/addons.ts",
+  "webapp/.storybook/manager.ts",
+    "docs/**"
+  ],
+  "zip": true
+}
