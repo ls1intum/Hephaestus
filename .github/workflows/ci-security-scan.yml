@@ -65,9 +65,10 @@ jobs:
           mvn compile -DskipTests --quiet
           
           # Node.js (webapp) - Type-only build for CodeQL; avoid bundle to reduce native deps
-          cd ../../webapp
+          cd ../..
           rm -rf node_modules
-          npm ci --include=dev --include=optional --no-audit --progress=false
+          npm ci --workspaces --include=dev --include=optional --no-audit --progress=false
+          cd webapp
           npx tsc --noEmit
 
           # Python dependencies

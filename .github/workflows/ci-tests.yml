@@ -73,18 +73,22 @@ jobs:
         working-directory: webapp
         run: |
           echo "🎨 Running webapp ${{ matrix.test-type }} tests"
+          # Install from repo root for workspace/hoisted optional deps
+          cd ..
           rm -rf node_modules
-          npm ci --include=dev --include=optional --no-audit --progress=false
-
+          npm ci --workspaces --include=dev --include=optional --no-audit --progress=false
           # Optional: report Rollup native presence (warning only)
           npm ls @rollup/rollup-linux-x64-gnu || echo "⚠️ rollup native not installed yet"
+          cd webapp
 
           case "${{ matrix.test-type }}" in
             "webapp-visual")
               if ! npm run build-storybook; then
-                echo "❌ Storybook build failed (retrying after clean reinstall to pull any missed optionals)..."
+                echo "❌ Storybook build failed (retrying after clean reinstall at root to pull any missed optionals)..."
+                cd ..
                 rm -rf node_modules
-                npm ci --include=dev --include=optional --no-audit --progress=false
+                npm ci --workspaces --include=dev --include=optional --no-audit --progress=false
+                cd webapp
                 npm run build-storybook
               fi
               ;;
