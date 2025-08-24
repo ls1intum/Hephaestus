@@ -4,7 +4,7 @@
 
 ### React + Vite
 
-We use React with Vite for a fast DX and modern build tooling. The app lives in `webapp-react`.
+We use React with Vite for a fast DX and modern build tooling. The app lives in `webapp`.
 
 - React docs: [react.dev](https://react.dev/)
 - Vite server options (ports/proxy): [vite.dev/config/server-options](https://vite.dev/config/server-options)

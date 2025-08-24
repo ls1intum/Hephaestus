@@ -34,7 +34,7 @@ The recommended extensions include:
 Alternatively, you can use JetBrain's IDEs depending on part of Hephaestus you are working with:
 
 - [IntelliJ](https://www.jetbrains.com/idea/) for the _application-server_ (Spring Boot - Java),
-- [WebStorm](https://www.jetbrains.com/webstorm/) for the _webapp-react_ (React - TypeScript) and
+- [WebStorm](https://www.jetbrains.com/webstorm/) for the _webapp_ (React - TypeScript) and
 - [PyCharm](https://www.jetbrains.com/pycharm/) for the _intelligence-service_ (Python).
 
 ## Application Server Setup
@@ -102,9 +102,9 @@ TODO Setup GitHub Identity Provider
 
 ## Application Client Setup
 
-The client lives in `webapp-react` and uses Vite for development/build:
+The client lives in `webapp` and uses Vite for development/build:
 
-1. **Install Dependencies**: Open a terminal in the `webapp-react` directory and install the dependencies:
+1. **Install Dependencies**: Open a terminal in the `webapp` directory and install the dependencies:
 
 ```bash
 npm install

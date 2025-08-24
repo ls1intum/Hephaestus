@@ -55,7 +55,7 @@ jobs:
           mvn compile -DskipTests --quiet
           
           # Node.js build 
-          cd ../../webapp-react
+          cd ../../webapp
 
           # Always install to avoid half-restored caches
           npm ci --prefer-offline --no-audit

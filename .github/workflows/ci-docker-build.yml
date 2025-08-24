@@ -17,12 +17,12 @@ jobs:
       fail-fast: false
       matrix:
         component:
-          - name: "webapp-react"
-            image-name: "ls1intum/hephaestus/webapp-react"
-            docker-file: "./webapp-react/Dockerfile"
-            docker-context: "./webapp-react"
+          - name: "webapp"
+            image-name: "ls1intum/hephaestus/webapp"
+            docker-file: "./webapp/Dockerfile"
+            docker-context: "./webapp"
             title: "Hephaestus Webapp"
-            description: "React-based web client for Hephaestus"
+            description: "Web client for Hephaestus"
           - name: "application-server"
             image-name: "ls1intum/hephaestus/application-server"
             docker-file: "./server/application-server/Dockerfile"

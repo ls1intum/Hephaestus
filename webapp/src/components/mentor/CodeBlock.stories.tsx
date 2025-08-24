@@ -115,7 +115,7 @@ export const JSONResponse: Story = {
   "recentActivity": [
     {
       "type": "review",
-      "repository": "webapp-react",
+	"repository": "webapp",
       "points": 15
     }
   ]

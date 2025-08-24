@@ -1,6 +1,6 @@
 services:
   webapp:
-    image: "ghcr.io/ls1intum/hephaestus/webapp-react:${IMAGE_TAG}"
+    image: "ghcr.io/ls1intum/hephaestus/webapp:${IMAGE_TAG}"
     environment:
       APPLICATION_CLIENT_URL: https://${APP_HOSTNAME}
       APPLICATION_SERVER_URL: https://${APP_HOSTNAME}/api
