@@ -60,26 +60,24 @@ export function LandingFeaturesSection() {
 							<div className="flex items-center gap-2 mb-2 text-muted-foreground">
 								<MentorIcon className="-m-2" size={32} pad={4} />
 							</div>
-							<CardTitle>AI-Powered Mentorship</CardTitle>
+							<CardTitle>Process-Aware AI Mentoring</CardTitle>
 							<CardDescription>
-								Personalized guidance for improvement
+								Heph provides guidance grounded in your repository activity
 							</CardDescription>
 						</CardHeader>
 						<CardContent>
 							<ul className="space-y-2">
 								<li className="flex gap-2 items-start">
 									<CheckCheck className="size-5 mt-1 text-github-success-foreground" />
-									<span>Weekly reflective sessions for improvement</span>
+									<span>SRL-guided weekly reflection</span>
 								</li>
 								<li className="flex gap-2 items-start">
 									<CheckCheck className="size-5 mt-1 text-github-success-foreground" />
-									<span>
-										GitHub activity analysis for context-aware feedback
-									</span>
+									<span>Repo activity context for objective feedback</span>
 								</li>
 								<li className="flex gap-2 items-start">
 									<CheckCheck className="size-5 mt-1 text-github-success-foreground" />
-									<span>Goal-setting framework with progress tracking</span>
+									<span>Goal setting and progress tracking</span>
 								</li>
 							</ul>
 						</CardContent>

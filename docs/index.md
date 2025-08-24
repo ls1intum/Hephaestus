@@ -1,4 +1,4 @@
-# Hephaestus: Forging Healthy Software Teams
+# Hephaestus — Process-Aware Mentoring for Agile Software Teams
 
 ```{figure} ./images/agile_hephaestus.png
 :width: 200px
@@ -16,10 +16,12 @@ Hephaestus /hɪˈfɛstəs/ is the Greek god of blacksmiths, craftsmen, and artis
 
     - **Automated Recognition:** Celebrate excellence with weekly Slack notifications that honor the top three reviewers and link directly to the previous week's leaderboard.
 
-2. **AI Mentor**
-    - **Reflective Sessions:** Engage in AI-assisted weekly sessions that help you set, adjust, and achieve your goals through structured reflection.
-    - **Automated Standups:** Convert insights from your reflective sessions into a structured weekly standup table for streamlined team communication.
-    - **GitHub Activity Awareness:** Utilize the GitHub integration to provide context during reflective sessions, driving continuous improvement through objective, data-driven feedback.
+2. **Heph (Conversational AI Mentor)**
+    - **SRL-guided reflection:** Engage in AI-assisted sessions that support goal setting, strategy selection, and reflection aligned with agile rituals.
+    - **Automated standups:** Convert insights into a structured weekly standup table for streamlined team communication.
+    - **Repo context awareness:** Use GitHub activity to ground mentoring in issues, commits, reviews, and pull requests for objective, data-informed feedback.
+
+Note: Hephaestus is the platform; Heph is the conversational AI mentor embedded in the platform.
 
 ```{toctree}
 :caption: User Guide

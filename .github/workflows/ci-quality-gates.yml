@@ -36,6 +36,17 @@ jobs:
         with:
           fetch-depth: 0
 
+      # Ensure a stable Node/npm toolchain and proper npm caching
+      - name: Setup Node.js (LTS) and npm cache
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: '.node-version'
+          cache: 'npm'
+          cache-dependency-path: |
+            package-lock.json
+            webapp/package-lock.json
+
+
       # Advanced cache setup with fallback
       - name: Setup shared caches
         uses: ./.github/actions/setup-caches
@@ -81,16 +92,28 @@ jobs:
         run: |
           echo "🔍 Running webapp quality checks..."
 
-          if [ ! -d "node_modules" ]; then
-            npm ci --prefer-offline --no-audit --progress=false
-          fi
+          # Always install at repo root to ensure hoisted deps (incl. platform optionals) are present
+          cd ..
+          rm -rf node_modules
+          npm ci --workspaces --include=dev --include=optional --no-audit --progress=false
+          # Optional: report native package presence (warnings only) at the hoist root
+          npm ls @rollup/rollup-linux-x64-gnu || echo "⚠️ rollup native not installed yet"
+          npm ls @biomejs/cli-linux-x64 || echo "⚠️ biome binary not installed yet (will try npx fallback)"
+          # Force-install platform binaries deterministically
+          node scripts/install-platform-binaries.mjs
+          cd webapp
 
           ISSUES_FOUND=()
 
           echo "🎨 Running Biome checks..."
           if ! npm run check; then
-            echo "❌ Biome checks failed"
-            ISSUES_FOUND+=("Biome checks failed. Run: npm run check -- --write")
+            echo "❌ Biome checks failed (attempting npx fallback to platform-specific CLI)..."
+            BIOME_VER=$(node -p "require('./package.json').devDependencies['@biomejs/biome'] || ''")
+            if ! npx -y @biomejs/cli-linux-x64@${BIOME_VER:-latest} check; then
+              ISSUES_FOUND+=("Biome checks failed. Run: npm run check -- --write")
+            else
+              echo "✅ Biome checks passed via pinned platform CLI fallback (${BIOME_VER:-latest})"
+            fi
           else
             echo "✅ Biome checks passed"
           fi
@@ -105,8 +128,16 @@ jobs:
 
           echo "🏗️ Running build check..."
           if ! npm run build; then
-            echo "❌ Build check failed"
-            ISSUES_FOUND+=("Build failed")
+            echo "❌ Build failed (retrying after clean reinstall at root to pull any missed optionals)..."
+            cd ..
+            rm -rf node_modules
+            npm ci --workspaces --include=dev --include=optional --no-audit --progress=false
+            cd webapp
+            if ! npm run build; then
+              ISSUES_FOUND+=("Build failed")
+            else
+              echo "✅ Build passed after reinstall"
+            fi
           else
             echo "✅ Build check passed"
           fi

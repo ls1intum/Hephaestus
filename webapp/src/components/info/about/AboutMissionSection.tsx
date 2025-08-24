@@ -14,10 +14,10 @@ const FEATURES_DATA: FeatureData[] = [
 	{
 		icon: Sparkles,
 		badge: "Core Feature",
-		title: "AI-Powered Mentorship",
-		description: "Your team's personalized guide",
+		title: "Process-Aware AI Mentoring",
+		description: "Guidance grounded in your repo activity",
 		content:
-			"Receive contextual guidance through Heph—our AI mentor—that provides personalized feedback, identifies growth opportunities, and helps team members develop their skills with practical insights that lead to measurable improvement.",
+			"Heph — our AI mentor — delivers personalized, data-informed feedback based on issues, commits, reviews, and pull requests. It supports self-regulated learning with goal setting, reflection, and practical next steps.",
 	},
 ];
 
@@ -32,15 +32,17 @@ export function AboutMissionSection() {
 
 				<div className="space-y-6">
 					<p className="text-lg leading-relaxed">
-						We empower novice software engineers and foster sustainable,
-						collaborative development practices through smart gamification and
-						AI guidance that adapts to your team's unique challenges.
+						We help novice developers onboard and grow in agile, project-based
+						courses by combining smart gamification with process-aware AI
+						mentoring. Our guidance is grounded in your actual repository
+						activity and supports self-regulated learning.
 					</p>
 
 					<div className="border-l-4 border-primary pl-6 py-2">
 						<p className="text-lg font-medium">
-							We believe the best software isn't just about writing code — it's
-							about building teams that bring out the best in each other.
+							We believe the best software isn't just about code — it's about
+							building teams that practice healthy habits and continuous
+							reflection.
 						</p>
 					</div>
 				</div>

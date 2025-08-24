@@ -112,11 +112,12 @@ export function LandingHeroSection({
 				<div className="flex flex-col items-center space-y-8 text-center">
 					<div className="space-y-4 max-w-3xl">
 						<h1 className="text-4xl font-bold tracking-tighter sm:text-5xl md:text-6xl">
-							Forge Healthy Software Teams
+							Process-Aware Mentoring for Agile Software Teams
 						</h1>
 						<p className="mx-auto max-w-[700px] text-xl text-muted-foreground">
-							Empower engineers, foster collaboration, and build sustainable
-							development practices with our open-source platform.
+							Onboard faster and learn better habits with an AI mentor grounded
+							in your repo workflow — from issues to pull requests and team
+							rituals.
 						</p>
 					</div>
 					<div className="flex gap-4 sm:gap-6">
