@@ -1,7 +1,8 @@
 #!/usr/bin/env node
 import { createRequire } from 'node:module';
 import { execSync } from 'node:child_process';
-import { existsSync } from 'node:fs';
+import { readFileSync } from 'node:fs';
+import path from 'node:path';
 
 const require = createRequire(import.meta.url);
 
@@ -31,13 +32,40 @@ if (!suffix) {
 
 // Resolve versions from installed/declared packages
 const rollupVer = getVersionSafe(() => require('rollup/package.json').version, 'rollup');
-const lightningCssVer = getVersionSafe(() => require('lightningcss/package.json').version, 'lightningcss');
+
+function resolveLightningCssVersion() {
+  // Try npm ls first (works well with workspaces)
+  try {
+    const out = execSync('npm ls lightningcss --json', { stdio: 'pipe' }).toString();
+    const json = JSON.parse(out);
+    if (json.dependencies && json.dependencies.lightningcss && json.dependencies.lightningcss.version) {
+      return json.dependencies.lightningcss.version;
+    }
+  } catch {}
+  // Fallback: resolve file path then read nearest package.json
+  try {
+    const entry = require.resolve('lightningcss/node/index.js');
+    let dir = path.dirname(entry);
+    while (dir && dir !== path.parse(dir).root) {
+      const pj = path.join(dir, 'package.json');
+      try {
+        const data = JSON.parse(readFileSync(pj, 'utf8'));
+        if (data.name === 'lightningcss' && data.version) return data.version;
+      } catch {}
+      dir = path.dirname(dir);
+    }
+  } catch {}
+  return '';
+}
+
+const lightningCssVer = resolveLightningCssVersion();
 const biomeVer = getVersionSafe(() => require('../webapp/package.json').devDependencies['@biomejs/biome'], '@biomejs/biome');
 
 const pkgs = [];
 if (rollupVer) pkgs.push(`@rollup/rollup-${suffix}@${rollupVer}`);
 if (lightningCssVer) pkgs.push(`lightningcss-${suffix}@${lightningCssVer}`);
-if (biomeVer) pkgs.push(`@biomejs/cli-${suffix}@${biomeVer}`);
+// Biome CLI package naming does not include -gnu suffix
+if (biomeVer) pkgs.push(`@biomejs/cli-linux-x64@${biomeVer}`);
 
 if (pkgs.length === 0) {
   log('INFO: No platform-specific packages to install (versions unresolved).');
