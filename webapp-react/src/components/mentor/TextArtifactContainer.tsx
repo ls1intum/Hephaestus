@@ -90,8 +90,14 @@ export function TextArtifactContainer({
 			isCurrentVersion,
 			currentVersionIndex: doc.selectedIndex,
 			// prefer the selected document's timestamp; it should already be a Date
-			selectedUpdatedAt: (isCurrentVersion ? doc.latest?.createdAt : doc.selectedVersion?.createdAt) ?? undefined,
-			versionNumber: (isCurrentVersion ? doc.latest?.versionNumber : doc.selectedVersion?.versionNumber) ?? undefined,
+			selectedUpdatedAt:
+				(isCurrentVersion
+					? doc.latest?.createdAt
+					: doc.selectedVersion?.createdAt) ?? undefined,
+			versionNumber:
+				(isCurrentVersion
+					? doc.latest?.versionNumber
+					: doc.selectedVersion?.versionNumber) ?? undefined,
 			canPrev: doc.canPrev,
 			canNext: doc.canNext,
 			onPrevVersion: doc.onPrevVersion,

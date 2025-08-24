@@ -27,7 +27,12 @@ type TextEditorProps = {
 	currentVersionIndex: number;
 };
 
-function PureTextEditor({ content, onSaveContent, status, isCurrentVersion }: TextEditorProps) {
+function PureTextEditor({
+	content,
+	onSaveContent,
+	status,
+	isCurrentVersion,
+}: TextEditorProps) {
 	const containerRef = useRef<HTMLDivElement>(null);
 	const editorRef = useRef<EditorView | null>(null);
 	const prevStatusRef = useRef<TextEditorProps["status"]>(status);
@@ -88,7 +93,7 @@ function PureTextEditor({ content, onSaveContent, status, isCurrentVersion }: Te
 				editable: () => status !== "streaming" && isCurrentVersion,
 			});
 		}
-    }, [onSaveContent, status, isCurrentVersion]);
+	}, [onSaveContent, status, isCurrentVersion]);
 
 	useEffect(() => {
 		const view = editorRef.current;
@@ -124,17 +129,21 @@ function PureTextEditor({ content, onSaveContent, status, isCurrentVersion }: Te
 			return;
 		}
 
-	if (leavingStream && ghostActiveRef.current) {
+		if (leavingStream && ghostActiveRef.current) {
 			// Commit buffered text as one undo step
 			streamingGhost.finish(view, { adoptMarks: true });
 			ghostActiveRef.current = false;
 			streamBufRef.current = "";
-	} else {
+		} else {
 			// Not streaming: ensure the document matches content
 			const currentContent = buildContentFromDocument(view.state.doc);
 			if (currentContent !== content) {
 				const newDoc = buildDocumentFromContent(content ?? "");
-				const tr = view.state.tr.replaceWith(0, view.state.doc.content.size, newDoc.content);
+				const tr = view.state.tr.replaceWith(
+					0,
+					view.state.doc.content.size,
+					newDoc.content,
+				);
 				tr.setMeta("no-save", true);
 				view.dispatch(tr);
 			}

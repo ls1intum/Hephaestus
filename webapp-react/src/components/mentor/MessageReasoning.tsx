@@ -225,13 +225,11 @@ export function MessageReasoning({
 						exit="collapsed"
 						variants={variants}
 						transition={{ duration: 0.2, ease: "easeInOut" }}
-						className={
-							[
-								"pl-4 text-zinc-600 dark:text-zinc-400 border-l flex flex-col gap-2",
-								// Use the artifact chat surface for ring to blend in when embedded
-								variant === "artifact" ? "[--ring-color:var(--artifact-bg)]" : "",
-							].filter(Boolean).join(" ")
-						}
+						className={cn(
+							"pl-4 text-zinc-600 dark:text-zinc-400 border-l flex flex-col gap-2",
+							// Use the artifact chat surface for ring to blend in when embedded
+							variant === "artifact" ? "[--ring-color:var(--artifact-bg)]" : "",
+						)}
 					>
 						{sections.length > 0 ? (
 							<>
@@ -242,8 +240,10 @@ export function MessageReasoning({
 											<span
 												className={cn(
 													"absolute -left-[19.5px] top-2.5 h-1.5 w-1.5 rounded-full bg-zinc-400 ring-12",
-													variant === "artifact" ? "ring-muted dark:ring-background" : "ring-background",
-									)}
+													variant === "artifact"
+														? "ring-muted dark:ring-background"
+														: "ring-background",
+												)}
 											/>
 											{s.body && <Markdown>{s.body}</Markdown>}
 										</div>
@@ -251,7 +251,14 @@ export function MessageReasoning({
 								})}
 								{!isLoading && (
 									<div className="relative pt-1">
-										<span className={cn("absolute -left-[24px] top-1.5 text-zinc-400 ring-8", variant === "artifact" ? "bg-muted dark:bg-background ring-muted dark:ring-background" : "ring-background bg-background")}>
+										<span
+											className={cn(
+												"absolute -left-[24px] top-1.5 text-zinc-400 ring-8",
+												variant === "artifact"
+													? "bg-muted dark:bg-background ring-muted dark:ring-background"
+													: "ring-background bg-background",
+											)}
+										>
 											<CheckCircle2 className="size-4" />
 										</span>
 										<div className="text-sm text-muted-foreground">Done</div>

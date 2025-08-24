@@ -221,14 +221,15 @@ export function useMentorChat({
 		onFinish: stableOnFinish,
 		onError: stableOnError,
 		onData: (dataPart) => {
-			if (dataPart.type === "data-document-create" ||
+			if (
+				dataPart.type === "data-document-create" ||
 				dataPart.type === "data-document-update" ||
 				dataPart.type === "data-document-delta" ||
 				dataPart.type === "data-document-finish"
 			) {
 				artifactDoc.onStreamPart(dataPart);
 			}
-		}
+		},
 	});
 
 	// Hydrate thread messages once when loaded and not streaming

@@ -1,6 +1,11 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { getDocumentOptions, getDocumentQueryKey, getDocumentVersionOptions, updateDocumentMutation } from "@/api/@tanstack/react-query.gen";
+import {
+	getDocumentOptions,
+	getDocumentQueryKey,
+	getDocumentVersionOptions,
+	updateDocumentMutation,
+} from "@/api/@tanstack/react-query.gen";
 import type { Document } from "@/api/types.gen";
 import type { DataPart } from "@/lib/types";
 import { useArtifactStore } from "@/stores/artifact-store";
@@ -47,10 +52,18 @@ export function useDocumentArtifact({
 	const { openArtifact } = useArtifactStore();
 	const queryClient = useQueryClient();
 
-	const documentState = useDocumentsStore((state) => state.documents[documentId]);
-	const draft = useDocumentsStore((state) => state.documents[documentId]?.draft);
-	const { setStreaming: setDocStreaming, setEmptyDraft, appendDraftDelta, finishDraft } =
-		useDocumentsStore.getState();
+	const documentState = useDocumentsStore(
+		(state) => state.documents[documentId],
+	);
+	const draft = useDocumentsStore(
+		(state) => state.documents[documentId]?.draft,
+	);
+	const {
+		setStreaming: setDocStreaming,
+		setEmptyDraft,
+		appendDraftDelta,
+		finishDraft,
+	} = useDocumentsStore.getState();
 
 	// Local selection state: -1 = latest
 	const [selectedIndex, setSelectedIndex] = useState<number>(-1);
@@ -58,15 +71,19 @@ export function useDocumentArtifact({
 
 	// Streaming state
 	const isStreaming = documentState?.isStreaming ?? false;
-	const setStreaming = (streaming: boolean) => setDocStreaming(documentId, streaming);
+	const setStreaming = (streaming: boolean) =>
+		setDocStreaming(documentId, streaming);
 	const [isSaving, setIsSaving] = useState(false);
 
 	// Queries
-	const { data: latest, isLoading: loadingLatest, error: errorLatest } = useQuery({
+	const {
+		data: latest,
+		isLoading: loadingLatest,
+		error: errorLatest,
+	} = useQuery({
 		...getDocumentOptions({ path: { id: documentId } }),
 		enabled: !isStreaming && Boolean(documentId),
 	});
-
 
 	// Build a continuous list from 1..latest-1 for navigation; load selected versions on demand
 	const versionNumbersAsc = useMemo(() => {
@@ -87,10 +104,18 @@ export function useDocumentArtifact({
 	}, [versionNumbersAsc, latest?.versionNumber]);
 
 	// Resolve selected version number by index in the navigable list
-	const selectedVersionNumber = selectedIndex >= 0 ? navigableNumbersAsc[selectedIndex] : undefined;
+	const selectedVersionNumber =
+		selectedIndex >= 0 ? navigableNumbersAsc[selectedIndex] : undefined;
 
-	const { data: selectedVersionDoc, isLoading: loadingSelectedVersion, error: errorSelectedVersion } = useQuery({
-		enabled: selectedIndex >= 0 && selectedVersionNumber != null && Boolean(documentId),
+	const {
+		data: selectedVersionDoc,
+		isLoading: loadingSelectedVersion,
+		error: errorSelectedVersion,
+	} = useQuery({
+		enabled:
+			selectedIndex >= 0 &&
+			selectedVersionNumber != null &&
+			Boolean(documentId),
 		...getDocumentVersionOptions({
 			path: { id: documentId, versionNumber: selectedVersionNumber ?? 0 },
 		}),
@@ -98,7 +123,8 @@ export function useDocumentArtifact({
 
 	// Derived
 	const selectedVersion = isCurrentVersion ? latest : selectedVersionDoc;
-	const isLoading = loadingLatest || (selectedIndex >= 0 && loadingSelectedVersion);
+	const isLoading =
+		loadingLatest || (selectedIndex >= 0 && loadingSelectedVersion);
 	const error = errorLatest ?? errorSelectedVersion;
 	// Navigation using the sorted navigableNumbersAsc as the source of truth
 	const posInNumbers = selectedIndex >= 0 ? selectedIndex : -1;
@@ -130,27 +156,32 @@ export function useDocumentArtifact({
 			}
 		: undefined;
 
-	const onNextVersion = !isCurrentVersion && posInNumbers >= 0
-		? () => {
-				setSelectedIndex((prev) => {
-					const nav = navRef.current;
-					if (!nav.length) return prev;
-					if (prev >= 0 && prev < nav.length - 1) {
-						const toIdx = prev + 1;
-						return toIdx;
-					}
-					return -1; // newest previous -> latest
-				});
-			}
-		: undefined;
+	const onNextVersion =
+		!isCurrentVersion && posInNumbers >= 0
+			? () => {
+					setSelectedIndex((prev) => {
+						const nav = navRef.current;
+						if (!nav.length) return prev;
+						if (prev >= 0 && prev < nav.length - 1) {
+							const toIdx = prev + 1;
+							return toIdx;
+						}
+						return -1; // newest previous -> latest
+					});
+				}
+			: undefined;
 
-	const onBackToLatestVersion = !isCurrentVersion ? () => setSelectedIndex(-1) : undefined;
+	const onBackToLatestVersion = !isCurrentVersion
+		? () => setSelectedIndex(-1)
+		: undefined;
 
 	// Restore selected version as new latest
 	const { mutate: mutateRestore } = useMutation({
 		...updateDocumentMutation(),
 		onSuccess: () => {
-			queryClient.invalidateQueries({ queryKey: getDocumentQueryKey({ path: { id: documentId } }) });
+			queryClient.invalidateQueries({
+				queryKey: getDocumentQueryKey({ path: { id: documentId } }),
+			});
 			queryClient.invalidateQueries({ queryKey: ["getDocumentVersions"] });
 			setSelectedIndex(-1);
 		},
@@ -163,7 +194,11 @@ export function useDocumentArtifact({
 					if (selectedDoc?.content && selectedDoc?.title) {
 						mutateRestore({
 							path: { id: documentId },
-							body: { content: selectedDoc.content, title: selectedDoc.title, kind: selectedDoc.kind },
+							body: {
+								content: selectedDoc.content,
+								title: selectedDoc.title,
+								kind: selectedDoc.kind,
+							},
 						});
 					}
 				}
@@ -172,8 +207,11 @@ export function useDocumentArtifact({
 	// Save latest content
 	const { mutate: mutateSave } = useMutation({
 		...updateDocumentMutation(),
-	onSuccess: (data) => {
-			queryClient.setQueryData(getDocumentQueryKey({ path: { id: documentId } }), data);
+		onSuccess: (data) => {
+			queryClient.setQueryData(
+				getDocumentQueryKey({ path: { id: documentId } }),
+				data,
+			);
 			// Also refresh versions list so the new version appears
 			queryClient.invalidateQueries({ queryKey: ["getDocumentVersions"] });
 		},
@@ -185,7 +223,7 @@ export function useDocumentArtifact({
 	const debouncedRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 	const saveContent = (newContent: string, debounce = true) => {
 		// Only allow saving when on latest and not streaming
-	if (!isCurrentVersion || isStreaming) {
+		if (!isCurrentVersion || isStreaming) {
 			return;
 		}
 		if (debouncedRef.current) {
@@ -194,7 +232,10 @@ export function useDocumentArtifact({
 		}
 		const doSave = () => {
 			const currentTitle = latest?.title ?? "Document";
-			mutateSave({ body: { content: newContent, kind: "TEXT", title: currentTitle }, path: { id: documentId } });
+			mutateSave({
+				body: { content: newContent, kind: "TEXT", title: currentTitle },
+				path: { id: documentId },
+			});
 		};
 		// indicate saving as soon as content changes
 		setIsSaving(true);
@@ -205,12 +246,15 @@ export function useDocumentArtifact({
 		}
 	};
 
-	useEffect(() => () => {
-		if (debouncedRef.current) {
-			clearTimeout(debouncedRef.current);
-			debouncedRef.current = null;
-		}
-	}, []);
+	useEffect(
+		() => () => {
+			if (debouncedRef.current) {
+				clearTimeout(debouncedRef.current);
+				debouncedRef.current = null;
+			}
+		},
+		[],
+	);
 
 	// Overlay open
 	const openOverlay = (rect: DOMRect) => {
@@ -229,14 +273,7 @@ export function useDocumentArtifact({
 		if (part.type === "data-document-delta") {
 			const draft = useDocumentsStore.getState().documents[part.data.id]?.draft;
 			const draftLength = draft?.content.length ?? 0;
-			console.log("document delte", {
-				draftLength,
-				partDeltaLength: part.data.delta.length,
-				totalLength: draftLength + part.data.delta.length,
-				condition: (draftLength + part.data.delta.length) > 100 && (draftLength <= 100),
-				openOverlay,
-			});
-			if ((draftLength + part.data.delta.length) > 200 && (draftLength <= 200)) {
+			if (draftLength + part.data.delta.length > 200 && draftLength <= 200) {
 				const vv = window.visualViewport || {
 					offsetLeft: 0,
 					offsetTop: 0,
@@ -256,7 +293,7 @@ export function useDocumentArtifact({
 			const draft = useDocumentsStore.getState().documents[part.data.id]?.draft;
 			const draftLength = draft?.content.length ?? 0;
 			if (draftLength <= 200) {
-								const vv = window.visualViewport || {
+				const vv = window.visualViewport || {
 					offsetLeft: 0,
 					offsetTop: 0,
 					width: window.innerWidth,
@@ -294,4 +331,3 @@ export function useDocumentArtifact({
 		openOverlay,
 	};
 }
-

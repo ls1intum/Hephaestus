@@ -1,7 +1,7 @@
 import type { Meta, StoryObj } from "@storybook/react";
 import { fn } from "@storybook/test";
-import { TextArtifact } from "./TextArtifact";
 import type { ArtifactShellModel, TextContentModel } from "./artifact-model";
+import { TextArtifact } from "./TextArtifact";
 
 /**
  * TextArtifact integrates shell + chat sidebar + text content via ArtifactShellModel.

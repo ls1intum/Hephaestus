@@ -5,7 +5,7 @@ import type { ChatMessageVote } from "@/api/types.gen";
 import { useScrollToBottom } from "@/hooks/use-scroll-to-bottom";
 import type { Attachment, ChatMessage } from "@/lib/types";
 import { cn } from "@/lib/utils";
-import { ArtifactActions, type ArtifactAction } from "./ArtifactActions";
+import { type ArtifactAction, ArtifactActions } from "./ArtifactActions";
 import { ArtifactCloseButton } from "./ArtifactCloseButton";
 import { Messages } from "./Messages";
 import { MultimodalInput } from "./MultimodalInput";
@@ -250,7 +250,9 @@ export function ArtifactShell({
 											Saving changes...
 										</div>
 									) : headerMeta?.subtitle ? (
-										<div className="text-sm text-muted-foreground">{headerMeta.subtitle}</div>
+										<div className="text-sm text-muted-foreground">
+											{headerMeta.subtitle}
+										</div>
 									) : (
 										<div className="w-32 h-3 mt-2 bg-muted-foreground/20 rounded-md animate-pulse" />
 									)}

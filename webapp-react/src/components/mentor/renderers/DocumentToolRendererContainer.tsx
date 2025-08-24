@@ -22,15 +22,27 @@ export const DocumentToolRendererContainer: PartRenderer<
 		documentId = input.id;
 	}
 
-	const { latest, draft, selectedVersion, isLoading, isStreaming, openOverlay } =
-		useDocumentArtifact({ documentId });
+	const {
+		latest,
+		draft,
+		selectedVersion,
+		isLoading,
+		isStreaming,
+		openOverlay,
+	} = useDocumentArtifact({ documentId });
 
-	const currentDoc = isStreaming ? draft ?? latest ?? selectedVersion : selectedVersion || latest;
+	const currentDoc = isStreaming
+		? (draft ?? latest ?? selectedVersion)
+		: selectedVersion || latest;
 	const hasContent =
 		typeof currentDoc?.content === "string" && currentDoc.content.length > 0;
 
 	const isEmbeddedInArtifact = variant === "artifact";
-	if (!isEmbeddedInArtifact && part.type === "tool-createDocument" && (hasContent || latest || (draft?.content.length ?? 0) > 0)) {
+	if (
+		!isEmbeddedInArtifact &&
+		part.type === "tool-createDocument" &&
+		(hasContent || latest || (draft?.content.length ?? 0) > 0)
+	) {
 		const doc: Document =
 			(isStreaming ? (draft as Document | undefined) : latest) ??
 			({

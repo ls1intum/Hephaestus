@@ -10,7 +10,10 @@ type DocumentState = {
 type DocumentsState = {
 	documents: Record<string, DocumentState>;
 	setStreaming: (documentId: string, isStreaming: boolean) => void;
-	setEmptyDraft: (documentId: string, params?: { title?: string; id?: string }) => void;
+	setEmptyDraft: (
+		documentId: string,
+		params?: { title?: string; id?: string },
+	) => void;
 	appendDraftDelta: (documentId: string, delta: string) => void;
 	finishDraft: (documentId: string) => void;
 };
@@ -19,7 +22,9 @@ export const useDocumentsStore = create<DocumentsState>()((set) => ({
 	documents: {},
 	setStreaming: (documentId, isStreaming) =>
 		set((state) => {
-			const prev: DocumentState = state.documents[documentId] ?? { isStreaming: false };
+			const prev: DocumentState = state.documents[documentId] ?? {
+				isStreaming: false,
+			};
 			return {
 				documents: {
 					...state.documents,
@@ -29,7 +34,9 @@ export const useDocumentsStore = create<DocumentsState>()((set) => ({
 		}),
 	setEmptyDraft: (documentId, params) =>
 		set((state) => {
-			const prev: DocumentState = state.documents[documentId] ?? { isStreaming: false };
+			const prev: DocumentState = state.documents[documentId] ?? {
+				isStreaming: false,
+			};
 			const title = params?.title ?? prev.draft?.title ?? "Document";
 			const id = params?.id ?? prev.draft?.id ?? documentId;
 			return {
@@ -54,21 +61,25 @@ export const useDocumentsStore = create<DocumentsState>()((set) => ({
 		}),
 	appendDraftDelta: (documentId, delta) =>
 		set((state) => {
-			const prev: DocumentState = state.documents[documentId] ?? { isStreaming: false };
+			const prev: DocumentState = state.documents[documentId] ?? {
+				isStreaming: false,
+			};
 			const nextContent =
 				((prev.draft?.content as string | undefined) ?? "") + (delta ?? "");
 
-			const draft = (prev.draft
-							? { ...prev.draft, content: nextContent }
-							: {
-									id: documentId,
-									title: "Document",
-									kind: "TEXT",
-									versionNumber: 0,
-									createdAt: new Date(),
-									content: nextContent,
-									userId: "",
-								}) satisfies Document;
+			const draft = (
+				prev.draft
+					? { ...prev.draft, content: nextContent }
+					: {
+							id: documentId,
+							title: "Document",
+							kind: "TEXT",
+							versionNumber: 0,
+							createdAt: new Date(),
+							content: nextContent,
+							userId: "",
+						}
+			) satisfies Document;
 
 			return {
 				documents: {
@@ -83,7 +94,9 @@ export const useDocumentsStore = create<DocumentsState>()((set) => ({
 		}),
 	finishDraft: (documentId) =>
 		set((state) => {
-			const prev: DocumentState = state.documents[documentId] ?? { isStreaming: false };
+			const prev: DocumentState = state.documents[documentId] ?? {
+				isStreaming: false,
+			};
 			return {
 				documents: {
 					...state.documents,

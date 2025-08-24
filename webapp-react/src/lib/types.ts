@@ -49,11 +49,11 @@ export type CustomUIDataTypes = {
 	"document-finish": DocumentFinishData;
 };
 
-type ToDataMessageUnion<T extends Record<PropertyKey, unknown>> =
-  { [K in keyof T]: { type: `data-${Extract<K, string>}`; data: T[K] } }[keyof T];
+type ToDataMessageUnion<T extends Record<PropertyKey, unknown>> = {
+	[K in keyof T]: { type: `data-${Extract<K, string>}`; data: T[K] };
+}[keyof T];
 
 export type DataPart = ToDataMessageUnion<CustomUIDataTypes>;
-
 
 // Typed tools mapping for automatic tool part typing in UIMessage
 export type ChatTools = {
