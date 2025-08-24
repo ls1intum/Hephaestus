@@ -99,16 +99,8 @@ jobs:
           # Optional: report native package presence (warnings only) at the hoist root
           npm ls @rollup/rollup-linux-x64-gnu || echo "⚠️ rollup native not installed yet"
           npm ls @biomejs/cli-linux-x64 || echo "⚠️ biome binary not installed yet (will try npx fallback)"
-
-          # Force-install platform binaries into the webapp workspace to avoid npm optional-deps flakiness
-          BIOME_VER=$(node -p "require('./webapp/package.json').devDependencies['@biomejs/biome'] || ''")
-          ROLLUP_VER=$(node -p "(function(){try{return require('rollup/package.json').version}catch(e){return ''}})()")
-          if [ -n "$BIOME_VER" ]; then
-            npm -w webapp i -D --no-save @biomejs/cli-linux-x64@${BIOME_VER}
-          fi
-          if [ -n "$ROLLUP_VER" ]; then
-            npm -w webapp i -D --no-save @rollup/rollup-linux-x64-gnu@${ROLLUP_VER}
-          fi
+          # Force-install platform binaries deterministically
+          node scripts/install-platform-binaries.mjs
           cd webapp
 
           ISSUES_FOUND=()
