@@ -11,7 +11,7 @@
 	</parent>
 	<groupId>de.tum.in.www1</groupId>
 	<artifactId>hephaestus</artifactId>
-	<version>0.9.0-rc.11-SNAPSHOT</version>
+	<version>0.9.0-rc.12-SNAPSHOT</version>
 	<name>Hephaestus</name>
 	<description>AI-driven learning for better software development</description>
 	<url />
