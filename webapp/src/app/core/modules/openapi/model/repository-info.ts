@@ -12,10 +12,10 @@
 
 
 export interface RepositoryInfo { 
+    description?: string;
+    htmlUrl: string;
     id: number;
     name: string;
     nameWithOwner: string;
-    description?: string;
-    htmlUrl: string;
 }
 

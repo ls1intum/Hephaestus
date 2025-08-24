@@ -40,9 +40,8 @@ class Settings(BaseSettings):
     @property
     def DATABASE_CONNECTION_STRING(self):
         return (
-            f"postgresql://{self.DATABASE_USERNAME}:{self.DATABASE_PASSWORD}"
+            f"postgresql+psycopg://{self.DATABASE_USERNAME}:{self.DATABASE_PASSWORD}"
             + f"@{self.DATABASE_URL.replace('postgresql://', '')}"
-            + "?sslmode=disable"
         )
 
     LANGFUSE_PUBLIC_KEY: str = ""

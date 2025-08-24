@@ -1,7 +1,7 @@
+import { ArrowRight, Code, Hammer, Users } from "lucide-react";
 import agileHephaestus from "@/assets/agile_hephaestus.png";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { ArrowRight, Code, Hammer, Users } from "lucide-react";
 
 interface LandingWhyChooseSectionProps {
 	onSignIn: () => void;

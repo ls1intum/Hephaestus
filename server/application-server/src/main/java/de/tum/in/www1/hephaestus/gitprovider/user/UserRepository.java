@@ -1,6 +1,7 @@
 package de.tum.in.www1.hephaestus.gitprovider.user;
 
 import de.tum.in.www1.hephaestus.SecurityUtils;
+import de.tum.in.www1.hephaestus.core.exception.EntityNotFoundException;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
@@ -97,5 +98,12 @@ public interface UserRepository extends JpaRepository<User, Long> {
     default Optional<User> getCurrentUser() {
         var currentUserLogin = SecurityUtils.getCurrentUserLogin();
         return currentUserLogin.map(this::findByLogin).orElse(Optional.empty());
+    }
+
+    /**
+     * @return existing user object by current user login
+     */
+    default User getCurrentUserElseThrow() {
+        return getCurrentUser().orElseThrow(() -> new EntityNotFoundException("User", "current authenticated user"));
     }
 }

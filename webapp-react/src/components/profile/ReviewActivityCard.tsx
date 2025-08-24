@@ -1,3 +1,11 @@
+import {
+	CheckIcon,
+	CommentIcon,
+	FileDiffIcon,
+	GitPullRequestIcon,
+} from "@primer/octicons-react";
+import { formatDistanceToNow } from "date-fns";
+import { AwardIcon } from "lucide-react";
 import { FormattedTitle } from "@/components/shared/FormattedTitle";
 import { Card } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -7,14 +15,6 @@ import {
 	TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
-import {
-	CheckIcon,
-	CommentIcon,
-	FileDiffIcon,
-	GitPullRequestIcon,
-} from "@primer/octicons-react";
-import { formatDistanceToNow } from "date-fns";
-import { AwardIcon } from "lucide-react";
 
 // Define the styling for different review states
 const REVIEW_STATE_STYLES: Record<

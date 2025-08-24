@@ -1,3 +1,6 @@
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { createFileRoute } from "@tanstack/react-router";
+import { toast } from "sonner";
 import {
 	detectBadPracticesByUserMutation,
 	detectBadPracticesForPullRequestMutation,
@@ -10,9 +13,6 @@ import {
 import type { BadPracticeFeedback } from "@/api/types.gen";
 import { PracticesPage } from "@/components/practices/PracticesPage";
 import { useAuth } from "@/integrations/auth/AuthContext";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { createFileRoute } from "@tanstack/react-router";
-import { toast } from "sonner";
 
 export const Route = createFileRoute(
 	"/_authenticated/user/$username/best-practices",

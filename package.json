@@ -1,30 +1,42 @@
 {
   "name": "hephaestus",
+  "private": true,
   "workspaces": [
-    "webapp/*"
+    "webapp-react"
   ],
   "scripts": {
     "generate:api:application-server:clean": "shx rm -rf webapp/src/app/core/modules/openapi",
     "generate:api:application-server:specs": "cd server/application-server && mvn verify -DskipTests=true -Dapp.profiles=specs",
     "generate:api:application-server:client": "npx openapi-generator-cli generate -i server/application-server/openapi.yaml -g typescript-angular -o webapp/src/app/core/modules/openapi --additional-properties fileNaming=kebab-case,withInterfaces=true --generate-alias-as-model",
-    "generate:api:application-server:client-react": "cd webapp-react && npm install && npm run openapi-ts",
+    "generate:api:application-server:client-react": "npm -w webapp-react run openapi-ts",
     "generate:api:application-server": "npm run generate:api:application-server:specs && npm run generate:api:application-server:clean && npm run generate:api:application-server:client && npm run generate:api:application-server:client-react",
     "generate:api:intelligence-service:clean": "shx rm -rf server/application-server/src/main/java/de/tum/in/www1/hephaestus/intelligenceservice",
     "generate:api:intelligence-service:specs": "cd server/intelligence-service && poetry run openapi",
-    "generate:api:intelligence-service:client": "npx openapi-generator-cli generate -i server/intelligence-service/openapi.yaml -g java --library resttemplate --api-package de.tum.in.www1.hephaestus.intelligenceservice.api --model-package de.tum.in.www1.hephaestus.intelligenceservice.model --invoker-package de.tum.in.www1.hephaestus.intelligenceservice --additional-properties useJakartaEe=true,performBeanValidation=true,hideGenerationTimestamp=true --package-name de.tum.in.www1.hephaestus.intelligenceservice -o tmp/java-client && shx cp -r tmp/java-client/src/main/java/de/tum/in/www1/hephaestus/intelligenceservice server/application-server/src/main/java/de/tum/in/www1/hephaestus && shx rm -rf tmp",
+    "generate:api:intelligence-service:client": "npx openapi-generator-cli generate -i server/intelligence-service/openapi.yaml -g java --library resttemplate --api-package de.tum.in.www1.hephaestus.intelligenceservice.api --model-package de.tum.in.www1.hephaestus.intelligenceservice.model --invoker-package de.tum.in.www1.hephaestus.intelligenceservice --additional-properties useJakartaEe=true,performBeanValidation=true,hideGenerationTimestamp=true,openApiNullable=true,serializationLibrary=jackson --package-name de.tum.in.www1.hephaestus.intelligenceservice -o tmp/java-client && shx mkdir -p server/application-server/src/main/java/de/tum/in/www1/hephaestus && shx cp -r tmp/java-client/src/main/java/de/tum/in/www1/hephaestus/intelligenceservice server/application-server/src/main/java/de/tum/in/www1/hephaestus/ && shx rm -rf tmp",
     "generate:api:intelligence-service": "npm run generate:api:intelligence-service:clean && npm run generate:api:intelligence-service:specs && npm run generate:api:intelligence-service:client",
     "generate:api": "npm run generate:api:intelligence-service && npm run generate:api:application-server",
-    "format:application-server:check": "prettier --check server/application-server/src/**/*.java --config-precedence prefer-file --config server/application-server/.prettierrc.yaml --ignore-path server/application-server/.prettierignore",
-    "format:application-server:write": "prettier --write server/application-server/src/**/*.java --config-precedence prefer-file --config server/application-server/.prettierrc.yaml --ignore-path server/application-server/.prettierignore",
-    "format:intelligence-service:check": "cd server/intelligence-service/ && poetry run black --check .",
-    "format:intelligence-service:write": "cd server/intelligence-service/ && poetry run black .",
-    "format:webhook-ingest:check": "cd server/webhook-ingest/ && poetry run black --check .",
-    "format:webhook-ingest:write": "cd server/webhook-ingest/ && poetry run black .",
+    "format:java": "prettier --write server/application-server/src/**/*.java --config-precedence prefer-file --config server/application-server/.prettierrc.yaml --ignore-path server/application-server/.prettierignore",
+    "lint:java": "prettier --check server/application-server/src/**/*.java --config-precedence prefer-file --config server/application-server/.prettierrc.yaml --ignore-path server/application-server/.prettierignore",
+    "format:py:intelligence-service": "cd server/intelligence-service/ && poetry run black .",
+    "lint:py:intelligence-service": "cd server/intelligence-service/ && poetry run flake8 .",
+    "format:py:webhook-ingest": "cd server/webhook-ingest/ && poetry run black .",
+    "lint:py:webhook-ingest": "cd server/webhook-ingest/ && poetry run flake8 .",
+    "format:ts": "npm exec -w webapp-react biome format --write",
+    "lint:ts": "npm exec -w webapp-react biome check",
+    "typecheck:ts": "npm exec -w webapp-react tsc --noEmit",
+    "format:server": "run-s format:java format:py:intelligence-service format:py:webhook-ingest",
+    "lint:server": "run-s lint:java lint:py:intelligence-service lint:py:webhook-ingest",
+    "format:client": "npm run format:ts",
+    "lint:client": "run-s -c lint:ts typecheck:ts",
+    "format": "npm run format:server && npm run format:client",
+    "lint": "run-s lint:server lint:client",
     "db:draft-changelog": "scripts/db-utils.sh draft-changelog",
-    "db:generate-erd-docs": "scripts/db-utils.sh generate-erd"
+    "db:generate-erd-docs": "scripts/db-utils.sh generate-erd",
+    "db:generate-models:intelligence-service": "scripts/db-utils.sh generate-models-intelligence-service"
   },
   "devDependencies": {
     "@openapitools/openapi-generator-cli": "2.16.3",
+    "npm-run-all": "^4.1.5",
     "prettier": "3.5.1",
     "prettier-plugin-java": "2.6.7",
     "shx": "0.3.4"

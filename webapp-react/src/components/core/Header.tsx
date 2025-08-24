@@ -1,3 +1,5 @@
+import { Link } from "@tanstack/react-router";
+import { Hammer, LogOut, Settings, User } from "lucide-react";
 import { ModeToggle } from "@/components/core/ModeToggle";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
@@ -10,8 +12,6 @@ import {
 	DropdownMenuSeparator,
 	DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Link } from "@tanstack/react-router";
-import { Hammer, LogOut, Settings, User } from "lucide-react";
 
 export interface HeaderProps {
 	/** Sidebar trigger button component */

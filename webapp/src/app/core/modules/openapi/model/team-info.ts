@@ -15,12 +15,12 @@ import { UserInfo } from './user-info';
 
 
 export interface TeamInfo { 
-    id: number;
-    name: string;
     color: string;
-    repositories: Array<RepositoryInfo>;
+    hidden: boolean;
+    id: number;
     labels: Array<LabelInfo>;
     members: Array<UserInfo>;
-    hidden: boolean;
+    name: string;
+    repositories: Array<RepositoryInfo>;
 }
 

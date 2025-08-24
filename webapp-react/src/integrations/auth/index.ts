@@ -1,3 +1,3 @@
-import { type AuthContextType, AuthProvider, useAuth } from "./AuthContext.tsx";
-import keycloakService from "./keycloak.ts";
+import { type AuthContextType, AuthProvider, useAuth } from "./AuthContext";
+import keycloakService from "./keycloak";
 export { AuthProvider, useAuth, keycloakService, type AuthContextType };

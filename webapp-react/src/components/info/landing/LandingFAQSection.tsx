@@ -1,3 +1,4 @@
+import { Github } from "lucide-react";
 import {
 	Accordion,
 	AccordionContent,
@@ -6,7 +7,6 @@ import {
 } from "@/components/ui/accordion";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Github } from "lucide-react";
 
 const faqItems = [
 	{

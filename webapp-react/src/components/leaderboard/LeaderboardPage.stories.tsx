@@ -1,5 +1,5 @@
-import type { LeaderboardEntry } from "@/api/types.gen";
 import type { Meta, StoryObj } from "@storybook/react";
+import type { LeaderboardEntry } from "@/api/types.gen";
 import { LeaderboardPage } from "./LeaderboardPage";
 
 const mockLeaderboardEntries: LeaderboardEntry[] = [

@@ -13,8 +13,8 @@ import { TeamInfo } from './team-info';
 
 
 export interface MetaData { 
-    teams: Array<TeamInfo>;
     scheduledDay: string;
     scheduledTime: string;
+    teams: Array<TeamInfo>;
 }
 

@@ -27,10 +27,8 @@ jobs:
 
       - name: Install Node.js dependencies
         run: |
-          # Install dependencies if not cached
-          if [ ! -d "node_modules" ]; then
-            npm ci --prefer-offline --no-audit
-          fi
+          # Always install to avoid half-restored caches
+          npm ci --prefer-offline --no-audit
 
       - name: Install Python dependencies
         working-directory: server/intelligence-service

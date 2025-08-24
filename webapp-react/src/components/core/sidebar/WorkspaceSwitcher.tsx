@@ -1,3 +1,5 @@
+import { ChevronsUpDown, Plus } from "lucide-react";
+import { useEffect, useState } from "react";
 import {
 	DropdownMenu,
 	DropdownMenuContent,
@@ -13,8 +15,6 @@ import {
 	SidebarMenuItem,
 	useSidebar,
 } from "@/components/ui/sidebar";
-import { ChevronsUpDown, Plus } from "lucide-react";
-import { useEffect, useState } from "react";
 
 interface Workspace {
 	name: string;

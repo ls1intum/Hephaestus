@@ -1,6 +1,6 @@
+import { createFileRoute, Outlet } from "@tanstack/react-router";
 import { Spinner } from "@/components/ui/spinner";
 import { useAuth } from "@/integrations/auth/AuthContext";
-import { Outlet, createFileRoute } from "@tanstack/react-router";
 import { LandingContainer } from "./landing";
 
 // This route will be a parent for all routes that require authentication

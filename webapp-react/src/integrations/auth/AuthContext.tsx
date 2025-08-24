@@ -1,3 +1,4 @@
+import type { ReactNode } from "react";
 import {
 	createContext,
 	useCallback,
@@ -5,7 +6,6 @@ import {
 	useEffect,
 	useState,
 } from "react";
-import type { ReactNode } from "react";
 import keycloakService, { type UserProfile } from "./keycloak";
 
 // Global state to prevent duplicate initialization across strict mode renders
@@ -61,8 +61,13 @@ export function AuthProvider({ children }: AuthProviderProps) {
 				window.location.hash.includes("session_state=") ||
 				window.location.hash.includes("code="))
 		) {
-			const baseUrl = window.location.pathname;
-			console.log("Cleaning URL from auth params, redirecting to:", baseUrl);
+			const baseUrl = window.location.pathname + window.location.search;
+			if (process.env.NODE_ENV !== "production") {
+				console.debug(
+					"AuthProvider: Cleaning URL from auth params, redirecting to:",
+					baseUrl,
+				);
+			}
 
 			// Use history API to replace the current URL without auth parameters
 			if (window.history?.replaceState) {
@@ -77,7 +82,9 @@ export function AuthProvider({ children }: AuthProviderProps) {
 	useEffect(() => {
 		// Prevent multiple initializations in strict mode
 		if (globalState.initialized) {
-			console.log("AuthProvider: Already initialized globally");
+			if (process.env.NODE_ENV !== "production") {
+				console.debug("AuthProvider: Already initialized globally");
+			}
 			setIsLoading(false);
 
 			// Update local state with current authentication status
@@ -96,13 +103,17 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
 		// If initialization is already in progress, wait for it
 		if (globalState.initPromise) {
-			console.log("AuthProvider: Waiting for existing initialization");
+			if (process.env.NODE_ENV !== "production") {
+				console.debug("AuthProvider: Waiting for existing initialization");
+			}
 			globalState.initPromise
 				.then((authenticated) => {
-					console.log(
-						"AuthProvider: Existing initialization completed:",
-						authenticated,
-					);
+					if (process.env.NODE_ENV !== "production") {
+						console.debug(
+							"AuthProvider: Existing initialization completed:",
+							authenticated,
+						);
+					}
 					if (authenticated) {
 						const userName = keycloakService.getUsername();
 						const roles = keycloakService.getUserRoles();
@@ -126,12 +137,16 @@ export function AuthProvider({ children }: AuthProviderProps) {
 				// Clean URL from auth parameters first
 				cleanUrlFromAuthParams();
 
-				console.log("AuthProvider: Initializing Keycloak");
+				if (process.env.NODE_ENV !== "production") {
+					console.debug("AuthProvider: Initializing Keycloak");
+				}
 				const authenticated = await keycloakService.init();
-				console.log(
-					"AuthProvider: Keycloak initialized, authenticated:",
-					authenticated,
-				);
+				if (process.env.NODE_ENV !== "production") {
+					console.debug(
+						"AuthProvider: Keycloak initialized, authenticated:",
+						authenticated,
+					);
+				}
 
 				if (authenticated) {
 					const userName = keycloakService.getUsername();

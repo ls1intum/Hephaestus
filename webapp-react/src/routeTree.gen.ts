@@ -8,264 +8,415 @@
 // You should NOT make any changes in this file as it will be overwritten.
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
-// Import Routes
+import { createFileRoute } from '@tanstack/react-router'
 
-import { Route as rootRoute } from './routes/__root'
-import { Route as PrivacyImport } from './routes/privacy'
-import { Route as LandingImport } from './routes/landing'
-import { Route as ImprintImport } from './routes/imprint'
-import { Route as AboutImport } from './routes/about'
-import { Route as AuthenticatedImport } from './routes/_authenticated'
-import { Route as AuthenticatedIndexImport } from './routes/_authenticated/index'
-import { Route as AuthenticatedTeamsImport } from './routes/_authenticated/teams'
-import { Route as AuthenticatedSettingsImport } from './routes/_authenticated/settings'
-import { Route as AuthenticatedMentorImport } from './routes/_authenticated/mentor'
-import { Route as AuthenticatedBestPracticesImport } from './routes/_authenticated/best-practices'
-import { Route as AuthenticatedAdminImport } from './routes/_authenticated/_admin'
-import { Route as AuthenticatedUserUsernameIndexImport } from './routes/_authenticated/user/$username/index'
-import { Route as AuthenticatedAdminAdminIndexImport } from './routes/_authenticated/_admin/admin/index'
-import { Route as AuthenticatedUserUsernameBestPracticesImport } from './routes/_authenticated/user/$username/best-practices'
-import { Route as AuthenticatedAdminAdminTeamsImport } from './routes/_authenticated/_admin/admin/teams'
-import { Route as AuthenticatedAdminAdminSettingsImport } from './routes/_authenticated/_admin/admin/settings'
-import { Route as AuthenticatedAdminAdminMembersImport } from './routes/_authenticated/_admin/admin/members'
+import { Route as rootRouteImport } from './routes/__root'
+import { Route as PrivacyRouteImport } from './routes/privacy'
+import { Route as LandingRouteImport } from './routes/landing'
+import { Route as ImprintRouteImport } from './routes/imprint'
+import { Route as AboutRouteImport } from './routes/about'
+import { Route as AuthenticatedRouteImport } from './routes/_authenticated'
+import { Route as AuthenticatedIndexRouteImport } from './routes/_authenticated/index'
+import { Route as AuthenticatedTeamsRouteImport } from './routes/_authenticated/teams'
+import { Route as AuthenticatedSettingsRouteImport } from './routes/_authenticated/settings'
+import { Route as AuthenticatedBestPracticesRouteImport } from './routes/_authenticated/best-practices'
+import { Route as AuthenticatedAdminRouteImport } from './routes/_authenticated/_admin'
+import { Route as AuthenticatedMentorIndexRouteImport } from './routes/_authenticated/mentor/index'
+import { Route as AuthenticatedMentorMentor_accessRouteImport } from './routes/_authenticated/mentor/_mentor_access'
+import { Route as AuthenticatedMentorThreadIdRouteImport } from './routes/_authenticated/mentor/$threadId'
+import { Route as AuthenticatedUserUsernameIndexRouteImport } from './routes/_authenticated/user/$username/index'
+import { Route as AuthenticatedAdminAdminIndexRouteImport } from './routes/_authenticated/_admin/admin/index'
+import { Route as AuthenticatedUserUsernameBestPracticesRouteImport } from './routes/_authenticated/user/$username/best-practices'
+import { Route as AuthenticatedAdminAdminTeamsRouteImport } from './routes/_authenticated/_admin/admin/teams'
+import { Route as AuthenticatedAdminAdminSettingsRouteImport } from './routes/_authenticated/_admin/admin/settings'
+import { Route as AuthenticatedAdminAdminMembersRouteImport } from './routes/_authenticated/_admin/admin/members'
 
-// Create/Update Routes
+const AuthenticatedMentorRouteImport = createFileRoute(
+  '/_authenticated/mentor',
+)()
 
-const PrivacyRoute = PrivacyImport.update({
+const PrivacyRoute = PrivacyRouteImport.update({
   id: '/privacy',
   path: '/privacy',
-  getParentRoute: () => rootRoute,
+  getParentRoute: () => rootRouteImport,
 } as any)
-
-const LandingRoute = LandingImport.update({
+const LandingRoute = LandingRouteImport.update({
   id: '/landing',
   path: '/landing',
-  getParentRoute: () => rootRoute,
+  getParentRoute: () => rootRouteImport,
 } as any)
-
-const ImprintRoute = ImprintImport.update({
+const ImprintRoute = ImprintRouteImport.update({
   id: '/imprint',
   path: '/imprint',
-  getParentRoute: () => rootRoute,
+  getParentRoute: () => rootRouteImport,
 } as any)
-
-const AboutRoute = AboutImport.update({
+const AboutRoute = AboutRouteImport.update({
   id: '/about',
   path: '/about',
-  getParentRoute: () => rootRoute,
+  getParentRoute: () => rootRouteImport,
 } as any)
-
-const AuthenticatedRoute = AuthenticatedImport.update({
+const AuthenticatedRoute = AuthenticatedRouteImport.update({
   id: '/_authenticated',
-  getParentRoute: () => rootRoute,
+  getParentRoute: () => rootRouteImport,
 } as any)
-
-const AuthenticatedIndexRoute = AuthenticatedIndexImport.update({
-  id: '/',
-  path: '/',
-  getParentRoute: () => AuthenticatedRoute,
-} as any)
-
-const AuthenticatedTeamsRoute = AuthenticatedTeamsImport.update({
-  id: '/teams',
-  path: '/teams',
-  getParentRoute: () => AuthenticatedRoute,
-} as any)
-
-const AuthenticatedSettingsRoute = AuthenticatedSettingsImport.update({
-  id: '/settings',
-  path: '/settings',
-  getParentRoute: () => AuthenticatedRoute,
-} as any)
-
-const AuthenticatedMentorRoute = AuthenticatedMentorImport.update({
+const AuthenticatedMentorRoute = AuthenticatedMentorRouteImport.update({
   id: '/mentor',
   path: '/mentor',
   getParentRoute: () => AuthenticatedRoute,
 } as any)
-
-const AuthenticatedBestPracticesRoute = AuthenticatedBestPracticesImport.update(
-  {
+const AuthenticatedIndexRoute = AuthenticatedIndexRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => AuthenticatedRoute,
+} as any)
+const AuthenticatedTeamsRoute = AuthenticatedTeamsRouteImport.update({
+  id: '/teams',
+  path: '/teams',
+  getParentRoute: () => AuthenticatedRoute,
+} as any)
+const AuthenticatedSettingsRoute = AuthenticatedSettingsRouteImport.update({
+  id: '/settings',
+  path: '/settings',
+  getParentRoute: () => AuthenticatedRoute,
+} as any)
+const AuthenticatedBestPracticesRoute =
+  AuthenticatedBestPracticesRouteImport.update({
     id: '/best-practices',
     path: '/best-practices',
     getParentRoute: () => AuthenticatedRoute,
-  } as any,
-)
-
-const AuthenticatedAdminRoute = AuthenticatedAdminImport.update({
+  } as any)
+const AuthenticatedAdminRoute = AuthenticatedAdminRouteImport.update({
   id: '/_admin',
   getParentRoute: () => AuthenticatedRoute,
 } as any)
-
+const AuthenticatedMentorIndexRoute =
+  AuthenticatedMentorIndexRouteImport.update({
+    id: '/',
+    path: '/',
+    getParentRoute: () => AuthenticatedMentorRoute,
+  } as any)
+const AuthenticatedMentorMentor_accessRoute =
+  AuthenticatedMentorMentor_accessRouteImport.update({
+    id: '/_mentor_access',
+    getParentRoute: () => AuthenticatedMentorRoute,
+  } as any)
+const AuthenticatedMentorThreadIdRoute =
+  AuthenticatedMentorThreadIdRouteImport.update({
+    id: '/mentor/$threadId',
+    path: '/mentor/$threadId',
+    getParentRoute: () => AuthenticatedRoute,
+  } as any)
 const AuthenticatedUserUsernameIndexRoute =
-  AuthenticatedUserUsernameIndexImport.update({
+  AuthenticatedUserUsernameIndexRouteImport.update({
     id: '/user/$username/',
     path: '/user/$username/',
     getParentRoute: () => AuthenticatedRoute,
   } as any)
-
 const AuthenticatedAdminAdminIndexRoute =
-  AuthenticatedAdminAdminIndexImport.update({
+  AuthenticatedAdminAdminIndexRouteImport.update({
     id: '/admin/',
     path: '/admin/',
     getParentRoute: () => AuthenticatedAdminRoute,
   } as any)
-
 const AuthenticatedUserUsernameBestPracticesRoute =
-  AuthenticatedUserUsernameBestPracticesImport.update({
+  AuthenticatedUserUsernameBestPracticesRouteImport.update({
     id: '/user/$username/best-practices',
     path: '/user/$username/best-practices',
     getParentRoute: () => AuthenticatedRoute,
   } as any)
-
 const AuthenticatedAdminAdminTeamsRoute =
-  AuthenticatedAdminAdminTeamsImport.update({
+  AuthenticatedAdminAdminTeamsRouteImport.update({
     id: '/admin/teams',
     path: '/admin/teams',
     getParentRoute: () => AuthenticatedAdminRoute,
   } as any)
-
 const AuthenticatedAdminAdminSettingsRoute =
-  AuthenticatedAdminAdminSettingsImport.update({
+  AuthenticatedAdminAdminSettingsRouteImport.update({
     id: '/admin/settings',
     path: '/admin/settings',
     getParentRoute: () => AuthenticatedAdminRoute,
   } as any)
-
 const AuthenticatedAdminAdminMembersRoute =
-  AuthenticatedAdminAdminMembersImport.update({
+  AuthenticatedAdminAdminMembersRouteImport.update({
     id: '/admin/members',
     path: '/admin/members',
     getParentRoute: () => AuthenticatedAdminRoute,
   } as any)
 
-// Populate the FileRoutesByPath interface
+export interface FileRoutesByFullPath {
+  '/about': typeof AboutRoute
+  '/imprint': typeof ImprintRoute
+  '/landing': typeof LandingRoute
+  '/privacy': typeof PrivacyRoute
+  '/best-practices': typeof AuthenticatedBestPracticesRoute
+  '/settings': typeof AuthenticatedSettingsRoute
+  '/teams': typeof AuthenticatedTeamsRoute
+  '/': typeof AuthenticatedIndexRoute
+  '/mentor/$threadId': typeof AuthenticatedMentorThreadIdRoute
+  '/mentor': typeof AuthenticatedMentorMentor_accessRoute
+  '/mentor/': typeof AuthenticatedMentorIndexRoute
+  '/admin/members': typeof AuthenticatedAdminAdminMembersRoute
+  '/admin/settings': typeof AuthenticatedAdminAdminSettingsRoute
+  '/admin/teams': typeof AuthenticatedAdminAdminTeamsRoute
+  '/user/$username/best-practices': typeof AuthenticatedUserUsernameBestPracticesRoute
+  '/admin': typeof AuthenticatedAdminAdminIndexRoute
+  '/user/$username': typeof AuthenticatedUserUsernameIndexRoute
+}
+export interface FileRoutesByTo {
+  '/about': typeof AboutRoute
+  '/imprint': typeof ImprintRoute
+  '/landing': typeof LandingRoute
+  '/privacy': typeof PrivacyRoute
+  '/best-practices': typeof AuthenticatedBestPracticesRoute
+  '/settings': typeof AuthenticatedSettingsRoute
+  '/teams': typeof AuthenticatedTeamsRoute
+  '/': typeof AuthenticatedIndexRoute
+  '/mentor/$threadId': typeof AuthenticatedMentorThreadIdRoute
+  '/mentor': typeof AuthenticatedMentorIndexRoute
+  '/admin/members': typeof AuthenticatedAdminAdminMembersRoute
+  '/admin/settings': typeof AuthenticatedAdminAdminSettingsRoute
+  '/admin/teams': typeof AuthenticatedAdminAdminTeamsRoute
+  '/user/$username/best-practices': typeof AuthenticatedUserUsernameBestPracticesRoute
+  '/admin': typeof AuthenticatedAdminAdminIndexRoute
+  '/user/$username': typeof AuthenticatedUserUsernameIndexRoute
+}
+export interface FileRoutesById {
+  __root__: typeof rootRouteImport
+  '/_authenticated': typeof AuthenticatedRouteWithChildren
+  '/about': typeof AboutRoute
+  '/imprint': typeof ImprintRoute
+  '/landing': typeof LandingRoute
+  '/privacy': typeof PrivacyRoute
+  '/_authenticated/_admin': typeof AuthenticatedAdminRouteWithChildren
+  '/_authenticated/best-practices': typeof AuthenticatedBestPracticesRoute
+  '/_authenticated/settings': typeof AuthenticatedSettingsRoute
+  '/_authenticated/teams': typeof AuthenticatedTeamsRoute
+  '/_authenticated/': typeof AuthenticatedIndexRoute
+  '/_authenticated/mentor/$threadId': typeof AuthenticatedMentorThreadIdRoute
+  '/_authenticated/mentor': typeof AuthenticatedMentorRouteWithChildren
+  '/_authenticated/mentor/_mentor_access': typeof AuthenticatedMentorMentor_accessRoute
+  '/_authenticated/mentor/': typeof AuthenticatedMentorIndexRoute
+  '/_authenticated/_admin/admin/members': typeof AuthenticatedAdminAdminMembersRoute
+  '/_authenticated/_admin/admin/settings': typeof AuthenticatedAdminAdminSettingsRoute
+  '/_authenticated/_admin/admin/teams': typeof AuthenticatedAdminAdminTeamsRoute
+  '/_authenticated/user/$username/best-practices': typeof AuthenticatedUserUsernameBestPracticesRoute
+  '/_authenticated/_admin/admin/': typeof AuthenticatedAdminAdminIndexRoute
+  '/_authenticated/user/$username/': typeof AuthenticatedUserUsernameIndexRoute
+}
+export interface FileRouteTypes {
+  fileRoutesByFullPath: FileRoutesByFullPath
+  fullPaths:
+    | '/about'
+    | '/imprint'
+    | '/landing'
+    | '/privacy'
+    | '/best-practices'
+    | '/settings'
+    | '/teams'
+    | '/'
+    | '/mentor/$threadId'
+    | '/mentor'
+    | '/mentor/'
+    | '/admin/members'
+    | '/admin/settings'
+    | '/admin/teams'
+    | '/user/$username/best-practices'
+    | '/admin'
+    | '/user/$username'
+  fileRoutesByTo: FileRoutesByTo
+  to:
+    | '/about'
+    | '/imprint'
+    | '/landing'
+    | '/privacy'
+    | '/best-practices'
+    | '/settings'
+    | '/teams'
+    | '/'
+    | '/mentor/$threadId'
+    | '/mentor'
+    | '/admin/members'
+    | '/admin/settings'
+    | '/admin/teams'
+    | '/user/$username/best-practices'
+    | '/admin'
+    | '/user/$username'
+  id:
+    | '__root__'
+    | '/_authenticated'
+    | '/about'
+    | '/imprint'
+    | '/landing'
+    | '/privacy'
+    | '/_authenticated/_admin'
+    | '/_authenticated/best-practices'
+    | '/_authenticated/settings'
+    | '/_authenticated/teams'
+    | '/_authenticated/'
+    | '/_authenticated/mentor/$threadId'
+    | '/_authenticated/mentor'
+    | '/_authenticated/mentor/_mentor_access'
+    | '/_authenticated/mentor/'
+    | '/_authenticated/_admin/admin/members'
+    | '/_authenticated/_admin/admin/settings'
+    | '/_authenticated/_admin/admin/teams'
+    | '/_authenticated/user/$username/best-practices'
+    | '/_authenticated/_admin/admin/'
+    | '/_authenticated/user/$username/'
+  fileRoutesById: FileRoutesById
+}
+export interface RootRouteChildren {
+  AuthenticatedRoute: typeof AuthenticatedRouteWithChildren
+  AboutRoute: typeof AboutRoute
+  ImprintRoute: typeof ImprintRoute
+  LandingRoute: typeof LandingRoute
+  PrivacyRoute: typeof PrivacyRoute
+}
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
-    '/_authenticated': {
-      id: '/_authenticated'
-      path: ''
-      fullPath: ''
-      preLoaderRoute: typeof AuthenticatedImport
-      parentRoute: typeof rootRoute
-    }
-    '/about': {
-      id: '/about'
-      path: '/about'
-      fullPath: '/about'
-      preLoaderRoute: typeof AboutImport
-      parentRoute: typeof rootRoute
-    }
-    '/imprint': {
-      id: '/imprint'
-      path: '/imprint'
-      fullPath: '/imprint'
-      preLoaderRoute: typeof ImprintImport
-      parentRoute: typeof rootRoute
+    '/privacy': {
+      id: '/privacy'
+      path: '/privacy'
+      fullPath: '/privacy'
+      preLoaderRoute: typeof PrivacyRouteImport
+      parentRoute: typeof rootRouteImport
     }
     '/landing': {
       id: '/landing'
       path: '/landing'
       fullPath: '/landing'
-      preLoaderRoute: typeof LandingImport
-      parentRoute: typeof rootRoute
+      preLoaderRoute: typeof LandingRouteImport
+      parentRoute: typeof rootRouteImport
     }
-    '/privacy': {
-      id: '/privacy'
-      path: '/privacy'
-      fullPath: '/privacy'
-      preLoaderRoute: typeof PrivacyImport
-      parentRoute: typeof rootRoute
+    '/imprint': {
+      id: '/imprint'
+      path: '/imprint'
+      fullPath: '/imprint'
+      preLoaderRoute: typeof ImprintRouteImport
+      parentRoute: typeof rootRouteImport
     }
-    '/_authenticated/_admin': {
-      id: '/_authenticated/_admin'
+    '/about': {
+      id: '/about'
+      path: '/about'
+      fullPath: '/about'
+      preLoaderRoute: typeof AboutRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/_authenticated': {
+      id: '/_authenticated'
       path: ''
       fullPath: ''
-      preLoaderRoute: typeof AuthenticatedAdminImport
-      parentRoute: typeof AuthenticatedImport
-    }
-    '/_authenticated/best-practices': {
-      id: '/_authenticated/best-practices'
-      path: '/best-practices'
-      fullPath: '/best-practices'
-      preLoaderRoute: typeof AuthenticatedBestPracticesImport
-      parentRoute: typeof AuthenticatedImport
+      preLoaderRoute: typeof AuthenticatedRouteImport
+      parentRoute: typeof rootRouteImport
     }
     '/_authenticated/mentor': {
       id: '/_authenticated/mentor'
       path: '/mentor'
       fullPath: '/mentor'
-      preLoaderRoute: typeof AuthenticatedMentorImport
-      parentRoute: typeof AuthenticatedImport
-    }
-    '/_authenticated/settings': {
-      id: '/_authenticated/settings'
-      path: '/settings'
-      fullPath: '/settings'
-      preLoaderRoute: typeof AuthenticatedSettingsImport
-      parentRoute: typeof AuthenticatedImport
-    }
-    '/_authenticated/teams': {
-      id: '/_authenticated/teams'
-      path: '/teams'
-      fullPath: '/teams'
-      preLoaderRoute: typeof AuthenticatedTeamsImport
-      parentRoute: typeof AuthenticatedImport
+      preLoaderRoute: typeof AuthenticatedMentorRouteImport
+      parentRoute: typeof AuthenticatedRoute
     }
     '/_authenticated/': {
       id: '/_authenticated/'
       path: '/'
       fullPath: '/'
-      preLoaderRoute: typeof AuthenticatedIndexImport
-      parentRoute: typeof AuthenticatedImport
+      preLoaderRoute: typeof AuthenticatedIndexRouteImport
+      parentRoute: typeof AuthenticatedRoute
     }
-    '/_authenticated/_admin/admin/members': {
-      id: '/_authenticated/_admin/admin/members'
-      path: '/admin/members'
-      fullPath: '/admin/members'
-      preLoaderRoute: typeof AuthenticatedAdminAdminMembersImport
-      parentRoute: typeof AuthenticatedAdminImport
+    '/_authenticated/teams': {
+      id: '/_authenticated/teams'
+      path: '/teams'
+      fullPath: '/teams'
+      preLoaderRoute: typeof AuthenticatedTeamsRouteImport
+      parentRoute: typeof AuthenticatedRoute
     }
-    '/_authenticated/_admin/admin/settings': {
-      id: '/_authenticated/_admin/admin/settings'
-      path: '/admin/settings'
-      fullPath: '/admin/settings'
-      preLoaderRoute: typeof AuthenticatedAdminAdminSettingsImport
-      parentRoute: typeof AuthenticatedAdminImport
+    '/_authenticated/settings': {
+      id: '/_authenticated/settings'
+      path: '/settings'
+      fullPath: '/settings'
+      preLoaderRoute: typeof AuthenticatedSettingsRouteImport
+      parentRoute: typeof AuthenticatedRoute
     }
-    '/_authenticated/_admin/admin/teams': {
-      id: '/_authenticated/_admin/admin/teams'
-      path: '/admin/teams'
-      fullPath: '/admin/teams'
-      preLoaderRoute: typeof AuthenticatedAdminAdminTeamsImport
-      parentRoute: typeof AuthenticatedAdminImport
+    '/_authenticated/best-practices': {
+      id: '/_authenticated/best-practices'
+      path: '/best-practices'
+      fullPath: '/best-practices'
+      preLoaderRoute: typeof AuthenticatedBestPracticesRouteImport
+      parentRoute: typeof AuthenticatedRoute
     }
-    '/_authenticated/user/$username/best-practices': {
-      id: '/_authenticated/user/$username/best-practices'
-      path: '/user/$username/best-practices'
-      fullPath: '/user/$username/best-practices'
-      preLoaderRoute: typeof AuthenticatedUserUsernameBestPracticesImport
-      parentRoute: typeof AuthenticatedImport
+    '/_authenticated/_admin': {
+      id: '/_authenticated/_admin'
+      path: ''
+      fullPath: ''
+      preLoaderRoute: typeof AuthenticatedAdminRouteImport
+      parentRoute: typeof AuthenticatedRoute
     }
-    '/_authenticated/_admin/admin/': {
-      id: '/_authenticated/_admin/admin/'
-      path: '/admin'
-      fullPath: '/admin'
-      preLoaderRoute: typeof AuthenticatedAdminAdminIndexImport
-      parentRoute: typeof AuthenticatedAdminImport
+    '/_authenticated/mentor/': {
+      id: '/_authenticated/mentor/'
+      path: '/'
+      fullPath: '/mentor/'
+      preLoaderRoute: typeof AuthenticatedMentorIndexRouteImport
+      parentRoute: typeof AuthenticatedMentorRoute
+    }
+    '/_authenticated/mentor/_mentor_access': {
+      id: '/_authenticated/mentor/_mentor_access'
+      path: '/mentor'
+      fullPath: '/mentor'
+      preLoaderRoute: typeof AuthenticatedMentorMentor_accessRouteImport
+      parentRoute: typeof AuthenticatedMentorRoute
+    }
+    '/_authenticated/mentor/$threadId': {
+      id: '/_authenticated/mentor/$threadId'
+      path: '/mentor/$threadId'
+      fullPath: '/mentor/$threadId'
+      preLoaderRoute: typeof AuthenticatedMentorThreadIdRouteImport
+      parentRoute: typeof AuthenticatedRoute
     }
     '/_authenticated/user/$username/': {
       id: '/_authenticated/user/$username/'
       path: '/user/$username'
       fullPath: '/user/$username'
-      preLoaderRoute: typeof AuthenticatedUserUsernameIndexImport
-      parentRoute: typeof AuthenticatedImport
+      preLoaderRoute: typeof AuthenticatedUserUsernameIndexRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
+    '/_authenticated/_admin/admin/': {
+      id: '/_authenticated/_admin/admin/'
+      path: '/admin'
+      fullPath: '/admin'
+      preLoaderRoute: typeof AuthenticatedAdminAdminIndexRouteImport
+      parentRoute: typeof AuthenticatedAdminRoute
+    }
+    '/_authenticated/user/$username/best-practices': {
+      id: '/_authenticated/user/$username/best-practices'
+      path: '/user/$username/best-practices'
+      fullPath: '/user/$username/best-practices'
+      preLoaderRoute: typeof AuthenticatedUserUsernameBestPracticesRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
+    '/_authenticated/_admin/admin/teams': {
+      id: '/_authenticated/_admin/admin/teams'
+      path: '/admin/teams'
+      fullPath: '/admin/teams'
+      preLoaderRoute: typeof AuthenticatedAdminAdminTeamsRouteImport
+      parentRoute: typeof AuthenticatedAdminRoute
+    }
+    '/_authenticated/_admin/admin/settings': {
+      id: '/_authenticated/_admin/admin/settings'
+      path: '/admin/settings'
+      fullPath: '/admin/settings'
+      preLoaderRoute: typeof AuthenticatedAdminAdminSettingsRouteImport
+      parentRoute: typeof AuthenticatedAdminRoute
+    }
+    '/_authenticated/_admin/admin/members': {
+      id: '/_authenticated/_admin/admin/members'
+      path: '/admin/members'
+      fullPath: '/admin/members'
+      preLoaderRoute: typeof AuthenticatedAdminAdminMembersRouteImport
+      parentRoute: typeof AuthenticatedAdminRoute
     }
   }
 }
-
-// Create and export the route tree
 
 interface AuthenticatedAdminRouteChildren {
   AuthenticatedAdminAdminMembersRoute: typeof AuthenticatedAdminAdminMembersRoute
@@ -284,13 +435,27 @@ const AuthenticatedAdminRouteChildren: AuthenticatedAdminRouteChildren = {
 const AuthenticatedAdminRouteWithChildren =
   AuthenticatedAdminRoute._addFileChildren(AuthenticatedAdminRouteChildren)
 
+interface AuthenticatedMentorRouteChildren {
+  AuthenticatedMentorMentor_accessRoute: typeof AuthenticatedMentorMentor_accessRoute
+  AuthenticatedMentorIndexRoute: typeof AuthenticatedMentorIndexRoute
+}
+
+const AuthenticatedMentorRouteChildren: AuthenticatedMentorRouteChildren = {
+  AuthenticatedMentorMentor_accessRoute: AuthenticatedMentorMentor_accessRoute,
+  AuthenticatedMentorIndexRoute: AuthenticatedMentorIndexRoute,
+}
+
+const AuthenticatedMentorRouteWithChildren =
+  AuthenticatedMentorRoute._addFileChildren(AuthenticatedMentorRouteChildren)
+
 interface AuthenticatedRouteChildren {
   AuthenticatedAdminRoute: typeof AuthenticatedAdminRouteWithChildren
   AuthenticatedBestPracticesRoute: typeof AuthenticatedBestPracticesRoute
-  AuthenticatedMentorRoute: typeof AuthenticatedMentorRoute
   AuthenticatedSettingsRoute: typeof AuthenticatedSettingsRoute
   AuthenticatedTeamsRoute: typeof AuthenticatedTeamsRoute
   AuthenticatedIndexRoute: typeof AuthenticatedIndexRoute
+  AuthenticatedMentorThreadIdRoute: typeof AuthenticatedMentorThreadIdRoute
+  AuthenticatedMentorRoute: typeof AuthenticatedMentorRouteWithChildren
   AuthenticatedUserUsernameBestPracticesRoute: typeof AuthenticatedUserUsernameBestPracticesRoute
   AuthenticatedUserUsernameIndexRoute: typeof AuthenticatedUserUsernameIndexRoute
 }
@@ -298,10 +463,11 @@ interface AuthenticatedRouteChildren {
 const AuthenticatedRouteChildren: AuthenticatedRouteChildren = {
   AuthenticatedAdminRoute: AuthenticatedAdminRouteWithChildren,
   AuthenticatedBestPracticesRoute: AuthenticatedBestPracticesRoute,
-  AuthenticatedMentorRoute: AuthenticatedMentorRoute,
   AuthenticatedSettingsRoute: AuthenticatedSettingsRoute,
   AuthenticatedTeamsRoute: AuthenticatedTeamsRoute,
   AuthenticatedIndexRoute: AuthenticatedIndexRoute,
+  AuthenticatedMentorThreadIdRoute: AuthenticatedMentorThreadIdRoute,
+  AuthenticatedMentorRoute: AuthenticatedMentorRouteWithChildren,
   AuthenticatedUserUsernameBestPracticesRoute:
     AuthenticatedUserUsernameBestPracticesRoute,
   AuthenticatedUserUsernameIndexRoute: AuthenticatedUserUsernameIndexRoute,
@@ -311,132 +477,6 @@ const AuthenticatedRouteWithChildren = AuthenticatedRoute._addFileChildren(
   AuthenticatedRouteChildren,
 )
 
-export interface FileRoutesByFullPath {
-  '': typeof AuthenticatedAdminRouteWithChildren
-  '/about': typeof AboutRoute
-  '/imprint': typeof ImprintRoute
-  '/landing': typeof LandingRoute
-  '/privacy': typeof PrivacyRoute
-  '/best-practices': typeof AuthenticatedBestPracticesRoute
-  '/mentor': typeof AuthenticatedMentorRoute
-  '/settings': typeof AuthenticatedSettingsRoute
-  '/teams': typeof AuthenticatedTeamsRoute
-  '/': typeof AuthenticatedIndexRoute
-  '/admin/members': typeof AuthenticatedAdminAdminMembersRoute
-  '/admin/settings': typeof AuthenticatedAdminAdminSettingsRoute
-  '/admin/teams': typeof AuthenticatedAdminAdminTeamsRoute
-  '/user/$username/best-practices': typeof AuthenticatedUserUsernameBestPracticesRoute
-  '/admin': typeof AuthenticatedAdminAdminIndexRoute
-  '/user/$username': typeof AuthenticatedUserUsernameIndexRoute
-}
-
-export interface FileRoutesByTo {
-  '/about': typeof AboutRoute
-  '/imprint': typeof ImprintRoute
-  '/landing': typeof LandingRoute
-  '/privacy': typeof PrivacyRoute
-  '': typeof AuthenticatedAdminRouteWithChildren
-  '/best-practices': typeof AuthenticatedBestPracticesRoute
-  '/mentor': typeof AuthenticatedMentorRoute
-  '/settings': typeof AuthenticatedSettingsRoute
-  '/teams': typeof AuthenticatedTeamsRoute
-  '/': typeof AuthenticatedIndexRoute
-  '/admin/members': typeof AuthenticatedAdminAdminMembersRoute
-  '/admin/settings': typeof AuthenticatedAdminAdminSettingsRoute
-  '/admin/teams': typeof AuthenticatedAdminAdminTeamsRoute
-  '/user/$username/best-practices': typeof AuthenticatedUserUsernameBestPracticesRoute
-  '/admin': typeof AuthenticatedAdminAdminIndexRoute
-  '/user/$username': typeof AuthenticatedUserUsernameIndexRoute
-}
-
-export interface FileRoutesById {
-  __root__: typeof rootRoute
-  '/_authenticated': typeof AuthenticatedRouteWithChildren
-  '/about': typeof AboutRoute
-  '/imprint': typeof ImprintRoute
-  '/landing': typeof LandingRoute
-  '/privacy': typeof PrivacyRoute
-  '/_authenticated/_admin': typeof AuthenticatedAdminRouteWithChildren
-  '/_authenticated/best-practices': typeof AuthenticatedBestPracticesRoute
-  '/_authenticated/mentor': typeof AuthenticatedMentorRoute
-  '/_authenticated/settings': typeof AuthenticatedSettingsRoute
-  '/_authenticated/teams': typeof AuthenticatedTeamsRoute
-  '/_authenticated/': typeof AuthenticatedIndexRoute
-  '/_authenticated/_admin/admin/members': typeof AuthenticatedAdminAdminMembersRoute
-  '/_authenticated/_admin/admin/settings': typeof AuthenticatedAdminAdminSettingsRoute
-  '/_authenticated/_admin/admin/teams': typeof AuthenticatedAdminAdminTeamsRoute
-  '/_authenticated/user/$username/best-practices': typeof AuthenticatedUserUsernameBestPracticesRoute
-  '/_authenticated/_admin/admin/': typeof AuthenticatedAdminAdminIndexRoute
-  '/_authenticated/user/$username/': typeof AuthenticatedUserUsernameIndexRoute
-}
-
-export interface FileRouteTypes {
-  fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths:
-    | ''
-    | '/about'
-    | '/imprint'
-    | '/landing'
-    | '/privacy'
-    | '/best-practices'
-    | '/mentor'
-    | '/settings'
-    | '/teams'
-    | '/'
-    | '/admin/members'
-    | '/admin/settings'
-    | '/admin/teams'
-    | '/user/$username/best-practices'
-    | '/admin'
-    | '/user/$username'
-  fileRoutesByTo: FileRoutesByTo
-  to:
-    | '/about'
-    | '/imprint'
-    | '/landing'
-    | '/privacy'
-    | ''
-    | '/best-practices'
-    | '/mentor'
-    | '/settings'
-    | '/teams'
-    | '/'
-    | '/admin/members'
-    | '/admin/settings'
-    | '/admin/teams'
-    | '/user/$username/best-practices'
-    | '/admin'
-    | '/user/$username'
-  id:
-    | '__root__'
-    | '/_authenticated'
-    | '/about'
-    | '/imprint'
-    | '/landing'
-    | '/privacy'
-    | '/_authenticated/_admin'
-    | '/_authenticated/best-practices'
-    | '/_authenticated/mentor'
-    | '/_authenticated/settings'
-    | '/_authenticated/teams'
-    | '/_authenticated/'
-    | '/_authenticated/_admin/admin/members'
-    | '/_authenticated/_admin/admin/settings'
-    | '/_authenticated/_admin/admin/teams'
-    | '/_authenticated/user/$username/best-practices'
-    | '/_authenticated/_admin/admin/'
-    | '/_authenticated/user/$username/'
-  fileRoutesById: FileRoutesById
-}
-
-export interface RootRouteChildren {
-  AuthenticatedRoute: typeof AuthenticatedRouteWithChildren
-  AboutRoute: typeof AboutRoute
-  ImprintRoute: typeof ImprintRoute
-  LandingRoute: typeof LandingRoute
-  PrivacyRoute: typeof PrivacyRoute
-}
-
 const rootRouteChildren: RootRouteChildren = {
   AuthenticatedRoute: AuthenticatedRouteWithChildren,
   AboutRoute: AboutRoute,
@@ -444,103 +484,6 @@ const rootRouteChildren: RootRouteChildren = {
   LandingRoute: LandingRoute,
   PrivacyRoute: PrivacyRoute,
 }
-
-export const routeTree = rootRoute
+export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
-
-/* ROUTE_MANIFEST_START
-{
-  "routes": {
-    "__root__": {
-      "filePath": "__root.tsx",
-      "children": [
-        "/_authenticated",
-        "/about",
-        "/imprint",
-        "/landing",
-        "/privacy"
-      ]
-    },
-    "/_authenticated": {
-      "filePath": "_authenticated.tsx",
-      "children": [
-        "/_authenticated/_admin",
-        "/_authenticated/best-practices",
-        "/_authenticated/mentor",
-        "/_authenticated/settings",
-        "/_authenticated/teams",
-        "/_authenticated/",
-        "/_authenticated/user/$username/best-practices",
-        "/_authenticated/user/$username/"
-      ]
-    },
-    "/about": {
-      "filePath": "about.tsx"
-    },
-    "/imprint": {
-      "filePath": "imprint.tsx"
-    },
-    "/landing": {
-      "filePath": "landing.tsx"
-    },
-    "/privacy": {
-      "filePath": "privacy.tsx"
-    },
-    "/_authenticated/_admin": {
-      "filePath": "_authenticated/_admin.tsx",
-      "parent": "/_authenticated",
-      "children": [
-        "/_authenticated/_admin/admin/members",
-        "/_authenticated/_admin/admin/settings",
-        "/_authenticated/_admin/admin/teams",
-        "/_authenticated/_admin/admin/"
-      ]
-    },
-    "/_authenticated/best-practices": {
-      "filePath": "_authenticated/best-practices.tsx",
-      "parent": "/_authenticated"
-    },
-    "/_authenticated/mentor": {
-      "filePath": "_authenticated/mentor.tsx",
-      "parent": "/_authenticated"
-    },
-    "/_authenticated/settings": {
-      "filePath": "_authenticated/settings.tsx",
-      "parent": "/_authenticated"
-    },
-    "/_authenticated/teams": {
-      "filePath": "_authenticated/teams.tsx",
-      "parent": "/_authenticated"
-    },
-    "/_authenticated/": {
-      "filePath": "_authenticated/index.tsx",
-      "parent": "/_authenticated"
-    },
-    "/_authenticated/_admin/admin/members": {
-      "filePath": "_authenticated/_admin/admin/members.tsx",
-      "parent": "/_authenticated/_admin"
-    },
-    "/_authenticated/_admin/admin/settings": {
-      "filePath": "_authenticated/_admin/admin/settings.tsx",
-      "parent": "/_authenticated/_admin"
-    },
-    "/_authenticated/_admin/admin/teams": {
-      "filePath": "_authenticated/_admin/admin/teams.tsx",
-      "parent": "/_authenticated/_admin"
-    },
-    "/_authenticated/user/$username/best-practices": {
-      "filePath": "_authenticated/user/$username/best-practices.tsx",
-      "parent": "/_authenticated"
-    },
-    "/_authenticated/_admin/admin/": {
-      "filePath": "_authenticated/_admin/admin/index.tsx",
-      "parent": "/_authenticated/_admin"
-    },
-    "/_authenticated/user/$username/": {
-      "filePath": "_authenticated/user/$username/index.tsx",
-      "parent": "/_authenticated"
-    }
-  }
-}
-ROUTE_MANIFEST_END */

@@ -1,4 +1,3 @@
-import type { PullRequestBadPractice } from "@/api/types.gen";
 import type { LucideIcon } from "lucide-react";
 import {
 	AlertTriangle,
@@ -9,6 +8,7 @@ import {
 	Rocket,
 	XOctagon,
 } from "lucide-react";
+import type { PullRequestBadPractice } from "@/api/types.gen";
 
 // State configuration for bad practice types
 export const stateConfig: {

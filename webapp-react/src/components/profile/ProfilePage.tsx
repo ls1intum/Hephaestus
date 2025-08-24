@@ -1,6 +1,6 @@
+import { XCircleIcon } from "lucide-react";
 import type { UserProfile } from "@/api/types.gen";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { XCircleIcon } from "lucide-react";
 import { ProfileContent } from "./ProfileContent";
 import { ProfileHeader } from "./ProfileHeader";
 

@@ -12,7 +12,7 @@
 
 
 export interface LeagueChange { 
-    login: string;
     leaguePointsChange: number;
+    login: string;
 }
 

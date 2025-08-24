@@ -1,9 +1,3 @@
-import type { LabelInfo } from "@/api/types.gen";
-import { FormattedTitle } from "@/components/shared/FormattedTitle";
-import { GithubBadge } from "@/components/shared/GithubBadge";
-import { Card } from "@/components/ui/card";
-import { Skeleton } from "@/components/ui/skeleton";
-import { cn } from "@/lib/utils";
 import {
 	GitMergeIcon,
 	GitPullRequestClosedIcon,
@@ -11,6 +5,12 @@ import {
 	GitPullRequestIcon,
 } from "@primer/octicons-react";
 import { format } from "date-fns";
+import type { LabelInfo } from "@/api/types.gen";
+import { FormattedTitle } from "@/components/shared/FormattedTitle";
+import { GithubBadge } from "@/components/shared/GithubBadge";
+import { Card } from "@/components/ui/card";
+import { Skeleton } from "@/components/ui/skeleton";
+import { cn } from "@/lib/utils";
 
 export interface IssueCardProps {
 	isLoading: boolean;

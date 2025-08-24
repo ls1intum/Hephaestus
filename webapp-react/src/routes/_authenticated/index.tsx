@@ -1,3 +1,13 @@
+import { useQuery } from "@tanstack/react-query";
+import {
+	createFileRoute,
+	retainSearchParams,
+	useNavigate,
+} from "@tanstack/react-router";
+import { zodValidator } from "@tanstack/zod-adapter";
+import { endOfISOWeek, formatISO, startOfISOWeek } from "date-fns";
+import { useMemo } from "react";
+import { z } from "zod";
 import {
 	getLeaderboardOptions,
 	getMetaDataOptions,
@@ -7,13 +17,6 @@ import {
 import { LeaderboardPage } from "@/components/leaderboard/LeaderboardPage";
 import type { LeaderboardSortType } from "@/components/leaderboard/SortFilter";
 import { useAuth } from "@/integrations/auth/AuthContext";
-import { useQuery } from "@tanstack/react-query";
-import { createFileRoute, retainSearchParams } from "@tanstack/react-router";
-import { useNavigate } from "@tanstack/react-router";
-import { zodValidator } from "@tanstack/zod-adapter";
-import { endOfISOWeek, formatISO, startOfISOWeek } from "date-fns";
-import { useMemo } from "react";
-import { z } from "zod";
 
 // Calculate default date range with ISO 8601 format including timezone
 const today = new Date();

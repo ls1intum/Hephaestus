@@ -1,5 +1,5 @@
 import * as Sentry from "@sentry/react";
-import { RouterProvider, createRouter } from "@tanstack/react-router";
+import { createRouter, RouterProvider } from "@tanstack/react-router";
 import { PostHogProvider } from "posthog-js/react";
 import ReactDOM from "react-dom/client";
 
@@ -10,12 +10,12 @@ import { client } from "@/api/client.gen";
 import { routeTree } from "./routeTree.gen";
 
 import "./styles.css";
-import reportWebVitals from "./reportWebVitals.ts";
+import { StrictMode } from "react";
 
 import environment from "@/environment";
 import { AuthProvider, keycloakService, useAuth } from "@/integrations/auth";
 import { ThemeProvider } from "@/integrations/theme";
-import { StrictMode } from "react";
+import reportWebVitals from "./reportWebVitals";
 
 client.setConfig({
 	baseUrl: environment.serverUrl,
@@ -92,13 +92,23 @@ if (rootElement && !rootElement.innerHTML) {
 	});
 	root.render(
 		<StrictMode>
-			<PostHogProvider
-				apiKey={environment.posthog.projectApiKey}
-				options={{
-					api_host: environment.posthog.apiHost,
-					cross_subdomain_cookie: false,
-				}}
-			>
+			{environment.posthog?.projectApiKey ? (
+				<PostHogProvider
+					apiKey={environment.posthog.projectApiKey}
+					options={{
+						api_host: environment.posthog.apiHost,
+						cross_subdomain_cookie: false,
+					}}
+				>
+					<TanstackQuery.Provider>
+						<AuthProvider>
+							<ThemeProvider defaultTheme="dark" storageKey="theme">
+								<WrappedRouterProvider />
+							</ThemeProvider>
+						</AuthProvider>
+					</TanstackQuery.Provider>
+				</PostHogProvider>
+			) : (
 				<TanstackQuery.Provider>
 					<AuthProvider>
 						<ThemeProvider defaultTheme="dark" storageKey="theme">
@@ -106,7 +116,7 @@ if (rootElement && !rootElement.innerHTML) {
 						</ThemeProvider>
 					</AuthProvider>
 				</TanstackQuery.Provider>
-			</PostHogProvider>
+			)}
 		</StrictMode>,
 	);
 }

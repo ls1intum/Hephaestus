@@ -12,11 +12,11 @@
 
 
 export interface Contributor { 
+    avatarUrl: string;
+    contributions?: number;
+    htmlUrl: string;
     id: number;
     login: string;
     name: string;
-    avatarUrl: string;
-    htmlUrl: string;
-    contributions?: number;
 }
 

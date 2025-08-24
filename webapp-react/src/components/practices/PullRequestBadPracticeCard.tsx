@@ -1,19 +1,18 @@
-import type { LabelInfo, PullRequestBadPractice } from "@/api/types.gen";
-import { IssueCard } from "@/components/shared/IssueCard";
-import { Button } from "@/components/ui/button";
 import { RefreshCw } from "lucide-react";
 import type React from "react";
 import { useState } from "react";
-import { BadPracticeCard } from "./BadPracticeCard";
-import { filterGoodAndBadPractices } from "./utils";
-
+import type { LabelInfo, PullRequestBadPractice } from "@/api/types.gen";
+import { IssueCard } from "@/components/shared/IssueCard";
 import {
 	Accordion,
 	AccordionContent,
 	AccordionItem,
 	AccordionTrigger,
 } from "@/components/ui/accordion";
+import { Button } from "@/components/ui/button";
 import { Spinner } from "@/components/ui/spinner";
+import { BadPracticeCard } from "./BadPracticeCard";
+import { filterGoodAndBadPractices } from "./utils";
 
 /**
  * Feedback data for bad practices

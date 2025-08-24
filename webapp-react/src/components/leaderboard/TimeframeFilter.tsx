@@ -1,19 +1,3 @@
-import { Button } from "@/components/ui/button";
-import { Calendar } from "@/components/ui/calendar";
-import { Label } from "@/components/ui/label";
-import {
-	Popover,
-	PopoverContent,
-	PopoverTrigger,
-} from "@/components/ui/popover";
-import {
-	Select,
-	SelectContent,
-	SelectItem,
-	SelectTrigger,
-	SelectValue,
-} from "@/components/ui/select";
-import { cn } from "@/lib/utils";
 import {
 	addDays,
 	addWeeks,
@@ -37,6 +21,22 @@ import {
 import { CalendarIcon } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { DateRange } from "react-day-picker";
+import { Button } from "@/components/ui/button";
+import { Calendar } from "@/components/ui/calendar";
+import { Label } from "@/components/ui/label";
+import {
+	Popover,
+	PopoverContent,
+	PopoverTrigger,
+} from "@/components/ui/popover";
+import {
+	Select,
+	SelectContent,
+	SelectItem,
+	SelectTrigger,
+	SelectValue,
+} from "@/components/ui/select";
+import { cn } from "@/lib/utils";
 
 type TimeframeOption =
 	| "this-week"
@@ -596,11 +596,11 @@ export function TimeframeFilter({
 									<CalendarIcon className="mr-2 h-4 w-4" />
 									{dateRange?.from ? (
 										dateRange.to ? (
-											<>
-												{isSameYear(dateRange.from, dateRange.to)
-													? `${format(dateRange.from, "LLL dd")} - ${format(dateRange.to, "LLL dd, y")}`
-													: `${format(dateRange.from, "LLL dd, y")} - ${format(dateRange.to, "LLL dd, y")}`}
-											</>
+											isSameYear(dateRange.from, dateRange.to) ? (
+												`${format(dateRange.from, "LLL dd")} - ${format(dateRange.to, "LLL dd, y")}`
+											) : (
+												`${format(dateRange.from, "LLL dd, y")} - ${format(dateRange.to, "LLL dd, y")}`
+											)
 										) : (
 											format(dateRange.from, "LLL dd, y")
 										)

@@ -1,6 +1,6 @@
+import { Github, Globe } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
-import { Github, Globe } from "lucide-react";
 
 export interface ProjectManager {
 	id: number;
