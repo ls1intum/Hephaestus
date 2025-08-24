@@ -1,4 +1,4 @@
-// League data structure matches the structure in the Angular application
+// League data structure used for mapping points to tiers in the client
 export const Leagues = [
 	{
 		name: "Bronze",
