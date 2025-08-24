@@ -1,4 +1,4 @@
-# Hephaestus — Process-Aware Mentoring for Agile Student Teams
+# Hephaestus — Process-Aware Mentoring for Agile Software Teams
 
 ```{figure} ./images/agile_hephaestus.png
 :width: 200px
