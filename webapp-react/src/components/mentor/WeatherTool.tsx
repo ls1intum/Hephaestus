@@ -1,4 +1,4 @@
-import cx from "classnames";
+import { cn } from "@/lib/utils";
 import { format, isWithinInterval } from "date-fns";
 import { useEffect, useState } from "react";
 import type { GetWeatherOutput } from "@/api/types.gen";
@@ -222,7 +222,7 @@ export function WeatherTool({
 
 	return (
 		<div
-			className={cx(
+			className={cn(
 				"flex flex-col gap-4 rounded-2xl p-4 skeleton-bg max-w-[500px]",
 				{
 					"bg-blue-400": isDay,
@@ -235,7 +235,7 @@ export function WeatherTool({
 			<div className="flex flex-row justify-between items-center">
 				<div className="flex flex-row gap-2 items-center">
 					<div
-						className={cx(
+						className={cn(
 							"size-10 rounded-full skeleton-div",
 							{
 								"bg-yellow-300": isDay,
@@ -265,7 +265,7 @@ export function WeatherTool({
 							{format(new Date(time), "ha")}
 						</div>
 						<div
-							className={cx(
+							className={cn(
 								"size-6 rounded-full skeleton-div",
 								{
 									"bg-yellow-300": isDay,
