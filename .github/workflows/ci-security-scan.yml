@@ -28,6 +28,16 @@ jobs:
         with:
           fetch-depth: 0
 
+      # Ensure stable Node/npm and caching for Node steps used in SAST
+      - name: Setup Node.js (LTS) and npm cache
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: '.node-version'
+          cache: 'npm'
+          cache-dependency-path: |
+            package-lock.json
+            webapp/package-lock.json
+
       # SAST (Static Application Security Testing)
       - name: Initialize CodeQL
         if: matrix.scan-type == 'sast'
@@ -54,13 +64,11 @@ jobs:
           cd server/application-server
           mvn compile -DskipTests --quiet
           
-          # Node.js build 
+          # Node.js (webapp) - Type-only build for CodeQL; avoid bundle to reduce native deps
           cd ../../webapp
-
-          # Always install to avoid half-restored caches
-          npm ci --prefer-offline --no-audit
-
-          npm run build
+          rm -rf node_modules
+          npm ci --include=dev --include=optional --no-audit --progress=false
+          npx tsc --noEmit
 
           # Python dependencies
           cd ../server/intelligence-service
