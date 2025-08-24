@@ -11,9 +11,14 @@
  */
 
 
-export interface Session { 
-    id: number;
-    createdAt: string;
-    isClosed: boolean;
+/**
+ * Tool output error event.
+ */
+export interface StreamToolOutputErrorPart { 
+    dynamic?: boolean | null;
+    errorText: string;
+    providerExecuted?: boolean | null;
+    toolCallId: string;
+    type?: string;
 }
 

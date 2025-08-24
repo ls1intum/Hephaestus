@@ -16,7 +16,7 @@ export interface UserTeams {
     id: number;
     login: string;
     name: string;
-    url: string;
     teams: Set<TeamInfo>;
+    url: string;
 }
 

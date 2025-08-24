@@ -11,19 +11,13 @@
  */
 
 
-export interface Message { 
-    id: number;
-    sentAt: string;
-    sender: Message.SenderEnum;
+/**
+ * Output for createDocument tool.
+ */
+export interface CreateDocumentOutput { 
     content: string;
-    sessionId: number;
+    id: string;
+    kind: string;
+    title: string;
 }
-export namespace Message {
-    export type SenderEnum = 'MENTOR' | 'USER';
-    export const SenderEnum = {
-        Mentor: 'MENTOR' as SenderEnum,
-        User: 'USER' as SenderEnum
-    };
-}
-
 

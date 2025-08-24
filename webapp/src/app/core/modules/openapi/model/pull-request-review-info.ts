@@ -14,14 +14,14 @@ import { UserInfo } from './user-info';
 
 
 export interface PullRequestReviewInfo { 
+    author?: UserInfo;
+    codeComments: number;
+    htmlUrl: string;
     id: number;
     isDismissed: boolean;
-    state: PullRequestReviewInfo.StateEnum;
-    codeComments: number;
-    author?: UserInfo;
     pullRequest?: PullRequestBaseInfo;
-    htmlUrl: string;
     score: number;
+    state: PullRequestReviewInfo.StateEnum;
     submittedAt?: string;
 }
 export namespace PullRequestReviewInfo {

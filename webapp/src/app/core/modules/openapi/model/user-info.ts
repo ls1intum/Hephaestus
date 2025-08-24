@@ -12,12 +12,12 @@
 
 
 export interface UserInfo { 
-    id: number;
-    login: string;
-    email?: string;
     avatarUrl: string;
-    name: string;
+    email?: string;
     htmlUrl: string;
+    id: number;
     leaguePoints?: number;
+    login: string;
+    name: string;
 }
 

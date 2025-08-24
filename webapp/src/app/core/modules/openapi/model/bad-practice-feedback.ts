@@ -12,7 +12,7 @@
 
 
 export interface BadPracticeFeedback { 
-    type: string;
     explanation: string;
+    type: string;
 }
 
