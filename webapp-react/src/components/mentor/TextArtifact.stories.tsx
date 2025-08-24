@@ -1,61 +1,73 @@
 import type { Meta, StoryObj } from "@storybook/react";
 import { fn } from "@storybook/test";
 import { TextArtifact } from "./TextArtifact";
+import type { ArtifactShellModel, TextContentModel } from "./artifact-model";
 
 /**
- * TextArtifactView renders editable text content with version context.
- * Presentational only: no fetching, no global state; ideal for Storybook.
+ * TextArtifact integrates shell + chat sidebar + text content via ArtifactShellModel.
+ * Use this to validate the full presentational wrapper with minimal mock wiring.
  */
+const defaultModel: ArtifactShellModel<TextContentModel> = {
+	overlay: {
+		title: "Project Plan",
+		status: "idle",
+		boundingBox: { top: 0, left: 0, width: 600, height: 400 },
+	},
+	ui: { isVisible: true, isMobile: false, readonly: false },
+	chat: {
+		messages: [],
+		votes: [],
+		status: "ready",
+		attachments: [],
+		onMessageSubmit: fn(),
+		onStop: fn(),
+		onFileUpload: async () => [],
+		onMessageEdit: fn(),
+		onCopy: fn(),
+		onVote: fn(),
+		onClose: fn(),
+	},
+	version: {
+		isCurrentVersion: true,
+		currentVersionIndex: -1,
+		selectedUpdatedAt: new Date(),
+	},
+	content: {
+		content: `# Project Plan\n\nThis is some example content to showcase the editor.`,
+		mode: "edit",
+		onSaveContent: fn(),
+		isLoading: false,
+	},
+};
+
 const meta = {
 	component: TextArtifact,
 	tags: ["autodocs"],
 	parameters: { layout: "fullscreen" },
-	argTypes: {
-		mode: {
-			control: "select",
-			options: ["edit", "diff"],
-			description: "Display mode",
-		},
-		status: {
-			control: "select",
-			options: ["idle", "streaming"],
-			description: "Streaming status",
-		},
-		isCurrentVersion: {
-			control: "boolean",
-			description: "Whether the latest version is active",
-		},
-		currentVersionIndex: {
-			control: "number",
-			description: "Index of the current version",
-		},
-		isLoading: {
-			control: "boolean",
-			description: "Show loading skeleton",
-		},
-	},
 	args: {
-		content: `# Project Plan\n\nThis is some example content to showcase the editor.`,
-		mode: "edit",
-		status: "idle",
-		isCurrentVersion: true,
-		currentVersionIndex: 2,
-		onSaveContent: fn(),
-		isLoading: false,
+		model: defaultModel satisfies ArtifactShellModel<TextContentModel>,
 	},
 } satisfies Meta<typeof TextArtifact>;
 
 export default meta;
 export type Story = StoryObj<typeof meta>;
 
-/**
- * Default editable content in the latest version.
- */
 export const Default: Story = {};
 
-/**
- * Loading state while versions/content are being fetched.
- */
-export const Loading: Story = {
-	args: { isLoading: true },
+export const ViewingPreviousVersion: Story = {
+	args: {
+		model: {
+			...defaultModel,
+			version: {
+				...(defaultModel.version ?? {
+					isCurrentVersion: true,
+					currentVersionIndex: -1,
+				}),
+				isCurrentVersion: false,
+				currentVersionIndex: 2,
+				canPrev: true,
+				canNext: true,
+			},
+		},
+	},
 };

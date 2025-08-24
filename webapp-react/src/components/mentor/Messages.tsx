@@ -8,6 +8,7 @@ import type { ChatMessage } from "@/lib/types";
 import { cn } from "@/lib/utils";
 import { Greeting } from "./Greeting";
 import { PreviewMessage, ThinkingMessage } from "./Message";
+import type { PartRendererMap } from "./renderers/types";
 
 export interface MessagesProps {
 	/** Array of chat messages to display */
@@ -34,12 +35,10 @@ export interface MessagesProps {
 	onCopy?: (content: string) => void;
 	/** Handler for voting on messages */
 	onVote?: (messageId: string, isUpvote: boolean) => void;
-	/** Handler for document interactions */
-	onDocumentClick?: (documentId: string, boundingBox: DOMRect) => void;
-	/** Handler for document content changes */
-	onDocumentSave?: (documentId: string, content: string) => void;
 	/** Optional CSS class name */
 	className?: string;
+	/** Injected renderers for tool parts */
+	partRenderers?: PartRendererMap;
 }
 
 function PureMessages({
@@ -55,9 +54,8 @@ function PureMessages({
 	onMessageEdit,
 	onCopy,
 	onVote,
-	onDocumentClick,
-	onDocumentSave,
 	className,
+	partRenderers,
 }: MessagesProps) {
 	const isArtifact = variant === "artifact";
 
@@ -124,8 +122,7 @@ function PureMessages({
 							onMessageEdit={onMessageEdit}
 							onCopy={onCopy}
 							onVote={onVote}
-							onDocumentClick={onDocumentClick}
-							onDocumentSave={onDocumentSave}
+							partRenderers={partRenderers}
 						/>
 					);
 				})}

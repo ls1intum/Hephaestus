@@ -1,6 +1,6 @@
 import { FileText, MessageCircle, PenLine } from "lucide-react";
 import { memo } from "react";
-import type { ArtifactKind } from "./Artifact";
+import type { ArtifactKind } from "@/lib/types";
 import { LoaderIcon } from "./LoaderIcon";
 
 const getActionText = (
@@ -34,7 +34,7 @@ interface DocumentToolProps {
 		| { id: string; description: string } // for update
 		| { documentId: string }; // for request-suggestions
 	/** Handler for document clicks - receives document ID and rect */
-	onDocumentClick?: (documentId: string, boundingBox: DOMRect) => void;
+	onDocumentClick?: (boundingBox: DOMRect) => void;
 }
 
 function PureDocumentTool({
@@ -49,7 +49,7 @@ function PureDocumentTool({
 
 		if (result) {
 			// Just pass the document ID and let parent handle the rest
-			onDocumentClick?.(result.id, rect as DOMRect);
+			onDocumentClick?.(rect as DOMRect);
 		}
 		// For in-progress operations, we don't need to do anything
 		// The loading state is already shown via isLoading prop

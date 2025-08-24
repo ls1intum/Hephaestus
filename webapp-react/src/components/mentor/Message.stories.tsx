@@ -45,14 +45,6 @@ const meta = {
 			description: "Handler for voting on messages",
 			control: false,
 		},
-		onDocumentClick: {
-			description: "Handler for document interactions",
-			control: false,
-		},
-		onDocumentSave: {
-			description: "Handler for document content changes",
-			control: false,
-		},
 		className: {
 			description: "Optional CSS class name",
 			control: "text",
@@ -65,8 +57,6 @@ const meta = {
 		onMessageEdit: fn(),
 		onCopy: fn(),
 		onVote: fn(),
-		onDocumentClick: fn(),
-		onDocumentSave: fn(),
 	},
 	decorators: [
 		(Story) => (

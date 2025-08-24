@@ -23,7 +23,6 @@ const meta = {
 	},
 	args: {
 		onDocumentClick: fn(),
-		onSaveContent: fn(),
 		isLoading: false,
 		isStreaming: false,
 	},

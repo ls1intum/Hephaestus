@@ -1,16 +1,13 @@
 import type { UseChatHelpers } from "@ai-sdk/react";
 import equal from "fast-deep-equal";
 import { memo } from "react";
-import { createPortal } from "react-dom";
-import { useWindowSize } from "usehooks-ts";
-import type { ChatMessageVote, Document } from "@/api/types.gen";
+import type { ChatMessageVote } from "@/api/types.gen";
 import { useScrollToBottom } from "@/hooks/use-scroll-to-bottom";
 import type { Attachment, ChatMessage } from "@/lib/types";
 import { cn } from "@/lib/utils";
-import type { UIArtifact } from "./Artifact";
-import { Artifact } from "./Artifact";
 import { Messages } from "./Messages";
 import { MultimodalInput } from "./MultimodalInput";
+import type { PartRendererMap } from "./renderers/types";
 
 export interface ChatProps {
 	/** Unique identifier for the chat session */
@@ -43,8 +40,6 @@ export interface ChatProps {
 	onCopy?: (content: string) => void;
 	/** Handler for voting on messages */
 	onVote?: (messageId: string, isUpvote: boolean) => void;
-	/** Handler called when document preview is clicked */
-	onDocumentClick?: (documentId: string, boundingBox: DOMRect) => void;
 	/** Whether to show suggested actions in input */
 	showSuggestedActions?: boolean;
 	/** Placeholder text for input */
@@ -53,21 +48,8 @@ export interface ChatProps {
 	disableAttachments?: boolean;
 	/** Optional CSS class name */
 	className?: string;
-	/** Artifact overlay state (from hook) */
-	artifact?: UIArtifact | null;
-	artifactDocuments?: Document[];
-	artifactCurrentVersionIndex?: number;
-	artifactIsCurrentVersion?: boolean;
-	artifactIsContentDirty?: boolean;
-	artifactMode?: "edit" | "diff";
-	/** Artifact handlers (from hook) */
-	onOpenArtifactById?: (documentId: string, boundingBox: DOMRect) => void;
-	onOpenArtifact?: (document: Document, boundingBox: DOMRect) => void;
-	onCloseArtifact?: () => void;
-	onSaveArtifactContent?: (content: string, debounce: boolean) => void;
-	onChangeArtifactVersion?: (
-		type: "next" | "prev" | "toggle" | "latest",
-	) => void;
+	/** Injected renderers for tool parts (keep presentational) */
+	partRenderers?: PartRendererMap;
 }
 
 function PureChat({
@@ -89,21 +71,8 @@ function PureChat({
 	inputPlaceholder = "Send a message...",
 	disableAttachments = false,
 	className,
-	artifact,
-	artifactDocuments,
-	artifactCurrentVersionIndex,
-	artifactIsCurrentVersion,
-	artifactIsContentDirty,
-	artifactMode,
-	onOpenArtifactById,
-	// onOpenArtifact not yet used within Chat (artifact opens from Message -> handler)
-	onCloseArtifact,
-	onSaveArtifactContent,
-	onChangeArtifactVersion,
+	partRenderers,
 }: ChatProps) {
-	const { width } = useWindowSize();
-	const isMobile = width ? width < 768 : false;
-
 	// Internal scroll management for the chat container
 	const { containerRef, endRef, isAtBottom, scrollToBottom } =
 		useScrollToBottom();
@@ -111,15 +80,6 @@ function PureChat({
 	// Use internal scroll management if parent doesn't provide it
 	const actualIsAtBottom = parentScrollToBottom ? parentIsAtBottom : isAtBottom;
 	const actualScrollToBottom = parentScrollToBottom || scrollToBottom;
-
-	// Derived values from provided artifact/doc state
-	const currentDocument =
-		artifactDocuments?.[artifactCurrentVersionIndex ?? -1] ||
-		artifactDocuments?.[0];
-	const isCurrentVersion =
-		artifactIsCurrentVersion ??
-		(!!artifactDocuments &&
-			(artifactCurrentVersionIndex ?? -1) === artifactDocuments.length - 1);
 
 	// Suggested actions should only show when there are no messages and explicitly enabled
 	const shouldShowSuggestedActions =
@@ -142,8 +102,7 @@ function PureChat({
 						onMessageEdit={onMessageEdit}
 						onCopy={onCopy}
 						onVote={onVote}
-						onDocumentClick={onOpenArtifactById}
-						onDocumentSave={(content) => onSaveArtifactContent?.(content, true)}
+						partRenderers={partRenderers}
 					/>
 
 					{/* Absolutely anchored input at the bottom of SidebarInset content area */}
@@ -169,7 +128,7 @@ function PureChat({
 									disableAttachments={disableAttachments}
 									isAtBottom={actualIsAtBottom}
 									scrollToBottom={actualScrollToBottom}
-									isCurrentVersion={isCurrentVersion}
+									isCurrentVersion={true}
 									className="bg-background dark:bg-muted"
 								/>
 							</div>
@@ -182,41 +141,7 @@ function PureChat({
 				</div>
 			</div>
 
-			{artifact &&
-				createPortal(
-					<Artifact
-						artifact={artifact}
-						documents={artifactDocuments}
-						currentDocument={currentDocument}
-						currentVersionIndex={artifactCurrentVersionIndex ?? -1}
-						isCurrentVersion={isCurrentVersion}
-						isContentDirty={artifactIsContentDirty ?? false}
-						mode={artifactMode ?? "edit"}
-						isVisible={artifact.isVisible}
-						isMobile={isMobile}
-						readonly={readonly}
-						messages={messages}
-						votes={votes}
-						status={status}
-						attachments={attachments}
-						metadata={{}}
-						onClose={onCloseArtifact ?? (() => {})}
-						onContentSave={(content: string) =>
-							onSaveArtifactContent?.(content, true)
-						}
-						onVersionChange={onChangeArtifactVersion ?? (() => {})}
-						onMessageSubmit={onMessageSubmit}
-						onStop={onStop}
-						onFileUpload={onFileUpload}
-						onMessageEdit={onMessageEdit}
-						onCopy={onCopy}
-						onVote={onVote}
-						onDocumentClick={onOpenArtifactById}
-						onDocumentSave={(content) => onSaveArtifactContent?.(content, true)}
-						onMetadataUpdate={() => {}}
-					/>,
-					document.body,
-				)}
+			{/* Overlay is injected by route containers, not here */}
 		</>
 	);
 }

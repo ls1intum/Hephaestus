@@ -14,9 +14,7 @@ interface DocumentPreviewProps {
 	/** Whether the document is currently streaming content */
 	isStreaming?: boolean;
 	/** Handler for when the document preview is clicked */
-	onDocumentClick?: (document: Document, boundingBox: DOMRect) => void;
-	/** Handler for saving document content changes */
-	onSaveContent?: (updatedContent: string, debounce: boolean) => void;
+	onDocumentClick?: (boundingBox: DOMRect) => void;
 }
 
 function PureDocumentPreview({
@@ -24,14 +22,13 @@ function PureDocumentPreview({
 	isLoading = false,
 	isStreaming = false,
 	onDocumentClick,
-	onSaveContent,
 }: DocumentPreviewProps) {
 	const handleClick = useCallback(
 		(event: MouseEvent<HTMLElement>) => {
 			if (!document || !onDocumentClick) return;
 
 			const boundingBox = event.currentTarget.getBoundingClientRect();
-			onDocumentClick(document, boundingBox);
+			onDocumentClick(boundingBox);
 		},
 		[document, onDocumentClick],
 	);
@@ -44,11 +41,7 @@ function PureDocumentPreview({
 		<div className="relative w-full cursor-pointer">
 			<HitboxLayer onClick={handleClick} />
 			<DocumentHeader title={document.title} isStreaming={isStreaming} />
-			<DocumentContent
-				document={document}
-				isStreaming={isStreaming}
-				onSaveContent={onSaveContent}
-			/>
+			<DocumentContent document={document} isStreaming={isStreaming} />
 		</div>
 	);
 }
@@ -138,14 +131,9 @@ const DocumentHeader = memo(PureDocumentHeader, (prevProps, nextProps) => {
 interface DocumentContentProps {
 	document: Document;
 	isStreaming: boolean;
-	onSaveContent?: (updatedContent: string, debounce: boolean) => void;
 }
 
-const DocumentContent = ({
-	document,
-	isStreaming,
-	onSaveContent,
-}: DocumentContentProps) => {
+const DocumentContent = ({ document, isStreaming }: DocumentContentProps) => {
 	const containerClassName = cn(
 		"h-[257px] overflow-y-scroll border rounded-b-2xl dark:bg-muted border-t-0 dark:border-zinc-700",
 		{
@@ -153,19 +141,12 @@ const DocumentContent = ({
 		},
 	);
 
-	const handleSaveContent = useCallback(
-		(updatedContent: string, debounce: boolean) => {
-			onSaveContent?.(updatedContent, debounce);
-		},
-		[onSaveContent],
-	);
-
 	return (
 		<div className={containerClassName}>
 			{document.kind === "TEXT" && (
 				<TextEditor
 					content={document.content ?? ""}
-					onSaveContent={handleSaveContent}
+					onSaveContent={() => {}}
 					status={isStreaming ? "streaming" : "idle"}
 					isCurrentVersion={true}
 					currentVersionIndex={0}

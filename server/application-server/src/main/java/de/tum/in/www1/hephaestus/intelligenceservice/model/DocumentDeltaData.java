@@ -25,53 +25,78 @@ import com.fasterxml.jackson.annotation.JsonTypeName;
 import org.hibernate.validator.constraints.*;
 
 /**
- * Input for createDocument tool.
+ * DocumentDeltaData
  */
 @JsonPropertyOrder({
-  CreateDocumentInput.JSON_PROPERTY_DOCUMENT_ID,
-  CreateDocumentInput.JSON_PROPERTY_KIND,
-  CreateDocumentInput.JSON_PROPERTY_TITLE
+  DocumentDeltaData.JSON_PROPERTY_DELTA,
+  DocumentDeltaData.JSON_PROPERTY_ID,
+  DocumentDeltaData.JSON_PROPERTY_KIND
 })
 @jakarta.annotation.Generated(value = "org.openapitools.codegen.languages.JavaClientCodegen", comments = "Generator version: 7.7.0")
-public class CreateDocumentInput {
-  public static final String JSON_PROPERTY_DOCUMENT_ID = "document_id";
-  private String documentId;
+public class DocumentDeltaData {
+  public static final String JSON_PROPERTY_DELTA = "delta";
+  private String delta;
+
+  public static final String JSON_PROPERTY_ID = "id";
+  private String id;
 
   public static final String JSON_PROPERTY_KIND = "kind";
   private String kind;
 
-  public static final String JSON_PROPERTY_TITLE = "title";
-  private String title;
-
-  public CreateDocumentInput() {
+  public DocumentDeltaData() {
   }
 
-  public CreateDocumentInput documentId(String documentId) {
+  public DocumentDeltaData delta(String delta) {
     
-    this.documentId = documentId;
+    this.delta = delta;
     return this;
   }
 
   /**
-   * Do not populate this field, will automatically be set by the system
-   * @return documentId
+   * Get delta
+   * @return delta
    */
   @jakarta.annotation.Nonnull
-  @JsonProperty(JSON_PROPERTY_DOCUMENT_ID)
+  @JsonProperty(JSON_PROPERTY_DELTA)
   @JsonInclude(value = JsonInclude.Include.ALWAYS)
 
-  public String getDocumentId() {
-    return documentId;
+  public String getDelta() {
+    return delta;
   }
 
 
-  @JsonProperty(JSON_PROPERTY_DOCUMENT_ID)
+  @JsonProperty(JSON_PROPERTY_DELTA)
   @JsonInclude(value = JsonInclude.Include.ALWAYS)
-  public void setDocumentId(String documentId) {
-    this.documentId = documentId;
+  public void setDelta(String delta) {
+    this.delta = delta;
   }
 
-  public CreateDocumentInput kind(String kind) {
+  public DocumentDeltaData id(String id) {
+    
+    this.id = id;
+    return this;
+  }
+
+  /**
+   * Get id
+   * @return id
+   */
+  @jakarta.annotation.Nonnull
+  @JsonProperty(JSON_PROPERTY_ID)
+  @JsonInclude(value = JsonInclude.Include.ALWAYS)
+
+  public String getId() {
+    return id;
+  }
+
+
+  @JsonProperty(JSON_PROPERTY_ID)
+  @JsonInclude(value = JsonInclude.Include.ALWAYS)
+  public void setId(String id) {
+    this.id = id;
+  }
+
+  public DocumentDeltaData kind(String kind) {
     
     this.kind = kind;
     return this;
@@ -96,31 +121,6 @@ public class CreateDocumentInput {
     this.kind = kind;
   }
 
-  public CreateDocumentInput title(String title) {
-    
-    this.title = title;
-    return this;
-  }
-
-  /**
-   * Get title
-   * @return title
-   */
-  @jakarta.annotation.Nonnull
-  @JsonProperty(JSON_PROPERTY_TITLE)
-  @JsonInclude(value = JsonInclude.Include.ALWAYS)
-
-  public String getTitle() {
-    return title;
-  }
-
-
-  @JsonProperty(JSON_PROPERTY_TITLE)
-  @JsonInclude(value = JsonInclude.Include.ALWAYS)
-  public void setTitle(String title) {
-    this.title = title;
-  }
-
   @Override
   public boolean equals(Object o) {
     if (this == o) {
@@ -129,24 +129,24 @@ public class CreateDocumentInput {
     if (o == null || getClass() != o.getClass()) {
       return false;
     }
-    CreateDocumentInput createDocumentInput = (CreateDocumentInput) o;
-    return Objects.equals(this.documentId, createDocumentInput.documentId) &&
-        Objects.equals(this.kind, createDocumentInput.kind) &&
-        Objects.equals(this.title, createDocumentInput.title);
+    DocumentDeltaData documentDeltaData = (DocumentDeltaData) o;
+    return Objects.equals(this.delta, documentDeltaData.delta) &&
+        Objects.equals(this.id, documentDeltaData.id) &&
+        Objects.equals(this.kind, documentDeltaData.kind);
   }
 
   @Override
   public int hashCode() {
-    return Objects.hash(documentId, kind, title);
+    return Objects.hash(delta, id, kind);
   }
 
   @Override
   public String toString() {
     StringBuilder sb = new StringBuilder();
-    sb.append("class CreateDocumentInput {\n");
-    sb.append("    documentId: ").append(toIndentedString(documentId)).append("\n");
+    sb.append("class DocumentDeltaData {\n");
+    sb.append("    delta: ").append(toIndentedString(delta)).append("\n");
+    sb.append("    id: ").append(toIndentedString(id)).append("\n");
     sb.append("    kind: ").append(toIndentedString(kind)).append("\n");
-    sb.append("    title: ").append(toIndentedString(title)).append("\n");
     sb.append("}");
     return sb.toString();
   }

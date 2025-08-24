@@ -100,6 +100,11 @@ export type Contributor = {
  */
 export type CreateDocumentInput = {
     /**
+     * Document Id
+     * Do not populate this field, will automatically be set by the system
+     */
+    document_id: string;
+    /**
      * Kind
      */
     kind: 'text';
@@ -178,6 +183,56 @@ export type Document = {
 };
 
 /**
+ * DocumentCreateData
+ */
+export type DocumentCreateData = {
+    /**
+     * Id
+     */
+    id: string;
+    /**
+     * Kind
+     */
+    kind: 'text';
+    /**
+     * Title
+     */
+    title: string;
+};
+
+/**
+ * DocumentDeltaData
+ */
+export type DocumentDeltaData = {
+    /**
+     * Delta
+     */
+    delta: string;
+    /**
+     * Id
+     */
+    id: string;
+    /**
+     * Kind
+     */
+    kind: 'text';
+};
+
+/**
+ * DocumentFinishData
+ */
+export type DocumentFinishData = {
+    /**
+     * Id
+     */
+    id: string;
+    /**
+     * Kind
+     */
+    kind: 'text';
+};
+
+/**
  * DTO for document summary in list views.
  * Excludes content for performance - only metadata.
  */
@@ -187,6 +242,20 @@ export type DocumentSummary = {
     kind: 'TEXT';
     title: string;
     userId: string;
+};
+
+/**
+ * DocumentUpdateData
+ */
+export type DocumentUpdateData = {
+    /**
+     * Id
+     */
+    id: string;
+    /**
+     * Kind
+     */
+    kind: 'text';
 };
 
 /**

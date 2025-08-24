@@ -1,16 +1,19 @@
 import { AnimatePresence, motion } from "framer-motion";
 import { CheckCircle2 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { cn } from "@/lib/utils";
 import { Markdown } from "./Markdown";
 
 interface MessageReasoningProps {
 	isLoading: boolean;
 	reasoning: string;
+	variant?: "default" | "artifact";
 }
 
 export function MessageReasoning({
 	isLoading,
 	reasoning,
+	variant = "default",
 }: MessageReasoningProps) {
 	const [isExpanded, setIsExpanded] = useState(false);
 	const hasContent = (reasoning ?? "").trim().length > 0;
@@ -222,7 +225,13 @@ export function MessageReasoning({
 						exit="collapsed"
 						variants={variants}
 						transition={{ duration: 0.2, ease: "easeInOut" }}
-						className="pl-4 text-zinc-600 dark:text-zinc-400 border-l flex flex-col gap-2"
+						className={
+							[
+								"pl-4 text-zinc-600 dark:text-zinc-400 border-l flex flex-col gap-2",
+								// Use the artifact chat surface for ring to blend in when embedded
+								variant === "artifact" ? "[--ring-color:var(--artifact-bg)]" : "",
+							].filter(Boolean).join(" ")
+						}
 					>
 						{sections.length > 0 ? (
 							<>
@@ -230,17 +239,24 @@ export function MessageReasoning({
 									const k = `${s.title ?? "_"}-${(s.body ?? "").slice(0, 24)}-${idx}`;
 									return (
 										<div key={k} className="relative">
-											<span className="absolute -left-[19.5px] top-2.5 h-1.5 w-1.5 rounded-full bg-zinc-400 ring-12 ring-background" />
+											<span
+												className={cn(
+													"absolute -left-[19.5px] top-2.5 h-1.5 w-1.5 rounded-full bg-zinc-400 ring-12",
+													variant === "artifact" ? "ring-muted dark:ring-background" : "ring-background",
+									)}
+											/>
 											{s.body && <Markdown>{s.body}</Markdown>}
 										</div>
 									);
 								})}
-								<div className="relative pt-1">
-									<span className="absolute -left-[22.5px] top-2 text-zinc-400 bg-background ring-12 ring-background rounded-full">
-										<CheckCircle2 className="size-3" />
-									</span>
-									<div className="text-sm text-muted-foreground">Done</div>
-								</div>
+								{!isLoading && (
+									<div className="relative pt-1">
+										<span className={cn("absolute -left-[24px] top-1.5 text-zinc-400 ring-8", variant === "artifact" ? "bg-muted dark:bg-background ring-muted dark:ring-background" : "ring-background bg-background")}>
+											<CheckCircle2 className="size-4" />
+										</span>
+										<div className="text-sm text-muted-foreground">Done</div>
+									</div>
+								)}
 							</>
 						) : (
 							<Markdown>{reasoning}</Markdown>

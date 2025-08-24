@@ -1,6 +1,7 @@
 package de.tum.in.www1.hephaestus.mentor;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
+import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
@@ -12,6 +13,7 @@ import de.tum.in.www1.hephaestus.mentor.document.DocumentRepository;
 import java.lang.reflect.Method;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
+import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -119,20 +121,18 @@ public class ChatPersistenceService {
         // Track data parts by ID for replacement/merge updates
         private final ConcurrentHashMap<String, ChatMessagePart> dataPartsById = new ConcurrentHashMap<>();
 
-        /**
-         * Accumulator for building/updating a document from transient data-* parts in the stream.
-         * "Transient" here means: not shown to the client UI as message parts, but MUST be used by the server
-         * to construct and persist document content and versions.
-         */
-        private static class DocumentBuildState {
+        // Track active document data streams by document id
+        private static class ActiveDocState {
 
-            UUID id; // Stable document ID across versions
+            UUID id;
             DocumentKind kind = DocumentKind.TEXT;
-            String title;
+            String title; // only for create
             final StringBuilder content = new StringBuilder();
         }
 
-        private DocumentBuildState currentDocument;
+        private final ConcurrentHashMap<UUID, ActiveDocState> activeDocuments = new ConcurrentHashMap<>();
+
+        // Legacy document build state removed in favor of new protocol
 
         public ChatStreamProcessor(User user, ChatThread thread, ChatMessage parentMessage) {
             this.user = user;
@@ -1131,12 +1131,11 @@ public class ChatPersistenceService {
                     return;
                 }
 
-                // Special handling for document construction via transient data-* parts
+                // New protocol: handle document data events data-document-*
                 String partType = dataPart.getType();
-                if (partType != null && partType.startsWith("data-")) {
-                    handleDocumentDataPart(dataPart);
-                    // Never persist these as chat message parts – they are control/data signals for document ops
-                    return;
+                if (partType != null && partType.startsWith("data-document-")) {
+                    handleNewDocumentProtocol(dataPart);
+                    return; // Never persist these as chat parts
                 }
 
                 // For any other data parts: keep existing semantics
@@ -1190,7 +1189,6 @@ public class ChatPersistenceService {
             // Use consistent helper method
             ChatMessagePart part = createMessagePart(ChatMessagePart.PartType.DATA, "");
             part.setOriginalType(dataPart.getType()); // Set originalType for data parts
-
             updateDataPartContent(part, dataPart);
             return part;
         }
@@ -1233,103 +1231,88 @@ public class ChatPersistenceService {
             part.setContent(dataContent);
         }
 
-        /**
-         * Handle server-side document building/updating from AI SDK v5 data-* transient parts.
-         * Supported control parts (type -> data expected):
-         *  - data-kind:       "text" | ... -> sets DocumentKind
-         *  - data-title:      string        -> sets title
-         *  - data-id:         UUID string   -> sets/locks the document id
-         *  - data-textDelta:  string        -> append to content buffer
-         *  - data-clear:      any           -> clears content buffer
-         *  - data-finish:     any           -> persists a new document version
-         */
-        private void handleDocumentDataPart(StreamDataPart dataPart) {
+        // New protocol handler for data-document-* events
+        @SuppressWarnings("unchecked")
+        private void handleNewDocumentProtocol(StreamDataPart dataPart) {
             try {
-                String type = dataPart.getType();
-                Object data = dataPart.getData();
+                String type = dataPart.getType(); // e.g., data-document-create
+                Object payload = dataPart.getData();
 
-                // Ensure we have a build state to work with
-                if (currentDocument == null) {
-                    currentDocument = new DocumentBuildState();
+                Map<String, Object> payloadMap;
+                if (payload instanceof Map<?, ?> m) {
+                    payloadMap = (Map<String, Object>) m;
+                } else {
+                    payloadMap = objectMapper.convertValue(payload, new TypeReference<Map<String, Object>>() {});
                 }
 
                 switch (type) {
-                    case "data-kind" -> {
-                        if (data instanceof String s && !s.isBlank()) {
-                            try {
-                                currentDocument.kind = DocumentKind.fromValue(s);
-                            } catch (IllegalArgumentException ex) {
-                                logger.warn("Unknown document kind '{}', defaulting to TEXT", s);
-                                currentDocument.kind = DocumentKind.TEXT;
-                            }
+                    case "data-document-create": {
+                        UUID id = UUID.fromString(String.valueOf(payloadMap.get("id")));
+                        String title = String.valueOf(payloadMap.get("title"));
+                        String kindStr = String.valueOf(payloadMap.get("kind"));
+                        DocumentKind kind;
+                        try {
+                            kind = DocumentKind.fromValue(kindStr);
+                        } catch (Exception e) {
+                            kind = DocumentKind.TEXT;
                         }
+                        ActiveDocState state = new ActiveDocState();
+                        state.id = id;
+                        state.kind = kind;
+                        state.title = title;
+                        activeDocuments.put(id, state);
+                        logger.debug("Initialized document-create state for {}", id);
+                        break;
                     }
-                    case "data-title" -> {
-                        if (data instanceof String s) {
-                            currentDocument.title = s;
+                    case "data-document-update": {
+                        UUID id = UUID.fromString(String.valueOf(payloadMap.get("id")));
+                        String kindStr = String.valueOf(payloadMap.get("kind"));
+                        DocumentKind kind;
+                        try {
+                            kind = DocumentKind.fromValue(kindStr);
+                        } catch (Exception e) {
+                            kind = DocumentKind.TEXT;
                         }
+                        ActiveDocState state = activeDocuments.computeIfAbsent(id, k -> new ActiveDocState());
+                        state.id = id;
+                        state.kind = kind;
+                        state.content.setLength(0);
+                        logger.debug("Initialized/cleared document-update state for {}", id);
+                        break;
                     }
-                    case "data-id" -> {
-                        if (data instanceof String s && !s.isBlank()) {
-                            try {
-                                currentDocument.id = UUID.fromString(s.trim());
-                            } catch (IllegalArgumentException ex) {
-                                logger.warn("Invalid document UUID received in data-id: {}", s);
-                            }
+                    case "data-document-delta": {
+                        UUID id = UUID.fromString(String.valueOf(payloadMap.get("id")));
+                        String delta = String.valueOf(payloadMap.get("delta"));
+                        ActiveDocState state = activeDocuments.computeIfAbsent(id, k -> new ActiveDocState());
+                        state.id = id;
+                        state.content.append(delta != null ? delta : "");
+                        break;
+                    }
+                    case "data-document-finish": {
+                        UUID id = UUID.fromString(String.valueOf(payloadMap.get("id")));
+                        ActiveDocState state = activeDocuments.get(id);
+                        if (state == null) {
+                            logger.warn("Finish received without prior state for {}", id);
+                            return;
                         }
-                    }
-                    case "data-textDelta" -> {
-                        if (data instanceof String s) {
-                            currentDocument.content.append(s);
-                        }
-                    }
-                    case "data-clear" -> {
-                        currentDocument.content.setLength(0);
-                    }
-                    case "data-finish" -> {
-                        // On finish: persist a document version (create or update)
-                        if (currentDocument.id == null) {
-                            // If no explicit id provided so far, generate a new one for creation
-                            currentDocument.id = UUID.randomUUID();
-                        }
-
-                        // Try to reuse existing doc attributes when this is an update (id provided without title/kind)
-                        String title = currentDocument.title;
-                        DocumentKind kind = currentDocument.kind;
+                        String title = state.title;
+                        DocumentKind kind = state.kind != null ? state.kind : DocumentKind.TEXT;
+                        String content = state.content.toString();
 
                         var latestExisting = documentRepository.findFirstByIdAndUserOrderByVersionNumberDesc(
-                            currentDocument.id,
+                            id,
                             thread.getUser()
                         );
-                        if (latestExisting.isPresent()) {
-                            if (title == null || title.isBlank()) {
-                                title = latestExisting.get().getTitle();
-                            }
-                            if (kind == null) {
-                                kind = latestExisting.get().getKind();
-                            }
+                        if (latestExisting.isPresent() && (title == null || title.isBlank())) {
+                            title = latestExisting.get().getTitle();
                         }
-
                         if (title == null || title.isBlank()) {
                             title = "Untitled";
                         }
-                        if (kind == null) {
-                            kind = DocumentKind.TEXT;
-                        }
-
-                        String content = currentDocument.content.toString();
 
                         int nextVersion = latestExisting.map(d -> d.getVersionNumber() + 1).orElse(1);
-                        Document toSave = new Document(
-                            currentDocument.id,
-                            nextVersion,
-                            title,
-                            content,
-                            kind,
-                            thread.getUser()
-                        );
+                        Document toSave = new Document(id, nextVersion, title, content, kind, thread.getUser());
                         documentRepository.save(toSave);
-
                         logger.info(
                             "Persisted document version: id={}, title='{}', kind={}, contentLen={}",
                             toSave.getId(),
@@ -1337,14 +1320,15 @@ public class ChatPersistenceService {
                             toSave.getKind(),
                             content != null ? content.length() : 0
                         );
-                        // Keep build state for potential further updates in the same stream
+                        state.content.setLength(0);
+                        break;
                     }
-                    default -> {
-                        // For other data-* types not related to documents, ignore silently
-                    }
+                    default:
+                        // ignore
+                        break;
                 }
             } catch (Exception e) {
-                logger.error("Failed to handle document data part {}: {}", dataPart.getType(), e.getMessage(), e);
+                logger.error("Failed to handle new document protocol {}: {}", dataPart.getType(), e.getMessage(), e);
             }
         }
 

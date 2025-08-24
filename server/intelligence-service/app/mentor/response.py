@@ -12,6 +12,7 @@ from langchain_core.runnables import RunnableConfig
 from app.mentor.streaming import StreamGenerator
 from app.mentor.mentor import mentor_graph
 from app.logger import logger
+from app.mentor.utils import tool_call_id_to_uuid
 
 
 async def generate_response(
@@ -255,6 +256,13 @@ async def generate_response(
                         tool_args = tool_call.get("args", {})
 
                         if tool_call_id:
+                            # For createDocument, populate document_id.
+                            if tool_name == "createDocument" and isinstance(
+                                tool_args, dict
+                            ):
+                                tool_args["document_id"] = str(
+                                    tool_call_id_to_uuid(tool_call_id)
+                                )
                             yield stream.tool_input_available(
                                 tool_call_id=tool_call_id,
                                 tool_name=tool_name,

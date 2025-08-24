@@ -86,6 +86,11 @@ components:
     CreateDocumentInput:
       description: Input for createDocument tool.
       properties:
+        document_id:
+          description: Do not populate this field, will automatically be set by the
+            system
+          title: Document Id
+          type: string
         kind:
           const: text
           title: Kind
@@ -96,9 +101,11 @@ components:
       required:
       - title
       - kind
+      - document_id
       title: CreateDocumentInput
       type: object
-      x-hephaestus-tool-model: true
+      x-hephaestus:
+        toolModel: true
     CreateDocumentOutput:
       description: Output for createDocument tool.
       properties:
@@ -122,7 +129,8 @@ components:
       - content
       title: CreateDocumentOutput
       type: object
-      x-hephaestus-tool-model: true
+      x-hephaestus:
+        toolModel: true
     DataUIPart:
       description: 'A data part with dynamic type.
 
@@ -204,6 +212,78 @@ components:
       - trace_id
       title: DetectorResponse
       type: object
+    DocumentCreateData:
+      properties:
+        id:
+          title: Id
+          type: string
+        kind:
+          const: text
+          title: Kind
+          type: string
+        title:
+          title: Title
+          type: string
+      required:
+      - id
+      - title
+      - kind
+      title: DocumentCreateData
+      type: object
+      x-hephaestus:
+        dataModel: true
+    DocumentDeltaData:
+      properties:
+        delta:
+          title: Delta
+          type: string
+        id:
+          title: Id
+          type: string
+        kind:
+          const: text
+          title: Kind
+          type: string
+      required:
+      - id
+      - kind
+      - delta
+      title: DocumentDeltaData
+      type: object
+      x-hephaestus:
+        dataModel: true
+    DocumentFinishData:
+      properties:
+        id:
+          title: Id
+          type: string
+        kind:
+          const: text
+          title: Kind
+          type: string
+      required:
+      - id
+      - kind
+      title: DocumentFinishData
+      type: object
+      x-hephaestus:
+        dataModel: true
+    DocumentUpdateData:
+      properties:
+        id:
+          title: Id
+          type: string
+        kind:
+          const: text
+          title: Kind
+          type: string
+      required:
+      - id
+      - kind
+      title: DocumentUpdateData
+      type: object
+      x-hephaestus:
+        dataModel: true
     FileUIPart:
       description: A file part of a message.
       properties:
@@ -247,7 +327,8 @@ components:
       - longitude
       title: GetWeatherInput
       type: object
-      x-hephaestus-tool-model: true
+      x-hephaestus:
+        toolModel: true
     GetWeatherOutput:
       description: Output for getWeather tool, aligned with WeatherTool.tsx expectations.
       properties:
@@ -325,7 +406,8 @@ components:
           title: Utc Offset Seconds
       title: GetWeatherOutput
       type: object
-      x-hephaestus-tool-model: true
+      x-hephaestus:
+        toolModel: true
     HTTPValidationError:
       properties:
         detail:
@@ -1195,7 +1277,8 @@ components:
       - description
       title: UpdateDocumentInput
       type: object
-      x-hephaestus-tool-model: true
+      x-hephaestus:
+        toolModel: true
     UpdateDocumentOutput:
       description: Output for updateDocument tool.
       properties:
@@ -1219,7 +1302,8 @@ components:
       - content
       title: UpdateDocumentOutput
       type: object
-      x-hephaestus-tool-model: true
+      x-hephaestus:
+        toolModel: true
     ValidationError:
       properties:
         loc:

@@ -295,6 +295,18 @@ code {
 	box-shadow: none !important;
 }
 
+/* Ghost streaming widget styling */
+.pm-stream-ghost {
+	opacity: 0.6;
+	white-space: pre-wrap;
+	animation: pmGhostBlink 1.2s steps(1) infinite;
+}
+@keyframes pmGhostBlink {
+	60% {
+		opacity: 0.45;
+	}
+}
+
 /* Shimmer overlay utilities */
 @keyframes shimmer-glide {
 	from {

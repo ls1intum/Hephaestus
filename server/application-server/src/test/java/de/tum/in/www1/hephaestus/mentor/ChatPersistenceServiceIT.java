@@ -69,33 +69,84 @@ public class ChatPersistenceServiceIT extends BaseIntegrationTest {
         // Simulate start of assistant message
         processor.onStreamStart(new StreamStartPart().messageId(UUID.randomUUID().toString()));
 
-        // Simulate document creation sequence like in the example
-        // data-kind: text
-        processor.onDataPart(new StreamDataPart().type("data-kind").data("text")._transient(true));
-        // data-id: provide a deterministic id
+        // Simulate document creation sequence using new protocol
         UUID docId = UUID.randomUUID();
-        processor.onDataPart(new StreamDataPart().type("data-id").data(docId.toString())._transient(true));
-        // data-title
-        processor.onDataPart(new StreamDataPart().type("data-title").data("Short Poem")._transient(true));
-        // data-clear
-        processor.onDataPart(new StreamDataPart().type("data-clear").data(null)._transient(true));
+        processor.onDataPart(
+            new StreamDataPart()
+                .type("data-document-create")
+                .data(new DocumentCreateData().id(docId.toString()).kind("text").title("Short Poem"))
+                ._transient(true)
+        );
 
         // text deltas building the content
-        processor.onDataPart(new StreamDataPart().type("data-textDelta").data("# ")._transient(true));
-        processor.onDataPart(new StreamDataPart().type("data-textDelta").data("Short ")._transient(true));
-        processor.onDataPart(new StreamDataPart().type("data-textDelta").data("Poem\n\n")._transient(true));
-        processor.onDataPart(new StreamDataPart().type("data-textDelta").data("In ")._transient(true));
-        processor.onDataPart(new StreamDataPart().type("data-textDelta").data("the ")._transient(true));
-        processor.onDataPart(new StreamDataPart().type("data-textDelta").data("quiet ")._transient(true));
-        processor.onDataPart(new StreamDataPart().type("data-textDelta").data("of ")._transient(true));
-        processor.onDataPart(new StreamDataPart().type("data-textDelta").data("the ")._transient(true));
-        processor.onDataPart(new StreamDataPart().type("data-textDelta").data("night,\n")._transient(true));
+        processor.onDataPart(
+            new StreamDataPart()
+                .type("data-document-delta")
+                .data(new DocumentDeltaData().id(docId.toString()).kind("text").delta("# "))
+                ._transient(true)
+        );
+        processor.onDataPart(
+            new StreamDataPart()
+                .type("data-document-delta")
+                .data(new DocumentDeltaData().id(docId.toString()).kind("text").delta("Short "))
+                ._transient(true)
+        );
+        processor.onDataPart(
+            new StreamDataPart()
+                .type("data-document-delta")
+                .data(new DocumentDeltaData().id(docId.toString()).kind("text").delta("Poem\n\n"))
+                ._transient(true)
+        );
+        processor.onDataPart(
+            new StreamDataPart()
+                .type("data-document-delta")
+                .data(new DocumentDeltaData().id(docId.toString()).kind("text").delta("In "))
+                ._transient(true)
+        );
+        processor.onDataPart(
+            new StreamDataPart()
+                .type("data-document-delta")
+                .data(new DocumentDeltaData().id(docId.toString()).kind("text").delta("the "))
+                ._transient(true)
+        );
+        processor.onDataPart(
+            new StreamDataPart()
+                .type("data-document-delta")
+                .data(new DocumentDeltaData().id(docId.toString()).kind("text").delta("quiet "))
+                ._transient(true)
+        );
+        processor.onDataPart(
+            new StreamDataPart()
+                .type("data-document-delta")
+                .data(new DocumentDeltaData().id(docId.toString()).kind("text").delta("of "))
+                ._transient(true)
+        );
+        processor.onDataPart(
+            new StreamDataPart()
+                .type("data-document-delta")
+                .data(new DocumentDeltaData().id(docId.toString()).kind("text").delta("the "))
+                ._transient(true)
+        );
+        processor.onDataPart(
+            new StreamDataPart()
+                .type("data-document-delta")
+                .data(new DocumentDeltaData().id(docId.toString()).kind("text").delta("night,\n"))
+                ._transient(true)
+        );
 
         // finish -> should create version 1
-        processor.onDataPart(new StreamDataPart().type("data-finish").data(null)._transient(true));
+        processor.onDataPart(
+            new StreamDataPart()
+                .type("data-document-finish")
+                .data(new DocumentFinishData().id(docId.toString()).kind("text"))
+                ._transient(true)
+        );
 
         // Assert: one version exists with expected content prefix and metadata
-        List<Document> versionsAfterCreate = documentRepository.findByIdAndUserOrderByCreatedAtDesc(docId, mentorUser);
+        List<Document> versionsAfterCreate = documentRepository.findByIdAndUserOrderByVersionNumberDesc(
+            docId,
+            mentorUser
+        );
         assertThat(versionsAfterCreate).hasSize(1);
         Document v1 = versionsAfterCreate.getFirst();
         assertThat(v1.getId()).isEqualTo(docId);
@@ -119,19 +170,37 @@ public class ChatPersistenceServiceIT extends BaseIntegrationTest {
         );
         updateProcessor.onStreamStart(new StreamStartPart().messageId(UUID.randomUUID().toString()));
 
-        // Emit only id (no title/kind) and clear + new content
-        updateProcessor.onDataPart(new StreamDataPart().type("data-id").data(docId.toString())._transient(true));
-        updateProcessor.onDataPart(new StreamDataPart().type("data-clear").data(null)._transient(true));
+        // Emit update start and new content
         updateProcessor.onDataPart(
-            new StreamDataPart().type("data-textDelta").data("In the night's hush,\n")._transient(true)
+            new StreamDataPart()
+                .type("data-document-update")
+                .data(new DocumentUpdateData().id(docId.toString()).kind("text"))
+                ._transient(true)
         );
         updateProcessor.onDataPart(
-            new StreamDataPart().type("data-textDelta").data("Stars whisper secrets.\n")._transient(true)
+            new StreamDataPart()
+                .type("data-document-delta")
+                .data(new DocumentDeltaData().id(docId.toString()).kind("text").delta("In the night's hush,\n"))
+                ._transient(true)
         );
-        updateProcessor.onDataPart(new StreamDataPart().type("data-finish").data(null)._transient(true));
+        updateProcessor.onDataPart(
+            new StreamDataPart()
+                .type("data-document-delta")
+                .data(new DocumentDeltaData().id(docId.toString()).kind("text").delta("Stars whisper secrets.\n"))
+                ._transient(true)
+        );
+        updateProcessor.onDataPart(
+            new StreamDataPart()
+                .type("data-document-finish")
+                .data(new DocumentFinishData().id(docId.toString()).kind("text"))
+                ._transient(true)
+        );
 
         // Assert: two versions exist, latest content reflects update
-        List<Document> versionsAfterUpdate = documentRepository.findByIdAndUserOrderByCreatedAtDesc(docId, mentorUser);
+        List<Document> versionsAfterUpdate = documentRepository.findByIdAndUserOrderByVersionNumberDesc(
+            docId,
+            mentorUser
+        );
         assertThat(versionsAfterUpdate).hasSize(2);
         Document latest = versionsAfterUpdate.get(0);
         Document older = versionsAfterUpdate.get(1);

@@ -35,10 +35,18 @@ import org.springframework.context.annotation.Configuration;
 public class OpenAPIConfiguration {
 
     private static final Logger logger = LoggerFactory.getLogger(OpenAPIConfiguration.class);
+    // Track names of models imported from intelligence-service to preserve refs
+    private Set<String> discoveredIntelligenceModelNames = new LinkedHashSet<>();
 
     /**
      * Auto-discover intelligence service model names from the OpenAPI spec.
-     * This automatically includes all UI parts and tool input/output models.
+     * This automatically includes all UI parts and tool input/output models, and data models.
+     *
+     * Heuristics used when explicit tags are missing:
+     * - Names ending with UIPart or Part (UI and Stream parts)
+     * - UIMessage and UIMessagePart
+     * - Names ending with Input or Output (tool I/O models)
+     * - Names ending with Data (streaming data models like Document*Data)
      */
     private Set<String> discoverIntelligenceServiceModels(Map<String, Schema<?>> allSchemas) {
         Set<String> discoveredModels = new HashSet<>();
@@ -58,9 +66,10 @@ public class OpenAPIConfiguration {
                 continue;
             }
 
-            // Auto-discover tool models by checking for our custom tag
-            if (isToolModelByTag(schema)) {
+            // Only include tool and data models if explicitly tagged via nested x-hephaestus
+            if (isToolModelByTag(schema) || isDataModelByTag(schema)) {
                 discoveredModels.add(schemaName);
+                continue;
             }
         }
 
@@ -81,10 +90,35 @@ public class OpenAPIConfiguration {
         if (schema == null || schema.getExtensions() == null) {
             return false;
         }
+        // Expected nested form only:
+        // x-hephaestus:
+        //   toolModel: true
+        Object hephaestus = schema.getExtensions().get("x-hephaestus");
+        if (hephaestus instanceof Map<?, ?> map) {
+            Object flag = map.get("toolModel");
+            if (flag instanceof Boolean b) return b;
+            if (flag instanceof String s) return Boolean.parseBoolean(s);
+        }
+        return false;
+    }
 
-        // Check for our custom tag
-        Object toolModelTag = schema.getExtensions().get("x-hephaestus-tool-model");
-        return Boolean.TRUE.equals(toolModelTag);
+    /**
+     * Check if a schema is tagged as a data model by the intelligence service.
+     */
+    private boolean isDataModelByTag(Schema<?> schema) {
+        if (schema == null || schema.getExtensions() == null) {
+            return false;
+        }
+        // Expected nested form only:
+        // x-hephaestus:
+        //   dataModel: true
+        Object hephaestus = schema.getExtensions().get("x-hephaestus");
+        if (hephaestus instanceof Map<?, ?> map) {
+            Object flag = map.get("dataModel");
+            if (flag instanceof Boolean b) return b;
+            if (flag instanceof String s) return Boolean.parseBoolean(s);
+        }
+        return false;
     }
 
     /**
@@ -92,16 +126,8 @@ public class OpenAPIConfiguration {
      * This is used for preserving DTO suffixes in schema references.
      */
     private boolean isIntelligenceServiceModel(String schemaName) {
-        // Intelligence service model patterns - these should preserve their references
-        return (
-            schemaName.endsWith("UIPart") ||
-            schemaName.endsWith("Part") ||
-            schemaName.equals("UIMessage") ||
-            schemaName.equals("UIMessagePart") ||
-            // All tool models (they will have the tag, but we can identify by name pattern too)
-            schemaName.endsWith("Input") ||
-            schemaName.endsWith("Output")
-        );
+        // Preserve refs only for models we explicitly imported from intelligence-service
+        return discoveredIntelligenceModelNames.contains(schemaName);
     }
 
     /**

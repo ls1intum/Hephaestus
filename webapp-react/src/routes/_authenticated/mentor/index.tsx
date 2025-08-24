@@ -10,6 +10,7 @@ import {
 import type { ChatThreadGroup, ChatThreadSummary } from "@/api/types.gen";
 import type { ChatProps } from "@/components/mentor/Chat";
 import { Chat } from "@/components/mentor/Chat";
+import { defaultPartRenderers } from "@/components/mentor/renderers";
 import type { ChatMessage } from "@/lib/types";
 
 export const Route = createFileRoute("/_authenticated/mentor/")({
@@ -92,6 +93,7 @@ function MentorContainer() {
 				inputPlaceholder="Ask me anything about software development, best practices, or agile concepts..."
 				disableAttachments={true}
 				className="h-[calc(100dvh-4rem)]"
+				partRenderers={defaultPartRenderers}
 			/>
 		</div>
 	);

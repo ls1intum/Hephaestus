@@ -112,9 +112,6 @@ const meta = {
 		onVote: fn((messageId: string, isUpvoted: boolean) =>
 			console.log("Vote cast:", messageId, isUpvoted ? "upvote" : "downvote"),
 		),
-		onDocumentClick: fn((documentId: string, boundingRect: DOMRect) =>
-			console.log("Document artifact clicked:", documentId, boundingRect),
-		),
 		scrollToBottom: fn(() => console.log("Scroll to bottom triggered")),
 		showSuggestedActions: true,
 		inputPlaceholder: "Ask me anything...",
@@ -157,17 +154,8 @@ const CONVERSATION_MESSAGES: ChatMessage[] = [
 				text: "What a special milestone! I'd love to help you create a magical birthday poem for your daughter. Let me craft something that captures her love for unicorns and rainbows.",
 			},
 			{
-				type: "tool-createDocument",
-				toolCallId: "tool-1",
-				state: "output-available",
-				input: {
-					title: "Birthday Poem for Emma",
-					kind: "text" as const,
-				},
-				output: {
-					id: "doc-1",
-					title: "Birthday Poem for Emma",
-					content: `Eight Candles Bright
+				type: "text",
+				text: `Created document: Birthday Poem for Emma\n\nEight Candles Bright
 
 Today you turn eight, our shining star,
 With dreams that travel oh so far.
@@ -185,8 +173,6 @@ Our little unicorn so dear,
 We celebrate another year!
 
 Happy 8th Birthday! 🦄🌈`,
-					kind: "TEXT" as const,
-				},
 			},
 		],
 		metadata: {
@@ -215,17 +201,8 @@ Happy 8th Birthday! 🦄🌈`,
 				text: "Absolutely! Let me create a sweet and simple birthday message that would be perfect for the inside of her birthday card.",
 			},
 			{
-				type: "tool-createDocument",
-				toolCallId: "tool-2",
-				state: "output-available",
-				input: {
-					title: "Birthday Card Message",
-					kind: "text" as const,
-				},
-				output: {
-					id: "doc-2",
-					title: "Birthday Card Message",
-					content: `Dear Emma,
+				type: "text",
+				text: `Created document: Birthday Card Message\n\nDear Emma,
 
 Happy 8th Birthday to our amazing little girl!
 
@@ -239,8 +216,6 @@ With all our love,
 Mom & Dad 💕
 
 P.S. Don't forget to make a special wish when you blow out your candles! 🎂✨`,
-					kind: "TEXT" as const,
-				},
 			},
 		],
 		metadata: {
@@ -269,17 +244,8 @@ P.S. Don't forget to make a special wish when you blow out your candles! 🎂✨
 				text: "What a great idea! Adding that milestone will make the poem even more personal and meaningful. Let me update it to celebrate both her birthday and this exciting new chapter.",
 			},
 			{
-				type: "tool-updateDocument",
-				toolCallId: "tool-3",
-				state: "output-available",
-				input: {
-					id: "doc-1",
-					description: "Add reference to starting 3rd grade",
-				},
-				output: {
-					id: "doc-1",
-					title: "Birthday Poem for Emma",
-					content: `Eight Candles Bright
+				type: "text",
+				text: `Updated document: Birthday Poem for Emma\n\nEight Candles Bright
 
 Today you turn eight, our shining star,
 With dreams that travel oh so far.
@@ -302,8 +268,6 @@ Our little unicorn so dear,
 We celebrate another year!
 
 Happy 8th Birthday! 🦄🌈📚`,
-					kind: "TEXT" as const,
-				},
 			},
 		],
 		metadata: {
@@ -332,17 +296,8 @@ Happy 8th Birthday! 🦄🌈📚`,
 				text: "Of course! Let me create a practical shopping list for a fun 8th birthday party with 10 kids. I'll include everything from decorations to food and party favors.",
 			},
 			{
-				type: "tool-createDocument",
-				toolCallId: "tool-4",
-				state: "output-available",
-				input: {
-					title: "Birthday Party Shopping List",
-					kind: "text" as const,
-				},
-				output: {
-					id: "doc-3",
-					title: "Birthday Party Shopping List",
-					content: `Emma's 8th Birthday Party Shopping List
+				type: "text",
+				text: `Created document: Birthday Party Shopping List\n\nEmma's 8th Birthday Party Shopping List
 🦄 For 10 kids + family 🌈
 
 ## DECORATIONS
@@ -380,8 +335,6 @@ Happy 8th Birthday! 🦄🌈📚`,
 - [ ] Thank you cards
 
 **Budget estimate: $80-120 for everything!** 🎉`,
-					kind: "TEXT" as const,
-				},
 			},
 		],
 		metadata: {
@@ -474,11 +427,6 @@ export const FullConversationDemo: Story = {
 		messages: CONVERSATION_MESSAGES,
 		votes: CONVERSATION_VOTES,
 		attachments: [],
-		onDocumentClick: fn((documentId: string, boundingBox: DOMRect) => {
-			console.log("Document clicked:", documentId, boundingBox);
-			// In production, this would trigger external data fetching
-			// The component manages artifact state transitions internally
-		}),
 	},
 };
 

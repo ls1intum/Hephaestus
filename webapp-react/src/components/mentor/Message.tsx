@@ -2,18 +2,20 @@ import cx from "classnames";
 import equal from "fast-deep-equal";
 import { AnimatePresence, motion } from "framer-motion";
 import { memo, useState } from "react";
-import type { ChatMessageVote, Document } from "@/api/types.gen";
+import type { ChatMessageVote } from "@/api/types.gen";
 import type { ChatMessage } from "@/lib/types";
 import { cn, sanitizeText } from "@/lib/utils";
-import { DocumentPreview } from "./DocumentPreview";
-import { DocumentTool } from "./DocumentTool";
 import { Markdown } from "./Markdown";
 import { MentorAvatar } from "./MentorAvatar";
 import { MessageActions } from "./MessageActions";
 import { MessageEditor } from "./MessageEditor";
 import { MessageReasoning } from "./MessageReasoning";
 import { PreviewAttachment } from "./PreviewAttachment";
-import { WeatherTool } from "./WeatherTool";
+import type {
+	PartRenderer,
+	PartRendererMap,
+	ToolPart,
+} from "./renderers/types";
 
 export interface MessageProps {
 	/** The message to display */
@@ -32,14 +34,12 @@ export interface MessageProps {
 	onCopy?: (content: string) => void;
 	/** Handler for voting on messages */
 	onVote?: (messageId: string, isUpvote: boolean) => void;
-	/** Handler for document interactions */
-	onDocumentClick?: (documentId: string, boundingBox: DOMRect) => void;
-	/** Handler for document content changes */
-	onDocumentSave?: (documentId: string, content: string) => void;
 	/** Optional CSS class name */
 	className?: string;
 	/** Whether to show the edit mode initially */
 	initialEditMode?: boolean;
+	/** Injected renderers for tool parts (keeps component presentational) */
+	partRenderers?: PartRendererMap;
 }
 
 const PurePreviewMessage = ({
@@ -51,10 +51,9 @@ const PurePreviewMessage = ({
 	onMessageEdit,
 	onCopy,
 	onVote,
-	onDocumentClick,
-	onDocumentSave,
 	className,
 	initialEditMode = false,
+	partRenderers,
 }: MessageProps) => {
 	const [mode, setMode] = useState<"view" | "edit">(
 		initialEditMode ? "edit" : "view",
@@ -65,46 +64,6 @@ const PurePreviewMessage = ({
 	);
 
 	const isArtifact = variant === "artifact";
-
-	// Helper function to render document based on context and document lifecycle
-	const renderDocument = (
-		document: Document,
-		toolType: "create" | "update" | "request-suggestions",
-	) => {
-		// Design principle: Show full preview only for document creation,
-		// use compact tool for updates/suggestions to reduce visual noise
-		const shouldShowFullPreview = toolType === "create" && !isArtifact;
-
-		if (shouldShowFullPreview) {
-			return (
-				<DocumentPreview
-					document={document}
-					isLoading={false}
-					isStreaming={false}
-					onDocumentClick={(doc, boundingBox) => {
-						// DocumentPreview still uses old interface, adapt it
-						onDocumentClick?.(doc.id, boundingBox);
-					}}
-					onSaveContent={(content) => {
-						onDocumentSave?.(document.id, content);
-					}}
-				/>
-			);
-		}
-
-		// For all other cases: use compact DocumentTool
-		return (
-			<DocumentTool
-				type={toolType}
-				result={{
-					id: document.id,
-					title: document.title,
-					kind: document.kind === "TEXT" ? "text" : "text",
-				}}
-				onDocumentClick={onDocumentClick}
-			/>
-		);
-	};
 
 	return (
 		<AnimatePresence>
@@ -177,6 +136,7 @@ const PurePreviewMessage = ({
 										key={key}
 										isLoading={isReasoningLoading}
 										reasoning={part.text}
+										variant={variant}
 									/>
 								);
 							}
@@ -221,93 +181,33 @@ const PurePreviewMessage = ({
 								}
 							}
 
-							if (type === "tool-getWeather") {
-								const { toolCallId, state } = part;
-
-								if (state === "input-available") {
-									return (
-										<div
-											key={toolCallId}
-											className="flex flex-col gap-2 p-4 rounded-xl border"
-										>
-											<div className="h-4 w-28 bg-muted animate-pulse rounded" />
-											<div className="h-6 w-52 bg-muted animate-pulse rounded" />
-											<div className="h-3 w-80 bg-muted animate-pulse rounded" />
-										</div>
+							if (type.startsWith("tool-")) {
+								if (!partRenderers) return null;
+								const toolKey =
+									(part as { toolCallId?: string }).toolCallId || key;
+								const isAnyToolPart = (p: unknown): p is ToolPart =>
+									Boolean(
+										p &&
+											typeof (p as { type?: unknown }).type === "string" &&
+											(p as { type: string }).type.startsWith("tool-"),
 									);
-								}
-
-								if (state === "output-available") {
-									return (
-										<div key={toolCallId}>
-											<WeatherTool weatherAtLocation={part.output} />
-										</div>
-									);
-								}
+								if (!isAnyToolPart(part)) return null;
+								const renderers = partRenderers as unknown as Record<
+									string,
+									PartRenderer
+								>;
+								const Renderer = renderers[type];
+								return Renderer ? (
+									<Renderer
+										key={toolKey}
+										message={message}
+										part={part}
+										variant={variant}
+									/>
+								) : null;
 							}
 
-							if (type === "tool-createDocument") {
-								const { toolCallId, state } = part;
-
-								if (state === "input-available") {
-									const { input } = part;
-									const args = {
-										title: input.title,
-										kind: input.kind,
-									} as const;
-									return (
-										<div key={toolCallId}>
-											<DocumentTool
-												type="create"
-												isLoading={true}
-												args={args}
-												onDocumentClick={onDocumentClick}
-											/>
-										</div>
-									);
-								}
-
-								if (state === "output-available") {
-									const { output } = part;
-									return (
-										<div key={toolCallId}>
-											{renderDocument(output as Document, "create")}
-										</div>
-									);
-								}
-							}
-
-							if (type === "tool-updateDocument") {
-								const { toolCallId, state } = part;
-
-								if (state === "input-available") {
-									const { input } = part;
-									const args = {
-										id: input.id,
-										description: input.description,
-									} as const;
-									return (
-										<div key={toolCallId}>
-											<DocumentTool
-												type="update"
-												isLoading={true}
-												args={args}
-												onDocumentClick={onDocumentClick}
-											/>
-										</div>
-									);
-								}
-
-								if (state === "output-available") {
-									const { output } = part;
-
-									return (
-										<div key={toolCallId}>
-											{renderDocument(output as Document, "update")}
-										</div>
-									);
-								}
-							}
+							return null;
 						})}
 
 						{!readonly && (
@@ -315,30 +215,22 @@ const PurePreviewMessage = ({
 								className="-mt-3"
 								key={`action-${message.id}`}
 								messageContentToCopy={message.parts
-									.filter((part) => part.type === "text")
-									.map((part) => part.text)
+									.filter((p) => p.type === "text")
+									.map((p) => p.text)
 									.join("\n")}
 								messageRole={message.role}
 								vote={vote}
 								isLoading={isLoading}
 								isInEditMode={mode === "edit"}
 								variant={variant}
-								onCopy={(text) => {
-									onCopy?.(text);
-								}}
+								onCopy={(text) => onCopy?.(text)}
 								onVote={
 									message.role === "assistant"
-										? (isUpvote) => {
-												onVote?.(message.id, isUpvote);
-											}
+										? (isUpvote) => onVote?.(message.id, isUpvote)
 										: undefined
 								}
 								onEdit={
-									message.role === "user"
-										? () => {
-												setMode("edit");
-											}
-										: undefined
+									message.role === "user" ? () => setMode("edit") : undefined
 								}
 							/>
 						)}

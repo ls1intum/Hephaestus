@@ -17,8 +17,10 @@ import {
 	AppSidebar,
 	type SidebarContext,
 } from "@/components/core/sidebar/AppSidebar";
+import { ArtifactOverlayContainer } from "@/components/mentor/ArtifactOverlayContainer";
 import { Chat } from "@/components/mentor/Chat";
 import { Copilot } from "@/components/mentor/Copilot";
+import { defaultPartRenderers } from "@/components/mentor/renderers";
 import {
 	SidebarInset,
 	SidebarProvider,
@@ -176,20 +178,25 @@ function GlobalCopilot() {
 				onAttachmentsChange={() => {}}
 				onCopy={handleCopy}
 				onVote={handleVote}
-				artifact={mentorChat.artifact}
-				artifactDocuments={mentorChat.artifactDocuments}
-				artifactCurrentVersionIndex={mentorChat.artifactCurrentVersionIndex}
-				artifactIsCurrentVersion={mentorChat.artifactIsCurrentVersion}
-				artifactIsContentDirty={mentorChat.artifactIsContentDirty}
-				artifactMode={mentorChat.artifactMode}
-				onOpenArtifactById={mentorChat.openArtifactById}
-				onCloseArtifact={mentorChat.closeArtifact}
-				onSaveArtifactContent={mentorChat.saveArtifactContent}
-				onChangeArtifactVersion={mentorChat.changeArtifactVersion}
 				showSuggestedActions={true}
 				inputPlaceholder="Ask me anything..."
 				disableAttachments={true}
 				className="h-full max-h-none"
+				partRenderers={defaultPartRenderers}
+			/>
+			<ArtifactOverlayContainer
+				messages={mentorChat.messages as ChatMessage[]}
+				votes={mentorChat.votes}
+				status={mentorChat.status}
+				attachments={[]}
+				readonly={false}
+				onMessageSubmit={handleMessageSubmit}
+				onStop={mentorChat.stop}
+				onFileUpload={() => Promise.resolve([])}
+				onMessageEdit={handleMessageEdit}
+				onCopy={handleCopy}
+				onVote={handleVote}
+				partRenderers={defaultPartRenderers}
 			/>
 		</Copilot>
 	);

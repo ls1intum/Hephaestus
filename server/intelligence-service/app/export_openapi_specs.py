@@ -28,6 +28,21 @@ def auto_discover_tool_schemas():
     return tool_models
 
 
+def auto_discover_data_schemas():
+    """Automatically discover all data payload models using base class inspection."""
+    from app.mentor.models import DataBase
+
+    # Ensure models are imported so classes are loaded
+    import app.mentor.models as models_module
+
+    data_models = []
+    for name, obj in inspect.getmembers(models_module, inspect.isclass):
+        if issubclass(obj, DataBase) and obj is not DataBase:
+            data_models.append(obj)
+
+    return data_models
+
+
 def get_openapi_specs():
     """Generate OpenAPI spec with auto-discovered tool schemas."""
     # Generate the base OpenAPI schema
@@ -39,16 +54,22 @@ def get_openapi_specs():
         routes=main.app.routes,
     )
 
-    # Auto-discover tool models
+    # Auto-discover tool and data models
     tool_models = auto_discover_tool_schemas()
+    data_models = auto_discover_data_schemas()
 
-    if not tool_models:
-        print("⚠️  Warning: No tool models discovered")
+    if not tool_models and not data_models:
+        print("⚠️  Warning: No tool or data models discovered")
         return yaml.dump(openapi_schema, allow_unicode=True)
 
-    print(f"🔍 Auto-discovered {len(tool_models)} tool models:")
-    for model in tool_models:
-        print(f"  - {model.__name__}")
+    if tool_models:
+        print(f"🔍 Auto-discovered {len(tool_models)} tool models:")
+        for model in tool_models:
+            print(f"  - {model.__name__}")
+    if data_models:
+        print(f"🔍 Auto-discovered {len(data_models)} data models:")
+        for model in data_models:
+            print(f"  - {model.__name__}")
 
     # Ensure components.schemas exists
     if "components" not in openapi_schema:
@@ -74,13 +95,21 @@ def get_openapi_specs():
             for item in schema:
                 fix_schema_refs(item, def_map)
 
-    # Add each tool model schema and resolve $defs
-    for model in tool_models:
+    # Helper to add model schemas and resolve $defs
+    def add_model_schema(model):
         model_schema = model.model_json_schema()
         schema_name = model.__name__
 
-        # Tag tool models with custom extension for easy identification
-        model_schema["x-hephaestus-tool-model"] = True
+        # Tag with custom extension for easy identification
+        model_schema.setdefault("x-hephaestus", {})
+        if (
+            "Tool" in schema_name
+            or schema_name.endswith("Input")
+            or schema_name.endswith("Output")
+        ):
+            model_schema["x-hephaestus"]["toolModel"] = True
+        else:
+            model_schema["x-hephaestus"]["dataModel"] = True
 
         # Handle nested schemas from $defs
         if "$defs" in model_schema:
@@ -92,10 +121,19 @@ def get_openapi_specs():
 
             # Remove $defs from the main schema as we've moved them to components
             del model_schema["$defs"]
-
         openapi_schema["components"]["schemas"][schema_name] = model_schema
 
-    print(f"✅ Added {len(tool_models)} tool schemas to OpenAPI spec")
+    # Add each tool model schema and resolve $defs
+    for model in tool_models:
+        add_model_schema(model)
+
+    # Add each data model schema and resolve $defs
+    for model in data_models:
+        add_model_schema(model)
+
+    print(
+        f"✅ Added {len(tool_models)} tool schemas and {len(data_models)} data schemas to OpenAPI spec"
+    )
 
     openapi_yaml = yaml.dump(openapi_schema, allow_unicode=True)
     return openapi_yaml

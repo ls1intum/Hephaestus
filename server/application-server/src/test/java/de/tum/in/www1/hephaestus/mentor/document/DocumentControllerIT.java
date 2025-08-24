@@ -115,7 +115,7 @@ public class DocumentControllerIT extends BaseIntegrationTest {
             });
 
         // Assert - Should have created new version
-        var allVersions = documentRepository.findByIdAndUserOrderByCreatedAtDesc(documentId, testUser);
+        var allVersions = documentRepository.findByIdAndUserOrderByVersionNumberDesc(documentId, testUser);
         assertThat(allVersions).hasSize(2);
         assertThat(allVersions.get(0).getTitle()).isEqualTo("Updated Title"); // Latest first
         assertThat(allVersions.get(1).getTitle()).isEqualTo("Original Title");
@@ -214,14 +214,14 @@ public class DocumentControllerIT extends BaseIntegrationTest {
     void shouldGetSpecificDocumentVersionSuccessfully() {
         // Arrange - Create document with multiple versions
         UUID documentId = createTestDocument("Version 1", "Content 1");
-        var firstVersion = documentRepository.findFirstByIdAndUserOrderByCreatedAtDesc(documentId, testUser).get();
+        var firstVersion = documentRepository.findFirstByIdAndUserOrderByVersionNumberDesc(documentId, testUser).get();
 
         updateTestDocument(documentId, "Version 2", "Content 2");
 
-        // Act & Assert - Get specific version by timestamp
+        // Act & Assert - Get specific version by version number
         webTestClient
             .get()
-            .uri("/api/documents/{id}/versions/{timestamp}", documentId, firstVersion.getCreatedAt())
+            .uri("/api/documents/{id}/versions/{versionNumber}", documentId, firstVersion.getVersionNumber())
             .headers(TestAuthUtils.withCurrentUser())
             .exchange()
             .expectStatus()
@@ -230,7 +230,7 @@ public class DocumentControllerIT extends BaseIntegrationTest {
             .value(response -> {
                 assertThat(response.title()).isEqualTo("Version 1");
                 assertThat(response.content()).isEqualTo("Content 1");
-                assertThat(response.createdAt()).isEqualTo(firstVersion.getCreatedAt());
+                assertThat(response.versionNumber()).isEqualTo(firstVersion.getVersionNumber());
             });
     }
 
@@ -240,7 +240,7 @@ public class DocumentControllerIT extends BaseIntegrationTest {
         // Arrange - Create multiple versions
         UUID documentId = createTestDocument("Version 1", "Content 1");
         var firstVersionTime = documentRepository
-            .findFirstByIdAndUserOrderByCreatedAtDesc(documentId, testUser)
+            .findFirstByIdAndUserOrderByVersionNumberDesc(documentId, testUser)
             .get()
             .getCreatedAt();
 
@@ -268,7 +268,7 @@ public class DocumentControllerIT extends BaseIntegrationTest {
             });
 
         // Assert - Only first version should remain
-        var remainingVersions = documentRepository.findByIdAndUserOrderByCreatedAtDesc(documentId, testUser);
+        var remainingVersions = documentRepository.findByIdAndUserOrderByVersionNumberDesc(documentId, testUser);
         assertThat(remainingVersions).hasSize(1);
         assertThat(remainingVersions.get(0).getTitle()).isEqualTo("Version 1");
     }

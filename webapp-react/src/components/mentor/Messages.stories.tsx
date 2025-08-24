@@ -51,8 +51,6 @@ const meta = {
 		onMessageEdit: fn(),
 		onCopy: fn(),
 		onVote: fn(),
-		onDocumentClick: fn(),
-		onDocumentSave: fn(),
 	},
 } satisfies Meta<typeof Messages>;
 

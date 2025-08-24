@@ -1,5 +1,5 @@
 from __future__ import annotations
-from typing import Annotated, List, Literal, Optional, Any, Dict, Union
+from typing import Annotated, List, Literal, Optional, Any, Dict, Union, ClassVar
 from pydantic import BaseModel, Field, ConfigDict, field_validator
 import logging
 
@@ -603,6 +603,10 @@ class CreateDocumentInput(ToolInputBase):
 
     title: str
     kind: Literal["text"]
+    document_id: str = Field(
+        ...,
+        description="Do not populate this field, will automatically be set by the system",
+    )
 
 
 class UpdateDocumentInput(ToolInputBase):
@@ -701,3 +705,47 @@ ToolInputStreamingPart.model_rebuild()
 ToolInputAvailablePart.model_rebuild()
 ToolOutputAvailablePart.model_rebuild()
 ToolOutputErrorPart.model_rebuild()
+
+
+# --- Data-specific models for OpenAPI typing ---
+class DataBase(BaseModel):
+    """Base class for all data payload models used in data-* parts."""
+
+    # Event type suffix used for dispatching (e.g., data-<TYPE>). Not serialized.
+    TYPE: ClassVar[str] = ""
+
+    def event_type(self) -> str:
+        return self.TYPE
+
+
+# Document streaming payloads
+class DocumentCreateData(DataBase):
+    TYPE: ClassVar[str] = "document-create"
+    id: str
+    title: str
+    kind: Literal["text"]
+
+
+class DocumentUpdateData(DataBase):
+    TYPE: ClassVar[str] = "document-update"
+    id: str
+    kind: Literal["text"]
+
+
+class DocumentDeltaData(DataBase):
+    TYPE: ClassVar[str] = "document-delta"
+    id: str
+    kind: Literal["text"]
+    delta: str
+
+
+class DocumentFinishData(DataBase):
+    TYPE: ClassVar[str] = "document-finish"
+    id: str
+    kind: Literal["text"]
+
+
+# Unions used for documentation and OpenAPI discovery of data-* payloads
+DataUnion = Union[
+    DocumentCreateData, DocumentUpdateData, DocumentDeltaData, DocumentFinishData
+]

@@ -112,25 +112,26 @@ public class DocumentService {
             throw new EntityNotFoundException("Document", id.toString());
         }
 
-        // Map timestamp to cutoff versionNumber (the first created after timestamp), fallback to latest
-        int cutoffVersion = documentRepository
-            .findByIdAndUserOrderByVersionNumberDesc(id, user)
+        // Determine the smallest version strictly after the timestamp.
+        // Then delete all versions with versionNumber >= that minimum (i.e., greater than min-1).
+        var versionsDesc = documentRepository.findByIdAndUserOrderByVersionNumberDesc(id, user);
+        int minVersionAfter = versionsDesc
             .stream()
             .filter(d -> d.getCreatedAt().isAfter(timestamp))
-            .map(Document::getVersionNumber)
-            .findFirst()
+            .mapToInt(Document::getVersionNumber)
+            .min()
             .orElse(Integer.MAX_VALUE);
 
-        List<Document> deletedDocuments = cutoffVersion == Integer.MAX_VALUE
+        List<Document> deletedDocuments = minVersionAfter == Integer.MAX_VALUE
             ? List.of()
             : documentRepository.findByIdAndUserAndVersionNumberGreaterThanOrderByVersionNumberDesc(
                 id,
                 user,
-                cutoffVersion - 1
+                minVersionAfter - 1
             );
 
-        if (cutoffVersion != Integer.MAX_VALUE) {
-            documentRepository.deleteByIdAndUserAndVersionNumberGreaterThan(id, user, cutoffVersion - 1);
+        if (minVersionAfter != Integer.MAX_VALUE) {
+            documentRepository.deleteByIdAndUserAndVersionNumberGreaterThan(id, user, minVersionAfter - 1);
         }
 
         return deletedDocuments.stream().map(DocumentDTO::from).toList();

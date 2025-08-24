@@ -25,17 +25,17 @@ import com.fasterxml.jackson.annotation.JsonTypeName;
 import org.hibernate.validator.constraints.*;
 
 /**
- * Input for createDocument tool.
+ * DocumentCreateData
  */
 @JsonPropertyOrder({
-  CreateDocumentInput.JSON_PROPERTY_DOCUMENT_ID,
-  CreateDocumentInput.JSON_PROPERTY_KIND,
-  CreateDocumentInput.JSON_PROPERTY_TITLE
+  DocumentCreateData.JSON_PROPERTY_ID,
+  DocumentCreateData.JSON_PROPERTY_KIND,
+  DocumentCreateData.JSON_PROPERTY_TITLE
 })
 @jakarta.annotation.Generated(value = "org.openapitools.codegen.languages.JavaClientCodegen", comments = "Generator version: 7.7.0")
-public class CreateDocumentInput {
-  public static final String JSON_PROPERTY_DOCUMENT_ID = "document_id";
-  private String documentId;
+public class DocumentCreateData {
+  public static final String JSON_PROPERTY_ID = "id";
+  private String id;
 
   public static final String JSON_PROPERTY_KIND = "kind";
   private String kind;
@@ -43,35 +43,35 @@ public class CreateDocumentInput {
   public static final String JSON_PROPERTY_TITLE = "title";
   private String title;
 
-  public CreateDocumentInput() {
+  public DocumentCreateData() {
   }
 
-  public CreateDocumentInput documentId(String documentId) {
+  public DocumentCreateData id(String id) {
     
-    this.documentId = documentId;
+    this.id = id;
     return this;
   }
 
   /**
-   * Do not populate this field, will automatically be set by the system
-   * @return documentId
+   * Get id
+   * @return id
    */
   @jakarta.annotation.Nonnull
-  @JsonProperty(JSON_PROPERTY_DOCUMENT_ID)
+  @JsonProperty(JSON_PROPERTY_ID)
   @JsonInclude(value = JsonInclude.Include.ALWAYS)
 
-  public String getDocumentId() {
-    return documentId;
+  public String getId() {
+    return id;
   }
 
 
-  @JsonProperty(JSON_PROPERTY_DOCUMENT_ID)
+  @JsonProperty(JSON_PROPERTY_ID)
   @JsonInclude(value = JsonInclude.Include.ALWAYS)
-  public void setDocumentId(String documentId) {
-    this.documentId = documentId;
+  public void setId(String id) {
+    this.id = id;
   }
 
-  public CreateDocumentInput kind(String kind) {
+  public DocumentCreateData kind(String kind) {
     
     this.kind = kind;
     return this;
@@ -96,7 +96,7 @@ public class CreateDocumentInput {
     this.kind = kind;
   }
 
-  public CreateDocumentInput title(String title) {
+  public DocumentCreateData title(String title) {
     
     this.title = title;
     return this;
@@ -129,22 +129,22 @@ public class CreateDocumentInput {
     if (o == null || getClass() != o.getClass()) {
       return false;
     }
-    CreateDocumentInput createDocumentInput = (CreateDocumentInput) o;
-    return Objects.equals(this.documentId, createDocumentInput.documentId) &&
-        Objects.equals(this.kind, createDocumentInput.kind) &&
-        Objects.equals(this.title, createDocumentInput.title);
+    DocumentCreateData documentCreateData = (DocumentCreateData) o;
+    return Objects.equals(this.id, documentCreateData.id) &&
+        Objects.equals(this.kind, documentCreateData.kind) &&
+        Objects.equals(this.title, documentCreateData.title);
   }
 
   @Override
   public int hashCode() {
-    return Objects.hash(documentId, kind, title);
+    return Objects.hash(id, kind, title);
   }
 
   @Override
   public String toString() {
     StringBuilder sb = new StringBuilder();
-    sb.append("class CreateDocumentInput {\n");
-    sb.append("    documentId: ").append(toIndentedString(documentId)).append("\n");
+    sb.append("class DocumentCreateData {\n");
+    sb.append("    id: ").append(toIndentedString(id)).append("\n");
     sb.append("    kind: ").append(toIndentedString(kind)).append("\n");
     sb.append("    title: ").append(toIndentedString(title)).append("\n");
     sb.append("}");

@@ -1,5 +1,4 @@
 import requests
-from uuid import uuid4
 from typing import Annotated, List, Dict, Any, Literal, Optional
 from langchain_core.tools import tool
 from langgraph.prebuilt import InjectedState
@@ -15,6 +14,11 @@ from app.mentor.models import (
     UpdateDocumentInput,
     GetWeatherInput,
     GetWeatherOutput,
+    DataBase,
+    DocumentCreateData,
+    DocumentUpdateData,
+    DocumentDeltaData,
+    DocumentFinishData,
 )
 from langchain_core.callbacks.manager import adispatch_custom_event
 
@@ -24,24 +28,25 @@ logger = logger.getChild(__name__)
 model = init_hephaestus_chat_model(settings.MODEL_NAME, reasoning={"summary": "auto"})
 
 
-# Helper function to emit data events
+# Helper function to emit data events with type-safety
 async def emit_data(
     *,
     config: RunnableConfig,
-    type_name: str,
-    data: Any,
+    data: DataBase,
     transient: bool = True,
     id: Optional[str] = None,
 ) -> None:
-    """Emit a custom event named data-<type_name> with a standardized payload.
+    """Emit a custom event named data-<TYPE> with a standardized payload.
 
-    Payload shape: {"data": <data>, "transient": <bool>, (optional) "id": <str>}
+    - Accepts a DataBase instance only.
+    - Derives the type name from data.TYPE.
+    - Payload: {"data": <model_dump>, "transient": <bool>, (optional) "id": <str>}
     """
-    payload: dict[str, Any] = {"data": data, "transient": transient}
-    # Careful, this will replace the data part of with the last id equal to id
+    # Ensure the object is a Pydantic model and serialize safely
+    payload: dict[str, Any] = {"data": data.model_dump(), "transient": transient}
     if id is not None:
         payload["id"] = id
-    await adispatch_custom_event(f"data-{type_name}", payload, config=config)
+    await adispatch_custom_event(f"data-{data.event_type()}", payload, config=config)
 
 
 @tool("getWeather", args_schema=GetWeatherInput)
@@ -98,22 +103,23 @@ def get_weather(latitude: float, longitude: float) -> Dict[str, Any]:
 async def create_document(
     title: str,
     kind: Literal["text"],
+    document_id: str,
     *,
     config: RunnableConfig,
 ) -> Dict[str, Any]:
     """Create a document and stream preview content.
 
-    This tool emits transient header events (kind, id, title, clear) and streams
-    textDelta via an inner model to build a live preview. The final return value
+    This tool emits transient header events and streams
+    deltas via an inner model to build a live preview. The final return value
     summarizes the action; the persisted content is handled by the application server.
     """
 
-    document_id = str(uuid4())
-
-    await emit_data(config=config, type_name="kind", data=kind, transient=True)
-    await emit_data(config=config, type_name="id", data=document_id, transient=True)
-    await emit_data(config=config, type_name="title", data=title, transient=True)
-    await emit_data(config=config, type_name="clear", data=None, transient=True)
+    logger.info(f"Creating document: {title} (ID: {document_id})")
+    await emit_data(
+        config=config,
+        data=DocumentCreateData(id=document_id, title=title, kind=kind),
+        transient=True,
+    )
 
     msgs = [
         {
@@ -126,13 +132,19 @@ async def create_document(
         {"role": "user", "content": title},
     ]
     async for chunk in model.astream(msgs, config=config):
-        textDelta = chunk.text()
-        if textDelta:
+        text_delta = chunk.text()
+        if text_delta:
             await emit_data(
-                config=config, type_name="textDelta", data=textDelta, transient=True
+                config=config,
+                data=DocumentDeltaData(kind="text", id=document_id, delta=text_delta),
+                transient=True,
             )
 
-    await emit_data(config=config, type_name="finish", data=None, transient=True)
+    await emit_data(
+        config=config,
+        data=DocumentFinishData(kind="text", id=document_id),
+        transient=True,
+    )
 
     return {
         "id": document_id,
@@ -155,11 +167,11 @@ async def update_document(
     if not document:
         return {"error": "Document not found"}
 
-    # Emit header info to align with client expectations
-    await emit_data(config=config, type_name="id", data=id, transient=True)
-
-    # Stream a clean preview: clear -> deltas -> finish
-    await emit_data(config=config, type_name="clear", data=None, transient=True)
+    await emit_data(
+        config=config,
+        data=DocumentUpdateData(kind="text", id=id),
+        transient=True,
+    )
 
     msgs = [
         {
@@ -177,12 +189,18 @@ async def update_document(
         text_delta = chunk.text()
         if text_delta:
             preview_content.append(text_delta)
+
             await emit_data(
-                config=config, type_name="textDelta", data=text_delta, transient=True
+                config=config,
+                data=DocumentDeltaData(kind="text", id=id, delta=text_delta),
+                transient=True,
             )
 
-    await emit_data(config=config, type_name="finish", data=None, transient=True)
-
+    await emit_data(
+        config=config,
+        data=DocumentFinishData(kind="text", id=id),
+        transient=True,
+    )
     return {
         "id": id,
         "title": document.title,
