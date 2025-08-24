@@ -1,7 +1,7 @@
-import { cn } from "@/lib/utils";
 import { format, isWithinInterval } from "date-fns";
 import { useEffect, useState } from "react";
 import type { GetWeatherOutput } from "@/api/types.gen";
+import { cn } from "@/lib/utils";
 
 const SAMPLE = {
 	latitude: 37.763283,
