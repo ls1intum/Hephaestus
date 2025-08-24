@@ -1,15 +1,15 @@
 import {
 	type ColumnDef,
 	type ColumnFiltersState,
-	type RowSelectionState,
-	type SortingState,
-	type VisibilityState,
 	flexRender,
 	getCoreRowModel,
 	getFilteredRowModel,
 	getPaginationRowModel,
 	getSortedRowModel,
+	type RowSelectionState,
+	type SortingState,
 	useReactTable,
+	type VisibilityState,
 } from "@tanstack/react-table";
 import {
 	ArrowUpDown,
@@ -21,7 +21,7 @@ import {
 	Users,
 } from "lucide-react";
 import { useMemo, useState } from "react";
-
+import type { TeamInfo } from "@/api/types.gen";
 import { GithubBadge } from "@/components/shared/GithubBadge";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -70,8 +70,6 @@ import {
 	TableHeader,
 	TableRow,
 } from "@/components/ui/table";
-
-import type { TeamInfo } from "@/api/types.gen";
 import { cn } from "@/lib/utils";
 import type { ExtendedUserTeams } from "./types";
 

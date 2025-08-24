@@ -1,6 +1,6 @@
-import { Card, CardContent } from "@/components/ui/card";
 import type { LucideIcon } from "lucide-react";
 import React, { type ComponentType, type ReactNode } from "react";
+import { Card, CardContent } from "@/components/ui/card";
 
 export interface EmptyStateProps {
 	/** The icon to display at the top of the empty state */

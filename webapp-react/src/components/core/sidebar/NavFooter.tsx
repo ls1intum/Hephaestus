@@ -1,12 +1,11 @@
+import { Link } from "@tanstack/react-router";
 import { Bug, Settings, Sparkles } from "lucide-react";
-
 import {
 	SidebarMenu,
 	SidebarMenuButton,
 	SidebarMenuItem,
 	SidebarSeparator,
 } from "@/components/ui/sidebar";
-import { Link } from "@tanstack/react-router";
 
 export function NavFooter() {
 	return (

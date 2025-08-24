@@ -1,11 +1,11 @@
-import { Button } from "@/components/ui/button";
 import { Link } from "@tanstack/react-router";
+import { Button } from "@/components/ui/button";
 
 export default function Footer() {
 	return (
-		<footer className="py-4 md:px-8 md:py-6 border-t">
-			<div className="container">
-				<div className="flex flex-wrap justify-between gap-4">
+		<footer className="py-2 md:px-8 bg-sidebar border-sidebar-border border-t">
+			<div className="container p-0">
+				<div className="flex flex-wrap justify-between gap-0 md:gap-4">
 					{/* Links Section */}
 					<div className="flex flex-wrap items-center justify-center sm:justify-start w-full md:w-auto">
 						<nav className="flex flex-wrap gap-x-6 gap-y-2 justify-center sm:justify-start">

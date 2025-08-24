@@ -1,3 +1,16 @@
+import {
+	Eye,
+	EyeOff,
+	Pencil,
+	Plus,
+	Search,
+	Settings,
+	Tag,
+	Trash2,
+	Users,
+	X,
+} from "lucide-react";
+import { useState } from "react";
 import type { RepositoryInfo, TeamInfo, UserTeams } from "@/api/types.gen";
 import { GithubBadge } from "@/components/shared/GithubBadge";
 import { Button } from "@/components/ui/button";
@@ -18,19 +31,6 @@ import {
 	PopoverTrigger,
 } from "@/components/ui/popover";
 import { Spinner } from "@/components/ui/spinner";
-import {
-	Eye,
-	EyeOff,
-	Pencil,
-	Plus,
-	Search,
-	Settings,
-	Tag,
-	Trash2,
-	Users,
-	X,
-} from "lucide-react";
-import { useState } from "react";
 
 interface TeamsTableProps {
 	teams: TeamInfo[];

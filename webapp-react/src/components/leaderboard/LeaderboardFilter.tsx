@@ -1,3 +1,4 @@
+import { SlidersHorizontal } from "lucide-react";
 import {
 	Card,
 	CardContent,
@@ -5,7 +6,6 @@ import {
 	CardHeader,
 	CardTitle,
 } from "@/components/ui/card";
-import { SlidersHorizontal } from "lucide-react";
 import { type LeaderboardSortType, SortFilter } from "./SortFilter";
 import { TeamFilter } from "./TeamFilter";
 import { TimeframeFilter } from "./TimeframeFilter";

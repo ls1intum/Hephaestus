@@ -1,3 +1,6 @@
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { toast } from "sonner";
 import {
 	deleteUserMutation,
 	getUserSettingsOptions,
@@ -7,9 +10,6 @@ import {
 import type { UserSettings } from "@/api/types.gen";
 import { SettingsPage } from "@/components/settings/SettingsPage";
 import { useAuth } from "@/integrations/auth/AuthContext";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { createFileRoute, useNavigate } from "@tanstack/react-router";
-import { toast } from "sonner";
 
 export const Route = createFileRoute("/_authenticated/settings")({
 	component: RouteComponent,

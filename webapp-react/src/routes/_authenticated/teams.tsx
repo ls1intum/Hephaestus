@@ -1,7 +1,7 @@
-import { getTeamsOptions } from "@/api/@tanstack/react-query.gen";
-import { TeamsPage } from "@/components/teams/TeamsPage";
 import { useQuery } from "@tanstack/react-query";
 import { createFileRoute } from "@tanstack/react-router";
+import { getTeamsOptions } from "@/api/@tanstack/react-query.gen";
+import { TeamsPage } from "@/components/teams/TeamsPage";
 
 export const Route = createFileRoute("/_authenticated/teams")({
 	component: TeamsContainer,

@@ -1,6 +1,3 @@
-import type { LeaderboardEntry } from "@/api/types.gen";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
 import {
 	differenceInHours,
 	differenceInMinutes,
@@ -14,6 +11,9 @@ import {
 	TrendingUp,
 } from "lucide-react";
 import { useEffect, useState } from "react";
+import type { LeaderboardEntry } from "@/api/types.gen";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent } from "@/components/ui/card";
 import { LeagueInfoDialog } from "./LeagueInfoDialog";
 import { LeagueProgressCard } from "./LeagueProgressCard";
 

@@ -14,15 +14,15 @@ import { UserInfo } from './user-info';
 
 
 export interface LeaderboardEntry { 
-    rank: number;
-    score: number;
-    user: UserInfo;
-    reviewedPullRequests: Array<PullRequestInfo>;
-    numberOfReviewedPRs: number;
     numberOfApprovals: number;
     numberOfChangeRequests: number;
-    numberOfComments: number;
-    numberOfUnknowns: number;
     numberOfCodeComments: number;
+    numberOfComments: number;
+    numberOfReviewedPRs: number;
+    numberOfUnknowns: number;
+    rank: number;
+    reviewedPullRequests: Array<PullRequestInfo>;
+    score: number;
+    user: UserInfo;
 }
 

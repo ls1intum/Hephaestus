@@ -16,10 +16,10 @@ import { UserInfo } from './user-info';
 
 
 export interface UserProfile { 
-    userInfo: UserInfo;
-    firstContribution: string;
     contributedRepositories: Array<RepositoryInfo>;
-    reviewActivity?: Array<PullRequestReviewInfo>;
+    firstContribution: string;
     openPullRequests?: Array<PullRequestInfo>;
+    reviewActivity?: Array<PullRequestReviewInfo>;
+    userInfo: UserInfo;
 }
 

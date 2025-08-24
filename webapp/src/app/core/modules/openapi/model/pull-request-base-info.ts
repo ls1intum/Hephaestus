@@ -13,14 +13,14 @@ import { RepositoryInfo } from './repository-info';
 
 
 export interface PullRequestBaseInfo { 
+    htmlUrl: string;
     id: number;
-    number: number;
-    title: string;
-    state: PullRequestBaseInfo.StateEnum;
     isDraft: boolean;
     isMerged: boolean;
+    number: number;
     repository?: RepositoryInfo;
-    htmlUrl: string;
+    state: PullRequestBaseInfo.StateEnum;
+    title: string;
 }
 export namespace PullRequestBaseInfo {
     export type StateEnum = 'OPEN' | 'CLOSED';

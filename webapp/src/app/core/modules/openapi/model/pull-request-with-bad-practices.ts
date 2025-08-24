@@ -15,22 +15,22 @@ import { PullRequestBadPractice } from './pull-request-bad-practice';
 
 
 export interface PullRequestWithBadPractices { 
+    additions: number;
+    badPracticeSummary: string;
+    badPractices: Array<PullRequestBadPractice>;
+    createdAt: string;
+    deletions: number;
+    htmlUrl: string;
     id: number;
-    number: number;
-    title: string;
-    state: PullRequestWithBadPractices.StateEnum;
     isDraft: boolean;
     isMerged: boolean;
     labels: Array<LabelInfo>;
-    repository: RepositoryInfo;
-    additions: number;
-    deletions: number;
-    htmlUrl: string;
-    createdAt: string;
-    updatedAt: string;
-    badPracticeSummary: string;
-    badPractices: Array<PullRequestBadPractice>;
+    number: number;
     oldBadPractices: Array<PullRequestBadPractice>;
+    repository: RepositoryInfo;
+    state: PullRequestWithBadPractices.StateEnum;
+    title: string;
+    updatedAt: string;
 }
 export namespace PullRequestWithBadPractices {
     export type StateEnum = 'OPEN' | 'CLOSED';

@@ -12,15 +12,15 @@
 
 
 export interface TeamV2Info { 
-    id: number;
-    name: string;
-    parentId?: number;
     description?: string;
-    privacy?: TeamV2Info.PrivacyEnum;
-    organization?: string;
     htmlUrl?: string;
+    id: number;
     lastSyncedAt?: string;
     membershipCount?: number;
+    name: string;
+    organization?: string;
+    parentId?: number;
+    privacy?: TeamV2Info.PrivacyEnum;
     repoPermissionCount?: number;
 }
 export namespace TeamV2Info {

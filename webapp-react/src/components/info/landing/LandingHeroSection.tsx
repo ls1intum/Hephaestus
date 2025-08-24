@@ -1,10 +1,11 @@
+import { ArrowRight, ChevronDown } from "lucide-react";
 import type { LeaderboardEntry, PullRequestInfo } from "@/api/types.gen";
 import aliceAvatar from "@/assets/alice_developer.jpg";
 import bobAvatar from "@/assets/bob_builder.jpg";
 import charlieAvatar from "@/assets/charlie_coder.jpg";
 import { LeaderboardTable } from "@/components/leaderboard/LeaderboardTable";
+import { MentorIcon } from "@/components/mentor/MentorIcon";
 import { Button } from "@/components/ui/button";
-import { ArrowRight, ChevronDown } from "lucide-react";
 
 function createMockReviewedPullRequest(amount: number) {
 	return Array.from(
@@ -131,6 +132,14 @@ export function LandingHeroSection({
 						>
 							Learn More <ChevronDown className="h-4 w-4" />
 						</Button>
+					</div>
+					<div className="flex items-center gap-2 text-muted-foreground">
+						<MentorIcon size={36} className="text-primary" />
+						<span className="text-sm">
+							Powered by{" "}
+							<span className="text-github-done-foreground">Heph</span>, your AI
+							mentor
+						</span>
 					</div>
 				</div>
 			</div>

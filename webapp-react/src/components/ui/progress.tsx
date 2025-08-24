@@ -1,8 +1,7 @@
 import * as ProgressPrimitive from "@radix-ui/react-progress";
-import type * as React from "react";
-
-import { cn } from "@/lib/utils";
 import type { ClassValue } from "clsx";
+import type * as React from "react";
+import { cn } from "@/lib/utils";
 
 interface ProgressProps
 	extends React.ComponentProps<typeof ProgressPrimitive.Root> {

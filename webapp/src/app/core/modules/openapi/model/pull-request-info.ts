@@ -15,23 +15,23 @@ import { UserInfo } from './user-info';
 
 
 export interface PullRequestInfo { 
+    additions: number;
+    assignees?: Array<UserInfo>;
+    author?: UserInfo;
+    closedAt?: string;
+    commentsCount: number;
+    createdAt?: string;
+    deletions: number;
+    htmlUrl: string;
     id: number;
-    number: number;
-    title: string;
-    state: PullRequestInfo.StateEnum;
     isDraft: boolean;
     isMerged: boolean;
-    commentsCount: number;
-    author?: UserInfo;
     labels?: Array<LabelInfo>;
-    assignees?: Array<UserInfo>;
-    repository?: RepositoryInfo;
-    additions: number;
-    deletions: number;
     mergedAt?: string;
-    closedAt?: string;
-    htmlUrl: string;
-    createdAt?: string;
+    number: number;
+    repository?: RepositoryInfo;
+    state: PullRequestInfo.StateEnum;
+    title: string;
     updatedAt?: string;
 }
 export namespace PullRequestInfo {

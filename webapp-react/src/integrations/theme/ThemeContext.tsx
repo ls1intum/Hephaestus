@@ -3,7 +3,7 @@ import { createContext, useContext, useEffect, useState } from "react";
 type Theme = "dark" | "light" | "system";
 
 type ThemeProviderProps = {
-	children: React.ReactNode;
+	children?: React.ReactNode;
 	defaultTheme?: Theme;
 	storageKey?: string;
 };
@@ -57,16 +57,16 @@ export function ThemeProvider({
 		}
 	}, [theme]);
 
-	const value = {
+	const contextValue: ThemeProviderState = {
 		theme,
-		setTheme: (theme: Theme) => {
-			localStorage.setItem(storageKey, theme);
-			setTheme(theme);
+		setTheme: (next: Theme) => {
+			localStorage.setItem(storageKey, next);
+			setTheme(next);
 		},
 	};
 
 	return (
-		<ThemeProviderContext.Provider {...props} value={value}>
+		<ThemeProviderContext.Provider {...props} value={contextValue}>
 			{children}
 		</ThemeProviderContext.Provider>
 	);

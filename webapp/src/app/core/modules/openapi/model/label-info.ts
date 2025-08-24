@@ -13,9 +13,9 @@ import { RepositoryInfo } from './repository-info';
 
 
 export interface LabelInfo { 
+    color: string;
     id: number;
     name: string;
-    color: string;
     repository?: RepositoryInfo;
 }
 

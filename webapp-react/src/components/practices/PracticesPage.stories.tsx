@@ -1,6 +1,6 @@
-import type { Activity } from "@/api/types.gen";
 import type { Meta, StoryObj } from "@storybook/react";
 import { fn } from "@storybook/test";
+import type { Activity } from "@/api/types.gen";
 import { PracticesPage } from "./PracticesPage";
 
 /**

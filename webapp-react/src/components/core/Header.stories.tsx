@@ -1,6 +1,6 @@
-import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import type { Meta, StoryObj } from "@storybook/react";
 import { fn } from "@storybook/test";
+import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import Header from "./Header";
 
 /**

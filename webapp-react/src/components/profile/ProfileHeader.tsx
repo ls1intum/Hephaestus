@@ -1,3 +1,5 @@
+import { ClockIcon } from "@primer/octicons-react";
+import { format } from "date-fns";
 import type { RepositoryInfo, UserInfo } from "@/api/types.gen";
 import { LeagueIcon } from "@/components/leaderboard/LeagueIcon";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -8,8 +10,6 @@ import {
 	TooltipContent,
 	TooltipTrigger,
 } from "@/components/ui/tooltip";
-import { ClockIcon } from "@primer/octicons-react";
-import { format } from "date-fns";
 
 // Repository images for known repositories
 const REPO_IMAGES: Record<string, string> = {

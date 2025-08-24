@@ -1,3 +1,4 @@
+import { InfoIcon } from "@primer/octicons-react";
 import {
 	Card,
 	CardContent,
@@ -5,7 +6,6 @@ import {
 	CardHeader,
 	CardTitle,
 } from "@/components/ui/card";
-import { InfoIcon } from "@primer/octicons-react";
 import { stateConfig } from "./utils";
 
 export function BadPracticeLegendCard() {

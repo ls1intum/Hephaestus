@@ -1,6 +1,6 @@
+import { GitPullRequest, InfoIcon } from "lucide-react";
 import type { Activity, BadPracticeFeedback } from "@/api/types.gen";
 import { EmptyState } from "@/components/shared/EmptyState";
-import { GitPullRequest, InfoIcon } from "lucide-react";
 import { ActivitySummaryCard } from "./ActivitySummaryCard";
 import { BadPracticeLegendCard } from "./BadPracticeLegendCard";
 import { PullRequestBadPracticeCard } from "./PullRequestBadPracticeCard";

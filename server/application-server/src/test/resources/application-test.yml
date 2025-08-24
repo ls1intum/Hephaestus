@@ -7,12 +7,29 @@ spring:
     driver-class-name: org.postgresql.Driver
     username: test
     password: test
+    # HikariCP configuration optimized for tests
+    hikari:
+      maximum-pool-size: 5
+      minimum-idle: 1
+      max-lifetime: 300000  # 5 minutes (shorter for tests)
+      connection-timeout: 10000  # 10 seconds
+      idle-timeout: 60000  # 1 minute (shorter for tests)
+      validation-timeout: 5000  # 5 seconds
+      leak-detection-threshold: 10000  # 10 seconds for leak detection
+      connection-test-query: SELECT 1
   
   # JPA configuration for tests
   jpa:
     hibernate:
       ddl-auto: create-drop
     show-sql: false
+  
+  # Test-specific configurations for faster shutdown
+  task:
+    execution:
+      shutdown:
+        await-termination: true
+        await-termination-period: 5s
   
   # Disable liquibase for tests (use JPA auto DDL instead)
   liquibase:
@@ -35,6 +52,11 @@ nats:
   server: nats://localhost:4222
   timeframe: 1
   durable-consumer-name: test-consumer
+
+# Intelligence service configuration for tests (stub)
+hephaestus:
+  intelligence-service:
+    url: http://localhost:8080
 
 # Logging configuration for tests
 logging:

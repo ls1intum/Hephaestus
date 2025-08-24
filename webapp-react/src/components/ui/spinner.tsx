@@ -20,7 +20,7 @@ export function Spinner({
 				},
 				className,
 			)}
-			aria-label="loading"
+			aria-busy
 			{...props}
 		>
 			<span className="sr-only">Loading...</span>
