@@ -1,0 +1,21 @@
+name: Auto-approve own PRs
+
+on:
+  pull_request_target:
+    types: [opened, synchronize, reopened, ready_for_review]
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  approve:
+    if: ${{ github.event.pull_request.user.login == 'FelixTJDietrich' && !github.event.pull_request.draft }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Approve as github-actions[bot]
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          echo "Approving PR #${{ github.event.pull_request.number }} by ${{ github.event.pull_request.user.login }}"
+          gh pr review ${{ github.event.pull_request.number }} --approve --repo ${{ github.repository }}
