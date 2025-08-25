@@ -106,30 +106,14 @@ if [[ -f webapp/package-lock.json ]]; then
     ' webapp/package-lock.json > webapp/package-lock.json.tmp && mv webapp/package-lock.json.tmp webapp/package-lock.json
 fi
 
-# Update root package-lock.json (if it exists)
-# 1) Update the top-level version field (before the packages block)
-# 2) Update the first hephaestus entry's immediate version (mirrors webapp logic)
+# Update root package-lock.json (top-level version), if present
 if [[ -f package-lock.json ]]; then
-    # 1) Top-level version (only within header before "packages":)
     awk -v old_version="$CURRENT_VERSION" -v new_version="$NEW_VERSION" '
-        BEGIN {in_header = 1; updated = 0}
-        in_header && /"packages"[[:space:]]*:/ { in_header = 0 }
-        in_header && !updated && /"version":/ {
+        NR==1 { print; next } # keep formatting stable
+        /"version":/ && FNR < 50 {
             sub("\"version\": \"" old_version "\"", "\"version\": \"" new_version "\"")
-            updated = 1
         }
         { print }
-    ' package-lock.json > package-lock.json.tmp && mv package-lock.json.tmp package-lock.json
-
-    # 2) First hephaestus name+version pair (e.g., packages[""] or packages["webapp"]) — matches the pattern you provided
-    awk -v old_version="$CURRENT_VERSION" -v new_version="$NEW_VERSION" '
-        BEGIN {found_name = 0}
-        /"name": "hephaestus"/ {found_name = 1}
-        found_name && /"version":/ {
-            sub("\"version\": \"" old_version "\"", "\"version\": \"" new_version "\"")
-            found_name = 0
-        }
-        {print}
     ' package-lock.json > package-lock.json.tmp && mv package-lock.json.tmp package-lock.json
 fi
 

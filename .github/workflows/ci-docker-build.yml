@@ -10,9 +10,9 @@ on:
         default: "false"
 
 jobs:
-  docker-build-and-push:
-    name: "${{ matrix.component.name }}-build-and-push"
-    if: ${{ inputs.should_skip != 'true' && github.event_name != 'merge_group' }}
+  docker-build:
+    name: "${{ matrix.component.name }}-build"
+    if: inputs.should_skip != 'true'
     strategy:
       fail-fast: false
       matrix:
@@ -59,33 +59,3 @@ jobs:
         org.opencontainers.image.licenses=MIT
         hephaestus.component=${{ matrix.component.name }}
     secrets: inherit
-
-  docker-build-check:
-    name: "${{ matrix.component.name }}-build-check"
-    if: ${{ inputs.should_skip != 'true' && github.event_name == 'merge_group' }}
-    runs-on: ubuntu-latest
-    strategy:
-      fail-fast: false
-      matrix:
-        component:
-          - name: "webapp"
-            docker-file: "./webapp/Dockerfile"
-            docker-context: "./webapp"
-          - name: "application-server"
-            docker-file: "./server/application-server/Dockerfile"
-            docker-context: "./server/application-server"
-          - name: "intelligence-service"
-            docker-file: "./server/intelligence-service/Dockerfile"
-            docker-context: "./server/intelligence-service"
-          - name: "webhook-ingest"
-            docker-file: "./server/webhook-ingest/Dockerfile"
-            docker-context: "./server/webhook-ingest"
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-      - name: Build image (no push)
-        run: |
-          echo "Building ${{ matrix.component.name }} (merge_queue)"
-          docker build \
-            -f "${{ matrix.component.docker-file }}" \
-            "${{ matrix.component.docker-context }}"
