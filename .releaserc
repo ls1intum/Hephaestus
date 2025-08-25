@@ -150,16 +150,25 @@
       }
     ],
     [
+      "@semantic-release/changelog",
+      {
+        "changelogFile": "CHANGELOG.md",
+        "changelogTitle": "# Changelog"
+      }
+    ],
+    [
       "@semantic-release/exec",
       {
         "prepareCmd": "./update_version.sh ${nextRelease.version}",
-        "publishCmd": "echo 'Version ${nextRelease.version} has been released'"
+        "publishCmd": "echo 'Version ${nextRelease.version} has been released'",
+        "successCmd": "node scripts/update_rc_release_assets.mjs ${nextRelease.version}"
       }
     ],
     [
       "@semantic-release/git",
       {
         "assets": [
+          "CHANGELOG.md",
           "package.json",
           "package-lock.json",
           "webapp/package.json",
@@ -174,21 +183,17 @@
           "server/intelligence-service/app/main.py",
           "server/intelligence-service/openapi.yaml",
           "server/webhook-ingest/pyproject.toml"
-        ],
-        "message": "chore(release): ${nextRelease.version}\n\n${nextRelease.notes}"
+  ],
+  "message": "chore(release): ${nextRelease.version}"
       }
     ],
     [
       "@semantic-release/github",
       {
-        "successComment": "✅ **Released in v${nextRelease.version}**\n\nThis ${issue.pull_request ? 'pull request' : 'issue'} has been resolved and is now available in the [latest release](<github_release_url>).\n\nThank you for your contribution to Hephaestus! 🙏",
-        "successCommentCondition": "<% return issue.user.type !== 'Bot'; %>",
         "failTitle": "🚨 Automated Release Pipeline Failed",
         "failComment": "## Release Failure Report\n\nThe automated release pipeline for Hephaestus has encountered an error on branch `${branch.name}`.\n\n### Error Details\n${errors.map(err => `- **${err.pluginName}**: ${err.message}`).join('\\n')}\n\n### Next Steps\nOur team has been notified and will investigate this issue. You can track the resolution in this issue.\n\n---\n*This is an automated message from the Hephaestus release system.*",
         "labels": ["release-failure", "bug"],
-        "releasedLabels": ["released-v${nextRelease.version}"],
-        "addReleases": "bottom",
-        "discussionCategoryName": "Announcements"
+        "addReleases": "bottom"
       }
     ]
   ],
