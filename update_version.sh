@@ -9,6 +9,7 @@ set -euo pipefail
 #
 # This script updates the version in:
 #   - webapp/package.json & webapp/package-lock.json (for "hephaestus")
+#   - root package-lock.json (top-level version)
 #   - Java source: server/application-server/src/main/java/de/tum/in/www1/hephaestus/OpenAPIConfiguration.java
 #   - YAML config: server/application-server/src/main/resources/application.yml
 #   - Python projects: server/intelligence-service/pyproject.toml & server/webhook-ingest/pyproject.toml
@@ -103,6 +104,17 @@ if [[ -f webapp/package-lock.json ]]; then
         }
         {print}
     ' webapp/package-lock.json > webapp/package-lock.json.tmp && mv webapp/package-lock.json.tmp webapp/package-lock.json
+fi
+
+# Update root package-lock.json (top-level version), if present
+if [[ -f package-lock.json ]]; then
+    awk -v old_version="$CURRENT_VERSION" -v new_version="$NEW_VERSION" '
+        NR==1 { print; next } # keep formatting stable
+        /"version":/ && FNR < 50 {
+            sub("\"version\": \"" old_version "\"", "\"version\": \"" new_version "\"")
+        }
+        { print }
+    ' package-lock.json > package-lock.json.tmp && mv package-lock.json.tmp package-lock.json
 fi
 
 # Function to perform cross-platform sed in-place editing
