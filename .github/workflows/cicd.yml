@@ -22,7 +22,7 @@ jobs:
       - id: skip_check
         uses: fkirc/skip-duplicate-actions@v5
         with:
-          do_not_skip: '["workflow_dispatch"]'
+          do_not_skip: '["workflow_dispatch","merge_group"]'
 
   # Code quality and style checks
   quality-gates:
@@ -38,6 +38,9 @@ jobs:
     uses: ./.github/workflows/ci-security-scan.yml
     needs: [pre-job]
     if: needs.pre-job.outputs.should_skip != 'true'
+    permissions:
+      contents: read
+      security-events: write
     secrets: inherit
     with:
       should_skip: ${{ needs.pre-job.outputs.should_skip }}
@@ -53,9 +56,12 @@ jobs:
 
   # Build Docker images and push to registry
   docker-build:
-    uses: ./.github/workflows/ci-docker-build.yml
     needs: [pre-job]
     if: needs.pre-job.outputs.should_skip != 'true'
+    uses: ./.github/workflows/ci-docker-build.yml
+    permissions:
+      contents: read
+      packages: write
     secrets: inherit
     with:
       should_skip: ${{ needs.pre-job.outputs.should_skip }}

@@ -98,7 +98,7 @@ jobs:
 
       # Chromatic visual testing
       - name: "Chromatic Visual Testing"
-        if: matrix.test-type == 'webapp-visual'
+        if: matrix.test-type == 'webapp-visual' && github.event_name != 'merge_group'
         id: chromatic
         uses: chromaui/action@latest
         with:
@@ -113,11 +113,11 @@ jobs:
           junitReport: true
         env:
           CHROMATIC_BRANCH: ${{ github.head_ref || github.ref_name }}
-          CHROMATIC_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+          CHROMATIC_SHA: ${{ (github.event_name == 'pull_request' && github.event.pull_request.head.sha) || github.sha }}
 
       # Create Storybook status check
       - name: "Create Storybook status check"
-        if: matrix.test-type == 'webapp-visual' && always() && steps.chromatic.outputs.storybookUrl
+        if: github.event_name != 'merge_group' && matrix.test-type == 'webapp-visual' && always() && steps.chromatic.outputs.storybookUrl
         uses: actions/github-script@v7
         with:
           script: |
@@ -142,7 +142,7 @@ jobs:
           fail-on-error: false
 
       - name: Upload Chromatic test results
-        if: always() && matrix.test-type == 'webapp-visual'
+        if: always() && matrix.test-type == 'webapp-visual' && github.event_name != 'merge_group'
         uses: dorny/test-reporter@v2
         with:
           name: "Test Results - ${{ matrix.test-type }}"
