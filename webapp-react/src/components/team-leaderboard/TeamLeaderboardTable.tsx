@@ -1,4 +1,4 @@
-import type { LeaderboardEntry, TeamInfo } from "@/api/types.gen";
+import type { TeamLeaderboardEntry, TeamInfo } from "@/api/types.gen";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
 	Table,
@@ -17,18 +17,22 @@ import {
 	NoEntryIcon,
 } from "@primer/octicons-react";
 import { AwardIcon } from "lucide-react";
+import {Avatar, AvatarFallback, AvatarImage} from "@/components/ui/avatar.tsx";
+import {ReviewsPopover} from "@/components/leaderboard/ReviewsPopover.tsx";
+import {Tooltip, TooltipContent, TooltipTrigger} from "@/components/ui/tooltip.tsx";
 
 
 export interface TeamLeaderboardTableProps {
     isLoading: boolean;
-    leaderboard?: LeaderboardEntry[]; //TODO: check if it works with that or if i need to implement a TeamLeaderboardEntry
-    currentTeam?: TeamInfo;
-    onTeamClick?: (teamname: string) => void;
+    teamLeaderboard?: TeamLeaderboardEntry[]; //TODO: check if it works with that or if i need to implement a TeamLeaderboardEntry
+    currentTeam?: TeamInfo; // TODO: Maybe integrate that later on if the board works to highlight the teams of the logged in user
+    onTeamClick?: (teamName: string) => void;
 }
 
 export function TeamLeaderboardTable({
     isLoading,
-    leaderboard = [],
+    teamLeaderboard = [],
+    // @ts-ignore
     currentTeam,
     onTeamClick,
 }: TeamLeaderboardTableProps) {
@@ -36,7 +40,7 @@ export function TeamLeaderboardTable({
         return <TeamLeaderboardTableSkeleton/>
     }
 
-    if (!leaderboard.length) {
+    if (!teamLeaderboard.length) {
         return (
             <div className="flex flex-col items-center justify-center p-8 text-center">
 				<NoEntryIcon className="h-12 w-12 text-github-danger-foreground mb-2" />
@@ -50,29 +54,101 @@ export function TeamLeaderboardTable({
 
     return (
         <Table>
-            <TableHeader>
-				<TableRow>
-                    {/* TODO: review header spacings and tweak accordingly */}
-					<TableHead className="text-center w-10">Rank</TableHead>
-					<TableHead className="text-center w-20">League</TableHead>
-					<TableHead className="w-56">Team</TableHead>
-					<TableHead className="text-center">
-						<div className="flex justify-center items-center gap-1 text-github-done-foreground">
-							<span className="flex items-center gap-0.5">
-								<AwardIcon className="size-4" /> Score
-							</span>
-						</div>
-					</TableHead>
-					<TableHead>Activity</TableHead>
-				</TableRow>
-			</TableHeader>
+            <TeamLeaderboardTableHeader />
             <TableBody>
                 {/* TODO: Here needs to be a table body calculation like in the LeaderboardTable.tsx file for the normal Leaderboard but with teams data */}
-                {leaderboard.map((entry) => {
-                //    Decide later wether to use row styling for logged in users of a team
+                {teamLeaderboard.map((entry) => {
+                //    Decide later whether to use row styling for logged-in users of a team
                     return (
-                        <TableRow>
-
+                        <TableRow
+                            key={entry.team.name}
+                            id={`team-${entry.team.id}`}
+                            className="cursor-pointer"
+                            onClick={() => {
+                                onTeamClick?.(entry.team.name)
+                            }}
+                        >
+                            <TableCell className="text-center">{entry.rank}</TableCell>
+                            <TableCell>
+                                <div className="flex items-center gap-2 font-medium">
+                                    <Avatar className="size-9">
+                                        <AvatarImage
+                                            src={entry.team.color}
+                                            alt={`${entry.team.name}'s avatar`}
+                                        />
+                                        <AvatarFallback>
+                                            {entry.team.name.slice(0, 2).toUpperCase()}
+                                        </AvatarFallback>
+                                    </Avatar>
+                                    <span className="text-muted-foreground text-wrap">
+										{entry.team.name}
+									</span>
+                                </div>
+                            </TableCell>
+                            <TableCell className="text-center font-medium">
+                                {entry.score}
+                            </TableCell>
+                            <TableCell>
+                                <div className="flex items-center gap-2">
+                                    {entry.numberOfReviewedPRs > 0 && (
+                                        <>
+                                            <ReviewsPopover
+                                                reviewedPRs={entry.reviewedPullRequests}
+                                                // highlight={isCurrentUser}
+                                            />
+                                            <div className="flex items-center text-github-muted-foreground">
+                                                <ChevronLeftIcon className="h-4 w-4" />
+                                            </div>
+                                        </>
+                                    )}
+                                    {entry.numberOfChangeRequests > 0 && (
+                                        <Tooltip>
+                                            <TooltipTrigger asChild>
+                                                <div className="flex items-center gap-1 text-github-danger-foreground">
+                                                    <FileDiffIcon className="h-4 w-4" />
+                                                    <span>{entry.numberOfChangeRequests}</span>
+                                                </div>
+                                            </TooltipTrigger>
+                                            <TooltipContent>Changes Requested</TooltipContent>
+                                        </Tooltip>
+                                    )}
+                                    {entry.numberOfApprovals > 0 && (
+                                        <Tooltip>
+                                            <TooltipTrigger asChild>
+                                                <div className="flex items-center gap-1 text-github-success-foreground">
+                                                    <CheckIcon className="h-4 w-4" />
+                                                    <span>{entry.numberOfApprovals}</span>
+                                                </div>
+                                            </TooltipTrigger>
+                                            <TooltipContent>Approvals</TooltipContent>
+                                        </Tooltip>
+                                    )}
+                                    {entry.numberOfComments + entry.numberOfUnknowns > 0 && (
+                                        <Tooltip>
+                                            <TooltipTrigger asChild>
+                                                <div className="flex items-center gap-1 text-github-muted-foreground">
+                                                    <CommentIcon className="h-4 w-4" />
+                                                    <span>
+														{entry.numberOfComments + entry.numberOfUnknowns}
+													</span>
+                                                </div>
+                                            </TooltipTrigger>
+                                            <TooltipContent>Comments</TooltipContent>
+                                        </Tooltip>
+                                    )}
+                                    {entry.numberOfCodeComments > 0 && (
+                                        <Tooltip>
+                                            <TooltipTrigger asChild>
+                                                <div className="flex items-center gap-1 text-github-muted-foreground">
+                                                    <CommentDiscussionIcon className="h-4 w-4" />
+                                                    <span>{entry.numberOfCodeComments}</span>
+                                                </div>
+                                            </TooltipTrigger>
+                                            <TooltipContent>Code comments</TooltipContent>
+                                        </Tooltip>
+                                    )}
+                                </div>
+                            </TableCell>
                         </TableRow>
                     );
                 })
@@ -82,18 +158,32 @@ export function TeamLeaderboardTable({
     );
 }
 
+function TeamLeaderboardTableHeader() {
+    return (
+        <TableHeader>
+            <TableRow>
+                {/* TODO: review header spacings and tweak accordingly */}
+                <TableHead className="w-10">Rank</TableHead>
+                {/*TODO: Review for Team League Icons -> if a team league system is necessary or meaningful*/}
+                {/*<TableHead className="text-center w-20">League</TableHead>*/}
+                <TableHead className="">Team</TableHead>
+                <TableHead className="w-25 text-center">
+                    <div className="flex justify-center items-center gap-1 text-github-done-foreground">
+							<span className="flex items-center gap-0.5">
+								<AwardIcon className="size-4" /> Score
+							</span>
+                    </div>
+                </TableHead>
+                <TableHead>Activity</TableHead>
+            </TableRow>
+        </TableHeader>
+    );
+}
+
 function TeamLeaderboardTableSkeleton() {
 	return (
 		<Table>
-			<TableHeader>
-				<TableRow>
-					<TableHead className="text-center w-16">Rank</TableHead>
-					<TableHead className="text-center w-20">League</TableHead>
-					<TableHead>Team</TableHead>
-					<TableHead className="text-center">Score</TableHead>
-					<TableHead>Activity</TableHead>
-				</TableRow>
-			</TableHeader>
+            <TeamLeaderboardTableHeader />
 			<TableBody>
 				{Array.from({ length: 10 }).map((_, idx) => (
 					// biome-ignore lint/suspicious/noArrayIndexKey: Data is static and not user-generated
@@ -101,12 +191,13 @@ function TeamLeaderboardTableSkeleton() {
 						<TableCell>
 							<Skeleton
 								className="h-5 w-7"
-								style={{ width: `${20 + 1 * idx}px` }}
+								style={{ width: `${20 + idx}px` }}
 							/>
 						</TableCell>
-						<TableCell>
-							<Skeleton className="h-8 w-8 mx-auto" />
-						</TableCell>
+                        {/*TODO: Maybe reintroduce later when team league icons are a thing :D*/}
+						{/*<TableCell>*/}
+						{/*	<Skeleton className="h-8 w-8 mx-auto" />*/}
+						{/*</TableCell>*/}
 						<TableCell className="py-2">
 							<div className="flex items-center gap-2">
 								<Skeleton className="w-10 h-10 rounded-full" />
