@@ -543,6 +543,46 @@ paths:
                 type: array
                 items:
                   $ref: "#/components/schemas/TeamInfo"
+  /team-leaderboard:
+    get:
+      tags:
+      - team-leaderboard
+      operationId: getTeamLeaderboard
+      parameters:
+      - name: after
+        in: query
+        required: true
+        schema:
+          type: string
+          format: date-time
+      - name: before
+        in: query
+        required: true
+        schema:
+          type: string
+          format: date-time
+      - name: team
+        in: query
+        required: false
+        schema:
+          type: string
+      - name: sort
+        in: query
+        required: false
+        schema:
+          type: string
+          enum:
+          - SCORE
+          - LEAGUE_POINTS
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/TeamLeaderboardEntry"
   /meta:
     get:
       tags:
@@ -1036,6 +1076,50 @@ components:
       - members
       - name
       - repositories
+    TeamLeaderboardEntry:
+      type: object
+      properties:
+        rank:
+          type: integer
+          format: int32
+        score:
+          type: integer
+          format: int32
+        team:
+          $ref: "#/components/schemas/TeamInfo"
+        reviewedPullRequests:
+          type: array
+          items:
+            $ref: "#/components/schemas/PullRequestInfo"
+        numberOfReviewedPRs:
+          type: integer
+          format: int32
+        numberOfApprovals:
+          type: integer
+          format: int32
+        numberOfChangeRequests:
+          type: integer
+          format: int32
+        numberOfComments:
+          type: integer
+          format: int32
+        numberOfUnknowns:
+          type: integer
+          format: int32
+        numberOfCodeComments:
+          type: integer
+          format: int32
+      required:
+      - numberOfApprovals
+      - numberOfChangeRequests
+      - numberOfCodeComments
+      - numberOfComments
+      - numberOfReviewedPRs
+      - numberOfUnknowns
+      - rank
+      - reviewedPullRequests
+      - score
+      - team
     PullRequestBadPractice:
       type: object
       properties:
