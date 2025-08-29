@@ -1,26 +1,7 @@
 import type { Meta, StoryObj } from '@storybook/react';
 import { fn } from '@storybook/test';
 import { TeamLeaderboardTable } from './TeamLeaderboardTable';
-import type { TeamLeaderboardEntry, TeamInfo, PullRequestInfo, UserInfo, LabelInfo, RepositoryInfo } from '@/api/types.gen';
-
-const mockMembers: UserInfo[] = [
-  {
-    id: 1,
-    login: 'alice',
-    avatarUrl: 'https://avatars.githubusercontent.com/u/1?v=4',
-    name: 'Alice Developer',
-    htmlUrl: 'https://github.com/alice',
-    leaguePoints: 500,
-  },
-  {
-    id: 2,
-    login: 'bob',
-    avatarUrl: 'https://avatars.githubusercontent.com/u/2?v=4',
-    name: 'Bob Builder',
-    htmlUrl: 'https://github.com/bob',
-    leaguePoints: 400,
-  },
-];
+import type {TeamLeaderboardEntry, TeamInfo, RepositoryInfo, LabelInfo, PullRequestInfo} from '@/api/types.gen';
 
 const mockRepositories: RepositoryInfo[] = [
   {
@@ -35,6 +16,46 @@ const mockRepositories: RepositoryInfo[] = [
 const mockLabels: LabelInfo[] = [
   { id: 1, name: 'frontend', color: '#ffcc00' },
   { id: 2, name: 'backend', color: '#00ccff' },
+  { id: 3, name: 'devops', color: '#33cc99' },
+  { id: 4, name: 'qa', color: '#9966ff' },
+];
+
+const mockMembers = [
+  {
+    id: 1,
+    login: 'skywalker',
+    name: 'Luke Skywalker',
+    avatarUrl: 'https://avatars.githubusercontent.com/u/201?v=4',
+    htmlUrl: 'https://github.com/skywalker',
+  },
+  {
+    id: 2,
+    login: 'hermione',
+    name: 'Hermione Granger',
+    avatarUrl: 'https://avatars.githubusercontent.com/u/202?v=4',
+    htmlUrl: 'https://github.com/hermione',
+  },
+  {
+    id: 3,
+    login: 'batman',
+    name: 'Bruce Wayne',
+    avatarUrl: 'https://avatars.githubusercontent.com/u/203?v=4',
+    htmlUrl: 'https://github.com/batman',
+  },
+  {
+    id: 4,
+    login: 'frodo',
+    name: 'Frodo Baggins',
+    avatarUrl: 'https://avatars.githubusercontent.com/u/204?v=4',
+    htmlUrl: 'https://github.com/frodo',
+  },
+  {
+    id: 5,
+    login: 'lara',
+    name: 'Lara Croft',
+    avatarUrl: 'https://avatars.githubusercontent.com/u/205?v=4',
+    htmlUrl: 'https://github.com/lara',
+  },
 ];
 
 const mockPRs: PullRequestInfo[] = [
@@ -79,6 +100,24 @@ const mockTeams: TeamInfo[] = [
     members: mockMembers,
     hidden: false,
   },
+  {
+    id: 3,
+    name: 'DevOps Ninjas',
+    color: '#33cc99',
+    repositories: mockRepositories,
+    labels: mockLabels,
+    members: [mockMembers[2], mockMembers[3]],
+    hidden: false,
+  },
+  {
+    id: 4,
+    name: 'QA Wizards',
+    color: '#9966ff',
+    repositories: mockRepositories,
+    labels: mockLabels,
+    members: [mockMembers[4]],
+    hidden: false,
+  },
 ];
 
 const mockLeaderboard: TeamLeaderboardEntry[] = [
@@ -105,6 +144,46 @@ const mockLeaderboard: TeamLeaderboardEntry[] = [
     numberOfComments: 2,
     numberOfUnknowns: 1,
     numberOfCodeComments: 2,
+  },
+  {
+    rank: 3,
+    score: 100,
+    team: {
+      id: 3,
+      name: "DevOps Ninjas",
+      color: "#33cc99",
+      repositories: mockRepositories,
+      labels: mockLabels,
+      members: [mockMembers[2], mockMembers[3]],
+      hidden: false,
+    },
+    reviewedPullRequests: [],
+    numberOfReviewedPRs: 6,
+    numberOfApprovals: 3,
+    numberOfChangeRequests: 2,
+    numberOfComments: 1,
+    numberOfUnknowns: 0,
+    numberOfCodeComments: 1,
+  },
+  {
+    rank: 4,
+    score: 80,
+    team: {
+      id: 4,
+      name: "QA Wizards",
+      color: "#9966ff",
+      repositories: mockRepositories,
+      labels: mockLabels,
+      members: [mockMembers[4]],
+      hidden: false,
+    },
+    reviewedPullRequests: [],
+    numberOfReviewedPRs: 4,
+    numberOfApprovals: 2,
+    numberOfChangeRequests: 1,
+    numberOfComments: 0,
+    numberOfUnknowns: 1,
+    numberOfCodeComments: 0,
   },
 ];
 
@@ -139,6 +218,13 @@ export default meta;
 
 type Story = StoryObj<typeof meta>;
 
+export const Default: Story = {
+  args: {
+    isLoading: false,
+    teamLeaderboard: mockLeaderboard,
+  },
+};
+
 export const Loading: Story = {
   args: {
     isLoading: true,
@@ -150,13 +236,6 @@ export const Empty: Story = {
   args: {
     isLoading: false,
     teamLeaderboard: [],
-  },
-};
-
-export const Populated: Story = {
-  args: {
-    isLoading: false,
-    teamLeaderboard: mockLeaderboard,
   },
 };
 

@@ -1,13 +1,15 @@
-import type { LeaderboardEntry, TeamInfo } from "@/api/types.gen";
 import { LeaderboardLegend } from "../leaderboard/LeaderboardLegend";
 import { LeaderboardFilter } from "../leaderboard/LeaderboardFilter";
 import type { LeaderboardSortType } from "../leaderboard/SortFilter";
-import { LeaderboardTable } from "../leaderboard/LeaderboardTable";
-import { IsLoading } from "../info/about/AboutPage.stories";
 import { TeamLeaderboardTable } from "./TeamLeaderboardTable";
+import type {TeamInfo, TeamLeaderboardEntry} from "@/api/types.gen";
 
 interface TeamLeaderboardPageProps {
+    teamLeaderboard?: TeamLeaderboardEntry[];
     isLoading: boolean;
+    currentTeam?: TeamInfo;
+    onTeamClick?: (teamName: string) => void;
+
     teams: string[];
     onTeamChange?: (teams: string) => void;
     onSortChange?: (sort: LeaderboardSortType) => void;
@@ -29,6 +31,10 @@ interface TeamLeaderboardPageProps {
 
 export function TeamLeaderboardPage({
     isLoading,
+    teamLeaderboard,
+    currentTeam,
+    onTeamClick,
+
     teams,
     onTeamChange,
     onSortChange,
@@ -76,10 +82,12 @@ export function TeamLeaderboardPage({
                     </div>
 
                     <div className="col-span-2 space-y-4">
-                        <h2>Here is the space for the main table on this page where you can see the different teams</h2>
                         <div>
                             <TeamLeaderboardTable
-                                isLoading={true}
+                                isLoading={isLoading}
+                                teamLeaderboard={teamLeaderboard}
+                                currentTeam={currentTeam}
+                                onTeamClick={onTeamClick}
                             />
                         </div>
                     </div>
