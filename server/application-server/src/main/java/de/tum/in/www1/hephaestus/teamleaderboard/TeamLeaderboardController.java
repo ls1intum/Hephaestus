@@ -31,4 +31,14 @@ public class TeamLeaderboardController {
         return ResponseEntity.ok(teamLeaderboardService.createTeamLeaderboard(after, before, team, sort));
     }
 
+    @GetMapping("/all-time")
+    public ResponseEntity<List<TeamLeaderboardEntryDTO>> getAllTimeTeamLeaderboard() {
+        return getTeamLeaderboard(
+            OffsetDateTime.MIN,
+            OffsetDateTime.MAX,
+            Optional.empty(),
+            Optional.empty()
+        );
+    }
+
 }

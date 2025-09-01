@@ -583,6 +583,20 @@ paths:
                 type: array
                 items:
                   $ref: "#/components/schemas/TeamLeaderboardEntry"
+  /team-leaderboard/all-time:
+    get:
+      tags:
+      - team-leaderboard
+      operationId: getAllTimeTeamLeaderboard
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/TeamLeaderboardEntry"
   /meta:
     get:
       tags:
