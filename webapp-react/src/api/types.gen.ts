@@ -693,6 +693,22 @@ export type GetTeamLeaderboardResponses = {
 
 export type GetTeamLeaderboardResponse = GetTeamLeaderboardResponses[keyof GetTeamLeaderboardResponses];
 
+export type GetAllTimeTeamLeaderboardData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/team-leaderboard/all-time';
+};
+
+export type GetAllTimeTeamLeaderboardResponses = {
+    /**
+     * OK
+     */
+    200: Array<TeamLeaderboardEntry>;
+};
+
+export type GetAllTimeTeamLeaderboardResponse = GetAllTimeTeamLeaderboardResponses[keyof GetAllTimeTeamLeaderboardResponses];
+
 export type GetMetaDataData = {
     body?: never;
     path?: never;
