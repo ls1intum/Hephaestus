@@ -38,6 +38,10 @@ public class TeamLeaderboardService {
         Optional<String> team,
         Optional<LeaderboardSortType> sort) {
 
+        return createMockTeamLeaderboard();
+    }
+
+    private List<TeamLeaderboardEntryDTO> createMockTeamLeaderboard() {
         // Mock values for debug purpose
 
         RepositoryInfoDTO repoMock = new RepositoryInfoDTO(
@@ -77,7 +81,7 @@ public class TeamLeaderboardService {
 
         TeamLeaderboardEntryDTO entryMock = new TeamLeaderboardEntryDTO(
             1,
-            1002,
+            1001,
             teamInfoMock,
             List.of(),
             100,
