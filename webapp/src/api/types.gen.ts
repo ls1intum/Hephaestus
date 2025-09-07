@@ -1130,6 +1130,19 @@ export type TeamInfo = {
     repositories: Array<RepositoryInfo>;
 };
 
+export type TeamLeaderboardEntry = {
+    numberOfApprovals: number;
+    numberOfChangeRequests: number;
+    numberOfCodeComments: number;
+    numberOfComments: number;
+    numberOfReviewedPRs: number;
+    numberOfUnknowns: number;
+    rank: number;
+    reviewedPullRequests: Array<PullRequestInfo>;
+    score: number;
+    team: TeamInfo;
+};
+
 export type TeamV2Info = {
     description?: string;
     htmlUrl?: string;
@@ -2051,6 +2064,43 @@ export type GetContributorsResponses = {
 };
 
 export type GetContributorsResponse = GetContributorsResponses[keyof GetContributorsResponses];
+
+export type GetTeamLeaderboardData = {
+    body?: never;
+    path?: never;
+    query: {
+        after: Date;
+        before: Date;
+        team?: string;
+        sort?: 'SCORE' | 'LEAGUE_POINTS';
+    };
+    url: '/team-leaderboard';
+};
+
+export type GetTeamLeaderboardResponses = {
+    /**
+     * OK
+     */
+    200: Array<TeamLeaderboardEntry>;
+};
+
+export type GetTeamLeaderboardResponse = GetTeamLeaderboardResponses[keyof GetTeamLeaderboardResponses];
+
+export type GetAllTimeTeamLeaderboardData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/team-leaderboard/all-time';
+};
+
+export type GetAllTimeTeamLeaderboardResponses = {
+    /**
+     * OK
+     */
+    200: Array<TeamLeaderboardEntry>;
+};
+
+export type GetAllTimeTeamLeaderboardResponse = GetAllTimeTeamLeaderboardResponses[keyof GetAllTimeTeamLeaderboardResponses];
 
 export type GetTeamsData = {
     body?: never;
