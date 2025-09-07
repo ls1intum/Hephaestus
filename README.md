@@ -2,9 +2,9 @@
   <img alt="Hephaestus Logo" height="100px" src="./docs/images/hammer_bg.svg">
 </div>
 
-# Hephaestus: Forging Healthy Software Teams
+# Hephaestus — Process-Aware Mentoring for Agile Software Teams
 
-Our mission is simple: to empower novice software engineers and foster sustainable, collaborative development practices. Hephaestus is a growing platform designed to provide actionable tools — like code review gamification and AI-guided reflective sessions — that help teams continuously improve and stay focused on real-world challenges. While we're just getting started, our vision is to evolve into a comprehensive framework that nurtures agile, effective, and healthy software teams for the long term.
+Hephaestus is an open-source platform for process-aware mentoring that scaffolds self-regulated learning and onboarding for agile software teams. The platform focuses on the software process — from issues to pull requests and team rituals — to bridge the theory–practice gap and help novices adopt industry best practices faster with less struggle. Heph is the platform’s conversational AI mentor that delivers repo-grounded guidance.
 
 <img alt="Agile Hephaestus" height="200px" src="./docs/images/agile_hephaestus.png">
 
@@ -13,18 +13,20 @@ Hephaestus /hɪˈfɛstəs/ is the Greek god of blacksmiths, craftsmen, and artis
 ## Main Features
 
 1. **Code Review Gamification**
-    - **Weekly Leaderboard:** Stay motivated with a dynamic leaderboard that updates in real time via GitHub integration. Earn points for review activity, view detailed stats, and easily copy pull request links.
 
-    - **Team Competitions:** Foster a collaborative spirit with team leaderboards spanning multiple repositories and options to filter the associated activities via labels.
+   - **Weekly Leaderboard:** Stay motivated with a dynamic leaderboard that updates in real time via GitHub integration. Earn points for review activity, view detailed stats, and easily copy pull request links.
 
-    - **Leagues:** Engage in a structured league system where consistent review efforts build an Elo-like ranking — adding a competitive edge to your code reviews.
+   - **Team Competitions:** Foster a collaborative spirit with team leaderboards spanning multiple repositories and options to filter the associated activities via labels.
 
-    - **Automated Recognition:** Celebrate excellence with weekly Slack notifications that honor the top three reviewers and link directly to the previous week's leaderboard.
+   - **Leagues:** Engage in a structured league system where consistent review efforts build an Elo-like ranking — adding a competitive edge to your code reviews.
 
-2. **AI Mentor**
-    - **Reflective Sessions:** Engage in AI-assisted weekly sessions that help you set, adjust, and achieve your goals through structured reflection.
-    - **Automated Standups:** Convert insights from your reflective sessions into a structured weekly standup table for streamlined team communication.
-    - **GitHub Activity Awareness:** Utilize the GitHub integration to provide context during reflective sessions, driving continuous improvement through objective, data-driven feedback.
+   - **Automated Recognition:** Celebrate excellence with weekly Slack notifications that honor the top three reviewers and link directly to the previous week's leaderboard.
+
+2. **Heph (Conversational AI Mentor)**
+
+   - **SRL-guided reflection:** Run structured, AI-assisted sessions that support self-regulated learning (goals → strategies → reflection) tailored to agile project work.
+   - **Automated standups:** Turn weekly insights into a concise standup table to streamline team communication and accountability.
+   - **Repo context awareness:** Ground guidance in actual activity (issues, commits, reviews, PRs) to deliver objective, data-informed feedback and next steps.
 
 ## Roadmap
 
@@ -34,18 +36,18 @@ Hephaestus /hɪˈfɛstəs/ is the Greek god of blacksmiths, craftsmen, and artis
 - **Medium Term:** Expand multi-workspace capabilities to allow configuration of multiple organizations and selected open-source repositories, enabling seamless integration into diverse GitHub projects.
 - **Medium Term:** Integrate GitLab support to cater to self-hosted Git platforms, particularly for educational contexts.
 - **Medium Term:** Develop an advanced mentor prompt scheduler tailored for project-based courses, enabling daily reflective sessions and guided adaptation to evolving project requirements.
-- **Medium Term:** Enhance the gamification system with additional features and further expand the AI Mentor's capabilities.
+- **Medium Term:** Enhance the gamification system with additional features and further expand Heph's capabilities.
 - **Long Term:** Proactively integrate with GitHub and GitLab to deliver feedback directly via comments on issues or pull requests.
-- **Long Term:** Launch an peer-to-peer recognition system to reward high-quality reviews and establish a review quality assurance mechanism.
+- **Long Term:** Launch a peer-to-peer recognition system to reward high-quality reviews and establish a review quality assurance mechanism.
 
 ## Documentation
 
-Technical/user docs: [Read the Docs](https://ls1intum.github.io/Hephaestus/)  
+Technical/user docs: [Read the Docs](https://ls1intum.github.io/Hephaestus/)
 UI component docs: [Storybook](https://develop--66a8981a27ced8fef3190d41.chromatic.com/)
 
 ### Setup
 
-Read the [setup guide](https://ls1intum.github.io/Hephaestus/dev/setup_guide) on how to set up your local development environment.
+Read the [setup guide](https://ls1intum.github.io/Hephaestus/dev/setup_guide) for server, intelligence service, and the React client in `webapp`.
 
 ## Contributing
 

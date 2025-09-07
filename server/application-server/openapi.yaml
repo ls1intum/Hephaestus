@@ -1,260 +1,33 @@
 openapi: 3.1.0
 info:
-  title: Hephaestus API
-  description: API documentation for the Hephaestus application server.
   contact:
-    name: Felix T.J. Dietrich
     email: felixtj.dietrich@tum.de
+    name: Felix T.J. Dietrich
+  description: API documentation for the Hephaestus application server.
   license:
     name: MIT License
     url: https://github.com/ls1intum/Hephaestus/blob/develop/LICENSE
-  version: 0.9.0-rc.9
+  title: Hephaestus API
+  version: 0.9.0-rc.20
 servers:
-- url: /
-  description: Default Server URL
+- description: Default Server URL
+  url: /
+tags:
+- description: |-
+    REST controller for the chat functionality.
+     Handles streaming chat responses, message persistence, and thread management.
+  name: chat-controller
+- description: Document management with versioning support
+  name: Documents
+- description: Vote on chat messages (upvote/downvote)
+  name: Chat Message Voting
 paths:
-  /workspace/user/{login}/team/{teamId}:
-    put:
-      tags:
-      - workspace
-      operationId: addTeamToUser
-      parameters:
-      - name: login
-        in: path
-        required: true
-        schema:
-          type: string
-      - name: teamId
-        in: path
-        required: true
-        schema:
-          type: integer
-          format: int64
-      responses:
-        "200":
-          description: OK
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/UserInfo"
-    delete:
-      tags:
-      - workspace
-      operationId: removeUserFromTeam
-      parameters:
-      - name: login
-        in: path
-        required: true
-        schema:
-          type: string
-      - name: teamId
-        in: path
-        required: true
-        schema:
-          type: integer
-          format: int64
-      responses:
-        "200":
-          description: OK
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/UserInfo"
-  /workspace/teams:
-    put:
-      tags:
-      - workspace
-      operationId: createTeam
-      requestBody:
-        content:
-          application/json:
-            schema:
-              $ref: "#/components/schemas/TeamInfo"
-        required: true
-      responses:
-        "200":
-          description: OK
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/TeamInfo"
-  /workspace/teams/autoassign:
-    put:
-      tags:
-      - workspace
-      operationId: automaticallyAssignTeams
-      responses:
-        "200":
-          description: OK
-  /workspace/league/reset:
-    put:
-      tags:
-      - workspace
-      operationId: resetAndRecalculateLeagues
-      responses:
-        "200":
-          description: OK
-  /workspace/team/{teamId}/repository/{repositoryOwner}/{repositoryName}:
+  /activity/badpractice/{badPracticeId}/feedback:
     post:
-      tags:
-      - workspace
-      operationId: addRepositoryToTeam
+      operationId: provideFeedbackForBadPractice
       parameters:
-      - name: teamId
-        in: path
-        required: true
-        schema:
-          type: integer
-          format: int64
-      - name: repositoryOwner
-        in: path
-        required: true
-        schema:
-          type: string
-      - name: repositoryName
-        in: path
-        required: true
-        schema:
-          type: string
-      responses:
-        "200":
-          description: OK
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/TeamInfo"
-    delete:
-      tags:
-      - workspace
-      operationId: removeRepositoryFromTeam
-      parameters:
-      - name: teamId
-        in: path
-        required: true
-        schema:
-          type: integer
-          format: int64
-      - name: repositoryOwner
-        in: path
-        required: true
-        schema:
-          type: string
-      - name: repositoryName
-        in: path
-        required: true
-        schema:
-          type: string
-      responses:
-        "200":
-          description: OK
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/TeamInfo"
-  /workspace/team/{teamId}/label/{repositoryId}/{label}:
-    post:
-      tags:
-      - workspace
-      operationId: addLabelToTeam
-      parameters:
-      - name: teamId
-        in: path
-        required: true
-        schema:
-          type: integer
-          format: int64
-      - name: repositoryId
-        in: path
-        required: true
-        schema:
-          type: integer
-          format: int64
-      - name: label
-        in: path
-        required: true
-        schema:
-          type: string
-      responses:
-        "200":
-          description: OK
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/TeamInfo"
-  /workspace/repositories/{owner}/{name}:
-    post:
-      tags:
-      - workspace
-      operationId: addRepositoryToMonitor
-      parameters:
-      - name: owner
-        in: path
-        required: true
-        schema:
-          type: string
-      - name: name
-        in: path
-        required: true
-        schema:
-          type: string
-      responses:
-        "200":
-          description: OK
-    delete:
-      tags:
-      - workspace
-      operationId: removeRepositoryToMonitor
-      parameters:
-      - name: owner
-        in: path
-        required: true
-        schema:
-          type: string
-      - name: name
-        in: path
-        required: true
-        schema:
-          type: string
-      responses:
-        "200":
-          description: OK
-  /user/settings:
-    get:
-      tags:
-      - user
-      operationId: getUserSettings
-      responses:
-        "200":
-          description: OK
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/UserSettings"
-    post:
-      tags:
-      - user
-      operationId: updateUserSettings
-      requestBody:
-        content:
-          application/json:
-            schema:
-              $ref: "#/components/schemas/UserSettings"
-        required: true
-      responses:
-        "200":
-          description: OK
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/UserSettings"
-  /team/{id}/hide:
-    post:
-      tags:
-      - team
-      operationId: hideTeam
-      parameters:
-      - name: id
-        in: path
+      - in: path
+        name: badPracticeId
         required: true
         schema:
           type: integer
@@ -263,191 +36,25 @@ paths:
         content:
           application/json:
             schema:
-              type: boolean
+              $ref: "#/components/schemas/BadPracticeFeedback"
         required: true
       responses:
         "200":
           description: OK
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/TeamInfo"
-  /mentor/sessions:
-    get:
-      tags:
-      - session
-      operationId: getAllSessions
-      responses:
-        "200":
-          description: OK
-          content:
-            application/json:
-              schema:
-                type: array
-                items:
-                  $ref: "#/components/schemas/Session"
-    post:
-      tags:
-      - session
-      operationId: createNewSession
-      responses:
-        "200":
-          description: OK
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/Session"
-  /mentor/sessions/{sessionId}:
-    get:
-      tags:
-      - message
-      operationId: getMessages
-      parameters:
-      - name: sessionId
-        in: path
-        required: true
-        schema:
-          type: integer
-          format: int64
-      responses:
-        "200":
-          description: OK
-          content:
-            application/json:
-              schema:
-                type: array
-                items:
-                  $ref: "#/components/schemas/Message"
-    post:
-      tags:
-      - message
-      operationId: createMessage
-      parameters:
-      - name: sessionId
-        in: path
-        required: true
-        schema:
-          type: integer
-          format: int64
-      requestBody:
-        content:
-          application/json:
-            schema:
-              type: string
-        required: true
-      responses:
-        "200":
-          description: OK
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/Message"
-  /leaderboard:
-    get:
-      tags:
-      - leaderboard
-      operationId: getLeaderboard
-      parameters:
-      - name: after
-        in: query
-        required: true
-        schema:
-          type: string
-          format: date-time
-      - name: before
-        in: query
-        required: true
-        schema:
-          type: string
-          format: date-time
-      - name: team
-        in: query
-        required: false
-        schema:
-          type: string
-      - name: sort
-        in: query
-        required: false
-        schema:
-          type: string
-          enum:
-          - SCORE
-          - LEAGUE_POINTS
-      responses:
-        "200":
-          description: OK
-          content:
-            application/json:
-              schema:
-                type: array
-                items:
-                  $ref: "#/components/schemas/LeaderboardEntry"
-    post:
-      tags:
-      - leaderboard
-      operationId: getUserLeagueStats
-      parameters:
-      - name: login
-        in: query
-        required: true
-        schema:
-          type: string
-      requestBody:
-        content:
-          application/json:
-            schema:
-              $ref: "#/components/schemas/LeaderboardEntry"
-        required: true
-      responses:
-        "200":
-          description: OK
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/LeagueChange"
-  /activity/user/{login}/badpractices:
-    post:
       tags:
       - activity
-      operationId: detectBadPracticesByUser
-      parameters:
-      - name: login
-        in: path
-        required: true
-        schema:
-          type: string
-      responses:
-        "200":
-          description: OK
-  /activity/pullrequest/{pullRequestId}/badpractices:
-    post:
-      tags:
-      - activity
-      operationId: detectBadPracticesForPullRequest
-      parameters:
-      - name: pullRequestId
-        in: path
-        required: true
-        schema:
-          type: integer
-          format: int64
-      responses:
-        "200":
-          description: OK
   /activity/badpractice/{badPracticeId}/resolve:
     post:
-      tags:
-      - activity
       operationId: resolveBadPractice
       parameters:
-      - name: badPracticeId
-        in: path
+      - in: path
+        name: badPracticeId
         required: true
         schema:
           type: integer
           format: int64
-      - name: state
-        in: query
+      - in: query
+        name: state
         required: true
         schema:
           type: string
@@ -462,112 +69,402 @@ paths:
       responses:
         "200":
           description: OK
-  /activity/badpractice/{badPracticeId}/feedback:
-    post:
       tags:
       - activity
-      operationId: provideFeedbackForBadPractice
+  /activity/pullrequest/{pullRequestId}/badpractices:
+    post:
+      operationId: detectBadPracticesForPullRequest
       parameters:
-      - name: badPracticeId
-        in: path
+      - in: path
+        name: pullRequestId
         required: true
         schema:
           type: integer
           format: int64
+      responses:
+        "200":
+          description: OK
+      tags:
+      - activity
+  /activity/user/{login}/badpractices:
+    post:
+      operationId: detectBadPracticesByUser
+      parameters:
+      - in: path
+        name: login
+        required: true
+        schema:
+          type: string
+      responses:
+        "200":
+          description: OK
+      tags:
+      - activity
+  /activity/{login}:
+    get:
+      operationId: getActivityByUser
+      parameters:
+      - in: path
+        name: login
+        required: true
+        schema:
+          type: string
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Activity"
+          description: OK
+      tags:
+      - activity
+  /api/chat/messages/{messageId}/vote:
+    post:
+      description: Cast an upvote or downvote on a chat message
+      operationId: voteMessage
+      parameters:
+      - description: Message ID to vote on
+        in: path
+        name: messageId
+        required: true
+        schema:
+          type: string
+          format: uuid
       requestBody:
         content:
           application/json:
             schema:
-              $ref: "#/components/schemas/BadPracticeFeedback"
+              $ref: "#/components/schemas/VoteMessageRequest"
         required: true
       responses:
         "200":
-          description: OK
-  /workspace/users:
-    get:
-      tags:
-      - workspace
-      operationId: getUsersWithTeams
-      responses:
-        "200":
-          description: OK
           content:
             application/json:
               schema:
-                type: array
-                items:
-                  $ref: "#/components/schemas/UserTeams"
-  /workspace/repositories:
-    get:
-      tags:
-      - workspace
-      operationId: getRepositoriesToMonitor
-      responses:
-        "200":
-          description: OK
+                $ref: "#/components/schemas/ChatMessageVote"
+          description: Vote successfully recorded
+        "400":
           content:
             application/json:
               schema:
-                type: array
-                items:
-                  type: string
-  /user/{login}/profile:
-    get:
+                $ref: "#/components/schemas/ChatMessageVote"
+          description: Invalid vote type or message not found
+        "404":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ChatMessageVote"
+          description: Message not found
+      summary: Vote on a message
       tags:
-      - user
-      operationId: getUserProfile
+      - Chat Mes
+  /api/documents:
+    get:
+      operationId: getUserDocuments
       parameters:
-      - name: login
-        in: path
-        required: true
+      - in: query
+        name: page
+        required: false
         schema:
-          type: string
-      responses:
-        "200":
-          description: OK
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/UserProfile"
-  /team/all:
-    get:
-      tags:
-      - team
-      operationId: getTeams
-      responses:
-        "200":
-          description: OK
-          content:
-            application/json:
-              schema:
-                type: array
-                items:
-                  $ref: "#/components/schemas/TeamInfo"
-  /team-leaderboard:
-    get:
-      tags:
-      - team-leaderboard
-      operationId: getTeamLeaderboard
-      parameters:
-      - name: after
-        in: query
-        required: true
+          type: integer
+          format: int32
+          default: 0
+      - in: query
+        name: size
+        required: false
         schema:
-          type: string
-          format: date-time
-      - name: before
-        in: query
-        required: true
-        schema:
-          type: string
-          format: date-time
-      - name: team
-        in: query
+          type: integer
+          format: int32
+          default: 20
+      - in: query
+        name: sortBy
         required: false
         schema:
           type: string
-      - name: sort
-        in: query
+          default: createdAt
+      - in: query
+        name: sortDir
+        required: false
+        schema:
+          type: string
+          default: desc
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PageDocumentSummary"
+          description: Documents retrieved successfully
+      summary: Get all user documents (latest versions only)
+      tags: []
+    post:
+      operationId: createDocument
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateDocumentRequest"
+        required: true
+      responses:
+        "201":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Document"
+          description: Document created successfully
+        "400":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Document"
+          description: Invalid request data
+      summary: Create a new document
+      tags: []
+  /api/documents/{id}:
+    delete:
+      operationId: deleteDocument
+      parameters:
+      - in: path
+        name: id
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        "204":
+          description: Document deleted successfully
+        "404":
+          description: Document not found
+      summary: Delete a document and all its versions
+      tags: []
+    get:
+      operationId: getDocument
+      parameters:
+      - in: path
+        name: id
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Document"
+          description: Document retrieved successfully
+        "404":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Document"
+          description: Document not found
+      summary: Get latest version of a document
+      tags: []
+    put:
+      operationId: updateDocument
+      parameters:
+      - in: path
+        name: id
+        required: true
+        schema:
+          type: string
+          format: uuid
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateDocumentRequest"
+        required: true
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Document"
+          description: Document updated successfully
+        "400":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Document"
+          description: Invalid request data
+        "404":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Document"
+          description: Document not found
+      summary: Update a document (creates new version)
+      tags: []
+  /api/documents/{id}/versions:
+    delete:
+      operationId: deleteVersionsAfterTimestamp
+      parameters:
+      - in: path
+        name: id
+        required: true
+        schema:
+          type: string
+          format: uuid
+      - in: query
+        name: after
+        required: true
+        schema:
+          type: string
+          format: date-time
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Document"
+          description: Document versions deleted successfully
+        "400":
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Document"
+          description: Invalid timestamp parameter
+        "404":
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Document"
+          description: Document not found
+      summary: Delete document versions after specified timestamp
+      tags: []
+    get:
+      operationId: getDocumentVersions
+      parameters:
+      - in: path
+        name: id
+        required: true
+        schema:
+          type: string
+          format: uuid
+      - in: query
+        name: page
+        required: false
+        schema:
+          type: integer
+          format: int32
+          default: 0
+      - in: query
+        name: size
+        required: false
+        schema:
+          type: integer
+          format: int32
+          default: 20
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PageDocument"
+          description: Document versions retrieved successfully
+        "404":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PageDocument"
+          description: Document not found
+      summary: Get all versions of a document
+      tags: []
+  /api/documents/{id}/versions/{versionNumber}:
+    get:
+      operationId: getDocumentVersion
+      parameters:
+      - in: path
+        name: id
+        required: true
+        schema:
+          type: string
+          format: uuid
+      - in: path
+        name: versionNumber
+        required: true
+        schema:
+          type: integer
+          format: int32
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Document"
+          description: Document version retrieved successfully
+        "404":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Document"
+          description: Document version not found
+      summary: Get specific version of a document by version number
+      tags: []
+  /api/teamsV2:
+    get:
+      operationId: getAll
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/TeamV2Info"
+          description: OK
+      tags:
+      - team-v-2
+  /api/teamsV2/{id}:
+    get:
+      operationId: getById
+      parameters:
+      - in: path
+        name: id
+        required: true
+        schema:
+          type: integer
+          format: int64
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TeamV2Info"
+          description: OK
+      tags:
+      - team-v-2
+  /leaderboard:
+    get:
+      operationId: getLeaderboard
+      parameters:
+      - in: query
+        name: after
+        required: true
+        schema:
+          type: string
+          format: date-time
+      - in: query
+        name: before
+        required: true
+        schema:
+          type: string
+          format: date-time
+      - in: query
+        name: team
+        required: false
+        schema:
+          type: string
+      - in: query
+        name: sort
         required: false
         schema:
           type: string
@@ -576,222 +473,1272 @@ paths:
           - LEAGUE_POINTS
       responses:
         "200":
-          description: OK
           content:
             application/json:
               schema:
                 type: array
                 items:
-                  $ref: "#/components/schemas/TeamLeaderboardEntry"
-  /team-leaderboard/all-time:
-    get:
+                  $ref: "#/components/schemas/LeaderboardEntry"
+          description: OK
       tags:
-      - team-leaderboard
-      operationId: getAllTimeTeamLeaderboard
+      - leaderboard
+    post:
+      operationId: getUserLeagueStats
+      parameters:
+      - in: query
+        name: login
+        required: true
+        schema:
+          type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/LeaderboardEntry"
+        required: true
       responses:
         "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LeagueChange"
           description: OK
+      tags:
+      - leaderboard
+  /mentor/thread/{threadId}:
+    get:
+      description: Retrieve a specific chat thread with all messages
+      operationId: getThread
+      parameters:
+      - description: Thread ID
+        in: path
+        name: threadId
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ChatThreadDetail"
+          description: Successfully retrieved thread
+        "401":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ChatThreadDetail"
+          description: User not authenticated
+        "404":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ChatThreadDetail"
+          description: Thread not found or not owned by user
+      summary: Get chat thread detail
+      tags:
+      - chat
+  /mentor/threads:
+    get:
+      description: Retrieve all chat threads for the authenticated user
+      operationId: getThreads
+      responses:
+        "200":
           content:
             application/json:
               schema:
                 type: array
                 items:
-                  $ref: "#/components/schemas/TeamLeaderboardEntry"
+                  $ref: "#/components/schemas/ChatThreadSummary"
+          description: Successfully retrieved threads
+        "401":
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ChatThreadSummary"
+          description: User not authenticated
+      summary: Get user's chat threads
+      tags:
+      - chat
+  /mentor/threads/grouped:
+    get:
+      description: Retrieve all chat threads for the authenticated user grouped by
+        time periods
+      operationId: getGroupedThreads
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ChatThreadGroup"
+          description: Successfully retrieved grouped threads
+        "401":
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ChatThreadGroup"
+          description: User not authenticated
+      summary: Get user's grouped chat threads
+      tags:
+      - chat
   /meta:
     get:
-      tags:
-      - meta
       operationId: getMetaData
       responses:
         "200":
-          description: OK
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/MetaData"
-  /meta/contributors:
-    get:
+          description: OK
       tags:
       - meta
+  /meta/contributors:
+    get:
       operationId: getContributors
       responses:
         "200":
-          description: OK
           content:
             application/json:
               schema:
                 type: array
                 items:
                   $ref: "#/components/schemas/Contributor"
-  /mentor/sessions/last:
-    get:
+          description: OK
       tags:
-      - session
-      operationId: getLastSession
+      - meta
+  /team/all:
+    get:
+      operationId: getTeams
       responses:
         "200":
-          description: OK
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/Session"
-  /api/teamsV2:
-    get:
-      tags:
-      - team-v-2
-      operationId: getAll
-      responses:
-        "200":
-          description: OK
           content:
             application/json:
               schema:
                 type: array
                 items:
-                  $ref: "#/components/schemas/TeamV2Info"
-  /api/teamsV2/{id}:
-    get:
+                  $ref: "#/components/schemas/TeamInfo"
+          description: OK
       tags:
-      - team-v-2
-      operationId: getById
+      - team
+  /team/{id}/hide:
+    post:
+      operationId: hideTeam
       parameters:
-      - name: id
-        in: path
+      - in: path
+        name: id
         required: true
         schema:
           type: integer
           format: int64
-      responses:
-        "200":
-          description: OK
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/TeamV2Info"
-  /activity/{login}:
-    get:
-      tags:
-      - activity
-      operationId: getActivityByUser
-      parameters:
-      - name: login
-        in: path
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: boolean
         required: true
-        schema:
-          type: string
       responses:
         "200":
-          description: OK
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/Activity"
-  /workspace/team/{teamId}:
-    delete:
-      tags:
-      - workspace
-      operationId: deleteTeam
-      parameters:
-      - name: teamId
-        in: path
-        required: true
-        schema:
-          type: integer
-          format: int64
-      responses:
-        "200":
-          description: OK
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/TeamInfo"
-  /workspace/team/{teamId}/label/{labelId}:
-    delete:
-      tags:
-      - workspace
-      operationId: removeLabelFromTeam
-      parameters:
-      - name: teamId
-        in: path
-        required: true
-        schema:
-          type: integer
-          format: int64
-      - name: labelId
-        in: path
-        required: true
-        schema:
-          type: integer
-          format: int64
-      responses:
-        "200":
           description: OK
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/TeamInfo"
+      tags:
+      - team
   /user:
     delete:
-      tags:
-      - user
       operationId: deleteUser
       responses:
         "200":
           description: OK
+      tags:
+      - user
+  /user/settings:
+    get:
+      operationId: getUserSettings
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UserSettings"
+          description: OK
+      tags:
+      - user
+    post:
+      operationId: updateUserSettings
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UserSettings"
+        required: true
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UserSettings"
+          description: OK
+      tags:
+      - user
+  /user/{login}/profile:
+    get:
+      operationId: getUserProfile
+      parameters:
+      - in: path
+        name: login
+        required: true
+        schema:
+          type: string
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UserProfile"
+          description: OK
+      tags:
+      - user
+  /workspace/league/reset:
+    put:
+      operationId: resetAndRecalculateLeagues
+      responses:
+        "200":
+          description: OK
+      tags:
+      - workspace
+  /workspace/repositories:
+    get:
+      operationId: getRepositoriesToMonitor
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: string
+          description: OK
+      tags:
+      - workspace
+  /workspace/repositories/{owner}/{name}:
+    delete:
+      operationId: removeRepositoryToMonitor
+      parameters:
+      - in: path
+        name: owner
+        required: true
+        schema:
+          type: string
+      - in: path
+        name: name
+        required: true
+        schema:
+          type: string
+      responses:
+        "200":
+          description: OK
+      tags:
+      - workspace
+    post:
+      operationId: addRepositoryToMonitor
+      parameters:
+      - in: path
+        name: owner
+        required: true
+        schema:
+          type: string
+      - in: path
+        name: name
+        required: true
+        schema:
+          type: string
+      responses:
+        "200":
+          description: OK
+      tags:
+      - workspace
+  /workspace/team/{teamId}:
+    delete:
+      operationId: deleteTeam
+      parameters:
+      - in: path
+        name: teamId
+        required: true
+        schema:
+          type: integer
+          format: int64
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TeamInfo"
+          description: OK
+      tags:
+      - workspace
+  /workspace/team/{teamId}/label/{labelId}:
+    delete:
+      operationId: removeLabelFromTeam
+      parameters:
+      - in: path
+        name: teamId
+        required: true
+        schema:
+          type: integer
+          format: int64
+      - in: path
+        name: labelId
+        required: true
+        schema:
+          type: integer
+          format: int64
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TeamInfo"
+          description: OK
+      tags:
+      - workspace
+  /workspace/team/{teamId}/label/{repositoryId}/{label}:
+    post:
+      operationId: addLabelToTeam
+      parameters:
+      - in: path
+        name: teamId
+        required: true
+        schema:
+          type: integer
+          format: int64
+      - in: path
+        name: repositoryId
+        required: true
+        schema:
+          type: integer
+          format: int64
+      - in: path
+        name: label
+        required: true
+        schema:
+          type: string
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TeamInfo"
+          description: OK
+      tags:
+      - workspace
+  /workspace/team/{teamId}/repository/{repositoryOwner}/{repositoryName}:
+    delete:
+      operationId: removeRepositoryFromTeam
+      parameters:
+      - in: path
+        name: teamId
+        required: true
+        schema:
+          type: integer
+          format: int64
+      - in: path
+        name: repositoryOwner
+        required: true
+        schema:
+          type: string
+      - in: path
+        name: repositoryName
+        required: true
+        schema:
+          type: string
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TeamInfo"
+          description: OK
+      tags:
+      - workspace
+    post:
+      operationId: addRepositoryToTeam
+      parameters:
+      - in: path
+        name: teamId
+        required: true
+        schema:
+          type: integer
+          format: int64
+      - in: path
+        name: repositoryOwner
+        required: true
+        schema:
+          type: string
+      - in: path
+        name: repositoryName
+        required: true
+        schema:
+          type: string
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TeamInfo"
+          description: OK
+      tags:
+      - workspace
+  /workspace/teams:
+    put:
+      operationId: createTeam
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/TeamInfo"
+        required: true
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TeamInfo"
+          description: OK
+      tags:
+      - workspace
+  /workspace/teams/autoassign:
+    put:
+      operationId: automaticallyAssignTeams
+      responses:
+        "200":
+          description: OK
+      tags:
+      - workspace
+  /workspace/user/{login}/team/{teamId}:
+    delete:
+      operationId: removeUserFromTeam
+      parameters:
+      - in: path
+        name: login
+        required: true
+        schema:
+          type: string
+      - in: path
+        name: teamId
+        required: true
+        schema:
+          type: integer
+          format: int64
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UserInfo"
+          description: OK
+      tags:
+      - workspace
+    put:
+      operationId: addTeamToUser
+      parameters:
+      - in: path
+        name: login
+        required: true
+        schema:
+          type: string
+      - in: path
+        name: teamId
+        required: true
+        schema:
+          type: integer
+          format: int64
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UserInfo"
+          description: OK
+      tags:
+      - workspace
+  /workspace/users:
+    get:
+      operationId: getUsersWithTeams
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/UserTeams"
+          description: OK
+      tags:
+      - workspace
 components:
   schemas:
-    PullRequestInfo:
+    Activity:
       type: object
       properties:
+        pullRequests:
+          type: array
+          items:
+            $ref: "#/components/schemas/PullRequestWithBadPractices"
+      required:
+      - pullRequests
+    BadPracticeFeedback:
+      type: object
+      properties:
+        explanation:
+          type: string
+        type:
+          type: string
+      required:
+      - explanation
+      - type
+    ChatMessageVote:
+      type: object
+      description: DTO for returning vote information.
+      properties:
+        createdAt:
+          type: string
+          format: date-time
+        isUpvoted:
+          type: boolean
+        messageId:
+          type: string
+          format: uuid
+        updatedAt:
+          type: string
+          format: date-time
+    ChatThreadDetail:
+      type: object
+      description: |-
+        DTO for chat thread with full message content.
+         Used for initializing useChat in the frontend.
+      properties:
+        createdAt:
+          type: string
+          format: date-time
+          description: When the thread was created
+        id:
+          type: string
+          format: uuid
+          description: Unique identifier for the thread
+        messages:
+          type: array
+          description: |-
+            All messages in the conversation path (as JSON objects for useChat initialization)
+             As exception, we do not use a DTO here since we included those intelligece-service models in the OpenAPI spec.
+          items:
+            $ref: "#/components/schemas/UIMessage"
+        selectedLeafMessageId:
+          type: string
+          format: uuid
+          description: ID of the currently selected leaf message (end of active conversation
+            path)
+        title:
+          type: string
+          description: Thread title (may be null for untitled threads)
+        votes:
+          type: array
+          description: Votes for messages in this thread
+          items:
+            $ref: "#/components/schemas/ChatMessageVote"
+    ChatThreadGroup:
+      type: object
+      description: |-
+        DTO for grouped chat threads.
+         Used for organizing threads by time periods (today, yesterday, etc.).
+      properties:
+        groupName:
+          type: string
+          description: "Group name (e.g., \"Today\", \"Yesterday\", \"Last 7 Days\"\
+            , \"Last 30 Days\")"
+        threads:
+          type: array
+          description: List of thread summaries in this group
+          items:
+            $ref: "#/components/schemas/ChatThreadSummary"
+      required:
+      - groupName
+      - threads
+    ChatThreadSummary:
+      type: object
+      description: |-
+        DTO for chat thread summary information.
+         Used for listing threads without loading full message content.
+      properties:
+        createdAt:
+          type: string
+          format: date-time
+          description: When the thread was created
+        id:
+          type: string
+          format: uuid
+          description: Unique identifier for the thread
+        title:
+          type: string
+          description: Thread title (may be null for untitled threads)
+      required:
+      - createdAt
+      - id
+      - title
+    Contributor:
+      type: object
+      properties:
+        avatarUrl:
+          type: string
+        contributions:
+          type: integer
+          format: int32
+        htmlUrl:
+          type: string
         id:
           type: integer
           format: int64
+        login:
+          type: string
+        name:
+          type: string
+      required:
+      - avatarUrl
+      - htmlUrl
+      - id
+      - login
+      - name
+    CreateDocumentInput:
+      type: object
+      description: Input for createDocument tool.
+      x-hephaestus:
+        toolModel: true
+      properties:
+        document_id:
+          type: string
+          description: "Do not populate this field, will automatically be set by the\
+            \ system"
+          title: Document Id
+        kind:
+          type: string
+          const: text
+          title: Kind
+        title:
+          type: string
+          title: Title
+      required:
+      - document_id
+      - kind
+      - title
+      title: CreateDocumentInput
+    CreateDocumentOutput:
+      type: object
+      description: Output for createDocument tool.
+      x-hephaestus:
+        toolModel: true
+      properties:
+        content:
+          type: string
+          title: Content
+        id:
+          type: string
+          title: Id
+        kind:
+          type: string
+          const: TEXT
+          title: Kind
+        title:
+          type: string
+          title: Title
+      required:
+      - content
+      - id
+      - kind
+      - title
+      title: CreateDocumentOutput
+    CreateDocumentRequest:
+      type: object
+      description: |-
+        DTO for creating a new document.
+         Server generates UUID and timestamps.
+      properties:
+        content:
+          type: string
+        kind:
+          type: string
+          enum:
+          - TEXT
+        title:
+          type: string
+          maxLength: 255
+          minLength: 0
+      required:
+      - content
+      - kind
+      - title
+    DataUIPart:
+      type: object
+      description: |-
+        A data part with dynamic type.
+
+        Note: In UI messages, data can be of any JSON type (object, array, string, number, etc.).
+      properties:
+        data:
+          title: Data
+        id:
+          anyOf:
+          - type: string
+          - type: "null"
+          title: Id
+        type:
+          type: string
+          pattern: ^data-.*
+          title: Type
+      required:
+      - data
+      - type
+      title: DataUIPart
+    Document:
+      type: object
+      description: |-
+        DTO for complete document responses.
+         Used when returning full document details (includes content).
+      properties:
+        content:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+        id:
+          type: string
+          format: uuid
+        kind:
+          type: string
+          enum:
+          - TEXT
+        title:
+          type: string
+        userId:
+          type: string
+        versionNumber:
+          type: integer
+          format: int32
+      required:
+      - content
+      - createdAt
+      - id
+      - kind
+      - title
+      - userId
+      - versionNumber
+    DocumentCreateData:
+      type: object
+      x-hephaestus:
+        dataModel: true
+      properties:
+        id:
+          type: string
+          title: Id
+        kind:
+          type: string
+          const: text
+          title: Kind
+        title:
+          type: string
+          title: Title
+      required:
+      - id
+      - kind
+      - title
+      title: DocumentCreateData
+    DocumentDeltaData:
+      type: object
+      x-hephaestus:
+        dataModel: true
+      properties:
+        delta:
+          type: string
+          title: Delta
+        id:
+          type: string
+          title: Id
+        kind:
+          type: string
+          const: text
+          title: Kind
+      required:
+      - delta
+      - id
+      - kind
+      title: DocumentDeltaData
+    DocumentFinishData:
+      type: object
+      x-hephaestus:
+        dataModel: true
+      properties:
+        id:
+          type: string
+          title: Id
+        kind:
+          type: string
+          const: text
+          title: Kind
+      required:
+      - id
+      - kind
+      title: DocumentFinishData
+    DocumentSummary:
+      type: object
+      description: |-
+        DTO for document summary in list views.
+         Excludes content for performance - only metadata.
+      properties:
+        createdAt:
+          type: string
+          format: date-time
+        id:
+          type: string
+          format: uuid
+        kind:
+          type: string
+          enum:
+          - TEXT
+        title:
+          type: string
+        userId:
+          type: string
+      required:
+      - createdAt
+      - id
+      - kind
+      - title
+      - userId
+    DocumentUpdateData:
+      type: object
+      x-hephaestus:
+        dataModel: true
+      properties:
+        id:
+          type: string
+          title: Id
+        kind:
+          type: string
+          const: text
+          title: Kind
+      required:
+      - id
+      - kind
+      title: DocumentUpdateData
+    FileUIPart:
+      type: object
+      description: A file part of a message.
+      properties:
+        filename:
+          anyOf:
+          - type: string
+          - type: "null"
+          title: Filename
+        mediaType:
+          type: string
+          title: Mediatype
+        providerMetadata:
+          anyOf:
+          - type: object
+          - type: "null"
+          title: Providermetadata
+        type:
+          type: string
+          const: file
+          default: file
+          title: Type
+        url:
+          type: string
+          title: Url
+      required:
+      - mediaType
+      - url
+      title: FileUIPart
+    GetWeatherInput:
+      type: object
+      description: Input for getWeather tool.
+      x-hephaestus:
+        toolModel: true
+      properties:
+        latitude:
+          type: number
+          title: Latitude
+        longitude:
+          type: number
+          title: Longitude
+      required:
+      - latitude
+      - longitude
+      title: GetWeatherInput
+    GetWeatherOutput:
+      type: object
+      description: "Output for getWeather tool, aligned with WeatherTool.tsx expectations."
+      x-hephaestus:
+        toolModel: true
+      properties:
+        current:
+          anyOf:
+          - $ref: "#/components/schemas/WeatherCurrent"
+          - type: "null"
+          default: null
+        current_units:
+          anyOf:
+          - $ref: "#/components/schemas/WeatherCurrentUnits"
+          - type: "null"
+          default: null
+        daily:
+          anyOf:
+          - $ref: "#/components/schemas/WeatherDaily"
+          - type: "null"
+          default: null
+        daily_units:
+          anyOf:
+          - $ref: "#/components/schemas/WeatherDailyUnits"
+          - type: "null"
+          default: null
+        elevation:
+          anyOf:
+          - type: number
+          - type: "null"
+          default: null
+          title: Elevation
+        generationtime_ms:
+          anyOf:
+          - type: number
+          - type: "null"
+          default: null
+          title: Generationtime Ms
+        hourly:
+          anyOf:
+          - $ref: "#/components/schemas/WeatherHourly"
+          - type: "null"
+          default: null
+        hourly_units:
+          anyOf:
+          - $ref: "#/components/schemas/WeatherHourlyUnits"
+          - type: "null"
+          default: null
+        latitude:
+          anyOf:
+          - type: number
+          - type: "null"
+          default: null
+          title: Latitude
+        longitude:
+          anyOf:
+          - type: number
+          - type: "null"
+          default: null
+          title: Longitude
+        timezone:
+          anyOf:
+          - type: string
+          - type: "null"
+          default: null
+          title: Timezone
+        timezone_abbreviation:
+          anyOf:
+          - type: string
+          - type: "null"
+          default: null
+          title: Timezone Abbreviation
+        utc_offset_seconds:
+          anyOf:
+          - type: integer
+          - type: "null"
+          default: null
+          title: Utc Offset Seconds
+      title: GetWeatherOutput
+    LabelInfo:
+      type: object
+      properties:
+        color:
+          type: string
+        id:
+          type: integer
+          format: int64
+        name:
+          type: string
+        repository:
+          $ref: "#/components/schemas/RepositoryInfo"
+      required:
+      - color
+      - id
+      - name
+    LeaderboardEntry:
+      type: object
+      properties:
+        numberOfApprovals:
+          type: integer
+          format: int32
+        numberOfChangeRequests:
+          type: integer
+          format: int32
+        numberOfCodeComments:
+          type: integer
+          format: int32
+        numberOfComments:
+          type: integer
+          format: int32
+        numberOfReviewedPRs:
+          type: integer
+          format: int32
+        numberOfUnknowns:
+          type: integer
+          format: int32
+        rank:
+          type: integer
+          format: int32
+        reviewedPullRequests:
+          type: array
+          items:
+            $ref: "#/components/schemas/PullRequestInfo"
+        score:
+          type: integer
+          format: int32
+        user:
+          $ref: "#/components/schemas/UserInfo"
+      required:
+      - numberOfApprovals
+      - numberOfChangeRequests
+      - numberOfCodeComments
+      - numberOfComments
+      - numberOfReviewedPRs
+      - numberOfUnknowns
+      - rank
+      - reviewedPullRequests
+      - score
+      - user
+    LeagueChange:
+      type: object
+      properties:
+        leaguePointsChange:
+          type: integer
+          format: int32
+        login:
+          type: string
+      required:
+      - leaguePointsChange
+      - login
+    MetaData:
+      type: object
+      properties:
+        scheduledDay:
+          type: string
+        scheduledTime:
+          type: string
+        teams:
+          type: array
+          items:
+            $ref: "#/components/schemas/TeamInfo"
+      required:
+      - scheduledDay
+      - scheduledTime
+      - teams
+    PageDocument:
+      type: object
+      properties:
+        content:
+          type: array
+          items:
+            $ref: "#/components/schemas/Document"
+        empty:
+          type: boolean
+        first:
+          type: boolean
+        last:
+          type: boolean
         number:
           type: integer
           format: int32
+        numberOfElements:
+          type: integer
+          format: int32
+        pageable:
+          $ref: "#/components/schemas/PageableObject"
+        size:
+          type: integer
+          format: int32
+        sort:
+          $ref: "#/components/schemas/SortObject"
+        totalElements:
+          type: integer
+          format: int64
+        totalPages:
+          type: integer
+          format: int32
+    PageDocumentSummary:
+      type: object
+      properties:
+        content:
+          type: array
+          items:
+            $ref: "#/components/schemas/DocumentSummary"
+        empty:
+          type: boolean
+        first:
+          type: boolean
+        last:
+          type: boolean
+        number:
+          type: integer
+          format: int32
+        numberOfElements:
+          type: integer
+          format: int32
+        pageable:
+          $ref: "#/components/schemas/PageableObject"
+        size:
+          type: integer
+          format: int32
+        sort:
+          $ref: "#/components/schemas/SortObject"
+        totalElements:
+          type: integer
+          format: int64
+        totalPages:
+          type: integer
+          format: int32
+    PageableObject:
+      type: object
+      properties:
+        offset:
+          type: integer
+          format: int64
+        pageNumber:
+          type: integer
+          format: int32
+        pageSize:
+          type: integer
+          format: int32
+        paged:
+          type: boolean
+        sort:
+          $ref: "#/components/schemas/SortObject"
+        unpaged:
+          type: boolean
+    PullRequestBadPractice:
+      type: object
+      properties:
+        description:
+          type: string
+        id:
+          type: integer
+          format: int64
+        state:
+          type: string
+          enum:
+          - GOOD_PRACTICE
+          - FIXED
+          - CRITICAL_ISSUE
+          - NORMAL_ISSUE
+          - MINOR_ISSUE
+          - WONT_FIX
+          - WRONG
         title:
           type: string
+      required:
+      - description
+      - id
+      - state
+      - title
+    PullRequestBaseInfo:
+      type: object
+      properties:
+        htmlUrl:
+          type: string
+        id:
+          type: integer
+          format: int64
+        isDraft:
+          type: boolean
+        isMerged:
+          type: boolean
+        number:
+          type: integer
+          format: int32
+        repository:
+          $ref: "#/components/schemas/RepositoryInfo"
         state:
           type: string
           enum:
           - OPEN
           - CLOSED
-        isDraft:
-          type: boolean
-        isMerged:
-          type: boolean
-        commentsCount:
+        title:
+          type: string
+      required:
+      - htmlUrl
+      - id
+      - isDraft
+      - isMerged
+      - number
+      - state
+      - title
+    PullRequestInfo:
+      type: object
+      properties:
+        additions:
           type: integer
           format: int32
-        author:
-          $ref: "#/components/schemas/UserInfo"
-        labels:
-          type: array
-          items:
-            $ref: "#/components/schemas/LabelInfo"
         assignees:
           type: array
           items:
             $ref: "#/components/schemas/UserInfo"
-        repository:
-          $ref: "#/components/schemas/RepositoryInfo"
-        additions:
-          type: integer
-          format: int32
-        deletions:
-          type: integer
-          format: int32
-        mergedAt:
-          type: string
-          format: date-time
+        author:
+          $ref: "#/components/schemas/UserInfo"
         closedAt:
           type: string
           format: date-time
-        htmlUrl:
-          type: string
+        commentsCount:
+          type: integer
+          format: int32
         createdAt:
           type: string
           format: date-time
+        deletions:
+          type: integer
+          format: int32
+        htmlUrl:
+          type: string
+        id:
+          type: integer
+          format: int64
+        isDraft:
+          type: boolean
+        isMerged:
+          type: boolean
+        labels:
+          type: array
+          items:
+            $ref: "#/components/schemas/LabelInfo"
+        mergedAt:
+          type: string
+          format: date-time
+        number:
+          type: integer
+          format: int32
+        repository:
+          $ref: "#/components/schemas/RepositoryInfo"
+        state:
+          type: string
+          enum:
+          - OPEN
+          - CLOSED
+        title:
+          type: string
         updatedAt:
           type: string
           format: date-time
@@ -806,118 +1753,66 @@ components:
       - number
       - state
       - title
-    Message:
+    PullRequestReviewInfo:
       type: object
       properties:
-        id:
-          type: integer
-          format: int64
-        sentAt:
-          type: string
-          format: date-time
-        sender:
-          type: string
-          enum:
-          - MENTOR
-          - USER
-        content:
-          type: string
-        sessionId:
-          type: integer
-          format: int64
-      required:
-      - content
-      - id
-      - sender
-      - sentAt
-      - sessionId
-    UserProfile:
-      type: object
-      properties:
-        userInfo:
+        author:
           $ref: "#/components/schemas/UserInfo"
-        firstContribution:
-          type: string
-          format: date-time
-        contributedRepositories:
-          type: array
-          items:
-            $ref: "#/components/schemas/RepositoryInfo"
-        reviewActivity:
-          type: array
-          items:
-            $ref: "#/components/schemas/PullRequestReviewInfo"
-        openPullRequests:
-          type: array
-          items:
-            $ref: "#/components/schemas/PullRequestInfo"
-      required:
-      - contributedRepositories
-      - firstContribution
-      - userInfo
-    RepositoryInfo:
-      type: object
-      properties:
-        id:
-          type: integer
-          format: int64
-        name:
-          type: string
-        nameWithOwner:
-          type: string
-        description:
-          type: string
-        htmlUrl:
-          type: string
-      required:
-      - htmlUrl
-      - id
-      - name
-      - nameWithOwner
-    UserSettings:
-      type: object
-      properties:
-        receiveNotifications:
-          type: boolean
-    UserTeams:
-      type: object
-      properties:
-        id:
-          type: integer
-          format: int64
-        login:
-          type: string
-        name:
-          type: string
-        url:
-          type: string
-        teams:
-          type: array
-          items:
-            $ref: "#/components/schemas/TeamInfo"
-          uniqueItems: true
-      required:
-      - id
-      - login
-      - name
-      - teams
-      - url
-    PullRequestWithBadPractices:
-      type: object
-      properties:
-        id:
-          type: integer
-          format: int64
-        number:
+        codeComments:
           type: integer
           format: int32
-        title:
+        htmlUrl:
           type: string
+        id:
+          type: integer
+          format: int64
+        isDismissed:
+          type: boolean
+        pullRequest:
+          $ref: "#/components/schemas/PullRequestBaseInfo"
+        score:
+          type: integer
+          format: int32
         state:
           type: string
           enum:
-          - OPEN
-          - CLOSED
+          - COMMENTED
+          - APPROVED
+          - CHANGES_REQUESTED
+          - UNKNOWN
+        submittedAt:
+          type: string
+          format: date-time
+      required:
+      - codeComments
+      - htmlUrl
+      - id
+      - isDismissed
+      - score
+      - state
+    PullRequestWithBadPractices:
+      type: object
+      properties:
+        additions:
+          type: integer
+          format: int32
+        badPracticeSummary:
+          type: string
+        badPractices:
+          type: array
+          items:
+            $ref: "#/components/schemas/PullRequestBadPractice"
+        createdAt:
+          type: string
+          format: date-time
+        deletions:
+          type: integer
+          format: int32
+        htmlUrl:
+          type: string
+        id:
+          type: integer
+          format: int64
         isDraft:
           type: boolean
         isMerged:
@@ -926,32 +1821,25 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/LabelInfo"
-        repository:
-          $ref: "#/components/schemas/RepositoryInfo"
-        additions:
+        number:
           type: integer
           format: int32
-        deletions:
-          type: integer
-          format: int32
-        htmlUrl:
-          type: string
-        createdAt:
-          type: string
-          format: date-time
-        updatedAt:
-          type: string
-          format: date-time
-        badPracticeSummary:
-          type: string
-        badPractices:
-          type: array
-          items:
-            $ref: "#/components/schemas/PullRequestBadPractice"
         oldBadPractices:
           type: array
           items:
             $ref: "#/components/schemas/PullRequestBadPractice"
+        repository:
+          $ref: "#/components/schemas/RepositoryInfo"
+        state:
+          type: string
+          enum:
+          - OPEN
+          - CLOSED
+        title:
+          type: string
+        updatedAt:
+          type: string
+          format: date-time
       required:
       - additions
       - badPracticeSummary
@@ -969,109 +1857,664 @@ components:
       - state
       - title
       - updatedAt
-    PullRequestBaseInfo:
+    ReasoningUIPart:
+      type: object
+      description: A reasoning part of a message.
+      properties:
+        providerMetadata:
+          anyOf:
+          - type: object
+          - type: "null"
+          title: Providermetadata
+        state:
+          anyOf:
+          - type: string
+            enum:
+            - streaming
+            - done
+          - type: "null"
+          title: State
+        text:
+          type: string
+          title: Text
+        type:
+          type: string
+          const: reasoning
+          default: reasoning
+          title: Type
+      required:
+      - text
+      title: ReasoningUIPart
+    RepositoryInfo:
       type: object
       properties:
+        description:
+          type: string
+        htmlUrl:
+          type: string
         id:
           type: integer
           format: int64
-        number:
-          type: integer
-          format: int32
+        name:
+          type: string
+        nameWithOwner:
+          type: string
+      required:
+      - htmlUrl
+      - id
+      - name
+      - nameWithOwner
+    SortObject:
+      type: object
+      properties:
+        empty:
+          type: boolean
+        sorted:
+          type: boolean
+        unsorted:
+          type: boolean
+    SourceDocumentUIPart:
+      type: object
+      description: A document source part of a message.
+      properties:
+        filename:
+          anyOf:
+          - type: string
+          - type: "null"
+          title: Filename
+        mediaType:
+          type: string
+          title: Mediatype
+        providerMetadata:
+          anyOf:
+          - type: object
+          - type: "null"
+          title: Providermetadata
+        sourceId:
+          type: string
+          title: Sourceid
         title:
           type: string
-        state:
+          title: Title
+        type:
           type: string
-          enum:
-          - OPEN
-          - CLOSED
-        isDraft:
-          type: boolean
-        isMerged:
-          type: boolean
-        repository:
-          $ref: "#/components/schemas/RepositoryInfo"
-        htmlUrl:
-          type: string
+          const: source-document
+          default: source-document
+          title: Type
       required:
-      - htmlUrl
-      - id
-      - isDraft
-      - isMerged
-      - number
-      - state
+      - mediaType
+      - sourceId
       - title
-    Contributor:
+      title: SourceDocumentUIPart
+    SourceUrlUIPart:
       type: object
+      description: A URL source part of a message.
+      properties:
+        providerMetadata:
+          anyOf:
+          - type: object
+          - type: "null"
+          title: Providermetadata
+        sourceId:
+          type: string
+          title: Sourceid
+        title:
+          anyOf:
+          - type: string
+          - type: "null"
+          title: Title
+        type:
+          type: string
+          const: source-url
+          default: source-url
+          title: Type
+        url:
+          type: string
+          title: Url
+      required:
+      - sourceId
+      - url
+      title: SourceUrlUIPart
+    StepStartUIPart:
+      type: object
+      description: A step boundary part of a message.
+      properties:
+        type:
+          type: string
+          const: step-start
+          default: step-start
+          title: Type
+      title: StepStartUIPart
+    StreamDataPart:
+      type: object
+      description: |-
+        Data part with dynamic type.
+
+        AI SDK v5 stream chunks support a `transient` flag that indicates the data
+        should not be added to the persisted message state.
+      properties:
+        data:
+          title: Data
+        id:
+          anyOf:
+          - type: string
+          - type: "null"
+          title: Id
+        transient:
+          anyOf:
+          - type: boolean
+          - type: "null"
+          title: Transient
+        type:
+          type: string
+          pattern: ^data-.*
+          title: Type
+      required:
+      - data
+      - type
+      title: StreamDataPart
+    StreamErrorPart:
+      type: object
+      description: Error stream part.
+      properties:
+        errorText:
+          type: string
+          title: Errortext
+        type:
+          type: string
+          const: error
+          default: error
+          title: Type
+      required:
+      - errorText
+      title: StreamErrorPart
+    StreamFilePart:
+      type: object
+      description: File part of a message.
+      properties:
+        mediaType:
+          type: string
+          title: Mediatype
+        providerMetadata:
+          anyOf:
+          - type: object
+          - type: "null"
+          title: Providermetadata
+        type:
+          type: string
+          const: file
+          default: file
+          title: Type
+        url:
+          type: string
+          title: Url
+      required:
+      - mediaType
+      - url
+      title: StreamFilePart
+    StreamFinishPart:
+      type: object
+      description: End of stream event.
+      properties:
+        messageMetadata:
+          anyOf:
+          - type: object
+          - type: "null"
+          title: Messagemetadata
+        type:
+          type: string
+          const: finish
+          default: finish
+          title: Type
+      title: StreamFinishPart
+    StreamMessageMetadataPart:
+      type: object
+      description: Message metadata part.
+      properties:
+        messageMetadata:
+          type: object
+          title: Messagemetadata
+        type:
+          type: string
+          const: message-metadata
+          default: message-metadata
+          title: Type
+      required:
+      - messageMetadata
+      title: StreamMessageMetadataPart
+    StreamReasoningDeltaPart:
+      type: object
+      description: Reasoning stream delta part.
+      properties:
+        delta:
+          type: string
+          title: Delta
+        id:
+          type: string
+          title: Id
+        providerMetadata:
+          anyOf:
+          - type: object
+          - type: "null"
+          title: Providermetadata
+        type:
+          type: string
+          const: reasoning-delta
+          default: reasoning-delta
+          title: Type
+      required:
+      - delta
+      - id
+      title: StreamReasoningDeltaPart
+    StreamReasoningEndPart:
+      type: object
+      description: Reasoning stream end part.
       properties:
         id:
-          type: integer
-          format: int64
-        login:
           type: string
-        name:
+          title: Id
+        providerMetadata:
+          anyOf:
+          - type: object
+          - type: "null"
+          title: Providermetadata
+        type:
           type: string
-        avatarUrl:
-          type: string
-        htmlUrl:
-          type: string
-        contributions:
-          type: integer
-          format: int32
+          const: reasoning-end
+          default: reasoning-end
+          title: Type
       required:
-      - avatarUrl
-      - htmlUrl
       - id
-      - login
-      - name
-    Activity:
+      title: StreamReasoningEndPart
+    StreamReasoningStartPart:
       type: object
-      properties:
-        pullRequests:
-          type: array
-          items:
-            $ref: "#/components/schemas/PullRequestWithBadPractices"
-      required:
-      - pullRequests
-    UserInfo:
-      type: object
+      description: Reasoning stream start part.
       properties:
         id:
-          type: integer
-          format: int64
-        login:
           type: string
-        email:
+          title: Id
+        providerMetadata:
+          anyOf:
+          - type: object
+          - type: "null"
+          title: Providermetadata
+        type:
           type: string
-        avatarUrl:
-          type: string
-        name:
-          type: string
-        htmlUrl:
-          type: string
-        leaguePoints:
-          type: integer
-          format: int32
+          const: reasoning-start
+          default: reasoning-start
+          title: Type
       required:
-      - avatarUrl
-      - htmlUrl
       - id
-      - login
-      - name
+      title: StreamReasoningStartPart
+    StreamSourceDocumentPart:
+      type: object
+      description: Source document part of a message.
+      properties:
+        filename:
+          anyOf:
+          - type: string
+          - type: "null"
+          title: Filename
+        mediaType:
+          type: string
+          title: Mediatype
+        providerMetadata:
+          anyOf:
+          - type: object
+          - type: "null"
+          title: Providermetadata
+        sourceId:
+          type: string
+          title: Sourceid
+        title:
+          type: string
+          title: Title
+        type:
+          type: string
+          const: source-document
+          default: source-document
+          title: Type
+      required:
+      - mediaType
+      - sourceId
+      - title
+      title: StreamSourceDocumentPart
+    StreamSourceUrlPart:
+      type: object
+      description: Source URL part of a message.
+      properties:
+        providerMetadata:
+          anyOf:
+          - type: object
+          - type: "null"
+          title: Providermetadata
+        sourceId:
+          type: string
+          title: Sourceid
+        title:
+          anyOf:
+          - type: string
+          - type: "null"
+          title: Title
+        type:
+          type: string
+          const: source-url
+          default: source-url
+          title: Type
+        url:
+          type: string
+          title: Url
+      required:
+      - sourceId
+      - url
+      title: StreamSourceUrlPart
+    StreamStartPart:
+      type: object
+      description: Start of stream event.
+      properties:
+        messageId:
+          anyOf:
+          - type: string
+          - type: "null"
+          title: Messageid
+        messageMetadata:
+          anyOf:
+          - type: object
+          - type: "null"
+          title: Messagemetadata
+        type:
+          type: string
+          const: start
+          default: start
+          title: Type
+      title: StreamStartPart
+    StreamStepFinishPart:
+      type: object
+      description: Step finish event.
+      properties:
+        type:
+          type: string
+          const: finish-step
+          default: finish-step
+          title: Type
+      title: StreamStepFinishPart
+    StreamStepStartPart:
+      type: object
+      description: Step start event.
+      properties:
+        type:
+          type: string
+          const: start-step
+          default: start-step
+          title: Type
+      title: StreamStepStartPart
+    StreamTextDeltaPart:
+      type: object
+      description: Text stream delta part.
+      properties:
+        delta:
+          type: string
+          title: Delta
+        id:
+          type: string
+          title: Id
+        providerMetadata:
+          anyOf:
+          - type: object
+          - type: "null"
+          title: Providermetadata
+        type:
+          type: string
+          const: text-delta
+          default: text-delta
+          title: Type
+      required:
+      - delta
+      - id
+      title: StreamTextDeltaPart
+    StreamTextEndPart:
+      type: object
+      description: Text stream end part.
+      properties:
+        id:
+          type: string
+          title: Id
+        providerMetadata:
+          anyOf:
+          - type: object
+          - type: "null"
+          title: Providermetadata
+        type:
+          type: string
+          const: text-end
+          default: text-end
+          title: Type
+      required:
+      - id
+      title: StreamTextEndPart
+    StreamTextStartPart:
+      type: object
+      description: Text stream start part.
+      properties:
+        id:
+          type: string
+          title: Id
+        providerMetadata:
+          anyOf:
+          - type: object
+          - type: "null"
+          title: Providermetadata
+        type:
+          type: string
+          const: text-start
+          default: text-start
+          title: Type
+      required:
+      - id
+      title: StreamTextStartPart
+    StreamToolInputAvailablePart:
+      type: object
+      description: |-
+        Tool input available event.
+
+        AI SDK v5 uses `providerMetadata` on the stream chunk; the UI part maps this
+        to `callProviderMetadata` when persisting tool invocation parts.
+      properties:
+        dynamic:
+          anyOf:
+          - type: boolean
+          - type: "null"
+          title: Dynamic
+        input:
+          type: object
+          title: Input
+        providerExecuted:
+          anyOf:
+          - type: boolean
+          - type: "null"
+          title: Providerexecuted
+        providerMetadata:
+          anyOf:
+          - type: object
+          - type: "null"
+          title: Providermetadata
+        toolCallId:
+          type: string
+          title: Toolcallid
+        toolName:
+          type: string
+          title: Toolname
+        type:
+          type: string
+          const: tool-input-available
+          default: tool-input-available
+          title: Type
+      required:
+      - input
+      - toolCallId
+      - toolName
+      title: StreamToolInputAvailablePart
+    StreamToolInputDeltaPart:
+      type: object
+      description: Tool input delta event.
+      properties:
+        inputTextDelta:
+          type: string
+          title: Inputtextdelta
+        toolCallId:
+          type: string
+          title: Toolcallid
+        type:
+          type: string
+          const: tool-input-delta
+          default: tool-input-delta
+          title: Type
+      required:
+      - inputTextDelta
+      - toolCallId
+      title: StreamToolInputDeltaPart
+    StreamToolInputErrorPart:
+      type: object
+      description: |-
+        Tool input error event (signals an error occurred while preparing input).
+
+        Mirrors AI SDK 'tool-input-error' chunk. For non-dynamic tools, the server should
+        record an 'output-error' tool UI part where rawInput may be used for diagnostics.
+      properties:
+        dynamic:
+          anyOf:
+          - type: boolean
+          - type: "null"
+          title: Dynamic
+        errorText:
+          type: string
+          title: Errortext
+        input:
+          title: Input
+        providerExecuted:
+          anyOf:
+          - type: boolean
+          - type: "null"
+          title: Providerexecuted
+        providerMetadata:
+          anyOf:
+          - type: object
+          - type: "null"
+          title: Providermetadata
+        toolCallId:
+          type: string
+          title: Toolcallid
+        toolName:
+          type: string
+          title: Toolname
+        type:
+          type: string
+          const: tool-input-error
+          default: tool-input-error
+          title: Type
+      required:
+      - errorText
+      - input
+      - toolCallId
+      - toolName
+      title: StreamToolInputErrorPart
+    StreamToolInputStartPart:
+      type: object
+      description: Tool input start event.
+      properties:
+        dynamic:
+          anyOf:
+          - type: boolean
+          - type: "null"
+          title: Dynamic
+        providerExecuted:
+          anyOf:
+          - type: boolean
+          - type: "null"
+          title: Providerexecuted
+        toolCallId:
+          type: string
+          title: Toolcallid
+        toolName:
+          type: string
+          title: Toolname
+        type:
+          type: string
+          const: tool-input-start
+          default: tool-input-start
+          title: Type
+      required:
+      - toolCallId
+      - toolName
+      title: StreamToolInputStartPart
+    StreamToolOutputAvailablePart:
+      type: object
+      description: Tool output available event.
+      properties:
+        dynamic:
+          anyOf:
+          - type: boolean
+          - type: "null"
+          title: Dynamic
+        output:
+          type: object
+          title: Output
+        providerExecuted:
+          anyOf:
+          - type: boolean
+          - type: "null"
+          title: Providerexecuted
+        toolCallId:
+          type: string
+          title: Toolcallid
+        type:
+          type: string
+          const: tool-output-available
+          default: tool-output-available
+          title: Type
+      required:
+      - output
+      - toolCallId
+      title: StreamToolOutputAvailablePart
+    StreamToolOutputErrorPart:
+      type: object
+      description: Tool output error event.
+      properties:
+        dynamic:
+          anyOf:
+          - type: boolean
+          - type: "null"
+          title: Dynamic
+        errorText:
+          type: string
+          title: Errortext
+        providerExecuted:
+          anyOf:
+          - type: boolean
+          - type: "null"
+          title: Providerexecuted
+        toolCallId:
+          type: string
+          title: Toolcallid
+        type:
+          type: string
+          const: tool-output-error
+          default: tool-output-error
+          title: Type
+      required:
+      - errorText
+      - toolCallId
+      title: StreamToolOutputErrorPart
     TeamInfo:
       type: object
       properties:
+        color:
+          type: string
+        hidden:
+          type: boolean
         id:
           type: integer
           format: int64
-        name:
-          type: string
-        color:
-          type: string
-        repositories:
-          type: array
-          items:
-            $ref: "#/components/schemas/RepositoryInfo"
         labels:
           type: array
           items:
@@ -1080,8 +2523,12 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/UserInfo"
-        hidden:
-          type: boolean
+        name:
+          type: string
+        repositories:
+          type: array
+          items:
+            $ref: "#/components/schemas/RepositoryInfo"
       required:
       - color
       - hidden
@@ -1090,254 +2537,503 @@ components:
       - members
       - name
       - repositories
-    TeamLeaderboardEntry:
-      type: object
-      properties:
-        rank:
-          type: integer
-          format: int32
-        score:
-          type: integer
-          format: int32
-        team:
-          $ref: "#/components/schemas/TeamInfo"
-        reviewedPullRequests:
-          type: array
-          items:
-            $ref: "#/components/schemas/PullRequestInfo"
-        numberOfReviewedPRs:
-          type: integer
-          format: int32
-        numberOfApprovals:
-          type: integer
-          format: int32
-        numberOfChangeRequests:
-          type: integer
-          format: int32
-        numberOfComments:
-          type: integer
-          format: int32
-        numberOfUnknowns:
-          type: integer
-          format: int32
-        numberOfCodeComments:
-          type: integer
-          format: int32
-      required:
-      - numberOfApprovals
-      - numberOfChangeRequests
-      - numberOfCodeComments
-      - numberOfComments
-      - numberOfReviewedPRs
-      - numberOfUnknowns
-      - rank
-      - reviewedPullRequests
-      - score
-      - team
-    PullRequestBadPractice:
-      type: object
-      properties:
-        id:
-          type: integer
-          format: int64
-        title:
-          type: string
-        description:
-          type: string
-        state:
-          type: string
-          enum:
-          - GOOD_PRACTICE
-          - FIXED
-          - CRITICAL_ISSUE
-          - NORMAL_ISSUE
-          - MINOR_ISSUE
-          - WONT_FIX
-          - WRONG
-      required:
-      - description
-      - id
-      - state
-      - title
-    LeagueChange:
-      type: object
-      properties:
-        login:
-          type: string
-        leaguePointsChange:
-          type: integer
-          format: int32
-      required:
-      - leaguePointsChange
-      - login
-    LabelInfo:
-      type: object
-      properties:
-        id:
-          type: integer
-          format: int64
-        name:
-          type: string
-        color:
-          type: string
-        repository:
-          $ref: "#/components/schemas/RepositoryInfo"
-      required:
-      - color
-      - id
-      - name
     TeamV2Info:
       type: object
       properties:
-        id:
-          type: integer
-          format: int64
-        name:
-          type: string
-        parentId:
-          type: integer
-          format: int64
         description:
-          type: string
-        privacy:
-          type: string
-          enum:
-          - SECRET
-          - CLOSED
-        organization:
           type: string
         htmlUrl:
           type: string
+        id:
+          type: integer
+          format: int64
         lastSyncedAt:
           type: string
           format: date-time
         membershipCount:
           type: integer
           format: int32
+        name:
+          type: string
+        organization:
+          type: string
+        parentId:
+          type: integer
+          format: int64
+        privacy:
+          type: string
+          enum:
+          - SECRET
+          - CLOSED
         repoPermissionCount:
           type: integer
           format: int32
       required:
       - id
       - name
-    BadPracticeFeedback:
+    TextUIPart:
       type: object
+      description: A text part of a message.
       properties:
+        providerMetadata:
+          anyOf:
+          - type: object
+          - type: "null"
+          title: Providermetadata
+        state:
+          anyOf:
+          - type: string
+            enum:
+            - streaming
+            - done
+          - type: "null"
+          title: State
+        text:
+          type: string
+          title: Text
         type:
           type: string
-        explanation:
+          const: text
+          default: text
+          title: Type
+      required:
+      - text
+      title: TextUIPart
+    ToolInputAvailablePart:
+      type: object
+      description: Tool part with input available.
+      properties:
+        callProviderMetadata:
+          anyOf:
+          - type: object
+          - type: "null"
+          title: Callprovidermetadata
+        input:
+          type: object
+          title: Input
+        providerExecuted:
+          anyOf:
+          - type: boolean
+          - type: "null"
+          title: Providerexecuted
+        state:
+          type: string
+          const: input-available
+          title: State
+        toolCallId:
+          type: string
+          title: Toolcallid
+        type:
+          type: string
+          pattern: ^tool-.*
+          title: Type
+      required:
+      - input
+      - state
+      - toolCallId
+      - type
+      title: ToolInputAvailablePart
+    ToolInputStreamingPart:
+      type: object
+      description: Tool part with input being streamed.
+      properties:
+        input:
+          anyOf:
+          - type: object
+          - type: "null"
+          title: Input
+        providerExecuted:
+          anyOf:
+          - type: boolean
+          - type: "null"
+          title: Providerexecuted
+        state:
+          type: string
+          const: input-streaming
+          title: State
+        toolCallId:
+          type: string
+          title: Toolcallid
+        type:
+          type: string
+          pattern: ^tool-.*
+          title: Type
+      required:
+      - state
+      - toolCallId
+      - type
+      title: ToolInputStreamingPart
+    ToolOutputAvailablePart:
+      type: object
+      description: Tool part with output available.
+      properties:
+        callProviderMetadata:
+          anyOf:
+          - type: object
+          - type: "null"
+          title: Callprovidermetadata
+        input:
+          type: object
+          title: Input
+        output:
+          type: object
+          title: Output
+        providerExecuted:
+          anyOf:
+          - type: boolean
+          - type: "null"
+          title: Providerexecuted
+        state:
+          type: string
+          const: output-available
+          title: State
+        toolCallId:
+          type: string
+          title: Toolcallid
+        type:
+          type: string
+          pattern: ^tool-.*
+          title: Type
+      required:
+      - input
+      - output
+      - state
+      - toolCallId
+      - type
+      title: ToolOutputAvailablePart
+    ToolOutputErrorPart:
+      type: object
+      description: Tool part with output error.
+      properties:
+        callProviderMetadata:
+          anyOf:
+          - type: object
+          - type: "null"
+          title: Callprovidermetadata
+        errorText:
+          type: string
+          title: Errortext
+        input:
+          type: object
+          title: Input
+        providerExecuted:
+          anyOf:
+          - type: boolean
+          - type: "null"
+          title: Providerexecuted
+        state:
+          type: string
+          const: output-error
+          title: State
+        toolCallId:
+          type: string
+          title: Toolcallid
+        type:
+          type: string
+          pattern: ^tool-.*
+          title: Type
+      required:
+      - errorText
+      - input
+      - state
+      - toolCallId
+      - type
+      title: ToolOutputErrorPart
+    UIMessage:
+      type: object
+      description: Message model that matches the TypeScript interface.
+      properties:
+        id:
+          type: string
+          description: A unique identifier for the message
+          title: Id
+        metadata:
+          anyOf:
+          - type: object
+          - type: "null"
+          title: Metadata
+        parts:
+          type: array
+          items:
+            anyOf:
+            - $ref: "#/components/schemas/TextUIPart"
+            - $ref: "#/components/schemas/ReasoningUIPart"
+            - $ref: "#/components/schemas/ToolInputStreamingPart"
+            - $ref: "#/components/schemas/ToolInputAvailablePart"
+            - $ref: "#/components/schemas/ToolOutputAvailablePart"
+            - $ref: "#/components/schemas/ToolOutputErrorPart"
+            - $ref: "#/components/schemas/SourceUrlUIPart"
+            - $ref: "#/components/schemas/SourceDocumentUIPart"
+            - $ref: "#/components/schemas/FileUIPart"
+            - $ref: "#/components/schemas/DataUIPart"
+            - $ref: "#/components/schemas/StepStartUIPart"
+          title: Parts
+        role:
+          type: string
+          enum:
+          - system
+          - user
+          - assistant
+          title: Role
+      required:
+      - id
+      - parts
+      - role
+      title: UIMessage
+    UpdateDocumentInput:
+      type: object
+      description: Input for updateDocument tool.
+      x-hephaestus:
+        toolModel: true
+      properties:
+        description:
+          type: string
+          description: The description of changes that need to be made
+          title: Description
+        id:
+          type: string
+          description: The ID of the document to update
+          title: Id
+      required:
+      - description
+      - id
+      title: UpdateDocumentInput
+    UpdateDocumentOutput:
+      type: object
+      description: Output for updateDocument tool.
+      x-hephaestus:
+        toolModel: true
+      properties:
+        content:
+          type: string
+          title: Content
+        id:
+          type: string
+          title: Id
+        kind:
+          type: string
+          const: TEXT
+          title: Kind
+        title:
+          type: string
+          title: Title
+      required:
+      - content
+      - id
+      - kind
+      - title
+      title: UpdateDocumentOutput
+    UpdateDocumentRequest:
+      type: object
+      description: |-
+        DTO for updating an existing document.
+         Creates a new version with the updated content.
+      properties:
+        content:
+          type: string
+        kind:
+          type: string
+          enum:
+          - TEXT
+        title:
+          type: string
+          maxLength: 255
+          minLength: 0
+      required:
+      - content
+      - kind
+      - title
+    UserInfo:
+      type: object
+      properties:
+        avatarUrl:
+          type: string
+        email:
+          type: string
+        htmlUrl:
+          type: string
+        id:
+          type: integer
+          format: int64
+        leaguePoints:
+          type: integer
+          format: int32
+        login:
+          type: string
+        name:
           type: string
       required:
-      - explanation
-      - type
-    PullRequestReviewInfo:
+      - avatarUrl
+      - htmlUrl
+      - id
+      - login
+      - name
+    UserProfile:
+      type: object
+      properties:
+        contributedRepositories:
+          type: array
+          items:
+            $ref: "#/components/schemas/RepositoryInfo"
+        firstContribution:
+          type: string
+          format: date-time
+        openPullRequests:
+          type: array
+          items:
+            $ref: "#/components/schemas/PullRequestInfo"
+        reviewActivity:
+          type: array
+          items:
+            $ref: "#/components/schemas/PullRequestReviewInfo"
+        userInfo:
+          $ref: "#/components/schemas/UserInfo"
+      required:
+      - contributedRepositories
+      - firstContribution
+      - userInfo
+    UserSettings:
+      type: object
+      properties:
+        receiveNotifications:
+          type: boolean
+    UserTeams:
       type: object
       properties:
         id:
           type: integer
           format: int64
-        isDismissed:
-          type: boolean
-        state:
+        login:
           type: string
-          enum:
-          - COMMENTED
-          - APPROVED
-          - CHANGES_REQUESTED
-          - UNKNOWN
-        codeComments:
-          type: integer
-          format: int32
-        author:
-          $ref: "#/components/schemas/UserInfo"
-        pullRequest:
-          $ref: "#/components/schemas/PullRequestBaseInfo"
-        htmlUrl:
+        name:
           type: string
-        score:
-          type: integer
-          format: int32
-        submittedAt:
-          type: string
-          format: date-time
-      required:
-      - codeComments
-      - htmlUrl
-      - id
-      - isDismissed
-      - score
-      - state
-    MetaData:
-      type: object
-      properties:
         teams:
           type: array
           items:
             $ref: "#/components/schemas/TeamInfo"
-        scheduledDay:
-          type: string
-        scheduledTime:
+          uniqueItems: true
+        url:
           type: string
       required:
-      - scheduledDay
-      - scheduledTime
+      - id
+      - login
+      - name
       - teams
-    LeaderboardEntry:
+      - url
+    VoteMessageRequest:
       type: object
+      description: Request DTO for voting on a message.
       properties:
-        rank:
-          type: integer
-          format: int32
-        score:
-          type: integer
-          format: int32
-        user:
-          $ref: "#/components/schemas/UserInfo"
-        reviewedPullRequests:
-          type: array
-          items:
-            $ref: "#/components/schemas/PullRequestInfo"
-        numberOfReviewedPRs:
-          type: integer
-          format: int32
-        numberOfApprovals:
-          type: integer
-          format: int32
-        numberOfChangeRequests:
-          type: integer
-          format: int32
-        numberOfComments:
-          type: integer
-          format: int32
-        numberOfUnknowns:
-          type: integer
-          format: int32
-        numberOfCodeComments:
-          type: integer
-          format: int32
-      required:
-      - numberOfApprovals
-      - numberOfChangeRequests
-      - numberOfCodeComments
-      - numberOfComments
-      - numberOfReviewedPRs
-      - numberOfUnknowns
-      - rank
-      - reviewedPullRequests
-      - score
-      - user
-    Session:
-      type: object
-      properties:
-        id:
-          type: integer
-          format: int64
-        createdAt:
-          type: string
-          format: date-time
-        isClosed:
+        isUpvoted:
           type: boolean
       required:
-      - createdAt
-      - id
-      - isClosed
+      - isUpvoted
+    WeatherCurrent:
+      type: object
+      properties:
+        interval:
+          anyOf:
+          - type: integer
+          - type: "null"
+          title: Interval
+        temperature_2m:
+          anyOf:
+          - type: number
+          - type: "null"
+          title: Temperature 2M
+        time:
+          anyOf:
+          - type: string
+          - type: "null"
+          title: Time
+      title: WeatherCurrent
+    WeatherCurrentUnits:
+      type: object
+      properties:
+        interval:
+          anyOf:
+          - type: string
+          - type: "null"
+          title: Interval
+        temperature_2m:
+          anyOf:
+          - type: string
+          - type: "null"
+          title: Temperature 2M
+        time:
+          anyOf:
+          - type: string
+          - type: "null"
+          title: Time
+      title: WeatherCurrentUnits
+    WeatherDaily:
+      type: object
+      properties:
+        sunrise:
+          type: array
+          default: []
+          items:
+            type: string
+          title: Sunrise
+        sunset:
+          type: array
+          default: []
+          items:
+            type: string
+          title: Sunset
+        time:
+          type: array
+          default: []
+          items:
+            type: string
+          title: Time
+      title: WeatherDaily
+    WeatherDailyUnits:
+      type: object
+      properties:
+        sunrise:
+          anyOf:
+          - type: string
+          - type: "null"
+          title: Sunrise
+        sunset:
+          anyOf:
+          - type: string
+          - type: "null"
+          title: Sunset
+        time:
+          anyOf:
+          - type: string
+          - type: "null"
+          title: Time
+      title: WeatherDailyUnits
+    WeatherHourly:
+      type: object
+      properties:
+        temperature_2m:
+          type: array
+          default: []
+          items:
+            type: number
+          title: Temperature 2M
+        time:
+          type: array
+          default: []
+          items:
+            type: string
+          title: Time
+      title: WeatherHourly
+    WeatherHourlyUnits:
+      type: object
+      properties:
+        temperature_2m:
+          anyOf:
+          - type: string
+          - type: "null"
+          title: Temperature 2M
+        time:
+          anyOf:
+          - type: string
+          - type: "null"
+          title: Time
+      title: WeatherHourlyUnits

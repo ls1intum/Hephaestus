@@ -8,7 +8,7 @@ Before you can build Hephaestus, you must install and configure the following de
 
 1. [Java JDK](https://www.oracle.com/java/technologies/javase-downloads.html): We use Java (JDK 21) to develop and run the Hephaestus Application Server, which is based on [Spring Boot](http://projects.spring.io/spring-boot).
 2. [PostgreSQL 16](https://www.postgresql.org/): Hephaestus uses [Hibernate](https://hibernate.org/) to store entities in an SQL database and [Liquibase](https://www.liquibase.com/) to automatically apply schema transformations when updating the server. (No installation required since we use Docker)
-3. [Node.js](https://nodejs.org/en/download): We use Node LTS (>=22.10.0 < 23) to compile and run our Hephaestus Application Client based on [Angular](https://angular.dev/). Depending on your system, you can install Node either from source or as a pre-packaged bundle.
+3. [Node.js](https://nodejs.org/en/download): We use Node LTS (>=22.10.0 < 23) to compile and run our Hephaestus Application Client based on [React](https://react.dev/) and [Vite](https://vite.dev/). Depending on your system, you can install Node either from source or as a pre-packaged bundle.
 4. [Npm](https://nodejs.org/en/download): We use Npm (>=10.8.0) to manage client side dependencies. Npm is typically bundled with Node.js, but can also be installed separately.
 5. [Python](https://www.python.org/downloads/): We use Python (>=3.13) to develop and run our Hephaestus Intelligence Service.
 6. [Poetry](https://python-poetry.org/): We use Poetry (>=2.0.0) to manage dependencies and virtual environments for the Hephaestus Intelligence Service. It simplifies packaging and ensures a consistent and reproducible development environment.
@@ -27,14 +27,14 @@ The recommended extensions include:
 - [Language Support for Java(TM) by Red Hat](https://marketplace.visualstudio.com/items?itemName=redhat.java) for Spring Boot development
 - [Maven for Java](https://marketplace.visualstudio.com/items?itemName=vscjava.vscode-maven) for Maven support
 - [Python](https://marketplace.visualstudio.com/items?itemName=ms-python.python) for Python development
-- [Angular Language Service](https://marketplace.visualstudio.com/items?itemName=Angular.ng-template) for Angular development
+- [ESLint](https://marketplace.visualstudio.com/items?itemName=dbaeumer.vscode-eslint) for linting TypeScript/React code
 - [Tailwind CSS IntelliSense](https://marketplace.visualstudio.com/items?itemName=bradlc.vscode-tailwindcss) for Tailwind CSS development
 - [Prettier - Code formatter](https://marketplace.visualstudio.com/items?itemName=esbenp.prettier-vscode) for code formatting
 
 Alternatively, you can use JetBrain's IDEs depending on part of Hephaestus you are working with:
 
 - [IntelliJ](https://www.jetbrains.com/idea/) for the _application-server_ (Spring Boot - Java),
-- [WebStorm](https://www.jetbrains.com/webstorm/) for the _webapp_ (Angular - Typescript) and
+- [WebStorm](https://www.jetbrains.com/webstorm/) for the _webapp_ (React - TypeScript) and
 - [PyCharm](https://www.jetbrains.com/pycharm/) for the _intelligence-service_ (Python).
 
 ## Application Server Setup
@@ -102,21 +102,21 @@ TODO Setup GitHub Identity Provider
 
 ## Application Client Setup
 
-The client setup is straightforward and requires only a few steps:
+The client lives in `webapp` and uses Vite for development/build:
 
-1. **Install Dependencies**: Open a terminal in the `webapp` directory. Run the following command to install the required dependencies:
+1. **Install Dependencies**: Open a terminal in the `webapp` directory and install the dependencies:
 
 ```bash
 npm install
 ```
 
-2. **Start the Client**: Run the following command to start the application client:
+2. **Start the Dev Server**: Start Vite on port 4200:
 
 ```bash
-npm start
+npm run dev
 ```
 
-3. **Access the Application**: Once the client is running, you can access the application by opening a browser and navigating to `http://localhost:4200`. The application client should be up and running, allowing you to interact with the server.
+3. **Access the Application**: Open `http://localhost:4200` in your browser.
 
 ## Intelligence Service Setup
 

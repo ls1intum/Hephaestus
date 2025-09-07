@@ -15,7 +15,7 @@ jobs:
     name: ${{ matrix.check }}
     runs-on: ubuntu-latest
     if: inputs.should_skip != 'true'
-    timeout-minutes: ${{ contains(fromJSON('["database-schema-validation", "database-documentation-validation"]'), matrix.check) && 20 || 15 }}
+    timeout-minutes: ${{ contains(fromJSON('["database-schema-validation", "database-documentation-validation", "database-models-validation"]'), matrix.check) && 20 || 15 }}
     strategy:
       fail-fast: false
       matrix:
@@ -28,12 +28,24 @@ jobs:
             openapi-validation,
             database-schema-validation,
             database-documentation-validation,
+            database-models-validation,
           ]
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
+
+      # Ensure a stable Node/npm toolchain and proper npm caching
+      - name: Setup Node.js (LTS) and npm cache
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: '.node-version'
+          cache: 'npm'
+          cache-dependency-path: |
+            package-lock.json
+            webapp/package-lock.json
+
 
       # Advanced cache setup with fallback
       - name: Setup shared caches
@@ -48,13 +60,13 @@ jobs:
         uses: actions/cache@v4
         with:
           path: |
-            webapp-react/dist
-            webapp-react/.vite
-            webapp-react/node_modules/.vite
-            webapp-react/node_modules/.cache
-          key: ${{ runner.os }}-webapp-build-${{ hashFiles('package-lock.json', 'webapp-react/package-lock.json', 'webapp-react/biome.json', 'webapp-react/tsconfig.json', 'webapp-react/vite.config.js', 'webapp-react/components.json') }}-${{ github.sha }}
+            webapp/dist
+            webapp/.vite
+            webapp/node_modules/.vite
+            webapp/node_modules/.cache
+          key: ${{ runner.os }}-webapp-build-${{ hashFiles('package-lock.json', 'webapp/package-lock.json', 'webapp/biome.json', 'webapp/tsconfig.json', 'webapp/vite.config.js', 'webapp/components.json') }}-${{ github.sha }}
           restore-keys: |
-            ${{ runner.os }}-webapp-build-${{ hashFiles('package-lock.json', 'webapp-react/package-lock.json', 'webapp-react/biome.json', 'webapp-react/tsconfig.json', 'webapp-react/vite.config.js', 'webapp-react/components.json') }}-
+            ${{ runner.os }}-webapp-build-${{ hashFiles('package-lock.json', 'webapp/package-lock.json', 'webapp/biome.json', 'webapp/tsconfig.json', 'webapp/vite.config.js', 'webapp/components.json') }}-
             ${{ runner.os }}-webapp-build-
 
       # application-server code quality and formatting
@@ -63,12 +75,11 @@ jobs:
         run: |
           echo "🔍 Checking application-server code formatting..."
 
-          if [ ! -d "node_modules" ]; then
-            npm ci --prefer-offline --no-audit
-          fi
+          # Always install to avoid half-restored caches
+          npm ci --prefer-offline --no-audit
 
-          if ! npm run format:application-server:check; then
-            echo "❌ application-server formatting failed. Run: npm run format:application-server:write"
+          if ! npm run format:java; then
+            echo "❌ application-server formatting failed. Run: npm run format:java"
             exit 1
           fi
 
@@ -77,20 +88,32 @@ jobs:
       # Webapp quality checks with comprehensive validation
       - name: Webapp quality & type checking
         if: matrix.check == 'webapp-quality'
-        working-directory: ./webapp-react
+        working-directory: ./webapp
         run: |
           echo "🔍 Running webapp quality checks..."
 
-          if [ ! -d "node_modules" ]; then
-            npm ci --prefer-offline --no-audit --progress=false
-          fi
+          # Always install at repo root to ensure hoisted deps (incl. platform optionals) are present
+          cd ..
+          rm -rf node_modules
+          npm ci --workspaces --include=dev --include=optional --no-audit --progress=false
+          # Optional: report native package presence (warnings only) at the hoist root
+          npm ls @rollup/rollup-linux-x64-gnu || echo "⚠️ rollup native not installed yet"
+          npm ls @biomejs/cli-linux-x64 || echo "⚠️ biome binary not installed yet (will try npx fallback)"
+          # Force-install platform binaries deterministically
+          node scripts/install-platform-binaries.mjs
+          cd webapp
 
           ISSUES_FOUND=()
 
           echo "🎨 Running Biome checks..."
           if ! npm run check; then
-            echo "❌ Biome checks failed"
-            ISSUES_FOUND+=("Biome checks failed. Run: npm run check -- --write")
+            echo "❌ Biome checks failed (attempting npx fallback to platform-specific CLI)..."
+            BIOME_VER=$(node -p "require('./package.json').devDependencies['@biomejs/biome'] || ''")
+            if ! npx -y @biomejs/cli-linux-x64@${BIOME_VER:-latest} check; then
+              ISSUES_FOUND+=("Biome checks failed. Run: npm run check -- --write")
+            else
+              echo "✅ Biome checks passed via pinned platform CLI fallback (${BIOME_VER:-latest})"
+            fi
           else
             echo "✅ Biome checks passed"
           fi
@@ -105,8 +128,16 @@ jobs:
 
           echo "🏗️ Running build check..."
           if ! npm run build; then
-            echo "❌ Build check failed"
-            ISSUES_FOUND+=("Build failed")
+            echo "❌ Build failed (retrying after clean reinstall at root to pull any missed optionals)..."
+            cd ..
+            rm -rf node_modules
+            npm ci --workspaces --include=dev --include=optional --no-audit --progress=false
+            cd webapp
+            if ! npm run build; then
+              ISSUES_FOUND+=("Build failed")
+            else
+              echo "✅ Build passed after reinstall"
+            fi
           else
             echo "✅ Build check passed"
           fi
@@ -208,10 +239,8 @@ jobs:
         run: |
           echo "🔍 Validating OpenAPI specifications and clients..."
 
-          # Install all dependencies
-          if [ ! -d "node_modules" ]; then
-            npm ci --prefer-offline --no-audit
-          fi
+          # Install all dependencies (always, to avoid cache drift)
+          npm ci --prefer-offline --no-audit
 
           # Setup Python environments
           cd server/intelligence-service
@@ -364,4 +393,68 @@ jobs:
             exit 1
           else
             echo "✅ ERD documentation validation passed (up-to-date with committed migrations)"
+          fi
+
+      # Database models validation - SQLAlchemy models match committed migrations
+      - name: Database models validation
+        if: matrix.check == 'database-models-validation'
+        run: |
+          echo "🔍 Validating SQLAlchemy models match committed migrations..."
+
+          # Start PostgreSQL service for model operations
+          echo "🐘 Starting PostgreSQL service..."
+          docker run -d \
+            --name postgres-models \
+            -e POSTGRES_DB=hephaestus \
+            -e POSTGRES_PASSWORD=root \
+            -e POSTGRES_USER=root \
+            -p 5432:5432 \
+            --health-cmd="pg_isready" \
+            --health-interval=10s \
+            --health-timeout=5s \
+            --health-retries=5 \
+            postgres:16
+
+          # Wait for PostgreSQL to be ready
+          echo "⏳ Waiting for PostgreSQL..."
+          until docker exec postgres-models pg_isready -U root -d hephaestus; do
+            sleep 2
+          done
+
+          # Set environment variables for database connection
+          export SPRING_DATASOURCE_URL="jdbc:postgresql://localhost:5432/hephaestus"
+          export SPRING_DATASOURCE_USERNAME="root"
+          export SPRING_DATASOURCE_PASSWORD="root"
+
+          # Build application-server for schema operations
+          echo "🏗️ Building application-server..."
+          cd server/application-server
+          if ! mvn compile -DskipTests --quiet; then
+            echo "❌ Failed to build application-server"
+            docker stop postgres-models && docker rm postgres-models
+            exit 1
+          fi
+          cd ../..
+
+          # Generate SQLAlchemy models from committed migration-based schema
+          echo "📊 Generating SQLAlchemy models from committed migration-based schema..."
+          if ! scripts/db-utils.sh generate-models-intelligence-service; then
+            echo "❌ Failed to generate SQLAlchemy models"
+            docker stop postgres-models && docker rm postgres-models
+            exit 1
+          fi
+
+          # Clean up PostgreSQL container
+          docker stop postgres-models && docker rm postgres-models
+
+          # Check if generated models match committed versions
+          if ! git diff --quiet server/intelligence-service/app/db/models_gen.py; then
+            echo "❌ SQLAlchemy models validation failed - models are out of sync"
+            echo "Generated models differ from committed version:"
+            git diff server/intelligence-service/app/db/models_gen.py
+            echo ""
+            echo "Fix: npm run db:generate-models:intelligence-service"
+            exit 1
+          else
+            echo "✅ SQLAlchemy models validation passed (models are up-to-date)"
           fi

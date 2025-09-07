@@ -11,7 +11,7 @@
 	</parent>
 	<groupId>de.tum.in.www1</groupId>
 	<artifactId>hephaestus</artifactId>
-	<version>0.9.0-rc.9-SNAPSHOT</version>
+	<version>0.9.0-rc.20-SNAPSHOT</version>
 	<name>Hephaestus</name>
 	<description>AI-driven learning for better software development</description>
 	<url />
@@ -74,6 +74,10 @@
 		<dependency>
 			<groupId>org.springframework.boot</groupId>
 			<artifactId>spring-boot-starter-web</artifactId>
+		</dependency>
+		<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-starter-webflux</artifactId>
 		</dependency>
 		<dependency>
 			<groupId>org.springdoc</groupId>
@@ -146,6 +150,13 @@
 			<scope>test</scope>
 		</dependency>
 
+		<!-- Reactor test for reactive stream testing -->
+		<dependency>
+			<groupId>io.projectreactor</groupId>
+			<artifactId>reactor-test</artifactId>
+			<scope>test</scope>
+		</dependency>
+
 		<!-- Testcontainers for integration testing -->
 		<dependency>
 			<groupId>org.testcontainers</groupId>
@@ -168,6 +179,12 @@
 			<groupId>org.assertj</groupId>
 			<artifactId>assertj-core</artifactId>
 			<scope>test</scope>
+		</dependency>
+		
+		<!-- Jackson JSR-310 support for Java 8 date/time types -->
+		<dependency>
+			<groupId>com.fasterxml.jackson.datatype</groupId>
+			<artifactId>jackson-datatype-jsr310</artifactId>
 		</dependency>
 		
 		<!-- ArchUnit for architecture testing -->
@@ -315,6 +332,8 @@
 				<groupId>org.apache.maven.plugins</groupId>
 				<artifactId>maven-compiler-plugin</artifactId>
 				<configuration>
+					<source>${java.version}</source>
+					<target>${java.version}</target>
 					<annotationProcessorPaths>
 						<path>
 							<groupId>com.github.therapi</groupId>
@@ -332,7 +351,7 @@
 			<plugin>
 				<groupId>org.jacoco</groupId>
 				<artifactId>jacoco-maven-plugin</artifactId>
-				<version>0.8.12</version>
+				<version>0.8.13</version>
 				<executions>
 					<execution>
 						<goals>
@@ -395,6 +414,9 @@
 					<perCoreThreadCount>true</perCoreThreadCount>
 					<!-- Fail fast on errors -->
 					<skipAfterFailureCount>5</skipAfterFailureCount>
+					<!-- Forked JVM timeout settings to prevent hanging -->
+					<forkedProcessTimeoutInSeconds>60</forkedProcessTimeoutInSeconds>
+					<forkedProcessExitTimeoutInSeconds>10</forkedProcessExitTimeoutInSeconds>
 				</configuration>
 			</plugin>
 			
@@ -406,6 +428,7 @@
 					<argLine>@{argLine} -Xmx1024m -Dspring.profiles.active=test -Dfile.encoding=UTF-8</argLine>
 					<includes>
 						<include>**/*IntegrationTest.java</include>
+						<include>**/*IT.java</include>
 					</includes>
 					<groups>integration</groups>
 				</configuration>

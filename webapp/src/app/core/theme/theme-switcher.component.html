@@ -1,5 +1,0 @@
-<button hlmBtn (click)="toggleTheme()" variant="outline" size="icon">
-  <div [@iconTrigger]="this.themeSwitcherService.currentTheme() ?? 'dark'" class="leading-none size-5">
-    <ng-icon [name]="this.themeSwitcherService.currentTheme() === 'dark' ? 'lucideSun' : 'lucideMoon'" class="text-xl leading-none" />
-  </div>
-</button>

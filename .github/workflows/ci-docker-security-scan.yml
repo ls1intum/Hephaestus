@@ -21,7 +21,7 @@ jobs:
       fail-fast: false
       matrix:
         component:
-          - { name: "webapp-react",         image: "ghcr.io/ls1intum/hephaestus/webapp-react" }
+          - { name: "webapp",               image: "ghcr.io/ls1intum/hephaestus/webapp" }
           - { name: "application-server",   image: "ghcr.io/ls1intum/hephaestus/application-server" }
           - { name: "intelligence-service", image: "ghcr.io/ls1intum/hephaestus/intelligence-service" }
           - { name: "webhook-ingest",       image: "ghcr.io/ls1intum/hephaestus/webhook-ingest" }
@@ -48,6 +48,7 @@ jobs:
           ignore-unfixed: true
           severity: "CRITICAL,HIGH"
           trivyignores: ".trivyignore"
+          skip-setup-trivy: true
 
       - name: Upload SARIF to Security tab
         uses: github/codeql-action/upload-sarif@v3

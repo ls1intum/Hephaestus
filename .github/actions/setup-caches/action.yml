@@ -26,18 +26,18 @@ runs:
       with:
         path: |
           ~/.npm
-          webapp-react/node_modules
+          webapp/node_modules
           node_modules
-        key: ${{ inputs.os }}-node-${{ hashFiles('package-lock.json', 'webapp-react/package-lock.json', 'webapp-react/biome.json', 'webapp-react/tsconfig.json', 'webapp-react/vite.config.js', 'webapp-react/components.json') }}-${{ inputs.cache-type }}
+        key: ${{ inputs.os }}-node-${{ hashFiles('package-lock.json', 'webapp/package-lock.json', 'webapp/biome.json', 'webapp/tsconfig.json', 'webapp/vite.config.js', 'webapp/components.json') }}-${{ inputs.cache-type }}
         restore-keys: |
-          ${{ inputs.os }}-node-${{ hashFiles('package-lock.json', 'webapp-react/package-lock.json', 'webapp-react/biome.json', 'webapp-react/tsconfig.json', 'webapp-react/vite.config.js', 'webapp-react/components.json') }}-
-          ${{ inputs.os }}-node-${{ hashFiles('package-lock.json', 'webapp-react/package-lock.json') }}-
+          ${{ inputs.os }}-node-${{ hashFiles('package-lock.json', 'webapp/package-lock.json', 'webapp/biome.json', 'webapp/tsconfig.json', 'webapp/vite.config.js', 'webapp/components.json') }}-
+          ${{ inputs.os }}-node-${{ hashFiles('package-lock.json', 'webapp/package-lock.json') }}-
           ${{ inputs.os }}-node-
 
 
     # Java/Maven caching
     - name: Set up JDK 21
-      if: contains(fromJSON('["application-server-unit", "application-server-integration", "application-server-architecture", "application-server-quality", "openapi-validation", "database-schema-validation", "database-documentation-validation"]'), inputs.cache-type)
+      if: contains(fromJSON('["application-server-unit", "application-server-integration", "application-server-architecture", "application-server-quality", "openapi-validation", "database-schema-validation", "database-documentation-validation", "database-models-validation"]'), inputs.cache-type)
       uses: actions/setup-java@v4
       with:
         distribution: 'temurin'
@@ -45,7 +45,7 @@ runs:
         cache: maven
 
     - name: Cache Maven dependencies
-      if: contains(fromJSON('["application-server-unit", "application-server-integration", "application-server-architecture", "application-server-quality", "openapi-validation", "database-schema-validation", "database-documentation-validation"]'), inputs.cache-type)
+      if: contains(fromJSON('["application-server-unit", "application-server-integration", "application-server-architecture", "application-server-quality", "openapi-validation", "database-schema-validation", "database-documentation-validation", "database-models-validation"]'), inputs.cache-type)
       uses: actions/cache@v4
       with:
         path: |
@@ -58,13 +58,13 @@ runs:
 
     # Python/Poetry caching
     - name: Set up Python 3.13
-      if: contains(fromJSON('["intelligence-service-quality", "webhook-ingest-quality", "openapi-validation", "database-schema-validation", "database-documentation-validation"]'), inputs.cache-type)
+      if: contains(fromJSON('["intelligence-service-quality", "webhook-ingest-quality", "openapi-validation", "database-schema-validation", "database-documentation-validation", "database-models-validation"]'), inputs.cache-type)
       uses: actions/setup-python@v4
       with:
         python-version: 3.13
         
     - name: Install Poetry
-      if: contains(fromJSON('["intelligence-service-quality", "webhook-ingest-quality", "openapi-validation", "database-schema-validation", "database-documentation-validation"]'), inputs.cache-type)
+      if: contains(fromJSON('["intelligence-service-quality", "webhook-ingest-quality", "openapi-validation", "database-schema-validation", "database-documentation-validation", "database-models-validation"]'), inputs.cache-type)
       uses: snok/install-poetry@v1
       with:
         version: 2.1.1
@@ -72,7 +72,7 @@ runs:
         virtualenvs-in-project: true
 
     - name: Cache Poetry dependencies
-      if: contains(fromJSON('["intelligence-service-quality", "webhook-ingest-quality", "openapi-validation", "database-schema-validation", "database-documentation-validation"]'), inputs.cache-type)
+      if: contains(fromJSON('["intelligence-service-quality", "webhook-ingest-quality", "openapi-validation", "database-schema-validation", "database-documentation-validation", "database-models-validation"]'), inputs.cache-type)
       uses: actions/cache@v4
       with:
         path: |

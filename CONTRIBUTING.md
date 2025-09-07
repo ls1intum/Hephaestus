@@ -64,8 +64,7 @@ We use automated semantic pull request validation to ensure consistent and meani
 
 ### Recommended Scopes
 
-- `webapp`: Changes to the Angular webapp
-- `webapp-react`: Changes to the React webapp
+- `webapp`: Changes to the React webapp
 - `application-server`: Changes to the Java application server
 - `intelligence-service`: Changes to the Python intelligence service
 - `webhook-ingest`: Changes to the webhook ingestion service
