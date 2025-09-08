@@ -1,0 +1,49 @@
+package de.tum.`in`.www1.hephaestus.teamleaderboard.kotlin
+
+import de.tum.`in`.www1.hephaestus.leaderboard.LeaderboardSortType
+import org.springframework.beans.factory.annotation.Autowired
+import org.springframework.format.annotation.DateTimeFormat
+import org.springframework.http.ResponseEntity
+import org.springframework.web.bind.annotation.GetMapping
+import org.springframework.web.bind.annotation.RequestMapping
+import org.springframework.web.bind.annotation.RequestParam
+import org.springframework.web.bind.annotation.RestController
+import java.time.OffsetDateTime
+import java.util.*
+
+@RestController
+@RequestMapping("/team-leaderboard")
+class TeamLeaderboardController {
+
+    @Autowired
+    lateinit var teamLeaderboardService: TeamLeaderboardService
+
+    @GetMapping
+    fun getTeamLeaderboard(
+        @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) after: OffsetDateTime?,
+        @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) before: OffsetDateTime?,
+        @RequestParam team: Optional<String>?,
+        @RequestParam sort: Optional<LeaderboardSortType>?,
+    ): ResponseEntity<MutableList<TeamLeaderboardEntryDTO>> {
+
+        return ResponseEntity.ok<MutableList<TeamLeaderboardEntryDTO>>(
+            teamLeaderboardService.createTeamLeaderboard(
+                after,
+                before,
+                team,
+                sort
+            )
+        )
+    }
+
+    @GetMapping("/all-time")
+    fun getAllTimeTeamLeaderboard(): ResponseEntity<MutableList<TeamLeaderboardEntryDTO>> {
+        // Calculate or fetch the all-time leaderboard here
+        return getTeamLeaderboard(
+            OffsetDateTime.MIN,
+            OffsetDateTime.MAX,
+            Optional.empty(),
+            Optional.empty()
+        )
+    }
+}

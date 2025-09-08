@@ -18,6 +18,7 @@ import { Route as AboutRouteImport } from './routes/about'
 import { Route as AuthenticatedRouteImport } from './routes/_authenticated'
 import { Route as AuthenticatedIndexRouteImport } from './routes/_authenticated/index'
 import { Route as AuthenticatedTeamsRouteImport } from './routes/_authenticated/teams'
+import { Route as AuthenticatedTeamLeaderboardRouteImport } from './routes/_authenticated/team-leaderboard'
 import { Route as AuthenticatedSettingsRouteImport } from './routes/_authenticated/settings'
 import { Route as AuthenticatedBestPracticesRouteImport } from './routes/_authenticated/best-practices'
 import { Route as AuthenticatedAdminRouteImport } from './routes/_authenticated/_admin'
@@ -74,6 +75,12 @@ const AuthenticatedTeamsRoute = AuthenticatedTeamsRouteImport.update({
   path: '/teams',
   getParentRoute: () => AuthenticatedRoute,
 } as any)
+const AuthenticatedTeamLeaderboardRoute =
+  AuthenticatedTeamLeaderboardRouteImport.update({
+    id: '/team-leaderboard',
+    path: '/team-leaderboard',
+    getParentRoute: () => AuthenticatedRoute,
+  } as any)
 const AuthenticatedSettingsRoute = AuthenticatedSettingsRouteImport.update({
   id: '/settings',
   path: '/settings',
@@ -150,6 +157,7 @@ export interface FileRoutesByFullPath {
   '/privacy': typeof PrivacyRoute
   '/best-practices': typeof AuthenticatedBestPracticesRoute
   '/settings': typeof AuthenticatedSettingsRoute
+  '/team-leaderboard': typeof AuthenticatedTeamLeaderboardRoute
   '/teams': typeof AuthenticatedTeamsRoute
   '/': typeof AuthenticatedIndexRoute
   '/mentor/$threadId': typeof AuthenticatedMentorThreadIdRoute
@@ -169,6 +177,7 @@ export interface FileRoutesByTo {
   '/privacy': typeof PrivacyRoute
   '/best-practices': typeof AuthenticatedBestPracticesRoute
   '/settings': typeof AuthenticatedSettingsRoute
+  '/team-leaderboard': typeof AuthenticatedTeamLeaderboardRoute
   '/teams': typeof AuthenticatedTeamsRoute
   '/': typeof AuthenticatedIndexRoute
   '/mentor/$threadId': typeof AuthenticatedMentorThreadIdRoute
@@ -190,6 +199,7 @@ export interface FileRoutesById {
   '/_authenticated/_admin': typeof AuthenticatedAdminRouteWithChildren
   '/_authenticated/best-practices': typeof AuthenticatedBestPracticesRoute
   '/_authenticated/settings': typeof AuthenticatedSettingsRoute
+  '/_authenticated/team-leaderboard': typeof AuthenticatedTeamLeaderboardRoute
   '/_authenticated/teams': typeof AuthenticatedTeamsRoute
   '/_authenticated/': typeof AuthenticatedIndexRoute
   '/_authenticated/mentor/$threadId': typeof AuthenticatedMentorThreadIdRoute
@@ -212,6 +222,7 @@ export interface FileRouteTypes {
     | '/privacy'
     | '/best-practices'
     | '/settings'
+    | '/team-leaderboard'
     | '/teams'
     | '/'
     | '/mentor/$threadId'
@@ -231,6 +242,7 @@ export interface FileRouteTypes {
     | '/privacy'
     | '/best-practices'
     | '/settings'
+    | '/team-leaderboard'
     | '/teams'
     | '/'
     | '/mentor/$threadId'
@@ -251,6 +263,7 @@ export interface FileRouteTypes {
     | '/_authenticated/_admin'
     | '/_authenticated/best-practices'
     | '/_authenticated/settings'
+    | '/_authenticated/team-leaderboard'
     | '/_authenticated/teams'
     | '/_authenticated/'
     | '/_authenticated/mentor/$threadId'
@@ -329,6 +342,13 @@ declare module '@tanstack/react-router' {
       path: '/teams'
       fullPath: '/teams'
       preLoaderRoute: typeof AuthenticatedTeamsRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
+    '/_authenticated/team-leaderboard': {
+      id: '/_authenticated/team-leaderboard'
+      path: '/team-leaderboard'
+      fullPath: '/team-leaderboard'
+      preLoaderRoute: typeof AuthenticatedTeamLeaderboardRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
     '/_authenticated/settings': {
@@ -452,6 +472,7 @@ interface AuthenticatedRouteChildren {
   AuthenticatedAdminRoute: typeof AuthenticatedAdminRouteWithChildren
   AuthenticatedBestPracticesRoute: typeof AuthenticatedBestPracticesRoute
   AuthenticatedSettingsRoute: typeof AuthenticatedSettingsRoute
+  AuthenticatedTeamLeaderboardRoute: typeof AuthenticatedTeamLeaderboardRoute
   AuthenticatedTeamsRoute: typeof AuthenticatedTeamsRoute
   AuthenticatedIndexRoute: typeof AuthenticatedIndexRoute
   AuthenticatedMentorThreadIdRoute: typeof AuthenticatedMentorThreadIdRoute
@@ -464,6 +485,7 @@ const AuthenticatedRouteChildren: AuthenticatedRouteChildren = {
   AuthenticatedAdminRoute: AuthenticatedAdminRouteWithChildren,
   AuthenticatedBestPracticesRoute: AuthenticatedBestPracticesRoute,
   AuthenticatedSettingsRoute: AuthenticatedSettingsRoute,
+  AuthenticatedTeamLeaderboardRoute: AuthenticatedTeamLeaderboardRoute,
   AuthenticatedTeamsRoute: AuthenticatedTeamsRoute,
   AuthenticatedIndexRoute: AuthenticatedIndexRoute,
   AuthenticatedMentorThreadIdRoute: AuthenticatedMentorThreadIdRoute,
