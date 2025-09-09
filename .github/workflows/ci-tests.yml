@@ -96,9 +96,30 @@ jobs:
               ;;
           esac
 
+      # Detect if the only changed file is the webapp/package-lock.json (lockfile-only change)
+      - name: Detect lockfile-only change
+        if: matrix.test-type == 'webapp-visual'
+        id: lock_only
+        run: |
+          set -euo pipefail
+          BASE_BRANCH="${{ github.base_ref || 'develop' }}"
+          git fetch origin "$BASE_BRANCH" --depth=1 || true
+          if git rev-parse --verify origin/$BASE_BRANCH >/dev/null 2>&1; then
+            CHANGED=$(git diff --name-only origin/$BASE_BRANCH...HEAD)
+          else
+            CHANGED=$(git diff --name-only HEAD~1..HEAD || true)
+          fi
+          echo "Changed files:\n$CHANGED"
+          if [ -n "$CHANGED" ] && [ "$(echo "$CHANGED" | wc -l | tr -d ' ')" = "1" ] && [ "$CHANGED" = "webapp/package-lock.json" ]; then
+            echo "skip_chromatic=true" >> "$GITHUB_OUTPUT"
+            echo "🔐 Only lockfile changed: skipping Chromatic visual diff enforcement.";
+          else
+            echo "skip_chromatic=false" >> "$GITHUB_OUTPUT"
+          fi
+
       # Chromatic visual testing
       - name: "Chromatic Visual Testing"
-        if: matrix.test-type == 'webapp-visual'
+        if: matrix.test-type == 'webapp-visual' && steps.lock_only.outputs.skip_chromatic != 'true'
         id: chromatic
         uses: chromaui/action@latest
         with:
@@ -114,6 +135,10 @@ jobs:
         env:
           CHROMATIC_BRANCH: ${{ github.head_ref || github.ref_name }}
           CHROMATIC_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+
+      - name: "Chromatic skipped (lockfile only)"
+        if: matrix.test-type == 'webapp-visual' && steps.lock_only.outputs.skip_chromatic == 'true'
+        run: echo "Chromatic run skipped because only webapp/package-lock.json changed."
 
       # Create Storybook status check
       - name: "Create Storybook status check"
