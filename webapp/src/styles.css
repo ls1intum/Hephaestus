@@ -4,6 +4,8 @@
 
 @import "tailwindcss";
 
+@source "../node_modules/streamdown/dist/index.js";
+
 @plugin "tailwindcss-animate";
 @plugin "@tailwindcss/typography";
 

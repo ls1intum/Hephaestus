@@ -1,10 +1,10 @@
 import equal from "fast-deep-equal";
 import { AnimatePresence, motion } from "framer-motion";
 import { memo, useState } from "react";
+import { Streamdown } from "streamdown";
 import type { ChatMessageVote } from "@/api/types.gen";
 import type { ChatMessage } from "@/lib/types";
 import { cn, sanitizeText } from "@/lib/utils";
-import { Markdown } from "./Markdown";
 import { MentorAvatar } from "./MentorAvatar";
 import { MessageActions } from "./MessageActions";
 import { MessageEditor } from "./MessageEditor";
@@ -152,11 +152,7 @@ const PurePreviewMessage = ({
 													message.role === "user",
 											})}
 										>
-											<Markdown
-												isStreaming={isLoading && message.role === "assistant"}
-											>
-												{sanitizeText(part.text)}
-											</Markdown>
+											<Streamdown>{sanitizeText(part.text)}</Streamdown>
 										</div>
 									);
 								}
