@@ -1,6 +1,6 @@
 import type { UseChatHelpers } from "@ai-sdk/react";
 import type { ReactElement } from "react";
-import { useEffect, useMemo } from "react";
+import { useEffect } from "react";
 import { createPortal } from "react-dom";
 import { useWindowSize } from "usehooks-ts";
 import type { ChatMessageVote } from "@/api/types.gen";
@@ -45,9 +45,7 @@ export function ArtifactOverlayContainer({
 	const removeArtifact = useArtifactStore((s) => s.removeArtifact);
 
 	// Parse artifact id into kind and payload (e.g., "text:docId")
-	const { kind, payload } = useMemo(() => {
-		return parseArtifactId(visibleArtifact?.artifactId);
-	}, [visibleArtifact]);
+	const { kind, payload } = parseArtifactId(visibleArtifact?.artifactId);
 
 	const { width } = useWindowSize();
 	const isMobile = (width ?? 0) < 768;

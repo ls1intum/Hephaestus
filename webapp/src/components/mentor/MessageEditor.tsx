@@ -1,4 +1,10 @@
-import { memo, useCallback, useEffect, useRef, useState } from "react";
+import {
+	type ChangeEvent,
+	type KeyboardEvent,
+	useEffect,
+	useRef,
+	useState,
+} from "react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
@@ -18,7 +24,7 @@ interface MessageEditorProps {
 	className?: string;
 }
 
-function PureMessageEditor({
+export function MessageEditor({
 	initialContent,
 	isSubmitting = false,
 	placeholder = "",
@@ -29,50 +35,45 @@ function PureMessageEditor({
 	const [draftContent, setDraftContent] = useState(initialContent);
 	const textareaRef = useRef<HTMLTextAreaElement>(null);
 
-	const adjustHeight = useCallback(() => {
+	const adjustHeight = () => {
 		if (textareaRef.current) {
 			textareaRef.current.style.height = "auto";
 			textareaRef.current.style.height = `${textareaRef.current.scrollHeight + 2}px`;
 		}
-	}, []);
+	};
 
 	// Initial height adjustment
+	// biome-ignore lint/correctness/useExhaustiveDependencies: run once on mount
 	useEffect(() => {
 		if (textareaRef.current) {
 			adjustHeight();
 		}
-	}, [adjustHeight]);
+	}, []);
 
 	// Update internal state when initialContent changes
 	useEffect(() => {
 		setDraftContent(initialContent);
 	}, [initialContent]);
 
-	const handleInput = useCallback(
-		(event: React.ChangeEvent<HTMLTextAreaElement>) => {
-			setDraftContent(event.target.value);
-			adjustHeight();
-		},
-		[adjustHeight],
-	);
+	const handleInput = (event: ChangeEvent<HTMLTextAreaElement>) => {
+		setDraftContent(event.target.value);
+		adjustHeight();
+	};
 
-	const handleSend = useCallback(() => {
+	const handleSend = () => {
 		onSend(draftContent);
-	}, [draftContent, onSend]);
+	};
 
-	const handleKeyDown = useCallback(
-		(event: React.KeyboardEvent<HTMLTextAreaElement>) => {
-			if (event.key === "Enter" && (event.metaKey || event.ctrlKey)) {
-				event.preventDefault();
-				handleSend();
-			}
-			if (event.key === "Escape") {
-				event.preventDefault();
-				onCancel();
-			}
-		},
-		[handleSend, onCancel],
-	);
+	const handleKeyDown = (event: KeyboardEvent<HTMLTextAreaElement>) => {
+		if (event.key === "Enter" && (event.metaKey || event.ctrlKey)) {
+			event.preventDefault();
+			handleSend();
+		}
+		if (event.key === "Escape") {
+			event.preventDefault();
+			onCancel();
+		}
+	};
 
 	const hasChanges = draftContent !== initialContent;
 	const canSend = draftContent.trim().length > 0 && hasChanges && !isSubmitting;
@@ -125,10 +126,3 @@ function PureMessageEditor({
 		</div>
 	);
 }
-
-export const MessageEditor = memo(PureMessageEditor, (prevProps, nextProps) => {
-	if (prevProps.initialContent !== nextProps.initialContent) return false;
-	if (prevProps.isSubmitting !== nextProps.isSubmitting) return false;
-	if (prevProps.placeholder !== nextProps.placeholder) return false;
-	return true;
-});

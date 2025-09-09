@@ -1,5 +1,4 @@
 import { X } from "lucide-react";
-import { memo } from "react";
 import { Button } from "@/components/ui/button";
 
 export interface ArtifactCloseButtonProps {
@@ -11,7 +10,7 @@ export interface ArtifactCloseButtonProps {
  * ArtifactCloseButton provides a close button for artifacts.
  * Always requires an explicit onClose handler to be provided.
  */
-function PureArtifactCloseButton({ onClose }: ArtifactCloseButtonProps) {
+export function ArtifactCloseButton({ onClose }: ArtifactCloseButtonProps) {
 	return (
 		<Button
 			data-testid="artifact-close-button"
@@ -24,10 +23,3 @@ function PureArtifactCloseButton({ onClose }: ArtifactCloseButtonProps) {
 		</Button>
 	);
 }
-
-export const ArtifactCloseButton = memo(
-	PureArtifactCloseButton,
-	(prevProps, nextProps) => {
-		return prevProps.onClose === nextProps.onClose;
-	},
-);

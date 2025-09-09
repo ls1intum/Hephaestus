@@ -1,6 +1,5 @@
 import { useQueryClient } from "@tanstack/react-query";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
-import { useCallback } from "react";
 import { v4 as uuidv4 } from "uuid";
 
 import {
@@ -21,59 +20,53 @@ function MentorContainer() {
 	const queryClient = useQueryClient();
 	const navigate = useNavigate();
 
-	const handleMessageSubmit = useCallback(
-		({ text }: { text: string }) => {
-			const initialMessage = text.trim();
-			if (!initialMessage) return;
-			const threadId = uuidv4();
-			// Optimistically seed the thread cache so the thread route doesn't show loading
-			queryClient.setQueryData(getThreadQueryKey({ path: { threadId } }), {
-				messages: [],
-			});
+	const handleMessageSubmit = ({ text }: { text: string }) => {
+		const initialMessage = text.trim();
+		if (!initialMessage) return;
+		const threadId = uuidv4();
+		// Optimistically seed the thread cache so the thread route doesn't show loading
+		queryClient.setQueryData(getThreadQueryKey({ path: { threadId } }), {
+			messages: [],
+		});
 
-			queryClient.setQueryData<Array<ChatThreadGroup>>(
-				getGroupedThreadsQueryKey(),
-				(prev) => {
-					const threadGroups = prev ?? [];
-					const newSummary: ChatThreadSummary = {
-						id: threadId,
-						title: "New chat",
-						createdAt: new Date(),
+		queryClient.setQueryData<Array<ChatThreadGroup>>(
+			getGroupedThreadsQueryKey(),
+			(prev) => {
+				const threadGroups = prev ?? [];
+				const newSummary: ChatThreadSummary = {
+					id: threadId,
+					title: "New chat",
+					createdAt: new Date(),
+				};
+				const idx = threadGroups.findIndex(
+					(g) => g.groupName.toLowerCase() === "today",
+				);
+				if (idx >= 0) {
+					const group = threadGroups[idx];
+					const exists = group.threads.some((t) => t.id === threadId);
+					if (exists) return threadGroups;
+					const updatedGroup: ChatThreadGroup = {
+						groupName: group.groupName,
+						threads: [newSummary, ...group.threads],
 					};
-					const idx = threadGroups.findIndex(
-						(g) => g.groupName.toLowerCase() === "today",
-					);
-					if (idx >= 0) {
-						const group = threadGroups[idx];
-						const exists = group.threads.some((t) => t.id === threadId);
-						if (exists) return threadGroups;
-						const updatedGroup: ChatThreadGroup = {
-							groupName: group.groupName,
-							threads: [newSummary, ...group.threads],
-						};
-						return [
-							...threadGroups.slice(0, idx),
-							updatedGroup,
-							...threadGroups.slice(idx + 1),
-						];
-					}
-					// No Today group yet
 					return [
-						{ groupName: "Today", threads: [newSummary] },
-						...threadGroups,
+						...threadGroups.slice(0, idx),
+						updatedGroup,
+						...threadGroups.slice(idx + 1),
 					];
-				},
-			);
+				}
+				// No Today group yet
+				return [{ groupName: "Today", threads: [newSummary] }, ...threadGroups];
+			},
+		);
 
-			// Navigate with initial message state; thread route will send it immediately
-			navigate({
-				to: "/mentor/$threadId",
-				params: { threadId },
-				state: { initialMessage },
-			});
-		},
-		[navigate, queryClient],
-	);
+		// Navigate with initial message state; thread route will send it immediately
+		navigate({
+			to: "/mentor/$threadId",
+			params: { threadId },
+			state: { initialMessage },
+		});
+	};
 
 	// Index route acts as a thin redirector; editing/voting/copy are not used here
 

@@ -1,4 +1,4 @@
-import { memo, useMemo } from "react";
+import { useId } from "react";
 
 interface MentorIconProps {
 	/** Size of the icon */
@@ -15,18 +15,15 @@ interface MentorIconProps {
 	className?: string;
 }
 
-const MentorIconComponent = ({
+export function MentorIcon({
 	size = 16,
 	strokeWidth = 2,
 	pad = 2,
 	animated = true,
 	streaming = false,
 	className,
-}: MentorIconProps) => {
-	const uniqueId = useMemo(
-		() => `mentor-icon-${Math.random().toString(36).substr(2, 9)}`,
-		[],
-	);
+}: MentorIconProps) {
+	const uniqueId = useId();
 
 	return (
 		<svg
@@ -206,6 +203,4 @@ const MentorIconComponent = ({
 			</g>
 		</svg>
 	);
-};
-
-export const MentorIcon = memo(MentorIconComponent);
+}

@@ -8,7 +8,6 @@ import {
 	useRouter,
 } from "@tanstack/react-router";
 import { TanStackRouterDevtools } from "@tanstack/react-router-devtools";
-import { useCallback } from "react";
 import { Toaster } from "sonner";
 import { getGroupedThreadsOptions } from "@/api/@tanstack/react-query.gen";
 import Footer from "@/components/core/Footer";
@@ -112,39 +111,30 @@ function GlobalCopilot() {
 	const router = useRouter();
 	const { isAuthenticated, hasRole, isLoading } = useAuth();
 
-	const handleMessageSubmit = useCallback(
-		({ text }: { text: string }) => {
-			if (!text.trim()) return;
-			mentorChat.sendMessage(text);
-		},
-		[mentorChat.sendMessage],
-	);
+	const handleMessageSubmit = ({ text }: { text: string }) => {
+		if (!text.trim()) return;
+		mentorChat.sendMessage(text);
+	};
 
-	const handleVote = useCallback(
-		(messageId: string, isUpvote: boolean) => {
-			mentorChat.voteMessage(messageId, isUpvote);
-		},
-		[mentorChat.voteMessage],
-	);
+	const handleVote = (messageId: string, isUpvote: boolean) => {
+		mentorChat.voteMessage(messageId, isUpvote);
+	};
 
 	// Edit a previous message: discard that message and all following locally, then send the edited content
-	const handleMessageEdit = useCallback(
-		(messageId: string, content: string) => {
-			const idx = mentorChat.messages.findIndex((m) => m.id === messageId);
-			if (idx === -1) return;
-			// Keep everything before the edited message
-			mentorChat.setMessages(mentorChat.messages.slice(0, idx));
-			// Send the edited content as a new message; prepareSendMessagesRequest will set previousMessageId to the new last message
-			mentorChat.sendMessage(content);
-		},
-		[mentorChat.messages, mentorChat.setMessages, mentorChat.sendMessage],
-	);
+	const handleMessageEdit = (messageId: string, content: string) => {
+		const idx = mentorChat.messages.findIndex((m) => m.id === messageId);
+		if (idx === -1) return;
+		// Keep everything before the edited message
+		mentorChat.setMessages(mentorChat.messages.slice(0, idx));
+		// Send the edited content as a new message; prepareSendMessagesRequest will set previousMessageId to the new last message
+		mentorChat.sendMessage(content);
+	};
 
-	const handleCopy = useCallback((content: string) => {
+	const handleCopy = (content: string) => {
 		navigator.clipboard.writeText(content).catch((error) => {
 			console.error("Failed to copy to clipboard:", error);
 		});
-	}, []);
+	};
 
 	if (isLoading || !isAuthenticated || !hasRole("mentor_access")) {
 		return null;

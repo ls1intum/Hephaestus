@@ -19,7 +19,7 @@ import {
 	subWeeks,
 } from "date-fns";
 import { CalendarIcon } from "lucide-react";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { DateRange } from "react-day-picker";
 import { Button } from "@/components/ui/button";
 import { Calendar } from "@/components/ui/calendar";
@@ -72,66 +72,65 @@ export function TimeframeFilter({
 
 	// Helper function to set a date to a specific day of the week with specific time
 	// day is 1-7 where 1 is Monday (ISO)
-	const setToScheduledTime = useCallback(
-		(date: Date, dayOfWeek: number, hour: number, minute: number): Date => {
-			const currentISODay = getISODay(date); // 1 = Monday, 7 = Sunday
-			const diff = dayOfWeek - currentISODay;
-			const adjustedDate = addDays(date, diff);
+	const setToScheduledTime = (
+		date: Date,
+		dayOfWeek: number,
+		hour: number,
+		minute: number,
+	): Date => {
+		const currentISODay = getISODay(date); // 1 = Monday, 7 = Sunday
+		const diff = dayOfWeek - currentISODay;
+		const adjustedDate = addDays(date, diff);
 
-			// Set the time to the scheduled hour and minute
-			return setMilliseconds(
-				setSeconds(setMinutes(setHours(adjustedDate, hour), minute), 0),
-				0,
-			);
-		},
-		[],
-	);
+		// Set the time to the scheduled hour and minute
+		return setMilliseconds(
+			setSeconds(setMinutes(setHours(adjustedDate, hour), minute), 0),
+			0,
+		);
+	};
 
 	// Helper function to safely parse ISO date strings
-	const parseDateSafely = useCallback(
-		(dateString: string | null): Date | null => {
-			if (!dateString) return null;
+	const parseDateSafely = (dateString: string | null): Date | null => {
+		if (!dateString) return null;
 
-			try {
-				return parseISO(dateString);
-			} catch (e) {
-				console.error("Error parsing date:", e);
-				return null;
-			}
-		},
-		[],
-	);
+		try {
+			return parseISO(dateString);
+		} catch (e) {
+			console.error("Error parsing date:", e);
+			return null;
+		}
+	};
 
 	// Helper function to check if two dates are within 1 day of each other
 	// This is much more tolerant of timezone differences
-	const datesAreClose = useCallback(
-		(date1: string | null, date2: string | null): boolean => {
-			if (!date1 || !date2) return false;
+	const datesAreClose = (
+		date1: string | null,
+		date2: string | null,
+	): boolean => {
+		if (!date1 || !date2) return false;
 
-			try {
-				const parsedDate1 = parseDateSafely(date1);
-				const parsedDate2 = parseDateSafely(date2);
+		try {
+			const parsedDate1 = parseDateSafely(date1);
+			const parsedDate2 = parseDateSafely(date2);
 
-				if (!parsedDate1 || !parsedDate2) return false;
+			if (!parsedDate1 || !parsedDate2) return false;
 
-				// Calculate the absolute difference in hours
-				const hourDifference = Math.abs(
-					differenceInHours(parsedDate1, parsedDate2),
-				);
+			// Calculate the absolute difference in hours
+			const hourDifference = Math.abs(
+				differenceInHours(parsedDate1, parsedDate2),
+			);
 
-				// Consider dates equal if they're within 24-26 hours (about a day)
-				// This accounts for possible timezone and DST differences
-				return hourDifference <= 26;
-			} catch (e) {
-				console.error("Error comparing dates:", e);
-				return false;
-			}
-		},
-		[parseDateSafely],
-	);
+			// Consider dates equal if they're within 24-26 hours (about a day)
+			// This accounts for possible timezone and DST differences
+			return hourDifference <= 26;
+		} catch (e) {
+			console.error("Error comparing dates:", e);
+			return false;
+		}
+	};
 
 	// Function to detect which timeframe option matches the given date range
-	const detectTimeframeFromDates = useCallback((): TimeframeOption => {
+	const detectTimeframeFromDates = (): TimeframeOption => {
 		if (!initialAfterDate || !initialBeforeDate) return "this-week";
 
 		try {
@@ -248,13 +247,7 @@ export function TimeframeFilter({
 			console.error("Error detecting timeframe:", e);
 			return "this-week";
 		}
-	}, [
-		initialAfterDate,
-		initialBeforeDate,
-		leaderboardSchedule,
-		setToScheduledTime,
-		datesAreClose,
-	]);
+	};
 
 	// Set initial selection based on detected timeframe
 	const [selectedTimeframe, setSelectedTimeframe] = useState<TimeframeOption>(
@@ -290,116 +283,114 @@ export function TimeframeFilter({
 	});
 
 	// Handle timeframe selection change
-	const handleTimeframeChange = useCallback(
-		(value: string) => {
-			const timeframeOption = value as TimeframeOption;
+	const handleTimeframeChange = (value: string) => {
+		const timeframeOption = value as TimeframeOption;
 
-			// If changing to custom, update the date range to match the current timeframe's date range
-			if (timeframeOption === "custom" && selectedTimeframe !== "custom") {
-				try {
-					// Use a stable date reference
-					const now = new Date();
-					// Reset seconds and milliseconds
-					now.setSeconds(0, 0);
+		// If changing to custom, update the date range to match the current timeframe's date range
+		if (timeframeOption === "custom" && selectedTimeframe !== "custom") {
+			try {
+				// Use a stable date reference
+				const now = new Date();
+				// Reset seconds and milliseconds
+				now.setSeconds(0, 0);
 
-					// Extract leaderboard schedule details or use defaults
-					const scheduledDay = leaderboardSchedule?.day ?? 1; // Default to Monday
-					const scheduledHour = leaderboardSchedule?.hour ?? 9; // Default to 9 AM
-					const scheduledMinute = leaderboardSchedule?.minute ?? 0; // Default to 0 minutes
+				// Extract leaderboard schedule details or use defaults
+				const scheduledDay = leaderboardSchedule?.day ?? 1; // Default to Monday
+				const scheduledHour = leaderboardSchedule?.hour ?? 9; // Default to 9 AM
+				const scheduledMinute = leaderboardSchedule?.minute ?? 0; // Default to 0 minutes
 
-					let startDate: Date;
-					let endDate: Date;
+				let startDate: Date;
+				let endDate: Date;
 
-					switch (selectedTimeframe) {
-						case "this-week": {
-							const currentISODay = getISODay(now);
+				switch (selectedTimeframe) {
+					case "this-week": {
+						const currentISODay = getISODay(now);
 
-							if (currentISODay >= scheduledDay) {
-								// We've passed the scheduled day, so this week's range starts from this week's scheduled day
-								startDate = setToScheduledTime(
-									now,
-									scheduledDay,
-									scheduledHour,
-									scheduledMinute,
-								);
-							} else {
-								// We haven't reached the scheduled day yet, so range starts from last week's scheduled day
-								startDate = setToScheduledTime(
-									subWeeks(now, 1),
-									scheduledDay,
-									scheduledHour,
-									scheduledMinute,
-								);
-							}
-
-							// End date is the next scheduled day (next week or this coming one)
-							endDate = subDays(addWeeks(startDate, 1), 1); // Subtract 1 day for display purposes
-							break;
+						if (currentISODay >= scheduledDay) {
+							// We've passed the scheduled day, so this week's range starts from this week's scheduled day
+							startDate = setToScheduledTime(
+								now,
+								scheduledDay,
+								scheduledHour,
+								scheduledMinute,
+							);
+						} else {
+							// We haven't reached the scheduled day yet, so range starts from last week's scheduled day
+							startDate = setToScheduledTime(
+								subWeeks(now, 1),
+								scheduledDay,
+								scheduledHour,
+								scheduledMinute,
+							);
 						}
-						case "last-week": {
-							const currentISODay = getISODay(now);
 
-							if (currentISODay >= scheduledDay) {
-								// We've passed the scheduled day, use last week's scheduled day
-								startDate = setToScheduledTime(
-									subWeeks(now, 1),
-									scheduledDay,
-									scheduledHour,
-									scheduledMinute,
-								);
-							} else {
-								// We haven't reached the scheduled day, use scheduled day from 2 weeks ago
-								startDate = setToScheduledTime(
-									subWeeks(now, 2),
-									scheduledDay,
-									scheduledHour,
-									scheduledMinute,
-								);
-							}
-
-							// Before date is this week's or last week's scheduled day
-							endDate = subDays(addWeeks(startDate, 1), 1); // Subtract 1 day for display purposes
-							break;
-						}
-						case "this-month": {
-							// Start at the beginning of this month (midnight)
-							startDate = startOfMonth(now);
-							// End at the last day of this month
-							endDate = endOfMonth(now);
-							break;
-						}
-						case "last-month": {
-							// Start at the beginning of last month (midnight)
-							startDate = startOfMonth(subMonths(now, 1));
-							// End at the last day of last month
-							endDate = endOfMonth(subMonths(now, 1));
-							break;
-						}
-						default: {
-							// Default to last 7 days
-							startDate = subDays(now, 7);
-							endDate = now;
-							break;
-						}
+						// End date is the next scheduled day (next week or this coming one)
+						endDate = subDays(addWeeks(startDate, 1), 1); // Subtract 1 day for display purposes
+						break;
 					}
+					case "last-week": {
+						const currentISODay = getISODay(now);
 
-					// Update the dateRange state with the calculated dates
-					setDateRange({
-						from: startDate,
-						to: endDate,
-					});
-				} catch (e) {
-					console.error("Error setting custom date range:", e);
+						if (currentISODay >= scheduledDay) {
+							// We've passed the scheduled day, use last week's scheduled day
+							startDate = setToScheduledTime(
+								subWeeks(now, 1),
+								scheduledDay,
+								scheduledHour,
+								scheduledMinute,
+							);
+						} else {
+							// We haven't reached the scheduled day, use scheduled day from 2 weeks ago
+							startDate = setToScheduledTime(
+								subWeeks(now, 2),
+								scheduledDay,
+								scheduledHour,
+								scheduledMinute,
+							);
+						}
+
+						// Before date is this week's or last week's scheduled day
+						endDate = subDays(addWeeks(startDate, 1), 1); // Subtract 1 day for display purposes
+						break;
+					}
+					case "this-month": {
+						// Start at the beginning of this month (midnight)
+						startDate = startOfMonth(now);
+						// End at the last day of this month
+						endDate = endOfMonth(now);
+						break;
+					}
+					case "last-month": {
+						// Start at the beginning of last month (midnight)
+						startDate = startOfMonth(subMonths(now, 1));
+						// End at the last day of last month
+						endDate = endOfMonth(subMonths(now, 1));
+						break;
+					}
+					default: {
+						// Default to last 7 days
+						startDate = subDays(now, 7);
+						endDate = now;
+						break;
+					}
 				}
-			}
 
-			setSelectedTimeframe(timeframeOption);
-			setUserSelectedTimeframe(true);
-		},
-		[selectedTimeframe, leaderboardSchedule, setToScheduledTime],
-	);
+				// Update the dateRange state with the calculated dates
+				setDateRange({
+					from: startDate,
+					to: endDate,
+				});
+			} catch (e) {
+				console.error("Error setting custom date range:", e);
+			}
+		}
+
+		setSelectedTimeframe(timeframeOption);
+		setUserSelectedTimeframe(true);
+	};
 
 	// Update timeframe if initialDates change, but only if user hasn't manually selected a timeframe
+	// biome-ignore lint/correctness/useExhaustiveDependencies: detectTimeframeFromDates is stable
 	useEffect(() => {
 		if (initialAfterDate && initialBeforeDate && !userSelectedTimeframe) {
 			const detectedTimeframe = detectTimeframeFromDates();
@@ -427,13 +418,12 @@ export function TimeframeFilter({
 	}, [
 		initialAfterDate,
 		initialBeforeDate,
-		detectTimeframeFromDates,
 		selectedTimeframe,
 		userSelectedTimeframe,
 	]);
 
-	// Memoize date calculations to prevent unnecessary recalculations
-	const { afterDate, beforeDate } = useMemo(() => {
+	// Calculate date ranges based on selected timeframe
+	const computeDates = () => {
 		// Use a stable date reference
 		const now = new Date();
 		// Reset seconds and milliseconds
@@ -548,16 +538,11 @@ export function TimeframeFilter({
 			afterDate: formatISO(afterDate),
 			beforeDate: formatISO(beforeDate),
 		};
-	}, [
-		selectedTimeframe,
-		dateRange?.from,
-		dateRange?.to,
-		leaderboardSchedule,
-		setToScheduledTime,
-	]);
+	};
+	const { afterDate, beforeDate } = computeDates();
 
 	// Call onTimeframeChange when relevant values change
-	// Using useCallback to memoize the latest dates to avoid dependency issues
+	// Track latest dates to avoid dependency issues
 	const latestDates = useRef({ afterDate, beforeDate });
 
 	useEffect(() => {
