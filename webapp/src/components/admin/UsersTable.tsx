@@ -20,7 +20,7 @@ import {
 	UserPlus,
 	Users,
 } from "lucide-react";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import type { TeamInfo } from "@/api/types.gen";
 import { GithubBadge } from "@/components/shared/GithubBadge";
 import { Badge } from "@/components/ui/badge";
@@ -105,174 +105,185 @@ export function UsersTable({
 	const [selectedUserId, setSelectedUserId] = useState<string | null>(null);
 	const [selectedTeamId, setSelectedTeamId] = useState<string>("");
 
-	const columns: ColumnDef<ExtendedUserTeams>[] = [
-		{
-			id: "select",
-			header: ({ table }) => (
-				<Checkbox
-					checked={
-						table.getIsAllPageRowsSelected() ||
-						(table.getIsSomePageRowsSelected() && "indeterminate")
-					}
-					onCheckedChange={(value) => table.toggleAllPageRowsSelected(!!value)}
-					aria-label="Select all"
-				/>
-			),
-			cell: ({ row }) => (
-				<Checkbox
-					checked={row.getIsSelected()}
-					onCheckedChange={(value) => row.toggleSelected(!!value)}
-					aria-label="Select row"
-				/>
-			),
-			enableSorting: false,
-			enableHiding: false,
-		},
-		{
-			accessorKey: "user.name",
-			header: ({ column }) => {
-				return (
-					<Button
-						variant="ghost"
-						onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
-						className="h-auto p-0 font-semibold"
-					>
-						Name
-						<ArrowUpDown className="ml-2 h-4 w-4" />
-					</Button>
-				);
+	const columns: ColumnDef<ExtendedUserTeams>[] = useMemo(
+		() => [
+			{
+				id: "select",
+				header: ({ table }) => (
+					<Checkbox
+						checked={
+							table.getIsAllPageRowsSelected() ||
+							(table.getIsSomePageRowsSelected() && "indeterminate")
+						}
+						onCheckedChange={(value) =>
+							table.toggleAllPageRowsSelected(!!value)
+						}
+						aria-label="Select all"
+					/>
+				),
+				cell: ({ row }) => (
+					<Checkbox
+						checked={row.getIsSelected()}
+						onCheckedChange={(value) => row.toggleSelected(!!value)}
+						aria-label="Select row"
+					/>
+				),
+				enableSorting: false,
+				enableHiding: false,
 			},
-			cell: ({ row }) => (
-				<div className="font-medium">{row.original.user.name}</div>
-			),
-		},
-		{
-			accessorKey: "user.email",
-			header: ({ column }) => {
-				return (
-					<Button
-						variant="ghost"
-						onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
-						className="h-auto p-0 font-semibold"
-					>
-						Email
-						<ArrowUpDown className="ml-2 h-4 w-4" />
-					</Button>
-				);
+			{
+				accessorKey: "user.name",
+				header: ({ column }) => {
+					return (
+						<Button
+							variant="ghost"
+							onClick={() =>
+								column.toggleSorting(column.getIsSorted() === "asc")
+							}
+							className="h-auto p-0 font-semibold"
+						>
+							Name
+							<ArrowUpDown className="ml-2 h-4 w-4" />
+						</Button>
+					);
+				},
+				cell: ({ row }) => (
+					<div className="font-medium">{row.original.user.name}</div>
+				),
 			},
-			cell: ({ row }) => (
-				<div className="text-muted-foreground">{row.original.user.email}</div>
-			),
-		},
-		{
-			accessorKey: "teams",
-			header: "Teams",
-			cell: ({ row }) => {
-				const userTeams = row.original.teams || [];
-				return (
-					<div className="flex flex-wrap gap-1 max-w-xs">
-						{userTeams.length === 0 ? (
-							<Badge variant="outline" className="text-muted-foreground">
-								No teams
-							</Badge>
-						) : (
-							userTeams.map((team) => (
-								<GithubBadge
-									key={team.id}
-									label={team.name}
-									color={team.color?.replace("#", "")}
-									className="text-xs"
-								/>
-							))
-						)}
-					</div>
-				);
+			{
+				accessorKey: "user.email",
+				header: ({ column }) => {
+					return (
+						<Button
+							variant="ghost"
+							onClick={() =>
+								column.toggleSorting(column.getIsSorted() === "asc")
+							}
+							className="h-auto p-0 font-semibold"
+						>
+							Email
+							<ArrowUpDown className="ml-2 h-4 w-4" />
+						</Button>
+					);
+				},
+				cell: ({ row }) => (
+					<div className="text-muted-foreground">{row.original.user.email}</div>
+				),
 			},
-			filterFn: (row, _id, value) => {
-				if (value === "all") return true;
-				const userTeams = row.original.teams || [];
-				return userTeams.some((team) => team.id.toString() === value);
+			{
+				accessorKey: "teams",
+				header: "Teams",
+				cell: ({ row }) => {
+					const userTeams = row.original.teams || [];
+					return (
+						<div className="flex flex-wrap gap-1 max-w-xs">
+							{userTeams.length === 0 ? (
+								<Badge variant="outline" className="text-muted-foreground">
+									No teams
+								</Badge>
+							) : (
+								userTeams.map((team) => (
+									<GithubBadge
+										key={team.id}
+										label={team.name}
+										color={team.color?.replace("#", "")}
+										className="text-xs"
+									/>
+								))
+							)}
+						</div>
+					);
+				},
+				filterFn: (row, _id, value) => {
+					if (value === "all") return true;
+					const userTeams = row.original.teams || [];
+					return userTeams.some((team) => team.id.toString() === value);
+				},
 			},
-		},
-		{
-			id: "actions",
-			enableHiding: false,
-			cell: ({ row }) => {
-				const user = row.original.user;
-				const userTeams = new Set(
-					(row.original.teams || []).map((team) => team.id),
-				);
+			{
+				id: "actions",
+				enableHiding: false,
+				cell: ({ row }) => {
+					const user = row.original.user;
+					const userTeams = new Set(
+						(row.original.teams || []).map((team) => team.id),
+					);
 
-				const toggleTeam = (teamId: number) => {
-					if (userTeams.has(teamId)) {
-						onRemoveUserFromTeam(user.id.toString(), teamId.toString());
-					} else {
-						onAddTeamToUser(user.id.toString(), teamId.toString());
-					}
-				};
+					const toggleTeam = (teamId: number) => {
+						if (userTeams.has(teamId)) {
+							onRemoveUserFromTeam(user.id.toString(), teamId.toString());
+						} else {
+							onAddTeamToUser(user.id.toString(), teamId.toString());
+						}
+					};
 
-				return (
-					<Popover>
-						<PopoverTrigger asChild>
-							<Button variant="ghost" className="h-8 w-8 p-0">
-								<span className="sr-only">Manage teams</span>
-								<Users className="h-4 w-4" />
-							</Button>
-						</PopoverTrigger>
-						<PopoverContent className="w-80" align="end">
-							<div className="space-y-3">
-								<h4 className="font-medium">Manage Teams</h4>
-								<p className="text-sm text-muted-foreground">
-									Click team badges to add or remove {user.name} from teams.
-								</p>
-								<div className="flex flex-wrap gap-1.5">
-									{[...teams]
-										.sort((a, b) => a.name.localeCompare(b.name))
-										.map((team) => {
-											const isActive = userTeams.has(team.id);
+					return (
+						<Popover>
+							<PopoverTrigger asChild>
+								<Button variant="ghost" className="h-8 w-8 p-0">
+									<span className="sr-only">Manage teams</span>
+									<Users className="h-4 w-4" />
+								</Button>
+							</PopoverTrigger>
+							<PopoverContent className="w-80" align="end">
+								<div className="space-y-3">
+									<h4 className="font-medium">Manage Teams</h4>
+									<p className="text-sm text-muted-foreground">
+										Click team badges to add or remove {user.name} from teams.
+									</p>
+									<div className="flex flex-wrap gap-1.5">
+										{[...teams]
+											.sort((a, b) => a.name.localeCompare(b.name))
+											.map((team) => {
+												const isActive = userTeams.has(team.id);
 
-											return (
-												<button
-													type="button"
-													key={team.id}
-													className={cn(
-														"cursor-pointer transition-all duration-200 p-0 border-none bg-transparent",
-														!isActive && "hover:opacity-80",
-													)}
-													onClick={() => toggleTeam(team.id)}
-													onKeyDown={(e) => {
-														if (e.key === "Enter" || e.key === " ") {
-															e.preventDefault();
-															toggleTeam(team.id);
-														}
-													}}
-												>
-													<GithubBadge
-														label={team.name}
-														color={team.color?.replace("#", "")}
+												return (
+													<button
+														type="button"
+														key={team.id}
 														className={cn(
-															"text-xs transition-all duration-200",
-															!isActive && "opacity-60",
+															"cursor-pointer transition-all duration-200 p-0 border-none bg-transparent",
+															!isActive && "hover:opacity-80",
 														)}
-													/>
-												</button>
-											);
-										})}
+														onClick={() => toggleTeam(team.id)}
+														onKeyDown={(e) => {
+															if (e.key === "Enter" || e.key === " ") {
+																e.preventDefault();
+																toggleTeam(team.id);
+															}
+														}}
+													>
+														<GithubBadge
+															label={team.name}
+															color={team.color?.replace("#", "")}
+															className={cn(
+																"text-xs transition-all duration-200",
+																!isActive && "opacity-60",
+															)}
+														/>
+													</button>
+												);
+											})}
+									</div>
 								</div>
-							</div>
-						</PopoverContent>
-					</Popover>
-				);
+							</PopoverContent>
+						</Popover>
+					);
+				},
 			},
-		},
-	];
+		],
+		[teams, onAddTeamToUser, onRemoveUserFromTeam],
+	);
 
-	const filteredData = users.filter((user) => {
-		if (teamFilter === "all") return true;
-		return (
-			user.teams?.some((team) => team.id.toString() === teamFilter) || false
-		);
-	});
+	const filteredData = useMemo(() => {
+		return users.filter((user) => {
+			if (teamFilter === "all") return true;
+			return (
+				user.teams?.some((team) => team.id.toString() === teamFilter) || false
+			);
+		});
+	}, [users, teamFilter]);
 
 	const table = useReactTable({
 		data: filteredData,
