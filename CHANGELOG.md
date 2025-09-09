@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.9.0-rc.22](https://github.com/ls1intum/Hephaestus/compare/v0.9.0-rc.21...v0.9.0-rc.22) (2025-09-09)
+
+### ♻️ Code Refactoring
+
+* eliminate manual memoization across client ([#392](https://github.com/ls1intum/Hephaestus/issues/392)) ([6e8f01f](https://github.com/ls1intum/Hephaestus/commit/6e8f01f119c07a84c24137f7083844aa2e9261e3))
+
 ## [0.9.0-rc.21](https://github.com/ls1intum/Hephaestus/compare/v0.9.0-rc.20...v0.9.0-rc.21) (2025-09-09)
 
 ### 🐛 Bug Fixes
