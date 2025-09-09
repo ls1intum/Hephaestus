@@ -1,8 +1,8 @@
 import { AnimatePresence, motion } from "framer-motion";
 import { CheckCircle2 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { cn } from "@/lib/utils";
 import { Streamdown } from "streamdown";
+import { cn } from "@/lib/utils";
 
 interface MessageReasoningProps {
 	isLoading: boolean;
