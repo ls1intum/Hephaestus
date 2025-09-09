@@ -1,4 +1,4 @@
-import { memo, type ReactNode } from "react";
+import type { ReactNode } from "react";
 import { Button } from "@/components/ui/button";
 import {
 	Tooltip,
@@ -33,7 +33,7 @@ interface ArtifactActionsProps {
 	className?: string;
 }
 
-function PureArtifactActions({
+export function ArtifactActions({
 	actions,
 	isLoading = false,
 	isStreaming = false,
@@ -68,25 +68,3 @@ function PureArtifactActions({
 		</div>
 	);
 }
-
-export const ArtifactActions = memo(
-	PureArtifactActions,
-	(prevProps, nextProps) => {
-		if (prevProps.isLoading !== nextProps.isLoading) return false;
-		if (prevProps.isStreaming !== nextProps.isStreaming) return false;
-		if (prevProps.actions.length !== nextProps.actions.length) return false;
-
-		// Check if any action properties changed
-		for (let i = 0; i < prevProps.actions.length; i++) {
-			const prevAction = prevProps.actions[i];
-			const nextAction = nextProps.actions[i];
-
-			if (prevAction.id !== nextAction.id) return false;
-			if (prevAction.disabled !== nextAction.disabled) return false;
-			if (prevAction.label !== nextAction.label) return false;
-			if (prevAction.description !== nextAction.description) return false;
-		}
-
-		return true;
-	},
-);

@@ -3,7 +3,7 @@ import {
 	useLocation,
 	useNavigate,
 } from "@tanstack/react-router";
-import { useCallback, useEffect, useMemo, useRef } from "react";
+import { useEffect, useRef } from "react";
 import { ArtifactOverlayContainer } from "@/components/mentor/ArtifactOverlayContainer";
 import { Chat } from "@/components/mentor/Chat";
 import { defaultPartRenderers } from "@/components/mentor/renderers";
@@ -28,8 +28,7 @@ function ThreadContainer() {
 	});
 
 	// Detect initial message passed via navigation state and send it once
-	const initialMessage: string | undefined = useMemo(() => {
-		// Expect shape: { initialMessage?: string, optimistic?: boolean }
+	const initialMessage: string | undefined = (() => {
 		try {
 			return (
 				state as { initialMessage?: string } | undefined
@@ -37,7 +36,7 @@ function ThreadContainer() {
 		} catch {
 			return undefined;
 		}
-	}, [state]);
+	})();
 	const initialDispatchedRef = useRef(false);
 	useEffect(() => {
 		if (initialDispatchedRef.current) return;
@@ -54,37 +53,27 @@ function ThreadContainer() {
 		}
 		// eslint-disable-next-line react-hooks/exhaustive-deps
 	}, [initialMessage, mentorChat.sendMessage, threadId, navigate]);
+	const handleMessageSubmit = ({ text }: { text: string }) => {
+		if (!text.trim()) return;
+		mentorChat.sendMessage(text);
+	};
 
-	const handleMessageSubmit = useCallback(
-		({ text }: { text: string }) => {
-			if (!text.trim()) return;
-			mentorChat.sendMessage(text);
-		},
-		[mentorChat.sendMessage],
-	);
+	const handleVote = (messageId: string, isUpvote: boolean) => {
+		mentorChat.voteMessage(messageId, isUpvote);
+	};
 
-	const handleVote = useCallback(
-		(messageId: string, isUpvote: boolean) => {
-			mentorChat.voteMessage(messageId, isUpvote);
-		},
-		[mentorChat.voteMessage],
-	);
-
-	const handleCopy = useCallback((content: string) => {
+	const handleCopy = (content: string) => {
 		navigator.clipboard.writeText(content).catch((error) => {
 			console.error("Failed to copy to clipboard:", error);
 		});
-	}, []);
+	};
 
-	const handleMessageEdit = useCallback(
-		(messageId: string, content: string) => {
-			const idx = mentorChat.messages.findIndex((m) => m.id === messageId);
-			if (idx === -1) return;
-			mentorChat.setMessages(mentorChat.messages.slice(0, idx));
-			mentorChat.sendMessage(content);
-		},
-		[mentorChat.messages, mentorChat.setMessages, mentorChat.sendMessage],
-	);
+	const handleMessageEdit = (messageId: string, content: string) => {
+		const idx = mentorChat.messages.findIndex((m) => m.id === messageId);
+		if (idx === -1) return;
+		mentorChat.setMessages(mentorChat.messages.slice(0, idx));
+		mentorChat.sendMessage(content);
+	};
 
 	// Show loading state while fetching thread with a chat-like skeleton
 	if (mentorChat.isThreadLoading) {

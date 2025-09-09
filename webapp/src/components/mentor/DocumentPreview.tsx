@@ -1,5 +1,5 @@
 import { FileText, Maximize } from "lucide-react";
-import { type MouseEvent, memo, useCallback } from "react";
+import type { MouseEvent } from "react";
 import type { Document } from "@/api/types.gen";
 import { cn } from "@/lib/utils";
 import { InlineDocumentSkeleton } from "./DocumentSkeleton";
@@ -17,21 +17,18 @@ interface DocumentPreviewProps {
 	onDocumentClick?: (boundingBox: DOMRect) => void;
 }
 
-function PureDocumentPreview({
+export function DocumentPreview({
 	document,
 	isLoading = false,
 	isStreaming = false,
 	onDocumentClick,
 }: DocumentPreviewProps) {
-	const handleClick = useCallback(
-		(event: MouseEvent<HTMLElement>) => {
-			if (!document || !onDocumentClick) return;
+	const handleClick = (event: MouseEvent<HTMLElement>) => {
+		if (!document || !onDocumentClick) return;
 
-			const boundingBox = event.currentTarget.getBoundingClientRect();
-			onDocumentClick(boundingBox);
-		},
-		[document, onDocumentClick],
-	);
+		const boundingBox = event.currentTarget.getBoundingClientRect();
+		onDocumentClick(boundingBox);
+	};
 
 	if (isLoading || !document) {
 		return <LoadingSkeleton />;
@@ -45,18 +42,6 @@ function PureDocumentPreview({
 		</div>
 	);
 }
-
-export const DocumentPreview = memo(
-	PureDocumentPreview,
-	(prevProps, nextProps) => {
-		return (
-			prevProps.document?.id === nextProps.document?.id &&
-			prevProps.document?.content === nextProps.document?.content &&
-			prevProps.isLoading === nextProps.isLoading &&
-			prevProps.isStreaming === nextProps.isStreaming
-		);
-	},
-);
 
 const LoadingSkeleton = () => (
 	<div className="w-full">
@@ -81,7 +66,7 @@ interface HitboxLayerProps {
 	onClick: (event: MouseEvent<HTMLElement>) => void;
 }
 
-const PureHitboxLayer = ({ onClick }: HitboxLayerProps) => (
+const HitboxLayer = ({ onClick }: HitboxLayerProps) => (
 	<button
 		type="button"
 		className="size-full absolute top-0 left-0 rounded-xl z-10 bg-transparent border-none cursor-pointer"
@@ -96,14 +81,12 @@ const PureHitboxLayer = ({ onClick }: HitboxLayerProps) => (
 	</button>
 );
 
-const HitboxLayer = memo(PureHitboxLayer);
-
 interface DocumentHeaderProps {
 	title: string;
 	isStreaming: boolean;
 }
 
-const PureDocumentHeader = ({ title, isStreaming }: DocumentHeaderProps) => (
+const DocumentHeader = ({ title, isStreaming }: DocumentHeaderProps) => (
 	<div className="p-4 border rounded-t-2xl flex flex-row gap-2 items-start sm:items-center justify-between dark:bg-muted border-b-0 dark:border-zinc-700">
 		<div className="flex flex-row items-start sm:items-center gap-3">
 			<div className="text-muted-foreground">
@@ -120,13 +103,6 @@ const PureDocumentHeader = ({ title, isStreaming }: DocumentHeaderProps) => (
 		<div className="w-8" />
 	</div>
 );
-
-const DocumentHeader = memo(PureDocumentHeader, (prevProps, nextProps) => {
-	return (
-		prevProps.title === nextProps.title &&
-		prevProps.isStreaming === nextProps.isStreaming
-	);
-});
 
 interface DocumentContentProps {
 	document: Document;

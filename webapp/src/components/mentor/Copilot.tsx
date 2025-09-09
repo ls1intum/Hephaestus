@@ -1,5 +1,5 @@
 import { Sparkles, SquareArrowOutUpRight, SquarePen, X } from "lucide-react";
-import { memo, useCallback, useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -35,7 +35,7 @@ export interface CopilotProps {
 	hasMessages?: boolean;
 }
 
-function PureCopilot({
+export function Copilot({
 	children,
 	defaultOpen = false,
 	open: controlledOpen,
@@ -52,21 +52,21 @@ function PureCopilot({
 	const setIsOpen = onOpenChange || setInternalOpen;
 
 	// Handle trigger click
-	const handleTriggerClick = useCallback(() => {
+	const handleTriggerClick = () => {
 		setIsOpen(!isOpen);
-	}, [isOpen, setIsOpen]);
+	};
 
 	// Handle close via close button in content
-	const handleClose = useCallback(() => {
+	const handleClose = () => {
 		setIsOpen(false);
-	}, [setIsOpen]);
+	};
 
 	const prevBodyStylesRef = useRef<{
 		overflow: string;
 		paddingRight: string;
 		touchAction: string;
 	} | null>(null);
-	const lockBodyScroll = useCallback(() => {
+	const lockBodyScroll = () => {
 		if (prevBodyStylesRef.current) return;
 		const body = document.body;
 		prevBodyStylesRef.current = {
@@ -79,8 +79,8 @@ function PureCopilot({
 		if (scrollBarWidth > 0) body.style.paddingRight = `${scrollBarWidth}px`;
 		body.style.overflow = "hidden";
 		body.style.touchAction = "none";
-	}, []);
-	const unlockBodyScroll = useCallback(() => {
+	};
+	const unlockBodyScroll = () => {
 		const prev = prevBodyStylesRef.current;
 		if (!prev) return;
 		const body = document.body;
@@ -88,11 +88,12 @@ function PureCopilot({
 		body.style.paddingRight = prev.paddingRight;
 		body.style.touchAction = prev.touchAction;
 		prevBodyStylesRef.current = null;
-	}, []);
+	};
+	// biome-ignore lint/correctness/useExhaustiveDependencies: unlockBodyScroll stability handled by React Compiler
 	useEffect(() => {
 		if (!isOpen) unlockBodyScroll();
 		return () => unlockBodyScroll();
-	}, [isOpen, unlockBodyScroll]);
+	}, [isOpen]);
 
 	return (
 		<div className={cn("fixed bottom-6 right-6 z-50", className)}>
@@ -191,5 +192,3 @@ function PureCopilot({
 		</div>
 	);
 }
-
-export const Copilot = memo(PureCopilot);

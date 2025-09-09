@@ -1,4 +1,3 @@
-import { memo } from "react";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { DocumentSkeleton } from "./DocumentSkeleton";
 import { TextEditor } from "./TextEditor";
@@ -13,7 +12,7 @@ export interface TextArtifactContentProps {
 	isLoading?: boolean;
 }
 
-function PureTextArtifactContent({
+export function TextArtifactContent({
 	content,
 	mode,
 	status,
@@ -67,5 +66,3 @@ function PureTextArtifactContent({
 		</ScrollArea>
 	);
 }
-
-export const TextArtifactContent = memo(PureTextArtifactContent);

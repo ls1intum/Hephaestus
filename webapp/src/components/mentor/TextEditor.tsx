@@ -2,7 +2,7 @@ import { exampleSetup } from "prosemirror-example-setup";
 import { inputRules } from "prosemirror-inputrules";
 import { EditorState } from "prosemirror-state";
 import { EditorView } from "prosemirror-view";
-import { memo, useEffect, useRef } from "react";
+import { useEffect, useRef } from "react";
 import "prosemirror-view/style/prosemirror.css";
 
 import {
@@ -27,7 +27,7 @@ type TextEditorProps = {
 	currentVersionIndex: number;
 };
 
-function PureTextEditor({
+export function TextEditor({
 	content,
 	onSaveContent,
 	status,
@@ -161,15 +161,3 @@ function PureTextEditor({
 		/>
 	);
 }
-
-function areEqual(prevProps: TextEditorProps, nextProps: TextEditorProps) {
-	return (
-		prevProps.currentVersionIndex === nextProps.currentVersionIndex &&
-		prevProps.isCurrentVersion === nextProps.isCurrentVersion &&
-		!(prevProps.status === "streaming" && nextProps.status === "streaming") &&
-		prevProps.content === nextProps.content &&
-		prevProps.onSaveContent === nextProps.onSaveContent
-	);
-}
-
-export const TextEditor = memo(PureTextEditor, areEqual);

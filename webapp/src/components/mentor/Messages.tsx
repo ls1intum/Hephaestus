@@ -1,7 +1,6 @@
 import type { UseChatHelpers } from "@ai-sdk/react";
-import equal from "fast-deep-equal";
 import { motion } from "framer-motion";
-import { memo, type RefObject } from "react";
+import type { RefObject } from "react";
 import type { ChatMessageVote } from "@/api/types.gen";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import type { ChatMessage } from "@/lib/types";
@@ -41,7 +40,7 @@ export interface MessagesProps {
 	partRenderers?: PartRendererMap;
 }
 
-function PureMessages({
+export function Messages({
 	messages,
 	votes,
 	status,
@@ -147,26 +146,3 @@ function PureMessages({
 		</ScrollArea>
 	);
 }
-
-export const Messages = memo(PureMessages, (prevProps, nextProps) => {
-	// Only memoize when NOT streaming to allow real-time updates
-	if (nextProps.status === "streaming" || prevProps.status === "streaming") {
-		return false; // Always re-render during streaming
-	}
-
-	// For non-streaming states, use deep comparison
-	if (prevProps.status !== nextProps.status) return false;
-	if (prevProps.messages.length !== nextProps.messages.length) return false;
-
-	// Deep compare messages content only when not streaming
-	if (!equal(prevProps.messages, nextProps.messages)) return false;
-	if (!equal(prevProps.votes, nextProps.votes)) return false;
-
-	// Other props comparison
-	if (prevProps.readonly !== nextProps.readonly) return false;
-	if (prevProps.showThinking !== nextProps.showThinking) return false;
-	if (prevProps.showGreeting !== nextProps.showGreeting) return false;
-	if (prevProps.variant !== nextProps.variant) return false;
-
-	return true;
-});

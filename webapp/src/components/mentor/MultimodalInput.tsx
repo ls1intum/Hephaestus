@@ -1,14 +1,7 @@
 import { AnimatePresence, motion } from "framer-motion";
 import { ArrowDown, ArrowUp, Paperclip, Square } from "lucide-react";
 import type React from "react";
-import {
-	type ChangeEvent,
-	memo,
-	useCallback,
-	useEffect,
-	useRef,
-	useState,
-} from "react";
+import { type ChangeEvent, useEffect, useRef, useState } from "react";
 import { useWindowSize } from "usehooks-ts";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -50,7 +43,7 @@ export interface MultimodalInputProps {
 	isCurrentVersion?: boolean;
 }
 
-function PureMultimodalInput({
+export function MultimodalInput({
 	status,
 	onStop,
 	attachments,
@@ -83,55 +76,53 @@ function PureMultimodalInput({
 	// Show suggested actions if explicitly enabled and not readonly
 	const shouldShowSuggestedActions = showSuggestedActions && !readonly;
 
-	const adjustHeight = useCallback(() => {
+	const adjustHeight = () => {
 		if (textareaRef.current) {
 			textareaRef.current.style.height = "auto";
 			textareaRef.current.style.height = `${textareaRef.current.scrollHeight + 2}px`;
 		}
-	}, []);
+	};
 
-	const resetHeight = useCallback(() => {
+	const resetHeight = () => {
 		if (textareaRef.current) {
 			// Let the browser recalc to the intrinsic content height
 			textareaRef.current.style.height = "auto";
 		}
-	}, []);
+	};
 
 	// Handle initial setup and height adjustment
+	// biome-ignore lint/correctness/useExhaustiveDependencies: run once on mount
 	useEffect(() => {
 		if (textareaRef.current) {
 			adjustHeight();
 		}
-	}, [adjustHeight]);
+	}, []);
 
 	// biome-ignore lint/correctness/useExhaustiveDependencies: We need to adjust height when input changes
 	useEffect(() => {
 		adjustHeight();
-	}, [input, adjustHeight]);
+	}, [input]);
 
 	const handleInput = (event: React.ChangeEvent<HTMLTextAreaElement>) => {
 		setInput(event.target.value);
 	};
 
-	const handleSuggestedAction = useCallback(
-		(actionText: string) => {
-			// Send immediately when a suggested action is clicked
-			onSubmit({ text: actionText, attachments });
-			// Reset UI state after submission
-			setInput("");
-			resetHeight();
-			// After the state flush, adjust to minimal height again
-			requestAnimationFrame(() => {
-				adjustHeight();
-			});
-			if (width && width > 768) {
-				textareaRef.current?.focus();
-			}
-		},
-		[onSubmit, attachments, resetHeight, width, adjustHeight],
-	);
+	const handleSuggestedAction = (actionText: string) => {
+		// Send immediately when a suggested action is clicked
+		onSubmit({ text: actionText, attachments });
+		// Reset UI state after submission
+		setInput("");
+		resetHeight();
+		// After the state flush, adjust to minimal height again
+		requestAnimationFrame(() => {
+			adjustHeight();
+		});
+		if (width && width > 768) {
+			textareaRef.current?.focus();
+		}
+	};
 
-	const submitForm = useCallback(() => {
+	const submitForm = () => {
 		onSubmit({
 			text: input,
 			attachments,
@@ -144,33 +135,27 @@ function PureMultimodalInput({
 		if (width && width > 768) {
 			textareaRef.current?.focus();
 		}
-	}, [input, attachments, onSubmit, resetHeight, width]);
+	};
 
-	const handleFileChange = useCallback(
-		async (event: ChangeEvent<HTMLInputElement>) => {
-			const files = Array.from(event.target.files || []);
-			if (files.length === 0) return;
+	const handleFileChange = async (event: ChangeEvent<HTMLInputElement>) => {
+		const files = Array.from(event.target.files || []);
+		if (files.length === 0) return;
 
-			setUploadQueue(files.map((file) => file.name));
+		setUploadQueue(files.map((file) => file.name));
 
-			try {
-				const uploadedAttachments = await onFileUpload(files);
-				const successfullyUploadedAttachments = uploadedAttachments.filter(
-					(attachment) => attachment !== undefined,
-				);
+		try {
+			const uploadedAttachments = await onFileUpload(files);
+			const successfullyUploadedAttachments = uploadedAttachments.filter(
+				(attachment) => attachment !== undefined,
+			);
 
-				onAttachmentsChange([
-					...attachments,
-					...successfullyUploadedAttachments,
-				]);
-			} catch (error) {
-				console.error("Error uploading files!", error);
-			} finally {
-				setUploadQueue([]);
-			}
-		},
-		[attachments, onAttachmentsChange, onFileUpload],
-	);
+			onAttachmentsChange([...attachments, ...successfullyUploadedAttachments]);
+		} catch (error) {
+			console.error("Error uploading files!", error);
+		} finally {
+			setUploadQueue([]);
+		}
+	};
 
 	useEffect(() => {
 		if (status === "submitted" && scrollToBottom) {
@@ -327,26 +312,7 @@ function PureMultimodalInput({
 	);
 }
 
-export const MultimodalInput = memo(
-	PureMultimodalInput,
-	(prevProps, nextProps) => {
-		// Compare all relevant props for re-rendering
-		if (prevProps.status !== nextProps.status) return false;
-		if (prevProps.attachments.length !== nextProps.attachments.length)
-			return false;
-		if (prevProps.initialInput !== nextProps.initialInput) return false;
-		if (prevProps.showSuggestedActions !== nextProps.showSuggestedActions)
-			return false;
-		if (prevProps.readonly !== nextProps.readonly) return false;
-		if (prevProps.disableAttachments !== nextProps.disableAttachments)
-			return false;
-		if (prevProps.isAtBottom !== nextProps.isAtBottom) return false;
-		if (prevProps.isCurrentVersion !== nextProps.isCurrentVersion) return false;
-		return true;
-	},
-);
-
-function PureAttachmentsButton({
+function AttachmentsButton({
 	fileInputRef,
 	status,
 	readonly,
@@ -372,9 +338,7 @@ function PureAttachmentsButton({
 	);
 }
 
-const AttachmentsButton = memo(PureAttachmentsButton);
-
-function PureStopButton({ onStop }: { onStop: () => void }) {
+function StopButton({ onStop }: { onStop: () => void }) {
 	return (
 		<Button
 			data-testid="stop-button"
@@ -390,9 +354,7 @@ function PureStopButton({ onStop }: { onStop: () => void }) {
 	);
 }
 
-const StopButton = memo(PureStopButton);
-
-function PureSendButton({
+function SendButton({
 	onSubmit,
 	disabled,
 }: {
@@ -414,5 +376,3 @@ function PureSendButton({
 		</Button>
 	);
 }
-
-const SendButton = memo(PureSendButton);

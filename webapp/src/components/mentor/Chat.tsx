@@ -1,6 +1,4 @@
 import type { UseChatHelpers } from "@ai-sdk/react";
-import equal from "fast-deep-equal";
-import { memo } from "react";
 import type { ChatMessageVote } from "@/api/types.gen";
 import { useScrollToBottom } from "@/hooks/use-scroll-to-bottom";
 import type { Attachment, ChatMessage } from "@/lib/types";
@@ -52,7 +50,7 @@ export interface ChatProps {
 	partRenderers?: PartRendererMap;
 }
 
-function PureChat({
+export function Chat({
 	messages,
 	votes,
 	status,
@@ -145,40 +143,3 @@ function PureChat({
 		</>
 	);
 }
-
-export const Chat = memo(PureChat, (prevProps, nextProps) => {
-	// Compare messages arrays
-	if (!equal(prevProps.messages, nextProps.messages)) return false;
-
-	// Compare votes arrays
-	if (!equal(prevProps.votes, nextProps.votes)) return false;
-
-	// Compare attachments arrays
-	if (!equal(prevProps.attachments, nextProps.attachments)) return false;
-
-	// Compare status
-	if (prevProps.status !== nextProps.status) return false;
-
-	// Compare readonly state
-	if (prevProps.readonly !== nextProps.readonly) return false;
-
-	// Compare scroll state
-	if (prevProps.isAtBottom !== nextProps.isAtBottom) return false;
-
-	// Compare configuration props
-	if (prevProps.showSuggestedActions !== nextProps.showSuggestedActions)
-		return false;
-	if (prevProps.disableAttachments !== nextProps.disableAttachments)
-		return false;
-	if (prevProps.inputPlaceholder !== nextProps.inputPlaceholder) return false;
-
-	// Compare function handlers (by reference - they should be stable)
-	if (prevProps.onMessageSubmit !== nextProps.onMessageSubmit) return false;
-	if (prevProps.onStop !== nextProps.onStop) return false;
-	if (prevProps.onFileUpload !== nextProps.onFileUpload) return false;
-	if (prevProps.onAttachmentsChange !== nextProps.onAttachmentsChange)
-		return false;
-
-	// If all comparisons pass, component should not re-render
-	return true;
-});

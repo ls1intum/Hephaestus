@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 type ScrollBehavior = "auto" | "smooth";
 
@@ -10,9 +10,9 @@ export function useScrollToBottom() {
 	const [isAtBottom, setIsAtBottom] = useState(false);
 
 	// Auto-scroll to bottom with specified behavior
-	const scrollToBottom = useCallback((behavior: ScrollBehavior = "smooth") => {
+	const scrollToBottom = (behavior: ScrollBehavior = "smooth") => {
 		endRef.current?.scrollIntoView({ behavior });
-	}, []);
+	};
 
 	// Add scroll detection
 	useEffect(() => {

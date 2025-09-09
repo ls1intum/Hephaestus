@@ -6,7 +6,6 @@ import {
 } from "@tanstack/react-router";
 import { zodValidator } from "@tanstack/zod-adapter";
 import { endOfISOWeek, formatISO, startOfISOWeek } from "date-fns";
-import { useMemo } from "react";
 import { z } from "zod";
 import {
 	getLeaderboardOptions,
@@ -84,38 +83,24 @@ function LeaderboardContainer() {
 		: undefined;
 
 	// Get the leaderboard schedule from the server's metadata
-	const leaderboardSchedule = useMemo(() => {
-		// Parse the scheduled time and day from the metadata
-		const scheduledTime = metaQuery.data?.scheduledTime || "9:00";
-		const scheduledDay = Number.parseInt(
-			metaQuery.data?.scheduledDay || "2",
-			10,
-		);
-		const [hours, minutes] = scheduledTime
-			.split(":")
-			.map((part) => Number.parseInt(part, 10));
-
-		return {
-			day: scheduledDay,
-			hour: hours || 9,
-			minute: minutes || 0,
-		};
-	}, [metaQuery.data]);
+	const scheduledTime = metaQuery.data?.scheduledTime || "9:00";
+	const scheduledDay = Number.parseInt(metaQuery.data?.scheduledDay || "2", 10);
+	const [hours, minutes] = scheduledTime
+		.split(":")
+		.map((part) => Number.parseInt(part, 10));
+	const leaderboardSchedule = {
+		day: scheduledDay,
+		hour: hours || 9,
+		minute: minutes || 0,
+	};
 
 	// Calculate leaderboard end date with the correct time
-	const leaderboardEnd = useMemo(() => {
-		const endDate = new Date(before);
+	const endDate = new Date(before);
 
-		// Adjust the end date to include the schedule time from server metadata
-		endDate.setHours(
-			leaderboardSchedule.hour,
-			leaderboardSchedule.minute,
-			0,
-			0,
-		);
+	// Adjust the end date to include the schedule time from server metadata
+	endDate.setHours(leaderboardSchedule.hour, leaderboardSchedule.minute, 0, 0);
 
-		return formatISO(endDate);
-	}, [before, leaderboardSchedule]);
+	const leaderboardEnd = formatISO(endDate);
 
 	// Query for league points change data if we have a current user entry
 	const leagueStatsQuery = useQuery({
