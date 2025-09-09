@@ -1,4 +1,5 @@
 import { exampleSetup } from "prosemirror-example-setup";
+import { closeHistory } from "prosemirror-history";
 import { inputRules } from "prosemirror-inputrules";
 import { EditorState } from "prosemirror-state";
 import { EditorView } from "prosemirror-view";
@@ -14,10 +15,6 @@ import {
 	buildContentFromDocument,
 	buildDocumentFromContent,
 } from "@/lib/text-editor/functions";
-import {
-	streamingGhost,
-	streamingGhostPlugin,
-} from "@/lib/text-editor/streamingGhost";
 
 type TextEditorProps = {
 	content: string;
@@ -36,8 +33,33 @@ export function TextEditor({
 	const containerRef = useRef<HTMLDivElement>(null);
 	const editorRef = useRef<EditorView | null>(null);
 	const prevStatusRef = useRef<TextEditorProps["status"]>(status);
-	const streamBufRef = useRef<string>(""); // what we have already pushed as ghost
-	const ghostActiveRef = useRef<boolean>(false);
+	const streamBufRef = useRef<string>("");
+	const pendingRef = useRef<string>("");
+	const rafRef = useRef<number | null>(null);
+	const anchorRef = useRef<number>(0);
+
+	const flush = () => {
+		rafRef.current = null;
+		const view = editorRef.current;
+		if (!view) return;
+		if (!pendingRef.current) return;
+
+		const { state } = view;
+		const pos = anchorRef.current;
+		let tr = state.tr.insertText(pendingRef.current, pos, pos);
+		tr = tr
+			.setMeta("addToHistory", false)
+			.setMeta("no-save", true)
+			.setMeta("stream", true);
+		view.dispatch(tr);
+		anchorRef.current = tr.mapping.map(pos + pendingRef.current.length);
+		pendingRef.current = "";
+	};
+
+	const scheduleFlush = () => {
+		if (rafRef.current != null) return;
+		rafRef.current = requestAnimationFrame(flush);
+	};
 
 	// biome-ignore lint/correctness/useExhaustiveDependencies: We only want to run this once
 	useEffect(() => {
@@ -46,7 +68,6 @@ export function TextEditor({
 				doc: buildDocumentFromContent(content),
 				plugins: [
 					...exampleSetup({ schema: documentSchema, menuBar: false }),
-					streamingGhostPlugin,
 					inputRules({
 						rules: [
 							headingRule(1),
@@ -81,7 +102,7 @@ export function TextEditor({
 			editorRef.current.setProps({
 				dispatchTransaction: (transaction) => {
 					// Drop user edits while streaming to enforce read-only
-					if (status === "streaming") {
+					if (status === "streaming" && !transaction.getMeta("stream")) {
 						return;
 					}
 					handleTransaction({
@@ -95,6 +116,7 @@ export function TextEditor({
 		}
 	}, [onSaveContent, status, isCurrentVersion]);
 
+	// biome-ignore lint/correctness/useExhaustiveDependencies: flush and scheduleFlush are stable
 	useEffect(() => {
 		const view = editorRef.current;
 		if (!view) return;
@@ -104,55 +126,66 @@ export function TextEditor({
 		const leavingStream = prevStatus === "streaming" && status !== "streaming";
 
 		if (enteringStream) {
-			// Start a new ghost at current selection end
-			streamingGhost.start(view, undefined, "pm-stream-ghost");
-			// Initialize buffer to the current document content so we only push the delta
+			anchorRef.current = view.state.selection.to;
 			streamBufRef.current = buildContentFromDocument(view.state.doc);
-			ghostActiveRef.current = true;
 		}
 
 		if (status === "streaming") {
-			// Push only the delta since last tick
 			const prev = streamBufRef.current;
 			const next = content ?? "";
-			const delta = next.length >= prev.length ? next.slice(prev.length) : next; // restart if shrink
-			if (delta) {
-				// If content shrank (rare), restart ghost to avoid duplication
-				if (next.length < prev.length && ghostActiveRef.current) {
-					streamingGhost.cancel(view);
-					streamingGhost.start(view, undefined, "pm-stream-ghost");
-				}
-				streamingGhost.push(view, delta);
-				streamBufRef.current = next;
-			}
-			prevStatusRef.current = status;
-			return;
-		}
-
-		if (leavingStream && ghostActiveRef.current) {
-			// Commit buffered text as one undo step
-			streamingGhost.finish(view, { adoptMarks: true });
-			ghostActiveRef.current = false;
-			streamBufRef.current = "";
-		} else {
-			// Not streaming: ensure the document matches content
-			const currentContent = buildContentFromDocument(view.state.doc);
-			if (currentContent !== content) {
-				const newDoc = buildDocumentFromContent(content ?? "");
-				const tr = view.state.tr.replaceWith(
+			if (next.length < prev.length) {
+				const newDoc = buildDocumentFromContent(next);
+				let tr = view.state.tr.replaceWith(
 					0,
 					view.state.doc.content.size,
 					newDoc.content,
 				);
-				tr.setMeta("no-save", true);
+				tr = tr
+					.setMeta("addToHistory", false)
+					.setMeta("no-save", true)
+					.setMeta("stream", true);
+				view.dispatch(tr);
+				anchorRef.current = tr.mapping.map(newDoc.content.size);
+				pendingRef.current = "";
+			} else {
+				const delta = next.slice(prev.length);
+				if (delta) {
+					pendingRef.current += delta;
+					scheduleFlush();
+				}
+			}
+			streamBufRef.current = next;
+			prevStatusRef.current = status;
+			return;
+		}
+
+		if (leavingStream) {
+			if (pendingRef.current) {
+				flush();
+			}
+			view.dispatch(
+				closeHistory(view.state.tr)
+					.setMeta("no-save", true)
+					.setMeta("stream", true),
+			);
+			const updated = buildContentFromDocument(view.state.doc);
+			onSaveContent(updated, true);
+		} else {
+			const currentContent = buildContentFromDocument(view.state.doc);
+			if (currentContent !== content) {
+				const newDoc = buildDocumentFromContent(content ?? "");
+				let tr = view.state.tr.replaceWith(
+					0,
+					view.state.doc.content.size,
+					newDoc.content,
+				);
+				tr = tr.setMeta("no-save", true).setMeta("stream", true);
 				view.dispatch(tr);
 			}
-			// Best-effort cleanup
-			streamingGhost.cancel(view);
 		}
 
 		prevStatusRef.current = status;
-	}, [content, status]);
+	}, [content, status, onSaveContent]);
 
 	return (
 		<div
