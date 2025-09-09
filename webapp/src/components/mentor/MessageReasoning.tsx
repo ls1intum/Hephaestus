@@ -2,7 +2,7 @@ import { AnimatePresence, motion } from "framer-motion";
 import { CheckCircle2 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { cn } from "@/lib/utils";
-import { Markdown } from "./Markdown";
+import { Streamdown } from "streamdown";
 
 interface MessageReasoningProps {
 	isLoading: boolean;
@@ -245,7 +245,7 @@ export function MessageReasoning({
 														: "ring-background",
 												)}
 											/>
-											{s.body && <Markdown>{s.body}</Markdown>}
+											{s.body && <Streamdown>{s.body}</Streamdown>}
 										</div>
 									);
 								})}
@@ -266,7 +266,7 @@ export function MessageReasoning({
 								)}
 							</>
 						) : (
-							<Markdown>{reasoning}</Markdown>
+							<Streamdown>{reasoning}</Streamdown>
 						)}
 					</motion.div>
 				)}
