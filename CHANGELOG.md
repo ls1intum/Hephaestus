@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.9.0-rc.23](https://github.com/ls1intum/Hephaestus/compare/v0.9.0-rc.22...v0.9.0-rc.23) (2025-09-10)
+
+### ♻️ Code Refactoring
+
+* refine mentor suggested actions ([#395](https://github.com/ls1intum/Hephaestus/issues/395)) ([28faee2](https://github.com/ls1intum/Hephaestus/commit/28faee28241df248deb4e39f463f4d79156b7136))
+
 ## [0.9.0-rc.22](https://github.com/ls1intum/Hephaestus/compare/v0.9.0-rc.21...v0.9.0-rc.22) (2025-09-09)
 
 ### ♻️ Code Refactoring

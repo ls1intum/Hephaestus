@@ -7,7 +7,7 @@ from app.routers.detector import router as detector_router
 app = FastAPI(
     title="Hephaestus Intelligence Service API",
     description="API documentation for the Hephaestus Intelligence Service.",
-    version="0.9.0-rc.22",
+    version="0.9.0-rc.23",
     contact={"name": "Felix T.J. Dietrich", "email": "felixtj.dietrich@tum.de"},
 )
 
