@@ -58,6 +58,7 @@ public class GHEventPayloadOrganization extends GHEventPayload {
 
     @JsonIgnoreProperties(ignoreUnknown = true)
     public static class Membership {
+
         private String url;
         private String state;
         private String role;
@@ -90,6 +91,7 @@ public class GHEventPayloadOrganization extends GHEventPayload {
 
     @JsonIgnoreProperties(ignoreUnknown = true)
     public static class Invitation {
+
         private long id;
 
         @JsonProperty("node_id")
@@ -170,6 +172,7 @@ public class GHEventPayloadOrganization extends GHEventPayload {
 
     @JsonIgnoreProperties(ignoreUnknown = true)
     public static class Changes {
+
         private LoginChange login;
 
         public LoginChange getLogin() {
@@ -178,6 +181,7 @@ public class GHEventPayloadOrganization extends GHEventPayload {
 
         @JsonIgnoreProperties(ignoreUnknown = true)
         public static class LoginChange {
+
             private String from;
 
             public String getFrom() {

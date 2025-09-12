@@ -37,10 +37,20 @@ public class GitHubOrganizationMessageHandler extends GitHubMessageHandler<GHEve
             case "member_invited": {
                 var invitation = payload.getInvitation();
                 var login = invitation != null ? invitation.getLogin() : "-";
-                var inviter = (invitation != null && invitation.getInviter() != null) ? invitation.getInviter().getLogin() : "-";
+                var inviter = (invitation != null && invitation.getInviter() != null)
+                    ? invitation.getInviter().getLogin()
+                    : "-";
                 var source = invitation != null ? invitation.getInvitationSource() : "-";
                 var teams = invitation != null ? invitation.getTeamCount() : 0;
-                logger.info("org={} action={} login={} inviter={} source={} teams={}", orgLogin, action, login, inviter, source, teams);
+                logger.info(
+                    "org={} action={} login={} inviter={} source={} teams={}",
+                    orgLogin,
+                    action,
+                    login,
+                    inviter,
+                    source,
+                    teams
+                );
                 break;
             }
             case "renamed": {
@@ -66,4 +76,3 @@ public class GitHubOrganizationMessageHandler extends GitHubMessageHandler<GHEve
         return GitHubMessageDomain.ORGANIZATION;
     }
 }
-
