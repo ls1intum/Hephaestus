@@ -58,7 +58,16 @@ public abstract class GitHubMessageHandler<T extends GHEventPayload> implements 
      */
     protected abstract GHEvent getHandlerEvent();
 
-    protected boolean isOrganizationEvent() {
-        return false;
+    /**
+     * Domain classification for handler routing. Defaults to REPOSITORY.
+     */
+    public GitHubMessageDomain getDomain() {
+        return GitHubMessageDomain.REPOSITORY;
+    }
+
+    public enum GitHubMessageDomain {
+        REPOSITORY,
+        ORGANIZATION,
+        INSTALLATION
     }
 }

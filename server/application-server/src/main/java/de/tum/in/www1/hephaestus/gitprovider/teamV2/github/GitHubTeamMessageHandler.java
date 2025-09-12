@@ -55,7 +55,7 @@ public class GitHubTeamMessageHandler extends GitHubMessageHandler<GHEventPayloa
     }
 
     @Override
-    public boolean isOrganizationEvent() {
-        return true;
+    public GitHubMessageDomain getDomain() {
+        return GitHubMessageDomain.ORGANIZATION;
     }
 }

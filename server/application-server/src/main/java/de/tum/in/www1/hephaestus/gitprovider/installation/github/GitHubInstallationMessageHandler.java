@@ -68,4 +68,9 @@ public class GitHubInstallationMessageHandler extends GitHubMessageHandler<GHEve
     protected GHEvent getHandlerEvent() {
         return GHEvent.INSTALLATION;
     }
+
+    @Override
+    public GitHubMessageDomain getDomain() {
+        return GitHubMessageDomain.INSTALLATION;
+    }
 }
