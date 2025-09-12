@@ -5,6 +5,8 @@ import de.tum.in.www1.hephaestus.gitprovider.repository.Repository;
 import de.tum.in.www1.hephaestus.gitprovider.repository.RepositoryRepository;
 import jakarta.transaction.Transactional;
 import java.io.IOException;
+import java.time.OffsetDateTime;
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
@@ -114,5 +116,62 @@ public class GitHubRepositorySyncService {
         }
 
         return repositoryRepository.save(result);
+    }
+
+    /**
+     * Upserts a repository entity from minimal installation webhook data.
+     *
+     * @param id            GitHub repository ID
+     * @param nameWithOwner Full name (owner/repo)
+     * @param name          Repository name
+     * @param isPrivate     Whether the repository is private
+     * @return persisted Repository entity
+     */
+    @Transactional
+    public Repository upsertFromInstallationPayload(long id, String nameWithOwner, String name, boolean isPrivate) {
+        var now = OffsetDateTime.now();
+        var repository = repositoryRepository
+            .findById(id)
+            .orElseGet(() -> {
+                var r = new Repository();
+                r.setId(id);
+                r.setCreatedAt(now);
+                return r;
+            });
+
+        repository.setUpdatedAt(now);
+        repository.setName(name);
+        repository.setNameWithOwner(nameWithOwner);
+        repository.setPrivate(isPrivate);
+        repository.setHtmlUrl("https://github.com/" + nameWithOwner);
+        // Fields not present in installation payload – set safe defaults
+        if (repository.getPushedAt() == null) {
+            repository.setPushedAt(now);
+        }
+        repository.setArchived(false);
+        repository.setDisabled(false);
+        repository.setVisibility(isPrivate ? Repository.Visibility.PRIVATE : Repository.Visibility.PUBLIC);
+        if (repository.getDefaultBranch() == null) {
+            repository.setDefaultBranch("main");
+        }
+        repository.setHasIssues(true);
+        repository.setHasProjects(false);
+        repository.setHasWiki(false);
+        return repositoryRepository.save(repository);
+    }
+
+    /**
+     * Deletes repositories by id, ensuring team join cleanup before removal.
+     *
+     * @param ids repository ids to delete; no-op if null or empty
+     */
+    @Transactional
+    public void deleteRepositoriesByIds(Collection<Long> ids) {
+        if (ids == null || ids.isEmpty()) {
+            return;
+        }
+        var repos = repositoryRepository.findAllById(ids);
+        repos.forEach(Repository::removeAllTeams);
+        repositoryRepository.deleteAll(repos);
     }
 }
