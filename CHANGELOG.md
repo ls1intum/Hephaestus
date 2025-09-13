@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.9.0-rc.26](https://github.com/ls1intum/Hephaestus/compare/v0.9.0-rc.25...v0.9.0-rc.26) (2025-09-13)
+
+### 🚀 Features
+
+* change teams to stay automatically up-to-date  ([#398](https://github.com/ls1intum/Hephaestus/issues/398)) ([1667069](https://github.com/ls1intum/Hephaestus/commit/1667069091d43df290f0eb40782ecee83e1387b6))
+
 ## [0.9.0-rc.25](https://github.com/ls1intum/Hephaestus/compare/v0.9.0-rc.24...v0.9.0-rc.25) (2025-09-13)
 
 ### 🚀 Features
