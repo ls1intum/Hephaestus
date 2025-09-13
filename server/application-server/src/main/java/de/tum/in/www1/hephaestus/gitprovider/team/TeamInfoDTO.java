@@ -37,7 +37,6 @@ public record TeamInfoDTO(
                 .getRepoPermissions()
                 .stream()
                 .map(rp -> RepositoryInfoDTO.fromRepository(rp.getRepository()))
-                .distinct()
                 .toList(),
             team.getLabels().stream().map(LabelInfoDTO::fromLabel).toList(),
             team

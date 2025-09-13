@@ -13,8 +13,6 @@ export const Route = createFileRoute("/_authenticated/_admin/admin/members")({
 });
 
 function AdminMembersContainer() {
-	// no queryClient needed; page is read-only regarding team assignment
-
 	// Fetch users with teams
 	const {
 		data: usersData,

@@ -21,8 +21,6 @@ function AdminTeamsContainer() {
 	// Query for teams data
 	const teamsQuery = useQuery(getAllTeamsOptions({}));
 
-	// No additional queries needed
-
 	// Mutations
 	const updateTeamVisibility = useMutation({
 		...updateTeamVisibilityMutation(),

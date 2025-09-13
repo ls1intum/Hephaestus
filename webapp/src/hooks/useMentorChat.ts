@@ -17,7 +17,6 @@ import type {
 	ChatThreadGroup,
 	Document,
 } from "@/api/types.gen";
-// UIArtifact removed; overlay handled via store + containers
 import environment from "@/environment";
 import { keycloakService } from "@/integrations/auth";
 import type { ChatMessage } from "@/lib/types";
@@ -111,7 +110,6 @@ export function useMentorChat({
 	// ---------------------------
 	// Artifact/document state
 	// ---------------------------
-	// Legacy artifact state removed; overlay now managed via store + hook per open doc
 
 	// When a document overlay is open, maintain a streaming-aware doc controller
 	const visibleOverlay = useArtifactStore((s) => s.getVisibleArtifact());

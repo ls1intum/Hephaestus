@@ -26,7 +26,6 @@ public class TeamInfoDTOConverter implements Converter<Team, TeamInfoDTO> {
                 .getRepoPermissions()
                 .stream()
                 .map(rp -> RepositoryInfoDTO.fromRepository(rp.getRepository()))
-                .distinct()
                 .toList(),
             source.getLabels().stream().map(LabelInfoDTO::fromLabel).toList(),
             source

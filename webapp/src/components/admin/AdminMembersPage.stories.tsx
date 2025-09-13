@@ -25,7 +25,6 @@ const meta = {
 			control: "boolean",
 			description: "Loading state for data fetching",
 		},
-		// Auto-assign removed; no extra loading state beyond isLoading
 	},
 } satisfies Meta<typeof AdminMembersPage>;
 
@@ -146,7 +145,6 @@ export const Loading: Story = {
 /**
  * State during automatic team assignment operation.
  */
-// Removed AssigningTeams story; auto-assign is no longer available
 
 /**
  * Empty state with no users to manage.

@@ -45,7 +45,6 @@ import {
 	TableHeader,
 	TableRow,
 } from "@/components/ui/table";
-// Removed team assignment UI; keeping only search, filter, table, and pagination
 import type { ExtendedUserTeams } from "./types";
 
 interface UsersTableProps {
@@ -88,7 +87,7 @@ export function UsersTable({
 				),
 			},
 			{
-				accessorKey: "login",
+				accessorKey: "user.login",
 				header: ({ column }) => {
 					return (
 						<Button
@@ -104,10 +103,9 @@ export function UsersTable({
 					);
 				},
 				cell: ({ row }) => (
-					<div className="text-muted-foreground">{row.original.login}</div>
+					<div className="text-muted-foreground">{row.original.user.login}</div>
 				),
 			},
-			// Teams column intentionally removed; team filtering remains available above
 		],
 		[],
 	);
@@ -249,7 +247,7 @@ export function UsersTable({
 											key={column.id}
 											className="capitalize"
 											checked={column.getIsVisible()}
-											onCheckedChange={(value: boolean) =>
+											onCheckedChange={(value) =>
 												column.toggleVisibility(!!value)
 											}
 										>
@@ -261,8 +259,6 @@ export function UsersTable({
 					</DropdownMenu>
 				</div>
 			</div>
-
-			{/* Bulk team actions removed; team assignments are managed automatically */}
 
 			{/* Table */}
 			<div className="rounded-md border">
@@ -425,8 +421,6 @@ export function UsersTable({
 					)}
 				</div>
 			</div>
-
-			{/* Manual team assignment dialogs removed */}
 		</div>
 	);
 }

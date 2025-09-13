@@ -16,9 +16,10 @@ type Story = StoryObj<typeof meta>;
 
 const mockRepo: RepositoryInfo = {
 	id: 100,
+	name: "repo",
 	nameWithOwner: "org/repo",
 	htmlUrl: "https://github.com/org/repo",
-} as RepositoryInfo;
+};
 
 const mockTeam: TeamInfo = {
 	id: 1,

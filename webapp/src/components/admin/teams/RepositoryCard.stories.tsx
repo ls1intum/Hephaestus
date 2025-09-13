@@ -16,10 +16,11 @@ type Story = StoryObj<typeof meta>;
 
 const repo: RepositoryInfo = {
 	id: 100,
+	name: "repo",
 	nameWithOwner: "org/repo",
 	htmlUrl: "https://github.com/org/repo",
 	description: "A sample repository",
-} as RepositoryInfo;
+};
 
 const team: TeamInfo = {
 	id: 1,
@@ -32,7 +33,12 @@ const team: TeamInfo = {
 			repository: { id: 100 } as RepositoryInfo,
 		} as LabelInfo,
 	],
-} as TeamInfo;
+	hidden: false,
+	membershipCount: 5,
+	repoPermissionCount: 3,
+	repositories: [repo],
+	members: [],
+};
 
 const catalog: LabelInfo[] = [
 	{
