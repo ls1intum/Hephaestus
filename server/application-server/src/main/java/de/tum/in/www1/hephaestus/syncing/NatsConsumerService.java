@@ -70,6 +70,13 @@ public class NatsConsumerService {
         while (true) {
             try {
                 natsConnection = Nats.connect(options);
+                // Start global installation consumer once we're connected
+                try {
+                    setupInstallationConsumer(natsConnection);
+                    logger.info("Installation consumer setup successful");
+                } catch (IOException e) {
+                    logger.error("Failed to set up installation consumer: {}", e.getMessage());
+                }
                 return;
             } catch (IOException | InterruptedException e) {
                 logger.error("NATS connection error: {}", e.getMessage(), e);
@@ -173,6 +180,10 @@ public class NatsConsumerService {
 
     private void setupOrganizationConsumer(Connection connection, String owner) throws IOException {
         setupConsumer(connection, owner, owner, getOrganizationSubjects(owner));
+    }
+
+    private void setupInstallationConsumer(Connection connection) throws IOException {
+        setupConsumer(connection, "installation", "installation", getInstallationSubjects());
     }
 
     private void setupConsumer(Connection connection, String name, String id, String[] subjects) throws IOException {
@@ -318,6 +329,16 @@ public class NatsConsumerService {
             .map(GHEvent::name)
             .map(String::toLowerCase)
             .map(event -> getSubjectPrefix(nameWithOwner) + "." + event)
+            .toArray(String[]::new);
+    }
+
+    private String[] getInstallationSubjects() {
+        return handlerRegistry
+            .getSupportedInstallationEvents()
+            .stream()
+            .map(GHEvent::name)
+            .map(String::toLowerCase)
+            .map(event -> getSubjectPrefix("?/?") + "." + event)
             .toArray(String[]::new);
     }
 
