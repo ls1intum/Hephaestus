@@ -8,6 +8,7 @@ from typing import Any, List, Optional
 from sqlalchemy import (
     BigInteger,
     Boolean,
+    CheckConstraint,
     Column,
     DateTime,
     ForeignKeyConstraint,
@@ -172,6 +173,9 @@ class Repository(Base):
     milestone: Mapped[List["Milestone"]] = relationship(
         "Milestone", back_populates="repository"
     )
+    team_repository_permission: Mapped[List["TeamRepositoryPermission"]] = relationship(
+        "TeamRepositoryPermission", back_populates="repository"
+    )
     team_v2_repository_permission: Mapped[List["TeamV2RepositoryPermission"]] = (
         relationship("TeamV2RepositoryPermission", back_populates="repository")
     )
@@ -180,7 +184,13 @@ class Repository(Base):
 
 class Team(Base):
     __tablename__ = "team"
-    __table_args__ = (PrimaryKeyConstraint("id", name="teamPK"),)
+    __table_args__ = (
+        CheckConstraint(
+            "privacy::text = ANY (ARRAY['SECRET'::character varying, 'CLOSED'::character varying]::text[])",
+            name="team_privacy_check",
+        ),
+        PrimaryKeyConstraint("id", name="teamPK"),
+    )
     id: Mapped[int] = mapped_column(
         BigInteger,
         Identity(
@@ -196,6 +206,16 @@ class Team(Base):
     hidden: Mapped[bool] = mapped_column(Boolean, server_default=text("false"))
     color: Mapped[Optional[str]] = mapped_column(String(255))
     name: Mapped[Optional[str]] = mapped_column(String(255))
+    created_at: Mapped[Optional[datetime.datetime]] = mapped_column(TIMESTAMP(True, 6))
+    updated_at: Mapped[Optional[datetime.datetime]] = mapped_column(TIMESTAMP(True, 6))
+    description: Mapped[Optional[str]] = mapped_column(Text)
+    html_url: Mapped[Optional[str]] = mapped_column(Text)
+    last_synced_at: Mapped[Optional[datetime.datetime]] = mapped_column(
+        TIMESTAMP(True, 6)
+    )
+    organization: Mapped[Optional[str]] = mapped_column(String(255))
+    parent_id: Mapped[Optional[int]] = mapped_column(BigInteger)
+    privacy: Mapped[Optional[str]] = mapped_column(String(32))
     repository: Mapped[List["Repository"]] = relationship(
         "Repository", secondary="team_repositories", back_populates="team"
     )
@@ -204,6 +224,12 @@ class Team(Base):
     )
     label: Mapped[List["Label"]] = relationship(
         "Label", secondary="team_labels", back_populates="team"
+    )
+    team_membership: Mapped[List["TeamMembership"]] = relationship(
+        "TeamMembership", back_populates="team"
+    )
+    team_repository_permission: Mapped[List["TeamRepositoryPermission"]] = relationship(
+        "TeamRepositoryPermission", back_populates="team"
     )
 
 
@@ -261,6 +287,9 @@ class User(Base):
     document: Mapped[List["Document"]] = relationship("Document", back_populates="user")
     milestone: Mapped[List["Milestone"]] = relationship(
         "Milestone", back_populates="creator"
+    )
+    team_membership: Mapped[List["TeamMembership"]] = relationship(
+        "TeamMembership", back_populates="user"
     )
     team_v2_membership: Mapped[List["TeamV2Membership"]] = relationship(
         "TeamV2Membership", back_populates="user"
@@ -452,6 +481,30 @@ t_team_members = Table(
     ForeignKeyConstraint(["user_id"], ["user.id"], name="FKrk1tw9123clx7w5wjx6b58qch"),
     PrimaryKeyConstraint("team_id", "user_id", name="team_membersPK"),
 )
+
+
+class TeamMembership(Base):
+    __tablename__ = "team_membership"
+    __table_args__ = (
+        CheckConstraint(
+            "role::text = ANY (ARRAY['MEMBER'::character varying, 'MAINTAINER'::character varying]::text[])",
+            name="team_membership_role_check",
+        ),
+        ForeignKeyConstraint(
+            ["team_id"], ["team.id"], name="fkrf92vmiawfvyhxcmigcg10opm"
+        ),
+        ForeignKeyConstraint(
+            ["user_id"], ["user.id"], name="fknkpwi3whks92uvhn5qe71v4k6"
+        ),
+        PrimaryKeyConstraint("team_id", "user_id", name="team_membership_pkey"),
+    )
+    user_id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
+    team_id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
+    role: Mapped[Optional[str]] = mapped_column(String(32))
+    team: Mapped["Team"] = relationship("Team", back_populates="team_membership")
+    user: Mapped["User"] = relationship("User", back_populates="team_membership")
+
+
 t_team_repositories = Table(
     "team_repositories",
     Base.metadata,
@@ -463,6 +516,34 @@ t_team_repositories = Table(
     ForeignKeyConstraint(["team_id"], ["team.id"], name="FKip72ume6ebpeowoopiylw3gib"),
     PrimaryKeyConstraint("team_id", "repository_id", name="team_repositoriesPK"),
 )
+
+
+class TeamRepositoryPermission(Base):
+    __tablename__ = "team_repository_permission"
+    __table_args__ = (
+        CheckConstraint(
+            "permission::text = ANY (ARRAY['READ'::character varying, 'WRITE'::character varying, 'MAINTAIN'::character varying, 'ADMIN'::character varying]::text[])",
+            name="team_repository_permission_permission_check",
+        ),
+        ForeignKeyConstraint(
+            ["repository_id"], ["repository.id"], name="fk92gtctw6ca02527qjja7gns9f"
+        ),
+        ForeignKeyConstraint(
+            ["team_id"], ["team.id"], name="fk7qxvqq8p6690vtdux47lsg8b1"
+        ),
+        PrimaryKeyConstraint(
+            "repository_id", "team_id", name="team_repository_permission_pkey"
+        ),
+    )
+    permission: Mapped[str] = mapped_column(String(32))
+    repository_id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
+    team_id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
+    repository: Mapped["Repository"] = relationship(
+        "Repository", back_populates="team_repository_permission"
+    )
+    team: Mapped["Team"] = relationship(
+        "Team", back_populates="team_repository_permission"
+    )
 
 
 class TeamV2Membership(Base):

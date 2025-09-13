@@ -6,34 +6,14 @@ import {
 	getFilteredRowModel,
 	getPaginationRowModel,
 	getSortedRowModel,
-	type RowSelectionState,
 	type SortingState,
 	useReactTable,
 	type VisibilityState,
 } from "@tanstack/react-table";
-import {
-	ArrowUpDown,
-	ChevronDown,
-	Filter,
-	Search,
-	UserMinus,
-	UserPlus,
-	Users,
-} from "lucide-react";
+import { ArrowUpDown, ChevronDown, Filter, Search, Users } from "lucide-react";
 import { useMemo, useState } from "react";
 import type { TeamInfo } from "@/api/types.gen";
-import { GithubBadge } from "@/components/shared/GithubBadge";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Checkbox } from "@/components/ui/checkbox";
-import {
-	Dialog,
-	DialogContent,
-	DialogDescription,
-	DialogFooter,
-	DialogHeader,
-	DialogTitle,
-} from "@/components/ui/dialog";
 import {
 	DropdownMenu,
 	DropdownMenuCheckboxItem,
@@ -51,11 +31,6 @@ import {
 	PaginationPrevious,
 } from "@/components/ui/pagination";
 import {
-	Popover,
-	PopoverContent,
-	PopoverTrigger,
-} from "@/components/ui/popover";
-import {
 	Select,
 	SelectContent,
 	SelectItem,
@@ -70,67 +45,28 @@ import {
 	TableHeader,
 	TableRow,
 } from "@/components/ui/table";
-import { cn } from "@/lib/utils";
+// Removed team assignment UI; keeping only search, filter, table, and pagination
 import type { ExtendedUserTeams } from "./types";
 
 interface UsersTableProps {
 	users: ExtendedUserTeams[];
 	teams: TeamInfo[];
 	isLoading?: boolean;
-	onAddTeamToUser: (userId: string, teamId: string) => void;
-	onRemoveUserFromTeam: (userId: string, teamId: string) => void;
-	onBulkAddTeam: (userIds: string[], teamId: string) => void;
-	onBulkRemoveTeam: (userIds: string[], teamId: string) => void;
 }
 
 export function UsersTable({
 	users,
 	teams,
 	isLoading = false,
-	onAddTeamToUser,
-	onRemoveUserFromTeam,
-	onBulkAddTeam,
-	onBulkRemoveTeam,
 }: UsersTableProps) {
 	const [sorting, setSorting] = useState<SortingState>([]);
 	const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([]);
 	const [columnVisibility, setColumnVisibility] = useState<VisibilityState>({});
-	const [rowSelection, setRowSelection] = useState<RowSelectionState>({});
 	const [globalFilter, setGlobalFilter] = useState("");
 	const [teamFilter, setTeamFilter] = useState<string>("all");
 
-	// Dialog states
-	const [addTeamDialogOpen, setAddTeamDialogOpen] = useState(false);
-	const [removeTeamDialogOpen, setRemoveTeamDialogOpen] = useState(false);
-	const [selectedUserId, setSelectedUserId] = useState<string | null>(null);
-	const [selectedTeamId, setSelectedTeamId] = useState<string>("");
-
 	const columns: ColumnDef<ExtendedUserTeams>[] = useMemo(
 		() => [
-			{
-				id: "select",
-				header: ({ table }) => (
-					<Checkbox
-						checked={
-							table.getIsAllPageRowsSelected() ||
-							(table.getIsSomePageRowsSelected() && "indeterminate")
-						}
-						onCheckedChange={(value) =>
-							table.toggleAllPageRowsSelected(!!value)
-						}
-						aria-label="Select all"
-					/>
-				),
-				cell: ({ row }) => (
-					<Checkbox
-						checked={row.getIsSelected()}
-						onCheckedChange={(value) => row.toggleSelected(!!value)}
-						aria-label="Select row"
-					/>
-				),
-				enableSorting: false,
-				enableHiding: false,
-			},
 			{
 				accessorKey: "user.name",
 				header: ({ column }) => {
@@ -152,7 +88,7 @@ export function UsersTable({
 				),
 			},
 			{
-				accessorKey: "user.email",
+				accessorKey: "login",
 				header: ({ column }) => {
 					return (
 						<Button
@@ -162,118 +98,18 @@ export function UsersTable({
 							}
 							className="h-auto p-0 font-semibold"
 						>
-							Email
+							Username
 							<ArrowUpDown className="ml-2 h-4 w-4" />
 						</Button>
 					);
 				},
 				cell: ({ row }) => (
-					<div className="text-muted-foreground">{row.original.user.email}</div>
+					<div className="text-muted-foreground">{row.original.login}</div>
 				),
 			},
-			{
-				accessorKey: "teams",
-				header: "Teams",
-				cell: ({ row }) => {
-					const userTeams = row.original.teams || [];
-					return (
-						<div className="flex flex-wrap gap-1 max-w-xs">
-							{userTeams.length === 0 ? (
-								<Badge variant="outline" className="text-muted-foreground">
-									No teams
-								</Badge>
-							) : (
-								userTeams.map((team) => (
-									<GithubBadge
-										key={team.id}
-										label={team.name}
-										color={team.color?.replace("#", "")}
-										className="text-xs"
-									/>
-								))
-							)}
-						</div>
-					);
-				},
-				filterFn: (row, _id, value) => {
-					if (value === "all") return true;
-					const userTeams = row.original.teams || [];
-					return userTeams.some((team) => team.id.toString() === value);
-				},
-			},
-			{
-				id: "actions",
-				enableHiding: false,
-				cell: ({ row }) => {
-					const user = row.original.user;
-					const userTeams = new Set(
-						(row.original.teams || []).map((team) => team.id),
-					);
-
-					const toggleTeam = (teamId: number) => {
-						if (userTeams.has(teamId)) {
-							onRemoveUserFromTeam(user.id.toString(), teamId.toString());
-						} else {
-							onAddTeamToUser(user.id.toString(), teamId.toString());
-						}
-					};
-
-					return (
-						<Popover>
-							<PopoverTrigger asChild>
-								<Button variant="ghost" className="h-8 w-8 p-0">
-									<span className="sr-only">Manage teams</span>
-									<Users className="h-4 w-4" />
-								</Button>
-							</PopoverTrigger>
-							<PopoverContent className="w-80" align="end">
-								<div className="space-y-3">
-									<h4 className="font-medium">Manage Teams</h4>
-									<p className="text-sm text-muted-foreground">
-										Click team badges to add or remove {user.name} from teams.
-									</p>
-									<div className="flex flex-wrap gap-1.5">
-										{[...teams]
-											.sort((a, b) => a.name.localeCompare(b.name))
-											.map((team) => {
-												const isActive = userTeams.has(team.id);
-
-												return (
-													<button
-														type="button"
-														key={team.id}
-														className={cn(
-															"cursor-pointer transition-all duration-200 p-0 border-none bg-transparent",
-															!isActive && "hover:opacity-80",
-														)}
-														onClick={() => toggleTeam(team.id)}
-														onKeyDown={(e) => {
-															if (e.key === "Enter" || e.key === " ") {
-																e.preventDefault();
-																toggleTeam(team.id);
-															}
-														}}
-													>
-														<GithubBadge
-															label={team.name}
-															color={team.color?.replace("#", "")}
-															className={cn(
-																"text-xs transition-all duration-200",
-																!isActive && "opacity-60",
-															)}
-														/>
-													</button>
-												);
-											})}
-									</div>
-								</div>
-							</PopoverContent>
-						</Popover>
-					);
-				},
-			},
+			// Teams column intentionally removed; team filtering remains available above
 		],
-		[teams, onAddTeamToUser, onRemoveUserFromTeam],
+		[],
 	);
 
 	const filteredData = useMemo(() => {
@@ -295,60 +131,15 @@ export function UsersTable({
 		getSortedRowModel: getSortedRowModel(),
 		getFilteredRowModel: getFilteredRowModel(),
 		onColumnVisibilityChange: setColumnVisibility,
-		onRowSelectionChange: setRowSelection,
 		onGlobalFilterChange: setGlobalFilter,
 		globalFilterFn: "includesString",
 		state: {
 			sorting,
 			columnFilters,
 			columnVisibility,
-			rowSelection,
 			globalFilter,
 		},
 	});
-
-	const selectedRows = table.getFilteredSelectedRowModel().rows;
-	const selectedUserIds = selectedRows.map((row) =>
-		row.original.user.id.toString(),
-	);
-
-	const handleBulkAddTeam = () => {
-		if (selectedTeamId && selectedUserIds.length > 0) {
-			onBulkAddTeam(selectedUserIds, selectedTeamId);
-			setRowSelection({});
-			setSelectedTeamId("");
-		}
-	};
-
-	const handleBulkRemoveTeam = () => {
-		if (selectedTeamId && selectedUserIds.length > 0) {
-			onBulkRemoveTeam(selectedUserIds, selectedTeamId);
-			setRowSelection({});
-			setSelectedTeamId("");
-		}
-	};
-
-	const handleAddTeamToUser = () => {
-		if (selectedUserId && selectedTeamId) {
-			onAddTeamToUser(selectedUserId, selectedTeamId);
-			setAddTeamDialogOpen(false);
-			setSelectedUserId(null);
-			setSelectedTeamId("");
-		}
-	};
-
-	const handleRemoveUserFromTeam = () => {
-		if (selectedUserId && selectedTeamId) {
-			onRemoveUserFromTeam(selectedUserId, selectedTeamId);
-			setRemoveTeamDialogOpen(false);
-			setSelectedUserId(null);
-			setSelectedTeamId("");
-		}
-	};
-
-	const selectedUser = selectedUserId
-		? users.find((u) => u.user.id === selectedUserId)
-		: null;
 
 	// Helper function to generate pagination items
 	const generatePaginationItems = () => {
@@ -401,7 +192,7 @@ export function UsersTable({
 					<div className="relative w-full sm:w-auto">
 						<Search className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
 						<Input
-							placeholder="Search by name or email..."
+							placeholder="Search by name or username..."
 							value={globalFilter}
 							onChange={(event) => setGlobalFilter(event.target.value)}
 							className="pl-9 w-full sm:w-[300px]"
@@ -424,12 +215,6 @@ export function UsersTable({
 								.map((team) => (
 									<SelectItem key={team.id} value={team.id.toString()}>
 										<div className="flex items-center space-x-2">
-											{team.color && (
-												<div
-													className="w-3 h-3 rounded-full"
-													style={{ backgroundColor: team.color }}
-												/>
-											)}
 											<span>{team.name}</span>
 										</div>
 									</SelectItem>
@@ -464,7 +249,7 @@ export function UsersTable({
 											key={column.id}
 											className="capitalize"
 											checked={column.getIsVisible()}
-											onCheckedChange={(value) =>
+											onCheckedChange={(value: boolean) =>
 												column.toggleVisibility(!!value)
 											}
 										>
@@ -477,70 +262,7 @@ export function UsersTable({
 				</div>
 			</div>
 
-			{/* Enhanced Bulk actions */}
-			{selectedUserIds.length > 0 && (
-				<div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4 p-4 bg-accent/50 border border-border rounded-lg shadow-sm">
-					<div className="flex items-center space-x-3">
-						<div className="flex items-center justify-center w-8 h-8 bg-primary/10 rounded-full aspect-square flex-shrink-0">
-							<Users className="h-4 w-4 text-primary" />
-						</div>
-						<div className="min-w-0">
-							<p className="text-sm font-medium">
-								{selectedUserIds.length} user
-								{selectedUserIds.length > 1 ? "s" : ""} selected
-							</p>
-							<p className="text-xs text-muted-foreground hidden sm:block">
-								Choose a team and action to perform on selected users
-							</p>
-						</div>
-					</div>
-					<div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 sm:gap-3">
-						<Select value={selectedTeamId} onValueChange={setSelectedTeamId}>
-							<SelectTrigger className="w-full sm:w-[180px]">
-								<SelectValue placeholder="Select team" />
-							</SelectTrigger>
-							<SelectContent>
-								{[...teams]
-									.sort((a, b) => a.name.localeCompare(b.name))
-									.map((team) => (
-										<SelectItem key={team.id} value={team.id.toString()}>
-											<div className="flex items-center space-x-2">
-												{team.color && (
-													<div
-														className="w-3 h-3 rounded-full"
-														style={{ backgroundColor: team.color }}
-													/>
-												)}
-												<span>{team.name}</span>
-											</div>
-										</SelectItem>
-									))}
-							</SelectContent>
-						</Select>
-						<div className="flex flex-col sm:flex-row gap-2 sm:gap-2">
-							<Button
-								size="sm"
-								onClick={handleBulkAddTeam}
-								disabled={!selectedTeamId}
-								className="gap-2 w-full sm:w-auto"
-							>
-								<UserPlus className="h-4 w-4" />
-								<span className="sm:inline">Add to team</span>
-							</Button>
-							<Button
-								size="sm"
-								variant="outline"
-								onClick={handleBulkRemoveTeam}
-								disabled={!selectedTeamId}
-								className="gap-2 w-full sm:w-auto"
-							>
-								<UserMinus className="h-4 w-4" />
-								<span className="sm:inline">Remove from team</span>
-							</Button>
-						</div>
-					</div>
-				</div>
-			)}
+			{/* Bulk team actions removed; team assignments are managed automatically */}
 
 			{/* Table */}
 			<div className="rounded-md border">
@@ -621,11 +343,6 @@ export function UsersTable({
 			<div className="flex flex-col sm:flex-row items-center justify-between space-y-4 sm:space-y-0 sm:space-x-2 py-4">
 				<div className="flex-1 text-sm text-muted-foreground order-2 sm:order-1">
 					<div className="flex flex-col sm:flex-row gap-1 sm:gap-4">
-						<span>
-							{table.getFilteredSelectedRowModel().rows.length} of{" "}
-							{table.getFilteredRowModel().rows.length} row(s) selected
-						</span>
-						<span className="hidden sm:inline">•</span>
 						<span>
 							Showing {table.getRowModel().rows.length} of {filteredData.length}{" "}
 							users
@@ -709,112 +426,7 @@ export function UsersTable({
 				</div>
 			</div>
 
-			{/* Add Team Dialog */}
-			<Dialog open={addTeamDialogOpen} onOpenChange={setAddTeamDialogOpen}>
-				<DialogContent>
-					<DialogHeader>
-						<DialogTitle>Add User to Team</DialogTitle>
-						<DialogDescription>
-							Select a team to add {selectedUser?.user.name} to.
-						</DialogDescription>
-					</DialogHeader>
-					<div className="py-4">
-						<Select value={selectedTeamId} onValueChange={setSelectedTeamId}>
-							<SelectTrigger>
-								<SelectValue placeholder="Select a team" />
-							</SelectTrigger>
-							<SelectContent>
-								{[...teams]
-									.filter(
-										(team) =>
-											!selectedUser?.teams?.some(
-												(userTeam) => userTeam.id === team.id,
-											),
-									)
-									.sort((a, b) => a.name.localeCompare(b.name))
-									.map((team) => (
-										<SelectItem key={team.id} value={team.id.toString()}>
-											<div className="flex items-center space-x-2">
-												{team.color && (
-													<div
-														className="w-3 h-3 rounded-full"
-														style={{ backgroundColor: team.color }}
-													/>
-												)}
-												<span>{team.name}</span>
-											</div>
-										</SelectItem>
-									))}
-							</SelectContent>
-						</Select>
-					</div>
-					<DialogFooter>
-						<Button
-							variant="outline"
-							onClick={() => setAddTeamDialogOpen(false)}
-						>
-							Cancel
-						</Button>
-						<Button onClick={handleAddTeamToUser} disabled={!selectedTeamId}>
-							Add to Team
-						</Button>
-					</DialogFooter>
-				</DialogContent>
-			</Dialog>
-
-			{/* Remove Team Dialog */}
-			<Dialog
-				open={removeTeamDialogOpen}
-				onOpenChange={setRemoveTeamDialogOpen}
-			>
-				<DialogContent>
-					<DialogHeader>
-						<DialogTitle>Remove User from Team</DialogTitle>
-						<DialogDescription>
-							Select a team to remove {selectedUser?.user.name} from.
-						</DialogDescription>
-					</DialogHeader>
-					<div className="py-4">
-						<Select value={selectedTeamId} onValueChange={setSelectedTeamId}>
-							<SelectTrigger>
-								<SelectValue placeholder="Select a team" />
-							</SelectTrigger>
-							<SelectContent>
-								{selectedUser?.teams
-									?.sort((a, b) => a.name.localeCompare(b.name))
-									.map((team) => (
-										<SelectItem key={team.id} value={team.id.toString()}>
-											<div className="flex items-center space-x-2">
-												{team.color && (
-													<div
-														className="w-3 h-3 rounded-full"
-														style={{ backgroundColor: team.color }}
-													/>
-												)}
-												<span>{team.name}</span>
-											</div>
-										</SelectItem>
-									))}
-							</SelectContent>
-						</Select>
-					</div>
-					<DialogFooter>
-						<Button
-							variant="outline"
-							onClick={() => setRemoveTeamDialogOpen(false)}
-						>
-							Cancel
-						</Button>
-						<Button
-							variant="destructive"
-							onClick={handleRemoveUserFromTeam}
-							disabled={!selectedTeamId}
-						>
-							Remove from Team
-						</Button>
-					</DialogFooter>
-				</DialogContent>
-			</Dialog>
+			{/* Manual team assignment dialogs removed */}
 		</div>
 	);
 }

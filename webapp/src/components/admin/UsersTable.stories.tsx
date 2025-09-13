@@ -1,5 +1,4 @@
 import type { Meta, StoryObj } from "@storybook/react";
-import { fn } from "@storybook/test";
 import type { TeamInfo } from "@/api/types.gen";
 import type { ExtendedUserTeams } from "./types";
 import { UsersTable } from "./UsersTable";
@@ -8,8 +7,9 @@ const mockTeams: TeamInfo[] = [
 	{
 		id: 1,
 		name: "Frontend Team",
-		color: "#3b82f6",
 		hidden: false,
+		membershipCount: 0,
+		repoPermissionCount: 0,
 		repositories: [],
 		labels: [],
 		members: [],
@@ -17,8 +17,9 @@ const mockTeams: TeamInfo[] = [
 	{
 		id: 2,
 		name: "Backend Team",
-		color: "#ef4444",
 		hidden: false,
+		membershipCount: 0,
+		repoPermissionCount: 0,
 		repositories: [],
 		labels: [],
 		members: [],
@@ -26,8 +27,9 @@ const mockTeams: TeamInfo[] = [
 	{
 		id: 3,
 		name: "DevOps Team",
-		color: "#10b981",
 		hidden: false,
+		membershipCount: 0,
+		repoPermissionCount: 0,
 		repositories: [],
 		labels: [],
 		members: [],
@@ -35,8 +37,9 @@ const mockTeams: TeamInfo[] = [
 	{
 		id: 4,
 		name: "QA Team",
-		color: "#f59e0b",
 		hidden: false,
+		membershipCount: 0,
+		repoPermissionCount: 0,
 		repositories: [],
 		labels: [],
 		members: [],
@@ -120,10 +123,6 @@ const meta: Meta<typeof UsersTable> = {
 	args: {
 		users: mockUsers,
 		teams: mockTeams,
-		onAddTeamToUser: fn(),
-		onRemoveUserFromTeam: fn(),
-		onBulkAddTeam: fn(),
-		onBulkRemoveTeam: fn(),
 	},
 };
 

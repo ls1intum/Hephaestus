@@ -1,12 +1,12 @@
-package de.tum.in.www1.hephaestus.gitprovider.teamV2.github;
+package de.tum.in.www1.hephaestus.gitprovider.team.github;
 
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubMessageHandler;
 import de.tum.in.www1.hephaestus.gitprovider.repository.Repository;
 import de.tum.in.www1.hephaestus.gitprovider.repository.RepositoryRepository;
 import de.tum.in.www1.hephaestus.gitprovider.repository.github.GitHubRepositoryConverter;
-import de.tum.in.www1.hephaestus.gitprovider.teamV2.TeamV2;
-import de.tum.in.www1.hephaestus.gitprovider.teamV2.TeamV2Repository;
-import de.tum.in.www1.hephaestus.gitprovider.teamV2.permission.TeamRepositoryPermission;
+import de.tum.in.www1.hephaestus.gitprovider.team.Team;
+import de.tum.in.www1.hephaestus.gitprovider.team.TeamRepository;
+import de.tum.in.www1.hephaestus.gitprovider.team.permission.TeamRepositoryPermission;
 import java.util.List;
 import java.util.Objects;
 import org.kohsuke.github.GHEvent;
@@ -22,13 +22,13 @@ public class GitHubTeamMessageHandler extends GitHubMessageHandler<GHEventPayloa
 
     private static final Logger logger = LoggerFactory.getLogger(GitHubTeamMessageHandler.class);
 
-    private final TeamV2Repository teamRepository;
+    private final TeamRepository teamRepository;
     private final RepositoryRepository repositoryRepository;
     private final GitHubTeamConverter teamConverter;
     private final GitHubRepositoryConverter repositoryConverter;
 
     public GitHubTeamMessageHandler(
-        TeamV2Repository teamRepository,
+        TeamRepository teamRepository,
         RepositoryRepository repositoryRepository,
         GitHubTeamConverter teamConverter,
         GitHubRepositoryConverter repositoryConverter
@@ -54,7 +54,7 @@ public class GitHubTeamMessageHandler extends GitHubMessageHandler<GHEventPayloa
         }
 
         // Upsert team basics from payload for any non-deleted action
-        TeamV2 team = upsertTeamFromPayload(eventPayload, orgLogin);
+        Team team = upsertTeamFromPayload(eventPayload, orgLogin);
 
         // If repository present, handle repo-level permission updates offline
         if (eventPayload.getRepository() != null) {
@@ -82,12 +82,12 @@ public class GitHubTeamMessageHandler extends GitHubMessageHandler<GHEventPayloa
         }
     }
 
-    private TeamV2 upsertTeamFromPayload(GHEventPayload.Team payload, String orgLogin) {
+    private Team upsertTeamFromPayload(GHEventPayload.Team payload, String orgLogin) {
         if (payload.getTeam() == null) {
             return null;
         }
         GHTeam t = payload.getTeam();
-        TeamV2 team = teamRepository.findById(t.getId()).orElseGet(TeamV2::new);
+        Team team = teamRepository.findById(t.getId()).orElseGet(Team::new);
         team.setId(t.getId());
         team = teamConverter.update(t, team);
         // Ensure organization is taken from event payload (converter may attempt API call)

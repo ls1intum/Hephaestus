@@ -1,9 +1,9 @@
-package de.tum.in.www1.hephaestus.gitprovider.teamV2.github;
+package de.tum.in.www1.hephaestus.gitprovider.team.github;
 
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubMessageHandler;
-import de.tum.in.www1.hephaestus.gitprovider.teamV2.TeamV2;
-import de.tum.in.www1.hephaestus.gitprovider.teamV2.TeamV2Repository;
-import de.tum.in.www1.hephaestus.gitprovider.teamV2.membership.TeamMembership;
+import de.tum.in.www1.hephaestus.gitprovider.team.Team;
+import de.tum.in.www1.hephaestus.gitprovider.team.TeamRepository;
+import de.tum.in.www1.hephaestus.gitprovider.team.membership.TeamMembership;
 import de.tum.in.www1.hephaestus.gitprovider.user.User;
 import de.tum.in.www1.hephaestus.gitprovider.user.UserRepository;
 import de.tum.in.www1.hephaestus.gitprovider.user.github.GitHubUserConverter;
@@ -21,13 +21,13 @@ public class GitHubMembershipMessageHandler extends GitHubMessageHandler<GHEvent
 
     private static final Logger logger = LoggerFactory.getLogger(GitHubMembershipMessageHandler.class);
 
-    private final TeamV2Repository teamRepository;
+    private final TeamRepository teamRepository;
     private final UserRepository userRepository;
     private final GitHubTeamConverter teamConverter;
     private final GitHubUserConverter userConverter;
 
     public GitHubMembershipMessageHandler(
-        TeamV2Repository teamRepository,
+        TeamRepository teamRepository,
         UserRepository userRepository,
         GitHubTeamConverter teamConverter,
         GitHubUserConverter userConverter
@@ -56,7 +56,7 @@ public class GitHubMembershipMessageHandler extends GitHubMessageHandler<GHEvent
         }
 
         // Upsert team and force organization from payload to avoid any network lookups in converter
-        TeamV2 team = teamRepository.findById(ghTeam.getId()).orElseGet(TeamV2::new);
+        Team team = teamRepository.findById(ghTeam.getId()).orElseGet(Team::new);
         team.setId(ghTeam.getId());
         team = teamConverter.update(ghTeam, team);
         if (orgLogin != null) {

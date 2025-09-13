@@ -6,6 +6,7 @@ import {
 } from "@tanstack/react-router";
 import { zodValidator } from "@tanstack/zod-adapter";
 import { endOfISOWeek, formatISO, startOfISOWeek } from "date-fns";
+import { useEffect, useMemo } from "react";
 import { z } from "zod";
 import {
 	getLeaderboardOptions,
@@ -81,6 +82,59 @@ function LeaderboardContainer() {
 				(entry) => entry.user.login.toLowerCase() === username.toLowerCase(),
 			)
 		: undefined;
+
+	// Compute visible teams list (exclude hidden teams)
+	type MetaTeam = {
+		id: number;
+		name: string;
+		parentId?: number;
+		hidden?: boolean;
+	};
+	const visibleTeams = useMemo<string[]>(() => {
+		const teams = (metaQuery.data?.teams ?? []) as MetaTeam[];
+		return teams.filter((t) => !t.hidden).map((t) => t.name);
+	}, [metaQuery.data]);
+
+	// Build a map for id->team to compute visible-only path labels
+	const teamById = useMemo(() => {
+		const teams = (metaQuery.data?.teams ?? []) as MetaTeam[];
+		const m = new Map<number, MetaTeam>();
+		teams.forEach((t) => m.set(t.id, t));
+		return m;
+	}, [metaQuery.data]);
+
+	const teamOptions = useMemo(() => {
+		const teams = (metaQuery.data?.teams ?? []) as MetaTeam[];
+		const visible = teams.filter((t) => !t.hidden);
+		const makeLabel = (t: MetaTeam): string => {
+			const names: string[] = [];
+			// Walk up the ancestry, but only include visible ancestors
+			let cur: MetaTeam | undefined = t;
+			while (cur) {
+				if (!cur.hidden) names.push(cur.name);
+				const parent: MetaTeam | undefined =
+					cur.parentId !== undefined ? teamById.get(cur.parentId) : undefined;
+				cur = parent;
+			}
+			// names currently has child->...->root, reverse to root->child
+			return names.reverse().join(" / ");
+		};
+		return visible
+			.map((t) => ({ value: t.name, label: makeLabel(t) }))
+			.sort((a, b) => a.label.localeCompare(b.label));
+	}, [metaQuery.data, teamById]);
+
+	// If current selected team is hidden (or no longer present), reset to 'all'
+	useEffect(() => {
+		if (team && team !== "all" && !visibleTeams.includes(team)) {
+			navigate({
+				search: (prev) => ({
+					...prev,
+					team: "all",
+				}),
+			});
+		}
+	}, [team, visibleTeams, navigate]);
 
 	// Get the leaderboard schedule from the server's metadata
 	const scheduledTime = metaQuery.data?.scheduledTime || "9:00";
@@ -174,7 +228,7 @@ function LeaderboardContainer() {
 			currentUserEntry={currentUserEntry}
 			leaguePoints={userProfileQuery.data?.userInfo?.leaguePoints}
 			leaguePointsChange={leagueStatsQuery.data?.leaguePointsChange}
-			teams={metaQuery.data?.teams.map((team) => team.name) || []}
+			teamOptions={teamOptions}
 			selectedTeam={team}
 			selectedSort={sort}
 			initialAfterDate={after}

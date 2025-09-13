@@ -9,14 +9,18 @@ import {
 	SelectValue,
 } from "@/components/ui/select";
 
+export interface TeamFilterOption {
+	value: string;
+	label: string;
+}
 export interface TeamFilterProps {
-	teams: string[];
+	options: TeamFilterOption[];
 	onTeamChange?: (team: string) => void;
 	selectedTeam?: string;
 }
 
 export function TeamFilter({
-	teams = [],
+	options = [],
 	onTeamChange,
 	selectedTeam = "all",
 }: TeamFilterProps) {
@@ -34,9 +38,9 @@ export function TeamFilter({
 					<SelectItem value="all">All Teams</SelectItem>
 					<DropdownMenuSeparator />
 					<SelectGroup>
-						{teams.map((team) => (
-							<SelectItem key={team} value={team}>
-								{team}
+						{options.map((opt) => (
+							<SelectItem key={opt.value} value={opt.value}>
+								{opt.label}
 							</SelectItem>
 						))}
 					</SelectGroup>

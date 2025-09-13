@@ -9,9 +9,6 @@ export type BadPracticeFeedback = {
     type: string;
 };
 
-/**
- * DTO for returning vote information.
- */
 export type ChatMessageVote = {
     createdAt?: Date;
     isUpvoted?: boolean;
@@ -19,69 +16,23 @@ export type ChatMessageVote = {
     updatedAt?: Date;
 };
 
-/**
- * DTO for chat thread with full message content.
- * Used for initializing useChat in the frontend.
- */
 export type ChatThreadDetail = {
-    /**
-     * When the thread was created
-     */
     createdAt?: Date;
-    /**
-     * Unique identifier for the thread
-     */
     id?: string;
-    /**
-     * All messages in the conversation path (as JSON objects for useChat initialization)
-     * As exception, we do not use a DTO here since we included those intelligece-service models in the OpenAPI spec.
-     */
     messages?: Array<UiMessage>;
-    /**
-     * ID of the currently selected leaf message (end of active conversation path)
-     */
     selectedLeafMessageId?: string;
-    /**
-     * Thread title (may be null for untitled threads)
-     */
     title?: string;
-    /**
-     * Votes for messages in this thread
-     */
     votes?: Array<ChatMessageVote>;
 };
 
-/**
- * DTO for grouped chat threads.
- * Used for organizing threads by time periods (today, yesterday, etc.).
- */
 export type ChatThreadGroup = {
-    /**
-     * Group name (e.g., "Today", "Yesterday", "Last 7 Days", "Last 30 Days")
-     */
     groupName: string;
-    /**
-     * List of thread summaries in this group
-     */
     threads: Array<ChatThreadSummary>;
 };
 
-/**
- * DTO for chat thread summary information.
- * Used for listing threads without loading full message content.
- */
 export type ChatThreadSummary = {
-    /**
-     * When the thread was created
-     */
     createdAt: Date;
-    /**
-     * Unique identifier for the thread
-     */
     id: string;
-    /**
-     * Thread title (may be null for untitled threads)
-     */
     title: string;
 };
 
@@ -137,10 +88,6 @@ export type CreateDocumentOutput = {
     title: string;
 };
 
-/**
- * DTO for creating a new document.
- * Server generates UUID and timestamps.
- */
 export type CreateDocumentRequest = {
     content: string;
     kind: 'TEXT';
@@ -510,6 +457,7 @@ export type RepositoryInfo = {
     description?: string;
     htmlUrl: string;
     id: number;
+    labels?: Array<LabelInfo>;
     name: string;
     nameWithOwner: string;
 };
@@ -1121,26 +1069,19 @@ export type StreamToolOutputErrorPart = {
 };
 
 export type TeamInfo = {
-    color: string;
+    description?: string;
     hidden: boolean;
+    htmlUrl?: string;
     id: number;
     labels: Array<LabelInfo>;
     members: Array<UserInfo>;
-    name: string;
-    repositories: Array<RepositoryInfo>;
-};
-
-export type TeamV2Info = {
-    description?: string;
-    htmlUrl?: string;
-    id: number;
-    lastSyncedAt?: Date;
-    membershipCount?: number;
+    membershipCount: number;
     name: string;
     organization?: string;
     parentId?: number;
     privacy?: 'SECRET' | 'CLOSED';
-    repoPermissionCount?: number;
+    repoPermissionCount: number;
+    repositories: Array<RepositoryInfo>;
 };
 
 /**
@@ -1378,10 +1319,6 @@ export type UpdateDocumentOutput = {
     title: string;
 };
 
-/**
- * DTO for updating an existing document.
- * Creates a new version with the updated content.
- */
 export type UpdateDocumentRequest = {
     content: string;
     kind: 'TEXT';
@@ -1411,6 +1348,7 @@ export type UserSettings = {
 };
 
 export type UserTeams = {
+    email?: string;
     id: number;
     login: string;
     name: string;
@@ -1418,9 +1356,6 @@ export type UserTeams = {
     url: string;
 };
 
-/**
- * Request DTO for voting on a message.
- */
 export type VoteMessageRequest = {
     isUpvoted: boolean;
 };
@@ -1863,40 +1798,6 @@ export type GetDocumentVersionResponses = {
 
 export type GetDocumentVersionResponse = GetDocumentVersionResponses[keyof GetDocumentVersionResponses];
 
-export type GetAllData = {
-    body?: never;
-    path?: never;
-    query?: never;
-    url: '/api/teamsV2';
-};
-
-export type GetAllResponses = {
-    /**
-     * OK
-     */
-    200: Array<TeamV2Info>;
-};
-
-export type GetAllResponse = GetAllResponses[keyof GetAllResponses];
-
-export type GetByIdData = {
-    body?: never;
-    path: {
-        id: number;
-    };
-    query?: never;
-    url: '/api/teamsV2/{id}';
-};
-
-export type GetByIdResponses = {
-    /**
-     * OK
-     */
-    200: TeamV2Info;
-};
-
-export type GetByIdResponse = GetByIdResponses[keyof GetByIdResponses];
-
 export type GetLeaderboardData = {
     body?: never;
     path?: never;
@@ -2052,39 +1953,39 @@ export type GetContributorsResponses = {
 
 export type GetContributorsResponse = GetContributorsResponses[keyof GetContributorsResponses];
 
-export type GetTeamsData = {
+export type GetAllTeamsData = {
     body?: never;
     path?: never;
     query?: never;
-    url: '/team/all';
+    url: '/team';
 };
 
-export type GetTeamsResponses = {
+export type GetAllTeamsResponses = {
     /**
      * OK
      */
     200: Array<TeamInfo>;
 };
 
-export type GetTeamsResponse = GetTeamsResponses[keyof GetTeamsResponses];
+export type GetAllTeamsResponse = GetAllTeamsResponses[keyof GetAllTeamsResponses];
 
-export type HideTeamData = {
-    body: boolean;
+export type UpdateTeamVisibilityData = {
+    body?: boolean;
     path: {
         id: number;
     };
-    query?: never;
-    url: '/team/{id}/hide';
+    query?: {
+        hidden?: boolean;
+    };
+    url: '/team/{id}/visibility';
 };
 
-export type HideTeamResponses = {
+export type UpdateTeamVisibilityResponses = {
     /**
      * OK
      */
-    200: TeamInfo;
+    200: unknown;
 };
-
-export type HideTeamResponse = HideTeamResponses[keyof HideTeamResponses];
 
 export type DeleteUserData = {
     body?: never;
@@ -2214,24 +2115,6 @@ export type AddRepositoryToMonitorResponses = {
     200: unknown;
 };
 
-export type DeleteTeamData = {
-    body?: never;
-    path: {
-        teamId: number;
-    };
-    query?: never;
-    url: '/workspace/team/{teamId}';
-};
-
-export type DeleteTeamResponses = {
-    /**
-     * OK
-     */
-    200: TeamInfo;
-};
-
-export type DeleteTeamResponse = DeleteTeamResponses[keyof DeleteTeamResponses];
-
 export type RemoveLabelFromTeamData = {
     body?: never;
     path: {
@@ -2270,114 +2153,6 @@ export type AddLabelToTeamResponses = {
 };
 
 export type AddLabelToTeamResponse = AddLabelToTeamResponses[keyof AddLabelToTeamResponses];
-
-export type RemoveRepositoryFromTeamData = {
-    body?: never;
-    path: {
-        teamId: number;
-        repositoryOwner: string;
-        repositoryName: string;
-    };
-    query?: never;
-    url: '/workspace/team/{teamId}/repository/{repositoryOwner}/{repositoryName}';
-};
-
-export type RemoveRepositoryFromTeamResponses = {
-    /**
-     * OK
-     */
-    200: TeamInfo;
-};
-
-export type RemoveRepositoryFromTeamResponse = RemoveRepositoryFromTeamResponses[keyof RemoveRepositoryFromTeamResponses];
-
-export type AddRepositoryToTeamData = {
-    body?: never;
-    path: {
-        teamId: number;
-        repositoryOwner: string;
-        repositoryName: string;
-    };
-    query?: never;
-    url: '/workspace/team/{teamId}/repository/{repositoryOwner}/{repositoryName}';
-};
-
-export type AddRepositoryToTeamResponses = {
-    /**
-     * OK
-     */
-    200: TeamInfo;
-};
-
-export type AddRepositoryToTeamResponse = AddRepositoryToTeamResponses[keyof AddRepositoryToTeamResponses];
-
-export type CreateTeamData = {
-    body: TeamInfo;
-    path?: never;
-    query?: never;
-    url: '/workspace/teams';
-};
-
-export type CreateTeamResponses = {
-    /**
-     * OK
-     */
-    200: TeamInfo;
-};
-
-export type CreateTeamResponse = CreateTeamResponses[keyof CreateTeamResponses];
-
-export type AutomaticallyAssignTeamsData = {
-    body?: never;
-    path?: never;
-    query?: never;
-    url: '/workspace/teams/autoassign';
-};
-
-export type AutomaticallyAssignTeamsResponses = {
-    /**
-     * OK
-     */
-    200: unknown;
-};
-
-export type RemoveUserFromTeamData = {
-    body?: never;
-    path: {
-        login: string;
-        teamId: number;
-    };
-    query?: never;
-    url: '/workspace/user/{login}/team/{teamId}';
-};
-
-export type RemoveUserFromTeamResponses = {
-    /**
-     * OK
-     */
-    200: UserInfo;
-};
-
-export type RemoveUserFromTeamResponse = RemoveUserFromTeamResponses[keyof RemoveUserFromTeamResponses];
-
-export type AddTeamToUserData = {
-    body?: never;
-    path: {
-        login: string;
-        teamId: number;
-    };
-    query?: never;
-    url: '/workspace/user/{login}/team/{teamId}';
-};
-
-export type AddTeamToUserResponses = {
-    /**
-     * OK
-     */
-    200: UserInfo;
-};
-
-export type AddTeamToUserResponse = AddTeamToUserResponses[keyof AddTeamToUserResponses];
 
 export type GetUsersWithTeamsData = {
     body?: never;

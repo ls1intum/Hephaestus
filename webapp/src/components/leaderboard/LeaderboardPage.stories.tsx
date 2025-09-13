@@ -81,7 +81,13 @@ const mockLeaderboardEntries: LeaderboardEntry[] = [
 	},
 ];
 
-const mockTeams = ["Frontend", "Backend", "DevOps", "QA", "Design"];
+const mockTeamOptions = [
+	{ value: "Frontend", label: "Frontend" },
+	{ value: "Backend", label: "Backend" },
+	{ value: "DevOps", label: "DevOps" },
+	{ value: "QA", label: "QA" },
+	{ value: "Design", label: "Design" },
+];
 
 const meta: Meta<typeof LeaderboardPage> = {
 	component: LeaderboardPage,
@@ -98,7 +104,7 @@ export const Default: Story = {
 	args: {
 		leaderboard: mockLeaderboardEntries,
 		isLoading: false,
-		teams: mockTeams,
+		teamOptions: mockTeamOptions,
 		selectedTeam: "all",
 		selectedSort: "SCORE",
 	},
@@ -108,7 +114,7 @@ export const WithCurrentUser: Story = {
 	args: {
 		leaderboard: mockLeaderboardEntries,
 		isLoading: false,
-		teams: mockTeams,
+		teamOptions: mockTeamOptions,
 		selectedTeam: "all",
 		selectedSort: "SCORE",
 		currentUser: {
@@ -128,7 +134,7 @@ export const WithCurrentUser: Story = {
 export const Loading: Story = {
 	args: {
 		isLoading: true,
-		teams: mockTeams,
+		teamOptions: mockTeamOptions,
 		selectedTeam: "all",
 		selectedSort: "SCORE",
 	},
@@ -138,7 +144,7 @@ export const EmptyLeaderboard: Story = {
 	args: {
 		leaderboard: [],
 		isLoading: false,
-		teams: mockTeams,
+		teamOptions: mockTeamOptions,
 		selectedTeam: "all",
 		selectedSort: "SCORE",
 	},

@@ -12,7 +12,7 @@ interface LeaderboardPageProps {
 	currentUserEntry?: LeaderboardEntry;
 	leaguePoints?: number;
 	leaguePointsChange?: number;
-	teams: string[];
+	teamOptions: { value: string; label: string }[];
 	onTeamChange?: (team: string) => void;
 	onSortChange?: (sort: LeaderboardSortType) => void;
 	onTimeframeChange?: (
@@ -40,7 +40,7 @@ export function LeaderboardPage({
 	currentUserEntry,
 	leaguePoints = 0,
 	leaguePointsChange = 0,
-	teams,
+	teamOptions,
 	onTeamChange,
 	onSortChange,
 	onTimeframeChange,
@@ -68,7 +68,7 @@ export function LeaderboardPage({
 					<div className="space-y-4 col-span-1">
 						<div className="xl:sticky xl:top-4 xl:self-start xl:max-h-[calc(100vh-2rem)] xl:overflow-auto">
 							<LeaderboardFilter
-								teams={teams}
+								teamOptions={teamOptions}
 								onTeamChange={onTeamChange}
 								onSortChange={onSortChange}
 								onTimeframeChange={onTimeframeChange}

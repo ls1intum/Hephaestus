@@ -1,13 +1,26 @@
-package de.tum.in.www1.hephaestus.gitprovider.teamV2.membership;
+package de.tum.in.www1.hephaestus.gitprovider.team.membership;
 
-import de.tum.in.www1.hephaestus.gitprovider.teamV2.TeamV2;
+import de.tum.in.www1.hephaestus.gitprovider.team.Team;
 import de.tum.in.www1.hephaestus.gitprovider.user.User;
-import jakarta.persistence.*;
+import jakarta.persistence.Column;
+import jakarta.persistence.Embeddable;
+import jakarta.persistence.EmbeddedId;
+import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
+import jakarta.persistence.FetchType;
+import jakarta.persistence.ManyToOne;
+import jakarta.persistence.MapsId;
+import jakarta.persistence.Table;
 import java.io.Serializable;
-import lombok.*;
+import lombok.AllArgsConstructor;
+import lombok.EqualsAndHashCode;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+import lombok.Setter;
 
 @Entity
-@Table(name = "team_v2_membership")
+@Table(name = "team_membership")
 @Getter
 @Setter
 @NoArgsConstructor
@@ -20,7 +33,7 @@ public class TeamMembership {
 
     @ManyToOne(fetch = FetchType.LAZY)
     @MapsId("teamId")
-    private TeamV2 team;
+    private Team team;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @MapsId("userId")
@@ -30,7 +43,7 @@ public class TeamMembership {
     @Enumerated(EnumType.STRING)
     private Role role;
 
-    public TeamMembership(TeamV2 team, User user, Role role) {
+    public TeamMembership(Team team, User user, Role role) {
         this.team = team;
         this.user = user;
         this.role = role;

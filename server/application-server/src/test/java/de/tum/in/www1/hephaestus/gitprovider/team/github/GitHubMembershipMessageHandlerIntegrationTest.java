@@ -1,10 +1,10 @@
-package de.tum.in.www1.hephaestus.gitprovider.teamV2.github;
+package de.tum.in.www1.hephaestus.gitprovider.team.github;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
 import de.tum.in.www1.hephaestus.gitprovider.common.GitHubPayload;
 import de.tum.in.www1.hephaestus.gitprovider.common.GitHubPayloadExtension;
-import de.tum.in.www1.hephaestus.gitprovider.teamV2.TeamV2Repository;
+import de.tum.in.www1.hephaestus.gitprovider.team.TeamRepository;
 import de.tum.in.www1.hephaestus.gitprovider.user.UserRepository;
 import de.tum.in.www1.hephaestus.testconfig.BaseIntegrationTest;
 import org.junit.jupiter.api.BeforeEach;
@@ -24,7 +24,7 @@ class GitHubMembershipMessageHandlerIntegrationTest extends BaseIntegrationTest 
     private GitHubMembershipMessageHandler membershipHandler;
 
     @Autowired
-    private TeamV2Repository teamRepository;
+    private TeamRepository teamRepository;
 
     @Autowired
     private UserRepository userRepository;
@@ -37,14 +37,11 @@ class GitHubMembershipMessageHandlerIntegrationTest extends BaseIntegrationTest 
     @Test
     @DisplayName("membership added -> user linked to team")
     void membershipAdded_linksUserToTeam(@GitHubPayload("membership.added") GHEventPayload.Membership payload) {
-        // Arrange
         long teamId = payload.getTeam().getId();
         long userId = payload.getMember().getId();
 
-        // Act
         membershipHandler.handleEvent(payload);
 
-        // Assert user exists and is linked to team
         var team = teamRepository.findById(teamId).orElseThrow();
         var user = userRepository.findById(userId).orElseThrow();
         assertThat(team.getMemberships()).anySatisfy(m -> {
@@ -58,15 +55,12 @@ class GitHubMembershipMessageHandlerIntegrationTest extends BaseIntegrationTest 
         @GitHubPayload("membership.added") GHEventPayload.Membership added,
         @GitHubPayload("membership.removed") GHEventPayload.Membership removed
     ) {
-        // Arrange: ensure membership exists
         membershipHandler.handleEvent(added);
         long teamId = removed.getTeam().getId();
         long userId = removed.getMember().getId();
 
-        // Act
         membershipHandler.handleEvent(removed);
 
-        // Assert
         var team = teamRepository.findById(teamId).orElseThrow();
         assertThat(team.getMemberships()).noneSatisfy(m -> assertThat(m.getUser().getId()).isEqualTo(userId));
     }

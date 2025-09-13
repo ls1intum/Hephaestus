@@ -53,7 +53,8 @@ public interface IssueCommentRepository extends JpaRepository<IssueComment, Long
         LEFT JOIN FETCH ic.author
         LEFT JOIN FETCH ic.issue
         LEFT JOIN FETCH ic.issue.repository
-        JOIN Team t ON ic.issue.repository MEMBER OF t.repositories
+        JOIN TeamRepositoryPermission trp ON trp.repository = ic.issue.repository
+        JOIN Team t ON trp.team = t
         WHERE
             ic.createdAt BETWEEN :after AND :before
             AND ic.author.type = 'USER'

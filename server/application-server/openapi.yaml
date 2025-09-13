@@ -409,39 +409,6 @@ paths:
           description: Document version not found
       summary: Get specific version of a document by version number
       tags: []
-  /api/teamsV2:
-    get:
-      operationId: getAll
-      responses:
-        "200":
-          content:
-            application/json:
-              schema:
-                type: array
-                items:
-                  $ref: "#/components/schemas/TeamV2Info"
-          description: OK
-      tags:
-      - team-v-2
-  /api/teamsV2/{id}:
-    get:
-      operationId: getById
-      parameters:
-      - in: path
-        name: id
-        required: true
-        schema:
-          type: integer
-          format: int64
-      responses:
-        "200":
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/TeamV2Info"
-          description: OK
-      tags:
-      - team-v-2
   /leaderboard:
     get:
       operationId: getLeaderboard
@@ -614,9 +581,9 @@ paths:
           description: OK
       tags:
       - meta
-  /team/all:
+  /team:
     get:
-      operationId: getTeams
+      operationId: getAllTeams
       responses:
         "200":
           content:
@@ -628,9 +595,9 @@ paths:
           description: OK
       tags:
       - team
-  /team/{id}/hide:
+  /team/{id}/visibility:
     post:
-      operationId: hideTeam
+      operationId: updateTeamVisibility
       parameters:
       - in: path
         name: id
@@ -638,18 +605,18 @@ paths:
         schema:
           type: integer
           format: int64
+      - in: query
+        name: hidden
+        required: false
+        schema:
+          type: boolean
       requestBody:
         content:
           application/json:
             schema:
               type: boolean
-        required: true
       responses:
         "200":
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/TeamInfo"
           description: OK
       tags:
       - team
@@ -767,25 +734,6 @@ paths:
           description: OK
       tags:
       - workspace
-  /workspace/team/{teamId}:
-    delete:
-      operationId: deleteTeam
-      parameters:
-      - in: path
-        name: teamId
-        required: true
-        schema:
-          type: integer
-          format: int64
-      responses:
-        "200":
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/TeamInfo"
-          description: OK
-      tags:
-      - workspace
   /workspace/team/{teamId}/label/{labelId}:
     delete:
       operationId: removeLabelFromTeam
@@ -841,136 +789,6 @@ paths:
           description: OK
       tags:
       - workspace
-  /workspace/team/{teamId}/repository/{repositoryOwner}/{repositoryName}:
-    delete:
-      operationId: removeRepositoryFromTeam
-      parameters:
-      - in: path
-        name: teamId
-        required: true
-        schema:
-          type: integer
-          format: int64
-      - in: path
-        name: repositoryOwner
-        required: true
-        schema:
-          type: string
-      - in: path
-        name: repositoryName
-        required: true
-        schema:
-          type: string
-      responses:
-        "200":
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/TeamInfo"
-          description: OK
-      tags:
-      - workspace
-    post:
-      operationId: addRepositoryToTeam
-      parameters:
-      - in: path
-        name: teamId
-        required: true
-        schema:
-          type: integer
-          format: int64
-      - in: path
-        name: repositoryOwner
-        required: true
-        schema:
-          type: string
-      - in: path
-        name: repositoryName
-        required: true
-        schema:
-          type: string
-      responses:
-        "200":
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/TeamInfo"
-          description: OK
-      tags:
-      - workspace
-  /workspace/teams:
-    put:
-      operationId: createTeam
-      requestBody:
-        content:
-          application/json:
-            schema:
-              $ref: "#/components/schemas/TeamInfo"
-        required: true
-      responses:
-        "200":
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/TeamInfo"
-          description: OK
-      tags:
-      - workspace
-  /workspace/teams/autoassign:
-    put:
-      operationId: automaticallyAssignTeams
-      responses:
-        "200":
-          description: OK
-      tags:
-      - workspace
-  /workspace/user/{login}/team/{teamId}:
-    delete:
-      operationId: removeUserFromTeam
-      parameters:
-      - in: path
-        name: login
-        required: true
-        schema:
-          type: string
-      - in: path
-        name: teamId
-        required: true
-        schema:
-          type: integer
-          format: int64
-      responses:
-        "200":
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/UserInfo"
-          description: OK
-      tags:
-      - workspace
-    put:
-      operationId: addTeamToUser
-      parameters:
-      - in: path
-        name: login
-        required: true
-        schema:
-          type: string
-      - in: path
-        name: teamId
-        required: true
-        schema:
-          type: integer
-          format: int64
-      responses:
-        "200":
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/UserInfo"
-          description: OK
-      tags:
-      - workspace
   /workspace/users:
     get:
       operationId: getUsersWithTeams
@@ -1008,7 +826,6 @@ components:
       - type
     ChatMessageVote:
       type: object
-      description: DTO for returning vote information.
       properties:
         createdAt:
           type: string
@@ -1023,51 +840,33 @@ components:
           format: date-time
     ChatThreadDetail:
       type: object
-      description: |-
-        DTO for chat thread with full message content.
-         Used for initializing useChat in the frontend.
       properties:
         createdAt:
           type: string
           format: date-time
-          description: When the thread was created
         id:
           type: string
           format: uuid
-          description: Unique identifier for the thread
         messages:
           type: array
-          description: |-
-            All messages in the conversation path (as JSON objects for useChat initialization)
-             As exception, we do not use a DTO here since we included those intelligece-service models in the OpenAPI spec.
           items:
             $ref: "#/components/schemas/UIMessage"
         selectedLeafMessageId:
           type: string
           format: uuid
-          description: ID of the currently selected leaf message (end of active conversation
-            path)
         title:
           type: string
-          description: Thread title (may be null for untitled threads)
         votes:
           type: array
-          description: Votes for messages in this thread
           items:
             $ref: "#/components/schemas/ChatMessageVote"
     ChatThreadGroup:
       type: object
-      description: |-
-        DTO for grouped chat threads.
-         Used for organizing threads by time periods (today, yesterday, etc.).
       properties:
         groupName:
           type: string
-          description: "Group name (e.g., \"Today\", \"Yesterday\", \"Last 7 Days\"\
-            , \"Last 30 Days\")"
         threads:
           type: array
-          description: List of thread summaries in this group
           items:
             $ref: "#/components/schemas/ChatThreadSummary"
       required:
@@ -1075,21 +874,15 @@ components:
       - threads
     ChatThreadSummary:
       type: object
-      description: |-
-        DTO for chat thread summary information.
-         Used for listing threads without loading full message content.
       properties:
         createdAt:
           type: string
           format: date-time
-          description: When the thread was created
         id:
           type: string
           format: uuid
-          description: Unique identifier for the thread
         title:
           type: string
-          description: Thread title (may be null for untitled threads)
       required:
       - createdAt
       - id
@@ -1167,9 +960,6 @@ components:
       title: CreateDocumentOutput
     CreateDocumentRequest:
       type: object
-      description: |-
-        DTO for creating a new document.
-         Server generates UUID and timestamps.
       properties:
         content:
           type: string
@@ -1895,6 +1685,10 @@ components:
         id:
           type: integer
           format: int64
+        labels:
+          type: array
+          items:
+            $ref: "#/components/schemas/LabelInfo"
         name:
           type: string
         nameWithOwner:
@@ -2508,10 +2302,12 @@ components:
     TeamInfo:
       type: object
       properties:
-        color:
+        description:
           type: string
         hidden:
           type: boolean
+        htmlUrl:
+          type: string
         id:
           type: integer
           format: int64
@@ -2523,33 +2319,6 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/UserInfo"
-        name:
-          type: string
-        repositories:
-          type: array
-          items:
-            $ref: "#/components/schemas/RepositoryInfo"
-      required:
-      - color
-      - hidden
-      - id
-      - labels
-      - members
-      - name
-      - repositories
-    TeamV2Info:
-      type: object
-      properties:
-        description:
-          type: string
-        htmlUrl:
-          type: string
-        id:
-          type: integer
-          format: int64
-        lastSyncedAt:
-          type: string
-          format: date-time
         membershipCount:
           type: integer
           format: int32
@@ -2568,9 +2337,19 @@ components:
         repoPermissionCount:
           type: integer
           format: int32
+        repositories:
+          type: array
+          items:
+            $ref: "#/components/schemas/RepositoryInfo"
       required:
+      - hidden
       - id
+      - labels
+      - members
+      - membershipCount
       - name
+      - repoPermissionCount
+      - repositories
     TextUIPart:
       type: object
       description: A text part of a message.
@@ -2825,9 +2604,6 @@ components:
       title: UpdateDocumentOutput
     UpdateDocumentRequest:
       type: object
-      description: |-
-        DTO for updating an existing document.
-         Creates a new version with the updated content.
       properties:
         content:
           type: string
@@ -2900,6 +2676,8 @@ components:
     UserTeams:
       type: object
       properties:
+        email:
+          type: string
         id:
           type: integer
           format: int64
@@ -2922,7 +2700,6 @@ components:
       - url
     VoteMessageRequest:
       type: object
-      description: Request DTO for voting on a message.
       properties:
         isUpvoted:
           type: boolean
