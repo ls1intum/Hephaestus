@@ -9,6 +9,9 @@ export type BadPracticeFeedback = {
     type: string;
 };
 
+/**
+ * DTO for returning vote information.
+ */
 export type ChatMessageVote = {
     createdAt?: Date;
     isUpvoted?: boolean;
@@ -16,23 +19,69 @@ export type ChatMessageVote = {
     updatedAt?: Date;
 };
 
+/**
+ * DTO for chat thread with full message content.
+ * Used for initializing useChat in the frontend.
+ */
 export type ChatThreadDetail = {
+    /**
+     * When the thread was created
+     */
     createdAt?: Date;
+    /**
+     * Unique identifier for the thread
+     */
     id?: string;
+    /**
+     * All messages in the conversation path (as JSON objects for useChat initialization)
+     * As exception, we do not use a DTO here since we included those intelligece-service models in the OpenAPI spec.
+     */
     messages?: Array<UiMessage>;
+    /**
+     * ID of the currently selected leaf message (end of active conversation path)
+     */
     selectedLeafMessageId?: string;
+    /**
+     * Thread title (may be null for untitled threads)
+     */
     title?: string;
+    /**
+     * Votes for messages in this thread
+     */
     votes?: Array<ChatMessageVote>;
 };
 
+/**
+ * DTO for grouped chat threads.
+ * Used for organizing threads by time periods (today, yesterday, etc.).
+ */
 export type ChatThreadGroup = {
+    /**
+     * Group name (e.g., "Today", "Yesterday", "Last 7 Days", "Last 30 Days")
+     */
     groupName: string;
+    /**
+     * List of thread summaries in this group
+     */
     threads: Array<ChatThreadSummary>;
 };
 
+/**
+ * DTO for chat thread summary information.
+ * Used for listing threads without loading full message content.
+ */
 export type ChatThreadSummary = {
+    /**
+     * When the thread was created
+     */
     createdAt: Date;
+    /**
+     * Unique identifier for the thread
+     */
     id: string;
+    /**
+     * Thread title (may be null for untitled threads)
+     */
     title: string;
 };
 
@@ -88,6 +137,10 @@ export type CreateDocumentOutput = {
     title: string;
 };
 
+/**
+ * DTO for creating a new document.
+ * Server generates UUID and timestamps.
+ */
 export type CreateDocumentRequest = {
     content: string;
     kind: 'TEXT';
@@ -1319,6 +1372,10 @@ export type UpdateDocumentOutput = {
     title: string;
 };
 
+/**
+ * DTO for updating an existing document.
+ * Creates a new version with the updated content.
+ */
 export type UpdateDocumentRequest = {
     content: string;
     kind: 'TEXT';
@@ -1356,6 +1413,9 @@ export type UserTeams = {
     url: string;
 };
 
+/**
+ * Request DTO for voting on a message.
+ */
 export type VoteMessageRequest = {
     isUpvoted: boolean;
 };
