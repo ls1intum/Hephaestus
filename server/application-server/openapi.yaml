@@ -8,7 +8,7 @@ info:
     name: MIT License
     url: https://github.com/ls1intum/Hephaestus/blob/develop/LICENSE
   title: Hephaestus API
-  version: 0.9.0-rc.23
+  version: 0.9.0-rc.25
 servers:
 - description: Default Server URL
   url: /
