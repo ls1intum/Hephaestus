@@ -8,8 +8,8 @@ set -euo pipefail
 #   Examples: 1.2.3, 1.0.0-alpha.1, 2.0.0-beta.1, 1.2.3+build.123
 #
 # This script updates the version in:
-#   - webapp/package.json & webapp/package-lock.json (for "hephaestus")
-#   - webapp-react/package.json & webapp-react/package-lock.json (for "hephaestus")
+#   - webapp/package.json & webapp/package-lock.json (for "webapp")
+#   - root package-lock.json (top-level version)
 #   - Java source: server/application-server/src/main/java/de/tum/in/www1/hephaestus/OpenAPIConfiguration.java
 #   - YAML config: server/application-server/src/main/resources/application.yml
 #   - Python projects: server/intelligence-service/pyproject.toml & server/webhook-ingest/pyproject.toml
@@ -17,7 +17,7 @@ set -euo pipefail
 #   - Maven POM: server/application-server/pom.xml (preserving -SNAPSHOT)
 #   - OpenAPI docs: server/application-server/openapi.yaml & server/intelligence-service/openapi.yaml
 #   - All files containing "The version of the OpenAPI document:" (only in these directories):
-#         webapp/src/app/core/modules/openapi
+#         server/application-server/src/main/java/de/tum/in/www1/hephaestus/intelligenceservice
 #         server/application-server/src/main/java/de/tum/in/www1/hephaestus/intelligenceservice
 
 
@@ -33,8 +33,8 @@ PARAM=$1
 if [[ "$PARAM" =~ ^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z-]+(\.[0-9A-Za-z-]+)*)?(\+[0-9A-Za-z-]+(\.[0-9A-Za-z-]+)*)?$ ]]; then
     # Direct version specified (used by semantic-release)
     NEW_VERSION="$PARAM"
-    # Extract the current version from webapp/package.json (the authoritative version for "hephaestus")
-    CURRENT_VERSION=$(awk '/"name": "hephaestus"/ {found=1} found && /"version":/ { sub(/.*"version": "/, ""); sub(/".*/, ""); print; exit }' webapp/package.json)
+    # Extract the current version from webapp/package.json (the authoritative version for "webapp")
+    CURRENT_VERSION=$(awk '/"name": "webapp"/ {found=1} found && /"version":/ { sub(/.*"version": "/, ""); sub(/".*/, ""); print; exit }' webapp/package.json)
     if [[ -z "$CURRENT_VERSION" ]]; then
         echo "Error: Could not determine current version from webapp/package.json"
         exit 1
@@ -66,9 +66,9 @@ elif [[ "$PARAM" == "major" || "$PARAM" == "minor" || "$PARAM" == "patch" ]]; th
         echo "$major.$minor.$patch"
     }
 
-    # Extract the current version from webapp/package.json (the authoritative version for "hephaestus")
+    # Extract the current version from webapp/package.json (the authoritative version for "webapp")
     # This uses awk to strip everything before/after the version string.
-    CURRENT_VERSION=$(awk '/"name": "hephaestus"/ {found=1} found && /"version":/ { sub(/.*"version": "/, ""); sub(/".*/, ""); print; exit }' webapp/package.json)
+    CURRENT_VERSION=$(awk '/"name": "webapp"/ {found=1} found && /"version":/ { sub(/.*"version": "/, ""); sub(/".*/, ""); print; exit }' webapp/package.json)
     if [[ -z "$CURRENT_VERSION" ]]; then
         echo "Error: Could not determine current version from webapp/package.json"
         exit 1
@@ -81,10 +81,11 @@ else
     exit 1
 fi
 
+
 # Update webapp/package.json
 awk -v old_version="$CURRENT_VERSION" -v new_version="$NEW_VERSION" '
     BEGIN {found_name = 0}
-    /"name": "hephaestus"/ {found_name = 1}
+    /"name": "webapp"/ {found_name = 1}
     found_name && /"version":/ {
         sub("\"version\": \"" old_version "\"", "\"version\": \"" new_version "\"")
         found_name = 0
@@ -96,7 +97,7 @@ awk -v old_version="$CURRENT_VERSION" -v new_version="$NEW_VERSION" '
 if [[ -f webapp/package-lock.json ]]; then
     awk -v old_version="$CURRENT_VERSION" -v new_version="$NEW_VERSION" '
         BEGIN {found_name = 0}
-        /"name": "hephaestus"/ {found_name = 1}
+        /"name": "webapp"/ {found_name = 1}
         found_name && /"version":/ {
             sub("\"version\": \"" old_version "\"", "\"version\": \"" new_version "\"")
             found_name = 0
@@ -105,28 +106,31 @@ if [[ -f webapp/package-lock.json ]]; then
     ' webapp/package-lock.json > webapp/package-lock.json.tmp && mv webapp/package-lock.json.tmp webapp/package-lock.json
 fi
 
-# Update webapp-react/package.json
-awk -v old_version="$CURRENT_VERSION" -v new_version="$NEW_VERSION" '
-    BEGIN {found_name = 0}
-    /"name": "hephaestus"/ {found_name = 1}
-    found_name && /"version":/ {
-        sub("\"version\": \"" old_version "\"", "\"version\": \"" new_version "\"")
-        found_name = 0
-    }
-    {print}
-' webapp-react/package.json > webapp-react/package.json.tmp && mv webapp-react/package.json.tmp webapp-react/package.json
-
-# Update webapp-react/package-lock.json (if it exists)
-if [[ -f webapp-react/package-lock.json ]]; then
+# Update root package-lock.json (if it exists)
+# 1) Update the top-level version field (before the packages block)
+# 2) Update the webapp workspace's version entry
+if [[ -f package-lock.json ]]; then
+    # 1) Top-level version (only within header before "packages":)
     awk -v old_version="$CURRENT_VERSION" -v new_version="$NEW_VERSION" '
-        BEGIN {found_name = 0}
-        /"name": "hephaestus"/ {found_name = 1}
-        found_name && /"version":/ {
+        BEGIN {in_header = 1; updated = 0}
+        in_header && /"packages"[[:space:]]*:/ { in_header = 0 }
+        in_header && !updated && /"version":/ {
             sub("\"version\": \"" old_version "\"", "\"version\": \"" new_version "\"")
-            found_name = 0
+            updated = 1
+        }
+        { print }
+    ' package-lock.json > package-lock.json.tmp && mv package-lock.json.tmp package-lock.json
+
+    # 2) Version entry for the webapp workspace
+    awk -v old_version="$CURRENT_VERSION" -v new_version="$NEW_VERSION" '
+        BEGIN {found_webapp = 0}
+        /"webapp"[[:space:]]*:/ {found_webapp = 1}
+        found_webapp && /"version":/ {
+            sub("\"version\": \"" old_version "\"", "\"version\": \"" new_version "\"")
+            found_webapp = 0
         }
         {print}
-    ' webapp-react/package-lock.json > webapp-react/package-lock.json.tmp && mv webapp-react/package-lock.json.tmp webapp-react/package-lock.json
+    ' package-lock.json > package-lock.json.tmp && mv package-lock.json.tmp package-lock.json
 fi
 
 # Function to perform cross-platform sed in-place editing
@@ -188,9 +192,6 @@ fi
 # Update all files containing "The version of the OpenAPI document:" to use the new version,
 # limited to the specified directories.
 openapi_files=""
-if [[ -d webapp/src/app/core/modules/openapi ]]; then
-    openapi_files+=" $(grep -rl "The version of the OpenAPI document:" webapp/src/app/core/modules/openapi 2>/dev/null || true)"
-fi
 if [[ -d server/application-server/src/main/java/de/tum/in/www1/hephaestus/intelligenceservice ]]; then
     openapi_files+=" $(grep -rl "The version of the OpenAPI document:" server/application-server/src/main/java/de/tum/in/www1/hephaestus/intelligenceservice 2>/dev/null || true)"
 fi

@@ -28,6 +28,16 @@ jobs:
           # Critical for TurboSnap: Ensure Chromatic can read full git history
           fetch-depth: 0
 
+      # Ensure stable Node/npm and proper caching for webapp visual tests
+      - name: Setup Node.js (LTS) and npm cache
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: '.node-version'
+          cache: 'npm'
+          cache-dependency-path: |
+            package-lock.json
+            webapp/package-lock.json
+
       # Advanced caching strategy
       - name: Setup advanced caches
         uses: ./.github/actions/setup-caches
@@ -60,14 +70,29 @@ jobs:
       # Webapp tests
       - name: "Webapp ${{ matrix.test-type }} execution"
         if: startsWith(matrix.test-type, 'webapp-')
-        working-directory: webapp-react
+        working-directory: webapp
         run: |
           echo "🎨 Running webapp ${{ matrix.test-type }} tests"
-          npm ci --prefer-offline --no-audit --progress=false
+          # Install from repo root for workspace/hoisted optional deps
+          cd ..
+          rm -rf node_modules
+          npm ci --workspaces --include=dev --include=optional --no-audit --progress=false
+          # Optional: report Rollup native presence (warning only)
+          npm ls @rollup/rollup-linux-x64-gnu || echo "⚠️ rollup native not installed yet"
+          # Force-install platform binaries deterministically
+          node scripts/install-platform-binaries.mjs
+          cd webapp
 
           case "${{ matrix.test-type }}" in
             "webapp-visual")
-              npm run build-storybook
+              if ! npm run build-storybook; then
+                echo "❌ Storybook build failed (retrying after clean reinstall at root to pull any missed optionals)..."
+                cd ..
+                rm -rf node_modules
+                npm ci --workspaces --include=dev --include=optional --no-audit --progress=false
+                cd webapp
+                npm run build-storybook
+              fi
               ;;
           esac
 
@@ -78,16 +103,14 @@ jobs:
         uses: chromaui/action@latest
         with:
           projectToken: ${{ secrets.CHROMATIC_PROJECT_TOKEN }}
-          workingDir: webapp-react
+          workingDir: webapp
           onlyChanged: true
           zip: true
           skip: "@(dependabot/**|renovate/**)"
           autoAcceptChanges: ${{ github.ref == 'refs/heads/main' && 'main' || '' }}
           exitZeroOnChanges: false
-          diagnostics: true
           logLevel: info
           junitReport: true
-          allowConsoleErrors: false
         env:
           CHROMATIC_BRANCH: ${{ github.head_ref || github.ref_name }}
           CHROMATIC_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
@@ -123,6 +146,6 @@ jobs:
         uses: dorny/test-reporter@v2
         with:
           name: "Test Results - ${{ matrix.test-type }}"
-          path: "webapp-react/chromatic-build-*.xml"
+          path: "webapp/chromatic-build-*.xml"
           reporter: java-junit
           fail-on-error: false

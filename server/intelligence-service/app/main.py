@@ -1,13 +1,13 @@
 from fastapi import FastAPI
 
-from app.routers.mentor import router as mentor_router
+from app.mentor.router import router as mentor_router
 from app.routers.health import router as health_router
 from app.routers.detector import router as detector_router
 
 app = FastAPI(
     title="Hephaestus Intelligence Service API",
     description="API documentation for the Hephaestus Intelligence Service.",
-    version="0.9.0-rc.7",
+    version="0.9.0-rc.26",
     contact={"name": "Felix T.J. Dietrich", "email": "felixtj.dietrich@tum.de"},
 )
 

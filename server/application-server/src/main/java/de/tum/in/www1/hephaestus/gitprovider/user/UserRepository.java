@@ -1,6 +1,7 @@
 package de.tum.in.www1.hephaestus.gitprovider.user;
 
 import de.tum.in.www1.hephaestus.SecurityUtils;
+import de.tum.in.www1.hephaestus.core.exception.EntityNotFoundException;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
@@ -30,9 +31,10 @@ public interface UserRepository extends JpaRepository<User, Long> {
 
     @Query(
         """
-            SELECT u
+            SELECT DISTINCT u
             FROM User u
-            LEFT JOIN FETCH u.teams
+            LEFT JOIN FETCH u.teamMemberships m
+            LEFT JOIN FETCH m.team t
             WHERE u.type = 'USER'
         """
     )
@@ -49,9 +51,10 @@ public interface UserRepository extends JpaRepository<User, Long> {
 
     @Query(
         """
-            SELECT u
+            SELECT DISTINCT u
             FROM User u
-            JOIN FETCH u.teams
+            JOIN FETCH u.teamMemberships m
+            JOIN FETCH m.team t
             WHERE u.type = 'USER'
         """
     )
@@ -59,9 +62,10 @@ public interface UserRepository extends JpaRepository<User, Long> {
 
     @Query(
         """
-            SELECT u
+            SELECT DISTINCT u
             FROM User u
-            JOIN u.teams t
+            JOIN u.teamMemberships m
+            JOIN m.team t
             WHERE t.id = :teamId
             AND u.type = 'USER'
         """
@@ -72,7 +76,8 @@ public interface UserRepository extends JpaRepository<User, Long> {
         """
             SELECT DISTINCT pr.author
             FROM PullRequest pr
-            JOIN Team t ON pr.repository MEMBER OF t.repositories
+            JOIN TeamRepositoryPermission trp ON trp.repository = pr.repository
+            JOIN Team t ON trp.team = t
             WHERE t.id = :teamId
             AND (
                 NOT EXISTS (SELECT l
@@ -97,5 +102,12 @@ public interface UserRepository extends JpaRepository<User, Long> {
     default Optional<User> getCurrentUser() {
         var currentUserLogin = SecurityUtils.getCurrentUserLogin();
         return currentUserLogin.map(this::findByLogin).orElse(Optional.empty());
+    }
+
+    /**
+     * @return existing user object by current user login
+     */
+    default User getCurrentUserElseThrow() {
+        return getCurrentUser().orElseThrow(() -> new EntityNotFoundException("User", "current authenticated user"));
     }
 }

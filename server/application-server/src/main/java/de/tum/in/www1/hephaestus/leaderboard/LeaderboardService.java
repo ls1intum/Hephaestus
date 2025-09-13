@@ -128,7 +128,9 @@ public class LeaderboardService {
         Optional<String> team,
         Optional<LeaderboardSortType> sort
     ) {
-        Optional<Team> teamEntity = team.map(t -> teamRepository.findByName(t)).orElse(Optional.empty());
+        Optional<Team> teamEntity = team
+            .map(t -> teamRepository.findAll().stream().filter(tm -> t.equals(tm.getName())).findFirst())
+            .orElse(Optional.empty());
         logger.info(
             "Creating leaderboard dataset with timeframe: {} - {} and team: {}",
             after,

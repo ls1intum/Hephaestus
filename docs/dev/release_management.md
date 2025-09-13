@@ -46,12 +46,14 @@ flowchart TD
 ```
 
 #### PR Requirements
+
 - **Title format**: Must follow conventional commit format (only title matters, not individual commits)
 - **Breaking changes**: Use `!` in title (e.g., `feat!: breaking API change`)
 - **Merge method**: Always use "Squash and merge" in GitHub
 - **Code review**: Required before merge
 
 #### PR Automation
+
 - **Title validation**: Enforces conventional commit format
 - **Size labeling**: Auto-applies XS/S/M/L/XL/XXL based on lines changed
 - **Auto-assignment**: PR author automatically assigned
@@ -97,8 +99,7 @@ flowchart TD
 
 | Scope                  | Description                | Example                                          |
 | ---------------------- | -------------------------- | ------------------------------------------------ |
-| `webapp`               | Angular web application    | `feat(webapp): add user profile`                 |
-| `webapp-react`         | React web application      | `fix(webapp-react): resolve routing issue`       |
+| `webapp`               | React web application      | `fix(webapp): resolve routing issue`       |
 | `application-server`   | Java backend service       | `feat(application-server): add new API endpoint` |
 | `intelligence-service` | Python AI service          | `perf(intelligence-service): optimize analysis`  |
 | `webhook-ingest`       | Webhook processing service | `fix(webhook-ingest): handle invalid payloads`   |
@@ -146,6 +147,13 @@ For bypassing normal release flow during incidents:
 - **Test in staging first** - Never skip RC phase except for hotfixes
 - **Group related features** - Bundle logically related changes in one RC
 
+### Release Candidate Discussions and Notes
+
+- We keep a single GitHub Discussion per upcoming release cycle titled `Release Candidate: vX.Y.Z` in the Announcements category.
+- Each new RC (e.g., `-rc.2`, `-rc.3`) posts an update comment in that thread instead of creating a new discussion.
+- RC GitHub release notes are cumulative: they always include all changes since the last stable tag. This helps reviewers validate the full scope of the next stable.
+- When the stable is published on `main`, we add a final comment to the RC discussion thread to close out the cycle.
+
 ### ❌ Critical DON'Ts
 
 - **Never push directly to `develop`/`main`** - Always use PRs
@@ -156,7 +164,7 @@ For bypassing normal release flow during incidents:
 
 Single `update_version.sh` script updates:
 
-- Node.js packages (`webapp*/package.json`)
+- Node.js package (`webapp/package.json`)
 - Java services (`pom.xml`)
 - Python services (`pyproject.toml`)
 - OpenAPI specs

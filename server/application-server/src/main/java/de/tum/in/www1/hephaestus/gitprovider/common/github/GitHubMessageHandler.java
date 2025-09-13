@@ -5,6 +5,7 @@ import io.nats.client.MessageHandler;
 import java.io.IOException;
 import java.io.StringReader;
 import java.nio.charset.StandardCharsets;
+import java.util.List;
 import org.kohsuke.github.GHEvent;
 import org.kohsuke.github.GHEventPayload;
 import org.kohsuke.github.GitHub;
@@ -58,7 +59,24 @@ public abstract class GitHubMessageHandler<T extends GHEventPayload> implements 
      */
     protected abstract GHEvent getHandlerEvent();
 
-    protected boolean isOrganizationEvent() {
-        return false;
+    /**
+     * Domain classification for handler routing. Defaults to REPOSITORY.
+     */
+    public GitHubMessageDomain getDomain() {
+        return GitHubMessageDomain.REPOSITORY;
+    }
+
+    /**
+     * Optionally declare additional domains this handler should subscribe to.
+     * Default: none.
+     */
+    public List<GitHubMessageDomain> getAdditionalDomains() {
+        return List.of();
+    }
+
+    public enum GitHubMessageDomain {
+        REPOSITORY,
+        ORGANIZATION,
+        INSTALLATION,
     }
 }

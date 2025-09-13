@@ -31,6 +31,129 @@ components:
       - Wrong
       title: BadPracticeStatus
       type: string
+    ChatRequest:
+      description: Chat request model.
+      properties:
+        id:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Id
+        messages:
+          items:
+            $ref: '#/components/schemas/UIMessage'
+          title: Messages
+          type: array
+        metadata:
+          anyOf:
+          - type: object
+          - type: 'null'
+          title: Metadata
+        user_id:
+          title: User Id
+          type: integer
+      required:
+      - messages
+      - user_id
+      title: ChatRequest
+      type: object
+    ChatResponse:
+      anyOf:
+      - $ref: '#/components/schemas/StreamTextStartPart'
+      - $ref: '#/components/schemas/StreamTextDeltaPart'
+      - $ref: '#/components/schemas/StreamTextEndPart'
+      - $ref: '#/components/schemas/StreamReasoningStartPart'
+      - $ref: '#/components/schemas/StreamReasoningDeltaPart'
+      - $ref: '#/components/schemas/StreamReasoningEndPart'
+      - $ref: '#/components/schemas/StreamErrorPart'
+      - $ref: '#/components/schemas/StreamToolInputStartPart'
+      - $ref: '#/components/schemas/StreamToolInputDeltaPart'
+      - $ref: '#/components/schemas/StreamToolInputAvailablePart'
+      - $ref: '#/components/schemas/StreamToolInputErrorPart'
+      - $ref: '#/components/schemas/StreamToolOutputAvailablePart'
+      - $ref: '#/components/schemas/StreamToolOutputErrorPart'
+      - $ref: '#/components/schemas/StreamSourceUrlPart'
+      - $ref: '#/components/schemas/StreamSourceDocumentPart'
+      - $ref: '#/components/schemas/StreamFilePart'
+      - $ref: '#/components/schemas/StreamDataPart'
+      - $ref: '#/components/schemas/StreamStepStartPart'
+      - $ref: '#/components/schemas/StreamStepFinishPart'
+      - $ref: '#/components/schemas/StreamStartPart'
+      - $ref: '#/components/schemas/StreamFinishPart'
+      - $ref: '#/components/schemas/StreamMessageMetadataPart'
+      description: Response model for chat streaming.
+      title: StreamPart
+    CreateDocumentInput:
+      description: Input for createDocument tool.
+      properties:
+        document_id:
+          description: Do not populate this field, will automatically be set by the
+            system
+          title: Document Id
+          type: string
+        kind:
+          const: text
+          title: Kind
+          type: string
+        title:
+          title: Title
+          type: string
+      required:
+      - title
+      - kind
+      - document_id
+      title: CreateDocumentInput
+      type: object
+      x-hephaestus:
+        toolModel: true
+    CreateDocumentOutput:
+      description: Output for createDocument tool.
+      properties:
+        content:
+          title: Content
+          type: string
+        id:
+          title: Id
+          type: string
+        kind:
+          const: TEXT
+          title: Kind
+          type: string
+        title:
+          title: Title
+          type: string
+      required:
+      - id
+      - title
+      - kind
+      - content
+      title: CreateDocumentOutput
+      type: object
+      x-hephaestus:
+        toolModel: true
+    DataUIPart:
+      description: 'A data part with dynamic type.
+
+
+        Note: In UI messages, data can be of any JSON type (object, array, string,
+        number, etc.).'
+      properties:
+        data:
+          title: Data
+        id:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Id
+        type:
+          pattern: ^data-.*
+          title: Type
+          type: string
+      required:
+      - type
+      - data
+      title: DataUIPart
+      type: object
     DetectorRequest:
       properties:
         bad_practice_summary:
@@ -89,6 +212,202 @@ components:
       - trace_id
       title: DetectorResponse
       type: object
+    DocumentCreateData:
+      properties:
+        id:
+          title: Id
+          type: string
+        kind:
+          const: text
+          title: Kind
+          type: string
+        title:
+          title: Title
+          type: string
+      required:
+      - id
+      - title
+      - kind
+      title: DocumentCreateData
+      type: object
+      x-hephaestus:
+        dataModel: true
+    DocumentDeltaData:
+      properties:
+        delta:
+          title: Delta
+          type: string
+        id:
+          title: Id
+          type: string
+        kind:
+          const: text
+          title: Kind
+          type: string
+      required:
+      - id
+      - kind
+      - delta
+      title: DocumentDeltaData
+      type: object
+      x-hephaestus:
+        dataModel: true
+    DocumentFinishData:
+      properties:
+        id:
+          title: Id
+          type: string
+        kind:
+          const: text
+          title: Kind
+          type: string
+      required:
+      - id
+      - kind
+      title: DocumentFinishData
+      type: object
+      x-hephaestus:
+        dataModel: true
+    DocumentUpdateData:
+      properties:
+        id:
+          title: Id
+          type: string
+        kind:
+          const: text
+          title: Kind
+          type: string
+      required:
+      - id
+      - kind
+      title: DocumentUpdateData
+      type: object
+      x-hephaestus:
+        dataModel: true
+    FileUIPart:
+      description: A file part of a message.
+      properties:
+        filename:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Filename
+        mediaType:
+          title: Mediatype
+          type: string
+        providerMetadata:
+          anyOf:
+          - type: object
+          - type: 'null'
+          title: Providermetadata
+        type:
+          const: file
+          default: file
+          title: Type
+          type: string
+        url:
+          title: Url
+          type: string
+      required:
+      - mediaType
+      - url
+      title: FileUIPart
+      type: object
+    GetWeatherInput:
+      description: Input for getWeather tool.
+      properties:
+        latitude:
+          title: Latitude
+          type: number
+        longitude:
+          title: Longitude
+          type: number
+      required:
+      - latitude
+      - longitude
+      title: GetWeatherInput
+      type: object
+      x-hephaestus:
+        toolModel: true
+    GetWeatherOutput:
+      description: Output for getWeather tool, aligned with WeatherTool.tsx expectations.
+      properties:
+        current:
+          anyOf:
+          - $ref: '#/components/schemas/WeatherCurrent'
+          - type: 'null'
+          default: null
+        current_units:
+          anyOf:
+          - $ref: '#/components/schemas/WeatherCurrentUnits'
+          - type: 'null'
+          default: null
+        daily:
+          anyOf:
+          - $ref: '#/components/schemas/WeatherDaily'
+          - type: 'null'
+          default: null
+        daily_units:
+          anyOf:
+          - $ref: '#/components/schemas/WeatherDailyUnits'
+          - type: 'null'
+          default: null
+        elevation:
+          anyOf:
+          - type: number
+          - type: 'null'
+          default: null
+          title: Elevation
+        generationtime_ms:
+          anyOf:
+          - type: number
+          - type: 'null'
+          default: null
+          title: Generationtime Ms
+        hourly:
+          anyOf:
+          - $ref: '#/components/schemas/WeatherHourly'
+          - type: 'null'
+          default: null
+        hourly_units:
+          anyOf:
+          - $ref: '#/components/schemas/WeatherHourlyUnits'
+          - type: 'null'
+          default: null
+        latitude:
+          anyOf:
+          - type: number
+          - type: 'null'
+          default: null
+          title: Latitude
+        longitude:
+          anyOf:
+          - type: number
+          - type: 'null'
+          default: null
+          title: Longitude
+        timezone:
+          anyOf:
+          - type: string
+          - type: 'null'
+          default: null
+          title: Timezone
+        timezone_abbreviation:
+          anyOf:
+          - type: string
+          - type: 'null'
+          default: null
+          title: Timezone Abbreviation
+        utc_offset_seconds:
+          anyOf:
+          - type: integer
+          - type: 'null'
+          default: null
+          title: Utc Offset Seconds
+      title: GetWeatherOutput
+      type: object
+      x-hephaestus:
+        toolModel: true
     HTTPValidationError:
       properties:
         detail:
@@ -108,53 +427,883 @@ components:
           type: string
       title: HealthCheck
       type: object
-    MentorRequest:
+    ReasoningUIPart:
+      description: A reasoning part of a message.
+      properties:
+        providerMetadata:
+          anyOf:
+          - type: object
+          - type: 'null'
+          title: Providermetadata
+        state:
+          anyOf:
+          - enum:
+            - streaming
+            - done
+            type: string
+          - type: 'null'
+          title: State
+        text:
+          title: Text
+          type: string
+        type:
+          const: reasoning
+          default: reasoning
+          title: Type
+          type: string
+      required:
+      - text
+      title: ReasoningUIPart
+      type: object
+    SourceDocumentUIPart:
+      description: A document source part of a message.
+      properties:
+        filename:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Filename
+        mediaType:
+          title: Mediatype
+          type: string
+        providerMetadata:
+          anyOf:
+          - type: object
+          - type: 'null'
+          title: Providermetadata
+        sourceId:
+          title: Sourceid
+          type: string
+        title:
+          title: Title
+          type: string
+        type:
+          const: source-document
+          default: source-document
+          title: Type
+          type: string
+      required:
+      - sourceId
+      - mediaType
+      - title
+      title: SourceDocumentUIPart
+      type: object
+    SourceUrlUIPart:
+      description: A URL source part of a message.
+      properties:
+        providerMetadata:
+          anyOf:
+          - type: object
+          - type: 'null'
+          title: Providermetadata
+        sourceId:
+          title: Sourceid
+          type: string
+        title:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Title
+        type:
+          const: source-url
+          default: source-url
+          title: Type
+          type: string
+        url:
+          title: Url
+          type: string
+      required:
+      - sourceId
+      - url
+      title: SourceUrlUIPart
+      type: object
+    StepStartUIPart:
+      description: A step boundary part of a message.
+      properties:
+        type:
+          const: step-start
+          default: step-start
+          title: Type
+          type: string
+      title: StepStartUIPart
+      type: object
+    StreamDataPart:
+      description: 'Data part with dynamic type.
+
+
+        AI SDK v5 stream chunks support a `transient` flag that indicates the data
+
+        should not be added to the persisted message state.'
+      properties:
+        data:
+          title: Data
+        id:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Id
+        transient:
+          anyOf:
+          - type: boolean
+          - type: 'null'
+          title: Transient
+        type:
+          pattern: ^data-.*
+          title: Type
+          type: string
+      required:
+      - type
+      - data
+      title: StreamDataPart
+      type: object
+    StreamErrorPart:
+      description: Error stream part.
+      properties:
+        errorText:
+          title: Errortext
+          type: string
+        type:
+          const: error
+          default: error
+          title: Type
+          type: string
+      required:
+      - errorText
+      title: StreamErrorPart
+      type: object
+    StreamFilePart:
+      description: File part of a message.
+      properties:
+        mediaType:
+          title: Mediatype
+          type: string
+        providerMetadata:
+          anyOf:
+          - type: object
+          - type: 'null'
+          title: Providermetadata
+        type:
+          const: file
+          default: file
+          title: Type
+          type: string
+        url:
+          title: Url
+          type: string
+      required:
+      - url
+      - mediaType
+      title: StreamFilePart
+      type: object
+    StreamFinishPart:
+      description: End of stream event.
+      properties:
+        messageMetadata:
+          anyOf:
+          - type: object
+          - type: 'null'
+          title: Messagemetadata
+        type:
+          const: finish
+          default: finish
+          title: Type
+          type: string
+      title: StreamFinishPart
+      type: object
+    StreamMessageMetadataPart:
+      description: Message metadata part.
+      properties:
+        messageMetadata:
+          title: Messagemetadata
+          type: object
+        type:
+          const: message-metadata
+          default: message-metadata
+          title: Type
+          type: string
+      required:
+      - messageMetadata
+      title: StreamMessageMetadataPart
+      type: object
+    StreamReasoningDeltaPart:
+      description: Reasoning stream delta part.
+      properties:
+        delta:
+          title: Delta
+          type: string
+        id:
+          title: Id
+          type: string
+        providerMetadata:
+          anyOf:
+          - type: object
+          - type: 'null'
+          title: Providermetadata
+        type:
+          const: reasoning-delta
+          default: reasoning-delta
+          title: Type
+          type: string
+      required:
+      - id
+      - delta
+      title: StreamReasoningDeltaPart
+      type: object
+    StreamReasoningEndPart:
+      description: Reasoning stream end part.
+      properties:
+        id:
+          title: Id
+          type: string
+        providerMetadata:
+          anyOf:
+          - type: object
+          - type: 'null'
+          title: Providermetadata
+        type:
+          const: reasoning-end
+          default: reasoning-end
+          title: Type
+          type: string
+      required:
+      - id
+      title: StreamReasoningEndPart
+      type: object
+    StreamReasoningStartPart:
+      description: Reasoning stream start part.
+      properties:
+        id:
+          title: Id
+          type: string
+        providerMetadata:
+          anyOf:
+          - type: object
+          - type: 'null'
+          title: Providermetadata
+        type:
+          const: reasoning-start
+          default: reasoning-start
+          title: Type
+          type: string
+      required:
+      - id
+      title: StreamReasoningStartPart
+      type: object
+    StreamSourceDocumentPart:
+      description: Source document part of a message.
+      properties:
+        filename:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Filename
+        mediaType:
+          title: Mediatype
+          type: string
+        providerMetadata:
+          anyOf:
+          - type: object
+          - type: 'null'
+          title: Providermetadata
+        sourceId:
+          title: Sourceid
+          type: string
+        title:
+          title: Title
+          type: string
+        type:
+          const: source-document
+          default: source-document
+          title: Type
+          type: string
+      required:
+      - sourceId
+      - mediaType
+      - title
+      title: StreamSourceDocumentPart
+      type: object
+    StreamSourceUrlPart:
+      description: Source URL part of a message.
+      properties:
+        providerMetadata:
+          anyOf:
+          - type: object
+          - type: 'null'
+          title: Providermetadata
+        sourceId:
+          title: Sourceid
+          type: string
+        title:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Title
+        type:
+          const: source-url
+          default: source-url
+          title: Type
+          type: string
+        url:
+          title: Url
+          type: string
+      required:
+      - sourceId
+      - url
+      title: StreamSourceUrlPart
+      type: object
+    StreamStartPart:
+      description: Start of stream event.
+      properties:
+        messageId:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Messageid
+        messageMetadata:
+          anyOf:
+          - type: object
+          - type: 'null'
+          title: Messagemetadata
+        type:
+          const: start
+          default: start
+          title: Type
+          type: string
+      title: StreamStartPart
+      type: object
+    StreamStepFinishPart:
+      description: Step finish event.
+      properties:
+        type:
+          const: finish-step
+          default: finish-step
+          title: Type
+          type: string
+      title: StreamStepFinishPart
+      type: object
+    StreamStepStartPart:
+      description: Step start event.
+      properties:
+        type:
+          const: start-step
+          default: start-step
+          title: Type
+          type: string
+      title: StreamStepStartPart
+      type: object
+    StreamTextDeltaPart:
+      description: Text stream delta part.
+      properties:
+        delta:
+          title: Delta
+          type: string
+        id:
+          title: Id
+          type: string
+        providerMetadata:
+          anyOf:
+          - type: object
+          - type: 'null'
+          title: Providermetadata
+        type:
+          const: text-delta
+          default: text-delta
+          title: Type
+          type: string
+      required:
+      - id
+      - delta
+      title: StreamTextDeltaPart
+      type: object
+    StreamTextEndPart:
+      description: Text stream end part.
+      properties:
+        id:
+          title: Id
+          type: string
+        providerMetadata:
+          anyOf:
+          - type: object
+          - type: 'null'
+          title: Providermetadata
+        type:
+          const: text-end
+          default: text-end
+          title: Type
+          type: string
+      required:
+      - id
+      title: StreamTextEndPart
+      type: object
+    StreamTextStartPart:
+      description: Text stream start part.
+      properties:
+        id:
+          title: Id
+          type: string
+        providerMetadata:
+          anyOf:
+          - type: object
+          - type: 'null'
+          title: Providermetadata
+        type:
+          const: text-start
+          default: text-start
+          title: Type
+          type: string
+      required:
+      - id
+      title: StreamTextStartPart
+      type: object
+    StreamToolInputAvailablePart:
+      description: 'Tool input available event.
+
+
+        AI SDK v5 uses `providerMetadata` on the stream chunk; the UI part maps this
+
+        to `callProviderMetadata` when persisting tool invocation parts.'
+      properties:
+        dynamic:
+          anyOf:
+          - type: boolean
+          - type: 'null'
+          title: Dynamic
+        input:
+          title: Input
+          type: object
+        providerExecuted:
+          anyOf:
+          - type: boolean
+          - type: 'null'
+          title: Providerexecuted
+        providerMetadata:
+          anyOf:
+          - type: object
+          - type: 'null'
+          title: Providermetadata
+        toolCallId:
+          title: Toolcallid
+          type: string
+        toolName:
+          title: Toolname
+          type: string
+        type:
+          const: tool-input-available
+          default: tool-input-available
+          title: Type
+          type: string
+      required:
+      - toolCallId
+      - toolName
+      - input
+      title: StreamToolInputAvailablePart
+      type: object
+    StreamToolInputDeltaPart:
+      description: Tool input delta event.
+      properties:
+        inputTextDelta:
+          title: Inputtextdelta
+          type: string
+        toolCallId:
+          title: Toolcallid
+          type: string
+        type:
+          const: tool-input-delta
+          default: tool-input-delta
+          title: Type
+          type: string
+      required:
+      - toolCallId
+      - inputTextDelta
+      title: StreamToolInputDeltaPart
+      type: object
+    StreamToolInputErrorPart:
+      description: 'Tool input error event (signals an error occurred while preparing
+        input).
+
+
+        Mirrors AI SDK ''tool-input-error'' chunk. For non-dynamic tools, the server
+        should
+
+        record an ''output-error'' tool UI part where rawInput may be used for diagnostics.'
+      properties:
+        dynamic:
+          anyOf:
+          - type: boolean
+          - type: 'null'
+          title: Dynamic
+        errorText:
+          title: Errortext
+          type: string
+        input:
+          title: Input
+        providerExecuted:
+          anyOf:
+          - type: boolean
+          - type: 'null'
+          title: Providerexecuted
+        providerMetadata:
+          anyOf:
+          - type: object
+          - type: 'null'
+          title: Providermetadata
+        toolCallId:
+          title: Toolcallid
+          type: string
+        toolName:
+          title: Toolname
+          type: string
+        type:
+          const: tool-input-error
+          default: tool-input-error
+          title: Type
+          type: string
+      required:
+      - toolCallId
+      - toolName
+      - input
+      - errorText
+      title: StreamToolInputErrorPart
+      type: object
+    StreamToolInputStartPart:
+      description: Tool input start event.
+      properties:
+        dynamic:
+          anyOf:
+          - type: boolean
+          - type: 'null'
+          title: Dynamic
+        providerExecuted:
+          anyOf:
+          - type: boolean
+          - type: 'null'
+          title: Providerexecuted
+        toolCallId:
+          title: Toolcallid
+          type: string
+        toolName:
+          title: Toolname
+          type: string
+        type:
+          const: tool-input-start
+          default: tool-input-start
+          title: Type
+          type: string
+      required:
+      - toolCallId
+      - toolName
+      title: StreamToolInputStartPart
+      type: object
+    StreamToolOutputAvailablePart:
+      description: Tool output available event.
+      properties:
+        dynamic:
+          anyOf:
+          - type: boolean
+          - type: 'null'
+          title: Dynamic
+        output:
+          title: Output
+          type: object
+        providerExecuted:
+          anyOf:
+          - type: boolean
+          - type: 'null'
+          title: Providerexecuted
+        toolCallId:
+          title: Toolcallid
+          type: string
+        type:
+          const: tool-output-available
+          default: tool-output-available
+          title: Type
+          type: string
+      required:
+      - toolCallId
+      - output
+      title: StreamToolOutputAvailablePart
+      type: object
+    StreamToolOutputErrorPart:
+      description: Tool output error event.
+      properties:
+        dynamic:
+          anyOf:
+          - type: boolean
+          - type: 'null'
+          title: Dynamic
+        errorText:
+          title: Errortext
+          type: string
+        providerExecuted:
+          anyOf:
+          - type: boolean
+          - type: 'null'
+          title: Providerexecuted
+        toolCallId:
+          title: Toolcallid
+          type: string
+        type:
+          const: tool-output-error
+          default: tool-output-error
+          title: Type
+          type: string
+      required:
+      - toolCallId
+      - errorText
+      title: StreamToolOutputErrorPart
+      type: object
+    TextUIPart:
+      description: A text part of a message.
+      properties:
+        providerMetadata:
+          anyOf:
+          - type: object
+          - type: 'null'
+          title: Providermetadata
+        state:
+          anyOf:
+          - enum:
+            - streaming
+            - done
+            type: string
+          - type: 'null'
+          title: State
+        text:
+          title: Text
+          type: string
+        type:
+          const: text
+          default: text
+          title: Type
+          type: string
+      required:
+      - text
+      title: TextUIPart
+      type: object
+    ToolInputAvailablePart:
+      description: Tool part with input available.
+      properties:
+        callProviderMetadata:
+          anyOf:
+          - type: object
+          - type: 'null'
+          title: Callprovidermetadata
+        input:
+          title: Input
+          type: object
+        providerExecuted:
+          anyOf:
+          - type: boolean
+          - type: 'null'
+          title: Providerexecuted
+        state:
+          const: input-available
+          title: State
+          type: string
+        toolCallId:
+          title: Toolcallid
+          type: string
+        type:
+          pattern: ^tool-.*
+          title: Type
+          type: string
+      required:
+      - type
+      - toolCallId
+      - state
+      - input
+      title: ToolInputAvailablePart
+      type: object
+    ToolInputStreamingPart:
+      description: Tool part with input being streamed.
+      properties:
+        input:
+          anyOf:
+          - type: object
+          - type: 'null'
+          title: Input
+        providerExecuted:
+          anyOf:
+          - type: boolean
+          - type: 'null'
+          title: Providerexecuted
+        state:
+          const: input-streaming
+          title: State
+          type: string
+        toolCallId:
+          title: Toolcallid
+          type: string
+        type:
+          pattern: ^tool-.*
+          title: Type
+          type: string
+      required:
+      - type
+      - toolCallId
+      - state
+      title: ToolInputStreamingPart
+      type: object
+    ToolOutputAvailablePart:
+      description: Tool part with output available.
+      properties:
+        callProviderMetadata:
+          anyOf:
+          - type: object
+          - type: 'null'
+          title: Callprovidermetadata
+        input:
+          title: Input
+          type: object
+        output:
+          title: Output
+          type: object
+        providerExecuted:
+          anyOf:
+          - type: boolean
+          - type: 'null'
+          title: Providerexecuted
+        state:
+          const: output-available
+          title: State
+          type: string
+        toolCallId:
+          title: Toolcallid
+          type: string
+        type:
+          pattern: ^tool-.*
+          title: Type
+          type: string
+      required:
+      - type
+      - toolCallId
+      - state
+      - input
+      - output
+      title: ToolOutputAvailablePart
+      type: object
+    ToolOutputErrorPart:
+      description: Tool part with output error.
+      properties:
+        callProviderMetadata:
+          anyOf:
+          - type: object
+          - type: 'null'
+          title: Callprovidermetadata
+        errorText:
+          title: Errortext
+          type: string
+        input:
+          title: Input
+          type: object
+        providerExecuted:
+          anyOf:
+          - type: boolean
+          - type: 'null'
+          title: Providerexecuted
+        state:
+          const: output-error
+          title: State
+          type: string
+        toolCallId:
+          title: Toolcallid
+          type: string
+        type:
+          pattern: ^tool-.*
+          title: Type
+          type: string
+      required:
+      - type
+      - toolCallId
+      - state
+      - input
+      - errorText
+      title: ToolOutputErrorPart
+      type: object
+    UIMessage:
+      description: Message model that matches the TypeScript interface.
+      properties:
+        id:
+          description: A unique identifier for the message
+          title: Id
+          type: string
+        metadata:
+          anyOf:
+          - type: object
+          - type: 'null'
+          title: Metadata
+        parts:
+          items:
+            anyOf:
+            - $ref: '#/components/schemas/TextUIPart'
+            - $ref: '#/components/schemas/ReasoningUIPart'
+            - $ref: '#/components/schemas/ToolInputStreamingPart'
+            - $ref: '#/components/schemas/ToolInputAvailablePart'
+            - $ref: '#/components/schemas/ToolOutputAvailablePart'
+            - $ref: '#/components/schemas/ToolOutputErrorPart'
+            - $ref: '#/components/schemas/SourceUrlUIPart'
+            - $ref: '#/components/schemas/SourceDocumentUIPart'
+            - $ref: '#/components/schemas/FileUIPart'
+            - $ref: '#/components/schemas/DataUIPart'
+            - $ref: '#/components/schemas/StepStartUIPart'
+          title: Parts
+          type: array
+        role:
+          enum:
+          - system
+          - user
+          - assistant
+          title: Role
+          type: string
+      required:
+      - id
+      - role
+      - parts
+      title: UIMessage
+      type: object
+    UpdateDocumentInput:
+      description: Input for updateDocument tool.
+      properties:
+        description:
+          description: The description of changes that need to be made
+          title: Description
+          type: string
+        id:
+          description: The ID of the document to update
+          title: Id
+          type: string
+      required:
+      - id
+      - description
+      title: UpdateDocumentInput
+      type: object
+      x-hephaestus:
+        toolModel: true
+    UpdateDocumentOutput:
+      description: Output for updateDocument tool.
       properties:
         content:
           title: Content
           type: string
-        session_id:
-          title: Session Id
+        id:
+          title: Id
+          type: string
+        kind:
+          const: TEXT
+          title: Kind
+          type: string
+        title:
+          title: Title
           type: string
       required:
-      - session_id
+      - id
+      - title
+      - kind
       - content
-      title: MentorRequest
+      title: UpdateDocumentOutput
       type: object
-    MentorResponse:
-      properties:
-        closed:
-          default: false
-          title: Closed
-          type: boolean
-        content:
-          title: Content
-          type: string
-      required:
-      - content
-      title: MentorResponse
-      type: object
-    MentorStartRequest:
-      properties:
-        dev_progress:
-          title: Dev Progress
-          type: string
-        previous_session_id:
-          title: Previous Session Id
-          type: string
-        session_id:
-          title: Session Id
-          type: string
-        user_id:
-          title: User Id
-          type: string
-      required:
-      - session_id
-      - user_id
-      - previous_session_id
-      - dev_progress
-      title: MentorStartRequest
-      type: object
+      x-hephaestus:
+        toolModel: true
     ValidationError:
       properties:
         loc:
@@ -176,13 +1325,133 @@ components:
       - type
       title: ValidationError
       type: object
+    WeatherCurrent:
+      properties:
+        interval:
+          anyOf:
+          - type: integer
+          - type: 'null'
+          default: null
+          title: Interval
+        temperature_2m:
+          anyOf:
+          - type: number
+          - type: 'null'
+          default: null
+          title: Temperature 2M
+        time:
+          anyOf:
+          - type: string
+          - type: 'null'
+          default: null
+          title: Time
+      title: WeatherCurrent
+      type: object
+    WeatherCurrentUnits:
+      properties:
+        interval:
+          anyOf:
+          - type: string
+          - type: 'null'
+          default: null
+          title: Interval
+        temperature_2m:
+          anyOf:
+          - type: string
+          - type: 'null'
+          default: null
+          title: Temperature 2M
+        time:
+          anyOf:
+          - type: string
+          - type: 'null'
+          default: null
+          title: Time
+      title: WeatherCurrentUnits
+      type: object
+    WeatherDaily:
+      properties:
+        sunrise:
+          default: []
+          items:
+            type: string
+          title: Sunrise
+          type: array
+        sunset:
+          default: []
+          items:
+            type: string
+          title: Sunset
+          type: array
+        time:
+          default: []
+          items:
+            type: string
+          title: Time
+          type: array
+      title: WeatherDaily
+      type: object
+    WeatherDailyUnits:
+      properties:
+        sunrise:
+          anyOf:
+          - type: string
+          - type: 'null'
+          default: null
+          title: Sunrise
+        sunset:
+          anyOf:
+          - type: string
+          - type: 'null'
+          default: null
+          title: Sunset
+        time:
+          anyOf:
+          - type: string
+          - type: 'null'
+          default: null
+          title: Time
+      title: WeatherDailyUnits
+      type: object
+    WeatherHourly:
+      properties:
+        temperature_2m:
+          default: []
+          items:
+            type: number
+          title: Temperature 2M
+          type: array
+        time:
+          default: []
+          items:
+            type: string
+          title: Time
+          type: array
+      title: WeatherHourly
+      type: object
+    WeatherHourlyUnits:
+      properties:
+        temperature_2m:
+          anyOf:
+          - type: string
+          - type: 'null'
+          default: null
+          title: Temperature 2M
+        time:
+          anyOf:
+          - type: string
+          - type: 'null'
+          default: null
+          title: Time
+      title: WeatherHourlyUnits
+      type: object
 info:
   contact:
     email: felixtj.dietrich@tum.de
     name: Felix T.J. Dietrich
   description: API documentation for the Hephaestus Intelligence Service.
   title: Hephaestus Intelligence Service API
-  version: 0.9.0-rc.7
+  version: 0.9.0-rc.26
 openapi: 3.1.0
 paths:
   /detector/:
@@ -229,65 +1498,37 @@ paths:
       summary: Perform a Health Check
       tags:
       - healthcheck
-  /mentor/:
+  /mentor/chat:
     post:
-      operationId: generate_mentor__post
+      operationId: handle_chat_mentor_chat_post
       requestBody:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/MentorRequest'
+              $ref: '#/components/schemas/ChatRequest'
         required: true
       responses:
         '200':
           content:
-            application/json:
+            text/event-stream:
+              examples:
+                error:
+                  value:
+                    errorText: oops
+                    type: error
+                text:
+                  value:
+                    text: Hello
+                    type: text
               schema:
-                $ref: '#/components/schemas/MentorResponse'
-          description: Successful Response
+                $ref: '#/components/schemas/ChatResponse'
+          description: Event stream of chat updates.
         '422':
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/HTTPValidationError'
           description: Validation Error
-      summary: Continue a chat session with an LLM.
-      tags:
-      - mentor
-  /mentor/health:
-    get:
-      operationId: status_mentor_health_get
-      responses:
-        '200':
-          content:
-            application/json:
-              schema: {}
-          description: Successful Response
-      summary: Check if the intelligence service is running
-      tags:
-      - mentor
-  /mentor/start:
-    post:
-      operationId: start_mentor_start_post
-      requestBody:
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/MentorStartRequest'
-        required: true
-      responses:
-        '200':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/MentorResponse'
-          description: Successful Response
-        '422':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/HTTPValidationError'
-          description: Validation Error
-      summary: Start a chat session with an LLM.
+      summary: Handle Chat
       tags:
       - mentor

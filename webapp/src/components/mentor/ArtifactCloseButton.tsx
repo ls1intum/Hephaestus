@@ -1,0 +1,25 @@
+import { X } from "lucide-react";
+import { Button } from "@/components/ui/button";
+
+export interface ArtifactCloseButtonProps {
+	/** Handler for closing the artifact */
+	onClose: () => void;
+}
+
+/**
+ * ArtifactCloseButton provides a close button for artifacts.
+ * Always requires an explicit onClose handler to be provided.
+ */
+export function ArtifactCloseButton({ onClose }: ArtifactCloseButtonProps) {
+	return (
+		<Button
+			data-testid="artifact-close-button"
+			className="dark:border-primary/10 dark:hover:bg-primary/10"
+			variant="outline"
+			size="icon"
+			onClick={onClose}
+		>
+			<X className="size-6" strokeWidth={1.5} />
+		</Button>
+	);
+}
