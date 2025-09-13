@@ -121,4 +121,29 @@
     <changeSet author="FelixTJDietrich" id="1757778309656-29">
         <dropColumn columnName="color" tableName="team"/>
     </changeSet>
+    <!-- Purge legacy team-related data to ensure a clean slate after schema changes -->
+    <changeSet author="FelixTJDietrich" id="1757778309656-30">
+        <preConditions onFail="MARK_RAN">
+            <tableExists tableName="team_labels"/>
+        </preConditions>
+        <delete tableName="team_labels"/>
+    </changeSet>
+    <changeSet author="FelixTJDietrich" id="1757778309656-31">
+        <preConditions onFail="MARK_RAN">
+            <tableExists tableName="team_repository_permission"/>
+        </preConditions>
+        <delete tableName="team_repository_permission"/>
+    </changeSet>
+    <changeSet author="FelixTJDietrich" id="1757778309656-32">
+        <preConditions onFail="MARK_RAN">
+            <tableExists tableName="team_membership"/>
+        </preConditions>
+        <delete tableName="team_membership"/>
+    </changeSet>
+    <changeSet author="FelixTJDietrich" id="1757778309656-33">
+        <preConditions onFail="MARK_RAN">
+            <tableExists tableName="team"/>
+        </preConditions>
+        <delete tableName="team"/>
+    </changeSet>
 </databaseChangeLog>
