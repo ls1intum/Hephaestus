@@ -25,40 +25,25 @@ const repo: RepositoryInfo = {
 const team: TeamInfo = {
 	id: 1,
 	name: "Platform",
-	labels: [
-		{
-			id: 1,
-			name: "bug",
-			color: "d73a4a",
-			repository: { id: 100 } as RepositoryInfo,
-		} as LabelInfo,
-	],
 	hidden: false,
 	membershipCount: 5,
 	repoPermissionCount: 3,
 	repositories: [repo],
 	members: [],
+	labels: [
+		{
+			id: 1,
+			name: "bug",
+			color: "d73a4a",
+			repository: repo,
+		},
+	],
 };
 
 const catalog: LabelInfo[] = [
-	{
-		id: 1,
-		name: "bug",
-		color: "d73a4a",
-		repository: { id: 100 } as RepositoryInfo,
-	} as LabelInfo,
-	{
-		id: 2,
-		name: "feature",
-		color: "a2eeef",
-		repository: { id: 100 } as RepositoryInfo,
-	} as LabelInfo,
-	{
-		id: 3,
-		name: "docs",
-		color: "0075ca",
-		repository: { id: 100 } as RepositoryInfo,
-	} as LabelInfo,
+	{ id: 1, name: "bug", color: "d73a4a", repository: repo },
+	{ id: 2, name: "feature", color: "a2eeef", repository: repo },
+	{ id: 3, name: "docs", color: "0075ca", repository: repo },
 ];
 
 export const Default: Story = {

@@ -61,7 +61,10 @@ export function RepositoryCard({
 								href={repository.htmlUrl}
 								target="_blank"
 								rel="noopener noreferrer"
-								className={cn("text-sm font-medium hover:underline block truncate", team.hidden ? "text-muted-foreground" : "")}
+								className={cn(
+									"text-sm font-medium hover:underline block truncate",
+									team.hidden ? "text-muted-foreground" : "",
+								)}
 								title={repository.nameWithOwner}
 							>
 								{repository.nameWithOwner}

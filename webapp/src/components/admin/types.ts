@@ -6,7 +6,7 @@ export interface ExtendedUserTeams extends Omit<ApiUserTeams, "teams"> {
 	user: {
 		id: string | number;
 		name: string;
-		login?: string;
+		login: string;
 		email?: string;
 		role?: string;
 	};
@@ -21,7 +21,7 @@ export const adaptApiUserTeams = (
 		user: {
 			id: apiUserTeams.id,
 			name: apiUserTeams.name,
-			login: apiUserTeams.login,
+			login: String(apiUserTeams.login ?? ""),
 			email: apiUserTeams.email,
 		},
 	};

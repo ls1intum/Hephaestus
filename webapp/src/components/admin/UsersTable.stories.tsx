@@ -56,6 +56,7 @@ const mockUsers: ExtendedUserTeams[] = [
 		user: {
 			id: "user-1",
 			name: "Alice Johnson",
+			login: "alice",
 			email: "alice@example.com",
 		},
 	},
@@ -68,6 +69,7 @@ const mockUsers: ExtendedUserTeams[] = [
 		user: {
 			id: "user-2",
 			name: "Bob Smith",
+			login: "bob",
 			email: "bob@example.com",
 		},
 	},
@@ -80,6 +82,7 @@ const mockUsers: ExtendedUserTeams[] = [
 		user: {
 			id: "user-3",
 			name: "Charlie Brown",
+			login: "charlie",
 			email: "charlie@example.com",
 		},
 	},
@@ -92,6 +95,7 @@ const mockUsers: ExtendedUserTeams[] = [
 		user: {
 			id: "user-4",
 			name: "Diana Prince",
+			login: "diana",
 			email: "diana@example.com",
 		},
 	},
@@ -104,6 +108,7 @@ const mockUsers: ExtendedUserTeams[] = [
 		user: {
 			id: "user-5",
 			name: "Ethan Hunt",
+			login: "ethan",
 			email: "ethan@example.com",
 		},
 	},
@@ -193,6 +198,7 @@ export const ManyUsers: Story = {
 			user: {
 				id: `user-${i + 10}`,
 				name: `User ${i + 1}`,
+				login: `user${i + 1}`,
 				email: `user${i + 1}@example.com`,
 			},
 		})),

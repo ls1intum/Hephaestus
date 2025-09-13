@@ -14,37 +14,54 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-const repoA = {
+const repoA: RepositoryInfo = {
 	id: 100,
+	name: "api",
 	nameWithOwner: "org/api",
 	htmlUrl: "https://github.com/org/api",
-} as RepositoryInfo;
-const repoB = {
+};
+const repoB: RepositoryInfo = {
 	id: 101,
+	name: "web",
 	nameWithOwner: "org/web",
 	htmlUrl: "https://github.com/org/web",
-} as RepositoryInfo;
-const bug = {
+};
+const bug: LabelInfo = {
 	id: 1,
 	name: "bug",
 	color: "d73a4a",
-	repository: { id: 100 } as RepositoryInfo,
-} as LabelInfo;
+	repository: repoA,
+};
 
-const child = {
+const child: TeamInfo = {
 	id: 2,
 	name: "Frontend",
+	hidden: false,
+	membershipCount: 0,
+	repoPermissionCount: 0,
 	repositories: [repoB],
 	labels: [],
-} as unknown as TeamInfo;
+	members: [],
+};
 
-const parent = {
+const parent: TeamInfo = {
 	id: 1,
 	name: "Platform",
-	members: [{ id: 10, login: "alice" }],
+	hidden: false,
+	membershipCount: 1,
+	repoPermissionCount: 1,
+	members: [
+		{
+			id: 10,
+			login: "alice",
+			name: "Alice",
+			avatarUrl: "",
+			htmlUrl: "https://github.com/alice",
+		},
+	],
 	repositories: [repoA],
 	labels: [bug],
-} as unknown as TeamInfo;
+};
 
 const childrenMap = new Map<number, TeamInfo[]>([[1, [child]]]);
 const displaySet = new Set<number>([1, 2]);

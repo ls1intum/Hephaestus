@@ -75,6 +75,7 @@ const mockUsers: ExtendedUserTeams[] = [
 		user: {
 			id: 1,
 			name: "Alice Smith",
+			login: "alice.smith",
 			email: "alice.smith@example.com",
 			role: "user",
 		},
@@ -88,6 +89,7 @@ const mockUsers: ExtendedUserTeams[] = [
 		user: {
 			id: 2,
 			name: "Bob Johnson",
+			login: "bob.johnson",
 			email: "bob.johnson@example.com",
 			role: "admin",
 		},
@@ -101,6 +103,7 @@ const mockUsers: ExtendedUserTeams[] = [
 		user: {
 			id: 3,
 			name: "Carol Williams",
+			login: "carol.williams",
 			email: "carol.williams@example.com",
 			role: "user",
 		},
@@ -114,6 +117,7 @@ const mockUsers: ExtendedUserTeams[] = [
 		user: {
 			id: 4,
 			name: "David Brown",
+			login: "david.brown",
 			email: "david.brown@example.com",
 			role: "user",
 		},

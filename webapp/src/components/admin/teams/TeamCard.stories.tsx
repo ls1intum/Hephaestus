@@ -15,15 +15,27 @@ const meta = {
 			id: 1,
 			name: "Platform Team",
 			hidden: false,
-			members: [{ id: 10, login: "alice" }],
+			membershipCount: 1,
+			repoPermissionCount: 0,
+			members: [
+				{
+					id: 10,
+					login: "alice",
+					name: "Alice",
+					avatarUrl: "",
+					htmlUrl: "https://github.com/alice",
+				},
+			],
 			repositories: [
 				{
 					id: 101,
+					name: "repo",
 					nameWithOwner: "org/repo",
 					htmlUrl: "https://github.com/org/repo",
 				},
 			],
-		} as unknown as TeamInfo,
+			labels: [],
+		} satisfies TeamInfo,
 		memberCount: 1,
 	},
 } satisfies Meta<typeof TeamCard>;
@@ -45,7 +57,16 @@ export const Default: Story = {
 
 export const Hidden: Story = {
 	args: {
-		team: { id: 1, name: "Platform Team", hidden: true } as unknown as TeamInfo,
+		team: {
+			id: 1,
+			name: "Platform Team",
+			hidden: true,
+			membershipCount: 5,
+			repoPermissionCount: 0,
+			members: [],
+			repositories: [],
+			labels: [],
+		} satisfies TeamInfo,
 		memberCount: 5,
 		onToggleVisibility: () => {},
 		getCatalogLabels: () => [],

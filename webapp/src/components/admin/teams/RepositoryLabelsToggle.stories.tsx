@@ -24,35 +24,40 @@ const mockRepo: RepositoryInfo = {
 const mockTeam: TeamInfo = {
 	id: 1,
 	name: "Team Alpha",
+	hidden: false,
+	membershipCount: 0,
+	repoPermissionCount: 0,
+	repositories: [mockRepo],
+	members: [],
 	labels: [
 		{
 			id: 1,
 			name: "bug",
 			color: "d73a4a",
-			repository: { id: 100 } as RepositoryInfo,
-		} as LabelInfo,
+			repository: mockRepo,
+		},
 	],
-} as TeamInfo;
+};
 
 const catalog: LabelInfo[] = [
 	{
 		id: 1,
 		name: "bug",
 		color: "d73a4a",
-		repository: { id: 100 } as RepositoryInfo,
-	} as LabelInfo,
+		repository: mockRepo,
+	},
 	{
 		id: 2,
 		name: "feature",
 		color: "a2eeef",
-		repository: { id: 100 } as RepositoryInfo,
-	} as LabelInfo,
+		repository: mockRepo,
+	},
 	{
 		id: 3,
 		name: "docs",
 		color: "0075ca",
-		repository: { id: 100 } as RepositoryInfo,
-	} as LabelInfo,
+		repository: mockRepo,
+	},
 ];
 
 export const Default: Story = {
