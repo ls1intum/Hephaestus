@@ -3,7 +3,7 @@ package de.tum.in.www1.hephaestus.gitprovider.issue;
 import de.tum.in.www1.hephaestus.gitprovider.issue.Issue.State;
 import de.tum.in.www1.hephaestus.gitprovider.label.LabelInfoDTO;
 import de.tum.in.www1.hephaestus.gitprovider.user.UserInfoDTO;
-import java.time.OffsetDateTime;
+import java.time.Instant;
 import java.util.List;
 import org.springframework.lang.NonNull;
 
@@ -18,6 +18,6 @@ public record IssueInfoDTO(
     List<UserInfoDTO> assignees,
     String repositoryNameWithOwner,
     @NonNull String htmlUrl,
-    OffsetDateTime createdAt,
-    OffsetDateTime updatedAt
+    Instant createdAt,
+    Instant updatedAt
 ) {}

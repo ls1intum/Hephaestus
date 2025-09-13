@@ -12,7 +12,7 @@ import jakarta.persistence.Lob;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.OneToMany;
 import jakarta.persistence.Table;
-import java.time.OffsetDateTime;
+import java.time.Instant;
 import java.util.HashSet;
 import java.util.Set;
 import lombok.Getter;
@@ -44,9 +44,9 @@ public class Milestone extends BaseGitServiceEntity {
     @Lob
     private String description;
 
-    private OffsetDateTime closedAt;
+    private Instant closedAt;
 
-    private OffsetDateTime dueOn;
+    private Instant dueOn;
 
     @ManyToOne
     @JoinColumn(name = "creator_id")

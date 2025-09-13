@@ -1,6 +1,6 @@
 package de.tum.in.www1.hephaestus.leaderboard;
 
-import java.time.OffsetDateTime;
+import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -23,8 +23,8 @@ public class LeaderboardController {
 
     @GetMapping
     public ResponseEntity<List<LeaderboardEntryDTO>> getLeaderboard(
-        @RequestParam @DateTimeFormat(iso = ISO.DATE_TIME) OffsetDateTime after,
-        @RequestParam @DateTimeFormat(iso = ISO.DATE_TIME) OffsetDateTime before,
+        @RequestParam @DateTimeFormat(iso = ISO.DATE_TIME) Instant after,
+        @RequestParam @DateTimeFormat(iso = ISO.DATE_TIME) Instant before,
         @RequestParam Optional<String> team,
         @RequestParam Optional<LeaderboardSortType> sort
     ) {

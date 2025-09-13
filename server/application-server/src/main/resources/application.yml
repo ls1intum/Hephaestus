@@ -22,6 +22,10 @@ spring:
     liquibase:
         change-log: classpath:db/master.xml
 
+    devtools:
+        restart:
+            additional-exclude: org/kohsuke/github/**
+
     security:
         oauth2:
             resourceserver:

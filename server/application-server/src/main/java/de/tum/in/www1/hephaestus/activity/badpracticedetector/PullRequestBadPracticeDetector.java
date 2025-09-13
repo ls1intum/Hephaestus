@@ -10,7 +10,7 @@ import de.tum.in.www1.hephaestus.intelligenceservice.model.BadPractice;
 import de.tum.in.www1.hephaestus.intelligenceservice.model.DetectorRequest;
 import de.tum.in.www1.hephaestus.intelligenceservice.model.DetectorResponse;
 import jakarta.transaction.Transactional;
-import java.time.OffsetDateTime;
+import java.time.Instant;
 import java.util.List;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -109,7 +109,7 @@ public class PullRequestBadPracticeDetector {
 
         DetectorResponse detectorResponse = detectorApi.detectDetectorPost(detectorRequest);
 
-        pullRequest.setLastDetectionTime(OffsetDateTime.now());
+        pullRequest.setLastDetectionTime(Instant.now());
         pullRequest.setBadPracticeSummary(detectorResponse.getBadPracticeSummary());
         pullRequestRepository.save(pullRequest);
 
@@ -133,7 +133,7 @@ public class PullRequestBadPracticeDetector {
         badPracticeDetection.setPullRequest(pullRequest);
         badPracticeDetection.setBadPractices(detectedBadPractices);
         badPracticeDetection.setSummary(detectorResponse.getBadPracticeSummary());
-        badPracticeDetection.setDetectionTime(OffsetDateTime.now());
+        badPracticeDetection.setDetectionTime(Instant.now());
         badPracticeDetection.setTraceId(detectorResponse.getTraceId());
 
         detectedBadPractices.forEach(badPractice -> {
@@ -162,8 +162,8 @@ public class PullRequestBadPracticeDetector {
         pullRequestBadPractice.setDescription(badPractice.getDescription());
         pullRequestBadPractice.setPullrequest(pullRequest);
         pullRequestBadPractice.setState(PullRequestBadPracticeState.fromBadPracticeStatus(badPractice.getStatus()));
-        pullRequestBadPractice.setDetectionTime(OffsetDateTime.now());
-        pullRequestBadPractice.setLastUpdateTime(OffsetDateTime.now());
+        pullRequestBadPractice.setDetectionTime(Instant.now());
+        pullRequestBadPractice.setLastUpdateTime(Instant.now());
         pullRequestBadPractice.setDetectionPullrequestLifecycleState(lifecycleState);
         pullRequestBadPractice.setDetectionTraceId(traceId);
         return pullRequestBadPractice;

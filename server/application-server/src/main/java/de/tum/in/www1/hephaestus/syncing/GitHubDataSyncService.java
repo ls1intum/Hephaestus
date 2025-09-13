@@ -19,7 +19,7 @@ import de.tum.in.www1.hephaestus.workspace.RepositoryToMonitorRepository;
 import de.tum.in.www1.hephaestus.workspace.Workspace;
 import de.tum.in.www1.hephaestus.workspace.WorkspaceRepository;
 import java.io.IOException;
-import java.time.OffsetDateTime;
+import java.time.Instant;
 import java.util.NoSuchElementException;
 import java.util.Optional;
 import java.util.stream.Collectors;
@@ -99,7 +99,7 @@ public class GitHubDataSyncService {
     public void syncUsers(Workspace workspace) {
         boolean shouldSyncUsers =
             workspace.getUsersSyncedAt() == null ||
-            workspace.getUsersSyncedAt().isBefore(OffsetDateTime.now().minusMinutes(syncCooldownInMinutes));
+            workspace.getUsersSyncedAt().isBefore(Instant.now().minusSeconds(syncCooldownInMinutes * 60L));
 
         if (!shouldSyncUsers) {
             logger.info("No users to sync.");
@@ -107,7 +107,7 @@ public class GitHubDataSyncService {
         }
 
         logger.info("Syncing all existing users...");
-        var currentTime = OffsetDateTime.now();
+        var currentTime = Instant.now();
         userSyncService.syncAllExistingUsers();
         workspace.setUsersSyncedAt(currentTime);
         workspaceRepository.save(workspace);
@@ -127,7 +127,7 @@ public class GitHubDataSyncService {
     public void syncRepositoryToMonitor(RepositoryToMonitor repositoryToMonitor) {
         logger.info(repositoryToMonitor.getNameWithOwner() + " - Syncing data...");
 
-        var cooldownTime = OffsetDateTime.now().minusMinutes(syncCooldownInMinutes);
+        var cooldownTime = Instant.now().minusSeconds(syncCooldownInMinutes * 60L);
 
         boolean shouldSyncRepository =
             repositoryToMonitor.getRepositorySyncedAt() == null ||
@@ -188,7 +188,7 @@ public class GitHubDataSyncService {
 
     private Optional<GHRepository> syncRepository(RepositoryToMonitor repositoryToMonitor) {
         String nameWithOwner = repositoryToMonitor.getNameWithOwner();
-        var currentTime = OffsetDateTime.now();
+        var currentTime = Instant.now();
         var repository = repositorySyncService.syncRepository(nameWithOwner);
         repositoryToMonitor.setRepositorySyncedAt(currentTime);
         repositoryToMonitorRepository.save(repositoryToMonitor);
@@ -215,14 +215,14 @@ public class GitHubDataSyncService {
     }
 
     private void syncRepositoryLabels(GHRepository repository, RepositoryToMonitor repositoryToMonitor) {
-        var currentTime = OffsetDateTime.now();
+        var currentTime = Instant.now();
         labelSyncService.syncLabelsOfRepository(repository);
         repositoryToMonitor.setLabelsSyncedAt(currentTime);
         repositoryToMonitorRepository.save(repositoryToMonitor);
     }
 
     private void syncRepositoryMilestones(GHRepository repository, RepositoryToMonitor repositoryToMonitor) {
-        var currentTime = OffsetDateTime.now();
+        var currentTime = Instant.now();
         milestoneSyncService.syncMilestonesOfRepository(repository);
         repositoryToMonitor.setMilestonesSyncedAt(currentTime);
         repositoryToMonitorRepository.save(repositoryToMonitor);
@@ -242,7 +242,7 @@ public class GitHubDataSyncService {
         GHRepository repository,
         RepositoryToMonitor repositoryToMonitor
     ) {
-        var cutoffDate = OffsetDateTime.now().minusDays(timeframe);
+        var cutoffDate = Instant.now().minusSeconds(timeframe * 24L * 60L * 60L);
 
         var issuesAndPullRequestsSyncedAt = repositoryToMonitor.getIssuesAndPullRequestsSyncedAt();
         if (issuesAndPullRequestsSyncedAt != null) {
@@ -264,11 +264,11 @@ public class GitHubDataSyncService {
      * @param issuesIterator iterator for fetching issues
      * @return the last updated time of the last issue or the current time if no issues were fetched
      */
-    private OffsetDateTime syncRepositoryRecentIssuesAndPullRequestsNextPage(
+    private Instant syncRepositoryRecentIssuesAndPullRequestsNextPage(
         GHRepository repository,
         PagedIterator<GHIssue> issuesIterator
     ) {
-        var currentTime = OffsetDateTime.now();
+        var currentTime = Instant.now();
         var ghIssues = issuesIterator.nextPage();
         var issues = ghIssues.stream().map(issueSyncService::processIssue).toList();
         issueCommentSyncService.syncIssueCommentsOfAllIssues(ghIssues);

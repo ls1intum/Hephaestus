@@ -1,11 +1,10 @@
 package de.tum.in.www1.hephaestus.gitprovider.repository.github;
 
-import de.tum.in.www1.hephaestus.gitprovider.common.DateUtil;
 import de.tum.in.www1.hephaestus.gitprovider.repository.Repository;
 import de.tum.in.www1.hephaestus.gitprovider.repository.RepositoryRepository;
 import jakarta.transaction.Transactional;
 import java.io.IOException;
-import java.time.OffsetDateTime;
+import java.time.Instant;
 import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
@@ -97,9 +96,7 @@ public class GitHubRepositorySyncService {
                 try {
                     if (
                         repository.getUpdatedAt() == null ||
-                        repository
-                            .getUpdatedAt()
-                            .isBefore(DateUtil.convertToOffsetDateTime(ghRepository.getUpdatedAt()))
+                        repository.getUpdatedAt().isBefore(ghRepository.getUpdatedAt())
                     ) {
                         return repositoryConverter.update(ghRepository, repository);
                     }
@@ -129,7 +126,7 @@ public class GitHubRepositorySyncService {
      */
     @Transactional
     public Repository upsertFromInstallationPayload(long id, String nameWithOwner, String name, boolean isPrivate) {
-        var now = OffsetDateTime.now();
+        var now = Instant.now();
         var repository = repositoryRepository
             .findById(id)
             .orElseGet(() -> {

@@ -1,7 +1,6 @@
 package de.tum.in.www1.hephaestus.gitprovider.repository.github;
 
 import de.tum.in.www1.hephaestus.gitprovider.common.BaseGitServiceEntityConverter;
-import de.tum.in.www1.hephaestus.gitprovider.common.DateUtil;
 import de.tum.in.www1.hephaestus.gitprovider.repository.Repository;
 import org.kohsuke.github.GHRepository;
 import org.kohsuke.github.GHRepository.Visibility;
@@ -29,7 +28,7 @@ public class GitHubRepositoryConverter extends BaseGitServiceEntityConverter<GHR
         repository.setHtmlUrl(source.getHtmlUrl().toString());
         repository.setDescription(source.getDescription());
         repository.setHomepage(source.getHomepage());
-        repository.setPushedAt(DateUtil.convertToOffsetDateTime(source.getPushedAt()));
+        repository.setPushedAt(source.getPushedAt());
         repository.setArchived(source.isArchived());
         repository.setDisabled(source.isDisabled());
         repository.setVisibility(convertVisibility(source.getVisibility()));

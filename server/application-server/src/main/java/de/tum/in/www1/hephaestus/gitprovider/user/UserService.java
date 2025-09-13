@@ -10,7 +10,7 @@ import de.tum.in.www1.hephaestus.gitprovider.pullrequestreview.PullRequestReview
 import de.tum.in.www1.hephaestus.gitprovider.repository.RepositoryInfoDTO;
 import de.tum.in.www1.hephaestus.gitprovider.repository.RepositoryRepository;
 import jakarta.transaction.Transactional;
-import java.time.OffsetDateTime;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
@@ -55,7 +55,7 @@ public class UserService {
         }
 
         UserInfoDTO user = optionalUser.get();
-        OffsetDateTime firstContribution = pullRequestRepository.firstContributionByAuthorLogin(login).orElse(null);
+        var firstContribution = pullRequestRepository.firstContributionByAuthorLogin(login).orElse(null);
         List<PullRequestInfoDTO> openPullRequests = pullRequestRepository
             .findAssignedByLoginAndStates(login, Set.of(Issue.State.OPEN))
             .stream()
@@ -70,13 +70,13 @@ public class UserService {
 
         // Review activity includes both pull request reviews and issue comments
         List<PullRequestReviewInfoDTO> reviewActivity = pullRequestReviewRepository
-            .findAllByAuthorLoginSince(login, OffsetDateTime.now().minusDays(7))
+            .findAllByAuthorLoginSince(login, Instant.now().minusSeconds(7L * 24 * 60 * 60))
             .stream()
             .map(pullRequestReviewInfoDTOConverter::convert)
             .collect(Collectors.toCollection(ArrayList::new));
         reviewActivity.addAll(
             issueCommentRepository
-                .findAllByAuthorLoginSince(login, OffsetDateTime.now().minusDays(7), true)
+                .findAllByAuthorLoginSince(login, Instant.now().minusSeconds(7L * 24 * 60 * 60), true)
                 .stream()
                 .map(pullRequestReviewInfoDTOConverter::convert)
                 .toList()

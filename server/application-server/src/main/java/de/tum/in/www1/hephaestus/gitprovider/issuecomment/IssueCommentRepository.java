@@ -1,6 +1,6 @@
 package de.tum.in.www1.hephaestus.gitprovider.issuecomment;
 
-import java.time.OffsetDateTime;
+import java.time.Instant;
 import java.util.List;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
@@ -22,7 +22,7 @@ public interface IssueCommentRepository extends JpaRepository<IssueComment, Long
     )
     List<IssueComment> findAllByAuthorLoginSince(
         @Param("authorLogin") String authorLogin,
-        @Param("activitySince") OffsetDateTime activitySince,
+        @Param("activitySince") Instant activitySince,
         @Param("onlyFromPullRequests") boolean onlyFromPullRequests
     );
 
@@ -41,8 +41,8 @@ public interface IssueCommentRepository extends JpaRepository<IssueComment, Long
         """
     )
     List<IssueComment> findAllInTimeframe(
-        @Param("after") OffsetDateTime after,
-        @Param("before") OffsetDateTime before,
+        @Param("after") Instant after,
+        @Param("before") Instant before,
         @Param("onlyFromPullRequests") boolean onlyFromPullRequests
     );
 
@@ -78,8 +78,8 @@ public interface IssueCommentRepository extends JpaRepository<IssueComment, Long
         """
     )
     List<IssueComment> findAllInTimeframeOfTeam(
-        @Param("after") OffsetDateTime after,
-        @Param("before") OffsetDateTime before,
+        @Param("after") Instant after,
+        @Param("before") Instant before,
         @Param("teamId") Long teamId,
         @Param("onlyFromPullRequests") boolean onlyFromPullRequests
     );

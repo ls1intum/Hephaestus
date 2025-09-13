@@ -16,7 +16,8 @@ import de.tum.in.www1.hephaestus.leaderboard.LeaguePointsCalculationService;
 import de.tum.in.www1.hephaestus.syncing.GitHubDataSyncService;
 import de.tum.in.www1.hephaestus.syncing.NatsConsumerService;
 import jakarta.transaction.Transactional;
-import java.time.OffsetDateTime;
+import java.time.Instant;
+import java.time.temporal.ChronoUnit;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
@@ -311,8 +312,8 @@ public class WorkspaceService {
             });
 
         // Get all pull request reviews and issue comments to calculate past leaderboards
-        var now = OffsetDateTime.now();
-        var weekAgo = now.minusWeeks(1);
+        var now = Instant.now();
+        var weekAgo = now.minus(7, ChronoUnit.DAYS);
 
         // While we still have reviews in the past, calculate leaderboard and update points
         do {
@@ -331,9 +332,9 @@ public class WorkspaceService {
 
             // Move time window back one week
             now = weekAgo;
-            weekAgo = weekAgo.minusWeeks(1);
+            weekAgo = weekAgo.minus(7, ChronoUnit.DAYS);
             // only recalculate points for the last year
-        } while (weekAgo.isAfter(OffsetDateTime.parse("2024-01-01T00:00:00Z")));
+        } while (weekAgo.isAfter(Instant.parse("2024-01-01T00:00:00Z")));
 
         logger.info("Finished recalculating league points");
     }

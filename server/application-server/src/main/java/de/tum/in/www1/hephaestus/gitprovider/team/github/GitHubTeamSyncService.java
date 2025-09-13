@@ -120,7 +120,7 @@ public class GitHubTeamSyncService {
                         }
                     });
             }
-        } catch (IOException e) {
+        } catch (Exception e) {
             log.warn("Could not list child teams for {}: {}", parent.getName(), e.getMessage());
         }
     }
