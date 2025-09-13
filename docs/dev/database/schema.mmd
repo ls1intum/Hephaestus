@@ -234,27 +234,21 @@ erDiagram
 
     Team {
         BIGINT id PK
-        VARCHAR(255) color
         VARCHAR(255) name
         BOOLEAN hidden "NOT NULL"
         TIMESTAMPTZ created_at
-        TIMESTAMPTZ updated_at
         TEXT description
         TEXT html_url
         TIMESTAMPTZ last_synced_at
         VARCHAR(255) organization
         BIGINT parent_id
         VARCHAR(32) privacy
+        TIMESTAMPTZ updated_at
     }
 
     TeamLabel {
         BIGINT team_id PK,FK
         BIGINT label_id PK,FK
-    }
-
-    TeamMember {
-        BIGINT team_id PK,FK
-        BIGINT user_id PK,FK
     }
 
     TeamMembership {
@@ -263,37 +257,7 @@ erDiagram
         BIGINT team_id PK,FK
     }
 
-    TeamRepository {
-        BIGINT team_id PK,FK
-        BIGINT repository_id PK,FK
-    }
-
     TeamRepositoryPermission {
-        VARCHAR(32) permission "NOT NULL"
-        BIGINT repository_id PK,FK
-        BIGINT team_id PK,FK
-    }
-
-    TeamV2 {
-        BIGINT id PK
-        TIMESTAMPTZ created_at
-        TIMESTAMPTZ updated_at
-        TEXT description
-        TEXT html_url
-        TIMESTAMPTZ last_synced_at
-        VARCHAR(255) name
-        VARCHAR(255) organization
-        BIGINT parent_id
-        VARCHAR(32) privacy
-    }
-
-    TeamV2Membership {
-        VARCHAR(32) role
-        BIGINT user_id PK,FK
-        BIGINT team_id PK,FK
-    }
-
-    TeamV2RepositoryPermission {
         VARCHAR(32) permission "NOT NULL"
         BIGINT repository_id PK,FK
         BIGINT team_id PK,FK
@@ -363,18 +327,10 @@ erDiagram
     User }o--o{ PullRequestRequestedReviewer : reviewed
     Label }o--o{ TeamLabel : labeled
     Team }o--o{ TeamLabel : labeled
-    Team }o--o{ TeamMember : belongs_to
-    User }o--o{ TeamMember : belongs_to
     Team }o--o{ TeamMembership : belongs_to
     User }o--o{ TeamMembership : belongs_to
-    Repository }o--o{ TeamRepository : has
-    Team }o--o{ TeamRepository : has
     Repository }o--o{ TeamRepositoryPermission : has
     Team }o--o{ TeamRepositoryPermission : has
-    TeamV2 }o--o{ TeamV2Membership : belongs_to
-    User }o--o{ TeamV2Membership : belongs_to
-    Repository }o--o{ TeamV2RepositoryPermission : has
-    TeamV2 }o--o{ TeamV2RepositoryPermission : has
 
     %% Styling
     classDef primaryEntity fill:#e1f5fe,stroke:#01579b,stroke-width:2px
@@ -391,7 +347,5 @@ erDiagram
     class RepositoryToMonitor metadataEntity
     class Team primaryEntity
     class TeamLabel associationEntity
-    class TeamMember associationEntity
-    class TeamRepository associationEntity
     class User primaryEntity
     class Workspace primaryEntity
