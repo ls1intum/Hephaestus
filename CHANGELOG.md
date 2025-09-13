@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.9.0-rc.25](https://github.com/ls1intum/Hephaestus/compare/v0.9.0-rc.24...v0.9.0-rc.25) (2025-09-13)
+
+### 🚀 Features
+
+* handle organization events ([#397](https://github.com/ls1intum/Hephaestus/issues/397)) ([59f1f41](https://github.com/ls1intum/Hephaestus/commit/59f1f418d1b78d53712de6360f180cfc175e50bd))
+
 ## [0.9.0-rc.24](https://github.com/ls1intum/Hephaestus/compare/v0.9.0-rc.23...v0.9.0-rc.24) (2025-09-13)
 
 ### 🚀 Features
