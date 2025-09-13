@@ -1,9 +1,9 @@
 package de.tum.in.www1.hephaestus.gitprovider.team;
 
+import de.tum.in.www1.hephaestus.security.EnsureAdminUser;
 import java.util.List;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
-import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -30,7 +30,7 @@ public class TeamController {
     }
 
     @PostMapping("/{id}/visibility")
-    @PreAuthorize("hasAuthority('admin')")
+    @EnsureAdminUser
     public ResponseEntity<Void> updateTeamVisibility(
         @PathVariable Long id,
         @RequestBody(required = false) Boolean hidden,

@@ -46,16 +46,9 @@ export function RepositoryLabelsToggle({
 		}
 	};
 
-	const activeCount = activeByName.size;
-
 	return (
 		<div className="space-y-1.5">
-			<div className="flex items-center justify-between gap-2">
-				<h4 className="font-medium text-sm">Labels</h4>
-				<span className="text-[11px] text-muted-foreground">
-					Active: {activeCount}
-				</span>
-			</div>
+			<h4 className="font-medium text-sm">Labels</h4>
 			<p className="text-xs text-muted-foreground">
 				Selecting labels limits this team's contribution metrics to items tagged
 				with any of the selected labels for this repository.
