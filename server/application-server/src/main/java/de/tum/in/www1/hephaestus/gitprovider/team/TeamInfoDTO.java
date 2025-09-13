@@ -33,11 +33,7 @@ public record TeamInfoDTO(
             team.getOrganization(),
             team.getHtmlUrl(),
             team.isHidden(),
-            team
-                .getRepoPermissions()
-                .stream()
-                .map(rp -> RepositoryInfoDTO.fromRepository(rp.getRepository()))
-                .toList(),
+            team.getRepoPermissions().stream().map(rp -> RepositoryInfoDTO.fromRepository(rp.getRepository())).toList(),
             team.getLabels().stream().map(LabelInfoDTO::fromLabel).toList(),
             team
                 .getMemberships()

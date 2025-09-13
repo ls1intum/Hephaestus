@@ -1,9 +1,7 @@
 package de.tum.in.www1.hephaestus.gitprovider.milestone.github;
 
 import de.tum.in.www1.hephaestus.gitprovider.common.BaseGitServiceEntityConverter;
-import de.tum.in.www1.hephaestus.gitprovider.common.DateUtil;
 import de.tum.in.www1.hephaestus.gitprovider.milestone.Milestone;
-import java.util.Date;
 import org.kohsuke.github.GHMilestone;
 import org.kohsuke.github.GHMilestoneState;
 import org.slf4j.Logger;
@@ -29,11 +27,11 @@ public class GitHubMilestoneConverter extends BaseGitServiceEntityConverter<GHMi
         milestone.setHtmlUrl(source.getHtmlUrl().toString());
         milestone.setTitle(source.getTitle());
         milestone.setDescription(source.getDescription());
-        milestone.setDueOn(DateUtil.convertToOffsetDateTime(Date.from(source.getDueOn())));
+        milestone.setDueOn(source.getDueOn());
         try {
-            milestone.setClosedAt(DateUtil.convertToOffsetDateTime(Date.from(source.getClosedAt())));
+            milestone.setClosedAt(source.getClosedAt());
         } catch (Exception e) {
-            logger.error("Failed to convert closedAt field for source {}: {}", source.getId(), e.getMessage());
+            logger.error("Failed to read closedAt for source {}: {}", source.getId(), e.getMessage());
         }
         return milestone;
     }

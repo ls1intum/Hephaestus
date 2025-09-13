@@ -2,7 +2,7 @@ package de.tum.in.www1.hephaestus.gitprovider.team.github;
 
 import de.tum.in.www1.hephaestus.gitprovider.common.BaseGitServiceEntityConverter;
 import de.tum.in.www1.hephaestus.gitprovider.team.Team;
-import java.time.OffsetDateTime;
+import java.time.Instant;
 import org.kohsuke.github.GHTeam;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -25,7 +25,7 @@ public class GitHubTeamConverter extends BaseGitServiceEntityConverter<GHTeam, T
         team.setDescription(source.getDescription());
         team.setPrivacy(source.getPrivacy() == null ? null : Team.Privacy.valueOf(source.getPrivacy().name()));
         team.setHtmlUrl(source.getHtmlUrl().toString());
-        team.setLastSyncedAt(OffsetDateTime.now());
+        team.setLastSyncedAt(Instant.now());
         String organization = null;
 
         // getOrganization() may perform an API call and throw IOException.

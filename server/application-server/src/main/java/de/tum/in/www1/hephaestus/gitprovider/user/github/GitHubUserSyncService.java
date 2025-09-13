@@ -1,11 +1,9 @@
 package de.tum.in.www1.hephaestus.gitprovider.user.github;
 
-import de.tum.in.www1.hephaestus.gitprovider.common.DateUtil;
 import de.tum.in.www1.hephaestus.gitprovider.user.User;
 import de.tum.in.www1.hephaestus.gitprovider.user.UserRepository;
 import jakarta.transaction.Transactional;
 import java.io.IOException;
-import java.util.Date;
 import org.kohsuke.github.GHUser;
 import org.kohsuke.github.GitHub;
 import org.slf4j.Logger;
@@ -63,10 +61,7 @@ public class GitHubUserSyncService {
             .findById(ghUser.getId())
             .map(user -> {
                 try {
-                    if (
-                        user.getUpdatedAt() == null ||
-                        user.getUpdatedAt().isBefore(DateUtil.convertToOffsetDateTime(Date.from(ghUser.getUpdatedAt())))
-                    ) {
+                    if (user.getUpdatedAt() == null || user.getUpdatedAt().isBefore(ghUser.getUpdatedAt())) {
                         return userConverter.update(ghUser, user);
                     }
                     return user;

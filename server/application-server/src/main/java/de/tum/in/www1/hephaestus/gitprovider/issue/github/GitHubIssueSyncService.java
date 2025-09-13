@@ -1,6 +1,5 @@
 package de.tum.in.www1.hephaestus.gitprovider.issue.github;
 
-import de.tum.in.www1.hephaestus.gitprovider.common.DateUtil;
 import de.tum.in.www1.hephaestus.gitprovider.issue.Issue;
 import de.tum.in.www1.hephaestus.gitprovider.issue.IssueRepository;
 import de.tum.in.www1.hephaestus.gitprovider.label.Label;
@@ -14,9 +13,8 @@ import de.tum.in.www1.hephaestus.gitprovider.user.UserRepository;
 import de.tum.in.www1.hephaestus.gitprovider.user.github.GitHubUserConverter;
 import jakarta.transaction.Transactional;
 import java.io.IOException;
-import java.time.OffsetDateTime;
+import java.time.Instant;
 import java.util.ArrayList;
-import java.util.Date;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Optional;
@@ -75,7 +73,7 @@ public class GitHubIssueSyncService {
      * @param since        An optional date to filter issues by their last update.
      * @return A list of successfully fetched GitHub issues.
      */
-    public List<GHIssue> syncIssuesOfAllRepositories(List<GHRepository> repositories, Optional<OffsetDateTime> since) {
+    public List<GHIssue> syncIssuesOfAllRepositories(List<GHRepository> repositories, Optional<Instant> since) {
         return repositories
             .stream()
             .map(repository -> syncIssuesOfRepository(repository, since))
@@ -90,9 +88,9 @@ public class GitHubIssueSyncService {
      * @param since      An optional date to filter issues by their last update.
      * @return A list of successfully fetched GitHub issues.
      */
-    public List<GHIssue> syncIssuesOfRepository(GHRepository repository, Optional<OffsetDateTime> since) {
+    public List<GHIssue> syncIssuesOfRepository(GHRepository repository, Optional<Instant> since) {
         GHIssueQueryBuilder builder = repository.queryIssues().pageSize(100).state(GHIssueState.ALL);
-        since.ifPresent(sinceDate -> builder.since(Date.from(sinceDate.toInstant())));
+        since.ifPresent(builder::since);
 
         try {
             var issues = builder.list().toList();
@@ -111,12 +109,12 @@ public class GitHubIssueSyncService {
      * @param since      An date to filter issues by their last update.
      * @return A paged iterator for fetching issues.
      */
-    public PagedIterator<GHIssue> getIssuesIterator(GHRepository repository, OffsetDateTime since) {
+    public PagedIterator<GHIssue> getIssuesIterator(GHRepository repository, Instant since) {
         var builder = repository
             .queryIssues()
             .pageSize(100)
             .state(GHIssueState.ALL)
-            .since(Date.from(since.toInstant()))
+            .since(since)
             .sort(Sort.UPDATED)
             .direction(GHDirection.ASC);
         return builder.list().iterator();
@@ -161,12 +159,7 @@ public class GitHubIssueSyncService {
             .findById(ghIssue.getId())
             .map(issue -> {
                 try {
-                    if (
-                        issue.getUpdatedAt() == null ||
-                        issue
-                            .getUpdatedAt()
-                            .isBefore(DateUtil.convertToOffsetDateTime(Date.from(ghIssue.getUpdatedAt())))
-                    ) {
+                    if (issue.getUpdatedAt() == null || issue.getUpdatedAt().isBefore(ghIssue.getUpdatedAt())) {
                         return issueConverter.update(ghIssue, issue);
                     }
                     return issue;

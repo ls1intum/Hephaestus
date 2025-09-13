@@ -1,7 +1,6 @@
 package de.tum.in.www1.hephaestus.gitprovider.pullrequest.github;
 
 import de.tum.in.www1.hephaestus.activity.badpracticedetector.BadPracticeDetectorScheduler;
-import de.tum.in.www1.hephaestus.gitprovider.common.DateUtil;
 import de.tum.in.www1.hephaestus.gitprovider.label.Label;
 import de.tum.in.www1.hephaestus.gitprovider.label.LabelRepository;
 import de.tum.in.www1.hephaestus.gitprovider.label.github.GitHubLabelConverter;
@@ -15,9 +14,8 @@ import de.tum.in.www1.hephaestus.gitprovider.user.UserRepository;
 import de.tum.in.www1.hephaestus.gitprovider.user.github.GitHubUserConverter;
 import jakarta.transaction.Transactional;
 import java.io.IOException;
-import java.time.OffsetDateTime;
+import java.time.Instant;
 import java.util.ArrayList;
-import java.util.Date;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Optional;
@@ -78,7 +76,7 @@ public class GitHubPullRequestSyncService {
      */
     public List<GHPullRequest> syncPullRequestsOfAllRepositories(
         List<GHRepository> repositories,
-        Optional<OffsetDateTime> since
+        Optional<Instant> since
     ) {
         return repositories
             .stream()
@@ -96,7 +94,7 @@ public class GitHubPullRequestSyncService {
      * @return a list of GitHub pull requests that were successfully fetched and
      *         processed
      */
-    public List<GHPullRequest> syncPullRequestsOfRepository(GHRepository repository, Optional<OffsetDateTime> since) {
+    public List<GHPullRequest> syncPullRequestsOfRepository(GHRepository repository, Optional<Instant> since) {
         var iterator = repository
             .queryPullRequests()
             .state(GHIssueState.ALL)
@@ -106,8 +104,6 @@ public class GitHubPullRequestSyncService {
             .withPageSize(100)
             .iterator();
 
-        var sinceDate = since.map(date -> Date.from(date.toInstant()));
-
         var pullRequests = new ArrayList<GHPullRequest>();
         while (iterator.hasNext()) {
             var ghPullRequests = iterator.nextPage();
@@ -115,7 +111,7 @@ public class GitHubPullRequestSyncService {
                 .stream()
                 .filter(pullRequest -> {
                     try {
-                        return sinceDate.isEmpty() || Date.from(pullRequest.getUpdatedAt()).after(sinceDate.get());
+                        return since.isEmpty() || pullRequest.getUpdatedAt().isAfter(since.get());
                     } catch (IOException e) {
                         logger.error("Failed to filter pull request {}: {}", pullRequest.getId(), e.getMessage());
                         return false;
@@ -198,9 +194,7 @@ public class GitHubPullRequestSyncService {
                 try {
                     if (
                         pullRequest.getUpdatedAt() == null ||
-                        pullRequest
-                            .getUpdatedAt()
-                            .isBefore(DateUtil.convertToOffsetDateTime(Date.from(ghPullRequest.getUpdatedAt())))
+                        pullRequest.getUpdatedAt().isBefore(ghPullRequest.getUpdatedAt())
                     ) {
                         return pullRequestConverter.update(ghPullRequest, pullRequest);
                     }

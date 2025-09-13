@@ -13,7 +13,7 @@ import jakarta.persistence.Lob;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.OneToMany;
 import jakarta.persistence.Table;
-import java.time.OffsetDateTime;
+import java.time.Instant;
 import java.util.HashSet;
 import java.util.Set;
 import lombok.Getter;
@@ -48,7 +48,7 @@ public class PullRequestReview {
     private String htmlUrl;
 
     @NonNull
-    private OffsetDateTime submittedAt;
+    private Instant submittedAt;
 
     private String commitId;
 

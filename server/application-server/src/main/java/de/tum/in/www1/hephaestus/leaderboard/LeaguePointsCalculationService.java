@@ -2,7 +2,7 @@ package de.tum.in.www1.hephaestus.leaderboard;
 
 import de.tum.in.www1.hephaestus.gitprovider.pullrequest.PullRequest;
 import de.tum.in.www1.hephaestus.gitprovider.user.User;
-import java.time.OffsetDateTime;
+import java.time.Instant;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
@@ -93,7 +93,7 @@ public class LeaguePointsCalculationService {
             .stream()
             .filter(PullRequest::isMerged)
             .map(PullRequest::getMergedAt)
-            .noneMatch(date -> date.isAfter(OffsetDateTime.now().minusDays(30)));
+            .noneMatch(date -> date.isAfter(Instant.now().minusSeconds(30L * 24 * 60 * 60)));
     }
 
     /**

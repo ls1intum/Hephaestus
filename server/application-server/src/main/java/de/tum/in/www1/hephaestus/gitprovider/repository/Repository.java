@@ -11,7 +11,7 @@ import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
 import jakarta.persistence.OneToMany;
 import jakarta.persistence.Table;
-import java.time.OffsetDateTime;
+import java.time.Instant;
 import java.util.HashSet;
 import java.util.Set;
 import lombok.Getter;
@@ -45,7 +45,7 @@ public class Repository extends BaseGitServiceEntity {
     private String homepage;
 
     @NonNull
-    private OffsetDateTime pushedAt;
+    private Instant pushedAt;
 
     private boolean isArchived;
 

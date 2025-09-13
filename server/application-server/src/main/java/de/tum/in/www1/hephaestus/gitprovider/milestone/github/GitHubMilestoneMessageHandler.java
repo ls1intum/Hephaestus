@@ -4,13 +4,13 @@ import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubMessageHandler;
 import de.tum.in.www1.hephaestus.gitprovider.milestone.MilestoneRepository;
 import de.tum.in.www1.hephaestus.gitprovider.repository.github.GitHubRepositorySyncService;
 import org.kohsuke.github.GHEvent;
-import org.kohsuke.github.GHEventPayload;
+import org.kohsuke.github.GHEventPayloadMilestone;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
 
 @Component
-public class GitHubMilestoneMessageHandler extends GitHubMessageHandler<GHEventPayload.Milestone> {
+public class GitHubMilestoneMessageHandler extends GitHubMessageHandler<GHEventPayloadMilestone> {
 
     private static final Logger logger = LoggerFactory.getLogger(GitHubMilestoneMessageHandler.class);
 
@@ -23,14 +23,14 @@ public class GitHubMilestoneMessageHandler extends GitHubMessageHandler<GHEventP
         GitHubMilestoneSyncService milestoneSyncService,
         GitHubRepositorySyncService repositorySyncService
     ) {
-        super(GHEventPayload.Milestone.class);
+        super(GHEventPayloadMilestone.class);
         this.milestoneRepository = milestoneRepository;
         this.milestoneSyncService = milestoneSyncService;
         this.repositorySyncService = repositorySyncService;
     }
 
     @Override
-    protected void handleEvent(GHEventPayload.Milestone eventPayload) {
+    protected void handleEvent(GHEventPayloadMilestone eventPayload) {
         var action = eventPayload.getAction();
         var milestone = eventPayload.getMilestone();
         var repository = eventPayload.getRepository();

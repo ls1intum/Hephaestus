@@ -1,6 +1,5 @@
 package de.tum.in.www1.hephaestus.gitprovider.issuecomment.github;
 
-import de.tum.in.www1.hephaestus.gitprovider.common.DateUtil;
 import de.tum.in.www1.hephaestus.gitprovider.issue.IssueRepository;
 import de.tum.in.www1.hephaestus.gitprovider.issue.github.GitHubIssueConverter;
 import de.tum.in.www1.hephaestus.gitprovider.issuecomment.IssueComment;
@@ -9,7 +8,6 @@ import de.tum.in.www1.hephaestus.gitprovider.user.UserRepository;
 import de.tum.in.www1.hephaestus.gitprovider.user.github.GitHubUserConverter;
 import jakarta.transaction.Transactional;
 import java.io.IOException;
-import java.util.Date;
 import java.util.List;
 import org.kohsuke.github.GHIssue;
 import org.kohsuke.github.GHIssueComment;
@@ -81,9 +79,7 @@ public class GitHubIssueCommentSyncService {
                 try {
                     if (
                         issueComment.getUpdatedAt() == null ||
-                        issueComment
-                            .getUpdatedAt()
-                            .isBefore(DateUtil.convertToOffsetDateTime(Date.from(ghIssueComment.getUpdatedAt())))
+                        issueComment.getUpdatedAt().isBefore(ghIssueComment.getUpdatedAt())
                     ) {
                         return issueCommentConverter.update(ghIssueComment, issueComment);
                     }

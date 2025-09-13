@@ -12,7 +12,7 @@ import de.tum.in.www1.hephaestus.gitprovider.user.User;
 import de.tum.in.www1.hephaestus.gitprovider.user.UserInfoDTO;
 import de.tum.in.www1.hephaestus.gitprovider.user.UserRepository;
 import jakarta.transaction.Transactional;
-import java.time.OffsetDateTime;
+import java.time.Instant;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
@@ -123,8 +123,8 @@ public class LeaderboardService {
 
     @Transactional
     public List<LeaderboardEntryDTO> createLeaderboard(
-        OffsetDateTime after,
-        OffsetDateTime before,
+        Instant after,
+        Instant before,
         Optional<String> team,
         Optional<LeaderboardSortType> sort
     ) {

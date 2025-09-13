@@ -6,7 +6,9 @@ import de.tum.in.www1.hephaestus.leaderboard.LeaderboardService;
 import de.tum.in.www1.hephaestus.leaderboard.LeaguePointsCalculationService;
 import jakarta.transaction.Transactional;
 import java.time.DayOfWeek;
-import java.time.OffsetDateTime;
+import java.time.Instant;
+import java.time.ZoneId;
+import java.time.ZonedDateTime;
 import java.time.temporal.TemporalAdjusters;
 import java.util.List;
 import java.util.Optional;
@@ -59,13 +61,15 @@ public class LeaguePointsUpdateTask implements Runnable {
      */
     private List<LeaderboardEntryDTO> getLatestLeaderboard() {
         String[] timeParts = scheduledTime.split(":");
-        OffsetDateTime before = OffsetDateTime.now()
+        ZonedDateTime zonedNow = ZonedDateTime.now(ZoneId.systemDefault());
+        ZonedDateTime zonedBefore = zonedNow
             .with(TemporalAdjusters.previousOrSame(DayOfWeek.of(Integer.parseInt(scheduledDay))))
             .withHour(Integer.parseInt(timeParts[0]))
             .withMinute(timeParts.length > 1 ? Integer.parseInt(timeParts[1]) : 0)
             .withSecond(0)
             .withNano(0);
-        OffsetDateTime after = before.minusWeeks(1);
+        Instant before = zonedBefore.toInstant();
+        Instant after = zonedBefore.minusWeeks(1).toInstant();
         return leaderboardService.createLeaderboard(after, before, Optional.empty(), Optional.empty());
     }
 }
