@@ -16,10 +16,19 @@ public class GitHubMessageHandlerRegistry {
 
     public GitHubMessageHandlerRegistry(GitHubMessageHandler<?>[] handlers) {
         for (GitHubMessageHandler<?> handler : handlers) {
+            // register primary domain
             switch (handler.getDomain()) {
                 case ORGANIZATION -> organizationHandlerMap.put(handler.getHandlerEvent(), handler);
                 case INSTALLATION -> installationHandlerMap.put(handler.getHandlerEvent(), handler);
                 case REPOSITORY -> repositoryHandlerMap.put(handler.getHandlerEvent(), handler);
+            }
+            // register any additional domains for the same event
+            for (var domain : handler.getAdditionalDomains()) {
+                switch (domain) {
+                    case ORGANIZATION -> organizationHandlerMap.put(handler.getHandlerEvent(), handler);
+                    case INSTALLATION -> installationHandlerMap.put(handler.getHandlerEvent(), handler);
+                    case REPOSITORY -> repositoryHandlerMap.put(handler.getHandlerEvent(), handler);
+                }
             }
         }
     }

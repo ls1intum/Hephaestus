@@ -165,15 +165,12 @@ class Repository(Base):
     name_with_owner: Mapped[Optional[str]] = mapped_column(String(255))
     pushed_at: Mapped[Optional[datetime.datetime]] = mapped_column(DateTime(True))
     visibility: Mapped[Optional[str]] = mapped_column(String(255))
-    team: Mapped[List["Team"]] = relationship(
-        "Team", secondary="team_repositories", back_populates="repository"
-    )
     label: Mapped[List["Label"]] = relationship("Label", back_populates="repository")
     milestone: Mapped[List["Milestone"]] = relationship(
         "Milestone", back_populates="repository"
     )
-    team_v2_repository_permission: Mapped[List["TeamV2RepositoryPermission"]] = (
-        relationship("TeamV2RepositoryPermission", back_populates="repository")
+    team_repository_permission: Mapped[List["TeamRepositoryPermission"]] = relationship(
+        "TeamRepositoryPermission", back_populates="repository"
     )
     issue: Mapped[List["Issue"]] = relationship("Issue", back_populates="repository")
 
@@ -194,39 +191,25 @@ class Team(Base):
         primary_key=True,
     )
     hidden: Mapped[bool] = mapped_column(Boolean, server_default=text("false"))
-    color: Mapped[Optional[str]] = mapped_column(String(255))
     name: Mapped[Optional[str]] = mapped_column(String(255))
-    repository: Mapped[List["Repository"]] = relationship(
-        "Repository", secondary="team_repositories", back_populates="team"
-    )
-    user: Mapped[List["User"]] = relationship(
-        "User", secondary="team_members", back_populates="team"
-    )
-    label: Mapped[List["Label"]] = relationship(
-        "Label", secondary="team_labels", back_populates="team"
-    )
-
-
-class TeamV2(Base):
-    __tablename__ = "team_v2"
-    __table_args__ = (PrimaryKeyConstraint("id", name="team_v2PK"),)
-    id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
     created_at: Mapped[Optional[datetime.datetime]] = mapped_column(TIMESTAMP(True, 6))
-    updated_at: Mapped[Optional[datetime.datetime]] = mapped_column(TIMESTAMP(True, 6))
     description: Mapped[Optional[str]] = mapped_column(Text)
     html_url: Mapped[Optional[str]] = mapped_column(Text)
     last_synced_at: Mapped[Optional[datetime.datetime]] = mapped_column(
         TIMESTAMP(True, 6)
     )
-    name: Mapped[Optional[str]] = mapped_column(String(255))
     organization: Mapped[Optional[str]] = mapped_column(String(255))
     parent_id: Mapped[Optional[int]] = mapped_column(BigInteger)
     privacy: Mapped[Optional[str]] = mapped_column(String(32))
-    team_v2_membership: Mapped[List["TeamV2Membership"]] = relationship(
-        "TeamV2Membership", back_populates="team"
+    updated_at: Mapped[Optional[datetime.datetime]] = mapped_column(TIMESTAMP(True, 6))
+    label: Mapped[List["Label"]] = relationship(
+        "Label", secondary="team_labels", back_populates="team"
     )
-    team_v2_repository_permission: Mapped[List["TeamV2RepositoryPermission"]] = (
-        relationship("TeamV2RepositoryPermission", back_populates="team")
+    team_membership: Mapped[List["TeamMembership"]] = relationship(
+        "TeamMembership", back_populates="team"
+    )
+    team_repository_permission: Mapped[List["TeamRepositoryPermission"]] = relationship(
+        "TeamRepositoryPermission", back_populates="team"
     )
 
 
@@ -255,15 +238,12 @@ class User(Base):
     chat_thread: Mapped[List["ChatThread"]] = relationship(
         "ChatThread", back_populates="user"
     )
-    team: Mapped[List["Team"]] = relationship(
-        "Team", secondary="team_members", back_populates="user"
-    )
     document: Mapped[List["Document"]] = relationship("Document", back_populates="user")
     milestone: Mapped[List["Milestone"]] = relationship(
         "Milestone", back_populates="creator"
     )
-    team_v2_membership: Mapped[List["TeamV2Membership"]] = relationship(
-        "TeamV2Membership", back_populates="user"
+    team_membership: Mapped[List["TeamMembership"]] = relationship(
+        "TeamMembership", back_populates="user"
     )
     issue: Mapped[List["Issue"]] = relationship(
         "Issue", foreign_keys="[Issue.author_id]", back_populates="author"
@@ -443,67 +423,45 @@ class RepositoryToMonitor(Base):
     )
 
 
-t_team_members = Table(
-    "team_members",
-    Base.metadata,
-    Column("team_id", BigInteger, primary_key=True, nullable=False),
-    Column("user_id", BigInteger, primary_key=True, nullable=False),
-    ForeignKeyConstraint(["team_id"], ["team.id"], name="FKb3toat7ors5scfmd3n69dhmr1"),
-    ForeignKeyConstraint(["user_id"], ["user.id"], name="FKrk1tw9123clx7w5wjx6b58qch"),
-    PrimaryKeyConstraint("team_id", "user_id", name="team_membersPK"),
-)
-t_team_repositories = Table(
-    "team_repositories",
-    Base.metadata,
-    Column("team_id", BigInteger, primary_key=True, nullable=False),
-    Column("repository_id", BigInteger, primary_key=True, nullable=False),
-    ForeignKeyConstraint(
-        ["repository_id"], ["repository.id"], name="FKg67ljxfdoy2i15wkfskdefhvf"
-    ),
-    ForeignKeyConstraint(["team_id"], ["team.id"], name="FKip72ume6ebpeowoopiylw3gib"),
-    PrimaryKeyConstraint("team_id", "repository_id", name="team_repositoriesPK"),
-)
-
-
-class TeamV2Membership(Base):
-    __tablename__ = "team_v2_membership"
+class TeamMembership(Base):
+    __tablename__ = "team_membership"
     __table_args__ = (
         ForeignKeyConstraint(
-            ["team_id"], ["team_v2.id"], name="FKqx9knktjv7ep34em8xxj22im0"
+            ["team_id"], ["team.id"], name="FKrf92vmiawfvyhxcmigcg10opm"
         ),
         ForeignKeyConstraint(
-            ["user_id"], ["user.id"], name="FK72jl22tdts2ia0icqa5qot044"
+            ["user_id"], ["user.id"], name="FKnkpwi3whks92uvhn5qe71v4k6"
         ),
-        PrimaryKeyConstraint("team_id", "user_id", name="team_v2_membershipPK"),
+        PrimaryKeyConstraint("team_id", "user_id", name="team_membershipPK"),
     )
     user_id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
     team_id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
     role: Mapped[Optional[str]] = mapped_column(String(32))
-    team: Mapped["TeamV2"] = relationship("TeamV2", back_populates="team_v2_membership")
-    user: Mapped["User"] = relationship("User", back_populates="team_v2_membership")
+    team: Mapped["Team"] = relationship("Team", back_populates="team_membership")
+    user: Mapped["User"] = relationship("User", back_populates="team_membership")
 
 
-class TeamV2RepositoryPermission(Base):
-    __tablename__ = "team_v2_repository_permission"
+class TeamRepositoryPermission(Base):
+    __tablename__ = "team_repository_permission"
     __table_args__ = (
         ForeignKeyConstraint(
-            ["repository_id"], ["repository.id"], name="FKkkg4iyyc4nn31erml7j72u6cl"
+            ["repository_id"], ["repository.id"], name="FK92gtctw6ca02527qjja7gns9f"
         ),
         ForeignKeyConstraint(
-            ["team_id"], ["team_v2.id"], name="FK803huikp5crsrk7v28kv09vmi"
+            ["team_id"], ["team.id"], name="FK7qxvqq8p6690vtdux47lsg8b1"
         ),
         PrimaryKeyConstraint(
-            "repository_id", "team_id", name="team_v2_repository_permissionPK"
+            "repository_id", "team_id", name="team_repository_permissionPK"
         ),
     )
     permission: Mapped[str] = mapped_column(String(32))
     repository_id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
     team_id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
     repository: Mapped["Repository"] = relationship(
-        "Repository", back_populates="team_v2_repository_permission"
+        "Repository", back_populates="team_repository_permission"
     )
-    team: Mapped["TeamV2"] = relationship(
-        "TeamV2", back_populates="team_v2_repository_permission"
+    team: Mapped["Team"] = relationship(
+        "Team", back_populates="team_repository_permission"
     )
 
 

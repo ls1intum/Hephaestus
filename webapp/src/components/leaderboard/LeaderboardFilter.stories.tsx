@@ -11,7 +11,13 @@ type Story = StoryObj<typeof LeaderboardFilter>;
 
 export const Default: Story = {
 	args: {
-		teams: ["Frontend", "Backend", "DevOps", "QA", "Design"],
+		teamOptions: [
+			{ value: "Frontend", label: "Frontend" },
+			{ value: "Backend", label: "Backend" },
+			{ value: "DevOps", label: "DevOps" },
+			{ value: "QA", label: "QA" },
+			{ value: "Design", label: "Design" },
+		],
 		selectedTeam: "all",
 		selectedSort: "SCORE",
 	},
@@ -19,7 +25,13 @@ export const Default: Story = {
 
 export const WithSelectedFilters: Story = {
 	args: {
-		teams: ["Frontend", "Backend", "DevOps", "QA", "Design"],
+		teamOptions: [
+			{ value: "Frontend", label: "Frontend" },
+			{ value: "Backend", label: "Backend" },
+			{ value: "DevOps", label: "DevOps" },
+			{ value: "QA", label: "QA" },
+			{ value: "Design", label: "Design" },
+		],
 		selectedTeam: "Frontend",
 		selectedSort: "LEAGUE_POINTS",
 	},

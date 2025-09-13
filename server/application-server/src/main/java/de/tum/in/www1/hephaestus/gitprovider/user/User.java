@@ -7,6 +7,7 @@ import de.tum.in.www1.hephaestus.gitprovider.pullrequest.PullRequest;
 import de.tum.in.www1.hephaestus.gitprovider.pullrequestreview.PullRequestReview;
 import de.tum.in.www1.hephaestus.gitprovider.pullrequestreviewcomment.PullRequestReviewComment;
 import de.tum.in.www1.hephaestus.gitprovider.team.Team;
+import de.tum.in.www1.hephaestus.gitprovider.team.membership.TeamMembership;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
@@ -62,9 +63,9 @@ public class User extends BaseGitServiceEntity {
 
     private int following;
 
-    @ManyToMany(mappedBy = "members")
+    @OneToMany(mappedBy = "user")
     @ToString.Exclude
-    private Set<Team> teams = new HashSet<>();
+    private Set<TeamMembership> teamMemberships = new HashSet<>();
 
     @OneToMany(mappedBy = "author")
     @ToString.Exclude
@@ -107,11 +108,11 @@ public class User extends BaseGitServiceEntity {
     }
 
     public void addTeam(Team team) {
-        teams.add(team);
+        teamMemberships.add(new TeamMembership(team, this, TeamMembership.Role.MEMBER));
     }
 
     public void removeTeam(Team team) {
-        teams.remove(team);
+        teamMemberships.removeIf(m -> m.getTeam() != null && m.getTeam().equals(team));
     }
     // Ignored GitHub properties:
     // - totalPrivateRepos

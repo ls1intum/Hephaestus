@@ -75,8 +75,11 @@ export function LeaderboardTable({
 			</TableHeader>
 			<TableBody>
 				{leaderboard.map((entry) => {
+					const currentUserLogin = currentUser?.login
+						? currentUser.login.toLowerCase()
+						: undefined;
 					const isCurrentUser =
-						currentUser?.login.toLowerCase() === entry.user.login.toLowerCase();
+						currentUserLogin === entry.user.login.toLowerCase();
 
 					return (
 						<TableRow

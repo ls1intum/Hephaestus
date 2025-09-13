@@ -31,9 +31,10 @@ public interface UserRepository extends JpaRepository<User, Long> {
 
     @Query(
         """
-            SELECT u
+            SELECT DISTINCT u
             FROM User u
-            LEFT JOIN FETCH u.teams
+            LEFT JOIN FETCH u.teamMemberships m
+            LEFT JOIN FETCH m.team t
             WHERE u.type = 'USER'
         """
     )
@@ -50,9 +51,10 @@ public interface UserRepository extends JpaRepository<User, Long> {
 
     @Query(
         """
-            SELECT u
+            SELECT DISTINCT u
             FROM User u
-            JOIN FETCH u.teams
+            JOIN FETCH u.teamMemberships m
+            JOIN FETCH m.team t
             WHERE u.type = 'USER'
         """
     )
@@ -60,9 +62,10 @@ public interface UserRepository extends JpaRepository<User, Long> {
 
     @Query(
         """
-            SELECT u
+            SELECT DISTINCT u
             FROM User u
-            JOIN u.teams t
+            JOIN u.teamMemberships m
+            JOIN m.team t
             WHERE t.id = :teamId
             AND u.type = 'USER'
         """
@@ -73,7 +76,8 @@ public interface UserRepository extends JpaRepository<User, Long> {
         """
             SELECT DISTINCT pr.author
             FROM PullRequest pr
-            JOIN Team t ON pr.repository MEMBER OF t.repositories
+            JOIN TeamRepositoryPermission trp ON trp.repository = pr.repository
+            JOIN Team t ON trp.team = t
             WHERE t.id = :teamId
             AND (
                 NOT EXISTS (SELECT l

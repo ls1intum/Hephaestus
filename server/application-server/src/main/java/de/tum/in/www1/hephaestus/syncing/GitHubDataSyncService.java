@@ -12,7 +12,7 @@ import de.tum.in.www1.hephaestus.gitprovider.pullrequestreview.github.GitHubPull
 import de.tum.in.www1.hephaestus.gitprovider.pullrequestreviewcomment.github.GitHubPullRequestReviewCommentSyncService;
 import de.tum.in.www1.hephaestus.gitprovider.repository.RepositoryRepository;
 import de.tum.in.www1.hephaestus.gitprovider.repository.github.GitHubRepositorySyncService;
-import de.tum.in.www1.hephaestus.gitprovider.teamV2.github.GitHubTeamSyncService;
+import de.tum.in.www1.hephaestus.gitprovider.team.github.GitHubTeamSyncService;
 import de.tum.in.www1.hephaestus.gitprovider.user.github.GitHubUserSyncService;
 import de.tum.in.www1.hephaestus.workspace.RepositoryToMonitor;
 import de.tum.in.www1.hephaestus.workspace.RepositoryToMonitorRepository;

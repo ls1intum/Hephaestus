@@ -1,11 +1,13 @@
-package de.tum.in.www1.hephaestus.gitprovider.teamV2.github;
+package de.tum.in.www1.hephaestus.gitprovider.team.github;
 
 import de.tum.in.www1.hephaestus.gitprovider.repository.Repository;
 import de.tum.in.www1.hephaestus.gitprovider.repository.RepositoryRepository;
-import de.tum.in.www1.hephaestus.gitprovider.teamV2.*;
-import de.tum.in.www1.hephaestus.gitprovider.teamV2.membership.TeamMembership;
-import de.tum.in.www1.hephaestus.gitprovider.teamV2.permission.*;
-import de.tum.in.www1.hephaestus.gitprovider.user.*;
+import de.tum.in.www1.hephaestus.gitprovider.team.Team;
+import de.tum.in.www1.hephaestus.gitprovider.team.TeamRepository;
+import de.tum.in.www1.hephaestus.gitprovider.team.membership.TeamMembership;
+import de.tum.in.www1.hephaestus.gitprovider.team.permission.TeamRepositoryPermission;
+import de.tum.in.www1.hephaestus.gitprovider.user.User;
+import de.tum.in.www1.hephaestus.gitprovider.user.UserRepository;
 import java.io.IOException;
 import java.util.HashSet;
 import java.util.List;
@@ -13,7 +15,11 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 import java.util.stream.Collectors;
-import org.kohsuke.github.*;
+import org.kohsuke.github.GHOrganization;
+import org.kohsuke.github.GHRepository;
+import org.kohsuke.github.GHTeam;
+import org.kohsuke.github.GHUser;
+import org.kohsuke.github.GitHub;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -29,14 +35,14 @@ public class GitHubTeamSyncService {
     private static final Logger log = LoggerFactory.getLogger(GitHubTeamSyncService.class);
 
     private final GitHub gitHub;
-    private final TeamV2Repository teamRepository;
+    private final TeamRepository teamRepository;
     private final UserRepository userRepository;
     private final RepositoryRepository repositoryRepository;
     private final GitHubTeamConverter teamConverter;
 
     public GitHubTeamSyncService(
         GitHub gitHub,
-        TeamV2Repository teamRepository,
+        TeamRepository teamRepository,
         UserRepository userRepository,
         RepositoryRepository repositoryRepository,
         GitHubTeamConverter teamConverter
@@ -56,7 +62,7 @@ public class GitHubTeamSyncService {
             .parallelStream()
             .forEach(ghTeam -> {
                 // must call via the proxy (self) to trigger @Transactional on processTeam()
-                TeamV2 saved = self.processTeam(ghTeam);
+                Team saved = self.processTeam(ghTeam);
                 if (saved == null) {
                     log.warn(
                         "Skipped team {} with following id: {} due to an error:",
@@ -70,9 +76,9 @@ public class GitHubTeamSyncService {
     }
 
     @Transactional
-    public TeamV2 processTeam(GHTeam ghTeam) {
+    public Team processTeam(GHTeam ghTeam) {
         try {
-            TeamV2 team = teamRepository
+            Team team = teamRepository
                 .findById(ghTeam.getId())
                 .map(existing -> {
                     teamConverter.update(ghTeam, existing);
@@ -82,7 +88,7 @@ public class GitHubTeamSyncService {
 
             syncMemberships(ghTeam, Objects.requireNonNull(team));
             syncRepoPermissions(ghTeam, team);
-            TeamV2 saved = teamRepository.save(team);
+            Team saved = teamRepository.save(team);
             log.info(
                 "Processed team={}, having {} members with {} repository permissions",
                 team.getName(),
@@ -119,7 +125,7 @@ public class GitHubTeamSyncService {
         }
     }
 
-    private void syncMemberships(GHTeam ghTeam, TeamV2 team) throws IOException {
+    private void syncMemberships(GHTeam ghTeam, Team team) throws IOException {
         Set<Long> maintainerIds = ghTeam
             .listMembers(GHTeam.Role.MAINTAINER)
             .toList()
@@ -168,7 +174,7 @@ public class GitHubTeamSyncService {
         existing.values().forEach(team::removeMembership);
     }
 
-    private void syncRepoPermissions(GHTeam ghTeam, TeamV2 team) {
+    private void syncRepoPermissions(GHTeam ghTeam, Team team) {
         Set<TeamRepositoryPermission> fresh = new HashSet<>();
         for (GHRepository ghRepo : ghTeam.listRepositories()) {
             long repoId = ghRepo.getId();

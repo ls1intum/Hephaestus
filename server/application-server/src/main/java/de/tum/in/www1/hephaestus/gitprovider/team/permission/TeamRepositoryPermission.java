@@ -1,13 +1,26 @@
-package de.tum.in.www1.hephaestus.gitprovider.teamV2.permission;
+package de.tum.in.www1.hephaestus.gitprovider.team.permission;
 
 import de.tum.in.www1.hephaestus.gitprovider.repository.Repository;
-import de.tum.in.www1.hephaestus.gitprovider.teamV2.TeamV2;
-import jakarta.persistence.*;
+import de.tum.in.www1.hephaestus.gitprovider.team.Team;
+import jakarta.persistence.Column;
+import jakarta.persistence.Embeddable;
+import jakarta.persistence.EmbeddedId;
+import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
+import jakarta.persistence.FetchType;
+import jakarta.persistence.ManyToOne;
+import jakarta.persistence.MapsId;
+import jakarta.persistence.Table;
 import java.io.Serializable;
-import lombok.*;
+import lombok.AllArgsConstructor;
+import lombok.EqualsAndHashCode;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+import lombok.Setter;
 
 @Entity
-@Table(name = "team_v2_repository_permission")
+@Table(name = "team_repository_permission")
 @Getter
 @Setter
 @NoArgsConstructor
@@ -20,7 +33,7 @@ public class TeamRepositoryPermission {
 
     @ManyToOne(fetch = FetchType.LAZY)
     @MapsId("teamId")
-    private TeamV2 team;
+    private Team team;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @MapsId("repositoryId")
@@ -30,7 +43,7 @@ public class TeamRepositoryPermission {
     @Column(nullable = false, length = 32)
     private PermissionLevel permission;
 
-    public TeamRepositoryPermission(TeamV2 team, Repository repository, PermissionLevel permission) {
+    public TeamRepositoryPermission(Team team, Repository repository, PermissionLevel permission) {
         this.team = team;
         this.repository = repository;
         this.permission = permission;

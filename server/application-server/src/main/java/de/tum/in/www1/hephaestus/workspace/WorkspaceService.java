@@ -6,10 +6,9 @@ import de.tum.in.www1.hephaestus.gitprovider.repository.RepositoryRepository;
 import de.tum.in.www1.hephaestus.gitprovider.repository.github.GitHubRepositorySyncService;
 import de.tum.in.www1.hephaestus.gitprovider.team.Team;
 import de.tum.in.www1.hephaestus.gitprovider.team.TeamInfoDTO;
+import de.tum.in.www1.hephaestus.gitprovider.team.TeamInfoDTOConverter;
 import de.tum.in.www1.hephaestus.gitprovider.team.TeamRepository;
-import de.tum.in.www1.hephaestus.gitprovider.team.TeamService;
-import de.tum.in.www1.hephaestus.gitprovider.user.User;
-import de.tum.in.www1.hephaestus.gitprovider.user.UserInfoDTO;
+import de.tum.in.www1.hephaestus.gitprovider.team.membership.TeamMembership;
 import de.tum.in.www1.hephaestus.gitprovider.user.UserRepository;
 import de.tum.in.www1.hephaestus.gitprovider.user.UserTeamsDTO;
 import de.tum.in.www1.hephaestus.leaderboard.LeaderboardService;
@@ -55,10 +54,10 @@ public class WorkspaceService {
     private UserRepository userRepository;
 
     @Autowired
-    private TeamService teamService;
+    private TeamRepository teamRepository;
 
     @Autowired
-    private TeamRepository teamRepository;
+    private TeamInfoDTOConverter teamInfoDTOConverter;
 
     @Autowired
     private RepositoryRepository repositoryRepository;
@@ -132,12 +131,6 @@ public class WorkspaceService {
                 });
 
             CompletableFuture.allOf(teamsFuture).thenRun(() -> {
-                //TODO: to be removed after teamV2 is released
-                if (initDefaultWorkspace) {
-                    // Setup default teams
-                    logger.info("Setting up default teams");
-                    teamService.setupDefaultTeams();
-                }
                 logger.info("Finished running monitoring on startup");
             });
         }
@@ -231,7 +224,6 @@ public class WorkspaceService {
         }
 
         repository.get().getLabels().forEach(Label::removeAllTeams);
-        repository.get().removeAllTeams();
         repositoryRepository.delete(repository.get());
 
         if (isNatsEnabled) {
@@ -242,69 +234,6 @@ public class WorkspaceService {
     public List<UserTeamsDTO> getUsersWithTeams() {
         logger.info("Getting all users with their teams");
         return userRepository.findAllHuman().stream().map(UserTeamsDTO::fromUser).toList();
-    }
-
-    public Optional<UserInfoDTO> addTeamToUser(String login, Long teamId) {
-        logger.info("Adding team (ID: " + teamId + ") to user with login: " + login);
-        Optional<User> optionalUser = userRepository.findByLogin(login);
-        if (optionalUser.isEmpty()) {
-            return Optional.empty();
-        }
-        Optional<Team> optionalTeam = teamRepository.findById(teamId);
-        if (optionalTeam.isEmpty()) {
-            return Optional.empty();
-        }
-        Team team = optionalTeam.get();
-        User user = optionalUser.get();
-        team.addMember(user);
-        teamRepository.save(team);
-        return Optional.of(UserInfoDTO.fromUser(user));
-    }
-
-    public Optional<UserInfoDTO> removeUserFromTeam(String login, Long teamId) {
-        logger.info("Removing team (ID: " + teamId + ") from user with login: " + login);
-        Optional<User> optionalUser = userRepository.findByLogin(login);
-        if (optionalUser.isEmpty()) {
-            return Optional.empty();
-        }
-        Optional<Team> optionalTeam = teamRepository.findById(teamId);
-        if (optionalTeam.isEmpty()) {
-            return Optional.empty();
-        }
-        Team team = optionalTeam.get();
-        User user = optionalUser.get();
-        team.removeMember(user);
-        teamRepository.save(team);
-        return Optional.of(UserInfoDTO.fromUser(user));
-    }
-
-    public TeamInfoDTO createTeam(String name, String color) {
-        logger.info("Creating team with name: " + name + " and color: " + color);
-        return TeamInfoDTO.fromTeam(teamService.createTeam(name, color));
-    }
-
-    public Optional<TeamInfoDTO> addRepositoryToTeam(Long teamId, String repositoryName) {
-        logger.info("Adding repository with name: " + repositoryName + " to team with ID: " + teamId);
-        Optional<Team> optionalTeam = teamRepository.findById(teamId);
-        if (optionalTeam.isEmpty()) {
-            return Optional.empty();
-        }
-        Team team = optionalTeam.get();
-        repositoryRepository.findByNameWithOwner(repositoryName).ifPresent(team::addRepository);
-        teamRepository.save(team);
-        return Optional.of(TeamInfoDTO.fromTeam(team));
-    }
-
-    public Optional<TeamInfoDTO> removeRepositoryFromTeam(Long teamId, String repositoryName) {
-        logger.info("Removing repository with name: " + repositoryName + " from team with ID: " + teamId);
-        Optional<Team> optionalTeam = teamRepository.findById(teamId);
-        if (optionalTeam.isEmpty()) {
-            return Optional.empty();
-        }
-        Team team = optionalTeam.get();
-        repositoryRepository.findByNameWithOwner(repositoryName).ifPresent(team::removeRepository);
-        teamRepository.save(team);
-        return Optional.of(TeamInfoDTO.fromTeam(team));
     }
 
     public Optional<TeamInfoDTO> addLabelToTeam(Long teamId, Long repositoryId, String label) {
@@ -322,7 +251,7 @@ public class WorkspaceService {
         }
         team.addLabel(labelEntity.get());
         teamRepository.save(team);
-        return Optional.of(TeamInfoDTO.fromTeam(team));
+        return Optional.of(teamInfoDTOConverter.convert(team));
     }
 
     public Optional<TeamInfoDTO> removeLabelFromTeam(Long teamId, Long labelId) {
@@ -338,7 +267,7 @@ public class WorkspaceService {
         }
         team.removeLabel(labelEntity.get());
         teamRepository.save(team);
-        return Optional.of(TeamInfoDTO.fromTeam(team));
+        return Optional.of(teamInfoDTOConverter.convert(team));
     }
 
     public Optional<TeamInfoDTO> deleteTeam(Long teamId) {
@@ -348,7 +277,7 @@ public class WorkspaceService {
             return Optional.empty();
         }
         teamRepository.delete(optionalTeam.get());
-        return Optional.of(TeamInfoDTO.fromTeam(optionalTeam.get()));
+        return Optional.of(teamInfoDTOConverter.convert(optionalTeam.get()));
     }
 
     @Transactional
@@ -359,9 +288,8 @@ public class WorkspaceService {
         teams.forEach(team -> {
             var contributors = userRepository.findAllContributingToTeam(team.getId());
             contributors.forEach(contributor -> {
-                contributor.addTeam(team);
-                userRepository.save(contributor);
-                team.addMember(contributor);
+                var membership = new TeamMembership(team, contributor, TeamMembership.Role.MEMBER);
+                team.addMembership(membership);
                 teamRepository.save(team);
             });
         });

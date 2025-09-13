@@ -1,6 +1,6 @@
 import type { Meta, StoryObj } from "@storybook/react";
 import { fn } from "@storybook/test";
-import { TeamFilter } from "./TeamFilter";
+import { TeamFilter, type TeamFilterOption } from "./TeamFilter";
 
 /**
  * Team filter component allowing users to filter leaderboard results by team.
@@ -13,8 +13,8 @@ const meta = {
 		layout: "centered",
 	},
 	argTypes: {
-		teams: {
-			description: "Array of available teams to filter by",
+		options: {
+			description: "Team options with value and visible path label",
 			control: "object",
 		},
 		selectedTeam: {
@@ -39,7 +39,13 @@ type Story = StoryObj<typeof meta>;
  */
 export const Default: Story = {
 	args: {
-		teams: ["Frontend", "Backend", "DevOps", "QA", "Design"],
+		options: [
+			{ value: "Frontend", label: "Frontend" },
+			{ value: "Backend", label: "Backend" },
+			{ value: "DevOps", label: "DevOps" },
+			{ value: "QA", label: "QA" },
+			{ value: "Design", label: "Design" },
+		] satisfies TeamFilterOption[],
 		selectedTeam: "all",
 	},
 };
@@ -49,7 +55,13 @@ export const Default: Story = {
  */
 export const TeamSelected: Story = {
 	args: {
-		teams: ["Frontend", "Backend", "DevOps", "QA", "Design"],
+		options: [
+			{ value: "Frontend", label: "Frontend" },
+			{ value: "Backend", label: "Backend" },
+			{ value: "DevOps", label: "DevOps" },
+			{ value: "QA", label: "QA" },
+			{ value: "Design", label: "Design" },
+		] satisfies TeamFilterOption[],
 		selectedTeam: "Frontend",
 	},
 };
@@ -59,21 +71,27 @@ export const TeamSelected: Story = {
  */
 export const NoTeams: Story = {
 	args: {
-		teams: [],
+		options: [] as TeamFilterOption[],
 		selectedTeam: "all",
 	},
 };
 
 export const WithSelectedTeam: Story = {
 	args: {
-		teams: ["Frontend", "Backend", "DevOps", "QA", "Design"],
+		options: [
+			{ value: "Frontend", label: "Frontend" },
+			{ value: "Backend", label: "Backend" },
+			{ value: "DevOps", label: "DevOps" },
+			{ value: "QA", label: "QA" },
+			{ value: "Design", label: "Design" },
+		] satisfies TeamFilterOption[],
 		selectedTeam: "Frontend",
 	},
 };
 
 export const EmptyTeamList: Story = {
 	args: {
-		teams: [],
+		options: [] as TeamFilterOption[],
 		selectedTeam: "all",
 	},
 };

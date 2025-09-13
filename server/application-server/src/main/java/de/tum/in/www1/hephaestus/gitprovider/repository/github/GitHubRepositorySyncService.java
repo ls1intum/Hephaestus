@@ -171,7 +171,6 @@ public class GitHubRepositorySyncService {
             return;
         }
         var repos = repositoryRepository.findAllById(ids);
-        repos.forEach(Repository::removeAllTeams);
         repositoryRepository.deleteAll(repos);
     }
 }

@@ -31,7 +31,6 @@ public interface PullRequestReviewRepository extends JpaRepository<PullRequestRe
         SELECT prr
         FROM PullRequestReview prr
         LEFT JOIN FETCH prr.author
-        LEFT JOIN FETCH prr.author.teams
         LEFT JOIN FETCH prr.pullRequest
         LEFT JOIN FETCH prr.pullRequest.repository
         LEFT JOIN FETCH prr.comments
@@ -51,11 +50,11 @@ public interface PullRequestReviewRepository extends JpaRepository<PullRequestRe
         SELECT prr
         FROM PullRequestReview prr
         LEFT JOIN FETCH prr.author
-        LEFT JOIN FETCH prr.author.teams
         LEFT JOIN FETCH prr.pullRequest
         LEFT JOIN FETCH prr.pullRequest.repository
         LEFT JOIN FETCH prr.comments
-        JOIN Team t ON prr.pullRequest.repository MEMBER OF t.repositories
+        JOIN TeamRepositoryPermission trp ON trp.repository = prr.pullRequest.repository
+        JOIN Team t ON trp.team = t
         WHERE
             prr.submittedAt BETWEEN :after AND :before
             AND prr.author.type = 'USER'

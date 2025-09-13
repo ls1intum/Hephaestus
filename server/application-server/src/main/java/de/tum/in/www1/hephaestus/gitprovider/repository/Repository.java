@@ -4,15 +4,11 @@ import de.tum.in.www1.hephaestus.gitprovider.common.BaseGitServiceEntity;
 import de.tum.in.www1.hephaestus.gitprovider.issue.Issue;
 import de.tum.in.www1.hephaestus.gitprovider.label.Label;
 import de.tum.in.www1.hephaestus.gitprovider.milestone.Milestone;
-import de.tum.in.www1.hephaestus.gitprovider.team.Team;
-import de.tum.in.www1.hephaestus.gitprovider.teamV2.TeamV2;
+import de.tum.in.www1.hephaestus.gitprovider.team.permission.TeamRepositoryPermission;
 import jakarta.persistence.CascadeType;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
-import jakarta.persistence.JoinColumn;
-import jakarta.persistence.JoinTable;
-import jakarta.persistence.ManyToMany;
 import jakarta.persistence.OneToMany;
 import jakarta.persistence.Table;
 import java.time.OffsetDateTime;
@@ -85,18 +81,9 @@ public class Repository extends BaseGitServiceEntity {
     @ToString.Exclude
     private Set<Milestone> milestones = new HashSet<>();
 
-    @ManyToMany(mappedBy = "repositories")
+    @OneToMany(mappedBy = "repository", cascade = CascadeType.REMOVE, orphanRemoval = true)
     @ToString.Exclude
-    private Set<Team> teams = new HashSet<>();
-
-    @ManyToMany
-    @JoinTable(
-        name = "team_v2_repository_permission",
-        joinColumns = @JoinColumn(name = "repository_id"),
-        inverseJoinColumns = @JoinColumn(name = "team_id")
-    )
-    @ToString.Exclude
-    private Set<TeamV2> teamsV2 = new HashSet<>();
+    private Set<TeamRepositoryPermission> teamRepoPermissions = new HashSet<>();
 
     public enum Visibility {
         PUBLIC,
@@ -105,9 +92,19 @@ public class Repository extends BaseGitServiceEntity {
         UNKNOWN,
     }
 
+    /**
+     * Removes all team permissions referencing this repository.
+     */
     public void removeAllTeams() {
-        this.teams.forEach(team -> team.getRepositories().remove(this));
-        this.teams.clear();
+        if (this.teamRepoPermissions != null) {
+            this.teamRepoPermissions.forEach(perm -> {
+                    var team = perm.getTeam();
+                    if (team != null) {
+                        team.getRepoPermissions().remove(perm);
+                    }
+                });
+            this.teamRepoPermissions.clear();
+        }
     }
     // TODO:
     // owner
