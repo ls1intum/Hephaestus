@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.9.0-rc.24](https://github.com/ls1intum/Hephaestus/compare/v0.9.0-rc.23...v0.9.0-rc.24) (2025-09-13)
+
+### 🚀 Features
+
+* handle installation and installation repositories events ([#396](https://github.com/ls1intum/Hephaestus/issues/396)) ([dfc1a1c](https://github.com/ls1intum/Hephaestus/commit/dfc1a1c01965d68ce7856b8a09599754d1b74ef9))
+
 ## [0.9.0-rc.23](https://github.com/ls1intum/Hephaestus/compare/v0.9.0-rc.22...v0.9.0-rc.23) (2025-09-10)
 
 ### ♻️ Code Refactoring
