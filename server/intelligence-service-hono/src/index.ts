@@ -1,14 +1,12 @@
 import { serve } from "@hono/node-server";
-import { createApp } from "./openapi.js";
 
-const app = createApp();
+import app from "./app";
+import env from "./env";
 
-serve(
-	{
-		fetch: app.fetch,
-		port: 8000,
-	},
-	(info) => {
-		console.log(`Server is running on http://localhost:${info.port}`);
-	},
-);
+const port = env.PORT;
+console.log(`Server is running on port http://localhost:${port}`);
+
+serve({
+  fetch: app.fetch,
+  port,
+});

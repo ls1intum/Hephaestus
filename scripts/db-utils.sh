@@ -7,6 +7,7 @@
 #   generate-erd                         - Generate ERD documentation only
 #   draft-changelog                      - Generate changelog diff only
 #   generate-models-intelligence-service - Generate SQLAlchemy models for intelligence service
+#   generate-models-intelligence-service-hono - Introspect existing DB and generate Drizzle schema for Hono service
 
 set -e  # Exit on any error
 
@@ -198,6 +199,14 @@ generate_intelligence_service_models() {
     log_success "SQLAlchemy models generated for intelligence service"
 }
 
+# Generate Drizzle schema for Hono intelligence service
+generate_hono_intelligence_service_models() {
+    log_info "Generating Drizzle schema for Hono intelligence service..."
+    cd "$PROJECT_ROOT"
+    npm run db:generate-models:intelligence-service-hono
+    log_success "Drizzle schema generated for Hono intelligence service (see server/intelligence-service-hono/drizzle)"
+}
+
 # Generate changelog diff with database backup/restore
 generate_changelog_diff() {
     log_info "Generating changelog diff..."
@@ -307,6 +316,7 @@ Commands:
   generate-erd                      Generate ERD documentation only (requires running database)
   draft-changelog                   Generate changelog diff only
   generate-models-intelligence-service  Generate SQLAlchemy models for intelligence service
+    generate-models-intelligence-service-hono  Generate Drizzle schema for Hono intelligence service
   help                             Show this help message
 
 Examples:
@@ -328,6 +338,23 @@ main() {
             ;;
         "generate-models-intelligence-service")
             cmd_generate_db_models_intelligence_service
+            ;;
+        "generate-models-intelligence-service-hono")
+            # Ensure PostgreSQL is running
+            log_info "🚀 Starting Drizzle schema generation for Hono intelligence service..."
+            check_environment
+            cd "$APP_SERVER_DIR"
+            if ! docker compose ps postgres | grep -q "Up"; then
+                log_warning "PostgreSQL is not running. Starting it now..."
+                start_postgres
+            fi
+            if [[ "${CI:-false}" == "true" ]]; then
+                apply_migrations
+            else
+                log_info "Skipping migrations in local mode (assuming DB is up-to-date)"
+            fi
+            generate_hono_intelligence_service_models
+            log_success "🎉 Drizzle schema generation completed successfully!"
             ;;
         "help"|"-h"|"--help")
             show_usage
