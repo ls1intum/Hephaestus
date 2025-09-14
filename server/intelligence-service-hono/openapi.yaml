@@ -1,0 +1,60 @@
+openapi: 3.1.0
+info:
+  title: Hephaestus Intelligence Service (Hono) API
+  version: 0.9.0-rc.27
+components:
+  securitySchemes:
+    Bearer:
+      type: http
+      scheme: bearer
+  schemas:
+    Error:
+      type: object
+      properties:
+        code:
+          type: number
+          example: 400
+        message:
+          type: string
+          example: Bad Request
+      required:
+        - code
+        - message
+    HealthResponse:
+      type: object
+      properties:
+        status:
+          type: string
+          enum:
+            - ok
+        service:
+          type: string
+      required:
+        - status
+        - service
+  parameters: {}
+paths:
+  /health:
+    get:
+      tags:
+        - system
+      responses:
+        "200":
+          description: Service health status
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HealthResponse"
+  /:
+    get:
+      tags:
+        - system
+      responses:
+        "200":
+          description: Welcome
+          content:
+            text/plain:
+              schema:
+                type: string
+                example: Hello Hono!
+webhooks: {}
