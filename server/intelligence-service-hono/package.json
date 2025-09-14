@@ -6,7 +6,7 @@
 		"build": "tsc && tsc-alias",
 		"start": "node dist/index.js",
 		"openapi:export": "tsx scripts/export-openapi.ts",
-		"db:introspect": "drizzle-kit introspect --dialect=postgresql --out=./src/db/ --url=postgresql://root:root@localhost:5432/hephaestus && tsx scripts/post-introspect.ts",
+		"db:introspect": "drizzle-kit introspect --dialect=postgresql --url=postgresql://root:root@localhost:5432/hephaestus && tsx scripts/post-introspect.ts",
 		"check": "biome check src scripts drizzle.config.ts",
 		"format": "biome format --write .",
 		"typecheck": "tsc --noEmit"

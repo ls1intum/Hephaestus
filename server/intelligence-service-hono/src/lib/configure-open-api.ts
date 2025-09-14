@@ -4,10 +4,16 @@ import type { AppOpenAPI } from "./types";
 
 import packageJSON from "../../../../package.json" with { type: "json" };
 
+// Derive a version string safely, falling back for local dev or when unset
+const VERSION: string =
+  (packageJSON as { version?: string }).version ??
+  process.env.npm_package_version ??
+  "0.0.0-dev";
+
 export const openAPIConfig = {
   openapi: "3.1.0",
   info: {
-    version: packageJSON.version,
+    version: VERSION,
     title: "Hephaestus Intelligence Service API",
   },
 };

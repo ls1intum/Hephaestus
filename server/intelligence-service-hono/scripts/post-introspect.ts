@@ -12,7 +12,7 @@ import { fileURLToPath } from "node:url";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
-const schemaPath = path.resolve(__dirname, "../src/db/schema.ts");
+const schemaPath = path.resolve(__dirname, "../drizzle/schema.ts");
 
 if (!fs.existsSync(schemaPath)) {
 	console.error(`[post-introspect] schema.ts not found at ${schemaPath}`);
@@ -107,4 +107,49 @@ removePgTableBlock("databasechangelog");
 removePgTableBlock("databasechangeloglock");
 
 fs.writeFileSync(schemaPath, content, "utf8");
+
+// Move ./drizzle/relations.ts to ./src/db/relations.ts (overwrite if exists)
+const relationsSrc = path.resolve(__dirname, "../drizzle/relations.ts");
+const relationsDst = path.resolve(__dirname, "../src/db/relations.ts");
+if (fs.existsSync(relationsSrc)) {
+	fs.copyFileSync(relationsSrc, relationsDst);
+	fs.unlinkSync(relationsSrc);
+	// Also remove the ./drizzle directory if it exists (remove recursively to handle .DS_Store or leftover files)
+	const drizzleDir = path.resolve(__dirname, "../drizzle");
+	if (fs.existsSync(drizzleDir)) {
+		try {
+			fs.rmSync(drizzleDir, { recursive: true, force: true });
+		} catch (e) {
+			console.warn(`[post-introspect] Failed to remove ${drizzleDir}:`, e);
+		}
+	}
+}
+
+// Move ./drizzle/schema.ts to ./src/db/schema.ts (overwrite if exists)
+const schemaSrc = path.resolve(__dirname, "../drizzle/schema.ts");
+const schemaDst = path.resolve(__dirname, "../src/db/schema.ts");
+if (fs.existsSync(schemaSrc)) {
+	fs.copyFileSync(schemaSrc, schemaDst);
+	fs.unlinkSync(schemaSrc);
+	// Also remove the ./drizzle directory if it exists (remove recursively to handle .DS_Store or leftover files)
+	const drizzleDir = path.resolve(__dirname, "../drizzle");
+	if (fs.existsSync(drizzleDir)) {
+		try {
+			fs.rmSync(drizzleDir, { recursive: true, force: true });
+		} catch (e) {
+			console.warn(`[post-introspect] Failed to remove ${drizzleDir}:`, e);
+		}
+	}
+}
+
+// Ensure ../drizzle directory is removed even if residual files (e.g., .DS_Store) exist
+const drizzleDir = path.resolve(__dirname, "../drizzle");
+if (fs.existsSync(drizzleDir)) {
+	try {
+		fs.rmSync(drizzleDir, { recursive: true, force: true });
+	} catch (e) {
+		console.warn(`[post-introspect] Final remove failed for ${drizzleDir}:`, e);
+	}
+}
+
 console.log("[post-introspect] Patched schema.ts with ts-nocheck and cleanup");
