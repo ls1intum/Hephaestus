@@ -30,6 +30,11 @@ const EnvSchema = z
 		// Models
 		MODEL_NAME: z.string().min(1).default("openai:gpt-5-mini"),
 		DETECTION_MODEL_NAME: z.string().min(1).default("openai:gpt-5-mini"),
+
+		// LangFuse (optional)
+		LANGFUSE_SECRET_KEY: z.string().min(1).optional(),
+		LANGFUSE_PUBLIC_KEY: z.string().min(1).optional(),
+		LANGFUSE_BASE_URL: z.string().min(1).url().optional(),
 	})
 	.superRefine((val, ctx) => {
 		// Basic model format validation: "provider:model"
