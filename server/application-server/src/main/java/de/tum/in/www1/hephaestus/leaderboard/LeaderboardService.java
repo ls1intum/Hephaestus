@@ -128,9 +128,7 @@ public class LeaderboardService {
         Optional<String> team,
         Optional<LeaderboardSortType> sort
     ) {
-        Optional<Team> teamEntity = team
-            .map(t -> teamRepository.findAll().stream().filter(tm -> t.equals(tm.getName())).findFirst())
-            .orElse(Optional.empty());
+        Optional<Team> teamEntity = team.flatMap(this::findTeamByPath);
         logger.info(
             "Creating leaderboard dataset with timeframe: {} - {} and team: {}",
             after,
@@ -271,6 +269,29 @@ public class LeaderboardService {
             .toList();
 
         return leaderboard;
+    }
+
+    private Optional<Team> findTeamByPath(String path) {
+        String[] parts = path.split(" / ");
+        List<Team> candidates = teamRepository.findAllByName(parts[parts.length - 1]);
+
+        return candidates.stream().filter(t -> matchesVisiblePath(t, parts)).findFirst();
+    }
+
+    private boolean matchesVisiblePath(Team team, String[] parts) {
+        int index = parts.length - 1;
+        Team current = team;
+        while (current != null) {
+            if (!current.isHidden()) {
+                if (index < 0 || !current.getName().equals(parts[index])) {
+                    return false;
+                }
+                index--;
+            }
+            Long parentId = current.getParentId();
+            current = parentId != null ? teamRepository.findById(parentId).orElse(null) : null;
+        }
+        return index < 0;
     }
 
     private int calculateTotalScore(List<PullRequestReview> reviews, List<IssueComment> issueComments) {
