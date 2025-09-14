@@ -17,6 +17,10 @@
 			"path": "./server/intelligence-service"
 		},
 		{
+			"name": "server/intelligence-service-hono",
+			"path": "./server/intelligence-service-hono"
+		},
+		{
 			"name": "server/webhook-ingest",
 			"path": "./server/webhook-ingest"
 		},
