@@ -1,3 +1,4 @@
+import "./instrumentation"; // must be first import to initialize OTEL
 import { serve } from "@hono/node-server";
 
 import app from "./app";

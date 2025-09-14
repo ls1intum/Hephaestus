@@ -5,6 +5,7 @@ import * as HttpStatusCodes from "stoker/http-status-codes";
 import { jsonContentRequired } from "stoker/openapi/helpers";
 import env from "@/env";
 import { createRouter } from "@/lib/create-app";
+import { getLangfuseClient } from "@/lib/langfuse";
 
 const tags: string[] = ["Poem"];
 
@@ -52,9 +53,30 @@ const router = createRouter().openapi(route, async (c) => {
 	const stylePrefix = style ? ` in the style of ${style}` : "";
 	const prompt = `Write a short poem about ${topic}${stylePrefix}. Keep it under 8 lines.`;
 
+	// Try to fetch a prompt from Langfuse for linking (optional)
+	const langfuse = getLangfuseClient();
+	let telemetryOptions: Record<string, unknown> | undefined;
+	if (langfuse) {
+		try {
+			const promptDoc = await langfuse.prompt.get("poem-generator");
+			telemetryOptions = {
+				experimental_telemetry: {
+					isEnabled: true,
+					metadata: { langfusePrompt: promptDoc.toJSON() },
+				},
+			};
+		} catch (_e) {
+			// If prompt not found or Langfuse error, still enable telemetry if possible
+			telemetryOptions = {
+				experimental_telemetry: { isEnabled: true },
+			};
+		}
+	}
+
 	const result = streamText({
 		model: env.defaultModel,
 		prompt,
+		...(telemetryOptions ?? {}),
 	});
 
 	// The OpenAPI-typed handler expects a Hono TypedResponse<string, 200, 'text'>.
