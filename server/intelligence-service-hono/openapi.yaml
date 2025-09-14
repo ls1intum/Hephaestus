@@ -1,9 +1,36 @@
 openapi: 3.1.0
 info:
-  title: Hephaestus Intelligence Service (Hono) API
   version: 0.9.0-rc.27
+  title: Hephaestus Intelligence Service API
 components:
   schemas:
+    HealthCheck:
+      type: object
+      properties:
+        status:
+          type: string
+          enum:
+            - OK
+          description: Health status
+          example: OK
+      required:
+        - status
+    PoemRequest:
+      type: object
+      properties:
+        topic:
+          type: string
+          minLength: 1
+          description: Topic of the poem
+          example: coding
+        style:
+          type: string
+          minLength: 1
+          default: ""
+          description: Optional poem style
+          example: haiku
+      required:
+        - topic
     Task:
       type: object
       properties:
@@ -45,26 +72,121 @@ components:
           type: boolean
           default: false
           example: false
+    BadPractice:
+      type: object
+      properties:
+        title:
+          type: string
+        description:
+          type: string
+        status:
+          type: string
+          enum:
+            - Good Practice
+            - Fixed
+            - Critical Issue
+            - Normal Issue
+            - Minor Issue
+            - Won't Fix
+            - Wrong
+      required:
+        - title
+        - description
+        - status
+    BadPracticeResult:
+      type: object
+      properties:
+        bad_practice_summary:
+          type: string
+        bad_practices:
+          type: array
+          items:
+            $ref: "#/components/schemas/BadPractice"
+      required:
+        - bad_practice_summary
+        - bad_practices
+    DetectorResponse:
+      allOf:
+        - $ref: "#/components/schemas/BadPracticeResult"
+        - type: object
+          properties:
+            trace_id:
+              type: string
+          required:
+            - trace_id
+    DetectorRequest:
+      type: object
+      properties:
+        title:
+          type: string
+        description:
+          type: string
+        lifecycle_state:
+          type: string
+        repository_name:
+          type: string
+        pull_request_number:
+          type: number
+        bad_practice_summary:
+          type: string
+        bad_practices:
+          type: array
+          items:
+            $ref: "#/components/schemas/BadPractice"
+        pull_request_template:
+          type: string
+      required:
+        - title
+        - description
+        - lifecycle_state
+        - repository_name
+        - pull_request_number
+        - bad_practice_summary
+        - bad_practices
+        - pull_request_template
   parameters: {}
 paths:
-  /:
+  /health:
     get:
       tags:
-        - Index
+        - healthcheck
+      summary: Perform a Health Check
+      description: Endpoint to perform a healthcheck on. This endpoint can primarily
+        be used by Docker to ensure robust container orchestration and
+        management. Other services which rely on proper functioning of the API
+        service will not deploy if this endpoint returns any other HTTP status
+        code except 200 (OK).
       responses:
         "200":
-          description: Tasks API Index
+          description: Return HTTP Status Code 200 (OK)
           content:
             application/json:
               schema:
-                type: object
-                properties:
-                  message:
-                    type: string
-                required:
-                  - message
-                example:
-                  message: Tasks API
+                $ref: "#/components/schemas/HealthCheck"
+  /poem:
+    post:
+      tags:
+        - Poem
+      summary: Generate a poem
+      description: Generates a short poem using the configured default AI model. The
+        response is streamed as plain text. If Langfuse is configured, telemetry
+        and prompt linking are enabled.
+      requestBody:
+        description: Poem generation input
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PoemRequest"
+      responses:
+        "200":
+          description: Streamed poem text
+          content:
+            text/plain:
+              schema:
+                type: string
+                description: Streamed poem text
+                example: Code flows\nlike rivers of logic\ninto the dawn.
   /tasks:
     get:
       tags: &a1
@@ -419,4 +541,23 @@ paths:
                 required:
                   - success
                   - error
+  /detector:
+    post:
+      tags:
+        - Detector
+      summary: Detect bad practices for a pull request
+      requestBody:
+        description: Detector request
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/DetectorRequest"
+      responses:
+        "200":
+          description: Detection response
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DetectorResponse"
 webhooks: {}

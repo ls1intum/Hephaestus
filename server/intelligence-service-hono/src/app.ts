@@ -1,5 +1,6 @@
 import configureOpenAPI from "@/lib/configure-open-api";
 import createApp from "@/lib/create-app";
+import detector from "@/routes/detector/detector.index";
 import health from "@/routes/health.route";
 import index from "@/routes/index.route";
 import poem from "@/routes/poem/poem.index";
@@ -9,7 +10,7 @@ const app = createApp();
 
 configureOpenAPI(app);
 
-const routes = [index, health, poem, tasks] as const;
+const routes = [index, health, poem, tasks, detector] as const;
 
 routes.forEach((route) => {
 	app.route("/", route);

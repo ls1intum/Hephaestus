@@ -1,5 +1,5 @@
+import type { ChatPromptClient, TextPromptClient } from "@langfuse/client";
 import env from "@/env";
-import { ChatPromptClient, TextPromptClient } from "@langfuse/client";
 
 export function isTelemetryEnabled() {
 	return Boolean(
@@ -8,7 +8,9 @@ export function isTelemetryEnabled() {
 }
 
 /** Build AI SDK telemetry options, optionally linking a Langfuse prompt. */
-export function buildTelemetryOptions(prompt: ChatPromptClient | TextPromptClient) {
+export function buildTelemetryOptions(
+	prompt: ChatPromptClient | TextPromptClient,
+) {
 	if (!isTelemetryEnabled()) return undefined;
 	return {
 		experimental_telemetry: {
