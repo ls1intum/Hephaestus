@@ -1,23 +1,30 @@
 {
-  "name": "intelligence-service-hono",
-  "type": "module",
-  "scripts": {
-    "dev": "tsx watch src/index.ts",
-    "build": "tsc",
-    "start": "node dist/index.js",
-    "openapi:export": "tsx scripts/export-openapi.ts"
-  },
-  "dependencies": {
-    "@hono/node-server": "^1.19.2",
-    "@hono/swagger-ui": "^0.5.2",
-    "@hono/zod-openapi": "^0.19.10",
-    "hono": "^4.9.7",
-    "yaml": "^2.8.0",
-    "zod": "^3.25.76"
-  },
-  "devDependencies": {
-    "@types/node": "^20.19.14",
-    "tsx": "^4.7.1",
-    "typescript": "^5.8.3"
-  }
+	"name": "intelligence-service-hono",
+	"type": "module",
+	"scripts": {
+		"dev": "tsx watch src/index.ts",
+		"build": "tsc",
+		"start": "node dist/index.js",
+		"openapi:export": "tsx scripts/export-openapi.ts",
+		"check": "biome check .",
+		"format": "biome format --write .",
+		"typecheck": "tsc --noEmit"
+	},
+	"dependencies": {
+		"@hono/node-server": "^1.19.2",
+		"@hono/swagger-ui": "^0.5.2",
+		"@hono/zod-openapi": "^0.19.10",
+		"hono": "^4.9.7",
+		"yaml": "^2.8.0",
+		"zod": "^3.25.76"
+	},
+	"devDependencies": {
+		"@biomejs/biome": "^1.9.4",
+		"@types/node": "^20.19.14",
+		"tsx": "^4.7.1",
+		"typescript": "^5.8.3"
+	},
+	"engines": {
+		"node": ">=22.10.0"
+	}
 }

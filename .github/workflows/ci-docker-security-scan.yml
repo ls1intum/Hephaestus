@@ -24,6 +24,7 @@ jobs:
           - { name: "webapp",               image: "ghcr.io/ls1intum/hephaestus/webapp" }
           - { name: "application-server",   image: "ghcr.io/ls1intum/hephaestus/application-server" }
           - { name: "intelligence-service", image: "ghcr.io/ls1intum/hephaestus/intelligence-service" }
+          - { name: "intelligence-service-hono", image: "ghcr.io/ls1intum/hephaestus/intelligence-service-hono" }
           - { name: "webhook-ingest",       image: "ghcr.io/ls1intum/hephaestus/webhook-ingest" }
 
     steps:

@@ -24,6 +24,7 @@ jobs:
             application-server-quality,
             webapp-quality,
             intelligence-service-quality,
+            intelligence-service-hono-quality,
             webhook-ingest-quality,
             openapi-validation,
             database-schema-validation,
@@ -45,6 +46,7 @@ jobs:
           cache-dependency-path: |
             package-lock.json
             webapp/package-lock.json
+            server/intelligence-service-hono/package-lock.json
 
 
       # Advanced cache setup with fallback
@@ -192,6 +194,21 @@ jobs:
           fi
 
           echo "✅ intelligence-service quality checks passed"
+
+      # webhook-ingest quality checks with comprehensive validation
+      - name: intelligence-service-hono quality & type checking
+        if: matrix.check == 'intelligence-service-hono-quality'
+        working-directory: ./server/intelligence-service-hono
+        run: |
+          echo "🔍 Running intelligence-service-hono quality checks..."
+          npm ci --no-audit --progress=false
+          echo "🎨 Linting (Biome)..."
+          npm run check
+          echo "📊 TypeScript typecheck..."
+          npm run typecheck
+          echo "🧪 Build check..."
+          npm run build
+          echo "✅ intelligence-service-hono quality checks passed"
 
       # webhook-ingest quality checks with comprehensive validation
       - name: webhook-ingest quality & security analysis

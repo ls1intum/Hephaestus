@@ -74,7 +74,9 @@ elif [[ "$PARAM" == "major" || "$PARAM" == "minor" || "$PARAM" == "patch" ]]; th
         exit 1
     fi
 
-    NEW_VERSION=$(increment_version "$CURRENT_VERSION" "$INCREMENT_TYPE")
+    # Strip pre-release/build metadata from current version for arithmetic ops
+    BASE_VERSION=$(echo "$CURRENT_VERSION" | sed -E 's/^([0-9]+\.[0-9]+\.[0-9]+).*$/\1/')
+    NEW_VERSION=$(increment_version "$BASE_VERSION" "$INCREMENT_TYPE")
     echo "Updating version from $CURRENT_VERSION to $NEW_VERSION..."
 else
     echo "Error: Invalid argument. Use one of [major, minor, patch] or provide a semantic version (e.g., 1.2.3, 1.0.0-alpha.1, 2.0.0-beta.1)."
@@ -187,6 +189,23 @@ fi
 # Update server/intelligence-service/openapi.yaml (non-quoted version) (if it exists)
 if [[ -f server/intelligence-service/openapi.yaml ]]; then
     sed_inplace "s#(version:[[:space:]]*)[0-9]+(\.[0-9]+){2}(-[0-9A-Za-z.-]+)?(\+[0-9A-Za-z.-]+)?#\1${NEW_VERSION}#" server/intelligence-service/openapi.yaml
+fi
+
+# Update intelligence-service-hono OpenAPI and sources (if they exist)
+# Update generated YAML (quoted or unquoted)
+if [[ -f server/intelligence-service-hono/openapi.yaml ]]; then
+    sed_inplace "s#(version:[[:space:]]*)\"[^\"]*\"#\\1\"${NEW_VERSION}\"#" server/intelligence-service-hono/openapi.yaml || true
+    sed_inplace "s#(version:[[:space:]]*)[^\"'[:space:]]+#\\1${NEW_VERSION}#" server/intelligence-service-hono/openapi.yaml || true
+fi
+
+# Update TypeScript sources that define the OpenAPI doc version
+if [[ -f server/intelligence-service-hono/src/openapi.ts ]]; then
+    sed_inplace "s#(version:[[:space:]]*)\"[^\"]*\"#\\1\"${NEW_VERSION}\"#" server/intelligence-service-hono/src/openapi.ts || true
+    sed_inplace "s#(version:[[:space:]]*)'[^']*'#\\1'${NEW_VERSION}'#" server/intelligence-service-hono/src/openapi.ts || true
+fi
+if [[ -f server/intelligence-service-hono/scripts/export-openapi.ts ]]; then
+    sed_inplace "s#(version:[[:space:]]*)\"[^\"]*\"#\\1\"${NEW_VERSION}\"#" server/intelligence-service-hono/scripts/export-openapi.ts || true
+    sed_inplace "s#(version:[[:space:]]*)'[^']*'#\\1'${NEW_VERSION}'#" server/intelligence-service-hono/scripts/export-openapi.ts || true
 fi
 
 # Update all files containing "The version of the OpenAPI document:" to use the new version,

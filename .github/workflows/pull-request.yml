@@ -38,6 +38,7 @@ jobs:
             webapp
             application-server
             intelligence-service
+            intelligence-service-hono
             webhook-ingest
             docs
             ci
