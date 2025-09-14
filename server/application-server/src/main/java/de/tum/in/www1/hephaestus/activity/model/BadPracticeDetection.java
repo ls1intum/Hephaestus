@@ -24,7 +24,7 @@ public class BadPracticeDetection {
     private PullRequest pullRequest;
 
     @NonNull
-    @Lob
+    @Column(columnDefinition = "text")
     private String summary;
 
     @NonNull

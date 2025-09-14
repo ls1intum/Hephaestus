@@ -1,4 +1,4 @@
-import { pgTable, varchar, timestamp, integer, boolean, foreignKey, bigint, text, smallint, uuid, type AnyPgColumn, jsonb, unique, primaryKey, index } from "drizzle-orm/pg-core"
+import { pgTable, varchar, timestamp, integer, boolean, bigint, foreignKey, text, smallint, uuid, type AnyPgColumn, jsonb, unique, primaryKey, index } from "drizzle-orm/pg-core"
 import { sql } from "drizzle-orm"
 
 
@@ -27,33 +27,6 @@ export const databasechangeloglock = pgTable("databasechangeloglock", {
 	lockedby: varchar({ length: 255 }),
 });
 
-export const pullRequestReview = pgTable("pull_request_review", {
-	// You can use { mode: "bigint" } if numbers are exceeding js number limitations
-	id: bigint({ mode: "number" }).primaryKey().notNull(),
-	// TODO: failed to parse database type 'oid'
-	body: unknown("body"),
-	commitId: varchar("commit_id", { length: 255 }),
-	htmlUrl: varchar("html_url", { length: 255 }),
-	isDismissed: boolean("is_dismissed").notNull(),
-	state: varchar({ length: 255 }),
-	submittedAt: timestamp("submitted_at", { withTimezone: true, mode: 'string' }),
-	// You can use { mode: "bigint" } if numbers are exceeding js number limitations
-	authorId: bigint("author_id", { mode: "number" }),
-	// You can use { mode: "bigint" } if numbers are exceeding js number limitations
-	pullRequestId: bigint("pull_request_id", { mode: "number" }),
-}, (table) => [
-	foreignKey({
-			columns: [table.authorId],
-			foreignColumns: [user.id],
-			name: "fkeehfcwrodfu61gremlcvhgir5"
-		}),
-	foreignKey({
-			columns: [table.pullRequestId],
-			foreignColumns: [issue.id],
-			name: "fkio96gq2jetvy6a4in9nl8vkvd"
-		}),
-]);
-
 export const user = pgTable("user", {
 	// You can use { mode: "bigint" } if numbers are exceeding js number limitations
 	id: bigint({ mode: "number" }).primaryKey().notNull(),
@@ -74,62 +47,6 @@ export const user = pgTable("user", {
 	leaguePoints: integer("league_points").default(0).notNull(),
 	notificationsEnabled: boolean("notifications_enabled").default(true).notNull(),
 });
-
-export const issueComment = pgTable("issue_comment", {
-	// You can use { mode: "bigint" } if numbers are exceeding js number limitations
-	id: bigint({ mode: "number" }).primaryKey().notNull(),
-	createdAt: timestamp("created_at", { withTimezone: true, mode: 'string' }),
-	updatedAt: timestamp("updated_at", { withTimezone: true, mode: 'string' }),
-	authorAssociation: varchar("author_association", { length: 255 }),
-	// TODO: failed to parse database type 'oid'
-	body: unknown("body"),
-	htmlUrl: varchar("html_url", { length: 255 }),
-	// You can use { mode: "bigint" } if numbers are exceeding js number limitations
-	authorId: bigint("author_id", { mode: "number" }),
-	// You can use { mode: "bigint" } if numbers are exceeding js number limitations
-	issueId: bigint("issue_id", { mode: "number" }),
-}, (table) => [
-	foreignKey({
-			columns: [table.issueId],
-			foreignColumns: [issue.id],
-			name: "fk8wy5rxggrte2ntcq80g7o7210"
-		}),
-	foreignKey({
-			columns: [table.authorId],
-			foreignColumns: [user.id],
-			name: "fkdy6oeojymud1wna20olqgyt31"
-		}),
-]);
-
-export const milestone = pgTable("milestone", {
-	// You can use { mode: "bigint" } if numbers are exceeding js number limitations
-	id: bigint({ mode: "number" }).primaryKey().notNull(),
-	createdAt: timestamp("created_at", { withTimezone: true, mode: 'string' }),
-	updatedAt: timestamp("updated_at", { withTimezone: true, mode: 'string' }),
-	closedAt: timestamp("closed_at", { withTimezone: true, mode: 'string' }),
-	// TODO: failed to parse database type 'oid'
-	description: unknown("description"),
-	dueOn: timestamp("due_on", { withTimezone: true, mode: 'string' }),
-	htmlUrl: varchar("html_url", { length: 255 }),
-	number: integer().notNull(),
-	state: varchar({ length: 255 }),
-	title: varchar({ length: 255 }),
-	// You can use { mode: "bigint" } if numbers are exceeding js number limitations
-	creatorId: bigint("creator_id", { mode: "number" }),
-	// You can use { mode: "bigint" } if numbers are exceeding js number limitations
-	repositoryId: bigint("repository_id", { mode: "number" }),
-}, (table) => [
-	foreignKey({
-			columns: [table.repositoryId],
-			foreignColumns: [repository.id],
-			name: "fkbjhs37s6qmqtd330gu9mit6w0"
-		}),
-	foreignKey({
-			columns: [table.creatorId],
-			foreignColumns: [user.id],
-			name: "fkg6ieho7gomiumy85puy6l13f1"
-		}),
-]);
 
 export const repository = pgTable("repository", {
 	// You can use { mode: "bigint" } if numbers are exceeding js number limitations
@@ -154,17 +71,95 @@ export const repository = pgTable("repository", {
 	watchersCount: integer("watchers_count").notNull(),
 });
 
+export const issueComment = pgTable("issue_comment", {
+	// You can use { mode: "bigint" } if numbers are exceeding js number limitations
+	id: bigint({ mode: "number" }).primaryKey().notNull(),
+	createdAt: timestamp("created_at", { withTimezone: true, mode: 'string' }),
+	updatedAt: timestamp("updated_at", { withTimezone: true, mode: 'string' }),
+	authorAssociation: varchar("author_association", { length: 255 }),
+	body: text(),
+	htmlUrl: varchar("html_url", { length: 255 }),
+	// You can use { mode: "bigint" } if numbers are exceeding js number limitations
+	authorId: bigint("author_id", { mode: "number" }),
+	// You can use { mode: "bigint" } if numbers are exceeding js number limitations
+	issueId: bigint("issue_id", { mode: "number" }),
+}, (table) => [
+	foreignKey({
+			columns: [table.issueId],
+			foreignColumns: [issue.id],
+			name: "fk8wy5rxggrte2ntcq80g7o7210"
+		}),
+	foreignKey({
+			columns: [table.authorId],
+			foreignColumns: [user.id],
+			name: "fkdy6oeojymud1wna20olqgyt31"
+		}),
+]);
+
+export const milestone = pgTable("milestone", {
+	// You can use { mode: "bigint" } if numbers are exceeding js number limitations
+	id: bigint({ mode: "number" }).primaryKey().notNull(),
+	createdAt: timestamp("created_at", { withTimezone: true, mode: 'string' }),
+	updatedAt: timestamp("updated_at", { withTimezone: true, mode: 'string' }),
+	closedAt: timestamp("closed_at", { withTimezone: true, mode: 'string' }),
+	description: text(),
+	dueOn: timestamp("due_on", { withTimezone: true, mode: 'string' }),
+	htmlUrl: varchar("html_url", { length: 255 }),
+	number: integer().notNull(),
+	state: varchar({ length: 255 }),
+	title: varchar({ length: 255 }),
+	// You can use { mode: "bigint" } if numbers are exceeding js number limitations
+	creatorId: bigint("creator_id", { mode: "number" }),
+	// You can use { mode: "bigint" } if numbers are exceeding js number limitations
+	repositoryId: bigint("repository_id", { mode: "number" }),
+}, (table) => [
+	foreignKey({
+			columns: [table.repositoryId],
+			foreignColumns: [repository.id],
+			name: "fkbjhs37s6qmqtd330gu9mit6w0"
+		}),
+	foreignKey({
+			columns: [table.creatorId],
+			foreignColumns: [user.id],
+			name: "fkg6ieho7gomiumy85puy6l13f1"
+		}),
+]);
+
+export const pullRequestReview = pgTable("pull_request_review", {
+	// You can use { mode: "bigint" } if numbers are exceeding js number limitations
+	id: bigint({ mode: "number" }).primaryKey().notNull(),
+	body: text(),
+	commitId: varchar("commit_id", { length: 255 }),
+	htmlUrl: varchar("html_url", { length: 255 }),
+	isDismissed: boolean("is_dismissed").notNull(),
+	state: varchar({ length: 255 }),
+	submittedAt: timestamp("submitted_at", { withTimezone: true, mode: 'string' }),
+	// You can use { mode: "bigint" } if numbers are exceeding js number limitations
+	authorId: bigint("author_id", { mode: "number" }),
+	// You can use { mode: "bigint" } if numbers are exceeding js number limitations
+	pullRequestId: bigint("pull_request_id", { mode: "number" }),
+}, (table) => [
+	foreignKey({
+			columns: [table.authorId],
+			foreignColumns: [user.id],
+			name: "fkeehfcwrodfu61gremlcvhgir5"
+		}),
+	foreignKey({
+			columns: [table.pullRequestId],
+			foreignColumns: [issue.id],
+			name: "fkio96gq2jetvy6a4in9nl8vkvd"
+		}),
+]);
+
 export const pullRequestReviewComment = pgTable("pull_request_review_comment", {
 	// You can use { mode: "bigint" } if numbers are exceeding js number limitations
 	id: bigint({ mode: "number" }).primaryKey().notNull(),
 	createdAt: timestamp("created_at", { withTimezone: true, mode: 'string' }),
 	updatedAt: timestamp("updated_at", { withTimezone: true, mode: 'string' }),
 	authorAssociation: varchar("author_association", { length: 255 }),
-	// TODO: failed to parse database type 'oid'
-	body: unknown("body"),
+	body: text(),
 	commitId: varchar("commit_id", { length: 255 }),
-	// TODO: failed to parse database type 'oid'
-	diffHunk: unknown("diff_hunk"),
+	diffHunk: text("diff_hunk"),
 	htmlUrl: varchar("html_url", { length: 255 }),
 	line: integer().notNull(),
 	originalCommitId: varchar("original_commit_id", { length: 255 }),
@@ -206,8 +201,7 @@ export const issue = pgTable("issue", {
 	id: bigint({ mode: "number" }).primaryKey().notNull(),
 	createdAt: timestamp("created_at", { withTimezone: true, mode: 'string' }),
 	updatedAt: timestamp("updated_at", { withTimezone: true, mode: 'string' }),
-	// TODO: failed to parse database type 'oid'
-	body: unknown("body"),
+	body: text(),
 	closedAt: timestamp("closed_at", { withTimezone: true, mode: 'string' }),
 	commentsCount: integer("comments_count").notNull(),
 	htmlUrl: varchar("html_url", { length: 255 }),
@@ -236,8 +230,7 @@ export const issue = pgTable("issue", {
 	mergedById: bigint("merged_by_id", { mode: "number" }),
 	hasPullRequest: boolean("has_pull_request").notNull(),
 	lastSyncAt: timestamp("last_sync_at", { precision: 6, mode: 'string' }),
-	// TODO: failed to parse database type 'oid'
-	badPracticeSummary: unknown("bad_practice_summary"),
+	badPracticeSummary: text("bad_practice_summary"),
 	lastDetectionTime: timestamp("last_detection_time", { precision: 6, withTimezone: true, mode: 'string' }),
 }, (table) => [
 	foreignKey({
@@ -318,11 +311,42 @@ export const repositoryToMonitor = pgTable("repository_to_monitor", {
 		}),
 ]);
 
+export const badPracticeDetection = pgTable("bad_practice_detection", {
+	// You can use { mode: "bigint" } if numbers are exceeding js number limitations
+	id: bigint({ mode: "number" }).primaryKey().generatedByDefaultAsIdentity({ name: "bad_practice_detection_id_seq", startWith: 1, increment: 1, minValue: 1, maxValue: 9223372036854775807, cache: 1 }),
+	detectionTime: timestamp("detection_time", { precision: 6, withTimezone: true, mode: 'string' }),
+	summary: text(),
+	traceId: varchar("trace_id", { length: 255 }),
+	// You can use { mode: "bigint" } if numbers are exceeding js number limitations
+	pullrequestId: bigint("pullrequest_id", { mode: "number" }),
+}, (table) => [
+	foreignKey({
+			columns: [table.pullrequestId],
+			foreignColumns: [issue.id],
+			name: "FKhk2vrsr2rdq2gb3cjnvieh3nw"
+		}),
+]);
+
+export const badPracticeFeedback = pgTable("bad_practice_feedback", {
+	// You can use { mode: "bigint" } if numbers are exceeding js number limitations
+	id: bigint({ mode: "number" }).primaryKey().generatedByDefaultAsIdentity({ name: "bad_practice_feedback_id_seq", startWith: 1, increment: 1, minValue: 1, maxValue: 9223372036854775807, cache: 1 }),
+	explanation: text(),
+	type: varchar({ length: 255 }),
+	// You can use { mode: "bigint" } if numbers are exceeding js number limitations
+	pullRequestBadPracticeId: bigint("pull_request_bad_practice_id", { mode: "number" }),
+	creationTime: timestamp("creation_time", { precision: 6, withTimezone: true, mode: 'string' }),
+}, (table) => [
+	foreignKey({
+			columns: [table.pullRequestBadPracticeId],
+			foreignColumns: [pullrequestbadpractice.id],
+			name: "FK34k5tg4qb6gy4g7tn9q8uhogl"
+		}),
+]);
+
 export const pullrequestbadpractice = pgTable("pullrequestbadpractice", {
 	// You can use { mode: "bigint" } if numbers are exceeding js number limitations
 	id: bigint({ mode: "number" }).primaryKey().generatedByDefaultAsIdentity({ name: "pullrequestbadpractice_id_seq", startWith: 1, increment: 1, minValue: 1, maxValue: 9223372036854775807, cache: 1 }),
-	// TODO: failed to parse database type 'oid'
-	description: unknown("description"),
+	description: text(),
 	title: varchar({ length: 255 }),
 	// You can use { mode: "bigint" } if numbers are exceeding js number limitations
 	pullrequestId: bigint("pullrequest_id", { mode: "number" }),
@@ -344,40 +368,6 @@ export const pullrequestbadpractice = pgTable("pullrequestbadpractice", {
 			columns: [table.badPracticeDetectionId],
 			foreignColumns: [badPracticeDetection.id],
 			name: "FKdn50l1oul09kq3142ku39gnlp"
-		}),
-]);
-
-export const badPracticeFeedback = pgTable("bad_practice_feedback", {
-	// You can use { mode: "bigint" } if numbers are exceeding js number limitations
-	id: bigint({ mode: "number" }).primaryKey().generatedByDefaultAsIdentity({ name: "bad_practice_feedback_id_seq", startWith: 1, increment: 1, minValue: 1, maxValue: 9223372036854775807, cache: 1 }),
-	// TODO: failed to parse database type 'oid'
-	explanation: unknown("explanation"),
-	type: varchar({ length: 255 }),
-	// You can use { mode: "bigint" } if numbers are exceeding js number limitations
-	pullRequestBadPracticeId: bigint("pull_request_bad_practice_id", { mode: "number" }),
-	creationTime: timestamp("creation_time", { precision: 6, withTimezone: true, mode: 'string' }),
-}, (table) => [
-	foreignKey({
-			columns: [table.pullRequestBadPracticeId],
-			foreignColumns: [pullrequestbadpractice.id],
-			name: "FK34k5tg4qb6gy4g7tn9q8uhogl"
-		}),
-]);
-
-export const badPracticeDetection = pgTable("bad_practice_detection", {
-	// You can use { mode: "bigint" } if numbers are exceeding js number limitations
-	id: bigint({ mode: "number" }).primaryKey().generatedByDefaultAsIdentity({ name: "bad_practice_detection_id_seq", startWith: 1, increment: 1, minValue: 1, maxValue: 9223372036854775807, cache: 1 }),
-	detectionTime: timestamp("detection_time", { precision: 6, withTimezone: true, mode: 'string' }),
-	// TODO: failed to parse database type 'oid'
-	summary: unknown("summary"),
-	traceId: varchar("trace_id", { length: 255 }),
-	// You can use { mode: "bigint" } if numbers are exceeding js number limitations
-	pullrequestId: bigint("pullrequest_id", { mode: "number" }),
-}, (table) => [
-	foreignKey({
-			columns: [table.pullrequestId],
-			foreignColumns: [issue.id],
-			name: "FKhk2vrsr2rdq2gb3cjnvieh3nw"
 		}),
 ]);
 

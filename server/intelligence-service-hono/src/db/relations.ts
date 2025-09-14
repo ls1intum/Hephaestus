@@ -1,39 +1,20 @@
 import { relations } from "drizzle-orm/relations";
-import { user, pullRequestReview, issue, issueComment, repository, milestone, pullRequestReviewComment, label, workspace, repositoryToMonitor, pullrequestbadpractice, badPracticeDetection, badPracticeFeedback, chatThread, chatMessage, issueLabel, issueAssignee, pullRequestRequestedReviewers, team, teamLabels, teamMembership, teamRepositoryPermission, chatMessagePart, document } from "./schema";
+import { issue, issueComment, user, repository, milestone, pullRequestReview, pullRequestReviewComment, label, workspace, repositoryToMonitor, badPracticeDetection, pullrequestbadpractice, badPracticeFeedback, chatThread, chatMessage, issueLabel, issueAssignee, pullRequestRequestedReviewers, team, teamLabels, teamMembership, teamRepositoryPermission, chatMessagePart, document } from "./schema";
 
-export const pullRequestReviewRelations = relations(pullRequestReview, ({one, many}) => ({
-	user: one(user, {
-		fields: [pullRequestReview.authorId],
-		references: [user.id]
-	}),
+export const issueCommentRelations = relations(issueComment, ({one}) => ({
 	issue: one(issue, {
-		fields: [pullRequestReview.pullRequestId],
+		fields: [issueComment.issueId],
 		references: [issue.id]
 	}),
-	pullRequestReviewComments: many(pullRequestReviewComment),
-}));
-
-export const userRelations = relations(user, ({many}) => ({
-	pullRequestReviews: many(pullRequestReview),
-	issueComments: many(issueComment),
-	milestones: many(milestone),
-	pullRequestReviewComments: many(pullRequestReviewComment),
-	issues_mergedById: many(issue, {
-		relationName: "issue_mergedById_user_id"
+	user: one(user, {
+		fields: [issueComment.authorId],
+		references: [user.id]
 	}),
-	issues_authorId: many(issue, {
-		relationName: "issue_authorId_user_id"
-	}),
-	chatThreads: many(chatThread),
-	issueAssignees: many(issueAssignee),
-	pullRequestRequestedReviewers: many(pullRequestRequestedReviewers),
-	teamMemberships: many(teamMembership),
-	documents: many(document),
 }));
 
 export const issueRelations = relations(issue, ({one, many}) => ({
-	pullRequestReviews: many(pullRequestReview),
 	issueComments: many(issueComment),
+	pullRequestReviews: many(pullRequestReview),
 	pullRequestReviewComments: many(pullRequestReviewComment),
 	repository: one(repository, {
 		fields: [issue.repositoryId],
@@ -53,22 +34,29 @@ export const issueRelations = relations(issue, ({one, many}) => ({
 		references: [user.id],
 		relationName: "issue_authorId_user_id"
 	}),
-	pullrequestbadpractices: many(pullrequestbadpractice),
 	badPracticeDetections: many(badPracticeDetection),
+	pullrequestbadpractices: many(pullrequestbadpractice),
 	issueLabels: many(issueLabel),
 	issueAssignees: many(issueAssignee),
 	pullRequestRequestedReviewers: many(pullRequestRequestedReviewers),
 }));
 
-export const issueCommentRelations = relations(issueComment, ({one}) => ({
-	issue: one(issue, {
-		fields: [issueComment.issueId],
-		references: [issue.id]
+export const userRelations = relations(user, ({many}) => ({
+	issueComments: many(issueComment),
+	milestones: many(milestone),
+	pullRequestReviews: many(pullRequestReview),
+	pullRequestReviewComments: many(pullRequestReviewComment),
+	issues_mergedById: many(issue, {
+		relationName: "issue_mergedById_user_id"
 	}),
-	user: one(user, {
-		fields: [issueComment.authorId],
-		references: [user.id]
+	issues_authorId: many(issue, {
+		relationName: "issue_authorId_user_id"
 	}),
+	chatThreads: many(chatThread),
+	issueAssignees: many(issueAssignee),
+	pullRequestRequestedReviewers: many(pullRequestRequestedReviewers),
+	teamMemberships: many(teamMembership),
+	documents: many(document),
 }));
 
 export const milestoneRelations = relations(milestone, ({one, many}) => ({
@@ -88,6 +76,18 @@ export const repositoryRelations = relations(repository, ({many}) => ({
 	issues: many(issue),
 	labels: many(label),
 	teamRepositoryPermissions: many(teamRepositoryPermission),
+}));
+
+export const pullRequestReviewRelations = relations(pullRequestReview, ({one, many}) => ({
+	user: one(user, {
+		fields: [pullRequestReview.authorId],
+		references: [user.id]
+	}),
+	issue: one(issue, {
+		fields: [pullRequestReview.pullRequestId],
+		references: [issue.id]
+	}),
+	pullRequestReviewComments: many(pullRequestReviewComment),
 }));
 
 export const pullRequestReviewCommentRelations = relations(pullRequestReviewComment, ({one}) => ({
@@ -125,7 +125,23 @@ export const workspaceRelations = relations(workspace, ({many}) => ({
 	repositoryToMonitors: many(repositoryToMonitor),
 }));
 
+export const badPracticeDetectionRelations = relations(badPracticeDetection, ({one, many}) => ({
+	issue: one(issue, {
+		fields: [badPracticeDetection.pullrequestId],
+		references: [issue.id]
+	}),
+	pullrequestbadpractices: many(pullrequestbadpractice),
+}));
+
+export const badPracticeFeedbackRelations = relations(badPracticeFeedback, ({one}) => ({
+	pullrequestbadpractice: one(pullrequestbadpractice, {
+		fields: [badPracticeFeedback.pullRequestBadPracticeId],
+		references: [pullrequestbadpractice.id]
+	}),
+}));
+
 export const pullrequestbadpracticeRelations = relations(pullrequestbadpractice, ({one, many}) => ({
+	badPracticeFeedbacks: many(badPracticeFeedback),
 	issue: one(issue, {
 		fields: [pullrequestbadpractice.pullrequestId],
 		references: [issue.id]
@@ -133,22 +149,6 @@ export const pullrequestbadpracticeRelations = relations(pullrequestbadpractice,
 	badPracticeDetection: one(badPracticeDetection, {
 		fields: [pullrequestbadpractice.badPracticeDetectionId],
 		references: [badPracticeDetection.id]
-	}),
-	badPracticeFeedbacks: many(badPracticeFeedback),
-}));
-
-export const badPracticeDetectionRelations = relations(badPracticeDetection, ({one, many}) => ({
-	pullrequestbadpractices: many(pullrequestbadpractice),
-	issue: one(issue, {
-		fields: [badPracticeDetection.pullrequestId],
-		references: [issue.id]
-	}),
-}));
-
-export const badPracticeFeedbackRelations = relations(badPracticeFeedback, ({one}) => ({
-	pullrequestbadpractice: one(pullrequestbadpractice, {
-		fields: [badPracticeFeedback.pullRequestBadPracticeId],
-		references: [pullrequestbadpractice.id]
 	}),
 }));
 
