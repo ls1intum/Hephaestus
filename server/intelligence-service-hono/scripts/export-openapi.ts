@@ -1,8 +1,8 @@
 import { writeFileSync } from "node:fs";
 import { resolve } from "node:path";
 import YAML from "yaml";
-import app from "../src/app";
 import { openAPIConfig } from "@/lib/configure-open-api";
+import app from "../src/app";
 
 async function main() {
 	const yaml = YAML.stringify(app.getOpenAPI31Document(openAPIConfig));

@@ -1,10 +1,8 @@
 import * as HttpStatusCodes from "stoker/http-status-codes";
 import * as HttpStatusPhrases from "stoker/http-status-phrases";
 
-import type { AppRouteHandler } from "@/lib/types";
 import { ZOD_ERROR_CODES, ZOD_ERROR_MESSAGES } from "@/lib/constants";
-import { type Task } from "./tasks.schemas";
-
+import type { AppRouteHandler } from "@/lib/types";
 import type {
 	CreateRoute,
 	GetOneRoute,
@@ -12,25 +10,30 @@ import type {
 	PatchRoute,
 	RemoveRoute,
 } from "./tasks.routes";
+import type { Task } from "./tasks.schemas";
 
 // In-memory task store
 let seq = 1;
 const store: Task[] = [];
 
 export const list: AppRouteHandler<ListRoute> = async (c) => {
-  return c.json(store);
+	return c.json(store);
 };
 
 export const create: AppRouteHandler<CreateRoute> = async (c) => {
 	const body = c.req.valid("json");
-	const newTask: Task = { id: seq++, name: body.name, done: body.done ?? false };
+	const newTask: Task = {
+		id: seq++,
+		name: body.name,
+		done: body.done ?? false,
+	};
 	store.push(newTask);
 	return c.json(newTask, HttpStatusCodes.OK);
 };
 
 export const getOne: AppRouteHandler<GetOneRoute> = async (c) => {
-  const { id } = c.req.valid("param");
-  const task = store.find((t) => t.id === id);
+	const { id } = c.req.valid("param");
+	const task = store.find((t) => t.id === id);
 
 	if (!task) {
 		return c.json(
@@ -41,12 +44,12 @@ export const getOne: AppRouteHandler<GetOneRoute> = async (c) => {
 		);
 	}
 
-		return c.json(task, HttpStatusCodes.OK);
+	return c.json(task, HttpStatusCodes.OK);
 };
 
 export const patch: AppRouteHandler<PatchRoute> = async (c) => {
-  const { id } = c.req.valid("param");
-  const updates = c.req.valid("json");
+	const { id } = c.req.valid("param");
+	const updates = c.req.valid("json");
 
 	if (Object.keys(updates).length === 0) {
 		return c.json(
@@ -67,8 +70,8 @@ export const patch: AppRouteHandler<PatchRoute> = async (c) => {
 		);
 	}
 
-  const idx = store.findIndex((t) => t.id === id);
-  if (idx === -1) {
+	const idx = store.findIndex((t) => t.id === id);
+	if (idx === -1) {
 		return c.json(
 			{
 				message: HttpStatusPhrases.NOT_FOUND,
@@ -76,17 +79,17 @@ export const patch: AppRouteHandler<PatchRoute> = async (c) => {
 			HttpStatusCodes.NOT_FOUND,
 		);
 	}
-  const updated = { ...store[idx], ...updates } satisfies Task;
-  store[idx] = updated;
-  return c.json(updated, HttpStatusCodes.OK);
+	const updated = { ...store[idx], ...updates } satisfies Task;
+	store[idx] = updated;
+	return c.json(updated, HttpStatusCodes.OK);
 };
 
 export const remove: AppRouteHandler<RemoveRoute> = async (c) => {
-  const { id } = c.req.valid("param");
-  const before = store.length;
-  const idx = store.findIndex((t) => t.id === id);
-  if (idx !== -1) store.splice(idx, 1);
-  const rowsAffected = idx !== -1 ? 1 : 0;
+	const { id } = c.req.valid("param");
+	const _before = store.length;
+	const idx = store.findIndex((t) => t.id === id);
+	if (idx !== -1) store.splice(idx, 1);
+	const rowsAffected = idx !== -1 ? 1 : 0;
 
 	if (rowsAffected === 0) {
 		return c.json(

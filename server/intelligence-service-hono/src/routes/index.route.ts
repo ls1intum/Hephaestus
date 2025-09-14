@@ -12,15 +12,15 @@ const router = createRouter().openapi(
 		path: "/",
 		responses: {
 			[HttpStatusCodes.OK]: jsonContent(
-				createMessageObjectSchema("Tasks API"),
-				"Tasks API Index",
+				createMessageObjectSchema("Intelligence Service API"),
+				"Intelligence Service API Index",
 			),
 		},
 	}),
 	(c) => {
 		return c.json(
 			{
-				message: "Tasks API",
+				message: "Intelligence Service API",
 			},
 			HttpStatusCodes.OK,
 		);
