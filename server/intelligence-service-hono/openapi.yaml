@@ -3,58 +3,420 @@ info:
   title: Hephaestus Intelligence Service (Hono) API
   version: 0.9.0-rc.27
 components:
-  securitySchemes:
-    Bearer:
-      type: http
-      scheme: bearer
   schemas:
-    Error:
+    Task:
       type: object
       properties:
-        code:
+        id:
           type: number
-          example: 400
-        message:
+          example: 1
+        name:
           type: string
-          example: Bad Request
+          minLength: 1
+          example: Learn hono
+        done:
+          type: boolean
+          default: false
+          example: false
       required:
-        - code
-        - message
-    HealthResponse:
+        - id
+        - name
+    InsertTask:
       type: object
       properties:
-        status:
+        name:
           type: string
-          enum:
-            - ok
-        service:
-          type: string
+          minLength: 1
+          example: Learn hono
+        done:
+          type: boolean
+          default: false
+          example: false
       required:
-        - status
-        - service
+        - name
+    PatchTask:
+      type: object
+      properties:
+        name:
+          type: string
+          minLength: 1
+          example: Learn hono
+        done:
+          type: boolean
+          default: false
+          example: false
   parameters: {}
 paths:
-  /health:
-    get:
-      tags:
-        - system
-      responses:
-        "200":
-          description: Service health status
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/HealthResponse"
   /:
     get:
       tags:
-        - system
+        - Index
       responses:
         "200":
-          description: Welcome
+          description: Tasks API Index
           content:
-            text/plain:
+            application/json:
               schema:
-                type: string
-                example: Hello Hono!
+                type: object
+                properties:
+                  message:
+                    type: string
+                required:
+                  - message
+                example:
+                  message: Tasks API
+  /tasks:
+    get:
+      tags: &a1
+        - Tasks
+      responses:
+        "200":
+          description: The list of tasks
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Task"
+    post:
+      tags: *a1
+      requestBody:
+        description: The task to create
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/InsertTask"
+      responses:
+        "200":
+          description: The created task
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Task"
+        "422":
+          description: The validation error(s)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: false
+                  error:
+                    type: object
+                    properties:
+                      issues:
+                        type: array
+                        items:
+                          type: object
+                          properties:
+                            code:
+                              type: string
+                            path:
+                              type: array
+                              items:
+                                anyOf:
+                                  - type: string
+                                  - type: number
+                            message:
+                              type: string
+                          required:
+                            - code
+                            - path
+                      name:
+                        type: string
+                    required:
+                      - issues
+                      - name
+                    example:
+                      name: ZodError
+                      issues:
+                        - code: invalid_type
+                          path:
+                            - name
+                          message: "Invalid input: expected string, received undefined"
+                required:
+                  - success
+                  - error
+  /tasks/{id}:
+    get:
+      tags: *a1
+      parameters:
+        - schema:
+            type:
+              - number
+              - "null"
+            required: &a2
+              - id
+            example: 42
+          required: true
+          name: id
+          in: path
+      responses:
+        "200":
+          description: The requested task
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Task"
+        "404":
+          description: Task not found
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                required:
+                  - message
+                example: &a3
+                  message: Not Found
+        "422":
+          description: Invalid id error
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: false
+                  error:
+                    type: object
+                    properties:
+                      issues:
+                        type: array
+                        items:
+                          type: object
+                          properties:
+                            code:
+                              type: string
+                            path:
+                              type: array
+                              items:
+                                anyOf:
+                                  - type: string
+                                  - type: number
+                            message:
+                              type: string
+                          required:
+                            - code
+                            - path
+                      name:
+                        type: string
+                    required:
+                      - issues
+                      - name
+                    example:
+                      name: ZodError
+                      issues:
+                        - code: invalid_type
+                          path:
+                            - id
+                          message: "Invalid input: expected number, received NaN"
+                required:
+                  - success
+                  - error
+    patch:
+      tags: *a1
+      parameters:
+        - schema:
+            type:
+              - number
+              - "null"
+            required: *a2
+            example: 42
+          required: true
+          name: id
+          in: path
+      requestBody:
+        description: The task updates
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PatchTask"
+      responses:
+        "200":
+          description: The updated task
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Task"
+        "404":
+          description: Task not found
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                required:
+                  - message
+                example: *a3
+        "422":
+          description: The validation error(s)
+          content:
+            application/json:
+              schema:
+                anyOf:
+                  - type: object
+                    properties:
+                      success:
+                        type: boolean
+                        example: false
+                      error:
+                        type: object
+                        properties:
+                          issues:
+                            type: array
+                            items:
+                              type: object
+                              properties:
+                                code:
+                                  type: string
+                                path:
+                                  type: array
+                                  items:
+                                    anyOf:
+                                      - type: string
+                                      - type: number
+                                message:
+                                  type: string
+                              required:
+                                - code
+                                - path
+                          name:
+                            type: string
+                        required:
+                          - issues
+                          - name
+                        example:
+                          name: ZodError
+                          issues:
+                            - code: invalid_type
+                              path:
+                                - fieldName
+                              message: Expected string, received undefined
+                    required:
+                      - success
+                      - error
+                  - type: object
+                    properties:
+                      success:
+                        type: boolean
+                        example: false
+                      error:
+                        type: object
+                        properties:
+                          issues:
+                            type: array
+                            items:
+                              type: object
+                              properties:
+                                code:
+                                  type: string
+                                path:
+                                  type: array
+                                  items:
+                                    anyOf:
+                                      - type: string
+                                      - type: number
+                                message:
+                                  type: string
+                              required:
+                                - code
+                                - path
+                          name:
+                            type: string
+                        required:
+                          - issues
+                          - name
+                        example:
+                          name: ZodError
+                          issues:
+                            - code: invalid_type
+                              path:
+                                - id
+                              message: "Invalid input: expected number, received NaN"
+                    required:
+                      - success
+                      - error
+    delete:
+      tags: *a1
+      parameters:
+        - schema:
+            type:
+              - number
+              - "null"
+            required: *a2
+            example: 42
+          required: true
+          name: id
+          in: path
+      responses:
+        "204":
+          description: Task deleted
+        "404":
+          description: Task not found
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                required:
+                  - message
+                example: *a3
+        "422":
+          description: Invalid id error
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: false
+                  error:
+                    type: object
+                    properties:
+                      issues:
+                        type: array
+                        items:
+                          type: object
+                          properties:
+                            code:
+                              type: string
+                            path:
+                              type: array
+                              items:
+                                anyOf:
+                                  - type: string
+                                  - type: number
+                            message:
+                              type: string
+                          required:
+                            - code
+                            - path
+                      name:
+                        type: string
+                    required:
+                      - issues
+                      - name
+                    example:
+                      name: ZodError
+                      issues:
+                        - code: invalid_type
+                          path:
+                            - id
+                          message: "Invalid input: expected number, received NaN"
+                required:
+                  - success
+                  - error
 webhooks: {}

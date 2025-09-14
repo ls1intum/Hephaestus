@@ -16,7 +16,8 @@ const EnvSchema = z
 	.object({
 		NODE_ENV: z.string().default("development"),
 		PORT: z.coerce.number().default(9999),
-		LOG_LEVEL: z.enum([
+		LOG_LEVEL: z
+			.enum([
 			"fatal",
 			"error",
 			"warn",
@@ -24,8 +25,9 @@ const EnvSchema = z
 			"debug",
 			"trace",
 			"silent",
-		]),
-		DATABASE_URL: z.string().url(),
+			])
+			.default("info"),
+		DATABASE_URL: z.string().url().optional(),
 		DATABASE_AUTH_TOKEN: z.string().optional(),
 	})
 	.superRefine((input, ctx) => {
