@@ -2,7 +2,7 @@ import configureOpenAPI from "@/lib/configure-open-api";
 import createApp from "@/lib/create-app";
 import health from "@/routes/health.route";
 import index from "@/routes/index.route";
-import poem from "@/routes/poem.route";
+import poem from "@/routes/poem/poem.index";
 import tasks from "@/routes/tasks/tasks.index";
 
 const app = createApp();

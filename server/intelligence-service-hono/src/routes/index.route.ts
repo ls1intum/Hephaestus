@@ -5,26 +5,11 @@ import { createMessageObjectSchema } from "stoker/openapi/schemas";
 
 import { createRouter } from "@/lib/create-app";
 
-const router = createRouter().openapi(
-	createRoute({
-		tags: ["Index"],
-		method: "get",
-		path: "/",
-		responses: {
-			[HttpStatusCodes.OK]: jsonContent(
-				createMessageObjectSchema("Intelligence Service API"),
-				"Intelligence Service API Index",
-			),
-		},
-	}),
+const router = createRouter().get("/",
 	(c) => {
-		return c.json(
-			{
-				message: "Intelligence Service API",
-			},
-			HttpStatusCodes.OK,
-		);
+		return c.redirect("/reference", HttpStatusCodes.TEMPORARY_REDIRECT);
 	},
 );
+
 
 export default router;
