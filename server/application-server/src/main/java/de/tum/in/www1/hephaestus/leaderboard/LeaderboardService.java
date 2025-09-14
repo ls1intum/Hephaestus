@@ -14,9 +14,12 @@ import de.tum.in.www1.hephaestus.gitprovider.user.UserRepository;
 import jakarta.transaction.Transactional;
 import java.time.Instant;
 import java.util.Comparator;
+import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 import org.slf4j.Logger;
@@ -128,9 +131,7 @@ public class LeaderboardService {
         Optional<String> team,
         Optional<LeaderboardSortType> sort
     ) {
-        Optional<Team> teamEntity = team
-            .map(t -> teamRepository.findAll().stream().filter(tm -> t.equals(tm.getName())).findFirst())
-            .orElse(Optional.empty());
+        Optional<Team> teamEntity = team.flatMap(this::findTeamByPath);
         logger.info(
             "Creating leaderboard dataset with timeframe: {} - {} and team: {}",
             after,
@@ -271,6 +272,129 @@ public class LeaderboardService {
             .toList();
 
         return leaderboard;
+    }
+
+    private Optional<Team> findTeamByPath(String path) {
+        String[] parts = path.split(" / ");
+        if (parts.length == 0) {
+            return Optional.empty();
+        }
+
+        // Start from leaf name candidates
+        String leaf = parts[parts.length - 1];
+        List<Team> candidates = teamRepository.findAllByName(leaf);
+        if (candidates.isEmpty()) {
+            return Optional.empty();
+        }
+        if (parts.length == 1) {
+            // If only the leaf name is given, accept only if unique to avoid ambiguity
+            return candidates.size() == 1 ? Optional.of(candidates.get(0)) : Optional.empty();
+        }
+
+        // Cache teams by id to minimize DB round-trips
+        Map<Long, Team> cache = candidates.stream().collect(Collectors.toMap(Team::getId, t -> t));
+
+        // Working set: map candidateId -> current node (starts at candidate)
+        Map<Long, Team> currentByCandidate = candidates.stream().collect(Collectors.toMap(Team::getId, t -> t));
+
+        // Walk up visible ancestors breadth-first over candidates, eliminating mismatches per segment
+        for (int index = parts.length - 2; index >= 0 && currentByCandidate.size() > 1; index--) {
+            String expected = parts[index];
+
+            // Resolve each candidate's next VISIBLE parent in batched fashion
+            Map<Long, Team> nextVisibleByCandidate = new HashMap<>();
+
+            // We may need multiple fetch rounds if chains include hidden ancestors
+            boolean pendingResolution = true;
+            while (pendingResolution) {
+                pendingResolution = false;
+                Set<Long> missingIds = new HashSet<>();
+
+                for (Map.Entry<Long, Team> entry : currentByCandidate.entrySet()) {
+                    Long candidateId = entry.getKey();
+                    Team cursor = entry.getValue();
+                    if (nextVisibleByCandidate.containsKey(candidateId)) {
+                        continue; // already resolved
+                    }
+
+                    Long parentId = cursor.getParentId();
+                    while (parentId != null) {
+                        Team parent = cache.get(parentId);
+                        if (parent == null) {
+                            missingIds.add(parentId);
+                            break; // fetch in batch first
+                        }
+                        if (!parent.isHidden()) {
+                            nextVisibleByCandidate.put(candidateId, parent);
+                            break;
+                        }
+                        parentId = parent.getParentId();
+                    }
+                    if (parentId == null && !nextVisibleByCandidate.containsKey(candidateId)) {
+                        // No more visible parent
+                        nextVisibleByCandidate.put(candidateId, null);
+                    }
+                }
+
+                if (!missingIds.isEmpty()) {
+                    // Batch fetch all missing parents
+                    teamRepository.findAllById(missingIds).forEach(t -> cache.put(t.getId(), t));
+                    pendingResolution = true; // try resolving again with filled cache
+                }
+            }
+
+            // Eliminate candidates whose next visible parent does not match the expected segment
+            Map<Long, Team> filtered = new HashMap<>();
+            for (Map.Entry<Long, Team> entry : currentByCandidate.entrySet()) {
+                Long candidateId = entry.getKey();
+                Team nextVisible = nextVisibleByCandidate.get(candidateId);
+                if (nextVisible != null && expected.equals(nextVisible.getName())) {
+                    filtered.put(candidateId, nextVisible);
+                }
+            }
+            currentByCandidate = filtered;
+
+            if (currentByCandidate.isEmpty()) {
+                return Optional.empty();
+            }
+            if (currentByCandidate.size() == 1) {
+                // Early exit as soon as unique
+                Long onlyId = currentByCandidate.keySet().iterator().next();
+                return Optional.of(cache.get(onlyId));
+            }
+        }
+
+        // If we consumed all parts and still have multiple, attempt exact full visible path match; otherwise pick first.
+        if (currentByCandidate.size() > 1) {
+            for (Long id : currentByCandidate.keySet()) {
+                Team t = cache.get(id);
+                if (t != null && equalsVisiblePath(t, parts, cache)) {
+                    return Optional.of(t);
+                }
+            }
+            logger.warn("Ambiguous team path '{}' resolved to multiple candidates; picking first.", path);
+        }
+
+        Long anyId = currentByCandidate.keySet().iterator().next();
+        return Optional.ofNullable(cache.get(anyId));
+    }
+
+    private boolean equalsVisiblePath(Team team, String[] parts, Map<Long, Team> cache) {
+        int index = parts.length - 1;
+        Team current = team;
+        while (current != null) {
+            if (!current.isHidden()) {
+                if (index < 0 || !current.getName().equals(parts[index])) {
+                    return false;
+                }
+                index--;
+            }
+            Long parentId = current.getParentId();
+            current = parentId != null
+                ? cache.computeIfAbsent(parentId, id -> teamRepository.findById(id).orElse(null))
+                : null;
+        }
+        return index < 0;
     }
 
     private int calculateTotalScore(List<PullRequestReview> reviews, List<IssueComment> issueComments) {
