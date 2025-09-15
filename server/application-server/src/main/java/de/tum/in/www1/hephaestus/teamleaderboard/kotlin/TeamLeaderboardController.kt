@@ -9,7 +9,6 @@ import org.springframework.web.bind.annotation.RequestMapping
 import org.springframework.web.bind.annotation.RequestParam
 import org.springframework.web.bind.annotation.RestController
 import java.time.OffsetDateTime
-import java.util.*
 
 @RestController
 @RequestMapping("/team-leaderboard")
@@ -20,13 +19,13 @@ class TeamLeaderboardController {
 
     @GetMapping
     fun getTeamLeaderboard(
-        @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) after: OffsetDateTime?,
-        @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) before: OffsetDateTime?,
-        @RequestParam team: Optional<String>?,
-        @RequestParam sort: Optional<LeaderboardSortType>?,
+        @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) after: OffsetDateTime,
+        @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) before: OffsetDateTime,
+        @RequestParam team: String?,
+        @RequestParam sort: LeaderboardSortType?,
     ): ResponseEntity<MutableList<TeamLeaderboardEntryDTO>> {
 
-        return ResponseEntity.ok<MutableList<TeamLeaderboardEntryDTO>>(
+        return ResponseEntity.ok(
             teamLeaderboardService.createTeamLeaderboard(
                 after,
                 before,
@@ -42,8 +41,8 @@ class TeamLeaderboardController {
         return getTeamLeaderboard(
             OffsetDateTime.MIN,
             OffsetDateTime.MAX,
-            Optional.empty(),
-            Optional.empty()
+            "",
+            LeaderboardSortType.SCORE
         )
     }
 }
