@@ -2,9 +2,7 @@ package de.tum.`in`.www1.hephaestus.teamleaderboard.kotlin
 
 import de.tum.`in`.www1.hephaestus.gitprovider.issuecomment.IssueCommentRepository
 import de.tum.`in`.www1.hephaestus.gitprovider.pullrequestreview.PullRequestReviewRepository
-import de.tum.`in`.www1.hephaestus.gitprovider.team.Team
 import de.tum.`in`.www1.hephaestus.gitprovider.team.TeamRepository
-import de.tum.`in`.www1.hephaestus.gitprovider.user.User
 import de.tum.`in`.www1.hephaestus.leaderboard.LeaderboardSortType
 import org.slf4j.LoggerFactory
 import org.springframework.beans.factory.annotation.Autowired
@@ -40,6 +38,7 @@ class TeamLeaderboardService {
         return createMockTeamLeaderboard()
     }
 
+    @Suppress("UNREACHABLE_CODE")
     fun createTeamLeaderboard(
         after: OffsetDateTime,
         before: OffsetDateTime,
@@ -50,25 +49,22 @@ class TeamLeaderboardService {
             before,
         )
 
-//        TODO("fetch all teams")
-        val teams = teamRepository.findAll()
+        TODO("fetch all pull requests reviews")
+        val reviews = pullRequestReviewRepository.findAllInTimeframe(after, before)
 
 
-//        TODO("for each team, collect all users")
-        val usersByTeam: Map<Team, Set<User>> = teams.associateWith { it.members }
+        TODO("group PR reviews fro the same repository to the according team")
 
-        logger.debug(
-            "=== usersByTeam map ===\n{}",
-            usersByTeam.map { (team, users) -> "${team.name}: ${users.size} users" },
-        )
+        TODO("Let the scoring service grade the PR reviews")
+
+        TODO("Aggregate the scored result into a general PR review score for the team")
+
+        TODO("Add this for the review comments as well")
+
+        TODO("Order the scores for the Team Leaderboard")
+
+        TODO("Construct the list of TeamLeaderboardEntryDTOs to send back to the frontend")
 
 
-        TODO("for each user, collect their reviews and comments (reuse the grouping and scoring logic)")
-
-        TODO("aggregate user scores and stats at the team level")
-
-        TODO("sort teams by total/average or other criteria")
-
-        TODO("Build and return a list of team leaderboard entries")
     }
 }
