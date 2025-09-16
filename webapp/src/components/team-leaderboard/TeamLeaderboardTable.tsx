@@ -73,7 +73,7 @@ export function TeamLeaderboardTable({
                                 <div className="flex items-center gap-2 font-medium">
                                     <Avatar className="size-9">
                                         <AvatarImage
-                                            src={entry.team.color}
+                                            src={"https://http.cat/501"}
                                             alt={`${entry.team.name}'s avatar`}
                                         />
                                         <AvatarFallback>

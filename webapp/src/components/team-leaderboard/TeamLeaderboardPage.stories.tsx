@@ -1,6 +1,6 @@
 import type { Meta, StoryObj } from "@storybook/react";
+import type { LabelInfo, RepositoryInfo, TeamInfo, TeamLeaderboardEntry } from "@/api/types.gen";
 import { TeamLeaderboardPage } from "./TeamLeaderboardPage";
-import type { TeamLeaderboardEntry, TeamInfo, LabelInfo, RepositoryInfo } from "@/api/types.gen";
 
 const mockTeams = ["Frontend", "Backend", "DevOps", "QA", "Design"];
 
@@ -30,8 +30,8 @@ const mockTeamInfos: TeamInfo[] = [
 	{
 		id: 1,
 		name: "Frontend",
-		color: "#FF5733",
-		repositories: [mockRepositories[0]],
+		description: "Frontend team responsible for UI/UX.",
+		hidden: false,
 		labels: mockLabels,
 		members: [
 			{
@@ -43,13 +43,15 @@ const mockTeamInfos: TeamInfo[] = [
 				leaguePoints: 1200,
 			},
 		],
-		hidden: false,
+		membershipCount: 1,
+		repoPermissionCount: 0,
+		repositories: [],
 	},
 	{
 		id: 2,
 		name: "Backend",
-		color: "#33C1FF",
-		repositories: [mockRepositories[1]],
+		description: "Backend team responsible for API and server logic.",
+		hidden: false,
 		labels: mockLabels,
 		members: [
 			{
@@ -61,13 +63,15 @@ const mockTeamInfos: TeamInfo[] = [
 				leaguePoints: 950,
 			},
 		],
-		hidden: false,
+		membershipCount: 1,
+		repoPermissionCount: 1,
+		repositories: [mockRepositories[1]],
 	},
 	{
 		id: 3,
 		name: "QA",
-		color: "#8D33FF",
-		repositories: [],
+		description: "QA team responsible for testing and quality assurance.",
+		hidden: false,
 		labels: [],
 		members: [
 			{
@@ -79,7 +83,9 @@ const mockTeamInfos: TeamInfo[] = [
 				leaguePoints: 800,
 			},
 		],
-		hidden: false,
+		membershipCount: 1,
+		repoPermissionCount: 0,
+		repositories: [],
 	},
 ];
 
