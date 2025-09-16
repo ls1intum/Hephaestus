@@ -8,7 +8,7 @@ import org.springframework.web.bind.annotation.GetMapping
 import org.springframework.web.bind.annotation.RequestMapping
 import org.springframework.web.bind.annotation.RequestParam
 import org.springframework.web.bind.annotation.RestController
-import java.time.OffsetDateTime
+import java.time.Instant
 
 @RestController
 @RequestMapping("/team-leaderboard")
@@ -19,8 +19,8 @@ class TeamLeaderboardController {
 
     @GetMapping
     fun getTeamLeaderboard(
-        @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) after: OffsetDateTime,
-        @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) before: OffsetDateTime,
+        @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) after: Instant,
+        @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) before: Instant,
         @RequestParam team: String?,
         @RequestParam sort: LeaderboardSortType?,
     ): ResponseEntity<MutableList<TeamLeaderboardEntryDTO>> {
@@ -39,8 +39,8 @@ class TeamLeaderboardController {
     fun getAllTimeTeamLeaderboard(): ResponseEntity<MutableList<TeamLeaderboardEntryDTO>> {
         // Calculate or fetch the all-time leaderboard here
         return getTeamLeaderboard(
-            OffsetDateTime.parse("1970-01-01T00:00:00Z"),
-            OffsetDateTime.now().plusDays(1),
+            Instant.parse("1970-01-01T00:00:00Z"),
+            Instant.now().plusSeconds(600),
             "",
             LeaderboardSortType.SCORE
         )

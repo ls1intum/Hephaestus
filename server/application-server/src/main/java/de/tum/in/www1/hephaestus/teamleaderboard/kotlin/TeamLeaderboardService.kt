@@ -1,15 +1,17 @@
 package de.tum.`in`.www1.hephaestus.teamleaderboard.kotlin
 
+import de.tum.`in`.www1.hephaestus.gitprovider.issuecomment.IssueComment
 import de.tum.`in`.www1.hephaestus.gitprovider.issuecomment.IssueCommentRepository
 import de.tum.`in`.www1.hephaestus.gitprovider.pullrequestreview.PullRequestReview
 import de.tum.`in`.www1.hephaestus.gitprovider.pullrequestreview.PullRequestReviewRepository
-import de.tum.`in`.www1.hephaestus.gitprovider.teamV2.TeamV2
-import de.tum.`in`.www1.hephaestus.gitprovider.teamV2.TeamV2Repository
+import de.tum.`in`.www1.hephaestus.gitprovider.team.Team
+import de.tum.`in`.www1.hephaestus.gitprovider.team.TeamRepository
 import de.tum.`in`.www1.hephaestus.leaderboard.LeaderboardSortType
+import de.tum.`in`.www1.hephaestus.leaderboard.ScoringService
 import org.slf4j.LoggerFactory
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.stereotype.Service
-import java.time.OffsetDateTime
+import java.time.Instant
 
 @Service
 class TeamLeaderboardService {
@@ -19,7 +21,7 @@ class TeamLeaderboardService {
     }
 
     @Autowired
-    private lateinit var teamV2Repository: TeamV2Repository
+    private lateinit var teamRepository: TeamRepository
 
     @Autowired
     private lateinit var pullRequestReviewRepository: PullRequestReviewRepository
@@ -27,12 +29,15 @@ class TeamLeaderboardService {
     @Autowired
     private lateinit var issueCommentRepository: IssueCommentRepository
 
+    @Autowired
+    private lateinit var scoringService: ScoringService
+
     // TODO: private attributes that are needed for the class to fulfill it's duty
     // ---
     // TODO: add the method bodies to the according functions
     fun createTeamLeaderboard(
-        after: OffsetDateTime,
-        before: OffsetDateTime,
+        after: Instant,
+        before: Instant,
         team: String?,
         sort: LeaderboardSortType?,
     ): MutableList<TeamLeaderboardEntryDTO> {
@@ -42,8 +47,8 @@ class TeamLeaderboardService {
 
     @Suppress("UNREACHABLE_CODE")
     fun createTeamLeaderboard(
-        after: OffsetDateTime,
-        before: OffsetDateTime,
+        after: Instant,
+        before: Instant,
     ): MutableList<TeamLeaderboardEntryDTO> {
         logger.info(
             "Creating leaderboard dataset with timeframe: {} - {} for all teams",
@@ -51,18 +56,26 @@ class TeamLeaderboardService {
             before,
         )
 
-        TODO("fetch all teams from the team repository")
-        val teams: List<TeamV2> = teamV2Repository.findAll()
+//        TODO("fetch all teams from the team repository")
+        val teams: List<Team> = teamRepository.findAll()
 
-        TODO("fetch all pull requests reviews")
-        val reviews: List<PullRequestReview> = pullRequestReviewRepository.findAllInTimeframe(after, before)
+//        TODO("fetch all pull requests reviews by their respective team")
+        val reviewsByTeam: Map<Team, List<PullRequestReview>> =
+            teams.associateWith { team -> pullRequestReviewRepository.findAllInTimeframeOfTeam(after, before, team.id) }
 
-
-
-        TODO("group PR reviews for the same repository to the according team")
-//        val reviewsByTeam: Map<Team, List<PullRequestReview>> = teams.associateWith { team -> reviews.filter { it. }}
+//        TODO("Repeat that for the review comments as well")
+        val commentsByTeam: Map<Team, List<IssueComment>> =
+            teams.associateWith { team ->
+                issueCommentRepository.findAllInTimeframeOfTeam(
+                    after,
+                    before,
+                    team.id,
+                    true
+                )
+            }
 
         TODO("Let the scoring service grade the PR reviews")
+
 
         TODO("Aggregate the scored result into a general PR review score for the team")
 

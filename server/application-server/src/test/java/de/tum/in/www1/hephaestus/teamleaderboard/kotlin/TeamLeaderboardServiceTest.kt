@@ -5,7 +5,7 @@ import de.tum.`in`.www1.hephaestus.gitprovider.team.TeamRepository
 import de.tum.`in`.www1.hephaestus.gitprovider.user.User
 import org.junit.jupiter.api.Test
 import org.mockito.Mockito.*
-import java.time.OffsetDateTime
+import java.time.Instant
 
 class TeamLeaderboardServiceTest {
 
@@ -24,18 +24,18 @@ class TeamLeaderboardServiceTest {
             User().apply { this.id = id; this.login = "user$id" }
         }
         val teams = listOf(
-            Team().apply { this.id = 1L; this.name = "TeamA"; this.members = setOf(users[0]) },
-            Team().apply { this.id = 2L; this.name = "TeamB"; this.members = setOf(users[1], users[3]) }
+            Team().apply { this.id = 1L; this.name = "TeamA" },
+            Team().apply { this.id = 2L; this.name = "TeamB" }
         )
         val (user1, user2, user3) = users
         val (teamA, teamB) = teams
         `when`(teamRepository.findAll()).thenReturn(listOf(teamA, teamB))
 
-        service.createTeamLeaderboard(OffsetDateTime.now().minusDays(1), OffsetDateTime.now())
+        service.createTeamLeaderboard(Instant.now().minusSeconds(86400), Instant.now())
 
         // You can verify the logger output or, better, refactor the code to expose usersByTeam for testing.
         // For now, just verify that findAll was called.
         verify(teamRepository).findAll()
     }
-    
+
 }
