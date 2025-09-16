@@ -39,8 +39,8 @@ class TeamLeaderboardController {
     fun getAllTimeTeamLeaderboard(): ResponseEntity<MutableList<TeamLeaderboardEntryDTO>> {
         // Calculate or fetch the all-time leaderboard here
         return getTeamLeaderboard(
-            OffsetDateTime.MIN,
-            OffsetDateTime.MAX,
+            OffsetDateTime.parse("1970-01-01T00:00:00Z"),
+            OffsetDateTime.now().plusDays(1),
             "",
             LeaderboardSortType.SCORE
         )

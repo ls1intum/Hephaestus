@@ -1,8 +1,10 @@
 package de.tum.`in`.www1.hephaestus.teamleaderboard.kotlin
 
 import de.tum.`in`.www1.hephaestus.gitprovider.issuecomment.IssueCommentRepository
+import de.tum.`in`.www1.hephaestus.gitprovider.pullrequestreview.PullRequestReview
 import de.tum.`in`.www1.hephaestus.gitprovider.pullrequestreview.PullRequestReviewRepository
-import de.tum.`in`.www1.hephaestus.gitprovider.team.TeamRepository
+import de.tum.`in`.www1.hephaestus.gitprovider.teamV2.TeamV2
+import de.tum.`in`.www1.hephaestus.gitprovider.teamV2.TeamV2Repository
 import de.tum.`in`.www1.hephaestus.leaderboard.LeaderboardSortType
 import org.slf4j.LoggerFactory
 import org.springframework.beans.factory.annotation.Autowired
@@ -17,7 +19,7 @@ class TeamLeaderboardService {
     }
 
     @Autowired
-    private lateinit var teamRepository: TeamRepository
+    private lateinit var teamV2Repository: TeamV2Repository
 
     @Autowired
     private lateinit var pullRequestReviewRepository: PullRequestReviewRepository
@@ -49,11 +51,16 @@ class TeamLeaderboardService {
             before,
         )
 
+        TODO("fetch all teams from the team repository")
+        val teams: List<TeamV2> = teamV2Repository.findAll()
+
         TODO("fetch all pull requests reviews")
-        val reviews = pullRequestReviewRepository.findAllInTimeframe(after, before)
+        val reviews: List<PullRequestReview> = pullRequestReviewRepository.findAllInTimeframe(after, before)
 
 
-        TODO("group PR reviews fro the same repository to the according team")
+
+        TODO("group PR reviews for the same repository to the according team")
+//        val reviewsByTeam: Map<Team, List<PullRequestReview>> = teams.associateWith { team -> reviews.filter { it. }}
 
         TODO("Let the scoring service grade the PR reviews")
 

@@ -37,4 +37,5 @@ class TeamLeaderboardServiceTest {
         // For now, just verify that findAll was called.
         verify(teamRepository).findAll()
     }
+    
 }
