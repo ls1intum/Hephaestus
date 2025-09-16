@@ -5,7 +5,7 @@ import de.tum.in.www1.hephaestus.gitprovider.pullrequestreview.PullRequestReview
 import de.tum.in.www1.hephaestus.gitprovider.pullrequestreviewcomment.PullRequestReviewComment;
 import de.tum.in.www1.hephaestus.gitprovider.user.User;
 import jakarta.persistence.*;
-import java.time.OffsetDateTime;
+import java.time.Instant;
 import java.util.HashSet;
 import java.util.Set;
 import lombok.*;
@@ -18,7 +18,7 @@ import lombok.*;
 @ToString(callSuper = true)
 public class PullRequest extends Issue {
 
-    private OffsetDateTime mergedAt;
+    private Instant mergedAt;
 
     private String mergeCommitSha;
 
@@ -66,7 +66,7 @@ public class PullRequest extends Issue {
     @Lob
     private String badPracticeSummary;
 
-    protected OffsetDateTime lastDetectionTime;
+    protected Instant lastDetectionTime;
 
     @Override
     public boolean isPullRequest() {

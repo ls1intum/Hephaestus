@@ -510,6 +510,7 @@ export type RepositoryInfo = {
     description?: string;
     htmlUrl: string;
     id: number;
+    labels?: Array<LabelInfo>;
     name: string;
     nameWithOwner: string;
 };
@@ -1121,39 +1122,19 @@ export type StreamToolOutputErrorPart = {
 };
 
 export type TeamInfo = {
-    color: string;
+    description?: string;
     hidden: boolean;
+    htmlUrl?: string;
     id: number;
     labels: Array<LabelInfo>;
     members: Array<UserInfo>;
-    name: string;
-    repositories: Array<RepositoryInfo>;
-};
-
-export type TeamLeaderboardEntry = {
-    numberOfApprovals: number;
-    numberOfChangeRequests: number;
-    numberOfCodeComments: number;
-    numberOfComments: number;
-    numberOfReviewedPRs: number;
-    numberOfUnknowns: number;
-    rank: number;
-    reviewedPullRequests: Array<PullRequestInfo>;
-    score: number;
-    team: TeamInfo;
-};
-
-export type TeamV2Info = {
-    description?: string;
-    htmlUrl?: string;
-    id: number;
-    lastSyncedAt?: Date;
-    membershipCount?: number;
+    membershipCount: number;
     name: string;
     organization?: string;
     parentId?: number;
     privacy?: 'SECRET' | 'CLOSED';
-    repoPermissionCount?: number;
+    repoPermissionCount: number;
+    repositories: Array<RepositoryInfo>;
 };
 
 /**
@@ -1424,6 +1405,7 @@ export type UserSettings = {
 };
 
 export type UserTeams = {
+    email?: string;
     id: number;
     login: string;
     name: string;
@@ -1876,40 +1858,6 @@ export type GetDocumentVersionResponses = {
 
 export type GetDocumentVersionResponse = GetDocumentVersionResponses[keyof GetDocumentVersionResponses];
 
-export type GetAllData = {
-    body?: never;
-    path?: never;
-    query?: never;
-    url: '/api/teamsV2';
-};
-
-export type GetAllResponses = {
-    /**
-     * OK
-     */
-    200: Array<TeamV2Info>;
-};
-
-export type GetAllResponse = GetAllResponses[keyof GetAllResponses];
-
-export type GetByIdData = {
-    body?: never;
-    path: {
-        id: number;
-    };
-    query?: never;
-    url: '/api/teamsV2/{id}';
-};
-
-export type GetByIdResponses = {
-    /**
-     * OK
-     */
-    200: TeamV2Info;
-};
-
-export type GetByIdResponse = GetByIdResponses[keyof GetByIdResponses];
-
 export type GetLeaderboardData = {
     body?: never;
     path?: never;
@@ -2065,76 +2013,39 @@ export type GetContributorsResponses = {
 
 export type GetContributorsResponse = GetContributorsResponses[keyof GetContributorsResponses];
 
-export type GetTeamLeaderboardData = {
-    body?: never;
-    path?: never;
-    query: {
-        after: Date;
-        before: Date;
-        team?: string;
-        sort?: 'SCORE' | 'LEAGUE_POINTS';
-    };
-    url: '/team-leaderboard';
-};
-
-export type GetTeamLeaderboardResponses = {
-    /**
-     * OK
-     */
-    200: Array<TeamLeaderboardEntry>;
-};
-
-export type GetTeamLeaderboardResponse = GetTeamLeaderboardResponses[keyof GetTeamLeaderboardResponses];
-
-export type GetAllTimeTeamLeaderboardData = {
+export type GetAllTeamsData = {
     body?: never;
     path?: never;
     query?: never;
-    url: '/team-leaderboard/all-time';
+    url: '/team';
 };
 
-export type GetAllTimeTeamLeaderboardResponses = {
-    /**
-     * OK
-     */
-    200: Array<TeamLeaderboardEntry>;
-};
-
-export type GetAllTimeTeamLeaderboardResponse = GetAllTimeTeamLeaderboardResponses[keyof GetAllTimeTeamLeaderboardResponses];
-
-export type GetTeamsData = {
-    body?: never;
-    path?: never;
-    query?: never;
-    url: '/team/all';
-};
-
-export type GetTeamsResponses = {
+export type GetAllTeamsResponses = {
     /**
      * OK
      */
     200: Array<TeamInfo>;
 };
 
-export type GetTeamsResponse = GetTeamsResponses[keyof GetTeamsResponses];
+export type GetAllTeamsResponse = GetAllTeamsResponses[keyof GetAllTeamsResponses];
 
-export type HideTeamData = {
-    body: boolean;
+export type UpdateTeamVisibilityData = {
+    body?: boolean;
     path: {
         id: number;
     };
-    query?: never;
-    url: '/team/{id}/hide';
+    query?: {
+        hidden?: boolean;
+    };
+    url: '/team/{id}/visibility';
 };
 
-export type HideTeamResponses = {
+export type UpdateTeamVisibilityResponses = {
     /**
      * OK
      */
-    200: TeamInfo;
+    200: unknown;
 };
-
-export type HideTeamResponse = HideTeamResponses[keyof HideTeamResponses];
 
 export type DeleteUserData = {
     body?: never;
@@ -2264,24 +2175,6 @@ export type AddRepositoryToMonitorResponses = {
     200: unknown;
 };
 
-export type DeleteTeamData = {
-    body?: never;
-    path: {
-        teamId: number;
-    };
-    query?: never;
-    url: '/workspace/team/{teamId}';
-};
-
-export type DeleteTeamResponses = {
-    /**
-     * OK
-     */
-    200: TeamInfo;
-};
-
-export type DeleteTeamResponse = DeleteTeamResponses[keyof DeleteTeamResponses];
-
 export type RemoveLabelFromTeamData = {
     body?: never;
     path: {
@@ -2320,114 +2213,6 @@ export type AddLabelToTeamResponses = {
 };
 
 export type AddLabelToTeamResponse = AddLabelToTeamResponses[keyof AddLabelToTeamResponses];
-
-export type RemoveRepositoryFromTeamData = {
-    body?: never;
-    path: {
-        teamId: number;
-        repositoryOwner: string;
-        repositoryName: string;
-    };
-    query?: never;
-    url: '/workspace/team/{teamId}/repository/{repositoryOwner}/{repositoryName}';
-};
-
-export type RemoveRepositoryFromTeamResponses = {
-    /**
-     * OK
-     */
-    200: TeamInfo;
-};
-
-export type RemoveRepositoryFromTeamResponse = RemoveRepositoryFromTeamResponses[keyof RemoveRepositoryFromTeamResponses];
-
-export type AddRepositoryToTeamData = {
-    body?: never;
-    path: {
-        teamId: number;
-        repositoryOwner: string;
-        repositoryName: string;
-    };
-    query?: never;
-    url: '/workspace/team/{teamId}/repository/{repositoryOwner}/{repositoryName}';
-};
-
-export type AddRepositoryToTeamResponses = {
-    /**
-     * OK
-     */
-    200: TeamInfo;
-};
-
-export type AddRepositoryToTeamResponse = AddRepositoryToTeamResponses[keyof AddRepositoryToTeamResponses];
-
-export type CreateTeamData = {
-    body: TeamInfo;
-    path?: never;
-    query?: never;
-    url: '/workspace/teams';
-};
-
-export type CreateTeamResponses = {
-    /**
-     * OK
-     */
-    200: TeamInfo;
-};
-
-export type CreateTeamResponse = CreateTeamResponses[keyof CreateTeamResponses];
-
-export type AutomaticallyAssignTeamsData = {
-    body?: never;
-    path?: never;
-    query?: never;
-    url: '/workspace/teams/autoassign';
-};
-
-export type AutomaticallyAssignTeamsResponses = {
-    /**
-     * OK
-     */
-    200: unknown;
-};
-
-export type RemoveUserFromTeamData = {
-    body?: never;
-    path: {
-        login: string;
-        teamId: number;
-    };
-    query?: never;
-    url: '/workspace/user/{login}/team/{teamId}';
-};
-
-export type RemoveUserFromTeamResponses = {
-    /**
-     * OK
-     */
-    200: UserInfo;
-};
-
-export type RemoveUserFromTeamResponse = RemoveUserFromTeamResponses[keyof RemoveUserFromTeamResponses];
-
-export type AddTeamToUserData = {
-    body?: never;
-    path: {
-        login: string;
-        teamId: number;
-    };
-    query?: never;
-    url: '/workspace/user/{login}/team/{teamId}';
-};
-
-export type AddTeamToUserResponses = {
-    /**
-     * OK
-     */
-    200: UserInfo;
-};
-
-export type AddTeamToUserResponse = AddTeamToUserResponses[keyof AddTeamToUserResponses];
 
 export type GetUsersWithTeamsData = {
     body?: never;

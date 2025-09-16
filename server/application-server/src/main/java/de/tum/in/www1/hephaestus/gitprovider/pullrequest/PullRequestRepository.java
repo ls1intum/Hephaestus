@@ -1,7 +1,7 @@
 package de.tum.in.www1.hephaestus.gitprovider.pullrequest;
 
 import jakarta.transaction.Transactional;
-import java.time.OffsetDateTime;
+import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
@@ -19,7 +19,7 @@ public interface PullRequestRepository extends JpaRepository<PullRequest, Long> 
         WHERE p.author.login ILIKE :authorLogin
         """
     )
-    Optional<OffsetDateTime> firstContributionByAuthorLogin(@Param("authorLogin") String authorLogin);
+    Optional<Instant> firstContributionByAuthorLogin(@Param("authorLogin") String authorLogin);
 
     @Transactional
     @Query(
@@ -54,7 +54,7 @@ public interface PullRequestRepository extends JpaRepository<PullRequest, Long> 
     List<PullRequest> findAssignedByLoginAndStatesUpdatedSince(
         @Param("assigneeLogin") String assigneeLogin,
         @Param("states") Set<PullRequest.State> states,
-        @Param("activitySince") OffsetDateTime activitySince
+        @Param("activitySince") Instant activitySince
     );
 
     @Query(

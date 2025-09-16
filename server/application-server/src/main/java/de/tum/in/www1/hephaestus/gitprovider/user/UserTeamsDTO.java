@@ -9,6 +9,7 @@ import org.springframework.lang.NonNull;
 public record UserTeamsDTO(
     @NonNull Long id,
     @NonNull String login,
+    String email,
     @NonNull String name,
     @NonNull String url,
     @NonNull Set<TeamInfoDTO> teams
@@ -17,9 +18,16 @@ public record UserTeamsDTO(
         return new UserTeamsDTO(
             user.getId(),
             user.getLogin(),
+            user.getEmail(),
             user.getName(),
             user.getHtmlUrl(),
-            user.getTeams().stream().map(TeamInfoDTO::fromTeam).collect(Collectors.toCollection(LinkedHashSet::new))
+            user
+                .getTeamMemberships()
+                .stream()
+                .map(m -> m.getTeam())
+                .filter(t -> t != null)
+                .map(TeamInfoDTO::fromTeam)
+                .collect(Collectors.toCollection(LinkedHashSet::new))
         );
     }
 }

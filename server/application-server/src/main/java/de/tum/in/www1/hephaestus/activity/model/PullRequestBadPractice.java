@@ -9,7 +9,7 @@ import jakarta.persistence.JoinColumn;
 import jakarta.persistence.Lob;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
-import java.time.OffsetDateTime;
+import java.time.Instant;
 import lombok.*;
 
 @Entity
@@ -41,9 +41,9 @@ public class PullRequestBadPractice {
 
     private PullRequestBadPracticeState userState;
 
-    private OffsetDateTime detectionTime;
+    private Instant detectionTime;
 
-    private OffsetDateTime lastUpdateTime;
+    private Instant lastUpdateTime;
 
     private PullRequestLifecycleState detectionPullrequestLifecycleState;
 

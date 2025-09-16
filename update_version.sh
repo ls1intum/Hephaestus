@@ -8,7 +8,7 @@ set -euo pipefail
 #   Examples: 1.2.3, 1.0.0-alpha.1, 2.0.0-beta.1, 1.2.3+build.123
 #
 # This script updates the version in:
-#   - webapp/package.json & webapp/package-lock.json (for "hephaestus")
+#   - webapp/package.json & webapp/package-lock.json (for "webapp")
 #   - root package-lock.json (top-level version)
 #   - Java source: server/application-server/src/main/java/de/tum/in/www1/hephaestus/OpenAPIConfiguration.java
 #   - YAML config: server/application-server/src/main/resources/application.yml
@@ -33,8 +33,8 @@ PARAM=$1
 if [[ "$PARAM" =~ ^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z-]+(\.[0-9A-Za-z-]+)*)?(\+[0-9A-Za-z-]+(\.[0-9A-Za-z-]+)*)?$ ]]; then
     # Direct version specified (used by semantic-release)
     NEW_VERSION="$PARAM"
-    # Extract the current version from webapp/package.json (the authoritative version for "hephaestus")
-    CURRENT_VERSION=$(awk '/"name": "hephaestus"/ {found=1} found && /"version":/ { sub(/.*"version": "/, ""); sub(/".*/, ""); print; exit }' webapp/package.json)
+    # Extract the current version from webapp/package.json (the authoritative version for "webapp")
+    CURRENT_VERSION=$(awk '/"name": "webapp"/ {found=1} found && /"version":/ { sub(/.*"version": "/, ""); sub(/".*/, ""); print; exit }' webapp/package.json)
     if [[ -z "$CURRENT_VERSION" ]]; then
         echo "Error: Could not determine current version from webapp/package.json"
         exit 1
@@ -66,9 +66,9 @@ elif [[ "$PARAM" == "major" || "$PARAM" == "minor" || "$PARAM" == "patch" ]]; th
         echo "$major.$minor.$patch"
     }
 
-    # Extract the current version from webapp/package.json (the authoritative version for "hephaestus")
+    # Extract the current version from webapp/package.json (the authoritative version for "webapp")
     # This uses awk to strip everything before/after the version string.
-    CURRENT_VERSION=$(awk '/"name": "hephaestus"/ {found=1} found && /"version":/ { sub(/.*"version": "/, ""); sub(/".*/, ""); print; exit }' webapp/package.json)
+    CURRENT_VERSION=$(awk '/"name": "webapp"/ {found=1} found && /"version":/ { sub(/.*"version": "/, ""); sub(/".*/, ""); print; exit }' webapp/package.json)
     if [[ -z "$CURRENT_VERSION" ]]; then
         echo "Error: Could not determine current version from webapp/package.json"
         exit 1
@@ -85,7 +85,7 @@ fi
 # Update webapp/package.json
 awk -v old_version="$CURRENT_VERSION" -v new_version="$NEW_VERSION" '
     BEGIN {found_name = 0}
-    /"name": "hephaestus"/ {found_name = 1}
+    /"name": "webapp"/ {found_name = 1}
     found_name && /"version":/ {
         sub("\"version\": \"" old_version "\"", "\"version\": \"" new_version "\"")
         found_name = 0
@@ -97,7 +97,7 @@ awk -v old_version="$CURRENT_VERSION" -v new_version="$NEW_VERSION" '
 if [[ -f webapp/package-lock.json ]]; then
     awk -v old_version="$CURRENT_VERSION" -v new_version="$NEW_VERSION" '
         BEGIN {found_name = 0}
-        /"name": "hephaestus"/ {found_name = 1}
+        /"name": "webapp"/ {found_name = 1}
         found_name && /"version":/ {
             sub("\"version\": \"" old_version "\"", "\"version\": \"" new_version "\"")
             found_name = 0
@@ -108,7 +108,7 @@ fi
 
 # Update root package-lock.json (if it exists)
 # 1) Update the top-level version field (before the packages block)
-# 2) Update the first hephaestus entry's immediate version (mirrors webapp logic)
+# 2) Update the webapp workspace's version entry
 if [[ -f package-lock.json ]]; then
     # 1) Top-level version (only within header before "packages":)
     awk -v old_version="$CURRENT_VERSION" -v new_version="$NEW_VERSION" '
@@ -121,13 +121,13 @@ if [[ -f package-lock.json ]]; then
         { print }
     ' package-lock.json > package-lock.json.tmp && mv package-lock.json.tmp package-lock.json
 
-    # 2) First hephaestus name+version pair (e.g., packages[""] or packages["webapp"]) — matches the pattern you provided
+    # 2) Version entry for the webapp workspace
     awk -v old_version="$CURRENT_VERSION" -v new_version="$NEW_VERSION" '
-        BEGIN {found_name = 0}
-        /"name": "hephaestus"/ {found_name = 1}
-        found_name && /"version":/ {
+        BEGIN {found_webapp = 0}
+        /"webapp"[[:space:]]*:/ {found_webapp = 1}
+        found_webapp && /"version":/ {
             sub("\"version\": \"" old_version "\"", "\"version\": \"" new_version "\"")
-            found_name = 0
+            found_webapp = 0
         }
         {print}
     ' package-lock.json > package-lock.json.tmp && mv package-lock.json.tmp package-lock.json

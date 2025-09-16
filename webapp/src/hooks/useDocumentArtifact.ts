@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
 	getDocumentOptions,
 	getDocumentQueryKey,
@@ -86,22 +86,22 @@ export function useDocumentArtifact({
 	});
 
 	// Build a continuous list from 1..latest-1 for navigation; load selected versions on demand
-	const versionNumbersAsc = useMemo(() => {
+	const versionNumbersAsc = (() => {
 		const latestNum = latest?.versionNumber ?? 0;
 		if (!latestNum || latestNum <= 1) return [] as number[];
 		const arr: number[] = [];
 		for (let i = 1; i < latestNum; i++) arr.push(i);
 		return arr;
-	}, [latest?.versionNumber]);
+	})();
 
 	// Build navigable list that excludes the current latest version number to avoid duplicating "latest" (-1) in the list
-	const navigableNumbersAsc = useMemo(() => {
+	const navigableNumbersAsc = (() => {
 		if (!versionNumbersAsc.length) return versionNumbersAsc;
 		const latestNum = latest?.versionNumber;
 		return latestNum == null
 			? versionNumbersAsc
 			: versionNumbersAsc.filter((n) => n !== latestNum);
-	}, [versionNumbersAsc, latest?.versionNumber]);
+	})();
 
 	// Resolve selected version number by index in the navigable list
 	const selectedVersionNumber =

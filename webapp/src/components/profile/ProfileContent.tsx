@@ -1,6 +1,5 @@
 import { CodeReviewIcon, GitPullRequestIcon } from "@primer/octicons-react";
 import { Link } from "@tanstack/react-router";
-import { useMemo } from "react";
 import type { PullRequestInfo, PullRequestReviewInfo } from "@/api/types.gen";
 import { Button } from "@/components/ui/button";
 import { EmptyState } from "../shared/EmptyState";
@@ -25,26 +24,19 @@ export function ProfileContent({
 	currUserIsDashboardUser,
 }: ProfileContentProps) {
 	// Generate skeleton arrays for loading state
-	const skeletonReviews = useMemo(
-		() => (isLoading ? Array.from({ length: 3 }, (_, i) => ({ id: i })) : []),
-		[isLoading],
-	);
+	const skeletonReviews = isLoading
+		? Array.from({ length: 3 }, (_, i) => ({ id: i }))
+		: [];
 
-	const skeletonPullRequests = useMemo(
-		() => (isLoading ? Array.from({ length: 2 }, (_, i) => ({ id: i })) : []),
-		[isLoading],
-	);
+	const skeletonPullRequests = isLoading
+		? Array.from({ length: 2 }, (_, i) => ({ id: i }))
+		: [];
 
-	// Use skeleton data during loading state
-	const displayReviews = useMemo(
-		() => (isLoading ? skeletonReviews : reviewActivity),
-		[isLoading, skeletonReviews, reviewActivity],
-	);
+	const displayReviews = isLoading ? skeletonReviews : reviewActivity;
 
-	const displayPullRequests = useMemo(
-		() => (isLoading ? skeletonPullRequests : openPullRequests),
-		[isLoading, skeletonPullRequests, openPullRequests],
-	);
+	const displayPullRequests = isLoading
+		? skeletonPullRequests
+		: openPullRequests;
 
 	return (
 		<div className="grid grid-cols-1 lg:grid-cols-2 gap-2 border-t border-border pt-6">

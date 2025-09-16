@@ -11,7 +11,10 @@ import de.tum.in.www1.hephaestus.leaderboard.LeaderboardService;
 import de.tum.in.www1.hephaestus.leaderboard.SlackMessageService;
 import java.io.IOException;
 import java.time.DayOfWeek;
-import java.time.OffsetDateTime;
+import java.time.Instant;
+import java.time.ZoneId;
+import java.time.ZonedDateTime;
+import java.time.format.DateTimeFormatter;
 import java.time.temporal.TemporalAdjusters;
 import java.util.List;
 import java.util.Optional;
@@ -69,7 +72,7 @@ public class SlackWeeklyLeaderboardTask implements Runnable {
      * Gets the Slack handles of the top 3 reviewers in the given time frame.
      * @return
      */
-    private List<User> getTop3SlackReviewers(OffsetDateTime after, OffsetDateTime before, Optional<String> team) {
+    private List<User> getTop3SlackReviewers(Instant after, Instant before, Optional<String> team) {
         var leaderboard = leaderboardService.createLeaderboard(after, before, team, Optional.empty());
         var top3 = leaderboard.subList(0, Math.min(3, leaderboard.size()));
         logger.debug("Top 3 Users of the last week: " + top3.stream().map(e -> e.user().name()).toList());
@@ -110,23 +113,27 @@ public class SlackWeeklyLeaderboardTask implements Runnable {
         };
     }
 
-    private String formatDateForURL(OffsetDateTime date) {
-        return date.format(java.time.format.DateTimeFormatter.ISO_OFFSET_DATE_TIME).replace("+", "%2B");
+    private String formatDateForURL(Instant instant) {
+        // Use ISO-8601 for query params (e.g., 2025-01-01T00:00:00Z)
+        return DateTimeFormatter.ISO_INSTANT.format(instant);
     }
 
     @Override
     public void run() {
-        // get date in unix format
-        long currentDate = OffsetDateTime.now().toEpochSecond();
-        // Calculate the the last leaderboard schedule
+        // get date in unix seconds for Slack date formatting
+        long currentDate = Instant.now().getEpochSecond();
+
+        // Calculate the last leaderboard schedule in system default zone, then convert to Instants
         String[] timeParts = scheduledTime.split(":");
-        OffsetDateTime before = OffsetDateTime.now()
+        ZonedDateTime zonedNow = ZonedDateTime.now(ZoneId.systemDefault());
+        ZonedDateTime zonedBefore = zonedNow
             .with(TemporalAdjusters.previousOrSame(DayOfWeek.of(Integer.parseInt(scheduledDay))))
             .withHour(Integer.parseInt(timeParts[0]))
             .withMinute(timeParts.length > 1 ? Integer.parseInt(timeParts[1]) : 0)
             .withSecond(0)
             .withNano(0);
-        OffsetDateTime after = before.minusWeeks(1);
+        Instant before = zonedBefore.toInstant();
+        Instant after = zonedBefore.minusWeeks(1).toInstant();
 
         var top3reviewers = getTop3SlackReviewers(after, before, Optional.of(team));
 

@@ -1,6 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { createFileRoute } from "@tanstack/react-router";
-import { getTeamsOptions } from "@/api/@tanstack/react-query.gen";
+import { getAllTeamsOptions } from "@/api/@tanstack/react-query.gen";
 import { TeamsPage } from "@/components/teams/TeamsPage";
 
 export const Route = createFileRoute("/_authenticated/teams")({
@@ -8,7 +8,7 @@ export const Route = createFileRoute("/_authenticated/teams")({
 });
 
 function TeamsContainer() {
-	const teamsQuery = useQuery(getTeamsOptions({}));
+	const teamsQuery = useQuery(getAllTeamsOptions({}));
 
 	return (
 		<TeamsPage teams={teamsQuery.data || []} isLoading={teamsQuery.isLoading} />

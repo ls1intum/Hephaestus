@@ -1,8 +1,8 @@
 import { AnimatePresence, motion } from "framer-motion";
 import { CheckCircle2 } from "lucide-react";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import { Streamdown } from "streamdown";
 import { cn } from "@/lib/utils";
-import { Markdown } from "./Markdown";
 
 interface MessageReasoningProps {
 	isLoading: boolean;
@@ -83,7 +83,7 @@ export function MessageReasoning({
 		kind: "md" | "bold";
 	};
 
-	const parseHeadings = useCallback((text: string): ParsedHeading[] => {
+	const parseHeadings = (text: string): ParsedHeading[] => {
 		const found: ParsedHeading[] = [];
 		if (!text) return found;
 		// Markdown headings at start of line
@@ -107,45 +107,34 @@ export function MessageReasoning({
 		}
 		found.sort((a, b) => a.index - b.index);
 		return found;
-	}, []);
+	};
 
 	type Section = { title?: string; body: string };
-	const parseSections = useCallback(
-		(text: string): Section[] => {
-			const sections: Section[] = [];
-			if (!text) return sections;
-			const heads = parseHeadings(text);
-			if (heads.length === 0)
-				return [{ title: "Thinking for a few seconds", body: text }];
-			// Preamble before first heading
-			if (heads[0].index > 0) {
-				sections.push({ body: text.slice(0, heads[0].index).trim() });
-			}
-			for (let i = 0; i < heads.length; i++) {
-				const h = heads[i];
-				const startBody = h.index + h.length;
-				const end = i + 1 < heads.length ? heads[i + 1].index : text.length;
-				sections.push({
-					title: h.title,
-					body: text.slice(startBody, end).trim(),
-				});
-			}
-			return sections;
-		},
-		[parseHeadings],
-	);
+	const parseSections = (text: string): Section[] => {
+		const sections: Section[] = [];
+		if (!text) return sections;
+		const heads = parseHeadings(text);
+		if (heads.length === 0)
+			return [{ title: "Thinking for a few seconds", body: text }];
+		// Preamble before first heading
+		if (heads[0].index > 0) {
+			sections.push({ body: text.slice(0, heads[0].index).trim() });
+		}
+		for (let i = 0; i < heads.length; i++) {
+			const h = heads[i];
+			const startBody = h.index + h.length;
+			const end = i + 1 < heads.length ? heads[i + 1].index : text.length;
+			sections.push({
+				title: h.title,
+				body: text.slice(startBody, end).trim(),
+			});
+		}
+		return sections;
+	};
 
-	const sections = useMemo(
-		() => (hasContent ? parseSections(reasoning) : []),
-		[hasContent, reasoning, parseSections],
-	);
-	const lastHeading = useMemo(
-		() =>
-			sections.length > 0
-				? (sections[sections.length - 1].title ?? null)
-				: null,
-		[sections],
-	);
+	const sections = hasContent ? parseSections(reasoning) : [];
+	const lastHeading =
+		sections.length > 0 ? (sections[sections.length - 1].title ?? null) : null;
 	const hasTiming = startRef.current != null && endRef.current != null;
 	const headerText = isLoading
 		? lastHeading || "Thinking"
@@ -245,7 +234,7 @@ export function MessageReasoning({
 														: "ring-background",
 												)}
 											/>
-											{s.body && <Markdown>{s.body}</Markdown>}
+											{s.body && <Streamdown>{s.body}</Streamdown>}
 										</div>
 									);
 								})}
@@ -266,7 +255,7 @@ export function MessageReasoning({
 								)}
 							</>
 						) : (
-							<Markdown>{reasoning}</Markdown>
+							<Streamdown>{reasoning}</Streamdown>
 						)}
 					</motion.div>
 				)}

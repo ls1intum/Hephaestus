@@ -8,24 +8,28 @@ interface SuggestedActionsProps {
 export function SuggestedActions({ onAction }: SuggestedActionsProps) {
 	const suggestedActions = [
 		{
-			title: "What are the advantages",
-			label: "of using Next.js?",
-			action: "What are the advantages of using Next.js?",
+			title: "Review progress & plan next steps",
+			label: "Reflect on recent work and goals ahead",
+			action:
+				"Can we review my recent progress and map out what to tackle next?",
 		},
 		{
-			title: "Write code to",
-			label: `demonstrate djikstra's algorithm`,
-			action: `Write code to demonstrate djikstra's algorithm`,
+			title: "Break work into smaller tasks",
+			label: "Keep things simple and deliverable",
+			action:
+				"I'm not sure how to slice my work—can you help me break it into smaller pieces?",
 		},
 		{
-			title: "Help me write an essay",
-			label: "about silicon valley",
-			action: "Help me write an essay about silicon valley",
+			title: "Check task aligns with our goal",
+			label: "Ensure I'm building the right thing",
+			action:
+				"Does this task fit our overall goal, or should I adjust my approach?",
 		},
 		{
-			title: "What is the weather",
-			label: "in San Francisco?",
-			action: "What is the weather in San Francisco?",
+			title: "Troubleshoot a blocker",
+			label: "Find a strategy to move forward",
+			action:
+				"I'm running into a blocker and need help figuring out a way forward.",
 		},
 	];
 
@@ -48,7 +52,7 @@ export function SuggestedActions({ onAction }: SuggestedActionsProps) {
 						onClick={() => {
 							onAction(suggestedAction.action);
 						}}
-						className="text-left border rounded-xl px-4 py-3.5 text-sm flex-1 gap-1 sm:flex-col w-full h-auto justify-start items-start"
+						className="text-left bg-background border rounded-xl px-4 py-3.5 text-sm flex-1 gap-1 sm:flex-col w-full h-auto justify-start items-start"
 					>
 						<span className="font-medium">{suggestedAction.title}</span>
 						<span className="text-muted-foreground">

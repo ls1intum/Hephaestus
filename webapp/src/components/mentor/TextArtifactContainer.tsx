@@ -1,5 +1,4 @@
 import type { UseChatHelpers } from "@ai-sdk/react";
-import { useMemo } from "react";
 import { useDebounceCallback } from "usehooks-ts";
 import type { ChatMessageVote, Document } from "@/api/types.gen";
 import { useDocumentArtifact } from "@/hooks/useDocumentArtifact";
@@ -55,7 +54,7 @@ export function TextArtifactContainer({
 		doc.saveContent(content, true);
 	}, 600);
 
-	const documents: Document[] = useMemo(() => [], []);
+	const documents: Document[] = [];
 
 	const isCurrentVersion = doc.isCurrentVersion;
 

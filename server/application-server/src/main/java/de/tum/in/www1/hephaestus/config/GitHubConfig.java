@@ -5,7 +5,6 @@ import org.kohsuke.github.GitHub;
 import org.kohsuke.github.GitHubBuilder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -16,14 +15,8 @@ public class GitHubConfig {
 
     private static final Logger logger = LoggerFactory.getLogger(GitHubConfig.class);
 
-    @Value("${github.auth-token}")
-    private String ghAuthToken;
-
-    @Autowired
-    private Environment environment;
-
     @Bean
-    public GitHub gitHubClient() {
+    public GitHub gitHubClient(Environment environment, @Value("${github.auth-token}") String ghAuthToken) {
         if (environment.matchesProfiles("specs", "test")) {
             logger.info("GitHub client is disabled in specs/test profile");
             return GitHub.offline();

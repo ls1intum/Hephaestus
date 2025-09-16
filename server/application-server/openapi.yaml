@@ -8,7 +8,7 @@ info:
     name: MIT License
     url: https://github.com/ls1intum/Hephaestus/blob/develop/LICENSE
   title: Hephaestus API
-  version: 0.9.0-rc.20
+  version: 0.9.0-rc.27
 servers:
 - description: Default Server URL
   url: /
@@ -409,39 +409,6 @@ paths:
           description: Document version not found
       summary: Get specific version of a document by version number
       tags: []
-  /api/teamsV2:
-    get:
-      operationId: getAll
-      responses:
-        "200":
-          content:
-            application/json:
-              schema:
-                type: array
-                items:
-                  $ref: "#/components/schemas/TeamV2Info"
-          description: OK
-      tags:
-      - team-v-2
-  /api/teamsV2/{id}:
-    get:
-      operationId: getById
-      parameters:
-      - in: path
-        name: id
-        required: true
-        schema:
-          type: integer
-          format: int64
-      responses:
-        "200":
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/TeamV2Info"
-          description: OK
-      tags:
-      - team-v-2
   /leaderboard:
     get:
       operationId: getLeaderboard
@@ -614,63 +581,9 @@ paths:
           description: OK
       tags:
       - meta
-  /team-leaderboard:
+  /team:
     get:
-      operationId: getTeamLeaderboard
-      parameters:
-      - in: query
-        name: after
-        required: true
-        schema:
-          type: string
-          format: date-time
-      - in: query
-        name: before
-        required: true
-        schema:
-          type: string
-          format: date-time
-      - in: query
-        name: team
-        required: false
-        schema:
-          type: string
-      - in: query
-        name: sort
-        required: false
-        schema:
-          type: string
-          enum:
-          - SCORE
-          - LEAGUE_POINTS
-      responses:
-        "200":
-          content:
-            application/json:
-              schema:
-                type: array
-                items:
-                  $ref: "#/components/schemas/TeamLeaderboardEntry"
-          description: OK
-      tags:
-      - team-leaderboard
-  /team-leaderboard/all-time:
-    get:
-      operationId: getAllTimeTeamLeaderboard
-      responses:
-        "200":
-          content:
-            application/json:
-              schema:
-                type: array
-                items:
-                  $ref: "#/components/schemas/TeamLeaderboardEntry"
-          description: OK
-      tags:
-      - team-leaderboard
-  /team/all:
-    get:
-      operationId: getTeams
+      operationId: getAllTeams
       responses:
         "200":
           content:
@@ -682,9 +595,9 @@ paths:
           description: OK
       tags:
       - team
-  /team/{id}/hide:
+  /team/{id}/visibility:
     post:
-      operationId: hideTeam
+      operationId: updateTeamVisibility
       parameters:
       - in: path
         name: id
@@ -692,18 +605,18 @@ paths:
         schema:
           type: integer
           format: int64
+      - in: query
+        name: hidden
+        required: false
+        schema:
+          type: boolean
       requestBody:
         content:
           application/json:
             schema:
               type: boolean
-        required: true
       responses:
         "200":
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/TeamInfo"
           description: OK
       tags:
       - team
@@ -821,25 +734,6 @@ paths:
           description: OK
       tags:
       - workspace
-  /workspace/team/{teamId}:
-    delete:
-      operationId: deleteTeam
-      parameters:
-      - in: path
-        name: teamId
-        required: true
-        schema:
-          type: integer
-          format: int64
-      responses:
-        "200":
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/TeamInfo"
-          description: OK
-      tags:
-      - workspace
   /workspace/team/{teamId}/label/{labelId}:
     delete:
       operationId: removeLabelFromTeam
@@ -892,136 +786,6 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/TeamInfo"
-          description: OK
-      tags:
-      - workspace
-  /workspace/team/{teamId}/repository/{repositoryOwner}/{repositoryName}:
-    delete:
-      operationId: removeRepositoryFromTeam
-      parameters:
-      - in: path
-        name: teamId
-        required: true
-        schema:
-          type: integer
-          format: int64
-      - in: path
-        name: repositoryOwner
-        required: true
-        schema:
-          type: string
-      - in: path
-        name: repositoryName
-        required: true
-        schema:
-          type: string
-      responses:
-        "200":
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/TeamInfo"
-          description: OK
-      tags:
-      - workspace
-    post:
-      operationId: addRepositoryToTeam
-      parameters:
-      - in: path
-        name: teamId
-        required: true
-        schema:
-          type: integer
-          format: int64
-      - in: path
-        name: repositoryOwner
-        required: true
-        schema:
-          type: string
-      - in: path
-        name: repositoryName
-        required: true
-        schema:
-          type: string
-      responses:
-        "200":
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/TeamInfo"
-          description: OK
-      tags:
-      - workspace
-  /workspace/teams:
-    put:
-      operationId: createTeam
-      requestBody:
-        content:
-          application/json:
-            schema:
-              $ref: "#/components/schemas/TeamInfo"
-        required: true
-      responses:
-        "200":
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/TeamInfo"
-          description: OK
-      tags:
-      - workspace
-  /workspace/teams/autoassign:
-    put:
-      operationId: automaticallyAssignTeams
-      responses:
-        "200":
-          description: OK
-      tags:
-      - workspace
-  /workspace/user/{login}/team/{teamId}:
-    delete:
-      operationId: removeUserFromTeam
-      parameters:
-      - in: path
-        name: login
-        required: true
-        schema:
-          type: string
-      - in: path
-        name: teamId
-        required: true
-        schema:
-          type: integer
-          format: int64
-      responses:
-        "200":
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/UserInfo"
-          description: OK
-      tags:
-      - workspace
-    put:
-      operationId: addTeamToUser
-      parameters:
-      - in: path
-        name: login
-        required: true
-        schema:
-          type: string
-      - in: path
-        name: teamId
-        required: true
-        schema:
-          type: integer
-          format: int64
-      responses:
-        "200":
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/UserInfo"
           description: OK
       tags:
       - workspace
@@ -1949,6 +1713,10 @@ components:
         id:
           type: integer
           format: int64
+        labels:
+          type: array
+          items:
+            $ref: "#/components/schemas/LabelInfo"
         name:
           type: string
         nameWithOwner:
@@ -2562,10 +2330,12 @@ components:
     TeamInfo:
       type: object
       properties:
-        color:
+        description:
           type: string
         hidden:
           type: boolean
+        htmlUrl:
+          type: string
         id:
           type: integer
           format: int64
@@ -2577,77 +2347,6 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/UserInfo"
-        name:
-          type: string
-        repositories:
-          type: array
-          items:
-            $ref: "#/components/schemas/RepositoryInfo"
-      required:
-      - color
-      - hidden
-      - id
-      - labels
-      - members
-      - name
-      - repositories
-    TeamLeaderboardEntry:
-      type: object
-      properties:
-        numberOfApprovals:
-          type: integer
-          format: int32
-        numberOfChangeRequests:
-          type: integer
-          format: int32
-        numberOfCodeComments:
-          type: integer
-          format: int32
-        numberOfComments:
-          type: integer
-          format: int32
-        numberOfReviewedPRs:
-          type: integer
-          format: int32
-        numberOfUnknowns:
-          type: integer
-          format: int32
-        rank:
-          type: integer
-          format: int32
-        reviewedPullRequests:
-          type: array
-          items:
-            $ref: "#/components/schemas/PullRequestInfo"
-        score:
-          type: integer
-          format: int32
-        team:
-          $ref: "#/components/schemas/TeamInfo"
-      required:
-      - numberOfApprovals
-      - numberOfChangeRequests
-      - numberOfCodeComments
-      - numberOfComments
-      - numberOfReviewedPRs
-      - numberOfUnknowns
-      - rank
-      - reviewedPullRequests
-      - score
-      - team
-    TeamV2Info:
-      type: object
-      properties:
-        description:
-          type: string
-        htmlUrl:
-          type: string
-        id:
-          type: integer
-          format: int64
-        lastSyncedAt:
-          type: string
-          format: date-time
         membershipCount:
           type: integer
           format: int32
@@ -2666,9 +2365,19 @@ components:
         repoPermissionCount:
           type: integer
           format: int32
+        repositories:
+          type: array
+          items:
+            $ref: "#/components/schemas/RepositoryInfo"
       required:
+      - hidden
       - id
+      - labels
+      - members
+      - membershipCount
       - name
+      - repoPermissionCount
+      - repositories
     TextUIPart:
       type: object
       description: A text part of a message.
@@ -2998,6 +2707,8 @@ components:
     UserTeams:
       type: object
       properties:
+        email:
+          type: string
         id:
           type: integer
           format: int64
@@ -3033,19 +2744,16 @@ components:
           anyOf:
           - type: integer
           - type: "null"
-          default: null
           title: Interval
         temperature_2m:
           anyOf:
           - type: number
           - type: "null"
-          default: null
           title: Temperature 2M
         time:
           anyOf:
           - type: string
           - type: "null"
-          default: null
           title: Time
       title: WeatherCurrent
     WeatherCurrentUnits:
@@ -3055,13 +2763,11 @@ components:
           anyOf:
           - type: string
           - type: "null"
-          default: null
           title: Interval
         temperature_2m:
           anyOf:
           - type: string
           - type: "null"
-          default: null
           title: Temperature 2M
         time:
           anyOf:
@@ -3098,13 +2804,11 @@ components:
           anyOf:
           - type: string
           - type: "null"
-          default: null
           title: Sunrise
         sunset:
           anyOf:
           - type: string
           - type: "null"
-          default: null
           title: Sunset
         time:
           anyOf:

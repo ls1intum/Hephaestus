@@ -1,7 +1,6 @@
 package de.tum.in.www1.hephaestus.gitprovider.issue.github;
 
 import de.tum.in.www1.hephaestus.gitprovider.common.BaseGitServiceEntityConverter;
-import de.tum.in.www1.hephaestus.gitprovider.common.DateUtil;
 import de.tum.in.www1.hephaestus.gitprovider.issue.Issue;
 import org.kohsuke.github.GHIssue;
 import org.kohsuke.github.GHIssueState;
@@ -25,7 +24,7 @@ public class GitHubIssueConverter extends BaseGitServiceEntityConverter<GHIssue,
         issue.setBody(source.getBody());
         issue.setHtmlUrl(source.getHtmlUrl().toString());
         issue.setLocked(source.isLocked());
-        issue.setClosedAt(DateUtil.convertToOffsetDateTime(source.getClosedAt()));
+        issue.setClosedAt(source.getClosedAt());
         issue.setCommentsCount(issue.getCommentsCount());
         issue.setHasPullRequest(source.getPullRequest() != null);
         return issue;
