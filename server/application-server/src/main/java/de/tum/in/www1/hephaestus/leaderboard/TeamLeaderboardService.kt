@@ -58,7 +58,6 @@ class TeamLeaderboardService {
         }
 
         data class TeamStats(
-//            val team: Team,
             val teamId: Long,
             val score: Int,
             val reviewedPrs: List<PullRequestInfoDTO>,
@@ -72,7 +71,6 @@ class TeamLeaderboardService {
 
         val teamStatsById = leaderboardsByTeamId.mapValues { (teamId, entries) ->
             TeamStats(
-//                team = teamsById[teamId]?: Team(),
                 teamId = teamId,
                 score = entries.sumOf { it.score },
                 reviewedPrs = entries.flatMap { it.reviewedPullRequests() }.distinct(),
