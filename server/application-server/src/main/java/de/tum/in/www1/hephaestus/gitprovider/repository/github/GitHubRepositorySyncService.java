@@ -1,6 +1,7 @@
 package de.tum.in.www1.hephaestus.gitprovider.repository.github;
 
 import de.tum.in.www1.hephaestus.gitprovider.common.DateUtil;
+import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubClientProvider;
 import de.tum.in.www1.hephaestus.gitprovider.repository.Repository;
 import de.tum.in.www1.hephaestus.gitprovider.repository.RepositoryRepository;
 import jakarta.transaction.Transactional;
@@ -13,15 +14,18 @@ import org.kohsuke.github.GitHub;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.annotation.Lazy;
 import org.springframework.stereotype.Service;
 
 @Service
 public class GitHubRepositorySyncService {
 
+    private GitHubRepositorySyncService self;
+
     private static final Logger logger = LoggerFactory.getLogger(GitHubRepositorySyncService.class);
 
     @Autowired
-    private GitHub github;
+    private GitHubClientProvider gitHubClientProvider;
 
     @Autowired
     private RepositoryRepository repositoryRepository;
@@ -29,17 +33,32 @@ public class GitHubRepositorySyncService {
     @Autowired
     private GitHubRepositoryConverter repositoryConverter;
 
+    /** Helper to get a GitHub client via the provider. */
+    private GitHub getGitHub() throws IOException {
+        return gitHubClientProvider.forDefaultWorkspace();
+    }
+
     /**
      * Syncs all repositories owned by a specific GitHub user or organization.
      *
      * @param owner The GitHub username (login) of the repository owner.
      */
     public void syncAllRepositoriesOfOwner(String owner) {
-        var builder = github.searchRepositories().user(owner);
-        var iterator = builder.list().withPageSize(100).iterator();
-        while (iterator.hasNext()) {
-            var ghRepositories = iterator.nextPage();
-            ghRepositories.forEach(this::processRepository);
+        try {
+            var gh = getGitHub();
+            var builder = gh.searchRepositories().user(owner);
+            var iterator = builder.list().withPageSize(100).iterator();
+            while (iterator.hasNext()) {
+                var ghRepositories = iterator.nextPage();
+                ghRepositories.forEach(this::processRepository);
+            }
+        } catch (IOException e) {
+            logger.error(
+                "Failed to obtain GitHub client or list repositories for owner {}: {}",
+                owner,
+                e.getMessage(),
+                e
+            );
         }
     }
 
@@ -70,8 +89,9 @@ public class GitHubRepositorySyncService {
      */
     public Optional<GHRepository> syncRepository(String nameWithOwner) {
         try {
-            var repository = github.getRepository(nameWithOwner);
-            processRepository(repository);
+            var gh = getGitHub();
+            var repository = gh.getRepository(nameWithOwner);
+            self.processRepository(repository);
             return Optional.of(repository);
         } catch (IOException e) {
             logger.error("Failed to fetch repository {}: {}", nameWithOwner, e.getMessage());
@@ -114,5 +134,11 @@ public class GitHubRepositorySyncService {
         }
 
         return repositoryRepository.save(result);
+    }
+
+    @Autowired
+    @Lazy
+    public void setSelf(GitHubRepositorySyncService self) {
+        this.self = self;
     }
 }

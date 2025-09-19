@@ -7,4 +7,5 @@ import org.springframework.stereotype.Repository;
 @Repository
 public interface WorkspaceRepository extends JpaRepository<Workspace, Long> {
     Optional<Workspace> findFirstByOrderByIdAsc();
+    Optional<Workspace> findByInstallationId(Long installationId);
 }

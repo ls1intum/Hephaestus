@@ -119,6 +119,12 @@ monitoring:
 
 # Can be any OAuth token, such as the PAT
 github:
+    app:
+        id: 1690929
+        privateKeyLocation: classpath:keys/hephaestusapptest.pk8.pem
+        privateKey: |
+            here you can paste the private key
+
     auth-token: null
 
 slack:

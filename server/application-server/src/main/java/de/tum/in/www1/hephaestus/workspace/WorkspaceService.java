@@ -1,5 +1,6 @@
 package de.tum.in.www1.hephaestus.workspace;
 
+import de.tum.in.www1.hephaestus.gitprovider.common.enums.RepositorySelection;
 import de.tum.in.www1.hephaestus.gitprovider.label.Label;
 import de.tum.in.www1.hephaestus.gitprovider.label.LabelRepository;
 import de.tum.in.www1.hephaestus.gitprovider.repository.RepositoryRepository;
@@ -408,5 +409,25 @@ public class WorkspaceService {
         } while (weekAgo.isAfter(OffsetDateTime.parse("2024-01-01T00:00:00Z")));
 
         logger.info("Finished recalculating league points");
+    }
+
+    @Transactional
+    public Workspace ensureForInstallation(
+        long installationId,
+        RepositorySelection repositorySelection
+    ) {
+        Workspace workspace = workspaceRepository.findByInstallationId(installationId).orElseGet(Workspace::new);
+        workspace.setGitProviderMode(Workspace.GitProviderMode.GITHUB_APP_INSTALLATION);
+        workspace.setInstallationId(installationId);
+
+        if (repositorySelection != null) {
+            workspace.setGithubRepositorySelection(repositorySelection);
+        }
+
+        if (workspace.getInstallationLinkedAt() == null) {
+            workspace.setInstallationLinkedAt(OffsetDateTime.now());
+        }
+
+        return workspaceRepository.save(workspace);
     }
 }
