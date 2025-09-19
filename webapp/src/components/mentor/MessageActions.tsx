@@ -1,5 +1,4 @@
 import { Copy, PencilIcon, ThumbsDown, ThumbsUp } from "lucide-react";
-import { memo } from "react";
 import type { ChatMessageVote } from "@/api/types.gen";
 import { Button } from "@/components/ui/button";
 import {
@@ -33,7 +32,7 @@ interface MessageActionsProps {
 	onEdit?: () => void;
 }
 
-function PureMessageActions({
+export function MessageActions({
 	className,
 	messageContentToCopy,
 	messageRole,
@@ -157,16 +156,3 @@ function PureMessageActions({
 		</TooltipProvider>
 	);
 }
-
-export const MessageActions = memo(
-	PureMessageActions,
-	(prevProps, nextProps) => {
-		if (prevProps.messageContentToCopy !== nextProps.messageContentToCopy)
-			return false;
-		if (prevProps.messageRole !== nextProps.messageRole) return false;
-		if (prevProps.vote?.isUpvoted !== nextProps.vote?.isUpvoted) return false;
-		if (prevProps.isLoading !== nextProps.isLoading) return false;
-		if (prevProps.isInEditMode !== nextProps.isInEditMode) return false;
-		return true;
-	},
-);

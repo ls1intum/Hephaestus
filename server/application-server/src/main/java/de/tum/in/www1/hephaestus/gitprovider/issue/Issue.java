@@ -23,7 +23,7 @@ import jakarta.persistence.ManyToMany;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.OneToMany;
 import jakarta.persistence.Table;
-import java.time.OffsetDateTime;
+import java.time.Instant;
 import java.util.HashSet;
 import java.util.Set;
 import lombok.Getter;
@@ -62,7 +62,7 @@ public class Issue extends BaseGitServiceEntity {
 
     private boolean isLocked;
 
-    private OffsetDateTime closedAt;
+    private Instant closedAt;
 
     private int commentsCount;
 
@@ -70,7 +70,7 @@ public class Issue extends BaseGitServiceEntity {
     private boolean hasPullRequest;
 
     // The last time the issue and its associated comments were updated (is also used for pull requests with reviews and review comments)
-    private OffsetDateTime lastSyncAt;
+    private Instant lastSyncAt;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "author_id")

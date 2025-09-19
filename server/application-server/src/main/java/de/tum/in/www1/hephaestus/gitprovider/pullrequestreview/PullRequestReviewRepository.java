@@ -1,6 +1,6 @@
 package de.tum.in.www1.hephaestus.gitprovider.pullrequestreview;
 
-import java.time.OffsetDateTime;
+import java.time.Instant;
 import java.util.List;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
@@ -10,7 +10,7 @@ import org.springframework.stereotype.Repository;
 @Repository
 public interface PullRequestReviewRepository extends JpaRepository<PullRequestReview, Long> {
     @Query(
-        """
+        value = """
         SELECT prr
         FROM PullRequestReview prr
         LEFT JOIN FETCH prr.author
@@ -23,15 +23,14 @@ public interface PullRequestReviewRepository extends JpaRepository<PullRequestRe
     )
     List<PullRequestReview> findAllByAuthorLoginSince(
         @Param("authorLogin") String authorLogin,
-        @Param("activitySince") OffsetDateTime activitySince
+        @Param("activitySince") Instant activitySince
     );
 
     @Query(
-        """
+        value = """
         SELECT prr
         FROM PullRequestReview prr
         LEFT JOIN FETCH prr.author
-        LEFT JOIN FETCH prr.author.teams
         LEFT JOIN FETCH prr.pullRequest
         LEFT JOIN FETCH prr.pullRequest.repository
         LEFT JOIN FETCH prr.comments
@@ -41,21 +40,18 @@ public interface PullRequestReviewRepository extends JpaRepository<PullRequestRe
         ORDER BY prr.submittedAt DESC
         """
     )
-    List<PullRequestReview> findAllInTimeframe(
-        @Param("after") OffsetDateTime after,
-        @Param("before") OffsetDateTime before
-    );
+    List<PullRequestReview> findAllInTimeframe(@Param("after") Instant after, @Param("before") Instant before);
 
     @Query(
-        """
+        value = """
         SELECT prr
         FROM PullRequestReview prr
         LEFT JOIN FETCH prr.author
-        LEFT JOIN FETCH prr.author.teams
         LEFT JOIN FETCH prr.pullRequest
         LEFT JOIN FETCH prr.pullRequest.repository
         LEFT JOIN FETCH prr.comments
-        JOIN Team t ON prr.pullRequest.repository MEMBER OF t.repositories
+        JOIN TeamRepositoryPermission trp ON trp.repository = prr.pullRequest.repository
+        JOIN Team t ON trp.team = t
         WHERE
             prr.submittedAt BETWEEN :after AND :before
             AND prr.author.type = 'USER'
@@ -78,8 +74,8 @@ public interface PullRequestReviewRepository extends JpaRepository<PullRequestRe
         """
     )
     List<PullRequestReview> findAllInTimeframeOfTeam(
-        @Param("after") OffsetDateTime after,
-        @Param("before") OffsetDateTime before,
+        @Param("after") Instant after,
+        @Param("before") Instant before,
         @Param("teamId") Long teamId
     );
 }

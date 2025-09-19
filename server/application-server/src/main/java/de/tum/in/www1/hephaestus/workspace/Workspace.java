@@ -15,7 +15,7 @@ import jakarta.persistence.JoinColumn;
 import jakarta.persistence.OneToMany;
 import jakarta.persistence.OneToOne;
 import jakarta.persistence.Table;
-import java.time.OffsetDateTime;
+import java.time.Instant;
 import java.util.HashSet;
 import java.util.Set;
 import lombok.Getter;
@@ -35,7 +35,7 @@ public class Workspace {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    private OffsetDateTime usersSyncedAt;
+    private Instant usersSyncedAt;
 
     @OneToMany(
         mappedBy = "workspace",
@@ -56,7 +56,7 @@ public class Workspace {
     @Enumerated(EnumType.STRING)
     private RepositorySelection githubRepositorySelection; // ALL / SELECTED
 
-    private OffsetDateTime installationLinkedAt;
+    private Instant installationLinkedAt;
 
     @OneToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "organization_id", unique = true, foreignKey = @ForeignKey(name = "fk_workspace_organization"))

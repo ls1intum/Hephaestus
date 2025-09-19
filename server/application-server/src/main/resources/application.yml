@@ -1,7 +1,7 @@
 spring:
     application:
         name: Hephaestus
-        version: "0.9.0-rc.20"
+        version: "0.9.0-rc.27"
 
     datasource:
         url: jdbc:postgresql://localhost:5432/hephaestus
@@ -21,6 +21,10 @@ spring:
 
     liquibase:
         change-log: classpath:db/master.xml
+
+    devtools:
+        restart:
+            additional-exclude: org/kohsuke/github/**
 
     security:
         oauth2:

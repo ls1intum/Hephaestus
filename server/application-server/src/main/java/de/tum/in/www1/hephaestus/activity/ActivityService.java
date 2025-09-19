@@ -10,7 +10,7 @@ import de.tum.in.www1.hephaestus.gitprovider.issue.Issue;
 import de.tum.in.www1.hephaestus.gitprovider.pullrequest.PullRequest;
 import de.tum.in.www1.hephaestus.gitprovider.pullrequest.PullRequestRepository;
 import jakarta.transaction.Transactional;
-import java.time.OffsetDateTime;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
@@ -139,7 +139,7 @@ public class ActivityService {
         badPracticeFeedback.setPullRequestBadPractice(badPractice);
         badPracticeFeedback.setExplanation(feedback.explanation());
         badPracticeFeedback.setType(feedback.type());
-        badPracticeFeedback.setCreationTime(OffsetDateTime.now());
+        badPracticeFeedback.setCreationTime(Instant.now());
         badPracticeFeedbackRepository.save(badPracticeFeedback);
 
         if (tracingEnabled && badPractice.getDetectionTraceId() != null) {

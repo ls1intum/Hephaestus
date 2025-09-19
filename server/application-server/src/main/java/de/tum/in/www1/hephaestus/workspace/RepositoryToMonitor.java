@@ -7,7 +7,7 @@ import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
-import java.time.OffsetDateTime;
+import java.time.Instant;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
@@ -29,12 +29,12 @@ public class RepositoryToMonitor {
     @NonNull
     private String nameWithOwner;
 
-    private OffsetDateTime repositorySyncedAt;
-    private OffsetDateTime labelsSyncedAt;
-    private OffsetDateTime milestonesSyncedAt;
+    private Instant repositorySyncedAt;
+    private Instant labelsSyncedAt;
+    private Instant milestonesSyncedAt;
 
     // The time up to which issues and pull requests have been synced in the recent sync
-    private OffsetDateTime issuesAndPullRequestsSyncedAt;
+    private Instant issuesAndPullRequestsSyncedAt;
 
     @ManyToOne
     @JoinColumn(name = "workspace_id")

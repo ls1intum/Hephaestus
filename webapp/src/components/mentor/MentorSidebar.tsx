@@ -1,7 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { Link, useParams } from "@tanstack/react-router";
 import { MessageSquare, Plus } from "lucide-react";
-import { useCallback } from "react";
 import { getGroupedThreadsOptions } from "@/api/@tanstack/react-query.gen";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -17,7 +16,7 @@ export function MentorSidebar({ className }: MentorSidebarProps) {
 		getGroupedThreadsOptions(),
 	);
 
-	const formatDate = useCallback((dateString: string) => {
+	const formatDate = (dateString: string) => {
 		const date = new Date(dateString);
 		const now = new Date();
 		const diffInMinutes = Math.floor(
@@ -39,7 +38,7 @@ export function MentorSidebar({ className }: MentorSidebarProps) {
 		}
 
 		return date.toLocaleDateString();
-	}, []);
+	};
 
 	return (
 		<div

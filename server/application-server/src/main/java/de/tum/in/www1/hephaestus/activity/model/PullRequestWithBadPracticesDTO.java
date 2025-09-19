@@ -4,7 +4,7 @@ import de.tum.in.www1.hephaestus.gitprovider.issue.Issue;
 import de.tum.in.www1.hephaestus.gitprovider.label.LabelInfoDTO;
 import de.tum.in.www1.hephaestus.gitprovider.pullrequest.PullRequest;
 import de.tum.in.www1.hephaestus.gitprovider.repository.RepositoryInfoDTO;
-import java.time.OffsetDateTime;
+import java.time.Instant;
 import java.util.Comparator;
 import java.util.List;
 import org.springframework.lang.NonNull;
@@ -21,8 +21,8 @@ public record PullRequestWithBadPracticesDTO(
     @NonNull Integer additions,
     @NonNull Integer deletions,
     @NonNull String htmlUrl,
-    @NonNull OffsetDateTime createdAt,
-    @NonNull OffsetDateTime updatedAt,
+    @NonNull Instant createdAt,
+    @NonNull Instant updatedAt,
     @NonNull String badPracticeSummary,
     @NonNull List<PullRequestBadPracticeDTO> badPractices,
     @NonNull List<PullRequestBadPracticeDTO> oldBadPractices

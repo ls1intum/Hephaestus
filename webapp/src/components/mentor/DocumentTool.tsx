@@ -1,5 +1,4 @@
 import { FileText, MessageCircle, PenLine } from "lucide-react";
-import { memo } from "react";
 import type { ArtifactKind } from "@/lib/types";
 import { LoaderIcon } from "./LoaderIcon";
 
@@ -37,7 +36,7 @@ interface DocumentToolProps {
 	onDocumentClick?: (boundingBox: DOMRect) => void;
 }
 
-function PureDocumentTool({
+export function DocumentTool({
 	type,
 	isLoading = false,
 	result,
@@ -100,5 +99,3 @@ function PureDocumentTool({
 		</button>
 	);
 }
-
-export const DocumentTool = memo(PureDocumentTool, () => true);

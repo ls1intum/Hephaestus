@@ -1,10 +1,9 @@
-import equal from "fast-deep-equal";
 import { AnimatePresence, motion } from "framer-motion";
-import { memo, useState } from "react";
+import { useState } from "react";
+import { Streamdown } from "streamdown";
 import type { ChatMessageVote } from "@/api/types.gen";
 import type { ChatMessage } from "@/lib/types";
 import { cn, sanitizeText } from "@/lib/utils";
-import { Markdown } from "./Markdown";
 import { MentorAvatar } from "./MentorAvatar";
 import { MessageActions } from "./MessageActions";
 import { MessageEditor } from "./MessageEditor";
@@ -41,7 +40,7 @@ export interface MessageProps {
 	partRenderers?: PartRendererMap;
 }
 
-const PurePreviewMessage = ({
+export function PreviewMessage({
 	message,
 	vote,
 	isLoading = false,
@@ -53,7 +52,7 @@ const PurePreviewMessage = ({
 	className,
 	initialEditMode = false,
 	partRenderers,
-}: MessageProps) => {
+}: MessageProps) {
 	const [mode, setMode] = useState<"view" | "edit">(
 		initialEditMode ? "edit" : "view",
 	);
@@ -152,11 +151,7 @@ const PurePreviewMessage = ({
 													message.role === "user",
 											})}
 										>
-											<Markdown
-												isStreaming={isLoading && message.role === "assistant"}
-											>
-												{sanitizeText(part.text)}
-											</Markdown>
+											<Streamdown>{sanitizeText(part.text)}</Streamdown>
 										</div>
 									);
 								}
@@ -238,27 +233,7 @@ const PurePreviewMessage = ({
 			</motion.div>
 		</AnimatePresence>
 	);
-};
-
-export const PreviewMessage = memo(
-	PurePreviewMessage,
-	(prevProps, nextProps) => {
-		// During streaming, allow re-renders for loading messages
-		if (nextProps.isLoading || prevProps.isLoading) {
-			return false;
-		}
-
-		if (prevProps.isLoading !== nextProps.isLoading) return false;
-		if (prevProps.message.id !== nextProps.message.id) return false;
-		if (prevProps.readonly !== nextProps.readonly) return false;
-		if (prevProps.variant !== nextProps.variant) return false;
-		if (prevProps.initialEditMode !== nextProps.initialEditMode) return false;
-		if (!equal(prevProps.message.parts, nextProps.message.parts)) return false;
-		if (!equal(prevProps.vote, nextProps.vote)) return false;
-
-		return true;
-	},
-);
+}
 
 export const ThinkingMessage = () => {
 	const role = "assistant";

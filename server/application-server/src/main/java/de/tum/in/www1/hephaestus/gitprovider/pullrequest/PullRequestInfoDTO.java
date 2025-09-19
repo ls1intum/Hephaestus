@@ -5,7 +5,7 @@ import de.tum.in.www1.hephaestus.gitprovider.issue.Issue.State;
 import de.tum.in.www1.hephaestus.gitprovider.label.LabelInfoDTO;
 import de.tum.in.www1.hephaestus.gitprovider.repository.RepositoryInfoDTO;
 import de.tum.in.www1.hephaestus.gitprovider.user.UserInfoDTO;
-import java.time.OffsetDateTime;
+import java.time.Instant;
 import java.util.Comparator;
 import java.util.List;
 import org.springframework.lang.NonNull;
@@ -25,11 +25,11 @@ public record PullRequestInfoDTO(
     RepositoryInfoDTO repository,
     @NonNull Integer additions,
     @NonNull Integer deletions,
-    OffsetDateTime mergedAt,
-    OffsetDateTime closedAt,
+    Instant mergedAt,
+    Instant closedAt,
     @NonNull String htmlUrl,
-    OffsetDateTime createdAt,
-    OffsetDateTime updatedAt
+    Instant createdAt,
+    Instant updatedAt
 ) {
     public static PullRequestInfoDTO fromPullRequest(PullRequest pullRequest) {
         return new PullRequestInfoDTO(

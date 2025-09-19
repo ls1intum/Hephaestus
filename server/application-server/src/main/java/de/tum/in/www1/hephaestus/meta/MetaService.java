@@ -1,6 +1,7 @@
 package de.tum.in.www1.hephaestus.meta;
 
-import de.tum.in.www1.hephaestus.gitprovider.team.TeamService;
+import de.tum.in.www1.hephaestus.gitprovider.team.TeamInfoDTOConverter;
+import de.tum.in.www1.hephaestus.gitprovider.team.TeamRepository;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
@@ -20,7 +21,10 @@ public class MetaService {
     private static final Logger logger = LoggerFactory.getLogger(MetaService.class);
 
     @Autowired
-    private TeamService teamService;
+    private TeamRepository teamRepository;
+
+    @Autowired
+    private TeamInfoDTOConverter teamInfoDTOConverter;
 
     @Value("${hephaestus.leaderboard.schedule.day}")
     private String scheduledDay;
@@ -33,9 +37,9 @@ public class MetaService {
 
     public MetaDataDTO getMetaData() {
         logger.info("Getting meta data...");
-        var teams = teamService.getAllTeams();
+        var teams = teamRepository.findAll().stream().map(teamInfoDTOConverter::convert).toList();
         return new MetaDataDTO(
-            teams.stream().sorted((team1, team2) -> team1.name().compareTo(team2.name())).toList(),
+            teams.stream().sorted((a, b) -> a.name().compareTo(b.name())).toList(),
             scheduledDay,
             scheduledTime
         );

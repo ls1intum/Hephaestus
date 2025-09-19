@@ -49,11 +49,7 @@ public class GitHubLabelSyncService {
      * @param repository the GitHub repository whose labels are to be synchronized
      */
     public void syncLabelsOfRepository(GHRepository repository) {
-        try {
-            repository.listLabels().withPageSize(100).forEach(this::processLabel);
-        } catch (IOException e) {
-            logger.error("Failed to fetch labels for repository {}: {}", repository.getFullName(), e.getMessage());
-        }
+        repository.listLabels().withPageSize(100).forEach(this::processLabel);
     }
 
     /**

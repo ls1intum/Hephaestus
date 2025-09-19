@@ -1,6 +1,5 @@
 package de.tum.in.www1.hephaestus.gitprovider.pullrequestreviewcomment.github;
 
-import de.tum.in.www1.hephaestus.gitprovider.common.DateUtil;
 import de.tum.in.www1.hephaestus.gitprovider.pullrequest.PullRequestRepository;
 import de.tum.in.www1.hephaestus.gitprovider.pullrequest.github.GitHubPullRequestConverter;
 import de.tum.in.www1.hephaestus.gitprovider.pullrequestreview.PullRequestReviewRepository;
@@ -65,15 +64,7 @@ public class GitHubPullRequestReviewCommentSyncService {
      * @param pullRequest the GitHub pull request to sync review comments for
      */
     public void syncReviewCommentsOfPullRequest(GHPullRequest pullRequest) {
-        try {
-            pullRequest.listReviewComments().withPageSize(100).forEach(this::processPullRequestReviewComment);
-        } catch (IOException e) {
-            logger.error(
-                "Failed to fetch review comments for pull request {}: {}",
-                pullRequest.getId(),
-                e.getMessage()
-            );
-        }
+        pullRequest.listReviewComments().withPageSize(100).forEach(this::processPullRequestReviewComment);
     }
 
     /**
@@ -97,9 +88,7 @@ public class GitHubPullRequestReviewCommentSyncService {
                 try {
                     if (
                         pullRequestReviewComment.getUpdatedAt() == null ||
-                        pullRequestReviewComment
-                            .getUpdatedAt()
-                            .isBefore(DateUtil.convertToOffsetDateTime(ghPullRequestReviewComment.getUpdatedAt()))
+                        pullRequestReviewComment.getUpdatedAt().isBefore(ghPullRequestReviewComment.getUpdatedAt())
                     ) {
                         return pullRequestReviewCommentConverter.update(
                             ghPullRequestReviewComment,

@@ -1,11 +1,5 @@
 import type { ReactNode } from "react";
-import {
-	createContext,
-	useCallback,
-	useContext,
-	useEffect,
-	useState,
-} from "react";
+import { createContext, useContext, useEffect, useState } from "react";
 import keycloakService, { type UserProfile } from "./keycloak";
 
 // Global state to prevent duplicate initialization across strict mode renders
@@ -53,33 +47,32 @@ export function AuthProvider({ children }: AuthProviderProps) {
 		undefined,
 	);
 
-	// Clean the URL from authentication parameters
-	const cleanUrlFromAuthParams = useCallback(() => {
-		if (
-			window.location.hash &&
-			(window.location.hash.includes("state=") ||
-				window.location.hash.includes("session_state=") ||
-				window.location.hash.includes("code="))
-		) {
-			const baseUrl = window.location.pathname + window.location.search;
-			if (process.env.NODE_ENV !== "production") {
-				console.debug(
-					"AuthProvider: Cleaning URL from auth params, redirecting to:",
-					baseUrl,
-				);
-			}
-
-			// Use history API to replace the current URL without auth parameters
-			if (window.history?.replaceState) {
-				window.history.replaceState(null, "", baseUrl);
-				return true;
-			}
-		}
-		return false;
-	}, []);
-
 	// Initialize Keycloak once
 	useEffect(() => {
+		const cleanUrlFromAuthParams = () => {
+			if (
+				window.location.hash &&
+				(window.location.hash.includes("state=") ||
+					window.location.hash.includes("session_state=") ||
+					window.location.hash.includes("code="))
+			) {
+				const baseUrl = window.location.pathname + window.location.search;
+				if (process.env.NODE_ENV !== "production") {
+					console.debug(
+						"AuthProvider: Cleaning URL from auth params, redirecting to:",
+						baseUrl,
+					);
+				}
+
+				// Use history API to replace the current URL without auth parameters
+				if (window.history?.replaceState) {
+					window.history.replaceState(null, "", baseUrl);
+					return true;
+				}
+			}
+			return false;
+		};
+
 		// Prevent multiple initializations in strict mode
 		if (globalState.initialized) {
 			if (process.env.NODE_ENV !== "production") {
@@ -176,7 +169,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
 		// Start initialization and store the promise
 		globalState.initPromise = initKeycloak();
-	}, [cleanUrlFromAuthParams]);
+	}, []);
 
 	const login = async () => {
 		await keycloakService.login();

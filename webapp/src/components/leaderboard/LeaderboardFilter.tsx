@@ -7,11 +7,11 @@ import {
 	CardTitle,
 } from "@/components/ui/card";
 import { type LeaderboardSortType, SortFilter } from "./SortFilter";
-import { TeamFilter } from "./TeamFilter";
+import { TeamFilter, type TeamFilterOption } from "./TeamFilter";
 import { TimeframeFilter } from "./TimeframeFilter";
 
 export interface LeaderboardFilterProps {
-	teams: string[];
+	teamOptions: TeamFilterOption[];
 	onTeamChange?: (team: string) => void;
 	onSortChange?: (sort: LeaderboardSortType) => void;
 	onTimeframeChange?: (
@@ -32,7 +32,7 @@ export interface LeaderboardFilterProps {
 }
 
 export function LeaderboardFilter({
-	teams,
+	teamOptions,
 	onTeamChange,
 	onSortChange,
 	onTimeframeChange,
@@ -64,7 +64,7 @@ export function LeaderboardFilter({
 			<CardContent>
 				<div className="grid grid-cols-1 md:grid-cols-3 gap-4 xl:grid-cols-1">
 					<TeamFilter
-						teams={teams}
+						options={teamOptions}
 						onTeamChange={onTeamChange}
 						selectedTeam={selectedTeam}
 					/>

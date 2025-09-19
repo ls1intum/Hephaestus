@@ -100,7 +100,7 @@ public class GitHubAppTokenService {
             GHAppInstallation appInstallation = asApp.getApp().getInstallationById(installationId);
             GHAppInstallationToken tok = appInstallation.createToken().create();
 
-            return new CachedToken(tok.getToken(), tok.getExpiresAt().toInstant());
+            return new CachedToken(tok.getToken(), tok.getExpiresAt());
         } catch (IOException e) {
             throw new UncheckedIOException("GitHub error minting installation token for " + installationId, e);
         }

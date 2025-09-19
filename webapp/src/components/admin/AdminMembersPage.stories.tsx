@@ -1,5 +1,4 @@
 import type { Meta, StoryObj } from "@storybook/react";
-import { fn } from "@storybook/test";
 
 import type { TeamInfo } from "@/api/types.gen";
 import type { ExtendedUserTeams } from "@/components/admin/types";
@@ -26,10 +25,6 @@ const meta = {
 			control: "boolean",
 			description: "Loading state for data fetching",
 		},
-		isAssigningTeams: {
-			control: "boolean",
-			description: "Loading state for automatic team assignment",
-		},
 	},
 } satisfies Meta<typeof AdminMembersPage>;
 
@@ -41,7 +36,8 @@ const mockTeams: TeamInfo[] = [
 	{
 		id: 1,
 		name: "Frontend",
-		color: "#3b82f6",
+		membershipCount: 0,
+		repoPermissionCount: 0,
 		repositories: [],
 		labels: [],
 		members: [],
@@ -50,7 +46,8 @@ const mockTeams: TeamInfo[] = [
 	{
 		id: 2,
 		name: "Backend",
-		color: "#ef4444",
+		membershipCount: 0,
+		repoPermissionCount: 0,
 		repositories: [],
 		labels: [],
 		members: [],
@@ -59,7 +56,8 @@ const mockTeams: TeamInfo[] = [
 	{
 		id: 3,
 		name: "DevOps",
-		color: "#22c55e",
+		membershipCount: 0,
+		repoPermissionCount: 0,
 		repositories: [],
 		labels: [],
 		members: [],
@@ -77,6 +75,7 @@ const mockUsers: ExtendedUserTeams[] = [
 		user: {
 			id: 1,
 			name: "Alice Smith",
+			login: "alice.smith",
 			email: "alice.smith@example.com",
 			role: "user",
 		},
@@ -90,6 +89,7 @@ const mockUsers: ExtendedUserTeams[] = [
 		user: {
 			id: 2,
 			name: "Bob Johnson",
+			login: "bob.johnson",
 			email: "bob.johnson@example.com",
 			role: "admin",
 		},
@@ -103,6 +103,7 @@ const mockUsers: ExtendedUserTeams[] = [
 		user: {
 			id: 3,
 			name: "Carol Williams",
+			login: "carol.williams",
 			email: "carol.williams@example.com",
 			role: "user",
 		},
@@ -116,6 +117,7 @@ const mockUsers: ExtendedUserTeams[] = [
 		user: {
 			id: 4,
 			name: "David Brown",
+			login: "david.brown",
 			email: "david.brown@example.com",
 			role: "user",
 		},
@@ -130,12 +132,6 @@ export const Default: Story = {
 		users: mockUsers,
 		teams: mockTeams,
 		isLoading: false,
-		isAssigningTeams: false,
-		onAddTeamToUser: fn(),
-		onRemoveUserFromTeam: fn(),
-		onBulkAddTeam: fn(),
-		onBulkRemoveTeam: fn(),
-		onAutomaticallyAssignTeams: fn(),
 	},
 };
 
@@ -147,31 +143,12 @@ export const Loading: Story = {
 		users: [],
 		teams: [],
 		isLoading: true,
-		isAssigningTeams: false,
-		onAddTeamToUser: fn(),
-		onRemoveUserFromTeam: fn(),
-		onBulkAddTeam: fn(),
-		onBulkRemoveTeam: fn(),
-		onAutomaticallyAssignTeams: fn(),
 	},
 };
 
 /**
  * State during automatic team assignment operation.
  */
-export const AssigningTeams: Story = {
-	args: {
-		users: mockUsers,
-		teams: mockTeams,
-		isLoading: false,
-		isAssigningTeams: true,
-		onAddTeamToUser: fn(),
-		onRemoveUserFromTeam: fn(),
-		onBulkAddTeam: fn(),
-		onBulkRemoveTeam: fn(),
-		onAutomaticallyAssignTeams: fn(),
-	},
-};
 
 /**
  * Empty state with no users to manage.
@@ -181,12 +158,6 @@ export const EmptyUsers: Story = {
 		users: [],
 		teams: mockTeams,
 		isLoading: false,
-		isAssigningTeams: false,
-		onAddTeamToUser: fn(),
-		onRemoveUserFromTeam: fn(),
-		onBulkAddTeam: fn(),
-		onBulkRemoveTeam: fn(),
-		onAutomaticallyAssignTeams: fn(),
 	},
 };
 
@@ -201,11 +172,5 @@ export const NoTeams: Story = {
 		})),
 		teams: [],
 		isLoading: false,
-		isAssigningTeams: false,
-		onAddTeamToUser: fn(),
-		onRemoveUserFromTeam: fn(),
-		onBulkAddTeam: fn(),
-		onBulkRemoveTeam: fn(),
-		onAutomaticallyAssignTeams: fn(),
 	},
 };

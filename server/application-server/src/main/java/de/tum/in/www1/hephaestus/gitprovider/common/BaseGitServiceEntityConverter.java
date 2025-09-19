@@ -1,6 +1,6 @@
 package de.tum.in.www1.hephaestus.gitprovider.common;
 
-import java.io.IOException;
+import java.time.Instant;
 import org.kohsuke.github.GHObject;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -25,16 +25,18 @@ public abstract class BaseGitServiceEntityConverter<S extends GHObject, T extend
         target.setId(source.getId());
 
         try {
-            target.setCreatedAt(DateUtil.convertToOffsetDateTime(source.getCreatedAt()));
-        } catch (IOException e) {
-            logger.error("Failed to convert createdAt field for source {}: {}", source.getId(), e.getMessage());
+            Instant created = source.getCreatedAt();
+            target.setCreatedAt(created);
+        } catch (Exception e) {
+            logger.error("Failed to read createdAt for source {}: {}", source.getId(), e.getMessage());
             target.setCreatedAt(null);
         }
 
         try {
-            target.setUpdatedAt(DateUtil.convertToOffsetDateTime(source.getUpdatedAt()));
-        } catch (IOException e) {
-            logger.error("Failed to convert updatedAt field for source {}: {}", source.getId(), e.getMessage());
+            Instant updated = source.getUpdatedAt();
+            target.setUpdatedAt(updated);
+        } catch (Exception e) {
+            logger.error("Failed to read updatedAt for source {}: {}", source.getId(), e.getMessage());
             target.setUpdatedAt(null);
         }
     }

@@ -2,7 +2,7 @@ package de.tum.in.www1.hephaestus.activity.model;
 
 import de.tum.in.www1.hephaestus.gitprovider.pullrequest.PullRequest;
 import jakarta.persistence.*;
-import java.time.OffsetDateTime;
+import java.time.Instant;
 import java.util.List;
 import lombok.*;
 
@@ -33,7 +33,7 @@ public class BadPracticeDetection {
     private List<PullRequestBadPractice> badPractices;
 
     @NonNull
-    private OffsetDateTime detectionTime;
+    private Instant detectionTime;
 
     private String traceId;
 }

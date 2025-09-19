@@ -2,18 +2,13 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { createFileRoute } from "@tanstack/react-router";
 import {
 	addLabelToTeamMutation,
-	addRepositoryToTeamMutation,
-	createTeamMutation,
-	deleteTeamMutation,
-	getRepositoriesToMonitorOptions,
-	getTeamsOptions,
-	getTeamsQueryKey,
-	getUsersWithTeamsOptions,
-	getUsersWithTeamsQueryKey,
-	hideTeamMutation,
+	getAllTeamsOptions,
+	getAllTeamsQueryKey,
 	removeLabelFromTeamMutation,
-	removeRepositoryFromTeamMutation,
+	updateTeamVisibilityMutation,
 } from "@/api/@tanstack/react-query.gen";
+import type { Options } from "@/api/sdk.gen";
+import type { TeamInfo, UpdateTeamVisibilityData } from "@/api/types.gen";
 import { AdminTeamsTable } from "@/components/admin/AdminTeamsTable";
 
 export const Route = createFileRoute("/_authenticated/_admin/admin/teams")({
@@ -24,111 +19,53 @@ function AdminTeamsContainer() {
 	const queryClient = useQueryClient();
 
 	// Query for teams data
-	const teamsQuery = useQuery(getTeamsOptions({}));
-
-	// Query for users with teams
-	const usersQuery = useQuery(getUsersWithTeamsOptions({}));
-
-	// Query for available repositories
-	const repositoriesQuery = useQuery(getRepositoriesToMonitorOptions({}));
+	const teamsQuery = useQuery(getAllTeamsOptions({}));
 
 	// Mutations
-	const createTeam = useMutation({
-		...createTeamMutation(),
-		onSuccess: () => {
-			queryClient.invalidateQueries({ queryKey: getTeamsQueryKey() });
-			queryClient.invalidateQueries({ queryKey: getUsersWithTeamsQueryKey() });
+	const updateTeamVisibility = useMutation({
+		...updateTeamVisibilityMutation(),
+		onMutate: async (vars: Options<UpdateTeamVisibilityData>) => {
+			await queryClient.cancelQueries({ queryKey: getAllTeamsQueryKey() });
+			const key = getAllTeamsQueryKey();
+			const prev = queryClient.getQueryData<TeamInfo[]>(key);
+			const teamId = vars.path?.id;
+			const hidden = vars.body;
+			if (prev && typeof teamId === "number" && typeof hidden === "boolean") {
+				const next = prev.map((t) => (t.id === teamId ? { ...t, hidden } : t));
+				queryClient.setQueryData(key, next);
+			}
+			return { prev } as { prev: TeamInfo[] | undefined };
 		},
-	});
-
-	const deleteTeam = useMutation({
-		...deleteTeamMutation(),
-		onSuccess: () => {
-			queryClient.invalidateQueries({ queryKey: getTeamsQueryKey() });
-			queryClient.invalidateQueries({ queryKey: getUsersWithTeamsQueryKey() });
+		onError: (_err, _vars, ctx) => {
+			const key = getAllTeamsQueryKey();
+			if (ctx?.prev) {
+				queryClient.setQueryData(key, ctx.prev);
+			}
 		},
-	});
-
-	const hideTeam = useMutation({
-		...hideTeamMutation(),
-		onSuccess: () => {
-			queryClient.invalidateQueries({ queryKey: getTeamsQueryKey() });
-		},
-	});
-
-	const removeRepositoryFromTeam = useMutation({
-		...removeRepositoryFromTeamMutation(),
-		onSuccess: () => {
-			queryClient.invalidateQueries({ queryKey: getTeamsQueryKey() });
-		},
-	});
-
-	const addRepositoryToTeam = useMutation({
-		...addRepositoryToTeamMutation(),
-		onSuccess: () => {
-			queryClient.invalidateQueries({ queryKey: getTeamsQueryKey() });
+		onSettled: () => {
+			queryClient.invalidateQueries({ queryKey: getAllTeamsQueryKey() });
 		},
 	});
 
 	const addLabelToTeam = useMutation({
 		...addLabelToTeamMutation(),
-		onSuccess: () => {
-			queryClient.invalidateQueries({ queryKey: getTeamsQueryKey() });
+		onSettled: () => {
+			queryClient.invalidateQueries({ queryKey: getAllTeamsQueryKey() });
 		},
 	});
 
 	const removeLabelFromTeam = useMutation({
 		...removeLabelFromTeamMutation(),
-		onSuccess: () => {
-			queryClient.invalidateQueries({ queryKey: getTeamsQueryKey() });
+		onSettled: () => {
+			queryClient.invalidateQueries({ queryKey: getAllTeamsQueryKey() });
 		},
 	});
 
 	// Handler functions
-	const handleCreateTeam = async (name: string, color: string) => {
-		await createTeam.mutateAsync({
-			body: {
-				id: 0, // Will be assigned by server
-				name,
-				color,
-				hidden: false,
-				repositories: [],
-				labels: [],
-				members: [],
-			},
-		});
-	};
-
-	const handleDeleteTeam = async (teamId: number) => {
-		await deleteTeam.mutateAsync({
-			path: { teamId },
-		});
-	};
-
 	const handleHideTeam = async (teamId: number, hidden: boolean) => {
-		await hideTeam.mutateAsync({
+		await updateTeamVisibility.mutateAsync({
 			path: { id: teamId },
 			body: hidden,
-		});
-	};
-
-	const handleRemoveRepositoryFromTeam = async (
-		teamId: number,
-		repositoryOwner: string,
-		repositoryName: string,
-	) => {
-		await removeRepositoryFromTeam.mutateAsync({
-			path: { teamId, repositoryOwner, repositoryName },
-		});
-	};
-
-	const handleAddRepositoryToTeam = async (
-		teamId: number,
-		repositoryOwner: string,
-		repositoryName: string,
-	) => {
-		await addRepositoryToTeam.mutateAsync({
-			path: { teamId, repositoryOwner, repositoryName },
 		});
 	};
 
@@ -148,29 +85,11 @@ function AdminTeamsContainer() {
 		});
 	};
 
-	// Convert repositories array to RepositoryInfo objects
-	const availableRepositories = repositoriesQuery.data?.map((repo, index) => {
-		const [, name] = repo.split("/");
-		return {
-			id: index + 1, // Simple ID assignment
-			name,
-			nameWithOwner: repo,
-			description: `Repository: ${repo}`,
-			htmlUrl: `https://github.com/${repo}`,
-		};
-	});
-
 	return (
 		<AdminTeamsTable
 			teams={teamsQuery.data || []}
-			availableRepositories={availableRepositories}
-			users={usersQuery.data}
-			isLoading={teamsQuery.isLoading || usersQuery.isLoading}
-			onCreateTeam={handleCreateTeam}
-			onDeleteTeam={handleDeleteTeam}
+			isLoading={teamsQuery.isLoading}
 			onHideTeam={handleHideTeam}
-			onAddRepositoryToTeam={handleAddRepositoryToTeam}
-			onRemoveRepositoryFromTeam={handleRemoveRepositoryFromTeam}
 			onAddLabelToTeam={handleAddLabelToTeam}
 			onRemoveLabelFromTeam={handleRemoveLabelFromTeam}
 		/>

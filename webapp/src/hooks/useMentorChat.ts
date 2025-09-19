@@ -2,7 +2,7 @@ import type { UseChatHelpers } from "@ai-sdk/react";
 import { useChat } from "@ai-sdk/react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { DefaultChatTransport } from "ai";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { v4 as uuidv4 } from "uuid";
 import {
 	getGroupedThreadsOptions,
@@ -17,7 +17,6 @@ import type {
 	ChatThreadGroup,
 	Document,
 } from "@/api/types.gen";
-// UIArtifact removed; overlay handled via store + containers
 import environment from "@/environment";
 import { keycloakService } from "@/integrations/auth";
 import type { ChatMessage } from "@/lib/types";
@@ -101,17 +100,16 @@ export function useMentorChat({
 	const [voteState, setVoteState] = useState<
 		Record<string, boolean | undefined>
 	>({});
-	const votes: ChatMessageVote[] = useMemo(() => {
-		return Object.entries(voteState).map(([messageId, isUpvoted]) => ({
+	const votes: ChatMessageVote[] = Object.entries(voteState).map(
+		([messageId, isUpvoted]) => ({
 			messageId,
 			isUpvoted,
-		}));
-	}, [voteState]);
+		}),
+	);
 
 	// ---------------------------
 	// Artifact/document state
 	// ---------------------------
-	// Legacy artifact state removed; overlay now managed via store + hook per open doc
 
 	// When a document overlay is open, maintain a streaming-aware doc controller
 	const visibleOverlay = useArtifactStore((s) => s.getVisibleArtifact());
@@ -122,83 +120,70 @@ export function useMentorChat({
 	// Versions query for the active document
 	// No local version/save handling here; containers manage per-artifact logic
 
-	const openArtifactForDocument = useCallback(
-		(document: Document, boundingBox: DOMRect) => {
-			// Delegate to global overlay store
-			useArtifactStore
-				.getState()
-				.openArtifact(`text:${document.id}`, boundingBox, document.title);
-		},
-		[],
-	);
+	const openArtifactForDocument = (
+		document: Document,
+		boundingBox: DOMRect,
+	) => {
+		// Delegate to global overlay store
+		useArtifactStore
+			.getState()
+			.openArtifact(`text:${document.id}`, boundingBox, document.title);
+	};
 
-	const openArtifactById = useCallback(
-		async (documentId: string, boundingBox: DOMRect) => {
-			// Optimistically open overlay; data will be fetched by overlay hook
-			useArtifactStore
-				.getState()
-				.openArtifact(`text:${documentId}`, boundingBox, "Document");
-		},
-		[],
-	);
+	const openArtifactById = async (documentId: string, boundingBox: DOMRect) => {
+		// Optimistically open overlay; data will be fetched by overlay hook
+		useArtifactStore
+			.getState()
+			.openArtifact(`text:${documentId}`, boundingBox, "Document");
+	};
 
-	const closeArtifact = useCallback(() => {
+	const closeArtifact = () => {
 		useArtifactStore.getState().closeArtifact();
-	}, []);
+	};
 
 	// No save/version APIs exposed; handled in TextArtifactContainer
 
 	// Create stable transport configuration
-	const stableTransport = useMemo(
-		() =>
-			new DefaultChatTransport({
-				api: `${environment.serverUrl}/mentor/chat`,
-				// Always attach a fresh token per request
-				prepareSendMessagesRequest: ({ id, messages }) => {
-					const effectiveId = id || stableThreadId;
-					// Only send the latest message; backend reconstructs context from thread ID
-					const lastMessage = messages.at(-1);
-					// Determine previous message ID from current local state (selected leaf or last message)
-					const prev =
-						messages.length > 1 ? messages[messages.length - 2]?.id : undefined;
-					return {
-						body: {
-							id: effectiveId,
-							message: lastMessage,
-							previousMessageId: prev,
-						},
-						headers: {
-							Authorization: `Bearer ${keycloakService.getToken()}`,
-						},
-					};
+	const stableTransport = new DefaultChatTransport({
+		api: `${environment.serverUrl}/mentor/chat`,
+		// Always attach a fresh token per request
+		prepareSendMessagesRequest: ({ id, messages }) => {
+			const effectiveId = id || stableThreadId;
+			// Only send the latest message; backend reconstructs context from thread ID
+			const lastMessage = messages.at(-1);
+			// Determine previous message ID from current local state (selected leaf or last message)
+			const prev =
+				messages.length > 1 ? messages[messages.length - 2]?.id : undefined;
+			return {
+				body: {
+					id: effectiveId,
+					message: lastMessage,
+					previousMessageId: prev,
 				},
-			}),
-		[stableThreadId],
-	);
+				headers: {
+					Authorization: `Bearer ${keycloakService.getToken()}`,
+				},
+			};
+		},
+	});
 
 	// Create stable onFinish callback
-	const stableOnFinish = useCallback(
-		(_options: { message: ChatMessage }) => {
-			queryClient.invalidateQueries({ queryKey: getGroupedThreadsQueryKey() });
-			if (threadId || stableThreadId) {
-				queryClient.invalidateQueries({
-					queryKey: getThreadQueryKey({
-						path: { threadId: threadId || stableThreadId || "" },
-					}),
-				});
-			}
-			onFinish?.();
-		},
-		[queryClient, threadId, stableThreadId, onFinish],
-	);
+	const stableOnFinish = (_options: { message: ChatMessage }) => {
+		queryClient.invalidateQueries({ queryKey: getGroupedThreadsQueryKey() });
+		if (threadId || stableThreadId) {
+			queryClient.invalidateQueries({
+				queryKey: getThreadQueryKey({
+					path: { threadId: threadId || stableThreadId || "" },
+				}),
+			});
+		}
+		onFinish?.();
+	};
 
 	// Create stable onError callback
-	const stableOnError = useCallback(
-		(error: Error) => {
-			onError?.(error);
-		},
-		[onError],
-	);
+	const stableOnError = (error: Error) => {
+		onError?.(error);
+	};
 
 	const {
 		messages,
@@ -265,48 +250,42 @@ export function useMentorChat({
 	}, [threadId, threadDetail]);
 
 	// Send message function
-	const sendMessage = useCallback(
-		(text: string) => {
-			if (!text.trim()) {
-				return;
-			}
+	const sendMessage = (text: string) => {
+		if (!text.trim()) {
+			return;
+		}
 
-			originalSendMessage({ text });
-		},
-		[originalSendMessage],
-	); // Vote message function
-	const voteMessage = useCallback(
-		(messageId: string, isUpvoted: boolean) => {
-			// Optimistically set local vote state
-			setVoteState((prev) => ({ ...prev, [messageId]: isUpvoted }));
-			voteMessageMut.mutate(
-				{
-					path: { messageId },
-					body: { isUpvoted },
+		originalSendMessage({ text });
+	}; // Vote message function
+	const voteMessage = (messageId: string, isUpvoted: boolean) => {
+		// Optimistically set local vote state
+		setVoteState((prev) => ({ ...prev, [messageId]: isUpvoted }));
+		voteMessageMut.mutate(
+			{
+				path: { messageId },
+				body: { isUpvoted },
+			},
+			{
+				onError: () => {
+					// Rollback optimistic update on error
+					setVoteState((prev) => {
+						const next = { ...prev };
+						delete next[messageId];
+						return next;
+					});
 				},
-				{
-					onError: () => {
-						// Rollback optimistic update on error
-						setVoteState((prev) => {
-							const next = { ...prev };
-							delete next[messageId];
-							return next;
+				onSettled: () => {
+					if (threadId || stableThreadId) {
+						queryClient.invalidateQueries({
+							queryKey: getThreadQueryKey({
+								path: { threadId: threadId || stableThreadId || "" },
+							}),
 						});
-					},
-					onSettled: () => {
-						if (threadId || stableThreadId) {
-							queryClient.invalidateQueries({
-								queryKey: getThreadQueryKey({
-									path: { threadId: threadId || stableThreadId || "" },
-								}),
-							});
-						}
-					},
+					}
 				},
-			);
-		},
-		[voteMessageMut, queryClient, threadId, stableThreadId],
-	);
+			},
+		);
+	};
 
 	// Compute loading states
 	const isLoading =

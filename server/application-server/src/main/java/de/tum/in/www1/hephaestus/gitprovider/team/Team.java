@@ -1,24 +1,26 @@
 package de.tum.in.www1.hephaestus.gitprovider.team;
 
+import de.tum.in.www1.hephaestus.gitprovider.common.BaseGitServiceEntity;
 import de.tum.in.www1.hephaestus.gitprovider.label.Label;
-import de.tum.in.www1.hephaestus.gitprovider.repository.Repository;
-import de.tum.in.www1.hephaestus.gitprovider.user.User;
+import de.tum.in.www1.hephaestus.gitprovider.team.membership.TeamMembership;
+import de.tum.in.www1.hephaestus.gitprovider.team.permission.TeamRepositoryPermission;
+import jakarta.persistence.CascadeType;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
-import jakarta.persistence.GeneratedValue;
-import jakarta.persistence.GenerationType;
-import jakarta.persistence.Id;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.JoinTable;
 import jakarta.persistence.ManyToMany;
+import jakarta.persistence.OneToMany;
 import jakarta.persistence.Table;
+import java.time.Instant;
 import java.util.HashSet;
 import java.util.Set;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 import lombok.ToString;
-import org.springframework.lang.NonNull;
 
 @Entity
 @Table(name = "team")
@@ -26,27 +28,44 @@ import org.springframework.lang.NonNull;
 @Setter
 @NoArgsConstructor
 @ToString(callSuper = true)
-public class Team {
+public class Team extends BaseGitServiceEntity {
 
-    @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
-    private Long id;
-
-    @Column
     private String name;
 
-    @NonNull
-    private String color;
+    @Column(columnDefinition = "TEXT")
+    private String description;
 
-    @ManyToMany
-    @JoinTable(
-        name = "team_repositories",
-        joinColumns = @JoinColumn(name = "team_id"),
-        inverseJoinColumns = @JoinColumn(name = "repository_id")
-    )
+    @Column(length = 32)
+    @Enumerated(EnumType.STRING)
+    private Privacy privacy;
+
+    private String organization;
+
+    @Column(columnDefinition = "TEXT")
+    private String htmlUrl;
+
+    private Long parentId;
+
+    private Instant lastSyncedAt;
+
+    /**
+     * Hephaestus field. Controls whether the team is hidden in the overview.
+     */
+    private boolean hidden = false;
+
+    @OneToMany(mappedBy = "team", cascade = CascadeType.ALL, orphanRemoval = true)
     @ToString.Exclude
-    private Set<Repository> repositories = new HashSet<>();
+    private Set<TeamRepositoryPermission> repoPermissions = new HashSet<>();
 
+    @OneToMany(mappedBy = "team", cascade = CascadeType.ALL, orphanRemoval = true)
+    @ToString.Exclude
+    private Set<TeamMembership> memberships = new HashSet<>();
+
+    /**
+     * Hephaestus-managed labels assigned to this team (admin-managed only).
+     *
+     * Used for filtering team-specific contributions.
+     */
     @ManyToMany
     @JoinTable(
         name = "team_labels",
@@ -56,33 +75,24 @@ public class Team {
     @ToString.Exclude
     private Set<Label> labels = new HashSet<>();
 
-    @ManyToMany
-    @JoinTable(
-        name = "team_members",
-        joinColumns = @JoinColumn(name = "team_id"),
-        inverseJoinColumns = @JoinColumn(name = "user_id")
-    )
-    @ToString.Exclude
-    private Set<User> members = new HashSet<>();
-
-    private boolean hidden = false;
-
-    public void addMember(User user) {
-        members.add(user);
-        user.addTeam(this);
+    public void addMembership(TeamMembership membership) {
+        memberships.add(membership);
+        membership.setTeam(this);
     }
 
-    public void removeMember(User user) {
-        members.remove(user);
-        user.removeTeam(this);
+    public void removeMembership(TeamMembership membership) {
+        memberships.remove(membership);
+        membership.setTeam(null);
     }
 
-    public void addRepository(Repository repository) {
-        repositories.add(repository);
+    public void addRepoPermission(TeamRepositoryPermission permission) {
+        repoPermissions.add(permission);
+        permission.setTeam(this);
     }
 
-    public void removeRepository(Repository repository) {
-        repositories.remove(repository);
+    public void clearAndAddRepoPermissions(Set<TeamRepositoryPermission> fresh) {
+        repoPermissions.clear();
+        fresh.forEach(this::addRepoPermission);
     }
 
     public void addLabel(Label label) {
@@ -92,4 +102,22 @@ public class Team {
     public void removeLabel(Label label) {
         labels.remove(label);
     }
+
+    public enum Privacy {
+        /** Only organization members can view or request access. */
+        SECRET,
+        /** Visible to all members of the organization. */
+        CLOSED,
+    }
+    // Ignored GitHub properties:
+    // - nodeId
+    // - slug
+    // - apiUrl               (API URL for this team)
+    // - members_url       (templated URL for member listing)
+    // - repositories_url  (templated URL for repos listing)
+    // - parent            (if this team has a parent team)
+    // - permissions       (maps to our repoPermissions, but scoped to the OAuth user)
+    // - members_count     (cached count; we page through listMembers())
+    // - repos_count       (cached count; we page through listRepositories())
+    // - privacy_level     (older name for privacy)
 }
