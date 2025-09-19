@@ -263,31 +263,6 @@ erDiagram
         BIGINT team_id PK,FK
     }
 
-    TeamV2 {
-        BIGINT id PK
-        TIMESTAMPTZ created_at
-        TIMESTAMPTZ updated_at
-        TEXT description
-        TEXT html_url
-        TIMESTAMPTZ last_synced_at
-        VARCHAR(255) name
-        VARCHAR(255) organization
-        BIGINT parent_id
-        VARCHAR(32) privacy
-    }
-
-    TeamV2Membership {
-        VARCHAR(32) role
-        BIGINT user_id PK,FK
-        BIGINT team_id PK,FK
-    }
-
-    TeamV2RepositoryPermission {
-        VARCHAR(32) permission "NOT NULL"
-        BIGINT repository_id PK,FK
-        BIGINT team_id PK,FK
-    }
-
     User {
         BIGINT id PK
         TIMESTAMPTZ created_at
