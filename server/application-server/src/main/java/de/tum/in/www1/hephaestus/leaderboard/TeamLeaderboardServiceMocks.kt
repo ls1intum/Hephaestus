@@ -1,4 +1,4 @@
-package de.tum.`in`.www1.hephaestus.teamleaderboard.kotlin
+package de.tum.`in`.www1.hephaestus.leaderboard
 
 import de.tum.`in`.www1.hephaestus.gitprovider.issue.Issue
 import de.tum.`in`.www1.hephaestus.gitprovider.label.LabelInfoDTO

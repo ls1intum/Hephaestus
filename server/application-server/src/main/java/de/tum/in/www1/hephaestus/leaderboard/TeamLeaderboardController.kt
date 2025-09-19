@@ -1,6 +1,5 @@
-package de.tum.`in`.www1.hephaestus.teamleaderboard.kotlin
+package de.tum.`in`.www1.hephaestus.leaderboard
 
-import de.tum.`in`.www1.hephaestus.leaderboard.LeaderboardSortType
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.format.annotation.DateTimeFormat
 import org.springframework.http.ResponseEntity

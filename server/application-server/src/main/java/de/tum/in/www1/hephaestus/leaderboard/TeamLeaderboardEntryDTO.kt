@@ -1,4 +1,4 @@
-package de.tum.`in`.www1.hephaestus.teamleaderboard.kotlin
+package de.tum.`in`.www1.hephaestus.leaderboard
 
 import de.tum.`in`.www1.hephaestus.gitprovider.pullrequest.PullRequestInfoDTO
 import de.tum.`in`.www1.hephaestus.gitprovider.team.TeamInfoDTO

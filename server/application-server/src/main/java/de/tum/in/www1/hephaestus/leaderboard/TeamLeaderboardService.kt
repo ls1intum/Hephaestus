@@ -1,4 +1,4 @@
-package de.tum.`in`.www1.hephaestus.teamleaderboard.kotlin
+package de.tum.`in`.www1.hephaestus.leaderboard
 
 import de.tum.`in`.www1.hephaestus.gitprovider.issuecomment.IssueComment
 import de.tum.`in`.www1.hephaestus.gitprovider.issuecomment.IssueCommentRepository
@@ -6,8 +6,6 @@ import de.tum.`in`.www1.hephaestus.gitprovider.pullrequestreview.PullRequestRevi
 import de.tum.`in`.www1.hephaestus.gitprovider.pullrequestreview.PullRequestReviewRepository
 import de.tum.`in`.www1.hephaestus.gitprovider.team.Team
 import de.tum.`in`.www1.hephaestus.gitprovider.team.TeamRepository
-import de.tum.`in`.www1.hephaestus.leaderboard.LeaderboardSortType
-import de.tum.`in`.www1.hephaestus.leaderboard.ScoringService
 import org.slf4j.LoggerFactory
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.stereotype.Service

@@ -3,6 +3,7 @@ package de.tum.`in`.www1.hephaestus.teamleaderboard.kotlin
 import de.tum.`in`.www1.hephaestus.gitprovider.team.Team
 import de.tum.`in`.www1.hephaestus.gitprovider.team.TeamRepository
 import de.tum.`in`.www1.hephaestus.gitprovider.user.User
+import de.tum.`in`.www1.hephaestus.leaderboard.TeamLeaderboardService
 import org.junit.jupiter.api.Test
 import org.mockito.Mockito.*
 import java.time.Instant

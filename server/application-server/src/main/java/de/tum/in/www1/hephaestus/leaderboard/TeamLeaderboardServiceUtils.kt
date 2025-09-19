@@ -1,4 +1,4 @@
-package de.tum.`in`.www1.hephaestus.teamleaderboard.kotlin
+package de.tum.`in`.www1.hephaestus.leaderboard
 
 import org.slf4j.LoggerFactory
 
