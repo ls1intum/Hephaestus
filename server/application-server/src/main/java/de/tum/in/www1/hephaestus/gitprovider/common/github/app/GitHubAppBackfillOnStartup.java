@@ -95,8 +95,6 @@ public class GitHubAppBackfillOnStartup {
                 RepositorySelection selection = mapRepositorySelection(inst.getRepositorySelection());
                 Workspace workspace = workspaceService.ensureForInstallation(installationId, selection);
 
-//                organizationLinkService.linkWorkspaceToOrganization(workspace.getId(), login, installationId);
-//                logger.info("Linked workspace {} to org id={} (install={})", workspace.getId(), organizationId, installationId);
                 organizationLinkService.attachOrganization(workspace.getId(), installationId);
                 organizationLinkService.setAccountLoginOnly(workspace.getId(), login);
 
@@ -105,7 +103,7 @@ public class GitHubAppBackfillOnStartup {
                 organizationSyncService.syncByInstallationId(installationId);
                 organizationSyncService.syncMembersByInstallationId(installationId);
 
-                if (isNatsEnabled && workspace.getGithubRepositorySelection() == RepositorySelection.ALL) {
+                if (isNatsEnabled && workspace.getGithubRepositorySelection() == RepositorySelection.SELECTED) {
                     logger.info("Auto-managing monitors for org={} installationId={}", login, installationId);
                     backfillService.seedReposForWorkspace(workspace);
                 }
