@@ -1,5 +1,5 @@
-import type { TeamLeaderboardEntry, TeamInfo } from "@/api/types.gen";
-import { Skeleton } from "@/components/ui/skeleton";
+import type { TeamLeaderboardEntry, TeamInfo } from "@/api/types.gen.ts";
+import { Skeleton } from "@/components/ui/skeleton.tsx";
 import {
 	Table,
 	TableBody,
@@ -7,7 +7,7 @@ import {
 	TableHead,
 	TableHeader,
 	TableRow,
-} from "@/components/ui/table";
+} from "@/components/ui/table.tsx";
 import {
 	CheckIcon,
 	ChevronLeftIcon,
@@ -73,7 +73,7 @@ export function TeamLeaderboardTable({
                                 <div className="flex items-center gap-2 font-medium">
                                     <Avatar className="size-9">
                                         <AvatarImage
-                                            src={"https://http.cat/501"}
+                                            src={`https://avatars.githubusercontent.com/t/${entry.team.id}?s=512&v=4`}
                                             alt={`${entry.team.name}'s avatar`}
                                         />
                                         <AvatarFallback>

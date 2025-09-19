@@ -1,7 +1,7 @@
 import type { Meta, StoryObj } from '@storybook/react';
 import { fn } from '@storybook/test';
-import { TeamLeaderboardTable } from './TeamLeaderboardTable';
-import type {TeamLeaderboardEntry, TeamInfo, RepositoryInfo, LabelInfo, PullRequestInfo} from '@/api/types.gen';
+import { TeamLeaderboardTable } from './TeamLeaderboardTable.tsx';
+import type {TeamLeaderboardEntry, TeamInfo, RepositoryInfo, LabelInfo, PullRequestInfo} from '@/api/types.gen.ts';
 
 const mockRepositories: RepositoryInfo[] = [
   {

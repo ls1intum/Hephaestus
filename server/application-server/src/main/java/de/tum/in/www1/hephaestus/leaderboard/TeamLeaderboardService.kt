@@ -1,15 +1,14 @@
 package de.tum.`in`.www1.hephaestus.leaderboard
 
-import de.tum.`in`.www1.hephaestus.gitprovider.issuecomment.IssueComment
-import de.tum.`in`.www1.hephaestus.gitprovider.issuecomment.IssueCommentRepository
-import de.tum.`in`.www1.hephaestus.gitprovider.pullrequestreview.PullRequestReview
-import de.tum.`in`.www1.hephaestus.gitprovider.pullrequestreview.PullRequestReviewRepository
+import de.tum.`in`.www1.hephaestus.gitprovider.pullrequest.PullRequestInfoDTO
 import de.tum.`in`.www1.hephaestus.gitprovider.team.Team
+import de.tum.`in`.www1.hephaestus.gitprovider.team.TeamInfoDTO
 import de.tum.`in`.www1.hephaestus.gitprovider.team.TeamRepository
 import org.slf4j.LoggerFactory
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.stereotype.Service
 import java.time.Instant
+import java.util.*
 
 @Service
 class TeamLeaderboardService {
@@ -22,13 +21,7 @@ class TeamLeaderboardService {
     private lateinit var teamRepository: TeamRepository
 
     @Autowired
-    private lateinit var pullRequestReviewRepository: PullRequestReviewRepository
-
-    @Autowired
-    private lateinit var issueCommentRepository: IssueCommentRepository
-
-    @Autowired
-    private lateinit var scoringService: ScoringService
+    private lateinit var leaderboardService: LeaderboardService
 
     // TODO: private attributes that are needed for the class to fulfill it's duty
     // ---
@@ -40,10 +33,9 @@ class TeamLeaderboardService {
         sort: LeaderboardSortType?,
     ): MutableList<TeamLeaderboardEntryDTO> {
 
-        return createMockTeamLeaderboard()
+        return createTeamLeaderboard(after, before)
     }
 
-    @Suppress("UNREACHABLE_CODE")
     fun createTeamLeaderboard(
         after: Instant,
         before: Instant,
@@ -54,35 +46,64 @@ class TeamLeaderboardService {
             before,
         )
 
-//        TODO("fetch all teams from the team repository")
         val teams: List<Team> = teamRepository.findAll()
+        val teamsById = teams.associateBy { it.id }
+        val leaderboardsByTeamId = teams.associate { team ->
+            team.id to leaderboardService.createLeaderboard(
+                after,
+                before,
+                Optional.of(team.name),
+                Optional.of(LeaderboardSortType.SCORE)
+            )
+        }
 
-//        TODO("fetch all pull requests reviews by their respective team")
-        val reviewsByTeam: Map<Team, List<PullRequestReview>> =
-            teams.associateWith { team -> pullRequestReviewRepository.findAllInTimeframeOfTeam(after, before, team.id) }
+        data class TeamStats(
+//            val team: Team,
+            val teamId: Long,
+            val score: Int,
+            val reviewedPrs: List<PullRequestInfoDTO>,
+            val numberOfReviewedPRs: Int,
+            val numberOfApprovals: Int,
+            val numberOfChangeRequests: Int,
+            val numberOfComments: Int,
+            val numberOfUnknowns: Int,
+            val numberOfCodeComments: Int,
+        )
 
-//        TODO("Repeat that for the review comments as well")
-        val commentsByTeam: Map<Team, List<IssueComment>> =
-            teams.associateWith { team ->
-                issueCommentRepository.findAllInTimeframeOfTeam(
-                    after,
-                    before,
-                    team.id,
-                    true
+        val teamStatsById = leaderboardsByTeamId.mapValues { (teamId, entries) ->
+            TeamStats(
+//                team = teamsById[teamId]?: Team(),
+                teamId = teamId,
+                score = entries.sumOf { it.score },
+                reviewedPrs = entries.flatMap { it.reviewedPullRequests() }.distinct(),
+                numberOfReviewedPRs = entries.sumOf { it.numberOfReviewedPRs },
+                numberOfApprovals = entries.sumOf { it.numberOfApprovals },
+                numberOfChangeRequests = entries.sumOf { it.numberOfChangeRequests },
+                numberOfComments = entries.sumOf { it.numberOfComments },
+                numberOfUnknowns = entries.sumOf { it.numberOfUnknowns },
+                numberOfCodeComments = entries.sumOf { it.numberOfCodeComments },
+            )
+        }
+
+        return teamStatsById.entries
+            .sortedWith(
+                compareByDescending<Map.Entry<Long, TeamStats>> { it.value.score }
+                    .thenBy { teamsById[it.key]?.name }
+            )
+            .mapIndexed { index, (teamId, teamStats) ->
+                TeamLeaderboardEntryDTO(
+                    rank = index + 1,
+                    score = teamStats.score,
+                    team = TeamInfoDTO.fromTeam(teamsById[teamId]),
+                    reviewedPullRequests = teamStats.reviewedPrs,
+                    numberOfReviewedPRs = teamStats.numberOfReviewedPRs,
+                    numberOfApprovals = teamStats.numberOfApprovals,
+                    numberOfChangeRequests = teamStats.numberOfChangeRequests,
+                    numberOfComments = teamStats.numberOfComments,
+                    numberOfUnknowns = teamStats.numberOfUnknowns,
+                    numberOfCodeComments = teamStats.numberOfCodeComments
                 )
             }
-
-        TODO("Let the scoring service grade the PR reviews")
-
-
-        TODO("Aggregate the scored result into a general PR review score for the team")
-
-        TODO("Add this for the review comments as well")
-
-        TODO("Order the scores for the Team Leaderboard")
-
-        TODO("Construct the list of TeamLeaderboardEntryDTOs to send back to the frontend")
-
-
+            .toMutableList()
     }
 }

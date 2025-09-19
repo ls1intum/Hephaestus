@@ -1,6 +1,6 @@
 import type { Meta, StoryObj } from "@storybook/react";
-import type { LabelInfo, RepositoryInfo, TeamInfo, TeamLeaderboardEntry } from "@/api/types.gen";
-import { TeamLeaderboardPage } from "./TeamLeaderboardPage";
+import type { LabelInfo, RepositoryInfo, TeamInfo, TeamLeaderboardEntry } from "@/api/types.gen.ts";
+import { TeamLeaderboardPage } from "./TeamLeaderboardPage.tsx";
 
 const mockTeams = ["Frontend", "Backend", "DevOps", "QA", "Design"];
 

@@ -1,5 +1,5 @@
 import {createFileRoute, retainSearchParams, useNavigate} from '@tanstack/react-router';
-import { TeamLeaderboardPage } from '@/components/team-leaderboard/TeamLeaderboardPage';
+import { TeamLeaderboardPage } from '@/components/leaderboard/TeamLeaderboardPage.tsx';
 import { z } from "zod";
 import { endOfISOWeek, formatISO, startOfISOWeek } from "date-fns";
 import { zodValidator } from "@tanstack/zod-adapter";

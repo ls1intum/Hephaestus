@@ -1,8 +1,8 @@
-import { LeaderboardLegend } from "../leaderboard/LeaderboardLegend";
-import { LeaderboardFilter } from "../leaderboard/LeaderboardFilter";
-import type { LeaderboardSortType } from "../leaderboard/SortFilter";
-import { TeamLeaderboardTable } from "./TeamLeaderboardTable";
-import type {TeamInfo, TeamLeaderboardEntry} from "@/api/types.gen";
+import { LeaderboardLegend } from "./LeaderboardLegend.tsx";
+import { LeaderboardFilter } from "./LeaderboardFilter.tsx";
+import type { LeaderboardSortType } from "./SortFilter.tsx";
+import { TeamLeaderboardTable } from "./TeamLeaderboardTable.tsx";
+import type {TeamInfo, TeamLeaderboardEntry} from "@/api/types.gen.ts";
 
 interface TeamLeaderboardPageProps {
     teamLeaderboard?: TeamLeaderboardEntry[];
