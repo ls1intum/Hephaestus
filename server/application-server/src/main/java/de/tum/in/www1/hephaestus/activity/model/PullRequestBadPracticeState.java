@@ -1,6 +1,6 @@
 package de.tum.in.www1.hephaestus.activity.model;
 
-import de.tum.in.www1.hephaestus.intelligenceservice.model.BadPracticeStatus;
+import de.tum.in.www1.hephaestus.intelligenceservice.model.BadPractice;
 import lombok.Getter;
 
 @Getter
@@ -19,7 +19,7 @@ public enum PullRequestBadPracticeState {
         this.value = value;
     }
 
-    public static PullRequestBadPracticeState fromBadPracticeStatus(BadPracticeStatus status) {
+    public static PullRequestBadPracticeState fromBadPracticeStatus(BadPractice.StatusEnum status) {
         return switch (status) {
             case GOOD_PRACTICE -> GOOD_PRACTICE;
             case FIXED -> FIXED;
@@ -31,15 +31,15 @@ public enum PullRequestBadPracticeState {
         };
     }
 
-    public static BadPracticeStatus toBadPracticeStatus(PullRequestBadPracticeState state) {
+    public static BadPractice.StatusEnum toBadPracticeStatus(PullRequestBadPracticeState state) {
         return switch (state) {
-            case GOOD_PRACTICE -> BadPracticeStatus.GOOD_PRACTICE;
-            case FIXED -> BadPracticeStatus.FIXED;
-            case CRITICAL_ISSUE -> BadPracticeStatus.CRITICAL_ISSUE;
-            case NORMAL_ISSUE -> BadPracticeStatus.NORMAL_ISSUE;
-            case MINOR_ISSUE -> BadPracticeStatus.MINOR_ISSUE;
-            case WONT_FIX -> BadPracticeStatus.WON_T_FIX;
-            case WRONG -> BadPracticeStatus.WRONG;
+            case GOOD_PRACTICE -> BadPractice.StatusEnum.GOOD_PRACTICE;
+            case FIXED -> BadPractice.StatusEnum.FIXED;
+            case CRITICAL_ISSUE -> BadPractice.StatusEnum.CRITICAL_ISSUE;
+            case NORMAL_ISSUE -> BadPractice.StatusEnum.NORMAL_ISSUE;
+            case MINOR_ISSUE -> BadPractice.StatusEnum.MINOR_ISSUE;
+            case WONT_FIX -> BadPractice.StatusEnum.WON_T_FIX;
+            case WRONG -> BadPractice.StatusEnum.WRONG;
         };
     }
 }

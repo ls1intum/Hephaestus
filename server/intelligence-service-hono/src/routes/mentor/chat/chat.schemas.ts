@@ -48,25 +48,25 @@ export const streamTextStartPartSchema = z.object({
 	type: z.literal("text-start"),
 	id: z.string(),
 	providerMetadata: z.unknown().optional(),
-});
+}).openapi("StreamTextStartPart");
 
 export const streamTextDeltaPartSchema = z.object({
 	type: z.literal("text-delta"),
 	id: z.string(),
 	delta: z.string(),
 	providerMetadata: z.unknown().optional(),
-});
+}).openapi("StreamTextDeltaPart");
 
 export const streamTextEndPartSchema = z.object({
 	type: z.literal("text-end"),
 	id: z.string(),
 	providerMetadata: z.unknown().optional(),
-});
+}).openapi("StreamTextEndPart");
 
 export const streamErrorPartSchema = z.object({
 	type: z.literal("error"),
 	errorText: z.string(),
-});
+}).openapi("StreamErrorPart");
 
 export const streamToolInputStartPartSchema = z.object({
 	type: z.literal("tool-input-start"),
@@ -74,13 +74,13 @@ export const streamToolInputStartPartSchema = z.object({
 	toolName: z.string(),
 	providerExecuted: z.boolean().optional(),
 	dynamic: z.boolean().optional(),
-});
+}).openapi("StreamToolInputStartPart");
 
 export const streamToolInputDeltaPartSchema = z.object({
 	type: z.literal("tool-input-delta"),
 	toolCallId: z.string(),
 	inputTextDelta: z.string(),
-});
+}).openapi("StreamToolInputDeltaPart");
 
 export const streamToolInputAvailablePartSchema = z.object({
 	type: z.literal("tool-input-available"),
@@ -90,7 +90,7 @@ export const streamToolInputAvailablePartSchema = z.object({
 	providerExecuted: z.boolean().optional(),
 	providerMetadata: z.unknown().optional(),
 	dynamic: z.boolean().optional(),
-});
+}).openapi("StreamToolInputAvailablePart");
 
 export const streamToolInputErrorPartSchema = z.object({
 	type: z.literal("tool-input-error"),
@@ -101,7 +101,7 @@ export const streamToolInputErrorPartSchema = z.object({
 	providerExecuted: z.boolean().optional(),
 	providerMetadata: z.unknown().optional(),
 	dynamic: z.boolean().optional(),
-});
+}).openapi("StreamToolInputErrorPart");
 
 export const streamToolOutputAvailablePartSchema = z.object({
 	type: z.literal("tool-output-available"),
@@ -109,7 +109,7 @@ export const streamToolOutputAvailablePartSchema = z.object({
 	output: z.unknown(),
 	providerExecuted: z.boolean().optional(),
 	dynamic: z.boolean().optional(),
-});
+}).openapi("StreamToolOutputAvailablePart");
 
 export const streamToolOutputErrorPartSchema = z.object({
 	type: z.literal("tool-output-error"),
@@ -117,26 +117,26 @@ export const streamToolOutputErrorPartSchema = z.object({
 	errorText: z.string(),
 	providerExecuted: z.boolean().optional(),
 	dynamic: z.boolean().optional(),
-});
+}).openapi("StreamToolOutputErrorPart");
 
 export const streamReasoningStartPartSchema = z.object({
 	type: z.literal("reasoning-start"),
 	id: z.string(),
 	providerMetadata: z.unknown().optional(),
-});
+}).openapi("StreamReasoningStartPart");
 
 export const streamReasoningDeltaPartSchema = z.object({
 	type: z.literal("reasoning-delta"),
 	id: z.string(),
 	delta: z.string(),
 	providerMetadata: z.unknown().optional(),
-});
+}).openapi("StreamReasoningDeltaPart");
 
 export const streamReasoningEndPartSchema = z.object({
 	type: z.literal("reasoning-end"),
 	id: z.string(),
 	providerMetadata: z.unknown().optional(),
-});
+}).openapi("StreamReasoningEndPart");
 
 export const streamSourceUrlPartSchema = z.object({
 	type: z.literal("source-url"),
@@ -144,7 +144,7 @@ export const streamSourceUrlPartSchema = z.object({
 	url: z.string(),
 	title: z.string().optional(),
 	providerMetadata: z.unknown().optional(),
-});
+}).openapi("StreamSourceUrlPart");
 
 export const streamSourceDocumentPartSchema = z.object({
 	type: z.literal("source-document"),
@@ -153,49 +153,49 @@ export const streamSourceDocumentPartSchema = z.object({
 	title: z.string(),
 	filename: z.string().optional(),
 	providerMetadata: z.unknown().optional(),
-});
+}).openapi("StreamSourceDocumentPart");
 
 export const streamFilePartSchema = z.object({
 	type: z.literal("file"),
 	url: z.string(),
 	mediaType: z.string(),
 	providerMetadata: z.unknown().optional(),
-});
+}).openapi("StreamFilePart");
 
 export const streamDataPartSchema = z.object({
 	type: z.string().regex(/^data-.+/),
 	id: z.string().optional(),
 	data: z.unknown(),
 	transient: z.boolean().optional(),
-});
+}).openapi("StreamDataPart");
 
 export const streamStepStartPartSchema = z.object({
 	type: z.literal("start-step"),
-});
+}).openapi("StreamStepStartPart");
 
 export const streamStepFinishPartSchema = z.object({
 	type: z.literal("finish-step"),
-});
+}).openapi("StreamStepFinishPart");
 
 export const streamStartPartSchema = z.object({
 	type: z.literal("start"),
 	messageId: z.string().optional(),
 	messageMetadata: z.unknown().optional(),
-});
+}).openapi("StreamStartPart");
 
 export const streamFinishPartSchema = z.object({
 	type: z.literal("finish"),
 	messageMetadata: z.unknown().optional(),
-});
+}).openapi("StreamFinishPart");
 
 export const streamMessageMetadataPartSchema = z.object({
 	type: z.literal("message-metadata"),
 	messageMetadata: z.unknown(),
-});
+}).openapi("StreamMessageMetadataPart");
 
 export const streamAbortPartSchema = z.object({
 	type: z.literal("abort"),
-});
+}).openapi("StreamAbortPart");
 
 export const streamPartSchema = z.union([
 	streamTextStartPartSchema,

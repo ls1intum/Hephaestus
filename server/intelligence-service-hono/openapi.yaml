@@ -15,6 +15,344 @@ components:
           example: OK
       required:
         - status
+    StreamTextStartPart:
+      type: object
+      properties:
+        type:
+          type: string
+          enum:
+            - text-start
+        id:
+          type: string
+        providerMetadata: {}
+      required:
+        - type
+        - id
+    StreamTextDeltaPart:
+      type: object
+      properties:
+        type:
+          type: string
+          enum:
+            - text-delta
+        id:
+          type: string
+        delta:
+          type: string
+        providerMetadata: {}
+      required:
+        - type
+        - id
+        - delta
+    StreamTextEndPart:
+      type: object
+      properties:
+        type:
+          type: string
+          enum:
+            - text-end
+        id:
+          type: string
+        providerMetadata: {}
+      required:
+        - type
+        - id
+    StreamErrorPart:
+      type: object
+      properties:
+        type:
+          type: string
+          enum:
+            - error
+        errorText:
+          type: string
+      required:
+        - type
+        - errorText
+    StreamToolInputStartPart:
+      type: object
+      properties:
+        type:
+          type: string
+          enum:
+            - tool-input-start
+        toolCallId:
+          type: string
+        toolName:
+          type: string
+        providerExecuted:
+          type: boolean
+        dynamic:
+          type: boolean
+      required:
+        - type
+        - toolCallId
+        - toolName
+    StreamToolInputDeltaPart:
+      type: object
+      properties:
+        type:
+          type: string
+          enum:
+            - tool-input-delta
+        toolCallId:
+          type: string
+        inputTextDelta:
+          type: string
+      required:
+        - type
+        - toolCallId
+        - inputTextDelta
+    StreamToolInputAvailablePart:
+      type: object
+      properties:
+        type:
+          type: string
+          enum:
+            - tool-input-available
+        toolCallId:
+          type: string
+        toolName:
+          type: string
+        input: {}
+        providerExecuted:
+          type: boolean
+        providerMetadata: {}
+        dynamic:
+          type: boolean
+      required:
+        - type
+        - toolCallId
+        - toolName
+    StreamToolInputErrorPart:
+      type: object
+      properties:
+        type:
+          type: string
+          enum:
+            - tool-input-error
+        toolCallId:
+          type: string
+        toolName:
+          type: string
+        input: {}
+        errorText:
+          type: string
+        providerExecuted:
+          type: boolean
+        providerMetadata: {}
+        dynamic:
+          type: boolean
+      required:
+        - type
+        - toolCallId
+        - toolName
+        - errorText
+    StreamToolOutputAvailablePart:
+      type: object
+      properties:
+        type:
+          type: string
+          enum:
+            - tool-output-available
+        toolCallId:
+          type: string
+        output: {}
+        providerExecuted:
+          type: boolean
+        dynamic:
+          type: boolean
+      required:
+        - type
+        - toolCallId
+    StreamToolOutputErrorPart:
+      type: object
+      properties:
+        type:
+          type: string
+          enum:
+            - tool-output-error
+        toolCallId:
+          type: string
+        errorText:
+          type: string
+        providerExecuted:
+          type: boolean
+        dynamic:
+          type: boolean
+      required:
+        - type
+        - toolCallId
+        - errorText
+    StreamReasoningStartPart:
+      type: object
+      properties:
+        type:
+          type: string
+          enum:
+            - reasoning-start
+        id:
+          type: string
+        providerMetadata: {}
+      required:
+        - type
+        - id
+    StreamReasoningDeltaPart:
+      type: object
+      properties:
+        type:
+          type: string
+          enum:
+            - reasoning-delta
+        id:
+          type: string
+        delta:
+          type: string
+        providerMetadata: {}
+      required:
+        - type
+        - id
+        - delta
+    StreamReasoningEndPart:
+      type: object
+      properties:
+        type:
+          type: string
+          enum:
+            - reasoning-end
+        id:
+          type: string
+        providerMetadata: {}
+      required:
+        - type
+        - id
+    StreamSourceUrlPart:
+      type: object
+      properties:
+        type:
+          type: string
+          enum:
+            - source-url
+        sourceId:
+          type: string
+        url:
+          type: string
+        title:
+          type: string
+        providerMetadata: {}
+      required:
+        - type
+        - sourceId
+        - url
+    StreamSourceDocumentPart:
+      type: object
+      properties:
+        type:
+          type: string
+          enum:
+            - source-document
+        sourceId:
+          type: string
+        mediaType:
+          type: string
+        title:
+          type: string
+        filename:
+          type: string
+        providerMetadata: {}
+      required:
+        - type
+        - sourceId
+        - mediaType
+        - title
+    StreamFilePart:
+      type: object
+      properties:
+        type:
+          type: string
+          enum:
+            - file
+        url:
+          type: string
+        mediaType:
+          type: string
+        providerMetadata: {}
+      required:
+        - type
+        - url
+        - mediaType
+    StreamDataPart:
+      type: object
+      properties:
+        type:
+          type: string
+          pattern: ^data-.+
+        id:
+          type: string
+        data: {}
+        transient:
+          type: boolean
+      required:
+        - type
+    StreamStepStartPart:
+      type: object
+      properties:
+        type:
+          type: string
+          enum:
+            - start-step
+      required:
+        - type
+    StreamStepFinishPart:
+      type: object
+      properties:
+        type:
+          type: string
+          enum:
+            - finish-step
+      required:
+        - type
+    StreamStartPart:
+      type: object
+      properties:
+        type:
+          type: string
+          enum:
+            - start
+        messageId:
+          type: string
+        messageMetadata: {}
+      required:
+        - type
+    StreamFinishPart:
+      type: object
+      properties:
+        type:
+          type: string
+          enum:
+            - finish
+        messageMetadata: {}
+      required:
+        - type
+    StreamMessageMetadataPart:
+      type: object
+      properties:
+        type:
+          type: string
+          enum:
+            - message-metadata
+        messageMetadata: {}
+      required:
+        - type
+    StreamAbortPart:
+      type: object
+      properties:
+        type:
+          type: string
+          enum:
+            - abort
+      required:
+        - type
     DocumentKind:
       type: string
       enum:
@@ -340,321 +678,29 @@ paths:
             text/event-stream:
               schema:
                 anyOf:
-                  - type: object
-                    properties:
-                      type:
-                        type: string
-                        enum:
-                          - text-start
-                      id:
-                        type: string
-                      providerMetadata: {}
-                    required:
-                      - type
-                      - id
-                  - type: object
-                    properties:
-                      type:
-                        type: string
-                        enum:
-                          - text-delta
-                      id:
-                        type: string
-                      delta:
-                        type: string
-                      providerMetadata: {}
-                    required:
-                      - type
-                      - id
-                      - delta
-                  - type: object
-                    properties:
-                      type:
-                        type: string
-                        enum:
-                          - text-end
-                      id:
-                        type: string
-                      providerMetadata: {}
-                    required:
-                      - type
-                      - id
-                  - type: object
-                    properties:
-                      type:
-                        type: string
-                        enum:
-                          - error
-                      errorText:
-                        type: string
-                    required:
-                      - type
-                      - errorText
-                  - type: object
-                    properties:
-                      type:
-                        type: string
-                        enum:
-                          - tool-input-start
-                      toolCallId:
-                        type: string
-                      toolName:
-                        type: string
-                      providerExecuted:
-                        type: boolean
-                      dynamic:
-                        type: boolean
-                    required:
-                      - type
-                      - toolCallId
-                      - toolName
-                  - type: object
-                    properties:
-                      type:
-                        type: string
-                        enum:
-                          - tool-input-delta
-                      toolCallId:
-                        type: string
-                      inputTextDelta:
-                        type: string
-                    required:
-                      - type
-                      - toolCallId
-                      - inputTextDelta
-                  - type: object
-                    properties:
-                      type:
-                        type: string
-                        enum:
-                          - tool-input-available
-                      toolCallId:
-                        type: string
-                      toolName:
-                        type: string
-                      input: {}
-                      providerExecuted:
-                        type: boolean
-                      providerMetadata: {}
-                      dynamic:
-                        type: boolean
-                    required:
-                      - type
-                      - toolCallId
-                      - toolName
-                  - type: object
-                    properties:
-                      type:
-                        type: string
-                        enum:
-                          - tool-input-error
-                      toolCallId:
-                        type: string
-                      toolName:
-                        type: string
-                      input: {}
-                      errorText:
-                        type: string
-                      providerExecuted:
-                        type: boolean
-                      providerMetadata: {}
-                      dynamic:
-                        type: boolean
-                    required:
-                      - type
-                      - toolCallId
-                      - toolName
-                      - errorText
-                  - type: object
-                    properties:
-                      type:
-                        type: string
-                        enum:
-                          - tool-output-available
-                      toolCallId:
-                        type: string
-                      output: {}
-                      providerExecuted:
-                        type: boolean
-                      dynamic:
-                        type: boolean
-                    required:
-                      - type
-                      - toolCallId
-                  - type: object
-                    properties:
-                      type:
-                        type: string
-                        enum:
-                          - tool-output-error
-                      toolCallId:
-                        type: string
-                      errorText:
-                        type: string
-                      providerExecuted:
-                        type: boolean
-                      dynamic:
-                        type: boolean
-                    required:
-                      - type
-                      - toolCallId
-                      - errorText
-                  - type: object
-                    properties:
-                      type:
-                        type: string
-                        enum:
-                          - reasoning-start
-                      id:
-                        type: string
-                      providerMetadata: {}
-                    required:
-                      - type
-                      - id
-                  - type: object
-                    properties:
-                      type:
-                        type: string
-                        enum:
-                          - reasoning-delta
-                      id:
-                        type: string
-                      delta:
-                        type: string
-                      providerMetadata: {}
-                    required:
-                      - type
-                      - id
-                      - delta
-                  - type: object
-                    properties:
-                      type:
-                        type: string
-                        enum:
-                          - reasoning-end
-                      id:
-                        type: string
-                      providerMetadata: {}
-                    required:
-                      - type
-                      - id
-                  - type: object
-                    properties:
-                      type:
-                        type: string
-                        enum:
-                          - source-url
-                      sourceId:
-                        type: string
-                      url:
-                        type: string
-                      title:
-                        type: string
-                      providerMetadata: {}
-                    required:
-                      - type
-                      - sourceId
-                      - url
-                  - type: object
-                    properties:
-                      type:
-                        type: string
-                        enum:
-                          - source-document
-                      sourceId:
-                        type: string
-                      mediaType:
-                        type: string
-                      title:
-                        type: string
-                      filename:
-                        type: string
-                      providerMetadata: {}
-                    required:
-                      - type
-                      - sourceId
-                      - mediaType
-                      - title
-                  - type: object
-                    properties:
-                      type:
-                        type: string
-                        enum:
-                          - file
-                      url:
-                        type: string
-                      mediaType:
-                        type: string
-                      providerMetadata: {}
-                    required:
-                      - type
-                      - url
-                      - mediaType
-                  - type: object
-                    properties:
-                      type:
-                        type: string
-                        pattern: ^data-.+
-                      id:
-                        type: string
-                      data: {}
-                      transient:
-                        type: boolean
-                    required:
-                      - type
-                  - type: object
-                    properties:
-                      type:
-                        type: string
-                        enum:
-                          - start-step
-                    required:
-                      - type
-                  - type: object
-                    properties:
-                      type:
-                        type: string
-                        enum:
-                          - finish-step
-                    required:
-                      - type
-                  - type: object
-                    properties:
-                      type:
-                        type: string
-                        enum:
-                          - start
-                      messageId:
-                        type: string
-                      messageMetadata: {}
-                    required:
-                      - type
-                  - type: object
-                    properties:
-                      type:
-                        type: string
-                        enum:
-                          - finish
-                      messageMetadata: {}
-                    required:
-                      - type
-                  - type: object
-                    properties:
-                      type:
-                        type: string
-                        enum:
-                          - message-metadata
-                      messageMetadata: {}
-                    required:
-                      - type
-                  - type: object
-                    properties:
-                      type:
-                        type: string
-                        enum:
-                          - abort
-                    required:
-                      - type
+                  - $ref: "#/components/schemas/StreamTextStartPart"
+                  - $ref: "#/components/schemas/StreamTextDeltaPart"
+                  - $ref: "#/components/schemas/StreamTextEndPart"
+                  - $ref: "#/components/schemas/StreamErrorPart"
+                  - $ref: "#/components/schemas/StreamToolInputStartPart"
+                  - $ref: "#/components/schemas/StreamToolInputDeltaPart"
+                  - $ref: "#/components/schemas/StreamToolInputAvailablePart"
+                  - $ref: "#/components/schemas/StreamToolInputErrorPart"
+                  - $ref: "#/components/schemas/StreamToolOutputAvailablePart"
+                  - $ref: "#/components/schemas/StreamToolOutputErrorPart"
+                  - $ref: "#/components/schemas/StreamReasoningStartPart"
+                  - $ref: "#/components/schemas/StreamReasoningDeltaPart"
+                  - $ref: "#/components/schemas/StreamReasoningEndPart"
+                  - $ref: "#/components/schemas/StreamSourceUrlPart"
+                  - $ref: "#/components/schemas/StreamSourceDocumentPart"
+                  - $ref: "#/components/schemas/StreamFilePart"
+                  - $ref: "#/components/schemas/StreamDataPart"
+                  - $ref: "#/components/schemas/StreamStepStartPart"
+                  - $ref: "#/components/schemas/StreamStepFinishPart"
+                  - $ref: "#/components/schemas/StreamStartPart"
+                  - $ref: "#/components/schemas/StreamFinishPart"
+                  - $ref: "#/components/schemas/StreamMessageMetadataPart"
+                  - $ref: "#/components/schemas/StreamAbortPart"
   /mentor/threads/{threadId}:
     get:
       tags:

@@ -2,7 +2,9 @@ package de.tum.in.www1.hephaestus.config;
 
 import de.tum.in.www1.hephaestus.intelligenceservice.ApiClient;
 import de.tum.in.www1.hephaestus.intelligenceservice.api.DetectorApi;
+import de.tum.in.www1.hephaestus.intelligenceservice.api.DocumentsApi;
 import de.tum.in.www1.hephaestus.intelligenceservice.api.MentorApi;
+import de.tum.in.www1.hephaestus.intelligenceservice.api.VoteApi;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -14,26 +16,27 @@ public class IntelligenceServiceConfig {
     private String intelligenceServiceUrl;
 
     @Bean
-    public IntelligenceServiceApi intelligenceServiceApi() {
-        return new IntelligenceServiceApi();
-    }
-
-    public class IntelligenceServiceApi extends MentorApi {
-
-        public IntelligenceServiceApi() {
-            super(new ApiClient().setBasePath(intelligenceServiceUrl));
-        }
+    public ApiClient intelligenceApiClient() {
+        return new ApiClient().setBasePath(intelligenceServiceUrl);
     }
 
     @Bean
-    public BadPracticeDetectorService badPracticeDetectorService() {
-        return new BadPracticeDetectorService();
+    public MentorApi mentorApi(ApiClient intelligenceApiClient) {
+        return new MentorApi(intelligenceApiClient);
     }
 
-    public class BadPracticeDetectorService extends DetectorApi {
+    @Bean
+    public DocumentsApi documentsApi(ApiClient intelligenceApiClient) {
+        return new DocumentsApi(intelligenceApiClient);
+    }
 
-        public BadPracticeDetectorService() {
-            super(new ApiClient().setBasePath(intelligenceServiceUrl));
-        }
+    @Bean
+    public VoteApi voteApi(ApiClient intelligenceApiClient) {
+        return new VoteApi(intelligenceApiClient);
+    }
+
+    @Bean
+    public DetectorApi detectorApi(ApiClient intelligenceApiClient) {
+        return new DetectorApi(intelligenceApiClient);
     }
 }
