@@ -145,7 +145,7 @@ export function useMentorChat({
 
 	// Create stable transport configuration
 	const stableTransport = new DefaultChatTransport({
-		api: `${environment.serverUrl}/mentor/chat`,
+		api: `http://localhost:8000/mentor/chat`,
 		// Always attach a fresh token per request
 		prepareSendMessagesRequest: ({ id, messages }) => {
 			const effectiveId = id || stableThreadId;

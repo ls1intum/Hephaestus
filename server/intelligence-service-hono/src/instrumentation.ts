@@ -15,8 +15,7 @@ if (!started && isLangfuseConfigured()) {
 	const langfuseSpanProcessor = new LangfuseSpanProcessor();
 	const tracerProvider = new NodeTracerProvider({
 		spanProcessors: [langfuseSpanProcessor],
-	});	
+	});
 	tracerProvider.register();
 	started = true;
 }
-
