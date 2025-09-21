@@ -12,7 +12,7 @@ export const poemRequestSchema = z
 			.string()
 			.min(1)
 			.optional()
-      .default("")
+			.default("")
 			.openapi({ description: "Optional poem style", example: "haiku" }),
 	})
 	.openapi("PoemRequest");

@@ -3,7 +3,7 @@ import createApp from "@/lib/create-app";
 import detector from "@/routes/detector/detector.index";
 import health from "@/routes/health.route";
 import index from "@/routes/index.route";
-import mentor from "@/routes/mentor/mentor.index";
+import mentor from "@/routes/mentor/index";
 import poem from "@/routes/poem/poem.index";
 import tasks from "@/routes/tasks/tasks.index";
 

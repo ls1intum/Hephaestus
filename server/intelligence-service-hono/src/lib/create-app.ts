@@ -1,9 +1,9 @@
 import { OpenAPIHono } from "@hono/zod-openapi";
 import type { Schema } from "hono";
+import { cors } from "hono/cors";
 import { requestId } from "hono/request-id";
 import { notFound, onError, serveEmojiFavicon } from "stoker/middlewares";
 import { defaultHook } from "stoker/openapi";
-import { cors } from 'hono/cors'
 
 import { pinoLogger } from "@/middlewares/pino-logger";
 
@@ -18,8 +18,13 @@ export function createRouter() {
 
 export default function createApp() {
 	const app = createRouter();
-	app.use('/*', cors())
-	app.use(requestId()).use(serveEmojiFavicon("📝")).use(pinoLogger());
+	app.use("/*", cors());
+	const isTest =
+		process.env.VITEST === "true" || process.env.NODE_ENV === "test";
+	const chain = app.use(requestId()).use(serveEmojiFavicon("📝"));
+	if (!isTest) {
+		chain.use(pinoLogger());
+	}
 
 	app.notFound(notFound);
 	app.onError(onError);
@@ -27,5 +32,6 @@ export default function createApp() {
 }
 
 export function createTestApp<S extends Schema>(router: AppOpenAPI<S>) {
+	process.env.VITEST = "true";
 	return createApp().route("/", router);
 }

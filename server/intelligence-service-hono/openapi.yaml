@@ -15,6 +15,100 @@ components:
           example: OK
       required:
         - status
+    DocumentKind:
+      type: string
+      enum:
+        - text
+    Document:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        versionNumber:
+          type: integer
+        createdAt:
+          type: string
+          format: date-time
+        title:
+          type: string
+        content:
+          type: string
+        kind:
+          $ref: "#/components/schemas/DocumentKind"
+        userId:
+          type: integer
+      required:
+        - id
+        - versionNumber
+        - createdAt
+        - title
+        - content
+        - kind
+        - userId
+    CreateDocumentRequest:
+      type: object
+      properties:
+        title:
+          type: string
+          minLength: 1
+          maxLength: 255
+        content:
+          type: string
+          minLength: 1
+        kind:
+          $ref: "#/components/schemas/DocumentKind"
+      required:
+        - title
+        - content
+        - kind
+    DocumentSummary:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        title:
+          type: string
+        kind:
+          $ref: "#/components/schemas/DocumentKind"
+        createdAt:
+          type: string
+          format: date-time
+        userId:
+          type: integer
+      required:
+        - id
+        - title
+        - kind
+        - createdAt
+        - userId
+    ChatMessageVote:
+      type: object
+      properties:
+        messageId:
+          type: string
+          format: uuid
+        isUpvoted:
+          type: boolean
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+      required:
+        - messageId
+        - isUpvoted
+        - createdAt
+        - updatedAt
+    VoteMessageRequest:
+      type: object
+      properties:
+        isUpvoted:
+          type: boolean
+      required:
+        - isUpvoted
     PoemRequest:
       type: object
       properties:
@@ -169,6 +263,7 @@ paths:
         - mentor
       summary: Handle mentor chat
       requestBody:
+        description: Chat request body
         required: true
         content:
           application/json:
@@ -176,268 +271,68 @@ paths:
               type: object
               properties:
                 id:
-                  type:
-                    - string
-                    - "null"
-                messages:
-                  type: array
-                  items:
-                    type: object
-                    properties:
-                      id:
-                        type: string
-                      role:
-                        type: string
-                        enum:
-                          - system
-                          - user
-                          - assistant
-                      metadata:
-                        type:
-                          - object
-                          - "null"
-                        additionalProperties: {}
-                      parts:
-                        type: array
-                        items:
-                          anyOf:
-                            - type: object
-                              properties:
-                                type:
-                                  type: string
-                                  enum:
-                                    - text
-                                text:
-                                  type: string
-                                state:
-                                  type: string
-                                  enum:
-                                    - streaming
-                                    - done
-                                providerMetadata:
-                                  type: object
-                                  additionalProperties: {}
-                              required:
-                                - type
-                                - text
-                            - type: object
-                              properties:
-                                type:
-                                  type: string
-                                  enum:
-                                    - reasoning
-                                text:
-                                  type: string
-                                state:
-                                  type: string
-                                  enum:
-                                    - streaming
-                                    - done
-                                providerMetadata:
-                                  type: object
-                                  additionalProperties: {}
-                              required:
-                                - type
-                                - text
-                            - type: object
-                              properties:
-                                type:
-                                  type: string
-                                  pattern: ^tool-.+
-                                toolCallId:
-                                  type: string
-                                providerMetadata:
-                                  type: object
-                                  additionalProperties: {}
-                                state:
-                                  type: string
-                                  enum:
-                                    - input-streaming
-                                input:
-                                  type: object
-                                  additionalProperties: {}
-                                providerExecuted:
-                                  type: boolean
-                              required:
-                                - type
-                                - toolCallId
-                                - state
-                            - type: object
-                              properties:
-                                type:
-                                  type: string
-                                  pattern: ^tool-.+
-                                toolCallId:
-                                  type: string
-                                providerMetadata:
-                                  type: object
-                                  additionalProperties: {}
-                                state:
-                                  type: string
-                                  enum:
-                                    - input-available
-                                input:
-                                  type: object
-                                  additionalProperties: {}
-                                providerExecuted:
-                                  type: boolean
-                                callProviderMetadata:
-                                  type: object
-                                  additionalProperties: {}
-                              required:
-                                - type
-                                - toolCallId
-                                - state
-                                - input
-                            - type: object
-                              properties:
-                                type:
-                                  type: string
-                                  pattern: ^tool-.+
-                                toolCallId:
-                                  type: string
-                                providerMetadata:
-                                  type: object
-                                  additionalProperties: {}
-                                state:
-                                  type: string
-                                  enum:
-                                    - output-available
-                                input:
-                                  type: object
-                                  additionalProperties: {}
-                                output:
-                                  type: object
-                                  additionalProperties: {}
-                                providerExecuted:
-                                  type: boolean
-                                callProviderMetadata:
-                                  type: object
-                                  additionalProperties: {}
-                              required:
-                                - type
-                                - toolCallId
-                                - state
-                            - type: object
-                              properties:
-                                type:
-                                  type: string
-                                  pattern: ^tool-.+
-                                toolCallId:
-                                  type: string
-                                providerMetadata:
-                                  type: object
-                                  additionalProperties: {}
-                                state:
-                                  type: string
-                                  enum:
-                                    - output-error
-                                input:
-                                  type: object
-                                  additionalProperties: {}
-                                errorText:
-                                  type: string
-                                providerExecuted:
-                                  type: boolean
-                                callProviderMetadata:
-                                  type: object
-                                  additionalProperties: {}
-                              required:
-                                - type
-                                - toolCallId
-                                - state
-                                - errorText
-                            - type: object
-                              properties:
-                                type:
-                                  type: string
-                                  enum:
-                                    - source-url
-                                sourceId:
-                                  type: string
-                                url:
-                                  type: string
-                                title:
-                                  type: string
-                                providerMetadata:
-                                  type: object
-                                  additionalProperties: {}
-                              required:
-                                - type
-                                - sourceId
-                                - url
-                            - type: object
-                              properties:
-                                type:
-                                  type: string
-                                  enum:
-                                    - source-document
-                                sourceId:
-                                  type: string
-                                mediaType:
-                                  type: string
-                                title:
-                                  type: string
-                                filename:
-                                  type: string
-                                providerMetadata:
-                                  type: object
-                                  additionalProperties: {}
-                              required:
-                                - type
-                                - sourceId
-                                - mediaType
-                                - title
-                            - type: object
-                              properties:
-                                type:
-                                  type: string
-                                  enum:
-                                    - file
-                                mediaType:
-                                  type: string
-                                filename:
-                                  type: string
-                                url:
-                                  type: string
-                                providerMetadata:
-                                  type: object
-                                  additionalProperties: {}
-                              required:
-                                - type
-                                - mediaType
-                                - url
-                            - type: object
-                              properties:
-                                type:
-                                  type: string
-                                  pattern: ^data-.+
-                                id:
-                                  type: string
-                                data: {}
-                                providerMetadata:
-                                  type: object
-                                  additionalProperties: {}
-                              required:
-                                - type
-                            - type: object
-                              properties:
-                                type:
-                                  type: string
-                                  enum:
-                                    - step-start
-                              required:
-                                - type
-                    required:
-                      - id
-                      - role
-                      - parts
-                metadata: {}
-                user_id:
-                  type: number
+                  type: string
+                  format: uuid
+                message:
+                  type: object
+                  properties:
+                    id:
+                      type: string
+                      format: uuid
+                    role:
+                      type: string
+                      enum:
+                        - user
+                    parts:
+                      type: array
+                      items:
+                        anyOf:
+                          - type: object
+                            properties:
+                              type:
+                                type: string
+                                enum:
+                                  - text
+                              text:
+                                type: string
+                                minLength: 1
+                                maxLength: 2000
+                            required:
+                              - type
+                              - text
+                          - type: object
+                            properties:
+                              type:
+                                type: string
+                                enum:
+                                  - file
+                              mediaType:
+                                type: string
+                                enum:
+                                  - image/jpeg
+                                  - image/png
+                              name:
+                                type: string
+                                minLength: 1
+                                maxLength: 100
+                              url:
+                                type: string
+                                format: uri
+                            required:
+                              - type
+                              - mediaType
+                              - name
+                              - url
+                  required:
+                    - id
+                    - role
+                    - parts
+                previousMessageId:
+                  type: string
+                  format: uuid
               required:
-                - messages
-                - user_id
+                - id
+                - message
       responses:
         "200":
           description: Event stream of chat updates.
@@ -453,9 +348,7 @@ paths:
                           - text-start
                       id:
                         type: string
-                      providerMetadata:
-                        type: object
-                        additionalProperties: {}
+                      providerMetadata: {}
                     required:
                       - type
                       - id
@@ -469,9 +362,7 @@ paths:
                         type: string
                       delta:
                         type: string
-                      providerMetadata:
-                        type: object
-                        additionalProperties: {}
+                      providerMetadata: {}
                     required:
                       - type
                       - id
@@ -484,9 +375,7 @@ paths:
                           - text-end
                       id:
                         type: string
-                      providerMetadata:
-                        type: object
-                        additionalProperties: {}
+                      providerMetadata: {}
                     required:
                       - type
                       - id
@@ -546,9 +435,7 @@ paths:
                       input: {}
                       providerExecuted:
                         type: boolean
-                      providerMetadata:
-                        type: object
-                        additionalProperties: {}
+                      providerMetadata: {}
                       dynamic:
                         type: boolean
                     required:
@@ -570,9 +457,7 @@ paths:
                         type: string
                       providerExecuted:
                         type: boolean
-                      providerMetadata:
-                        type: object
-                        additionalProperties: {}
+                      providerMetadata: {}
                       dynamic:
                         type: boolean
                     required:
@@ -622,9 +507,7 @@ paths:
                           - reasoning-start
                       id:
                         type: string
-                      providerMetadata:
-                        type: object
-                        additionalProperties: {}
+                      providerMetadata: {}
                     required:
                       - type
                       - id
@@ -638,9 +521,7 @@ paths:
                         type: string
                       delta:
                         type: string
-                      providerMetadata:
-                        type: object
-                        additionalProperties: {}
+                      providerMetadata: {}
                     required:
                       - type
                       - id
@@ -653,9 +534,7 @@ paths:
                           - reasoning-end
                       id:
                         type: string
-                      providerMetadata:
-                        type: object
-                        additionalProperties: {}
+                      providerMetadata: {}
                     required:
                       - type
                       - id
@@ -671,9 +550,7 @@ paths:
                         type: string
                       title:
                         type: string
-                      providerMetadata:
-                        type: object
-                        additionalProperties: {}
+                      providerMetadata: {}
                     required:
                       - type
                       - sourceId
@@ -692,9 +569,7 @@ paths:
                         type: string
                       filename:
                         type: string
-                      providerMetadata:
-                        type: object
-                        additionalProperties: {}
+                      providerMetadata: {}
                     required:
                       - type
                       - sourceId
@@ -710,9 +585,7 @@ paths:
                         type: string
                       mediaType:
                         type: string
-                      providerMetadata:
-                        type: object
-                        additionalProperties: {}
+                      providerMetadata: {}
                     required:
                       - type
                       - url
@@ -782,6 +655,524 @@ paths:
                           - abort
                     required:
                       - type
+  /mentor/threads/{threadId}:
+    get:
+      tags:
+        - mentor
+      summary: Get mentor chat thread detail
+      parameters:
+        - schema:
+            type: string
+            format: uuid
+          required: true
+          name: threadId
+          in: path
+      responses:
+        "200":
+          description: Thread detail with messages
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  id:
+                    type: string
+                    format: uuid
+                  title:
+                    type:
+                      - string
+                      - "null"
+                  selectedLeafMessageId:
+                    type:
+                      - string
+                      - "null"
+                    format: uuid
+                  messages:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        id:
+                          type: string
+                          format: uuid
+                        role:
+                          type: string
+                          enum:
+                            - system
+                            - user
+                            - assistant
+                        parts:
+                          type: array
+                          items:
+                            anyOf:
+                              - type: object
+                                properties:
+                                  type:
+                                    type: string
+                                    enum:
+                                      - text
+                                  text:
+                                    type: string
+                                required:
+                                  - type
+                                  - text
+                              - type: object
+                                properties:
+                                  type:
+                                    type: string
+                                    enum:
+                                      - file
+                                  url:
+                                    type: string
+                                    format: uri
+                                  mediaType:
+                                    type: string
+                                    enum:
+                                      - image/jpeg
+                                      - image/png
+                                  name:
+                                    type: string
+                                required:
+                                  - type
+                                  - url
+                                  - mediaType
+                        createdAt:
+                          type: string
+                          format: date-time
+                        parentMessageId:
+                          type:
+                            - string
+                            - "null"
+                          format: uuid
+                      required:
+                        - id
+                        - role
+                        - parts
+                required:
+                  - id
+                  - messages
+        "404":
+          description: Thread not found
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                required:
+                  - error
+        "500":
+          description: Internal error
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                required:
+                  - error
+  /mentor/documents:
+    post:
+      tags:
+        - documents
+      summary: Create a new document
+      requestBody:
+        description: Create document
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateDocumentRequest"
+      responses:
+        "201":
+          description: Created document
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Document"
+        "500":
+          description: Internal error
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                required:
+                  - error
+    get:
+      tags:
+        - documents
+      summary: List latest version of documents (no auth; all users)
+      parameters:
+        - schema:
+            type:
+              - integer
+              - "null"
+            minimum: 0
+            default: 0
+          required: false
+          name: page
+          in: query
+        - schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 20
+          required: false
+          name: size
+          in: query
+      responses:
+        "200":
+          description: Document summaries
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/DocumentSummary"
+        "500":
+          description: Internal error
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                required:
+                  - error
+  /mentor/documents/{id}:
+    get:
+      tags:
+        - documents
+      summary: Get latest version of a document
+      parameters:
+        - schema:
+            type: string
+            format: uuid
+          required: true
+          name: id
+          in: path
+      responses:
+        "200":
+          description: Document
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Document"
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                required:
+                  - error
+        "500":
+          description: Internal error
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                required:
+                  - error
+    put:
+      tags:
+        - documents
+      summary: Update a document (creates new version)
+      parameters:
+        - schema:
+            type: string
+            format: uuid
+          required: true
+          name: id
+          in: path
+      requestBody:
+        description: Update document
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateDocumentRequest"
+      responses:
+        "200":
+          description: Updated document
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Document"
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                required:
+                  - error
+        "500":
+          description: Internal error
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                required:
+                  - error
+    delete:
+      tags:
+        - documents
+      summary: Delete a document and all versions
+      parameters:
+        - schema:
+            type: string
+            format: uuid
+          required: true
+          name: id
+          in: path
+      responses:
+        "204":
+          description: Deleted
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                required:
+                  - error
+        "500":
+          description: Internal error
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                required:
+                  - error
+  /mentor/documents/{id}/versions:
+    get:
+      tags:
+        - documents
+      summary: List versions of a document
+      parameters:
+        - schema:
+            type: string
+            format: uuid
+          required: true
+          name: id
+          in: path
+        - schema:
+            type:
+              - integer
+              - "null"
+            minimum: 0
+            default: 0
+          required: false
+          name: page
+          in: query
+        - schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 20
+          required: false
+          name: size
+          in: query
+      responses:
+        "200":
+          description: Document versions
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Document"
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                required:
+                  - error
+        "500":
+          description: Internal error
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                required:
+                  - error
+    delete:
+      tags:
+        - documents
+      summary: Delete versions after timestamp
+      parameters:
+        - schema:
+            type: string
+            format: uuid
+          required: true
+          name: id
+          in: path
+        - schema:
+            type: string
+            format: date-time
+          required: true
+          name: after
+          in: query
+      responses:
+        "200":
+          description: Deleted versions
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Document"
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                required:
+                  - error
+        "500":
+          description: Internal error
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                required:
+                  - error
+  /mentor/documents/{id}/versions/{versionNumber}:
+    get:
+      tags:
+        - documents
+      summary: Get specific version
+      parameters:
+        - schema:
+            type: string
+            format: uuid
+          required: true
+          name: id
+          in: path
+        - schema:
+            type:
+              - integer
+              - "null"
+          required: false
+          name: versionNumber
+          in: path
+      responses:
+        "200":
+          description: Document
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Document"
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                required:
+                  - error
+        "500":
+          description: Internal error
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                required:
+                  - error
+  /mentor/chat/messages/{messageId}/vote:
+    post:
+      tags:
+        - vote
+      summary: Vote on a chat message (upvote/downvote)
+      parameters:
+        - schema:
+            type: string
+            format: uuid
+          required: true
+          name: messageId
+          in: path
+      requestBody:
+        description: Vote request body
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/VoteMessageRequest"
+      responses:
+        "200":
+          description: Vote recorded
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ChatMessageVote"
+        "404":
+          description: Message not found
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                required:
+                  - error
+        "500":
+          description: Internal error
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                required:
+                  - error
   /poem:
     post:
       tags:

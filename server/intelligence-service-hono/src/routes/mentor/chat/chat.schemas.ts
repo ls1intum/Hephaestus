@@ -1,5 +1,5 @@
-import { z } from "zod";
 import type { InferUITool, UIMessage } from "ai";
+import { z } from "zod";
 import type { getWeather } from "@/lib/ai/tools/get-weather";
 import type { AppUsage } from "@/lib/ai/usage";
 
@@ -8,7 +8,7 @@ import type { AppUsage } from "@/lib/ai/usage";
 export type DataPart = { type: "append-message"; message: string };
 
 export const messageMetadataSchema = z.object({
-  createdAt: z.string(),
+	createdAt: z.string(),
 });
 
 export type MessageMetadata = z.infer<typeof messageMetadataSchema>;
@@ -16,30 +16,30 @@ export type MessageMetadata = z.infer<typeof messageMetadataSchema>;
 type weatherTool = InferUITool<typeof getWeather>;
 
 export type ChatTools = {
-  getWeather: weatherTool;
+	getWeather: weatherTool;
 };
 
 export type CustomUIDataTypes = {
-  textDelta: string;
-  appendMessage: string;
-  id: string;
-  title: string;
-  kind: "text";
-  clear: null;
-  finish: null;
-  usage: AppUsage;
+	textDelta: string;
+	appendMessage: string;
+	id: string;
+	title: string;
+	kind: "text";
+	clear: null;
+	finish: null;
+	usage: AppUsage;
 };
 
 export type ChatMessage = UIMessage<
-  MessageMetadata,
-  CustomUIDataTypes,
-  ChatTools
+	MessageMetadata,
+	CustomUIDataTypes,
+	ChatTools
 >;
 
 export type Attachment = {
-  name: string;
-  url: string;
-  contentType: string;
+	name: string;
+	url: string;
+	contentType: string;
 };
 
 // Stream part schema for server-sent events
@@ -228,26 +228,61 @@ export type StreamPart = z.infer<typeof streamPartSchema>;
 // Request body schema for /mentor/chat
 
 const textPartSchema = z.object({
-  type: z.enum(["text"]),
-  text: z.string().min(1).max(2000),
+	type: z.enum(["text"]),
+	text: z.string().min(1).max(2000),
 });
 
 const filePartSchema = z.object({
-  type: z.enum(["file"]),
-  mediaType: z.enum(["image/jpeg", "image/png"]),
-  name: z.string().min(1).max(100),
-  url: z.string().url(),
+	type: z.enum(["file"]),
+	mediaType: z.enum(["image/jpeg", "image/png"]),
+	name: z.string().min(1).max(100),
+	url: z.string().url(),
 });
 
 const partSchema = z.union([textPartSchema, filePartSchema]);
 
 export const chatRequestBodySchema = z.object({
-  id: z.string().uuid(),
-  message: z.object({
-    id: z.string().uuid(),
-    role: z.enum(["user"]),
-    parts: z.array(partSchema),
-  }),
+	id: z.string().uuid(),
+	message: z.object({
+		id: z.string().uuid(),
+		role: z.enum(["user"]),
+		parts: z.array(partSchema),
+	}),
+	previousMessageId: z.string().uuid().optional(),
 });
 
 export type ChatRequestBody = z.infer<typeof chatRequestBodySchema>;
+
+// Thread detail response schema for GET /mentor/threads/:threadId
+export const ThreadIdParamsSchema = z
+	.object({ threadId: z.string().uuid() })
+	.openapi("ThreadIdParams");
+export type ThreadIdParams = z.infer<typeof ThreadIdParamsSchema>;
+
+const uiTextPartSchema = z.object({
+	type: z.literal("text"),
+	text: z.string(),
+});
+const uiFilePartSchema = z.object({
+	type: z.literal("file"),
+	url: z.string().url(),
+	mediaType: z.enum(["image/jpeg", "image/png"]),
+	name: z.string().optional(),
+});
+
+export const threadMessageSchema = z.object({
+	id: z.string().uuid(),
+	role: z.enum(["system", "user", "assistant"]),
+	parts: z.array(z.union([uiTextPartSchema, uiFilePartSchema])),
+	createdAt: z.string().datetime().optional(),
+	parentMessageId: z.string().uuid().nullable().optional(),
+});
+
+export const threadDetailSchema = z.object({
+	id: z.string().uuid(),
+	title: z.string().nullable().optional(),
+	selectedLeafMessageId: z.string().uuid().nullable().optional(),
+	messages: z.array(threadMessageSchema),
+});
+
+export type ThreadDetail = z.infer<typeof threadDetailSchema>;

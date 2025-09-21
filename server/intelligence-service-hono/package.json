@@ -5,6 +5,8 @@
 		"dev": "tsx watch src/index.ts",
 		"build": "tsc && tsc-alias",
 		"start": "node dist/index.js",
+		"db:setup": "tsx scripts/setup-db.ts",
+		"test": "vitest run",
 		"openapi:export": "tsx scripts/export-openapi.ts",
 		"db:introspect": "drizzle-kit introspect --dialect=postgresql --url=postgresql://root:root@localhost:5432/hephaestus && tsx scripts/post-introspect.ts",
 		"check": "biome check src scripts drizzle.config.ts",
@@ -44,7 +46,8 @@
 		"drizzle-kit": "^0.31.4",
 		"tsc-alias": "^1.8.16",
 		"tsx": "^4.19.4",
-		"typescript": "^5.8.3"
+		"typescript": "^5.8.3",
+		"vitest": "^2.1.4"
 	},
 	"engines": {
 		"node": ">=22.10.0"

@@ -1,4 +1,5 @@
 import path from "node:path";
+import type { LanguageModel } from "ai";
 import { config } from "dotenv";
 import { expand } from "dotenv-expand";
 import { z } from "zod";
@@ -100,19 +101,50 @@ const EnvSchema = z
 
 export type env = z.infer<typeof EnvSchema>;
 
-const { data: parsed, error } = EnvSchema.safeParse(process.env);
+const isTestEnv =
+	process.env.VITEST === "true" || process.env.NODE_ENV === "test";
+const { data: parsedMaybe, error } = EnvSchema.safeParse(process.env);
+let envData: z.infer<typeof EnvSchema>;
+if (parsedMaybe) {
+	envData = parsedMaybe;
+} else if (isTestEnv) {
+	envData = {
+		NODE_ENV: "test",
+		PORT: 18080,
+		LOG_LEVEL: "silent",
+		DATABASE_URL: "postgresql://root:root@localhost:5432/hephaestus",
+		MODEL_NAME: "openai:gpt-5-mini",
+		DETECTION_MODEL_NAME: "openai:gpt-5-mini",
+		OPENAI_API_KEY: "test",
+	};
+} else {
+	// Will exit below due to error
+	envData = undefined as unknown as z.infer<typeof EnvSchema>;
+}
 
-if (error) {
+if (error && !isTestEnv) {
 	console.error("❌ Invalid env:");
 	console.error(JSON.stringify(z.treeifyError(error).properties, null, 2));
 	process.exit(1);
 }
+// In tests, fall back to stub models to avoid external calls
+const defaultModel: LanguageModel = isTestEnv
+	? ({
+			doStream: async function* () {
+				yield { type: "text-delta", textDelta: "test " } as unknown;
+				yield { type: "text-delta", textDelta: "response" } as unknown;
+				yield { type: "finish" } as unknown;
+			},
+		} as unknown as LanguageModel)
+	: (getModel(envData.MODEL_NAME) as unknown as LanguageModel);
+const detectionModel: LanguageModel = isTestEnv
+	? (defaultModel as LanguageModel)
+	: (getModel(envData.DETECTION_MODEL_NAME) as unknown as LanguageModel);
 
-const defaultModel = getModel(parsed.MODEL_NAME);
-const detectionModel = getModel(parsed.DETECTION_MODEL_NAME);
-
-export default {
-	...parsed,
+const exportedEnv = {
+	...envData,
 	defaultModel,
 	detectionModel,
 };
+
+export default exportedEnv;
