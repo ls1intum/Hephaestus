@@ -31,6 +31,7 @@ const leaderboardSearchSchema = z.object({
 	sort: z.enum(["SCORE", "LEAGUE_POINTS"]).default("SCORE"),
 	after: z.string().optional().default(startOfCurrentWeek),
 	before: z.string().optional().default(endOfCurrentWeek),
+	mode: z.enum(["INDIVIDUAL", "TEAM"]).optional().default("INDIVIDUAL"),
 });
 
 // Export route with search param validation
@@ -39,7 +40,9 @@ export const Route = createFileRoute("/_authenticated/")({
 	validateSearch: zodValidator(leaderboardSearchSchema),
 	// Configure search middleware to retain params when navigating
 	search: {
-		middlewares: [retainSearchParams(["team", "sort", "after", "before"])],
+		middlewares: [
+			retainSearchParams(["team", "sort", "after", "before", "mode"]),
+		],
 	},
 });
 
@@ -48,7 +51,7 @@ function LeaderboardContainer() {
 	const { username } = useAuth();
 
 	// Access properly validated search params with correct types
-	const { team, sort, after, before } = Route.useSearch();
+	const { team, sort, after, before, mode } = Route.useSearch();
 	const navigate = useNavigate({ from: Route.fullPath });
 
 	// Query for metadata (teams, schedule info)
@@ -64,6 +67,7 @@ function LeaderboardContainer() {
 				before: new Date(before || endOfCurrentWeek),
 				team,
 				sort,
+				mode,
 			},
 		}),
 		enabled: Boolean(after && before && metaQuery.data),
@@ -79,7 +83,7 @@ function LeaderboardContainer() {
 	// Find the current user's entry in the leaderboard
 	const currentUserEntry = username
 		? leaderboardQuery.data?.find(
-				(entry) => entry.user.login.toLowerCase() === username.toLowerCase(),
+				(entry) => entry.user?.login?.toLowerCase() === username.toLowerCase(),
 			)
 		: undefined;
 

@@ -438,6 +438,14 @@ paths:
           enum:
           - SCORE
           - LEAGUE_POINTS
+      - in: query
+        name: mode
+        required: false
+        schema:
+          type: string
+          enum:
+          - INDIVIDUAL
+          - TEAM
       responses:
         "200":
           content:
@@ -595,60 +603,6 @@ paths:
           description: OK
       tags:
       - team
-  /team-leaderboard:
-    get:
-      operationId: getTeamLeaderboard
-      parameters:
-      - in: query
-        name: after
-        required: true
-        schema:
-          type: string
-          format: date-time
-      - in: query
-        name: before
-        required: true
-        schema:
-          type: string
-          format: date-time
-      - in: query
-        name: team
-        required: false
-        schema:
-          type: string
-      - in: query
-        name: sort
-        required: false
-        schema:
-          type: string
-          enum:
-          - SCORE
-          - LEAGUE_POINTS
-      responses:
-        "200":
-          content:
-            application/json:
-              schema:
-                type: array
-                items:
-                  $ref: "#/components/schemas/TeamLeaderboardEntry"
-          description: OK
-      tags:
-      - team-leaderboard
-  /team-leaderboard/all-time:
-    get:
-      operationId: getAllTimeTeamLeaderboard
-      responses:
-        "200":
-          content:
-            application/json:
-              schema:
-                type: array
-                items:
-                  $ref: "#/components/schemas/TeamLeaderboardEntry"
-          description: OK
-      tags:
-      - team-leaderboard
   /team/{id}/visibility:
     post:
       operationId: updateTeamVisibility
@@ -1381,6 +1335,8 @@ components:
         score:
           type: integer
           format: int32
+        team:
+          $ref: "#/components/schemas/TeamInfo"
         user:
           $ref: "#/components/schemas/UserInfo"
       required:
@@ -1393,7 +1349,6 @@ components:
       - rank
       - reviewedPullRequests
       - score
-      - user
     LeagueChange:
       type: object
       properties:
@@ -2432,50 +2387,6 @@ components:
       - name
       - repoPermissionCount
       - repositories
-    TeamLeaderboardEntry:
-      type: object
-      properties:
-        numberOfApprovals:
-          type: integer
-          format: int32
-        numberOfChangeRequests:
-          type: integer
-          format: int32
-        numberOfCodeComments:
-          type: integer
-          format: int32
-        numberOfComments:
-          type: integer
-          format: int32
-        numberOfReviewedPRs:
-          type: integer
-          format: int32
-        numberOfUnknowns:
-          type: integer
-          format: int32
-        rank:
-          type: integer
-          format: int32
-        reviewedPullRequests:
-          type: array
-          items:
-            $ref: "#/components/schemas/PullRequestInfo"
-        score:
-          type: integer
-          format: int32
-        team:
-          $ref: "#/components/schemas/TeamInfo"
-      required:
-      - numberOfApprovals
-      - numberOfChangeRequests
-      - numberOfCodeComments
-      - numberOfComments
-      - numberOfReviewedPRs
-      - numberOfUnknowns
-      - rank
-      - reviewedPullRequests
-      - score
-      - team
     TextUIPart:
       type: object
       description: A text part of a message.
@@ -2842,19 +2753,16 @@ components:
           anyOf:
           - type: integer
           - type: "null"
-          default: null
           title: Interval
         temperature_2m:
           anyOf:
           - type: number
           - type: "null"
-          default: null
           title: Temperature 2M
         time:
           anyOf:
           - type: string
           - type: "null"
-          default: null
           title: Time
       title: WeatherCurrent
     WeatherCurrentUnits:
@@ -2864,13 +2772,11 @@ components:
           anyOf:
           - type: string
           - type: "null"
-          default: null
           title: Interval
         temperature_2m:
           anyOf:
           - type: string
           - type: "null"
-          default: null
           title: Temperature 2M
         time:
           anyOf:
@@ -2907,13 +2813,11 @@ components:
           anyOf:
           - type: string
           - type: "null"
-          default: null
           title: Sunrise
         sunset:
           anyOf:
           - type: string
           - type: "null"
-          default: null
           title: Sunset
         time:
           anyOf:

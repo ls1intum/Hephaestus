@@ -11,6 +11,7 @@ import de.tum.in.www1.hephaestus.gitprovider.team.TeamRepository;
 import de.tum.in.www1.hephaestus.gitprovider.team.membership.TeamMembership;
 import de.tum.in.www1.hephaestus.gitprovider.user.UserRepository;
 import de.tum.in.www1.hephaestus.gitprovider.user.UserTeamsDTO;
+import de.tum.in.www1.hephaestus.leaderboard.LeaderboardMode;
 import de.tum.in.www1.hephaestus.leaderboard.LeaderboardService;
 import de.tum.in.www1.hephaestus.leaderboard.LeaguePointsCalculationService;
 import de.tum.in.www1.hephaestus.syncing.GitHubDataSyncService;
@@ -317,14 +318,25 @@ public class WorkspaceService {
 
         // While we still have reviews in the past, calculate leaderboard and update points
         do {
-            var leaderboard = leaderboardService.createLeaderboard(weekAgo, now, Optional.empty(), Optional.empty());
+            var leaderboard = leaderboardService.createLeaderboard(
+                weekAgo,
+                now,
+                Optional.empty(),
+                Optional.empty(),
+                Optional.of(LeaderboardMode.INDIVIDUAL)
+            );
             if (leaderboard.isEmpty()) {
                 break;
             }
 
             // Update league points for each user
             leaderboard.forEach(entry -> {
-                var user = userRepository.findByLoginWithEagerMergedPullRequests(entry.user().login()).orElseThrow();
+                var leaderboardUser = entry.getUser();
+                if (leaderboardUser == null) {
+                    return;
+                }
+                var user =
+                    userRepository.findByLoginWithEagerMergedPullRequests(leaderboardUser.getLogin()).orElseThrow();
                 int newPoints = leaguePointsCalculationService.calculateNewPoints(user, entry);
                 user.setLeaguePoints(newPoints);
                 userRepository.save(user);

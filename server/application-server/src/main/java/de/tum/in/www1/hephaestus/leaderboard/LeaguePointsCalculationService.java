@@ -40,9 +40,9 @@ public class LeaguePointsCalculationService {
         // Base decay
         int decay = calculateDecay(user.getLeaguePoints());
         // Bonus based on leaderboard score
-        int performanceBonus = calculatePerformanceBonus(entry.score());
+        int performanceBonus = calculatePerformanceBonus(entry.getScore());
         // Additional bonus for placements
-        int placementBonus = calculatePlacementBonus(entry.rank());
+        int placementBonus = calculatePlacementBonus(entry.getRank());
         // Calculate final point change
         int pointChange = (int) (kFactor * (performanceBonus + placementBonus - decay));
         // Apply minimum change to prevent extreme swings

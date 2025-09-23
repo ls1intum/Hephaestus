@@ -1,7 +1,9 @@
 package de.tum.in.www1.hephaestus.leaderboard.tasks;
 
 import de.tum.in.www1.hephaestus.gitprovider.user.UserRepository;
+import de.tum.in.www1.hephaestus.gitprovider.user.UserInfoDTO;
 import de.tum.in.www1.hephaestus.leaderboard.LeaderboardEntryDTO;
+import de.tum.in.www1.hephaestus.leaderboard.LeaderboardMode;
 import de.tum.in.www1.hephaestus.leaderboard.LeaderboardService;
 import de.tum.in.www1.hephaestus.leaderboard.LeaguePointsCalculationService;
 import jakarta.transaction.Transactional;
@@ -48,7 +50,12 @@ public class LeaguePointsUpdateTask implements Runnable {
      */
     private Consumer<? super LeaderboardEntryDTO> updateLeaderboardEntry() {
         return entry -> {
-            var user = userRepository.findByLoginWithEagerMergedPullRequests(entry.user().login()).orElseThrow();
+            UserInfoDTO leaderboardUser = entry.getUser();
+            if (leaderboardUser == null) {
+                return;
+            }
+            var user =
+                userRepository.findByLoginWithEagerMergedPullRequests(leaderboardUser.login()).orElseThrow();
             int newPoints = leaguePointsCalculationService.calculateNewPoints(user, entry);
             user.setLeaguePoints(newPoints);
             userRepository.save(user);
@@ -70,6 +77,12 @@ public class LeaguePointsUpdateTask implements Runnable {
             .withNano(0);
         Instant before = zonedBefore.toInstant();
         Instant after = zonedBefore.minusWeeks(1).toInstant();
-        return leaderboardService.createLeaderboard(after, before, Optional.empty(), Optional.empty());
+        return leaderboardService.createLeaderboard(
+            after,
+            before,
+            Optional.empty(),
+            Optional.empty(),
+            Optional.of(LeaderboardMode.INDIVIDUAL)
+        );
     }
 }
