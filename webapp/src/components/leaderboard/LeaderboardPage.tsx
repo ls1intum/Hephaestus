@@ -4,6 +4,7 @@ import { LeaderboardLegend } from "./LeaderboardLegend";
 import { LeaderboardOverview } from "./LeaderboardOverview";
 import { LeaderboardTable } from "./LeaderboardTable";
 import type { LeaderboardSortType } from "./SortFilter";
+import { TeamLeaderboardTable } from '@/components/leaderboard/TeamLeaderboardTable.tsx';
 
 interface LeaderboardPageProps {
 	leaderboard?: LeaderboardEntry[];
@@ -31,6 +32,8 @@ interface LeaderboardPageProps {
 		hour: number;
 		minute: number;
 	};
+  selectedMode: "INDIVIDUAL" | "TEAM";
+  onModeChange?: (mode: "INDIVIDUAL" | "TEAM") => void;
 }
 
 export function LeaderboardPage({
@@ -92,12 +95,17 @@ export function LeaderboardPage({
 						)}
 
 						<div className="border rounded-md border-input overflow-auto">
-							<LeaderboardTable
+              {isTeam? (
+                <LeaderboardTable
 								leaderboard={leaderboard}
 								isLoading={isLoading}
 								currentUser={currentUser}
 								onUserClick={onUserClick}
 							/>
+              ) : (
+                <TeamLeaderboardTable
+                  isLoading={isLoading}/>
+              )}
 						</div>
 					</div>
 

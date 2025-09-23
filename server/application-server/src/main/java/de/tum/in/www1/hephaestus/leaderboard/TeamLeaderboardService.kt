@@ -53,7 +53,7 @@ class TeamLeaderboardService {
                 after,
                 before,
                 Optional.of(team.name),
-                Optional.of(LeaderboardSortType.SCORE)
+                Optional.of(LeaderboardSortType.SCORE),
             )
         }
 
@@ -99,7 +99,7 @@ class TeamLeaderboardService {
                     numberOfChangeRequests = teamStats.numberOfChangeRequests,
                     numberOfComments = teamStats.numberOfComments,
                     numberOfUnknowns = teamStats.numberOfUnknowns,
-                    numberOfCodeComments = teamStats.numberOfCodeComments
+                    numberOfCodeComments = teamStats.numberOfCodeComments,
                 )
             }
             .toMutableList()

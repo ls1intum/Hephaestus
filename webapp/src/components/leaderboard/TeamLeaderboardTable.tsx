@@ -24,7 +24,7 @@ import {Tooltip, TooltipContent, TooltipTrigger} from "@/components/ui/tooltip.t
 
 export interface TeamLeaderboardTableProps {
     isLoading: boolean;
-    teamLeaderboard?: TeamLeaderboardEntry[]; //TODO: check if it works with that or if i need to implement a TeamLeaderboardEntry
+    teamLeaderboard?: TeamLeaderboardEntry[]; // TODO: check if it works with that or if i need to implement a TeamLeaderboardEntry
     currentTeam?: TeamInfo; // TODO: Maybe integrate that later on if the board works to highlight the teams of the logged in user
     onTeamClick?: (teamName: string) => void;
 }

@@ -25,12 +25,14 @@ const endOfCurrentWeekDate = endOfISOWeek(today);
 const startOfCurrentWeek = formatISO(startOfCurrentWeekDate);
 const endOfCurrentWeek = formatISO(endOfCurrentWeekDate);
 
+
 // Define search params schema for validation and types
 const leaderboardSearchSchema = z.object({
 	team: z.string().default("all"),
 	sort: z.enum(["SCORE", "LEAGUE_POINTS"]).default("SCORE"),
 	after: z.string().optional().default(startOfCurrentWeek),
 	before: z.string().optional().default(endOfCurrentWeek),
+  mode: z.enum(["INDIVIDUAL", "TEAM"]).default("INDIVIDUAL")
 });
 
 // Export route with search param validation
@@ -39,7 +41,7 @@ export const Route = createFileRoute("/_authenticated/")({
 	validateSearch: zodValidator(leaderboardSearchSchema),
 	// Configure search middleware to retain params when navigating
 	search: {
-		middlewares: [retainSearchParams(["team", "sort", "after", "before"])],
+		middlewares: [retainSearchParams(["team", "sort", "after", "before", "mode"])],
 	},
 });
 
@@ -48,7 +50,7 @@ function LeaderboardContainer() {
 	const { username } = useAuth();
 
 	// Access properly validated search params with correct types
-	const { team, sort, after, before } = Route.useSearch();
+	const { team, sort, after, before, mode } = Route.useSearch();
 	const navigate = useNavigate({ from: Route.fullPath });
 
 	// Query for metadata (teams, schedule info)
@@ -220,6 +222,15 @@ function LeaderboardContainer() {
 		navigate({ to: "/user/$username", params: { username } });
 	};
 
+  const handleModeChange = (newMode: "INDIVIDUAL" | "TEAM") => {
+    navigate({
+      search: (prev) => ({
+        ...prev,
+        mode: newMode,
+      }),
+    });
+  };
+
 	return (
 		<LeaderboardPage
 			leaderboard={leaderboardQuery.data || []}
@@ -239,6 +250,8 @@ function LeaderboardContainer() {
 			onSortChange={handleSortChange}
 			onTimeframeChange={handleTimeframeChange}
 			onUserClick={handleUserClick}
+      selectedMode={mode}
+      onModeChange={handleModeChange}
 		/>
 	);
 }
