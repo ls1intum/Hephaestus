@@ -427,12 +427,12 @@ paths:
           format: date-time
       - in: query
         name: team
-        required: false
+        required: true
         schema:
           type: string
       - in: query
         name: sort
-        required: false
+        required: true
         schema:
           type: string
           enum:
@@ -440,7 +440,7 @@ paths:
           - LEAGUE_POINTS
       - in: query
         name: mode
-        required: false
+        required: true
         schema:
           type: string
           enum:
@@ -2753,16 +2753,19 @@ components:
           anyOf:
           - type: integer
           - type: "null"
+          default: null
           title: Interval
         temperature_2m:
           anyOf:
           - type: number
           - type: "null"
+          default: null
           title: Temperature 2M
         time:
           anyOf:
           - type: string
           - type: "null"
+          default: null
           title: Time
       title: WeatherCurrent
     WeatherCurrentUnits:
@@ -2772,11 +2775,13 @@ components:
           anyOf:
           - type: string
           - type: "null"
+          default: null
           title: Interval
         temperature_2m:
           anyOf:
           - type: string
           - type: "null"
+          default: null
           title: Temperature 2M
         time:
           anyOf:
@@ -2813,11 +2818,13 @@ components:
           anyOf:
           - type: string
           - type: "null"
+          default: null
           title: Sunrise
         sunset:
           anyOf:
           - type: string
           - type: "null"
+          default: null
           title: Sunset
         time:
           anyOf:

@@ -155,14 +155,20 @@ class LeaderboardService(
     private fun createTeamLeaderboard(
         after: Instant,
         before: Instant,
-        team: String?,
+        team: String,
         sort: LeaderboardSortType,
     ): List<LeaderboardEntryDTO> {
-        val allTeams = teamRepository.findAll()
-        val targetTeams = team?.let { name -> allTeams.filter { it.name == name } } ?: allTeams
+        logger.info(
+            "Creating team leaderboard dataset with timeframe: {} - {} and team: {}",
+            after,
+            before,
+            team,
+        )
 
-        if (team != null && targetTeams.isEmpty()) {
-            logger.info("No teams found for provided filter: {}", team)
+        val targetTeams = if (team != "all") teamRepository.findTeamByName(team) else teamRepository.findAll()
+
+        if (targetTeams.isEmpty()) {
+            logger.info("❌ No teams found for provided filter: {}", team)
             return emptyList()
         }
 

@@ -1865,9 +1865,9 @@ export type GetLeaderboardData = {
     query: {
         after: Date;
         before: Date;
-        team?: string;
-        sort?: 'SCORE' | 'LEAGUE_POINTS';
-        mode?: 'INDIVIDUAL' | 'TEAM';
+        team: string;
+        sort: 'SCORE' | 'LEAGUE_POINTS';
+        mode: 'INDIVIDUAL' | 'TEAM';
     };
     url: '/leaderboard';
 };
