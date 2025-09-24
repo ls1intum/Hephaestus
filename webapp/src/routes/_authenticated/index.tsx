@@ -66,6 +66,7 @@ function LeaderboardContainer() {
 				before: new Date(before || endOfCurrentWeek),
 				team,
 				sort,
+				mode,
 			},
 		}),
 		enabled: Boolean(after && before && metaQuery.data),
@@ -81,7 +82,7 @@ function LeaderboardContainer() {
 	// Find the current user's entry in the leaderboard
 	const currentUserEntry = username
 		? leaderboardQuery.data?.find(
-				(entry) => entry.user.login.toLowerCase() === username.toLowerCase(),
+				(entry) => entry.user?.login?.toLowerCase() === username.toLowerCase(),
 			)
 		: undefined;
 
