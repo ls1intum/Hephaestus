@@ -9,6 +9,8 @@ import {
 import { type LeaderboardSortType, SortFilter } from "./SortFilter";
 import { TeamFilter, type TeamFilterOption } from "./TeamFilter";
 import { TimeframeFilter } from "./TimeframeFilter";
+import { Switch } from '@/components/ui/switch.tsx';
+import { Label } from '@/components/ui/label.tsx';
 
 export interface LeaderboardFilterProps {
 	teamOptions: TeamFilterOption[];
@@ -29,6 +31,8 @@ export interface LeaderboardFilterProps {
 		minute: number;
 		formatted: string;
 	};
+  selectedMode: "INDIVIDUAL" | "TEAM";
+  onModeChange?: (mode: "INDIVIDUAL" | "TEAM") => void;
 }
 
 export function LeaderboardFilter({
@@ -41,6 +45,8 @@ export function LeaderboardFilter({
 	initialAfterDate,
 	initialBeforeDate,
 	leaderboardSchedule,
+  selectedMode,
+  onModeChange,
 }: LeaderboardFilterProps & {
 	initialAfterDate?: string;
 	initialBeforeDate?: string;
@@ -62,6 +68,15 @@ export function LeaderboardFilter({
 				</CardDescription>
 			</CardHeader>
 			<CardContent>
+        <div className="flex items-center space-x-2 mb-4">
+          <Label htmlFor="mode-switch" className={selectedMode === "INDIVIDUAL" ? "font-bold" : ""}>Individual</Label>
+          <Switch
+            id="mode-switch"
+            checked={selectedMode === "TEAM"}
+            onCheckedChange={(checked) => onModeChange?.(checked ? "TEAM" : "INDIVIDUAL")}
+          />
+          <Label htmlFor="mode-switch" className={selectedMode === "TEAM" ? "font-bold" : ""}>Team</Label>
+        </div>
 				<div className="grid grid-cols-1 md:grid-cols-3 gap-4 xl:grid-cols-1">
 					<TeamFilter
 						options={teamOptions}

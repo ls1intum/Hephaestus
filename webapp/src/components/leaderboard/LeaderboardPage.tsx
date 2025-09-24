@@ -54,6 +54,8 @@ export function LeaderboardPage({
 	initialBeforeDate,
 	leaderboardEnd,
 	leaderboardSchedule,
+  selectedMode,
+  onModeChange
 }: LeaderboardPageProps) {
 	// Add formatted property to the leaderboardSchedule object if it exists
 	const formattedSchedule = leaderboardSchedule
@@ -71,6 +73,8 @@ export function LeaderboardPage({
 					<div className="space-y-4 col-span-1">
 						<div className="xl:sticky xl:top-4 xl:self-start xl:max-h-[calc(100vh-2rem)] xl:overflow-auto">
 							<LeaderboardFilter
+                selectedMode={selectedMode}
+                onModeChange={onModeChange}
 								teamOptions={teamOptions}
 								onTeamChange={onTeamChange}
 								onSortChange={onSortChange}
@@ -95,7 +99,7 @@ export function LeaderboardPage({
 						)}
 
 						<div className="border rounded-md border-input overflow-auto">
-              {isTeam? (
+              {selectedMode === "INDIVIDUAL" ? (
                 <LeaderboardTable
 								leaderboard={leaderboard}
 								isLoading={isLoading}
