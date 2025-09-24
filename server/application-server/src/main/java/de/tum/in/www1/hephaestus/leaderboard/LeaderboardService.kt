@@ -39,28 +39,11 @@ class LeaderboardService(
         sort: LeaderboardSortType,
         mode: LeaderboardMode,
     ): List<LeaderboardEntryDTO> {
-//        val resolvedMode = mode ?: LeaderboardMode.INDIVIDUAL
-//        val resolvedSort = sort ?: LeaderboardSortType.SCORE
-        val resolvedTeam = resolveTeamByName(team)
-        logger.info("\n➡️ team parameter: {}\n➡️ resolved Team: {}", team, resolvedTeam);
         return when (mode) {
             LeaderboardMode.INDIVIDUAL -> createIndividualLeaderboard(after, before, if (team == "all") null else resolveTeamByName(team), sort)
             LeaderboardMode.TEAM -> createTeamLeaderboard(after, before, team, sort)
         }
     }
-
-//    fun createLeaderboard(
-//        after: Instant,
-//        before: Instant,
-//        team: Optional<String>,
-//        sort: Optional<LeaderboardSortType>,
-//    ): List<LeaderboardEntryDTO> = createLeaderboard(
-//        after,
-//        before,
-//        team.orElse(null),
-//        sort.orElse(null),
-//        null,
-//    )
 
     fun createLeaderboard(
         after: Instant,
@@ -80,11 +63,8 @@ class LeaderboardService(
         after: Instant,
         before: Instant,
         team: Team?,
-//        teamName: String?,
         sort: LeaderboardSortType,
     ): List<LeaderboardEntryDTO> {
-//        val resolvedTeam = team ?: resolveTeamByName(teamName)
-//        val resolvedTeam = team
         logger.info(
             "Creating leaderboard dataset with timeframe: {} - {} and team: {}",
             after,
@@ -287,10 +267,6 @@ class LeaderboardService(
         val projectedNewPoints = leaguePointsCalculationService.calculateNewPoints(user, entry)
         return LeagueChangeDTO(user.login, projectedNewPoints - currentLeaguePoints)
     }
-
-//    private fun resolveTeamByName(teamName: String): Team = teamName.let { name ->
-//        teamRepository.findAll().firstOrNull { it.name == name }
-//    }
 
     private fun resolveTeamByName(teamName: String): Team? = teamRepository.findFirstByName(teamName)
 
