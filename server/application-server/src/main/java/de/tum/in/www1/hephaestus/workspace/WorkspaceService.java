@@ -9,6 +9,7 @@ import de.tum.in.www1.hephaestus.gitprovider.team.TeamInfoDTO;
 import de.tum.in.www1.hephaestus.gitprovider.team.TeamInfoDTOConverter;
 import de.tum.in.www1.hephaestus.gitprovider.team.TeamRepository;
 import de.tum.in.www1.hephaestus.gitprovider.team.membership.TeamMembership;
+import de.tum.in.www1.hephaestus.gitprovider.user.UserInfoDTO;
 import de.tum.in.www1.hephaestus.gitprovider.user.UserRepository;
 import de.tum.in.www1.hephaestus.gitprovider.user.UserTeamsDTO;
 import de.tum.in.www1.hephaestus.leaderboard.LeaderboardMode;
@@ -336,7 +337,7 @@ public class WorkspaceService {
                     return;
                 }
                 var user =
-                    userRepository.findByLoginWithEagerMergedPullRequests(leaderboardUser.getLogin()).orElseThrow();
+                    userRepository.findByLoginWithEagerMergedPullRequests(leaderboardUser.login()).orElseThrow();
                 int newPoints = leaguePointsCalculationService.calculateNewPoints(user, entry);
                 user.setLeaguePoints(newPoints);
                 userRepository.save(user);

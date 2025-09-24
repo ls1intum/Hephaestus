@@ -29,37 +29,38 @@ class LeaderboardService(
     private val leaguePointsCalculationService: LeaguePointsCalculationService,
 ) {
 
-    private val logger = LoggerFactory.getLogger(javaClass)
+    private val logger = LoggerFactory.getLogger("LeaderboardService")
 
     @Transactional
     fun createLeaderboard(
         after: Instant,
         before: Instant,
-        team: String?,
-        sort: LeaderboardSortType?,
-        mode: LeaderboardMode?,
+        team: String,
+        sort: LeaderboardSortType,
+        mode: LeaderboardMode,
     ): List<LeaderboardEntryDTO> {
-        val resolvedMode = mode ?: LeaderboardMode.INDIVIDUAL
-        val resolvedSort = sort ?: LeaderboardSortType.SCORE
-
-        return when (resolvedMode) {
-            LeaderboardMode.INDIVIDUAL -> createIndividualLeaderboard(after, before, resolveTeamByName(team), team, resolvedSort)
-            LeaderboardMode.TEAM -> createTeamLeaderboard(after, before, team, resolvedSort)
+//        val resolvedMode = mode ?: LeaderboardMode.INDIVIDUAL
+//        val resolvedSort = sort ?: LeaderboardSortType.SCORE
+        val resolvedTeam = resolveTeamByName(team)
+        logger.info("\n➡️ team parameter: {}\n➡️ resolved Team: {}", team, resolvedTeam);
+        return when (mode) {
+            LeaderboardMode.INDIVIDUAL -> createIndividualLeaderboard(after, before, if (team == "all") null else resolveTeamByName(team), sort)
+            LeaderboardMode.TEAM -> createTeamLeaderboard(after, before, team, sort)
         }
     }
 
-    fun createLeaderboard(
-        after: Instant,
-        before: Instant,
-        team: Optional<String>,
-        sort: Optional<LeaderboardSortType>,
-    ): List<LeaderboardEntryDTO> = createLeaderboard(
-        after,
-        before,
-        team.orElse(null),
-        sort.orElse(null),
-        null,
-    )
+//    fun createLeaderboard(
+//        after: Instant,
+//        before: Instant,
+//        team: Optional<String>,
+//        sort: Optional<LeaderboardSortType>,
+//    ): List<LeaderboardEntryDTO> = createLeaderboard(
+//        after,
+//        before,
+//        team.orElse(null),
+//        sort.orElse(null),
+//        null,
+//    )
 
     fun createLeaderboard(
         after: Instant,
@@ -79,23 +80,24 @@ class LeaderboardService(
         after: Instant,
         before: Instant,
         team: Team?,
-        teamName: String?,
+//        teamName: String?,
         sort: LeaderboardSortType,
     ): List<LeaderboardEntryDTO> {
-        val resolvedTeam = team ?: resolveTeamByName(teamName)
+//        val resolvedTeam = team ?: resolveTeamByName(teamName)
+//        val resolvedTeam = team
         logger.info(
             "Creating leaderboard dataset with timeframe: {} - {} and team: {}",
             after,
             before,
-            resolvedTeam?.name ?: "all",
+            team?.name ?: "all",
         )
 
         val reviews: List<PullRequestReview>
         val issueComments: List<IssueComment>
 
-        if (resolvedTeam != null) {
-            reviews = pullRequestReviewRepository.findAllInTimeframeOfTeam(after, before, resolvedTeam.id)
-            issueComments = issueCommentRepository.findAllInTimeframeOfTeam(after, before, resolvedTeam.id, true)
+        if (team != null) {
+            reviews = pullRequestReviewRepository.findAllInTimeframeOfTeam(after, before, team.id)
+            issueComments = issueCommentRepository.findAllInTimeframeOfTeam(after, before, team.id, true)
         } else {
             reviews = pullRequestReviewRepository.findAllInTimeframe(after, before)
             issueComments = issueCommentRepository.findAllInTimeframe(after, before, true)
@@ -108,8 +110,8 @@ class LeaderboardService(
 
         issueComments.mapNotNull { it.author }.forEach { usersById.putIfAbsent(it.id, it) }
 
-        if (resolvedTeam != null) {
-            userRepository.findAllByTeamId(resolvedTeam.id).forEach { usersById.putIfAbsent(it.id, it) }
+        if (team != null) {
+            userRepository.findAllByTeamId(team.id).forEach { usersById.putIfAbsent(it.id, it) }
         } else {
             userRepository.findAllHumanInTeams().forEach { usersById.putIfAbsent(it.id, it) }
         }
@@ -185,7 +187,7 @@ class LeaderboardService(
         }
 
         val teamStatsById = targetTeams.associateWith { teamEntity ->
-            val entries = createIndividualLeaderboard(after, before, teamEntity, teamEntity.name, sort)
+            val entries = createIndividualLeaderboard(after, before, teamEntity, sort)
             aggregateTeamStats(entries)
         }
 
@@ -286,9 +288,11 @@ class LeaderboardService(
         return LeagueChangeDTO(user.login, projectedNewPoints - currentLeaguePoints)
     }
 
-    private fun resolveTeamByName(teamName: String?): Team? = teamName?.let { name ->
-        teamRepository.findAll().firstOrNull { it.name == name }
-    }
+//    private fun resolveTeamByName(teamName: String): Team = teamName.let { name ->
+//        teamRepository.findAll().firstOrNull { it.name == name }
+//    }
+
+    private fun resolveTeamByName(teamName: String): Team? = teamRepository.findFirstByName(teamName)
 
     private data class TeamStats(
         val score: Int,

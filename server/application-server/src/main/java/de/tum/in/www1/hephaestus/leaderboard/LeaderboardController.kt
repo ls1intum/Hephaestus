@@ -20,9 +20,9 @@ class LeaderboardController(
     fun getLeaderboard(
         @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) after: Instant,
         @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) before: Instant,
-        @RequestParam(required = false) team: String?,
-        @RequestParam(required = false) sort: LeaderboardSortType?,
-        @RequestParam(required = false) mode: LeaderboardMode?,
+        @RequestParam team: String,
+        @RequestParam sort: LeaderboardSortType,
+        @RequestParam mode: LeaderboardMode,
     ): ResponseEntity<List<LeaderboardEntryDTO>> {
         return ResponseEntity.ok(leaderboardService.createLeaderboard(after, before, team, sort, mode))
     }

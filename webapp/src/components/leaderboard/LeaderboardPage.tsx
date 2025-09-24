@@ -4,7 +4,7 @@ import { LeaderboardLegend } from "./LeaderboardLegend";
 import { LeaderboardOverview } from "./LeaderboardOverview";
 import { LeaderboardTable } from "./LeaderboardTable";
 import type { LeaderboardSortType } from "./SortFilter";
-import { TeamLeaderboardTable } from '@/components/leaderboard/TeamLeaderboardTable.tsx';
+// import { TeamLeaderboardTable } from '@/components/leaderboard/TeamLeaderboardTable.tsx';
 
 interface LeaderboardPageProps {
 	leaderboard?: LeaderboardEntry[];
@@ -98,19 +98,14 @@ export function LeaderboardPage({
 							/>
 						)}
 
-						<div className="border rounded-md border-input overflow-auto">
-              {selectedMode === "INDIVIDUAL" ? (
-                <LeaderboardTable
-								leaderboard={leaderboard}
-								isLoading={isLoading}
-								currentUser={currentUser}
-								onUserClick={onUserClick}
-							/>
-              ) : (
-                <TeamLeaderboardTable
-                  isLoading={isLoading}/>
-              )}
-						</div>
+            <div className="border rounded-md border-input overflow-auto">
+              <LeaderboardTable
+                leaderboard={leaderboard}
+                isLoading={isLoading}
+                currentUser={currentUser}
+                onUserClick={onUserClick}
+              />
+            </div>
 					</div>
 
 					<div className="col-span-1 xl:sticky xl:top-4 xl:self-start xl:max-h-[calc(100vh-2rem)] xl:overflow-auto">
