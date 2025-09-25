@@ -26,17 +26,16 @@ import {
 import { cn } from "@/lib/utils";
 import { LeagueIcon } from "./LeagueIcon";
 import { ReviewsPopover } from "./ReviewsPopover";
+import type { LeaderboardVariant } from '@/components/leaderboard/LeaderboardPage.tsx';
 
 type TeamLeaderboardEntry = LeaderboardEntry & {
 	team: NonNullable<LeaderboardEntry["team"]>;
 };
 
-export type LeaderboardVariant = "individual" | "team";
-
 export interface LeaderboardTableProps {
 	leaderboard?: LeaderboardEntry[] | TeamLeaderboardEntry[];
 	isLoading: boolean;
-	variant?: LeaderboardVariant;
+	variant: LeaderboardVariant;
 	currentUser?: UserInfo;
 	onUserClick?: (username: string) => void;
 	onTeamClick?: (teamName: string) => void;
@@ -45,7 +44,7 @@ export interface LeaderboardTableProps {
 export function LeaderboardTable({
 	leaderboard = [],
 	isLoading,
-	variant = "individual",
+	variant,
 	currentUser,
 	onUserClick,
 	onTeamClick,
@@ -66,7 +65,7 @@ export function LeaderboardTable({
 		);
 	}
 
-	const isTeam = variant === "team";
+	const isTeam = variant === "TEAM";
 
 	return (
 		<Table>

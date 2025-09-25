@@ -232,6 +232,11 @@ function LeaderboardContainer() {
     });
   };
 
+  // TODO: implement handleTeamClick with scrollability function
+  const handleTeamClick = (teamName: string) => {
+    navigate({ to: "/teams" });
+  };
+
 	return (
 		<LeaderboardPage
 			leaderboard={leaderboardQuery.data || []}
@@ -253,6 +258,7 @@ function LeaderboardContainer() {
 			onUserClick={handleUserClick}
       selectedMode={mode}
       onModeChange={handleModeChange}
+      onTeamClick={handleTeamClick}
 		/>
 	);
 }

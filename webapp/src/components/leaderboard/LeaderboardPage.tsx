@@ -1,10 +1,11 @@
-import type { LeaderboardEntry, UserInfo } from "@/api/types.gen";
+import type { LeaderboardEntry, UserInfo } from '@/api/types.gen';
 import { LeaderboardFilter } from "./LeaderboardFilter";
 import { LeaderboardLegend } from "./LeaderboardLegend";
 import { LeaderboardOverview } from "./LeaderboardOverview";
-import { LeaderboardTable } from "./LeaderboardTable";
+import { LeaderboardTable } from './LeaderboardTable';
 import type { LeaderboardSortType } from "./SortFilter";
-// import { TeamLeaderboardTable } from '@/components/leaderboard/TeamLeaderboardTable.tsx';
+
+export type LeaderboardVariant = "INDIVIDUAL" | "TEAM";
 
 interface LeaderboardPageProps {
 	leaderboard?: LeaderboardEntry[];
@@ -32,8 +33,9 @@ interface LeaderboardPageProps {
 		hour: number;
 		minute: number;
 	};
-  selectedMode: "INDIVIDUAL" | "TEAM";
-  onModeChange?: (mode: "INDIVIDUAL" | "TEAM") => void;
+  selectedMode: LeaderboardVariant;
+  onModeChange?: (mode: LeaderboardVariant) => void;
+  onTeamClick?: (teamName: string) => void;
 }
 
 export function LeaderboardPage({
@@ -55,7 +57,8 @@ export function LeaderboardPage({
 	leaderboardEnd,
 	leaderboardSchedule,
   selectedMode,
-  onModeChange
+  onModeChange,
+  onTeamClick,
 }: LeaderboardPageProps) {
 	// Add formatted property to the leaderboardSchedule object if it exists
 	const formattedSchedule = leaderboardSchedule
@@ -102,8 +105,10 @@ export function LeaderboardPage({
               <LeaderboardTable
                 leaderboard={leaderboard}
                 isLoading={isLoading}
+                variant={selectedMode}
                 currentUser={currentUser}
                 onUserClick={onUserClick}
+                onTeamClick={onTeamClick}
               />
             </div>
 					</div>

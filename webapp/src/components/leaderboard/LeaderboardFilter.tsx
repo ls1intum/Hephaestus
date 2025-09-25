@@ -11,6 +11,7 @@ import { TeamFilter, type TeamFilterOption } from "./TeamFilter";
 import { TimeframeFilter } from "./TimeframeFilter";
 import { Switch } from '@/components/ui/switch.tsx';
 import { Label } from '@/components/ui/label.tsx';
+import type { LeaderboardVariant } from '@/components/leaderboard/LeaderboardPage.tsx';
 
 export interface LeaderboardFilterProps {
 	teamOptions: TeamFilterOption[];
@@ -31,8 +32,8 @@ export interface LeaderboardFilterProps {
 		minute: number;
 		formatted: string;
 	};
-  selectedMode: "INDIVIDUAL" | "TEAM";
-  onModeChange?: (mode: "INDIVIDUAL" | "TEAM") => void;
+  selectedMode: LeaderboardVariant;
+  onModeChange?: (mode: LeaderboardVariant) => void;
 }
 
 export function LeaderboardFilter({
