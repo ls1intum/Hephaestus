@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useMemo, useLayoutEffect } from "react";
 import type { TeamInfo } from "@/api/types.gen";
 import {
 	type Contributor,
@@ -142,7 +142,7 @@ export function TeamsPage({ teams, isLoading }: TeamsPageProps) {
 				? emptyStateNode
 				: undefined;
 		return (
-			<Card key={team.id} className="flex flex-col gap-3">
+			<Card key={team.id} id={`team-${team.id}`} className="flex flex-col gap-3">
 				<CardHeader>
 					<CardTitle>{team.name}</CardTitle>
 				</CardHeader>
@@ -159,6 +159,40 @@ export function TeamsPage({ teams, isLoading }: TeamsPageProps) {
 			</Card>
 		);
 	};
+
+  useLayoutEffect(() => {
+    const scrollToHash = () => {
+      const hash = window.location.hash;
+      if (!hash) return;
+      const id = hash.slice(1);
+      const el = document.getElementById(id);
+      if (el) {
+        el.scrollIntoView({ behavior: "smooth", block: "center" });
+        return true;
+      }
+      // one-frame fallback
+      requestAnimationFrame(() => {
+        const elNext = document.getElementById(id);
+        if (elNext) elNext.scrollIntoView({ behavior: "smooth", block: "center" });
+      });
+    };
+
+    // try immediately
+    if (scrollToHash()) return;
+
+    // observe DOM until the target appears (then disconnect)
+    const observer = new MutationObserver(() => {
+      if (scrollToHash()) observer.disconnect();
+    });
+    observer.observe(document.body, { childList: true, subtree: true });
+
+    // also handle manual hash change
+    window.addEventListener("hashchange", scrollToHash);
+    return () => {
+      observer.disconnect();
+      window.removeEventListener("hashchange", scrollToHash);
+    }
+  }, []); // no `roots` dependency - observer handles late DOM insertion
 
 	return (
 		<>

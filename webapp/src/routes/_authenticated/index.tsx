@@ -233,8 +233,8 @@ function LeaderboardContainer() {
   };
 
   // TODO: implement handleTeamClick with scrollability function
-  const handleTeamClick = (teamName: string) => {
-    navigate({ to: "/teams" });
+  const handleTeamClick = (teamId: number) => {
+    navigate({ to: `/teams#team-${teamId}` });
   };
 
 	return (

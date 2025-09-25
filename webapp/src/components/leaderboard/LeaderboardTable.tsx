@@ -38,7 +38,7 @@ export interface LeaderboardTableProps {
 	variant: LeaderboardVariant;
 	currentUser?: UserInfo;
 	onUserClick?: (username: string) => void;
-	onTeamClick?: (teamName: string) => void;
+	onTeamClick?: (teamId: number) => void;
 }
 
 export function LeaderboardTable({
@@ -98,7 +98,7 @@ export function LeaderboardTable({
 								key={team.name}
 								id={`team-${team.id}`}
 								className="cursor-pointer"
-								onClick={() => onTeamClick?.(team.name)}
+								onClick={() => onTeamClick?.(team.id)}
 							>
 								<TableCell className="text-center">{entry.rank}</TableCell>
 								<TableCell>
