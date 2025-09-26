@@ -17,7 +17,7 @@ public interface PullRequestReviewRepository extends JpaRepository<PullRequestRe
         LEFT JOIN FETCH prr.pullRequest
         LEFT JOIN FETCH prr.pullRequest.repository
         LEFT JOIN FETCH prr.comments
-        WHERE prr.author.login ILIKE :authorLogin AND prr.submittedAt >= :activitySince
+        WHERE prr.author.login = :authorLogin AND prr.submittedAt >= :activitySince
         ORDER BY prr.submittedAt DESC
         """
     )

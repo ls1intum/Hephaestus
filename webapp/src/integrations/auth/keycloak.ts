@@ -250,7 +250,7 @@ class KeycloakService {
 	public isCurrentUser(login?: string): boolean {
 		if (!login) return false;
 		const username = this.keycloak?.tokenParsed?.preferred_username;
-		return username?.toLowerCase() === login.toLowerCase();
+		return username === login;
 	}
 }
 
