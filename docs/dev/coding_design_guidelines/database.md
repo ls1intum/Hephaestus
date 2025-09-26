@@ -28,7 +28,7 @@ public class ExampleClass {
 
 - Use `@NonNull` to indicate that a field is required. Generally, this is a very desirable property and should be used unless there is a specific reason to allow the field to be `null`.
 - Use `@Id` for the primary ID key field. Every entity should have such a field.
-- If `String` fields can contain more than 255 characters, use the `@Lob` annotation to indicate that the field should be stored as a large object in the database. This is particularly important whenever fields are filled by an external source (e.g. the Github API).
+- If `String` fields can contain more than 255 characters, use `@Column(columnDefinition = "TEXT")` to indicate that the field should be stored as a TEXT column in the database. This is particularly important whenever fields are filled by an external source (e.g. the Github API).
 
 ### Entity Relationships
 

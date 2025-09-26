@@ -4,11 +4,11 @@ import de.tum.in.www1.hephaestus.gitprovider.common.AuthorAssociation;
 import de.tum.in.www1.hephaestus.gitprovider.common.BaseGitServiceEntity;
 import de.tum.in.www1.hephaestus.gitprovider.issue.Issue;
 import de.tum.in.www1.hephaestus.gitprovider.user.User;
+import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
 import jakarta.persistence.JoinColumn;
-import jakarta.persistence.Lob;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
 import lombok.Getter;
@@ -25,7 +25,7 @@ import org.springframework.lang.NonNull;
 @ToString(callSuper = true)
 public class IssueComment extends BaseGitServiceEntity {
 
-    @Lob
+    @Column(columnDefinition = "TEXT")
     @NonNull
     private String body;
 

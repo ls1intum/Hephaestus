@@ -63,7 +63,7 @@ public class PullRequest extends Issue {
     @ToString.Exclude
     private Set<PullRequestReviewComment> reviewComments = new HashSet<>();
 
-    @Lob
+    @Column(columnDefinition = "TEXT")
     private String badPracticeSummary;
 
     protected Instant lastDetectionTime;
