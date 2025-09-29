@@ -50,8 +50,7 @@ public class GitHubAppBackfillService {
             .orElseThrow(() -> new IllegalStateException("No organization found for installation " + installationId));
 
         try {
-            String token = tokenService.getInstallationToken(installationId);
-            GitHub gh = new GitHubBuilder().withAppInstallationToken(token).build();
+            GitHub gh = tokenService.clientForInstallation(installationId);
             GHOrganization ghOrg = gh.getOrganization(org.getLogin());
 
             logger.info("Seeding repos for org={} installationId={} (selection={})",

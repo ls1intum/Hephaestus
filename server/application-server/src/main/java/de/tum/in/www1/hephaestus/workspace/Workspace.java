@@ -60,6 +60,7 @@ public class Workspace {
 
     @OneToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "organization_id", unique = true, foreignKey = @ForeignKey(name = "fk_workspace_organization"))
+    @ToString.Exclude
     private Organization organization;
 
     //TODO: Only temporary to differentiate between ls1intum <-> orgs installed via GHApp. To be deleted in the future

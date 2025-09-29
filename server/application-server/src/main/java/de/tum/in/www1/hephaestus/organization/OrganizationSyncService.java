@@ -94,7 +94,7 @@ public class OrganizationSyncService {
                 String loginLower = ghUser.getLogin().toLowerCase(Locale.ROOT);
                 if (!byLoginLower.containsKey(loginLower)) {
                     User u = userSyncService.syncUser(loginLower);
-                    if (u!= null) {
+                    if (u != null) {
                         toCreate.add(u);
                         byLoginLower.put(loginLower, u);
                     }

@@ -102,6 +102,7 @@ public class GitHubAppBackfillOnStartup {
                 organizationSyncService.syncByInstallationId(installationId);
                 organizationSyncService.syncMembersByInstallationId(installationId);
 
+                // We want to seed only selected repositories on startup
                 if (isNatsEnabled && workspace.getGithubRepositorySelection() == GHRepositorySelection.SELECTED) {
                     logger.info("Auto-managing monitors for org={} installationId={}", login, installationId);
                     backfillService.seedReposForWorkspace(workspace);
