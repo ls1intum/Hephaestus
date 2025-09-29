@@ -1,6 +1,5 @@
 package de.tum.in.www1.hephaestus.workspace;
 
-import de.tum.in.www1.hephaestus.gitprovider.common.enums.RepositorySelection;
 import de.tum.in.www1.hephaestus.gitprovider.label.Label;
 import de.tum.in.www1.hephaestus.gitprovider.label.LabelRepository;
 import de.tum.in.www1.hephaestus.gitprovider.repository.RepositoryRepository;
@@ -24,6 +23,8 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.stream.Collectors;
+
+import org.kohsuke.github.GHRepositorySelection;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -363,7 +364,7 @@ public class WorkspaceService {
     @Transactional
     public Workspace ensureForInstallation(
         long installationId,
-        RepositorySelection repositorySelection
+        GHRepositorySelection repositorySelection
     ) {
         Workspace workspace = workspaceRepository.findByInstallationId(installationId).orElseGet(Workspace::new);
         workspace.setGitProviderMode(Workspace.GitProviderMode.GITHUB_APP_INSTALLATION);

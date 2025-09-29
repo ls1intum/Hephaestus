@@ -1,6 +1,5 @@
 package de.tum.in.www1.hephaestus.workspace;
 
-import de.tum.in.www1.hephaestus.gitprovider.common.enums.RepositorySelection;
 import de.tum.in.www1.hephaestus.organization.Organization;
 import jakarta.persistence.CascadeType;
 import jakarta.persistence.Enumerated;
@@ -22,6 +21,7 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 import lombok.ToString;
+import org.kohsuke.github.GHRepositorySelection;
 
 @Entity
 @Table(name = "workspace")
@@ -54,7 +54,7 @@ public class Workspace {
     private String accountLogin;
 
     @Enumerated(EnumType.STRING)
-    private RepositorySelection githubRepositorySelection; // ALL / SELECTED
+    private GHRepositorySelection githubRepositorySelection; // ALL / SELECTED
 
     private Instant installationLinkedAt;
 

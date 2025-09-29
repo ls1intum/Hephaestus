@@ -1,6 +1,5 @@
 package de.tum.in.www1.hephaestus.gitprovider.common.github.app;
 
-import de.tum.in.www1.hephaestus.gitprovider.common.enums.RepositorySelection;
 import de.tum.in.www1.hephaestus.organization.Organization;
 import de.tum.in.www1.hephaestus.organization.OrganizationLinkService;
 import de.tum.in.www1.hephaestus.organization.OrganizationService;
@@ -92,7 +91,7 @@ public class GitHubAppBackfillOnStartup {
                 organizationService.upsertIdentityAndAttachInstallation(organizationId, login, installationId);
                 logger.info("Org ensured/attached: id={} login={} installation={}", organizationId, login, installationId);
 
-                RepositorySelection selection = mapRepositorySelection(inst.getRepositorySelection());
+                GHRepositorySelection selection = inst.getRepositorySelection();
                 Workspace workspace = workspaceService.ensureForInstallation(installationId, selection);
 
                 organizationLinkService.attachOrganization(workspace.getId(), installationId);
@@ -103,7 +102,7 @@ public class GitHubAppBackfillOnStartup {
                 organizationSyncService.syncByInstallationId(installationId);
                 organizationSyncService.syncMembersByInstallationId(installationId);
 
-                if (isNatsEnabled && workspace.getGithubRepositorySelection() == RepositorySelection.SELECTED) {
+                if (isNatsEnabled && workspace.getGithubRepositorySelection() == GHRepositorySelection.SELECTED) {
                     logger.info("Auto-managing monitors for org={} installationId={}", login, installationId);
                     backfillService.seedReposForWorkspace(workspace);
                 }
@@ -111,12 +110,5 @@ public class GitHubAppBackfillOnStartup {
         } catch (Exception e) {
             logger.warn("Startup reconcile/backfill failed: {}", e.getMessage(), e);
         }
-    }
-
-    private static RepositorySelection mapRepositorySelection(GHRepositorySelection sel) {
-        if (sel == null) {
-            return null;
-        }
-        return (sel == GHRepositorySelection.ALL) ? RepositorySelection.ALL : RepositorySelection.SELECTED;
     }
 }
