@@ -215,4 +215,34 @@
     <changeSet author="ddmukh" id="1758640191062-43">
         <dropColumn columnName="updated_at" tableName="team"/>
     </changeSet>
+    <changeSet author="ddmukh" id="1758640191062-45">
+        <preConditions onFail="MARK_RAN">
+            <tableExists tableName="team_v2_repository_permission"/>
+        </preConditions>
+        <dropTable tableName="team_v2_repository_permission" cascadeConstraints="true"/>
+    </changeSet>
+    <changeSet author="ddmukh" id="1758640191062-46">
+        <preConditions onFail="MARK_RAN">
+            <tableExists tableName="team_v2_membership"/>
+        </preConditions>
+        <dropTable tableName="team_v2_membership" cascadeConstraints="true"/>
+    </changeSet>
+    <changeSet author="ddmukh" id="1758640191062-47">
+        <preConditions onFail="MARK_RAN">
+            <tableExists tableName="team_v2"/>
+        </preConditions>
+        <dropTable tableName="team_v2" cascadeConstraints="true"/>
+    </changeSet>
+    <changeSet author="ddmukh" id="1758640191062-48">
+        <preConditions onFail="MARK_RAN">
+            <tableExists tableName="team_members"/>
+        </preConditions>
+        <dropTable tableName="team_members" cascadeConstraints="true"/>
+    </changeSet>
+    <changeSet author="ddmukh" id="1758640191062-49">
+        <preConditions onFail="MARK_RAN">
+            <tableExists tableName="team_repositories"/>
+        </preConditions>
+        <dropTable tableName="team_repositories" cascadeConstraints="true"/>
+    </changeSet>
 </databaseChangeLog>
