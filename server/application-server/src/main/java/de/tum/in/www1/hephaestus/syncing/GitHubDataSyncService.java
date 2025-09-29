@@ -45,6 +45,7 @@ public class GitHubDataSyncService {
     @Value("${monitoring.sync-cooldown-in-minutes}")
     private int syncCooldownInMinutes;
 
+    //TODO: Field is assigned but never accessed
     @Value("${monitoring.sync-all-issues-and-pull-requests}")
     private boolean syncAllIssuesAndPullRequests;
 
@@ -188,8 +189,9 @@ public class GitHubDataSyncService {
 
     private Optional<GHRepository> syncRepository(RepositoryToMonitor repositoryToMonitor) {
         String nameWithOwner = repositoryToMonitor.getNameWithOwner();
+        Long workSpaceId = repositoryToMonitor.getWorkspace().getId();
         var currentTime = Instant.now();
-        var repository = repositorySyncService.syncRepository(nameWithOwner);
+        var repository = repositorySyncService.syncRepository(workSpaceId, nameWithOwner);
         repositoryToMonitor.setRepositorySyncedAt(currentTime);
         repositoryToMonitorRepository.save(repositoryToMonitor);
         return repository;
@@ -230,7 +232,6 @@ public class GitHubDataSyncService {
 
     /**
      * Syncs the recent issues and pull requests of the repository in ascending order of their last update time.
-     *
      * Issues and pull requests are separate entites but are synced together in the same method.
      * Issues are synced first with their associated issue comments.
      * If an issue has a pull request, the pull request is synced next with its associated reviews and review comments.
@@ -302,7 +303,7 @@ public class GitHubDataSyncService {
         }
 
         var repositoryId = repository.get().getId();
-        var lastIssueNumber = issueRepository.findLastIssueNumber(repositoryId).orElse(0);
+        int lastIssueNumber = issueRepository.findLastIssueNumber(repositoryId).orElse(0);
         if (lastIssueNumber == 0) {
             return false;
         }
@@ -329,15 +330,14 @@ public class GitHubDataSyncService {
 
     /**
      * Syncs all past issues and pull requests of the repository that have not been synced yet.
-     *
      * This method will process all issues and pull requests that have not yet been synced and
      * ensures they are synchronized with the repository.
      *
      * @param repository the GitHub repository to sync
-     * @param repositoryToMonitor the repository to sync
      */
-    private void syncAllPastIssuesAndPullRequests(GHRepository repository, RepositoryToMonitor repositoryToMonitor) {
-        var lastIssueNumber = issueRepository.findLastIssueNumber(repository.getId()).orElse(0);
+    //TODO: Method never used
+    private void syncAllPastIssuesAndPullRequests(GHRepository repository) {
+        int lastIssueNumber = issueRepository.findLastIssueNumber(repository.getId()).orElse(0);
         if (lastIssueNumber == 0) {
             return;
         }

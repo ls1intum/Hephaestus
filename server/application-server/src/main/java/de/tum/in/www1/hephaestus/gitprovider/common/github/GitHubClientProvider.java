@@ -26,19 +26,13 @@ public class GitHubClientProvider {
         this.legacyPat = legacyPat;
     }
 
-    /** App-scoped client (JWT). */
-    public GitHub asApp() throws IOException {
-        return appTokens.clientAsApp();
-    }
-
     /**
-     * Client for the first workspace. Prefers installation token; falls back to PAT if configured.
-     * Throws if neither is available.
+     * Get a GitHub client for a specific installation.
+     * Falls back to PAT if no installationId is provided.
      */
-    public GitHub forDefaultWorkspace() throws IOException {
-        Workspace workspace = workspaceRepository.findFirstByOrderByIdAsc().orElseThrow();
-        if (workspace.getInstallationId() != null) {
-            return appTokens.clientForInstallation(workspace.getInstallationId());
+    public GitHub forInstallationOrPat(Long installationId) throws IOException {
+        if (installationId != null) {
+            return appTokens.clientForInstallation(installationId);
         }
         if (legacyPat == null || legacyPat.isBlank()) {
             throw new IllegalStateException(
@@ -46,5 +40,14 @@ public class GitHubClientProvider {
             );
         }
         return new GitHubBuilder().withOAuthToken(legacyPat).build();
+    }
+
+    /**
+     * Get a GitHub client for the given workspace.
+     */
+    public GitHub forWorkspace(Long workspaceId) throws IOException {
+        Workspace workspace = workspaceRepository.findById(workspaceId)
+            .orElseThrow(() -> new IllegalArgumentException("Workspace not found: " + workspaceId));
+        return forInstallationOrPat(workspace.getInstallationId());
     }
 }

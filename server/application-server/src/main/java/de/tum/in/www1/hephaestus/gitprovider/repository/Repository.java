@@ -116,6 +116,7 @@ public class Repository extends BaseGitServiceEntity {
     /**
      * Removes all team permissions referencing this repository.
      */
+    //TODO: Method never used
     public void removeAllTeams() {
         if (this.teamRepoPermissions != null) {
             this.teamRepoPermissions.forEach(perm -> {
@@ -129,7 +130,6 @@ public class Repository extends BaseGitServiceEntity {
     }
     // TODO:
     // owner
-    // organization
 
     // Ignored GitHub properties:
     // - subscribersCount

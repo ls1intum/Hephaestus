@@ -90,54 +90,59 @@ public class WorkspaceService {
 
     @EventListener(ApplicationReadyEvent.class)
     public void onApplicationReady() {
-        Workspace workspace = getWorkspace();
-        Set<RepositoryToMonitor> repositoriesToMonitor = workspace.getRepositoriesToMonitor();
-
-        if (isNatsEnabled) {
-            repositoriesToMonitor.forEach(repositoryToMonitor ->
-                natsConsumerService.startConsumingRepositoryToMonitorAsync(repositoryToMonitor)
-            );
-            natsConsumerService.startConsumingOrganizationAsync(defaultOrganization);
+        List<Workspace> workspaces = workspaceRepository.findAll();
+        if (workspaces.isEmpty()) {
+            logger.warn("No workspaces found on startup");
+            return;
         }
+        for(Workspace workspace : workspaces) {
+            Set<RepositoryToMonitor> repositoriesToMonitor = workspace.getRepositoriesToMonitor();
 
-        if (runMonitoringOnStartup) {
-            logger.info("Running monitoring on startup");
+            if (isNatsEnabled) {
+                repositoriesToMonitor.forEach(repositoryToMonitor ->
+                    natsConsumerService.startConsumingRepositoryToMonitorAsync(repositoryToMonitor)
+                );
+                natsConsumerService.startConsumingOrganizationAsync(defaultOrganization);
+            }
 
-            // Run all repository syncs asynchronously
-            CompletableFuture<?>[] repoFutures = repositoriesToMonitor
-                .stream()
-                .map(repo -> CompletableFuture.runAsync(() -> gitHubDataSyncService.syncRepositoryToMonitor(repo)))
-                .toArray(CompletableFuture[]::new);
-            CompletableFuture<Void> reposDone = CompletableFuture.allOf(repoFutures);
+            if (runMonitoringOnStartup) {
+                logger.info("Running monitoring on startup");
 
-            // When all repository syncs complete, then sync users
-            CompletableFuture<Void> usersFuture = reposDone
-                .thenRunAsync(() -> {
-                    logger.info("All repositories synced, now syncing users");
-                    gitHubDataSyncService.syncUsers(workspace);
-                })
-                .exceptionally(ex -> {
-                    logger.error("Error during syncUsers: {}", ex.getMessage(), ex);
-                    return null;
-                });
+                // Run all repository syncs asynchronously
+                CompletableFuture<?>[] repoFutures = repositoriesToMonitor
+                    .stream()
+                    .map(repo -> CompletableFuture.runAsync(() -> gitHubDataSyncService.syncRepositoryToMonitor(repo)))
+                    .toArray(CompletableFuture[]::new);
+                CompletableFuture<Void> reposDone = CompletableFuture.allOf(repoFutures);
 
-            // When all users syncs complete, then sync teams
-            CompletableFuture<Void> teamsFuture = usersFuture
-                .thenRunAsync(() -> {
-                    logger.info("Syncing teams");
-                    gitHubDataSyncService.syncTeams(workspace);
-                })
-                .exceptionally(ex -> {
-                    logger.error("Error during syncTeams: {}", ex.getMessage(), ex);
-                    return null;
-                });
+                // When all repository syncs complete, then sync users
+                CompletableFuture<Void> usersFuture = reposDone
+                    .thenRunAsync(() -> {
+                        logger.info("All repositories synced, now syncing users");
+                        gitHubDataSyncService.syncUsers(workspace);
+                    })
+                    .exceptionally(ex -> {
+                        logger.error("Error during syncUsers: {}", ex.getMessage(), ex);
+                        return null;
+                    });
 
-            CompletableFuture.allOf(teamsFuture).thenRun(() -> {
-                logger.info("Finished running monitoring on startup");
-            });
+                // When all users syncs complete, then sync teams
+                CompletableFuture<Void> teamsFuture = usersFuture
+                    .thenRunAsync(() -> {
+                        logger.info("Syncing teams");
+                        gitHubDataSyncService.syncTeams(workspace);
+                    })
+                    .exceptionally(ex -> {
+                        logger.error("Error during syncTeams: {}", ex.getMessage(), ex);
+                        return null;
+                    });
+
+                CompletableFuture.allOf(teamsFuture).thenRun(() -> logger.info("Finished running monitoring on startup"));
+            }
         }
     }
 
+    //TODO: Method never used
     private Workspace createInitialWorkspace() {
         Workspace workspace = new Workspace();
 
@@ -159,27 +164,40 @@ public class WorkspaceService {
         return workspaceRepository.save(workspace);
     }
 
-    public Workspace getWorkspace() {
-        return workspaceRepository.findFirstByOrderByIdAsc().orElseGet(this::createInitialWorkspace);
+    public Workspace getWorkspaceByRepositoryOwner(String nameWithOwner) {
+        return workspaceRepository.findByRepositoriesToMonitor_NameWithOwner(nameWithOwner)
+            .orElseThrow(() -> new IllegalStateException(
+                "No workspace found for repository: " + nameWithOwner
+            ));
+    }
+
+    public List<Workspace> listAllWorkspaces() {
+        return workspaceRepository.findAll();
     }
 
     public List<String> getRepositoriesToMonitor() {
-        logger.info("Getting repositories to monitor");
-        return getWorkspace().getRepositoriesToMonitor().stream().map(RepositoryToMonitor::getNameWithOwner).toList();
+        logger.info("Getting repositories to monitor from all workspaces");
+        return workspaceRepository.findAll().stream()
+            .flatMap(ws -> ws.getRepositoriesToMonitor().stream())
+            .map(RepositoryToMonitor::getNameWithOwner)
+            .distinct()
+            .toList();
     }
 
     public void addRepositoryToMonitor(String nameWithOwner)
         throws RepositoryAlreadyMonitoredException, RepositoryNotFoundException {
         logger.info("Adding repository to monitor: " + nameWithOwner);
-        Workspace workspace = getWorkspace();
+        Workspace workspace = resolveWorkspaceForRepo(nameWithOwner);
 
         if (workspace.getRepositoriesToMonitor().stream().anyMatch(r -> r.getNameWithOwner().equals(nameWithOwner))) {
             logger.info("Repository is already being monitored");
             throw new RepositoryAlreadyMonitoredException(nameWithOwner);
         }
 
+        var workspaceId = workspace.getId();
+
         // Validate that repository exists
-        var repository = repositorySyncService.syncRepository(nameWithOwner);
+        var repository = repositorySyncService.syncRepository(workspaceId, nameWithOwner);
         if (repository.isEmpty()) {
             logger.info("Repository does not exist");
             throw new RepositoryNotFoundException(nameWithOwner);
@@ -201,7 +219,7 @@ public class WorkspaceService {
 
     public void removeRepositoryToMonitor(String nameWithOwner) throws RepositoryNotFoundException {
         logger.info("Removing repository from monitor: " + nameWithOwner);
-        Workspace workspace = getWorkspace();
+        Workspace workspace = getWorkspaceByRepositoryOwner(nameWithOwner);
 
         RepositoryToMonitor repositoryToMonitor = workspace
             .getRepositoriesToMonitor()
@@ -253,7 +271,7 @@ public class WorkspaceService {
         }
         team.addLabel(labelEntity.get());
         teamRepository.save(team);
-        return Optional.of(teamInfoDTOConverter.convert(team));
+        return Optional.ofNullable(teamInfoDTOConverter.convert(team));
     }
 
     public Optional<TeamInfoDTO> removeLabelFromTeam(Long teamId, Long labelId) {
@@ -269,9 +287,10 @@ public class WorkspaceService {
         }
         team.removeLabel(labelEntity.get());
         teamRepository.save(team);
-        return Optional.of(teamInfoDTOConverter.convert(team));
+        return Optional.ofNullable(teamInfoDTOConverter.convert(team));
     }
 
+    //TODO: Method never used
     public Optional<TeamInfoDTO> deleteTeam(Long teamId) {
         logger.info("Deleting team with ID: " + teamId);
         Optional<Team> optionalTeam = teamRepository.findById(teamId);
@@ -279,9 +298,10 @@ public class WorkspaceService {
             return Optional.empty();
         }
         teamRepository.delete(optionalTeam.get());
-        return Optional.of(teamInfoDTOConverter.convert(optionalTeam.get()));
+        return Optional.ofNullable(teamInfoDTOConverter.convert(optionalTeam.get()));
     }
 
+    //TODO: Method never used
     @Transactional
     public void automaticallyAssignTeams() {
         logger.info("Automatically assigning teams");
@@ -359,4 +379,18 @@ public class WorkspaceService {
 
         return workspaceRepository.save(workspace);
     }
+
+    private Workspace resolveWorkspaceForRepo(String nameWithOwner) {
+        int i = nameWithOwner.indexOf('/');
+        if (i < 1) throw new IllegalArgumentException("Expected 'owner/name', got: " + nameWithOwner);
+        String owner = nameWithOwner.substring(0, i);
+
+        return workspaceRepository.findByOrganization_Login(owner)
+            .or(() -> workspaceRepository.findByAccountLoginIgnoreCase(owner))
+            .orElseThrow(() -> new IllegalStateException(
+                "No workspace linked to organization/login '" + owner + "'. " +
+                    "Make sure the GitHub App installation was linked to a workspace on startup."
+            ));
+    }
+
 }
