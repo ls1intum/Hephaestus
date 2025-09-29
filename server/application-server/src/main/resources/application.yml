@@ -124,10 +124,9 @@ monitoring:
 # Can be any OAuth token, such as the PAT
 github:
     app:
-        id: 1690929
-        privateKeyLocation: classpath:keys/hephaestusapptest.pk8.pem
-        privateKey: |
-            here you can paste the private key
+        id: ${GITHUB_APP_ID}
+        privateKeyLocation: ${GITHUB_APP_PRIVATE_KEY_LOCATION}
+        privateKey: ${GITHUB_APP_PRIVATE_KEY}
 
     auth-token: null
 
