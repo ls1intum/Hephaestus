@@ -63,7 +63,7 @@ replace_vars() {
   # If the environment variable is not set, skip the replacement to avoid
   # exiting because of `set -u`. This keeps the behaviour consistent with the
   # earlier validation step that only warns about missing variables.
-  if [[ -z "${!env_var+x}" ]]; then
+  if [[ ! -v "$env_var" ]]; then
     log "⚠️ Skipping placeholder '${placeholder}' because environment variable '${env_var}' is not set."
     return
   fi
