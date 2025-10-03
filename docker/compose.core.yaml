@@ -5,7 +5,8 @@ services:
       - "4200"
     environment:
       NATS_URL: "nats://nats-server:4222"
-      WEBHOOK_SECRET: ${WEBHOOK_SECRET}
+      GITHUB_WEBHOOK_SECRET: ${GITHUB_WEBHOOK_SECRET}
+      GITLAB_WEBHOOK_SECRET: ${GITLAB_WEBHOOK_SECRET}
     depends_on:
       nats-server:
         condition: service_healthy
@@ -172,8 +173,6 @@ configs:
         max_mem: 4G
         max_file: 50G
       }
-
-      # No tls for production since we are not exposing the NATS ports to the host
 
   realm-import.json:
     content: |

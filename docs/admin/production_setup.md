@@ -4,7 +4,8 @@ TODO
 
 ## Environment Variables
 
-- `WEBHOOK_SECRET`: GitHub webhook secret (`openssl rand -base64 32`)
+- `GITHUB_WEBHOOK_SECRET`: GitHub webhook secret (`openssl rand -base64 32`)
+- `GITLAB_WEBHOOK_SECRET`: GitLab webhook secret token (`openssl rand -base64 32`)
 - `KEYCLOAK_GITHUB_CLIENT_ID`: GitHub identity provider client ID
 - `KEYCLOAK_GITHUB_CLIENT_SECRET`: GitHub identity provider client secret
 - `KEYCLOAK_ADMIN`: Keycloak admin username
