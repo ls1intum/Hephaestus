@@ -8,7 +8,6 @@ from typing import Any, List, Optional
 from sqlalchemy import (
     BigInteger,
     Boolean,
-    CheckConstraint,
     Column,
     DateTime,
     ForeignKeyConstraint,
@@ -183,13 +182,7 @@ class OrganizationMembership(Base):
 
 class Team(Base):
     __tablename__ = "team"
-    __table_args__ = (
-        CheckConstraint(
-            "privacy::text = ANY (ARRAY['SECRET'::character varying, 'CLOSED'::character varying]::text[])",
-            name="team_privacy_check",
-        ),
-        PrimaryKeyConstraint("id", name="teamPK"),
-    )
+    __table_args__ = (PrimaryKeyConstraint("id", name="teamPK"),)
     id: Mapped[int] = mapped_column(
         BigInteger,
         Identity(
@@ -204,9 +197,7 @@ class Team(Base):
     )
     hidden: Mapped[bool] = mapped_column(Boolean, server_default=text("false"))
     name: Mapped[Optional[str]] = mapped_column(String(255))
-    color: Mapped[Optional[str]] = mapped_column(String(255))
     created_at: Mapped[Optional[datetime.datetime]] = mapped_column(TIMESTAMP(True, 6))
-    updated_at: Mapped[Optional[datetime.datetime]] = mapped_column(TIMESTAMP(True, 6))
     description: Mapped[Optional[str]] = mapped_column(Text)
     html_url: Mapped[Optional[str]] = mapped_column(Text)
     last_synced_at: Mapped[Optional[datetime.datetime]] = mapped_column(
@@ -215,6 +206,7 @@ class Team(Base):
     organization: Mapped[Optional[str]] = mapped_column(String(255))
     parent_id: Mapped[Optional[int]] = mapped_column(BigInteger)
     privacy: Mapped[Optional[str]] = mapped_column(String(32))
+    updated_at: Mapped[Optional[datetime.datetime]] = mapped_column(TIMESTAMP(True, 6))
     team_membership: Mapped[List["TeamMembership"]] = relationship(
         "TeamMembership", back_populates="team"
     )
@@ -364,17 +356,13 @@ class Repository(Base):
 class TeamMembership(Base):
     __tablename__ = "team_membership"
     __table_args__ = (
-        CheckConstraint(
-            "role::text = ANY (ARRAY['MEMBER'::character varying, 'MAINTAINER'::character varying]::text[])",
-            name="team_membership_role_check",
+        ForeignKeyConstraint(
+            ["team_id"], ["team.id"], name="FKrf92vmiawfvyhxcmigcg10opm"
         ),
         ForeignKeyConstraint(
-            ["team_id"], ["team.id"], name="fkrf92vmiawfvyhxcmigcg10opm"
+            ["user_id"], ["user.id"], name="FKnkpwi3whks92uvhn5qe71v4k6"
         ),
-        ForeignKeyConstraint(
-            ["user_id"], ["user.id"], name="fknkpwi3whks92uvhn5qe71v4k6"
-        ),
-        PrimaryKeyConstraint("team_id", "user_id", name="team_membership_pkey"),
+        PrimaryKeyConstraint("team_id", "user_id", name="team_membershipPK"),
     )
     user_id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
     team_id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
@@ -519,18 +507,14 @@ class RepositoryToMonitor(Base):
 class TeamRepositoryPermission(Base):
     __tablename__ = "team_repository_permission"
     __table_args__ = (
-        CheckConstraint(
-            "permission::text = ANY (ARRAY['READ'::character varying, 'WRITE'::character varying, 'MAINTAIN'::character varying, 'ADMIN'::character varying]::text[])",
-            name="team_repository_permission_permission_check",
+        ForeignKeyConstraint(
+            ["repository_id"], ["repository.id"], name="FK92gtctw6ca02527qjja7gns9f"
         ),
         ForeignKeyConstraint(
-            ["repository_id"], ["repository.id"], name="fk92gtctw6ca02527qjja7gns9f"
-        ),
-        ForeignKeyConstraint(
-            ["team_id"], ["team.id"], name="fk7qxvqq8p6690vtdux47lsg8b1"
+            ["team_id"], ["team.id"], name="FK7qxvqq8p6690vtdux47lsg8b1"
         ),
         PrimaryKeyConstraint(
-            "repository_id", "team_id", name="team_repository_permission_pkey"
+            "repository_id", "team_id", name="team_repository_permissionPK"
         ),
     )
     permission: Mapped[str] = mapped_column(String(32))

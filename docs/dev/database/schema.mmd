@@ -256,15 +256,14 @@ erDiagram
         BIGINT id PK
         VARCHAR(255) name
         BOOLEAN hidden "NOT NULL"
-        VARCHAR(255) color
         TIMESTAMPTZ created_at
-        TIMESTAMPTZ updated_at
         TEXT description
         TEXT html_url
         TIMESTAMPTZ last_synced_at
         VARCHAR(255) organization
         BIGINT parent_id
         VARCHAR(32) privacy
+        TIMESTAMPTZ updated_at
     }
 
     TeamLabel {
