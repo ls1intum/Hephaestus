@@ -45,6 +45,13 @@ spring:
 # GitHub configuration for tests (matches actual property)
 github:
   auth-token: test-token-not-real
+  app:
+    id: 1
+    privateKeyLocation: ""
+    privateKey: |
+      -----BEGIN PRIVATE KEY-----
+      TEST-ONLY-NOT-VALID
+      -----END PRIVATE KEY-----
 
 # NATS configuration for tests (matches actual properties)
 nats:
@@ -61,5 +68,12 @@ hephaestus:
 # Logging configuration for tests
 logging:
   level:
-    de.tum.in.www1.hephaestus: INFO
+    de.tum.in.www1.hephaestus: INFOgithub:
+  app:
+    id: 1                    # dummy
+    privateKeyLocation: ""   # force unused in tests
+    privateKey: |
+      -----BEGIN PRIVATE KEY-----
+      TEST-ONLY-NOT-VALID
+      -----END PRIVATE KEY-----
     root: WARN
