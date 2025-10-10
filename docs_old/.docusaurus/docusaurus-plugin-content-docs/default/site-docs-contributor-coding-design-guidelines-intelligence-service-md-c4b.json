@@ -1,0 +1,27 @@
+{
+  "id": "contributor/coding-design-guidelines/intelligence-service",
+  "title": "Intelligence Service Guidelines",
+  "description": "Navigate the structure and components of the Hephaestus intelligence service.",
+  "source": "@site/docs/contributor/coding-design-guidelines/intelligence-service.md",
+  "sourceDirName": "contributor/coding-design-guidelines",
+  "slug": "/contributor/coding-design-guidelines/intelligence-service",
+  "permalink": "/docs/contributor/coding-design-guidelines/intelligence-service",
+  "draft": false,
+  "unlisted": false,
+  "editUrl": "https://github.com/ls1intum/Hephaestus/tree/main/docs/docs/contributor/coding-design-guidelines/intelligence-service.md",
+  "tags": [],
+  "version": "current",
+  "frontMatter": {
+    "title": "Intelligence Service Guidelines",
+    "description": "Navigate the structure and components of the Hephaestus intelligence service."
+  },
+  "sidebar": "docs",
+  "previous": {
+    "title": "Server Guidelines",
+    "permalink": "/docs/contributor/coding-design-guidelines/server"
+  },
+  "next": {
+    "title": "Client Guidelines",
+    "permalink": "/docs/contributor/coding-design-guidelines/client"
+  }
+}

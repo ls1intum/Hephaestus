@@ -1,0 +1,29 @@
+{
+  "id": "user/workspace",
+  "title": "Workspace",
+  "description": "Configure repositories, teams, and access controls inside a Hephaestus workspace.",
+  "source": "@site/docs/user/workspace.md",
+  "sourceDirName": "user",
+  "slug": "/user/workspace",
+  "permalink": "/docs/user/workspace",
+  "draft": false,
+  "unlisted": false,
+  "editUrl": "https://github.com/ls1intum/Hephaestus/tree/main/docs/docs/user/workspace.md",
+  "tags": [],
+  "version": "current",
+  "sidebarPosition": 2,
+  "frontMatter": {
+    "title": "Workspace",
+    "sidebar_position": 2,
+    "description": "Configure repositories, teams, and access controls inside a Hephaestus workspace."
+  },
+  "sidebar": "docs",
+  "previous": {
+    "title": "Leaderboard",
+    "permalink": "/docs/user/leaderboard"
+  },
+  "next": {
+    "title": "AI Mentor",
+    "permalink": "/docs/user/ai-mentor"
+  }
+}
