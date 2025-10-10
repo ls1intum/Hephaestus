@@ -38,12 +38,7 @@ const config: Config = {
     [
       'classic',
       {
-        docs: {
-          sidebarPath: './sidebars.ts',
-          editUrl: 'https://github.com/ls1intum/Hephaestus/tree/develop/docs/',
-          showLastUpdateAuthor: true,
-          showLastUpdateTime: true,
-        },
+        docs: false,
         blog: {
           showReadingTime: true,
           feedOptions: {
@@ -62,10 +57,56 @@ const config: Config = {
     ],
   ],
 
+  plugins: [
+    [
+      '@docusaurus/plugin-content-docs',
+      {
+        id: 'default',
+        path: './user',
+        routeBasePath: 'user',
+        sidebarPath: './sidebars.user.ts',
+        editUrl: 'https://github.com/ls1intum/Hephaestus/tree/develop/docs/user/',
+        showLastUpdateAuthor: true,
+        showLastUpdateTime: true,
+      },
+    ],
+    [
+      '@docusaurus/plugin-content-docs',
+      {
+        id: 'contributor-docs',
+        path: './contributor',
+        routeBasePath: 'contributor',
+        sidebarPath: './sidebars.contributor.ts',
+        editUrl: 'https://github.com/ls1intum/Hephaestus/tree/develop/docs/contributor/',
+        showLastUpdateAuthor: true,
+        showLastUpdateTime: true,
+      },
+    ],
+    [
+      '@easyops-cn/docusaurus-search-local',
+      {
+        hashed: true,
+        language: ['en'],
+        indexBlog: false,
+        docsRouteBasePath: ['user', 'contributor'],
+        docsDir: ['user', 'contributor'],
+        searchContextByPaths: [
+          {label: {en: 'User Guide'}, path: 'user'},
+          {label: {en: 'Contributor Guide'}, path: 'contributor'},
+        ],
+        hideSearchBarWithNoSearchContext: true,
+        useAllContextsWithNoSearchContext: false,
+        highlightSearchTermsOnTargetPage: true,
+        searchResultContextMaxLength: 60,
+      },
+    ],
+  ],
+
   themeConfig: {
     image: 'img/hephaestus-social-card.jpg',
     colorMode: {
       respectPrefersColorScheme: true,
+      disableSwitch: false,
     },
     metadata: [
       {name: 'keywords', content: 'Hephaestus, AI mentor, agile coaching, code review gamification, TUM'},
@@ -86,9 +127,17 @@ const config: Config = {
       items: [
         {
           type: 'docSidebar',
-          sidebarId: 'tutorialSidebar',
+          sidebarId: 'userSidebar',
+          docsPluginId: 'default',
           position: 'left',
-          label: 'Documentation',
+          label: 'User Guide',
+        },
+        {
+          type: 'docSidebar',
+          sidebarId: 'contributorSidebar',
+          docsPluginId: 'contributor-docs',
+          position: 'left',
+          label: 'Contributor Guide',
         },
         {
           to: '/blog',
@@ -98,7 +147,7 @@ const config: Config = {
         {
           href: 'https://hephaestus.aet.cit.tum.de',
           label: 'Open Hephaestus',
-          position: 'left',
+          position: 'right',
         },
         {
           href: 'https://github.com/ls1intum/Hephaestus',
@@ -114,8 +163,8 @@ const config: Config = {
           title: 'Product',
           items: [
             {
-              label: 'Overview',
-              to: '/docs/intro',
+              label: 'User Guide',
+              to: '/user/overview',
             },
             {
               label: 'Release Notes',
@@ -131,16 +180,16 @@ const config: Config = {
           title: 'Contribute',
           items: [
             {
-              label: 'GitHub Repository',
-              href: 'https://github.com/ls1intum/Hephaestus',
+              label: 'Contributor Guide',
+              to: '/contributor/overview',
             },
             {
-              label: 'Issue Tracker',
+              label: 'Feature Requests',
+              href: 'https://github.com/ls1intum/Hephaestus/discussions/categories/feature-requests',
+            },
+            {
+              label: 'Bug Tracker',
               href: 'https://github.com/ls1intum/Hephaestus/issues',
-            },
-            {
-              label: 'Contribution Guide',
-              href: 'https://github.com/ls1intum/Hephaestus/blob/develop/CONTRIBUTING.md',
             },
           ],
         },
@@ -152,8 +201,8 @@ const config: Config = {
               href: 'https://aet.cit.tum.de/',
             },
             {
-              label: 'GitHub Discussions',
-              href: 'https://github.com/ls1intum/Hephaestus/discussions',
+              label: 'GitHub Repository',
+              href: 'https://github.com/ls1intum/Hephaestus',
             },
           ],
         },
@@ -169,6 +218,7 @@ const config: Config = {
     prism: {
       theme: prismThemes.github,
       darkTheme: prismThemes.dracula,
+      additionalLanguages: ['bash', 'json', 'yaml', 'java', 'python'],
     },
   } satisfies Preset.ThemeConfig,
 };
