@@ -5,25 +5,19 @@ import type * as Preset from '@docusaurus/preset-classic';
 // This runs in Node.js - Don't use client-side code here (browser APIs, JSX...)
 
 const config: Config = {
-  title: 'My Site',
-  tagline: 'Dinosaurs are cool',
+  title: 'Hephaestus Documentation',
+  tagline: 'Process-aware mentoring for agile software teams',
   favicon: 'img/favicon.ico',
 
   // Future flags, see https://docusaurus.io/docs/api/docusaurus-config#future
   future: {
-    v4: true, // Improve compatibility with the upcoming Docusaurus v4
+    v4: true,
   },
 
-  // Set the production url of your site here
-  url: 'https://your-docusaurus-site.example.com',
-  // Set the /<baseUrl>/ pathname under which your site is served
-  // For GitHub pages deployment, it is often '/<projectName>/'
-  baseUrl: '/',
-
-  // GitHub pages deployment config.
-  // If you aren't using GitHub pages, you don't need these.
-  organizationName: 'facebook', // Usually your GitHub org/user name.
-  projectName: 'docusaurus', // Usually your repo name.
+  url: 'https://ls1intum.github.io',
+  baseUrl: '/Hephaestus/',
+  organizationName: 'ls1intum',
+  projectName: 'Hephaestus',
 
   onBrokenLinks: 'throw',
 
@@ -35,16 +29,20 @@ const config: Config = {
     locales: ['en'],
   },
 
+  customFields: {
+    productUrl: 'https://hephaestus.aet.cit.tum.de',
+    repoUrl: 'https://github.com/ls1intum/Hephaestus',
+  },
+
   presets: [
     [
       'classic',
       {
         docs: {
           sidebarPath: './sidebars.ts',
-          // Please change this to your repo.
-          // Remove this to remove the "edit this page" links.
-          editUrl:
-            'https://github.com/facebook/docusaurus/tree/main/packages/create-docusaurus/templates/shared/',
+          editUrl: 'https://github.com/ls1intum/Hephaestus/tree/develop/docs/',
+          showLastUpdateAuthor: true,
+          showLastUpdateTime: true,
         },
         blog: {
           showReadingTime: true,
@@ -52,11 +50,7 @@ const config: Config = {
             type: ['rss', 'atom'],
             xslt: true,
           },
-          // Please change this to your repo.
-          // Remove this to remove the "edit this page" links.
-          editUrl:
-            'https://github.com/facebook/docusaurus/tree/main/packages/create-docusaurus/templates/shared/',
-          // Useful options to enforce blogging best practices
+          editUrl: 'https://github.com/ls1intum/Hephaestus/tree/develop/docs/blog/',
           onInlineTags: 'warn',
           onInlineAuthors: 'warn',
           onUntruncatedBlogPosts: 'warn',
@@ -69,27 +63,45 @@ const config: Config = {
   ],
 
   themeConfig: {
-    // Replace with your project's social card
-    image: 'img/docusaurus-social-card.jpg',
+    image: 'img/hephaestus-social-card.jpg',
     colorMode: {
       respectPrefersColorScheme: true,
     },
+    metadata: [
+      {name: 'keywords', content: 'Hephaestus, AI mentor, agile coaching, code review gamification, TUM'},
+      {name: 'twitter:card', content: 'summary_large_image'},
+      {name: 'twitter:site', content: '@ls1intum'},
+      {name: 'twitter:title', content: 'Hephaestus Documentation'},
+      {
+        name: 'twitter:description',
+        content: 'Learn how Hephaestus aligns AI mentoring with agile software development practices.',
+      },
+    ],
     navbar: {
-      title: 'My Site',
+      title: 'Hephaestus',
       logo: {
-        alt: 'My Site Logo',
-        src: 'img/logo.svg',
+        alt: 'Hephaestus logo',
+        src: 'img/hammer.svg',
       },
       items: [
         {
           type: 'docSidebar',
           sidebarId: 'tutorialSidebar',
           position: 'left',
-          label: 'Tutorial',
+          label: 'Documentation',
         },
-        {to: '/blog', label: 'Blog', position: 'left'},
         {
-          href: 'https://github.com/facebook/docusaurus',
+          to: '/blog',
+          label: 'Updates',
+          position: 'left',
+        },
+        {
+          href: 'https://hephaestus.aet.cit.tum.de',
+          label: 'Open Hephaestus',
+          position: 'left',
+        },
+        {
+          href: 'https://github.com/ls1intum/Hephaestus',
           label: 'GitHub',
           position: 'right',
         },
@@ -99,11 +111,36 @@ const config: Config = {
       style: 'dark',
       links: [
         {
-          title: 'Docs',
+          title: 'Product',
           items: [
             {
-              label: 'Tutorial',
+              label: 'Overview',
               to: '/docs/intro',
+            },
+            {
+              label: 'Release Notes',
+              to: '/blog',
+            },
+            {
+              label: 'Open Hephaestus',
+              href: 'https://hephaestus.aet.cit.tum.de',
+            },
+          ],
+        },
+        {
+          title: 'Contribute',
+          items: [
+            {
+              label: 'GitHub Repository',
+              href: 'https://github.com/ls1intum/Hephaestus',
+            },
+            {
+              label: 'Issue Tracker',
+              href: 'https://github.com/ls1intum/Hephaestus/issues',
+            },
+            {
+              label: 'Contribution Guide',
+              href: 'https://github.com/ls1intum/Hephaestus/blob/develop/CONTRIBUTING.md',
             },
           ],
         },
@@ -111,34 +148,23 @@ const config: Config = {
           title: 'Community',
           items: [
             {
-              label: 'Stack Overflow',
-              href: 'https://stackoverflow.com/questions/tagged/docusaurus',
+              label: 'Applied Education Technologies',
+              href: 'https://aet.cit.tum.de/',
             },
             {
-              label: 'Discord',
-              href: 'https://discordapp.com/invite/docusaurus',
-            },
-            {
-              label: 'X',
-              href: 'https://x.com/docusaurus',
-            },
-          ],
-        },
-        {
-          title: 'More',
-          items: [
-            {
-              label: 'Blog',
-              to: '/blog',
-            },
-            {
-              label: 'GitHub',
-              href: 'https://github.com/facebook/docusaurus',
+              label: 'GitHub Discussions',
+              href: 'https://github.com/ls1intum/Hephaestus/discussions',
             },
           ],
         },
       ],
-      copyright: `Copyright © ${new Date().getFullYear()} My Project, Inc. Built with Docusaurus.`,
+      copyright: `© ${new Date().getFullYear()} Technische Universität München - Built with, Built with ❤️ by the Hephaestus Team at Applied Education Technologies (AET)`,
+    },
+    docs: {
+      sidebar: {
+        hideable: true,
+        autoCollapseCategories: true,
+      },
     },
     prism: {
       theme: prismThemes.github,
