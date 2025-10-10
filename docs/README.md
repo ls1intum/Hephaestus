@@ -1,46 +1,44 @@
 # Hephaestus Documentation
 
-## Writing Documentation
+The documentation site is built with [Docusaurus 3](https://docusaurus.io/docs). All content lives in `docs/docs` and is written in Markdown or MDX.
 
-We are using [Sphinx](http://www.sphinx-doc.org/en/stable/) to generate the documentation. The documentation is written in Markdown format.
+## Prerequisites
 
-### Installation
+- [Node.js](https://nodejs.org/) 22.10 or later (LTS)
+- npm 10.8 or later
 
-Optional: Create a virtual environment
+## Install dependencies
 
-```bash
-python3 -m venv venv
-```
-
-Activate the virtual environment:
+From the repository root run:
 
 ```bash
-# Unix:
-source venv/bin/activate
-# Windows:
-.\venv\Scripts\activate
+npm install
 ```
 
-Install the required packages
+The command installs dependencies for the docs workspace and other packages in the monorepo.
+
+## Local development
+
+Start a local dev server with live reload:
 
 ```bash
-pip install -r requirements.txt
+npm run docs:dev
 ```
 
-### Live Preview
+The site is served at `http://localhost:3000`. Changes to Markdown/MDX files or configuration are reloaded automatically.
 
-To preview the documentation, run the following command:
+## Production build
+
+To generate a static production build run:
 
 ```bash
-make livehtml
+npm run docs:build
 ```
 
-### Building the Documentation
-
-To build the documentation, run the following command:
+Preview the build locally with:
 
 ```bash
-make html
+npm run docs:serve
 ```
 
-The generated documentation will be in the `_build/html` directory.
+The static assets are written to `docs/build` and can be deployed to any static hosting provider.
