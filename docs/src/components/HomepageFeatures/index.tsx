@@ -1,56 +1,72 @@
 import type {ReactNode} from 'react';
 import clsx from 'clsx';
 import Heading from '@theme/Heading';
+import Link from '@docusaurus/Link';
+
 import styles from './styles.module.css';
 
 type FeatureItem = {
   title: string;
-  Svg: React.ComponentType<React.ComponentProps<'svg'>>;
-  description: ReactNode;
+  kicker: string;
+  description: string;
+  bullets: string[];
+  cta: {label: string; to: string};
 };
 
 const FeatureList: FeatureItem[] = [
   {
-    title: 'Easy to Use',
-    Svg: require('@site/static/img/undraw_docusaurus_mountain.svg').default,
-    description: (
-      <>
-        Docusaurus was designed from the ground up to be easily installed and
-        used to get your website up and running quickly.
-      </>
-    ),
+    title: 'Code Review Gamification',
+    kicker: 'Transform code reviews into learning opportunities',
+    description:
+      'Friendly competition keeps healthy review habits visible with leaderboards, leagues, and team-wide recognition.',
+    bullets: [
+      'Weekly leaderboards with GitHub integration',
+      'Team competitions across multiple repositories',
+      'Structured league system for ongoing engagement',
+    ],
+    cta: {label: 'See the leaderboard tour', to: '/user/leaderboard'},
   },
   {
-    title: 'Focus on What Matters',
-    Svg: require('@site/static/img/undraw_docusaurus_tree.svg').default,
-    description: (
-      <>
-        Docusaurus lets you focus on your docs, and we&apos;ll do the chores. Go
-        ahead and move your docs into the <code>docs</code> directory.
-      </>
-    ),
+    title: 'Process-Aware AI Mentoring',
+    kicker: 'Heph provides guidance grounded in your repository activity',
+    description:
+      'Mentoring sessions blend self-regulated learning prompts with real repo events so goals, reflections, and next steps stay actionable.',
+    bullets: [
+      'SRL-guided weekly reflection',
+      'Repo activity context for objective feedback',
+      'Goal setting and progress tracking',
+    ],
+    cta: {label: 'Work with the mentor', to: '/user/ai-mentor'},
   },
   {
-    title: 'Powered by React',
-    Svg: require('@site/static/img/undraw_docusaurus_react.svg').default,
-    description: (
-      <>
-        Extend or customize your website layout by reusing React. Docusaurus can
-        be extended while reusing the same header and footer.
-      </>
-    ),
+    title: 'Build Better Team Habits',
+    kicker: 'Creativity meets technical expertise — just like on the landing page',
+    description:
+      'Our approach combines craft, collaboration, and quality so teams stay aligned while the platform scales with them.',
+    bullets: [
+      'Empower engineers with real-world feedback loops',
+      'Foster collaboration that strengthens engineering culture',
+      'Improve code quality through friendly competition',
+    ],
+    cta: {label: 'Dive into contributor docs', to: '/contributor/overview'},
   },
 ];
 
-function Feature({title, Svg, description}: FeatureItem) {
+function Feature({title, kicker, description, bullets, cta}: FeatureItem) {
   return (
-    <div className={clsx('col col--4')}>
-      <div className="text--center">
-        <Svg className={styles.featureSvg} role="img" />
-      </div>
-      <div className="text--center padding-horiz--md">
+    <div className={clsx('col col--4', styles.featureColumn)}>
+      <div className={styles.featureCard}>
+        <p className={styles.kicker}>{kicker}</p>
         <Heading as="h3">{title}</Heading>
-        <p>{description}</p>
+        <p className={styles.description}>{description}</p>
+        <ul>
+          {bullets.map((bullet) => (
+            <li key={bullet}>{bullet}</li>
+          ))}
+        </ul>
+        <Link className={styles.cta} to={cta.to}>
+          {cta.label}
+        </Link>
       </div>
     </div>
   );
@@ -60,9 +76,9 @@ export default function HomepageFeatures(): ReactNode {
   return (
     <section className={styles.features}>
       <div className="container">
-        <div className="row">
-          {FeatureList.map((props, idx) => (
-            <Feature key={idx} {...props} />
+        <div className={clsx('row', styles.featureRow)}>
+          {FeatureList.map((feature) => (
+            <Feature key={feature.title} {...feature} />
           ))}
         </div>
       </div>

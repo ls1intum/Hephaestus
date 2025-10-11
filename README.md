@@ -42,12 +42,12 @@ Hephaestus /hɪˈfɛstəs/ is the Greek god of blacksmiths, craftsmen, and artis
 
 ## Documentation
 
-Technical/user docs: [Read the Docs](https://ls1intum.github.io/Hephaestus/)
+Technical & user docs (GitHub Pages): [https://ls1intum.github.io/Hephaestus/](https://ls1intum.github.io/Hephaestus/)
 UI component docs: [Storybook](https://develop--66a8981a27ced8fef3190d41.chromatic.com/)
 
 ### Setup
 
-Read the [setup guide](https://ls1intum.github.io/Hephaestus/dev/setup_guide) for server, intelligence service, and the React client in `webapp`.
+Read the [local development guide](https://ls1intum.github.io/Hephaestus/contributor/local-development) for server, intelligence service, and the React client in `webapp`.
 
 ## Contributing
 

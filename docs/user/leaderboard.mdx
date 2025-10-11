@@ -1,0 +1,55 @@
+---
+id: leaderboard
+sidebar_position: 4
+title: Leaderboard and Gamification
+description: Understand how weekly rankings, filters, and recognitions keep review activity transparent in Hephaestus.
+---
+
+Hephaestus provides a weekly leaderboard that tracks review engagement across your workspace. Scores are recalculated continuously so you can see the impact of your contributions in near real time.
+
+## Accessing the leaderboard
+
+Sign in with your GitHub account. The leaderboard is the landing page, and you can always return to it by selecting the Hephaestus logo in the top-left corner.
+
+<iframe height="450" width="600" src="https://live.rbg.tum.de/w/artemisintro/59981?video_only=1&t=0" title="Tour the weekly leaderboard" frameBorder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" allowFullScreen />
+
+## Reading the overview card
+
+The overview card summarises your standing in the current competition:
+
+- Current rank within the selected leaderboard.
+- Time remaining until the week resets.
+- Projected **league point** adjustment based on your position.
+- Your league tier and progress towards the next tier.
+
+![Leaderboard overview card](./img/leaderboard/leaderboard-overview.png)
+
+:::tip Jump to your row
+Selecting your rank in the overview card scrolls the table to highlight your entry.
+:::
+
+## Table columns and reviewer drawer
+
+The leaderboard table includes rank, contributor, leaderboard score, and activity summary. Selecting any reviewer opens a detailed drawer that shows:
+
+- Pull requests reviewed that week with direct GitHub links.
+- Key statistics such as additions, deletions, and review sentiment.
+- A **Copy** action that formats review highlights for sharing in standups or retrospectives.
+
+![Leaderboard pull request overview](./img/leaderboard/leaderboard-pr-overview.png)
+
+## Exploring previous weeks and teams
+
+- Use the **time period** dropdown to switch between the current and previous weeks (the last four are stored by default).
+- Apply the **team filter** to compare performance within specific cohorts. Your personal rank only appears when the selected team includes you.
+- Filter by **labels** when your organisation tags pull requests per exercise or milestone.
+
+![Leaderboard filters](./img/leaderboard/leaderboard-filter.png)
+
+:::note League scoring
+Weekly points feed into the Elo-inspired league system. Consistent performance moves you through Bronze, Silver, and Gold leagues.
+:::
+
+## Recognition and notifications
+
+Hephaestus automatically posts the top three reviewers to Slack every Monday with quick links to their highlighted pull requests. Enable notifications in **Settings → Integrations** to receive the digest. You can also opt in to email summaries that recap your personal activity.

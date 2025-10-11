@@ -1,0 +1,134 @@
+---
+id: coding-guidelines
+sidebar_position: 6
+title: Coding & Design Guidelines
+description: Shared principles for the React client, Spring Boot server, and FastAPI intelligence service.
+---
+
+These guidelines keep the multi-service codebase consistent. When proposing changes, consider impact on existing code, ease of adoption, and alignment with industry best practices.
+
+## Performance fundamentals
+
+1. Minimise network requests—batch calls and rely on caching.
+2. Transfer only required data to keep payloads small.
+3. Choose algorithms with appropriate time/space complexity.
+4. Cache expensive computations on both client and server.
+5. Optimise database queries using projections, pagination, and indexes.
+
+### Frontend performance habits
+
+- Lazy-load large screens and feature bundles; prefer `React.lazy` + Suspense over bespoke loaders.
+- Virtualise long lists with `@tanstack/react-virtual` to keep DOM size predictable.
+- Optimise images (next-gen formats, `loading="lazy"`) and keep Tailwind class composition readable to avoid layout thrash.
+- Memoise expensive calculations and callbacks (`useMemo`, `useCallback`) when a component re-renders frequently.
+- Defer non-critical analytics to background tasks so mentor interactions stay responsive.
+
+### Backend performance habits
+
+- Use repository projections or DTO constructors to fetch only required columns.
+- Keep transactions narrow; annotate the smallest method that needs ACID guarantees.
+- Prefer shared Testcontainers for integration tests to avoid repeated container start-up cost.
+- Use asynchronous executors for long-running jobs (sync pipelines, gamification recalculations) so REST endpoints stay fast.
+- Profile Liquibase migrations that touch large tables—add indexes before backfilling data.
+
+## Client (React + Vite)
+
+- Consume APIs exclusively via the generated OpenAPI client (`@hey-api/openapi-ts`). This guarantees type safety between client and server.
+- Wrap API calls in TanStack Query hooks for caching, retries, optimistic updates, and error boundaries.
+- Tailwind CSS is our design system:
+  - Utilities stay in JSX—reserve `@apply` for component primitives only.
+  - Use the design tokens defined in `src/styles.css` (e.g., `bg-primary`, `text-muted-foreground`).
+  - Enable Tailwind IntelliSense so variants and responsive helpers autocomplete correctly.
+  - Reuse design tokens rather than ad-hoc colours or spacing.
+- Build components in Storybook first to document their states and support Chromatic visual reviews. Every component needs stories for empty, loading, success, and error paths.
+- Prefer headless Radix primitives or shadcn/ui patterns when crafting interactive components.
+- Treat Chromatic diffs as blocking—approve visual changes before merging.
+
+### Reference resources
+
+- [Tailwind CSS docs](https://tailwindcss.com/docs) – utility patterns, responsive variants, theming.
+- [Storybook documentation](https://storybook.js.org/docs) – stories, controls, automated testing.
+- [TanStack Query](https://tanstack.com/query/latest/docs/framework/react/overview) – caching and data-fetching strategies.
+- [Shadcn/ui](https://ui.shadcn.com/) – reference implementations for primitive composition.
+
+Example data hook:
+
+```tsx
+import {useQuery} from '@tanstack/react-query';
+import {PullRequestService} from '@/openapi';
+
+export function usePullRequests(repository: string) {
+  return useQuery({
+    queryKey: ['pull-requests', repository],
+    queryFn: () => PullRequestService.getPullRequests({repository}),
+  });
+}
+```
+
+## Server (Spring Boot)
+
+- Source layout: `config/` (infrastructure wiring), `core/` (shared utilities), `gitprovider/` (GitHub sync + entities), `leaderboard/`, `mentor/`, `notification/`, `syncing/`, `workspace/`. Keep new packages feature-oriented.
+- Return DTOs (preferably Java records) from controllers. Compose DTOs from primitives, enums, or other DTOs; never leak entities.
+- Use `Optional` instead of `null` to express missing values—repositories routinely return `Optional<T>`.
+- Prefer field injection with `@Autowired`, but keep dependencies lean to avoid circular references. If a bean needs >4 collaborators, revisit the design.
+- Use structured logging with SLF4J placeholders and initialise loggers per class (`LoggerFactory.getLogger`).
+- Apply `@Transactional` sparingly—wrap cohesive write operations, not entire services.
+
+### DTO checklist
+
+- Records stay immutable and focused on a single responsibility.
+- Include only the data the client needs; it keeps payloads small and avoids leaking sensitive information.
+- Provide a `fromEntity` factory when mapping from persistence models to DTOs.
+
+### Configuration and environment
+
+- Store local overrides in `application-local.yml`; never commit this file.
+- Profiles: `local` (dev default), `prod` (production defaults), `spec` (CI). Activate via `SPRING_PROFILES_ACTIVE` or the Maven profile flag.
+- Adjust log levels or external client configuration in `application-local.yml` rather than code.
+
+### Logging example
+
+```java
+@Service
+public class ExampleService {
+  private static final Logger logger = LoggerFactory.getLogger(ExampleService.class);
+
+  public void doSomething(User user) {
+    logger.info("User {} logged in", user.getLogin());
+  }
+}
+```
+
+Sample DTO:
+
+```java
+public record LeaderboardEntryDTO(long userId, int rank, int score) {
+    public static LeaderboardEntryDTO from(LeaderboardEntry entry) {
+        return new LeaderboardEntryDTO(entry.getUserId(), entry.getRank(), entry.getScore());
+    }
+}
+```
+
+## Intelligence service (FastAPI + LangGraph)
+
+- Core logic lives in `server/intelligence-service/app/mentor`:
+  - `run.py` defines the LangGraph orchestration.
+  - `state.py` contains TypedDict state definitions used by the mentor nodes.
+  - `nodes/` implements storage updates, response generation, and state mutations.
+  - `prompts/analyzer` contains internal analysis prompts; `prompts/mentor` contains user-facing responses.
+- Regenerate disposable SQLAlchemy models (`app/db/models_gen.py`) after every migration via `npm run db:generate-models:intelligence-service`—never edit the file manually.
+- Model request/response bodies with Pydantic schemas and keep router dependencies minimal for testability.
+- Store GenAI credentials in `.env` (copied from `.env.example`) and avoid embedding keys in code.
+
+## Database design
+
+- Define entities with explicit `@Id` fields (usually `Long`) and annotate nullable constraints with `@NonNull` or `@Column(nullable = false)`.
+- Use `@Lob` for string fields exceeding 255 characters, especially for data originating from GitHub.
+- Exclude relationship fields from `toString` to prevent recursive logging: `@ToString.Exclude`.
+- Apply pagination (`Pageable`) and projections in repositories to limit result sizes.
+- Prefer Spring Data method naming before falling back to custom `@Query` definitions—only write JPQL when derived queries cannot express the logic.
+- When renaming columns, use Liquibase `renameColumn` instead of drop/add pairs to avoid data loss.
+
+## When in doubt
+
+Discuss deviations in your pull request description. Guidelines evolve with the project—suggest improvements via PRs once you have consensus.

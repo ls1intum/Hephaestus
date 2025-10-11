@@ -9,7 +9,7 @@ Usage:
     python generate_mermaid_erd.py <jdbc_url> <username> <password> <output_file>
 
 Example:
-    python generate_mermaid_erd.py jdbc:postgresql://localhost:5432/hephaestus root root docs/database/schema.mmd
+    python generate_mermaid_erd.py jdbc:postgresql://localhost:5432/hephaestus root root docs/contributor/erd/schema.mmd
 
 Requirements:
     - psycopg[binary]
@@ -584,7 +584,7 @@ def main():
     """Main function to run the ERD generator."""
     if len(sys.argv) != 5:
         logger.error("Usage: python generate_mermaid_erd.py <jdbc_url> <username> <password> <output_file>")
-        logger.error("Example: python generate_mermaid_erd.py jdbc:postgresql://localhost:5432/hephaestus root root docs/database/schema.mmd")
+        logger.error("Example: python generate_mermaid_erd.py jdbc:postgresql://localhost:5432/hephaestus root root docs/contributor/erd/schema.mmd")
         sys.exit(1)
     
     jdbc_url = sys.argv[1]

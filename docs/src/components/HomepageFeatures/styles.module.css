@@ -1,11 +1,105 @@
 .features {
-  display: flex;
-  align-items: center;
-  padding: 2rem 0;
-  width: 100%;
+  padding: 4rem 0;
 }
 
-.featureSvg {
-  height: 200px;
-  width: 200px;
+.featureRow {
+  gap: 1.5rem;
+}
+
+.featureColumn {
+  display: flex;
+}
+
+.featureCard {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  padding: 2rem;
+  border-radius: 20px;
+  background: var(--ifm-card-background-color);
+  border: 1px solid var(--ifm-toc-border-color);
+  box-shadow: 0 20px 50px rgba(15, 23, 42, 0.1);
+  position: relative;
+  overflow: hidden;
+  flex: 1;
+}
+
+.featureCard::after {
+  content: '';
+  position: absolute;
+  inset: -40% 40% 60% -40%;
+  background: radial-gradient(circle, rgba(67, 56, 202, 0.15), transparent 65%);
+  pointer-events: none;
+  transform: rotate(-8deg);
+}
+
+.featureCard > * {
+  position: relative;
+  z-index: 1;
+}
+
+.kicker {
+  text-transform: uppercase;
+  font-size: 0.75rem;
+  letter-spacing: 0.16em;
+  font-weight: 600;
+  color: var(--ifm-color-primary);
+  margin: 0;
+}
+
+.description {
+  margin-top: -0.25rem;
+  color: var(--ifm-color-emphasis-700);
+}
+
+.featureCard ul {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.featureCard li {
+  position: relative;
+  padding-left: 1.5rem;
+  line-height: 1.5;
+}
+
+.featureCard li::before {
+  content: '•';
+  color: var(--ifm-color-primary);
+  position: absolute;
+  left: 0;
+  font-size: 1.25rem;
+  line-height: 1;
+  top: 0.2rem;
+}
+
+.cta {
+  margin-top: auto;
+  align-self: flex-start;
+  font-weight: 600;
+  text-decoration: none;
+  color: var(--ifm-color-primary);
+  transition: color 0.2s ease;
+}
+
+.cta:hover {
+  color: var(--ifm-color-primary-darker);
+}
+
+@media screen and (max-width: 996px) {
+  .features {
+    padding: 3rem 0;
+  }
+
+  .featureRow {
+    gap: 1rem;
+  }
+
+  .featureCard {
+    padding: 1.75rem;
+  }
 }

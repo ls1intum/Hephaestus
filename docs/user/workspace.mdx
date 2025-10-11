@@ -1,0 +1,45 @@
+---
+id: workspace
+sidebar_position: 3
+title: Managing Workspaces
+description: Configure repositories, teams, and permissions so Hephaestus tracks the right activity for your organisation.
+---
+
+Workspaces connect Hephaestus to the GitHub repositories your cohort relies on. They also define the teams used for leaderboard filters and mentoring groups.
+
+:::caution Workspace managers only
+For privacy reasons, only organisation managers or appointed workspace administrators can change repository or team assignments. Reach out to your manager if you need an update.
+:::
+
+## Repository configuration
+
+Adding repositories determines which pull requests, reviews, and issues Hephaestus monitors. Workspace managers should:
+
+1. Open **Settings → Repositories**.
+2. Select the repositories to monitor. You can add or remove them at any time.
+3. Choose if archived repositories should be included for historical reporting.
+
+<iframe height="450" width="600" src="https://live.rbg.tum.de/w/artemisintro/59984?video_only=1&t=0" title="Configure repositories for a workspace" frameBorder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" allowFullScreen />
+
+Hephaestus continuously syncs data from the selected repositories. Expect the first sync to take several minutes depending on history.
+
+## Teams and membership
+
+Teams allow you to filter the leaderboard and mentoring analytics for a specific cohort or tutorial group.
+
+1. Navigate to **Settings → Teams**.
+2. Create a team, assign it a distinctive colour, and add the relevant repositories.
+3. Add members by GitHub username. A developer can belong to multiple teams.
+4. (Optional) Assign GitHub labels to the team to scope leaderboard metrics even further.
+
+<iframe height="450" width="600" src="https://live.rbg.tum.de/w/artemisintro/59985?video_only=1&t=0" title="Manage workspace teams" frameBorder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" allowFullScreen />
+
+:::tip Keep data focused
+Only assign repositories to a team that match its scope. Large organisations should use GitHub labels in addition to teams to keep comparisons fair.
+:::
+
+## Troubleshooting
+
+- **Repository missing?** Confirm the GitHub organisation owner granted the Hephaestus app access to the repository.
+- **Team not visible in filters?** Ensure the team contains at least one repository and one member.
+- **Need to migrate workspace data?** Contact the Hephaestus support team with the workspace ID so they can assist.

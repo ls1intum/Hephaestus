@@ -6,7 +6,7 @@ import type * as Preset from '@docusaurus/preset-classic';
 
 const config: Config = {
   title: 'Hephaestus Documentation',
-  tagline: 'Process-aware mentoring for agile software teams',
+  tagline: 'Process-Aware Mentoring for Agile Software Teams',
   favicon: 'img/favicon.ico',
 
   // Future flags, see https://docusaurus.io/docs/api/docusaurus-config#future
@@ -33,6 +33,12 @@ const config: Config = {
     productUrl: 'https://hephaestus.aet.cit.tum.de',
     repoUrl: 'https://github.com/ls1intum/Hephaestus',
   },
+
+  markdown: {
+    mermaid: true,
+  },
+
+  themes: ['@docusaurus/theme-mermaid'],
 
   presets: [
     [
@@ -65,7 +71,7 @@ const config: Config = {
         path: './user',
         routeBasePath: 'user',
         sidebarPath: './sidebars.user.ts',
-        editUrl: 'https://github.com/ls1intum/Hephaestus/tree/develop/docs/user/',
+        editUrl: 'https://github.com/ls1intum/Hephaestus/tree/develop/docs/',
         showLastUpdateAuthor: true,
         showLastUpdateTime: true,
       },
@@ -77,7 +83,19 @@ const config: Config = {
         path: './contributor',
         routeBasePath: 'contributor',
         sidebarPath: './sidebars.contributor.ts',
-        editUrl: 'https://github.com/ls1intum/Hephaestus/tree/develop/docs/contributor/',
+        editUrl: 'https://github.com/ls1intum/Hephaestus/tree/develop/docs/',
+        showLastUpdateAuthor: true,
+        showLastUpdateTime: true,
+      },
+    ],
+    [
+      '@docusaurus/plugin-content-docs',
+      {
+        id: 'admin-docs',
+        path: './admin',
+        routeBasePath: 'admin',
+        sidebarPath: './sidebars.admin.ts',
+        editUrl: 'https://github.com/ls1intum/Hephaestus/tree/develop/docs/',
         showLastUpdateAuthor: true,
         showLastUpdateTime: true,
       },
@@ -88,11 +106,12 @@ const config: Config = {
         hashed: true,
         language: ['en'],
         indexBlog: false,
-        docsRouteBasePath: ['user', 'contributor'],
-        docsDir: ['user', 'contributor'],
+        docsRouteBasePath: ['user', 'contributor', 'admin'],
+        docsDir: ['user', 'contributor', 'admin'],
         searchContextByPaths: [
           {label: {en: 'User Guide'}, path: 'user'},
           {label: {en: 'Contributor Guide'}, path: 'contributor'},
+          {label: {en: 'Admin Guide'}, path: 'admin'},
         ],
         hideSearchBarWithNoSearchContext: true,
         useAllContextsWithNoSearchContext: false,
@@ -109,13 +128,19 @@ const config: Config = {
       disableSwitch: false,
     },
     metadata: [
+      {
+        name: 'description',
+        content:
+          'Onboard faster and learn better habits with an AI mentor grounded in your repo workflow — from issues to pull requests and team rituals.',
+      },
       {name: 'keywords', content: 'Hephaestus, AI mentor, agile coaching, code review gamification, TUM'},
       {name: 'twitter:card', content: 'summary_large_image'},
       {name: 'twitter:site', content: '@ls1intum'},
       {name: 'twitter:title', content: 'Hephaestus Documentation'},
       {
         name: 'twitter:description',
-        content: 'Learn how Hephaestus aligns AI mentoring with agile software development practices.',
+        content:
+          'Onboard faster and learn better habits with an AI mentor grounded in your repo workflow — from issues to pull requests and team rituals.',
       },
     ],
     navbar: {
@@ -138,6 +163,13 @@ const config: Config = {
           docsPluginId: 'contributor-docs',
           position: 'left',
           label: 'Contributor Guide',
+        },
+        {
+          type: 'docSidebar',
+          sidebarId: 'adminSidebar',
+          docsPluginId: 'admin-docs',
+          position: 'left',
+          label: 'Admin Guide',
         },
         {
           to: '/blog',
@@ -174,6 +206,10 @@ const config: Config = {
               label: 'Open Hephaestus',
               href: 'https://hephaestus.aet.cit.tum.de',
             },
+            {
+              label: 'Admin Guide',
+              to: '/admin/production-setup',
+            },
           ],
         },
         {
@@ -207,7 +243,7 @@ const config: Config = {
           ],
         },
       ],
-      copyright: `© ${new Date().getFullYear()} Technische Universität München - Built with, Built with ❤️ by the Hephaestus Team at Applied Education Technologies (AET)`,
+      copyright: `© ${new Date().getFullYear()} Technische Universität München · Built with ❤️ by the Hephaestus Team at Applied Education Technologies (AET)`,
     },
     docs: {
       sidebar: {

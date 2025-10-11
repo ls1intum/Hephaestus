@@ -385,9 +385,9 @@ jobs:
           docker stop postgres-erd && docker rm postgres-erd
 
           # Check if ERD documentation is up to date
-          git add docs/dev/database/schema.mmd
+          git add docs/contributor/erd/schema.mmd
 
-          if ! git diff --cached --quiet docs/dev/database/schema.mmd; then
+          if ! git diff --cached --quiet docs/contributor/erd/schema.mmd; then
             echo "❌ ERD documentation validation failed - outdated ERD"
             echo "Fix: npm run db:generate-erd-docs"
             exit 1
