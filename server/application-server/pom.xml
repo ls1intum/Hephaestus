@@ -12,7 +12,7 @@
     </parent>
     <groupId>de.tum.in.www1</groupId>
     <artifactId>hephaestus</artifactId>
-    <version>0.9.0-rc.27-SNAPSHOT</version>
+    <version>0.9.0-rc.28-SNAPSHOT</version>
     <name>Hephaestus</name>
     <description>AI-driven learning for better software development</description>
     <url/>
@@ -47,12 +47,6 @@
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
     </properties>
-    <repositories>
-        <repository>
-            <id>jitpack.io</id>
-            <url>https://jitpack.io</url>
-        </repository>
-    </repositories>
     <dependencies>
         <dependency>
             <groupId>org.springframework.boot</groupId>
