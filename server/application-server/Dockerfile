@@ -5,7 +5,7 @@ WORKDIR /app
 COPY pom.xml .
 
 # This step is to cache dependencies, avoiding re-downloading them every time
-RUN mvn dependency:go-offline
+RUN mvn -B dependency:go-offline
 
 COPY src ./src
 
