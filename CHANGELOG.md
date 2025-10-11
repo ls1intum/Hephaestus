@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.9.0-rc.30](https://github.com/ls1intum/Hephaestus/compare/v0.9.0-rc.29...v0.9.0-rc.30) (2025-10-11)
+
+### 🚀 Features
+
+* **application-server:** prevent team filtering mismatches  ([#400](https://github.com/ls1intum/Hephaestus/issues/400)) ([145666f](https://github.com/ls1intum/Hephaestus/commit/145666fe1ddf9337128af4e403dcf59e59aa3d81))
+
 ## [0.9.0-rc.29](https://github.com/ls1intum/Hephaestus/compare/v0.9.0-rc.28...v0.9.0-rc.29) (2025-10-11)
 
 ### 📚 Documentation
