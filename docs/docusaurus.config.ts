@@ -206,10 +206,6 @@ const config: Config = {
               label: 'Open Hephaestus',
               href: 'https://hephaestus.aet.cit.tum.de',
             },
-            {
-              label: 'Admin Guide',
-              to: '/admin/production-setup',
-            },
           ],
         },
         {
@@ -230,6 +226,15 @@ const config: Config = {
           ],
         },
         {
+          title: 'Admin',
+          items: [
+            {
+              label: 'Admin Guide',
+              to: '/admin/production-setup',
+            },
+          ],
+        },
+        {
           title: 'Community',
           items: [
             {
@@ -243,7 +248,7 @@ const config: Config = {
           ],
         },
       ],
-      copyright: `© ${new Date().getFullYear()} Technische Universität München · Built with ❤️ by the Hephaestus Team at Applied Education Technologies (AET)`,
+      copyright: `© ${new Date().getFullYear()} Technical University of Munich · Built with ❤️ by the Hephaestus Team at Applied Education Technologies (AET)`,
     },
     docs: {
       sidebar: {

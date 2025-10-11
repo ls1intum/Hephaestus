@@ -7,23 +7,19 @@ description: Sign in, connect repositories, and understand the core navigation b
 
 ## Requirements before you start
 
-- A GitHub account that belongs to your course organisation or project workspace.
-- An invitation email or registration link for your Hephaestus workspace.
+- A GitHub account that belongs to the organisation your course or team uses.
+- Access to [hephaestus.aet.cit.tum.de](https://hephaestus.aet.cit.tum.de) (course staff install the GitHub App for you).
 - A modern browser (Chrome, Firefox, Edge, Safari) with third-party cookies enabled for OAuth.
-- Optional: Slack access if your course uses automated leaderboard announcements.
 
 ## First-time sign-in
 
 1. Navigate to [hephaestus.aet.cit.tum.de](https://hephaestus.aet.cit.tum.de).
-2. Choose **Continue with GitHub** and complete the authorisation flow. Hephaestus only requests the minimal scopes required to read pull requests in repositories you are assigned to.
-3. Accept the workspace invitation. The onboarding wizard will prompt you to
-   - Select your **team** (you can belong to multiple teams),
-   - Pick the repositories you actively review, and
-   - Opt in to weekly Slack or email digests.
-4. Finish the onboarding checklist—your dashboard will load with initial goals from course staff if they configured any.
+2. Choose **Continue with GitHub** and complete the authorisation flow. Hephaestus only requests the minimal scopes required to read pull requests in repositories authorised by your organisation.
+3. When the redirect completes you land in the single workspace associated with your organisation. There is no invite flow—the GitHub App handles membership automatically.
+4. Your GitHub teams and repository permissions sync in the background. Hephaestus mirrors them, so you will only see activity for the repos you already touch on GitHub.
 
-:::info Need a new invite?
-If your invite expired or you joined the course late, contact your teaching team. Workspace membership is limited to organisation managers for privacy reasons.
+:::info Teams are GitHub-driven
+Need to change the team or repositories you appear under? Ask an organisation maintainer to update the GitHub team membership or App installation—Hephaestus refreshes automatically.
 :::
 
 ## Tour the main navigation
@@ -32,9 +28,9 @@ If your invite expired or you joined the course late, contact your teaching team
 | --- | --- |
 | **Dashboard** | Home base with your weekly objectives, mentoring reminders, and quick access to the mentor or leaderboard. |
 | **Mentor** | Launch Heph sessions for retrospectives, code review reflections, and standup prep. All conversations are stored as artifacts. |
-| **Leaderboard** | Real-time ranking of review activity. Filter by team, repository, timeframe, or labels to spotlight the work that matters. |
+| **Leaderboard** | Real-time ranking of review activity. Filters for team and repository reflect the GitHub setup your organisation already maintains. |
 | **Artifacts** | Library of mentor-generated documents (summaries, action plans, standup tables). Share or export them as Markdown. |
-| **Settings** | Manage repositories, notification preferences, data visibility, and integrations such as Slack. |
+| **Settings** | Review your synced GitHub identity and personal preferences. Repository access and team membership remain read-only because they come from GitHub. |
 
 ## Gain traction in your first week
 
@@ -44,8 +40,8 @@ If your invite expired or you joined the course late, contact your teaching team
 
 ## Staying informed
 
-- **Slack digests** celebrate the top three reviewers every Monday and link to your workspace leaderboard.
-- **Email reminders** summarise outstanding mentor actions and surface unresolved review feedback.
-- **In-app notifications** highlight when new artifacts are shared with you or when a workspace manager updates repository access.
+- **Dashboard insights** surface outstanding mentor actions and highlight recent leaderboard changes.
+- **In-app notifications** appear when new artifacts are shared with you or when course staff post announcements.
+- Planned features such as Slack or email digests are on the roadmap but not yet available in production deployments.
 
 Need help? Use the **Help & Feedback** button in the footer or join the [GitHub Discussions](https://github.com/ls1intum/Hephaestus/discussions) board for peer support.
