@@ -1,0 +1,30 @@
+---
+id: mail-notifications
+sidebar_position: 9
+title: Mail Notifications
+description: Configure mail delivery in development and production.
+---
+
+Hephaestus notifies users when automated best-practice detection finds issues. Different SMTP providers are used in development and production.
+
+## Development setup (Gmail example)
+
+1. Create or use a dedicated Gmail account.
+2. Generate an app-specific password ([Google docs](https://support.google.com/mail/answer/185833)).
+3. Add the following properties to your `application-local.yml`:
+
+   ```yaml
+   mail:
+     host: smtp.gmail.com
+     port: 587
+     username: hephaestus@example.com
+     password: <app-password>
+   ```
+
+   Alternatively, set `POSTFIX_USERNAME` and `POSTFIX_PASSWORD` environment variables.
+
+## Production setup
+
+- Production uses a Postfix relay provided by TUM.
+- Copy `main.cf` and `master.cf` from [`ls1admin/postfix-container-tum-mailrelay`](https://github.com/ls1admin/postfix-container-tum-mailrelay).
+- Secrets and credentials are managed by the deployment team; avoid committing them to the repository.
