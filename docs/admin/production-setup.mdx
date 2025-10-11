@@ -1,0 +1,59 @@
+---
+id: production-setup
+sidebar_position: 1
+title: Production Setup
+description: Checklist for deploying Hephaestus in a production environment.
+---
+
+This guide covers the minimum configuration required to deploy Hephaestus in production. It assumes you are familiar with Docker Compose or Kubernetes and have access to the protected secrets managed by TUM.
+
+## Platform overview
+
+The production stack consists of:
+
+- **Application server** (Spring Boot)
+- **Intelligence service** (FastAPI)
+- **Webhook ingest** (NATS consumers)
+- **React webapp** (served via nginx)
+- **PostgreSQL 16**
+- **Keycloak** (with GitHub as identity provider)
+- **Mail relay** (Postfix)
+
+## Environment variables
+
+Set the following secrets before starting the stack:
+
+| Variable | Purpose |
+| --- | --- |
+| `WEBHOOK_SECRET` | Shared secret for GitHub webhooks (`openssl rand -base64 32`) |
+| `KEYCLOAK_GITHUB_CLIENT_ID` | GitHub OAuth app client ID |
+| `KEYCLOAK_GITHUB_CLIENT_SECRET` | GitHub OAuth app client secret |
+| `KEYCLOAK_ADMIN` | Keycloak admin username |
+| `KEYCLOAK_ADMIN_PASSWORD` | Keycloak admin password (`openssl rand -base64 32`) |
+| `KEYCLOAK_HEPHAESTUS_CONFIDENTIAL_CLIENT_SECRET` | Secret used by the app server to call Keycloak |
+| `POSTFIX_USERNAME` / `POSTFIX_PASSWORD` | Credentials for production SMTP relay |
+| `SLACK_WEBHOOK_URL` | Optional: webhook for weekly leaderboard posts |
+
+## Deployment steps
+
+1. **Provision infrastructure:** Ensure PostgreSQL, Redis (if used), and storage volumes are ready.
+2. **Configure Keycloak:**
+   - Import the `keycloak-hephaestus-realm-example-config.json` from the repository.
+   - Configure the GitHub identity provider with the client credentials above.
+3. **Bootstrap secrets:** Load environment variables into your secret manager or `.env` files consumed by Docker/Kubernetes.
+4. **Deploy services:** Use the provided Compose files (`docker/compose.app.yaml`, `docker/compose.core.yaml`, `docker/compose.proxy.yaml`) or your Kubernetes manifests.
+5. **Run database migrations:** The application server runs Liquibase migrations on startup; monitor logs to confirm success.
+6. **Verify integrations:**
+   - Sign in via GitHub to confirm Keycloak configuration.
+   - Trigger a test webhook from GitHub to validate the ingest pipeline.
+   - Send a test best-practice email using the application server.
+
+## Operational tips
+
+- Monitor services with the central Prometheus/Loki stack; ensure trace IDs appear in logs.
+- Schedule regular backups for PostgreSQL and Keycloak.
+- Review weekly leaderboard Slack posts to ensure the automation is active.
+
+## Support
+
+Contact the Hephaestus core team if you need to rotate secrets or migrate infrastructure. Document any deviations from this checklist in the deployment runbook.

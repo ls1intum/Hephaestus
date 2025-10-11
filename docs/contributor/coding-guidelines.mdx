@@ -1,0 +1,124 @@
+---
+id: coding-guidelines
+sidebar_position: 6
+title: Coding & Design Guidelines
+description: Shared principles for the React client, Spring Boot server, and FastAPI intelligence service.
+---
+
+These guidelines keep every service aligned. Keep changes focused. Mention any deviation in your pull request. Raise follow-up issues when you discover gaps.
+
+## Contributor checklist
+
+- Run the formatter and linter for the area you touched. Examples: `npm run -w webapp format`, `npm run lint:server`.
+- Smoke-test the critical scripts. `npm run -w webapp build` must pass. If you changed migrations, run `npm run db:generate-erd-docs`.
+- Update Chromatic snapshots when you change UI components.
+- Regenerate clients and documentation when you change an API contract.
+- Rerun the quality gates that match your changes: `npm run lint`, `npm run generate:api`, or `./mvnw -pl server/application-server test`.
+- Document what you verified in the pull request template. Link failing checks to tickets if you must defer.
+
+## Webapp (`/webapp`)
+
+### Platform overview
+
+- React 19.1 with Vite 6 and `@vitejs/plugin-react`.
+- `babel-plugin-react-compiler` runs first in `vite.config.js`. Leave it there so the compiler stays active.
+- Routing uses TanStack Router file routes in `src/routes/**` with the generated `routeTree.gen.ts`.
+- TanStack Query v5 is initialised in `src/integrations/tanstack-query/root-provider.tsx`. OpenAPI helpers live in `src/api/@tanstack/react-query.gen.ts`.
+- Global state lives in Zustand stores under `src/stores/**`.
+- Tailwind CSS 4 powers styling. Tokens sit in `src/styles.css`. shadcn/ui primitives live in `src/components/ui/**`.
+- Storybook 8, Chromatic, Vitest, and Biome cover tooling.
+
+### Building features
+
+- Create routes with `createFileRoute`. Route modules handle auth gating (see `src/routes/_authenticated.tsx`), loader logic, and orchestration.
+- Keep presentational components in `src/components/**`. They should take props, stay pure, and avoid side effects.
+- Fetch data by spreading generated `...Options()` helpers into `useQuery` or `useMutation`. The helpers provide typing, query keys, and retry defaults. `useDocumentArtifact.ts` shows the pattern.
+- Invalidate caches with the generated `...QueryKey()` helpers or the same keys passed to `useQuery`. Use optimistic updates only when the UI must respond instantly, such as mentor chat streaming.
+- Subscribe to Zustand stores with selectors (`useDocumentsStore((state) => state.documents[id])`). Keep store actions pure.
+- Respect React Compiler requirements. No conditional hooks. No prop mutation. Check React DevTools for the `Memo ✨` badge or inspect builds for `react/compiler-runtime` when you need assurance. Use `'use no memo'` only while debugging.
+- Stay inside the Tailwind token scale. Reach for shadcn/ui primitives before adding new component libraries. Use `@apply` sparingly and only for wrapper primitives you reuse widely.
+- Co-locate `*.stories.tsx` files. Show default, loading, empty, and error states with realistic data. Run `npm run chromatic:ci` whenever stories change.
+- Push heavy routes behind `React.lazy` and Suspense. Virtualise long lists with `@tanstack/react-virtual`. Defer analytics work to effects that run after paint.
+
+### Quality gates
+
+- Install dependencies with `npm install` at the repo root so optional binaries resolve.
+- Run `npm run -w webapp check` and `npm run -w webapp build` before opening a pull request.
+- Execute Vitest suites with `npm run -w webapp test`. Add unit tests beside the feature you touched.
+- Keep Storybook stories in sync with design. Launch `npm run -w webapp storybook` when pairing with design reviews.
+- Validate bundle impact by checking the Vite build stats when you add large libraries.
+
+## Spring Boot application server (`/server/application-server`)
+
+### Structure
+
+- Feature packages live under `gitprovider/`, `leaderboard/`, `mentor/`, `notification/`, `syncing/`, and `workspace/`. Shared wiring sits in `config/` and `core/`.
+- Controllers return DTOs located near the controller. `LeaderboardEntryDTO` is the reference example.
+- Repositories return `Optional<T>` instead of `null`.
+- Services use field injection with `@Autowired`, as in `LeaderboardService`. If a service depends on many collaborators, split the responsibility.
+- Set up loggers with `LoggerFactory.getLogger`. Use structured log messages.
+- Annotate the smallest unit of write work with `@Transactional`.
+
+### Coding habits
+
+- Use Java 21 features where they simplify code. Records, pattern matching, and sealed hierarchies improve readability.
+- Keep controllers thin. Push orchestration into services and prefer constructor helpers over static util classes.
+- Expose dedicated DTO mappers in the package instead of sprinkling conversion logic across layers.
+- Treat `Optional` as a signal for missing data. Avoid returning `null` from repository methods.
+
+### Safe workflows
+
+- Configuration overrides stay in `application-*.yml`. Do not commit `application-local.yml`.
+- Share long-lived infrastructure in tests. Lean on Testcontainers and GitHub fixtures where possible.
+- After updating Liquibase migrations, regenerate the REST client with `npm run generate:api` and rerun `npm run db:generate-erd-docs`.
+- Run the modular test suites with `./mvnw verify`. The build uses ArchUnit checks to enforce package boundaries.
+- Prefer integration tests that extend `AbstractSpringIntegrationTest` when you touch persistence logic.
+
+## Intelligence service (`/server/intelligence-service`)
+
+- LangGraph orchestration resides in `app/mentor/run.py`. Nodes live in `app/mentor/nodes/**`. Shared state types live in `app/mentor/state.py`.
+- Regenerate SQLAlchemy models by running `npm run db:generate-models:intelligence-service`. Never edit `app/db/models_gen.py` by hand.
+- Keep FastAPI routers thin. Push business logic into services or nodes. Define request and response models in `app/models/**`.
+- Load configuration via `app/settings.py`. Secrets belong in `.env`, which you create from `.env.example`.
+- Manage dependencies with Poetry. Run `poetry install --no-root` once and reuse the virtual environment via `poetry shell`.
+- Format with `poetry run black .` and lint with `poetry run flake8 .`. Run `poetry run mypy` before pushing when you add new types.
+- Add or update service tests with `pytest` under `app/tests/**`. Use `httpx.AsyncClient` to exercise FastAPI routers.
+
+## Webhook ingest service (`/server/webhook-ingest`)
+
+- The service listens for GitHub events and publishes to NATS JetStream.
+- Configure secrets through environment variables defined in `.env.example`.
+- Format and lint with Poetry (`poetry run black .`, `poetry run flake8 .`).
+
+## Docs site (`/docs`)
+
+- Docusaurus 3 powers the documentation. Install dependencies with `npm install` and run `npm run start` to preview.
+- Keep front matter fields (`id`, `title`, `sidebar_position`) unique. Update `sidebars.*.ts` when adding new pages.
+- Use MDX components from `docs/src/components/**` to keep styling consistent.
+- Run `npm run build` before committing structural changes to confirm the static export succeeds.
+
+## Database and migrations
+
+- Liquibase changesets live in `server/application-server/src/main/resources/config/liquibase`.
+- Prefer `renameColumn` or `modifyDataType` when evolving schemas so data survives deployments.
+- Add indexes before backfilling large tables. Profile long migrations locally.
+- After schema updates, regenerate the ERD, refresh the FastAPI models, and run backend tests that touch the affected tables.
+
+## Observability and security
+
+- Sentry is configured in both the webapp and the application server. Capture exceptions with context tags instead of console logs.
+- PostHog records product analytics. Gate new events behind environment checks so tests stay deterministic.
+- Store shared secrets in LastPass and load them via `.env` or the respective `application-*.yml` files. Never commit real secrets.
+- Rotate API keys when you onboard new external services. Document the process in the runbooks under `docs/admin`.
+- Sanitise logged user data. Log IDs rather than emails.
+
+## Performance reminders
+
+- Batch network calls and paginate large results.
+- Cache expensive computations when you reuse them. TanStack Query handles client caching. Use memoised services or projections on the backend.
+- Measure before tuning. Add logging or metrics when you touch critical latency paths.
+- Profile React work with the DevTools profiler and Chrome Performance panel. Profile Java code with JFR and async-profiler.
+
+## When unsure
+
+Record trade-offs in your pull request. Ask for a second review on risky work. Suggest improvements to this page when you find a better pattern.

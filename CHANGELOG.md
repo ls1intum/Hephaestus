@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.9.0-rc.30](https://github.com/ls1intum/Hephaestus/compare/v0.9.0-rc.29...v0.9.0-rc.30) (2025-10-11)
+
+### 🚀 Features
+
+* **application-server:** prevent team filtering mismatches  ([#400](https://github.com/ls1intum/Hephaestus/issues/400)) ([145666f](https://github.com/ls1intum/Hephaestus/commit/145666fe1ddf9337128af4e403dcf59e59aa3d81))
+
+## [0.9.0-rc.29](https://github.com/ls1intum/Hephaestus/compare/v0.9.0-rc.28...v0.9.0-rc.29) (2025-10-11)
+
+### 📚 Documentation
+
+* migrate to docusaurus ([#498](https://github.com/ls1intum/Hephaestus/issues/498)) ([4e3d37d](https://github.com/ls1intum/Hephaestus/commit/4e3d37d8620573bb1671e0c09997a38503edf7b1))
+
 ## [0.9.0-rc.28](https://github.com/ls1intum/Hephaestus/compare/v0.9.0-rc.27...v0.9.0-rc.28) (2025-10-02)
 
 ## [0.9.0-rc.27](https://github.com/ls1intum/Hephaestus/compare/v0.9.0-rc.26...v0.9.0-rc.27) (2025-09-13)

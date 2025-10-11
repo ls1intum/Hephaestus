@@ -6,7 +6,7 @@ import {
 } from "@tanstack/react-router";
 import { zodValidator } from "@tanstack/zod-adapter";
 import { endOfISOWeek, formatISO, startOfISOWeek } from "date-fns";
-import { useEffect, useMemo } from "react";
+import { useEffect } from "react";
 import { z } from "zod";
 import {
 	getLeaderboardOptions,
@@ -93,39 +93,33 @@ function LeaderboardContainer() {
 		parentId?: number;
 		hidden?: boolean;
 	};
-	const visibleTeams = useMemo<string[]>(() => {
-		const teams = (metaQuery.data?.teams ?? []) as MetaTeam[];
-		return teams.filter((t) => !t.hidden).map((t) => t.name);
-	}, [metaQuery.data]);
 
 	// Build a map for id->team to compute visible-only path labels
-	const teamById = useMemo(() => {
-		const teams = (metaQuery.data?.teams ?? []) as MetaTeam[];
-		const m = new Map<number, MetaTeam>();
-		teams.forEach((t) => m.set(t.id, t));
-		return m;
-	}, [metaQuery.data]);
+	const teamsList = (metaQuery.data?.teams ?? []) as MetaTeam[];
+	const teamById = new Map<number, MetaTeam>(teamsList.map((t) => [t.id, t]));
 
-	const teamOptions = useMemo(() => {
-		const teams = (metaQuery.data?.teams ?? []) as MetaTeam[];
-		const visible = teams.filter((t) => !t.hidden);
-		const makeLabel = (t: MetaTeam): string => {
-			const names: string[] = [];
-			// Walk up the ancestry, but only include visible ancestors
-			let cur: MetaTeam | undefined = t;
-			while (cur) {
-				if (!cur.hidden) names.push(cur.name);
-				const parent: MetaTeam | undefined =
-					cur.parentId !== undefined ? teamById.get(cur.parentId) : undefined;
-				cur = parent;
-			}
-			// names currently has child->...->root, reverse to root->child
-			return names.reverse().join(" / ");
-		};
-		return visible
-			.map((t) => ({ value: t.name, label: makeLabel(t) }))
-			.sort((a, b) => a.label.localeCompare(b.label));
-	}, [metaQuery.data, teamById]);
+	// Helper to create the visible-only path label for a team
+	const makeLabel = (t: MetaTeam): string => {
+		const names: string[] = [];
+		let cur: MetaTeam | undefined = t;
+		while (cur) {
+			if (!cur.hidden) names.push(cur.name);
+			const parent: MetaTeam | undefined =
+				cur.parentId !== undefined ? teamById.get(cur.parentId) : undefined;
+			cur = parent;
+		}
+		return names.reverse().join(" / ");
+	};
+
+	// Valid selectable values are the full visible paths
+	const visibleTeams = teamsList
+		.filter((t) => !t.hidden)
+		.map((t) => makeLabel(t));
+
+	const teamOptions = teamsList
+		.filter((t) => !t.hidden)
+		.map((t) => ({ value: makeLabel(t), label: makeLabel(t) }))
+		.sort((a, b) => a.label.localeCompare(b.label));
 
 	// If current selected team is hidden (or no longer present), reset to 'all'
 	useEffect(() => {
