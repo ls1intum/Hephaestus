@@ -8,6 +8,7 @@ import de.tum.in.www1.hephaestus.gitprovider.pullrequestreview.PullRequestReview
 import de.tum.in.www1.hephaestus.gitprovider.pullrequestreviewcomment.PullRequestReviewComment;
 import de.tum.in.www1.hephaestus.gitprovider.team.Team;
 import de.tum.in.www1.hephaestus.gitprovider.team.membership.TeamMembership;
+import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
@@ -31,6 +32,7 @@ import org.springframework.lang.NonNull;
 public class User extends BaseGitServiceEntity {
 
     @NonNull
+    @Column(columnDefinition = "CITEXT")
     private String login;
 
     @NonNull

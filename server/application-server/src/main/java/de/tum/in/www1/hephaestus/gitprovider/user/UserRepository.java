@@ -14,7 +14,7 @@ public interface UserRepository extends JpaRepository<User, Long> {
         """
             SELECT u
             FROM User u
-            WHERE u.login ILIKE :login
+            WHERE u.login = :login
         """
     )
     Optional<User> findByLogin(@Param("login") String login);
@@ -24,7 +24,7 @@ public interface UserRepository extends JpaRepository<User, Long> {
             SELECT u
             FROM User u
             LEFT JOIN FETCH u.mergedPullRequests
-            WHERE u.login ILIKE :login
+            WHERE u.login = :login
         """
     )
     Optional<User> findByLoginWithEagerMergedPullRequests(@Param("login") String login);

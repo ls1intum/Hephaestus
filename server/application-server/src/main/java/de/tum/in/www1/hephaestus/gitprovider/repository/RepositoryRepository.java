@@ -15,7 +15,7 @@ public interface RepositoryRepository extends JpaRepository<Repository, Long> {
         SELECT r
         FROM Repository r
         JOIN PullRequest pr ON r.id = pr.repository.id
-        WHERE pr.author.login ILIKE :contributorLogin
+        WHERE pr.author.login = :contributorLogin
         ORDER BY r.name ASC
         """
     )
