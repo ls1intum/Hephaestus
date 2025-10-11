@@ -12,7 +12,11 @@ export default defineConfig(({ command }) => {
 	return {
 		plugins: [
 			tanstackRouter({ autoCodeSplitting: true }),
-			viteReact(),
+			viteReact({
+				babel: {
+					plugins: ["babel-plugin-react-compiler"],
+				},
+			}),
 			tailwindcss(),
 			// Only use the terminal plugin during development
 			isDevelopment &&

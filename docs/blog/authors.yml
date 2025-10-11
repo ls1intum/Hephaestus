@@ -1,0 +1,19 @@
+hephaestus-team:
+  name: Hephaestus Team
+  title: Applied Education Technologies (TUM)
+  url: https://hephaestus.aet.cit.tum.de
+  image_url: /img/brand/hammer.svg
+
+felixtjdietrich:
+  name: Felix T.J. Dietrich
+  title: Research Associate at TUM (AET)
+  url: https://linkedin.com/in/felixtjdietrich
+  image_url: https://avatars.githubusercontent.com/u/5898705?v=4
+  page: false
+  socials:
+    linkedin: felixtjdietrich
+    github: FelixTJDietrich
+    email: felixtj.dietrich@tum.de
+    newsletter: https://aet.cit.tum.de/people/dietrich/
+
+

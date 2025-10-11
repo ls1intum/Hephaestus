@@ -1,0 +1,48 @@
+---
+id: best-practices
+sidebar_position: 6
+title: Best Practices Analyzer
+description: Learn how Hephaestus detects good and bad practices and how to act on the results.
+---
+
+The **Best Practices** page helps reviewers learn from high- and low-quality examples in their pull requests. It lists all assigned and open pull requests, highlights detected practices, and lets you trigger additional analysis as needed.
+
+## Accessing the page
+
+Open **Best Practices** from the navigation. You will see a dashboard summarising your queue, the state of each pull request, and a legend for detected practices.
+
+![Best practices dashboard](./img/best-practices/best-practices.png)
+
+## Running an analysis
+
+Hephaestus automatically analyses pull requests when key lifecycle events occur (created, ready for review, ready to merge, merged). You can also force an analysis:
+
+1. Select a pull request from the list.
+2. Choose **Analyse changes** to run detection with the latest commits.
+3. Review the **Current analysis** section for detected good and bad practices.
+
+![Analysis of one pull request](./img/best-practices/bad-practices.png)
+
+Each practice includes a title, description, severity, detection state, and optional reviewer feedback.
+
+## Managing practice states
+
+Use the **Resolve** menu to update the state of a detected practice:
+
+- **Fixed** – The issue has been addressed.
+- **Won't fix** – The team agreed the practice is acceptable for now.
+- **Wrong** – The detection was inaccurate.
+
+![Resolve button options](./img/best-practices/resolve.png)
+
+When you disagree with a detection, leave feedback. Your comments go straight to the Hephaestus team to improve future models.
+
+## Notifications
+
+If automatic detection finds a critical bad practice, Hephaestus emails the assignee. Configure notification preferences under **Settings → Notifications**.
+
+![Notification settings for best practices](./img/best-practices/settings.png)
+
+:::tip Fresh data wins
+The Best Practices page always shows the latest pull request state. Re-run an analysis after addressing feedback to verify the fix.
+:::
