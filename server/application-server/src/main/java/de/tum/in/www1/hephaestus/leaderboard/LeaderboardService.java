@@ -18,6 +18,8 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Collection;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
@@ -275,10 +277,10 @@ public class LeaderboardService {
     }
 
     private Optional<Team> findTeamByPath(String path) {
-        String[] parts = path.split(" / ");
-        if (parts.length == 0) {
+        if (path == null || path.trim().isEmpty()) {
             return Optional.empty();
         }
+        String[] parts = path.split(" / ");
 
         // Start from leaf name candidates
         String leaf = parts[parts.length - 1];
@@ -366,13 +368,17 @@ public class LeaderboardService {
 
         // If we consumed all parts and still have multiple, attempt exact full visible path match; otherwise pick first.
         if (currentByCandidate.size() > 1) {
+            preloadAncestors(currentByCandidate.values(), cache);
             for (Long id : currentByCandidate.keySet()) {
                 Team t = cache.get(id);
                 if (t != null && equalsVisiblePath(t, parts, cache)) {
                     return Optional.of(t);
                 }
             }
-            logger.warn("Ambiguous team path '{}' resolved to multiple candidates; picking first.", path);
+            logger.warn(
+                "Ambiguous team path '{}' resolved to multiple candidates; picking first.",
+                sanitizeForLog(path)
+            );
         }
 
         Long anyId = currentByCandidate.keySet().iterator().next();
@@ -384,17 +390,45 @@ public class LeaderboardService {
         Team current = team;
         while (current != null) {
             if (!current.isHidden()) {
-                if (index < 0 || !current.getName().equals(parts[index])) {
+                if (index < 0 || !Objects.equals(parts[index], current.getName())) {
                     return false;
                 }
                 index--;
             }
             Long parentId = current.getParentId();
-            current = parentId != null
-                ? cache.computeIfAbsent(parentId, id -> teamRepository.findById(id).orElse(null))
-                : null;
+            current = parentId != null ? cache.get(parentId) : null;
         }
         return index < 0;
+    }
+
+    private void preloadAncestors(Collection<Team> teams, Map<Long, Team> cache) {
+        Set<Long> pending = teams
+            .stream()
+            .map(Team::getParentId)
+            .filter(Objects::nonNull)
+            .filter(id -> !cache.containsKey(id))
+            .collect(Collectors.toSet());
+
+        while (!pending.isEmpty()) {
+            Set<Long> nextRound = new HashSet<>();
+            teamRepository
+                .findAllById(pending)
+                .forEach(parent -> {
+                    cache.putIfAbsent(parent.getId(), parent);
+                    Long ancestorId = parent.getParentId();
+                    if (ancestorId != null && !cache.containsKey(ancestorId)) {
+                        nextRound.add(ancestorId);
+                    }
+                });
+            pending = nextRound;
+        }
+    }
+
+    private String sanitizeForLog(String input) {
+        if (input == null) {
+            return null;
+        }
+        return input.replaceAll("[\\r\\n]", "");
     }
 
     private int calculateTotalScore(List<PullRequestReview> reviews, List<IssueComment> issueComments) {
