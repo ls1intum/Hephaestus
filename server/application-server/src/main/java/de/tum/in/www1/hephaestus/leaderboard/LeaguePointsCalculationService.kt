@@ -9,9 +9,9 @@ import org.slf4j.LoggerFactory
 import org.springframework.stereotype.Service
 
 @Service
-class LeaguePointsCalculationServiceImpl : LeaguePointsCalculationService {
+class DefaultLeaguePointsCalculationService : LeaguePointsCalculationService {
 
-    private val logger = LoggerFactory.getLogger(LeaguePointsCalculationServiceImpl::class.java)
+    private val logger = LoggerFactory.getLogger(DefaultLeaguePointsCalculationService::class.java)
 
     override fun calculateNewPoints(user: User, entry: LeaderboardEntryDTO): Int {
         if (user.leaguePoints == 0) {
