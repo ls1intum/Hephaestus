@@ -9,13 +9,13 @@ import org.slf4j.LoggerFactory
 import org.springframework.stereotype.Service
 
 @Service
-class LeaguePointsCalculationService {
+class LeaguePointsCalculationServiceImpl : LeaguePointsCalculationService {
 
-    private val logger = LoggerFactory.getLogger(LeaguePointsCalculationService::class.java)
+    private val logger = LoggerFactory.getLogger(LeaguePointsCalculationServiceImpl::class.java)
 
-    fun calculateNewPoints(user: User, entry: LeaderboardEntryDTO): Int {
+    override fun calculateNewPoints(user: User, entry: LeaderboardEntryDTO): Int {
         if (user.leaguePoints == 0) {
-            user.leaguePoints = POINTS_DEFAULT
+            user.leaguePoints = defaultPoints
         }
 
         val oldPoints = user.leaguePoints
@@ -42,10 +42,10 @@ class LeaguePointsCalculationService {
 
     private fun getKFactor(user: User): Double {
         return when {
-            isNewPlayer(user) -> K_FACTOR_NEW_PLAYER
-            user.leaguePoints < POINTS_THRESHOLD_LOW -> K_FACTOR_LOW_POINTS
-            user.leaguePoints < POINTS_THRESHOLD_HIGH -> K_FACTOR_MEDIUM_POINTS
-            else -> K_FACTOR_HIGH_POINTS
+            isNewPlayer(user) -> kFactorNewPlayer
+            user.leaguePoints < pointsThresholdLow -> kFactorLowPoints
+            user.leaguePoints < pointsThresholdHigh -> kFactorMediumPoints
+            else -> kFactorHighPoints
         }
     }
 
@@ -60,7 +60,7 @@ class LeaguePointsCalculationService {
 
     private fun calculateDecay(currentPoints: Int): Int {
         return if (currentPoints > 0) {
-            max(DECAY_MINIMUM, (currentPoints * DECAY_FACTOR).toInt())
+            max(decayMinimum, (currentPoints * decayFactor).toInt())
         } else {
             0
         }
@@ -78,21 +78,15 @@ class LeaguePointsCalculationService {
         }
     }
 
-    companion object {
-        // Starting points for new players
-        const val POINTS_DEFAULT: Int = 1000
-        // Upper bound for first reduction in the k-factor
-        const val POINTS_THRESHOLD_HIGH: Int = 1750
-        // Lower bound for first reduction in the k-factor
-        const val POINTS_THRESHOLD_LOW: Int = 1250
-        // Minimum amount of points to decay each cycle
-        const val DECAY_MINIMUM: Int = 10
-        // Factor to determine how much of the current points are decayed each cycle
-        const val DECAY_FACTOR: Double = 0.05
-        // K-factors depending on the player's league points
-        const val K_FACTOR_NEW_PLAYER: Double = 2.0
-        const val K_FACTOR_LOW_POINTS: Double = 1.5
-        const val K_FACTOR_MEDIUM_POINTS: Double = 1.2
-        const val K_FACTOR_HIGH_POINTS: Double = 1.1
+    private companion object {
+        val defaultPoints = LeaguePointsCalculationService.POINTS_DEFAULT
+        val pointsThresholdHigh = LeaguePointsCalculationService.POINTS_THRESHOLD_HIGH
+        val pointsThresholdLow = LeaguePointsCalculationService.POINTS_THRESHOLD_LOW
+        val decayMinimum = LeaguePointsCalculationService.DECAY_MINIMUM
+        val decayFactor = LeaguePointsCalculationService.DECAY_FACTOR
+        val kFactorNewPlayer = LeaguePointsCalculationService.K_FACTOR_NEW_PLAYER
+        val kFactorLowPoints = LeaguePointsCalculationService.K_FACTOR_LOW_POINTS
+        val kFactorMediumPoints = LeaguePointsCalculationService.K_FACTOR_MEDIUM_POINTS
+        val kFactorHighPoints = LeaguePointsCalculationService.K_FACTOR_HIGH_POINTS
     }
 }
