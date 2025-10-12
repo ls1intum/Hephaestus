@@ -79,6 +79,12 @@ public interface IssueCommentRepository extends JpaRepository<IssueComment, Long
                     )
                 )
             )
+            AND EXISTS (
+                SELECT 1
+                FROM TeamMembership tm
+                WHERE tm.team.id IN :teamIds
+                AND tm.user = ic.author
+            )
             AND (:onlyFromPullRequests = false OR ic.issue.htmlUrl LIKE '%/pull/%')
         ORDER BY ic.createdAt DESC
         """
