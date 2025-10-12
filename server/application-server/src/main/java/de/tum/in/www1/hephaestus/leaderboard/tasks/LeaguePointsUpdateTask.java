@@ -1,7 +1,7 @@
 package de.tum.in.www1.hephaestus.leaderboard.tasks;
 
-import de.tum.in.www1.hephaestus.gitprovider.user.UserRepository;
 import de.tum.in.www1.hephaestus.gitprovider.user.UserInfoDTO;
+import de.tum.in.www1.hephaestus.gitprovider.user.UserRepository;
 import de.tum.in.www1.hephaestus.leaderboard.LeaderboardEntryDTO;
 import de.tum.in.www1.hephaestus.leaderboard.LeaderboardMode;
 import de.tum.in.www1.hephaestus.leaderboard.LeaderboardService;
@@ -54,8 +54,7 @@ public class LeaguePointsUpdateTask implements Runnable {
             if (leaderboardUser == null) {
                 return;
             }
-            var user =
-                userRepository.findByLoginWithEagerMergedPullRequests(leaderboardUser.login()).orElseThrow();
+            var user = userRepository.findByLoginWithEagerMergedPullRequests(leaderboardUser.login()).orElseThrow();
             int newPoints = leaguePointsCalculationService.calculateNewPoints(user, entry);
             user.setLeaguePoints(newPoints);
             userRepository.save(user);

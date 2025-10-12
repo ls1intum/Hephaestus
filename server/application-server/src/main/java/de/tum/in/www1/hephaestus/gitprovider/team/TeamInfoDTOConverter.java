@@ -22,11 +22,7 @@ public class TeamInfoDTOConverter implements Converter<Team, TeamInfoDTO> {
             source.getOrganization(),
             source.getHtmlUrl(),
             source.isHidden(),
-            source
-                .getRepoPermissions()
-                .stream()
-                .map(RepositoryInfoDTO::fromPermission)
-                .toList(),
+            source.getRepoPermissions().stream().map(RepositoryInfoDTO::fromPermission).toList(),
             source.getLabels().stream().map(LabelInfoDTO::fromLabel).toList(),
             source
                 .getMemberships()

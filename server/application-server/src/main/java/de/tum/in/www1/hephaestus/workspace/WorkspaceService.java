@@ -336,8 +336,7 @@ public class WorkspaceService {
                 if (leaderboardUser == null) {
                     return;
                 }
-                var user =
-                    userRepository.findByLoginWithEagerMergedPullRequests(leaderboardUser.login()).orElseThrow();
+                var user = userRepository.findByLoginWithEagerMergedPullRequests(leaderboardUser.login()).orElseThrow();
                 int newPoints = leaguePointsCalculationService.calculateNewPoints(user, entry);
                 user.setLeaguePoints(newPoints);
                 userRepository.save(user);

@@ -6,11 +6,11 @@ import static com.slack.api.model.block.composition.BlockCompositions.*;
 import com.slack.api.methods.SlackApiException;
 import com.slack.api.model.User;
 import com.slack.api.model.block.LayoutBlock;
+import de.tum.in.www1.hephaestus.gitprovider.user.UserInfoDTO;
 import de.tum.in.www1.hephaestus.leaderboard.LeaderboardEntryDTO;
 import de.tum.in.www1.hephaestus.leaderboard.LeaderboardMode;
 import de.tum.in.www1.hephaestus.leaderboard.LeaderboardService;
 import de.tum.in.www1.hephaestus.leaderboard.SlackMessageService;
-import de.tum.in.www1.hephaestus.gitprovider.user.UserInfoDTO;
 import java.io.IOException;
 import java.time.DayOfWeek;
 import java.time.Instant;
@@ -67,7 +67,7 @@ public class SlackWeeklyLeaderboardTask implements Runnable {
      * @return {@code true} if the connection is valid, {@code false} otherwise.
      */
     public boolean testSlackConnection() {
-    return runScheduledMessage && slackMessageService != null && slackMessageService.initTest();
+        return runScheduledMessage && slackMessageService != null && slackMessageService.initTest();
     }
 
     /**
@@ -85,13 +85,10 @@ public class SlackWeeklyLeaderboardTask implements Runnable {
         var top3 = leaderboard.subList(0, Math.min(3, leaderboard.size()));
         logger.debug(
             "Top 3 Users of the last week: " +
-            top3
-                .stream()
-                .map(entry -> entry.getUser() != null ? entry.getUser().name() : "<team>")
-                .toList()
+            top3.stream().map(entry -> entry.getUser() != null ? entry.getUser().name() : "<team>").toList()
         );
 
-    List<User> allSlackUsers = slackMessageService != null ? slackMessageService.getAllMembers() : List.of();
+        List<User> allSlackUsers = slackMessageService != null ? slackMessageService.getAllMembers() : List.of();
 
         return top3.stream().map(mapToSlackUser(allSlackUsers)).filter(user -> user != null).toList();
     }

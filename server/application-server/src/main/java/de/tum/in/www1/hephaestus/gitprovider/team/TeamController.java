@@ -62,8 +62,9 @@ public class TeamController {
         @RequestBody(required = false) Boolean hiddenFromContributions,
         @RequestParam(name = "hiddenFromContributions", required = false) Boolean hiddenFromContributionsParam
     ) {
-        final var resolvedHidden =
-            hiddenFromContributions != null ? hiddenFromContributions : hiddenFromContributionsParam;
+        final var resolvedHidden = hiddenFromContributions != null
+            ? hiddenFromContributions
+            : hiddenFromContributionsParam;
 
         if (resolvedHidden == null) {
             return ResponseEntity.badRequest().build();
