@@ -1,5 +1,7 @@
 # Changelog
 
+## [0.9.1-rc.4](https://github.com/ls1intum/Hephaestus/compare/v0.9.1-rc.3...v0.9.1-rc.4) (2025-10-12)
+
 ## [0.9.1-rc.3](https://github.com/ls1intum/Hephaestus/compare/v0.9.1-rc.2...v0.9.1-rc.3) (2025-10-12)
 
 ## [0.9.1-rc.2](https://github.com/ls1intum/Hephaestus/compare/v0.9.1-rc.1...v0.9.1-rc.2) (2025-10-12)
