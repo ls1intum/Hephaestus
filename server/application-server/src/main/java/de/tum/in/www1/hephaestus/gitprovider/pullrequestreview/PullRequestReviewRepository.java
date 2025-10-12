@@ -76,6 +76,12 @@ public interface PullRequestReviewRepository extends JpaRepository<PullRequestRe
                     )
                 )
             )
+            AND EXISTS (
+                SELECT 1
+                FROM TeamMembership tm
+                WHERE tm.team.id IN :teamIds
+                AND tm.user = prr.author
+            )
         ORDER BY prr.submittedAt DESC
         """
     )
