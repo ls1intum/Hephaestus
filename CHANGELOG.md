@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.9.1](https://github.com/ls1intum/Hephaestus/compare/v0.9.0...v0.9.1) (2025-10-12)
+
+### 🐛 Bug Fixes
+
+* correct team contribution attribution ([#500](https://github.com/ls1intum/Hephaestus/issues/500)) ([82b31c6](https://github.com/ls1intum/Hephaestus/commit/82b31c6437518c4000abeb96527cc35f37b45fc8))
+
 ## [0.9.1-rc.6](https://github.com/ls1intum/Hephaestus/compare/v0.9.1-rc.5...v0.9.1-rc.6) (2025-10-12)
 
 ## [0.9.1-rc.5](https://github.com/ls1intum/Hephaestus/compare/v0.9.1-rc.4...v0.9.1-rc.5) (2025-10-12)
