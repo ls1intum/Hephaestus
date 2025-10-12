@@ -1,7 +1,7 @@
 spring:
     application:
         name: Hephaestus
-        version: "0.9.1-rc.2"
+        version: "0.9.1-rc.3"
 
     datasource:
         url: jdbc:postgresql://localhost:5432/hephaestus
