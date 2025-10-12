@@ -19,27 +19,3 @@ jobs:
 
       - name: Sync main with develop
         run: git push origin +develop:main
-
-      - name: Prepare main branch
-        run: |
-          git fetch origin main
-          git checkout -B main origin/main
-
-      - name: Install release dependencies
-        run: npm ci
-
-      - name: Create production release
-        run: npx semantic-release --branches main
-        env:
-          GITHUB_TOKEN: ${{ secrets.GH_PAT }}
-          GITHUB_REF: refs/heads/main
-          GITHUB_REF_NAME: main
-          GITHUB_HEAD_REF: main
-          GITHUB_BASE_REF: main
-          GIT_AUTHOR_NAME: "Felix T.J. Dietrich"
-          GIT_AUTHOR_EMAIL: "felixtj.dietrich@tum.de"
-          GIT_COMMITTER_NAME: "Felix T.J. Dietrich"
-          GIT_COMMITTER_EMAIL: "felixtj.dietrich@tum.de"
-
-      - name: Fast-forward develop to production release
-        run: git push origin main:develop
