@@ -6,9 +6,11 @@ import java.time.Instant
 import kotlin.math.max
 import kotlin.math.sqrt
 import org.slf4j.LoggerFactory
+import org.springframework.context.annotation.Primary
 import org.springframework.stereotype.Service
 
 @Service
+@Primary
 class DefaultLeaguePointsCalculationService : LeaguePointsCalculationService {
 
     private val logger = LoggerFactory.getLogger(DefaultLeaguePointsCalculationService::class.java)

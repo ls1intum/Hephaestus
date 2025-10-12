@@ -41,7 +41,7 @@ class LeaderboardService(
         mode: LeaderboardMode,
     ): List<LeaderboardEntryDTO> {
         return when (mode) {
-            LeaderboardMode.INDIVIDUAL -> createIndividualLeaderboard(after, before, if (team == "all") null else resolveTeamByName(team), sort)
+            LeaderboardMode.INDIVIDUAL -> createIndividualLeaderboard(after, before, if (team == "all") null else resolveTeamByPath(team), sort)
             LeaderboardMode.TEAM -> createTeamLeaderboard(after, before)
         }
     }
@@ -284,7 +284,160 @@ class LeaderboardService(
         return LeagueChangeDTO(user.login, projectedNewPoints - currentLeaguePoints)
     }
 
-    private fun resolveTeamByName(teamName: String): Team? = teamRepository.findFirstByName(teamName)
+    private fun resolveTeamByPath(path: String?): Team? {
+        if (path.isNullOrBlank()) {
+            return null
+        }
+
+        val parts = path.split(" / ")
+        val leaf = parts.last()
+        val candidates = teamRepository.findAllByName(leaf)
+        if (candidates.isEmpty()) {
+            return null
+        }
+
+        val cache = mutableMapOf<Long, Team>()
+        var currentByCandidate = mutableMapOf<Long, Team>()
+
+        candidates.forEach { candidate ->
+            val candidateId = candidate.id ?: return@forEach
+            cache[candidateId] = candidate
+            currentByCandidate[candidateId] = candidate
+        }
+
+        if (currentByCandidate.isEmpty()) {
+            return null
+        }
+
+        if (parts.size == 1) {
+            val sole = currentByCandidate.keys.singleOrNull() ?: return null
+            return cache[sole]
+        }
+
+        for (index in parts.size - 2 downTo 0) {
+            if (currentByCandidate.size <= 1) {
+                break
+            }
+
+            val expected = parts[index]
+            val nextVisibleByCandidate = mutableMapOf<Long, Team?>()
+            var pendingResolution = true
+
+            while (pendingResolution) {
+                pendingResolution = false
+                val missingIds = mutableSetOf<Long>()
+
+                currentByCandidate.forEach { (candidateId, cursor) ->
+                    if (candidateId in nextVisibleByCandidate) {
+                        return@forEach
+                    }
+
+                    var parentId = cursor.parentId
+                    while (parentId != null) {
+                        val parent = cache[parentId]
+                        if (parent == null) {
+                            missingIds.add(parentId)
+                            break
+                        }
+                        if (!parent.isHidden) {
+                            nextVisibleByCandidate[candidateId] = parent
+                            break
+                        }
+                        parentId = parent.parentId
+                    }
+
+                    if (parentId == null && candidateId !in nextVisibleByCandidate) {
+                        nextVisibleByCandidate[candidateId] = null
+                    }
+                }
+
+                if (missingIds.isNotEmpty()) {
+                    teamRepository.findAllById(missingIds).forEach { parent ->
+                        val parentId = parent.id ?: return@forEach
+                        cache.putIfAbsent(parentId, parent)
+                    }
+                    pendingResolution = true
+                }
+            }
+
+            val filtered = mutableMapOf<Long, Team>()
+            currentByCandidate.forEach { (candidateId, _) ->
+                val nextVisible = nextVisibleByCandidate[candidateId]
+                if (nextVisible != null && nextVisible.name == expected) {
+                    filtered[candidateId] = nextVisible
+                    nextVisible.id?.let { cache.putIfAbsent(it, nextVisible) }
+                }
+            }
+
+            currentByCandidate = filtered
+
+            if (currentByCandidate.isEmpty()) {
+                return null
+            }
+
+            if (currentByCandidate.size == 1) {
+                val onlyId = currentByCandidate.keys.first()
+                return cache[onlyId]
+            }
+        }
+
+        if (currentByCandidate.size > 1) {
+            preloadAncestors(currentByCandidate.values, cache)
+            for (candidateId in currentByCandidate.keys) {
+                val candidate = cache[candidateId]
+                if (candidate != null && equalsVisiblePath(candidate, parts, cache)) {
+                    return candidate
+                }
+            }
+            logger.warn(
+                "Ambiguous team path '{}' resolved to multiple candidates; picking first.",
+                sanitizeForLog(path),
+            )
+        }
+
+        val anyId = currentByCandidate.keys.firstOrNull() ?: return null
+        return cache[anyId]
+    }
+
+    private fun equalsVisiblePath(team: Team, parts: List<String>, cache: Map<Long, Team>): Boolean {
+        var index = parts.size - 1
+        var current: Team? = team
+        while (current != null) {
+            if (!current.isHidden) {
+                if (index < 0 || parts[index] != current.name) {
+                    return false
+                }
+                index -= 1
+            }
+            val parentId = current.parentId
+            current = parentId?.let(cache::get)
+        }
+        return index < 0
+    }
+
+    private fun preloadAncestors(teams: Collection<Team>, cache: MutableMap<Long, Team>) {
+        var pending = teams
+            .mapNotNull { it.parentId }
+            .filterNot { cache.containsKey(it) }
+            .toMutableSet()
+
+        while (pending.isNotEmpty()) {
+            val nextRound = mutableSetOf<Long>()
+            teamRepository.findAllById(pending).forEach { parent ->
+                val parentId = parent.id ?: return@forEach
+                if (!cache.containsKey(parentId)) {
+                    cache[parentId] = parent
+                }
+                val ancestorId = parent.parentId
+                if (ancestorId != null && !cache.containsKey(ancestorId)) {
+                    nextRound.add(ancestorId)
+                }
+            }
+            pending = nextRound
+        }
+    }
+
+    private fun sanitizeForLog(input: String?): String? = input?.replace(Regex("[\r\n]"), "")
 
     private data class TeamStats(
         val score: Int,
