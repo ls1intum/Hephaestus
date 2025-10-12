@@ -9,4 +9,6 @@ public interface TeamRepository extends JpaRepository<Team, Long> {
     Team findFirstByName(String teamName);
 
     List<Team> findAllByName(String name);
+
+    List<Team> findAllByHiddenFalse();
 }

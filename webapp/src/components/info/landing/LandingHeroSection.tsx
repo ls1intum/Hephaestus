@@ -158,6 +158,7 @@ export function LandingHeroSection({
 						<LeaderboardTable
 							leaderboard={SAMPLE_LEADERBOARD_ENTRIES}
 							isLoading={false}
+							variant="INDIVIDUAL"
 						/>
 					</div>
 				</div>

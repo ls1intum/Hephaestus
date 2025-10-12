@@ -41,7 +41,7 @@ class LeaderboardService(
     ): List<LeaderboardEntryDTO> {
         return when (mode) {
             LeaderboardMode.INDIVIDUAL -> createIndividualLeaderboard(after, before, if (team == "all") null else resolveTeamByName(team), sort)
-            LeaderboardMode.TEAM -> createTeamLeaderboard(after, before, team, sort)
+            LeaderboardMode.TEAM -> createTeamLeaderboard(after, before)
         }
     }
 
@@ -155,25 +155,22 @@ class LeaderboardService(
     private fun createTeamLeaderboard(
         after: Instant,
         before: Instant,
-        team: String,
-        sort: LeaderboardSortType,
     ): List<LeaderboardEntryDTO> {
         logger.info(
-            "Creating team leaderboard dataset with timeframe: {} - {} and team: {}",
+            "Creating team leaderboard dataset with timeframe: {} - {}",
             after,
             before,
-            team,
         )
 
-        val targetTeams = if (team != "all") teamRepository.findAllByName(team) else teamRepository.findAll()
+        val targetTeams = teamRepository.findAllByHiddenFalse()
 
         if (targetTeams.isEmpty()) {
-            logger.info("❌ No teams found for provided filter: {}", team)
+            logger.info("❌ No teams found for team leaderboard")
             return emptyList()
         }
 
         val teamStatsById = targetTeams.associateWith { teamEntity ->
-            val entries = createIndividualLeaderboard(after, before, teamEntity, sort)
+            val entries = createIndividualLeaderboard(after, before, teamEntity, LeaderboardSortType.SCORE)
             aggregateTeamStats(entries)
         }
 

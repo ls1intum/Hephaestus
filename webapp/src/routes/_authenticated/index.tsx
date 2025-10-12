@@ -32,7 +32,7 @@ const leaderboardSearchSchema = z.object({
 	sort: z.enum(["SCORE", "LEAGUE_POINTS"]).default("SCORE"),
 	after: z.string().optional().default(startOfCurrentWeek),
 	before: z.string().optional().default(endOfCurrentWeek),
-  mode: z.enum(["INDIVIDUAL", "TEAM"]).default("INDIVIDUAL")
+	mode: z.enum(["INDIVIDUAL", "TEAM"]).default("INDIVIDUAL"),
 });
 
 // Export route with search param validation
@@ -112,13 +112,23 @@ function LeaderboardContainer() {
 	};
 
 	// Valid selectable values are the full visible paths
-	const visibleTeams = teamsList
-		.filter((t) => !t.hidden)
-		.map((t) => makeLabel(t));
+	const teamLabelsById = teamsList.reduce<Record<number, string>>(
+		(acc, team) => {
+			const label = makeLabel(team);
+			acc[team.id] = label.length > 0 ? label : team.name;
+			return acc;
+		},
+		{},
+	);
 
-	const teamOptions = teamsList
+	const visibleTeamEntries = teamsList
 		.filter((t) => !t.hidden)
-		.map((t) => ({ value: makeLabel(t), label: makeLabel(t) }))
+		.map((team) => ({ team, label: teamLabelsById[team.id] }));
+
+	const visibleTeams = visibleTeamEntries.map((entry) => entry.label);
+
+	const teamOptions = visibleTeamEntries
+		.map(({ label }) => ({ value: label, label }))
 		.sort((a, b) => a.label.localeCompare(b.label));
 
 	// If current selected team is hidden (or no longer present), reset to 'all'
@@ -132,6 +142,28 @@ function LeaderboardContainer() {
 			});
 		}
 	}, [team, visibleTeams, navigate]);
+
+	useEffect(() => {
+		if (mode === "TEAM" && team !== "all") {
+			navigate({
+				search: (prev) => ({
+					...prev,
+					team: "all",
+				}),
+			});
+		}
+	}, [mode, team, navigate]);
+
+	useEffect(() => {
+		if (mode === "TEAM" && sort !== "SCORE") {
+			navigate({
+				search: (prev) => ({
+					...prev,
+					sort: "SCORE" as LeaderboardSortType,
+				}),
+			});
+		}
+	}, [mode, sort, navigate]);
 
 	// Get the leaderboard schedule from the server's metadata
 	const scheduledTime = metaQuery.data?.scheduledTime || "9:00";
@@ -217,19 +249,29 @@ function LeaderboardContainer() {
 		navigate({ to: "/user/$username", params: { username } });
 	};
 
-  const handleModeChange = (newMode: "INDIVIDUAL" | "TEAM") => {
-    navigate({
-      search: (prev) => ({
-        ...prev,
-        mode: newMode,
-      }),
-    });
-  };
+	const handleModeChange = (newMode: "INDIVIDUAL" | "TEAM") => {
+		navigate({
+			search: (prev) => ({
+				...prev,
+				mode: newMode,
+				team: newMode === "TEAM" ? "all" : prev.team,
+				sort: newMode === "TEAM" ? "SCORE" : prev.sort,
+			}),
+		});
+	};
 
-  // TODO: implement handleTeamClick with scrollability function
-  const handleTeamClick = (teamId: number) => {
-    navigate({ to: `/teams#team-${teamId}` });
-  };
+	const handleTeamClick = (teamId: number) => {
+		const label = teamLabelsById[teamId];
+		if (!label) return;
+		navigate({
+			search: (prev) => ({
+				...prev,
+				mode: "INDIVIDUAL",
+				sort: "SCORE",
+				team: label,
+			}),
+		});
+	};
 
 	return (
 		<LeaderboardPage
@@ -240,6 +282,7 @@ function LeaderboardContainer() {
 			leaguePoints={userProfileQuery.data?.userInfo?.leaguePoints}
 			leaguePointsChange={leagueStatsQuery.data?.leaguePointsChange}
 			teamOptions={teamOptions}
+			teamLabelsById={teamLabelsById}
 			selectedTeam={team}
 			selectedSort={sort}
 			initialAfterDate={after}

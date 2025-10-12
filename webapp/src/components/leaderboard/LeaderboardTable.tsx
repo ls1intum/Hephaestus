@@ -8,6 +8,7 @@ import {
 } from "@primer/octicons-react";
 import { AwardIcon } from "lucide-react";
 import type { LeaderboardEntry, UserInfo } from "@/api/types.gen";
+import type { LeaderboardVariant } from '@/components/leaderboard/LeaderboardPage.tsx';
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
@@ -26,7 +27,6 @@ import {
 import { cn } from "@/lib/utils";
 import { LeagueIcon } from "./LeagueIcon";
 import { ReviewsPopover } from "./ReviewsPopover";
-import type { LeaderboardVariant } from '@/components/leaderboard/LeaderboardPage.tsx';
 
 type TeamLeaderboardEntry = LeaderboardEntry & {
 	team: NonNullable<LeaderboardEntry["team"]>;
@@ -39,6 +39,7 @@ export interface LeaderboardTableProps {
 	currentUser?: UserInfo;
 	onUserClick?: (username: string) => void;
 	onTeamClick?: (teamId: number) => void;
+	teamLabelsById?: Record<number, string>;
 }
 
 export function LeaderboardTable({
@@ -48,6 +49,7 @@ export function LeaderboardTable({
 	currentUser,
 	onUserClick,
 	onTeamClick,
+	teamLabelsById,
 }: LeaderboardTableProps) {
 	if (isLoading) {
 		return <LeaderboardTableSkeleton />;
@@ -93,9 +95,10 @@ export function LeaderboardTable({
 					if (isTeam) {
 						const team = (entry as TeamLeaderboardEntry).team;
 						if (!team) return null;
+						const displayName = teamLabelsById?.[team.id] ?? team.name;
 						return (
 							<TableRow
-								key={team.name}
+								key={team.id}
 								id={`team-${team.id}`}
 								className="cursor-pointer"
 								onClick={() => onTeamClick?.(team.id)}
@@ -106,14 +109,14 @@ export function LeaderboardTable({
 										<Avatar className="size-9">
 											<AvatarImage
 												src={`https://avatars.githubusercontent.com/t/${team.id}?s=512&v=4`}
-												alt={`${team.name}'s avatar`}
+												alt={`${displayName}'s avatar`}
 											/>
 											<AvatarFallback>
-												{team.name.slice(0, 2).toUpperCase()}
+												{displayName.slice(0, 2).toUpperCase()}
 											</AvatarFallback>
 										</Avatar>
 										<span className="text-muted-foreground text-wrap">
-											{team.name}
+											{displayName}
 										</span>
 									</div>
 								</TableCell>

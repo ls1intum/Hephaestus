@@ -15,6 +15,7 @@ interface LeaderboardPageProps {
 	leaguePoints?: number;
 	leaguePointsChange?: number;
 	teamOptions: { value: string; label: string }[];
+	teamLabelsById?: Record<number, string>;
 	onTeamChange?: (team: string) => void;
 	onSortChange?: (sort: LeaderboardSortType) => void;
 	onTimeframeChange?: (
@@ -35,7 +36,7 @@ interface LeaderboardPageProps {
 	};
   selectedMode: LeaderboardVariant;
   onModeChange?: (mode: LeaderboardVariant) => void;
-  onTeamClick?: (teamName: string) => void;
+  onTeamClick?: (teamId: number) => void;
 }
 
 export function LeaderboardPage({
@@ -46,6 +47,7 @@ export function LeaderboardPage({
 	leaguePoints = 0,
 	leaguePointsChange = 0,
 	teamOptions,
+	teamLabelsById,
 	onTeamChange,
 	onSortChange,
 	onTimeframeChange,
@@ -109,6 +111,7 @@ export function LeaderboardPage({
                 currentUser={currentUser}
                 onUserClick={onUserClick}
                 onTeamClick={onTeamClick}
+								teamLabelsById={teamLabelsById}
               />
             </div>
 					</div>

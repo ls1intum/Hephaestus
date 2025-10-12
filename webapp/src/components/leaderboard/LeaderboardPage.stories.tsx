@@ -107,6 +107,7 @@ export const Default: Story = {
 		teamOptions: mockTeamOptions,
 		selectedTeam: "all",
 		selectedSort: "SCORE",
+		selectedMode: "INDIVIDUAL",
 	},
 };
 
@@ -117,6 +118,7 @@ export const WithCurrentUser: Story = {
 		teamOptions: mockTeamOptions,
 		selectedTeam: "all",
 		selectedSort: "SCORE",
+		selectedMode: "INDIVIDUAL",
 		currentUser: {
 			id: 1,
 			login: "FelixTJDietrich",
@@ -137,6 +139,7 @@ export const Loading: Story = {
 		teamOptions: mockTeamOptions,
 		selectedTeam: "all",
 		selectedSort: "SCORE",
+		selectedMode: "INDIVIDUAL",
 	},
 };
 
@@ -147,5 +150,6 @@ export const EmptyLeaderboard: Story = {
 		teamOptions: mockTeamOptions,
 		selectedTeam: "all",
 		selectedSort: "SCORE",
+		selectedMode: "INDIVIDUAL",
 	},
 };

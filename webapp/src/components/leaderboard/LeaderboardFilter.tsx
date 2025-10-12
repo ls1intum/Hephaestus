@@ -1,4 +1,5 @@
 import { SlidersHorizontal } from "lucide-react";
+import type { LeaderboardVariant } from '@/components/leaderboard/LeaderboardPage.tsx';
 import {
 	Card,
 	CardContent,
@@ -6,12 +7,11 @@ import {
 	CardHeader,
 	CardTitle,
 } from "@/components/ui/card";
+import { Label } from '@/components/ui/label.tsx';
+import { Switch } from '@/components/ui/switch.tsx';
 import { type LeaderboardSortType, SortFilter } from "./SortFilter";
 import { TeamFilter, type TeamFilterOption } from "./TeamFilter";
 import { TimeframeFilter } from "./TimeframeFilter";
-import { Switch } from '@/components/ui/switch.tsx';
-import { Label } from '@/components/ui/label.tsx';
-import type { LeaderboardVariant } from '@/components/leaderboard/LeaderboardPage.tsx';
 
 export interface LeaderboardFilterProps {
 	teamOptions: TeamFilterOption[];
@@ -70,21 +70,24 @@ export function LeaderboardFilter({
 			</CardHeader>
 			<CardContent>
         <div className="flex items-center space-x-2 mb-4">
-          <Label htmlFor="mode-switch" className={selectedMode === "INDIVIDUAL" ? "font-bold" : ""}>Individual</Label>
           <Switch
             id="mode-switch"
             checked={selectedMode === "TEAM"}
             onCheckedChange={(checked) => onModeChange?.(checked ? "TEAM" : "INDIVIDUAL")}
           />
-          <Label htmlFor="mode-switch" className={selectedMode === "TEAM" ? "font-bold" : ""}>Team</Label>
+          <Label htmlFor="mode-switch">Team Leaderboard</Label>
         </div>
-				<div className="grid grid-cols-1 md:grid-cols-3 gap-4 xl:grid-cols-1">
-					<TeamFilter
-						options={teamOptions}
-						onTeamChange={onTeamChange}
-						selectedTeam={selectedTeam}
-					/>
-					<SortFilter onSortChange={onSortChange} selectedSort={selectedSort} />
+				<div className="space-y-4">
+					{selectedMode === "INDIVIDUAL" && (
+						<TeamFilter
+							options={teamOptions}
+							onTeamChange={onTeamChange}
+							selectedTeam={selectedTeam}
+						/>
+					)}
+					{selectedMode === "INDIVIDUAL" && (
+						<SortFilter onSortChange={onSortChange} selectedSort={selectedSort} />
+					)}
 					<TimeframeFilter
 						onTimeframeChange={onTimeframeChange}
 						initialAfterDate={initialAfterDate}
