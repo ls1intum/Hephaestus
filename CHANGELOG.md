@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.9.0-rc.32](https://github.com/ls1intum/Hephaestus/compare/v0.9.0-rc.31...v0.9.0-rc.32) (2025-10-12)
+
+### 📚 Documentation
+
+* add 0.9.0 announcement update ([#499](https://github.com/ls1intum/Hephaestus/issues/499)) ([8974066](https://github.com/ls1intum/Hephaestus/commit/8974066d0e52a22daa0cb9a62f8c6aeb947dd560))
+
 ## [0.9.0-rc.31](https://github.com/ls1intum/Hephaestus/compare/v0.9.0-rc.30...v0.9.0-rc.31) (2025-10-12)
 
 ### 🚀 Features
