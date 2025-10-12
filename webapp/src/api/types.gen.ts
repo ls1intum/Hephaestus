@@ -1866,7 +1866,13 @@ export type GetLeaderboardData = {
     query: {
         after: Date;
         before: Date;
+        /**
+         * Team filter to apply in INDIVIDUAL mode; ignored when mode is TEAM.
+         */
         team: string;
+        /**
+         * Determines the ranking metric. In TEAM mode SCORE uses summed contribution scores; LEAGUE_POINTS uses total league points.
+         */
         sort: 'SCORE' | 'LEAGUE_POINTS';
         mode: 'INDIVIDUAL' | 'TEAM';
     };

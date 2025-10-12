@@ -1,6 +1,7 @@
 package de.tum.in.www1.hephaestus.leaderboard;
 
 import de.tum.in.www1.hephaestus.gitprovider.user.User;
+import de.tum.in.www1.hephaestus.leaderboard.LeaderboardEntryDTO;
 
 public interface LeaguePointsCalculationService {
     int POINTS_DEFAULT = 1000;

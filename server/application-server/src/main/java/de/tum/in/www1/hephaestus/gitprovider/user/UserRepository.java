@@ -74,6 +74,9 @@ public interface UserRepository extends JpaRepository<User, Long> {
     List<User> findAllByTeamIds(@Param("teamIds") Collection<Long> teamIds);
 
     default List<User> findAllByTeamId(Long teamId) {
+        if (teamId == null) {
+            return List.of();
+        }
         return findAllByTeamIds(List.of(teamId));
     }
 
@@ -104,6 +107,9 @@ public interface UserRepository extends JpaRepository<User, Long> {
     Set<User> findAllContributingToTeams(@Param("teamIds") Collection<Long> teamIds);
 
     default Set<User> findAllContributingToTeam(Long teamId) {
+        if (teamId == null) {
+            return Set.of();
+        }
         return findAllContributingToTeams(List.of(teamId));
     }
 

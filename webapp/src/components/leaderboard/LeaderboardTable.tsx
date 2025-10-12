@@ -8,7 +8,7 @@ import {
 } from "@primer/octicons-react";
 import { AwardIcon } from "lucide-react";
 import type { LeaderboardEntry, UserInfo } from "@/api/types.gen";
-import type { LeaderboardVariant } from "@/components/leaderboard/LeaderboardPage.tsx";
+import type { LeaderboardVariant } from "@/components/leaderboard/LeaderboardPage";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Skeleton } from "@/components/ui/skeleton";
 import {

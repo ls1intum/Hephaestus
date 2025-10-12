@@ -16,21 +16,18 @@ class DefaultLeaguePointsCalculationService : LeaguePointsCalculationService {
     private val logger = LoggerFactory.getLogger(DefaultLeaguePointsCalculationService::class.java)
 
     override fun calculateNewPoints(user: User, entry: LeaderboardEntryDTO): Int {
-        if (user.leaguePoints == 0) {
-            user.leaguePoints = defaultPoints
-        }
-
-        val oldPoints = user.leaguePoints
-        val kFactor = getKFactor(user)
-        val decay = calculateDecay(user.leaguePoints)
+        val storedPoints = user.leaguePoints
+        val effectivePoints = if (storedPoints == 0) defaultPoints else storedPoints
+        val kFactor = getKFactor(user, effectivePoints)
+        val decay = calculateDecay(effectivePoints)
         val performanceBonus = calculatePerformanceBonus(entry.score)
         val placementBonus = calculatePlacementBonus(entry.rank)
         val pointChange = (kFactor * (performanceBonus + placementBonus - decay)).toInt()
-        val newPoints = max(1, oldPoints + pointChange)
+        val newPoints = max(1, effectivePoints + pointChange)
 
         logger.info(
             "Points calculation: old={}, k={}, decay={}, performanceBonus={}, placement={}, pointchange={}, new={}",
-            oldPoints,
+            effectivePoints,
             kFactor,
             decay,
             performanceBonus,
@@ -42,11 +39,11 @@ class DefaultLeaguePointsCalculationService : LeaguePointsCalculationService {
         return newPoints
     }
 
-    private fun getKFactor(user: User): Double {
+    private fun getKFactor(user: User, currentPoints: Int): Double {
         return when {
             isNewPlayer(user) -> kFactorNewPlayer
-            user.leaguePoints < pointsThresholdLow -> kFactorLowPoints
-            user.leaguePoints < pointsThresholdHigh -> kFactorMediumPoints
+            currentPoints < pointsThresholdLow -> kFactorLowPoints
+            currentPoints < pointsThresholdHigh -> kFactorMediumPoints
             else -> kFactorHighPoints
         }
     }
@@ -57,7 +54,7 @@ class DefaultLeaguePointsCalculationService : LeaguePointsCalculationService {
             .asSequence()
             .filter { it.isMerged }
             .mapNotNull(PullRequest::getMergedAt)
-            .none { it.isAfter(thirtyDaysAgo) }
+            .none { it.isBefore(thirtyDaysAgo) }
     }
 
     private fun calculateDecay(currentPoints: Int): Int {
@@ -79,7 +76,6 @@ class DefaultLeaguePointsCalculationService : LeaguePointsCalculationService {
             0
         }
     }
-
     private companion object {
         val defaultPoints = LeaguePointsCalculationService.POINTS_DEFAULT
         val pointsThresholdHigh = LeaguePointsCalculationService.POINTS_THRESHOLD_HIGH

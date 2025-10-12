@@ -165,39 +165,59 @@ export function TeamsPage({ teams, isLoading }: TeamsPageProps) {
 	};
 
 	useLayoutEffect(() => {
-		const scrollToHash = () => {
+		let observer: MutationObserver | null = null;
+
+		const cleanupObserver = () => {
+			observer?.disconnect();
+			observer = null;
+		};
+
+		const scrollToHash = (): boolean => {
 			const hash = window.location.hash;
-			if (!hash) return;
+			if (!hash) return false;
 			const id = hash.slice(1);
 			const el = document.getElementById(id);
 			if (el) {
 				el.scrollIntoView({ behavior: "smooth", block: "center" });
 				return true;
 			}
-			// one-frame fallback
 			requestAnimationFrame(() => {
 				const elNext = document.getElementById(id);
-				if (elNext)
+				if (elNext) {
 					elNext.scrollIntoView({ behavior: "smooth", block: "center" });
+				}
 			});
+			return false;
 		};
 
-		// try immediately
-		if (scrollToHash()) return;
+		const ensureScroll = () => {
+			if (!window.location.hash) {
+				cleanupObserver();
+				return;
+			}
 
-		// observe DOM until the target appears (then disconnect)
-		const observer = new MutationObserver(() => {
-			if (scrollToHash()) observer.disconnect();
-		});
-		observer.observe(document.body, { childList: true, subtree: true });
+			if (scrollToHash()) {
+				cleanupObserver();
+				return;
+			}
 
-		// also handle manual hash change
-		window.addEventListener("hashchange", scrollToHash);
+			if (!observer) {
+				observer = new MutationObserver(() => {
+					if (scrollToHash()) {
+						cleanupObserver();
+					}
+				});
+				observer.observe(document.body, { childList: true, subtree: true });
+			}
+		};
+
+		ensureScroll();
+		window.addEventListener("hashchange", ensureScroll);
 		return () => {
-			observer.disconnect();
-			window.removeEventListener("hashchange", scrollToHash);
+			cleanupObserver();
+			window.removeEventListener("hashchange", ensureScroll);
 		};
-	}, []); // no `roots` dependency - observer handles late DOM insertion
+	}, []);
 
 	return (
 		<>

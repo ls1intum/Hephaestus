@@ -123,6 +123,7 @@
         <dependency>
             <groupId>org.postgresql</groupId>
             <artifactId>postgresql</artifactId>
+            <version>42.7.7</version>
             <scope>runtime</scope>
         </dependency>
         <dependency>
@@ -430,9 +431,6 @@
                     <!-- Test output -->
                     <printSummary>true</printSummary>
                     <redirectTestOutputToFile>false</redirectTestOutputToFile>
-                    <!-- Enable test categorization -->
-                    <groups>${groups}</groups>
-                    <excludedGroups>${excludedGroups}</excludedGroups>
                     <!-- Parallel execution for faster tests -->
                     <parallel>methods</parallel>
                     <threadCount>4</threadCount>

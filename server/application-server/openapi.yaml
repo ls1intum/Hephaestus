@@ -425,12 +425,16 @@ paths:
         schema:
           type: string
           format: date-time
-      - in: query
+      - description: Team filter to apply in INDIVIDUAL mode; ignored when mode is
+          TEAM.
+        in: query
         name: team
         required: true
         schema:
           type: string
-      - in: query
+      - description: Determines the ranking metric. In TEAM mode SCORE uses summed
+          contribution scores; LEAGUE_POINTS uses total league points.
+        in: query
         name: sort
         required: true
         schema:

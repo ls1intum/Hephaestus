@@ -264,6 +264,7 @@ function LeaderboardContainer() {
 	const handleTeamClick = (teamId: number) => {
 		const label = teamLabelsById[teamId];
 		if (!label) return;
+		// Expand the team path and navigate to INDIVIDUAL mode with that team filter
 		navigate({
 			search: (prev) => ({
 				...prev,

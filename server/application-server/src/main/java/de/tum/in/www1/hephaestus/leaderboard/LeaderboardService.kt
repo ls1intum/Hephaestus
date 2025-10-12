@@ -42,7 +42,10 @@ class LeaderboardService(
     ): List<LeaderboardEntryDTO> {
         return when (mode) {
             LeaderboardMode.INDIVIDUAL -> createIndividualLeaderboard(after, before, if (team == "all") null else resolveTeamByPath(team), sort)
-            LeaderboardMode.TEAM -> createTeamLeaderboard(after, before)
+            LeaderboardMode.TEAM -> {
+                // Team mode aggregates across all visible teams; the team filter is ignored on purpose (documented in OpenAPI).
+                createTeamLeaderboard(after, before, sort)
+            }
         }
     }
 
@@ -56,8 +59,8 @@ class LeaderboardService(
         after,
         before,
         team.orElse(null),
-        sort.orElse(null),
-        mode.orElse(null),
+        sort.orElse(LeaderboardSortType.SCORE),
+        mode.orElse(LeaderboardMode.INDIVIDUAL),
     )
 
     private fun createIndividualLeaderboard(
@@ -166,6 +169,7 @@ class LeaderboardService(
     private fun createTeamLeaderboard(
         after: Instant,
         before: Instant,
+        sort: LeaderboardSortType,
     ): List<LeaderboardEntryDTO> {
         logger.info(
             "Creating team leaderboard dataset with timeframe: {} - {}",
@@ -190,13 +194,19 @@ class LeaderboardService(
         return teamStatsById
             .entries
             .sortedWith(
-                compareByDescending<Map.Entry<Team, TeamStats>> { it.value.score }
+                when (sort) {
+                    LeaderboardSortType.SCORE -> compareByDescending<Map.Entry<Team, TeamStats>> { it.value.score }
+                    LeaderboardSortType.LEAGUE_POINTS -> compareByDescending<Map.Entry<Team, TeamStats>> { it.value.leaguePoints }
+                }
                     .thenBy { it.key.name }
             )
             .mapIndexed { index, (teamEntity, stats) ->
                 LeaderboardEntryDTO(
                     rank = index + 1,
-                    score = stats.score,
+                    score = when (sort) {
+                        LeaderboardSortType.SCORE -> stats.score
+                        LeaderboardSortType.LEAGUE_POINTS -> stats.leaguePoints
+                    },
                     user = null,
                     team = TeamInfoDTO.fromTeam(teamEntity),
                     reviewedPullRequests = stats.reviewedPullRequests,
@@ -265,7 +275,9 @@ class LeaderboardService(
             }
             .size
 
-        val reviewsByPullRequest = reviews.groupBy { it.pullRequest.id }
+        val reviewsByPullRequest = reviews
+            .filter { it.pullRequest != null }
+            .groupBy { it.pullRequest!!.id }
 
         val totalScore = reviewsByPullRequest
             .values
@@ -441,6 +453,7 @@ class LeaderboardService(
 
     private data class TeamStats(
         val score: Int,
+        val leaguePoints: Int,
         val reviewedPullRequests: List<PullRequestInfoDTO>,
         val numberOfReviewedPRs: Int,
         val numberOfApprovals: Int,
@@ -459,6 +472,7 @@ class LeaderboardService(
 
         return TeamStats(
             score = entries.sumOf { it.score },
+            leaguePoints = entries.sumOf { it.user?.leaguePoints ?: 0 },
             reviewedPullRequests = reviewedPullRequests,
             numberOfReviewedPRs = entries.sumOf { it.numberOfReviewedPRs },
             numberOfApprovals = entries.sumOf { it.numberOfApprovals },
