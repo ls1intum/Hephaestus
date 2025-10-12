@@ -509,6 +509,7 @@ export type ReasoningUiPart = {
 
 export type RepositoryInfo = {
     description?: string;
+    hiddenFromContributions: boolean;
     htmlUrl: string;
     id: number;
     labels?: Array<LabelInfo>;
@@ -2043,6 +2044,25 @@ export type UpdateTeamVisibilityData = {
 };
 
 export type UpdateTeamVisibilityResponses = {
+    /**
+     * OK
+     */
+    200: unknown;
+};
+
+export type UpdateRepositoryVisibilityData = {
+    body?: boolean;
+    path: {
+        teamId: number;
+        repositoryId: number;
+    };
+    query?: {
+        hiddenFromContributions?: boolean;
+    };
+    url: '/team/{teamId}/repositories/{repositoryId}/visibility';
+};
+
+export type UpdateRepositoryVisibilityResponses = {
     /**
      * OK
      */

@@ -79,6 +79,7 @@ public interface UserRepository extends JpaRepository<User, Long> {
             JOIN TeamRepositoryPermission trp ON trp.repository = pr.repository
             JOIN Team t ON trp.team = t
             WHERE t.id = :teamId
+            AND trp.hiddenFromContributions = false
             AND (
                 NOT EXISTS (SELECT l
                     FROM t.labels l

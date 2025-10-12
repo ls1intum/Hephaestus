@@ -457,6 +457,9 @@ class TeamRepositoryPermission(Base):
     permission: Mapped[str] = mapped_column(String(32))
     repository_id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
     team_id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
+    hidden_from_contributions: Mapped[bool] = mapped_column(
+        Boolean, server_default=text("false")
+    )
     repository: Mapped["Repository"] = relationship(
         "Repository", back_populates="team_repository_permission"
     )

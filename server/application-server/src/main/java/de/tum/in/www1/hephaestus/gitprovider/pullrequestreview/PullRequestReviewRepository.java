@@ -56,6 +56,7 @@ public interface PullRequestReviewRepository extends JpaRepository<PullRequestRe
             prr.submittedAt BETWEEN :after AND :before
             AND prr.author.type = 'USER'
             AND t.id = :teamId
+            AND trp.hiddenFromContributions = false
             AND (
                 NOT EXISTS (
                     SELECT l

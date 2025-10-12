@@ -7,6 +7,11 @@ export interface TeamTreeProps {
 	childrenMap: Map<number, TeamInfo[]>;
 	displaySet: Set<number>;
 	onToggleVisibility: (teamId: number, hidden: boolean) => void | Promise<void>;
+	onToggleRepositoryVisibility: (
+		teamId: number,
+		repositoryId: number,
+		hidden: boolean,
+	) => void | Promise<void>;
 	onAddLabel?: (
 		teamId: number,
 		repositoryId: number,
@@ -21,6 +26,7 @@ export function TeamTree({
 	childrenMap,
 	displaySet,
 	onToggleVisibility,
+	onToggleRepositoryVisibility,
 	onAddLabel,
 	onRemoveLabel,
 	getCatalogLabels,
@@ -47,6 +53,9 @@ export function TeamTree({
 								catalogLabels={getCatalogLabels(repo.id)}
 								onAddLabel={onAddLabel}
 								onRemoveLabel={onRemoveLabel}
+								onToggleVisibility={(hidden: boolean) =>
+									onToggleRepositoryVisibility(team.id, repo.id, hidden)
+								}
 							/>
 						))}
 				</div>
@@ -65,6 +74,7 @@ export function TeamTree({
 							childrenMap={childrenMap}
 							displaySet={displaySet}
 							onToggleVisibility={onToggleVisibility}
+							onToggleRepositoryVisibility={onToggleRepositoryVisibility}
 							onAddLabel={onAddLabel}
 							onRemoveLabel={onRemoveLabel}
 							getCatalogLabels={getCatalogLabels}

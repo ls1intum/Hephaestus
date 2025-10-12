@@ -628,6 +628,37 @@ paths:
           description: OK
       tags:
       - team
+  /team/{teamId}/repositories/{repositoryId}/visibility:
+    post:
+      operationId: updateRepositoryVisibility
+      parameters:
+      - in: path
+        name: teamId
+        required: true
+        schema:
+          type: integer
+          format: int64
+      - in: path
+        name: repositoryId
+        required: true
+        schema:
+          type: integer
+          format: int64
+      - in: query
+        name: hiddenFromContributions
+        required: false
+        schema:
+          type: boolean
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: boolean
+      responses:
+        "200":
+          description: OK
+      tags:
+      - team
   /user:
     delete:
       operationId: deleteUser
@@ -1717,6 +1748,8 @@ components:
       properties:
         description:
           type: string
+        hiddenFromContributions:
+          type: boolean
         htmlUrl:
           type: string
         id:
@@ -1731,6 +1764,7 @@ components:
         nameWithOwner:
           type: string
       required:
+      - hiddenFromContributions
       - htmlUrl
       - id
       - name
@@ -2753,19 +2787,16 @@ components:
           anyOf:
           - type: integer
           - type: "null"
-          default: null
           title: Interval
         temperature_2m:
           anyOf:
           - type: number
           - type: "null"
-          default: null
           title: Temperature 2M
         time:
           anyOf:
           - type: string
           - type: "null"
-          default: null
           title: Time
       title: WeatherCurrent
     WeatherCurrentUnits:
@@ -2775,13 +2806,11 @@ components:
           anyOf:
           - type: string
           - type: "null"
-          default: null
           title: Interval
         temperature_2m:
           anyOf:
           - type: string
           - type: "null"
-          default: null
           title: Temperature 2M
         time:
           anyOf:
@@ -2818,13 +2847,11 @@ components:
           anyOf:
           - type: string
           - type: "null"
-          default: null
           title: Sunrise
         sunset:
           anyOf:
           - type: string
           - type: "null"
-          default: null
           title: Sunset
         time:
           anyOf:

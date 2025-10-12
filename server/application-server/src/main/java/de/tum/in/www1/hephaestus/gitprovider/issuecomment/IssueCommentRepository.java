@@ -59,6 +59,7 @@ public interface IssueCommentRepository extends JpaRepository<IssueComment, Long
             ic.createdAt BETWEEN :after AND :before
             AND ic.author.type = 'USER'
             AND t.id = :teamId
+            AND trp.hiddenFromContributions = false
             AND (
                 NOT EXISTS (
                     SELECT l

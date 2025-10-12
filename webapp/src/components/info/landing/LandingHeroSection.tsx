@@ -29,6 +29,7 @@ function createMockReviewedPullRequest(amount: number) {
 					name: "example/repo",
 					nameWithOwner: "example/repo",
 					htmlUrl: "https://example.com/repo",
+					hiddenFromContributions: false,
 				},
 			}) satisfies PullRequestInfo,
 	);

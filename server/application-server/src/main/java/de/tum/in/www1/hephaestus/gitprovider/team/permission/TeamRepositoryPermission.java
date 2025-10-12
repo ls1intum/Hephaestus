@@ -43,10 +43,17 @@ public class TeamRepositoryPermission {
     @Column(nullable = false, length = 32)
     private PermissionLevel permission;
 
+    /**
+     * Hephaestus field. Controls whether contributions from this repository should be excluded for the owning team.
+     */
+    @Column(name = "hidden_from_contributions", nullable = false)
+    private boolean hiddenFromContributions = false;
+
     public TeamRepositoryPermission(Team team, Repository repository, PermissionLevel permission) {
         this.team = team;
         this.repository = repository;
         this.permission = permission;
+        this.hiddenFromContributions = false;
         this.id.setTeamId(team.getId());
         this.id.setRepositoryId(repository.getId());
     }

@@ -32,6 +32,7 @@ const meta = {
 					name: "repo",
 					nameWithOwner: "org/repo",
 					htmlUrl: "https://github.com/org/repo",
+					hiddenFromContributions: false,
 				},
 			],
 			labels: [],
