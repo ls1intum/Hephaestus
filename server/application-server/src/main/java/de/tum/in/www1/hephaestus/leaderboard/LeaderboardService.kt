@@ -15,6 +15,7 @@ import de.tum.`in`.www1.hephaestus.gitprovider.user.UserRepository
 import jakarta.transaction.Transactional
 import java.time.Instant
 import java.util.Optional
+import kotlin.collections.ArrayDeque
 import kotlin.math.ceil
 import org.slf4j.LoggerFactory
 import org.springframework.stereotype.Service
@@ -64,6 +65,7 @@ class LeaderboardService(
         before: Instant,
         team: Team?,
         sort: LeaderboardSortType,
+        teamHierarchy: Map<Long?, List<Team>>? = null,
     ): List<LeaderboardEntryDTO> {
         logger.info(
             "Creating leaderboard dataset with timeframe: {} - {} and team: {}",
@@ -75,9 +77,16 @@ class LeaderboardService(
         val reviews: List<PullRequestReview>
         val issueComments: List<IssueComment>
 
+        val teamIds: Set<Long> = if (team != null) {
+            val hierarchy = teamHierarchy ?: buildTeamHierarchy()
+            collectTeamAndDescendantIds(team, hierarchy)
+        } else {
+            emptySet()
+        }
+
         if (team != null) {
-            reviews = pullRequestReviewRepository.findAllInTimeframeOfTeam(after, before, team.id)
-            issueComments = issueCommentRepository.findAllInTimeframeOfTeam(after, before, team.id, true)
+            reviews = pullRequestReviewRepository.findAllInTimeframeOfTeams(after, before, teamIds)
+            issueComments = issueCommentRepository.findAllInTimeframeOfTeams(after, before, teamIds, true)
         } else {
             reviews = pullRequestReviewRepository.findAllInTimeframe(after, before)
             issueComments = issueCommentRepository.findAllInTimeframe(after, before, true)
@@ -91,7 +100,9 @@ class LeaderboardService(
         issueComments.mapNotNull { it.author }.forEach { usersById.putIfAbsent(it.id, it) }
 
         if (team != null) {
-            userRepository.findAllByTeamId(team.id).forEach { usersById.putIfAbsent(it.id, it) }
+            if (teamIds.isNotEmpty()) {
+                userRepository.findAllByTeamIds(teamIds).forEach { usersById.putIfAbsent(it.id, it) }
+            }
         } else {
             userRepository.findAllHumanInTeams().forEach { usersById.putIfAbsent(it.id, it) }
         }
@@ -162,7 +173,9 @@ class LeaderboardService(
             before,
         )
 
-        val targetTeams = teamRepository.findAllByHiddenFalse()
+        val allTeams = teamRepository.findAll()
+        val teamHierarchy = allTeams.groupBy { it.parentId }
+        val targetTeams = allTeams.filter { !it.isHidden }
 
         if (targetTeams.isEmpty()) {
             logger.info("❌ No teams found for team leaderboard")
@@ -170,7 +183,7 @@ class LeaderboardService(
         }
 
         val teamStatsById = targetTeams.associateWith { teamEntity ->
-            val entries = createIndividualLeaderboard(after, before, teamEntity, LeaderboardSortType.SCORE)
+            val entries = createIndividualLeaderboard(after, before, teamEntity, LeaderboardSortType.SCORE, teamHierarchy)
             aggregateTeamStats(entries)
         }
 
@@ -301,5 +314,23 @@ class LeaderboardService(
             numberOfUnknowns = entries.sumOf { it.numberOfUnknowns },
             numberOfCodeComments = entries.sumOf { it.numberOfCodeComments },
         )
+    }
+
+    private fun buildTeamHierarchy(): Map<Long?, List<Team>> = teamRepository.findAll().groupBy { it.parentId }
+
+    private fun collectTeamAndDescendantIds(team: Team, hierarchy: Map<Long?, List<Team>>): Set<Long> {
+        val result = mutableSetOf<Long>()
+        val queue = ArrayDeque<Team>()
+        queue.add(team)
+
+        while (queue.isNotEmpty()) {
+            val current = queue.removeFirst()
+            val currentId = current.id ?: continue
+            if (result.add(currentId)) {
+                hierarchy[currentId].orEmpty().forEach { child -> queue.add(child) }
+            }
+        }
+
+        return result
     }
 }
