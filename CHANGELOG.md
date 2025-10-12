@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.9.0-rc.31](https://github.com/ls1intum/Hephaestus/compare/v0.9.0-rc.30...v0.9.0-rc.31) (2025-10-12)
+
+### 🚀 Features
+
+* add team leaderboard ([#496](https://github.com/ls1intum/Hephaestus/issues/496)) ([c93da39](https://github.com/ls1intum/Hephaestus/commit/c93da39fcdcbdbe7d40521570f7259a985072cba))
+
 ## [0.9.0-rc.30](https://github.com/ls1intum/Hephaestus/compare/v0.9.0-rc.29...v0.9.0-rc.30) (2025-10-11)
 
 ### 🚀 Features
