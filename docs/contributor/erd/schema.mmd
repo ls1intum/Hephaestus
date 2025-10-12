@@ -293,8 +293,6 @@ erDiagram
     %% One-to-One relationships
     ChatMessage ||--|| ChatMessagePart : has
     ChatMessage ||--|| ChatThread : references
-    Repository ||--|| TeamRepositoryPermission : has
-    Team ||--|| TeamRepositoryPermission : has
 
     %% One-to-Many relationships
     Issue ||--o{ BadPracticeDetection : references
@@ -332,6 +330,8 @@ erDiagram
     Team }o--o{ TeamLabel : labeled
     Team }o--o{ TeamMembership : belongs_to
     User }o--o{ TeamMembership : belongs_to
+    Repository }o--o{ TeamRepositoryPermission : has
+    Team }o--o{ TeamRepositoryPermission : has
 
     %% Styling
     classDef primaryEntity fill:#e1f5fe,stroke:#01579b,stroke-width:2px
