@@ -425,19 +425,31 @@ paths:
         schema:
           type: string
           format: date-time
-      - in: query
+      - description: Team filter to apply in INDIVIDUAL mode; ignored when mode is
+          TEAM.
+        in: query
         name: team
-        required: false
+        required: true
         schema:
           type: string
-      - in: query
+      - description: Determines the ranking metric. In TEAM mode SCORE uses summed
+          contribution scores; LEAGUE_POINTS uses total league points.
+        in: query
         name: sort
-        required: false
+        required: true
         schema:
           type: string
           enum:
           - SCORE
           - LEAGUE_POINTS
+      - in: query
+        name: mode
+        required: true
+        schema:
+          type: string
+          enum:
+          - INDIVIDUAL
+          - TEAM
       responses:
         "200":
           content:
@@ -607,6 +619,37 @@ paths:
           format: int64
       - in: query
         name: hidden
+        required: false
+        schema:
+          type: boolean
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: boolean
+      responses:
+        "200":
+          description: OK
+      tags:
+      - team
+  /team/{teamId}/repositories/{repositoryId}/visibility:
+    post:
+      operationId: updateRepositoryVisibility
+      parameters:
+      - in: path
+        name: teamId
+        required: true
+        schema:
+          type: integer
+          format: int64
+      - in: path
+        name: repositoryId
+        required: true
+        schema:
+          type: integer
+          format: int64
+      - in: query
+        name: hiddenFromContributions
         required: false
         schema:
           type: boolean
@@ -1327,6 +1370,8 @@ components:
         score:
           type: integer
           format: int32
+        team:
+          $ref: "#/components/schemas/TeamInfo"
         user:
           $ref: "#/components/schemas/UserInfo"
       required:
@@ -1339,7 +1384,6 @@ components:
       - rank
       - reviewedPullRequests
       - score
-      - user
     LeagueChange:
       type: object
       properties:
@@ -1708,6 +1752,8 @@ components:
       properties:
         description:
           type: string
+        hiddenFromContributions:
+          type: boolean
         htmlUrl:
           type: string
         id:
@@ -1722,6 +1768,7 @@ components:
         nameWithOwner:
           type: string
       required:
+      - hiddenFromContributions
       - htmlUrl
       - id
       - name

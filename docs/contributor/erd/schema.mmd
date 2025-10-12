@@ -261,6 +261,7 @@ erDiagram
         VARCHAR(32) permission "NOT NULL"
         BIGINT repository_id PK,FK
         BIGINT team_id PK,FK
+        BOOLEAN hidden_from_contributions "NOT NULL"
     }
 
     User {

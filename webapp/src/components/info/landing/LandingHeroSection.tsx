@@ -29,6 +29,7 @@ function createMockReviewedPullRequest(amount: number) {
 					name: "example/repo",
 					nameWithOwner: "example/repo",
 					htmlUrl: "https://example.com/repo",
+					hiddenFromContributions: false,
 				},
 			}) satisfies PullRequestInfo,
 	);
@@ -158,6 +159,7 @@ export function LandingHeroSection({
 						<LeaderboardTable
 							leaderboard={SAMPLE_LEADERBOARD_ENTRIES}
 							isLoading={false}
+							variant="INDIVIDUAL"
 						/>
 					</div>
 				</div>

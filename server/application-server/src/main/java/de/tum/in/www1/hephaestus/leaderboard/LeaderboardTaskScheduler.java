@@ -47,6 +47,7 @@ public class LeaderboardTaskScheduler {
 
     @EventListener(ApplicationReadyEvent.class)
     public void activateTaskScheduler() {
+        // Schedule always on app ready; guard per-task below
         var timeParts = scheduledTime.split(":");
 
         // CRON for the end of every leaderboard cycle
@@ -70,7 +71,15 @@ public class LeaderboardTaskScheduler {
      * Schedule a Slack message to be sent at the end of every leaderboard cycle.
      */
     private void scheduleSlackMessage(String cron) {
-        if (!runScheduledMessage) return;
+        if (!runScheduledMessage) {
+            logger.info("Leaderboard notifications disabled; Slack message not scheduled.");
+            return;
+        }
+
+        if (slackWeeklyLeaderboardTask == null) {
+            logger.warn("SlackWeeklyLeaderboardTask bean not available; skipping Slack scheduling.");
+            return;
+        }
 
         if (!slackWeeklyLeaderboardTask.testSlackConnection()) {
             logger.error("Failed to schedule Slack message");

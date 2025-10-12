@@ -6,7 +6,9 @@ import static com.slack.api.model.block.composition.BlockCompositions.*;
 import com.slack.api.methods.SlackApiException;
 import com.slack.api.model.User;
 import com.slack.api.model.block.LayoutBlock;
+import de.tum.in.www1.hephaestus.gitprovider.user.UserInfoDTO;
 import de.tum.in.www1.hephaestus.leaderboard.LeaderboardEntryDTO;
+import de.tum.in.www1.hephaestus.leaderboard.LeaderboardMode;
 import de.tum.in.www1.hephaestus.leaderboard.LeaderboardService;
 import de.tum.in.www1.hephaestus.leaderboard.SlackMessageService;
 import java.io.IOException;
@@ -54,7 +56,7 @@ public class SlackWeeklyLeaderboardTask implements Runnable {
     @Value("${hephaestus.leaderboard.schedule.time}")
     private String scheduledTime;
 
-    @Autowired
+    @Autowired(required = false)
     private SlackMessageService slackMessageService;
 
     @Autowired
@@ -65,7 +67,7 @@ public class SlackWeeklyLeaderboardTask implements Runnable {
      * @return {@code true} if the connection is valid, {@code false} otherwise.
      */
     public boolean testSlackConnection() {
-        return runScheduledMessage && slackMessageService.initTest();
+        return runScheduledMessage && slackMessageService != null && slackMessageService.initTest();
     }
 
     /**
@@ -73,24 +75,38 @@ public class SlackWeeklyLeaderboardTask implements Runnable {
      * @return
      */
     private List<User> getTop3SlackReviewers(Instant after, Instant before, Optional<String> team) {
-        var leaderboard = leaderboardService.createLeaderboard(after, before, team, Optional.empty());
+        var leaderboard = leaderboardService.createLeaderboard(
+            after,
+            before,
+            team,
+            Optional.empty(),
+            Optional.of(LeaderboardMode.INDIVIDUAL)
+        );
         var top3 = leaderboard.subList(0, Math.min(3, leaderboard.size()));
-        logger.debug("Top 3 Users of the last week: " + top3.stream().map(e -> e.user().name()).toList());
+        logger.debug(
+            "Top 3 Users of the last week: " +
+            top3.stream().map(entry -> entry.getUser() != null ? entry.getUser().name() : "<team>").toList()
+        );
 
-        List<User> allSlackUsers = slackMessageService.getAllMembers();
+        List<User> allSlackUsers = slackMessageService != null ? slackMessageService.getAllMembers() : List.of();
 
         return top3.stream().map(mapToSlackUser(allSlackUsers)).filter(user -> user != null).toList();
     }
 
     private Function<LeaderboardEntryDTO, User> mapToSlackUser(List<User> allSlackUsers) {
         return entry -> {
+            UserInfoDTO leaderboardUser = entry.getUser();
+            if (leaderboardUser == null) {
+                return null;
+            }
+
             var exactUser = allSlackUsers
                 .stream()
                 .filter(
                     user ->
-                        user.getName().equalsIgnoreCase(entry.user().name()) ||
+                        user.getName().equalsIgnoreCase(leaderboardUser.name()) ||
                         (user.getProfile().getEmail() != null &&
-                            user.getProfile().getEmail().equalsIgnoreCase(entry.user().email()))
+                            user.getProfile().getEmail().equalsIgnoreCase(leaderboardUser.email()))
                 )
                 .findFirst();
             if (exactUser.isPresent()) {
@@ -105,8 +121,8 @@ public class SlackWeeklyLeaderboardTask implements Runnable {
                     String bName = b.getRealName() != null ? b.getRealName() : b.getName();
 
                     return Integer.compare(
-                        LevenshteinDistance.getDefaultInstance().apply(entry.user().name(), aName),
-                        LevenshteinDistance.getDefaultInstance().apply(entry.user().name(), bName)
+                        LevenshteinDistance.getDefaultInstance().apply(leaderboardUser.name(), aName),
+                        LevenshteinDistance.getDefaultInstance().apply(leaderboardUser.name(), bName)
                     );
                 })
                 .orElse(null);
@@ -179,10 +195,14 @@ public class SlackWeeklyLeaderboardTask implements Runnable {
             ),
             section(section -> section.text(markdownText("Happy coding and reviewing! :rocket:")))
         );
-        try {
-            slackMessageService.sendMessage(channelId, blocks, "Reviews of the last week");
-        } catch (IOException | SlackApiException e) {
-            logger.error("Failed to send scheduled message to Slack channel: " + e.getMessage());
+        if (slackMessageService != null) {
+            try {
+                slackMessageService.sendMessage(channelId, blocks, "Reviews of the last week");
+            } catch (IOException | SlackApiException e) {
+                logger.error("Failed to send scheduled message to Slack channel: " + e.getMessage());
+            }
+        } else {
+            logger.warn("SlackMessageService not available; skipping message send.");
         }
     }
 }

@@ -8,6 +8,11 @@ export interface TeamsTableProps {
 	teams: TeamInfo[];
 	isLoading?: boolean;
 	onHideTeam: (teamId: number, hidden: boolean) => Promise<void>;
+	onToggleRepositoryVisibility: (
+		teamId: number,
+		repositoryId: number,
+		hidden: boolean,
+	) => Promise<void>;
 	onAddLabelToTeam?: (
 		teamId: number,
 		repositoryId: number,
@@ -20,6 +25,7 @@ export function AdminTeamsTable({
 	teams,
 	isLoading = false,
 	onHideTeam,
+	onToggleRepositoryVisibility,
 	onAddLabelToTeam,
 	onRemoveLabelFromTeam,
 }: TeamsTableProps) {
@@ -177,6 +183,7 @@ export function AdminTeamsTable({
 								onToggleVisibility={(teamId, hidden) =>
 									onHideTeam(teamId, hidden)
 								}
+								onToggleRepositoryVisibility={onToggleRepositoryVisibility}
 								onAddLabel={onAddLabelToTeam}
 								onRemoveLabel={onRemoveLabelFromTeam}
 								getCatalogLabels={getCatalogLabels}

@@ -1,8 +1,8 @@
 package de.tum.in.www1.hephaestus.gitprovider.team;
 
+import de.tum.in.www1.hephaestus.gitprovider.team.permission.TeamRepositoryPermissionRepository;
 import de.tum.in.www1.hephaestus.security.EnsureAdminUser;
 import java.util.List;
-import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -18,10 +18,16 @@ public class TeamController {
 
     private final TeamRepository teamRepo;
     private final TeamInfoDTOConverter converter;
+    private final TeamRepositoryPermissionRepository permissionRepository;
 
-    public TeamController(TeamRepository teamRepo, TeamInfoDTOConverter converter) {
+    public TeamController(
+        TeamRepository teamRepo,
+        TeamInfoDTOConverter converter,
+        TeamRepositoryPermissionRepository permissionRepository
+    ) {
         this.teamRepo = teamRepo;
         this.converter = converter;
+        this.permissionRepository = permissionRepository;
     }
 
     @GetMapping
@@ -43,7 +49,33 @@ public class TeamController {
             .map(team -> {
                 team.setHidden(Boolean.TRUE.equals(resolvedHidden));
                 teamRepo.save(team);
-                return new ResponseEntity<Void>(HttpStatus.NO_CONTENT);
+                return ResponseEntity.ok().<Void>build();
+            })
+            .orElse(ResponseEntity.notFound().build());
+    }
+
+    @PostMapping("/{teamId}/repositories/{repositoryId}/visibility")
+    @EnsureAdminUser
+    public ResponseEntity<Void> updateRepositoryVisibility(
+        @PathVariable Long teamId,
+        @PathVariable Long repositoryId,
+        @RequestBody(required = false) Boolean hiddenFromContributions,
+        @RequestParam(name = "hiddenFromContributions", required = false) Boolean hiddenFromContributionsParam
+    ) {
+        final var resolvedHidden = hiddenFromContributions != null
+            ? hiddenFromContributions
+            : hiddenFromContributionsParam;
+
+        if (resolvedHidden == null) {
+            return ResponseEntity.badRequest().build();
+        }
+
+        return permissionRepository
+            .findByTeam_IdAndRepository_Id(teamId, repositoryId)
+            .map(permission -> {
+                permission.setHiddenFromContributions(Boolean.TRUE.equals(resolvedHidden));
+                permissionRepository.save(permission);
+                return ResponseEntity.ok().<Void>build();
             })
             .orElse(ResponseEntity.notFound().build());
     }

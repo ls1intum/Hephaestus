@@ -13,6 +13,7 @@ import java.util.List;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Service;
 
 /**
@@ -20,6 +21,7 @@ import org.springframework.stereotype.Service;
  * @implNote Use the exposed method to test the Slack connection beforehand.
  */
 @Service
+@ConditionalOnProperty(prefix = "hephaestus.leaderboard.notification", name = "enabled", havingValue = "true")
 public class SlackMessageService {
 
     private static final Logger logger = LoggerFactory.getLogger(SlackMessageService.class);

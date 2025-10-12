@@ -66,7 +66,7 @@ public class Issue extends BaseGitServiceEntity {
 
     private int commentsCount;
 
-    @Accessors(prefix = "")
+    @Accessors(prefix = { "" })
     private boolean hasPullRequest;
 
     // The last time the issue and its associated comments were updated (is also used for pull requests with reviews and review comments)

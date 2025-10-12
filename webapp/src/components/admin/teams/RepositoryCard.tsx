@@ -1,4 +1,4 @@
-import { Settings } from "lucide-react";
+import { Eye, EyeOff, Settings } from "lucide-react";
 import { useMemo } from "react";
 import type { LabelInfo, RepositoryInfo, TeamInfo } from "@/api/types.gen";
 import { GithubBadge } from "@/components/shared/GithubBadge";
@@ -22,6 +22,7 @@ export interface RepositoryCardProps {
 		label: string,
 	) => Promise<void>;
 	onRemoveLabel?: (teamId: number, labelId: number) => Promise<void>;
+	onToggleVisibility?: (hidden: boolean) => void | Promise<void>;
 }
 
 export function RepositoryCard({
@@ -30,6 +31,7 @@ export function RepositoryCard({
 	catalogLabels,
 	onAddLabel,
 	onRemoveLabel,
+	onToggleVisibility,
 }: RepositoryCardProps) {
 	const repoLabels = useMemo(() => {
 		const byName = new Map<string, LabelInfo>();
@@ -49,8 +51,9 @@ export function RepositoryCard({
 	return (
 		<Card
 			className={cn(
-				"flex flex-col border-border/50 gap-0",
-				team.hidden ? "opacity-40" : "",
+				"flex flex-col border-border/50 gap-0 transition-colors",
+				team.hidden ? "bg-muted/40" : "",
+				repository.hiddenFromContributions ? "bg-muted/40 border-dashed" : "",
 			)}
 		>
 			<CardHeader>
@@ -63,13 +66,22 @@ export function RepositoryCard({
 								rel="noopener noreferrer"
 								className={cn(
 									"text-sm font-medium hover:underline block truncate",
-									team.hidden ? "text-muted-foreground" : "",
+									team.hidden || repository.hiddenFromContributions
+										? "text-muted-foreground"
+										: "",
 								)}
 								title={repository.nameWithOwner}
 							>
 								{repository.nameWithOwner}
 							</a>
 						</div>
+						{repository.hiddenFromContributions && (
+							<div className="flex items-center gap-1 flex-wrap mt-1">
+								<span className="text-[10px] px-1.5 py-0.5 rounded bg-muted text-muted-foreground uppercase tracking-wide">
+									Hidden in contributions
+								</span>
+							</div>
+						)}
 						{repository.description && (
 							<p className="text-xs text-muted-foreground mt-1 line-clamp-2">
 								{repository.description}
@@ -77,6 +89,27 @@ export function RepositoryCard({
 						)}
 					</div>
 					<div className="flex items-center gap-1 ml-2 flex-shrink-0">
+						{onToggleVisibility && (
+							<Button
+								variant="ghost"
+								size="sm"
+								className="h-7 w-7 p-0"
+								onClick={() =>
+									onToggleVisibility(!repository.hiddenFromContributions)
+								}
+								title={
+									repository.hiddenFromContributions
+										? "Show repository contributions"
+										: "Hide repository contributions"
+								}
+							>
+								{repository.hiddenFromContributions ? (
+									<EyeOff className="h-3 w-3" />
+								) : (
+									<Eye className="h-3 w-3" />
+								)}
+							</Button>
+						)}
 						<Popover>
 							<PopoverTrigger asChild>
 								<Button variant="ghost" size="sm" className="h-7 w-7 p-0">

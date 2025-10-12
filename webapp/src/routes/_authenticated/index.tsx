@@ -31,6 +31,7 @@ const leaderboardSearchSchema = z.object({
 	sort: z.enum(["SCORE", "LEAGUE_POINTS"]).default("SCORE"),
 	after: z.string().optional().default(startOfCurrentWeek),
 	before: z.string().optional().default(endOfCurrentWeek),
+	mode: z.enum(["INDIVIDUAL", "TEAM"]).default("INDIVIDUAL"),
 });
 
 // Export route with search param validation
@@ -39,7 +40,9 @@ export const Route = createFileRoute("/_authenticated/")({
 	validateSearch: zodValidator(leaderboardSearchSchema),
 	// Configure search middleware to retain params when navigating
 	search: {
-		middlewares: [retainSearchParams(["team", "sort", "after", "before"])],
+		middlewares: [
+			retainSearchParams(["team", "sort", "after", "before", "mode"]),
+		],
 	},
 });
 
@@ -48,7 +51,7 @@ function LeaderboardContainer() {
 	const { username } = useAuth();
 
 	// Access properly validated search params with correct types
-	const { team, sort, after, before } = Route.useSearch();
+	const { team, sort, after, before, mode } = Route.useSearch();
 	const navigate = useNavigate({ from: Route.fullPath });
 
 	// Query for metadata (teams, schedule info)
@@ -64,6 +67,7 @@ function LeaderboardContainer() {
 				before: new Date(before || endOfCurrentWeek),
 				team,
 				sort,
+				mode,
 			},
 		}),
 		enabled: Boolean(after && before && metaQuery.data),
@@ -79,7 +83,7 @@ function LeaderboardContainer() {
 	// Find the current user's entry in the leaderboard
 	const currentUserEntry = username
 		? leaderboardQuery.data?.find(
-				(entry) => entry.user.login.toLowerCase() === username.toLowerCase(),
+				(entry) => entry.user?.login?.toLowerCase() === username.toLowerCase(),
 			)
 		: undefined;
 
@@ -109,13 +113,23 @@ function LeaderboardContainer() {
 	};
 
 	// Valid selectable values are the full visible paths
-	const visibleTeams = teamsList
-		.filter((t) => !t.hidden)
-		.map((t) => makeLabel(t));
+	const teamLabelsById = teamsList.reduce<Record<number, string>>(
+		(acc, team) => {
+			const label = makeLabel(team);
+			acc[team.id] = label.length > 0 ? label : team.name;
+			return acc;
+		},
+		{},
+	);
 
-	const teamOptions = teamsList
+	const visibleTeamEntries = teamsList
 		.filter((t) => !t.hidden)
-		.map((t) => ({ value: makeLabel(t), label: makeLabel(t) }))
+		.map((team) => ({ team, label: teamLabelsById[team.id] }));
+
+	const visibleTeams = visibleTeamEntries.map((entry) => entry.label);
+
+	const teamOptions = visibleTeamEntries
+		.map(({ label }) => ({ value: label, label }))
 		.sort((a, b) => a.label.localeCompare(b.label));
 
 	// If current selected team is hidden (or no longer present), reset to 'all'
@@ -129,6 +143,28 @@ function LeaderboardContainer() {
 			});
 		}
 	}, [team, visibleTeams, navigate]);
+
+	useEffect(() => {
+		if (mode === "TEAM" && team !== "all") {
+			navigate({
+				search: (prev) => ({
+					...prev,
+					team: "all",
+				}),
+			});
+		}
+	}, [mode, team, navigate]);
+
+	useEffect(() => {
+		if (mode === "TEAM" && sort !== "SCORE") {
+			navigate({
+				search: (prev) => ({
+					...prev,
+					sort: "SCORE" as LeaderboardSortType,
+				}),
+			});
+		}
+	}, [mode, sort, navigate]);
 
 	// Get the leaderboard schedule from the server's metadata
 	const scheduledTime = metaQuery.data?.scheduledTime || "9:00";
@@ -214,6 +250,31 @@ function LeaderboardContainer() {
 		navigate({ to: "/user/$username", params: { username } });
 	};
 
+	const handleModeChange = (newMode: "INDIVIDUAL" | "TEAM") => {
+		navigate({
+			search: (prev) => ({
+				...prev,
+				mode: newMode,
+				team: newMode === "TEAM" ? "all" : prev.team,
+				sort: newMode === "TEAM" ? "SCORE" : prev.sort,
+			}),
+		});
+	};
+
+	const handleTeamClick = (teamId: number) => {
+		const label = teamLabelsById[teamId];
+		if (!label) return;
+		// Expand the team path and navigate to INDIVIDUAL mode with that team filter
+		navigate({
+			search: (prev) => ({
+				...prev,
+				mode: "INDIVIDUAL",
+				sort: "SCORE",
+				team: label,
+			}),
+		});
+	};
+
 	return (
 		<LeaderboardPage
 			leaderboard={leaderboardQuery.data || []}
@@ -223,6 +284,7 @@ function LeaderboardContainer() {
 			leaguePoints={userProfileQuery.data?.userInfo?.leaguePoints}
 			leaguePointsChange={leagueStatsQuery.data?.leaguePointsChange}
 			teamOptions={teamOptions}
+			teamLabelsById={teamLabelsById}
 			selectedTeam={team}
 			selectedSort={sort}
 			initialAfterDate={after}
@@ -233,6 +295,9 @@ function LeaderboardContainer() {
 			onSortChange={handleSortChange}
 			onTimeframeChange={handleTimeframeChange}
 			onUserClick={handleUserClick}
+			selectedMode={mode}
+			onModeChange={handleModeChange}
+			onTeamClick={handleTeamClick}
 		/>
 	);
 }

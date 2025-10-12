@@ -68,6 +68,7 @@ export const Default: Story = {
 				nameWithOwner: "ls1intum/Hephaestus",
 				description: "A GitHub contribution tracking tool",
 				htmlUrl: "https://github.com/ls1intum/Hephaestus",
+				hiddenFromContributions: false,
 			},
 			{
 				id: 2,
@@ -75,6 +76,7 @@ export const Default: Story = {
 				nameWithOwner: "ls1intum/Artemis",
 				description: "Interactive learning platform",
 				htmlUrl: "https://github.com/ls1intum/Artemis",
+				hiddenFromContributions: false,
 			},
 		],
 	},
