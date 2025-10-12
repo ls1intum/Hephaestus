@@ -165,7 +165,7 @@ class LeaderboardService(
             team,
         )
 
-        val targetTeams = if (team != "all") teamRepository.findTeamByName(team) else teamRepository.findAll()
+        val targetTeams = if (team != "all") teamRepository.findAllByName(team) else teamRepository.findAll()
 
         if (targetTeams.isEmpty()) {
             logger.info("❌ No teams found for provided filter: {}", team)
