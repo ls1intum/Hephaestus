@@ -94,7 +94,9 @@ export function RepositoryCard({
 								variant="ghost"
 								size="sm"
 								className="h-7 w-7 p-0"
-								onClick={() => onToggleVisibility(!repository.hiddenFromContributions)}
+								onClick={() =>
+									onToggleVisibility(!repository.hiddenFromContributions)
+								}
 								title={
 									repository.hiddenFromContributions
 										? "Show repository contributions"

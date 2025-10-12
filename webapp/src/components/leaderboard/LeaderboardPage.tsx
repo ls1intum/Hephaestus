@@ -1,8 +1,8 @@
-import type { LeaderboardEntry, UserInfo } from '@/api/types.gen';
+import type { LeaderboardEntry, UserInfo } from "@/api/types.gen";
 import { LeaderboardFilter } from "./LeaderboardFilter";
 import { LeaderboardLegend } from "./LeaderboardLegend";
 import { LeaderboardOverview } from "./LeaderboardOverview";
-import { LeaderboardTable } from './LeaderboardTable';
+import { LeaderboardTable } from "./LeaderboardTable";
 import type { LeaderboardSortType } from "./SortFilter";
 
 export type LeaderboardVariant = "INDIVIDUAL" | "TEAM";
@@ -34,9 +34,9 @@ interface LeaderboardPageProps {
 		hour: number;
 		minute: number;
 	};
-  selectedMode: LeaderboardVariant;
-  onModeChange?: (mode: LeaderboardVariant) => void;
-  onTeamClick?: (teamId: number) => void;
+	selectedMode: LeaderboardVariant;
+	onModeChange?: (mode: LeaderboardVariant) => void;
+	onTeamClick?: (teamId: number) => void;
 }
 
 export function LeaderboardPage({
@@ -58,9 +58,9 @@ export function LeaderboardPage({
 	initialBeforeDate,
 	leaderboardEnd,
 	leaderboardSchedule,
-  selectedMode,
-  onModeChange,
-  onTeamClick,
+	selectedMode,
+	onModeChange,
+	onTeamClick,
 }: LeaderboardPageProps) {
 	// Add formatted property to the leaderboardSchedule object if it exists
 	const formattedSchedule = leaderboardSchedule
@@ -78,8 +78,8 @@ export function LeaderboardPage({
 					<div className="space-y-4 col-span-1">
 						<div className="xl:sticky xl:top-4 xl:self-start xl:max-h-[calc(100vh-2rem)] xl:overflow-auto">
 							<LeaderboardFilter
-                selectedMode={selectedMode}
-                onModeChange={onModeChange}
+								selectedMode={selectedMode}
+								onModeChange={onModeChange}
 								teamOptions={teamOptions}
 								onTeamChange={onTeamChange}
 								onSortChange={onSortChange}
@@ -103,17 +103,17 @@ export function LeaderboardPage({
 							/>
 						)}
 
-            <div className="border rounded-md border-input overflow-auto">
-              <LeaderboardTable
-                leaderboard={leaderboard}
-                isLoading={isLoading}
-                variant={selectedMode}
-                currentUser={currentUser}
-                onUserClick={onUserClick}
-                onTeamClick={onTeamClick}
+						<div className="border rounded-md border-input overflow-auto">
+							<LeaderboardTable
+								leaderboard={leaderboard}
+								isLoading={isLoading}
+								variant={selectedMode}
+								currentUser={currentUser}
+								onUserClick={onUserClick}
+								onTeamClick={onTeamClick}
 								teamLabelsById={teamLabelsById}
-              />
-            </div>
+							/>
+						</div>
 					</div>
 
 					<div className="col-span-1 xl:sticky xl:top-4 xl:self-start xl:max-h-[calc(100vh-2rem)] xl:overflow-auto">

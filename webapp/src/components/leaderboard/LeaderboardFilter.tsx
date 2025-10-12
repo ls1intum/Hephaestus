@@ -1,5 +1,5 @@
 import { SlidersHorizontal } from "lucide-react";
-import type { LeaderboardVariant } from '@/components/leaderboard/LeaderboardPage.tsx';
+import type { LeaderboardVariant } from "@/components/leaderboard/LeaderboardPage.tsx";
 import {
 	Card,
 	CardContent,
@@ -7,8 +7,8 @@ import {
 	CardHeader,
 	CardTitle,
 } from "@/components/ui/card";
-import { Label } from '@/components/ui/label.tsx';
-import { Switch } from '@/components/ui/switch.tsx';
+import { Label } from "@/components/ui/label.tsx";
+import { Switch } from "@/components/ui/switch.tsx";
 import { type LeaderboardSortType, SortFilter } from "./SortFilter";
 import { TeamFilter, type TeamFilterOption } from "./TeamFilter";
 import { TimeframeFilter } from "./TimeframeFilter";
@@ -32,8 +32,8 @@ export interface LeaderboardFilterProps {
 		minute: number;
 		formatted: string;
 	};
-  selectedMode: LeaderboardVariant;
-  onModeChange?: (mode: LeaderboardVariant) => void;
+	selectedMode: LeaderboardVariant;
+	onModeChange?: (mode: LeaderboardVariant) => void;
 }
 
 export function LeaderboardFilter({
@@ -46,8 +46,8 @@ export function LeaderboardFilter({
 	initialAfterDate,
 	initialBeforeDate,
 	leaderboardSchedule,
-  selectedMode,
-  onModeChange,
+	selectedMode,
+	onModeChange,
 }: LeaderboardFilterProps & {
 	initialAfterDate?: string;
 	initialBeforeDate?: string;
@@ -69,14 +69,16 @@ export function LeaderboardFilter({
 				</CardDescription>
 			</CardHeader>
 			<CardContent>
-        <div className="flex items-center space-x-2 mb-4">
-          <Switch
-            id="mode-switch"
-            checked={selectedMode === "TEAM"}
-            onCheckedChange={(checked) => onModeChange?.(checked ? "TEAM" : "INDIVIDUAL")}
-          />
-          <Label htmlFor="mode-switch">Team Leaderboard</Label>
-        </div>
+				<div className="flex items-center space-x-2 mb-4">
+					<Switch
+						id="mode-switch"
+						checked={selectedMode === "TEAM"}
+						onCheckedChange={(checked) =>
+							onModeChange?.(checked ? "TEAM" : "INDIVIDUAL")
+						}
+					/>
+					<Label htmlFor="mode-switch">Team Leaderboard</Label>
+				</div>
 				<div className="space-y-4">
 					{selectedMode === "INDIVIDUAL" && (
 						<TeamFilter
@@ -86,7 +88,10 @@ export function LeaderboardFilter({
 						/>
 					)}
 					{selectedMode === "INDIVIDUAL" && (
-						<SortFilter onSortChange={onSortChange} selectedSort={selectedSort} />
+						<SortFilter
+							onSortChange={onSortChange}
+							selectedSort={selectedSort}
+						/>
 					)}
 					<TimeframeFilter
 						onTimeframeChange={onTimeframeChange}

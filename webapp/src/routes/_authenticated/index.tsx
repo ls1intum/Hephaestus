@@ -25,7 +25,6 @@ const endOfCurrentWeekDate = endOfISOWeek(today);
 const startOfCurrentWeek = formatISO(startOfCurrentWeekDate);
 const endOfCurrentWeek = formatISO(endOfCurrentWeekDate);
 
-
 // Define search params schema for validation and types
 const leaderboardSearchSchema = z.object({
 	team: z.string().default("all"),
@@ -41,7 +40,9 @@ export const Route = createFileRoute("/_authenticated/")({
 	validateSearch: zodValidator(leaderboardSearchSchema),
 	// Configure search middleware to retain params when navigating
 	search: {
-		middlewares: [retainSearchParams(["team", "sort", "after", "before", "mode"])],
+		middlewares: [
+			retainSearchParams(["team", "sort", "after", "before", "mode"]),
+		],
 	},
 });
 
@@ -293,9 +294,9 @@ function LeaderboardContainer() {
 			onSortChange={handleSortChange}
 			onTimeframeChange={handleTimeframeChange}
 			onUserClick={handleUserClick}
-      selectedMode={mode}
-      onModeChange={handleModeChange}
-      onTeamClick={handleTeamClick}
+			selectedMode={mode}
+			onModeChange={handleModeChange}
+			onTeamClick={handleTeamClick}
 		/>
 	);
 }

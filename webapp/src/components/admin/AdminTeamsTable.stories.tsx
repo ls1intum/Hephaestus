@@ -120,7 +120,7 @@ const meta = {
 	args: {
 		teams,
 		onHideTeam: fn(),
-			onToggleRepositoryVisibility: fn(),
+		onToggleRepositoryVisibility: fn(),
 		onAddLabelToTeam: fn(),
 		onRemoveLabelFromTeam: fn(),
 	},
