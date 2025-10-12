@@ -39,6 +39,8 @@ jobs:
             conventional-changelog-conventionalcommits
         env:
           GITHUB_TOKEN: ${{ secrets.GH_PAT }}
+          GITHUB_REF: refs/heads/main
+          GITHUB_REF_NAME: main
           GIT_AUTHOR_NAME: "Felix T.J. Dietrich"
           GIT_AUTHOR_EMAIL: "felixtj.dietrich@tum.de"
           GIT_COMMITTER_NAME: "Felix T.J. Dietrich"
