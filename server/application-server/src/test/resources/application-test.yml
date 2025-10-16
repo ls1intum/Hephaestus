@@ -50,7 +50,32 @@ github:
     privateKeyLocation: ""
     privateKey: |
       -----BEGIN PRIVATE KEY-----
-      TEST-ONLY-NOT-VALID
+      MIIEvAIBADANBgkqhkiG9w0BAQEFAASCBKYwggSiAgEAAoIBAQC6/rUt7fKIKHIt
+      OPeiUYu23oLOMSRGuYIVdt+mQbKfmll6E95zmQqHyT0INxe2QL2E6Dkpk7lyylk6
+      N47fCDjP+423RS0z5efqzMrZBOPpln1xOqUxfOFR+yuXDAeX0IX0zCCe8BGnEGwv
+      o4ZSCPFRqY+zE+wbZPX+uREP/ryuc/qy7pEM8p8Vbc3ApFqr45QV7x1nt1mGB7FY
+      sajk1FlbH/5+jpm8yei9BuqRbT5PsnDeoNf7DY4PW30CnTSYTEIVCCc6MG+fmfLO
+      wZmiyv/4eO78+IVqGnInI3JaoDikncc8T0hzNrd7B86cDdUAHUldvc1i/WO+H14h
+      jveZAoz/AgMBAAECggEAAh2k39RdnMFzmc65icaRw6mamWwgQWtF7TI/VbZQMFtR
+      u/56Oa3RJ9GhjtJwOgvBnXlup1hhBakDzIJd40avAZ0KClLjuIMTGoAFgSZzFOzM
+      hRepPz2ABdUck+KdKPrr5eXrPzzeJkPWcDPRzIWO2S72b+EmKTqF8xieK6wYItfV
+      meFBonOUsEiOI43bqLzsf7hG1bSx7n8Zui7TmDjxrC3uAqEAC9vLunNgps619gl9
+      svzDPyOye79+rUiz8yAMIjjCH5a0cjvOsBq2LFJEdNAVvZBl66Tiazf/v/yVO/hr
+      US99H9B+AfGzLp4IMixKXw8dyuoU3ZL4Di0I32FbMQKBgQDujglmE/0/cAv/tEbM
+      XqZIvyVsbTIA/SvE0YoaQfwIaGzN0rIiGjuXvysEvqUq++vjmxDRNMaHzQArUJ6b
+      /s2cQeRy6dKj34/3xWA9QYO09u6d37d6BdGoub6gZrIsff0uLCA4xfm8HaGJ0epA
+      OZGMAqabK7jWqtVtOTspnWdTqQKBgQDIq2xX+fFd2gat53MpqCfyQSOJNsyicJzg
+      aoQtxUBKNTySjAb/LN0gIw+xbCtCdS0Jy8rRqnK+60BEeACzrdF7lzjCZQZBohPV
+      1AfleKAGZHsM/rAWZsqSYowkJUxJx3acVGwhEFBOpRnt3bhe9sGXg1BwyLjselb7
+      B8Ifot9EZwKBgBtegmeKvZBsq4O/zCugZFWOUJ3a/VSttzrSi5Sto1vXlzwaA0P0
+      XIfxb98QfGStGIg5fzlxY6Gq/Gz7x+a/2hkmWi5w8zDH8n2L0JnWjWTSu9ezFhrS
+      1hYUkXFXtvNx1P1aJKw+0oMppyHnyodp03AL0c+VuZQvb2MjoM0KeRNZAoGATxxt
+      6T0rb/Gdgn/lwf1+Sh5uERFemYfGAR9dHuJN1zOnvqqfs4gPYTURYcQgReIGMH98
+      ZS5KcIQ0YQniVPPoy02x3cmQLt3j7f/aYRguFncUn+nkp+A8anuZfkKKEegmFbme
+      q2ZQEsE6OLGZly624bGuS9iGNwyAMBU97dT7Km8CgYB8GUoNHTiq0Yd3tPkT6GRd
+      QpQtCVAPH5jZXp7Qoh9S9oucvaJsDBgKILevskzJnyyiheQKBQwHQ+rPuA2IF9Bg
+      vRoVteI+FzizS6XBoQljwdotJGqFllYVNKiVCDUzV4/SnOc1fjCL3++bJu9B3VAg
+      G89jtjX/fwyfD4VVyoMHoA==
       -----END PRIVATE KEY-----
 
 # NATS configuration for tests (matches actual properties)
@@ -68,12 +93,9 @@ hephaestus:
 # Logging configuration for tests
 logging:
   level:
-    de.tum.in.www1.hephaestus: INFOgithub:
-  app:
-    id: 1                    # dummy
-    privateKeyLocation: ""   # force unused in tests
-    privateKey: |
-      -----BEGIN PRIVATE KEY-----
-      TEST-ONLY-NOT-VALID
-      -----END PRIVATE KEY-----
     root: WARN
+    de:
+      tum:
+        in:
+          www1:
+            hephaestus: INFO
