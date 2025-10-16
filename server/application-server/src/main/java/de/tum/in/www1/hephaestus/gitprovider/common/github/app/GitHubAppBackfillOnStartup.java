@@ -72,6 +72,10 @@ public class GitHubAppBackfillOnStartup {
      */
     @EventListener(ApplicationReadyEvent.class)
     public void run() {
+        if (!tokenService.isConfigured()) {
+            logger.info("Skipping GitHub App startup reconcile because credentials are not configured.");
+            return;
+        }
         try {
             GitHub asApp = tokenService.clientAsApp();
 

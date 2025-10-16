@@ -8,6 +8,7 @@ import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.nio.charset.StandardCharsets;
 import java.security.KeyFactory;
+import java.security.KeyPairGenerator;
 import java.security.PrivateKey;
 import java.security.interfaces.RSAPrivateKey;
 import java.security.spec.PKCS8EncodedKeySpec;
@@ -40,7 +41,9 @@ public class GitHubAppTokenService {
         @Value("${github.app.privateKey:}") String privateKeyPem
     ) {
         this.appId = appId;
-        this.privateKey = loadKey(privateKeyRes, privateKeyPem);
+        this.privateKey = appId > 0
+            ? loadKey(privateKeyRes, privateKeyPem)
+            : generateEphemeralRsaKey();
     }
 
     /**
@@ -49,6 +52,9 @@ public class GitHubAppTokenService {
      * - exp is set to 9 minutes to stay within the 10-minute GitHub limit with buffer.
      */
     public String generateAppJWT() {
+        if (!isConfigured()) {
+            throw new IllegalStateException("GitHub App credentials not configured.");
+        }
         Instant now = Instant.now();
         Algorithm algorithm = Algorithm.RSA256(null, (RSAPrivateKey) privateKey);
         return JWT.create()
@@ -107,19 +113,19 @@ public class GitHubAppTokenService {
     }
 
     private static PrivateKey loadKey(Resource privateKeyRes, String privateKeyPem) {
-        String pemKey;
         try {
             if (privateKeyRes != null && privateKeyRes.exists()) {
-                pemKey = new String(privateKeyRes.getInputStream().readAllBytes(), StandardCharsets.UTF_8);
-            } else if (privateKeyPem != null && !privateKeyPem.isBlank()) {
-                pemKey = privateKeyPem;
-            } else {
-                throw new IllegalStateException("No GitHub App private key configured.");
+                String pemKey = new String(privateKeyRes.getInputStream().readAllBytes(), StandardCharsets.UTF_8);
+                return loadPkcs8RsaPrivateKey(pemKey);
+            }
+            if (privateKeyPem != null && !privateKeyPem.isBlank()) {
+                return loadPkcs8RsaPrivateKey(privateKeyPem);
             }
         } catch (IOException e) {
             throw new UncheckedIOException("Failed to read private key", e);
         }
-        return loadPkcs8RsaPrivateKey(pemKey);
+
+        throw new IllegalStateException("No GitHub App private key configured.");
     }
 
     private static PrivateKey loadPkcs8RsaPrivateKey(String pem) {
@@ -135,6 +141,20 @@ public class GitHubAppTokenService {
         } catch (Exception e) {
             throw new IllegalStateException("Invalid PKCS#8 RSA private key", e);
         }
+    }
+
+    private static PrivateKey generateEphemeralRsaKey() {
+        try {
+            var generator = KeyPairGenerator.getInstance("RSA");
+            generator.initialize(2048);
+            return generator.generateKeyPair().getPrivate();
+        } catch (Exception e) {
+            throw new IllegalStateException("Failed to generate ephemeral RSA private key", e);
+        }
+    }
+
+    public boolean isConfigured() {
+        return appId > 0;
     }
 
     private record CachedToken(String token, Instant expiresAt) {}

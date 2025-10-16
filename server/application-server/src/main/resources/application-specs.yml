@@ -5,4 +5,8 @@ monitoring:
     run-on-startup: false
 
 github:
+    app:
+        id: 0
+        privateKey: ""
+        privateKeyLocation: ""
     auth-token: ""
