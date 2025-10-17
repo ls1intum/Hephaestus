@@ -10,18 +10,21 @@ const repos = [
 		name: "hephaestus",
 		nameWithOwner: "org/hephaestus",
 		htmlUrl: "https://github.com/org/hephaestus",
+		hiddenFromContributions: false,
 	},
 	{
 		id: 2,
 		name: "web-app",
 		nameWithOwner: "org/web-app",
 		htmlUrl: "https://github.com/org/web-app",
+		hiddenFromContributions: false,
 	},
 	{
 		id: 3,
 		name: "server",
 		nameWithOwner: "org/server",
 		htmlUrl: "https://github.com/org/server",
+		hiddenFromContributions: false,
 	},
 ];
 
@@ -110,12 +113,14 @@ const meta = {
 		teams: { control: false },
 		isLoading: { control: "boolean" },
 		onHideTeam: { action: "hideTeam" },
+		onToggleRepositoryVisibility: { action: "toggleRepositoryVisibility" },
 		onAddLabelToTeam: { action: "addLabelToTeam" },
 		onRemoveLabelFromTeam: { action: "removeLabelFromTeam" },
 	},
 	args: {
 		teams,
 		onHideTeam: fn(),
+		onToggleRepositoryVisibility: fn(),
 		onAddLabelToTeam: fn(),
 		onRemoveLabelFromTeam: fn(),
 	},

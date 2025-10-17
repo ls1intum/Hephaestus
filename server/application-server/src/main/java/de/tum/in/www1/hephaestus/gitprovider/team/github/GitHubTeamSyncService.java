@@ -190,7 +190,14 @@ public class GitHubTeamSyncService {
                 ? TeamRepositoryPermission.PermissionLevel.ADMIN
                 : push ? TeamRepositoryPermission.PermissionLevel.WRITE : TeamRepositoryPermission.PermissionLevel.READ;
 
-            fresh.add(new TeamRepositoryPermission(team, repoRef, level));
+            TeamRepositoryPermission permission = team
+                .getRepoPermissions()
+                .stream()
+                .filter(existing -> Objects.equals(existing.getRepository().getId(), repoId))
+                .findFirst()
+                .orElseGet(() -> new TeamRepositoryPermission(team, repoRef, level));
+            permission.setPermission(level);
+            fresh.add(permission);
         }
         team.clearAndAddRepoPermissions(fresh);
     }

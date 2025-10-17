@@ -1,0 +1,46 @@
+---
+id: workspace
+sidebar_position: 3
+title: Workspace basics
+description: Understand how the default Hephaestus workspace mirrors your GitHub organisation today.
+---
+
+Hephaestus currently operates with a single workspace per deployment. When the GitHub App is installed for your organisation, that workspace is provisioned automatically and mirrors the repositories and teams already defined in GitHub. There is no separate invite flow or manual workspace maintenance inside the app.
+
+:::info Who controls access?
+GitHub organisation owners manage access by deciding which repositories the Hephaestus GitHub App can read and by assigning members to GitHub teams. Those changes sync into Hephaestus within a few minutes.
+:::
+
+## Repository coverage
+
+Hephaestus syncs activity from every repository the GitHub App installation has been granted. To adjust which projects appear:
+
+1. Open your organisation settings in GitHub.
+2. Review the **Installed GitHub Apps** section and locate **Hephaestus**.
+3. Update the repository access (all repositories or a curated subset).
+4. Save the changes—Hephaestus picks them up automatically during the next sync cycle.
+
+Expect the first sync to take several minutes depending on repository history. Subsequent updates arrive within a few minutes of GitHub activity.
+
+:::tip Need to exclude a repository quickly?
+Temporarily remove it from the GitHub App installation. There is currently no in-app toggle inside Hephaestus.
+:::
+
+## Teams and membership
+
+Leaderboard filters and mentoring cohorts are sourced from GitHub teams. If you need to change who appears in a team or which repositories the team owns:
+
+1. Manage the team directly in GitHub (add or remove members, adjust repositories, or rename the team).
+2. Hephaestus will mirror those changes automatically—no additional confirmation is required.
+
+Because teams are read-only inside Hephaestus today, any inconsistencies need to be resolved in GitHub or by contacting your organisation maintainer.
+
+:::tip Keep data focused
+If you organise large classes or multi-team projects, continue to use GitHub labels alongside teams. Hephaestus will inherit both, letting you filter analytics without extra configuration steps.
+:::
+
+## Troubleshooting
+
+- **Repository missing?** Confirm the GitHub organisation owner granted the Hephaestus app access to the repository.
+- **Team not visible in filters?** Ensure the GitHub team contains at least one repository and one member.
+- **Need to migrate workspace data?** Contact the Hephaestus support team with the workspace ID so they can assist.

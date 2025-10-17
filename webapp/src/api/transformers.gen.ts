@@ -144,10 +144,23 @@ const pullRequestInfoSchemaResponseTransformer = (data: any) => {
     return data;
 };
 
+const teamInfoSchemaResponseTransformer = (data: any) => {
+    data.labels = data.labels.map((item: any) => {
+        return labelInfoSchemaResponseTransformer(item);
+    });
+    data.repositories = data.repositories.map((item: any) => {
+        return repositoryInfoSchemaResponseTransformer(item);
+    });
+    return data;
+};
+
 const leaderboardEntrySchemaResponseTransformer = (data: any) => {
     data.reviewedPullRequests = data.reviewedPullRequests.map((item: any) => {
         return pullRequestInfoSchemaResponseTransformer(item);
     });
+    if (data.team) {
+        data.team = teamInfoSchemaResponseTransformer(data.team);
+    }
     return data;
 };
 
@@ -197,16 +210,6 @@ const chatThreadGroupSchemaResponseTransformer = (data: any) => {
 export const getGroupedThreadsResponseTransformer = async (data: any): Promise<GetGroupedThreadsResponse> => {
     data = data.map((item: any) => {
         return chatThreadGroupSchemaResponseTransformer(item);
-    });
-    return data;
-};
-
-const teamInfoSchemaResponseTransformer = (data: any) => {
-    data.labels = data.labels.map((item: any) => {
-        return labelInfoSchemaResponseTransformer(item);
-    });
-    data.repositories = data.repositories.map((item: any) => {
-        return repositoryInfoSchemaResponseTransformer(item);
     });
     return data;
 };

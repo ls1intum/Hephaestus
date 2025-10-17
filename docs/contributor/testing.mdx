@@ -1,0 +1,98 @@
+---
+id: testing
+sidebar_position: 4
+title: Testing Guide
+description: Choose the right test type and integrate with the Maven-powered pipeline.
+---
+
+Testing keeps regression risk low across services. The application server uses Maven with dedicated base classes for unit and integration tests.
+
+## Quick start
+
+1. Decide whether you need a fast unit test or a Spring-backed integration test.
+2. Run the appropriate command:
+
+   ```bash
+   # Unit tests only (fast)
+   ./mvnw test
+
+   # Full suite including integration tests
+   ./mvnw verify
+   ```
+
+3. Extend the correct base class:
+
+   ```java
+   // Unit test
+   class UserServiceTest extends BaseUnitTest { }
+
+   // Integration test
+   class UserServiceIntegrationTest extends BaseIntegrationTest { }
+   ```
+
+:::warning Naming matters
+Use `*Test.java` for unit tests and `*IntegrationTest.java` for integration tests. Maven's surefire and failsafe plugins use these patterns.
+:::
+
+## Why testing?
+
+Tests catch regressions before they hit production, document expected behaviour, and unlock safe refactors. Our setup keeps the feedback loop fast—unit tests finish in under a second, while the shared Testcontainers environment limits the cost of integration suites.
+
+## Unit tests
+
+- Extend `BaseUnitTest` for isolated component tests.
+- Use Mockito (`@Mock`, `@InjectMocks`) for dependencies.
+- Expect sub-second runtime—no Spring context is loaded.
+
+```java
+class UserServiceTest extends BaseUnitTest {
+    @Mock private UserRepository repository;
+    @InjectMocks private UserService service;
+
+    @Test
+    @DisplayName("Should validate email format")
+    void shouldValidateEmailFormat() {
+        // Fast isolated test
+    }
+}
+```
+
+## Integration tests
+
+- Extend `BaseIntegrationTest` for cross-component behaviour.
+- Relies on a shared PostgreSQL Testcontainers instance (significantly faster than per-test containers).
+- Provides annotations such as `@GitHubPayload("label.created")` to inject recorded webhook payloads.
+
+Example:
+
+```java
+class GitHubLabelMessageHandlerIntegrationTest extends BaseIntegrationTest {
+    @Test
+    @DisplayName("Should persist label from webhook")
+    void shouldPersistLabel(GHEventPayload.Label payload) {
+        // Test with real webhook data
+    }
+}
+```
+
+## Webhook fixtures and tooling
+
+Reusable webhook JSON lives in `src/test/resources/github`. Use `@GitHubPayload("event.name")` to inject them, or extract new samples with:
+
+```bash
+python3 scripts/nats_extract_examples.py
+```
+
+Available examples include `label.created`, `repository.created`, `create`, `push`, and more—consult the folder before recording new payloads.
+
+## Maven recipes
+
+```bash
+./mvnw test                                   # Unit tests
+./mvnw verify                                 # Full suite + packaging
+./mvnw test -Dtest=UserServiceTest            # Single test class
+./mvnw test -Dtest=UserServiceTest#methodName # Single test method
+```
+
+Use the optional `-Dgroups=unit` or `-Dgroups=integration` flags once category support lands.
+

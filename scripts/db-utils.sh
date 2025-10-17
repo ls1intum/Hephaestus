@@ -159,9 +159,9 @@ generate_erd() {
         jdbc:postgresql://localhost:5432/hephaestus \
         root \
         root \
-        ../docs/dev/database/schema.mmd
+        ../docs/contributor/erd/schema.mmd
     
-    log_success "ERD documentation updated at 'docs/dev/database/schema.mmd'"
+    log_success "ERD documentation updated at 'docs/contributor/erd/schema.mmd'"
 }
 
 # Generate SQLAlchemy models for intelligence service
