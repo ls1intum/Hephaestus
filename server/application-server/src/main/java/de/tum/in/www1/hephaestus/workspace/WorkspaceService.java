@@ -173,9 +173,9 @@ public class WorkspaceService {
                 return null;
             });
 
-        CompletableFuture
-            .allOf(teamsFuture)
-            .thenRun(() -> logger.info("Finished running monitoring on startup for workspace id={}", workspace.getId()));
+        CompletableFuture.allOf(teamsFuture).thenRun(() ->
+            logger.info("Finished running monitoring on startup for workspace id={}", workspace.getId())
+        );
     }
 
     public Workspace getWorkspaceByRepositoryOwner(String nameWithOwner) {

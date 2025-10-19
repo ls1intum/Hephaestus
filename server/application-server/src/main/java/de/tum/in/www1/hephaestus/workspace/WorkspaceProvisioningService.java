@@ -4,6 +4,7 @@ import de.tum.in.www1.hephaestus.gitprovider.common.github.app.GitHubAppTokenSer
 import de.tum.in.www1.hephaestus.organization.OrganizationSyncService;
 import java.io.IOException;
 import java.util.List;
+import org.kohsuke.github.GHApp;
 import org.kohsuke.github.GHAppInstallation;
 import org.kohsuke.github.GHRepository;
 import org.kohsuke.github.GHRepositorySelection;
@@ -128,7 +129,10 @@ public class WorkspaceProvisioningService {
      */
     public void ensureGitHubAppInstallations() {
         if (!gitHubAppTokenService.isConfigured()) {
-            logger.info("Skipping GitHub App installation processing because credentials are not configured.");
+            logger.info(
+                "Skipping GitHub App installation processing because credentials are not configured (appId={}).",
+                gitHubAppTokenService.getConfiguredAppId()
+            );
             return;
         }
 
@@ -138,10 +142,38 @@ public class WorkspaceProvisioningService {
 
         try {
             GitHub asApp = gitHubAppTokenService.clientAsApp();
-            List<GHAppInstallation> installations = asApp.getApp().listInstallations().toList();
+            GHApp app = asApp.getApp();
+            GHUser owner = app.getOwner();
+            String ownerLogin = owner != null ? owner.getLogin() : "unknown";
+
+            logger.info(
+                "Authenticated as GitHub App '{}' (slug={}, id={}, owner={}).",
+                app.getName(),
+                app.getSlug(),
+                app.getId(),
+                ownerLogin
+            );
+
+            List<GHAppInstallation> installations = app.listInstallations().toList();
             logger.info("Ensuring {} GitHub App installation(s) are reflected as workspaces.", installations.size());
 
+            if (installations.isEmpty()) {
+                logger.warn(
+                    "No installations returned for GitHub App '{}' (id={}). Confirm the app is installed on the organization.",
+                    app.getSlug(),
+                    app.getId()
+                );
+            }
+
             for (GHAppInstallation installation : installations) {
+                GHUser account = installation.getAccount();
+                String accountLogin = account != null ? account.getLogin() : "<unknown>";
+                logger.info(
+                    "Processing GitHub App installation={} account={} selection={}",
+                    installation.getId(),
+                    accountLogin,
+                    installation.getRepositorySelection()
+                );
                 synchronizeInstallation(installation);
             }
         } catch (IOException e) {
