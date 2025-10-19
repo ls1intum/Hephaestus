@@ -30,6 +30,6 @@ public class WorkspaceStartupListener {
         logger.info("Starting workspace provisioning.");
         provisioningService.bootstrapDefaultPatWorkspace();
         provisioningService.ensureGitHubAppInstallations();
-        workspaceService.initializeAllWorkspaces();
+        workspaceService.activateAllWorkspaces();
     }
 }

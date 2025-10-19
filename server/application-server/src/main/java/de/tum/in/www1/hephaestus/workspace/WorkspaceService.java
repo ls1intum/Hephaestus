@@ -87,72 +87,95 @@ public class WorkspaceService {
     private boolean runMonitoringOnStartup;
 
     /**
-     * Bring every persisted workspace into an operational state by ensuring metadata, consumers, and
-     * optional startup syncs are triggered. This method is invoked after provisioning finishes so it can rely
-     * on the workspace catalog being up to date.
+     * Prepare every workspace and start monitoring/sync routines for those that are ready.
+     * Intended to run after provisioning so the workspace catalog is populated.
      */
-    public void initializeAllWorkspaces() {
+    public void activateAllWorkspaces() {
         List<Workspace> workspaces = workspaceRepository.findAll();
         if (workspaces.isEmpty()) {
             logger.info("No workspaces found on startup; waiting for GitHub App backfill or manual provisioning.");
             return;
         }
 
-        List<Workspace> bootstrapped = new ArrayList<>(workspaces.size());
+        List<Workspace> prepared = new ArrayList<>(workspaces.size());
         for (Workspace workspace : workspaces) {
-            bootstrapped.add(ensureWorkspaceMetadata(workspace));
+            prepared.add(ensureWorkspaceMetadata(workspace));
         }
 
         Set<String> organizationConsumersStarted = new HashSet<>();
-        for (Workspace workspace : bootstrapped) {
-            Set<RepositoryToMonitor> repositoriesToMonitor = workspace.getRepositoriesToMonitor();
+        for (Workspace workspace : prepared) {
+            if (shouldSkipActivation(workspace)) {
+                continue;
+            }
+            activateWorkspace(workspace, organizationConsumersStarted);
+        }
+    }
 
-            if (isNatsEnabled) {
-                repositoriesToMonitor.forEach(repositoryToMonitor ->
-                    natsConsumerService.startConsumingRepositoryToMonitorAsync(repositoryToMonitor)
-                );
-                String organizationLogin = workspace.getAccountLogin();
-                if (!isBlank(organizationLogin)) {
-                    String key = organizationLogin.toLowerCase();
-                    if (organizationConsumersStarted.add(key)) {
-                        natsConsumerService.startConsumingOrganizationAsync(organizationLogin);
-                    }
+    private boolean shouldSkipActivation(Workspace workspace) {
+        if (
+            workspace.getGitProviderMode() == Workspace.GitProviderMode.PAT_ORG &&
+            isBlank(workspace.getPersonalAccessToken())
+        ) {
+            logger.info(
+                "Workspace id={} remains idle: PAT mode without personal access token. Configure a token or migrate to the GitHub App.",
+                workspace.getId()
+            );
+            return true;
+        }
+        return false;
+    }
+
+    private void activateWorkspace(Workspace workspace, Set<String> organizationConsumersStarted) {
+        Set<RepositoryToMonitor> repositoriesToMonitor = workspace.getRepositoriesToMonitor();
+
+        if (isNatsEnabled) {
+            repositoriesToMonitor.forEach(repositoryToMonitor ->
+                natsConsumerService.startConsumingRepositoryToMonitorAsync(repositoryToMonitor)
+            );
+            String organizationLogin = workspace.getAccountLogin();
+            if (!isBlank(organizationLogin)) {
+                String key = organizationLogin.toLowerCase();
+                if (organizationConsumersStarted.add(key)) {
+                    natsConsumerService.startConsumingOrganizationAsync(organizationLogin);
                 }
             }
-
-            if (runMonitoringOnStartup) {
-                logger.info("Running monitoring on startup");
-
-                CompletableFuture<?>[] repoFutures = repositoriesToMonitor
-                    .stream()
-                    .map(repo -> CompletableFuture.runAsync(() -> gitHubDataSyncService.syncRepositoryToMonitor(repo)))
-                    .toArray(CompletableFuture[]::new);
-                CompletableFuture<Void> reposDone = CompletableFuture.allOf(repoFutures);
-
-                CompletableFuture<Void> usersFuture = reposDone
-                    .thenRunAsync(() -> {
-                        logger.info("All repositories synced, now syncing users");
-                        gitHubDataSyncService.syncUsers(workspace);
-                    })
-                    .exceptionally(ex -> {
-                        logger.error("Error during syncUsers: {}", ex.getMessage(), ex);
-                        return null;
-                    });
-
-                CompletableFuture<Void> teamsFuture = usersFuture
-                    .thenRunAsync(() -> {
-                        logger.info("Syncing teams");
-                        gitHubDataSyncService.syncTeams(workspace);
-                    })
-                    .exceptionally(ex -> {
-                        logger.error("Error during syncTeams: {}", ex.getMessage(), ex);
-                        return null;
-                    });
-
-                CompletableFuture.allOf(teamsFuture).thenRun(() -> logger.info("Finished running monitoring on startup")
-                );
-            }
         }
+
+        if (!runMonitoringOnStartup) {
+            return;
+        }
+
+        logger.info("Running monitoring on startup for workspace id={}", workspace.getId());
+
+        CompletableFuture<?>[] repoFutures = repositoriesToMonitor
+            .stream()
+            .map(repo -> CompletableFuture.runAsync(() -> gitHubDataSyncService.syncRepositoryToMonitor(repo)))
+            .toArray(CompletableFuture[]::new);
+        CompletableFuture<Void> reposDone = CompletableFuture.allOf(repoFutures);
+
+        CompletableFuture<Void> usersFuture = reposDone
+            .thenRunAsync(() -> {
+                logger.info("All repositories synced, now syncing users for workspace id={}", workspace.getId());
+                gitHubDataSyncService.syncUsers(workspace);
+            })
+            .exceptionally(ex -> {
+                logger.error("Error during syncUsers: {}", ex.getMessage(), ex);
+                return null;
+            });
+
+        CompletableFuture<Void> teamsFuture = usersFuture
+            .thenRunAsync(() -> {
+                logger.info("Syncing teams for workspace id={}", workspace.getId());
+                gitHubDataSyncService.syncTeams(workspace);
+            })
+            .exceptionally(ex -> {
+                logger.error("Error during syncTeams: {}", ex.getMessage(), ex);
+                return null;
+            });
+
+        CompletableFuture
+            .allOf(teamsFuture)
+            .thenRun(() -> logger.info("Finished running monitoring on startup for workspace id={}", workspace.getId()));
     }
 
     public Workspace getWorkspaceByRepositoryOwner(String nameWithOwner) {
