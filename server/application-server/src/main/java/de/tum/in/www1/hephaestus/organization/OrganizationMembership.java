@@ -1,10 +1,9 @@
 package de.tum.in.www1.hephaestus.organization;
 
 import jakarta.persistence.*;
+import java.time.Instant;
 import lombok.Getter;
 import lombok.Setter;
-
-import java.time.Instant;
 
 @Entity
 @Table(name = "organization_membership")

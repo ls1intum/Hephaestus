@@ -115,4 +115,17 @@
         </preConditions>
         <dropTable tableName="team_repositories" cascadeConstraints="true"/>
     </changeSet>
+
+    <changeSet author="FelixTJDietrich" id="1759109722048-20">
+        <update tableName="workspace">
+            <column name="git_provider_mode" value="PAT_ORG"/>
+            <where>git_provider_mode IS NULL</where>
+        </update>
+    </changeSet>
+
+    <changeSet author="FelixTJDietrich" id="1759109722048-21">
+        <addColumn tableName="workspace">
+            <column name="personal_access_token" type="TEXT"/>
+        </addColumn>
+    </changeSet>
 </databaseChangeLog>

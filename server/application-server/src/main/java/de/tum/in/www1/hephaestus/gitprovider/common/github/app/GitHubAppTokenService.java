@@ -41,9 +41,7 @@ public class GitHubAppTokenService {
         @Value("${github.app.privateKey:}") String privateKeyPem
     ) {
         this.appId = appId;
-        this.privateKey = appId > 0
-            ? loadKey(privateKeyRes, privateKeyPem)
-            : generateEphemeralRsaKey();
+        this.privateKey = appId > 0 ? loadKey(privateKeyRes, privateKeyPem) : generateEphemeralRsaKey();
     }
 
     /**

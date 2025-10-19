@@ -79,11 +79,15 @@ public class GitHubRepositorySyncService {
      */
     //TODO: Consider deleting this method -> not used in the application
     public List<GHRepository> syncAllRepositories(Set<String> nameWithOwners) {
-        return workspaceService.listAllWorkspaces().stream()
-            .flatMap(ws -> nameWithOwners.stream()
-                .map(nameWithOwner -> syncRepository(ws.getId(), nameWithOwner))
-                .filter(Optional::isPresent)
-                .map(Optional::get)
+        return workspaceService
+            .listAllWorkspaces()
+            .stream()
+            .flatMap(ws ->
+                nameWithOwners
+                    .stream()
+                    .map(nameWithOwner -> syncRepository(ws.getId(), nameWithOwner))
+                    .filter(Optional::isPresent)
+                    .map(Optional::get)
             )
             .toList();
     }

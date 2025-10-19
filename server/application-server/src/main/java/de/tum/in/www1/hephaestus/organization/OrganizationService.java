@@ -1,12 +1,12 @@
 package de.tum.in.www1.hephaestus.organization;
 
+import java.util.Optional;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.util.Optional;
-
 @Service
 public class OrganizationService {
+
     private final OrganizationRepository organizations;
 
     public OrganizationService(OrganizationRepository organizations) {
@@ -22,13 +22,15 @@ public class OrganizationService {
             throw new IllegalArgumentException("login required");
         }
 
-        Organization organization = organizations.findByGithubId(githubId).orElseGet(() -> {
-            Organization o = new Organization();
-            o.setId(githubId);
-            o.setGithubId(githubId);
+        Organization organization = organizations
+            .findByGithubId(githubId)
+            .orElseGet(() -> {
+                Organization o = new Organization();
+                o.setId(githubId);
+                o.setGithubId(githubId);
 
-            return o;
-        });
+                return o;
+            });
 
         if (!login.equals(organization.getLogin())) {
             organization.setLogin(login);
@@ -57,4 +59,3 @@ public class OrganizationService {
         return organizations.findByInstallationId(installationId);
     }
 }
-

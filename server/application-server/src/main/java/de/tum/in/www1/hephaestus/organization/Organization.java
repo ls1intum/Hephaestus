@@ -42,26 +42,25 @@ public class Organization extends BaseGitServiceEntity {
 
     @OneToOne(mappedBy = "organization")
     private Workspace workspace;
-
     // Ignored GitHub properties for Organization:
-// - description
-// - company
-// - blog
-// - location
-// - email
-// - twitter_username
-// - is_verified
-// - has_organization_projects
-// - has_repository_projects
-// - public_repos
-// - public_gists
-// - followers
-// - following
-// - type (always "Organization")
-// - node_id (GraphQL)
-// - billing_email
-// - default_repository_permission
-// - members_can_create_repositories
-// - two_factor_requirement_enabled
-// - plan (billing)
+    // - description
+    // - company
+    // - blog
+    // - location
+    // - email
+    // - twitter_username
+    // - is_verified
+    // - has_organization_projects
+    // - has_repository_projects
+    // - public_repos
+    // - public_gists
+    // - followers
+    // - following
+    // - type (always "Organization")
+    // - node_id (GraphQL)
+    // - billing_email
+    // - default_repository_permission
+    // - members_can_create_repositories
+    // - two_factor_requirement_enabled
+    // - plan (billing)
 }
