@@ -351,22 +351,22 @@ export type LabelInfo = {
 };
 
 export type LeaderboardEntry = {
-    numberOfApprovals: number;
-    numberOfChangeRequests: number;
-    numberOfCodeComments: number;
-    numberOfComments: number;
-    numberOfReviewedPRs: number;
-    numberOfUnknowns: number;
-    rank: number;
+    numberOfApprovals?: number;
+    numberOfChangeRequests?: number;
+    numberOfCodeComments?: number;
+    numberOfComments?: number;
+    numberOfReviewedPRs?: number;
+    numberOfUnknowns?: number;
+    rank?: number;
     reviewedPullRequests: Array<PullRequestInfo>;
-    score: number;
+    score?: number;
     team?: TeamInfo;
     user?: UserInfo;
 };
 
 export type LeagueChange = {
-    leaguePointsChange: number;
-    login: string;
+    leaguePointsChange?: number;
+    login?: string;
 };
 
 export type MetaData = {

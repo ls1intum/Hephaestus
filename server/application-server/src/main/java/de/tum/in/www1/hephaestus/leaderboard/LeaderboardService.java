@@ -13,23 +13,13 @@ import de.tum.in.www1.hephaestus.gitprovider.user.User;
 import de.tum.in.www1.hephaestus.gitprovider.user.UserInfoDTO;
 import de.tum.in.www1.hephaestus.gitprovider.user.UserRepository;
 import jakarta.transaction.Transactional;
-import java.time.Instant;
-import java.util.ArrayDeque;
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.Collections;
-import java.util.Comparator;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Map;
-import java.util.Objects;
-import java.util.Optional;
-import java.util.Set;
-import java.util.stream.Collectors;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
+
+import java.time.Instant;
+import java.util.*;
+import java.util.stream.Collectors;
 
 @Service
 public class LeaderboardService {
@@ -231,7 +221,7 @@ public class LeaderboardService {
         logger.info("Creating team leaderboard dataset with timeframe: {} - {}", after, before);
 
         List<Team> allTeams = teamRepository.findAll();
-        Map<Long, List<Team>> teamHierarchy = allTeams.stream().collect(Collectors.groupingBy(Team::getParentId));
+        LinkedHashMap<Long, List<Team>> teamHierarchy = allTeams.stream().collect(Collectors.groupingBy(Team::getParentId, LinkedHashMap::new, Collectors.toList()));
         List<Team> targetTeams = allTeams.stream().filter(t -> !t.isHidden()).collect(Collectors.toList());
 
         if (targetTeams.isEmpty()) {
@@ -556,9 +546,9 @@ public class LeaderboardService {
         return new TeamStats(score, leaguePoints, reviewedPullRequests, numberOfReviewedPRs, numberOfApprovals, numberOfChangeRequests, numberOfComments, numberOfUnknowns, numberOfCodeComments);
     }
 
-    private Map<Long, List<Team>> buildTeamHierarchy() {
+    private LinkedHashMap<Long, List<Team>> buildTeamHierarchy() {
         List<Team> all = teamRepository.findAll();
-        return all.stream().collect(Collectors.groupingBy(Team::getParentId));
+        return all.stream().collect(Collectors.groupingBy(Team::getParentId, LinkedHashMap::new, Collectors.toList()));
     }
 
     private Set<Long> collectTeamAndDescendantIds(Team team, Map<Long, List<Team>> hierarchy) {
@@ -590,5 +580,6 @@ public class LeaderboardService {
         int numberOfComments,
         int numberOfUnknowns,
         int numberOfCodeComments
-    ) {}
+    ) {
+    }
 }

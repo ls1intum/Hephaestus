@@ -1375,15 +1375,7 @@ components:
         user:
           $ref: "#/components/schemas/UserInfo"
       required:
-      - numberOfApprovals
-      - numberOfChangeRequests
-      - numberOfCodeComments
-      - numberOfComments
-      - numberOfReviewedPRs
-      - numberOfUnknowns
-      - rank
       - reviewedPullRequests
-      - score
     LeagueChange:
       type: object
       properties:
@@ -1392,9 +1384,6 @@ components:
           format: int32
         login:
           type: string
-      required:
-      - leaguePointsChange
-      - login
     MetaData:
       type: object
       properties:
@@ -2791,16 +2780,19 @@ components:
           anyOf:
           - type: integer
           - type: "null"
+          default: null
           title: Interval
         temperature_2m:
           anyOf:
           - type: number
           - type: "null"
+          default: null
           title: Temperature 2M
         time:
           anyOf:
           - type: string
           - type: "null"
+          default: null
           title: Time
       title: WeatherCurrent
     WeatherCurrentUnits:
@@ -2810,11 +2802,13 @@ components:
           anyOf:
           - type: string
           - type: "null"
+          default: null
           title: Interval
         temperature_2m:
           anyOf:
           - type: string
           - type: "null"
+          default: null
           title: Temperature 2M
         time:
           anyOf:
@@ -2851,11 +2845,13 @@ components:
           anyOf:
           - type: string
           - type: "null"
+          default: null
           title: Sunrise
         sunset:
           anyOf:
           - type: string
           - type: "null"
+          default: null
           title: Sunset
         time:
           anyOf:
