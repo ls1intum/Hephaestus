@@ -17,24 +17,24 @@ spring:
       validation-timeout: 5000  # 5 seconds
       leak-detection-threshold: 10000  # 10 seconds for leak detection
       connection-test-query: SELECT 1
-  
+
   # JPA configuration for tests
   jpa:
     hibernate:
       ddl-auto: create-drop
     show-sql: false
-  
+
   # Test-specific configurations for faster shutdown
   task:
     execution:
       shutdown:
         await-termination: true
         await-termination-period: 5s
-  
+
   # Disable liquibase for tests (use JPA auto DDL instead)
   liquibase:
     enabled: false
-  
+
   # Security configuration for tests (minimal config)
   security:
     oauth2:
@@ -63,6 +63,9 @@ hephaestus:
     url: http://localhost:8080
   workspace:
     init-default: false
+
+monitoring:
+  run-on-startup: false
 
 # Logging configuration for tests
 logging:
