@@ -403,6 +403,7 @@ class Workspace(Base):
         TIMESTAMP(True, 6)
     )
     organization_id: Mapped[Optional[int]] = mapped_column(BigInteger)
+    personal_access_token: Mapped[Optional[str]] = mapped_column(String(255))
     organization: Mapped[Optional["Organization"]] = relationship(
         "Organization", back_populates="workspace"
     )
@@ -520,6 +521,9 @@ class TeamRepositoryPermission(Base):
     permission: Mapped[str] = mapped_column(String(32))
     repository_id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
     team_id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
+    hidden_from_contributions: Mapped[bool] = mapped_column(
+        Boolean, server_default=text("false")
+    )
     repository: Mapped["Repository"] = relationship(
         "Repository", back_populates="team_repository_permission"
     )

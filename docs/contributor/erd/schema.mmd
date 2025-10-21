@@ -281,6 +281,7 @@ erDiagram
         VARCHAR(32) permission "NOT NULL"
         BIGINT repository_id PK,FK
         BIGINT team_id PK,FK
+        BOOLEAN hidden_from_contributions "NOT NULL"
     }
 
     User {
@@ -312,6 +313,7 @@ erDiagram
         BIGINT installation_id
         TIMESTAMPTZ installation_linked_at
         BIGINT organization_id FK,UK
+        VARCHAR(255) personal_access_token
     }
 
     %% Relationships

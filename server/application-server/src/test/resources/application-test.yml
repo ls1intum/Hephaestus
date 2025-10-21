@@ -61,6 +61,8 @@ nats:
 hephaestus:
   intelligence-service:
     url: http://localhost:8080
+  workspace:
+    init-default: false
 
 # Logging configuration for tests
 logging:
