@@ -150,7 +150,7 @@ public class LeaderboardService {
         List<Long> ranking = scoresByUserId.entrySet().stream()
             .sorted(comparatorFor(sort, usersById, reviewsByUserId, issueCommentsByUserId))
             .map(Map.Entry::getKey)
-            .collect(Collectors.toList());
+            .toList();
 
         List<LeaderboardEntryDTO> result = new ArrayList<>();
         for (int index = 0; index < ranking.size(); index++) {
@@ -179,23 +179,23 @@ public class LeaderboardService {
                 .count();
 
             int numberOfApprovals = (int) userReviews.stream()
-                .filter(r -> r.getState() == PullRequestReview.State.APPROVED)
+                .filter(prr -> prr.getState() == PullRequestReview.State.APPROVED)
                 .count();
 
             int numberOfChangeRequests = (int) userReviews.stream()
-                .filter(r -> r.getState() == PullRequestReview.State.CHANGES_REQUESTED)
+                .filter(prr -> prr.getState() == PullRequestReview.State.CHANGES_REQUESTED)
                 .count();
 
             int numberOfComments = (int) userReviews.stream()
-                .filter(r -> r.getState() == PullRequestReview.State.COMMENTED && r.getBody() != null)
+                .filter(prr -> prr.getState() == PullRequestReview.State.COMMENTED && prr.getBody() != null)
                 .count() + userIssueComments.size();
 
             int numberOfUnknowns = (int) userReviews.stream()
-                .filter(r -> r.getState() == PullRequestReview.State.UNKNOWN && r.getBody() != null)
+                .filter(prr -> prr.getState() == PullRequestReview.State.UNKNOWN && prr.getBody() != null)
                 .count();
 
             int numberOfCodeComments = userReviews.stream()
-                .mapToInt(r -> r.getComments() == null ? 0 : r.getComments().size())
+                .mapToInt(prr -> prr.getComments() == null ? 0 : prr.getComments().size())
                 .sum();
 
             LeaderboardEntryDTO entry = new LeaderboardEntryDTO(
