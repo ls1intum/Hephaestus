@@ -85,11 +85,11 @@ monitoring:
 
 github:
     app:
-        id: ${GITHUB_APP_ID}
-        privateKeyLocation: ${GITHUB_APP_PRIVATE_KEY_LOCATION:}
-        privateKey: ${GITHUB_APP_PRIVATE_KEY:}
+        id: ${GH_APP_ID}
+        privateKeyLocation: ${GH_APP_PRIVATE_KEY_LOCATION:}
+        privateKey: ${GH_APP_PRIVATE_KEY:}
     meta:
-        auth-token: ${GITHUB_META_AUTH_TOKEN:}
+        auth-token: ${GH_META_AUTH_TOKEN:}
 
 slack:
     token: ${SLACK_BOT_TOKEN}
