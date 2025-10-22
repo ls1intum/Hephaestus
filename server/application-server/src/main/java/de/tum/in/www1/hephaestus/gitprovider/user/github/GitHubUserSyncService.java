@@ -52,30 +52,15 @@ public class GitHubUserSyncService {
      * repository or creating a new one.
      *
      * @param ghUser The GitHub user data to process.
-     * @return The updated or newly created User entity, or {@code null} if an error
-     *         occurred during update.
+     * @return The updated or newly created User entity.
      */
     @Transactional
     public User processUser(GHUser ghUser) {
-        var result = userRepository
+        var user = userRepository
             .findById(ghUser.getId())
-            .map(user -> {
-                try {
-                    if (user.getUpdatedAt() == null || user.getUpdatedAt().isBefore(ghUser.getUpdatedAt())) {
-                        return userConverter.update(ghUser, user);
-                    }
-                    return user;
-                } catch (IOException e) {
-                    logger.error("Failed to update repository {}: {}", ghUser.getId(), e.getMessage());
-                    return null;
-                }
-            })
+            .map(existingUser -> userConverter.update(ghUser, existingUser))
             .orElseGet(() -> userConverter.convert(ghUser));
 
-        if (result == null) {
-            return null;
-        }
-
-        return userRepository.save(result);
+        return userRepository.save(user);
     }
 }
