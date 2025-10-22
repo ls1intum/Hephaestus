@@ -107,7 +107,7 @@ jobs:
           onlyChanged: true
           zip: true
           skip: "@(dependabot/**|renovate/**)"
-          autoAcceptChanges: ${{ github.ref == 'refs/heads/main' && 'main' || '' }}
+          autoAcceptChanges: ${{ github.ref == 'refs/heads/develop' && 'develop' || '' }}
           exitZeroOnChanges: false
           logLevel: info
           junitReport: true

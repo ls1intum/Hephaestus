@@ -1,6 +1,8 @@
 export default {
-	version: "DEV",
-	clientUrl: "http://localhost:4200",
+        version: "DEV",
+        gitSha: "dev",
+        buildDate: undefined as string | undefined,
+        clientUrl: "http://localhost:4200",
 	serverUrl: "http://localhost:8080",
 	sentry: {
 		environment: "local",

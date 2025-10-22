@@ -1,5 +1,6 @@
 import hmac
 import hashlib
+import os
 from contextlib import asynccontextmanager
 from fastapi import Body, FastAPI, HTTPException, Header, Request, status
 from pydantic import BaseModel
@@ -28,7 +29,15 @@ async def lifespan(app: FastAPI):
     await nats_client.close()
 
 
-app = FastAPI(lifespan=lifespan)
+def resolve_version() -> str:
+    for key in ("APP_VERSION", "IMAGE_TAG", "GIT_SHA"):
+        value = os.getenv(key)
+        if value:
+            return value
+    return "dev"
+
+
+app = FastAPI(lifespan=lifespan, version=resolve_version())
 
 
 def verify_github_signature(signature, secret, body):

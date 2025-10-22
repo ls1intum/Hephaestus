@@ -4,6 +4,9 @@ services:
     ports:
       - "4200"
     environment:
+      APP_VERSION: ${APP_VERSION:-${IMAGE_TAG}}
+      IMAGE_TAG: ${IMAGE_TAG}
+      GIT_SHA: ${GIT_SHA:-${IMAGE_TAG}}
       NATS_URL: "nats://nats-server:4222"
       WEBHOOK_SECRET: ${WEBHOOK_SECRET}
     depends_on:

@@ -3,7 +3,7 @@ name: CI/CD
 on:
   workflow_dispatch:
   push:
-    tags: ["v*"]
+    branches: ["develop"]
   merge_group:
   pull_request:
     branches: ["**"]
@@ -55,7 +55,7 @@ jobs:
   docker-build:
     uses: ./.github/workflows/ci-docker-build.yml
     needs: [pre-job]
-    if: needs.pre-job.outputs.should_skip != 'true'
+    if: needs.pre-job.outputs.should_skip != 'true' && github.event_name == 'push' && github.ref == 'refs/heads/develop'
     secrets: inherit
     with:
       should_skip: ${{ needs.pre-job.outputs.should_skip }}
@@ -78,15 +78,12 @@ jobs:
         security-scan,
         test-suite,
         docker-build,
-        # docker-security-scan, 
+        # docker-security-scan,
       ]
     if: always()
-    outputs:
-      environment: ${{ steps.set-environment.outputs.environment }}
     steps:
       - name: Check all jobs and determine overall status
         run: |
-          # Check if any required job failed
           if [[ "${{ contains(needs.*.result, 'failure') }}" == "true" ]]; then
             echo "❌ One or more CI jobs failed"
             exit 1
@@ -96,31 +93,22 @@ jobs:
           else
             echo "✅ All CI jobs passed successfully"
           fi
-      
-      - name: Determine deployment environment
-        id: set-environment
-        run: |
-          if [[ "${{ github.ref }}" =~ refs/tags/v[0-9]+\.[0-9]+\.[0-9]+-rc\.[0-9]+ ]]; then
-            echo "environment=Staging" >> $GITHUB_OUTPUT
-            echo "🎯 Deployment target: Staging (pre-release tag: ${{ github.ref }})"
-          elif [[ "${{ github.ref }}" =~ refs/tags/v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
-            echo "environment=Production" >> $GITHUB_OUTPUT
-            echo "🎯 Deployment target: Production (release tag: ${{ github.ref }})"
-          else
-            echo "environment=none" >> $GITHUB_OUTPUT
-            echo "🚫 No deployment target (tag not configured for deployment: ${{ github.ref }})"
-            exit 0
-          fi
 
-  # Automatic deployment based on tags
-  deploy-app:
-    needs: [all-ci-passed]
-    if: ${{ startsWith(github.ref, 'refs/tags/v') }}
-    uses: ls1intum/.github/.github/workflows/deploy-docker-compose.yml@main
+  deploy-staging:
+    needs:
+      [
+        quality-gates,
+        security-scan,
+        test-suite,
+        docker-build,
+      ]
+    if: >-
+      github.event_name == 'push' &&
+      github.ref == 'refs/heads/develop'
+    uses: ./.github/workflows/deploy-staging.yml
     with:
-      environment: ${{ needs.all-ci-passed.outputs.environment }}
-      docker-compose-file: "./docker/compose.app.yaml"
-      main-image-name: ls1intum/hephaestus/application-server
       image-tag: ${{ github.sha }}
-      deployment-base-path: "/opt/hephaestus/app"
+      app-version: ${{ github.sha }}
+      git-sha: ${{ github.sha }}
+      deploy-app: true
     secrets: inherit

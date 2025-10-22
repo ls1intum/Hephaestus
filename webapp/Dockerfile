@@ -1,6 +1,14 @@
 # Stage 1: Build the React application
 FROM node:22-alpine AS build
 
+ARG GIT_SHA=unknown
+ARG IMAGE_TAG=unknown
+ARG BUILD_DATE=unknown
+
+ENV GIT_SHA=${GIT_SHA}
+ENV IMAGE_TAG=${IMAGE_TAG}
+ENV BUILD_DATE=${BUILD_DATE}
+
 WORKDIR /app
 
 # Copy and install dependencies early to leverage Docker layer caching
@@ -17,6 +25,18 @@ RUN npm run build:prod
 
 # Stage 2: Serve the app with Nginx
 FROM nginx:stable-alpine
+
+ARG GIT_SHA=unknown
+ARG IMAGE_TAG=unknown
+ARG BUILD_DATE=unknown
+
+ENV GIT_SHA=${GIT_SHA}
+ENV IMAGE_TAG=${IMAGE_TAG}
+ENV BUILD_DATE=${BUILD_DATE}
+
+LABEL org.opencontainers.image.revision="${GIT_SHA}"
+LABEL org.opencontainers.image.version="${IMAGE_TAG}"
+LABEL org.opencontainers.image.created="${BUILD_DATE}"
 
 # Install necessary packages and explicitly update libxml2 for security fixes
 RUN apk update && \

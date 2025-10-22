@@ -46,12 +46,15 @@ jobs:
       image-name: "${{ matrix.component.image-name }}"
       docker-file: "${{ matrix.component.docker-file }}"
       docker-context: "${{ matrix.component.docker-context }}"
+      build-args: |
+        GIT_SHA=${{ github.sha }}
+        IMAGE_TAG=${{ github.sha }}
+        BUILD_DATE=${{ github.event.head_commit.timestamp }}
       registry: "ghcr.io"
       tags: |
-        ${{ github.ref_name }}
         ${{ github.sha }}
-        ci-${{ github.run_number }}
-        ${{ github.event_name == 'pull_request' && format('pr-{0}', github.event.number) || 'latest' }}
+        ${{ github.ref_name }}
+        staging-${{ github.sha }}
       labels: |
         org.opencontainers.image.title=${{ matrix.component.title }}
         org.opencontainers.image.description=${{ matrix.component.description }}

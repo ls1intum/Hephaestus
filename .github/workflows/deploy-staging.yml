@@ -6,6 +6,14 @@ on:
       image-tag:
         type: string
         description: "Image tag to deploy (default: pr-<number> if PR exists, latest for default branch)"
+      app-version:
+        type: string
+        description: "Optional runtime version shown in the UI"
+        default: ""
+      git-sha:
+        type: string
+        description: "Optional commit SHA used for traceability"
+        default: ""
       deploy-app:
         type: boolean
         default: true
@@ -23,6 +31,14 @@ on:
       image-tag:
         type: string
         description: "Image tag to deploy (default: pr-<number> if PR exists, latest for default branch)"
+      app-version:
+        type: string
+        description: "Optional runtime version shown in the UI"
+        default: ""
+      git-sha:
+        type: string
+        description: "Optional commit SHA used for traceability"
+        default: ""
       deploy-app:
         type: boolean
         default: true
@@ -39,6 +55,10 @@ on:
 jobs:  
   deploy-app:
     if: ${{ inputs.deploy-app }}
+    env:
+      IMAGE_TAG: ${{ inputs.image-tag }}
+      APP_VERSION: ${{ inputs.app-version != '' && inputs.app-version || inputs.image-tag }}
+      GIT_SHA: ${{ inputs.git-sha != '' && inputs.git-sha || inputs.image-tag }}
     uses: ls1intum/.github/.github/workflows/deploy-docker-compose.yml@main
     with:
       environment: Staging
@@ -50,6 +70,10 @@ jobs:
 
   deploy-core:
     if: ${{ inputs.deploy-core }}
+    env:
+      IMAGE_TAG: ${{ inputs.image-tag }}
+      APP_VERSION: ${{ inputs.app-version != '' && inputs.app-version || inputs.image-tag }}
+      GIT_SHA: ${{ inputs.git-sha != '' && inputs.git-sha || inputs.image-tag }}
     uses: ls1intum/.github/.github/workflows/deploy-docker-compose.yml@main
     with:
       environment: Staging
@@ -61,6 +85,10 @@ jobs:
 
   deploy-proxy:
     if: ${{ inputs.deploy-proxy }}
+    env:
+      IMAGE_TAG: ${{ inputs.image-tag }}
+      APP_VERSION: ${{ inputs.app-version != '' && inputs.app-version || inputs.image-tag }}
+      GIT_SHA: ${{ inputs.git-sha != '' && inputs.git-sha || inputs.image-tag }}
     uses: ls1intum/.github/.github/workflows/deploy-docker-compose.yml@main
     with:
       environment: Staging

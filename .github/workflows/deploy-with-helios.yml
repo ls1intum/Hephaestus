@@ -18,12 +18,20 @@ on:
         description: "Username that triggered deployment (not required, shown if triggered via GitHub UI, logged if triggered via GitHub app)"
         required: false
         type: string
+      app_version:
+        description: "Optional runtime version (defaults to the provided commit SHA)"
+        required: false
+        type: string
 
 # Suggestion: Ensures only one workflow runs at a time for a given environment name
 concurrency: ${{ github.event.inputs.environment_name }}
 
 jobs:
   deploy-app:
+    env:
+      IMAGE_TAG: ${{ github.event.inputs.commit_sha }}
+      APP_VERSION: ${{ github.event.inputs.app_version != '' && github.event.inputs.app_version || github.event.inputs.commit_sha }}
+      GIT_SHA: ${{ github.event.inputs.commit_sha }}
     uses: ls1intum/.github/.github/workflows/deploy-docker-compose.yml@main
     with:
       environment: ${{ github.event.inputs.environment_name }}
