@@ -13,6 +13,7 @@ import de.tum.in.www1.hephaestus.gitprovider.user.UserRepository;
 import de.tum.in.www1.hephaestus.gitprovider.user.UserTeamsDTO;
 import de.tum.in.www1.hephaestus.leaderboard.LeaderboardMode;
 import de.tum.in.www1.hephaestus.leaderboard.LeaderboardService;
+import de.tum.in.www1.hephaestus.leaderboard.LeaderboardSortType;
 import de.tum.in.www1.hephaestus.leaderboard.LeaguePointsCalculationService;
 import de.tum.in.www1.hephaestus.syncing.GitHubDataSyncService;
 import de.tum.in.www1.hephaestus.syncing.NatsConsumerService;
@@ -322,9 +323,9 @@ public class WorkspaceService {
             var leaderboard = leaderboardService.createLeaderboard(
                 weekAgo,
                 now,
-                Optional.empty(),
-                Optional.empty(),
-                Optional.of(LeaderboardMode.INDIVIDUAL)
+                "all",
+                LeaderboardSortType.SCORE,
+                LeaderboardMode.INDIVIDUAL
             );
             if (leaderboard.isEmpty()) {
                 break;

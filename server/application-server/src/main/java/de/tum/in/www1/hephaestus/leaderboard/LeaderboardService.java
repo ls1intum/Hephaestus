@@ -211,9 +211,8 @@ public class LeaderboardService {
     private List<LeaderboardEntryDTO> createTeamLeaderboard(Instant after, Instant before, LeaderboardSortType sort) {
         logger.info("Creating team leaderboard dataset with timeframe: {} - {}", after, before);
 
-        List<Team> allTeams = teamRepository.findAll();
-        HashMap<Long, List<Team>> teamHierarchy = allTeams.stream().collect(Collectors.groupingBy(Team::getParentId, HashMap::new, Collectors.toList()));
-        List<Team> targetTeams = allTeams.stream().filter(t -> !t.isHidden()).toList();
+        HashMap<Long, List<Team>> teamHierarchy = buildTeamHierarchy();
+        List<Team> targetTeams = teamRepository.findAllByHiddenFalse();
 
         if (targetTeams.isEmpty()) {
             logger.info("❌ No teams found for team leaderboard");
