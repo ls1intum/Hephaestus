@@ -2,6 +2,9 @@ services:
   webapp:
     image: "ghcr.io/ls1intum/hephaestus/webapp:${IMAGE_TAG}"
     environment:
+      APP_VERSION: ${APP_VERSION:-${IMAGE_TAG}}
+      IMAGE_TAG: ${IMAGE_TAG}
+      GIT_SHA: ${GIT_SHA:-${IMAGE_TAG}}
       APPLICATION_CLIENT_URL: https://${APP_HOSTNAME}
       APPLICATION_SERVER_URL: https://${APP_HOSTNAME}/api
       KEYCLOAK_URL: https://${APP_HOSTNAME}/keycloak
@@ -54,6 +57,9 @@ services:
     ports:
       - '8080'
     environment:
+      APP_VERSION: ${APP_VERSION:-${IMAGE_TAG}}
+      IMAGE_TAG: ${IMAGE_TAG}
+      GIT_SHA: ${GIT_SHA:-${IMAGE_TAG}}
       SPRING_PROFILES_ACTIVE: prod
       APPLICATION_HOST_URL: https://${APP_HOSTNAME}
       DATABASE_URL: postgresql://postgres:5432/hephaestus
@@ -121,6 +127,9 @@ services:
   intelligence-service:
     image: "ghcr.io/ls1intum/hephaestus/intelligence-service:${IMAGE_TAG}"
     environment:
+      APP_VERSION: ${APP_VERSION:-${IMAGE_TAG}}
+      IMAGE_TAG: ${IMAGE_TAG}
+      GIT_SHA: ${GIT_SHA:-${IMAGE_TAG}}
       DATABASE_URL: postgresql://postgres:5432/hephaestus
       DATABASE_USERNAME: root
       DATABASE_PASSWORD: root

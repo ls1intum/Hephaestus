@@ -20,7 +20,7 @@ To ensure a transparent and trustworthy environment, we have established differe
 
 2. **Forking the Repository**: External contributors fork the repository and work on changes in their own branches.
 
-3. **Submit a Pull Request**: Once your work is complete, submit a pull request for review. Ensure that your branch is up to date with the main branch before submitting.
+3. **Submit a Pull Request**: Once your work is complete, submit a pull request for review. Ensure that your branch is up to date with the `develop` branch before submitting.
 
 4. **Compliance**: Contributions from external contributors that do not adhere to these guidelines may not be accepted.
 

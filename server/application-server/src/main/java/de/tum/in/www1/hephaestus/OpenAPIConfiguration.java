@@ -18,6 +18,7 @@ import java.util.stream.Collectors;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springdoc.core.customizers.OpenApiCustomizer;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
@@ -26,7 +27,7 @@ import org.springframework.context.annotation.Configuration;
     info = @Info(
         title = "Hephaestus API",
         description = "API documentation for the Hephaestus application server.",
-        version = "0.9.2",
+        version = "0.0.0",
         contact = @Contact(name = "Felix T.J. Dietrich", email = "felixtj.dietrich@tum.de"),
         license = @License(name = "MIT License", url = "https://github.com/ls1intum/Hephaestus/blob/develop/LICENSE")
     ),
@@ -37,6 +38,9 @@ public class OpenAPIConfiguration {
     private static final Logger logger = LoggerFactory.getLogger(OpenAPIConfiguration.class);
     // Track names of models imported from intelligence-service to preserve refs
     private Set<String> discoveredIntelligenceModelNames = new LinkedHashSet<>();
+
+    @Value("${spring.application.version}")
+    private String applicationVersion;
 
     /**
      * Auto-discover intelligence service model names from the OpenAPI spec.
@@ -138,6 +142,9 @@ public class OpenAPIConfiguration {
     @Bean
     public OpenApiCustomizer schemaCustomizer() {
         return openApi -> {
+            if (openApi.getInfo() != null) {
+                openApi.getInfo().setVersion(applicationVersion);
+            }
             var components = openApi.getComponents();
 
             if (components != null && components.getSchemas() != null) {

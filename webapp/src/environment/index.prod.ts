@@ -1,10 +1,35 @@
-import { version } from "@/../package.json";
 // WEB_ENV_<VARIABLE_NAME> will be substituted with `substitute_env_variables.sh` on docker container start
 
+const APP_VERSION_PLACEHOLDER = "WEB_ENV_APP_VERSION";
+const IMAGE_TAG_PLACEHOLDER = "WEB_ENV_IMAGE_TAG";
+const GIT_SHA_PLACEHOLDER = "WEB_ENV_GIT_SHA";
+const BUILD_DATE_PLACEHOLDER = "WEB_ENV_BUILD_DATE";
+
+function resolvePlaceholder(value: string): string | undefined {
+        if (!value || value.startsWith("WEB_ENV_")) {
+                return undefined;
+        }
+        return value;
+}
+
+const resolvedImageTag = resolvePlaceholder(IMAGE_TAG_PLACEHOLDER);
+const resolvedGitSha =
+        resolvePlaceholder(GIT_SHA_PLACEHOLDER) ?? resolvedImageTag ?? "unknown";
+
+const resolvedVersion =
+        resolvePlaceholder(APP_VERSION_PLACEHOLDER) ?? resolvedImageTag ?? resolvedGitSha;
+
+const displayVersion =
+        resolvedGitSha && resolvedVersion && resolvedVersion !== resolvedGitSha
+                ? `${resolvedVersion} (${resolvedGitSha.slice(0, 7)})`
+                : resolvedVersion;
+
 export default {
-	version,
-	clientUrl: "WEB_ENV_APPLICATION_CLIENT_URL",
-	serverUrl: "WEB_ENV_APPLICATION_SERVER_URL",
+        version: displayVersion,
+        gitSha: resolvedGitSha,
+        buildDate: resolvePlaceholder(BUILD_DATE_PLACEHOLDER),
+        clientUrl: "WEB_ENV_APPLICATION_CLIENT_URL",
+        serverUrl: "WEB_ENV_APPLICATION_SERVER_URL",
 	sentry: {
 		environment: "WEB_ENV_SENTRY_ENVIRONMENT",
 		dsn: "WEB_ENV_SENTRY_DSN",
