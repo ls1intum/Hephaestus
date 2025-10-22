@@ -1,5 +1,19 @@
 # Changelog
 
+## [0.9.2](https://github.com/ls1intum/Hephaestus/compare/v0.9.1...v0.9.2) (2025-10-22)
+
+### 🐛 Bug Fixes
+
+* GitHub user sync to refresh profile fields ([#505](https://github.com/ls1intum/Hephaestus/issues/505)) ([0ae6ceb](https://github.com/ls1intum/Hephaestus/commit/0ae6ceb75f494e45f985bff401b9dcf1e145549e))
+
+## [0.9.2-rc.2](https://github.com/ls1intum/Hephaestus/compare/v0.9.2-rc.1...v0.9.2-rc.2) (2025-10-22)
+
+## [0.9.2-rc.1](https://github.com/ls1intum/Hephaestus/compare/v0.9.1...v0.9.2-rc.1) (2025-10-22)
+
+### 🐛 Bug Fixes
+
+* GitHub user sync to refresh profile fields ([#505](https://github.com/ls1intum/Hephaestus/issues/505)) ([0ae6ceb](https://github.com/ls1intum/Hephaestus/commit/0ae6ceb75f494e45f985bff401b9dcf1e145549e))
+
 ## [0.9.1](https://github.com/ls1intum/Hephaestus/compare/v0.9.0...v0.9.1) (2025-10-12)
 
 ### 🐛 Bug Fixes
