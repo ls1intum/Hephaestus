@@ -4,10 +4,7 @@ import com.slack.api.methods.SlackApiException;
 import com.slack.api.model.User;
 import com.slack.api.model.block.LayoutBlock;
 import de.tum.in.www1.hephaestus.gitprovider.user.UserInfoDTO;
-import de.tum.in.www1.hephaestus.leaderboard.LeaderboardEntryDTO;
-import de.tum.in.www1.hephaestus.leaderboard.LeaderboardMode;
-import de.tum.in.www1.hephaestus.leaderboard.LeaderboardService;
-import de.tum.in.www1.hephaestus.leaderboard.SlackMessageService;
+import de.tum.in.www1.hephaestus.leaderboard.*;
 import org.apache.commons.text.similarity.LevenshteinDistance;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -83,18 +80,14 @@ public class SlackWeeklyLeaderboardTask implements Runnable {
         var leaderboard = leaderboardService.createLeaderboard(
             after,
             before,
-            team,
-            Optional.empty(),
-            Optional.of(LeaderboardMode.INDIVIDUAL)
+            team.orElse("all"),
+            LeaderboardSortType.SCORE,
+            LeaderboardMode.INDIVIDUAL
         );
         var top3 = leaderboard.subList(0, Math.min(3, leaderboard.size()));
-        logger.debug(
-            "Top 3 Users of the last week: " +
-                top3.stream().map(entry -> entry.user() != null ? entry.user().name() : "<team>").toList()
-        );
+        logger.debug("Top 3 Users of the last week: {}", top3.stream().map(entry -> entry.user() != null ? entry.user().name() : "<team>").toList());
 
         List<User> allSlackUsers = slackMessageService != null ? slackMessageService.getAllMembers() : List.of();
-
         return top3.stream().map(mapToSlackUser(allSlackUsers)).filter(user -> user != null).toList();
     }
 

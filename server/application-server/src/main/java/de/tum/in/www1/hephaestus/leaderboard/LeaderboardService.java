@@ -212,7 +212,7 @@ public class LeaderboardService {
         logger.info("Creating team leaderboard dataset with timeframe: {} - {}", after, before);
 
         List<Team> allTeams = teamRepository.findAll();
-        LinkedHashMap<Long, List<Team>> teamHierarchy = allTeams.stream().collect(Collectors.groupingBy(Team::getParentId, LinkedHashMap::new, Collectors.toList()));
+        HashMap<Long, List<Team>> teamHierarchy = allTeams.stream().collect(Collectors.groupingBy(Team::getParentId, HashMap::new, Collectors.toList()));
         List<Team> targetTeams = allTeams.stream().filter(t -> !t.isHidden()).toList();
 
         if (targetTeams.isEmpty()) {
@@ -222,7 +222,7 @@ public class LeaderboardService {
 
         Map<Team, TeamStats> teamStatsById = targetTeams.stream()
             .collect(Collectors.toMap(
-                teamEntity -> teamEntity,
+                identity(),
                 teamEntity -> {
                     List<LeaderboardEntryDTO> entries = createIndividualLeaderboard(after, before, Optional.of(teamEntity), LeaderboardSortType.SCORE, teamHierarchy);
                     return aggregateTeamStats(entries);
