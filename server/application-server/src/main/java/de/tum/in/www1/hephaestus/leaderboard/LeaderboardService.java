@@ -222,7 +222,7 @@ public class LeaderboardService {
 
         List<Team> allTeams = teamRepository.findAll();
         LinkedHashMap<Long, List<Team>> teamHierarchy = allTeams.stream().collect(Collectors.groupingBy(Team::getParentId, LinkedHashMap::new, Collectors.toList()));
-        List<Team> targetTeams = allTeams.stream().filter(t -> !t.isHidden()).collect(Collectors.toList());
+        List<Team> targetTeams = allTeams.stream().filter(t -> !t.isHidden()).toList();
 
         if (targetTeams.isEmpty()) {
             logger.info("❌ No teams found for team leaderboard");
@@ -251,7 +251,7 @@ public class LeaderboardService {
                 }
                 return e1.getKey().getName().compareTo(e2.getKey().getName());
             })
-            .collect(Collectors.toList());
+            .toList();
 
         List<LeaderboardEntryDTO> result = new ArrayList<>();
         for (int i = 0; i < sorted.size(); i++) {
@@ -383,12 +383,12 @@ public class LeaderboardService {
         }
 
         if (parts.length == 1) {
-            Long sole = currentByCandidate.keySet().stream().findFirst().orElse(null);
-            return sole == null ? null : cache.get(sole);
+            Long sole = currentByCandidate.keySet().stream().findFirst().get();
+            return cache.get(sole);
         }
 
         for (int index = parts.length - 2; index >= 0; index--) {
-            if (currentByCandidate.size() <= 1) {
+            if (currentByCandidate.size() == 1) {
                 break;
             }
 
@@ -527,12 +527,10 @@ public class LeaderboardService {
     }
 
     private TeamStats aggregateTeamStats(List<LeaderboardEntryDTO> entries) {
-        List<PullRequestInfoDTO> reviewedPullRequests = entries.stream()
+        List<PullRequestInfoDTO> reviewedPullRequests = new ArrayList<>(entries.stream()
             .flatMap(e -> e.reviewedPullRequests().stream())
             .collect(Collectors.toMap(PullRequestInfoDTO::id, p -> p, (a, b) -> a))
-            .values()
-            .stream()
-            .collect(Collectors.toList());
+            .values());
 
         int score = entries.stream().mapToInt(LeaderboardEntryDTO::score).sum();
         int leaguePoints = entries.stream().mapToInt(e -> e.user() == null ? 0 : e.user().leaguePoints()).sum();
@@ -546,9 +544,9 @@ public class LeaderboardService {
         return new TeamStats(score, leaguePoints, reviewedPullRequests, numberOfReviewedPRs, numberOfApprovals, numberOfChangeRequests, numberOfComments, numberOfUnknowns, numberOfCodeComments);
     }
 
-    private LinkedHashMap<Long, List<Team>> buildTeamHierarchy() {
+    private HashMap<Long, List<Team>> buildTeamHierarchy() {
         List<Team> all = teamRepository.findAll();
-        return all.stream().collect(Collectors.groupingBy(Team::getParentId, LinkedHashMap::new, Collectors.toList()));
+        return all.stream().collect(Collectors.groupingBy(t -> Optional.ofNullable(t.getParentId()).orElse(0L), HashMap::new, Collectors.toList()));
     }
 
     private Set<Long> collectTeamAndDescendantIds(Team team, Map<Long, List<Team>> hierarchy) {
@@ -564,7 +562,7 @@ public class LeaderboardService {
             }
             if (result.add(currentId)) {
                 List<Team> children = hierarchy.getOrDefault(currentId, Collections.emptyList());
-                children.forEach(queue::add);
+                queue.addAll(children);
             }
         }
         return result;
