@@ -54,7 +54,7 @@ public class Workspace {
 
     private String accountLogin;
 
-    @Column(name = "personal_access_token")
+    @Column(name = "personal_access_token", columnDefinition = "TEXT")
     @ToString.Exclude
     private String personalAccessToken;
 

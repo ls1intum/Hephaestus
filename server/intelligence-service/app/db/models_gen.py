@@ -403,7 +403,7 @@ class Workspace(Base):
         TIMESTAMP(True, 6)
     )
     organization_id: Mapped[Optional[int]] = mapped_column(BigInteger)
-    personal_access_token: Mapped[Optional[str]] = mapped_column(String(255))
+    personal_access_token: Mapped[Optional[str]] = mapped_column(Text)
     organization: Mapped[Optional["Organization"]] = relationship(
         "Organization", back_populates="workspace"
     )
