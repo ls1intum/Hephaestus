@@ -34,8 +34,7 @@ public class GitHubDataSyncScheduler {
         for (Workspace workspace : workspaces) {
             logger.info("Syncing workspace {} (login={})", workspace.getId(), workspace.getAccountLogin());
 
-            workspace.getRepositoriesToMonitor()
-                .forEach(dataSyncService::syncRepositoryToMonitor);
+            workspace.getRepositoriesToMonitor().forEach(dataSyncService::syncRepositoryToMonitor);
 
             dataSyncService.syncUsers(workspace);
             dataSyncService.syncTeams(workspace);

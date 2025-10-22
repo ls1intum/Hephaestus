@@ -4,6 +4,7 @@ import de.tum.in.www1.hephaestus.gitprovider.common.BaseGitServiceEntityConverte
 import de.tum.in.www1.hephaestus.gitprovider.repository.Repository;
 import de.tum.in.www1.hephaestus.organization.Organization;
 import de.tum.in.www1.hephaestus.organization.OrganizationService;
+import java.io.IOException;
 import org.kohsuke.github.GHRepository;
 import org.kohsuke.github.GHRepository.Visibility;
 import org.slf4j.Logger;
@@ -11,8 +12,6 @@ import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.lang.NonNull;
 import org.springframework.stereotype.Component;
-
-import java.io.IOException;
 
 @Component
 public class GitHubRepositoryConverter extends BaseGitServiceEntityConverter<GHRepository, Repository> {

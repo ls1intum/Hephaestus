@@ -1,12 +1,12 @@
 package de.tum.in.www1.hephaestus.organization;
 
-import lombok.NoArgsConstructor;
-
 import java.io.Serializable;
 import java.util.Objects;
+import lombok.NoArgsConstructor;
 
 @NoArgsConstructor
 public class OrganizationMembershipId implements Serializable {
+
     private Long organizationId;
     private Long userId;
 

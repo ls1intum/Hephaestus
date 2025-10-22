@@ -1,5 +1,6 @@
 package de.tum.in.www1.hephaestus.syncing;
 
+import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubClientProvider;
 import de.tum.in.www1.hephaestus.gitprovider.issue.Issue;
 import de.tum.in.www1.hephaestus.gitprovider.issue.IssueRepository;
 import de.tum.in.www1.hephaestus.gitprovider.issue.github.GitHubIssueSyncService;
@@ -26,6 +27,7 @@ import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 import org.kohsuke.github.GHIssue;
 import org.kohsuke.github.GHRepository;
+import org.kohsuke.github.GitHub;
 import org.kohsuke.github.PagedIterator;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -60,6 +62,9 @@ public class GitHubDataSyncService {
 
     @Autowired
     private GitHubTeamSyncService teamSyncService;
+
+    @Autowired
+    private GitHubClientProvider gitHubClientProvider;
 
     @Autowired
     private GitHubRepositorySyncService repositorySyncService;
@@ -108,8 +113,16 @@ public class GitHubDataSyncService {
         }
 
         logger.info("Syncing all existing users...");
+        GitHub gitHubClient;
+        try {
+            gitHubClient = gitHubClientProvider.forWorkspace(workspace.getId());
+        } catch (IOException e) {
+            logger.error("Failed to initialize GitHub client for workspace {}: {}", workspace.getId(), e.getMessage());
+            return;
+        }
+
         var currentTime = Instant.now();
-        userSyncService.syncAllExistingUsers();
+        userSyncService.syncAllExistingUsers(gitHubClient);
         workspace.setUsersSyncedAt(currentTime);
         workspaceRepository.save(workspace);
         logger.info("User sync completed.");
@@ -198,6 +211,17 @@ public class GitHubDataSyncService {
     }
 
     public void syncTeams(Workspace workspace) {
+        GitHub gitHubClient;
+        try {
+            gitHubClient = gitHubClientProvider.forWorkspace(workspace.getId());
+        } catch (IOException e) {
+            logger.error(
+                "Failed to initialize GitHub client for workspace {} while syncing teams: {}",
+                workspace.getId(),
+                e.getMessage()
+            );
+            return;
+        }
         workspace
             .getRepositoriesToMonitor()
             .stream()
@@ -207,7 +231,7 @@ public class GitHubDataSyncService {
             .forEach(org -> {
                 try {
                     logger.info("Syncing teams for organisation {}", org);
-                    teamSyncService.syncAndSaveTeams(org);
+                    teamSyncService.syncAndSaveTeams(gitHubClient, org);
                 } catch (IOException e) {
                     logger.error("Team sync for {} failed: {}", org, e.getMessage());
                 }

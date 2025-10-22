@@ -10,3 +10,7 @@ github:
         privateKey: ""
         privateKeyLocation: ""
     auth-token: ""
+
+hephaestus:
+    workspace:
+        init-default: false

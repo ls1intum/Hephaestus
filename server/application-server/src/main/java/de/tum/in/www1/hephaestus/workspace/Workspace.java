@@ -2,9 +2,10 @@ package de.tum.in.www1.hephaestus.workspace;
 
 import de.tum.in.www1.hephaestus.organization.Organization;
 import jakarta.persistence.CascadeType;
-import jakarta.persistence.Enumerated;
+import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
 import jakarta.persistence.FetchType;
 import jakarta.persistence.ForeignKey;
 import jakarta.persistence.GeneratedValue;
@@ -52,6 +53,10 @@ public class Workspace {
     private Long installationId;
 
     private String accountLogin;
+
+    @Column(name = "personal_access_token")
+    @ToString.Exclude
+    private String personalAccessToken;
 
     @Enumerated(EnumType.STRING)
     private GHRepositorySelection githubRepositorySelection; // ALL / SELECTED

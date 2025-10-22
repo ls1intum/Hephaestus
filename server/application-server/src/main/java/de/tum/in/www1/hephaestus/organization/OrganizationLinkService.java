@@ -15,10 +15,12 @@ public class OrganizationLinkService {
 
     @Transactional
     public void attachOrganization(Long workspaceId, Long installationId) {
-        Workspace ws = workspaceRepository.findById(workspaceId)
+        Workspace ws = workspaceRepository
+            .findById(workspaceId)
             .orElseThrow(() -> new IllegalArgumentException("Workspace not found: " + workspaceId));
 
-        Organization org = organizationRepository.findByInstallationId(installationId)
+        Organization org = organizationRepository
+            .findByInstallationId(installationId)
             .orElseThrow(() -> new IllegalStateException("No org for installation " + installationId));
 
         ws.setOrganization(org);
@@ -27,7 +29,8 @@ public class OrganizationLinkService {
 
     @Transactional
     public void setAccountLoginOnly(Long workspaceId, String orgLogin) {
-        Workspace ws = workspaceRepository.findById(workspaceId)
+        Workspace ws = workspaceRepository
+            .findById(workspaceId)
             .orElseThrow(() -> new IllegalArgumentException("Workspace not found: " + workspaceId));
 
         ws.setAccountLogin(orgLogin);

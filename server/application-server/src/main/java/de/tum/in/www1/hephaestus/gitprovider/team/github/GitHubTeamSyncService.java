@@ -34,27 +34,24 @@ public class GitHubTeamSyncService {
 
     private static final Logger log = LoggerFactory.getLogger(GitHubTeamSyncService.class);
 
-    private final GitHub gitHub;
     private final TeamRepository teamRepository;
     private final UserRepository userRepository;
     private final RepositoryRepository repositoryRepository;
     private final GitHubTeamConverter teamConverter;
 
     public GitHubTeamSyncService(
-        GitHub gitHub,
         TeamRepository teamRepository,
         UserRepository userRepository,
         RepositoryRepository repositoryRepository,
         GitHubTeamConverter teamConverter
     ) {
-        this.gitHub = gitHub;
         this.teamRepository = teamRepository;
         this.userRepository = userRepository;
         this.repositoryRepository = repositoryRepository;
         this.teamConverter = teamConverter;
     }
 
-    public void syncAndSaveTeams(String orgName) throws IOException {
+    public void syncAndSaveTeams(GitHub gitHub, String orgName) throws IOException {
         GHOrganization org = gitHub.getOrganization(orgName);
         List<GHTeam> teams = org.listTeams().withPageSize(100).toList();
 

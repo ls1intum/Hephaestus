@@ -15,24 +15,25 @@ import de.tum.in.www1.hephaestus.gitprovider.user.UserTeamsDTO;
 import de.tum.in.www1.hephaestus.leaderboard.LeaderboardMode;
 import de.tum.in.www1.hephaestus.leaderboard.LeaderboardService;
 import de.tum.in.www1.hephaestus.leaderboard.LeaguePointsCalculationService;
+import de.tum.in.www1.hephaestus.organization.Organization;
+import de.tum.in.www1.hephaestus.organization.OrganizationService;
 import de.tum.in.www1.hephaestus.syncing.GitHubDataSyncService;
 import de.tum.in.www1.hephaestus.syncing.NatsConsumerService;
 import jakarta.transaction.Transactional;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
+import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
-import java.util.stream.Collectors;
-
 import org.kohsuke.github.GHRepositorySelection;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.boot.context.event.ApplicationReadyEvent;
-import org.springframework.context.event.EventListener;
 import org.springframework.stereotype.Service;
 
 @Service
@@ -76,102 +77,112 @@ public class WorkspaceService {
     @Autowired
     private LeaguePointsCalculationService leaguePointsCalculationService;
 
+    @Autowired
+    private OrganizationService organizationService;
+
     @Value("${nats.enabled}")
     private boolean isNatsEnabled;
-
-    @Value("${hephaestus.workspace.init-default}")
-    private boolean initDefaultWorkspace;
-
-    @Value("${hephaestus.workspace.default.organization}")
-    private String defaultOrganization;
-
-    @Value("${hephaestus.workspace.default.repositories-to-monitor}")
-    private String[] defaultRepositoriesToMonitor;
 
     @Value("${monitoring.run-on-startup}")
     private boolean runMonitoringOnStartup;
 
-    @EventListener(ApplicationReadyEvent.class)
-    public void onApplicationReady() {
+    /**
+     * Prepare every workspace and start monitoring/sync routines for those that are ready.
+     * Intended to run after provisioning so the workspace catalog is populated.
+     */
+    public void activateAllWorkspaces() {
         List<Workspace> workspaces = workspaceRepository.findAll();
         if (workspaces.isEmpty()) {
-            logger.warn("No workspaces found on startup");
+            logger.info("No workspaces found on startup; waiting for GitHub App backfill or manual provisioning.");
             return;
         }
-        for(Workspace workspace : workspaces) {
-            Set<RepositoryToMonitor> repositoriesToMonitor = workspace.getRepositoriesToMonitor();
 
-            if (isNatsEnabled) {
-                repositoriesToMonitor.forEach(repositoryToMonitor ->
-                    natsConsumerService.startConsumingRepositoryToMonitorAsync(repositoryToMonitor)
-                );
-                natsConsumerService.startConsumingOrganizationAsync(defaultOrganization);
+        List<Workspace> prepared = new ArrayList<>(workspaces.size());
+        for (Workspace workspace : workspaces) {
+            prepared.add(ensureWorkspaceMetadata(workspace));
+        }
+
+        Set<String> organizationConsumersStarted = new HashSet<>();
+        for (Workspace workspace : prepared) {
+            if (shouldSkipActivation(workspace)) {
+                continue;
             }
-
-            if (runMonitoringOnStartup) {
-                logger.info("Running monitoring on startup");
-
-                // Run all repository syncs asynchronously
-                CompletableFuture<?>[] repoFutures = repositoriesToMonitor
-                    .stream()
-                    .map(repo -> CompletableFuture.runAsync(() -> gitHubDataSyncService.syncRepositoryToMonitor(repo)))
-                    .toArray(CompletableFuture[]::new);
-                CompletableFuture<Void> reposDone = CompletableFuture.allOf(repoFutures);
-
-                // When all repository syncs complete, then sync users
-                CompletableFuture<Void> usersFuture = reposDone
-                    .thenRunAsync(() -> {
-                        logger.info("All repositories synced, now syncing users");
-                        gitHubDataSyncService.syncUsers(workspace);
-                    })
-                    .exceptionally(ex -> {
-                        logger.error("Error during syncUsers: {}", ex.getMessage(), ex);
-                        return null;
-                    });
-
-                // When all users syncs complete, then sync teams
-                CompletableFuture<Void> teamsFuture = usersFuture
-                    .thenRunAsync(() -> {
-                        logger.info("Syncing teams");
-                        gitHubDataSyncService.syncTeams(workspace);
-                    })
-                    .exceptionally(ex -> {
-                        logger.error("Error during syncTeams: {}", ex.getMessage(), ex);
-                        return null;
-                    });
-
-                CompletableFuture.allOf(teamsFuture).thenRun(() -> logger.info("Finished running monitoring on startup"));
-            }
+            activateWorkspace(workspace, organizationConsumersStarted);
         }
     }
 
-    //TODO: Method never used
-    private Workspace createInitialWorkspace() {
-        Workspace workspace = new Workspace();
+    private boolean shouldSkipActivation(Workspace workspace) {
+        if (
+            workspace.getGitProviderMode() == Workspace.GitProviderMode.PAT_ORG &&
+            isBlank(workspace.getPersonalAccessToken())
+        ) {
+            logger.info(
+                "Workspace id={} remains idle: PAT mode without personal access token. Configure a token or migrate to the GitHub App.",
+                workspace.getId()
+            );
+            return true;
+        }
+        return false;
+    }
 
-        // If the default workspace should be initialized, add the default repositories to monitor
-        if (initDefaultWorkspace) {
-            logger.info("Initializing default workspace");
-            Set<RepositoryToMonitor> workspaceRepositoriesToMonitor = Set.of(defaultRepositoriesToMonitor)
-                .stream()
-                .map(nameWithOwner -> {
-                    var repositoryToMonitor = new RepositoryToMonitor();
-                    repositoryToMonitor.setNameWithOwner(nameWithOwner);
-                    repositoryToMonitor.setWorkspace(workspace);
-                    return repositoryToMonitor;
-                })
-                .collect(Collectors.toSet());
-            workspace.setRepositoriesToMonitor(workspaceRepositoriesToMonitor);
+    private void activateWorkspace(Workspace workspace, Set<String> organizationConsumersStarted) {
+        Set<RepositoryToMonitor> repositoriesToMonitor = workspace.getRepositoriesToMonitor();
+
+        if (isNatsEnabled) {
+            repositoriesToMonitor.forEach(repositoryToMonitor ->
+                natsConsumerService.startConsumingRepositoryToMonitorAsync(repositoryToMonitor)
+            );
+            String organizationLogin = workspace.getAccountLogin();
+            if (!isBlank(organizationLogin)) {
+                String key = organizationLogin.toLowerCase();
+                if (organizationConsumersStarted.add(key)) {
+                    natsConsumerService.startConsumingOrganizationAsync(organizationLogin);
+                }
+            }
         }
 
-        return workspaceRepository.save(workspace);
+        if (!runMonitoringOnStartup) {
+            return;
+        }
+
+        logger.info("Running monitoring on startup for workspace id={}", workspace.getId());
+
+        CompletableFuture<?>[] repoFutures = repositoriesToMonitor
+            .stream()
+            .map(repo -> CompletableFuture.runAsync(() -> gitHubDataSyncService.syncRepositoryToMonitor(repo)))
+            .toArray(CompletableFuture[]::new);
+        CompletableFuture<Void> reposDone = CompletableFuture.allOf(repoFutures);
+
+        CompletableFuture<Void> usersFuture = reposDone
+            .thenRunAsync(() -> {
+                logger.info("All repositories synced, now syncing users for workspace id={}", workspace.getId());
+                gitHubDataSyncService.syncUsers(workspace);
+            })
+            .exceptionally(ex -> {
+                logger.error("Error during syncUsers: {}", ex.getMessage(), ex);
+                return null;
+            });
+
+        CompletableFuture<Void> teamsFuture = usersFuture
+            .thenRunAsync(() -> {
+                logger.info("Syncing teams for workspace id={}", workspace.getId());
+                gitHubDataSyncService.syncTeams(workspace);
+            })
+            .exceptionally(ex -> {
+                logger.error("Error during syncTeams: {}", ex.getMessage(), ex);
+                return null;
+            });
+
+        CompletableFuture.allOf(teamsFuture).thenRun(() ->
+            logger.info("Finished running monitoring on startup for workspace id={}", workspace.getId())
+        );
     }
 
     public Workspace getWorkspaceByRepositoryOwner(String nameWithOwner) {
-        return workspaceRepository.findByRepositoriesToMonitor_NameWithOwner(nameWithOwner)
-            .orElseThrow(() -> new IllegalStateException(
-                "No workspace found for repository: " + nameWithOwner
-            ));
+        return workspaceRepository
+            .findByRepositoriesToMonitor_NameWithOwner(nameWithOwner)
+            .or(() -> resolveFallbackWorkspace("repository " + nameWithOwner))
+            .orElseThrow(() -> new IllegalStateException("No workspace found for repository: " + nameWithOwner));
     }
 
     public List<Workspace> listAllWorkspaces() {
@@ -180,7 +191,9 @@ public class WorkspaceService {
 
     public List<String> getRepositoriesToMonitor() {
         logger.info("Getting repositories to monitor from all workspaces");
-        return workspaceRepository.findAll().stream()
+        return workspaceRepository
+            .findAll()
+            .stream()
             .flatMap(ws -> ws.getRepositoriesToMonitor().stream())
             .map(RepositoryToMonitor::getNameWithOwner)
             .distinct()
@@ -376,11 +389,34 @@ public class WorkspaceService {
     @Transactional
     public Workspace ensureForInstallation(
         long installationId,
+        String accountLogin,
         GHRepositorySelection repositorySelection
     ) {
-        Workspace workspace = workspaceRepository.findByInstallationId(installationId).orElseGet(Workspace::new);
+        Workspace workspace = workspaceRepository.findByInstallationId(installationId).orElse(null);
+
+        if (workspace == null && !isBlank(accountLogin)) {
+            workspace = workspaceRepository.findByAccountLoginIgnoreCase(accountLogin).orElse(null);
+            if (workspace != null) {
+                logger.info(
+                    "Linking existing workspace id={} login={} to installation {}.",
+                    workspace.getId(),
+                    accountLogin,
+                    installationId
+                );
+            }
+        }
+
+        if (workspace == null) {
+            workspace = new Workspace();
+        }
+
         workspace.setGitProviderMode(Workspace.GitProviderMode.GITHUB_APP_INSTALLATION);
         workspace.setInstallationId(installationId);
+        workspace.setPersonalAccessToken(null);
+
+        if (!isBlank(accountLogin)) {
+            workspace.setAccountLogin(accountLogin);
+        }
 
         if (repositorySelection != null) {
             workspace.setGithubRepositorySelection(repositorySelection);
@@ -393,17 +429,125 @@ public class WorkspaceService {
         return workspaceRepository.save(workspace);
     }
 
-    private Workspace resolveWorkspaceForRepo(String nameWithOwner) {
-        int i = nameWithOwner.indexOf('/');
-        if (i < 1) throw new IllegalArgumentException("Expected 'owner/name', got: " + nameWithOwner);
-        String owner = nameWithOwner.substring(0, i);
+    @Transactional
+    public Workspace updateAccountLogin(Long workspaceId, String accountLogin) {
+        Workspace workspace = workspaceRepository
+            .findById(workspaceId)
+            .orElseThrow(() -> new IllegalArgumentException("Workspace not found: " + workspaceId));
 
-        return workspaceRepository.findByOrganization_Login(owner)
-            .or(() -> workspaceRepository.findByAccountLoginIgnoreCase(owner))
-            .orElseThrow(() -> new IllegalStateException(
-                "No workspace linked to organization/login '" + owner + "'. " +
-                    "Make sure the GitHub App installation was linked to a workspace on startup."
-            ));
+        if (!Objects.equals(workspace.getAccountLogin(), accountLogin)) {
+            workspace.setAccountLogin(accountLogin);
+            workspace = workspaceRepository.save(workspace);
+        }
+
+        return workspace;
     }
 
+    Workspace ensureWorkspaceMetadata(Workspace workspace) {
+        boolean changed = false;
+
+        if (workspace.getGitProviderMode() == null) {
+            Workspace.GitProviderMode mode = workspace.getInstallationId() != null
+                ? Workspace.GitProviderMode.GITHUB_APP_INSTALLATION
+                : Workspace.GitProviderMode.PAT_ORG;
+            workspace.setGitProviderMode(mode);
+            changed = true;
+        }
+
+        if (isBlank(workspace.getAccountLogin())) {
+            String derived = deriveAccountLogin(workspace);
+            if (!isBlank(derived)) {
+                workspace.setAccountLogin(derived);
+                changed = true;
+            }
+        }
+
+        if (changed) {
+            workspace = workspaceRepository.save(workspace);
+        }
+
+        return workspace;
+    }
+
+    String deriveAccountLogin(Workspace workspace) {
+        if (!isBlank(workspace.getAccountLogin())) {
+            return workspace.getAccountLogin();
+        }
+
+        String organizationLogin = null;
+        Long installationId = workspace.getInstallationId();
+        if (installationId != null) {
+            organizationLogin = organizationService
+                .getByInstallationId(installationId)
+                .map(Organization::getLogin)
+                .filter(login -> !isBlank(login))
+                .orElse(null);
+        }
+
+        if (!isBlank(organizationLogin)) {
+            return organizationLogin;
+        }
+
+        String repoOwner = workspace
+            .getRepositoriesToMonitor()
+            .stream()
+            .map(RepositoryToMonitor::getNameWithOwner)
+            .map(this::extractOwner)
+            .filter(Objects::nonNull)
+            .findFirst()
+            .orElse(null);
+
+        if (!isBlank(repoOwner)) {
+            return repoOwner;
+        }
+
+        return null;
+    }
+
+    private Optional<Workspace> resolveFallbackWorkspace(String context) {
+        List<Workspace> all = workspaceRepository.findAll();
+        if (all.size() == 1) {
+            logger.info("Falling back to the only configured workspace id={} for {}.", all.get(0).getId(), context);
+            return Optional.of(all.get(0));
+        }
+        logger.warn("Unable to resolve workspace for {}. Available workspace count={}", context, all.size());
+        return Optional.empty();
+    }
+
+    private String extractOwner(String nameWithOwner) {
+        if (isBlank(nameWithOwner)) {
+            return null;
+        }
+        int idx = nameWithOwner.indexOf('/');
+        if (idx <= 0) {
+            return null;
+        }
+        return nameWithOwner.substring(0, idx);
+    }
+
+    private boolean isBlank(String value) {
+        return value == null || value.isBlank();
+    }
+
+    private Workspace resolveWorkspaceForRepo(String nameWithOwner) {
+        int i = nameWithOwner.indexOf('/');
+        if (i < 1) {
+            throw new IllegalArgumentException("Expected 'owner/name', got: " + nameWithOwner);
+        }
+        String owner = nameWithOwner.substring(0, i);
+
+        return workspaceRepository
+            .findByOrganization_Login(owner)
+            .or(() -> workspaceRepository.findByAccountLoginIgnoreCase(owner))
+            .or(() -> workspaceRepository.findByRepositoriesToMonitor_NameWithOwner(nameWithOwner))
+            .or(() -> resolveFallbackWorkspace("login '" + owner + "'"))
+            .orElseThrow(() ->
+                new IllegalStateException(
+                    "No workspace linked to organization/login '" +
+                    owner +
+                    "'. " +
+                    "Ensure a PAT workspace exists or the GitHub App installation was reconciled."
+                )
+            );
+    }
 }

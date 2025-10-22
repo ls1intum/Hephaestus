@@ -115,4 +115,41 @@
         </preConditions>
         <dropTable tableName="team_repositories" cascadeConstraints="true"/>
     </changeSet>
+
+    <changeSet author="FelixTJDietrich" id="1759109722048-20">
+        <update tableName="workspace">
+            <column name="git_provider_mode" value="PAT_ORG"/>
+            <where>git_provider_mode IS NULL</where>
+        </update>
+    </changeSet>
+
+    <changeSet author="FelixTJDietrich" id="1759109722048-21">
+        <addColumn tableName="workspace">
+            <column name="personal_access_token" type="TEXT"/>
+        </addColumn>
+    </changeSet>
+
+    <changeSet author="GitHubCopilot" id="1759109722048-22">
+        <preConditions onFail="MARK_RAN">
+            <tableExists tableName="repository_to_monitor"/>
+        </preConditions>
+        <sql>
+            UPDATE workspace AS w
+            SET account_login = sub.owner
+            FROM (
+                SELECT rtm.workspace_id, split_part(rtm.name_with_owner, '/', 1) AS owner
+                FROM repository_to_monitor rtm
+                WHERE rtm.name_with_owner IS NOT NULL AND position('/' IN rtm.name_with_owner) &gt; 0
+            ) sub
+            WHERE w.id = sub.workspace_id
+              AND w.account_login IS NULL;
+        </sql>
+    </changeSet>
+
+    <changeSet author="GitHubCopilot" id="1759109722048-23">
+        <update tableName="workspace">
+            <column name="github_repository_selection" value="SELECTED"/>
+            <where>github_repository_selection IS NULL</where>
+        </update>
+    </changeSet>
 </databaseChangeLog>

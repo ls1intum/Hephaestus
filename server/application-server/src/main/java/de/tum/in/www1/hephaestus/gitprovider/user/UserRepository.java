@@ -128,10 +128,12 @@ public interface UserRepository extends JpaRepository<User, Long> {
         return getCurrentUser().orElseThrow(() -> new EntityNotFoundException("User", "current authenticated user"));
     }
 
-    @Query("""
-    SELECT u
-    FROM User u
-    WHERE LOWER(u.login) IN :logins
-""")
+    @Query(
+        """
+            SELECT u
+            FROM User u
+            WHERE LOWER(u.login) IN :logins
+        """
+    )
     List<User> findAllByLoginLowerIn(@Param("logins") Set<String> logins);
 }
