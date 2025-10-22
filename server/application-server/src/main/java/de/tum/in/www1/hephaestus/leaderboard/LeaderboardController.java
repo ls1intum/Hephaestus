@@ -1,6 +1,7 @@
 package de.tum.in.www1.hephaestus.leaderboard;
 
 import io.swagger.v3.oas.annotations.Parameter;
+import jakarta.validation.constraints.NotBlank;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.format.annotation.DateTimeFormat;
@@ -27,7 +28,7 @@ public class LeaderboardController {
         @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) Instant after,
         @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) Instant before,
         @Parameter(description = "Team filter to apply in INDIVIDUAL mode; ignored when mode is TEAM.")
-        @RequestParam String team,
+        @RequestParam @NotBlank String team,
         @Parameter(description = "Determines the ranking metric. In TEAM mode SCORE uses summed contribution scores; LEAGUE_POINTS uses total league points.")
         @RequestParam LeaderboardSortType sort,
         @RequestParam LeaderboardMode mode

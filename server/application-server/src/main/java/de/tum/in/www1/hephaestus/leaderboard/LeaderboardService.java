@@ -12,6 +12,7 @@ import de.tum.in.www1.hephaestus.gitprovider.team.TeamRepository;
 import de.tum.in.www1.hephaestus.gitprovider.user.User;
 import de.tum.in.www1.hephaestus.gitprovider.user.UserInfoDTO;
 import de.tum.in.www1.hephaestus.gitprovider.user.UserRepository;
+import jakarta.annotation.Nonnull;
 import jakarta.transaction.Transactional;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -20,6 +21,8 @@ import org.springframework.stereotype.Service;
 import java.time.Instant;
 import java.util.*;
 import java.util.stream.Collectors;
+
+import static java.util.function.Function.identity;
 
 @Service
 public class LeaderboardService {
@@ -50,51 +53,43 @@ public class LeaderboardService {
     }
 
     @Transactional
-    public List<LeaderboardEntryDTO> createLeaderboard(Instant after, Instant before, String team, LeaderboardSortType sort, LeaderboardMode mode) {
+    public List<LeaderboardEntryDTO> createLeaderboard(
+        Instant after,
+        Instant before,
+        String team,
+        LeaderboardSortType sort,
+        LeaderboardMode mode
+    ) {
         if (mode == LeaderboardMode.INDIVIDUAL) {
-            Team resolvedTeam = "all".equals(team) ? null : resolveTeamByPath(team);
+            Optional<Team> resolvedTeam = "all".equals(team) ? Optional.empty() : resolveTeamByPath(team);
             return createIndividualLeaderboard(after, before, resolvedTeam, sort);
-        } else {
-            // Team mode aggregates across all visible teams; the team filter is ignored on purpose (documented in OpenAPI).
-            return createTeamLeaderboard(after, before, sort);
         }
+
+        // Team mode aggregates across all visible teams; the team filter is ignored on purpose (documented in OpenAPI).
+        return createTeamLeaderboard(after, before, sort);
     }
 
-    public List<LeaderboardEntryDTO> createLeaderboard(Instant after, Instant before, Optional<String> team, Optional<LeaderboardSortType> sort, Optional<LeaderboardMode> mode) {
-        return createLeaderboard(
-            after,
-            before,
-            team.orElse(null),
-            sort.orElse(LeaderboardSortType.SCORE),
-            mode.orElse(LeaderboardMode.INDIVIDUAL)
-        );
-    }
-
-    private List<LeaderboardEntryDTO> createIndividualLeaderboard(Instant after, Instant before, Team team, LeaderboardSortType sort) {
+    private List<LeaderboardEntryDTO> createIndividualLeaderboard(Instant after, Instant before, Optional<Team> team, LeaderboardSortType sort) {
         return createIndividualLeaderboard(after, before, team, sort, null);
     }
 
     private List<LeaderboardEntryDTO> createIndividualLeaderboard(
         Instant after,
         Instant before,
-        Team team,
+        Optional<Team> team,
         LeaderboardSortType sort,
         Map<Long, List<Team>> teamHierarchy
     ) {
-        logger.info("Creating leaderboard dataset with timeframe: {} - {} and team: {}", after, before, team == null ? "all" : team.getName());
+        logger.info("Creating leaderboard dataset with timeframe: {} - {} and team: {}", after, before, team.isEmpty() ? "all" : team.get().getName());
+
+        Set<Long> teamIds;
+        teamIds = team.map(teamName ->
+            collectTeamAndDescendantIds(teamName, Objects.requireNonNullElseGet(teamHierarchy, this::buildTeamHierarchy))).orElse(Collections.emptySet());
 
         List<PullRequestReview> reviews;
         List<IssueComment> issueComments;
 
-        Set<Long> teamIds;
-        if (team != null) {
-            Map<Long, List<Team>> hierarchy = teamHierarchy == null ? buildTeamHierarchy() : teamHierarchy;
-            teamIds = collectTeamAndDescendantIds(team, hierarchy);
-        } else {
-            teamIds = Collections.emptySet();
-        }
-
-        if (team != null) {
+        if (team.isPresent()) {
             reviews = pullRequestReviewRepository.findAllInTimeframeOfTeams(after, before, teamIds);
             issueComments = issueCommentRepository.findAllInTimeframeOfTeams(after, before, teamIds, true);
         } else {
@@ -104,24 +99,20 @@ public class LeaderboardService {
 
         Map<Long, User> usersById = reviews.stream()
             .map(PullRequestReview::getAuthor)
-            .filter(Objects::nonNull)
-            .filter(u -> u.getId() != null)
-            .collect(Collectors.toMap(User::getId, u -> u, (a, b) -> a, HashMap::new));
+            .filter(u -> u != null && u.getId() != null)
+            .collect(Collectors.toMap(User::getId, identity(), (a, b) -> a, HashMap::new));
 
         issueComments.stream()
             .map(IssueComment::getAuthor)
-            .filter(Objects::nonNull)
-            .filter(u -> u.getId() != null)
+            .filter(u -> u != null && u.getId() != null)
             .forEach(u -> usersById.putIfAbsent(u.getId(), u));
 
-        if (team != null) {
-            if (!teamIds.isEmpty()) {
-                userRepository.findAllByTeamIds(teamIds).forEach(u -> {
-                    if (u.getId() != null) {
-                        usersById.putIfAbsent(u.getId(), u);
-                    }
-                });
-            }
+        if (team.isPresent() && !teamIds.isEmpty()) {
+            userRepository.findAllByTeamIds(teamIds).forEach(u -> {
+                if (u.getId() != null) {
+                    usersById.putIfAbsent(u.getId(), u);
+                }
+            });
         } else {
             userRepository.findAllHumanInTeams().forEach(u -> {
                 if (u.getId() != null) {
@@ -233,7 +224,7 @@ public class LeaderboardService {
             .collect(Collectors.toMap(
                 teamEntity -> teamEntity,
                 teamEntity -> {
-                    List<LeaderboardEntryDTO> entries = createIndividualLeaderboard(after, before, teamEntity, LeaderboardSortType.SCORE, teamHierarchy);
+                    List<LeaderboardEntryDTO> entries = createIndividualLeaderboard(after, before, Optional.of(teamEntity), LeaderboardSortType.SCORE, teamHierarchy);
                     return aggregateTeamStats(entries);
                 }
             ));
@@ -354,16 +345,17 @@ public class LeaderboardService {
         return new LeagueChangeDTO(user.getLogin(), projectedNewPoints - currentLeaguePoints);
     }
 
-    private Team resolveTeamByPath(String path) {
-        if (path == null || path.isBlank()) {
-            return null;
+
+    private Optional<Team> resolveTeamByPath(@Nonnull String path) {
+        if (path.isBlank()) {
+            return Optional.empty();
         }
 
         String[] parts = path.split(" / ");
         String leaf = parts[parts.length - 1];
         List<Team> candidates = teamRepository.findAllByName(leaf);
         if (candidates.isEmpty()) {
-            return null;
+            return Optional.empty();
         }
 
         Map<Long, Team> cache = new HashMap<>();
@@ -379,12 +371,12 @@ public class LeaderboardService {
         }
 
         if (currentByCandidate.isEmpty()) {
-            return null;
+            return Optional.empty();
         }
 
         if (parts.length == 1) {
             Long sole = currentByCandidate.keySet().stream().findFirst().get();
-            return cache.get(sole);
+            return Optional.ofNullable(cache.get(sole));
         }
 
         for (int index = parts.length - 2; index >= 0; index--) {
@@ -452,12 +444,12 @@ public class LeaderboardService {
             currentByCandidate = filtered;
 
             if (currentByCandidate.isEmpty()) {
-                return null;
+                return Optional.empty();
             }
 
             if (currentByCandidate.size() == 1) {
                 Long onlyId = currentByCandidate.keySet().iterator().next();
-                return cache.get(onlyId);
+                return Optional.ofNullable(cache.get(onlyId));
             }
         }
 
@@ -466,14 +458,14 @@ public class LeaderboardService {
             for (Long candidateId : currentByCandidate.keySet()) {
                 Team candidate = cache.get(candidateId);
                 if (candidate != null && equalsVisiblePath(candidate, parts, cache)) {
-                    return candidate;
+                    return Optional.of(candidate);
                 }
             }
             logger.warn("Ambiguous team path '{}' resolved to multiple candidates; picking first.", sanitizeForLog(path));
         }
 
         Long anyId = currentByCandidate.keySet().stream().findFirst().orElse(null);
-        return anyId == null ? null : cache.get(anyId);
+        return Optional.ofNullable(cache.get(anyId));
     }
 
     private boolean equalsVisiblePath(Team team, String[] parts, Map<Long, Team> cache) {
