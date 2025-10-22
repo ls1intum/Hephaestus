@@ -205,4 +205,11 @@ if [[ -n "$openapi_files" ]]; then
     done
 fi
 
+# Normalize generated Java client headers to avoid release churn when only the version changes
+if command -v node >/dev/null 2>&1; then
+    node scripts/postprocess-openapi-java.mjs || true
+else
+    echo "Warning: Node.js not found; skipping OpenAPI Java client normalization." >&2
+fi
+
 echo "Version update complete. New version: ${NEW_VERSION}"
