@@ -9,22 +9,15 @@ import de.tum.in.www1.hephaestus.gitprovider.team.TeamInfoDTO;
 import de.tum.in.www1.hephaestus.gitprovider.team.TeamInfoDTOConverter;
 import de.tum.in.www1.hephaestus.gitprovider.team.TeamRepository;
 import de.tum.in.www1.hephaestus.gitprovider.team.membership.TeamMembership;
-import de.tum.in.www1.hephaestus.gitprovider.user.UserInfoDTO;
 import de.tum.in.www1.hephaestus.gitprovider.user.UserRepository;
 import de.tum.in.www1.hephaestus.gitprovider.user.UserTeamsDTO;
 import de.tum.in.www1.hephaestus.leaderboard.LeaderboardMode;
 import de.tum.in.www1.hephaestus.leaderboard.LeaderboardService;
+import de.tum.in.www1.hephaestus.leaderboard.LeaderboardSortType;
 import de.tum.in.www1.hephaestus.leaderboard.LeaguePointsCalculationService;
 import de.tum.in.www1.hephaestus.syncing.GitHubDataSyncService;
 import de.tum.in.www1.hephaestus.syncing.NatsConsumerService;
 import jakarta.transaction.Transactional;
-import java.time.Instant;
-import java.time.temporal.ChronoUnit;
-import java.util.List;
-import java.util.Optional;
-import java.util.Set;
-import java.util.concurrent.CompletableFuture;
-import java.util.stream.Collectors;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -32,6 +25,14 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.context.event.ApplicationReadyEvent;
 import org.springframework.context.event.EventListener;
 import org.springframework.stereotype.Service;
+
+import java.time.Instant;
+import java.time.temporal.ChronoUnit;
+import java.util.List;
+import java.util.Optional;
+import java.util.Set;
+import java.util.concurrent.CompletableFuture;
+import java.util.stream.Collectors;
 
 @Service
 public class WorkspaceService {
@@ -322,9 +323,9 @@ public class WorkspaceService {
             var leaderboard = leaderboardService.createLeaderboard(
                 weekAgo,
                 now,
-                Optional.empty(),
-                Optional.empty(),
-                Optional.of(LeaderboardMode.INDIVIDUAL)
+                "all",
+                LeaderboardSortType.SCORE,
+                LeaderboardMode.INDIVIDUAL
             );
             if (leaderboard.isEmpty()) {
                 break;
@@ -332,7 +333,7 @@ public class WorkspaceService {
 
             // Update league points for each user
             leaderboard.forEach(entry -> {
-                var leaderboardUser = entry.getUser();
+                var leaderboardUser = entry.user();
                 if (leaderboardUser == null) {
                     return;
                 }
