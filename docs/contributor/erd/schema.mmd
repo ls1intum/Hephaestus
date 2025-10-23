@@ -145,6 +145,25 @@ erDiagram
         BIGINT repository_id FK
     }
 
+    Organization {
+        BIGINT id PK
+        TIMESTAMPTZ created_at
+        TIMESTAMPTZ updated_at
+        VARCHAR(255) avatar_url
+        BIGINT github_id UK "NOT NULL"
+        VARCHAR(255) html_url
+        BIGINT installation_id
+        VARCHAR(255) login UK "NOT NULL"
+        VARCHAR(255) name
+    }
+
+    OrganizationMembership {
+        BIGINT organization_id PK
+        BIGINT user_id PK
+        TIMESTAMPTZ joined_at
+        VARCHAR(255) role
+    }
+
     PullRequestRequestedReviewer {
         BIGINT pull_request_id PK,FK
         BIGINT user_id PK,FK
@@ -220,6 +239,7 @@ erDiagram
         INTEGER stargazers_count "NOT NULL"
         VARCHAR(255) visibility
         INTEGER watchers_count "NOT NULL"
+        BIGINT organization_id FK
     }
 
     RepositoryToMonitor {
@@ -287,12 +307,20 @@ erDiagram
     Workspace {
         BIGINT id PK
         TIMESTAMP users_synced_at
+        VARCHAR(255) account_login
+        VARCHAR(255) git_provider_mode
+        VARCHAR(255) github_repository_selection
+        BIGINT installation_id
+        TIMESTAMPTZ installation_linked_at
+        BIGINT organization_id FK,UK
+        TEXT personal_access_token
     }
 
     %% Relationships
     %% One-to-One relationships
     ChatMessage ||--|| ChatMessagePart : has
     ChatMessage ||--|| ChatThread : references
+    Organization ||--|| Workspace : has
 
     %% One-to-Many relationships
     Issue ||--o{ BadPracticeDetection : references
@@ -317,6 +345,7 @@ erDiagram
     PullRequestReview ||--o{ PullRequestReviewComment : commented_on
     BadPracticeDetection ||--o{ PullRequestBadPractice : has
     Issue ||--o{ PullRequestBadPractice : references
+    Organization ||--o{ Repository : has
     Workspace ||--o{ RepositoryToMonitor : monitors
 
     %% Many-to-Many relationships

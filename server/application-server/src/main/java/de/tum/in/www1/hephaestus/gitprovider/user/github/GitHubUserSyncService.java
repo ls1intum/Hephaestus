@@ -8,19 +8,21 @@ import org.kohsuke.github.GHUser;
 import org.kohsuke.github.GitHub;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.annotation.Lazy;
 import org.springframework.stereotype.Service;
 
 @Service
 public class GitHubUserSyncService {
 
+    private GitHubUserSyncService self;
+
     private static final Logger logger = LoggerFactory.getLogger(GitHubUserSyncService.class);
 
-    private final GitHub github;
     private final UserRepository userRepository;
     private final GitHubUserConverter userConverter;
 
-    public GitHubUserSyncService(GitHub github, UserRepository userRepository, GitHubUserConverter userConverter) {
-        this.github = github;
+    public GitHubUserSyncService(UserRepository userRepository, GitHubUserConverter userConverter) {
         this.userRepository = userRepository;
         this.userConverter = userConverter;
     }
@@ -29,8 +31,8 @@ public class GitHubUserSyncService {
      * Sync all existing users in the local repository with their GitHub
      * data.
      */
-    public void syncAllExistingUsers() {
-        userRepository.findAll().stream().map(User::getLogin).forEach(this::syncUser);
+    public void syncAllExistingUsers(GitHub github) {
+        userRepository.findAll().stream().map(User::getLogin).forEach(login -> syncUser(github, login));
     }
 
     /**
@@ -39,12 +41,13 @@ public class GitHubUserSyncService {
      *
      * @param login The GitHub username (login) of the user to fetch.
      */
-    public void syncUser(String login) {
+    public User syncUser(GitHub github, String login) {
         try {
-            processUser(github.getUser(login));
+            return self.processUser(github.getUser(login));
         } catch (IOException e) {
             logger.error("Failed to fetch user {}: {}", login, e.getMessage());
         }
+        return null;
     }
 
     /**
@@ -62,5 +65,11 @@ public class GitHubUserSyncService {
             .orElseGet(() -> userConverter.convert(ghUser));
 
         return userRepository.save(user);
+    }
+
+    @Autowired
+    @Lazy
+    public void setSelf(GitHubUserSyncService self) {
+        this.self = self;
     }
 }

@@ -143,36 +143,41 @@ class Databasechangeloglock(Base):
     lockedby: Mapped[Optional[str]] = mapped_column(String(255))
 
 
-class Repository(Base):
-    __tablename__ = "repository"
-    __table_args__ = (PrimaryKeyConstraint("id", name="repository_pkey"),)
+class Organization(Base):
+    __tablename__ = "organization"
+    __table_args__ = (
+        PrimaryKeyConstraint("id", name="organizationPK"),
+        UniqueConstraint("github_id", name="uq_organization_github_id"),
+        UniqueConstraint("login", name="uq_organization_login"),
+    )
     id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
-    has_issues: Mapped[bool] = mapped_column(Boolean)
-    has_projects: Mapped[bool] = mapped_column(Boolean)
-    has_wiki: Mapped[bool] = mapped_column(Boolean)
-    is_archived: Mapped[bool] = mapped_column(Boolean)
-    is_disabled: Mapped[bool] = mapped_column(Boolean)
-    is_private: Mapped[bool] = mapped_column(Boolean)
-    stargazers_count: Mapped[int] = mapped_column(Integer)
-    watchers_count: Mapped[int] = mapped_column(Integer)
-    created_at: Mapped[Optional[datetime.datetime]] = mapped_column(DateTime(True))
-    updated_at: Mapped[Optional[datetime.datetime]] = mapped_column(DateTime(True))
-    default_branch: Mapped[Optional[str]] = mapped_column(String(255))
-    description: Mapped[Optional[str]] = mapped_column(String(255))
-    homepage: Mapped[Optional[str]] = mapped_column(String(255))
+    github_id: Mapped[int] = mapped_column(BigInteger)
+    login: Mapped[str] = mapped_column(String(255))
+    created_at: Mapped[Optional[datetime.datetime]] = mapped_column(TIMESTAMP(True, 6))
+    updated_at: Mapped[Optional[datetime.datetime]] = mapped_column(TIMESTAMP(True, 6))
+    avatar_url: Mapped[Optional[str]] = mapped_column(String(255))
     html_url: Mapped[Optional[str]] = mapped_column(String(255))
+    installation_id: Mapped[Optional[int]] = mapped_column(BigInteger)
     name: Mapped[Optional[str]] = mapped_column(String(255))
-    name_with_owner: Mapped[Optional[str]] = mapped_column(String(255))
-    pushed_at: Mapped[Optional[datetime.datetime]] = mapped_column(DateTime(True))
-    visibility: Mapped[Optional[str]] = mapped_column(String(255))
-    label: Mapped[List["Label"]] = relationship("Label", back_populates="repository")
-    milestone: Mapped[List["Milestone"]] = relationship(
-        "Milestone", back_populates="repository"
+    repository: Mapped[List["Repository"]] = relationship(
+        "Repository", back_populates="organization"
     )
-    team_repository_permission: Mapped[List["TeamRepositoryPermission"]] = relationship(
-        "TeamRepositoryPermission", back_populates="repository"
+    workspace: Mapped[Optional["Workspace"]] = relationship(
+        "Workspace", uselist=False, back_populates="organization"
     )
-    issue: Mapped[List["Issue"]] = relationship("Issue", back_populates="repository")
+
+
+class OrganizationMembership(Base):
+    __tablename__ = "organization_membership"
+    __table_args__ = (
+        PrimaryKeyConstraint(
+            "organization_id", "user_id", name="organization_membershipPK"
+        ),
+    )
+    organization_id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
+    user_id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
+    joined_at: Mapped[Optional[datetime.datetime]] = mapped_column(TIMESTAMP(True, 6))
+    role: Mapped[Optional[str]] = mapped_column(String(255))
 
 
 class Team(Base):
@@ -202,11 +207,11 @@ class Team(Base):
     parent_id: Mapped[Optional[int]] = mapped_column(BigInteger)
     privacy: Mapped[Optional[str]] = mapped_column(String(32))
     updated_at: Mapped[Optional[datetime.datetime]] = mapped_column(TIMESTAMP(True, 6))
-    label: Mapped[List["Label"]] = relationship(
-        "Label", secondary="team_labels", back_populates="team"
-    )
     team_membership: Mapped[List["TeamMembership"]] = relationship(
         "TeamMembership", back_populates="team"
+    )
+    label: Mapped[List["Label"]] = relationship(
+        "Label", secondary="team_labels", back_populates="team"
     )
     team_repository_permission: Mapped[List["TeamRepositoryPermission"]] = relationship(
         "TeamRepositoryPermission", back_populates="team"
@@ -239,11 +244,11 @@ class User(Base):
         "ChatThread", back_populates="user"
     )
     document: Mapped[List["Document"]] = relationship("Document", back_populates="user")
-    milestone: Mapped[List["Milestone"]] = relationship(
-        "Milestone", back_populates="creator"
-    )
     team_membership: Mapped[List["TeamMembership"]] = relationship(
         "TeamMembership", back_populates="user"
+    )
+    milestone: Mapped[List["Milestone"]] = relationship(
+        "Milestone", back_populates="creator"
     )
     issue: Mapped[List["Issue"]] = relationship(
         "Issue", foreign_keys="[Issue.author_id]", back_populates="author"
@@ -265,29 +270,6 @@ class User(Base):
     )
     pull_request_review_comment: Mapped[List["PullRequestReviewComment"]] = (
         relationship("PullRequestReviewComment", back_populates="author")
-    )
-
-
-class Workspace(Base):
-    __tablename__ = "workspace"
-    __table_args__ = (PrimaryKeyConstraint("id", name="workspacePK"),)
-    id: Mapped[int] = mapped_column(
-        BigInteger,
-        Identity(
-            start=1,
-            increment=1,
-            minvalue=1,
-            maxvalue=9223372036854775807,
-            cycle=False,
-            cache=1,
-        ),
-        primary_key=True,
-    )
-    users_synced_at: Mapped[Optional[datetime.datetime]] = mapped_column(
-        TIMESTAMP(precision=6)
-    )
-    repository_to_monitor: Mapped[List["RepositoryToMonitor"]] = relationship(
-        "RepositoryToMonitor", back_populates="workspace"
     )
 
 
@@ -328,6 +310,106 @@ class Document(Base):
     user_id: Mapped[int] = mapped_column(BigInteger)
     content: Mapped[Optional[str]] = mapped_column(Text)
     user: Mapped["User"] = relationship("User", back_populates="document")
+
+
+class Repository(Base):
+    __tablename__ = "repository"
+    __table_args__ = (
+        ForeignKeyConstraint(
+            ["organization_id"], ["organization.id"], name="fk_repository_organization"
+        ),
+        PrimaryKeyConstraint("id", name="repository_pkey"),
+    )
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
+    has_issues: Mapped[bool] = mapped_column(Boolean)
+    has_projects: Mapped[bool] = mapped_column(Boolean)
+    has_wiki: Mapped[bool] = mapped_column(Boolean)
+    is_archived: Mapped[bool] = mapped_column(Boolean)
+    is_disabled: Mapped[bool] = mapped_column(Boolean)
+    is_private: Mapped[bool] = mapped_column(Boolean)
+    stargazers_count: Mapped[int] = mapped_column(Integer)
+    watchers_count: Mapped[int] = mapped_column(Integer)
+    created_at: Mapped[Optional[datetime.datetime]] = mapped_column(DateTime(True))
+    updated_at: Mapped[Optional[datetime.datetime]] = mapped_column(DateTime(True))
+    default_branch: Mapped[Optional[str]] = mapped_column(String(255))
+    description: Mapped[Optional[str]] = mapped_column(String(255))
+    homepage: Mapped[Optional[str]] = mapped_column(String(255))
+    html_url: Mapped[Optional[str]] = mapped_column(String(255))
+    name: Mapped[Optional[str]] = mapped_column(String(255))
+    name_with_owner: Mapped[Optional[str]] = mapped_column(String(255))
+    pushed_at: Mapped[Optional[datetime.datetime]] = mapped_column(DateTime(True))
+    visibility: Mapped[Optional[str]] = mapped_column(String(255))
+    organization_id: Mapped[Optional[int]] = mapped_column(BigInteger)
+    organization: Mapped[Optional["Organization"]] = relationship(
+        "Organization", back_populates="repository"
+    )
+    label: Mapped[List["Label"]] = relationship("Label", back_populates="repository")
+    milestone: Mapped[List["Milestone"]] = relationship(
+        "Milestone", back_populates="repository"
+    )
+    team_repository_permission: Mapped[List["TeamRepositoryPermission"]] = relationship(
+        "TeamRepositoryPermission", back_populates="repository"
+    )
+    issue: Mapped[List["Issue"]] = relationship("Issue", back_populates="repository")
+
+
+class TeamMembership(Base):
+    __tablename__ = "team_membership"
+    __table_args__ = (
+        ForeignKeyConstraint(
+            ["team_id"], ["team.id"], name="FKrf92vmiawfvyhxcmigcg10opm"
+        ),
+        ForeignKeyConstraint(
+            ["user_id"], ["user.id"], name="FKnkpwi3whks92uvhn5qe71v4k6"
+        ),
+        PrimaryKeyConstraint("team_id", "user_id", name="team_membershipPK"),
+    )
+    user_id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
+    team_id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
+    role: Mapped[Optional[str]] = mapped_column(String(32))
+    team: Mapped["Team"] = relationship("Team", back_populates="team_membership")
+    user: Mapped["User"] = relationship("User", back_populates="team_membership")
+
+
+class Workspace(Base):
+    __tablename__ = "workspace"
+    __table_args__ = (
+        ForeignKeyConstraint(
+            ["organization_id"], ["organization.id"], name="fk_workspace_organization"
+        ),
+        PrimaryKeyConstraint("id", name="workspacePK"),
+        UniqueConstraint("organization_id", name="uc_workspaceorganization_id_col"),
+    )
+    id: Mapped[int] = mapped_column(
+        BigInteger,
+        Identity(
+            start=1,
+            increment=1,
+            minvalue=1,
+            maxvalue=9223372036854775807,
+            cycle=False,
+            cache=1,
+        ),
+        primary_key=True,
+    )
+    users_synced_at: Mapped[Optional[datetime.datetime]] = mapped_column(
+        TIMESTAMP(precision=6)
+    )
+    account_login: Mapped[Optional[str]] = mapped_column(String(255))
+    git_provider_mode: Mapped[Optional[str]] = mapped_column(String(255))
+    github_repository_selection: Mapped[Optional[str]] = mapped_column(String(255))
+    installation_id: Mapped[Optional[int]] = mapped_column(BigInteger)
+    installation_linked_at: Mapped[Optional[datetime.datetime]] = mapped_column(
+        TIMESTAMP(True, 6)
+    )
+    organization_id: Mapped[Optional[int]] = mapped_column(BigInteger)
+    personal_access_token: Mapped[Optional[str]] = mapped_column(Text)
+    organization: Mapped[Optional["Organization"]] = relationship(
+        "Organization", back_populates="workspace"
+    )
+    repository_to_monitor: Mapped[List["RepositoryToMonitor"]] = relationship(
+        "RepositoryToMonitor", back_populates="workspace"
+    )
 
 
 class Label(Base):
@@ -421,24 +503,6 @@ class RepositoryToMonitor(Base):
     workspace: Mapped[Optional["Workspace"]] = relationship(
         "Workspace", back_populates="repository_to_monitor"
     )
-
-
-class TeamMembership(Base):
-    __tablename__ = "team_membership"
-    __table_args__ = (
-        ForeignKeyConstraint(
-            ["team_id"], ["team.id"], name="FKrf92vmiawfvyhxcmigcg10opm"
-        ),
-        ForeignKeyConstraint(
-            ["user_id"], ["user.id"], name="FKnkpwi3whks92uvhn5qe71v4k6"
-        ),
-        PrimaryKeyConstraint("team_id", "user_id", name="team_membershipPK"),
-    )
-    user_id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
-    team_id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
-    role: Mapped[Optional[str]] = mapped_column(String(32))
-    team: Mapped["Team"] = relationship("Team", back_populates="team_membership")
-    user: Mapped["User"] = relationship("User", back_populates="team_membership")
 
 
 class TeamRepositoryPermission(Base):
