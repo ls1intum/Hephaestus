@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.10.0-rc.3](https://github.com/ls1intum/Hephaestus/compare/v0.10.0-rc.2...v0.10.0-rc.3) (2025-10-23)
+
+### 📚 Documentation
+
+* add repository agent handbook ([#512](https://github.com/ls1intum/Hephaestus/issues/512)) ([7e21d34](https://github.com/ls1intum/Hephaestus/commit/7e21d3449ea1a0320d22ed3ef4061dc7481ae69d))
+
 ## [0.10.0-rc.2](https://github.com/ls1intum/Hephaestus/compare/v0.10.0-rc.1...v0.10.0-rc.2) (2025-10-23)
 
 ### 🐛 Bug Fixes
