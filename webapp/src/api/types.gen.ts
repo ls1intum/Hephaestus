@@ -365,8 +365,8 @@ export type LeaderboardEntry = {
 };
 
 export type LeagueChange = {
-    leaguePointsChange?: number;
-    login?: string;
+    leaguePointsChange: number;
+    login: string;
 };
 
 export type MetaData = {

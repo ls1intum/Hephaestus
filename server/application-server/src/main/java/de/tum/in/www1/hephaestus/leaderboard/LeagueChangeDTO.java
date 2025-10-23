@@ -1,6 +1,8 @@
 package de.tum.in.www1.hephaestus.leaderboard;
 
+import org.springframework.lang.NonNull;
+
 public record LeagueChangeDTO(
-    String login,
-    int leaguePointsChange
+    @NonNull String login,
+    @NonNull Integer leaguePointsChange
 ) {}

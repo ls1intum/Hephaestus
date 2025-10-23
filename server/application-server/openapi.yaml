@@ -1392,6 +1392,9 @@ components:
           format: int32
         login:
           type: string
+      required:
+      - leaguePointsChange
+      - login
     MetaData:
       type: object
       properties:
