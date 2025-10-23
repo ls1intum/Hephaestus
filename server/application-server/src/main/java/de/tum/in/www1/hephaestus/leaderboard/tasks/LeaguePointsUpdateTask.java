@@ -4,10 +4,6 @@ import de.tum.in.www1.hephaestus.gitprovider.user.UserInfoDTO;
 import de.tum.in.www1.hephaestus.gitprovider.user.UserRepository;
 import de.tum.in.www1.hephaestus.leaderboard.*;
 import jakarta.transaction.Transactional;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.beans.factory.annotation.Value;
-import org.springframework.stereotype.Component;
-
 import java.time.DayOfWeek;
 import java.time.Instant;
 import java.time.ZoneId;
@@ -15,6 +11,9 @@ import java.time.ZonedDateTime;
 import java.time.temporal.TemporalAdjusters;
 import java.util.List;
 import java.util.function.Consumer;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.stereotype.Component;
 
 @Component
 public class LeaguePointsUpdateTask implements Runnable {

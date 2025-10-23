@@ -68,7 +68,8 @@ public class DefaultLeaguePointsCalculationService implements LeaguePointsCalcul
 
     private boolean isNewPlayer(User user) {
         Instant thirtyDaysAgo = Instant.now().minusSeconds(30L * 24 * 60 * 60);
-        return user.getMergedPullRequests()
+        return user
+            .getMergedPullRequests()
             .stream()
             .filter(Objects::nonNull)
             .filter(PullRequest::isMerged)
