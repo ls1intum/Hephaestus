@@ -16,7 +16,7 @@ This file governs the entire repository. Combine these guardrails with the scope
 - **Python**: Python 3.13 with Poetry 2.x. Both Python services keep virtualenvs inside their folders (`.venv`). Run `npm run bootstrap:py` before formatting/linting to ensure dev dependencies are installed.
 - **Docker & Docker Compose**: Required for database helper scripts (`scripts/db-utils.sh`) and for spinning up Postgres/Keycloak/NATS locally.
 - **Databases**: Default PostgreSQL DSN is `postgresql://root:root@localhost:5432/hephaestus`. The database helpers spin this up for you via Docker.
-- **Environment variables**: When generating intelligence service OpenAPI specs locally set `MODEL_NAME=fake:model` and `DETECTION_MODEL_NAME=fake:model` (the FastAPI settings expect a provider-qualified model name).
+- **Environment variables**: When generating intelligence service OpenAPI specs locally, set `MODEL_NAME=fake:model` and `DETECTION_MODEL_NAME=fake:model` (the FastAPI settings expect a provider-qualified model name).
 
 ## 3. Quality gates & routine commands
 Run the relevant commands locally before opening a PR:
