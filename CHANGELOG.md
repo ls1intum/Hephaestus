@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.9.3-rc.1](https://github.com/ls1intum/Hephaestus/compare/v0.9.2...v0.9.3-rc.1) (2025-10-23)
+
+### ♻️ Code Refactoring
+
+* **application-server:** remove Kotlin Support / Conversion back to Java ([#509](https://github.com/ls1intum/Hephaestus/issues/509)) ([5cf784e](https://github.com/ls1intum/Hephaestus/commit/5cf784e24d7b00c5f7948e0b719bc2c4ec26afe0))
+
 ## [0.9.2](https://github.com/ls1intum/Hephaestus/compare/v0.9.1...v0.9.2) (2025-10-22)
 
 ### 🐛 Bug Fixes

@@ -1,6 +1,6 @@
 [project]
 name = "intelligence-service"
-version = "0.9.2"
+version = "0.9.3-rc.1"
 description = "A FastAPI service for interfacing with machine learning models."
 authors = [
     { name = "Felix T.J. Dietrich", email = "felixtj.dietrich@tum.de"},
