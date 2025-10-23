@@ -118,7 +118,7 @@ public interface UserRepository extends JpaRepository<User, Long> {
      */
     default Optional<User> getCurrentUser() {
         var currentUserLogin = SecurityUtils.getCurrentUserLogin();
-        return currentUserLogin.map(this::findByLogin).orElse(Optional.empty());
+        return currentUserLogin.flatMap(this::findByLogin);
     }
 
     /**
@@ -127,4 +127,13 @@ public interface UserRepository extends JpaRepository<User, Long> {
     default User getCurrentUserElseThrow() {
         return getCurrentUser().orElseThrow(() -> new EntityNotFoundException("User", "current authenticated user"));
     }
+
+    @Query(
+        """
+            SELECT u
+            FROM User u
+            WHERE LOWER(u.login) IN :logins
+        """
+    )
+    List<User> findAllByLoginLowerIn(@Param("logins") Set<String> logins);
 }

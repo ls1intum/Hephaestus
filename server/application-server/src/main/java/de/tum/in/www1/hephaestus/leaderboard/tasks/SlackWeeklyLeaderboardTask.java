@@ -1,17 +1,14 @@
 package de.tum.in.www1.hephaestus.leaderboard.tasks;
 
+import static com.slack.api.model.block.Blocks.*;
+import static com.slack.api.model.block.composition.BlockCompositions.markdownText;
+import static com.slack.api.model.block.composition.BlockCompositions.plainText;
+
 import com.slack.api.methods.SlackApiException;
 import com.slack.api.model.User;
 import com.slack.api.model.block.LayoutBlock;
 import de.tum.in.www1.hephaestus.gitprovider.user.UserInfoDTO;
 import de.tum.in.www1.hephaestus.leaderboard.*;
-import org.apache.commons.text.similarity.LevenshteinDistance;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.beans.factory.annotation.Value;
-import org.springframework.stereotype.Component;
-
 import java.io.IOException;
 import java.time.DayOfWeek;
 import java.time.Instant;
@@ -23,10 +20,12 @@ import java.util.List;
 import java.util.Optional;
 import java.util.function.Function;
 import java.util.stream.IntStream;
-
-import static com.slack.api.model.block.Blocks.*;
-import static com.slack.api.model.block.composition.BlockCompositions.markdownText;
-import static com.slack.api.model.block.composition.BlockCompositions.plainText;
+import org.apache.commons.text.similarity.LevenshteinDistance;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.stereotype.Component;
 
 /**
  * Task to send a weekly leaderboard message to the Slack channel.
@@ -85,7 +84,10 @@ public class SlackWeeklyLeaderboardTask implements Runnable {
             LeaderboardMode.INDIVIDUAL
         );
         var top3 = leaderboard.subList(0, Math.min(3, leaderboard.size()));
-        logger.debug("Top 3 Users of the last week: {}", top3.stream().map(entry -> entry.user() != null ? entry.user().name() : "<team>").toList());
+        logger.debug(
+            "Top 3 Users of the last week: {}",
+            top3.stream().map(entry -> entry.user() != null ? entry.user().name() : "<team>").toList()
+        );
 
         List<User> allSlackUsers = slackMessageService != null ? slackMessageService.getAllMembers() : List.of();
         return top3.stream().map(mapToSlackUser(allSlackUsers)).filter(user -> user != null).toList();
@@ -103,8 +105,8 @@ public class SlackWeeklyLeaderboardTask implements Runnable {
                 .filter(
                     user ->
                         user.getName().equalsIgnoreCase(leaderboardUser.name()) ||
-                            (user.getProfile().getEmail() != null &&
-                                user.getProfile().getEmail().equalsIgnoreCase(leaderboardUser.email()))
+                        (user.getProfile().getEmail() != null &&
+                            user.getProfile().getEmail().equalsIgnoreCase(leaderboardUser.email()))
                 )
                 .findFirst();
             if (exactUser.isPresent()) {
@@ -169,14 +171,14 @@ public class SlackWeeklyLeaderboardTask implements Runnable {
                 section.text(
                     markdownText(
                         "Another *review leaderboard* has concluded. You can check out your placement <" +
-                            hephaestusUrl +
-                            "?after=" +
-                            formatDateForURL(after) +
-                            "&before=" +
-                            formatDateForURL(before) +
-                            "&team=" +
-                            team +
-                            "|here>."
+                        hephaestusUrl +
+                        "?after=" +
+                        formatDateForURL(after) +
+                        "&before=" +
+                        formatDateForURL(before) +
+                        "&team=" +
+                        team +
+                        "|here>."
                     )
                 )
             ),

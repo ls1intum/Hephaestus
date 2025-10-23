@@ -72,8 +72,12 @@ hephaestus:
     workspace:
         init-default: true
         default:
-            organization: ls1intum
-            repositories-to-monitor: ls1intum/Hephaestus
+            login: ${GITHUB_PAT_LOGIN:ls1intum}
+            token: ${GITHUB_PAT:}
+            repository-selection: SELECTED
+            repositories-to-monitor:
+                - ls1intum/Hephaestus
+                - ls1intum/Artemis
     
     intelligence-service:
         url: http://localhost:8000
@@ -123,7 +127,12 @@ monitoring:
 
 # Can be any OAuth token, such as the PAT
 github:
-    auth-token: null
+    app:
+        id: ${GH_APP_ID}
+        privateKeyLocation: ${GH_APP_PRIVATE_KEY_LOCATION}
+        privateKey: ${GH_APP_PRIVATE_KEY}
+    meta:
+        auth-token: ${GH_AUTH_TOKEN:}
 
 slack:
     token: ""

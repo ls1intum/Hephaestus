@@ -1,5 +1,6 @@
 package de.tum.in.www1.hephaestus.syncing;
 
+import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubClientProvider;
 import de.tum.in.www1.hephaestus.gitprovider.issue.Issue;
 import de.tum.in.www1.hephaestus.gitprovider.issue.IssueRepository;
 import de.tum.in.www1.hephaestus.gitprovider.issue.github.GitHubIssueSyncService;
@@ -26,6 +27,7 @@ import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 import org.kohsuke.github.GHIssue;
 import org.kohsuke.github.GHRepository;
+import org.kohsuke.github.GitHub;
 import org.kohsuke.github.PagedIterator;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -45,6 +47,7 @@ public class GitHubDataSyncService {
     @Value("${monitoring.sync-cooldown-in-minutes}")
     private int syncCooldownInMinutes;
 
+    //TODO: Field is assigned but never accessed
     @Value("${monitoring.sync-all-issues-and-pull-requests}")
     private boolean syncAllIssuesAndPullRequests;
 
@@ -59,6 +62,9 @@ public class GitHubDataSyncService {
 
     @Autowired
     private GitHubTeamSyncService teamSyncService;
+
+    @Autowired
+    private GitHubClientProvider gitHubClientProvider;
 
     @Autowired
     private GitHubRepositorySyncService repositorySyncService;
@@ -107,8 +113,16 @@ public class GitHubDataSyncService {
         }
 
         logger.info("Syncing all existing users...");
+        GitHub gitHubClient;
+        try {
+            gitHubClient = gitHubClientProvider.forWorkspace(workspace.getId());
+        } catch (IOException e) {
+            logger.error("Failed to initialize GitHub client for workspace {}: {}", workspace.getId(), e.getMessage());
+            return;
+        }
+
         var currentTime = Instant.now();
-        userSyncService.syncAllExistingUsers();
+        userSyncService.syncAllExistingUsers(gitHubClient);
         workspace.setUsersSyncedAt(currentTime);
         workspaceRepository.save(workspace);
         logger.info("User sync completed.");
@@ -188,14 +202,26 @@ public class GitHubDataSyncService {
 
     private Optional<GHRepository> syncRepository(RepositoryToMonitor repositoryToMonitor) {
         String nameWithOwner = repositoryToMonitor.getNameWithOwner();
+        Long workSpaceId = repositoryToMonitor.getWorkspace().getId();
         var currentTime = Instant.now();
-        var repository = repositorySyncService.syncRepository(nameWithOwner);
+        var repository = repositorySyncService.syncRepository(workSpaceId, nameWithOwner);
         repositoryToMonitor.setRepositorySyncedAt(currentTime);
         repositoryToMonitorRepository.save(repositoryToMonitor);
         return repository;
     }
 
     public void syncTeams(Workspace workspace) {
+        GitHub gitHubClient;
+        try {
+            gitHubClient = gitHubClientProvider.forWorkspace(workspace.getId());
+        } catch (IOException e) {
+            logger.error(
+                "Failed to initialize GitHub client for workspace {} while syncing teams: {}",
+                workspace.getId(),
+                e.getMessage()
+            );
+            return;
+        }
         workspace
             .getRepositoriesToMonitor()
             .stream()
@@ -205,7 +231,7 @@ public class GitHubDataSyncService {
             .forEach(org -> {
                 try {
                     logger.info("Syncing teams for organisation {}", org);
-                    teamSyncService.syncAndSaveTeams(org);
+                    teamSyncService.syncAndSaveTeams(gitHubClient, org);
                 } catch (IOException e) {
                     logger.error("Team sync for {} failed: {}", org, e.getMessage());
                 }
@@ -230,7 +256,6 @@ public class GitHubDataSyncService {
 
     /**
      * Syncs the recent issues and pull requests of the repository in ascending order of their last update time.
-     *
      * Issues and pull requests are separate entites but are synced together in the same method.
      * Issues are synced first with their associated issue comments.
      * If an issue has a pull request, the pull request is synced next with its associated reviews and review comments.
@@ -302,7 +327,7 @@ public class GitHubDataSyncService {
         }
 
         var repositoryId = repository.get().getId();
-        var lastIssueNumber = issueRepository.findLastIssueNumber(repositoryId).orElse(0);
+        int lastIssueNumber = issueRepository.findLastIssueNumber(repositoryId).orElse(0);
         if (lastIssueNumber == 0) {
             return false;
         }
@@ -329,15 +354,14 @@ public class GitHubDataSyncService {
 
     /**
      * Syncs all past issues and pull requests of the repository that have not been synced yet.
-     *
      * This method will process all issues and pull requests that have not yet been synced and
      * ensures they are synchronized with the repository.
      *
      * @param repository the GitHub repository to sync
-     * @param repositoryToMonitor the repository to sync
      */
-    private void syncAllPastIssuesAndPullRequests(GHRepository repository, RepositoryToMonitor repositoryToMonitor) {
-        var lastIssueNumber = issueRepository.findLastIssueNumber(repository.getId()).orElse(0);
+    //TODO: Method never used
+    private void syncAllPastIssuesAndPullRequests(GHRepository repository) {
+        int lastIssueNumber = issueRepository.findLastIssueNumber(repository.getId()).orElse(0);
         if (lastIssueNumber == 0) {
             return;
         }

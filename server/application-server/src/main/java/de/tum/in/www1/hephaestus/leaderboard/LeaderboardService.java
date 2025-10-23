@@ -1,5 +1,7 @@
 package de.tum.in.www1.hephaestus.leaderboard;
 
+import static java.util.function.Function.identity;
+
 import de.tum.in.www1.hephaestus.gitprovider.issuecomment.IssueComment;
 import de.tum.in.www1.hephaestus.gitprovider.issuecomment.IssueCommentRepository;
 import de.tum.in.www1.hephaestus.gitprovider.pullrequest.PullRequest;
@@ -14,15 +16,12 @@ import de.tum.in.www1.hephaestus.gitprovider.user.UserInfoDTO;
 import de.tum.in.www1.hephaestus.gitprovider.user.UserRepository;
 import jakarta.annotation.Nonnull;
 import jakarta.transaction.Transactional;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-import org.springframework.stereotype.Service;
-
 import java.time.Instant;
 import java.util.*;
 import java.util.stream.Collectors;
-
-import static java.util.function.Function.identity;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.stereotype.Service;
 
 @Service
 public class LeaderboardService {
@@ -69,7 +68,12 @@ public class LeaderboardService {
         return createTeamLeaderboard(after, before, sort);
     }
 
-    private List<LeaderboardEntryDTO> createIndividualLeaderboard(Instant after, Instant before, Optional<Team> team, LeaderboardSortType sort) {
+    private List<LeaderboardEntryDTO> createIndividualLeaderboard(
+        Instant after,
+        Instant before,
+        Optional<Team> team,
+        LeaderboardSortType sort
+    ) {
         return createIndividualLeaderboard(after, before, team, sort, null);
     }
 
@@ -80,11 +84,22 @@ public class LeaderboardService {
         LeaderboardSortType sort,
         Map<Long, List<Team>> teamHierarchy
     ) {
-        logger.info("Creating leaderboard dataset with timeframe: {} - {} and team: {}", after, before, team.isEmpty() ? "all" : team.get().getName());
+        logger.info(
+            "Creating leaderboard dataset with timeframe: {} - {} and team: {}",
+            after,
+            before,
+            team.isEmpty() ? "all" : team.get().getName()
+        );
 
         Set<Long> teamIds;
-        teamIds = team.map(teamName ->
-            collectTeamAndDescendantIds(teamName, Objects.requireNonNullElseGet(teamHierarchy, this::buildTeamHierarchy))).orElse(Collections.emptySet());
+        teamIds = team
+            .map(teamName ->
+                collectTeamAndDescendantIds(
+                    teamName,
+                    Objects.requireNonNullElseGet(teamHierarchy, this::buildTeamHierarchy)
+                )
+            )
+            .orElse(Collections.emptySet());
 
         List<PullRequestReview> reviews;
         List<IssueComment> issueComments;
@@ -97,48 +112,64 @@ public class LeaderboardService {
             issueComments = issueCommentRepository.findAllInTimeframe(after, before, true);
         }
 
-        Map<Long, User> usersById = reviews.stream()
+        Map<Long, User> usersById = reviews
+            .stream()
             .map(PullRequestReview::getAuthor)
             .filter(u -> u != null && u.getId() != null)
             .collect(Collectors.toMap(User::getId, identity(), (a, b) -> a, HashMap::new));
 
-        issueComments.stream()
+        issueComments
+            .stream()
             .map(IssueComment::getAuthor)
             .filter(u -> u != null && u.getId() != null)
             .forEach(u -> usersById.putIfAbsent(u.getId(), u));
 
         if (team.isPresent() && !teamIds.isEmpty()) {
-            userRepository.findAllByTeamIds(teamIds).forEach(u -> {
-                if (u.getId() != null) {
-                    usersById.putIfAbsent(u.getId(), u);
-                }
-            });
+            userRepository
+                .findAllByTeamIds(teamIds)
+                .forEach(u -> {
+                    if (u.getId() != null) {
+                        usersById.putIfAbsent(u.getId(), u);
+                    }
+                });
         } else {
-            userRepository.findAllHumanInTeams().forEach(u -> {
-                if (u.getId() != null) {
-                    usersById.putIfAbsent(u.getId(), u);
-                }
-            });
+            userRepository
+                .findAllHumanInTeams()
+                .forEach(u -> {
+                    if (u.getId() != null) {
+                        usersById.putIfAbsent(u.getId(), u);
+                    }
+                });
         }
 
-        Map<Long, List<PullRequestReview>> reviewsByUserId = reviews.stream()
+        Map<Long, List<PullRequestReview>> reviewsByUserId = reviews
+            .stream()
             .filter(r -> r.getAuthor() != null && r.getAuthor().getId() != null)
             .collect(Collectors.groupingBy(r -> r.getAuthor().getId()));
 
-        Map<Long, List<IssueComment>> issueCommentsByUserId = issueComments.stream()
+        Map<Long, List<IssueComment>> issueCommentsByUserId = issueComments
+            .stream()
             .filter(c -> c.getAuthor() != null && c.getAuthor().getId() != null)
             .collect(Collectors.groupingBy(c -> c.getAuthor().getId()));
 
-        Map<Long, Integer> scoresByUserId = reviewsByUserId.entrySet().stream()
-            .collect(Collectors.toMap(
-                Map.Entry::getKey,
-                e -> calculateTotalScore(e.getValue(), issueCommentsByUserId.getOrDefault(e.getKey(), Collections.emptyList()))
-            ));
+        Map<Long, Integer> scoresByUserId = reviewsByUserId
+            .entrySet()
+            .stream()
+            .collect(
+                Collectors.toMap(Map.Entry::getKey, e ->
+                    calculateTotalScore(
+                        e.getValue(),
+                        issueCommentsByUserId.getOrDefault(e.getKey(), Collections.emptyList())
+                    )
+                )
+            );
 
         // ensure all discovered users are present with at least score 0
         usersById.keySet().forEach(id -> scoresByUserId.putIfAbsent(id, 0));
 
-        List<Long> ranking = scoresByUserId.entrySet().stream()
+        List<Long> ranking = scoresByUserId
+            .entrySet()
+            .stream()
             .sorted(comparatorFor(sort, usersById, reviewsByUserId, issueCommentsByUserId))
             .map(Map.Entry::getKey)
             .toList();
@@ -151,7 +182,8 @@ public class LeaderboardService {
             List<PullRequestReview> userReviews = reviewsByUserId.getOrDefault(userId, Collections.emptyList());
             List<IssueComment> userIssueComments = issueCommentsByUserId.getOrDefault(userId, Collections.emptyList());
 
-            List<PullRequestInfoDTO> reviewedPullRequests = userReviews.stream()
+            List<PullRequestInfoDTO> reviewedPullRequests = userReviews
+                .stream()
                 .map(PullRequestReview::getPullRequest)
                 .filter(Objects::nonNull)
                 .filter(pr -> pr.getAuthor() == null || !Objects.equals(pr.getAuthor().getId(), userId))
@@ -161,7 +193,8 @@ public class LeaderboardService {
                 .map(PullRequestInfoDTO::fromPullRequest)
                 .collect(Collectors.toList());
 
-            int numberOfReviewedPRs = (int) userReviews.stream()
+            int numberOfReviewedPRs = (int) userReviews
+                .stream()
                 .map(PullRequestReview::getPullRequest)
                 .filter(Objects::nonNull)
                 .map(PullRequest::getId)
@@ -169,23 +202,30 @@ public class LeaderboardService {
                 .distinct()
                 .count();
 
-            int numberOfApprovals = (int) userReviews.stream()
+            int numberOfApprovals = (int) userReviews
+                .stream()
                 .filter(prr -> prr.getState() == PullRequestReview.State.APPROVED)
                 .count();
 
-            int numberOfChangeRequests = (int) userReviews.stream()
+            int numberOfChangeRequests = (int) userReviews
+                .stream()
                 .filter(prr -> prr.getState() == PullRequestReview.State.CHANGES_REQUESTED)
                 .count();
 
-            int numberOfComments = (int) userReviews.stream()
-                .filter(prr -> prr.getState() == PullRequestReview.State.COMMENTED && prr.getBody() != null)
-                .count() + userIssueComments.size();
+            int numberOfComments =
+                (int) userReviews
+                    .stream()
+                    .filter(prr -> prr.getState() == PullRequestReview.State.COMMENTED && prr.getBody() != null)
+                    .count() +
+                userIssueComments.size();
 
-            int numberOfUnknowns = (int) userReviews.stream()
+            int numberOfUnknowns = (int) userReviews
+                .stream()
                 .filter(prr -> prr.getState() == PullRequestReview.State.UNKNOWN && prr.getBody() != null)
                 .count();
 
-            int numberOfCodeComments = userReviews.stream()
+            int numberOfCodeComments = userReviews
+                .stream()
                 .mapToInt(prr -> prr.getComments() == null ? 0 : prr.getComments().size())
                 .sum();
 
@@ -219,16 +259,24 @@ public class LeaderboardService {
             return Collections.emptyList();
         }
 
-        Map<Team, TeamStats> teamStatsById = targetTeams.stream()
-            .collect(Collectors.toMap(
-                identity(),
-                teamEntity -> {
-                    List<LeaderboardEntryDTO> entries = createIndividualLeaderboard(after, before, Optional.of(teamEntity), LeaderboardSortType.SCORE, teamHierarchy);
+        Map<Team, TeamStats> teamStatsById = targetTeams
+            .stream()
+            .collect(
+                Collectors.toMap(identity(), teamEntity -> {
+                    List<LeaderboardEntryDTO> entries = createIndividualLeaderboard(
+                        after,
+                        before,
+                        Optional.of(teamEntity),
+                        LeaderboardSortType.SCORE,
+                        teamHierarchy
+                    );
                     return aggregateTeamStats(entries);
-                }
-            ));
+                })
+            );
 
-        List<Map.Entry<Team, TeamStats>> sorted = teamStatsById.entrySet().stream()
+        List<Map.Entry<Team, TeamStats>> sorted = teamStatsById
+            .entrySet()
+            .stream()
             .sorted((e1, e2) -> {
                 int cmp;
                 if (sort == LeaderboardSortType.SCORE) {
@@ -304,10 +352,16 @@ public class LeaderboardService {
             if (scoreCompare != 0) {
                 return scoreCompare;
             }
-            int e1ReviewComments = reviewsByUserId.getOrDefault(e1.getKey(), Collections.emptyList()).stream()
-                .mapToInt(r -> r.getComments() == null ? 0 : r.getComments().size()).sum();
-            int e2ReviewComments = reviewsByUserId.getOrDefault(e2.getKey(), Collections.emptyList()).stream()
-                .mapToInt(r -> r.getComments() == null ? 0 : r.getComments().size()).sum();
+            int e1ReviewComments = reviewsByUserId
+                .getOrDefault(e1.getKey(), Collections.emptyList())
+                .stream()
+                .mapToInt(r -> r.getComments() == null ? 0 : r.getComments().size())
+                .sum();
+            int e2ReviewComments = reviewsByUserId
+                .getOrDefault(e2.getKey(), Collections.emptyList())
+                .stream()
+                .mapToInt(r -> r.getComments() == null ? 0 : r.getComments().size())
+                .sum();
             int e1IssueComments = issueCommentsByUserId.getOrDefault(e1.getKey(), Collections.emptyList()).size();
             int e2IssueComments = issueCommentsByUserId.getOrDefault(e2.getKey(), Collections.emptyList()).size();
             int e1TotalComments = e1ReviewComments + e1IssueComments;
@@ -317,20 +371,28 @@ public class LeaderboardService {
     }
 
     private int calculateTotalScore(List<PullRequestReview> reviews, List<IssueComment> issueComments) {
-        long numberOfIssueComments = issueComments.stream()
+        long numberOfIssueComments = issueComments
+            .stream()
             .filter(issueComment -> {
-                Long issueAuthorId = issueComment.getIssue() == null ? null : issueComment.getIssue().getAuthor() == null ? null : issueComment.getIssue().getAuthor().getId();
+                Long issueAuthorId = issueComment.getIssue() == null
+                    ? null
+                    : issueComment.getIssue().getAuthor() == null ? null : issueComment.getIssue().getAuthor().getId();
                 Long commentAuthorId = issueComment.getAuthor() == null ? null : issueComment.getAuthor().getId();
                 return issueAuthorId != null && commentAuthorId != null && !issueAuthorId.equals(commentAuthorId);
             })
             .count();
 
-        Map<Long, List<PullRequestReview>> reviewsByPullRequest = reviews.stream()
+        Map<Long, List<PullRequestReview>> reviewsByPullRequest = reviews
+            .stream()
             .filter(r -> r.getPullRequest() != null && r.getPullRequest().getId() != null)
             .collect(Collectors.groupingBy(r -> r.getPullRequest().getId()));
 
-        double totalScore = reviewsByPullRequest.values().stream()
-            .mapToDouble(pullRequestReviews -> scoringService.calculateReviewScore(pullRequestReviews, (int) numberOfIssueComments))
+        double totalScore = reviewsByPullRequest
+            .values()
+            .stream()
+            .mapToDouble(pullRequestReviews ->
+                scoringService.calculateReviewScore(pullRequestReviews, (int) numberOfIssueComments)
+            )
             .sum();
 
         return (int) Math.ceil(totalScore);
@@ -338,12 +400,13 @@ public class LeaderboardService {
 
     @Transactional
     public LeagueChangeDTO getUserLeagueStats(String login, LeaderboardEntryDTO entry) {
-        User user = userRepository.findByLogin(login).orElseThrow(() -> new IllegalArgumentException("User not found with login: " + login));
+        User user = userRepository
+            .findByLogin(login)
+            .orElseThrow(() -> new IllegalArgumentException("User not found with login: " + login));
         int currentLeaguePoints = user.getLeaguePoints();
         int projectedNewPoints = leaguePointsCalculationService.calculateNewPoints(user, entry);
         return new LeagueChangeDTO(user.getLogin(), projectedNewPoints - currentLeaguePoints);
     }
-
 
     private Optional<Team> resolveTeamByPath(@Nonnull String path) {
         if (path.isBlank()) {
@@ -418,12 +481,14 @@ public class LeaderboardService {
                 }
 
                 if (!missingIds.isEmpty()) {
-                    teamRepository.findAllById(missingIds).forEach(parent -> {
-                        Long parentId = parent.getId();
-                        if (parentId != null) {
-                            cache.putIfAbsent(parentId, parent);
-                        }
-                    });
+                    teamRepository
+                        .findAllById(missingIds)
+                        .forEach(parent -> {
+                            Long parentId = parent.getId();
+                            if (parentId != null) {
+                                cache.putIfAbsent(parentId, parent);
+                            }
+                        });
                     pendingResolution = true;
                 }
             }
@@ -460,7 +525,10 @@ public class LeaderboardService {
                     return Optional.of(candidate);
                 }
             }
-            logger.warn("Ambiguous team path '{}' resolved to multiple candidates; picking first.", sanitizeForLog(path));
+            logger.warn(
+                "Ambiguous team path '{}' resolved to multiple candidates; picking first.",
+                sanitizeForLog(path)
+            );
         }
 
         Long anyId = currentByCandidate.keySet().stream().findFirst().orElse(null);
@@ -488,7 +556,8 @@ public class LeaderboardService {
     }
 
     private void preloadAncestors(Collection<Team> teams, Map<Long, Team> cache) {
-        Set<Long> pending = teams.stream()
+        Set<Long> pending = teams
+            .stream()
             .map(Team::getParentId)
             .filter(Objects::nonNull)
             .filter(id -> !cache.containsKey(id))
@@ -496,19 +565,21 @@ public class LeaderboardService {
 
         while (!pending.isEmpty()) {
             Set<Long> nextRound = new HashSet<>();
-            teamRepository.findAllById(pending).forEach(parent -> {
-                Long parentId = parent.getId();
-                if (parentId == null) {
-                    return;
-                }
-                if (!cache.containsKey(parentId)) {
-                    cache.put(parentId, parent);
-                }
-                Long ancestorId = parent.getParentId();
-                if (ancestorId != null && !cache.containsKey(ancestorId)) {
-                    nextRound.add(ancestorId);
-                }
-            });
+            teamRepository
+                .findAllById(pending)
+                .forEach(parent -> {
+                    Long parentId = parent.getId();
+                    if (parentId == null) {
+                        return;
+                    }
+                    if (!cache.containsKey(parentId)) {
+                        cache.put(parentId, parent);
+                    }
+                    Long ancestorId = parent.getParentId();
+                    if (ancestorId != null && !cache.containsKey(ancestorId)) {
+                        nextRound.add(ancestorId);
+                    }
+                });
             pending = nextRound;
         }
     }
@@ -518,10 +589,13 @@ public class LeaderboardService {
     }
 
     private TeamStats aggregateTeamStats(List<LeaderboardEntryDTO> entries) {
-        List<PullRequestInfoDTO> reviewedPullRequests = new ArrayList<>(entries.stream()
-            .flatMap(e -> e.reviewedPullRequests().stream())
-            .collect(Collectors.toMap(PullRequestInfoDTO::id, p -> p, (a, b) -> a))
-            .values());
+        List<PullRequestInfoDTO> reviewedPullRequests = new ArrayList<>(
+            entries
+                .stream()
+                .flatMap(e -> e.reviewedPullRequests().stream())
+                .collect(Collectors.toMap(PullRequestInfoDTO::id, p -> p, (a, b) -> a))
+                .values()
+        );
 
         int score = entries.stream().mapToInt(LeaderboardEntryDTO::score).sum();
         int leaguePoints = entries.stream().mapToInt(e -> e.user() == null ? 0 : e.user().leaguePoints()).sum();
@@ -532,12 +606,30 @@ public class LeaderboardService {
         int numberOfUnknowns = entries.stream().mapToInt(LeaderboardEntryDTO::numberOfUnknowns).sum();
         int numberOfCodeComments = entries.stream().mapToInt(LeaderboardEntryDTO::numberOfCodeComments).sum();
 
-        return new TeamStats(score, leaguePoints, reviewedPullRequests, numberOfReviewedPRs, numberOfApprovals, numberOfChangeRequests, numberOfComments, numberOfUnknowns, numberOfCodeComments);
+        return new TeamStats(
+            score,
+            leaguePoints,
+            reviewedPullRequests,
+            numberOfReviewedPRs,
+            numberOfApprovals,
+            numberOfChangeRequests,
+            numberOfComments,
+            numberOfUnknowns,
+            numberOfCodeComments
+        );
     }
 
     private HashMap<Long, List<Team>> buildTeamHierarchy() {
         List<Team> all = teamRepository.findAll();
-        return all.stream().collect(Collectors.groupingBy(t -> Optional.ofNullable(t.getParentId()).orElse(0L), HashMap::new, Collectors.toList()));
+        return all
+            .stream()
+            .collect(
+                Collectors.groupingBy(
+                    t -> Optional.ofNullable(t.getParentId()).orElse(0L),
+                    HashMap::new,
+                    Collectors.toList()
+                )
+            );
     }
 
     private Set<Long> collectTeamAndDescendantIds(Team team, Map<Long, List<Team>> hierarchy) {
@@ -569,6 +661,5 @@ public class LeaderboardService {
         int numberOfComments,
         int numberOfUnknowns,
         int numberOfCodeComments
-    ) {
-    }
+    ) {}
 }

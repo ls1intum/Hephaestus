@@ -43,7 +43,7 @@ hephaestus:
         channel-id: ${LEADERBOARD_NOTIFICATION_CHANNEL_ID:G6TCVL6HL}
     
     workspace:
-        init-default: false
+      init-default: false
 
     intelligence-service:
         url: ${INTELLIGENCE_SERVICE_URL}
@@ -84,7 +84,12 @@ monitoring:
     sync-all-issues-and-pull-requests: ${MONITORING_SYNC_ALL_ISSUES_AND_PULL_REQUESTS:true}
 
 github:
-  auth-token: ${GITHUB_AUTH_TOKEN}
+    app:
+        id: ${GH_APP_ID}
+        privateKeyLocation: ${GH_APP_PRIVATE_KEY_LOCATION:}
+        privateKey: ${GH_APP_PRIVATE_KEY:}
+    meta:
+        auth-token: ${GH_AUTH_TOKEN:}
 
 slack:
     token: ${SLACK_BOT_TOKEN}

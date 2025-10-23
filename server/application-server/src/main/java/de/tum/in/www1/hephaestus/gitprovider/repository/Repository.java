@@ -5,10 +5,15 @@ import de.tum.in.www1.hephaestus.gitprovider.issue.Issue;
 import de.tum.in.www1.hephaestus.gitprovider.label.Label;
 import de.tum.in.www1.hephaestus.gitprovider.milestone.Milestone;
 import de.tum.in.www1.hephaestus.gitprovider.team.permission.TeamRepositoryPermission;
+import de.tum.in.www1.hephaestus.organization.Organization;
 import jakarta.persistence.CascadeType;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
+import jakarta.persistence.FetchType;
+import jakarta.persistence.ForeignKey;
+import jakarta.persistence.JoinColumn;
+import jakarta.persistence.ManyToOne;
 import jakarta.persistence.OneToMany;
 import jakarta.persistence.Table;
 import java.time.Instant;
@@ -69,6 +74,10 @@ public class Repository extends BaseGitServiceEntity {
 
     private boolean hasWiki;
 
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "organization_id", foreignKey = @ForeignKey(name = "fk_repository_organization"))
+    private Organization organization;
+
     @OneToMany(mappedBy = "repository", cascade = CascadeType.REMOVE, orphanRemoval = true)
     @ToString.Exclude
     private Set<Issue> issues = new HashSet<>();
@@ -81,7 +90,7 @@ public class Repository extends BaseGitServiceEntity {
     @ToString.Exclude
     private Set<Milestone> milestones = new HashSet<>();
 
-    @OneToMany(mappedBy = "repository", cascade = CascadeType.REMOVE, orphanRemoval = true)
+    @OneToMany(mappedBy = "repository", cascade = CascadeType.ALL, orphanRemoval = true)
     @ToString.Exclude
     private Set<TeamRepositoryPermission> teamRepoPermissions = new HashSet<>();
 
@@ -95,6 +104,7 @@ public class Repository extends BaseGitServiceEntity {
     /**
      * Removes all team permissions referencing this repository.
      */
+    //TODO: Method never used
     public void removeAllTeams() {
         if (this.teamRepoPermissions != null) {
             this.teamRepoPermissions.forEach(perm -> {
@@ -108,7 +118,6 @@ public class Repository extends BaseGitServiceEntity {
     }
     // TODO:
     // owner
-    // organization
 
     // Ignored GitHub properties:
     // - subscribersCount
