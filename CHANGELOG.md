@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.10.0-rc.1](https://github.com/ls1intum/Hephaestus/compare/v0.9.3-rc.1...v0.10.0-rc.1) (2025-10-23)
+
+### 🚀 Features
+
+* **application-server:** implement workspace and organization domain ([#401](https://github.com/ls1intum/Hephaestus/issues/401)) ([cb5b2d4](https://github.com/ls1intum/Hephaestus/commit/cb5b2d4636c1862a2da0c3be90f213a67e55ae2a))
+
 ## [0.9.3-rc.1](https://github.com/ls1intum/Hephaestus/compare/v0.9.2...v0.9.3-rc.1) (2025-10-23)
 
 ### ♻️ Code Refactoring
