@@ -12,7 +12,7 @@
     </parent>
     <groupId>de.tum.in.www1</groupId>
     <artifactId>hephaestus</artifactId>
-    <version>0.9.1-SNAPSHOT</version>
+    <version>0.9.3-rc.1-SNAPSHOT</version>
     <name>Hephaestus</name>
     <description>AI-driven learning for better software development</description>
     <url/>
@@ -30,8 +30,6 @@
     </scm>
     <properties>
         <java.version>21</java.version>
-        <!-- Kotlin Support -->
-        <kotlin.version>1.9.25</kotlin.version>
         <app.profiles>local,dev</app.profiles>
 
         <!-- Test Configuration -->
@@ -327,21 +325,6 @@
             <artifactId>langfuse-java</artifactId>
             <version>0.0.6</version>
         </dependency>
-        <!-- Kotlin Dependencies -->
-        <dependency>
-            <groupId>org.jetbrains.kotlin</groupId>
-            <artifactId>kotlin-stdlib-jdk8</artifactId>
-            <version>${kotlin.version}</version>
-        </dependency>
-        <dependency>
-            <groupId>org.jetbrains.kotlin</groupId>
-            <artifactId>kotlin-reflect</artifactId>
-            <version>${kotlin.version}</version>
-        </dependency>
-        <dependency>
-            <groupId>com.fasterxml.jackson.module</groupId>
-            <artifactId>jackson-module-kotlin</artifactId>
-        </dependency>
     </dependencies>
     <dependencyManagement>
         <dependencies>
@@ -552,56 +535,6 @@
                         <version>${postgresql.version}</version>
                     </dependency>
                 </dependencies>
-            </plugin>
-
-            <!-- Kotlin Support -->
-            <plugin>
-                <groupId>org.jetbrains.kotlin</groupId>
-                <artifactId>kotlin-maven-plugin</artifactId>
-                <version>${kotlin.version}</version>
-                <configuration>
-                    <jvmTarget>${java.version}</jvmTarget>
-                    <args>
-                        <arg>-Xjsr305=strict</arg>
-                    </args>
-                    <compilerPlugins>
-                        <plugin>spring</plugin>
-                        <plugin>jpa</plugin>
-                        <plugin>lombok</plugin>
-                    </compilerPlugins>
-                </configuration>
-                <dependencies>
-                    <dependency>
-                        <groupId>org.jetbrains.kotlin</groupId>
-                        <artifactId>kotlin-maven-allopen</artifactId>
-                        <version>${kotlin.version}</version>
-                    </dependency>
-                    <dependency>
-                        <groupId>org.jetbrains.kotlin</groupId>
-                        <artifactId>kotlin-maven-noarg</artifactId>
-                        <version>${kotlin.version}</version>
-                    </dependency>
-                    <dependency>
-                        <groupId>org.jetbrains.kotlin</groupId>
-                        <artifactId>kotlin-maven-lombok</artifactId>
-                        <version>${kotlin.version}</version>
-                    </dependency>
-                </dependencies>
-                <executions>
-                    <execution>
-                        <id>compile</id>
-                        <phase>process-sources</phase>
-                        <goals>
-                            <goal>compile</goal>
-                        </goals>
-                    </execution>
-                    <execution>
-                        <id>test-compile</id>
-                        <goals>
-                            <goal>test-compile</goal>
-                        </goals>
-                    </execution>
-                </executions>
             </plugin>
         </plugins>
     </build>
