@@ -27,7 +27,7 @@
 			"recommended": true,
 			"suspicious": {
 				"noArrayIndexKey": "off",
-				"noDocumentCookie": "off",
+				"noDocumentCookie": "off"
 			},
 			"a11y": {
 				"useSemanticElements": "off",

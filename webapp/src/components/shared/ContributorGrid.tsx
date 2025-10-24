@@ -42,7 +42,6 @@ export function ContributorGrid({
 		return (
 			<div className={gridClass}>
 				{Array.from({ length: loadingSkeletonCount }).map((_, index) => (
-					// biome-ignore lint/suspicious/noArrayIndexKey: Static skeleton data
 					<div key={index} className="flex flex-col items-center gap-1">
 						<Skeleton className={cn(skeletonSize, "rounded-full")} />
 						<Skeleton className="h-3 w-16" />

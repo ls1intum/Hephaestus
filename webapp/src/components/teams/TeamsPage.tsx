@@ -245,7 +245,6 @@ export function TeamsPage({ teams, isLoading }: TeamsPageProps) {
 					.fill(null)
 					.map((_, teamIndex) => (
 						<Card
-							// biome-ignore lint/suspicious/noArrayIndexKey: Static array
 							key={`loading-team-${teamIndex}`}
 							className="flex flex-col mb-8 gap-3"
 						>
