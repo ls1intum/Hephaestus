@@ -358,7 +358,7 @@ configs:
             "linkOnly": false,
             "hideOnLogin": false,
             "config": {
-              "syncMode": "LEGACY",
+              "syncMode": "FORCE",
               "clientSecret": "${KEYCLOAK_GITHUB_CLIENT_SECRET}",
               "clientId": "${KEYCLOAK_GITHUB_CLIENT_ID}",
               "guiOrder": "1"
