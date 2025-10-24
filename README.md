@@ -1,12 +1,12 @@
 <div align="center">
-  <img alt="Hephaestus Logo" height="100px" src="./docs/images/hammer_bg.svg">
+  <img alt="Hephaestus Logo" height="100px" src="./docs/static/img/brand/hammer_bg.svg">
 </div>
 
 # Hephaestus — Process-Aware Mentoring for Agile Software Teams
 
 Hephaestus is an open-source platform for process-aware mentoring that scaffolds self-regulated learning and onboarding for agile software teams. The platform focuses on the software process — from issues to pull requests and team rituals — to bridge the theory–practice gap and help novices adopt industry best practices faster with less struggle. Heph is the platform’s conversational AI mentor that delivers repo-grounded guidance.
 
-<img alt="Agile Hephaestus" height="200px" src="./docs/images/agile_hephaestus.png">
+<img alt="Agile Hephaestus" height="200px" src="./docs/user/img/overview/agile_hephaestus.png">
 
 Hephaestus /hɪˈfɛstəs/ is the Greek god of blacksmiths, craftsmen, and artisans, symbolizing the fusion of creativity and technical skill.
 

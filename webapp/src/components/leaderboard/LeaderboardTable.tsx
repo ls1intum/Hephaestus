@@ -318,7 +318,6 @@ function LeaderboardTableSkeleton() {
 			</TableHeader>
 			<TableBody>
 				{Array.from({ length: 10 }).map((_, idx) => (
-					// biome-ignore lint/suspicious/noArrayIndexKey: Data is static and not user-generated
 					<TableRow key={`skeleton-${idx}`}>
 						<TableCell>
 							<Skeleton

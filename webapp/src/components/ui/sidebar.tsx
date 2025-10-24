@@ -2,7 +2,6 @@ import { Slot } from "@radix-ui/react-slot";
 import { cva, type VariantProps } from "class-variance-authority";
 import { PanelLeftIcon } from "lucide-react";
 import * as React from "react";
-
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Separator } from "@/components/ui/separator";
@@ -71,37 +70,28 @@ function SidebarProvider({
 	// We use openProp and setOpenProp for control from outside the component.
 	const [_open, _setOpen] = React.useState(defaultOpen);
 	const open = openProp ?? _open;
-	const setOpen = (value: boolean | ((value: boolean) => boolean)) => {
-		const openState = typeof value === "function" ? value(open) : value;
-		if (setOpenProp) {
-			setOpenProp(openState);
-		} else {
-			_setOpen(openState);
-		}
+	const setOpen = React.useCallback(
+		(value: boolean | ((value: boolean) => boolean)) => {
+			const openState = typeof value === "function" ? value(open) : value;
+			if (setOpenProp) {
+				setOpenProp(openState);
+			} else {
+				_setOpen(openState);
+			}
 
-		// This sets the cookie to keep the sidebar state.
-		if ("cookieStore" in window) {
-			// @ts-ignore cookieStore is not yet in TypeScript lib
-			window.cookieStore.set({
-				name: SIDEBAR_COOKIE_NAME,
-				value: String(openState),
-				path: "/",
-				expires: Date.now() + SIDEBAR_COOKIE_MAX_AGE * 1000,
-			});
-		} else {
-			// biome-ignore lint/suspicious/noDocumentCookie: Fallback for browsers without Cookie Store API
+			// This sets the cookie to keep the sidebar state.
 			document.cookie = `${SIDEBAR_COOKIE_NAME}=${openState}; path=/; max-age=${SIDEBAR_COOKIE_MAX_AGE}`;
-		}
-	};
+		},
+		[setOpenProp, open],
+	);
 
 	// Helper to toggle the sidebar.
-	const toggleSidebar = () => {
+	const toggleSidebar = React.useCallback(() => {
 		return isMobile ? setOpenMobile((open) => !open) : setOpen((open) => !open);
-	};
+	}, [isMobile, setOpen]);
 
-	// biome-ignore lint/correctness/useExhaustiveDependencies: toggleSidebar is stable
+	// Adds a keyboard shortcut to toggle the sidebar.
 	React.useEffect(() => {
-		// Adds a keyboard shortcut to toggle the sidebar.
 		const handleKeyDown = (event: KeyboardEvent) => {
 			if (
 				event.key === SIDEBAR_KEYBOARD_SHORTCUT &&
@@ -114,21 +104,24 @@ function SidebarProvider({
 
 		window.addEventListener("keydown", handleKeyDown);
 		return () => window.removeEventListener("keydown", handleKeyDown);
-	}, []);
+	}, [toggleSidebar]);
 
 	// We add a state so that we can do data-state="expanded" or "collapsed".
 	// This makes it easier to style the sidebar with Tailwind classes.
 	const state = open ? "expanded" : "collapsed";
 
-	const contextValue: SidebarContextProps = {
-		state,
-		open,
-		setOpen,
-		isMobile,
-		openMobile,
-		setOpenMobile,
-		toggleSidebar,
-	};
+	const contextValue = React.useMemo<SidebarContextProps>(
+		() => ({
+			state,
+			open,
+			setOpen,
+			isMobile,
+			openMobile,
+			setOpenMobile,
+			toggleSidebar,
+		}),
+		[state, open, setOpen, isMobile, openMobile, toggleSidebar],
+	);
 
 	return (
 		<SidebarContext.Provider value={contextValue}>
@@ -611,7 +604,9 @@ function SidebarMenuSkeleton({
 	showIcon?: boolean;
 }) {
 	// Random width between 50 to 90%.
-	const width = React.useRef(`${Math.floor(Math.random() * 40) + 50}%`).current;
+	const width = React.useMemo(() => {
+		return `${Math.floor(Math.random() * 40) + 50}%`;
+	}, []);
 
 	return (
 		<div
