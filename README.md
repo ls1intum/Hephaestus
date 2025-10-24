@@ -1,5 +1,5 @@
 <div align="center">
-  <img alt="Hephaestus Logo" height="100px" src="./docs/images/hammer_bg.svg">
+  <img alt="Hephaestus Logo" height="100px" src="./docs/static/img/brand/hammer_bg.svg">
 </div>
 
 # Hephaestus — Process-Aware Mentoring for Agile Software Teams
