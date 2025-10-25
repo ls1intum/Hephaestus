@@ -53,7 +53,7 @@ export function QuestionLink({
 		<Field data-invalid={error ? "true" : undefined}>
 			<FieldTitle>
 				{prompt}
-				{required && <span className="text-destructive ml-1">*</span>}
+				{required && <span className="text-destructive">*</span>}
 			</FieldTitle>
 			<FieldContent>
 				<QuestionDescription

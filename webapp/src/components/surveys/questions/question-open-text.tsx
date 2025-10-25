@@ -36,7 +36,7 @@ export function QuestionOpenText({
 		<Field data-invalid={error ? "true" : undefined}>
 			<FieldLabel htmlFor={elementId}>
 				{prompt}
-				{required && <span className="text-destructive">*</span>}
+				{required && <span className="text-destructive ml-0.5">*</span>}
 			</FieldLabel>
 			<FieldContent>
 				<QuestionDescription

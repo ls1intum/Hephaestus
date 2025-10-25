@@ -90,7 +90,7 @@ export function QuestionRating({
 		<Field data-invalid={error ? "true" : undefined}>
 			<FieldTitle>
 				{prompt}
-				{required && <span className="text-destructive">*</span>}
+				{required && <span className="text-destructive ml-0.5">*</span>}
 			</FieldTitle>
 			<FieldContent>
 				<QuestionDescription

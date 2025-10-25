@@ -131,7 +131,7 @@ export function QuestionMultipleChoice({
 		>
 			<FieldLegend>
 				{prompt}
-				{required && <span className="text-destructive ml-1">*</span>}
+				{required && <span className="text-destructive ml-0.5">*</span>}
 			</FieldLegend>
 			<QuestionDescription
 				description={description}
