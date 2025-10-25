@@ -7,6 +7,7 @@ services:
     ports:
       - "80:80"
       - "443:443"
+      - "443:443/udp"
       - "8080:8080"
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock:ro
@@ -18,6 +19,7 @@ services:
       - "--api.insecure=false"
       - "--entrypoints.http.address=:80"
       - "--entrypoints.https.address=:443"
+      - "--entrypoints.https.http3=true"
       - "--entrypoints.http.http.encodequerysemicolons=true"
       - "--entryPoints.http.http2.maxConcurrentStreams=50"
       - "--entrypoints.https.http.encodequerysemicolons=true"
