@@ -10,98 +10,88 @@ import {
 import type { PostHogSurvey } from "@/types/survey";
 import { SurveyContainer } from "./survey-container";
 
-const mockSurvey: PostHogSurvey = {
-	id: "demo-survey-001",
-	name: "Product Feedback Survey",
-	description: "Help us improve your experience",
+const branchingSurvey: PostHogSurvey = {
+	id: "019a1bba-e554-0000-ba61-39946d83e49c",
+	name: "Open feedback",
+	description: "",
 	type: "api",
 	questions: [
 		{
-			id: "q1",
-			type: "rating",
-			question: "How would you rate your overall experience?",
-			description: "Your honest feedback helps us improve",
+			id: "a5fee21d-eeaf-475a-9849-1f908e28fa79",
+			type: "open",
+			question: "What can we do to improve our product?",
+			description: "",
+			descriptionContentType: "text",
+			required: false,
+		},
+		{
+			id: "4af1e564-2a8b-4d6f-8e5a-13708bdfc551",
+			type: "single_choice",
+			choices: ["Yes", "No", "Other"],
+			question: "Have you found this tutorial useful?",
+			description: "",
+			descriptionContentType: "text",
 			required: true,
+			hasOpenChoice: true,
+			buttonText: "Submit",
+			branching: {
+				type: "response_based",
+				responseValues: {
+					Yes: "045bc9da-bdd7-4d93-8700-a7604aff9e94",
+					No: "077bc1cc-85e5-4a3a-9283-b386ecf2d299",
+					__other__: "077bc1cc-85e5-4a3a-9283-b386ecf2d299",
+					default: "045bc9da-bdd7-4d93-8700-a7604aff9e94",
+				},
+			},
+		},
+		{
+			id: "045bc9da-bdd7-4d93-8700-a7604aff9e94",
+			type: "rating",
 			scale: 10,
 			display: "number",
-			lowerBoundLabel: "Poor",
-			upperBoundLabel: "Excellent",
-		},
-		{
-			id: "q2",
-			type: "rating",
-			question: "How do you feel about our product?",
-			description: "Select the emoji that best represents your feeling",
+			question: "How likely are you to recommend us to a friend?",
+			description: "",
+			descriptionContentType: "text",
 			required: true,
-			scale: 5,
-			display: "emoji",
+			buttonText: "Submit",
+			lowerBoundLabel: "Unlikely",
+			upperBoundLabel: "Very likely",
 		},
 		{
-			id: "q3",
-			type: "single_choice",
-			question: "What is your primary use case?",
-			description:
-				"Select the option that best describes how you use our product",
-			required: true,
-			choices: [
-				"Personal projects",
-				"Professional work",
-				"Team collaboration",
-				"Learning and education",
-				"Other",
-			],
-			hasOpenChoice: true,
-		},
-		{
-			id: "q4",
+			id: "077bc1cc-85e5-4a3a-9283-b386ecf2d299",
 			type: "multiple_choice",
-			question: "Which features do you use most often?",
-			description: "Select all that apply",
-			required: false,
 			choices: [
-				"Analytics dashboard",
-				"User surveys",
-				"Session recordings",
-				"Feature flags",
-				"A/B testing",
-				"Heatmaps",
+				"Tutorials",
+				"Customer case studies",
+				"Product announcements",
 				"Other",
 			],
+			question: "Which types of content would you like to see more of?",
+			description: "",
+			descriptionContentType: "text",
+			required: false,
 			hasOpenChoice: true,
-		},
-		{
-			id: "q5",
-			type: "open",
-			question: "What can we do to improve your experience?",
-			description: "Share any suggestions, feedback, or ideas",
-			required: false,
-		},
-		{
-			id: "q6",
-			type: "link",
-			question: "Would you like to join our beta program?",
-			description:
-				"Get early access to new features and help shape the product",
-			required: false,
-			buttonText: "Join Beta Program",
-			linkUrl: "https://posthog.com/signup",
+			buttonText: "Submit",
 		},
 	],
-	conditions: undefined,
-	start_date: null,
+	conditions: null,
+	start_date: "2025-10-25T14:17:09.855000Z",
 	end_date: null,
 	enable_partial_responses: true,
 	current_iteration: 1,
 	current_iteration_start_date: new Date().toISOString(),
 };
 
+/**
+ * SurveyContainer renders multi-step PostHog API surveys with branching logic and progress handling.
+ */
 const meta = {
 	title: "Surveys/SurveyContainer",
 	component: SurveyContainer,
 	parameters: { layout: "centered" },
 	tags: ["autodocs"],
 	args: {
-		survey: mockSurvey,
+		survey: branchingSurvey,
 		onComplete: fn(),
 		onDismiss: fn(),
 		onProgress: fn(),
@@ -118,10 +108,16 @@ export default meta;
 
 type Story = StoryObj<typeof meta>;
 
+/**
+ * Walks through the feedback survey using the default layout.
+ */
 export const Default: Story = {
 	args: {},
 };
 
+/**
+ * Presents the survey inside a floating popover for contextual collection.
+ */
 export const InPagePopover: Story = {
 	parameters: {
 		layout: "fullscreen",
@@ -158,5 +154,16 @@ export const InPagePopover: Story = {
 				</Popover>
 			</div>
 		);
+	},
+};
+
+/**
+ * Highlights response-based branching by logging the active question after each response.
+ */
+export const ResponseBasedBranching: Story = {
+	args: {
+		onProgress: fn((responses, meta) => {
+			console.info("Progress updated", { responses, meta });
+		}),
 	},
 };

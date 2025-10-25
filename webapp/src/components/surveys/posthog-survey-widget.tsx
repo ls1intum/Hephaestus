@@ -17,32 +17,6 @@ interface PostHogSurveyWidgetProps {
 	reloadOnComplete?: boolean;
 }
 
-const SURVEY_STORAGE_PREFIX = "posthog:survey";
-
-type SurveyIdentifier = {
-	id: string;
-	current_iteration?: number | null;
-	current_iteration_start_date?: string | null;
-};
-
-const getSurveyInstanceKey = (survey: SurveyIdentifier) => {
-	const startDate = survey.current_iteration_start_date?.trim();
-	const iterationToken =
-		startDate && startDate.length > 0
-			? startDate
-			: typeof survey.current_iteration === "number"
-				? survey.current_iteration.toString()
-				: "";
-
-	return iterationToken ? `${survey.id}::${iterationToken}` : survey.id;
-};
-
-const getHandledStorageKey = (survey: SurveyIdentifier) =>
-	`${SURVEY_STORAGE_PREFIX}:${getSurveyInstanceKey(survey)}:handled`;
-
-const getShownMemoryKey = (survey: SurveyIdentifier) =>
-	`${SURVEY_STORAGE_PREFIX}:${getSurveyInstanceKey(survey)}:shown`;
-
 export function PostHogSurveyWidget({
 	surveyId,
 	autoOpen = true,
@@ -52,39 +26,12 @@ export function PostHogSurveyWidget({
 	const [survey, setSurvey] = useState<PostHogSurvey | null>(null);
 	const [isVisible, setIsVisible] = useState(false);
 	const [submissionId, setSubmissionId] = useState<string | null>(null);
-	const handledSurveys = useRef(new Set<string>());
-
-	const markHandled = (identifier: SurveyIdentifier) => {
-		const storageKey = getHandledStorageKey(identifier);
-		handledSurveys.current.add(storageKey);
-		if (typeof window !== "undefined") {
-			try {
-				window.localStorage.setItem(storageKey, "true");
-			} catch (error) {
-				console.warn("Failed to persist survey state", error);
-			}
-		}
-	};
+	const hasTrackedShown = useRef(false);
 
 	useEffect(() => {
 		if (!posthog || !autoOpen) {
 			return;
 		}
-
-		const hasHandled = (identifier: SurveyIdentifier) => {
-			const storageKey = getHandledStorageKey(identifier);
-			if (handledSurveys.current.has(storageKey)) {
-				return true;
-			}
-			if (typeof window === "undefined") {
-				return false;
-			}
-			const persisted = window.localStorage.getItem(storageKey) === "true";
-			if (persisted) {
-				handledSurveys.current.add(storageKey);
-			}
-			return persisted;
-		};
 
 		let isActive = true;
 
@@ -96,7 +43,7 @@ export function PostHogSurveyWidget({
 			const eligible = surveys.filter((candidate) => candidate.type === "api");
 			const selected = surveyId
 				? eligible.find((candidate) => candidate.id === surveyId)
-				: eligible.find((candidate) => !hasHandled(candidate));
+				: eligible[0];
 
 			if (!selected) {
 				return;
@@ -105,6 +52,7 @@ export function PostHogSurveyWidget({
 			const normalized = normalisePostHogSurvey(selected);
 			setSurvey(normalized);
 			setIsVisible(true);
+			hasTrackedShown.current = false;
 		};
 
 		const unsubscribe = posthog.onSurveysLoaded((surveys) =>
@@ -126,8 +74,7 @@ export function PostHogSurveyWidget({
 			return;
 		}
 
-		const shownKey = getShownMemoryKey(survey);
-		if (handledSurveys.current.has(shownKey)) {
+		if (hasTrackedShown.current) {
 			return;
 		}
 
@@ -135,7 +82,7 @@ export function PostHogSurveyWidget({
 			$survey_id: survey.id,
 			$survey_name: survey.name,
 		});
-		handledSurveys.current.add(shownKey);
+		hasTrackedShown.current = true;
 	}, [isVisible, posthog, survey]);
 
 	const ensureSubmissionId = () => {
@@ -159,7 +106,6 @@ export function PostHogSurveyWidget({
 			$survey_name: survey.name,
 			$current_step: step,
 		});
-		markHandled(survey);
 		setIsVisible(false);
 		setSurvey(null);
 		setSubmissionId(null);
@@ -201,7 +147,6 @@ export function PostHogSurveyWidget({
 				completed: true,
 			}),
 		);
-		markHandled(survey);
 		setIsVisible(false);
 		setSurvey(null);
 		setSubmissionId(null);

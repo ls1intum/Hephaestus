@@ -9,8 +9,8 @@ import type {
 	SurveyQuestion as SurveyQuestionType,
 	SurveyResponse,
 } from "@/types/survey";
-import { SURVEY_RESPONSE_END } from "@/types/survey";
 import { SurveyQuestion } from "./survey-question";
+import { determineNextQuestionIndex } from "./utils/branching";
 
 interface SurveyContainerProps {
 	survey: PostHogSurvey;
@@ -87,10 +87,10 @@ export function SurveyContainer({
 			[currentQuestion.id]: currentResponse,
 		};
 
-		const nextStep = computeNextStep({
-			question: currentQuestion,
-			currentIndex: currentStepIndex,
+		const nextStep = determineNextQuestionIndex({
 			survey,
+			currentIndex: currentStepIndex,
+			question: currentQuestion,
 			response: currentResponse,
 		});
 
@@ -206,96 +206,4 @@ const validateQuestion = (
 		default:
 			return typeof response === "string" && response.trim().length > 0;
 	}
-};
-
-const computeNextStep = ({
-	question,
-	currentIndex,
-	survey,
-	response,
-}: {
-	question: SurveyQuestionType;
-	currentIndex: number;
-	survey: PostHogSurvey;
-	response: SurveyResponse;
-}): number | null => {
-	const branching = question.branching;
-	if (!branching) {
-		return currentIndex + 1;
-	}
-
-	switch (branching.type) {
-		case "end":
-			return null;
-		case "specific_question": {
-			if (!branching.specificQuestionId) {
-				return currentIndex + 1;
-			}
-			const targetIndex = survey.questions.findIndex(
-				(candidate) => candidate.id === branching.specificQuestionId,
-			);
-			return targetIndex >= 0 ? targetIndex : currentIndex + 1;
-		}
-		case "response_based": {
-			const responseKey = resolveBranchingKey(question, response);
-			const targetId = responseKey
-				? branching.responseValues?.[responseKey]
-				: undefined;
-
-			if (!targetId) {
-				return currentIndex + 1;
-			}
-
-			if (targetId === SURVEY_RESPONSE_END) {
-				return null;
-			}
-
-			const targetIndex = survey.questions.findIndex(
-				(candidate) => candidate.id === targetId,
-			);
-			return targetIndex >= 0 ? targetIndex : currentIndex + 1;
-		}
-		default:
-			return currentIndex + 1;
-	}
-};
-
-const resolveBranchingKey = (
-	question: SurveyQuestionType,
-	response: SurveyResponse,
-): string | undefined => {
-	if (response === null || response === undefined) {
-		return undefined;
-	}
-
-	if (question.type === "rating" && typeof response === "number") {
-		const scale = question.scale ?? 5;
-		const bucket = classifyRatingBucket(response, scale);
-		return bucket ?? response.toString();
-	}
-
-	if (typeof response === "string") {
-		return response;
-	}
-
-	if (Array.isArray(response) && response.length > 0) {
-		return response[0];
-	}
-
-	return undefined;
-};
-
-const classifyRatingBucket = (value: number, scale: number) => {
-	if (scale <= 0) {
-		return undefined;
-	}
-
-	const third = Math.max(Math.floor(scale / 3), 1);
-	if (value <= third) {
-		return "negative";
-	}
-	if (value >= scale - third + 1) {
-		return "positive";
-	}
-	return "neutral";
 };
