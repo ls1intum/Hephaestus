@@ -123,7 +123,7 @@ export function PostHogSurveyWidget({
 		}
 		const id = ensureSubmissionId();
 		posthog.capture(
-			"survey sent",
+			"survey partial",
 			buildSurveyEventPayload({
 				survey,
 				responses,
@@ -237,10 +237,10 @@ const transformResponseValue = (
 			return Array.isArray(response) ? response : [String(response)];
 		case "rating": {
 			if (typeof response === "number") {
-				return Number.isFinite(response) ? response : response.toString();
+				return response.toString();
 			}
 			const numeric = Number(response);
-			return Number.isFinite(numeric) ? numeric : String(response);
+			return Number.isFinite(numeric) ? numeric.toString() : String(response);
 		}
 		default:
 			if (Array.isArray(response)) {
