@@ -14,6 +14,7 @@ import { StrictMode } from "react";
 
 import environment from "@/environment";
 import { AuthProvider, keycloakService, useAuth } from "@/integrations/auth";
+import { PostHogIdentity } from "@/integrations/posthog";
 import { ThemeProvider } from "@/integrations/theme";
 import reportWebVitals from "./reportWebVitals";
 
@@ -98,11 +99,11 @@ if (rootElement && !rootElement.innerHTML) {
 					options={{
 						api_host: environment.posthog.apiHost,
 						cross_subdomain_cookie: false,
-						person_profiles: "always",
 					}}
 				>
 					<TanstackQuery.Provider>
 						<AuthProvider>
+							<PostHogIdentity />
 							<ThemeProvider defaultTheme="dark" storageKey="theme">
 								<WrappedRouterProvider />
 							</ThemeProvider>

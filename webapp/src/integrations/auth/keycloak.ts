@@ -1,5 +1,4 @@
 import Keycloak from "keycloak-js";
-import posthog from "posthog-js";
 import environment from "@/environment";
 
 export interface UserProfile {
@@ -90,20 +89,8 @@ class KeycloakService {
 					this.profile = (await this.keycloak.loadUserProfile()) as UserProfile;
 					this.profile.token = this.keycloak.token || "";
 					this.profile.roles = this.keycloak.realmAccess?.roles || [];
-					
-					const sub = this.keycloak.tokenParsed?.sub || this.profile.id;
-					const email = this.profile.email;
-					const name = `${this.profile.firstName} ${this.profile.lastName}`.trim();
-					const username = this.profile.username;
-					
-					posthog.identify(sub, {
-						email,
-						name,
-						username,
-					});					
 				} catch (error) {
 					console.error("Failed to load user profile:", error);
-					posthog.reset();
 				}
 			}
 
@@ -113,7 +100,6 @@ class KeycloakService {
 			// Reset initialization state on error
 			this.initialized = false;
 			this.initializationPromise = null;
-			posthog.reset();
 			return false;
 		}
 	}
@@ -243,7 +229,6 @@ class KeycloakService {
 		this.initialized = false;
 		this.initializationPromise = null;
 		this.profile = undefined;
-		posthog.reset();
 
 		return (
 			this.keycloak?.logout({
