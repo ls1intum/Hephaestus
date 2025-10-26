@@ -98,6 +98,7 @@ if (rootElement && !rootElement.innerHTML) {
 					options={{
 						api_host: environment.posthog.apiHost,
 						cross_subdomain_cookie: false,
+						person_profiles: "always",
 					}}
 				>
 					<TanstackQuery.Provider>
