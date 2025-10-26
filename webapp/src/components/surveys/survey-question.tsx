@@ -15,6 +15,18 @@ interface SurveyQuestionProps {
 	error?: string;
 }
 
+/**
+ * Renders the appropriate survey question UI for the given question definition.
+ *
+ * Renders a question-specific component (open text, link, rating, single-choice, or multiple-choice)
+ * and wires its value updates to the provided `onChange` handler.
+ *
+ * @param question - Survey question definition including type, id, text, and type-specific properties
+ * @param value - Current response value for the question
+ * @param onChange - Called with the updated response value when the user changes their answer
+ * @param error - Optional validation or display error message to show for the question
+ * @returns A JSX element for the specific question component, or `null` if the question type is unrecognized
+ */
 export function SurveyQuestion({
 	question,
 	value,

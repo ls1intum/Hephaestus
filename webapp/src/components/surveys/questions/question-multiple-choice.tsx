@@ -33,6 +33,23 @@ export interface QuestionMultipleChoiceProps
 	error?: string;
 }
 
+/**
+ * Render a multiple-choice survey question, optionally including an open-ended "other" input.
+ *
+ * Renders a labeled group of checkboxes for the provided choices, synchronizes selection state with `value`, and, when `hasOpenChoice` is true, shows a textarea + checkbox pair to capture a custom answer that is included in the selected values.
+ *
+ * @param id - Unique identifier for the question (used to generate element ids)
+ * @param question - The question prompt text
+ * @param description - Optional description content for the question
+ * @param descriptionContentType - Content type of `description` (defaults to `"text"`)
+ * @param required - Whether the question is required
+ * @param choices - Array of choice labels; when `hasOpenChoice` is true the last entry is treated as the open/custom label
+ * @param hasOpenChoice - When true and `choices` is non-empty, show an open/custom input paired with a checkbox
+ * @param value - Current selected values; expected to be an array of strings
+ * @param onChange - Called with the updated array of selected values whenever selections change
+ * @param error - Optional validation error message; when present the fieldset is marked invalid and the message is rendered
+ * @returns The rendered React element representing the question field group
+ */
 export function QuestionMultipleChoice({
 	id,
 	question: prompt,

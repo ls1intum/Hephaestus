@@ -27,6 +27,22 @@ export interface QuestionLinkProps extends QuestionLinkQuestion {
 	error?: string;
 }
 
+/**
+ * Render a survey question with a button that opens an external link and records that the link was clicked.
+ *
+ * Clicking the button calls `onChange` with `linkUrl` if provided or the string `"link_clicked"`, and opens `linkUrl` in a new browser tab when present.
+ *
+ * @param question - The question prompt text to display as the field title.
+ * @param description - Additional descriptive content shown beneath the title.
+ * @param descriptionContentType - Content type for the description (e.g., "text" or "markdown").
+ * @param required - When true, show a required indicator next to the title.
+ * @param buttonText - Label for the action button; defaults to "Open link" when omitted.
+ * @param linkUrl - Optional URL to open when the button is clicked; also used as the response value if present.
+ * @param value - Current survey response value; a non-empty string is treated as "was clicked".
+ * @param onChange - Callback invoked with the response value when the button is clicked.
+ * @param error - Optional validation error message displayed under the control.
+ * @returns A JSX element rendering the titled field, description, action button, optional confirmation text after click, and any error message.
+ */
 export function QuestionLink({
 	question: prompt,
 	description,

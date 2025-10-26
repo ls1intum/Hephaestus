@@ -43,6 +43,14 @@ const getHandledStorageKey = (survey: SurveyIdentifier) =>
 const getShownMemoryKey = (survey: SurveyIdentifier) =>
 	`${SURVEY_STORAGE_PREFIX}:${getSurveyInstanceKey(survey)}:shown`;
 
+/**
+ * Render a PostHog survey UI that opens when an eligible survey is available and captures survey lifecycle events.
+ *
+ * @param surveyId - Optional PostHog survey id to prefer; when provided the widget will attempt to show that survey.
+ * @param autoOpen - Whether the widget should automatically open when matching surveys are loaded (default: `true`).
+ * @param reloadOnComplete - Whether to refresh PostHog's active survey cache after the user completes a survey (default: `false`).
+ * @returns A React element that displays the active survey, or `null` if no survey is active or visible.
+ */
 export function PostHogSurveyWidget({
 	surveyId,
 	autoOpen = true,

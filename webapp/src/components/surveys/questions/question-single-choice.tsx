@@ -32,6 +32,21 @@ export interface QuestionSingleChoiceProps
 	error?: string;
 }
 
+/**
+ * Renders a single-choice survey question with an optional open-ended (custom) choice.
+ *
+ * @param id - Unique question identifier used to construct element ids for accessibility.
+ * @param question - The question prompt displayed in the field legend.
+ * @param description - Optional supplemental description displayed under the legend.
+ * @param descriptionContentType - Content type of `description` (defaults to `"text"`).
+ * @param required - If true, displays a required indicator next to the prompt.
+ * @param choices - Array of choice labels. When `hasOpenChoice` is true, the last item is treated as the open-choice label and the preceding items are the base choices.
+ * @param hasOpenChoice - When true, renders an additional radio option paired with a textarea to accept a custom answer.
+ * @param value - Current response value; a non-empty string not present in base choices is treated as the custom answer.
+ * @param onChange - Called with the updated response string whenever the selected choice or custom input changes.
+ * @param error - Optional error message; when present the fieldset is marked invalid and the message is displayed.
+ * @returns A React element containing the labeled radio group (and optional custom textarea) for the question.
+ */
 export function QuestionSingleChoice({
 	id,
 	question: prompt,

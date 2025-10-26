@@ -19,6 +19,19 @@ export interface QuestionOpenTextProps extends QuestionOpenTextQuestion {
 	error?: string;
 }
 
+/**
+ * Render an open-text survey question with label, description, multiline textarea, and optional validation error.
+ *
+ * @param id - Unique identifier for the question (used to build element ids for accessibility)
+ * @param question - The question prompt text to display as the field label
+ * @param description - Optional supplemental description or instructions for the question
+ * @param descriptionContentType - Content type of `description` (defaults to "text")
+ * @param required - If true, marks the field as required and displays an asterisk
+ * @param value - Current response value; non-string values are treated as an empty string
+ * @param onChange - Callback invoked with the updated string value when the textarea changes
+ * @param error - Optional validation error message; when present, sets appropriate ARIA attributes and displays the error
+ * @returns The form field comprising the label, description, textarea, and conditional error message
+ */
 export function QuestionOpenText({
 	id,
 	question: prompt,

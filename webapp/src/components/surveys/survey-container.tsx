@@ -24,6 +24,15 @@ interface SurveyContainerProps {
 
 type ErrorMap = Record<string, string>;
 
+/**
+ * Renders and manages a multi-step, branching survey UI and user interaction state.
+ *
+ * @param survey - The survey definition including questions, branching rules, and metadata.
+ * @param onComplete - Called with collected responses when the survey is finished.
+ * @param onDismiss - Called with the current step index when the survey is dismissed/closed.
+ * @param onProgress - Optional callback invoked after advancing to a next step with the current responses and progress metadata.
+ * @returns The survey UI element or `null` when there is no current question to display.
+ */
 export function SurveyContainer({
 	survey,
 	onComplete,

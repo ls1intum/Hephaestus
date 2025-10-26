@@ -43,6 +43,14 @@ const getEmojiForRating = (rating: number, scale: number) => {
 	];
 };
 
+/**
+ * Renders a rating question input using either emoji buttons or numeric toggle items and reports selection changes.
+ *
+ * Renders the question prompt, optional description, an emoji or numeric rating control (1..scale), optional lower/upper bound labels, and an error message when present. Selection updates invoke `onChange` with the chosen rating number.
+ *
+ * @param onChange - Called with the selected rating as a number when the user chooses a value
+ * @returns A form field element containing the rating question UI
+ */
 export function QuestionRating({
 	question: prompt,
 	description,
