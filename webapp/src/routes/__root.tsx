@@ -83,7 +83,7 @@ export const Route = createRootRouteWithContext<MyRouterContext>()({
 				<TanstackQueryLayout />
 
 				{showCopilot && <GlobalCopilot />}
-				<PostHogSurveyWidget />
+				{!isLoading && isAuthenticated && <PostHogSurveyWidget />}
 			</>
 		);
 	},
