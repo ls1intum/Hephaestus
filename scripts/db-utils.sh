@@ -82,7 +82,7 @@ fi
 
 ensure_local_postgres_script() {
     if [[ ! -x "$LOCAL_POSTGRES_SCRIPT" ]]; then
-        log_error "Local PostgreSQL helper not found or not executable at '$LOCAL_POSTGRES_SCRIPT'. Run 'run/setup.sh' to install prerequisites."
+        log_error "Local PostgreSQL helper not found or not executable at '$LOCAL_POSTGRES_SCRIPT'. Run 'scripts/codex-setup.sh' to install prerequisites."
         exit 1
     fi
 }

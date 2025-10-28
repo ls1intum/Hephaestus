@@ -51,7 +51,7 @@ fi
 
 ensure_command() {
     if ! command -v "$1" >/dev/null 2>&1; then
-        log_error "Required command '$1' is not available. Run 'run/setup.sh' to install prerequisites."
+        log_error "Required command '$1' is not available. Run 'scripts/codex-setup.sh' to install prerequisites."
         exit 1
     fi
 }
@@ -89,7 +89,7 @@ find_pg_bindir() {
 
 PG_BINDIR="$(find_pg_bindir)"
 if [ -z "$PG_BINDIR" ]; then
-    log_error "Could not locate PostgreSQL binaries. Ensure PostgreSQL is installed (run 'run/setup.sh')."
+    log_error "Could not locate PostgreSQL binaries. Ensure PostgreSQL is installed (run 'scripts/codex-setup.sh')."
     exit 1
 fi
 

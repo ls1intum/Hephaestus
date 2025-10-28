@@ -52,7 +52,7 @@ if [[ $EUID -ne 0 ]]; then
     if command -v sudo >/dev/null 2>&1; then
         SUDO="sudo"
     else
-        echo "❌ run/setup.sh must be executed with root privileges to install system packages." >&2
+        echo "❌ scripts/codex-setup.sh must be executed with root privileges to install system packages." >&2
         exit 1
     fi
 else

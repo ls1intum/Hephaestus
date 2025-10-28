@@ -8,12 +8,12 @@ description: Run the Spring Boot server without Docker by managing a local Postg
 > **Scope**
 > This guide only applies to GitHub Copilot's Codex (or similar managed) sandboxes where Docker is disabled. These scripts are **not** meant for normal local workstations; if you have Docker available, follow the standard workflow in [Local Development](./local-development.mdx) instead.
 
-The repository ships a thin wrapper around the system PostgreSQL packages so that integration tests and local tooling work in Dockerless sandboxes. The scripts live in `run/` and `scripts/` and are idempotent, so you can run them whenever the environment is reset.
+The repository ships a thin wrapper around the system PostgreSQL packages so that integration tests and local tooling work in Dockerless sandboxes. The scripts live under `scripts/` and are idempotent, so you can run them whenever the environment is reset.
 
 ## One-time bootstrap
 
 ```bash
-sudo run/setup.sh
+sudo ./scripts/codex-setup.sh
 ```
 
 > Run this only inside the Codex VM (the script auto-detects the `/workspace/Hephaestus` checkout). If detection ever fails, pass `HEPHAESTUS_ROOT=/workspace/Hephaestus` explicitly.
@@ -32,7 +32,7 @@ What the script does:
 Codex reboots the VM between sessions, so use the lightweight helper whenever the sandbox wakes up from cold storage:
 
 ```bash
-run/maintenance.sh
+./scripts/codex-maintenance.sh
 ```
 
 It ensures the local cluster is running (`scripts/local-postgres.sh start`) and refreshes npm dependencies with cached modules (`npm install --prefer-offline`).
@@ -58,5 +58,5 @@ The script reuses the system PostgreSQL binaries provided in the Codex base imag
 ## Limitations
 
 - Keycloak and the remaining Docker Compose services still require Docker.
-- `scripts/local-postgres.sh` expects PostgreSQL 14+ binaries (`pg_ctl`, `pg_isready`). Run `run/setup.sh` if commands are missing.
+- `scripts/local-postgres.sh` expects PostgreSQL 14+ binaries (`pg_ctl`, `pg_isready`). Run `./scripts/codex-setup.sh` if commands are missing.
 - Always stop the cluster when you finish (`scripts/local-postgres.sh stop`) to leave port 5432 free for other workflows.

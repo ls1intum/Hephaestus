@@ -137,7 +137,7 @@ public final class PostgreSQLTestContainer {
             } catch (SQLException exception) {
                 throw new IllegalStateException(
                     "Failed to connect to local PostgreSQL instance at " + jdbcUrl +
-                    ". Run 'run/setup.sh' and ensure scripts/local-postgres.sh start completes successfully before running tests.",
+                    ". Run 'scripts/codex-setup.sh' and ensure scripts/local-postgres.sh start completes successfully before running tests.",
                     exception
                 );
             }
