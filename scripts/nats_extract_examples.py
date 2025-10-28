@@ -8,8 +8,9 @@ import argparse
 import asyncio
 import json
 import sys
+from datetime import datetime, timezone
 from pathlib import Path
-from typing import Set
+from typing import Dict, Optional, Set
 import nats
 
 # Default configuration
@@ -43,7 +44,11 @@ async def extract_webhook_examples(
     nats_server: str,
     examples_dir: Path,
     nats_subject: str,
-    nats_stream: str
+    nats_stream: str,
+    event_filters: Dict[str, Set[str]],
+    since: Optional[datetime],
+    until: Optional[datetime],
+    allow_duplicates: bool
 ):
     """
     Main extraction function.
@@ -60,7 +65,9 @@ async def extract_webhook_examples(
     # Track existing examples to avoid duplicates
     existing_examples = get_existing_examples(examples_dir)
     extracted_examples = {}  # filename -> payload
+    filename_counts: Dict[str, int] = {}
     processed_count = 0
+    matched_count = 0
     
     try:
         # Connect to NATS
@@ -115,6 +122,7 @@ async def extract_webhook_examples(
                         subject_parts = msg.subject.split('.')
                         if len(subject_parts) >= 4:
                             event_type = subject_parts[3]
+                            normalized_event_type = event_type.lower()
                         else:
                             print(f"   ⚠️  Unexpected subject format: {msg.subject}")
                             await msg.ack()
@@ -122,15 +130,51 @@ async def extract_webhook_examples(
                         
                         # Extract action from payload if present
                         action = payload.get("action")
+
+                        # Skip events that do not match requested filters
+                        if event_filters:
+                            allowed_actions = event_filters.get(normalized_event_type)
+                            if allowed_actions is None:
+                                await msg.ack()
+                                continue
+                            normalized_action = (action or "").lower()
+                            if allowed_actions and normalized_action not in allowed_actions:
+                                await msg.ack()
+                                continue
+                            matched_count += 1
                         
-                        # Generate filename for this webhook type
-                        filename = get_example_filename(event_type, action)
-                        
-                        # Skip if we already have this example (existing or newly extracted)
-                        if filename in existing_examples or filename in extracted_examples:
+                        metadata = getattr(msg, "metadata", None)
+                        msg_timestamp = getattr(metadata, "timestamp", None)
+
+                        if since and msg_timestamp and msg_timestamp < since:
                             await msg.ack()
                             continue
-                        
+                        if until and msg_timestamp and msg_timestamp > until:
+                            await msg.ack()
+                            continue
+
+                        # Generate filename for this webhook type
+                        filename = get_example_filename(event_type, action)
+
+                        if allow_duplicates:
+                            base_name = filename[:-5]  # drop .json
+                            count = filename_counts.get(base_name, 0)
+                            candidate = filename
+
+                            while (
+                                candidate in existing_examples
+                                or candidate in extracted_examples
+                            ):
+                                count += 1
+                                candidate = f"{base_name}.{count}.json"
+
+                            filename = candidate
+                            filename_counts[base_name] = count
+                        else:
+                            if filename in existing_examples or filename in extracted_examples:
+                                await msg.ack()
+                                continue
+
                         # Store the example
                         extracted_examples[filename] = payload
                         print(f"   ✅ Found new example: {filename}")
@@ -165,6 +209,8 @@ async def extract_webhook_examples(
         
         print(f"\n🎉 Extraction complete!")
         print(f"📊 Processed: {processed_count} messages")
+        if event_filters:
+            print(f"📊 Matched filter: {matched_count} messages")
         print(f"📊 Extracted: {len(extracted_examples)} new examples")
         print(f"📁 Total examples: {len(existing_examples) + len(extracted_examples)}")
         
@@ -181,6 +227,39 @@ async def extract_webhook_examples(
         except:
             pass
         await nc.close()
+
+
+def parse_event_filters(raw_filters) -> Dict[str, Set[str]]:
+    """Parse --event arguments into an event -> actions mapping."""
+    filters: Dict[str, Set[str]] = {}
+    for raw in raw_filters or []:
+        parts = raw.split(":", 1)
+        event = parts[0].strip().lower()
+        if not event:
+            continue
+        action_set = filters.setdefault(event, set())
+        if len(parts) == 2:
+            action = parts[1].strip().lower()
+            if action:
+                action_set.add(action)
+        else:
+            # Empty set indicates all actions for this event
+            filters[event] = action_set
+    return filters
+
+def parse_iso_datetime(value: Optional[str]) -> Optional[datetime]:
+    """Parse ISO8601 string into timezone-aware datetime."""
+    if not value:
+        return None
+    cleaned = value.strip()
+    if not cleaned:
+        return None
+    if cleaned.endswith("Z"):
+        cleaned = cleaned[:-1] + "+00:00"
+    dt = datetime.fromisoformat(cleaned)
+    if dt.tzinfo is None:
+        dt = dt.replace(tzinfo=timezone.utc)
+    return dt
 
 
 def main():
@@ -209,15 +288,52 @@ def main():
         default=DEFAULT_NATS_STREAM,
         help=f"NATS stream name (default: {DEFAULT_NATS_STREAM})"
     )
+    parser.add_argument(
+        "--event",
+        action="append",
+        dest="events",
+        help=(
+            "Filter to specific event/action pairs. "
+            "Format: event[:action]. Use multiple --event flags for more pairs."
+        )
+    )
+    parser.add_argument(
+        "--since",
+        help=(
+            "Only include messages published at or after this ISO8601 timestamp "
+            "(e.g. 2025-10-28T22:00:00+01:00)"
+        )
+    )
+    parser.add_argument(
+        "--until",
+        help=(
+            "Only include messages published at or before this ISO8601 timestamp"
+        )
+    )
+    parser.add_argument(
+        "--allow-duplicates",
+        action="store_true",
+        help=(
+            "Allow multiple payloads per event/action and append numeric suffixes "
+            "to filenames when necessary"
+        )
+    )
     
     args = parser.parse_args()
+    event_filters = parse_event_filters(args.events)
+    since = parse_iso_datetime(args.since)
+    until = parse_iso_datetime(args.until)
     
     try:
         success = asyncio.run(extract_webhook_examples(
             args.nats_server,
             args.examples_dir,
             args.subject,
-            args.stream
+            args.stream,
+            event_filters,
+            since,
+            until,
+            args.allow_duplicates
         ))
         
         if not success:
