@@ -6,7 +6,7 @@ description: Run the Spring Boot server without Docker by managing a local Postg
 ---
 
 > **Scope**
-> This guide only applies to environments where Docker cannot run (for example, GitHub Copilot's Codex instances). If Docker is available, stick with the standard workflow in [Local Development](./local-development.mdx).
+> This guide only applies to GitHub Copilot's Codex (or similar managed) sandboxes where Docker is disabled. These scripts are **not** meant for normal local workstations; if you have Docker available, follow the standard workflow in [Local Development](./local-development.mdx) instead.
 
 The repository ships a thin wrapper around the system PostgreSQL packages so that integration tests and local tooling work in Dockerless sandboxes. The scripts live in `run/` and `scripts/` and are idempotent, so you can run them whenever the environment is reset.
 
@@ -15,6 +15,8 @@ The repository ships a thin wrapper around the system PostgreSQL packages so tha
 ```bash
 sudo run/setup.sh
 ```
+
+> Run this only inside the Codex VM (the script auto-detects the `/workspace/Hephaestus` checkout). If detection ever fails, pass `HEPHAESTUS_ROOT=/workspace/Hephaestus` explicitly.
 
 What the script does:
 
@@ -27,7 +29,7 @@ What the script does:
 
 ## Daily maintenance
 
-Use the lightweight helper whenever the sandbox wakes up from cold storage:
+Codex reboots the VM between sessions, so use the lightweight helper whenever the sandbox wakes up from cold storage:
 
 ```bash
 run/maintenance.sh
@@ -51,7 +53,7 @@ scripts/local-postgres.sh stop     # free port 5432
 scripts/local-postgres.sh start    # restart after stop
 ```
 
-The script reuses your system PostgreSQL binaries. On macOS or Codex sandboxes without a `postgres` user it runs the cluster under the invoking user; on Linux desktops it uses `runuser`/`su` to switch to `postgres` when available.
+The script reuses the system PostgreSQL binaries provided in the Codex base image. On Codex sandboxes without a `postgres` user it runs the cluster under the invoking user; on Linux desktops it would fall back to `runuser`/`su`, but local machines should rely on Docker instead.
 
 ## Limitations
 

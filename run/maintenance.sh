@@ -1,12 +1,54 @@
 #!/usr/bin/env bash
+to_lower() {
 set -euo pipefail
 
-ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+ROOT_DIR=""
+
+resolve_repo_root() {
+    local script_root=""
+    local git_root=""
+
+    if [[ -n "${HEPHAESTUS_ROOT:-}" && -f "${HEPHAESTUS_ROOT}/package.json" ]]; then
+        ROOT_DIR="$(cd "${HEPHAESTUS_ROOT}" && pwd)"
+        return
+    fi
+
+    if [[ -n "${CODEX_REPO_ROOT:-}" && -f "${CODEX_REPO_ROOT}/package.json" ]]; then
+        ROOT_DIR="$(cd "${CODEX_REPO_ROOT}" && pwd)"
+        return
+    fi
+
+    script_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." 2>/dev/null && pwd 2>/dev/null || true)"
+    if [[ -n "$script_root" && -f "$script_root/package.json" ]]; then
+        ROOT_DIR="$script_root"
+        return
+    fi
+
+    if [[ -d /workspace/Hephaestus && -f /workspace/Hephaestus/package.json ]]; then
+        ROOT_DIR="/workspace/Hephaestus"
+        return
+    fi
+
+    if command -v git >/dev/null 2>&1; then
+        git_root="$(git rev-parse --show-toplevel 2>/dev/null || true)"
+        if [[ -n "$git_root" && -f "$git_root/package.json" ]]; then
+            ROOT_DIR="$git_root"
+            return
+        fi
+    fi
+
+    echo "❌ Failed to locate repository root. Set HEPHAESTUS_ROOT to the project directory and rerun." >&2
+    exit 1
+}
+
+resolve_repo_root
 SCRIPTS_DIR="$ROOT_DIR/scripts"
 DOCKER_AVAILABLE_CACHE=""
+
 to_lower() {
     printf '%s' "$1" | tr '[:upper:]' '[:lower:]'
 }
+
 if [[ $EUID -ne 0 ]]; then
     if command -v sudo >/dev/null 2>&1; then
         SUDO="sudo"
