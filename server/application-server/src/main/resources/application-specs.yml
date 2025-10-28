@@ -4,7 +4,7 @@ nats:
 spring:
     docker:
         compose:
-            enabled: false
+            enabled: ${SPRING_DOCKER_COMPOSE_ENABLED:true}
 
 monitoring:
     run-on-startup: false
