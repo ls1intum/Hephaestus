@@ -1,6 +1,11 @@
 nats:
     enabled: false
 
+spring:
+    docker:
+        compose:
+            enabled: false
+
 monitoring:
     run-on-startup: false
 

@@ -35,6 +35,7 @@
         <!-- Test Configuration -->
         <maven.test.failure.ignore>false</maven.test.failure.ignore>
         <maven.test.skip>false</maven.test.skip>
+        <hephaestus.surefire.timeout>60</hephaestus.surefire.timeout>
 
         <!-- Coverage Configuration (disabled by default) -->
         <skipCoverage>true</skipCoverage>
@@ -426,7 +427,7 @@
                     <!-- Fail fast on errors -->
                     <skipAfterFailureCount>5</skipAfterFailureCount>
                     <!-- Forked JVM timeout settings to prevent hanging -->
-                    <forkedProcessTimeoutInSeconds>60</forkedProcessTimeoutInSeconds>
+                    <forkedProcessTimeoutInSeconds>${hephaestus.surefire.timeout}</forkedProcessTimeoutInSeconds>
                     <forkedProcessExitTimeoutInSeconds>10</forkedProcessExitTimeoutInSeconds>
                 </configuration>
             </plugin>
@@ -538,4 +539,29 @@
             </plugin>
         </plugins>
     </build>
+    <profiles>
+        <profile>
+            <id>local-db-timeout</id>
+            <activation>
+                <property>
+                    <name>env.HEPHAESTUS_DB_MODE</name>
+                    <value>local</value>
+                </property>
+            </activation>
+            <properties>
+                <hephaestus.surefire.timeout>180</hephaestus.surefire.timeout>
+            </properties>
+        </profile>
+        <profile>
+            <id>codex-environment</id>
+            <activation>
+                <property>
+                    <name>env.CODEX</name>
+                </property>
+            </activation>
+            <properties>
+                <hephaestus.surefire.timeout>180</hephaestus.surefire.timeout>
+            </properties>
+        </profile>
+    </profiles>
 </project>

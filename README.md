@@ -49,6 +49,16 @@ UI component docs: [Storybook](https://develop--66a8981a27ced8fef3190d41.chromat
 
 Read the [local development guide](https://ls1intum.github.io/Hephaestus/contributor/local-development) for server, intelligence service, and the React client in `webapp`.
 
+#### Docker-free PostgreSQL workflow
+
+The repository now supports running the application server against a locally managed PostgreSQL instance for environments where Docker is unavailable (for example, when `CODEX=true`).
+
+1. Run `run/setup.sh` to install PostgreSQL, install npm dependencies, bootstrap Python tooling, and initialize the local database cluster.
+2. On subsequent checkouts (or cached containers) invoke `run/maintenance.sh` to refresh dependencies and ensure PostgreSQL is running.
+3. Database helpers (`npm run db:generate-erd-docs`, `npm run db:generate-models:intelligence-service`, etc.) automatically switch to the local database when `HEPHAESTUS_DB_MODE=local` or `CODEX=true`. You can also manage the instance manually via `scripts/local-postgres.sh [start|stop|status|restart]`.
+
+Keycloak still requires Docker for local development; only PostgreSQL is covered by the Docker-free workflow.
+
 ## Contributing
 
 We welcome contributions from both members of our organization and external contributors. To maintain transparency and trust:
