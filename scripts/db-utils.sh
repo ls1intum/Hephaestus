@@ -19,12 +19,14 @@ LOCAL_POSTGRES_SCRIPT="$SCRIPTS_DIR/local-postgres.sh"
 POSTGRES_HOST="${POSTGRES_HOST:-localhost}"
 POSTGRES_PORT="${POSTGRES_PORT:-5432}"
 
-CODEX_VALUE="${CODEX:-false}"
+DOCKER_AVAILABLE_CACHE=""
+
+to_lower() {
+    printf '%s' "$1" | tr '[:upper:]' '[:lower:]'
+}
 
 if [[ -n "${HEPHAESTUS_DB_MODE:-}" ]]; then
-    DB_MODE="${HEPHAESTUS_DB_MODE,,}"
-elif [[ "${CODEX_VALUE,,}" == "true" ]]; then
-    DB_MODE="local"
+    DB_MODE="$(to_lower "${HEPHAESTUS_DB_MODE}")"
 else
     DB_MODE="docker"
 fi
@@ -33,6 +35,21 @@ if [[ "$DB_MODE" != "docker" && "$DB_MODE" != "local" ]]; then
     echo "Unsupported database mode '$DB_MODE'. Use 'docker' or 'local'." >&2
     exit 1
 fi
+
+docker_available() {
+    if [[ -n "$DOCKER_AVAILABLE_CACHE" ]]; then
+        [[ "$DOCKER_AVAILABLE_CACHE" == "true" ]]
+        return
+    fi
+
+    if command -v docker >/dev/null 2>&1 && docker info >/dev/null 2>&1; then
+        DOCKER_AVAILABLE_CACHE="true"
+        return 0
+    fi
+
+    DOCKER_AVAILABLE_CACHE="false"
+    return 1
+}
 
 # Color codes for better output
 RED='\033[0;31m'
@@ -57,6 +74,11 @@ log_warning() {
 log_error() {
     echo -e "${RED}❌ $1${NC}"
 }
+
+if [[ "$DB_MODE" == "docker" ]] && ! docker_available; then
+    log_warning "Docker is not available; switching database utilities to local mode."
+    DB_MODE="local"
+fi
 
 ensure_local_postgres_script() {
     if [[ ! -x "$LOCAL_POSTGRES_SCRIPT" ]]; then

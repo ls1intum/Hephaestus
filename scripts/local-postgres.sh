@@ -38,6 +38,17 @@ log_error() {
     echo -e "${RED}❌ $1${NC}" >&2
 }
 
+if sed --version >/dev/null 2>&1; then
+    sed_inplace() {
+        sed -i "$@"
+    }
+else
+    sed_inplace() {
+        # BSD sed requires an explicit (possibly empty) backup suffix
+        sed -i '' "$@"
+    }
+fi
+
 ensure_command() {
     if ! command -v "$1" >/dev/null 2>&1; then
         log_error "Required command '$1' is not available. Run 'run/setup.sh' to install prerequisites."
@@ -46,6 +57,10 @@ ensure_command() {
 }
 
 ensure_runner() {
+    if [ "$USE_SYSTEM_POSTGRES_USER" -eq 0 ]; then
+        return 0
+    fi
+
     if command -v runuser >/dev/null 2>&1 || command -v su >/dev/null 2>&1; then
         return 0
     fi
@@ -80,7 +95,18 @@ fi
 
 PATH_WITH_PG="$PG_BINDIR:$PATH"
 
+if id -u postgres >/dev/null 2>&1; then
+    USE_SYSTEM_POSTGRES_USER=1
+else
+    USE_SYSTEM_POSTGRES_USER=0
+fi
+
 run_as_postgres() {
+    if [ "$USE_SYSTEM_POSTGRES_USER" -eq 0 ]; then
+        env PATH="$PATH_WITH_PG" "$@"
+        return
+    fi
+
     if command -v runuser >/dev/null 2>&1; then
         runuser -u postgres -- env PATH="$PATH_WITH_PG" "$@"
         return
@@ -108,13 +134,13 @@ configure_postgresql_conf() {
     local conf_file="$DATA_DIR/postgresql.conf"
 
     if grep -q "^#\?listen_addresses" "$conf_file"; then
-        sed -i "s/^#\?listen_addresses.*/listen_addresses = '127.0.0.1,localhost'/" "$conf_file"
+        sed_inplace "s/^#\?listen_addresses.*/listen_addresses = '127.0.0.1,localhost'/" "$conf_file"
     else
         echo "listen_addresses = '127.0.0.1,localhost'" >>"$conf_file"
     fi
 
     if grep -q "^#\?port" "$conf_file"; then
-        sed -i "s/^#\?port.*/port = ${PG_PORT}/" "$conf_file"
+        sed_inplace "s/^#\?port.*/port = ${PG_PORT}/" "$conf_file"
     else
         echo "port = ${PG_PORT}" >>"$conf_file"
     fi
@@ -134,7 +160,9 @@ ensure_data_directory() {
     if [ ! -f "$DATA_DIR/PG_VERSION" ]; then
         log_info "Initializing local PostgreSQL cluster in '$DATA_DIR'..."
         mkdir -p "$DATA_DIR"
-        chown postgres:postgres "$DATA_DIR"
+        if [ "$USE_SYSTEM_POSTGRES_USER" -eq 1 ]; then
+            chown postgres:postgres "$DATA_DIR"
+        fi
         run_as_postgres "$PG_BINDIR/initdb" -D "$DATA_DIR" --encoding=UTF8 --locale=C.UTF-8 >/dev/null
         configure_postgresql_conf
         configure_pg_hba

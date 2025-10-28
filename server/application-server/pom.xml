@@ -552,16 +552,5 @@
                 <hephaestus.surefire.timeout>180</hephaestus.surefire.timeout>
             </properties>
         </profile>
-        <profile>
-            <id>codex-environment</id>
-            <activation>
-                <property>
-                    <name>env.CODEX</name>
-                </property>
-            </activation>
-            <properties>
-                <hephaestus.surefire.timeout>180</hephaestus.surefire.timeout>
-            </properties>
-        </profile>
     </profiles>
 </project>

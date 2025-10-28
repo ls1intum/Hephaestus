@@ -51,11 +51,11 @@ Read the [local development guide](https://ls1intum.github.io/Hephaestus/contrib
 
 #### Docker-free PostgreSQL workflow
 
-The repository now supports running the application server against a locally managed PostgreSQL instance for environments where Docker is unavailable (for example, when `CODEX=true`).
+The repository now supports running the application server against a locally managed PostgreSQL instance for environments where Docker is unavailable (for example, GitHub Copilot's Codex runtime). The `run/setup.sh` and `run/maintenance.sh` helpers are the supported entry points for provisioning that Codex environment.
 
 1. Run `run/setup.sh` to install PostgreSQL, install npm dependencies, bootstrap Python tooling, and initialize the local database cluster.
 2. On subsequent checkouts (or cached containers) invoke `run/maintenance.sh` to refresh dependencies and ensure PostgreSQL is running.
-3. Database helpers (`npm run db:generate-erd-docs`, `npm run db:generate-models:intelligence-service`, etc.) automatically switch to the local database when `HEPHAESTUS_DB_MODE=local` or `CODEX=true`. You can also manage the instance manually via `scripts/local-postgres.sh [start|stop|status|restart]`.
+3. Database helpers (`npm run db:generate-erd-docs`, `npm run db:generate-models-intelligence-service`, etc.) automatically switch to the local database when `HEPHAESTUS_DB_MODE=local` or Docker is unavailable. You can also manage the instance manually via `scripts/local-postgres.sh [start|stop|status|restart]`.
 
 Keycloak still requires Docker for local development; only PostgreSQL is covered by the Docker-free workflow.
 

@@ -5,6 +5,9 @@ import java.sql.DriverManager;
 import java.sql.SQLException;
 import java.util.Locale;
 import java.util.Optional;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.testcontainers.DockerClientFactory;
 import org.testcontainers.containers.PostgreSQLContainer;
 
 /**
@@ -14,7 +17,6 @@ import org.testcontainers.containers.PostgreSQLContainer;
 public final class PostgreSQLTestContainer {
 
     private static final String ENV_DB_MODE = "HEPHAESTUS_DB_MODE";
-    private static final String ENV_CODEX = "CODEX";
     private static final String ENV_TEST_JDBC_URL = "HEPHAESTUS_TEST_JDBC_URL";
     private static final String ENV_TEST_DB_USER = "HEPHAESTUS_TEST_DB_USER";
     private static final String ENV_TEST_DB_PASSWORD = "HEPHAESTUS_TEST_DB_PASSWORD";
@@ -23,6 +25,8 @@ public final class PostgreSQLTestContainer {
     private static final String DEFAULT_TEST_PASSWORD = "test";
     private static final String DEFAULT_TEST_JDBC_URL =
         "jdbc:postgresql://localhost:5432/" + DEFAULT_TEST_DB;
+
+    private static final Logger LOGGER = LoggerFactory.getLogger(PostgreSQLTestContainer.class);
 
     private static PostgreSQLContainer<?> container;
 
@@ -49,11 +53,34 @@ public final class PostgreSQLTestContainer {
     @SuppressWarnings("resource") // Container lifecycle is managed by shutdown hook
     private static PostgreSQLContainer<?> createContainer() {
         if (useLocalDatabase()) {
-            LocalPostgresContainer localContainer = new LocalPostgresContainer();
-            localContainer.start();
-            return localContainer;
+            return startLocalContainer();
         }
 
+        if (!isDockerAvailable()) {
+            LOGGER.warn("Docker is not available. Falling back to the locally managed PostgreSQL instance.");
+            return startLocalContainer();
+        }
+
+        try {
+            return startDockerContainer();
+        } catch (RuntimeException exception) {
+            LOGGER.warn("Failed to start PostgreSQL Testcontainer. Falling back to local instance.", exception);
+            try {
+                return startLocalContainer();
+            } catch (RuntimeException fallbackException) {
+                exception.addSuppressed(fallbackException);
+                throw exception;
+            }
+        }
+    }
+
+    private static boolean useLocalDatabase() {
+        String dbMode = Optional.ofNullable(System.getenv(ENV_DB_MODE)).map(v -> v.toLowerCase(Locale.ROOT)).orElse(null);
+        return "local".equals(dbMode);
+    }
+
+    @SuppressWarnings("resource")
+    private static PostgreSQLContainer<?> startDockerContainer() {
         PostgreSQLContainer<?> newContainer = new PostgreSQLContainer<>("postgres:16")
             .withDatabaseName(DEFAULT_TEST_DB)
             .withUsername(DEFAULT_TEST_USER)
@@ -61,7 +88,6 @@ public final class PostgreSQLTestContainer {
 
         newContainer.start();
 
-        // Register shutdown hook to properly close the container
         Runtime
             .getRuntime()
             .addShutdownHook(
@@ -75,14 +101,18 @@ public final class PostgreSQLTestContainer {
         return newContainer;
     }
 
-    private static boolean useLocalDatabase() {
-        String dbMode = Optional.ofNullable(System.getenv(ENV_DB_MODE)).map(v -> v.toLowerCase(Locale.ROOT)).orElse(null);
-        if ("local".equals(dbMode)) {
-            return true;
-        }
+    private static PostgreSQLContainer<?> startLocalContainer() {
+        LocalPostgresContainer localContainer = new LocalPostgresContainer();
+        localContainer.start();
+        return localContainer;
+    }
 
-        String codex = Optional.ofNullable(System.getenv(ENV_CODEX)).map(v -> v.toLowerCase(Locale.ROOT)).orElse(null);
-        return "true".equals(codex);
+    private static boolean isDockerAvailable() {
+        try {
+            return DockerClientFactory.instance().isDockerAvailable();
+        } catch (Throwable exception) {
+            return false;
+        }
     }
 
     private static final class LocalPostgresContainer extends PostgreSQLContainer<LocalPostgresContainer> {
