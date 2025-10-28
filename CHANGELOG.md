@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.10.0-rc.6](https://github.com/ls1intum/Hephaestus/compare/v0.10.0-rc.5...v0.10.0-rc.6) (2025-10-28)
+
+### 🚀 Features
+
+* support dockerless postgres workflow ([#517](https://github.com/ls1intum/Hephaestus/issues/517)) ([15acfe2](https://github.com/ls1intum/Hephaestus/commit/15acfe2626dbb28745ff5cb7884dfd270772e374))
+
 ## [0.10.0-rc.5](https://github.com/ls1intum/Hephaestus/compare/v0.10.0-rc.4...v0.10.0-rc.5) (2025-10-24)
 
 ## [0.10.0-rc.4](https://github.com/ls1intum/Hephaestus/compare/v0.10.0-rc.3...v0.10.0-rc.4) (2025-10-24)
