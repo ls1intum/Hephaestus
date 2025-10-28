@@ -1,0 +1,60 @@
+---
+id: dockerless-postgres
+sidebar_position: 99
+title: Dockerless PostgreSQL
+description: Run the Spring Boot server without Docker by managing a local PostgreSQL cluster.
+---
+
+> **Scope**
+> This guide only applies to environments where Docker cannot run (for example, GitHub Copilot's Codex instances). If Docker is available, stick with the standard workflow in [Local Development](./local-development.mdx).
+
+The repository ships a thin wrapper around the system PostgreSQL packages so that integration tests and local tooling work in Dockerless sandboxes. The scripts live in `run/` and `scripts/` and are idempotent, so you can run them whenever the environment is reset.
+
+## One-time bootstrap
+
+```bash
+sudo run/setup.sh
+```
+
+What the script does:
+
+- Installs PostgreSQL server/client packages via `apt-get` when they are missing.
+- Installs top-level npm dependencies (`npm install`).
+- Bootstraps the shared Python tooling (`npm run bootstrap:py`).
+- Creates and initialises a managed database cluster in `server/application-server/postgres-data-local/` using `scripts/local-postgres.sh`.
+
+> If `sudo` is unavailable, run the script as the root user. The script exits early rather than attempting a partial install.
+
+## Daily maintenance
+
+Use the lightweight helper whenever the sandbox wakes up from cold storage:
+
+```bash
+run/maintenance.sh
+```
+
+It ensures the local cluster is running (`scripts/local-postgres.sh start`) and refreshes npm dependencies with cached modules (`npm install --prefer-offline`).
+
+## Database helpers and tests
+
+- All `npm run db:*` utilities automatically fall back to the managed cluster when Docker is missing. Set `HEPHAESTUS_DB_MODE=local` to force that behaviour even on hosts that have Docker installed.
+- The Maven Surefire/Failsafe configuration extends the fork timeout to 180 seconds when `HEPHAESTUS_DB_MODE=local`, giving the local cluster enough time to warm up during integration tests.
+- The integration-test harness (`PostgreSQLTestContainer`) connects to the managed cluster whenever Docker is unavailable.
+
+## Manual control
+
+You can manage the database directly:
+
+```bash
+scripts/local-postgres.sh status   # check
+scripts/local-postgres.sh stop     # free port 5432
+scripts/local-postgres.sh start    # restart after stop
+```
+
+The script reuses your system PostgreSQL binaries. On macOS or Codex sandboxes without a `postgres` user it runs the cluster under the invoking user; on Linux desktops it uses `runuser`/`su` to switch to `postgres` when available.
+
+## Limitations
+
+- Keycloak and the remaining Docker Compose services still require Docker.
+- `scripts/local-postgres.sh` expects PostgreSQL 14+ binaries (`pg_ctl`, `pg_isready`). Run `run/setup.sh` if commands are missing.
+- Always stop the cluster when you finish (`scripts/local-postgres.sh stop`) to leave port 5432 free for other workflows.
