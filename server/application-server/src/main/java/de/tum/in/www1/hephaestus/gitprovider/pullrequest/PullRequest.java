@@ -3,6 +3,7 @@ package de.tum.in.www1.hephaestus.gitprovider.pullrequest;
 import de.tum.in.www1.hephaestus.gitprovider.issue.Issue;
 import de.tum.in.www1.hephaestus.gitprovider.pullrequestreview.PullRequestReview;
 import de.tum.in.www1.hephaestus.gitprovider.pullrequestreviewcomment.PullRequestReviewComment;
+import de.tum.in.www1.hephaestus.gitprovider.pullrequestreviewthread.PullRequestReviewThread;
 import de.tum.in.www1.hephaestus.gitprovider.user.User;
 import jakarta.persistence.*;
 import java.time.Instant;
@@ -62,6 +63,10 @@ public class PullRequest extends Issue {
     @OneToMany(mappedBy = "pullRequest", cascade = CascadeType.REMOVE, orphanRemoval = true)
     @ToString.Exclude
     private Set<PullRequestReviewComment> reviewComments = new HashSet<>();
+
+    @OneToMany(mappedBy = "pullRequest", cascade = CascadeType.REMOVE, orphanRemoval = true)
+    @ToString.Exclude
+    private Set<PullRequestReviewThread> reviewThreads = new HashSet<>();
 
     @Lob
     private String badPracticeSummary;
