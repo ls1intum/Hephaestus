@@ -1,5 +1,5 @@
+import { AnimatePresence, motion } from "framer-motion";
 import type { Survey as PostHogSurveyRaw } from "posthog-js";
-
 import { usePostHog } from "posthog-js/react";
 import { useEffect, useRef, useState } from "react";
 
@@ -10,6 +10,43 @@ import {
 	type SurveyResponse,
 } from "@/types/survey";
 import { SurveyContainer } from "./survey-container";
+
+/**
+ * Check if a URL matches the survey's URL condition
+ * Replicates PostHog's internal URL matching logic
+ */
+function checkUrlMatch(
+	currentUrl: string,
+	pattern: string,
+	matchType?: string,
+): boolean {
+	const type = matchType || "icontains";
+
+	switch (type) {
+		case "icontains":
+			return currentUrl.toLowerCase().includes(pattern.toLowerCase());
+		case "regex":
+			try {
+				return new RegExp(pattern).test(currentUrl);
+			} catch {
+				return false;
+			}
+		case "exact":
+			return currentUrl === pattern;
+		case "is_not":
+			return currentUrl !== pattern;
+		case "not_icontains":
+			return !currentUrl.toLowerCase().includes(pattern.toLowerCase());
+		case "not_regex":
+			try {
+				return !new RegExp(pattern).test(currentUrl);
+			} catch {
+				return false;
+			}
+		default:
+			return currentUrl.toLowerCase().includes(pattern.toLowerCase());
+	}
+}
 
 interface PostHogSurveyWidgetProps {
 	surveyId?: string;
@@ -25,8 +62,75 @@ export function PostHogSurveyWidget({
 	const posthog = usePostHog();
 	const [survey, setSurvey] = useState<PostHogSurvey | null>(null);
 	const [isVisible, setIsVisible] = useState(false);
+	const [showWithDelay, setShowWithDelay] = useState(false);
 	const [submissionId, setSubmissionId] = useState<string | null>(null);
 	const hasTrackedShown = useRef(false);
+	const currentUrl = useRef(window.location.href);
+
+	// Monitor URL changes and re-check survey conditions
+	useEffect(() => {
+		const checkUrlChange = () => {
+			const newUrl = window.location.href;
+			if (newUrl !== currentUrl.current) {
+				currentUrl.current = newUrl;
+
+				// If we have a survey with URL conditions, re-check eligibility
+				if (survey?.conditions?.url) {
+					const urlMatches = checkUrlMatch(
+						newUrl,
+						survey.conditions.url,
+						survey.conditions.urlMatchType,
+					);
+
+					if (!urlMatches) {
+						// URL no longer matches - hide survey
+						setIsVisible(false);
+						setShowWithDelay(false);
+					} else if (!isVisible) {
+						// URL now matches - show survey with delay
+						setIsVisible(true);
+					}
+				}
+			}
+		};
+
+		// Listen to popstate (back/forward buttons)
+		window.addEventListener("popstate", checkUrlChange);
+
+		// Listen to pushState and replaceState (client-side navigation)
+		const originalPushState = window.history.pushState;
+		const originalReplaceState = window.history.replaceState;
+
+		window.history.pushState = (...args) => {
+			originalPushState.apply(window.history, args);
+			checkUrlChange();
+		};
+
+		window.history.replaceState = (...args) => {
+			originalReplaceState.apply(window.history, args);
+			checkUrlChange();
+		};
+
+		return () => {
+			window.removeEventListener("popstate", checkUrlChange);
+			window.history.pushState = originalPushState;
+			window.history.replaceState = originalReplaceState;
+		};
+	}, [survey, isVisible]);
+
+	// Delay showing the survey by 5 seconds for a better UX
+	useEffect(() => {
+		if (!isVisible) {
+			setShowWithDelay(false);
+			return;
+		}
+
+		const timer = setTimeout(() => {
+			setShowWithDelay(true);
+		}, 5000);
+
+		return () => clearTimeout(timer);
+	}, [isVisible]);
 
 	useEffect(() => {
 		if (!posthog || !autoOpen) {
@@ -34,47 +138,115 @@ export function PostHogSurveyWidget({
 		}
 
 		let isActive = true;
+		let latestRequestId = 0;
 
-		const handleSurveys = (surveys: PostHogSurveyRaw[]) => {
+		const resolveSurvey = async (surveys: PostHogSurveyRaw[]) => {
 			if (!isActive) {
 				return;
 			}
 
 			const eligible = surveys.filter((candidate) => candidate.type === "api");
-			const selected = surveyId
-				? eligible.find((candidate) => candidate.id === surveyId)
-				: eligible[0];
+			const candidates = surveyId
+				? eligible.filter((candidate) => candidate.id === surveyId)
+				: eligible;
 
-			if (!selected) {
+			if (candidates.length === 0) {
+				if (!isActive) {
+					return;
+				}
+				setIsVisible(false);
+				setSurvey(null);
+				setSubmissionId(null);
+				hasTrackedShown.current = false;
 				return;
 			}
 
-			const normalized = normalisePostHogSurvey(selected);
-			setSurvey(normalized);
-			setIsVisible(true);
+			const requestId = ++latestRequestId;
+
+			for (const candidate of candidates) {
+				try {
+					const reason = await posthog.canRenderSurveyAsync(candidate.id);
+
+					if (!isActive || requestId !== latestRequestId) {
+						return;
+					}
+
+					if (!reason.visible) {
+						continue;
+					}
+
+					// Check URL/selector conditions for API surveys
+					if (candidate.conditions?.url) {
+						const urlMatches = checkUrlMatch(
+							window.location.href,
+							candidate.conditions.url,
+							candidate.conditions.urlMatchType,
+						);
+						if (!urlMatches) {
+							continue;
+						}
+					}
+
+					if (candidate.conditions?.selector) {
+						const selectorExists = document.querySelector(
+							candidate.conditions.selector,
+						);
+						if (!selectorExists) {
+							continue;
+						}
+					}
+
+					const normalized = normalisePostHogSurvey(candidate);
+					setSurvey(normalized);
+					setIsVisible(true);
+					hasTrackedShown.current = false;
+					return;
+				} catch (error) {
+					console.error("[PostHogSurveyWidget] Error checking survey:", error);
+
+					if (!isActive || requestId !== latestRequestId) {
+						return;
+					}
+				}
+			}
+
+			if (!isActive || requestId !== latestRequestId) {
+				return;
+			}
+
+			setIsVisible(false);
+			setSurvey(null);
+			setSubmissionId(null);
 			hasTrackedShown.current = false;
 		};
 
-		const unsubscribe = posthog.onSurveysLoaded((surveys) =>
-			handleSurveys(surveys as PostHogSurveyRaw[]),
-		);
-		posthog.getActiveMatchingSurveys(
-			(surveys) => handleSurveys(surveys as PostHogSurveyRaw[]),
-			true,
-		);
+		const unsubscribe = posthog.onSurveysLoaded(() => {
+			if (!isActive) {
+				return;
+			}
+			posthog.getSurveys((updatedSurveys) => {
+				void resolveSurvey(updatedSurveys as PostHogSurveyRaw[]);
+			}, false);
+		});
+
+		const initTimeout = setTimeout(() => {
+			if (!isActive) {
+				return;
+			}
+
+			posthog.getSurveys((surveys) => {
+				void resolveSurvey(surveys as PostHogSurveyRaw[]);
+			}, false);
+		}, 100);
 
 		return () => {
 			isActive = false;
+			clearTimeout(initTimeout);
 			unsubscribe?.();
 		};
 	}, [autoOpen, posthog, surveyId]);
-
 	useEffect(() => {
-		if (!posthog || !survey || !isVisible) {
-			return;
-		}
-
-		if (hasTrackedShown.current) {
+		if (!posthog || !survey || !isVisible || hasTrackedShown.current) {
 			return;
 		}
 
@@ -82,6 +254,13 @@ export function PostHogSurveyWidget({
 			$survey_id: survey.id,
 			$survey_name: survey.name,
 		});
+
+		// CRITICAL: Update lastSeenSurveyDate for wait period logic
+		// PostHog's wait period check uses this value to prevent surveys from showing too frequently
+		// For API surveys (manual rendering), we must update this ourselves
+		// Popover/widget surveys do this automatically in usePopupVisibility
+		localStorage.setItem("lastSeenSurveyDate", new Date().toISOString());
+
 		hasTrackedShown.current = true;
 	}, [isVisible, posthog, survey]);
 
@@ -115,10 +294,10 @@ export function PostHogSurveyWidget({
 		if (!survey || !posthog) {
 			return;
 		}
-		if (survey.enable_partial_responses === false) {
-			return;
-		}
-		if (Object.keys(responses).length === 0) {
+		if (
+			survey.enable_partial_responses === false ||
+			Object.keys(responses).length === 0
+		) {
 			return;
 		}
 		const id = ensureSubmissionId();
@@ -152,9 +331,7 @@ export function PostHogSurveyWidget({
 		setSubmissionId(null);
 
 		if (reloadOnComplete) {
-			posthog.getActiveMatchingSurveys(() => {
-				// No-op: purpose is to refresh the internal cache
-			}, true);
+			posthog.getActiveMatchingSurveys(() => {}, true);
 		}
 	};
 
@@ -163,18 +340,38 @@ export function PostHogSurveyWidget({
 	}
 
 	return (
-		<div className="fixed inset-x-0 bottom-0 z-[100] w-full px-4 pb-4 sm:inset-auto sm:bottom-6 sm:right-6 sm:w-auto sm:px-0 sm:pb-0 animate-in fade-in slide-in-from-bottom-4 sm:slide-in-from-bottom-0">
-			<div className="mx-auto w-full sm:max-w-md">
-				<div className="overflow-hidden rounded-lg border bg-background shadow-2xl">
-					<SurveyContainer
-						survey={survey}
-						onComplete={handleComplete}
-						onDismiss={handleDismiss}
-						onProgress={handleProgress}
-					/>
-				</div>
-			</div>
-		</div>
+		<AnimatePresence>
+			{showWithDelay && (
+				<motion.div
+					initial={{ opacity: 0, y: 100, scale: 0.95 }}
+					animate={{ opacity: 1, y: 0, scale: 1 }}
+					exit={{ opacity: 0, y: 100, scale: 0.95 }}
+					transition={{
+						type: "spring",
+						stiffness: 300,
+						damping: 30,
+						opacity: { duration: 0.3 },
+					}}
+					className="fixed inset-x-0 bottom-0 z-[100] w-full px-4 pb-4 sm:inset-auto sm:bottom-6 sm:right-6 sm:w-auto sm:px-0 sm:pb-0"
+				>
+					<div className="mx-auto w-full sm:max-w-md">
+						<motion.div
+							initial={{ scale: 0.95 }}
+							animate={{ scale: 1 }}
+							transition={{ delay: 0.1, type: "spring", stiffness: 400 }}
+							className="overflow-hidden rounded-lg border bg-background shadow-2xl"
+						>
+							<SurveyContainer
+								survey={survey}
+								onComplete={handleComplete}
+								onDismiss={handleDismiss}
+								onProgress={handleProgress}
+							/>
+						</motion.div>
+					</div>
+				</motion.div>
+			)}
+		</AnimatePresence>
 	);
 }
 

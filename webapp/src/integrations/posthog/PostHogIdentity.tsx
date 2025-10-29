@@ -4,7 +4,7 @@ import { useAuth } from "../auth";
 
 /**
  * PostHogIdentity Component
- * 
+ *
  * This component handles user identification with PostHog after authentication.
  * It must be rendered inside both PostHogProvider and AuthProvider.
  */
@@ -22,14 +22,17 @@ export function PostHogIdentity() {
 		// If user is authenticated and we haven't identified them yet
 		if (isAuthenticated && userProfile && !hasIdentified.current) {
 			const userId = getUserId();
-			
+
 			if (!userId) {
-				console.warn("PostHogIdentity: User authenticated but no user ID available");
+				console.warn(
+					"PostHogIdentity: User authenticated but no user ID available",
+				);
 				return;
 			}
 
 			const email = userProfile.email;
-			const name = `${userProfile.firstName || ""} ${userProfile.lastName || ""}`.trim();
+			const name =
+				`${userProfile.firstName || ""} ${userProfile.lastName || ""}`.trim();
 			const username = userProfile.username;
 
 			posthog.identify(userId, {
