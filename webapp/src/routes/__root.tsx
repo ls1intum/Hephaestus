@@ -20,6 +20,7 @@ import { ArtifactOverlayContainer } from "@/components/mentor/ArtifactOverlayCon
 import { Chat } from "@/components/mentor/Chat";
 import { Copilot } from "@/components/mentor/Copilot";
 import { defaultPartRenderers } from "@/components/mentor/renderers";
+import { PostHogSurveyWidget } from "@/components/surveys/posthog-survey-widget";
 import {
 	SidebarInset,
 	SidebarProvider,
@@ -82,6 +83,7 @@ export const Route = createRootRouteWithContext<MyRouterContext>()({
 				<TanstackQueryLayout />
 
 				{showCopilot && <GlobalCopilot />}
+				{!isLoading && isAuthenticated && <PostHogSurveyWidget />}
 			</>
 		);
 	},
