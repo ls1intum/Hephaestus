@@ -15,6 +15,7 @@ import jakarta.persistence.OneToMany;
 import jakarta.persistence.OneToOne;
 import jakarta.persistence.Table;
 import java.time.Instant;
+import java.util.Collections;
 import java.util.HashSet;
 import java.util.Set;
 import lombok.Getter;
@@ -54,10 +55,19 @@ public class PullRequestReviewThread extends BaseGitServiceEntity {
 
     @OneToMany(mappedBy = "thread")
     @ToString.Exclude
+    @Getter(lombok.AccessLevel.NONE)
     private Set<PullRequestReviewComment> comments = new HashSet<>();
+
+    public Set<PullRequestReviewComment> getComments() {
+        return Collections.unmodifiableSet(comments);
+    }
+
+    public void addComment(PullRequestReviewComment comment) {
+        this.comments.add(comment);
+    }
 
     public enum State {
         RESOLVED,
-        UNRESOLVED,
+        UNRESOLVED
     }
 }

@@ -11,7 +11,6 @@ import de.tum.in.www1.hephaestus.gitprovider.user.UserRepository;
 import de.tum.in.www1.hephaestus.gitprovider.user.github.GitHubUserConverter;
 import jakarta.transaction.Transactional;
 import java.io.IOException;
-import java.lang.reflect.Field;
 import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
@@ -194,18 +193,19 @@ public class GitHubPullRequestReviewCommentSyncService {
         long inReplyToId = ghPullRequestReviewComment.getInReplyToId();
 
         if (inReplyToId > 0) {
-            pullRequestReviewThreadRepository
+            pullRequestReviewCommentRepository
                 .findById(inReplyToId)
+                .flatMap(parentComment -> Optional.ofNullable(parentComment.getThread()))
                 .ifPresentOrElse(
                     thread -> {
-                        thread.getComments().add(comment);
+                        thread.addComment(comment);
                         thread.setUpdatedAt(resolveTimestamp(comment));
                         comment.setThread(thread);
                         pullRequestReviewCommentRepository.save(comment);
                     },
                     () ->
                         logger.warn(
-                            "Failed to find thread {} for pull request review comment {}",
+                            "Failed to find thread for parent comment {} of pull request review comment {}",
                             inReplyToId,
                             ghPullRequestReviewComment.getId()
                         )
@@ -224,7 +224,7 @@ public class GitHubPullRequestReviewCommentSyncService {
         thread.setRootComment(comment);
         thread.setPullRequest(comment.getPullRequest());
         thread.setUpdatedAt(resolveTimestamp(comment));
-        thread.getComments().add(comment);
+        thread.addComment(comment);
 
         thread = pullRequestReviewThreadRepository.save(thread);
         comment.setThread(thread);
@@ -255,21 +255,7 @@ public class GitHubPullRequestReviewCommentSyncService {
             );
         }
 
-        try {
-            Field userField = ghComment.getClass().getDeclaredField("user");
-            userField.setAccessible(true);
-            Object value = userField.get(ghComment);
-            if (value instanceof GHUser ghUser) {
-                return Optional.of(ghUser);
-            }
-        } catch (NoSuchFieldException | IllegalAccessException reflectionError) {
-            logger.warn(
-                "Failed to access embedded user for pull request review comment {}: {}",
-                ghComment.getId(),
-                reflectionError.getMessage()
-            );
-        }
-
+        // Could not resolve author via public API
         return Optional.empty();
     }
 }

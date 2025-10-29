@@ -49,8 +49,8 @@ public class GitHubPullRequestReviewCommentConverter
         }
         comment.setStartLine(source.getStartLine());
         comment.setOriginalStartLine(source.getOriginalStartLine());
-        comment.setLine(source.getLine());
-        comment.setOriginalLine(source.getOriginalLine());
+        comment.setLine(source.getLine() != null ? source.getLine() : 0);
+        comment.setOriginalLine(source.getOriginalLine() != null ? source.getOriginalLine() : 0);
         comment.setStartSide(convertSide(source.getStartSide()));
         comment.setSide(convertSide(source.getSide()));
         comment.setPosition(source.getPosition());

@@ -148,7 +148,7 @@ public class GitHubPullRequestReviewThreadMessageHandler
                 thread.setRootComment(comment);
                 thread.setPullRequest(comment.getPullRequest());
                 thread.setCreatedAt(comment.getCreatedAt());
-                thread.getComments().add(comment);
+                thread.addComment(comment);
             });
 
         if (pullRequest != null) {

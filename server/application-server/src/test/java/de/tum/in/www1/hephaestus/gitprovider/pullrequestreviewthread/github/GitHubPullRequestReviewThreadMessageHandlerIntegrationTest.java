@@ -33,8 +33,6 @@ class GitHubPullRequestReviewThreadMessageHandlerIntegrationTest extends BaseInt
     @Test
     @DisplayName("Should mark a review thread as resolved")
     void shouldResolveReviewThread(
-        @GitHubPayload("pull_request_review_comment.created.thread-1") GHEventPayload.PullRequestReviewComment rootComment,
-        @GitHubPayload("pull_request_review_comment.created.thread-2") GHEventPayload.PullRequestReviewComment replyComment,
         @GitHubPayload("pull_request_review_thread.resolved") GHEventPayloadPullRequestReviewThread resolvedThread
     ) {
         threadHandler.handleEvent(resolvedThread);
@@ -60,8 +58,6 @@ class GitHubPullRequestReviewThreadMessageHandlerIntegrationTest extends BaseInt
     @Test
     @DisplayName("Should mark a review thread as unresolved")
     void shouldUnresolveReviewThread(
-        @GitHubPayload("pull_request_review_comment.created.thread-1") GHEventPayload.PullRequestReviewComment rootComment,
-        @GitHubPayload("pull_request_review_comment.created.thread-2") GHEventPayload.PullRequestReviewComment replyComment,
         @GitHubPayload("pull_request_review_thread.resolved") GHEventPayloadPullRequestReviewThread resolvedThread,
         @GitHubPayload("pull_request_review_thread.unresolved") GHEventPayloadPullRequestReviewThread unresolvedThread
     ) {
