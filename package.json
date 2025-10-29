@@ -6,7 +6,7 @@
   ],
   "scripts": {
     "generate:api:application-server:clean": "shx rm -rf webapp/src/api",
-    "generate:api:application-server:specs": "cd server/application-server && mvn verify -DskipTests=true -Dapp.profiles=specs",
+    "generate:api:application-server:specs": "cd server/application-server && sh -c 'if command -v docker >/dev/null 2>&1 && docker info >/dev/null 2>&1; then mvn verify -DskipTests=true -Dapp.profiles=specs; else SPRING_DOCKER_COMPOSE_ENABLED=false mvn verify -DskipTests=true -Dapp.profiles=specs; fi'",
     "generate:api:application-server:client": "npm run generate:api:application-server:clean && npm -w webapp run openapi-ts",
     "generate:api:application-server": "npm run generate:api:application-server:specs && npm run generate:api:application-server:client",
     "generate:api:intelligence-service:clean": "shx rm -rf server/application-server/src/main/java/de/tum/in/www1/hephaestus/intelligenceservice",

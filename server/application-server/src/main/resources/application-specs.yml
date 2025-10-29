@@ -1,6 +1,11 @@
 nats:
     enabled: false
 
+spring:
+    docker:
+        compose:
+            enabled: ${SPRING_DOCKER_COMPOSE_ENABLED:true}
+
 monitoring:
     run-on-startup: false
 
