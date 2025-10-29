@@ -203,6 +203,18 @@ erDiagram
         BIGINT author_id FK
         BIGINT pull_request_id FK
         BIGINT review_id FK
+        BIGINT in_reply_to_id FK
+        BIGINT thread_id FK
+    }
+
+    PullRequestReviewThread {
+        BIGINT root_comment_id PK,FK
+        TIMESTAMPTZ created_at
+        TIMESTAMPTZ updated_at
+        TIMESTAMPTZ resolved_at
+        VARCHAR(20) state "NOT NULL"
+        BIGINT last_actor_id FK
+        BIGINT pull_request_id FK "NOT NULL"
     }
 
     PullRequestBadPractice {
@@ -320,6 +332,7 @@ erDiagram
     %% One-to-One relationships
     ChatMessage ||--|| ChatMessagePart : has
     ChatMessage ||--|| ChatThread : references
+    PullRequestReviewComment ||--|| PullRequestReviewThread : reviewed
     Organization ||--|| Workspace : has
 
     %% One-to-Many relationships
@@ -341,8 +354,12 @@ erDiagram
     User ||--o{ PullRequestReview : reviewed
     Issue ||--o{ PullRequestReview : reviewed
     User ||--o{ PullRequestReviewComment : commented_on
+    PullRequestReviewComment ||--o{ PullRequestReviewComment : commented_on
     Issue ||--o{ PullRequestReviewComment : commented_on
     PullRequestReview ||--o{ PullRequestReviewComment : commented_on
+    PullRequestReviewThread ||--o{ PullRequestReviewComment : commented_on
+    User ||--o{ PullRequestReviewThread : reviewed
+    Issue ||--o{ PullRequestReviewThread : reviewed
     BadPracticeDetection ||--o{ PullRequestBadPractice : has
     Issue ||--o{ PullRequestBadPractice : references
     Organization ||--o{ Repository : has

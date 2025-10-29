@@ -3,12 +3,14 @@ package de.tum.in.www1.hephaestus.gitprovider.pullrequestreviewcomment.github;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubMessageHandler;
 import de.tum.in.www1.hephaestus.gitprovider.pullrequest.github.GitHubPullRequestSyncService;
 import de.tum.in.www1.hephaestus.gitprovider.pullrequestreviewcomment.PullRequestReviewCommentRepository;
+import de.tum.in.www1.hephaestus.gitprovider.pullrequestreviewthread.PullRequestReviewThreadRepository;
 import de.tum.in.www1.hephaestus.gitprovider.repository.github.GitHubRepositorySyncService;
 import org.kohsuke.github.GHEvent;
 import org.kohsuke.github.GHEventPayload;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
+import org.springframework.transaction.annotation.Transactional;
 
 @Component
 public class GitHubPullRequestReviewCommentMessageHandler
@@ -20,21 +22,25 @@ public class GitHubPullRequestReviewCommentMessageHandler
     private final GitHubPullRequestReviewCommentSyncService pullRequestReviewCommentSyncService;
     private final GitHubPullRequestSyncService pullRequestSyncService;
     private final GitHubRepositorySyncService repositorySyncService;
+    private final PullRequestReviewThreadRepository pullRequestReviewThreadRepository;
 
-    private GitHubPullRequestReviewCommentMessageHandler(
+    public GitHubPullRequestReviewCommentMessageHandler(
         PullRequestReviewCommentRepository pullRequestReviewCommentRepository,
         GitHubPullRequestReviewCommentSyncService pullRequestReviewCommentSyncService,
         GitHubPullRequestSyncService pullRequestSyncService,
-        GitHubRepositorySyncService repositorySyncService
+        GitHubRepositorySyncService repositorySyncService,
+        PullRequestReviewThreadRepository pullRequestReviewThreadRepository
     ) {
         super(GHEventPayload.PullRequestReviewComment.class);
         this.pullRequestReviewCommentRepository = pullRequestReviewCommentRepository;
         this.pullRequestReviewCommentSyncService = pullRequestReviewCommentSyncService;
         this.pullRequestSyncService = pullRequestSyncService;
         this.repositorySyncService = repositorySyncService;
+        this.pullRequestReviewThreadRepository = pullRequestReviewThreadRepository;
     }
 
     @Override
+    @Transactional
     protected void handleEvent(GHEventPayload.PullRequestReviewComment eventPayload) {
         var action = eventPayload.getAction();
         var pullRequest = eventPayload.getPullRequest();
@@ -51,7 +57,16 @@ public class GitHubPullRequestReviewCommentMessageHandler
         pullRequestSyncService.processPullRequest(pullRequest);
 
         if (action.equals("deleted")) {
-            pullRequestReviewCommentRepository.deleteById(comment.getId());
+            pullRequestReviewCommentRepository
+                .findById(comment.getId())
+                .ifPresent(existingComment -> {
+                    var thread = existingComment.getThread();
+                    if (thread != null && comment.getInReplyToId() <= 0) {
+                        pullRequestReviewThreadRepository.delete(thread);
+                    }
+
+                    pullRequestReviewCommentRepository.delete(existingComment);
+                });
         } else {
             pullRequestReviewCommentSyncService.processPullRequestReviewComment(comment);
         }

@@ -1,5 +1,6 @@
 package de.tum.in.www1.hephaestus.gitprovider.pullrequestreviewcomment.github;
 
+import de.tum.in.www1.hephaestus.gitprovider.common.AuthorAssociation;
 import de.tum.in.www1.hephaestus.gitprovider.common.BaseGitServiceEntityConverter;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubAuthorAssociationConverter;
 import de.tum.in.www1.hephaestus.gitprovider.pullrequestreviewcomment.PullRequestReviewComment;
@@ -38,12 +39,18 @@ public class GitHubPullRequestReviewCommentConverter
         comment.setCommitId(source.getCommitId());
         comment.setOriginalCommitId(source.getOriginalCommitId());
         comment.setBody(source.getBody());
-        comment.setHtmlUrl(source.getHtmlUrl().toString());
-        comment.setAuthorAssociation(authorAssociationConverter.convert(source.getAuthorAssociation()));
-        comment.setStartLine(source.getPosition());
-        comment.setOriginalStartLine(source.getOriginalPosition());
-        comment.setLine(source.getPosition());
-        comment.setOriginalLine(source.getOriginalPosition());
+        if (source.getHtmlUrl() != null) {
+            comment.setHtmlUrl(source.getHtmlUrl().toString());
+        }
+        if (source.getAuthorAssociation() != null) {
+            comment.setAuthorAssociation(authorAssociationConverter.convert(source.getAuthorAssociation()));
+        } else {
+            comment.setAuthorAssociation(AuthorAssociation.NONE);
+        }
+        comment.setStartLine(source.getStartLine());
+        comment.setOriginalStartLine(source.getOriginalStartLine());
+        comment.setLine(source.getLine());
+        comment.setOriginalLine(source.getOriginalLine());
         comment.setStartSide(convertSide(source.getStartSide()));
         comment.setSide(convertSide(source.getSide()));
         comment.setPosition(source.getPosition());
@@ -52,6 +59,9 @@ public class GitHubPullRequestReviewCommentConverter
     }
 
     private PullRequestReviewComment.Side convertSide(Side side) {
+        if (side == null) {
+            return PullRequestReviewComment.Side.UNKNOWN;
+        }
         switch (side) {
             case LEFT:
                 return PullRequestReviewComment.Side.LEFT;

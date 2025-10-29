@@ -4,6 +4,7 @@ import de.tum.in.www1.hephaestus.gitprovider.common.AuthorAssociation;
 import de.tum.in.www1.hephaestus.gitprovider.common.BaseGitServiceEntity;
 import de.tum.in.www1.hephaestus.gitprovider.pullrequest.PullRequest;
 import de.tum.in.www1.hephaestus.gitprovider.pullrequestreview.PullRequestReview;
+import de.tum.in.www1.hephaestus.gitprovider.pullrequestreviewthread.PullRequestReviewThread;
 import de.tum.in.www1.hephaestus.gitprovider.user.User;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
@@ -11,7 +12,10 @@ import jakarta.persistence.Enumerated;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.Lob;
 import jakarta.persistence.ManyToOne;
+import jakarta.persistence.OneToMany;
 import jakarta.persistence.Table;
+import java.util.HashSet;
+import java.util.Set;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
@@ -95,6 +99,20 @@ public class PullRequestReviewComment extends BaseGitServiceEntity {
     @JoinColumn(name = "pull_request_id")
     @ToString.Exclude
     private PullRequest pullRequest;
+
+    @ManyToOne
+    @JoinColumn(name = "in_reply_to_id")
+    @ToString.Exclude
+    private PullRequestReviewComment inReplyTo;
+
+    @OneToMany(mappedBy = "inReplyTo")
+    @ToString.Exclude
+    private Set<PullRequestReviewComment> replies = new HashSet<>();
+
+    @ManyToOne
+    @JoinColumn(name = "thread_id")
+    @ToString.Exclude
+    private PullRequestReviewThread thread;
 
     public enum Side {
         LEFT,

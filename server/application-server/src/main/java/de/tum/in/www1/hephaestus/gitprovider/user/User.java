@@ -6,6 +6,7 @@ import de.tum.in.www1.hephaestus.gitprovider.issuecomment.IssueComment;
 import de.tum.in.www1.hephaestus.gitprovider.pullrequest.PullRequest;
 import de.tum.in.www1.hephaestus.gitprovider.pullrequestreview.PullRequestReview;
 import de.tum.in.www1.hephaestus.gitprovider.pullrequestreviewcomment.PullRequestReviewComment;
+import de.tum.in.www1.hephaestus.gitprovider.pullrequestreviewthread.PullRequestReviewThread;
 import de.tum.in.www1.hephaestus.gitprovider.team.Team;
 import de.tum.in.www1.hephaestus.gitprovider.team.membership.TeamMembership;
 import jakarta.persistence.Entity;
@@ -94,6 +95,10 @@ public class User extends BaseGitServiceEntity {
     @OneToMany(mappedBy = "author")
     @ToString.Exclude
     private Set<PullRequestReviewComment> reviewComments = new HashSet<>();
+
+    @OneToMany(mappedBy = "lastActor")
+    @ToString.Exclude
+    private Set<PullRequestReviewThread> actedReviewThreads = new HashSet<>();
 
     @NonNull
     private boolean notificationsEnabled = true;

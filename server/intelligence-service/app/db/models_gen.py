@@ -180,6 +180,119 @@ class OrganizationMembership(Base):
     role: Mapped[Optional[str]] = mapped_column(String(255))
 
 
+class PullRequestReviewComment(Base):
+    __tablename__ = "pull_request_review_comment"
+    __table_args__ = (
+        ForeignKeyConstraint(
+            ["author_id"], ["user.id"], name="fktl08ieowbl171xem2bciho7kw"
+        ),
+        ForeignKeyConstraint(
+            ["in_reply_to_id"],
+            ["pull_request_review_comment.id"],
+            name="FKduaqvrxnbh51u0t9giye3l7jp",
+        ),
+        ForeignKeyConstraint(
+            ["pull_request_id"], ["issue.id"], name="fkohqvdiswptbm0h8cniq7r1tgq"
+        ),
+        ForeignKeyConstraint(
+            ["review_id"],
+            ["pull_request_review.id"],
+            name="fkbx1g5jpdegymhyv9pbk2jdgfw",
+        ),
+        ForeignKeyConstraint(
+            ["thread_id"],
+            ["pull_request_review_thread.root_comment_id"],
+            name="FK1tkv4fy10wj068jx4duufx9jc",
+        ),
+        PrimaryKeyConstraint("id", name="pull_request_review_comment_pkey"),
+    )
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
+    line: Mapped[int] = mapped_column(Integer)
+    original_line: Mapped[int] = mapped_column(Integer)
+    original_position: Mapped[int] = mapped_column(Integer)
+    position: Mapped[int] = mapped_column(Integer)
+    created_at: Mapped[Optional[datetime.datetime]] = mapped_column(DateTime(True))
+    updated_at: Mapped[Optional[datetime.datetime]] = mapped_column(DateTime(True))
+    author_association: Mapped[Optional[str]] = mapped_column(String(255))
+    body: Mapped[Optional[Any]] = mapped_column(OID)
+    commit_id: Mapped[Optional[str]] = mapped_column(String(255))
+    diff_hunk: Mapped[Optional[Any]] = mapped_column(OID)
+    html_url: Mapped[Optional[str]] = mapped_column(String(255))
+    original_commit_id: Mapped[Optional[str]] = mapped_column(String(255))
+    original_start_line: Mapped[Optional[int]] = mapped_column(Integer)
+    path: Mapped[Optional[str]] = mapped_column(String(255))
+    side: Mapped[Optional[str]] = mapped_column(String(255))
+    start_line: Mapped[Optional[int]] = mapped_column(Integer)
+    start_side: Mapped[Optional[str]] = mapped_column(String(255))
+    author_id: Mapped[Optional[int]] = mapped_column(BigInteger)
+    pull_request_id: Mapped[Optional[int]] = mapped_column(BigInteger)
+    review_id: Mapped[Optional[int]] = mapped_column(BigInteger)
+    in_reply_to_id: Mapped[Optional[int]] = mapped_column(BigInteger)
+    thread_id: Mapped[Optional[int]] = mapped_column(BigInteger)
+    author: Mapped[Optional["User"]] = relationship(
+        "User", back_populates="pull_request_review_comment"
+    )
+    in_reply_to: Mapped[Optional["PullRequestReviewComment"]] = relationship(
+        "PullRequestReviewComment",
+        remote_side=[id],
+        back_populates="in_reply_to_reverse",
+    )
+    in_reply_to_reverse: Mapped[List["PullRequestReviewComment"]] = relationship(
+        "PullRequestReviewComment",
+        remote_side=[in_reply_to_id],
+        back_populates="in_reply_to",
+    )
+    pull_request: Mapped[Optional["Issue"]] = relationship(
+        "Issue", back_populates="pull_request_review_comment"
+    )
+    review: Mapped[Optional["PullRequestReview"]] = relationship(
+        "PullRequestReview", back_populates="pull_request_review_comment"
+    )
+    thread: Mapped[Optional["PullRequestReviewThread"]] = relationship(
+        "PullRequestReviewThread",
+        foreign_keys=[thread_id],
+        back_populates="pull_request_review_comment",
+    )
+
+
+class PullRequestReviewThread(PullRequestReviewComment):
+    __tablename__ = "pull_request_review_thread"
+    __table_args__ = (
+        ForeignKeyConstraint(
+            ["last_actor_id"], ["user.id"], name="FK35nnjwnugugqk1rre9qarlp70"
+        ),
+        ForeignKeyConstraint(
+            ["pull_request_id"], ["issue.id"], name="FKcafsgno4wfovl48ua223nklus"
+        ),
+        ForeignKeyConstraint(
+            ["root_comment_id"],
+            ["pull_request_review_comment.id"],
+            name="FK5gy1uh6lk2eq0ma69mg661lpp",
+        ),
+        PrimaryKeyConstraint("root_comment_id", name="pull_request_review_threadPK"),
+    )
+    root_comment_id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
+    state: Mapped[str] = mapped_column(String(20))
+    pull_request_id: Mapped[int] = mapped_column(BigInteger)
+    created_at: Mapped[Optional[datetime.datetime]] = mapped_column(TIMESTAMP(True, 6))
+    updated_at: Mapped[Optional[datetime.datetime]] = mapped_column(TIMESTAMP(True, 6))
+    resolved_at: Mapped[Optional[datetime.datetime]] = mapped_column(TIMESTAMP(True, 6))
+    last_actor_id: Mapped[Optional[int]] = mapped_column(BigInteger)
+    pull_request_review_comment: Mapped[List["PullRequestReviewComment"]] = (
+        relationship(
+            "PullRequestReviewComment",
+            foreign_keys="[PullRequestReviewComment.thread_id]",
+            back_populates="thread",
+        )
+    )
+    last_actor: Mapped[Optional["User"]] = relationship(
+        "User", back_populates="pull_request_review_thread"
+    )
+    pull_request: Mapped["Issue"] = relationship(
+        "Issue", back_populates="pull_request_review_thread"
+    )
+
+
 class Team(Base):
     __tablename__ = "team"
     __table_args__ = (PrimaryKeyConstraint("id", name="teamPK"),)
@@ -243,6 +356,12 @@ class User(Base):
     chat_thread: Mapped[List["ChatThread"]] = relationship(
         "ChatThread", back_populates="user"
     )
+    pull_request_review_comment: Mapped[List["PullRequestReviewComment"]] = (
+        relationship("PullRequestReviewComment", back_populates="author")
+    )
+    pull_request_review_thread: Mapped[List["PullRequestReviewThread"]] = relationship(
+        "PullRequestReviewThread", back_populates="last_actor"
+    )
     document: Mapped[List["Document"]] = relationship("Document", back_populates="user")
     team_membership: Mapped[List["TeamMembership"]] = relationship(
         "TeamMembership", back_populates="user"
@@ -267,9 +386,6 @@ class User(Base):
     )
     pull_request_review: Mapped[List["PullRequestReview"]] = relationship(
         "PullRequestReview", back_populates="author"
-    )
-    pull_request_review_comment: Mapped[List["PullRequestReviewComment"]] = (
-        relationship("PullRequestReviewComment", back_populates="author")
     )
 
 
@@ -584,6 +700,12 @@ class Issue(Base):
     last_detection_time: Mapped[Optional[datetime.datetime]] = mapped_column(
         TIMESTAMP(True, 6)
     )
+    pull_request_review_comment: Mapped[List["PullRequestReviewComment"]] = (
+        relationship("PullRequestReviewComment", back_populates="pull_request")
+    )
+    pull_request_review_thread: Mapped[List["PullRequestReviewThread"]] = relationship(
+        "PullRequestReviewThread", back_populates="pull_request"
+    )
     author: Mapped[Optional["User"]] = relationship(
         "User", foreign_keys=[author_id], back_populates="issue"
     )
@@ -615,9 +737,6 @@ class Issue(Base):
     )
     pull_request_review: Mapped[List["PullRequestReview"]] = relationship(
         "PullRequestReview", back_populates="pull_request"
-    )
-    pull_request_review_comment: Mapped[List["PullRequestReviewComment"]] = (
-        relationship("PullRequestReviewComment", back_populates="pull_request")
     )
     pullrequestbadpractice: Mapped[List["Pullrequestbadpractice"]] = relationship(
         "Pullrequestbadpractice", back_populates="pullrequest"
@@ -757,62 +876,14 @@ class PullRequestReview(Base):
     submitted_at: Mapped[Optional[datetime.datetime]] = mapped_column(DateTime(True))
     author_id: Mapped[Optional[int]] = mapped_column(BigInteger)
     pull_request_id: Mapped[Optional[int]] = mapped_column(BigInteger)
+    pull_request_review_comment: Mapped[List["PullRequestReviewComment"]] = (
+        relationship("PullRequestReviewComment", back_populates="review")
+    )
     author: Mapped[Optional["User"]] = relationship(
         "User", back_populates="pull_request_review"
     )
     pull_request: Mapped[Optional["Issue"]] = relationship(
         "Issue", back_populates="pull_request_review"
-    )
-    pull_request_review_comment: Mapped[List["PullRequestReviewComment"]] = (
-        relationship("PullRequestReviewComment", back_populates="review")
-    )
-
-
-class PullRequestReviewComment(Base):
-    __tablename__ = "pull_request_review_comment"
-    __table_args__ = (
-        ForeignKeyConstraint(
-            ["author_id"], ["user.id"], name="fktl08ieowbl171xem2bciho7kw"
-        ),
-        ForeignKeyConstraint(
-            ["pull_request_id"], ["issue.id"], name="fkohqvdiswptbm0h8cniq7r1tgq"
-        ),
-        ForeignKeyConstraint(
-            ["review_id"],
-            ["pull_request_review.id"],
-            name="fkbx1g5jpdegymhyv9pbk2jdgfw",
-        ),
-        PrimaryKeyConstraint("id", name="pull_request_review_comment_pkey"),
-    )
-    id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
-    line: Mapped[int] = mapped_column(Integer)
-    original_line: Mapped[int] = mapped_column(Integer)
-    original_position: Mapped[int] = mapped_column(Integer)
-    position: Mapped[int] = mapped_column(Integer)
-    created_at: Mapped[Optional[datetime.datetime]] = mapped_column(DateTime(True))
-    updated_at: Mapped[Optional[datetime.datetime]] = mapped_column(DateTime(True))
-    author_association: Mapped[Optional[str]] = mapped_column(String(255))
-    body: Mapped[Optional[Any]] = mapped_column(OID)
-    commit_id: Mapped[Optional[str]] = mapped_column(String(255))
-    diff_hunk: Mapped[Optional[Any]] = mapped_column(OID)
-    html_url: Mapped[Optional[str]] = mapped_column(String(255))
-    original_commit_id: Mapped[Optional[str]] = mapped_column(String(255))
-    original_start_line: Mapped[Optional[int]] = mapped_column(Integer)
-    path: Mapped[Optional[str]] = mapped_column(String(255))
-    side: Mapped[Optional[str]] = mapped_column(String(255))
-    start_line: Mapped[Optional[int]] = mapped_column(Integer)
-    start_side: Mapped[Optional[str]] = mapped_column(String(255))
-    author_id: Mapped[Optional[int]] = mapped_column(BigInteger)
-    pull_request_id: Mapped[Optional[int]] = mapped_column(BigInteger)
-    review_id: Mapped[Optional[int]] = mapped_column(BigInteger)
-    author: Mapped[Optional["User"]] = relationship(
-        "User", back_populates="pull_request_review_comment"
-    )
-    pull_request: Mapped[Optional["Issue"]] = relationship(
-        "Issue", back_populates="pull_request_review_comment"
-    )
-    review: Mapped[Optional["PullRequestReview"]] = relationship(
-        "PullRequestReview", back_populates="pull_request_review_comment"
     )
 
 
