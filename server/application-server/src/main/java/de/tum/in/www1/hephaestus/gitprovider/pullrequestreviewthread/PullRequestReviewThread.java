@@ -5,6 +5,7 @@ import de.tum.in.www1.hephaestus.gitprovider.pullrequest.PullRequest;
 import de.tum.in.www1.hephaestus.gitprovider.pullrequestreviewcomment.PullRequestReviewComment;
 import de.tum.in.www1.hephaestus.gitprovider.user.User;
 import jakarta.persistence.CascadeType;
+import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
@@ -30,6 +31,7 @@ import lombok.ToString;
 public class PullRequestReviewThread extends BaseGitServiceEntity {
 
     @Enumerated(EnumType.STRING)
+    @Column(length = 20)
     private State state = State.UNRESOLVED;
 
     private Instant resolvedAt;
