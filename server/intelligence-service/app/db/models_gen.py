@@ -283,7 +283,7 @@ class PullRequestReviewThread(Base):
     )
     id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
     state: Mapped[str] = mapped_column(
-        String(255), server_default=text("'UNRESOLVED'::character varying")
+        String(20), server_default=text("'UNRESOLVED'::character varying")
     )
     pull_request_id: Mapped[int] = mapped_column(BigInteger)
     created_at: Mapped[Optional[datetime.datetime]] = mapped_column(DateTime(True))
