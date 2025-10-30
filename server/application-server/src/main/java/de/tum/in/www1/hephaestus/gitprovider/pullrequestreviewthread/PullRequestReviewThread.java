@@ -1,0 +1,55 @@
+package de.tum.in.www1.hephaestus.gitprovider.pullrequestreviewthread;
+
+import de.tum.in.www1.hephaestus.gitprovider.common.BaseGitServiceEntity;
+import de.tum.in.www1.hephaestus.gitprovider.pullrequest.PullRequest;
+import de.tum.in.www1.hephaestus.gitprovider.pullrequestreviewcomment.PullRequestReviewComment;
+import de.tum.in.www1.hephaestus.gitprovider.user.User;
+import jakarta.persistence.CascadeType;
+import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
+import jakarta.persistence.JoinColumn;
+import jakarta.persistence.ManyToOne;
+import jakarta.persistence.OneToMany;
+import jakarta.persistence.OneToOne;
+import jakarta.persistence.Table;
+import java.time.Instant;
+import java.util.HashSet;
+import java.util.Set;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+import lombok.Setter;
+import lombok.ToString;
+
+@Entity
+@Table(name = "pull_request_review_thread")
+@Getter
+@Setter
+@NoArgsConstructor
+@ToString(callSuper = true)
+public class PullRequestReviewThread extends BaseGitServiceEntity {
+
+    @Enumerated(EnumType.STRING)
+    private State state = State.UNRESOLVED;
+
+    private Instant resolvedAt;
+
+    @OneToOne
+    @JoinColumn(name = "root_comment_id")
+    @ToString.Exclude
+    private PullRequestReviewComment rootComment;
+
+    @ManyToOne(optional = false)
+    @JoinColumn(name = "pull_request_id")
+    @ToString.Exclude
+    private PullRequest pullRequest;
+
+    @OneToMany(mappedBy = "thread", cascade = CascadeType.ALL, orphanRemoval = true)
+    @ToString.Exclude
+    private Set<PullRequestReviewComment> comments = new HashSet<>();
+
+    public enum State {
+        RESOLVED,
+        UNRESOLVED,
+    }
+}
