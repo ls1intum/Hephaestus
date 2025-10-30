@@ -1404,6 +1404,7 @@ export type UserProfile = {
 
 export type UserSettings = {
     receiveNotifications?: boolean;
+    researchOptOut?: boolean;
 };
 
 export type UserTeams = {

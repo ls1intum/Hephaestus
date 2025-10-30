@@ -56,6 +56,16 @@ function RouteComponent() {
 	const handleNotificationToggle = (checked: boolean) => {
 		const updatedSettings: UserSettings = {
 			receiveNotifications: checked,
+			researchOptOut: settings?.researchOptOut,
+		};
+		updateSettingsMutation.mutate({ body: updatedSettings });
+	};
+
+	// Handle toggle change for research opt-out
+	const handleResearchOptOutToggle = (checked: boolean) => {
+		const updatedSettings: UserSettings = {
+			receiveNotifications: settings?.receiveNotifications,
+			researchOptOut: checked,
 		};
 		updateSettingsMutation.mutate({ body: updatedSettings });
 	};
@@ -71,6 +81,11 @@ function RouteComponent() {
 			notificationsProps={{
 				receiveNotifications: settings?.receiveNotifications ?? false,
 				onToggleNotifications: handleNotificationToggle,
+				isLoading: updateSettingsMutation.isPending,
+			}}
+			researchProps={{
+				researchOptOut: settings?.researchOptOut ?? false,
+				onToggleResearchOptOut: handleResearchOptOutToggle,
 				isLoading: updateSettingsMutation.isPending,
 			}}
 			accountProps={{

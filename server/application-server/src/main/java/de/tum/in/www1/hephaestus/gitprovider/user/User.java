@@ -98,6 +98,9 @@ public class User extends BaseGitServiceEntity {
     @NonNull
     private boolean notificationsEnabled = true;
 
+    @NonNull
+    private boolean researchOptOut = false;
+
     // Current ranking points for the leaderboard leagues
     private int leaguePoints;
 

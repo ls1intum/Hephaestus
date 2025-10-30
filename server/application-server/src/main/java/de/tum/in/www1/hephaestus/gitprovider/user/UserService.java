@@ -90,13 +90,14 @@ public class UserService {
 
     public UserSettingsDTO getUserSettings(User user) {
         logger.info("Getting user settings with userId: " + user);
-        return new UserSettingsDTO(user.isNotificationsEnabled());
+        return new UserSettingsDTO(user.isNotificationsEnabled(), user.isResearchOptOut());
     }
 
     public UserSettingsDTO updateUserSettings(User user, UserSettingsDTO userSettings) {
         logger.info("Updating user settings with userId: " + user);
         user.setNotificationsEnabled(userSettings.receiveNotifications());
+        user.setResearchOptOut(userSettings.researchOptOut());
         userRepository.save(user);
-        return new UserSettingsDTO(user.isNotificationsEnabled());
+        return new UserSettingsDTO(user.isNotificationsEnabled(), user.isResearchOptOut());
     }
 }
