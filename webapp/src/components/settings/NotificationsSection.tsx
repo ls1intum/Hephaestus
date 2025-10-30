@@ -32,7 +32,7 @@ export function NotificationsSection({
 			<div className="flex flex-row items-center justify-between">
 				{isLoading ? (
 					<>
-						<span className="flex-col items-start">
+						<span className="flex flex-col items-start">
 							<Skeleton className="h-5 w-36 mb-2" />
 							<Skeleton className="h-4 w-80" />
 						</span>
@@ -40,7 +40,7 @@ export function NotificationsSection({
 					</>
 				) : (
 					<>
-						<span className="flex-col items-start">
+						<span className="flex flex-col items-start">
 							<h3>Email notifications</h3>
 							<Label className="font-light">
 								Receive email notifications for newly detected bad practices and
