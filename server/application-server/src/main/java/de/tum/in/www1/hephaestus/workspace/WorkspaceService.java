@@ -19,6 +19,7 @@ import de.tum.in.www1.hephaestus.organization.Organization;
 import de.tum.in.www1.hephaestus.organization.OrganizationService;
 import de.tum.in.www1.hephaestus.syncing.GitHubDataSyncService;
 import de.tum.in.www1.hephaestus.syncing.NatsConsumerService;
+import de.tum.in.www1.hephaestus.workspace.member.WorkspaceMemberService;
 import jakarta.transaction.Transactional;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
@@ -76,6 +77,9 @@ public class WorkspaceService {
 
     @Autowired
     private LeaguePointsCalculationService leaguePointsCalculationService;
+
+    @Autowired
+    private WorkspaceMemberService workspaceMemberService;
 
     @Autowired
     private OrganizationService organizationService;
@@ -340,13 +344,15 @@ public class WorkspaceService {
     public void resetAndRecalculateLeagues() {
         logger.info("Resetting and recalculating league points for all users");
 
-        // Reset all users to default points (1000)
-        userRepository
-            .findAll()
-            .forEach(user -> {
-                user.setLeaguePoints(LeaguePointsCalculationService.POINTS_DEFAULT);
-                userRepository.save(user);
-            });
+        Optional<Workspace> workspaceOptional = workspaceMemberService.resolveSingleWorkspace(
+            "league recalculation"
+        );
+        if (workspaceOptional.isEmpty()) {
+            logger.warn("Skipping league recalculation because no workspace is configured.");
+            return;
+        }
+
+        workspaceMemberService.resetLeaguePoints(workspaceOptional, LeaguePointsCalculationService.POINTS_DEFAULT);
 
         // Get all pull request reviews and issue comments to calculate past leaderboards
         var now = Instant.now();
@@ -372,9 +378,9 @@ public class WorkspaceService {
                     return;
                 }
                 var user = userRepository.findByLoginWithEagerMergedPullRequests(leaderboardUser.login()).orElseThrow();
-                int newPoints = leaguePointsCalculationService.calculateNewPoints(user, entry);
-                user.setLeaguePoints(newPoints);
-                userRepository.save(user);
+                int currentPoints = workspaceMemberService.getCurrentLeaguePoints(workspaceOptional, user);
+                int newPoints = leaguePointsCalculationService.calculateNewPoints(user, currentPoints, entry);
+                workspaceMemberService.updateLeaguePoints(workspaceOptional, user, newPoints);
             });
 
             // Move time window back one week

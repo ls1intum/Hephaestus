@@ -8,6 +8,8 @@ import de.tum.in.www1.hephaestus.gitprovider.pullrequestreview.PullRequestReview
 import de.tum.in.www1.hephaestus.gitprovider.pullrequestreviewcomment.PullRequestReviewComment;
 import de.tum.in.www1.hephaestus.gitprovider.team.Team;
 import de.tum.in.www1.hephaestus.gitprovider.team.membership.TeamMembership;
+import de.tum.in.www1.hephaestus.workspace.member.WorkspaceMember;
+import jakarta.persistence.CascadeType;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
@@ -98,8 +100,9 @@ public class User extends BaseGitServiceEntity {
     @NonNull
     private boolean notificationsEnabled = true;
 
-    // Current ranking points for the leaderboard leagues
-    private int leaguePoints;
+    @OneToMany(mappedBy = "user", cascade = CascadeType.ALL, orphanRemoval = true)
+    @ToString.Exclude
+    private Set<WorkspaceMember> workspaceMemberships = new HashSet<>();
 
     public enum Type {
         USER,

@@ -312,7 +312,6 @@ erDiagram
         VARCHAR(255) login
         VARCHAR(255) name
         VARCHAR(255) type
-        INTEGER league_points "NOT NULL"
         BOOLEAN notifications_enabled "NOT NULL"
     }
 
@@ -326,6 +325,13 @@ erDiagram
         TIMESTAMPTZ installation_linked_at
         BIGINT organization_id FK,UK
         TEXT personal_access_token
+    }
+
+    WorkspaceMember {
+        BIGINT workspace_id PK,FK
+        BIGINT user_id PK,FK
+        INTEGER league_points "NOT NULL"
+        VARCHAR(32) role "NOT NULL"
     }
 
     %% Relationships
@@ -377,6 +383,8 @@ erDiagram
     User }o--o{ TeamMembership : belongs_to
     Repository }o--o{ TeamRepositoryPermission : has
     Team }o--o{ TeamRepositoryPermission : has
+    User }o--o{ WorkspaceMember : belongs_to
+    Workspace }o--o{ WorkspaceMember : belongs_to
 
     %% Styling
     classDef primaryEntity fill:#e1f5fe,stroke:#01579b,stroke-width:2px

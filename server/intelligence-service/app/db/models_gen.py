@@ -351,7 +351,6 @@ class User(Base):
     id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
     followers: Mapped[int] = mapped_column(Integer)
     following: Mapped[int] = mapped_column(Integer)
-    league_points: Mapped[int] = mapped_column(Integer, server_default=text("0"))
     notifications_enabled: Mapped[bool] = mapped_column(
         Boolean, server_default=text("true")
     )
@@ -379,6 +378,9 @@ class User(Base):
     )
     milestone: Mapped[List["Milestone"]] = relationship(
         "Milestone", back_populates="creator"
+    )
+    workspace_member: Mapped[List["WorkspaceMember"]] = relationship(
+        "WorkspaceMember", back_populates="user"
     )
     issue: Mapped[List["Issue"]] = relationship(
         "Issue", foreign_keys="[Issue.author_id]", back_populates="author"
@@ -537,6 +539,9 @@ class Workspace(Base):
     repository_to_monitor: Mapped[List["RepositoryToMonitor"]] = relationship(
         "RepositoryToMonitor", back_populates="workspace"
     )
+    workspace_member: Mapped[List["WorkspaceMember"]] = relationship(
+        "WorkspaceMember", back_populates="workspace"
+    )
 
 
 class Label(Base):
@@ -656,6 +661,27 @@ class TeamRepositoryPermission(Base):
     )
     team: Mapped["Team"] = relationship(
         "Team", back_populates="team_repository_permission"
+    )
+
+
+class WorkspaceMember(Base):
+    __tablename__ = "workspace_member"
+    __table_args__ = (
+        ForeignKeyConstraint(["user_id"], ["user.id"], name="fk_workspace_member_user"),
+        ForeignKeyConstraint(
+            ["workspace_id"], ["workspace.id"], name="fk_workspace_member_workspace"
+        ),
+        PrimaryKeyConstraint("workspace_id", "user_id", name="pk_workspace_member"),
+    )
+    workspace_id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
+    user_id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
+    league_points: Mapped[int] = mapped_column(Integer, server_default=text("0"))
+    role: Mapped[str] = mapped_column(
+        String(32), server_default=text("'MEMBER'::character varying")
+    )
+    user: Mapped["User"] = relationship("User", back_populates="workspace_member")
+    workspace: Mapped["Workspace"] = relationship(
+        "Workspace", back_populates="workspace_member"
     )
 
 

@@ -1,6 +1,7 @@
 package de.tum.in.www1.hephaestus.workspace;
 
 import de.tum.in.www1.hephaestus.organization.Organization;
+import de.tum.in.www1.hephaestus.workspace.member.WorkspaceMember;
 import jakarta.persistence.CascadeType;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
@@ -46,6 +47,10 @@ public class Workspace {
     )
     @ToString.Exclude
     private Set<RepositoryToMonitor> repositoriesToMonitor = new HashSet<>();
+
+    @OneToMany(mappedBy = "workspace", cascade = CascadeType.ALL, orphanRemoval = true)
+    @ToString.Exclude
+    private Set<WorkspaceMember> members = new HashSet<>();
 
     @Enumerated(EnumType.STRING)
     private GitProviderMode gitProviderMode = GitProviderMode.PAT_ORG;

@@ -3,6 +3,8 @@ package de.tum.in.www1.hephaestus.leaderboard.tasks;
 import de.tum.in.www1.hephaestus.gitprovider.user.UserInfoDTO;
 import de.tum.in.www1.hephaestus.gitprovider.user.UserRepository;
 import de.tum.in.www1.hephaestus.leaderboard.*;
+import de.tum.in.www1.hephaestus.workspace.Workspace;
+import de.tum.in.www1.hephaestus.workspace.member.WorkspaceMemberService;
 import jakarta.transaction.Transactional;
 import java.time.DayOfWeek;
 import java.time.Instant;
@@ -10,6 +12,7 @@ import java.time.ZoneId;
 import java.time.ZonedDateTime;
 import java.time.temporal.TemporalAdjusters;
 import java.util.List;
+import java.util.Optional;
 import java.util.function.Consumer;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
@@ -33,11 +36,22 @@ public class LeaguePointsUpdateTask implements Runnable {
     @Autowired
     private LeaguePointsCalculationService leaguePointsCalculationService;
 
+    @Autowired
+    private WorkspaceMemberService workspaceMemberService;
+
     @Override
     @Transactional
     public void run() {
+        Optional<Workspace> workspaceOptional = workspaceMemberService.resolveSingleWorkspace(
+            "scheduled league points update"
+        );
+        if (workspaceOptional.isEmpty()) {
+            logger.debug("Skipping league points update because no workspace is configured.");
+            return;
+        }
+
         List<LeaderboardEntryDTO> leaderboard = getLatestLeaderboard();
-        leaderboard.forEach(updateLeaderboardEntry());
+        leaderboard.forEach(updateLeaderboardEntry(workspaceOptional));
     }
 
     /**
@@ -45,16 +59,16 @@ public class LeaguePointsUpdateTask implements Runnable {
      *
      * @return {@code Consumer} that updates {@code leaguePoints} based on its leaderboard entry.
      */
-    private Consumer<? super LeaderboardEntryDTO> updateLeaderboardEntry() {
+    private Consumer<? super LeaderboardEntryDTO> updateLeaderboardEntry(Optional<Workspace> workspaceOptional) {
         return entry -> {
             UserInfoDTO leaderboardUser = entry.user();
             if (leaderboardUser == null) {
                 return;
             }
             var user = userRepository.findByLoginWithEagerMergedPullRequests(leaderboardUser.login()).orElseThrow();
-            int newPoints = leaguePointsCalculationService.calculateNewPoints(user, entry);
-            user.setLeaguePoints(newPoints);
-            userRepository.save(user);
+            int currentPoints = workspaceMemberService.getCurrentLeaguePoints(workspaceOptional, user);
+            int newPoints = leaguePointsCalculationService.calculateNewPoints(user, currentPoints, entry);
+            workspaceMemberService.updateLeaguePoints(workspaceOptional, user, newPoints);
         };
     }
 

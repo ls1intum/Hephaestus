@@ -1,0 +1,66 @@
+<?xml version="1.1" encoding="UTF-8" standalone="no"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd"
+>
+    <changeSet author="assistant" id="1761791989933-1">
+        <createTable tableName="workspace_member">
+            <column name="workspace_id" type="BIGINT">
+                <constraints nullable="false"/>
+            </column>
+            <column name="user_id" type="BIGINT">
+                <constraints nullable="false"/>
+            </column>
+            <column name="league_points" type="INTEGER" defaultValueNumeric="0">
+                <constraints nullable="false"/>
+            </column>
+            <column name="role" type="VARCHAR(32)" defaultValue="MEMBER">
+                <constraints nullable="false"/>
+            </column>
+        </createTable>
+        <addPrimaryKey columnNames="workspace_id, user_id" constraintName="pk_workspace_member" tableName="workspace_member"/>
+        <addForeignKeyConstraint
+            baseColumnNames="workspace_id"
+            baseTableName="workspace_member"
+            constraintName="fk_workspace_member_workspace"
+            referencedColumnNames="id"
+            referencedTableName="workspace"
+        />
+        <addForeignKeyConstraint
+            baseColumnNames="user_id"
+            baseTableName="workspace_member"
+            constraintName="fk_workspace_member_user"
+            referencedColumnNames="id"
+            referencedTableName="user"
+        />
+    </changeSet>
+
+    <changeSet author="assistant" id="1761791989933-2">
+        <comment>Seed workspace memberships for existing organization members and carry over league points.</comment>
+        <sql>
+            INSERT INTO workspace_member (workspace_id, user_id, league_points, role)
+            SELECT
+                w.id AS workspace_id,
+                om.user_id AS user_id,
+                COALESCE(u.league_points, 0) AS league_points,
+                CASE UPPER(COALESCE(om.role, 'MEMBER'))
+                    WHEN 'OWNER' THEN 'OWNER'
+                    WHEN 'ADMIN' THEN 'ADMIN'
+                    ELSE 'MEMBER'
+                END AS role
+            FROM workspace w
+            JOIN organization o ON o.id = w.organization_id
+            JOIN organization_membership om ON om.organization_id = o.github_id
+            JOIN "user" u ON u.id = om.user_id
+            ON CONFLICT (workspace_id, user_id) DO NOTHING;
+        </sql>
+    </changeSet>
+
+    <changeSet author="assistant" id="1761791989933-3">
+        <preConditions onFail="MARK_RAN">
+            <columnExists tableName="user" columnName="league_points"/>
+        </preConditions>
+        <dropColumn columnName="league_points" tableName="user"/>
+    </changeSet>
+</databaseChangeLog>

@@ -36,7 +36,6 @@ public class TestUserConfig {
                 user.setType(User.Type.USER);
                 user.setFollowers(0);
                 user.setFollowing(0);
-                user.setLeaguePoints(0);
                 user.setNotificationsEnabled(true);
                 // you can tweak defaults here if you need description, etc.
                 return repo.save(user);

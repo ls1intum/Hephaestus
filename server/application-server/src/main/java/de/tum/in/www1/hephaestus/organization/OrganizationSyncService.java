@@ -8,9 +8,12 @@ import de.tum.in.www1.hephaestus.workspace.Workspace;
 import de.tum.in.www1.hephaestus.workspace.WorkspaceGitHubAccess;
 import de.tum.in.www1.hephaestus.workspace.WorkspaceGitHubAccess.Context;
 import de.tum.in.www1.hephaestus.workspace.WorkspaceRepository;
+import de.tum.in.www1.hephaestus.workspace.member.WorkspaceMember;
+import de.tum.in.www1.hephaestus.workspace.member.WorkspaceMemberService;
 import jakarta.transaction.Transactional;
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -38,6 +41,7 @@ public class OrganizationSyncService {
     private final WorkspaceRepository workspaceRepository;
     private final GitHubUserSyncService userSyncService;
     private final WorkspaceGitHubAccess workspaceGitHubAccess;
+    private final WorkspaceMemberService workspaceMemberService;
 
     public OrganizationSyncService(
         OrganizationRepository organizationRepository,
@@ -46,7 +50,8 @@ public class OrganizationSyncService {
         UserRepository userRepository,
         WorkspaceRepository workspaceRepository,
         GitHubUserSyncService userSyncService,
-        WorkspaceGitHubAccess workspaceGitHubAccess
+        WorkspaceGitHubAccess workspaceGitHubAccess,
+        WorkspaceMemberService workspaceMemberService
     ) {
         this.organizationRepository = organizationRepository;
         this.organizationConverter = organizationConverter;
@@ -55,6 +60,7 @@ public class OrganizationSyncService {
         this.workspaceRepository = workspaceRepository;
         this.userSyncService = userSyncService;
         this.workspaceGitHubAccess = workspaceGitHubAccess;
+        this.workspaceMemberService = workspaceMemberService;
     }
 
     private static final Logger logger = LoggerFactory.getLogger(OrganizationSyncService.class);
@@ -122,6 +128,7 @@ public class OrganizationSyncService {
             if (!existing.isEmpty()) {
                 membershipRepository.deleteByOrganizationIdAndUserIdIn(organization.getGithubId(), existing);
             }
+            workspaceMemberService.syncWorkspaceMembers(context.workspace(), Collections.emptyMap());
             logger.info(
                 "Org members synced: orgId={} total=0 (cleared {})",
                 organization.getGithubId(),
@@ -155,6 +162,7 @@ public class OrganizationSyncService {
         }
 
         Set<Long> seen = new HashSet<>();
+        Map<Long, WorkspaceMember.Role> desiredWorkspaceRoles = new HashMap<>();
         for (Map.Entry<String, String> entry : desiredRoleByLoginLower.entrySet()) {
             User user = byLoginLower.get(entry.getKey());
             if (user == null) {
@@ -162,6 +170,7 @@ public class OrganizationSyncService {
             }
             membershipRepository.upsertMembership(organization.getGithubId(), user.getId(), entry.getValue());
             seen.add(user.getId());
+            desiredWorkspaceRoles.put(user.getId(), WorkspaceMember.Role.fromOrganizationRole(entry.getValue()));
         }
 
         List<Long> current = membershipRepository.findUserIdsByOrganizationId(organization.getGithubId());
@@ -169,6 +178,8 @@ public class OrganizationSyncService {
         if (!toRemove.isEmpty()) {
             membershipRepository.deleteByOrganizationIdAndUserIdIn(organization.getGithubId(), toRemove);
         }
+
+        workspaceMemberService.syncWorkspaceMembers(context.workspace(), desiredWorkspaceRoles);
 
         logger.info(
             "Org members synced: orgId={} total={}, createdUsers={}, removedMemberships={}",

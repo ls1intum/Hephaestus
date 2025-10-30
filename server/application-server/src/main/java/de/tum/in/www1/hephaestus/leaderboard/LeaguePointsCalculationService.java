@@ -14,5 +14,5 @@ public interface LeaguePointsCalculationService {
     double K_FACTOR_MEDIUM_POINTS = 1.2;
     double K_FACTOR_HIGH_POINTS = 1.1;
 
-    int calculateNewPoints(User user, LeaderboardEntryDTO entry);
+    int calculateNewPoints(User user, int currentLeaguePoints, LeaderboardEntryDTO entry);
 }
