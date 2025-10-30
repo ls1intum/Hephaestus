@@ -25,10 +25,43 @@
     <changeSet author="FelixTJDietrich" id="1761774703038-2">
         <addColumn tableName="pull_request_review_comment">
             <column name="thread_id" type="BIGINT">
-                <constraints nullable="false"/>
+                <constraints nullable="true"/>
             </column>
             <column name="in_reply_to_id" type="BIGINT"/>
         </addColumn>
+    </changeSet>
+
+    <changeSet author="FelixTJDietrich" id="1761774703038-2a">
+        <comment>Create a thread for each existing comment, treating each as its own thread</comment>
+        <sql>
+            INSERT INTO pull_request_review_thread (id, created_at, updated_at, state, pull_request_id, root_comment_id)
+            SELECT 
+                c.id as id,
+                c.created_at,
+                c.updated_at,
+                'UNRESOLVED' as state,
+                c.pull_request_id,
+                c.id as root_comment_id
+            FROM pull_request_review_comment c
+            WHERE c.thread_id IS NULL;
+        </sql>
+    </changeSet>
+
+    <changeSet author="FelixTJDietrich" id="1761774703038-2b">
+        <comment>Link existing comments to their newly created threads</comment>
+        <sql>
+            UPDATE pull_request_review_comment c
+            SET thread_id = c.id
+            WHERE c.thread_id IS NULL;
+        </sql>
+    </changeSet>
+
+    <changeSet author="FelixTJDietrich" id="1761774703038-2c">
+        <comment>Add NOT NULL constraint to thread_id after migrating existing data</comment>
+        <addNotNullConstraint 
+            tableName="pull_request_review_comment" 
+            columnName="thread_id" 
+            columnDataType="BIGINT"/>
     </changeSet>
 
     <changeSet author="FelixTJDietrich" id="1761774703038-3">
