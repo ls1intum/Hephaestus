@@ -32,21 +32,21 @@ export function NotificationsSection({
 			<div className="flex flex-row items-center justify-between">
 				{isLoading ? (
 					<>
-						<span className="flex-col items-start">
+						<div className="flex flex-col items-start">
 							<Skeleton className="h-5 w-36 mb-2" />
 							<Skeleton className="h-4 w-80" />
-						</span>
+						</div>
 						<Skeleton className="h-5 w-10 rounded-full mr-2" />
 					</>
 				) : (
 					<>
-						<span className="flex-col items-start">
+						<div className="flex flex-col items-start">
 							<h3>Email notifications</h3>
 							<Label className="font-light">
 								Receive email notifications for newly detected bad practices and
 								reminders.
 							</Label>
-						</span>
+						</div>
 						<Switch
 							className="mr-2"
 							checked={receiveNotifications}

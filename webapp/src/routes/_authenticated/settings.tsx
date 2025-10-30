@@ -7,7 +7,6 @@ import {
 	getUserSettingsQueryKey,
 	updateUserSettingsMutation,
 } from "@/api/@tanstack/react-query.gen";
-import type { UserSettings } from "@/api/types.gen";
 import { SettingsPage } from "@/components/settings/SettingsPage";
 import { useAuth } from "@/integrations/auth/AuthContext";
 
@@ -54,10 +53,27 @@ function RouteComponent() {
 
 	// Handle toggle change for notifications
 	const handleNotificationToggle = (checked: boolean) => {
-		const updatedSettings: UserSettings = {
-			receiveNotifications: checked,
-		};
-		updateSettingsMutation.mutate({ body: updatedSettings });
+		if (!settings) {
+			return;
+		}
+		updateSettingsMutation.mutate({
+			body: {
+				receiveNotifications: checked,
+				participateInResearch: settings.participateInResearch,
+			},
+		});
+	};
+
+	const handleResearchToggle = (checked: boolean) => {
+		if (!settings) {
+			return;
+		}
+		updateSettingsMutation.mutate({
+			body: {
+				participateInResearch: checked,
+				receiveNotifications: settings.receiveNotifications,
+			},
+		});
 	};
 
 	// Handle account deletion
@@ -71,6 +87,11 @@ function RouteComponent() {
 			notificationsProps={{
 				receiveNotifications: settings?.receiveNotifications ?? false,
 				onToggleNotifications: handleNotificationToggle,
+				isLoading: updateSettingsMutation.isPending,
+			}}
+			researchProps={{
+				participateInResearch: settings?.participateInResearch ?? true,
+				onToggleResearch: handleResearchToggle,
 				isLoading: updateSettingsMutation.isPending,
 			}}
 			accountProps={{

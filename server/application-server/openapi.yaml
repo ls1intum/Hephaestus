@@ -2749,8 +2749,13 @@ components:
     UserSettings:
       type: object
       properties:
+        participateInResearch:
+          type: boolean
         receiveNotifications:
           type: boolean
+      required:
+      - participateInResearch
+      - receiveNotifications
     UserTeams:
       type: object
       properties:

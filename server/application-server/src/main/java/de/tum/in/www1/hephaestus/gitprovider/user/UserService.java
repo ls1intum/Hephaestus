@@ -14,6 +14,7 @@ import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
@@ -90,13 +91,18 @@ public class UserService {
 
     public UserSettingsDTO getUserSettings(User user) {
         logger.info("Getting user settings with userId: " + user);
-        return new UserSettingsDTO(user.isNotificationsEnabled());
+        return new UserSettingsDTO(user.isNotificationsEnabled(), user.isParticipateInResearch());
     }
 
     public UserSettingsDTO updateUserSettings(User user, UserSettingsDTO userSettings) {
         logger.info("Updating user settings with userId: " + user);
-        user.setNotificationsEnabled(userSettings.receiveNotifications());
+        user.setNotificationsEnabled(
+            Objects.requireNonNull(userSettings.receiveNotifications(), "receiveNotifications must not be null")
+        );
+        user.setParticipateInResearch(
+            Objects.requireNonNull(userSettings.participateInResearch(), "participateInResearch must not be null")
+        );
         userRepository.save(user);
-        return new UserSettingsDTO(user.isNotificationsEnabled());
+        return new UserSettingsDTO(user.isNotificationsEnabled(), user.isParticipateInResearch());
     }
 }
