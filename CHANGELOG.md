@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.10.0-rc.9](https://github.com/ls1intum/Hephaestus/compare/v0.10.0-rc.8...v0.10.0-rc.9) (2025-10-30)
+
+### 🚀 Features
+
+* **application-server:** sync pull request review threads ([#522](https://github.com/ls1intum/Hephaestus/issues/522)) ([e5f00d0](https://github.com/ls1intum/Hephaestus/commit/e5f00d057ab74930b2bcd8c97fb870c66592dd97))
+
 ## [0.10.0-rc.8](https://github.com/ls1intum/Hephaestus/compare/v0.10.0-rc.7...v0.10.0-rc.8) (2025-10-29)
 
 ### 🚀 Features
