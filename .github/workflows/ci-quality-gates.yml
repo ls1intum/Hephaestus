@@ -185,10 +185,7 @@ jobs:
         run: |
           echo "🔍 Running intelligence-service quality checks..."
           cd server/intelligence-service
-
-          if [ ! -d ".venv" ]; then
-            poetry install --no-interaction --no-root
-          fi
+          poetry install --no-interaction --no-root --with dev
 
           ISSUES_FOUND=()
 
@@ -225,10 +222,7 @@ jobs:
         run: |
           echo "🔍 Running webhook-ingest quality checks..."
           cd server/webhook-ingest
-
-          if [ ! -d ".venv" ]; then
-            poetry install --no-interaction --no-root
-          fi
+          poetry install --no-interaction --no-root --with dev
 
           ISSUES_FOUND=()
 
@@ -270,9 +264,7 @@ jobs:
 
           # Setup Python environments
           cd server/intelligence-service
-          if [ ! -d ".venv" ]; then
-            poetry install --no-interaction --no-root
-          fi
+          poetry install --no-interaction --no-root --with dev
           cd ../..
 
           # Setup application-server environment
