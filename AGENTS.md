@@ -32,7 +32,7 @@ Run the relevant commands locally before opening a PR:
 | Intelligence service lint/type check | `poetry run black --check .`, `poetry run flake8 .`, `poetry run mypy .` inside `server/intelligence-service`. |
 | Webhook ingest lint | `poetry run black --check .` and `poetry run flake8 .` inside `server/webhook-ingest`. |
 
-Document any skipped gate in the PR description with a rationale.
+Document any skipped gate in the PR description with a rationale. Always finish a change set by running `npm run format` followed by `npm run lint` so both styling and type checks reflect the final state.
 
 ## 4. Code generation & forbidden edits
 We rely heavily on generated artifacts. Never hand-edit these directories—regenerate instead:
@@ -54,6 +54,7 @@ Regeneration is destructive; stash local edits before running these commands. Ch
   1. Spin up PostgreSQL through Docker (ensure Docker is running or set `CI=true` with a ready Postgres).
   2. Snapshot the schema, run Liquibase diff, and create a timestamped changelog file.
   3. Tear down the temporary container.
+- Trim the generated changelog to only the real schema deltas (e.g., new columns). Never commit the raw diff wholesale—prune back to the minimal change set before renaming it into `db/changelog/`.
 - After drafting a changelog, run `npm run db:generate-erd-docs` and `npm run db:generate-models:intelligence-service` to keep ERD docs and SQLAlchemy models in sync.
 - Never manually edit generated Liquibase diff sections unless you fully understand the implications. Prefer creating a follow-up changelog to fix mistakes.
 
@@ -76,6 +77,7 @@ Regeneration is destructive; stash local edits before running these commands. Ch
 - Reuse existing DTO converters/mappers instead of duplicating mapping logic. Look at `gitprovider.team` for established patterns.
 - Security: new endpoints must enforce permissions using the existing security utilities (`EnsureAdminUser`, etc.).
 - Keep Liquibase changelog IDs monotonic and descriptive. Align entity annotations with the generated change sets.
+- Annotate record components in DTOs with `@NonNull` whenever the API should require them so the generated OpenAPI schema matches the backend contract.
 - When integrating with the intelligence-service client, always regenerate (`npm run generate:api:intelligence-service:client`) after touching the spec and commit the updated Java files.
 
 ## 8. Python services expectations

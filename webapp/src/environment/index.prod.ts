@@ -16,6 +16,7 @@ export default {
 		skipLoginPage: "WEB_ENV_KEYCLOAK_SKIP_LOGIN",
 	},
 	posthog: {
+		enabled: "WEB_ENV_POSTHOG_ENABLED",
 		projectApiKey: "WEB_ENV_POSTHOG_PROJECT_API_KEY",
 		apiHost: "WEB_ENV_POSTHOG_API_HOST",
 	},

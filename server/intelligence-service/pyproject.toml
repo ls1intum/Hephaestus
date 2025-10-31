@@ -26,6 +26,7 @@ dependencies = [
     "ipython == 8.31.0",
     "psycopg[binary] (>=3.2.9,<4.0.0)",
     "sqlacodegen == 3.0.0",
+    "python-dotenv == 1.0.1",
 ]
 
 [tool.poetry]

@@ -123,11 +123,13 @@ public class GitHubPullRequestReviewCommentSyncService {
 
         pullRequestReviewRepository
             .findById(ghPullRequestReviewComment.getPullRequestReviewId())
-            .ifPresentOrElse(result::setReview, () -> logger.error(
-                "Failed to link review for pull request review comment {}: {}",
-                ghPullRequestReviewComment.getId(),
-                "Review not found"
-            ));
+            .ifPresentOrElse(result::setReview, () ->
+                logger.error(
+                    "Failed to link review for pull request review comment {}: {}",
+                    ghPullRequestReviewComment.getId(),
+                    "Review not found"
+                )
+            );
 
         attachAuthor(ghPullRequestReviewComment, result);
 
@@ -143,10 +145,7 @@ public class GitHubPullRequestReviewCommentSyncService {
         return persisted;
     }
 
-    private PullRequestReviewComment updateIfNewer(
-        GHPullRequestReviewComment source,
-        PullRequestReviewComment target
-    ) {
+    private PullRequestReviewComment updateIfNewer(GHPullRequestReviewComment source, PullRequestReviewComment target) {
         try {
             if (target.getUpdatedAt() == null || target.getUpdatedAt().isBefore(source.getUpdatedAt())) {
                 return pullRequestReviewCommentConverter.update(source, target);
@@ -158,10 +157,7 @@ public class GitHubPullRequestReviewCommentSyncService {
         }
     }
 
-    private void attachAuthor(
-        GHPullRequestReviewComment ghPullRequestReviewComment,
-        PullRequestReviewComment comment
-    ) {
+    private void attachAuthor(GHPullRequestReviewComment ghPullRequestReviewComment, PullRequestReviewComment comment) {
         try {
             GHUser user = ghPullRequestReviewComment.getUser();
             if (user == null) {
@@ -258,7 +254,10 @@ public class GitHubPullRequestReviewCommentSyncService {
             .findById(commentId)
             .ifPresent(comment -> {
                 var thread = comment.getThread();
-                boolean isRootComment = thread != null && thread.getRootComment() != null && thread.getRootComment().getId().equals(commentId);
+                boolean isRootComment =
+                    thread != null &&
+                    thread.getRootComment() != null &&
+                    thread.getRootComment().getId().equals(commentId);
 
                 if (isRootComment) {
                     pullRequestReviewThreadRepository.delete(thread);

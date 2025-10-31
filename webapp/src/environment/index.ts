@@ -13,6 +13,7 @@ export default {
 		skipLoginPage: true, // If true, it will directly use github IDP for login
 	},
 	posthog: {
+		enabled: false,
 		projectApiKey: "",
 		apiHost: "",
 	},

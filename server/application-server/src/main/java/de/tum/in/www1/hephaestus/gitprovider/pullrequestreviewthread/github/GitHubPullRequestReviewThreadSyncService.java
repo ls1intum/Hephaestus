@@ -69,7 +69,10 @@ public class GitHubPullRequestReviewThreadSyncService {
             .toList();
 
         for (GHPullRequestReviewComment comment : sortedComments) {
-            PullRequestReviewComment persisted = commentSyncService.processPullRequestReviewComment(comment, ghPullRequest);
+            PullRequestReviewComment persisted = commentSyncService.processPullRequestReviewComment(
+                comment,
+                ghPullRequest
+            );
             if (persisted != null) {
                 thread = persisted.getThread();
             }

@@ -355,6 +355,9 @@ class User(Base):
     notifications_enabled: Mapped[bool] = mapped_column(
         Boolean, server_default=text("true")
     )
+    participate_in_research: Mapped[bool] = mapped_column(
+        Boolean, server_default=text("true")
+    )
     created_at: Mapped[Optional[datetime.datetime]] = mapped_column(DateTime(True))
     updated_at: Mapped[Optional[datetime.datetime]] = mapped_column(DateTime(True))
     avatar_url: Mapped[Optional[str]] = mapped_column(String(255))

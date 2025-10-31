@@ -23,8 +23,7 @@ public final class PostgreSQLTestContainer {
     private static final String DEFAULT_TEST_DB = "hephaestus_test";
     private static final String DEFAULT_TEST_USER = "test";
     private static final String DEFAULT_TEST_PASSWORD = "test";
-    private static final String DEFAULT_TEST_JDBC_URL =
-        "jdbc:postgresql://localhost:5432/" + DEFAULT_TEST_DB;
+    private static final String DEFAULT_TEST_JDBC_URL = "jdbc:postgresql://localhost:5432/" + DEFAULT_TEST_DB;
 
     private static final Logger LOGGER = LoggerFactory.getLogger(PostgreSQLTestContainer.class);
 
@@ -75,7 +74,9 @@ public final class PostgreSQLTestContainer {
     }
 
     private static boolean useLocalDatabase() {
-        String dbMode = Optional.ofNullable(System.getenv(ENV_DB_MODE)).map(v -> v.toLowerCase(Locale.ROOT)).orElse(null);
+        String dbMode = Optional.ofNullable(System.getenv(ENV_DB_MODE))
+            .map(v -> v.toLowerCase(Locale.ROOT))
+            .orElse(null);
         return "local".equals(dbMode);
     }
 
@@ -88,8 +89,7 @@ public final class PostgreSQLTestContainer {
 
         newContainer.start();
 
-        Runtime
-            .getRuntime()
+        Runtime.getRuntime()
             .addShutdownHook(
                 new Thread(() -> {
                     if (newContainer.isRunning()) {
@@ -136,7 +136,8 @@ public final class PostgreSQLTestContainer {
                 connection.createStatement().execute("SELECT 1");
             } catch (SQLException exception) {
                 throw new IllegalStateException(
-                    "Failed to connect to local PostgreSQL instance at " + jdbcUrl +
+                    "Failed to connect to local PostgreSQL instance at " +
+                    jdbcUrl +
                     ". Run 'scripts/codex-setup.sh' and ensure scripts/local-postgres.sh start completes successfully before running tests.",
                     exception
                 );
