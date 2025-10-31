@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.10.0-rc.10](https://github.com/ls1intum/Hephaestus/compare/v0.10.0-rc.9...v0.10.0-rc.10) (2025-10-31)
+
+### 🚀 Features
+
+* enforce research participation consent ([#524](https://github.com/ls1intum/Hephaestus/issues/524)) ([6531868](https://github.com/ls1intum/Hephaestus/commit/65318683a7a8182c13fe13f2cd32817925d4fcaa))
+
 ## [0.10.0-rc.9](https://github.com/ls1intum/Hephaestus/compare/v0.10.0-rc.8...v0.10.0-rc.9) (2025-10-30)
 
 ### 🚀 Features
