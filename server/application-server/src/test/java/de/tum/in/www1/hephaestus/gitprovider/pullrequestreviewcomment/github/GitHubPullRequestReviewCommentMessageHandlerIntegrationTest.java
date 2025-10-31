@@ -76,7 +76,9 @@ class GitHubPullRequestReviewCommentMessageHandlerIntegrationTest extends BaseIn
                 assertThat(comment.getSide().name()).isEqualTo(commentPayload.getComment().getSide().name());
                 assertThat(comment.getThread()).isNotNull();
                 assertThat(comment.getThread().getId()).isEqualTo(comment.getId());
-                assertThat(comment.getThread().getState()).isEqualTo(de.tum.in.www1.hephaestus.gitprovider.pullrequestreviewthread.PullRequestReviewThread.State.UNRESOLVED);
+                assertThat(comment.getThread().getState()).isEqualTo(
+                    de.tum.in.www1.hephaestus.gitprovider.pullrequestreviewthread.PullRequestReviewThread.State.UNRESOLVED
+                );
             });
 
         assertThat(threadRepository.findById(commentPayload.getComment().getId())).isPresent();
@@ -128,8 +130,12 @@ class GitHubPullRequestReviewCommentMessageHandlerIntegrationTest extends BaseIn
     @Test
     @DisplayName("should persist replies and link them to the root thread")
     void createdReplyLinksToThread(
-        @GitHubPayload("pull_request_review_comment.created.thread-1") GHEventPayload.PullRequestReviewComment rootPayload,
-        @GitHubPayload("pull_request_review_comment.created.thread-2") GHEventPayload.PullRequestReviewComment replyPayload
+        @GitHubPayload(
+            "pull_request_review_comment.created.thread-1"
+        ) GHEventPayload.PullRequestReviewComment rootPayload,
+        @GitHubPayload(
+            "pull_request_review_comment.created.thread-2"
+        ) GHEventPayload.PullRequestReviewComment replyPayload
     ) throws Exception {
         // Arrange root review
         ensureReviewExists(rootPayload);
@@ -155,9 +161,15 @@ class GitHubPullRequestReviewCommentMessageHandlerIntegrationTest extends BaseIn
     @Test
     @DisplayName("should retain threads when a reply is deleted")
     void deletedReplyKeepsThread(
-        @GitHubPayload("pull_request_review_comment.created.thread-1") GHEventPayload.PullRequestReviewComment rootPayload,
-        @GitHubPayload("pull_request_review_comment.created.thread-2") GHEventPayload.PullRequestReviewComment replyPayload,
-        @GitHubPayload("pull_request_review_comment.deleted.thread-2") GHEventPayload.PullRequestReviewComment deletedReplyPayload
+        @GitHubPayload(
+            "pull_request_review_comment.created.thread-1"
+        ) GHEventPayload.PullRequestReviewComment rootPayload,
+        @GitHubPayload(
+            "pull_request_review_comment.created.thread-2"
+        ) GHEventPayload.PullRequestReviewComment replyPayload,
+        @GitHubPayload(
+            "pull_request_review_comment.deleted.thread-2"
+        ) GHEventPayload.PullRequestReviewComment deletedReplyPayload
     ) throws Exception {
         // Arrange
         ensureReviewExists(rootPayload);

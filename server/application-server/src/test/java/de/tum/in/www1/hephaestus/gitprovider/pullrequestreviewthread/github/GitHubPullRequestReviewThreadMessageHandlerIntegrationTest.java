@@ -9,8 +9,8 @@ import de.tum.in.www1.hephaestus.gitprovider.pullrequest.github.GitHubPullReques
 import de.tum.in.www1.hephaestus.gitprovider.pullrequestreview.PullRequestReview;
 import de.tum.in.www1.hephaestus.gitprovider.pullrequestreview.PullRequestReviewRepository;
 import de.tum.in.www1.hephaestus.gitprovider.pullrequestreviewcomment.github.GitHubPullRequestReviewCommentSyncService;
-import de.tum.in.www1.hephaestus.gitprovider.pullrequestreviewthread.PullRequestReviewThreadRepository;
 import de.tum.in.www1.hephaestus.gitprovider.pullrequestreviewthread.PullRequestReviewThread;
+import de.tum.in.www1.hephaestus.gitprovider.pullrequestreviewthread.PullRequestReviewThreadRepository;
 import de.tum.in.www1.hephaestus.testconfig.BaseIntegrationTest;
 import java.time.Instant;
 import org.junit.jupiter.api.BeforeEach;
@@ -51,8 +51,12 @@ class GitHubPullRequestReviewThreadMessageHandlerIntegrationTest extends BaseInt
     @Test
     @DisplayName("should update thread state on resolve and unresolve events")
     void threadEventsUpdateState(
-        @GitHubPayload("pull_request_review_comment.created.thread-1") GHEventPayload.PullRequestReviewComment rootComment,
-        @GitHubPayload("pull_request_review_comment.created.thread-2") GHEventPayload.PullRequestReviewComment replyComment,
+        @GitHubPayload(
+            "pull_request_review_comment.created.thread-1"
+        ) GHEventPayload.PullRequestReviewComment rootComment,
+        @GitHubPayload(
+            "pull_request_review_comment.created.thread-2"
+        ) GHEventPayload.PullRequestReviewComment replyComment,
         @GitHubPayload("pull_request_review_thread.resolved") GHEventPayloadPullRequestReviewThread resolvedPayload,
         @GitHubPayload("pull_request_review_thread.unresolved") GHEventPayloadPullRequestReviewThread unresolvedPayload
     ) throws Exception {

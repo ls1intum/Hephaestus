@@ -40,13 +40,11 @@ public class PosthogClient {
         this.projectId = projectId;
         if (this.enabled) {
             String resolvedHost = normalizeHost(apiHost);
-            this.restClient =
-                RestClient
-                    .builder()
-                    .baseUrl(resolvedHost)
-                    .defaultHeader(HttpHeaders.AUTHORIZATION, "Bearer " + personalApiKey)
-                    .defaultHeader(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE)
-                    .build();
+            this.restClient = RestClient.builder()
+                .baseUrl(resolvedHost)
+                .defaultHeader(HttpHeaders.AUTHORIZATION, "Bearer " + personalApiKey)
+                .defaultHeader(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE)
+                .build();
             logger.info("PostHog client activated for project {} using host {}", projectId, resolvedHost);
         } else {
             if (enabled) {
@@ -68,18 +66,16 @@ public class PosthogClient {
         }
         logger.info("Requesting PostHog person deletion for distinctId {}", distinctId);
         try {
-            JsonNode response =
-                restClient
-                    .get()
-                    .uri(
-                        uriBuilder ->
-                            uriBuilder
-                                .path("/api/projects/{projectId}/persons/")
-                                .queryParam("distinct_ids", distinctId)
-                                .build(projectId)
-                    )
-                    .retrieve()
-                    .body(JsonNode.class);
+            JsonNode response = restClient
+                .get()
+                .uri(uriBuilder ->
+                    uriBuilder
+                        .path("/api/projects/{projectId}/persons/")
+                        .queryParam("distinct_ids", distinctId)
+                        .build(projectId)
+                )
+                .retrieve()
+                .body(JsonNode.class);
 
             if (response == null || !response.has("results") || !response.get("results").isArray()) {
                 logger.debug("No PostHog person found for distinctId {}", distinctId);
@@ -111,21 +107,23 @@ public class PosthogClient {
             for (String personId : personIds) {
                 restClient
                     .delete()
-                    .uri(
-                        uriBuilder ->
-                            uriBuilder
-                                .path("/api/projects/{projectId}/persons/{personId}/")
-                                .queryParam("delete_events", true)
-                                .build(projectId, personId)
+                    .uri(uriBuilder ->
+                        uriBuilder
+                            .path("/api/projects/{projectId}/persons/{personId}/")
+                            .queryParam("delete_events", true)
+                            .build(projectId, personId)
                     )
                     .retrieve()
                     .toBodilessEntity();
                 logger.info("Requested PostHog deletion for person {}", personId);
             }
 
-            logger.info("Completed PostHog deletion request for distinctId {} ({} person(s))", distinctId, personIds.size());
+            logger.info(
+                "Completed PostHog deletion request for distinctId {} ({} person(s))",
+                distinctId,
+                personIds.size()
+            );
             return true;
-
         } catch (RestClientException exception) {
             logger.warn("Failed to delete PostHog data for distinctId {}", distinctId, exception);
             throw new PosthogClientException("Failed to delete PostHog data", exception);

@@ -1,9 +1,7 @@
 package de.tum.in.www1.hephaestus.gitprovider.user;
 
-import java.util.Optional;
 import de.tum.in.www1.hephaestus.integrations.posthog.PosthogClientException;
-import org.springframework.security.core.Authentication;
-import org.springframework.security.core.context.SecurityContextHolder;
+import java.util.Optional;
 import org.keycloak.admin.client.Keycloak;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -11,7 +9,9 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.Authentication;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.oauth2.core.oidc.StandardClaimNames;
 import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken;
 import org.springframework.web.bind.annotation.DeleteMapping;
@@ -67,12 +67,8 @@ public class UserController {
         try {
             userService.deleteUserTrackingData(gitUser, keycloakUserId);
         } catch (PosthogClientException exception) {
-                logger.error(
-                    "Failed to remove analytics data before deleting user {}",
-                    keycloakUserId,
-                    exception
-                );
-                return ResponseEntity.status(HttpStatus.BAD_GATEWAY).build();
+            logger.error("Failed to remove analytics data before deleting user {}", keycloakUserId, exception);
+            return ResponseEntity.status(HttpStatus.BAD_GATEWAY).build();
         }
 
         logger.info("Deleting user {}", keycloakUserId);
@@ -111,7 +107,8 @@ public class UserController {
             keycloakUserId = token.getToken().getClaimAsString(StandardClaimNames.SUB);
         } else {
             logger.warn("Updating user settings without an authenticated principal");
-            boolean switchingOffResearch = Boolean.FALSE.equals(userSettings.participateInResearch()) && user.get().isParticipateInResearch();
+            boolean switchingOffResearch =
+                Boolean.FALSE.equals(userSettings.participateInResearch()) && user.get().isParticipateInResearch();
             if (switchingOffResearch) {
                 return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
             }
