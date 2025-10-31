@@ -1,7 +1,4 @@
-import { Microscope, ShieldCheck } from "lucide-react";
-import { Badge } from "@/components/ui/badge";
 import { Label } from "@/components/ui/label";
-import { Skeleton } from "@/components/ui/skeleton";
 import { Switch } from "@/components/ui/switch";
 
 export interface ResearchParticipationSectionProps {
@@ -30,46 +27,23 @@ export function ResearchParticipationSection({
 }: ResearchParticipationSectionProps) {
 	return (
 		<div className="sm:w-2/3 w-full flex flex-col gap-3">
-			<div className="flex items-center gap-2">
-				<Microscope className="h-5 w-5 text-muted-foreground" />
-				<h2 className="text-lg font-semibold">Research Participation</h2>
-				<Badge variant="outline" className="text-xs gap-1">
-					<ShieldCheck className="h-3 w-3" />
-					SIGSOFT Ethics Verified
-				</Badge>
-			</div>
+			<h2 className="text-lg font-semibold">Research Participation</h2>
 			<div className="flex flex-row items-center justify-between">
-				{isLoading ? (
-					<>
-						<div className="flex flex-col items-start">
-							<Skeleton className="h-5 w-48 mb-2" />
-							<Skeleton className="h-4 w-full mb-1" />
-							<Skeleton className="h-4 w-full" />
-						</div>
-						<Skeleton className="h-5 w-10 rounded-full mr-2" />
-					</>
-				) : (
-					<>
-						<div className="flex flex-col items-start">
-							<h3 className="text-balance font-medium">
-								Help advance software engineering research
-							</h3>
-							<Label className="font-light text-pretty text-muted-foreground">
-								Your anonymized usage data contributes to peer-reviewed academic
-								research. All data is stripped of identifying information, used
-								exclusively for scholarly purposes, and handled according to ACM
-								SIGSOFT ethical guidelines. You maintain full control and can
-								withdraw consent at any time.
-							</Label>
-						</div>
-						<Switch
-							className="mr-2"
-							checked={participateInResearch}
-							onCheckedChange={onToggleResearch}
-							disabled={isLoading}
-						/>
-					</>
-				)}
+				<div className="flex flex-col items-start max-w-xl">
+					<h3>Help improve Hephaestus</h3>
+					<Label className="font-light">
+						Share which features you use and how you interact with them to
+						support academic research and product improvements. May include
+						occasional surveys. Data is only accessible to administrators.
+					</Label>
+				</div>
+				<Switch
+					aria-busy={isLoading}
+					className="mr-2"
+					checked={participateInResearch}
+					onCheckedChange={onToggleResearch}
+					disabled={isLoading}
+				/>
 			</div>
 		</div>
 	);

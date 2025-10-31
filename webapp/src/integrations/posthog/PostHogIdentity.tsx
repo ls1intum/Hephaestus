@@ -1,35 +1,76 @@
+import { useQuery } from "@tanstack/react-query";
 import { usePostHog } from "posthog-js/react";
-import { useEffect, useRef } from "react";
+import { useEffect, useMemo, useRef } from "react";
+
+import { getUserSettingsOptions } from "@/api/@tanstack/react-query.gen";
 import { useAuth } from "../auth";
+import { isPosthogEnabled } from "./config";
 
 /**
- * PostHogIdentity Component
- *
- * This component handles user identification with PostHog after authentication.
- * It must be rendered inside both PostHogProvider and AuthProvider.
+ * Handles user identification and consent-aware tracking with PostHog.
  */
 export function PostHogIdentity() {
 	const posthog = usePostHog();
 	const { isAuthenticated, isLoading, userProfile, getUserId } = useAuth();
 	const hasIdentified = useRef(false);
 
+	const {
+		data: userSettings,
+		isLoading: isSettingsLoading,
+		isError: isSettingsError,
+	} = useQuery({
+		...getUserSettingsOptions({}),
+		enabled: isAuthenticated && isPosthogEnabled,
+		retry: 1,
+	});
+
+	const participatesInResearch = userSettings?.participateInResearch;
+	const shouldDenyTracking = useMemo(() => {
+		if (!isAuthenticated) {
+			return false;
+		}
+		if (isSettingsError) {
+			return true;
+		}
+		return participatesInResearch !== true;
+	}, [isAuthenticated, participatesInResearch, isSettingsError]);
+
 	useEffect(() => {
-		// Wait for auth to finish loading
-		if (isLoading) {
+		if (!posthog || !isPosthogEnabled) {
 			return;
 		}
 
-		// If user is authenticated and we haven't identified them yet
-		if (isAuthenticated && userProfile && !hasIdentified.current) {
-			const userId = getUserId();
+		if (isLoading || isSettingsLoading) {
+			// Default to denied until consent is explicit; ensure client stays opted-out while loading
+			posthog.opt_out_capturing();
+			return;
+		}
 
-			if (!userId) {
-				console.warn(
-					"PostHogIdentity: User authenticated but no user ID available",
-				);
-				return;
+		if (!isAuthenticated) {
+			if (hasIdentified.current) {
+				posthog.reset();
+				hasIdentified.current = false;
 			}
+			return;
+		}
 
+		if (shouldDenyTracking) {
+			posthog.opt_out_capturing();
+			posthog.reset();
+			posthog.stopSessionRecording?.();
+			posthog.getActiveMatchingSurveys?.(() => {}, true);
+			hasIdentified.current = false;
+			return;
+		}
+
+		const userId = getUserId();
+		if (!userId) {
+			return;
+		}
+
+		posthog.opt_in_capturing();
+
+		if (userProfile && !hasIdentified.current) {
 			const email = userProfile.email;
 			const name =
 				`${userProfile.firstName || ""} ${userProfile.lastName || ""}`.trim();
@@ -39,18 +80,21 @@ export function PostHogIdentity() {
 				email,
 				name,
 				username,
+				participate_in_research: participatesInResearch === true,
 			});
 
 			hasIdentified.current = true;
 		}
+	}, [
+		posthog,
+		isLoading,
+		isSettingsLoading,
+		isAuthenticated,
+		shouldDenyTracking,
+		getUserId,
+		userProfile,
+		participatesInResearch,
+	]);
 
-		// If user logs out, reset PostHog
-		if (!isAuthenticated && hasIdentified.current) {
-			posthog.reset();
-			hasIdentified.current = false;
-		}
-	}, [isAuthenticated, isLoading, userProfile, getUserId, posthog]);
-
-	// This component doesn't render anything
 	return null;
 }

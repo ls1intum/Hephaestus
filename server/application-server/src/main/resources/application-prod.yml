@@ -63,6 +63,12 @@ hephaestus:
         # The secret key of the langfuse server
         secret-key: ${LANGFUSE_SECRET_KEY}
 
+    posthog:
+      enabled: ${POSTHOG_ENABLED:false}
+      api-host: ${POSTHOG_API_HOST:https://app.posthog.com}
+      project-id: ${POSTHOG_PROJECT_ID:}
+      personal-api-key: ${POSTHOG_PERSONAL_API_KEY:}
+
 keycloak:
     url: ${KEYCLOAK_URL}
     realm: ${KEYCLOAK_REALM}

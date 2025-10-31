@@ -1,3 +1,4 @@
+import { isPosthogEnabled } from "@/integrations/posthog/config";
 import { AccountSection, type AccountSectionProps } from "./AccountSection";
 import {
 	NotificationsSection,
@@ -49,10 +50,12 @@ export function SettingsPage({
 				{...notificationsRest}
 				isLoading={isLoading || notificationsLoading}
 			/>
-			<ResearchParticipationSection
-				{...researchRest}
-				isLoading={isLoading || researchLoading}
-			/>
+			{isPosthogEnabled && (
+				<ResearchParticipationSection
+					{...researchRest}
+					isLoading={isLoading || researchLoading}
+				/>
+			)}
 			<AccountSection
 				{...accountRest}
 				isLoading={isLoading || accountLoading}

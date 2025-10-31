@@ -9,6 +9,8 @@ import de.tum.in.www1.hephaestus.gitprovider.pullrequestreview.PullRequestReview
 import de.tum.in.www1.hephaestus.gitprovider.pullrequestreview.PullRequestReviewRepository;
 import de.tum.in.www1.hephaestus.gitprovider.repository.RepositoryInfoDTO;
 import de.tum.in.www1.hephaestus.gitprovider.repository.RepositoryRepository;
+import de.tum.in.www1.hephaestus.integrations.posthog.PosthogClient;
+import de.tum.in.www1.hephaestus.integrations.posthog.PosthogClientException;
 import jakarta.transaction.Transactional;
 import java.time.Instant;
 import java.util.ArrayList;
@@ -21,7 +23,10 @@ import java.util.stream.Collectors;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
+import org.springframework.util.StringUtils;
+import org.springframework.web.server.ResponseStatusException;
 
 @Service
 public class UserService {
@@ -45,6 +50,9 @@ public class UserService {
 
     @Autowired
     private PullRequestReviewInfoDTOConverter pullRequestReviewInfoDTOConverter;
+
+    @Autowired
+    private PosthogClient posthogClient;
 
     @Transactional
     public Optional<UserProfileDTO> getUserProfile(String login) {
@@ -94,15 +102,44 @@ public class UserService {
         return new UserSettingsDTO(user.isNotificationsEnabled(), user.isParticipateInResearch());
     }
 
-    public UserSettingsDTO updateUserSettings(User user, UserSettingsDTO userSettings) {
+    public UserSettingsDTO updateUserSettings(User user, UserSettingsDTO userSettings, String keycloakUserId) {
         logger.info("Updating user settings with userId: " + user);
         user.setNotificationsEnabled(
             Objects.requireNonNull(userSettings.receiveNotifications(), "receiveNotifications must not be null")
         );
-        user.setParticipateInResearch(
-            Objects.requireNonNull(userSettings.participateInResearch(), "participateInResearch must not be null")
+        boolean previousParticipation = user.isParticipateInResearch();
+        boolean participatesInResearch = Objects.requireNonNull(
+            userSettings.participateInResearch(),
+            "participateInResearch must not be null"
         );
+        user.setParticipateInResearch(participatesInResearch);
         userRepository.save(user);
+        if (previousParticipation && !participatesInResearch) {
+            if (!StringUtils.hasText(keycloakUserId)) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Missing authentication subject");
+            }
+            try {
+                boolean anyDeleted = false;
+                var distinctIds = new java.util.LinkedHashSet<String>();
+                distinctIds.add(keycloakUserId);
+                distinctIds.add(String.valueOf(user.getId()));
+                for (String distinctId : distinctIds) {
+                    if (!StringUtils.hasText(distinctId)) {
+                        continue;
+                    }
+                    anyDeleted = posthogClient.deletePersonData(distinctId) || anyDeleted;
+                }
+                if (!anyDeleted) {
+                    logger.warn("No PostHog person matched the provided identifiers for user {}", user.getLogin());
+                }
+            } catch (PosthogClientException exception) {
+                throw new ResponseStatusException(
+                    HttpStatus.BAD_GATEWAY,
+                    "Failed to revoke analytics consent",
+                    exception
+                );
+            }
+        }
         return new UserSettingsDTO(user.isNotificationsEnabled(), user.isParticipateInResearch());
     }
 }

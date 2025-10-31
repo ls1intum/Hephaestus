@@ -7,6 +7,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.oauth2.core.oidc.StandardClaimNames;
 import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken;
 import org.springframework.web.bind.annotation.DeleteMapping;
@@ -74,13 +75,17 @@ public class UserController {
     }
 
     @PostMapping("/settings")
-    public ResponseEntity<UserSettingsDTO> updateUserSettings(@RequestBody UserSettingsDTO userSettings) {
+    public ResponseEntity<UserSettingsDTO> updateUserSettings(
+        @AuthenticationPrincipal JwtAuthenticationToken auth,
+        @RequestBody UserSettingsDTO userSettings
+    ) {
         var user = userRepository.getCurrentUser();
         if (user.isEmpty()) {
             return ResponseEntity.notFound().build();
         }
 
-        UserSettingsDTO updatedUserSettings = userService.updateUserSettings(user.get(), userSettings);
+        String keycloakUserId = auth.getToken().getClaimAsString(StandardClaimNames.SUB);
+        UserSettingsDTO updatedUserSettings = userService.updateUserSettings(user.get(), userSettings, keycloakUserId);
         return ResponseEntity.ok(updatedUserSettings);
     }
 }
