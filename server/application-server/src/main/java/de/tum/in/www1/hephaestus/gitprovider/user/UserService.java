@@ -15,6 +15,7 @@ import jakarta.transaction.Transactional;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
@@ -114,32 +115,56 @@ public class UserService {
         );
         user.setParticipateInResearch(participatesInResearch);
         userRepository.save(user);
-        if (previousParticipation && !participatesInResearch) {
-            if (!StringUtils.hasText(keycloakUserId)) {
-                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Missing authentication subject");
-            }
-            try {
-                boolean anyDeleted = false;
-                var distinctIds = new java.util.LinkedHashSet<String>();
-                distinctIds.add(keycloakUserId);
-                distinctIds.add(String.valueOf(user.getId()));
-                for (String distinctId : distinctIds) {
-                    if (!StringUtils.hasText(distinctId)) {
-                        continue;
+            if (previousParticipation && !participatesInResearch) {
+                if (!StringUtils.hasText(keycloakUserId)) {
+                    throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Missing authentication subject");
+                }
+                try {
+                    boolean anyDeleted = deletePosthogIdentities(user, keycloakUserId);
+                    if (!anyDeleted) {
+                        logger.warn("No PostHog person matched the provided identifiers for user {}", user.getLogin());
                     }
-                    anyDeleted = posthogClient.deletePersonData(distinctId) || anyDeleted;
+                } catch (PosthogClientException exception) {
+                    throw new ResponseStatusException(
+                        HttpStatus.BAD_GATEWAY,
+                        "Failed to revoke analytics consent",
+                        exception
+                    );
                 }
-                if (!anyDeleted) {
-                    logger.warn("No PostHog person matched the provided identifiers for user {}", user.getLogin());
-                }
-            } catch (PosthogClientException exception) {
-                throw new ResponseStatusException(
-                    HttpStatus.BAD_GATEWAY,
-                    "Failed to revoke analytics consent",
-                    exception
-                );
-            }
         }
         return new UserSettingsDTO(user.isNotificationsEnabled(), user.isParticipateInResearch());
     }
+
+        public void deleteUserTrackingData(Optional<User> user, String keycloakUserId) {
+            try {
+                boolean anyDeleted = deletePosthogIdentities(user.orElse(null), keycloakUserId);
+                if (!anyDeleted) {
+                    logger.warn(
+                        "No PostHog person matched the provided identifiers for user {} during account deletion",
+                        user.map(User::getLogin).orElse("unknown")
+                    );
+                }
+            } catch (PosthogClientException exception) {
+                throw exception;
+            }
+        }
+
+        private boolean deletePosthogIdentities(User user, String primaryDistinctId) {
+            Set<String> distinctIds = new LinkedHashSet<>();
+            if (StringUtils.hasText(primaryDistinctId)) {
+                distinctIds.add(primaryDistinctId);
+            }
+            if (user != null) {
+                distinctIds.add(String.valueOf(user.getId()));
+            }
+
+            boolean anyDeleted = false;
+            for (String distinctId : distinctIds) {
+                if (!StringUtils.hasText(distinctId)) {
+                    continue;
+                }
+                anyDeleted = posthogClient.deletePersonData(distinctId) || anyDeleted;
+            }
+            return anyDeleted;
+        }
 }
