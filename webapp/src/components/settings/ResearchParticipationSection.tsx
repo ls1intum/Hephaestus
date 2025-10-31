@@ -33,7 +33,9 @@ export function ResearchParticipationSection({
 				<h2 id="research-heading" className="text-xl font-semibold">
 					Research Participation
 				</h2>
-				<p className="text-sm text-muted-foreground">Help us improve through research</p>
+				<p className="text-sm text-muted-foreground">
+					Help us improve through research
+				</p>
 			</div>
 
 			<div className="flex items-start justify-between gap-6 py-4">
@@ -45,9 +47,9 @@ export function ResearchParticipationSection({
 						Help improve Hephaestus
 					</Label>
 					<p className="text-sm text-muted-foreground leading-relaxed">
-						Share which features you use and how you interact with them to support academic
-						research and product improvements. May include occasional surveys. Data is only
-						accessible to administrators.
+						Share which features you use and how you interact with them to
+						support academic research and product improvements. May include
+						occasional surveys. Data is only accessible to administrators.
 					</p>
 				</div>
 				<Switch

@@ -77,10 +77,7 @@ export function SettingsPage({
 
 			<Separator />
 
-			<AccountSection
-				{...accountRest}
-				isLoading={accountPending}
-			/>
+			<AccountSection {...accountRest} isLoading={accountPending} />
 		</div>
 	);
 }

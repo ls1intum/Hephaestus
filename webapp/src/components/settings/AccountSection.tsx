@@ -43,18 +43,18 @@ export function AccountSection({
 				<h2 id="account-heading" className="text-xl font-semibold">
 					Danger Zone
 				</h2>
-				<p className="text-sm text-muted-foreground">Irreversible account actions</p>
+				<p className="text-sm text-muted-foreground">
+					Irreversible account actions
+				</p>
 			</div>
 
 			<div className="flex items-start justify-between gap-6 py-4">
 				<div className="space-y-1 flex-1">
 					<h3 className="text-base font-medium">Delete account</h3>
 					<p className="text-sm text-muted-foreground leading-relaxed">
-						Permanently delete your account and remove your data from our servers.
+						Permanently delete your account and remove your data from our
+						servers.
 					</p>
-					{pending && (
-						<p className="text-xs text-muted-foreground">Preparing account actions…</p>
-					)}
 				</div>
 				<AlertDialog>
 					<AlertDialogTrigger asChild>

@@ -49,9 +49,8 @@ function RouteComponent() {
 			await queryClient.cancelQueries({
 				queryKey: userSettingsQueryKey,
 			});
-			const previousSettings = queryClient.getQueryData<UserSettings>(
-				userSettingsQueryKey,
-			);
+			const previousSettings =
+				queryClient.getQueryData<UserSettings>(userSettingsQueryKey);
 			if (variables.body) {
 				queryClient.setQueryData(userSettingsQueryKey, variables.body);
 			}
@@ -59,7 +58,10 @@ function RouteComponent() {
 		},
 		onError: (error, _variables, context) => {
 			if (context?.previousSettings) {
-				queryClient.setQueryData(userSettingsQueryKey, context.previousSettings);
+				queryClient.setQueryData(
+					userSettingsQueryKey,
+					context.previousSettings,
+				);
 			}
 			console.error("Failed to update user settings:", error);
 			toast.error("Failed to update settings. Please try again later.");

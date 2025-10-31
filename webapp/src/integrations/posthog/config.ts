@@ -13,6 +13,8 @@ const sanitizeValue = (value?: string) => {
 	return trimmed;
 };
 
-export const posthogProjectApiKey = sanitizeValue(environment.posthog?.projectApiKey);
+export const posthogProjectApiKey = sanitizeValue(
+	environment.posthog?.projectApiKey,
+);
 export const posthogApiHost = sanitizeValue(environment.posthog?.apiHost);
 export const isPosthogEnabled = posthogProjectApiKey.length > 0;

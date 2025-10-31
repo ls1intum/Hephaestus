@@ -245,8 +245,15 @@ export function PostHogSurveyWidget({
 			unsubscribe?.();
 		};
 	}, [autoOpen, posthog, surveyId]);
+
 	useEffect(() => {
-		if (!posthog || !survey || !isVisible || !showWithDelay || hasTrackedShown.current) {
+		if (
+			!posthog ||
+			!survey ||
+			!isVisible ||
+			!showWithDelay ||
+			hasTrackedShown.current
+		) {
 			return;
 		}
 
@@ -262,7 +269,7 @@ export function PostHogSurveyWidget({
 		localStorage.setItem("lastSeenSurveyDate", new Date().toISOString());
 
 		hasTrackedShown.current = true;
-		}, [isVisible, posthog, showWithDelay, survey]);
+	}, [isVisible, posthog, showWithDelay, survey]);
 
 	const ensureSubmissionId = () => {
 		if (submissionId) {

@@ -53,7 +53,9 @@ export const Route = createRootRouteWithContext<MyRouterContext>()({
 			retry: 1,
 		});
 		const allowSurveys =
-			isPosthogEnabled && !userSettingsError && (userSettings?.participateInResearch ?? true);
+			isPosthogEnabled &&
+			!userSettingsError &&
+			(userSettings?.participateInResearch ?? true);
 		const isMentorRoute = pathname.startsWith("/mentor");
 
 		// Exclude routes where Copilot should not appear
