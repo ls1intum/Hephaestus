@@ -76,7 +76,7 @@ public class UserController {
 
     @PostMapping("/settings")
     public ResponseEntity<UserSettingsDTO> updateUserSettings(
-        @AuthenticationPrincipal JwtAuthenticationToken auth,
+        JwtAuthenticationToken auth,
         @RequestBody UserSettingsDTO userSettings
     ) {
         var user = userRepository.getCurrentUser();

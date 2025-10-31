@@ -1,3 +1,4 @@
+import { Separator } from "@/components/ui/separator";
 import { isPosthogEnabled } from "@/integrations/posthog/config";
 import { AccountSection, type AccountSectionProps } from "./AccountSection";
 import {
@@ -43,22 +44,42 @@ export function SettingsPage({
 	const { isLoading: researchLoading = false, ...researchRest } = researchProps;
 	const { isLoading: accountLoading = false, ...accountRest } = accountProps;
 
+	const notificationsPending = isLoading || notificationsLoading;
+	const researchPending = isLoading || researchLoading;
+	const accountPending = isLoading || accountLoading;
+	const showResearchSection = isPosthogEnabled;
+
 	return (
-		<div className="flex flex-col gap-4">
-			<h1 className="text-3xl font-bold">Settings</h1>
+		<div className="w-full max-w-3xl mx-auto space-y-8">
+			<div className="space-y-1">
+				<h1 className="text-3xl font-bold tracking-tight">Settings</h1>
+				<p className="text-muted-foreground text-balance">
+					Manage your account preferences and settings
+				</p>
+			</div>
+
+			<Separator />
+
 			<NotificationsSection
 				{...notificationsRest}
-				isLoading={isLoading || notificationsLoading}
+				isLoading={notificationsPending}
 			/>
-			{isPosthogEnabled && (
-				<ResearchParticipationSection
-					{...researchRest}
-					isLoading={isLoading || researchLoading}
-				/>
+
+			{showResearchSection && (
+				<>
+					<Separator />
+					<ResearchParticipationSection
+						{...researchRest}
+						isLoading={researchPending}
+					/>
+				</>
 			)}
+
+			<Separator />
+
 			<AccountSection
 				{...accountRest}
-				isLoading={isLoading || accountLoading}
+				isLoading={accountPending}
 			/>
 		</div>
 	);

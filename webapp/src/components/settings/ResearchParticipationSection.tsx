@@ -25,26 +25,41 @@ export function ResearchParticipationSection({
 	onToggleResearch,
 	isLoading = false,
 }: ResearchParticipationSectionProps) {
+	const pending = Boolean(isLoading);
+
 	return (
-		<div className="sm:w-2/3 w-full flex flex-col gap-3">
-			<h2 className="text-lg font-semibold">Research Participation</h2>
-			<div className="flex flex-row items-center justify-between">
-				<div className="flex flex-col items-start max-w-xl">
-					<h3>Help improve Hephaestus</h3>
-					<Label className="font-light">
-						Share which features you use and how you interact with them to
-						support academic research and product improvements. May include
-						occasional surveys. Data is only accessible to administrators.
+		<section className="space-y-4" aria-labelledby="research-heading">
+			<div className="space-y-1">
+				<h2 id="research-heading" className="text-xl font-semibold">
+					Research Participation
+				</h2>
+				<p className="text-sm text-muted-foreground">Help us improve through research</p>
+			</div>
+
+			<div className="flex items-start justify-between gap-6 py-4">
+				<div className="space-y-1 flex-1">
+					<Label
+						htmlFor="research-participation"
+						className="text-base font-medium cursor-pointer"
+					>
+						Help improve Hephaestus
 					</Label>
+					<p className="text-sm text-muted-foreground leading-relaxed">
+						Share which features you use and how you interact with them to support academic
+						research and product improvements. May include occasional surveys. Data is only
+						accessible to administrators.
+					</p>
 				</div>
 				<Switch
-					aria-busy={isLoading}
-					className="mr-2"
+					id="research-participation"
+					className="mt-1"
 					checked={participateInResearch}
 					onCheckedChange={onToggleResearch}
-					disabled={isLoading}
+					disabled={pending}
+					aria-busy={pending}
+					aria-label="Toggle research participation"
 				/>
 			</div>
-		</div>
+		</section>
 	);
 }

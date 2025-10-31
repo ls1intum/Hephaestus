@@ -10,8 +10,6 @@ import {
 	AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
-import { Label } from "@/components/ui/label";
-import { Skeleton } from "@/components/ui/skeleton";
 
 export interface AccountSectionProps {
 	/**
@@ -37,55 +35,58 @@ export function AccountSection({
 	isDeleting = false,
 	isLoading = false,
 }: AccountSectionProps) {
+	const pending = Boolean(isLoading);
+	const processing = Boolean(isDeleting);
 	return (
-		<div className="sm:w-2/3 w-full flex flex-col gap-3">
-			<h2 className="text-lg font-semibold">Account</h2>
-			<div className="flex flex-row items-center justify-between">
-				{isLoading ? (
-					<>
-						<span className="flex-col items-start">
-							<Skeleton className="h-5 w-32 mb-2" />
-							<Skeleton className="h-4 w-80" />
-						</span>
-						<Skeleton className="h-9 w-16" />
-					</>
-				) : (
-					<>
-						<span className="flex-col items-start">
-							<h3>Delete account</h3>
-							<Label className="font-light">
-								Permanently delete your account and remove your data from our
-								servers.
-							</Label>
-						</span>
-						<AlertDialog>
-							<AlertDialogTrigger asChild>
-								<Button variant="outline" disabled={isDeleting}>
-									Delete
-								</Button>
-							</AlertDialogTrigger>
-							<AlertDialogContent>
-								<AlertDialogHeader>
-									<AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
-									<AlertDialogDescription>
-										This action cannot be undone. This will permanently delete
-										your account and remove your data from our servers.
-									</AlertDialogDescription>
-								</AlertDialogHeader>
-								<AlertDialogFooter>
-									<AlertDialogCancel>Cancel</AlertDialogCancel>
-									<AlertDialogAction
-										onClick={onDeleteAccount}
-										disabled={isDeleting}
-									>
-										Delete account
-									</AlertDialogAction>
-								</AlertDialogFooter>
-							</AlertDialogContent>
-						</AlertDialog>
-					</>
-				)}
+		<section className="space-y-4" aria-labelledby="account-heading">
+			<div className="space-y-1">
+				<h2 id="account-heading" className="text-xl font-semibold">
+					Danger Zone
+				</h2>
+				<p className="text-sm text-muted-foreground">Irreversible account actions</p>
 			</div>
-		</div>
+
+			<div className="flex items-start justify-between gap-6 py-4">
+				<div className="space-y-1 flex-1">
+					<h3 className="text-base font-medium">Delete account</h3>
+					<p className="text-sm text-muted-foreground leading-relaxed">
+						Permanently delete your account and remove your data from our servers.
+					</p>
+					{pending && (
+						<p className="text-xs text-muted-foreground">Preparing account actions…</p>
+					)}
+				</div>
+				<AlertDialog>
+					<AlertDialogTrigger asChild>
+						<Button
+							variant="destructive"
+							disabled={pending || processing}
+							className="mt-1"
+						>
+							{processing ? "Deleting…" : "Delete"}
+						</Button>
+					</AlertDialogTrigger>
+					<AlertDialogContent>
+						<AlertDialogHeader>
+							<AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
+							<AlertDialogDescription>
+								This action cannot be undone. This will permanently delete your
+								account and remove your data from our servers.
+							</AlertDialogDescription>
+						</AlertDialogHeader>
+						<AlertDialogFooter>
+							<AlertDialogCancel>Cancel</AlertDialogCancel>
+							<AlertDialogAction
+								onClick={onDeleteAccount}
+								disabled={processing}
+								className="bg-destructive hover:bg-destructive/90"
+							>
+								{processing ? "Deleting…" : "Delete account"}
+							</AlertDialogAction>
+						</AlertDialogFooter>
+					</AlertDialogContent>
+				</AlertDialog>
+			</div>
+		</section>
 	);
 }
