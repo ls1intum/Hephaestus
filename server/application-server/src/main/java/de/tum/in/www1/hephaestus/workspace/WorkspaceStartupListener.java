@@ -3,6 +3,7 @@ package de.tum.in.www1.hephaestus.workspace;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.boot.context.event.ApplicationReadyEvent;
+import org.springframework.context.annotation.Profile;
 import org.springframework.context.event.EventListener;
 import org.springframework.stereotype.Component;
 
@@ -10,6 +11,7 @@ import org.springframework.stereotype.Component;
  * Spring lifecycle hook that kicks off workspace provisioning and monitoring once the application is ready.
  */
 @Component
+@Profile("!specs")
 public class WorkspaceStartupListener {
 
     private static final Logger logger = LoggerFactory.getLogger(WorkspaceStartupListener.class);
