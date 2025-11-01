@@ -17,9 +17,12 @@ services:
   keycloak:
     image: quay.io/keycloak/keycloak:26.0.0
     environment:
-      KEYCLOAK_ADMIN: admin
-      KEYCLOAK_ADMIN_PASSWORD: admin
+      KC_BOOTSTRAP_ADMIN_USERNAME: admin
+      KC_BOOTSTRAP_ADMIN_PASSWORD: admin
       KEYCLOAK_IMPORT: /opt/keycloak/data/import/hephaestus-realm.json
+      KEYCLOAK_GITHUB_CLIENT_ID: '${KEYCLOAK_GITHUB_CLIENT_ID:?Set GitHub OAuth client ID}'
+      KEYCLOAK_GITHUB_CLIENT_SECRET: '${KEYCLOAK_GITHUB_CLIENT_SECRET:?Set GitHub OAuth client secret}'
+      KEYCLOAK_GITHUB_ADMIN_USERNAME: '${KEYCLOAK_GITHUB_ADMIN_USERNAME:?Set GitHub admin username}'
     command: 
       - start-dev
       - --import-realm
