@@ -77,8 +77,6 @@ services:
       - shared-network
     volumes:
       - keycloak-data:/opt/keycloak/data
-      # Place keycloakify/dist_keycloak/keycloak-theme-for-kc-all-other-versions.jar into themes folder
-      - ./themes:/opt/keycloak/providers/
     configs:
       - source: realm-import.json
         target: /opt/keycloak/data/realm-import.json
