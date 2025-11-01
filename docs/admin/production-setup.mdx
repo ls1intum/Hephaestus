@@ -41,7 +41,7 @@ Set the following secrets before starting the stack:
 2. **Configure Keycloak:**
    - Import the `keycloak-hephaestus-realm-example-config.json` from the repository.
    - Copy `server/application-server/.env.example` to `server/application-server/.env`, then populate `KEYCLOAK_GITHUB_CLIENT_ID`, `KEYCLOAK_GITHUB_CLIENT_SECRET`, `KEYCLOAK_GITHUB_ADMIN_USERNAME`, and `KEYCLOAK_HEPHAESTUS_CONFIDENTIAL_CLIENT_SECRET` so the realm import can resolve them using [Keycloak's environment variable placeholders](https://www.keycloak.org/server/importExport#_using_environment_variables_within_the_realm_configuration_files).
-   - Confirm the GitHub identity provider requests the `user:email read:org` scopes and disable username/password login flows to keep authentication SSO-only.
+   - Confirm the GitHub identity provider requests the `user:email` scopes and disable username/password login flows to keep authentication SSO-only.
 3. **Bootstrap secrets:** Load environment variables into your secret manager or `.env` files consumed by Docker/Kubernetes.
 4. **Deploy services:** Use the provided Compose files (`docker/compose.app.yaml`, `docker/compose.core.yaml`, `docker/compose.proxy.yaml`) or your Kubernetes manifests.
 5. **Run database migrations:** The application server runs Liquibase migrations on startup; monitor logs to confirm success.

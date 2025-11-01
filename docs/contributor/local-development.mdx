@@ -69,7 +69,7 @@ Keycloak runs in Docker as part of the development compose stack. The bundled re
 
 #### Configure the GitHub identity provider
 
-1. [Create a new GitHub OAuth application](https://github.com/settings/developers) with the callback URL `http://localhost:8081/realms/hephaestus/broker/github/endpoint`. Request the `user:email` and `read:org` scopes so Keycloak can populate profile data and (optionally) map GitHub teams to roles later.
+1. [Create a new GitHub OAuth application](https://github.com/settings/developers) with the callback URL `http://localhost:8081/realms/hephaestus/broker/github/endpoint`.
 2. Export the generated **Client ID** and **Client secret**, then copy `server/application-server/.env.example` to `server/application-server/.env` and update the placeholders:
 
    ```bash
