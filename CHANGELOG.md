@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.10.0-rc.11](https://github.com/ls1intum/Hephaestus/compare/v0.10.0-rc.10...v0.10.0-rc.11) (2025-11-01)
+
+### 🚀 Features
+
+* skip Keycloak login page and directly login with Github ([#526](https://github.com/ls1intum/Hephaestus/issues/526)) ([cc83957](https://github.com/ls1intum/Hephaestus/commit/cc83957dfe89cfa55fce3271e617e1fe0c712657))
+
 ## [0.10.0-rc.10](https://github.com/ls1intum/Hephaestus/compare/v0.10.0-rc.9...v0.10.0-rc.10) (2025-10-31)
 
 ### 🚀 Features
