@@ -3,8 +3,8 @@ import { fn } from "@storybook/test";
 import { LandingCTASection } from "./LandingCTASection";
 
 /**
- * Call-to-Action section component that encourages users to get started
- * with Hephaestus through a prominent CTA button.
+ * Call-to-Action section component that encourages users to sign in
+ * with GitHub using an officially branded CTA button.
  */
 const meta = {
 	component: LandingCTASection,
@@ -39,7 +39,7 @@ type Story = StoryObj<typeof meta>;
 
 /**
  * Default CTA section for first-time visitors.
- * Features "Get Started" CTA button.
+ * Features "Sign in with GitHub" CTA button.
  */
 export const Default: Story = {
 	args: {
@@ -49,7 +49,7 @@ export const Default: Story = {
 
 /**
  * CTA section for authenticated users.
- * "Get Started" button is replaced with "Go to Dashboard".
+ * GitHub sign-in button is replaced with "Go to Dashboard".
  */
 export const SignedIn: Story = {
 	args: {

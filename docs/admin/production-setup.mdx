@@ -28,8 +28,9 @@ Set the following secrets before starting the stack:
 | `WEBHOOK_SECRET` | Shared secret for GitHub webhooks (`openssl rand -base64 32`) |
 | `KEYCLOAK_GITHUB_CLIENT_ID` | GitHub OAuth app client ID |
 | `KEYCLOAK_GITHUB_CLIENT_SECRET` | GitHub OAuth app client secret |
-| `KEYCLOAK_ADMIN` | Keycloak admin username |
-| `KEYCLOAK_ADMIN_PASSWORD` | Keycloak admin password (`openssl rand -base64 32`) |
+| `KEYCLOAK_GITHUB_ADMIN_USERNAME` | GitHub username that should receive Keycloak admin rights |
+| `KC_BOOTSTRAP_ADMIN_USERNAME` | Keycloak bootstrap admin username |
+| `KC_BOOTSTRAP_ADMIN_PASSWORD` | Keycloak bootstrap admin password (`openssl rand -base64 32`) |
 | `KEYCLOAK_HEPHAESTUS_CONFIDENTIAL_CLIENT_SECRET` | Secret used by the app server to call Keycloak |
 | `POSTFIX_USERNAME` / `POSTFIX_PASSWORD` | Credentials for production SMTP relay |
 | `SLACK_WEBHOOK_URL` | Optional: webhook for weekly leaderboard posts |
@@ -39,12 +40,13 @@ Set the following secrets before starting the stack:
 1. **Provision infrastructure:** Ensure PostgreSQL, Redis (if used), and storage volumes are ready.
 2. **Configure Keycloak:**
    - Import the `keycloak-hephaestus-realm-example-config.json` from the repository.
-   - Configure the GitHub identity provider with the client credentials above.
+   - Copy `server/application-server/.env.example` to `server/application-server/.env`, then populate `KEYCLOAK_GITHUB_CLIENT_ID`, `KEYCLOAK_GITHUB_CLIENT_SECRET`, `KEYCLOAK_GITHUB_ADMIN_USERNAME`, and `KEYCLOAK_HEPHAESTUS_CONFIDENTIAL_CLIENT_SECRET` so the realm import can resolve them using [Keycloak's environment variable placeholders](https://www.keycloak.org/server/importExport#_using_environment_variables_within_the_realm_configuration_files).
+   - Confirm the GitHub identity provider requests the `user:email` scopes and disable username/password login flows to keep authentication SSO-only.
 3. **Bootstrap secrets:** Load environment variables into your secret manager or `.env` files consumed by Docker/Kubernetes.
 4. **Deploy services:** Use the provided Compose files (`docker/compose.app.yaml`, `docker/compose.core.yaml`, `docker/compose.proxy.yaml`) or your Kubernetes manifests.
 5. **Run database migrations:** The application server runs Liquibase migrations on startup; monitor logs to confirm success.
 6. **Verify integrations:**
-   - Sign in via GitHub to confirm Keycloak configuration.
+   - Sign in via GitHub with the account configured in `KEYCLOAK_GITHUB_ADMIN_USERNAME` and confirm it lands in Keycloak with both the `admin` realm role and the `realm-management` → `realm-admin` client role automatically applied.
    - Trigger a test webhook from GitHub to validate the ingest pipeline.
    - Send a test best-practice email using the application server.
 

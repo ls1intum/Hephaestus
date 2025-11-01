@@ -65,7 +65,23 @@ Never commit `application-local.yml`. It may contain secrets and machine-specifi
 
 ### Keycloak integration
 
-Keycloak runs in Docker as part of the development compose stack. Configure GitHub as an identity provider before inviting external testers.
+Keycloak runs in Docker as part of the development compose stack. The bundled realm import no longer ships test users—authentication always flows through GitHub and mirrors production.
+
+#### Configure the GitHub identity provider
+
+1. [Create a new GitHub OAuth application](https://github.com/settings/developers) with the callback URL `http://localhost:8081/realms/hephaestus/broker/github/endpoint`.
+2. Export the generated **Client ID** and **Client secret**, then copy `server/application-server/.env.example` to `server/application-server/.env` and update the placeholders:
+
+   ```bash
+   cp server/application-server/.env.example server/application-server/.env
+   KEYCLOAK_GITHUB_CLIENT_ID=<github-client-id>
+   KEYCLOAK_GITHUB_CLIENT_SECRET=<github-client-secret>
+   KEYCLOAK_GITHUB_ADMIN_USERNAME=<github-handle-with-admin-access>
+   ```
+
+   The Keycloak container resolves these placeholders during realm import, as documented in the [Keycloak import guide](https://www.keycloak.org/server/importExport#_using_environment_variables_within_the_realm_configuration_files).
+3. (Re)start the local stack: `docker compose up keycloak postgres`. On first boot Keycloak imports `keycloak-hephaestus-realm-example-config.json` and wires the GitHub provider automatically.
+4. Sign in via GitHub using the account referenced by `KEYCLOAK_GITHUB_ADMIN_USERNAME`. During the first brokered login Keycloak automatically grants that account the `admin` realm role and the `realm-management` → `realm-admin` client role, unlocking the administrative views in the application server and Keycloak console.
 
 ## Web client (`webapp`)
 

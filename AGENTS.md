@@ -7,7 +7,6 @@ This file governs the entire repository. Combine these guardrails with the scope
 - `webapp/`: React 19 + TanStack Router/Query, Tailwind 4 UI kit (`src/components/ui`), generated API client in `src/api/**`.
 - `server/intelligence-service/`: FastAPI service orchestrating AI models. OpenAPI spec is exported via Poetry and mirrored into the Java client under the application server.
 - `server/webhook-ingest/`: FastAPI webhook intake that forwards events into NATS JetStream.
-- `keycloakify/`: Custom Keycloak theme built with Vite/React and copied into Keycloak containers.
 - `docs/`: Contributor docs (including the ERD that `db:generate-erd-docs` regenerates).
 
 ## 2. Toolchain & environment prerequisites
@@ -91,17 +90,12 @@ Regeneration is destructive; stash local edits before running these commands. Ch
   - Configuration via environment variables (see README). When adding config, extend `pyproject.toml` and `.env` templates accordingly.
 - Formatting: run `poetry run black .` (or `--check`) and `poetry run flake8 .`. Add type hints so mypy stays green in the intelligence service.
 
-## 9. Keycloakify theme
-- Theme assets live in `keycloakify/`. Build them with `npm run build-keycloak-theme`; artifacts land in `keycloakify/dist_keycloak` and are mounted by docker-compose.
-- Keep components idiomatic React/TypeScript (same style rules as the webapp). Storybook lives here as well; ensure new components ship with stories covering the real Keycloak context.
-- Do not commit the heavy `node_modules` content—only the generated theme under `dist_keycloak` that the compose files rely on.
-
-## 10. Documentation & assets
+## 9. Documentation & assets
 - ERD diagrams live under `docs/contributor/erd/`. Regenerate via `npm run db:generate-erd-docs` after schema changes.
 - Contributor documentation should stay in `docs/` (GitHub Pages). Keep README/CONTRIBUTING updates concise and actionable.
 - Screenshots or large binary assets belong under `docs/images/` or the Storybook stories, not inside source directories.
 
-## 11. Commit & PR checklist
+## 10. Commit & PR checklist
 Before marking work ready for review:
 - [ ] Regenerate and commit any impacted OpenAPI specs, clients, ERD docs, or generated SQLAlchemy models.
 - [ ] Run the formatting/linting/typecheck/test commands relevant to the modified modules; capture output for the PR description if CI cannot run a job locally.
@@ -109,7 +103,7 @@ Before marking work ready for review:
 - [ ] Double-check that no generated files were edited manually.
 - [ ] Follow Conventional Commit semantics for PR titles (`feat(webapp): ...`, etc., see `CONTRIBUTING.md`).
 
-## 12. Known command caveats
+## 11. Known command caveats
 - `npm run db:draft-changelog` requires Docker to be installed and available on PATH. In CI we set `CI=true`; locally ensure Docker Desktop/daemon is running before invoking the script.
 - `npm run generate:api:intelligence-service:specs` fails unless `MODEL_NAME` and `DETECTION_MODEL_NAME` are set (use the `fake:model` provider for tooling).
 - `npm run generate:api:application-server:specs` performs a full Maven `verify` against the specs profile. The initial run downloads the entire Spring Boot dependency tree (~hundreds of MB); expect several minutes on a cold cache.
