@@ -4,8 +4,11 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import de.tum.in.www1.hephaestus.gitprovider.common.GitHubPayload;
 import de.tum.in.www1.hephaestus.gitprovider.common.GitHubPayloadExtension;
+import de.tum.in.www1.hephaestus.gitprovider.issue.AuthorAssociation;
 import de.tum.in.www1.hephaestus.gitprovider.issue.Issue;
 import de.tum.in.www1.hephaestus.gitprovider.issue.IssueRepository;
+import de.tum.in.www1.hephaestus.gitprovider.issue.LockReason;
+import de.tum.in.www1.hephaestus.gitprovider.issue.StateReason;
 import de.tum.in.www1.hephaestus.gitprovider.label.LabelRepository;
 import de.tum.in.www1.hephaestus.gitprovider.milestone.MilestoneRepository;
 import de.tum.in.www1.hephaestus.gitprovider.repository.RepositoryRepository;
@@ -16,7 +19,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.kohsuke.github.GHEventPayload;
+import org.kohsuke.github.GHEventPayloadIssueExtended;
 import org.springframework.beans.factory.annotation.Autowired;
 
 @DisplayName("GitHub Issue Message Handler")
@@ -48,7 +51,8 @@ class GitHubIssueMessageHandlerIntegrationTest extends BaseIntegrationTest {
 
     @Test
     @DisplayName("should persist issue when opened")
-    void openedEventPersistsIssue(@GitHubPayload("issues.opened") GHEventPayload.Issue payload) throws Exception {
+    void openedEventPersistsIssue(@GitHubPayload("issues.opened") GHEventPayloadIssueExtended payload)
+        throws Exception {
         // Act
         handler.handleEvent(payload);
 
@@ -84,8 +88,8 @@ class GitHubIssueMessageHandlerIntegrationTest extends BaseIntegrationTest {
     @Test
     @DisplayName("should update issue state when closed")
     void closedEventUpdatesIssueState(
-        @GitHubPayload("issues.opened") GHEventPayload.Issue opened,
-        @GitHubPayload("issues.closed") GHEventPayload.Issue closed
+        @GitHubPayload("issues.opened") GHEventPayloadIssueExtended opened,
+        @GitHubPayload("issues.closed") GHEventPayloadIssueExtended closed
     ) throws Exception {
         // Arrange
         handler.handleEvent(opened);
@@ -102,8 +106,8 @@ class GitHubIssueMessageHandlerIntegrationTest extends BaseIntegrationTest {
     @Test
     @DisplayName("should update issue state when reopened")
     void reopenedEventUpdatesIssueState(
-        @GitHubPayload("issues.closed") GHEventPayload.Issue closed,
-        @GitHubPayload("issues.reopened") GHEventPayload.Issue reopened
+        @GitHubPayload("issues.closed") GHEventPayloadIssueExtended closed,
+        @GitHubPayload("issues.reopened") GHEventPayloadIssueExtended reopened
     ) throws Exception {
         // Arrange
         handler.handleEvent(closed);
@@ -121,8 +125,8 @@ class GitHubIssueMessageHandlerIntegrationTest extends BaseIntegrationTest {
     @Test
     @DisplayName("should delete issue when deleted")
     void deletedEventDeletesIssue(
-        @GitHubPayload("issues.opened") GHEventPayload.Issue opened,
-        @GitHubPayload("issues.deleted") GHEventPayload.Issue deleted
+        @GitHubPayload("issues.opened") GHEventPayloadIssueExtended opened,
+        @GitHubPayload("issues.deleted") GHEventPayloadIssueExtended deleted
     ) throws Exception {
         // Arrange
         handler.handleEvent(opened);
@@ -138,8 +142,8 @@ class GitHubIssueMessageHandlerIntegrationTest extends BaseIntegrationTest {
     @Test
     @DisplayName("should update issue title and body when edited")
     void editedEventUpdatesIssue(
-        @GitHubPayload("issues.opened") GHEventPayload.Issue opened,
-        @GitHubPayload("issues.edited") GHEventPayload.Issue edited
+        @GitHubPayload("issues.opened") GHEventPayloadIssueExtended opened,
+        @GitHubPayload("issues.edited") GHEventPayloadIssueExtended edited
     ) throws Exception {
         // Arrange
         handler.handleEvent(opened);
@@ -157,8 +161,8 @@ class GitHubIssueMessageHandlerIntegrationTest extends BaseIntegrationTest {
     @Transactional
     @DisplayName("should add label to issue when labeled")
     void labeledEventAddsLabel(
-        @GitHubPayload("issues.opened") GHEventPayload.Issue opened,
-        @GitHubPayload("issues.labeled") GHEventPayload.Issue labeled
+        @GitHubPayload("issues.opened") GHEventPayloadIssueExtended opened,
+        @GitHubPayload("issues.labeled") GHEventPayloadIssueExtended labeled
     ) throws Exception {
         // Arrange
         handler.handleEvent(opened);
@@ -180,8 +184,8 @@ class GitHubIssueMessageHandlerIntegrationTest extends BaseIntegrationTest {
     @Transactional
     @DisplayName("should remove label from issue when unlabeled")
     void unlabeledEventRemovesLabel(
-        @GitHubPayload("issues.labeled") GHEventPayload.Issue labeled,
-        @GitHubPayload("issues.unlabeled") GHEventPayload.Issue unlabeled
+        @GitHubPayload("issues.labeled") GHEventPayloadIssueExtended labeled,
+        @GitHubPayload("issues.unlabeled") GHEventPayloadIssueExtended unlabeled
     ) throws Exception {
         // Arrange
         handler.handleEvent(labeled);
@@ -200,8 +204,8 @@ class GitHubIssueMessageHandlerIntegrationTest extends BaseIntegrationTest {
     @Transactional
     @DisplayName("should add assignee to issue when assigned")
     void assignedEventAddsAssignee(
-        @GitHubPayload("issues.opened") GHEventPayload.Issue opened,
-        @GitHubPayload("issues.assigned") GHEventPayload.Issue assigned
+        @GitHubPayload("issues.opened") GHEventPayloadIssueExtended opened,
+        @GitHubPayload("issues.assigned") GHEventPayloadIssueExtended assigned
     ) throws Exception {
         // Arrange
         handler.handleEvent(opened);
@@ -219,8 +223,8 @@ class GitHubIssueMessageHandlerIntegrationTest extends BaseIntegrationTest {
     @Transactional
     @DisplayName("should remove assignee from issue when unassigned")
     void unassignedEventRemovesAssignee(
-        @GitHubPayload("issues.assigned") GHEventPayload.Issue assigned,
-        @GitHubPayload("issues.unassigned") GHEventPayload.Issue unassigned
+        @GitHubPayload("issues.assigned") GHEventPayloadIssueExtended assigned,
+        @GitHubPayload("issues.unassigned") GHEventPayloadIssueExtended unassigned
     ) throws Exception {
         // Arrange
         handler.handleEvent(assigned);
@@ -238,8 +242,8 @@ class GitHubIssueMessageHandlerIntegrationTest extends BaseIntegrationTest {
     @Test
     @DisplayName("should add milestone to issue when milestoned")
     void milestonedEventAddsMilestone(
-        @GitHubPayload("issues.opened") GHEventPayload.Issue opened,
-        @GitHubPayload("issues.milestoned") GHEventPayload.Issue milestoned
+        @GitHubPayload("issues.opened") GHEventPayloadIssueExtended opened,
+        @GitHubPayload("issues.milestoned") GHEventPayloadIssueExtended milestoned
     ) throws Exception {
         // Arrange
         handler.handleEvent(opened);
@@ -259,8 +263,8 @@ class GitHubIssueMessageHandlerIntegrationTest extends BaseIntegrationTest {
     @Test
     @DisplayName("should remove milestone from issue when demilestoned")
     void demilestonedEventRemovesMilestone(
-        @GitHubPayload("issues.milestoned") GHEventPayload.Issue milestoned,
-        @GitHubPayload("issues.demilestoned") GHEventPayload.Issue demilestoned
+        @GitHubPayload("issues.milestoned") GHEventPayloadIssueExtended milestoned,
+        @GitHubPayload("issues.demilestoned") GHEventPayloadIssueExtended demilestoned
     ) throws Exception {
         // Arrange
         handler.handleEvent(milestoned);
@@ -278,8 +282,8 @@ class GitHubIssueMessageHandlerIntegrationTest extends BaseIntegrationTest {
     @Test
     @DisplayName("should update issue lock status when locked")
     void lockedEventLocksIssue(
-        @GitHubPayload("issues.opened") GHEventPayload.Issue opened,
-        @GitHubPayload("issues.locked") GHEventPayload.Issue locked
+        @GitHubPayload("issues.opened") GHEventPayloadIssueExtended opened,
+        @GitHubPayload("issues.locked") GHEventPayloadIssueExtended locked
     ) throws Exception {
         // Arrange
         handler.handleEvent(opened);
@@ -295,8 +299,8 @@ class GitHubIssueMessageHandlerIntegrationTest extends BaseIntegrationTest {
     @Test
     @DisplayName("should update issue lock status when unlocked")
     void unlockedEventUnlocksIssue(
-        @GitHubPayload("issues.locked") GHEventPayload.Issue locked,
-        @GitHubPayload("issues.unlocked") GHEventPayload.Issue unlocked
+        @GitHubPayload("issues.locked") GHEventPayloadIssueExtended locked,
+        @GitHubPayload("issues.unlocked") GHEventPayloadIssueExtended unlocked
     ) throws Exception {
         // Arrange
         handler.handleEvent(locked);
@@ -313,7 +317,7 @@ class GitHubIssueMessageHandlerIntegrationTest extends BaseIntegrationTest {
 
     @Test
     @DisplayName("should handle issue pinned event")
-    void pinnedEventHandled(@GitHubPayload("issues.pinned") GHEventPayload.Issue payload) throws Exception {
+    void pinnedEventHandled(@GitHubPayload("issues.pinned") GHEventPayloadIssueExtended payload) throws Exception {
         // Act
         handler.handleEvent(payload);
 
@@ -331,8 +335,8 @@ class GitHubIssueMessageHandlerIntegrationTest extends BaseIntegrationTest {
     @Test
     @DisplayName("should handle issue unpinned event")
     void unpinnedEventHandled(
-        @GitHubPayload("issues.pinned") GHEventPayload.Issue pinned,
-        @GitHubPayload("issues.unpinned") GHEventPayload.Issue unpinned
+        @GitHubPayload("issues.pinned") GHEventPayloadIssueExtended pinned,
+        @GitHubPayload("issues.unpinned") GHEventPayloadIssueExtended unpinned
     ) throws Exception {
         // Arrange
         handler.handleEvent(pinned);
@@ -347,7 +351,8 @@ class GitHubIssueMessageHandlerIntegrationTest extends BaseIntegrationTest {
 
     @Test
     @DisplayName("should handle issue transferred event")
-    void transferredEventHandled(@GitHubPayload("issues.transferred") GHEventPayload.Issue payload) throws Exception {
+    void transferredEventHandled(@GitHubPayload("issues.transferred") GHEventPayloadIssueExtended payload)
+        throws Exception {
         // Act
         handler.handleEvent(payload);
 
@@ -368,8 +373,8 @@ class GitHubIssueMessageHandlerIntegrationTest extends BaseIntegrationTest {
     @Test
     @DisplayName("should handle issue typed event")
     void typedEventHandled(
-        @GitHubPayload("issues.opened") GHEventPayload.Issue opened,
-        @GitHubPayload("issues.typed") GHEventPayload.Issue typed
+        @GitHubPayload("issues.opened") GHEventPayloadIssueExtended opened,
+        @GitHubPayload("issues.typed") GHEventPayloadIssueExtended typed
     ) throws Exception {
         // Arrange
         handler.handleEvent(opened);
@@ -385,8 +390,8 @@ class GitHubIssueMessageHandlerIntegrationTest extends BaseIntegrationTest {
     @Test
     @DisplayName("should handle issue untyped event")
     void untypedEventHandled(
-        @GitHubPayload("issues.typed") GHEventPayload.Issue typed,
-        @GitHubPayload("issues.untyped") GHEventPayload.Issue untyped
+        @GitHubPayload("issues.typed") GHEventPayloadIssueExtended typed,
+        @GitHubPayload("issues.untyped") GHEventPayloadIssueExtended untyped
     ) throws Exception {
         // Arrange
         handler.handleEvent(typed);
@@ -401,23 +406,21 @@ class GitHubIssueMessageHandlerIntegrationTest extends BaseIntegrationTest {
 
     @Test
     @DisplayName("should capture author association for issue if available")
-    void capturesAuthorAssociation(@GitHubPayload("issues.opened") GHEventPayload.Issue payload) throws Exception {
+    void capturesAuthorAssociation(@GitHubPayload("issues.opened") GHEventPayloadIssueExtended payload)
+        throws Exception {
         // Act
         handler.handleEvent(payload);
 
         // Assert
         var issue = issueRepository.findById(payload.getIssue().getId()).orElseThrow();
-        // Author association should be set if enrichment works, but may be null
-        // if the github-api library doesn't expose it
-        // Test passes if enrichment attempt doesn't cause errors
-        assertThat(issue).isNotNull();
+        assertThat(issue.getAuthorAssociation()).isEqualTo(AuthorAssociation.CONTRIBUTOR);
     }
 
     @Test
     @DisplayName("should capture state reason when issue is closed if available")
     void capturesStateReason(
-        @GitHubPayload("issues.opened") GHEventPayload.Issue opened,
-        @GitHubPayload("issues.closed") GHEventPayload.Issue closed
+        @GitHubPayload("issues.opened") GHEventPayloadIssueExtended opened,
+        @GitHubPayload("issues.closed") GHEventPayloadIssueExtended closed
     ) throws Exception {
         // Arrange
         handler.handleEvent(opened);
@@ -427,28 +430,25 @@ class GitHubIssueMessageHandlerIntegrationTest extends BaseIntegrationTest {
 
         // Assert
         var issue = issueRepository.findById(closed.getIssue().getId()).orElseThrow();
-        // State reason may be populated by enrichment if available
-        // Test verifies no errors occur during processing
-        assertThat(issue).isNotNull();
         assertThat(issue.getState()).isEqualTo(Issue.State.CLOSED);
+        assertThat(issue.getStateReason()).isEqualTo(StateReason.COMPLETED);
     }
 
     @Test
     @DisplayName("should capture lock reason when issue is locked if available")
-    void capturesLockReason(@GitHubPayload("issues.locked") GHEventPayload.Issue payload) throws Exception {
+    void capturesLockReason(@GitHubPayload("issues.locked") GHEventPayloadIssueExtended payload) throws Exception {
         // Act
         handler.handleEvent(payload);
 
         // Assert
         var issue = issueRepository.findById(payload.getIssue().getId()).orElseThrow();
         assertThat(issue.isLocked()).isTrue();
-        // Lock reason enrichment attempted, test passes if no errors
-        assertThat(issue).isNotNull();
+        assertThat(issue.getActiveLockReason()).isEqualTo(LockReason.RESOLVED);
     }
 
     @Test
     @DisplayName("should capture reactions summary for issue")
-    void capturesReactions(@GitHubPayload("issues.opened") GHEventPayload.Issue payload) throws Exception {
+    void capturesReactions(@GitHubPayload("issues.opened") GHEventPayloadIssueExtended payload) throws Exception {
         // Act
         handler.handleEvent(payload);
 
@@ -468,7 +468,8 @@ class GitHubIssueMessageHandlerIntegrationTest extends BaseIntegrationTest {
 
     @Test
     @DisplayName("should capture sub-issues summary for issue")
-    void capturesSubIssuesSummary(@GitHubPayload("issues.opened") GHEventPayload.Issue payload) throws Exception {
+    void capturesSubIssuesSummary(@GitHubPayload("issues.opened") GHEventPayloadIssueExtended payload)
+        throws Exception {
         // Act
         handler.handleEvent(payload);
 
@@ -481,7 +482,7 @@ class GitHubIssueMessageHandlerIntegrationTest extends BaseIntegrationTest {
 
     @Test
     @DisplayName("should capture issue dependencies summary for issue")
-    void capturesIssueDependenciesSummary(@GitHubPayload("issues.opened") GHEventPayload.Issue payload)
+    void capturesIssueDependenciesSummary(@GitHubPayload("issues.opened") GHEventPayloadIssueExtended payload)
         throws Exception {
         // Act
         handler.handleEvent(payload);

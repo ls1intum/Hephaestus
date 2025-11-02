@@ -14,11 +14,11 @@ public class GHEventPayloadSubIssues extends GHEventPayload {
 
     /** The parent issue affected by the event. */
     @JsonProperty("parent_issue")
-    private GHIssue parentIssue;
+    private GHIssueExtended parentIssue;
 
     /** The sub-issue (child issue) affected by the event. */
     @JsonProperty("sub_issue")
-    private GHIssue subIssue;
+    private GHIssueExtended subIssue;
 
     /** The ID of the sub-issue. */
     @JsonProperty("sub_issue_id")
@@ -33,7 +33,7 @@ public class GHEventPayloadSubIssues extends GHEventPayload {
      *
      * @return the parent issue
      */
-    public GHIssue getParentIssue() {
+    public GHIssueExtended getParentIssue() {
         return parentIssue;
     }
 
@@ -42,7 +42,7 @@ public class GHEventPayloadSubIssues extends GHEventPayload {
      *
      * @return the sub-issue
      */
-    public GHIssue getSubIssue() {
+    public GHIssueExtended getSubIssue() {
         return subIssue;
     }
 
@@ -62,5 +62,19 @@ public class GHEventPayloadSubIssues extends GHEventPayload {
      */
     public Long getParentIssueId() {
         return parentIssueId;
+    }
+
+    @Override
+    void lateBind() {
+        super.lateBind();
+        GHRepository repository = getRepository();
+        if (repository != null) {
+            if (parentIssue != null) {
+                parentIssue.wrap(repository);
+            }
+            if (subIssue != null) {
+                subIssue.wrap(repository);
+            }
+        }
     }
 }

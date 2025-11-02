@@ -7,6 +7,7 @@ import de.tum.in.www1.hephaestus.gitprovider.milestone.Milestone;
 import de.tum.in.www1.hephaestus.gitprovider.repository.Repository;
 import de.tum.in.www1.hephaestus.gitprovider.user.User;
 import jakarta.persistence.CascadeType;
+import jakarta.persistence.Column;
 import jakarta.persistence.DiscriminatorColumn;
 import jakarta.persistence.DiscriminatorType;
 import jakarta.persistence.DiscriminatorValue;
@@ -73,6 +74,7 @@ public class Issue extends BaseGitServiceEntity {
     @Enumerated(EnumType.STRING)
     private AuthorAssociation authorAssociation;
 
+    @Column(length = 64)
     private String type;
 
     private int commentsCount;
@@ -134,6 +136,19 @@ public class Issue extends BaseGitServiceEntity {
     )
     @ToString.Exclude
     private Set<User> assignees = new HashSet<>();
+
+    @ManyToMany
+    @JoinTable(
+        name = "issue_sub_issue",
+        joinColumns = @JoinColumn(name = "parent_issue_id"),
+        inverseJoinColumns = @JoinColumn(name = "child_issue_id")
+    )
+    @ToString.Exclude
+    private Set<Issue> subIssues = new HashSet<>();
+
+    @ManyToMany(mappedBy = "subIssues")
+    @ToString.Exclude
+    private Set<Issue> parentIssues = new HashSet<>();
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "milestone_id")

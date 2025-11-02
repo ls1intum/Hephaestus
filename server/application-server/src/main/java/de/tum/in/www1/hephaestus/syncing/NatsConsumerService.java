@@ -2,7 +2,6 @@ package de.tum.in.www1.hephaestus.syncing;
 
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubMessageHandler;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubMessageHandlerRegistry;
-import de.tum.in.www1.hephaestus.gitprovider.subissues.github.GitHubSubIssuesMessageHandler;
 import de.tum.in.www1.hephaestus.workspace.RepositoryToMonitor;
 import io.nats.client.Connection;
 import io.nats.client.ConsumerContext;
@@ -55,11 +54,9 @@ public class NatsConsumerService {
     private Connection natsConnection;
     private final Map<String, ConsumerContext> repositoryToMonitorIdToConsumerContext = new HashMap<>();
     private final GitHubMessageHandlerRegistry handlerRegistry;
-    private final GitHubSubIssuesMessageHandler subIssuesHandler;
 
-    public NatsConsumerService(GitHubMessageHandlerRegistry handlerRegistry, GitHubSubIssuesMessageHandler subIssuesHandler) {
+    public NatsConsumerService(GitHubMessageHandlerRegistry handlerRegistry) {
         this.handlerRegistry = handlerRegistry;
-        this.subIssuesHandler = subIssuesHandler;
     }
 
     @EventListener(ApplicationReadyEvent.class)
@@ -297,19 +294,15 @@ public class NatsConsumerService {
         try {
             String subject = msg.getSubject();
             String lastPart = subject.substring(subject.lastIndexOf(".") + 1);
-            
-            // Special handling for sub_issues events since GHEvent.SUB_ISSUES doesn't exist in github-api library
-            if ("sub_issues".equals(lastPart)) {
-                subIssuesHandler.onMessage(msg);
-                msg.ack();
-                return;
+
+            GitHubMessageHandler<?> eventHandler = handlerRegistry.getCustomHandler(lastPart);
+            if (eventHandler == null) {
+                GHEvent eventType = GHEvent.valueOf(lastPart.toUpperCase());
+                eventHandler = handlerRegistry.getHandler(eventType);
             }
-            
-            GHEvent eventType = GHEvent.valueOf(lastPart.toUpperCase());
-            GitHubMessageHandler<?> eventHandler = handlerRegistry.getHandler(eventType);
 
             if (eventHandler == null) {
-                logger.warn("No handler found for event type: {}", eventType);
+                logger.warn("No handler found for event type: {}", lastPart);
                 msg.ack();
                 return;
             }
@@ -326,18 +319,28 @@ public class NatsConsumerService {
     }
 
     private String[] getOrganizationSubjects(String owner) {
-        return handlerRegistry
+        List<String> subjects = new ArrayList<>();
+
+        handlerRegistry
             .getSupportedOrganizationEvents()
             .stream()
             .map(GHEvent::name)
             .map(String::toLowerCase)
             .map(event -> getSubjectPrefix(owner + "/?") + "." + event)
-            .toArray(String[]::new);
+            .forEach(subjects::add);
+
+        handlerRegistry
+            .getSupportedOrganizationCustomEvents()
+            .stream()
+            .map(event -> getSubjectPrefix(owner + "/?") + "." + event)
+            .forEach(subjects::add);
+
+        return subjects.toArray(new String[0]);
     }
 
     private String[] getRepositorySubjects(String nameWithOwner) {
         List<String> subjects = new ArrayList<>();
-        
+
         // Add standard GitHub events from the registry
         handlerRegistry
             .getSupportedRepositoryEvents()
@@ -346,21 +349,34 @@ public class NatsConsumerService {
             .map(String::toLowerCase)
             .map(event -> getSubjectPrefix(nameWithOwner) + "." + event)
             .forEach(subjects::add);
-        
-        // Add custom sub_issues event (not in GHEvent enum) - specific event only, no .all
-        subjects.add(getSubjectPrefix(nameWithOwner) + ".sub_issues");
-        
+
+        handlerRegistry
+            .getSupportedRepositoryCustomEvents()
+            .stream()
+            .map(event -> getSubjectPrefix(nameWithOwner) + "." + event)
+            .forEach(subjects::add);
+
         return subjects.toArray(new String[0]);
     }
 
     private String[] getInstallationSubjects() {
-        return handlerRegistry
+        List<String> subjects = new ArrayList<>();
+
+        handlerRegistry
             .getSupportedInstallationEvents()
             .stream()
             .map(GHEvent::name)
             .map(String::toLowerCase)
             .map(event -> getSubjectPrefix("?/?") + "." + event)
-            .toArray(String[]::new);
+            .forEach(subjects::add);
+
+        handlerRegistry
+            .getSupportedInstallationCustomEvents()
+            .stream()
+            .map(event -> getSubjectPrefix("?/?") + "." + event)
+            .forEach(subjects::add);
+
+        return subjects.toArray(new String[0]);
     }
 
     private String getSubjectPrefix(String nameWithOwner) {

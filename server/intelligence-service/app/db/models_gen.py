@@ -343,6 +343,9 @@ class Team(Base):
     team_repository_permission: Mapped[List["TeamRepositoryPermission"]] = relationship(
         "TeamRepositoryPermission", back_populates="team"
     )
+    pull_request: Mapped[List["Issue"]] = relationship(
+        "Issue", secondary="pull_request_requested_teams", back_populates="team"
+    )
 
 
 class User(Base):
@@ -685,6 +688,19 @@ class Issue(Base):
     is_locked: Mapped[bool] = mapped_column(Boolean)
     number: Mapped[int] = mapped_column(Integer)
     has_pull_request: Mapped[bool] = mapped_column(Boolean)
+    reactions_total: Mapped[int] = mapped_column(Integer, server_default=text("0"))
+    reactions_plus1: Mapped[int] = mapped_column(Integer, server_default=text("0"))
+    reactions_minus1: Mapped[int] = mapped_column(Integer, server_default=text("0"))
+    reactions_laugh: Mapped[int] = mapped_column(Integer, server_default=text("0"))
+    reactions_hooray: Mapped[int] = mapped_column(Integer, server_default=text("0"))
+    reactions_confused: Mapped[int] = mapped_column(Integer, server_default=text("0"))
+    reactions_heart: Mapped[int] = mapped_column(Integer, server_default=text("0"))
+    reactions_rocket: Mapped[int] = mapped_column(Integer, server_default=text("0"))
+    reactions_eyes: Mapped[int] = mapped_column(Integer, server_default=text("0"))
+    sub_issues_total: Mapped[int] = mapped_column(Integer, server_default=text("0"))
+    sub_issues_completed: Mapped[int] = mapped_column(Integer, server_default=text("0"))
+    blocked_by_count: Mapped[int] = mapped_column(Integer, server_default=text("0"))
+    blocking_count: Mapped[int] = mapped_column(Integer, server_default=text("0"))
     created_at: Mapped[Optional[datetime.datetime]] = mapped_column(DateTime(True))
     updated_at: Mapped[Optional[datetime.datetime]] = mapped_column(DateTime(True))
     body: Mapped[Optional[Any]] = mapped_column(OID)
@@ -714,6 +730,10 @@ class Issue(Base):
     last_detection_time: Mapped[Optional[datetime.datetime]] = mapped_column(
         TIMESTAMP(True, 6)
     )
+    active_lock_reason: Mapped[Optional[str]] = mapped_column(String(255))
+    author_association: Mapped[Optional[str]] = mapped_column(String(255))
+    state_reason: Mapped[Optional[str]] = mapped_column(String(255))
+    type: Mapped[Optional[str]] = mapped_column(String(64))
     pull_request_review_comment: Mapped[List["PullRequestReviewComment"]] = (
         relationship("PullRequestReviewComment", back_populates="pull_request")
     )
@@ -738,10 +758,27 @@ class Issue(Base):
     label: Mapped[List["Label"]] = relationship(
         "Label", secondary="issue_label", back_populates="issue"
     )
+    parent_issue: Mapped[List["Issue"]] = relationship(
+        "Issue",
+        secondary="issue_sub_issue",
+        primaryjoin=lambda: Issue.id == t_issue_sub_issue.c.child_issue_id,
+        secondaryjoin=lambda: Issue.id == t_issue_sub_issue.c.parent_issue_id,
+        back_populates="child_issue",
+    )
+    child_issue: Mapped[List["Issue"]] = relationship(
+        "Issue",
+        secondary="issue_sub_issue",
+        primaryjoin=lambda: Issue.id == t_issue_sub_issue.c.parent_issue_id,
+        secondaryjoin=lambda: Issue.id == t_issue_sub_issue.c.child_issue_id,
+        back_populates="parent_issue",
+    )
     user_: Mapped[List["User"]] = relationship(
         "User",
         secondary="pull_request_requested_reviewers",
         back_populates="pull_request",
+    )
+    team: Mapped[List["Team"]] = relationship(
+        "Team", secondary="pull_request_requested_teams", back_populates="pull_request"
     )
     bad_practice_detection: Mapped[List["BadPracticeDetection"]] = relationship(
         "BadPracticeDetection", back_populates="pullrequest"
@@ -855,6 +892,21 @@ t_issue_label = Table(
     ForeignKeyConstraint(["label_id"], ["label.id"], name="fkxbk5rr30kkb6k4ech7x4vh9h"),
     PrimaryKeyConstraint("issue_id", "label_id", name="issue_label_pkey"),
 )
+t_issue_sub_issue = Table(
+    "issue_sub_issue",
+    Base.metadata,
+    Column("parent_issue_id", BigInteger, primary_key=True, nullable=False),
+    Column("child_issue_id", BigInteger, primary_key=True, nullable=False),
+    ForeignKeyConstraint(
+        ["child_issue_id"], ["issue.id"], name="fk_issue_sub_issue_child"
+    ),
+    ForeignKeyConstraint(
+        ["parent_issue_id"], ["issue.id"], name="fk_issue_sub_issue_parent"
+    ),
+    PrimaryKeyConstraint(
+        "parent_issue_id", "child_issue_id", name="issue_sub_issue_pkey"
+    ),
+)
 t_pull_request_requested_reviewers = Table(
     "pull_request_requested_reviewers",
     Base.metadata,
@@ -866,6 +918,21 @@ t_pull_request_requested_reviewers = Table(
     ForeignKeyConstraint(["user_id"], ["user.id"], name="fkioq4g5aksr97l6qyl4g5l63tn"),
     PrimaryKeyConstraint(
         "pull_request_id", "user_id", name="pull_request_requested_reviewers_pkey"
+    ),
+)
+t_pull_request_requested_teams = Table(
+    "pull_request_requested_teams",
+    Base.metadata,
+    Column("pull_request_id", BigInteger, primary_key=True, nullable=False),
+    Column("team_id", BigInteger, primary_key=True, nullable=False),
+    ForeignKeyConstraint(
+        ["pull_request_id"], ["issue.id"], name="fk_pull_request_requested_teams_pr"
+    ),
+    ForeignKeyConstraint(
+        ["team_id"], ["team.id"], name="fk_pull_request_requested_teams_team"
+    ),
+    PrimaryKeyConstraint(
+        "pull_request_id", "team_id", name="pull_request_requested_teams_pkey"
     ),
 )
 

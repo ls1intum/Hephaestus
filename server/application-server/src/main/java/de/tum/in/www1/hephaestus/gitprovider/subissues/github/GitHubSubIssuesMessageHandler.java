@@ -55,13 +55,35 @@ public class GitHubSubIssuesMessageHandler extends GitHubMessageHandler<GHEventP
 
         repositorySyncService.processRepository(repository);
 
-        // Process both parent and sub-issue to capture relationship metadata
-        // The enrichment logic in GitHubIssueSyncService will update sub-issues/dependencies counts
         if (parentIssue != null) {
             issueSyncService.processIssue(parentIssue);
         }
         if (subIssue != null) {
             issueSyncService.processIssue(subIssue);
+        }
+
+        Long parentId = parentIssue != null ? parentIssue.getId() : eventPayload.getParentIssueId();
+        Long subIssueId = subIssue != null ? subIssue.getId() : eventPayload.getSubIssueId();
+
+        if (parentId == null || subIssueId == null) {
+            logger.warn(
+                "Skipping relationship update due to missing identifiers (parent: {}, child: {})",
+                parentId,
+                subIssueId
+            );
+            return;
+        }
+
+        boolean addRelation =
+            switch (action) {
+                case "sub_issue_removed", "parent_issue_removed" -> false;
+                default -> true;
+            };
+
+        if (addRelation) {
+            issueSyncService.addSubIssueRelationship(parentId, subIssueId);
+        } else {
+            issueSyncService.removeSubIssueRelationship(parentId, subIssueId);
         }
     }
 
@@ -73,13 +95,8 @@ public class GitHubSubIssuesMessageHandler extends GitHubMessageHandler<GHEventP
         return GHEvent.ALL;
     }
 
-    /**
-     * Returns the custom event name for sub-issues webhooks.
-     * This is used by NatsConsumerService to route sub-issues events to this handler.
-     *
-     * @return "sub_issues"
-     */
-    public String getCustomEventName() {
+    @Override
+    protected String getCustomEventType() {
         return "sub_issues";
     }
 }

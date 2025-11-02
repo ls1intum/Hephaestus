@@ -2,13 +2,13 @@ package org.kohsuke.github;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
+import com.fasterxml.jackson.annotation.JsonSetter;
+import java.util.Map;
+import java.util.Objects;
 
 /**
- * Extended GHIssue that exposes additional fields not available in the standard github-api library.
- * This class provides access to GitHub issue fields like author_association, state_reason,
- * active_lock_reason, reactions, and other metadata.
- *
- * Unknown JSON fields are ignored to remain forward-compatible with GitHub's API.
+ * Extension of {@link GHIssue} that exposes webhook-only metadata (sub-issue summaries,
+ * reaction counters, author association, etc.).
  */
 @JsonIgnoreProperties(ignoreUnknown = true)
 public class GHIssueExtended extends GHIssue {
@@ -16,13 +16,27 @@ public class GHIssueExtended extends GHIssue {
     @JsonProperty("author_association")
     private String authorAssociation;
 
-    @JsonProperty("state_reason")
-    private String stateReason;
-
     @JsonProperty("active_lock_reason")
     private String activeLockReason;
 
-    private Reactions reactions;
+    private String typeLabel;
+
+    @JsonSetter("type")
+    private void setType(Object rawType) {
+        if (rawType == null) {
+            this.typeLabel = null;
+        } else if (rawType instanceof String stringType) {
+            this.typeLabel = stringType;
+        } else if (rawType instanceof Map<?, ?> mapType) {
+            Object name = mapType.get("name");
+            this.typeLabel = name != null ? name.toString() : null;
+        } else {
+            this.typeLabel = rawType.toString();
+        }
+    }
+
+    @JsonProperty("reactions")
+    private ReactionSummary reactions;
 
     @JsonProperty("sub_issues_summary")
     private SubIssuesSummary subIssuesSummary;
@@ -30,91 +44,73 @@ public class GHIssueExtended extends GHIssue {
     @JsonProperty("issue_dependencies_summary")
     private IssueDependenciesSummary issueDependenciesSummary;
 
-    /**
-     * Gets the author association indicating the user's relationship to the repository.
-     *
-     * @return the author association (e.g., OWNER, MEMBER, CONTRIBUTOR, etc.)
-     */
-    public String getAuthorAssociation() {
+    public String getAuthorAssociationRaw() {
         return authorAssociation;
     }
 
-    /**
-     * Gets the reason why the issue was closed.
-     *
-     * @return the state reason (e.g., completed, not_planned, reopened)
-     */
-    public String getStateReason() {
-        return stateReason;
-    }
-
-    /**
-     * Gets the reason why the issue is locked.
-     *
-     * @return the active lock reason (e.g., off-topic, too heated, resolved, spam)
-     */
-    public String getActiveLockReason() {
+    public String getActiveLockReasonRaw() {
         return activeLockReason;
     }
 
-    /**
-     * Gets the reactions on this issue.
-     *
-     * @return the reactions object containing counts for each reaction type
-     */
-    public Reactions getReactions() {
-        return reactions;
+    public String getTypeLabel() {
+        return typeLabel;
     }
 
-    /**
-     * Gets the sub-issues summary for this issue (GitHub tasklists feature).
-     *
-     * @return the sub-issues summary
-     */
+    public ReactionSummary getReactionsSummary() {
+        return reactions != null ? reactions : ReactionSummary.EMPTY;
+    }
+
     public SubIssuesSummary getSubIssuesSummary() {
-        return subIssuesSummary;
+        return subIssuesSummary != null ? subIssuesSummary : SubIssuesSummary.EMPTY;
     }
 
-    /**
-     * Gets the issue dependencies summary.
-     *
-     * @return the issue dependencies summary
-     */
     public IssueDependenciesSummary getIssueDependenciesSummary() {
-        return issueDependenciesSummary;
+        return issueDependenciesSummary != null ? issueDependenciesSummary : IssueDependenciesSummary.EMPTY;
     }
 
-    /**
-     * Reactions on an issue or pull request.
-     */
+    /** Snapshot of GitHub's reaction counter payload. */
     @JsonIgnoreProperties(ignoreUnknown = true)
-    public static class Reactions {
+    public static final class ReactionSummary {
 
-        private int total;
+        static final ReactionSummary EMPTY = new ReactionSummary();
+
+        @JsonProperty("total_count")
+        private int totalCount;
 
         @JsonProperty("+1")
-        private int plus1;
+        private int plusOne;
 
         @JsonProperty("-1")
-        private int minus1;
+        private int minusOne;
 
+        @JsonProperty("laugh")
         private int laugh;
+
+        @JsonProperty("hooray")
         private int hooray;
+
+        @JsonProperty("confused")
         private int confused;
+
+        @JsonProperty("heart")
         private int heart;
+
+        @JsonProperty("rocket")
         private int rocket;
+
+        @JsonProperty("eyes")
         private int eyes;
 
-        public int getTotal() {
-            return total;
+        public int getTotalCount() {
+            return totalCount;
         }
 
-        public int getPlus1() {
-            return plus1;
+        public int getPlusOne() {
+            return plusOne;
         }
 
-        public int getMinus1() {
-            return minus1;
+        public int getMinusOne() {
+            return minusOne;
         }
 
         public int getLaugh() {
@@ -142,13 +138,16 @@ public class GHIssueExtended extends GHIssue {
         }
     }
 
-    /**
-     * Summary of sub-issues (child issues) for this issue.
-     */
+    /** Snapshot of GitHub's task list aggregation payload. */
     @JsonIgnoreProperties(ignoreUnknown = true)
-    public static class SubIssuesSummary {
+    public static final class SubIssuesSummary {
 
+        static final SubIssuesSummary EMPTY = new SubIssuesSummary();
+
+        @JsonProperty("total")
         private int total;
+
+        @JsonProperty("completed")
         private int completed;
 
         public int getTotal() {
@@ -160,24 +159,30 @@ public class GHIssueExtended extends GHIssue {
         }
     }
 
-    /**
-     * Summary of issue dependencies (blocked by / blocking relationships).
-     */
+    /** Snapshot of GitHub's dependency summary payload. */
     @JsonIgnoreProperties(ignoreUnknown = true)
-    public static class IssueDependenciesSummary {
+    public static final class IssueDependenciesSummary {
 
-        @JsonProperty("blocked_by_count")
-        private int blockedByCount;
+        static final IssueDependenciesSummary EMPTY = new IssueDependenciesSummary();
 
-        @JsonProperty("blocking_count")
-        private int blockingCount;
+        @JsonProperty("blocked_by")
+        private int blockedBy;
 
-        public int getBlockedByCount() {
-            return blockedByCount;
+        @JsonProperty("total_blocked_by")
+        private Integer totalBlockedBy;
+
+        @JsonProperty("blocking")
+        private int blocking;
+
+        @JsonProperty("total_blocking")
+        private Integer totalBlocking;
+
+        public int getBlockedBy() {
+            return Objects.requireNonNullElse(totalBlockedBy, blockedBy);
         }
 
-        public int getBlockingCount() {
-            return blockingCount;
+        public int getBlocking() {
+            return Objects.requireNonNullElse(totalBlocking, blocking);
         }
     }
 }

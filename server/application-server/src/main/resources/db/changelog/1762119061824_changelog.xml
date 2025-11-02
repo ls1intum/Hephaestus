@@ -1,0 +1,117 @@
+<?xml version="1.1" encoding="UTF-8" standalone="no"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-3.8.xsd"
+>
+    <changeSet author="FelixTJDietrich" id="1762119061824-1">
+        <createTable tableName="issue_sub_issue">
+            <column name="parent_issue_id" type="BIGINT">
+                <constraints nullable="false" primaryKey="true" primaryKeyName="issue_sub_issue_pkey"/>
+            </column>
+            <column name="child_issue_id" type="BIGINT">
+                <constraints nullable="false" primaryKey="true" primaryKeyName="issue_sub_issue_pkey"/>
+            </column>
+        </createTable>
+    </changeSet>
+
+    <changeSet author="FelixTJDietrich" id="1762119061824-2">
+        <createTable tableName="pull_request_requested_teams">
+            <column name="pull_request_id" type="BIGINT">
+                <constraints nullable="false" primaryKey="true" primaryKeyName="pull_request_requested_teams_pkey"/>
+            </column>
+            <column name="team_id" type="BIGINT">
+                <constraints nullable="false" primaryKey="true" primaryKeyName="pull_request_requested_teams_pkey"/>
+            </column>
+        </createTable>
+    </changeSet>
+
+    <changeSet author="FelixTJDietrich" id="1762119061824-3">
+        <addColumn tableName="issue">
+            <column name="active_lock_reason" type="VARCHAR(255)"/>
+            <column name="author_association" type="VARCHAR(255)"/>
+            <column name="state_reason" type="VARCHAR(255)"/>
+            <column name="type" type="VARCHAR(64)"/>
+        </addColumn>
+    </changeSet>
+
+    <changeSet author="FelixTJDietrich" id="1762119061824-4">
+        <addColumn tableName="issue">
+            <column name="reactions_total" type="INTEGER" defaultValueNumeric="0">
+                <constraints nullable="false"/>
+            </column>
+            <column name="reactions_plus1" type="INTEGER" defaultValueNumeric="0">
+                <constraints nullable="false"/>
+            </column>
+            <column name="reactions_minus1" type="INTEGER" defaultValueNumeric="0">
+                <constraints nullable="false"/>
+            </column>
+            <column name="reactions_laugh" type="INTEGER" defaultValueNumeric="0">
+                <constraints nullable="false"/>
+            </column>
+            <column name="reactions_hooray" type="INTEGER" defaultValueNumeric="0">
+                <constraints nullable="false"/>
+            </column>
+            <column name="reactions_confused" type="INTEGER" defaultValueNumeric="0">
+                <constraints nullable="false"/>
+            </column>
+            <column name="reactions_heart" type="INTEGER" defaultValueNumeric="0">
+                <constraints nullable="false"/>
+            </column>
+            <column name="reactions_rocket" type="INTEGER" defaultValueNumeric="0">
+                <constraints nullable="false"/>
+            </column>
+            <column name="reactions_eyes" type="INTEGER" defaultValueNumeric="0">
+                <constraints nullable="false"/>
+            </column>
+        </addColumn>
+    </changeSet>
+
+    <changeSet author="FelixTJDietrich" id="1762119061824-5">
+        <addColumn tableName="issue">
+            <column name="sub_issues_total" type="INTEGER" defaultValueNumeric="0">
+                <constraints nullable="false"/>
+            </column>
+            <column name="sub_issues_completed" type="INTEGER" defaultValueNumeric="0">
+                <constraints nullable="false"/>
+            </column>
+            <column name="blocked_by_count" type="INTEGER" defaultValueNumeric="0">
+                <constraints nullable="false"/>
+            </column>
+            <column name="blocking_count" type="INTEGER" defaultValueNumeric="0">
+                <constraints nullable="false"/>
+            </column>
+        </addColumn>
+    </changeSet>
+
+    <changeSet author="FelixTJDietrich" id="1762119061824-6">
+        <addForeignKeyConstraint
+            baseColumnNames="parent_issue_id"
+            baseTableName="issue_sub_issue"
+            constraintName="fk_issue_sub_issue_parent"
+            referencedColumnNames="id"
+            referencedTableName="issue"
+        />
+        <addForeignKeyConstraint
+            baseColumnNames="child_issue_id"
+            baseTableName="issue_sub_issue"
+            constraintName="fk_issue_sub_issue_child"
+            referencedColumnNames="id"
+            referencedTableName="issue"
+        />
+        <addForeignKeyConstraint
+            baseColumnNames="pull_request_id"
+            baseTableName="pull_request_requested_teams"
+            constraintName="fk_pull_request_requested_teams_pr"
+            referencedColumnNames="id"
+            referencedTableName="issue"
+        />
+        <addForeignKeyConstraint
+            baseColumnNames="team_id"
+            baseTableName="pull_request_requested_teams"
+            constraintName="fk_pull_request_requested_teams_team"
+            referencedColumnNames="id"
+            referencedTableName="team"
+        />
+    </changeSet>
+</databaseChangeLog>

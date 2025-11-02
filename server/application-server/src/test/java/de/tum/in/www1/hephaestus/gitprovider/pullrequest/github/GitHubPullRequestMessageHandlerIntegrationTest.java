@@ -129,7 +129,7 @@ class GitHubPullRequestMessageHandlerIntegrationTest extends BaseIntegrationTest
         var pr = pullRequestRepository.findById(synchronizePayload.getPullRequest().getId()).orElseThrow();
         assertThat(pr.getNumber()).isEqualTo(synchronizePayload.getPullRequest().getNumber());
         assertThat(pr.getTitle()).isEqualTo(synchronizePayload.getPullRequest().getTitle());
-        assertThat(pr.getState()).isEqualTo(synchronizePayload.getPullRequest().getState());
+        assertThat(pr.getState().name()).isEqualTo(synchronizePayload.getPullRequest().getState().name());
     }
 
     @Test
@@ -365,7 +365,9 @@ class GitHubPullRequestMessageHandlerIntegrationTest extends BaseIntegrationTest
         // Verify reviewers list matches the payload - requested_reviewers should be updated
         assertThat(pr.getRequestedReviewers()).isNotNull();
         // After review_request_removed event, check that reviewer count matches payload
-        assertThat(pr.getRequestedReviewers()).hasSizeLessThanOrEqualTo(removed.getPullRequest().getRequestedReviewers().size() + 1);
+        assertThat(pr.getRequestedReviewers()).hasSizeLessThanOrEqualTo(
+            removed.getPullRequest().getRequestedReviewers().size() + 1
+        );
     }
 
     @Test

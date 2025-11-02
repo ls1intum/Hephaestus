@@ -2,11 +2,14 @@ package de.tum.in.www1.hephaestus.gitprovider.subissues.github;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import de.tum.in.www1.hephaestus.gitprovider.common.GitHubPayload;
+import de.tum.in.www1.hephaestus.gitprovider.common.GitHubPayloadExtension;
+import de.tum.in.www1.hephaestus.gitprovider.issue.Issue;
 import de.tum.in.www1.hephaestus.gitprovider.issue.IssueRepository;
-import de.tum.in.www1.hephaestus.testutil.github.annotation.GitHubPayload;
-import de.tum.in.www1.hephaestus.testutil.integration.BaseIntegrationTest;
+import de.tum.in.www1.hephaestus.testconfig.BaseIntegrationTest;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
 import org.kohsuke.github.GHEventPayloadSubIssues;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.transaction.annotation.Transactional;
@@ -17,6 +20,7 @@ import org.springframework.transaction.annotation.Transactional;
  * Tests webhook event handling for GitHub's sub-issues (tasklists) feature,
  * which allows tracking parent-child relationships between issues.
  */
+@ExtendWith(GitHubPayloadExtension.class)
 class GitHubSubIssuesMessageHandlerIntegrationTest extends BaseIntegrationTest {
 
     @Autowired
@@ -32,97 +36,104 @@ class GitHubSubIssuesMessageHandlerIntegrationTest extends BaseIntegrationTest {
 
     @Test
     @Transactional
-    @GitHubPayload("sub_issues.sub_issue_added")
-    void handlesSubIssueAddedEvent(GHEventPayloadSubIssues payload) {
+    void handlesSubIssueAddedEvent(@GitHubPayload("sub_issues.sub_issue_added") GHEventPayloadSubIssues payload) {
         // Arrange - payload loaded by @GitHubPayload
 
         // Act
         subIssuesMessageHandler.handleEvent(payload);
 
         // Assert - verify both parent and sub-issue are processed
-        var parentIssue = issueRepository.findById(payload.getParentIssue().getId());
-        var subIssue = issueRepository.findById(payload.getSubIssue().getId());
-
-        assertThat(parentIssue).isPresent();
-        assertThat(subIssue).isPresent();
+        var parentIssue = issueRepository.findById(payload.getParentIssue().getId()).orElseThrow();
+        var subIssue = issueRepository.findById(payload.getSubIssue().getId()).orElseThrow();
 
         // Verify basic properties are captured
-        assertThat(parentIssue.get().getNumber()).isEqualTo(payload.getParentIssue().getNumber());
-        assertThat(subIssue.get().getNumber()).isEqualTo(payload.getSubIssue().getNumber());
+        assertThat(parentIssue.getNumber()).isEqualTo(payload.getParentIssue().getNumber());
+        assertThat(subIssue.getNumber()).isEqualTo(payload.getSubIssue().getNumber());
+
+        // Relationship persisted
+        assertThat(parentIssue.getSubIssues()).extracting(Issue::getId).contains(subIssue.getId());
+        assertThat(subIssue.getParentIssues()).extracting(Issue::getId).contains(parentIssue.getId());
     }
 
     @Test
     @Transactional
-    @GitHubPayload("sub_issues.sub_issue_removed")
-    void handlesSubIssueRemovedEvent(GHEventPayloadSubIssues payload) {
-        // Arrange - payload loaded by @GitHubPayload
+    void handlesSubIssueRemovedEvent(
+        @GitHubPayload("sub_issues.sub_issue_added") GHEventPayloadSubIssues added,
+        @GitHubPayload("sub_issues.sub_issue_removed") GHEventPayloadSubIssues removed
+    ) {
+        // Arrange
+        subIssuesMessageHandler.handleEvent(added);
+        var parentBefore = issueRepository.findById(added.getParentIssue().getId()).orElseThrow();
+        assertThat(parentBefore.getSubIssues()).isNotEmpty();
 
         // Act
-        subIssuesMessageHandler.handleEvent(payload);
+        subIssuesMessageHandler.handleEvent(removed);
 
-        // Assert - verify both issues are still processed (relationship is in metadata)
-        var parentIssue = issueRepository.findById(payload.getParentIssue().getId());
-        var subIssue = issueRepository.findById(payload.getSubIssue().getId());
+        // Assert
+        var parentAfter = issueRepository.findById(removed.getParentIssue().getId()).orElseThrow();
+        var childAfter = issueRepository.findById(removed.getSubIssue().getId()).orElseThrow();
 
-        assertThat(parentIssue).isPresent();
-        assertThat(subIssue).isPresent();
+        assertThat(parentAfter.getSubIssues()).extracting(Issue::getId).doesNotContain(childAfter.getId());
+        assertThat(childAfter.getParentIssues()).extracting(Issue::getId).doesNotContain(parentAfter.getId());
     }
 
     @Test
     @Transactional
-    @GitHubPayload("sub_issues.parent_issue_added")
-    void handlesParentIssueAddedEvent(GHEventPayloadSubIssues payload) {
+    void handlesParentIssueAddedEvent(@GitHubPayload("sub_issues.parent_issue_added") GHEventPayloadSubIssues payload) {
         // Arrange - payload loaded by @GitHubPayload
 
         // Act
         subIssuesMessageHandler.handleEvent(payload);
 
         // Assert - verify both issues are processed
-        var parentIssue = issueRepository.findById(payload.getParentIssue().getId());
-        var subIssue = issueRepository.findById(payload.getSubIssue().getId());
-
-        assertThat(parentIssue).isPresent();
-        assertThat(subIssue).isPresent();
+        var parentIssue = issueRepository.findById(payload.getParentIssue().getId()).orElseThrow();
+        var subIssue = issueRepository.findById(payload.getSubIssue().getId()).orElseThrow();
 
         // Verify the relationship is captured
-        assertThat(parentIssue.get().getTitle()).isNotEmpty();
-        assertThat(subIssue.get().getTitle()).isNotEmpty();
+        assertThat(parentIssue.getSubIssues()).extracting(Issue::getId).contains(subIssue.getId());
+        assertThat(subIssue.getParentIssues()).extracting(Issue::getId).contains(parentIssue.getId());
     }
 
     @Test
     @Transactional
-    @GitHubPayload("sub_issues.parent_issue_removed")
-    void handlesParentIssueRemovedEvent(GHEventPayloadSubIssues payload) {
-        // Arrange - payload loaded by @GitHubPayload
+    void handlesParentIssueRemovedEvent(
+        @GitHubPayload("sub_issues.parent_issue_added") GHEventPayloadSubIssues added,
+        @GitHubPayload("sub_issues.parent_issue_removed") GHEventPayloadSubIssues removed
+    ) {
+        // Arrange
+        subIssuesMessageHandler.handleEvent(added);
+        var parentBefore = issueRepository.findById(added.getParentIssue().getId()).orElseThrow();
+        assertThat(parentBefore.getSubIssues()).isNotEmpty();
 
         // Act
-        subIssuesMessageHandler.handleEvent(payload);
+        subIssuesMessageHandler.handleEvent(removed);
 
-        // Assert - verify both issues are still processed
-        var parentIssue = issueRepository.findById(payload.getParentIssue().getId());
-        var subIssue = issueRepository.findById(payload.getSubIssue().getId());
+        // Assert
+        var parentAfter = issueRepository.findById(removed.getParentIssue().getId()).orElseThrow();
+        var childAfter = issueRepository.findById(removed.getSubIssue().getId()).orElseThrow();
 
-        assertThat(parentIssue).isPresent();
-        assertThat(subIssue).isPresent();
+        assertThat(parentAfter.getSubIssues()).extracting(Issue::getId).doesNotContain(childAfter.getId());
+        assertThat(childAfter.getParentIssues()).extracting(Issue::getId).doesNotContain(parentAfter.getId());
     }
 
     @Test
     @Transactional
-    @GitHubPayload("sub_issues.sub_issue_added")
-    void capturesSubIssuesMetadataFromPayload(GHEventPayloadSubIssues payload) {
+    void capturesSubIssuesMetadataFromPayload(
+        @GitHubPayload("sub_issues.sub_issue_added") GHEventPayloadSubIssues payload
+    ) {
         // Arrange - payload loaded by @GitHubPayload
 
         // Act
         subIssuesMessageHandler.handleEvent(payload);
 
         // Assert - verify sub-issues summary counts are captured via enrichment
-        var parentIssue = issueRepository.findById(payload.getParentIssue().getId());
+        var parentIssue = issueRepository.findById(payload.getParentIssue().getId()).orElseThrow();
+        var summary = payload.getParentIssue().getSubIssuesSummary();
+        var dependencies = payload.getParentIssue().getIssueDependenciesSummary();
 
-        assertThat(parentIssue).isPresent();
-
-        // The enrichment process should attempt to capture sub-issues metadata
-        // Note: Actual values depend on what's in the GitHub JSON payload
-        // The enrichIssueFromGitHub() method will parse these fields when available
-        assertThat(parentIssue.get()).isNotNull();
+        assertThat(parentIssue.getSubIssuesTotal()).isEqualTo(summary.getTotal());
+        assertThat(parentIssue.getSubIssuesCompleted()).isEqualTo(summary.getCompleted());
+        assertThat(parentIssue.getBlockedByCount()).isEqualTo(dependencies.getBlockedBy());
+        assertThat(parentIssue.getBlockingCount()).isEqualTo(dependencies.getBlocking());
     }
 }

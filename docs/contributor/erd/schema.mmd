@@ -99,13 +99,13 @@ erDiagram
         TIMESTAMP last_sync_at
         OID bad_practice_summary
         TIMESTAMPTZ last_detection_time
-        VARCHAR(50) author_association
-        VARCHAR(20) state_reason
-        VARCHAR(20) active_lock_reason
-        VARCHAR(20) type
+        VARCHAR(255) active_lock_reason
+        VARCHAR(255) author_association
+        VARCHAR(255) state_reason
+        VARCHAR(64) type
         INTEGER reactions_total "NOT NULL"
-        INTEGER reactions_plus_one "NOT NULL"
-        INTEGER reactions_minus_one "NOT NULL"
+        INTEGER reactions_plus1 "NOT NULL"
+        INTEGER reactions_minus1 "NOT NULL"
         INTEGER reactions_laugh "NOT NULL"
         INTEGER reactions_hooray "NOT NULL"
         INTEGER reactions_confused "NOT NULL"
@@ -137,6 +137,11 @@ erDiagram
     IssueLabel {
         BIGINT issue_id PK,FK
         BIGINT label_id PK,FK
+    }
+
+    IssueSubIssue {
+        BIGINT parent_issue_id PK,FK
+        BIGINT child_issue_id PK,FK
     }
 
     Label {
@@ -392,6 +397,8 @@ erDiagram
     User }o--o{ IssueAssignee : assigned_to
     Issue }o--o{ IssueLabel : labeled
     Label }o--o{ IssueLabel : labeled
+    Issue }o--o{ IssueSubIssue : has
+    Issue }o--o{ IssueSubIssue : has
     Issue }o--o{ PullRequestRequestedReviewer : reviewed
     User }o--o{ PullRequestRequestedReviewer : reviewed
     Issue }o--o{ PullRequestRequestedTeam : references

@@ -1,10 +1,8 @@
 package de.tum.in.www1.hephaestus.gitprovider.issue.github;
 
-import com.fasterxml.jackson.databind.JsonNode;
 import de.tum.in.www1.hephaestus.gitprovider.issue.AuthorAssociation;
 import de.tum.in.www1.hephaestus.gitprovider.issue.Issue;
 import de.tum.in.www1.hephaestus.gitprovider.issue.IssueRepository;
-import de.tum.in.www1.hephaestus.gitprovider.issue.IssueType;
 import de.tum.in.www1.hephaestus.gitprovider.issue.LockReason;
 import de.tum.in.www1.hephaestus.gitprovider.issue.StateReason;
 import de.tum.in.www1.hephaestus.gitprovider.label.Label;
@@ -25,6 +23,7 @@ import java.util.List;
 import java.util.Optional;
 import org.kohsuke.github.GHDirection;
 import org.kohsuke.github.GHIssue;
+import org.kohsuke.github.GHIssueExtended;
 import org.kohsuke.github.GHIssueQueryBuilder;
 import org.kohsuke.github.GHIssueQueryBuilder.Sort;
 import org.kohsuke.github.GHIssueState;
@@ -237,149 +236,77 @@ public class GitHubIssueSyncService {
         result.getAssignees().addAll(resultAssignees);
 
         // Enrich with additional fields from the raw GitHub data
-        enrichIssueFromGitHub(ghIssue, result);
+        GHIssueExtended extended = ghIssue instanceof GHIssueExtended ? (GHIssueExtended) ghIssue : null;
+        enrichIssueFromGitHub(ghIssue, extended, result);
 
         return issueRepository.save(result);
     }
 
     /**
-     * Enriches the issue with additional fields from GitHub using GHIssueExtended.
-     * This avoids reflection by using our custom extended class in org.kohsuke.github.
+     * Enriches the issue with additional fields from the raw webhook payload.
      */
-    private void enrichIssueFromGitHub(GHIssue ghIssue, Issue issue) {
-        // If ghIssue is actually a GHIssueExtended (parsed from JSON with extended fields),
-        // we can access the additional fields directly
-        if (ghIssue instanceof org.kohsuke.github.GHIssueExtended) {
-            var extended = (org.kohsuke.github.GHIssueExtended) ghIssue;
-            
-            // Author association
-            if (extended.getAuthorAssociation() != null) {
-                try {
-                    issue.setAuthorAssociation(AuthorAssociation.valueOf(extended.getAuthorAssociation()));
-                } catch (IllegalArgumentException e) {
-                    logger.debug("Unknown author association: {}", extended.getAuthorAssociation());
-                }
-            }
-            
-            // State reason
-            if (extended.getStateReason() != null) {
-                try {
-                    issue.setStateReason(StateReason.valueOf(extended.getStateReason().toUpperCase()));
-                } catch (IllegalArgumentException e) {
-                    logger.debug("Unknown state reason: {}", extended.getStateReason());
-                }
-            }
-            
-            // Active lock reason
-            if (extended.getActiveLockReason() != null) {
-                try {
-                    issue.setActiveLockReason(LockReason.valueOf(extended.getActiveLockReason().toUpperCase().replace('-', '_')));
-                } catch (IllegalArgumentException e) {
-                    logger.debug("Unknown lock reason: {}", extended.getActiveLockReason());
-                }
-            }
-            
-            // Reactions
-            var reactions = extended.getReactions();
-            if (reactions != null) {
-                issue.setReactionsTotal(reactions.getTotal());
-                issue.setReactionsPlus1(reactions.getPlus1());
-                issue.setReactionsMinus1(reactions.getMinus1());
-                issue.setReactionsLaugh(reactions.getLaugh());
-                issue.setReactionsHooray(reactions.getHooray());
-                issue.setReactionsConfused(reactions.getConfused());
-                issue.setReactionsHeart(reactions.getHeart());
-                issue.setReactionsRocket(reactions.getRocket());
-                issue.setReactionsEyes(reactions.getEyes());
-            }
-            
-            // Sub-issues summary
-            var subIssuesSummary = extended.getSubIssuesSummary();
-            if (subIssuesSummary != null) {
-                issue.setSubIssuesTotal(subIssuesSummary.getTotal());
-                issue.setSubIssuesCompleted(subIssuesSummary.getCompleted());
-            }
-            
-            // Issue dependencies summary
-            var dependencies = extended.getIssueDependenciesSummary();
-            if (dependencies != null) {
-                issue.setBlockedByCount(dependencies.getBlockedByCount());
-                issue.setBlockingCount(dependencies.getBlockingCount());
-            }
-            
-            return; // Successfully enriched using GHIssueExtended
+    private void enrichIssueFromGitHub(GHIssue ghIssue, GHIssueExtended extended, Issue issue) {
+        resetIssueMetadata(issue);
+
+        if (ghIssue.getStateReason() != null) {
+            issue.setStateReason(convertStateReason(ghIssue.getStateReason().name()));
         }
-        
-        // Fallback: Try to access via reflection if not GHIssueExtended
-        // This ensures compatibility if GitHub API library doesn't parse as our extended class
-        try {
-            var rootField = ghIssue.getClass().getSuperclass().getDeclaredField("root");
-            rootField.setAccessible(true);
-            var root = rootField.get(ghIssue);
 
-            if (root instanceof JsonNode) {
-                var jsonNode = (JsonNode) root;
-
-                // Author association
-                if (jsonNode.has("author_association") && !jsonNode.get("author_association").isNull()) {
-                    String authorAssoc = jsonNode.get("author_association").asText();
-                    issue.setAuthorAssociation(convertAuthorAssociation(authorAssoc));
-                }
-
-                // State reason
-                if (jsonNode.has("state_reason") && !jsonNode.get("state_reason").isNull()) {
-                    String stateReason = jsonNode.get("state_reason").asText();
-                    issue.setStateReason(convertStateReason(stateReason));
-                }
-
-                // Lock reason
-                if (jsonNode.has("active_lock_reason") && !jsonNode.get("active_lock_reason").isNull()) {
-                    String lockReason = jsonNode.get("active_lock_reason").asText();
-                    issue.setActiveLockReason(convertLockReason(lockReason));
-                }
-
-                // Issue type (customizable per organization, max 64 chars)
-                if (jsonNode.has("type") && !jsonNode.get("type").isNull()) {
-                    String type = jsonNode.get("type").asText();
-                    if (type != null && type.length() <= 64) {
-                        issue.setType(type);
-                    }
-                }
-                }
-
-                // Reactions
-                if (jsonNode.has("reactions") && !jsonNode.get("reactions").isNull()) {
-                    var reactions = jsonNode.get("reactions");
-                    issue.setReactionsTotal(reactions.has("total_count") ? reactions.get("total_count").asInt() : 0);
-                    issue.setReactionsPlus1(reactions.has("+1") ? reactions.get("+1").asInt() : 0);
-                    issue.setReactionsMinus1(reactions.has("-1") ? reactions.get("-1").asInt() : 0);
-                    issue.setReactionsLaugh(reactions.has("laugh") ? reactions.get("laugh").asInt() : 0);
-                    issue.setReactionsHooray(reactions.has("hooray") ? reactions.get("hooray").asInt() : 0);
-                    issue.setReactionsConfused(reactions.has("confused") ? reactions.get("confused").asInt() : 0);
-                    issue.setReactionsHeart(reactions.has("heart") ? reactions.get("heart").asInt() : 0);
-                    issue.setReactionsRocket(reactions.has("rocket") ? reactions.get("rocket").asInt() : 0);
-                    issue.setReactionsEyes(reactions.has("eyes") ? reactions.get("eyes").asInt() : 0);
-                }
-
-                // Sub-issues summary
-                if (jsonNode.has("sub_issues_summary") && !jsonNode.get("sub_issues_summary").isNull()) {
-                    var subIssues = jsonNode.get("sub_issues_summary");
-                    issue.setSubIssuesTotal(subIssues.has("total") ? subIssues.get("total").asInt() : 0);
-                    issue.setSubIssuesCompleted(subIssues.has("completed") ? subIssues.get("completed").asInt() : 0);
-                }
-
-                // Issue dependencies summary
-                if (
-                    jsonNode.has("issue_dependencies_summary") && !jsonNode.get("issue_dependencies_summary").isNull()
-                ) {
-                    var deps = jsonNode.get("issue_dependencies_summary");
-                    issue.setBlockedByCount(deps.has("blocked_by") ? deps.get("blocked_by").asInt() : 0);
-                    issue.setBlockingCount(deps.has("blocking") ? deps.get("blocking").asInt() : 0);
-                }
-            }
-        } catch (Exception e) {
-            logger.debug("Could not enrich issue with additional GitHub fields: {}", e.getMessage());
+        if (extended == null) {
+            return;
         }
+
+        if (extended.getAuthorAssociationRaw() != null) {
+            issue.setAuthorAssociation(convertAuthorAssociation(extended.getAuthorAssociationRaw()));
+        }
+
+        if (extended.getActiveLockReasonRaw() != null) {
+            issue.setActiveLockReason(convertLockReason(extended.getActiveLockReasonRaw()));
+        }
+
+        String type = extended.getTypeLabel();
+        if (type != null && !type.isBlank()) {
+            issue.setType(type.length() <= 64 ? type : type.substring(0, 64));
+        }
+
+        var reactions = extended.getReactionsSummary();
+        issue.setReactionsTotal(reactions.getTotalCount());
+        issue.setReactionsPlus1(reactions.getPlusOne());
+        issue.setReactionsMinus1(reactions.getMinusOne());
+        issue.setReactionsLaugh(reactions.getLaugh());
+        issue.setReactionsHooray(reactions.getHooray());
+        issue.setReactionsConfused(reactions.getConfused());
+        issue.setReactionsHeart(reactions.getHeart());
+        issue.setReactionsRocket(reactions.getRocket());
+        issue.setReactionsEyes(reactions.getEyes());
+
+        var subIssues = extended.getSubIssuesSummary();
+        issue.setSubIssuesTotal(subIssues.getTotal());
+        issue.setSubIssuesCompleted(subIssues.getCompleted());
+
+        var dependencies = extended.getIssueDependenciesSummary();
+        issue.setBlockedByCount(dependencies.getBlockedBy());
+        issue.setBlockingCount(dependencies.getBlocking());
+    }
+
+    private void resetIssueMetadata(Issue issue) {
+        issue.setAuthorAssociation(null);
+        issue.setStateReason(null);
+        issue.setActiveLockReason(null);
+        issue.setType(null);
+        issue.setReactionsTotal(0);
+        issue.setReactionsPlus1(0);
+        issue.setReactionsMinus1(0);
+        issue.setReactionsLaugh(0);
+        issue.setReactionsHooray(0);
+        issue.setReactionsConfused(0);
+        issue.setReactionsHeart(0);
+        issue.setReactionsRocket(0);
+        issue.setReactionsEyes(0);
+        issue.setSubIssuesTotal(0);
+        issue.setSubIssuesCompleted(0);
+        issue.setBlockedByCount(0);
+        issue.setBlockingCount(0);
     }
 
     private AuthorAssociation convertAuthorAssociation(String association) {
@@ -387,7 +314,7 @@ public class GitHubIssueSyncService {
             return AuthorAssociation.valueOf(association.toUpperCase());
         } catch (IllegalArgumentException e) {
             logger.warn("Unknown author association: {}", association);
-            return AuthorAssociation.NONE;
+            return null;
         }
     }
 
@@ -406,6 +333,70 @@ public class GitHubIssueSyncService {
         } catch (IllegalArgumentException e) {
             logger.warn("Unknown lock reason: {}", reason);
             return null;
+        }
+    }
+
+    @Transactional
+    public void addSubIssueRelationship(Long parentIssueId, Long childIssueId) {
+        updateSubIssueRelationship(parentIssueId, childIssueId, true);
+    }
+
+    @Transactional
+    public void removeSubIssueRelationship(Long parentIssueId, Long childIssueId) {
+        updateSubIssueRelationship(parentIssueId, childIssueId, false);
+    }
+
+    private void updateSubIssueRelationship(Long parentIssueId, Long childIssueId, boolean add) {
+        if (parentIssueId == null || childIssueId == null) {
+            logger.warn(
+                "Cannot {} sub-issue link with null identifiers (parent: {}, child: {})",
+                add ? "add" : "remove",
+                parentIssueId,
+                childIssueId
+            );
+            return;
+        }
+        if (parentIssueId.equals(childIssueId)) {
+            logger.warn(
+                "Skipping {} sub-issue relationship for identical parent/child id {}",
+                add ? "adding" : "removing",
+                parentIssueId
+            );
+            return;
+        }
+
+        var parentOpt = issueRepository.findById(parentIssueId);
+        var childOpt = issueRepository.findById(childIssueId);
+
+        if (parentOpt.isEmpty() || childOpt.isEmpty()) {
+            logger.warn(
+                "Cannot {} sub-issue link, missing entities (parent present: {}, child present: {})",
+                add ? "add" : "remove",
+                parentOpt.isPresent(),
+                childOpt.isPresent()
+            );
+            return;
+        }
+
+        var parent = parentOpt.get();
+        var child = childOpt.get();
+
+        boolean changed;
+        if (add) {
+            changed = parent.getSubIssues().add(child);
+            if (changed) {
+                child.getParentIssues().add(parent);
+            }
+        } else {
+            changed = parent.getSubIssues().remove(child);
+            if (changed) {
+                child.getParentIssues().remove(parent);
+            }
+        }
+
+        if (changed) {
+            issueRepository.save(parent);
+            issueRepository.save(child);
         }
     }
 }

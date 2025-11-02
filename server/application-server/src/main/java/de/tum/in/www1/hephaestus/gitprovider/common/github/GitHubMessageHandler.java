@@ -17,7 +17,6 @@ import org.springframework.stereotype.Component;
 public abstract class GitHubMessageHandler<T extends GHEventPayload> implements MessageHandler {
 
     private static final Logger logger = LoggerFactory.getLogger(GitHubMessageHandler.class);
-
     private final Class<T> payloadType;
 
     protected GitHubMessageHandler(Class<T> payloadType) {
@@ -26,7 +25,7 @@ public abstract class GitHubMessageHandler<T extends GHEventPayload> implements 
 
     @Override
     public void onMessage(Message msg) {
-        String eventType = getHandlerEvent().name().toLowerCase();
+        String eventType = getCustomEventType() != null ? getCustomEventType() : getHandlerEvent().name().toLowerCase();
         String subject = msg.getSubject();
         if (!subject.endsWith(eventType)) {
             logger.error("Received message on unexpected subject: {}, expected to end with {}", subject, eventType);
@@ -58,6 +57,14 @@ public abstract class GitHubMessageHandler<T extends GHEventPayload> implements 
      * @return The GHEvent.
      */
     protected abstract GHEvent getHandlerEvent();
+
+    /**
+     * Returns a custom event type (subject suffix) for handlers that are not represented
+     * in the {@link GHEvent} enum. Defaults to {@code null}.
+     */
+    protected String getCustomEventType() {
+        return null;
+    }
 
     /**
      * Domain classification for handler routing. Defaults to REPOSITORY.
