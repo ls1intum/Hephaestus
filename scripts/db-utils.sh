@@ -221,7 +221,9 @@ stop_postgres() {
 apply_migrations() {
     log_info "Applying Liquibase migrations..."
     cd "$APP_SERVER_DIR"
-    mvn liquibase:update
+    # Explicitly set Spring profiles to avoid specs profile (which uses H2)
+    # Use local,dev profiles for database operations
+    SPRING_PROFILES_ACTIVE=local,dev ./mvnw liquibase:update
 }
 
 # Generate ERD documentation
@@ -307,7 +309,9 @@ generate_changelog_diff() {
     
     # Generate changelog diff
     log_info "Generating changelog diff..."
-    mvn liquibase:diff
+    # Explicitly set Spring profiles to avoid specs profile (which uses H2)
+    # Use local,dev profiles for database operations
+    SPRING_PROFILES_ACTIVE=local,dev ./mvnw liquibase:diff
     
     # Restore original database state
     log_info "Restoring original database state..."
