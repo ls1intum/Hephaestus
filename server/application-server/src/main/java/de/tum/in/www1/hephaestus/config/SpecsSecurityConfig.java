@@ -20,28 +20,28 @@ import org.springframework.security.oauth2.jwt.JwtDecoder;
 @Profile("specs")
 public class SpecsSecurityConfig {
 
-	private static final Map<String, Object> DEFAULT_REALM_ACCESS = Map.of(
-		"realm_access",
-		Map.of("roles", Collections.emptyList())
-	);
+    private static final Map<String, Object> DEFAULT_REALM_ACCESS = Map.of(
+        "realm_access",
+        Map.of("roles", Collections.emptyList())
+    );
 
-	@Bean
-	@Primary
-	JwtDecoder specsJwtDecoder() {
-		return token -> Jwt
-			.withTokenValue(token)
-			.header("alg", "none")
-			.header("typ", "JWT")
-			.claims(claims -> {
-				claims.put("sub", "specs-profile-user");
-				claims.put("preferred_username", "specs");
-				claims.put("iss", "https://localhost/specs-profile");
-				claims.put("aud", "hephaestus-api");
-				// Ensure the expected realm_access structure exists so the authority converter works.
-				claims.putAll(DEFAULT_REALM_ACCESS);
-			})
-			.issuedAt(Instant.now())
-			.expiresAt(Instant.now().plusSeconds(3600))
-			.build();
-	}
+    @Bean
+    @Primary
+    JwtDecoder specsJwtDecoder() {
+        return token ->
+            Jwt.withTokenValue(token)
+                .header("alg", "none")
+                .header("typ", "JWT")
+                .claims(claims -> {
+                    claims.put("sub", "specs-profile-user");
+                    claims.put("preferred_username", "specs");
+                    claims.put("iss", "https://localhost/specs-profile");
+                    claims.put("aud", "hephaestus-api");
+                    // Ensure the expected realm_access structure exists so the authority converter works.
+                    claims.putAll(DEFAULT_REALM_ACCESS);
+                })
+                .issuedAt(Instant.now())
+                .expiresAt(Instant.now().plusSeconds(3600))
+                .build();
+    }
 }

@@ -1,5 +1,35 @@
 # Additional Hints
 
+## Pull Request Title Format
+
+When creating pull requests, follow the [Conventional Commits](https://www.conventionalcommits.org/) specification:
+
+**Format**: `<type>[optional scope]: <description>`
+
+**Common types**:
+- `fix`: Bug fixes
+- `feat`: New features
+- `docs`: Documentation changes
+- `refactor`: Code refactoring
+- `test`: Test changes
+- `chore`: Maintenance tasks
+- `ci`: CI/CD changes
+
+**Scopes**: `webapp`, `application-server`, `intelligence-service`, `webhook-ingest`, `docs`, `ci`, `deps`, `config`
+
+**Examples**:
+- `fix(webapp): correct authentication flow`
+- `feat(application-server): add team sync endpoint`
+- `chore(deps): update dependencies`
+
+**Guidelines**:
+- Use lowercase for description
+- Use imperative mood ("add" not "adds")
+- No period at the end
+- Keep under 72 characters
+
+See [CONTRIBUTING.md](../CONTRIBUTING.md) for complete guidelines.
+
 ## Shadcn instructions (UI components)
 
 If needed, check `src/components/ui` for existing components before you install new ones.

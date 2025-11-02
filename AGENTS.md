@@ -11,7 +11,7 @@ This file governs the entire repository. Combine these guardrails with the scope
 
 ## 2. Toolchain & environment prerequisites
 - **Node.js**: Use the exact version from `.node-version` (currently 22.10.0). Stick with npm—the repo maintains `package-lock.json` and uses npm workspaces.
-- **Java**: JDK 21 (see `pom.xml`). Maven wrapper is checked in; run builds through `./mvnw` or `mvn` with Java 21 configured.
+- **Java**: JDK 21 (see `pom.xml`). Maven wrapper is checked in; **always run builds through `./mvnw`** (Maven wrapper) to ensure consistent Maven versions.
 - **Python**: Python 3.13 with Poetry 2.x. Both Python services keep virtualenvs inside their folders (`.venv`). Run `npm run bootstrap:py` before formatting/linting to ensure dev dependencies are installed.
 - **Docker & Docker Compose**: Required for database helper scripts (`scripts/db-utils.sh`) and for spinning up Postgres/Keycloak/NATS locally.
 - **Databases**: Default PostgreSQL DSN is `postgresql://root:root@localhost:5432/hephaestus`. The database helpers spin this up for you via Docker.
@@ -38,7 +38,7 @@ We rely heavily on generated artifacts. Never hand-edit these directories—rege
 
 | Artifact | Source command |
 | --- | --- |
-| `server/application-server/openapi.yaml` | `npm run generate:api:application-server:specs` (runs `mvn verify -DskipTests=true -Dapp.profiles=specs`). |
+| `server/application-server/openapi.yaml` | `npm run generate:api:application-server:specs` (runs `./mvnw verify -DskipTests=true -Dapp.profiles=specs`). |
 | `webapp/src/api/**/*`, `webapp/src/api/@tanstack/react-query.gen.ts`, `webapp/src/api/client.gen.ts`, `webapp/src/api/types.gen.ts` | `npm run generate:api:application-server:client` (wraps `npm -w webapp run openapi-ts`). |
 | `server/application-server/src/main/java/de/tum/in/www1/hephaestus/intelligenceservice/**` | `npm run generate:api:intelligence-service:client` (OpenAPI Generator CLI). |
 | `server/intelligence-service/openapi.yaml` | `MODEL_NAME=fake:model DETECTION_MODEL_NAME=fake:model npm run generate:api:intelligence-service:specs` (delegates to `poetry run openapi`). |
