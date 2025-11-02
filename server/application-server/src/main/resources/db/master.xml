@@ -26,4 +26,5 @@
     <include file="./changelog/1759109722048_changelog.xml" relativeToChangelogFile="true"/>
     <include file="./changelog/1761774703038_changelog.xml" relativeToChangelogFile="true"/>
     <include file="./changelog/1761791825274_changelog.xml" relativeToChangelogFile="true"/>
+    <include file="./changelog/1762086458000_add_github_metadata_fields.xml" relativeToChangelogFile="true"/>
 </databaseChangeLog>

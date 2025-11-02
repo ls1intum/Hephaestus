@@ -297,7 +297,9 @@ public class GitHubIssueSyncService {
                 }
 
                 // Issue dependencies summary
-                if (jsonNode.has("issue_dependencies_summary") && !jsonNode.get("issue_dependencies_summary").isNull()) {
+                if (
+                    jsonNode.has("issue_dependencies_summary") && !jsonNode.get("issue_dependencies_summary").isNull()
+                ) {
                     var deps = jsonNode.get("issue_dependencies_summary");
                     issue.setBlockedByCount(deps.has("blocked_by") ? deps.get("blocked_by").asInt() : 0);
                     issue.setBlockingCount(deps.has("blocking") ? deps.get("blocking").asInt() : 0);
@@ -310,9 +312,7 @@ public class GitHubIssueSyncService {
 
     private de.tum.in.www1.hephaestus.gitprovider.issue.AuthorAssociation convertAuthorAssociation(String association) {
         try {
-            return de.tum.in.www1.hephaestus.gitprovider.issue.AuthorAssociation.valueOf(
-                association.toUpperCase()
-            );
+            return de.tum.in.www1.hephaestus.gitprovider.issue.AuthorAssociation.valueOf(association.toUpperCase());
         } catch (IllegalArgumentException e) {
             logger.warn("Unknown author association: {}", association);
             return de.tum.in.www1.hephaestus.gitprovider.issue.AuthorAssociation.NONE;
