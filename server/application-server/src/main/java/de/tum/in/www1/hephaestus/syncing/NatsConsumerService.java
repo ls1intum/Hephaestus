@@ -2,6 +2,7 @@ package de.tum.in.www1.hephaestus.syncing;
 
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubMessageHandler;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubMessageHandlerRegistry;
+import de.tum.in.www1.hephaestus.gitprovider.subissues.github.GitHubSubIssuesMessageHandler;
 import de.tum.in.www1.hephaestus.workspace.RepositoryToMonitor;
 import io.nats.client.Connection;
 import io.nats.client.ConsumerContext;
@@ -52,9 +53,14 @@ public class NatsConsumerService {
     private Connection natsConnection;
     private final Map<String, ConsumerContext> repositoryToMonitorIdToConsumerContext = new HashMap<>();
     private final GitHubMessageHandlerRegistry handlerRegistry;
+    private final GitHubSubIssuesMessageHandler subIssuesHandler;
 
-    public NatsConsumerService(GitHubMessageHandlerRegistry handlerRegistry) {
+    public NatsConsumerService(
+        GitHubMessageHandlerRegistry handlerRegistry,
+        GitHubSubIssuesMessageHandler subIssuesHandler
+    ) {
         this.handlerRegistry = handlerRegistry;
+        this.subIssuesHandler = subIssuesHandler;
     }
 
     @EventListener(ApplicationReadyEvent.class)
@@ -292,6 +298,15 @@ public class NatsConsumerService {
         try {
             String subject = msg.getSubject();
             String lastPart = subject.substring(subject.lastIndexOf(".") + 1);
+
+            // Handle sub_issues as a special case since it's not in the standard GHEvent enum
+            if ("sub_issues".equals(lastPart)) {
+                logger.info("Processing sub_issues event from subject: {}", subject);
+                subIssuesHandler.onMessage(msg);
+                msg.ack();
+                return;
+            }
+
             GHEvent eventType = GHEvent.valueOf(lastPart.toUpperCase());
             GitHubMessageHandler<?> eventHandler = handlerRegistry.getHandler(eventType);
 
@@ -323,13 +338,19 @@ public class NatsConsumerService {
     }
 
     private String[] getRepositorySubjects(String nameWithOwner) {
-        return handlerRegistry
+        var standardSubjects = handlerRegistry
             .getSupportedRepositoryEvents()
             .stream()
             .map(GHEvent::name)
             .map(String::toLowerCase)
             .map(event -> getSubjectPrefix(nameWithOwner) + "." + event)
-            .toArray(String[]::new);
+            .toList();
+
+        // Add sub_issues as a custom event since it's not in the standard GHEvent enum
+        var allSubjects = new java.util.ArrayList<>(standardSubjects);
+        allSubjects.add(getSubjectPrefix(nameWithOwner) + ".sub_issues");
+
+        return allSubjects.toArray(String[]::new);
     }
 
     private String[] getInstallationSubjects() {
