@@ -16,6 +16,7 @@ import io.nats.client.api.DeliverPolicy;
 import java.io.IOException;
 import java.time.Duration;
 import java.time.ZonedDateTime;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -347,7 +348,7 @@ public class NatsConsumerService {
             .toList();
 
         // Add sub_issues as a custom event since it's not in the standard GHEvent enum
-        var allSubjects = new java.util.ArrayList<>(standardSubjects);
+        var allSubjects = new ArrayList<>(standardSubjects);
         allSubjects.add(getSubjectPrefix(nameWithOwner) + ".sub_issues");
 
         return allSubjects.toArray(String[]::new);

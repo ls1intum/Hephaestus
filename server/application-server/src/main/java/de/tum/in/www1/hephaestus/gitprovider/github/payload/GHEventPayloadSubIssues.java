@@ -1,12 +1,19 @@
-package org.kohsuke.github;
+package de.tum.in.www1.hephaestus.gitprovider.github.payload;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
+import org.kohsuke.github.GHEventPayload;
+import org.kohsuke.github.GHIssue;
+import org.kohsuke.github.GHRepository;
 
 /**
  * Payload for GitHub Sub-Issues (tasklist) events.
  *
  * Sub-issues are a GitHub beta feature that allows issues to be organized in a parent-child hierarchy.
+ * 
+ * Note: This is a custom implementation since github-api library v2.0-rc.5 doesn't yet support sub-issues.
+ * When the library adds official support, this class can be deprecated in favor of the official implementation.
+ * 
  * Unknown JSON fields are ignored to remain forward-compatible with GitHub's API.
  */
 @JsonIgnoreProperties(ignoreUnknown = true)
