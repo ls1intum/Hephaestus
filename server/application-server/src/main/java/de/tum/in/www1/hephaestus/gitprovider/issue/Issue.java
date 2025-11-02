@@ -62,9 +62,50 @@ public class Issue extends BaseGitServiceEntity {
 
     private boolean isLocked;
 
+    @Enumerated(EnumType.STRING)
+    private LockReason activeLockReason;
+
     private Instant closedAt;
 
+    @Enumerated(EnumType.STRING)
+    private StateReason stateReason;
+
+    @Enumerated(EnumType.STRING)
+    private AuthorAssociation authorAssociation;
+
+    @Enumerated(EnumType.STRING)
+    private IssueType type;
+
     private int commentsCount;
+
+    // Reactions summary
+    private int reactionsTotal;
+
+    private int reactionsPlus1;
+
+    private int reactionsMinus1;
+
+    private int reactionsLaugh;
+
+    private int reactionsHooray;
+
+    private int reactionsConfused;
+
+    private int reactionsHeart;
+
+    private int reactionsRocket;
+
+    private int reactionsEyes;
+
+    // Sub-issues tracking
+    private int subIssuesTotal;
+
+    private int subIssuesCompleted;
+
+    // Issue dependencies tracking
+    private int blockedByCount;
+
+    private int blockingCount;
 
     @Accessors(prefix = { "" })
     private boolean hasPullRequest;
@@ -117,10 +158,6 @@ public class Issue extends BaseGitServiceEntity {
         return false;
     }
     // Ignored GitHub properties:
-    // - closed_by seems not to be used by webhooks
-    // - author_association (not provided by our GitHub API client)
-    // - state_reason
-    // - reactions
-    // - active_lock_reason
+    // - closed_by (seems not to be used by webhooks)
     // - [remaining urls]
 }

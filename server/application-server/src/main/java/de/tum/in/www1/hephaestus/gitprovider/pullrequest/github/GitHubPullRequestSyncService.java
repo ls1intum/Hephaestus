@@ -50,6 +50,9 @@ public class GitHubPullRequestSyncService {
     private UserRepository userRepository;
 
     @Autowired
+    private de.tum.in.www1.hephaestus.gitprovider.team.TeamRepository teamRepository;
+
+    @Autowired
     private GitHubPullRequestConverter pullRequestConverter;
 
     @Autowired
@@ -60,6 +63,9 @@ public class GitHubPullRequestSyncService {
 
     @Autowired
     private GitHubUserConverter userConverter;
+
+    @Autowired
+    private de.tum.in.www1.hephaestus.gitprovider.team.github.GitHubTeamConverter teamConverter;
 
     @Autowired
     private BadPracticeDetectorScheduler badPracticeDetectorScheduler;
@@ -298,6 +304,26 @@ public class GitHubPullRequestSyncService {
         } catch (IOException e) {
             logger.error(
                 "Failed to link requested reviewers for pull request {}: {}",
+                ghPullRequest.getId(),
+                e.getMessage()
+            );
+        }
+
+        // Link requested teams
+        try {
+            var requestedTeams = ghPullRequest.getRequestedTeams();
+            var resultRequestedTeams = new HashSet<de.tum.in.www1.hephaestus.gitprovider.team.Team>();
+            requestedTeams.forEach(requestedTeam -> {
+                var resultRequestedTeam = teamRepository
+                    .findById(requestedTeam.getId())
+                    .orElseGet(() -> teamRepository.save(teamConverter.convert(requestedTeam)));
+                resultRequestedTeams.add(resultRequestedTeam);
+            });
+            result.getRequestedTeams().clear();
+            result.getRequestedTeams().addAll(resultRequestedTeams);
+        } catch (IOException e) {
+            logger.error(
+                "Failed to link requested teams for pull request {}: {}",
                 ghPullRequest.getId(),
                 e.getMessage()
             );

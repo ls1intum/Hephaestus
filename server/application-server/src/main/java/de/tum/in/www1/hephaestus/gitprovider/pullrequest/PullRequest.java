@@ -56,6 +56,15 @@ public class PullRequest extends Issue {
     @ToString.Exclude
     private Set<User> requestedReviewers = new HashSet<>();
 
+    @ManyToMany
+    @JoinTable(
+        name = "pull_request_requested_teams",
+        joinColumns = @JoinColumn(name = "pull_request_id"),
+        inverseJoinColumns = @JoinColumn(name = "team_id")
+    )
+    @ToString.Exclude
+    private Set<de.tum.in.www1.hephaestus.gitprovider.team.Team> requestedTeams = new HashSet<>();
+
     @OneToMany(mappedBy = "pullRequest", cascade = CascadeType.REMOVE, orphanRemoval = true)
     @ToString.Exclude
     private Set<PullRequestReview> reviews = new HashSet<>();
@@ -82,7 +91,6 @@ public class PullRequest extends Issue {
     // - head -> "label", "ref", "repo", "sha", "user"
     // - base -> "label", "ref", "repo", "sha", "user"
     // - auto_merge
-    // - requested_teams
     // - comments (cached number)
     // - review_comments (cached number)
 }

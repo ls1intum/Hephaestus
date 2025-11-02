@@ -231,6 +231,123 @@ public class GitHubIssueSyncService {
         result.getAssignees().clear();
         result.getAssignees().addAll(resultAssignees);
 
+        // Enrich with additional fields from the raw GitHub data
+        enrichIssueFromGitHub(ghIssue, result);
+
         return issueRepository.save(result);
+    }
+
+    /**
+     * Enriches the issue with additional fields from GitHub that may not be exposed by the github-api library.
+     * Uses reflection to access the raw JSON data.
+     */
+    private void enrichIssueFromGitHub(GHIssue ghIssue, Issue issue) {
+        try {
+            // Access the raw JSON data through reflection
+            var rootField = ghIssue.getClass().getSuperclass().getDeclaredField("root");
+            rootField.setAccessible(true);
+            var root = rootField.get(ghIssue);
+
+            if (root instanceof com.fasterxml.jackson.databind.JsonNode) {
+                var jsonNode = (com.fasterxml.jackson.databind.JsonNode) root;
+
+                // Author association
+                if (jsonNode.has("author_association") && !jsonNode.get("author_association").isNull()) {
+                    String authorAssoc = jsonNode.get("author_association").asText();
+                    issue.setAuthorAssociation(convertAuthorAssociation(authorAssoc));
+                }
+
+                // State reason
+                if (jsonNode.has("state_reason") && !jsonNode.get("state_reason").isNull()) {
+                    String stateReason = jsonNode.get("state_reason").asText();
+                    issue.setStateReason(convertStateReason(stateReason));
+                }
+
+                // Lock reason
+                if (jsonNode.has("active_lock_reason") && !jsonNode.get("active_lock_reason").isNull()) {
+                    String lockReason = jsonNode.get("active_lock_reason").asText();
+                    issue.setActiveLockReason(convertLockReason(lockReason));
+                }
+
+                // Issue type
+                if (jsonNode.has("type") && !jsonNode.get("type").isNull()) {
+                    String type = jsonNode.get("type").asText();
+                    issue.setType(convertIssueType(type));
+                }
+
+                // Reactions
+                if (jsonNode.has("reactions") && !jsonNode.get("reactions").isNull()) {
+                    var reactions = jsonNode.get("reactions");
+                    issue.setReactionsTotal(reactions.has("total_count") ? reactions.get("total_count").asInt() : 0);
+                    issue.setReactionsPlus1(reactions.has("+1") ? reactions.get("+1").asInt() : 0);
+                    issue.setReactionsMinus1(reactions.has("-1") ? reactions.get("-1").asInt() : 0);
+                    issue.setReactionsLaugh(reactions.has("laugh") ? reactions.get("laugh").asInt() : 0);
+                    issue.setReactionsHooray(reactions.has("hooray") ? reactions.get("hooray").asInt() : 0);
+                    issue.setReactionsConfused(reactions.has("confused") ? reactions.get("confused").asInt() : 0);
+                    issue.setReactionsHeart(reactions.has("heart") ? reactions.get("heart").asInt() : 0);
+                    issue.setReactionsRocket(reactions.has("rocket") ? reactions.get("rocket").asInt() : 0);
+                    issue.setReactionsEyes(reactions.has("eyes") ? reactions.get("eyes").asInt() : 0);
+                }
+
+                // Sub-issues summary
+                if (jsonNode.has("sub_issues_summary") && !jsonNode.get("sub_issues_summary").isNull()) {
+                    var subIssues = jsonNode.get("sub_issues_summary");
+                    issue.setSubIssuesTotal(subIssues.has("total") ? subIssues.get("total").asInt() : 0);
+                    issue.setSubIssuesCompleted(subIssues.has("completed") ? subIssues.get("completed").asInt() : 0);
+                }
+
+                // Issue dependencies summary
+                if (jsonNode.has("issue_dependencies_summary") && !jsonNode.get("issue_dependencies_summary").isNull()) {
+                    var deps = jsonNode.get("issue_dependencies_summary");
+                    issue.setBlockedByCount(deps.has("blocked_by") ? deps.get("blocked_by").asInt() : 0);
+                    issue.setBlockingCount(deps.has("blocking") ? deps.get("blocking").asInt() : 0);
+                }
+            }
+        } catch (Exception e) {
+            logger.debug("Could not enrich issue with additional GitHub fields: {}", e.getMessage());
+        }
+    }
+
+    private de.tum.in.www1.hephaestus.gitprovider.issue.AuthorAssociation convertAuthorAssociation(String association) {
+        try {
+            return de.tum.in.www1.hephaestus.gitprovider.issue.AuthorAssociation.valueOf(
+                association.toUpperCase()
+            );
+        } catch (IllegalArgumentException e) {
+            logger.warn("Unknown author association: {}", association);
+            return de.tum.in.www1.hephaestus.gitprovider.issue.AuthorAssociation.NONE;
+        }
+    }
+
+    private de.tum.in.www1.hephaestus.gitprovider.issue.StateReason convertStateReason(String reason) {
+        try {
+            return de.tum.in.www1.hephaestus.gitprovider.issue.StateReason.valueOf(reason.toUpperCase());
+        } catch (IllegalArgumentException e) {
+            logger.warn("Unknown state reason: {}", reason);
+            return null;
+        }
+    }
+
+    private de.tum.in.www1.hephaestus.gitprovider.issue.LockReason convertLockReason(String reason) {
+        try {
+            return de.tum.in.www1.hephaestus.gitprovider.issue.LockReason.valueOf(
+                reason.toUpperCase().replace('-', '_')
+            );
+        } catch (IllegalArgumentException e) {
+            logger.warn("Unknown lock reason: {}", reason);
+            return null;
+        }
+    }
+
+    private de.tum.in.www1.hephaestus.gitprovider.issue.IssueType convertIssueType(String type) {
+        if (type == null || type.isEmpty()) {
+            return de.tum.in.www1.hephaestus.gitprovider.issue.IssueType.ISSUE;
+        }
+        try {
+            return de.tum.in.www1.hephaestus.gitprovider.issue.IssueType.valueOf(type.toUpperCase());
+        } catch (IllegalArgumentException e) {
+            logger.warn("Unknown issue type: {}", type);
+            return de.tum.in.www1.hephaestus.gitprovider.issue.IssueType.ISSUE;
+        }
     }
 }

@@ -4,11 +4,15 @@ import de.tum.in.www1.hephaestus.gitprovider.common.BaseGitServiceEntityConverte
 import de.tum.in.www1.hephaestus.gitprovider.issue.Issue;
 import org.kohsuke.github.GHIssue;
 import org.kohsuke.github.GHIssueState;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.lang.NonNull;
 import org.springframework.stereotype.Component;
 
 @Component
 public class GitHubIssueConverter extends BaseGitServiceEntityConverter<GHIssue, Issue> {
+
+    private static final Logger logger = LoggerFactory.getLogger(GitHubIssueConverter.class);
 
     @Override
     public Issue convert(@NonNull GHIssue source) {
@@ -27,6 +31,10 @@ public class GitHubIssueConverter extends BaseGitServiceEntityConverter<GHIssue,
         issue.setClosedAt(source.getClosedAt());
         issue.setCommentsCount(issue.getCommentsCount());
         issue.setHasPullRequest(source.getPullRequest() != null);
+
+        // Additional fields are populated by GitHubIssueSyncService.enrichIssueFromGitHub()
+        // which has access to the raw JSON data
+
         return issue;
     }
 
