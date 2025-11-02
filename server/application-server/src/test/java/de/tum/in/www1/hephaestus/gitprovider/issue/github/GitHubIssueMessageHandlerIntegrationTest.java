@@ -108,9 +108,10 @@ class GitHubIssueMessageHandlerIntegrationTest extends BaseIntegrationTest {
 
     @Test
     @DisplayName("should delete issue when deleted")
-    void deletedEventDeletesIssue(@GitHubPayload("issues.opened") GHEventPayload.Issue opened, @GitHubPayload(
-        "issues.deleted"
-    ) GHEventPayload.Issue deleted) throws Exception {
+    void deletedEventDeletesIssue(
+        @GitHubPayload("issues.opened") GHEventPayload.Issue opened,
+        @GitHubPayload("issues.deleted") GHEventPayload.Issue deleted
+    ) throws Exception {
         // Arrange
         handler.handleEvent(opened);
         assertThat(issueRepository.findById(opened.getIssue().getId())).isPresent();
