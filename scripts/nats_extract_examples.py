@@ -12,10 +12,14 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Dict, Optional, Set
 import nats
+from nats.errors import TimeoutError
+from nats.js import api as jsapi
 
 # Default configuration
+SCRIPT_DIR = Path(__file__).resolve().parent
+REPO_ROOT = SCRIPT_DIR.parent
 DEFAULT_NATS_SERVER = "nats://131.159.89.80:4222"
-DEFAULT_EXAMPLES_DIR = Path("server/application-server/src/test/resources/github")
+DEFAULT_EXAMPLES_DIR = REPO_ROOT / "server" / "application-server" / "src" / "test" / "resources" / "github"
 DEFAULT_NATS_SUBJECT = "github.HephaestusTest.>"
 DEFAULT_NATS_STREAM = "github"
 
@@ -48,7 +52,10 @@ async def extract_webhook_examples(
     event_filters: Dict[str, Set[str]],
     since: Optional[datetime],
     until: Optional[datetime],
-    allow_duplicates: bool
+    allow_duplicates: bool,
+    start_with_new: bool,
+    batch_size: int,
+    fetch_timeout: float
 ):
     """
     Main extraction function.
@@ -68,6 +75,8 @@ async def extract_webhook_examples(
     filename_counts: Dict[str, int] = {}
     processed_count = 0
     matched_count = 0
+    skipped_by_filter = 0
+    skipped_by_time = 0
     
     try:
         # Connect to NATS
@@ -76,7 +85,8 @@ async def extract_webhook_examples(
     except Exception as e:
         print(f"❌ Failed to connect to NATS server: {e}")
         return False
-    
+
+    psub = None
     try:
         print(f"📊 Found {len(existing_examples)} existing examples")
         
@@ -89,10 +99,26 @@ async def extract_webhook_examples(
 
         # Create a pull subscription to consume all available messages
         # Use ephemeral consumer to start from beginning every time
+        consumer_config = jsapi.ConsumerConfig(
+            ack_policy=jsapi.AckPolicy.EXPLICIT,
+            deliver_policy=jsapi.DeliverPolicy.ALL,
+        )
+        if start_with_new:
+            consumer_config.deliver_policy = jsapi.DeliverPolicy.NEW
+            print("⚙️  Consumer deliver policy: NEW (future messages only)")
+        elif since:
+            consumer_config.deliver_policy = jsapi.DeliverPolicy.BY_START_TIME
+            start_time = since.astimezone(timezone.utc)
+            consumer_config.opt_start_time = start_time.isoformat()
+            print(f"⚙️  Consumer deliver policy: BY_START_TIME from {start_time.isoformat()}")
+        else:
+            print("⚙️  Consumer deliver policy: ALL (full stream history)")
+
         try:
             psub = await js.pull_subscribe(
                 subject=nats_subject,
-                stream=nats_stream
+                stream=nats_stream,
+                config=consumer_config,
             )
             print(f"✅ Successfully created subscription for: {nats_subject}")
         except Exception as e:
@@ -105,7 +131,7 @@ async def extract_webhook_examples(
         while True:
             try:
                 # Fetch messages in batches
-                msgs = await psub.fetch(50, timeout=5.0)
+                msgs = await psub.fetch(batch_size, timeout=fetch_timeout)
                 
                 if not msgs:
                     print("ℹ️  No more messages available")
@@ -135,10 +161,12 @@ async def extract_webhook_examples(
                         if event_filters:
                             allowed_actions = event_filters.get(normalized_event_type)
                             if allowed_actions is None:
+                                skipped_by_filter += 1
                                 await msg.ack()
                                 continue
                             normalized_action = (action or "").lower()
                             if allowed_actions and normalized_action not in allowed_actions:
+                                skipped_by_filter += 1
                                 await msg.ack()
                                 continue
                             matched_count += 1
@@ -147,9 +175,11 @@ async def extract_webhook_examples(
                         msg_timestamp = getattr(metadata, "timestamp", None)
 
                         if since and msg_timestamp and msg_timestamp < since:
+                            skipped_by_time += 1
                             await msg.ack()
                             continue
                         if until and msg_timestamp and msg_timestamp > until:
+                            skipped_by_time += 1
                             await msg.ack()
                             continue
 
@@ -190,13 +220,12 @@ async def extract_webhook_examples(
                         await msg.ack()
                         continue
                 
+            except TimeoutError:
+                print("ℹ️  No more messages available (timeout)")
+                break
             except Exception as e:
-                if "timeout" in str(e).lower():
-                    print("ℹ️  No more messages available (timeout)")
-                    break
-                else:
-                    print(f"⚠️  Error fetching messages: {e}")
-                    break
+                print(f"⚠️  Error fetching messages: {e}")
+                break
         
         # Write all extracted examples to files
         for filename, payload in extracted_examples.items():
@@ -211,6 +240,10 @@ async def extract_webhook_examples(
         print(f"📊 Processed: {processed_count} messages")
         if event_filters:
             print(f"📊 Matched filter: {matched_count} messages")
+            if skipped_by_filter:
+                print(f"📊 Skipped by event filter: {skipped_by_filter} messages")
+        if skipped_by_time:
+            print(f"📊 Skipped by time window: {skipped_by_time} messages")
         print(f"📊 Extracted: {len(extracted_examples)} new examples")
         print(f"📁 Total examples: {len(existing_examples) + len(extracted_examples)}")
         
@@ -223,8 +256,9 @@ async def extract_webhook_examples(
         
     finally:
         try:
-            await psub.unsubscribe()
-        except:
+            if psub is not None:
+                await psub.unsubscribe()
+        except Exception:
             pass
         await nc.close()
 
@@ -318,22 +352,51 @@ def main():
             "to filenames when necessary"
         )
     )
+    parser.add_argument(
+        "--start-with-new",
+        action="store_true",
+        help=(
+            "Subscribe only to new messages. Useful when you do not need the full "
+            "stream history and want to avoid scanning millions of older events."
+        )
+    )
+    parser.add_argument(
+        "--batch-size",
+        type=int,
+        default=50,
+        help="Number of messages to request per fetch call (default: 50)"
+    )
+    parser.add_argument(
+        "--fetch-timeout",
+        type=float,
+        default=5.0,
+        help="Seconds to wait for a fetch batch before timing out (default: 5.0)"
+    )
     
     args = parser.parse_args()
     event_filters = parse_event_filters(args.events)
     since = parse_iso_datetime(args.since)
     until = parse_iso_datetime(args.until)
+    if args.batch_size <= 0:
+        parser.error("--batch-size must be a positive integer")
+    if args.fetch_timeout <= 0:
+        parser.error("--fetch-timeout must be positive")
+
+    examples_dir = args.examples_dir.expanduser().resolve()
     
     try:
         success = asyncio.run(extract_webhook_examples(
             args.nats_server,
-            args.examples_dir,
+            examples_dir,
             args.subject,
             args.stream,
             event_filters,
             since,
             until,
-            args.allow_duplicates
+            args.allow_duplicates,
+            args.start_with_new,
+            args.batch_size,
+            args.fetch_timeout
         ))
         
         if not success:

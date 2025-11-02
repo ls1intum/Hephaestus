@@ -1,7 +1,81 @@
 {
-  "ref": "refs/heads/payload-fixture-push",
-  "before": "0000000000000000000000000000000000000000",
-  "after": "5e25fac12d5c56488a01b1e4375828fe7d30d64e",
+  "action": "unlabeled",
+  "discussion": {
+    "repository_url": "https://api.github.com/repos/HephaestusTest/TestRepository",
+    "category": {
+      "id": 46489461,
+      "node_id": "DIC_kwDOO4CKW84CxV91",
+      "repository_id": 998279771,
+      "emoji": ":speech_balloon:",
+      "name": "General",
+      "description": "Chat about anything and everything here",
+      "created_at": "2025-11-02T00:14:11.000+01:00",
+      "updated_at": "2025-11-02T00:14:11.000+01:00",
+      "slug": "general",
+      "is_answerable": false
+    },
+    "answer_html_url": null,
+    "answer_chosen_at": null,
+    "answer_chosen_by": null,
+    "html_url": "https://github.com/HephaestusTest/TestRepository/discussions/27",
+    "id": 9096662,
+    "node_id": "D_kwDOO4CKW84Ais3W",
+    "number": 27,
+    "title": "Fixture discussion thread",
+    "user": {
+      "login": "FelixTJDietrich",
+      "id": 5898705,
+      "node_id": "MDQ6VXNlcjU4OTg3MDU=",
+      "avatar_url": "https://avatars.githubusercontent.com/u/5898705?v=4",
+      "gravatar_id": "",
+      "url": "https://api.github.com/users/FelixTJDietrich",
+      "html_url": "https://github.com/FelixTJDietrich",
+      "followers_url": "https://api.github.com/users/FelixTJDietrich/followers",
+      "following_url": "https://api.github.com/users/FelixTJDietrich/following{/other_user}",
+      "gists_url": "https://api.github.com/users/FelixTJDietrich/gists{/gist_id}",
+      "starred_url": "https://api.github.com/users/FelixTJDietrich/starred{/owner}{/repo}",
+      "subscriptions_url": "https://api.github.com/users/FelixTJDietrich/subscriptions",
+      "organizations_url": "https://api.github.com/users/FelixTJDietrich/orgs",
+      "repos_url": "https://api.github.com/users/FelixTJDietrich/repos",
+      "events_url": "https://api.github.com/users/FelixTJDietrich/events{/privacy}",
+      "received_events_url": "https://api.github.com/users/FelixTJDietrich/received_events",
+      "type": "User",
+      "user_view_type": "public",
+      "site_admin": false
+    },
+    "labels": [],
+    "state": "open",
+    "state_reason": null,
+    "locked": false,
+    "comments": 0,
+    "created_at": "2025-11-01T23:15:45Z",
+    "updated_at": "2025-11-01T23:15:46Z",
+    "author_association": "CONTRIBUTOR",
+    "active_lock_reason": null,
+    "body": "Testing discussion webhook payloads",
+    "reactions": {
+      "url": "https://api.github.com/repos/HephaestusTest/TestRepository/discussions/27/reactions",
+      "total_count": 0,
+      "+1": 0,
+      "-1": 0,
+      "laugh": 0,
+      "hooray": 0,
+      "confused": 0,
+      "heart": 0,
+      "rocket": 0,
+      "eyes": 0
+    },
+    "timeline_url": "https://api.github.com/repos/HephaestusTest/TestRepository/discussions/27/timeline"
+  },
+  "label": {
+    "id": 9568029313,
+    "node_id": "LA_kwDOO4CKW88AAAACOkyKgQ",
+    "url": "https://api.github.com/repos/HephaestusTest/TestRepository/labels/fixtures",
+    "name": "fixtures",
+    "color": "0e8a16",
+    "default": false,
+    "description": "Fixture label for webhook tests"
+  },
   "repository": {
     "id": 998279771,
     "node_id": "R_kgDOO4CKWw",
@@ -9,8 +83,6 @@
     "full_name": "HephaestusTest/TestRepository",
     "private": false,
     "owner": {
-      "name": "HephaestusTest",
-      "email": null,
       "login": "HephaestusTest",
       "id": 215361191,
       "node_id": "O_kgDODNYmpw",
@@ -71,15 +143,15 @@
     "labels_url": "https://api.github.com/repos/HephaestusTest/TestRepository/labels{/name}",
     "releases_url": "https://api.github.com/repos/HephaestusTest/TestRepository/releases{/id}",
     "deployments_url": "https://api.github.com/repos/HephaestusTest/TestRepository/deployments",
-    "created_at": 1749373758,
-    "updated_at": "2025-11-02T00:23:15Z",
-    "pushed_at": 1762043054,
+    "created_at": "2025-06-08T09:09:18Z",
+    "updated_at": "2025-07-29T11:38:08Z",
+    "pushed_at": "2025-11-01T23:11:48Z",
     "git_url": "git://github.com/HephaestusTest/TestRepository.git",
     "ssh_url": "git@github.com:HephaestusTest/TestRepository.git",
     "clone_url": "https://github.com/HephaestusTest/TestRepository.git",
     "svn_url": "https://github.com/HephaestusTest/TestRepository",
     "homepage": null,
-    "size": 2,
+    "size": 1,
     "stargazers_count": 0,
     "watchers_count": 0,
     "language": null,
@@ -93,7 +165,7 @@
     "mirror_url": null,
     "archived": false,
     "disabled": false,
-    "open_issues_count": 8,
+    "open_issues_count": 7,
     "license": null,
     "allow_forking": true,
     "is_template": false,
@@ -101,17 +173,10 @@
     "topics": [],
     "visibility": "public",
     "forks": 0,
-    "open_issues": 8,
+    "open_issues": 7,
     "watchers": 0,
     "default_branch": "main",
-    "stargazers": 0,
-    "master_branch": "main",
-    "organization": "HephaestusTest",
     "custom_properties": {}
-  },
-  "pusher": {
-    "name": "FelixTJDietrich",
-    "email": "felix_dietrich@gmx.de"
   },
   "organization": {
     "login": "HephaestusTest",
@@ -151,58 +216,5 @@
   "installation": {
     "id": 90982866,
     "node_id": "MDIzOkludGVncmF0aW9uSW5zdGFsbGF0aW9uOTA5ODI4NjY="
-  },
-  "created": true,
-  "deleted": false,
-  "forced": false,
-  "base_ref": null,
-  "compare": "https://github.com/HephaestusTest/TestRepository/commit/5e25fac12d5c",
-  "commits": [
-    {
-      "id": "5e25fac12d5c56488a01b1e4375828fe7d30d64e",
-      "tree_id": "28f1f201067724fc876198c77ebf451685521d63",
-      "distinct": true,
-      "message": "Add webhook fixture file",
-      "timestamp": "2025-11-02T01:23:58+01:00",
-      "url": "https://github.com/HephaestusTest/TestRepository/commit/5e25fac12d5c56488a01b1e4375828fe7d30d64e",
-      "author": {
-        "name": "Felix T.J. Dietrich",
-        "email": "felix_dietrich@gmx.de",
-        "username": "FelixTJDietrich"
-      },
-      "committer": {
-        "name": "Felix T.J. Dietrich",
-        "email": "felix_dietrich@gmx.de",
-        "username": "FelixTJDietrich"
-      },
-      "added": [
-        "webhook-fixture.txt"
-      ],
-      "removed": [],
-      "modified": []
-    }
-  ],
-  "head_commit": {
-    "id": "5e25fac12d5c56488a01b1e4375828fe7d30d64e",
-    "tree_id": "28f1f201067724fc876198c77ebf451685521d63",
-    "distinct": true,
-    "message": "Add webhook fixture file",
-    "timestamp": "2025-11-02T01:23:58+01:00",
-    "url": "https://github.com/HephaestusTest/TestRepository/commit/5e25fac12d5c56488a01b1e4375828fe7d30d64e",
-    "author": {
-      "name": "Felix T.J. Dietrich",
-      "email": "felix_dietrich@gmx.de",
-      "username": "FelixTJDietrich"
-    },
-    "committer": {
-      "name": "Felix T.J. Dietrich",
-      "email": "felix_dietrich@gmx.de",
-      "username": "FelixTJDietrich"
-    },
-    "added": [
-      "webhook-fixture.txt"
-    ],
-    "removed": [],
-    "modified": []
   }
 }
