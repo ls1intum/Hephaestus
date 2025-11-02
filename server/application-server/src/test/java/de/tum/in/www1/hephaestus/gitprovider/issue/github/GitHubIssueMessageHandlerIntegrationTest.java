@@ -11,6 +11,7 @@ import de.tum.in.www1.hephaestus.gitprovider.milestone.MilestoneRepository;
 import de.tum.in.www1.hephaestus.gitprovider.repository.RepositoryRepository;
 import de.tum.in.www1.hephaestus.gitprovider.user.UserRepository;
 import de.tum.in.www1.hephaestus.testconfig.BaseIntegrationTest;
+import jakarta.transaction.Transactional;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -145,6 +146,7 @@ class GitHubIssueMessageHandlerIntegrationTest extends BaseIntegrationTest {
     }
 
     @Test
+    @Transactional
     @DisplayName("should add label to issue when labeled")
     void labeledEventAddsLabel(
         @GitHubPayload("issues.opened") GHEventPayload.Issue opened,
@@ -169,6 +171,7 @@ class GitHubIssueMessageHandlerIntegrationTest extends BaseIntegrationTest {
     }
 
     @Test
+    @Transactional
     @DisplayName("should remove label from issue when unlabeled")
     void unlabeledEventRemovesLabel(
         @GitHubPayload("issues.labeled") GHEventPayload.Issue labeled,
@@ -188,6 +191,7 @@ class GitHubIssueMessageHandlerIntegrationTest extends BaseIntegrationTest {
     }
 
     @Test
+    @Transactional
     @DisplayName("should add assignee to issue when assigned")
     void assignedEventAddsAssignee(
         @GitHubPayload("issues.opened") GHEventPayload.Issue opened,
@@ -206,6 +210,7 @@ class GitHubIssueMessageHandlerIntegrationTest extends BaseIntegrationTest {
     }
 
     @Test
+    @Transactional
     @DisplayName("should remove assignee from issue when unassigned")
     void unassignedEventRemovesAssignee(
         @GitHubPayload("issues.assigned") GHEventPayload.Issue assigned,
