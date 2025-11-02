@@ -4,6 +4,7 @@ import de.tum.in.www1.hephaestus.gitprovider.issue.Issue;
 import de.tum.in.www1.hephaestus.gitprovider.pullrequestreview.PullRequestReview;
 import de.tum.in.www1.hephaestus.gitprovider.pullrequestreviewcomment.PullRequestReviewComment;
 import de.tum.in.www1.hephaestus.gitprovider.pullrequestreviewthread.PullRequestReviewThread;
+import de.tum.in.www1.hephaestus.gitprovider.team.Team;
 import de.tum.in.www1.hephaestus.gitprovider.user.User;
 import jakarta.persistence.*;
 import java.time.Instant;
@@ -63,7 +64,7 @@ public class PullRequest extends Issue {
         inverseJoinColumns = @JoinColumn(name = "team_id")
     )
     @ToString.Exclude
-    private Set<de.tum.in.www1.hephaestus.gitprovider.team.Team> requestedTeams = new HashSet<>();
+    private Set<Team> requestedTeams = new HashSet<>();
 
     @OneToMany(mappedBy = "pullRequest", cascade = CascadeType.REMOVE, orphanRemoval = true)
     @ToString.Exclude

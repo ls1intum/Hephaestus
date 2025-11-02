@@ -73,8 +73,7 @@ public class Issue extends BaseGitServiceEntity {
     @Enumerated(EnumType.STRING)
     private AuthorAssociation authorAssociation;
 
-    @Enumerated(EnumType.STRING)
-    private IssueType type;
+    private String type;
 
     private int commentsCount;
 

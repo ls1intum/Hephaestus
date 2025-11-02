@@ -5,7 +5,7 @@
     xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
         http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-3.8.xsd">
 
-    <changeSet id="1762086458000-1" author="copilot">
+    <changeSet id="1762086458000-1" author="FelixTJDietrich">
         <comment>Add GitHub metadata fields to Issue table: author_association, state_reason, active_lock_reason, type, reactions, sub-issues summary, and dependencies</comment>
         
         <!-- Add author association enum field -->
@@ -29,9 +29,9 @@
             </column>
         </addColumn>
 
-        <!-- Add issue type enum field -->
+        <!-- Add issue type field (customizable per organization, max 64 chars) -->
         <addColumn tableName="issue">
-            <column name="type" type="varchar(20)">
+            <column name="type" type="varchar(64)">
                 <constraints nullable="true"/>
             </column>
         </addColumn>
@@ -108,7 +108,7 @@
         </addColumn>
     </changeSet>
 
-    <changeSet id="1762086458000-2" author="copilot">
+    <changeSet id="1762086458000-2" author="FelixTJDietrich">
         <comment>Add pull_request_requested_teams many-to-many join table for team review requests</comment>
         
         <createTable tableName="pull_request_requested_teams">

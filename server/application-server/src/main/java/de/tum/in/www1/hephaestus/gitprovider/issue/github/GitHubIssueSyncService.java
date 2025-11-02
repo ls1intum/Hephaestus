@@ -274,10 +274,13 @@ public class GitHubIssueSyncService {
                     issue.setActiveLockReason(convertLockReason(lockReason));
                 }
 
-                // Issue type
+                // Issue type (customizable per organization, max 64 chars)
                 if (jsonNode.has("type") && !jsonNode.get("type").isNull()) {
                     String type = jsonNode.get("type").asText();
-                    issue.setType(convertIssueType(type));
+                    if (type != null && type.length() <= 64) {
+                        issue.setType(type);
+                    }
+                }
                 }
 
                 // Reactions
@@ -339,18 +342,6 @@ public class GitHubIssueSyncService {
         } catch (IllegalArgumentException e) {
             logger.warn("Unknown lock reason: {}", reason);
             return null;
-        }
-    }
-
-    private IssueType convertIssueType(String type) {
-        if (type == null || type.isEmpty()) {
-            return IssueType.ISSUE;
-        }
-        try {
-            return IssueType.valueOf(type.toUpperCase());
-        } catch (IllegalArgumentException e) {
-            logger.warn("Unknown issue type: {}", type);
-            return IssueType.ISSUE;
         }
     }
 }
