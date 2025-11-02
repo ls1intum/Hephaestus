@@ -55,15 +55,18 @@ class GitHubPullRequestMessageHandlerIntegrationTest extends BaseIntegrationTest
 
         // Assert
         var pr = pullRequestRepository.findById(payload.getPullRequest().getId());
-        assertThat(pr).isPresent().get().satisfies(saved -> {
-            assertThat(saved.getNumber()).isEqualTo(payload.getPullRequest().getNumber());
-            assertThat(saved.getTitle()).isEqualTo(payload.getPullRequest().getTitle());
-            assertThat(saved.getState()).isEqualTo(Issue.State.OPEN);
-            assertThat(saved.getHtmlUrl()).isEqualTo(payload.getPullRequest().getHtmlUrl().toString());
-            assertThat(saved.getBody()).isEqualTo(payload.getPullRequest().getBody());
-            assertThat(saved.isDraft()).isFalse();
-            assertThat(saved.hasPullRequest()).isTrue();
-        });
+        assertThat(pr)
+            .isPresent()
+            .get()
+            .satisfies(saved -> {
+                assertThat(saved.getNumber()).isEqualTo(payload.getPullRequest().getNumber());
+                assertThat(saved.getTitle()).isEqualTo(payload.getPullRequest().getTitle());
+                assertThat(saved.getState()).isEqualTo(Issue.State.OPEN);
+                assertThat(saved.getHtmlUrl()).isEqualTo(payload.getPullRequest().getHtmlUrl().toString());
+                assertThat(saved.getBody()).isEqualTo(payload.getPullRequest().getBody());
+                assertThat(saved.isDraft()).isFalse();
+                assertThat(saved.hasPullRequest()).isTrue();
+            });
 
         // Verify repository was created
         assertThat(repositoryRepository.findAll()).isNotEmpty();
@@ -113,17 +116,17 @@ class GitHubPullRequestMessageHandlerIntegrationTest extends BaseIntegrationTest
     @DisplayName("should update pull request when synchronized")
     void synchronizeEventUpdatesPullRequest(
         @GitHubPayload("pull_request.opened") GHEventPayload.PullRequest opened,
-        @GitHubPayload("pull_request.synchronize") GHEventPayload.PullRequest synchronized
+        @GitHubPayload("pull_request.synchronize") GHEventPayload.PullRequest synchronizePayload
     ) throws Exception {
         // Arrange
         handler.handleEvent(opened);
 
         // Act
-        handler.handleEvent(synchronized);
+        handler.handleEvent(synchronizePayload);
 
         // Assert
-        var pr = pullRequestRepository.findById(synchronized.getPullRequest().getId()).orElseThrow();
-        assertThat(pr.getNumber()).isEqualTo(synchronized.getPullRequest().getNumber());
+        var pr = pullRequestRepository.findById(synchronizePayload.getPullRequest().getId()).orElseThrow();
+        assertThat(pr.getNumber()).isEqualTo(synchronizePayload.getPullRequest().getNumber());
         // Verify the PR was updated (check updated timestamp or other fields)
     }
 

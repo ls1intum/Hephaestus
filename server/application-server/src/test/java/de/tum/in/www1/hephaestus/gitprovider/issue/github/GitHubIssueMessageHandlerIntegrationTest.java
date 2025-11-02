@@ -53,18 +53,21 @@ class GitHubIssueMessageHandlerIntegrationTest extends BaseIntegrationTest {
 
         // Assert
         var issue = issueRepository.findById(payload.getIssue().getId());
-        assertThat(issue).isPresent().get().satisfies(saved -> {
-            assertThat(saved.getNumber()).isEqualTo(payload.getIssue().getNumber());
-            assertThat(saved.getTitle()).isEqualTo(payload.getIssue().getTitle());
-            assertThat(saved.getState()).isEqualTo(Issue.State.OPEN);
-            assertThat(saved.getHtmlUrl()).isEqualTo(payload.getIssue().getHtmlUrl().toString());
-            assertThat(saved.getBody()).isEqualTo(payload.getIssue().getBody());
-            assertThat(saved.isLocked()).isFalse();
-        });
+        assertThat(issue)
+            .isPresent()
+            .get()
+            .satisfies(saved -> {
+                assertThat(saved.getNumber()).isEqualTo(payload.getIssue().getNumber());
+                assertThat(saved.getTitle()).isEqualTo(payload.getIssue().getTitle());
+                assertThat(saved.getState()).isEqualTo(Issue.State.OPEN);
+                assertThat(saved.getHtmlUrl()).isEqualTo(payload.getIssue().getHtmlUrl().toString());
+                assertThat(saved.getBody()).isEqualTo(payload.getIssue().getBody());
+                assertThat(saved.isLocked()).isFalse();
+            });
 
         // Verify repository was created
         assertThat(repositoryRepository.findAll()).isNotEmpty();
-        
+
         // Verify author was created
         assertThat(userRepository.findById(payload.getIssue().getUser().getId())).isPresent();
     }
@@ -159,7 +162,7 @@ class GitHubIssueMessageHandlerIntegrationTest extends BaseIntegrationTest {
         var issue = issueRepository.findById(labeled.getIssue().getId()).orElseThrow();
         assertThat(issue.getLabels()).hasSize(labeled.getIssue().getLabels().size());
         assertThat(issue.getLabels()).isNotEmpty();
-        
+
         // Verify label was persisted
         var labels = labelRepository.findAll();
         assertThat(labels).isNotEmpty();
@@ -237,7 +240,7 @@ class GitHubIssueMessageHandlerIntegrationTest extends BaseIntegrationTest {
         var issue = issueRepository.findById(milestoned.getIssue().getId()).orElseThrow();
         assertThat(issue.getMilestone()).isNotNull();
         assertThat(issue.getMilestone().getId()).isEqualTo(milestoned.getIssue().getMilestone().getId());
-        
+
         // Verify milestone was persisted
         assertThat(milestoneRepository.findById(milestoned.getIssue().getMilestone().getId())).isPresent();
     }
@@ -305,10 +308,13 @@ class GitHubIssueMessageHandlerIntegrationTest extends BaseIntegrationTest {
 
         // Assert - Issue should be persisted
         var issue = issueRepository.findById(payload.getIssue().getId());
-        assertThat(issue).isPresent().get().satisfies(saved -> {
-            assertThat(saved.getNumber()).isEqualTo(payload.getIssue().getNumber());
-            assertThat(saved.getTitle()).isEqualTo(payload.getIssue().getTitle());
-        });
+        assertThat(issue)
+            .isPresent()
+            .get()
+            .satisfies(saved -> {
+                assertThat(saved.getNumber()).isEqualTo(payload.getIssue().getNumber());
+                assertThat(saved.getTitle()).isEqualTo(payload.getIssue().getTitle());
+            });
     }
 
     @Test
@@ -336,11 +342,14 @@ class GitHubIssueMessageHandlerIntegrationTest extends BaseIntegrationTest {
 
         // Assert - Issue should be persisted with new repository reference
         var issue = issueRepository.findById(payload.getIssue().getId());
-        assertThat(issue).isPresent().get().satisfies(saved -> {
-            assertThat(saved.getNumber()).isEqualTo(payload.getIssue().getNumber());
-            assertThat(saved.getTitle()).isEqualTo(payload.getIssue().getTitle());
-        });
-        
+        assertThat(issue)
+            .isPresent()
+            .get()
+            .satisfies(saved -> {
+                assertThat(saved.getNumber()).isEqualTo(payload.getIssue().getNumber());
+                assertThat(saved.getTitle()).isEqualTo(payload.getIssue().getTitle());
+            });
+
         // Verify repository was created
         assertThat(repositoryRepository.findAll()).isNotEmpty();
     }

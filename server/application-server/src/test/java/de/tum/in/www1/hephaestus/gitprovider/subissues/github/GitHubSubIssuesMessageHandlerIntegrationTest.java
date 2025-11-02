@@ -42,16 +42,22 @@ class GitHubSubIssuesMessageHandlerIntegrationTest extends BaseIntegrationTest {
 
         // Assert - Both sub-issue and parent should be persisted
         var subIssue = issueRepository.findById(payload.getSubIssue().getId());
-        assertThat(subIssue).isPresent().get().satisfies(saved -> {
-            assertThat(saved.getNumber()).isEqualTo(payload.getSubIssue().getNumber());
-            assertThat(saved.getTitle()).isEqualTo(payload.getSubIssue().getTitle());
-        });
+        assertThat(subIssue)
+            .isPresent()
+            .get()
+            .satisfies(saved -> {
+                assertThat(saved.getNumber()).isEqualTo(payload.getSubIssue().getNumber());
+                assertThat(saved.getTitle()).isEqualTo(payload.getSubIssue().getTitle());
+            });
 
         var parentIssue = issueRepository.findById(payload.getParentIssue().getId());
-        assertThat(parentIssue).isPresent().get().satisfies(saved -> {
-            assertThat(saved.getNumber()).isEqualTo(payload.getParentIssue().getNumber());
-            assertThat(saved.getTitle()).isEqualTo(payload.getParentIssue().getTitle());
-        });
+        assertThat(parentIssue)
+            .isPresent()
+            .get()
+            .satisfies(saved -> {
+                assertThat(saved.getNumber()).isEqualTo(payload.getParentIssue().getNumber());
+                assertThat(saved.getTitle()).isEqualTo(payload.getParentIssue().getTitle());
+            });
 
         // Verify repository was created
         assertThat(repositoryRepository.findAll()).isNotEmpty();
@@ -91,16 +97,22 @@ class GitHubSubIssuesMessageHandlerIntegrationTest extends BaseIntegrationTest {
 
         // Assert - Both sub-issue and parent should be persisted
         var subIssue = issueRepository.findById(payload.getSubIssue().getId());
-        assertThat(subIssue).isPresent().get().satisfies(saved -> {
-            assertThat(saved.getNumber()).isEqualTo(payload.getSubIssue().getNumber());
-            assertThat(saved.getTitle()).isEqualTo(payload.getSubIssue().getTitle());
-        });
+        assertThat(subIssue)
+            .isPresent()
+            .get()
+            .satisfies(saved -> {
+                assertThat(saved.getNumber()).isEqualTo(payload.getSubIssue().getNumber());
+                assertThat(saved.getTitle()).isEqualTo(payload.getSubIssue().getTitle());
+            });
 
         var parentIssue = issueRepository.findById(payload.getParentIssue().getId());
-        assertThat(parentIssue).isPresent().get().satisfies(saved -> {
-            assertThat(saved.getNumber()).isEqualTo(payload.getParentIssue().getNumber());
-            assertThat(saved.getTitle()).isEqualTo(payload.getParentIssue().getTitle());
-        });
+        assertThat(parentIssue)
+            .isPresent()
+            .get()
+            .satisfies(saved -> {
+                assertThat(saved.getNumber()).isEqualTo(payload.getParentIssue().getNumber());
+                assertThat(saved.getTitle()).isEqualTo(payload.getParentIssue().getTitle());
+            });
 
         // Verify repository was created
         assertThat(repositoryRepository.findAll()).isNotEmpty();

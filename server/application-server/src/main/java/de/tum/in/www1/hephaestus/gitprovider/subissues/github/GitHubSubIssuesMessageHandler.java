@@ -11,13 +11,13 @@ import org.springframework.stereotype.Component;
 
 /**
  * Handler for GitHub sub-issues (tasklist) webhook events.
- * 
+ *
  * Sub-issues are a GitHub beta feature that allows issues to be organized in parent-child hierarchies
  * through tasklists. This handler processes events when issues are added or removed as sub-issues.
- * 
+ *
  * Supported actions:
  * - sub_issue_added: A child issue is added to a parent issue
- * - sub_issue_removed: A child issue is removed from a parent issue  
+ * - sub_issue_removed: A child issue is removed from a parent issue
  * - parent_issue_added: An issue gets a parent issue
  * - parent_issue_removed: An issue's parent is removed
  */
@@ -64,10 +64,7 @@ public class GitHubSubIssuesMessageHandler extends GitHubMessageHandler<GHEventP
         // If parent issue is in a different repository, sync that too
         var parentRepo = eventPayload.getParentIssueRepo();
         if (parentRepo != null && !parentRepo.getId().equals(repository.getId())) {
-            logger.info(
-                "Parent issue is in different repository: {}, syncing it as well",
-                parentRepo.getFullName()
-            );
+            logger.info("Parent issue is in different repository: {}, syncing it as well", parentRepo.getFullName());
             repositorySyncService.processRepository(parentRepo);
         }
     }
