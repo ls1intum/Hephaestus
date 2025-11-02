@@ -1,0 +1,77 @@
+# GitHub Copilot Agent Development Environment Configuration
+# This file preinstalls tools and dependencies to ensure smooth agent sessions
+# Documentation: https://docs.github.com/en/enterprise-cloud@latest/copilot/how-tos/use-copilot-agents/coding-agent/customize-the-agent-environment
+
+# Preinstall script runs once when the environment is created
+# Set up all required tools and dependencies
+preinstall: |
+  set -e
+  
+  echo "🔧 Setting up Hephaestus development environment..."
+  
+  # Install Node.js 22.10.0 (exact version from .node-version)
+  echo "📦 Installing Node.js 22.10.0..."
+  curl -fsSL https://deb.nodesource.com/setup_22.x | bash -
+  apt-get install -y nodejs
+  node --version
+  npm --version
+  
+  # Install Java 21 (OpenJDK via Adoptium/Eclipse Temurin)
+  echo "☕ Installing Java 21..."
+  apt-get install -y wget apt-transport-https gnupg
+  mkdir -p /etc/apt/keyrings
+  wget -O - https://packages.adoptium.net/artifactory/api/gpg/key/public | tee /etc/apt/keyrings/adoptium.asc
+  echo "deb [signed-by=/etc/apt/keyrings/adoptium.asc] https://packages.adoptium.net/artifactory/deb $(awk -F= '/^VERSION_CODENAME/{print$2}' /etc/os-release) main" | tee /etc/apt/sources.list.d/adoptium.list
+  apt-get update
+  apt-get install -y temurin-21-jdk
+  java -version
+  
+  # Install Python 3.13
+  echo "🐍 Installing Python 3.13..."
+  apt-get install -y software-properties-common
+  add-apt-repository -y ppa:deadsnakes/ppa
+  apt-get update
+  apt-get install -y python3.13 python3.13-venv python3.13-dev python3-pip
+  update-alternatives --install /usr/bin/python3 python3 /usr/bin/python3.13 1
+  python3 --version
+  
+  # Install Poetry 2.x for Python dependency management
+  echo "📝 Installing Poetry 2.x..."
+  curl -sSL https://install.python-poetry.org | POETRY_VERSION=2.0.0 python3 -
+  echo 'export PATH="/root/.local/bin:$PATH"' >> ~/.bashrc
+  export PATH="/root/.local/bin:$PATH"
+  poetry --version
+  
+  # Verify Docker is available (usually pre-installed in GitHub environments)
+  echo "🐳 Checking Docker availability..."
+  docker --version || echo "⚠️ Docker not available, some database operations may fail"
+  
+  # Install project npm dependencies
+  echo "📦 Installing npm dependencies..."
+  npm ci --prefer-offline --no-audit
+  
+  # Bootstrap Python environments for intelligence-service and webhook-ingest
+  echo "🔧 Bootstrapping Python environments..."
+  npm run bootstrap:py
+  
+  # Verify Maven wrapper is executable
+  echo "✅ Verifying Maven wrapper..."
+  chmod +x server/application-server/mvnw
+  cd server/application-server && ./mvnw --version
+  cd ../..
+  
+  echo "✅ Environment setup complete!"
+
+# Environment variables for development sessions
+environment:
+  # Database connection for local development
+  SPRING_DATASOURCE_URL: jdbc:postgresql://localhost:5432/hephaestus
+  SPRING_DATASOURCE_USERNAME: root
+  SPRING_DATASOURCE_PASSWORD: root
+  
+  # Intelligence service model configuration (fake provider for tooling/generation)
+  MODEL_NAME: fake:model
+  DETECTION_MODEL_NAME: fake:model
+  
+  # Add Poetry to PATH
+  PATH: /root/.local/bin:$PATH
