@@ -243,12 +243,76 @@ public class GitHubIssueSyncService {
     }
 
     /**
-     * Enriches the issue with additional fields from GitHub that may not be exposed by the github-api library.
-     * Uses reflection to access the raw JSON data.
+     * Enriches the issue with additional fields from GitHub using GHIssueExtended.
+     * This avoids reflection by using our custom extended class in org.kohsuke.github.
      */
     private void enrichIssueFromGitHub(GHIssue ghIssue, Issue issue) {
+        // If ghIssue is actually a GHIssueExtended (parsed from JSON with extended fields),
+        // we can access the additional fields directly
+        if (ghIssue instanceof org.kohsuke.github.GHIssueExtended) {
+            var extended = (org.kohsuke.github.GHIssueExtended) ghIssue;
+            
+            // Author association
+            if (extended.getAuthorAssociation() != null) {
+                try {
+                    issue.setAuthorAssociation(AuthorAssociation.valueOf(extended.getAuthorAssociation()));
+                } catch (IllegalArgumentException e) {
+                    logger.debug("Unknown author association: {}", extended.getAuthorAssociation());
+                }
+            }
+            
+            // State reason
+            if (extended.getStateReason() != null) {
+                try {
+                    issue.setStateReason(StateReason.valueOf(extended.getStateReason().toUpperCase()));
+                } catch (IllegalArgumentException e) {
+                    logger.debug("Unknown state reason: {}", extended.getStateReason());
+                }
+            }
+            
+            // Active lock reason
+            if (extended.getActiveLockReason() != null) {
+                try {
+                    issue.setActiveLockReason(LockReason.valueOf(extended.getActiveLockReason().toUpperCase().replace('-', '_')));
+                } catch (IllegalArgumentException e) {
+                    logger.debug("Unknown lock reason: {}", extended.getActiveLockReason());
+                }
+            }
+            
+            // Reactions
+            var reactions = extended.getReactions();
+            if (reactions != null) {
+                issue.setReactionsTotal(reactions.getTotal());
+                issue.setReactionsPlus1(reactions.getPlus1());
+                issue.setReactionsMinus1(reactions.getMinus1());
+                issue.setReactionsLaugh(reactions.getLaugh());
+                issue.setReactionsHooray(reactions.getHooray());
+                issue.setReactionsConfused(reactions.getConfused());
+                issue.setReactionsHeart(reactions.getHeart());
+                issue.setReactionsRocket(reactions.getRocket());
+                issue.setReactionsEyes(reactions.getEyes());
+            }
+            
+            // Sub-issues summary
+            var subIssuesSummary = extended.getSubIssuesSummary();
+            if (subIssuesSummary != null) {
+                issue.setSubIssuesTotal(subIssuesSummary.getTotal());
+                issue.setSubIssuesCompleted(subIssuesSummary.getCompleted());
+            }
+            
+            // Issue dependencies summary
+            var dependencies = extended.getIssueDependenciesSummary();
+            if (dependencies != null) {
+                issue.setBlockedByCount(dependencies.getBlockedByCount());
+                issue.setBlockingCount(dependencies.getBlockingCount());
+            }
+            
+            return; // Successfully enriched using GHIssueExtended
+        }
+        
+        // Fallback: Try to access via reflection if not GHIssueExtended
+        // This ensures compatibility if GitHub API library doesn't parse as our extended class
         try {
-            // Access the raw JSON data through reflection
             var rootField = ghIssue.getClass().getSuperclass().getDeclaredField("root");
             rootField.setAccessible(true);
             var root = rootField.get(ghIssue);

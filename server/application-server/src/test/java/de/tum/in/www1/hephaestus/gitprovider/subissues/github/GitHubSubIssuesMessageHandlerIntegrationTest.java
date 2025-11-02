@@ -9,7 +9,6 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.kohsuke.github.GHEventPayloadSubIssues;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
@@ -18,7 +17,6 @@ import org.springframework.transaction.annotation.Transactional;
  * Tests webhook event handling for GitHub's sub-issues (tasklists) feature,
  * which allows tracking parent-child relationships between issues.
  */
-@SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 class GitHubSubIssuesMessageHandlerIntegrationTest extends BaseIntegrationTest {
 
     @Autowired

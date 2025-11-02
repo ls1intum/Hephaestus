@@ -347,7 +347,7 @@ public class NatsConsumerService {
             .map(event -> getSubjectPrefix(nameWithOwner) + "." + event)
             .forEach(subjects::add);
         
-        // Add custom sub_issues event (not in GHEvent enum)
+        // Add custom sub_issues event (not in GHEvent enum) - specific event only, no .all
         subjects.add(getSubjectPrefix(nameWithOwner) + ".sub_issues");
         
         return subjects.toArray(new String[0]);
