@@ -140,8 +140,6 @@ class GitHubPullRequestMessageHandlerIntegrationTest extends BaseIntegrationTest
     ) throws Exception {
         // Arrange
         handler.handleEvent(opened);
-        var prBefore = pullRequestRepository.findById(opened.getPullRequest().getId()).orElseThrow();
-        int initialLabelCount = prBefore.getLabels().size();
 
         // Act
         handler.handleEvent(labeled);

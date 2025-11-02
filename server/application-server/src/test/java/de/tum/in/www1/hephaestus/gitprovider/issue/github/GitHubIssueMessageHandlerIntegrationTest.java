@@ -154,8 +154,6 @@ class GitHubIssueMessageHandlerIntegrationTest extends BaseIntegrationTest {
     ) throws Exception {
         // Arrange
         handler.handleEvent(opened);
-        var issueBefore = issueRepository.findById(opened.getIssue().getId()).orElseThrow();
-        int initialLabelCount = issueBefore.getLabels().size();
 
         // Act
         handler.handleEvent(labeled);
