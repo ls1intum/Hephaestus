@@ -37,8 +37,12 @@ preinstall: |
   
   # Install Poetry 2.x for Python dependency management
   echo "📝 Installing Poetry 2.x..."
-  curl -sSL https://install.python-poetry.org | POETRY_VERSION=2.0.0 python3 -
-  echo 'export PATH="/root/.local/bin:$PATH"' >> ~/.bashrc
+  if ! command -v poetry &> /dev/null; then
+    curl -sSL https://install.python-poetry.org | POETRY_VERSION=2.0.0 python3 -
+    echo 'export PATH="/root/.local/bin:$PATH"' >> ~/.bashrc
+  else
+    echo "Poetry already installed: $(poetry --version)"
+  fi
   export PATH="/root/.local/bin:$PATH"
   poetry --version
   
@@ -48,11 +52,19 @@ preinstall: |
   
   # Install project npm dependencies
   echo "📦 Installing npm dependencies..."
-  npm ci --prefer-offline --no-audit
+  if [ ! -d "node_modules" ]; then
+    npm ci --prefer-offline --no-audit
+  else
+    echo "node_modules already exists, skipping npm ci"
+  fi
   
   # Bootstrap Python environments for intelligence-service and webhook-ingest
   echo "🔧 Bootstrapping Python environments..."
-  npm run bootstrap:py
+  if command -v poetry &> /dev/null; then
+    npm run bootstrap:py || echo "⚠️ Poetry bootstrap failed, may need Python 3.13"
+  else
+    echo "⚠️ Poetry not available, skipping Python bootstrap"
+  fi
   
   # Verify Maven wrapper is executable
   echo "✅ Verifying Maven wrapper..."
