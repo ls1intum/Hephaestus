@@ -52,11 +52,12 @@ preinstall: |
   
   # Install project npm dependencies
   echo "📦 Installing npm dependencies..."
-  if [ ! -d "node_modules" ]; then
-    npm ci --prefer-offline --no-audit
-  else
-    echo "node_modules already exists, skipping npm ci"
+  # Always remove node_modules to ensure a clean install
+  if [ -d "node_modules" ]; then
+    echo "Removing existing node_modules directory..."
+    rm -rf node_modules
   fi
+  npm ci --prefer-offline --no-audit
   
   # Bootstrap Python environments for intelligence-service and webhook-ingest
   echo "🔧 Bootstrapping Python environments..."
