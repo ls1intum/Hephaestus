@@ -293,32 +293,46 @@ generate_changelog_diff() {
         rm "$changelog_file"
     fi
     
-    # Backup current database state
-    log_info "Backing up current database state..."
-    stop_postgres
-    local data_dir
-    data_dir="$(postgres_data_dir)"
-    local temp_dir="${data_dir}-temp"
-    if [[ -d "$data_dir" ]]; then
-        mv "$data_dir" "$temp_dir"
-    fi
+    # In CI environments with external Docker PostgreSQL, skip backup/restore
+    if [[ "${CI:-false}" == "true" ]]; then
+        log_info "CI environment detected - using external PostgreSQL container"
+        log_info "Ensuring PostgreSQL is ready..."
+        wait_for_postgres_ready
+        
+        # Apply migrations to fresh database
+        apply_migrations
+        
+        # Generate changelog diff
+        log_info "Generating changelog diff..."
+        SPRING_PROFILES_ACTIVE=local,dev ./mvnw liquibase:diff
+    else
+        # Local development - backup and restore database state
+        log_info "Backing up current database state..."
+        stop_postgres
+        local data_dir
+        data_dir="$(postgres_data_dir)"
+        local temp_dir="${data_dir}-temp"
+        if [[ -d "$data_dir" ]]; then
+            mv "$data_dir" "$temp_dir"
+        fi
 
-    # Start fresh database and apply migrations
-    start_postgres
-    apply_migrations
-    
-    # Generate changelog diff
-    log_info "Generating changelog diff..."
-    # Explicitly set Spring profiles to avoid specs profile (which uses H2)
-    # Use local,dev profiles for database operations
-    SPRING_PROFILES_ACTIVE=local,dev ./mvnw liquibase:diff
-    
-    # Restore original database state
-    log_info "Restoring original database state..."
-    stop_postgres
-    rm -rf "$data_dir"
-    if [[ -d "$temp_dir" ]]; then
-        mv "$temp_dir" "$data_dir"
+        # Start fresh database and apply migrations
+        start_postgres
+        apply_migrations
+        
+        # Generate changelog diff
+        log_info "Generating changelog diff..."
+        # Explicitly set Spring profiles to avoid specs profile (which uses H2)
+        # Use local,dev profiles for database operations
+        SPRING_PROFILES_ACTIVE=local,dev ./mvnw liquibase:diff
+        
+        # Restore original database state
+        log_info "Restoring original database state..."
+        stop_postgres
+        rm -rf "$data_dir"
+        if [[ -d "$temp_dir" ]]; then
+            mv "$temp_dir" "$data_dir"
+        fi
     fi
     
     # Check if changelog file was actually generated
@@ -335,14 +349,18 @@ cmd_generate_erd() {
     log_info "🚀 Starting ERD generation..."
     check_environment
     
-    # Ensure PostgreSQL is running
+    # Ensure PostgreSQL is running and ready
     cd "$APP_SERVER_DIR"
-    if ! is_postgres_running; then
+    if [[ "${CI:-false}" == "true" ]]; then
+        # In CI, PostgreSQL container is started externally
+        log_info "CI environment detected - using external PostgreSQL container"
+        wait_for_postgres_ready
+        apply_migrations
+    elif ! is_postgres_running; then
         log_warning "PostgreSQL is not running. Starting it now..."
         start_postgres
-    fi
-    # In CI or local mode, ensure schema is applied automatically
-    if [[ "${CI:-false}" == "true" || "$DB_MODE" == "local" ]]; then
+        apply_migrations
+    elif [[ "$DB_MODE" == "local" ]]; then
         apply_migrations
     else
         log_info "Skipping migrations in local Docker mode (assuming DB is up-to-date)"
@@ -365,15 +383,18 @@ cmd_generate_db_models_intelligence_service() {
     log_info "🚀 Starting SQLAlchemy model generation for intelligence service..."
     check_environment
     
-    # Ensure PostgreSQL is running
+    # Ensure PostgreSQL is running and ready
     cd "$APP_SERVER_DIR"
-    if ! is_postgres_running; then
+    if [[ "${CI:-false}" == "true" ]]; then
+        # In CI, PostgreSQL container is started externally
+        log_info "CI environment detected - using external PostgreSQL container"
+        wait_for_postgres_ready
+        apply_migrations
+    elif ! is_postgres_running; then
         log_warning "PostgreSQL is not running. Starting it now..."
         start_postgres
-    fi
-
-    # In CI or local mode, ensure schema is applied automatically
-    if [[ "${CI:-false}" == "true" || "$DB_MODE" == "local" ]]; then
+        apply_migrations
+    elif [[ "$DB_MODE" == "local" ]]; then
         apply_migrations
     else
         log_info "Skipping migrations in local Docker mode (assuming DB is up-to-date)"

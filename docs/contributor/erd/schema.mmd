@@ -99,6 +99,23 @@ erDiagram
         TIMESTAMP last_sync_at
         OID bad_practice_summary
         TIMESTAMPTZ last_detection_time
+        VARCHAR(50) author_association
+        VARCHAR(20) state_reason
+        VARCHAR(20) active_lock_reason
+        VARCHAR(20) type
+        INTEGER reactions_total "NOT NULL"
+        INTEGER reactions_plus_one "NOT NULL"
+        INTEGER reactions_minus_one "NOT NULL"
+        INTEGER reactions_laugh "NOT NULL"
+        INTEGER reactions_hooray "NOT NULL"
+        INTEGER reactions_confused "NOT NULL"
+        INTEGER reactions_heart "NOT NULL"
+        INTEGER reactions_rocket "NOT NULL"
+        INTEGER reactions_eyes "NOT NULL"
+        INTEGER sub_issues_total "NOT NULL"
+        INTEGER sub_issues_completed "NOT NULL"
+        INTEGER blocked_by_count "NOT NULL"
+        INTEGER blocking_count "NOT NULL"
     }
 
     IssueAssignee {
@@ -167,6 +184,11 @@ erDiagram
     PullRequestRequestedReviewer {
         BIGINT pull_request_id PK,FK
         BIGINT user_id PK,FK
+    }
+
+    PullRequestRequestedTeam {
+        BIGINT pull_request_id PK,FK
+        BIGINT team_id PK,FK
     }
 
     PullRequestReview {
@@ -372,6 +394,8 @@ erDiagram
     Label }o--o{ IssueLabel : labeled
     Issue }o--o{ PullRequestRequestedReviewer : reviewed
     User }o--o{ PullRequestRequestedReviewer : reviewed
+    Issue }o--o{ PullRequestRequestedTeam : references
+    Team }o--o{ PullRequestRequestedTeam : has
     Label }o--o{ TeamLabel : labeled
     Team }o--o{ TeamLabel : labeled
     Team }o--o{ TeamMembership : belongs_to
