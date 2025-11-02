@@ -1,7 +1,12 @@
 package de.tum.in.www1.hephaestus.gitprovider.issue.github;
 
+import com.fasterxml.jackson.databind.JsonNode;
+import de.tum.in.www1.hephaestus.gitprovider.issue.AuthorAssociation;
 import de.tum.in.www1.hephaestus.gitprovider.issue.Issue;
 import de.tum.in.www1.hephaestus.gitprovider.issue.IssueRepository;
+import de.tum.in.www1.hephaestus.gitprovider.issue.IssueType;
+import de.tum.in.www1.hephaestus.gitprovider.issue.LockReason;
+import de.tum.in.www1.hephaestus.gitprovider.issue.StateReason;
 import de.tum.in.www1.hephaestus.gitprovider.label.Label;
 import de.tum.in.www1.hephaestus.gitprovider.label.LabelRepository;
 import de.tum.in.www1.hephaestus.gitprovider.label.github.GitHubLabelConverter;
@@ -248,8 +253,8 @@ public class GitHubIssueSyncService {
             rootField.setAccessible(true);
             var root = rootField.get(ghIssue);
 
-            if (root instanceof com.fasterxml.jackson.databind.JsonNode) {
-                var jsonNode = (com.fasterxml.jackson.databind.JsonNode) root;
+            if (root instanceof JsonNode) {
+                var jsonNode = (JsonNode) root;
 
                 // Author association
                 if (jsonNode.has("author_association") && !jsonNode.get("author_association").isNull()) {
@@ -310,44 +315,42 @@ public class GitHubIssueSyncService {
         }
     }
 
-    private de.tum.in.www1.hephaestus.gitprovider.issue.AuthorAssociation convertAuthorAssociation(String association) {
+    private AuthorAssociation convertAuthorAssociation(String association) {
         try {
-            return de.tum.in.www1.hephaestus.gitprovider.issue.AuthorAssociation.valueOf(association.toUpperCase());
+            return AuthorAssociation.valueOf(association.toUpperCase());
         } catch (IllegalArgumentException e) {
             logger.warn("Unknown author association: {}", association);
-            return de.tum.in.www1.hephaestus.gitprovider.issue.AuthorAssociation.NONE;
+            return AuthorAssociation.NONE;
         }
     }
 
-    private de.tum.in.www1.hephaestus.gitprovider.issue.StateReason convertStateReason(String reason) {
+    private StateReason convertStateReason(String reason) {
         try {
-            return de.tum.in.www1.hephaestus.gitprovider.issue.StateReason.valueOf(reason.toUpperCase());
+            return StateReason.valueOf(reason.toUpperCase());
         } catch (IllegalArgumentException e) {
             logger.warn("Unknown state reason: {}", reason);
             return null;
         }
     }
 
-    private de.tum.in.www1.hephaestus.gitprovider.issue.LockReason convertLockReason(String reason) {
+    private LockReason convertLockReason(String reason) {
         try {
-            return de.tum.in.www1.hephaestus.gitprovider.issue.LockReason.valueOf(
-                reason.toUpperCase().replace('-', '_')
-            );
+            return LockReason.valueOf(reason.toUpperCase().replace('-', '_'));
         } catch (IllegalArgumentException e) {
             logger.warn("Unknown lock reason: {}", reason);
             return null;
         }
     }
 
-    private de.tum.in.www1.hephaestus.gitprovider.issue.IssueType convertIssueType(String type) {
+    private IssueType convertIssueType(String type) {
         if (type == null || type.isEmpty()) {
-            return de.tum.in.www1.hephaestus.gitprovider.issue.IssueType.ISSUE;
+            return IssueType.ISSUE;
         }
         try {
-            return de.tum.in.www1.hephaestus.gitprovider.issue.IssueType.valueOf(type.toUpperCase());
+            return IssueType.valueOf(type.toUpperCase());
         } catch (IllegalArgumentException e) {
             logger.warn("Unknown issue type: {}", type);
-            return de.tum.in.www1.hephaestus.gitprovider.issue.IssueType.ISSUE;
+            return IssueType.ISSUE;
         }
     }
 }

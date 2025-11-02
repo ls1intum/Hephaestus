@@ -9,6 +9,9 @@ import de.tum.in.www1.hephaestus.gitprovider.milestone.github.GitHubMilestoneCon
 import de.tum.in.www1.hephaestus.gitprovider.pullrequest.PullRequest;
 import de.tum.in.www1.hephaestus.gitprovider.pullrequest.PullRequestRepository;
 import de.tum.in.www1.hephaestus.gitprovider.repository.RepositoryRepository;
+import de.tum.in.www1.hephaestus.gitprovider.team.Team;
+import de.tum.in.www1.hephaestus.gitprovider.team.TeamRepository;
+import de.tum.in.www1.hephaestus.gitprovider.team.github.GitHubTeamConverter;
 import de.tum.in.www1.hephaestus.gitprovider.user.User;
 import de.tum.in.www1.hephaestus.gitprovider.user.UserRepository;
 import de.tum.in.www1.hephaestus.gitprovider.user.github.GitHubUserConverter;
@@ -50,7 +53,7 @@ public class GitHubPullRequestSyncService {
     private UserRepository userRepository;
 
     @Autowired
-    private de.tum.in.www1.hephaestus.gitprovider.team.TeamRepository teamRepository;
+    private TeamRepository teamRepository;
 
     @Autowired
     private GitHubPullRequestConverter pullRequestConverter;
@@ -65,7 +68,7 @@ public class GitHubPullRequestSyncService {
     private GitHubUserConverter userConverter;
 
     @Autowired
-    private de.tum.in.www1.hephaestus.gitprovider.team.github.GitHubTeamConverter teamConverter;
+    private GitHubTeamConverter teamConverter;
 
     @Autowired
     private BadPracticeDetectorScheduler badPracticeDetectorScheduler;
@@ -312,7 +315,7 @@ public class GitHubPullRequestSyncService {
         // Link requested teams
         try {
             var requestedTeams = ghPullRequest.getRequestedTeams();
-            var resultRequestedTeams = new HashSet<de.tum.in.www1.hephaestus.gitprovider.team.Team>();
+            var resultRequestedTeams = new HashSet<Team>();
             requestedTeams.forEach(requestedTeam -> {
                 var resultRequestedTeam = teamRepository
                     .findById(requestedTeam.getId())
