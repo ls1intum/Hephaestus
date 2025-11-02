@@ -1,10 +1,10 @@
 package de.tum.in.www1.hephaestus.gitprovider.subissues.github;
 
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubMessageHandler;
-import de.tum.in.www1.hephaestus.gitprovider.github.payload.GHEventPayloadSubIssues;
 import de.tum.in.www1.hephaestus.gitprovider.issue.github.GitHubIssueSyncService;
 import de.tum.in.www1.hephaestus.gitprovider.repository.github.GitHubRepositorySyncService;
 import org.kohsuke.github.GHEvent;
+import org.kohsuke.github.GHEventPayloadSubIssues;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
@@ -74,20 +74,6 @@ public class GitHubSubIssuesMessageHandler extends GitHubMessageHandler<GHEventP
 
     @Override
     protected GHEvent getHandlerEvent() {
-        // Note: SUB_ISSUES is not a standard GHEvent in github-api library 2.0-rc.5
-        // This will need special handling in NatsConsumerService
-        // For now, returning ISSUES as a fallback
-        return GHEvent.ISSUES;
-    }
-
-    /**
-     * Gets the custom event name for sub-issues.
-     * Since SUB_ISSUES is not in the standard GHEvent enum, we need this method
-     * for special handling in the consumer service.
-     * 
-     * @return the custom event name "sub_issues"
-     */
-    public String getCustomEventName() {
-        return "sub_issues";
+        return GHEvent.SUB_ISSUES;
     }
 }

@@ -2,7 +2,6 @@ package de.tum.in.www1.hephaestus.syncing;
 
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubMessageHandler;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubMessageHandlerRegistry;
-import de.tum.in.www1.hephaestus.gitprovider.subissues.github.GitHubSubIssuesMessageHandler;
 import de.tum.in.www1.hephaestus.workspace.RepositoryToMonitor;
 import io.nats.client.Connection;
 import io.nats.client.ConsumerContext;
@@ -16,7 +15,6 @@ import io.nats.client.api.DeliverPolicy;
 import java.io.IOException;
 import java.time.Duration;
 import java.time.ZonedDateTime;
-import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -54,14 +52,9 @@ public class NatsConsumerService {
     private Connection natsConnection;
     private final Map<String, ConsumerContext> repositoryToMonitorIdToConsumerContext = new HashMap<>();
     private final GitHubMessageHandlerRegistry handlerRegistry;
-    private final GitHubSubIssuesMessageHandler subIssuesHandler;
 
-    public NatsConsumerService(
-        GitHubMessageHandlerRegistry handlerRegistry,
-        GitHubSubIssuesMessageHandler subIssuesHandler
-    ) {
+    public NatsConsumerService(GitHubMessageHandlerRegistry handlerRegistry) {
         this.handlerRegistry = handlerRegistry;
-        this.subIssuesHandler = subIssuesHandler;
     }
 
     @EventListener(ApplicationReadyEvent.class)
@@ -299,15 +292,6 @@ public class NatsConsumerService {
         try {
             String subject = msg.getSubject();
             String lastPart = subject.substring(subject.lastIndexOf(".") + 1);
-
-            // Handle sub_issues as a special case since it's not in the standard GHEvent enum
-            if ("sub_issues".equals(lastPart)) {
-                logger.info("Processing sub_issues event from subject: {}", subject);
-                subIssuesHandler.onMessage(msg);
-                msg.ack();
-                return;
-            }
-
             GHEvent eventType = GHEvent.valueOf(lastPart.toUpperCase());
             GitHubMessageHandler<?> eventHandler = handlerRegistry.getHandler(eventType);
 
@@ -339,19 +323,13 @@ public class NatsConsumerService {
     }
 
     private String[] getRepositorySubjects(String nameWithOwner) {
-        var standardSubjects = handlerRegistry
+        return handlerRegistry
             .getSupportedRepositoryEvents()
             .stream()
             .map(GHEvent::name)
             .map(String::toLowerCase)
             .map(event -> getSubjectPrefix(nameWithOwner) + "." + event)
-            .toList();
-
-        // Add sub_issues as a custom event since it's not in the standard GHEvent enum
-        var allSubjects = new ArrayList<>(standardSubjects);
-        allSubjects.add(getSubjectPrefix(nameWithOwner) + ".sub_issues");
-
-        return allSubjects.toArray(String[]::new);
+            .toArray(String[]::new);
     }
 
     private String[] getInstallationSubjects() {
