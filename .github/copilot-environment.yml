@@ -24,6 +24,11 @@ preinstall: |
   echo "deb [signed-by=/etc/apt/keyrings/adoptium.asc] https://packages.adoptium.net/artifactory/deb $(awk -F= '/^VERSION_CODENAME/{print$2}' /etc/os-release) main" | tee /etc/apt/sources.list.d/adoptium.list
   apt-get update
   apt-get install -y temurin-21-jdk
+  
+  # Set Java 21 as default and verify
+  update-alternatives --set java /usr/lib/jvm/temurin-21-jdk-amd64/bin/java || true
+  export JAVA_HOME=/usr/lib/jvm/temurin-21-jdk-amd64
+  export PATH=$JAVA_HOME/bin:$PATH
   java -version
   
   # Install Python 3.13
@@ -77,6 +82,9 @@ preinstall: |
 
 # Environment variables for development sessions
 environment:
+  # Java 21 configuration - required for Spring Boot 3.5 and Liquibase
+  JAVA_HOME: /usr/lib/jvm/temurin-21-jdk-amd64
+  
   # Database connection for local development
   SPRING_DATASOURCE_URL: jdbc:postgresql://localhost:5432/hephaestus
   SPRING_DATASOURCE_USERNAME: root
@@ -86,5 +94,5 @@ environment:
   MODEL_NAME: fake:model
   DETECTION_MODEL_NAME: fake:model
   
-  # Add Poetry to PATH
-  PATH: /root/.local/bin:$PATH
+  # Add Java 21 and Poetry to PATH
+  PATH: /usr/lib/jvm/temurin-21-jdk-amd64/bin:/root/.local/bin:$PATH
