@@ -134,6 +134,7 @@ monitoring:
 # Can be any OAuth token, such as the PAT
 github:
     app:
+        # Set to 0 to disable GitHub App mode and use Personal Access Tokens instead
         id: ${GH_APP_ID:0}
         privateKeyLocation: ${GH_APP_PRIVATE_KEY_LOCATION:}
         privateKey: ${GH_APP_PRIVATE_KEY:}

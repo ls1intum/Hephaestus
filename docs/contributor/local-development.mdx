@@ -85,6 +85,10 @@ Hephaestus can connect to GitHub using either a **Personal Access Token (PAT)** 
          token: ghp_your_personal_access_token
    ```
 
+:::caution Security
+Never commit actual tokens to version control. Use `application-local.yml` (which is in `.gitignore`) or environment variables to store tokens securely. The example above shows placeholder values only.
+:::
+
 :::tip
 The GitHub App configuration (`github.app.id`, `github.app.privateKey`) is optional and defaults to disabled. The application will work perfectly with just a Personal Access Token for local development.
 :::
