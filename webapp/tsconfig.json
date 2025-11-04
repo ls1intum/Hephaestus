@@ -6,7 +6,7 @@
     "jsx": "react-jsx",
     "module": "ESNext",
     "lib": ["ES2022", "DOM", "DOM.Iterable"],
-    "types": ["vite/client"],
+    "types": ["vite/client", "./src/types/zod-openapi"],
 
     /* Bundler mode */
     "moduleResolution": "bundler",
@@ -24,6 +24,7 @@
     "baseUrl": ".",
     "paths": {
       "@/*": ["./src/*"],
+      "@intelligence-service/*": ["../server/intelligence-service-hono/src/routes/mentor/*"]
     }
   }
 }

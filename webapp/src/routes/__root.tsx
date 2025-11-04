@@ -223,13 +223,9 @@ function AppSidebarContainer() {
 		: "main";
 
 	// Always call useQuery but only enable when in mentor context and authenticated
-	const {
-		data: threadGroups,
-		isLoading: mentorThreadsLoading,
-		error: mentorThreadsError,
-	} = useQuery({
-		...getGroupedThreadsOptions(),
-		enabled: sidebarContext === "mentor" && isAuthenticated,
+	const { data: threadGroups, isLoading: mentorThreadsLoading, error: mentorThreadsError, } = useQuery({
+			...getGroupedThreadsOptions(),
+			enabled: sidebarContext === "mentor" && isAuthenticated,
 	});
 
 	if (pathname === "/landing" || !isAuthenticated || username === undefined) {

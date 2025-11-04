@@ -48,11 +48,11 @@ export const useDocumentsStore = create<DocumentsState>()((set) => ({
 						draft: {
 							id,
 							title,
-							kind: "TEXT",
+							kind: "text",
 							versionNumber: prev.draft?.versionNumber ?? 0,
 							createdAt: prev.draft?.createdAt ?? new Date(),
 							content: "",
-							userId: prev.draft?.userId ?? "",
+							userId: (prev.draft?.userId as number | undefined) ?? 0,
 						},
 						updatedAt: Date.now(),
 					},
@@ -73,11 +73,11 @@ export const useDocumentsStore = create<DocumentsState>()((set) => ({
 					: {
 							id: documentId,
 							title: "Document",
-							kind: "TEXT",
+							kind: "text",
 							versionNumber: 0,
 							createdAt: new Date(),
 							content: nextContent,
-							userId: "",
+							userId: 0,
 						}
 			) satisfies Document;
 

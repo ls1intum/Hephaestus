@@ -1,25 +1,43 @@
+import type { Document } from "@/api/types.gen";
+import {
+	DocumentToolRenderer,
+} from "./DocumentToolRenderer";
+import type { PartRenderer } from "./types";
+import {
+	toolCallIdToUuid,
+} from "@intelligence-service/chat/tool-call-id";
 import type {
-	CreateDocumentInput,
-	Document,
-	UpdateDocumentInput,
-} from "@/api/types.gen";
+	CreateDocumentOutput,
+	UpdateDocumentOutput,
+} from "@/lib/types";
 import { useDocumentArtifact } from "@/hooks/useDocumentArtifact";
 import { DocumentPreview } from "../DocumentPreview";
-import { DocumentToolRenderer } from "./DocumentToolRenderer";
-import type { PartRenderer } from "./types";
 
 export const DocumentToolRendererContainer: PartRenderer<
 	"createDocument" | "updateDocument"
 > = ({ message, part, variant }) => {
 	let documentId = "";
 	if (part.type === "tool-createDocument") {
-		const input = (part.input ?? {}) as CreateDocumentInput & {
-			document_id: string;
+		const input = (part.input ?? {}) as {
+			document_id?: string;
+			id?: string;
 		};
-		documentId = input.document_id;
+		documentId = input.document_id ?? input.id ?? "";
 	} else if (part.type === "tool-updateDocument") {
-		const input = (part.input ?? {}) as UpdateDocumentInput;
-		documentId = input.id;
+		const input = (part.input ?? {}) as { id?: string };
+		documentId = input.id ?? "";
+	}
+
+	if (!documentId && part.toolCallId) {
+		documentId = toolCallIdToUuid(part.toolCallId);
+	}
+
+	if (!documentId && part.output && typeof part.output === "object") {
+		const output = part.output as
+			| CreateDocumentOutput
+			| UpdateDocumentOutput
+			| { id?: string };
+		documentId = output?.id ?? "";
 	}
 
 	const {
@@ -48,10 +66,10 @@ export const DocumentToolRendererContainer: PartRenderer<
 			({
 				id: documentId,
 				title: currentDoc?.title ?? "Document",
-				kind: "TEXT",
+				kind: "text",
 				content: currentDoc?.content ?? "",
 				createdAt: new Date(),
-				userId: "",
+				userId: 0,
 				versionNumber: 0,
 			} as unknown as Document);
 

@@ -447,6 +447,32 @@ components:
           type: boolean
       required:
         - isUpvoted
+    ChatThreadSummary:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        title:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+      required:
+        - id
+        - title
+    ChatThreadGroup:
+      type: object
+      properties:
+        groupName:
+          type: string
+        threads:
+          type: array
+          items:
+            $ref: "#/components/schemas/ChatThreadSummary"
+      required:
+        - groupName
+        - threads
     PoemRequest:
       type: object
       properties:
@@ -1219,6 +1245,21 @@ paths:
                     type: string
                 required:
                   - error
+  /mentor/threads/grouped:
+    get:
+      tags:
+        - mentor
+      summary: List chat threads grouped by time buckets
+      operationId: getGroupedThreads
+      responses:
+        "200":
+          description: Grouped chat threads
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ChatThreadGroup"
   /poem:
     post:
       tags:

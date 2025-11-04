@@ -27,6 +27,17 @@ export type ChatMessageVote = {
     updatedAt: Date;
 };
 
+export type ChatThreadGroup = {
+    groupName: string;
+    threads: Array<ChatThreadSummary>;
+};
+
+export type ChatThreadSummary = {
+    createdAt?: Date;
+    id: string;
+    title: string;
+};
+
 export type Contributor = {
     avatarUrl: string;
     contributions?: number;
@@ -899,6 +910,22 @@ export type GetMentorDocumentsByIdVersionsByVersionNumberResponses = {
 };
 
 export type GetMentorDocumentsByIdVersionsByVersionNumberResponse = GetMentorDocumentsByIdVersionsByVersionNumberResponses[keyof GetMentorDocumentsByIdVersionsByVersionNumberResponses];
+
+export type GetGroupedThreadsData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/mentor/threads/grouped';
+};
+
+export type GetGroupedThreadsResponses = {
+    /**
+     * Grouped chat threads
+     */
+    200: Array<ChatThreadGroup>;
+};
+
+export type GetGroupedThreadsResponse = GetGroupedThreadsResponses[keyof GetGroupedThreadsResponses];
 
 export type GetMentorThreadsByThreadIdData = {
     body?: never;

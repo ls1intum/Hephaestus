@@ -1,6 +1,5 @@
 import { OpenAPIHono } from "@hono/zod-openapi";
 import type { Schema } from "hono";
-import { cors } from "hono/cors";
 import { requestId } from "hono/request-id";
 import { notFound, onError, serveEmojiFavicon } from "stoker/middlewares";
 import { defaultHook } from "stoker/openapi";
@@ -18,7 +17,6 @@ export function createRouter() {
 
 export default function createApp() {
 	const app = createRouter();
-	app.use("/*", cors());
 	const isTest =
 		process.env.VITEST === "true" || process.env.NODE_ENV === "test";
 	const chain = app.use(requestId()).use(serveEmojiFavicon("📝"));

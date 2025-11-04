@@ -7,19 +7,19 @@ import { v4 as uuidv4 } from "uuid";
 import {
 	getGroupedThreadsOptions,
 	getGroupedThreadsQueryKey,
-	getThreadOptions,
-	getThreadQueryKey,
-	voteMessageMutation,
+	getMentorThreadsByThreadIdOptions,
+	getMentorThreadsByThreadIdQueryKey,
+	postMentorChatMessagesByMessageIdVoteMutation,
 } from "@/api/@tanstack/react-query.gen";
 import type {
 	ChatMessageVote,
-	ChatThreadDetail,
 	ChatThreadGroup,
 	Document,
+	GetMentorThreadsByThreadIdResponse,
 } from "@/api/types.gen";
 import environment from "@/environment";
 import { keycloakService } from "@/integrations/auth";
-import type { ChatMessage } from "@/lib/types";
+import type { ChatMessage, DataPart } from "@/lib/types";
 import { useArtifactStore } from "@/stores/artifact-store";
 import { useDocumentArtifact } from "./useDocumentArtifact";
 
@@ -30,10 +30,12 @@ interface UseMentorChatOptions {
 	onError?: (error: Error) => void;
 }
 
+// Use server-defined vote type for consistency
+
 interface UseMentorChatReturn
 	extends Omit<UseChatHelpers<ChatMessage>, "sendMessage"> {
 	sendMessage: (text: string) => void;
-	threadDetail: ChatThreadDetail | undefined;
+	threadDetail: GetMentorThreadsByThreadIdResponse | undefined;
 	isThreadLoading: boolean;
 	threadError: Error | null;
 	groupedThreads: ChatThreadGroup[] | undefined;
@@ -60,11 +62,13 @@ export function useMentorChat({
 	const [stableThreadId] = useState(() => threadId || uuidv4());
 
 	// Fetch thread detail if threadId is provided; avoid immediate refetch on mount
-	const threadQueryKey = getThreadQueryKey({
+	const threadQueryKey = getMentorThreadsByThreadIdQueryKey({
 		path: { threadId: threadId || "" },
 	});
 	const threadQuery = useQuery({
-		...getThreadOptions({ path: { threadId: threadId || "" } }),
+		...getMentorThreadsByThreadIdOptions({
+			path: { threadId: threadId || "" },
+		}),
 		enabled: !!threadId,
 		initialData: () => queryClient.getQueryData(threadQueryKey),
 		initialDataUpdatedAt: Date.now(),
@@ -81,31 +85,33 @@ export function useMentorChat({
 	} = threadQuery;
 
 	// Fetch grouped threads for sidebar/navigation; avoid immediate refetch on mount
-	const { data: groupedThreads, isLoading: isGroupedThreadsLoading } = useQuery(
-		{
-			...getGroupedThreadsOptions(),
-			initialData: () => queryClient.getQueryData(getGroupedThreadsQueryKey()),
-			initialDataUpdatedAt: Date.now(),
-			staleTime: 60_000,
-			refetchOnMount: false,
-			refetchOnWindowFocus: false,
-			refetchOnReconnect: false,
-		},
-	);
+	const { data: groupedThreads, isLoading: isGroupedThreadsLoading } = useQuery({
+		...getGroupedThreadsOptions(),
+		initialData: () => queryClient.getQueryData(getGroupedThreadsQueryKey()),
+		initialDataUpdatedAt: Date.now(),
+		staleTime: 60_000,
+		refetchOnMount: false,
+		refetchOnWindowFocus: false,
+		refetchOnReconnect: false,
+	});
 
 	// Vote message mutation
-	const voteMessageMut = useMutation(voteMessageMutation());
+	const voteMessageMut = useMutation(
+		postMentorChatMessagesByMessageIdVoteMutation(),
+	);
 
 	// Optimistic votes state: messageId -> isUpvoted
 	const [voteState, setVoteState] = useState<
 		Record<string, boolean | undefined>
 	>({});
-	const votes: ChatMessageVote[] = Object.entries(voteState).map(
-		([messageId, isUpvoted]) => ({
+	const votes: ChatMessageVote[] = Object.entries(voteState)
+		.filter(([, isUpvoted]) => typeof isUpvoted === "boolean")
+		.map(([messageId, isUpvoted]) => ({
 			messageId,
-			isUpvoted,
-		}),
-	);
+			isUpvoted: Boolean(isUpvoted),
+			createdAt: new Date(),
+			updatedAt: new Date(),
+		}));
 
 	// ---------------------------
 	// Artifact/document state
@@ -145,7 +151,7 @@ export function useMentorChat({
 
 	// Create stable transport configuration
 	const stableTransport = new DefaultChatTransport({
-		api: `http://localhost:8000/mentor/chat`,
+		api: `${environment.serverUrl}/mentor/chat`,
 		// Always attach a fresh token per request
 		prepareSendMessagesRequest: ({ id, messages }) => {
 			const effectiveId = id || stableThreadId;
@@ -172,7 +178,7 @@ export function useMentorChat({
 		queryClient.invalidateQueries({ queryKey: getGroupedThreadsQueryKey() });
 		if (threadId || stableThreadId) {
 			queryClient.invalidateQueries({
-				queryKey: getThreadQueryKey({
+				queryKey: getMentorThreadsByThreadIdQueryKey({
 					path: { threadId: threadId || stableThreadId || "" },
 				}),
 			});
@@ -205,16 +211,17 @@ export function useMentorChat({
 		transport: stableTransport,
 		onFinish: stableOnFinish,
 		onError: stableOnError,
-		onData: (dataPart) => {
-			if (
-				dataPart.type === "data-document-create" ||
-				dataPart.type === "data-document-update" ||
-				dataPart.type === "data-document-delta" ||
-				dataPart.type === "data-document-finish"
-			) {
-				artifactDoc.onStreamPart(dataPart);
-			}
-		},
+	onData: (dataPart) => {
+		const part = dataPart as DataPart;
+		if (
+			part.type === "data-document-create" ||
+			part.type === "data-document-update" ||
+			part.type === "data-document-delta" ||
+			part.type === "data-document-finish"
+		) {
+			artifactDoc.onStreamPart(part);
+		}
+	},
 	});
 
 	// Hydrate thread messages once when loaded and not streaming
@@ -274,15 +281,15 @@ export function useMentorChat({
 						return next;
 					});
 				},
-				onSettled: () => {
-					if (threadId || stableThreadId) {
-						queryClient.invalidateQueries({
-							queryKey: getThreadQueryKey({
-								path: { threadId: threadId || stableThreadId || "" },
-							}),
-						});
-					}
-				},
+					onSettled: () => {
+						if (threadId || stableThreadId) {
+							queryClient.invalidateQueries({
+								queryKey: getMentorThreadsByThreadIdQueryKey({
+									path: { threadId: threadId || stableThreadId || "" },
+								}),
+							});
+						}
+					},
 			},
 		);
 	};

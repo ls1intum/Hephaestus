@@ -1,10 +1,10 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useRef, useState } from "react";
 import {
-	getDocumentOptions,
-	getDocumentQueryKey,
-	getDocumentVersionOptions,
-	updateDocumentMutation,
+	getMentorDocumentsByIdOptions,
+	getMentorDocumentsByIdQueryKey,
+	getMentorDocumentsByIdVersionsByVersionNumberOptions,
+	putMentorDocumentsByIdMutation,
 } from "@/api/@tanstack/react-query.gen";
 import type { Document } from "@/api/types.gen";
 import type { DataPart } from "@/lib/types";
@@ -81,7 +81,7 @@ export function useDocumentArtifact({
 		isLoading: loadingLatest,
 		error: errorLatest,
 	} = useQuery({
-		...getDocumentOptions({ path: { id: documentId } }),
+		...getMentorDocumentsByIdOptions({ path: { id: documentId } }),
 		enabled: !isStreaming && Boolean(documentId),
 	});
 
@@ -116,7 +116,7 @@ export function useDocumentArtifact({
 			selectedIndex >= 0 &&
 			selectedVersionNumber != null &&
 			Boolean(documentId),
-		...getDocumentVersionOptions({
+		...getMentorDocumentsByIdVersionsByVersionNumberOptions({
 			path: { id: documentId, versionNumber: selectedVersionNumber ?? 0 },
 		}),
 	});
@@ -177,10 +177,10 @@ export function useDocumentArtifact({
 
 	// Restore selected version as new latest
 	const { mutate: mutateRestore } = useMutation({
-		...updateDocumentMutation(),
+		...putMentorDocumentsByIdMutation(),
 		onSuccess: () => {
 			queryClient.invalidateQueries({
-				queryKey: getDocumentQueryKey({ path: { id: documentId } }),
+				queryKey: getMentorDocumentsByIdQueryKey({ path: { id: documentId } }),
 			});
 			queryClient.invalidateQueries({ queryKey: ["getDocumentVersions"] });
 			setSelectedIndex(-1);
@@ -206,10 +206,10 @@ export function useDocumentArtifact({
 
 	// Save latest content
 	const { mutate: mutateSave } = useMutation({
-		...updateDocumentMutation(),
+		...putMentorDocumentsByIdMutation(),
 		onSuccess: (data) => {
 			queryClient.setQueryData(
-				getDocumentQueryKey({ path: { id: documentId } }),
+				getMentorDocumentsByIdQueryKey({ path: { id: documentId } }),
 				data,
 			);
 			// Also refresh versions list so the new version appears
@@ -233,7 +233,7 @@ export function useDocumentArtifact({
 		const doSave = () => {
 			const currentTitle = latest?.title ?? "Document";
 			mutateSave({
-				body: { content: newContent, kind: "TEXT", title: currentTitle },
+				body: { content: newContent, kind: "text", title: currentTitle },
 				path: { id: documentId },
 			});
 		};

@@ -113,13 +113,13 @@ const DocumentContent = ({ document, isStreaming }: DocumentContentProps) => {
 	const containerClassName = cn(
 		"h-[257px] overflow-y-scroll border rounded-b-2xl dark:bg-muted border-t-0 dark:border-zinc-700",
 		{
-			"p-4 sm:px-14 sm:py-8": document.kind === "TEXT",
+			"p-4 sm:px-14 sm:py-8": document.kind === "text",
 		},
 	);
 
 	return (
 		<div className={containerClassName}>
-			{document.kind === "TEXT" && (
+			{document.kind === "text" && (
 				<TextEditor
 					content={document.content ?? ""}
 					onSaveContent={() => {}}

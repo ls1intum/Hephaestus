@@ -163,8 +163,8 @@ export const Button: React.FC<ButtonProps> = ({
 ## Testing
 
 Always write tests for your components using Jest and React Testing Library.`,
-	kind: "TEXT",
-	userId: "user-1",
+	kind: "text",
+	userId: 1,
 	versionNumber: 1,
 	createdAt: new Date(),
 };

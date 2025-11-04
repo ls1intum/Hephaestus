@@ -704,6 +704,21 @@ paths:
       summary: Get specific version
       tags:
       - documents
+  /mentor/threads/grouped:
+    get:
+      operationId: getGroupedThreads
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ChatThreadGroup"
+          description: Grouped chat threads
+      summary: List chat threads grouped by time buckets
+      tags:
+      - mentor
   /mentor/threads/{threadId}:
     get:
       parameters:
@@ -1146,6 +1161,32 @@ components:
       - isUpvoted
       - messageId
       - updatedAt
+    ChatThreadGroup:
+      type: object
+      properties:
+        groupName:
+          type: string
+        threads:
+          type: array
+          items:
+            $ref: "#/components/schemas/ChatThreadSummary"
+      required:
+      - groupName
+      - threads
+    ChatThreadSummary:
+      type: object
+      properties:
+        createdAt:
+          type: string
+          format: date-time
+        id:
+          type: string
+          format: uuid
+        title:
+          type: string
+      required:
+      - id
+      - title
     Contributor:
       type: object
       properties:

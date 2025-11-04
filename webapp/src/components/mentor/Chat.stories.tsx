@@ -23,20 +23,6 @@ const meta = {
 	component: Chat,
 	parameters: {
 		layout: "fullscreen",
-		docs: {
-			description: {
-				component:
-					"Primary conversational interface for AI-powered interactions with support for artifacts, attachments, and real-time streaming.",
-			},
-		},
-	},
-	tags: ["autodocs"],
-	argTypes: {
-		id: {
-			description:
-				"Unique identifier for the chat session, used for persistence and analytics",
-			control: "text",
-		},
 		messages: {
 			description:
 				"Chronologically ordered array of chat messages with full conversation history",
@@ -377,14 +363,20 @@ const CONVERSATION_VOTES: ChatMessageVote[] = [
 	{
 		messageId: "msg-2",
 		isUpvoted: true,
+		createdAt: new Date(),
+		updatedAt: new Date(),
 	},
 	{
 		messageId: "msg-6",
 		isUpvoted: true,
+		createdAt: new Date(),
+		updatedAt: new Date(),
 	},
 	{
 		messageId: "msg-8",
 		isUpvoted: true,
+		createdAt: new Date(),
+		updatedAt: new Date(),
 	},
 ];
 

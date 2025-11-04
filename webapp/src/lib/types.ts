@@ -1,17 +1,22 @@
-import type { UIMessage } from "ai";
 import { z } from "zod";
-import type {
+import type { CustomUIDataTypes } from "@intelligence-service/chat/chat.shared";
+
+export type {
+	ChatMessage,
+	ChatTools,
 	CreateDocumentInput,
 	CreateDocumentOutput,
+	CustomUIDataTypes,
 	DocumentCreateData,
 	DocumentDeltaData,
 	DocumentFinishData,
 	DocumentUpdateData,
 	GetWeatherInput,
 	GetWeatherOutput,
+	MessageMetadata,
 	UpdateDocumentInput,
 	UpdateDocumentOutput,
-} from "@/api/types.gen";
+} from "@intelligence-service/chat/chat.shared";
 
 // Artifact typing
 export type ArtifactKind = "text" | (string & {});
@@ -40,15 +45,6 @@ export const messageMetadataSchema = z.object({
 	createdAt: z.string(),
 });
 
-export type MessageMetadata = z.infer<typeof messageMetadataSchema>;
-
-export type CustomUIDataTypes = {
-	"document-create": DocumentCreateData;
-	"document-update": DocumentUpdateData;
-	"document-delta": DocumentDeltaData;
-	"document-finish": DocumentFinishData;
-};
-
 type ToDataMessageUnion<T extends Record<PropertyKey, unknown>> = {
 	[K in keyof T]: { type: `data-${Extract<K, string>}`; data: T[K] };
 }[keyof T];
@@ -56,26 +52,6 @@ type ToDataMessageUnion<T extends Record<PropertyKey, unknown>> = {
 export type DataPart = ToDataMessageUnion<CustomUIDataTypes>;
 
 // Typed tools mapping for automatic tool part typing in UIMessage
-export type ChatTools = {
-	getWeather: {
-		input: GetWeatherInput;
-		output: GetWeatherOutput;
-	};
-	createDocument: {
-		input: CreateDocumentInput;
-		output: CreateDocumentOutput;
-	};
-	updateDocument: {
-		input: UpdateDocumentInput;
-		output: UpdateDocumentOutput;
-	};
-};
-
-export type ChatMessage = UIMessage<
-	MessageMetadata,
-	CustomUIDataTypes,
-	ChatTools
->;
 
 export interface Attachment {
 	name: string;

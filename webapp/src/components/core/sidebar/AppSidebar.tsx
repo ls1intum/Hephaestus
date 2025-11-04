@@ -65,11 +65,11 @@ export function AppSidebar({
 			</NavContextHeader>
 		);
 		sidebarContent = (
-			<NavMentorThreads
-				threadGroups={mentorThreadGroups ?? []}
-				isLoading={mentorThreadsLoading}
-				error={mentorThreadsError}
-			/>
+		       <NavMentorThreads
+			       threadGroups={mentorThreadGroups ?? []}
+			       isLoading={mentorThreadsLoading}
+			       error={mentorThreadsError}
+		       />
 		);
 	} else {
 		contextHeader = undefined;

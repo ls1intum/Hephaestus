@@ -2,6 +2,7 @@ package de.tum.in.www1.hephaestus.intelligenceservice.api;
 
 import de.tum.in.www1.hephaestus.intelligenceservice.ApiClient;
 
+import de.tum.in.www1.hephaestus.intelligenceservice.model.ChatThreadGroup;
 import de.tum.in.www1.hephaestus.intelligenceservice.model.MentorChatPost200Response;
 import de.tum.in.www1.hephaestus.intelligenceservice.model.MentorChatPostRequest;
 import de.tum.in.www1.hephaestus.intelligenceservice.model.MentorThreadsThreadIdGet200Response;
@@ -50,6 +51,70 @@ public class MentorApi {
         this.apiClient = apiClient;
     }
 
+    /**
+     * List chat threads grouped by time buckets
+     * 
+     * <p><b>200</b> - Grouped chat threads
+     * @return List&lt;ChatThreadGroup&gt;
+     * @throws WebClientResponseException if an error occurs while attempting to invoke the API
+     */
+    private ResponseSpec getGroupedThreadsRequestCreation() throws WebClientResponseException {
+        Object postBody = null;
+        // create path and map variables
+        final Map<String, Object> pathParams = new HashMap<String, Object>();
+
+        final MultiValueMap<String, String> queryParams = new LinkedMultiValueMap<String, String>();
+        final HttpHeaders headerParams = new HttpHeaders();
+        final MultiValueMap<String, String> cookieParams = new LinkedMultiValueMap<String, String>();
+        final MultiValueMap<String, Object> formParams = new LinkedMultiValueMap<String, Object>();
+
+        final String[] localVarAccepts = { 
+            "application/json"
+        };
+        final List<MediaType> localVarAccept = apiClient.selectHeaderAccept(localVarAccepts);
+        final String[] localVarContentTypes = { };
+        final MediaType localVarContentType = apiClient.selectHeaderContentType(localVarContentTypes);
+
+        String[] localVarAuthNames = new String[] {  };
+
+        ParameterizedTypeReference<ChatThreadGroup> localVarReturnType = new ParameterizedTypeReference<ChatThreadGroup>() {};
+        return apiClient.invokeAPI("/mentor/threads/grouped", HttpMethod.GET, pathParams, queryParams, postBody, headerParams, cookieParams, formParams, localVarAccept, localVarContentType, localVarAuthNames, localVarReturnType);
+    }
+
+    /**
+     * List chat threads grouped by time buckets
+     * 
+     * <p><b>200</b> - Grouped chat threads
+     * @return List&lt;ChatThreadGroup&gt;
+     * @throws WebClientResponseException if an error occurs while attempting to invoke the API
+     */
+    public Flux<ChatThreadGroup> getGroupedThreads() throws WebClientResponseException {
+        ParameterizedTypeReference<ChatThreadGroup> localVarReturnType = new ParameterizedTypeReference<ChatThreadGroup>() {};
+        return getGroupedThreadsRequestCreation().bodyToFlux(localVarReturnType);
+    }
+
+    /**
+     * List chat threads grouped by time buckets
+     * 
+     * <p><b>200</b> - Grouped chat threads
+     * @return ResponseEntity&lt;List&lt;ChatThreadGroup&gt;&gt;
+     * @throws WebClientResponseException if an error occurs while attempting to invoke the API
+     */
+    public Mono<ResponseEntity<List<ChatThreadGroup>>> getGroupedThreadsWithHttpInfo() throws WebClientResponseException {
+        ParameterizedTypeReference<ChatThreadGroup> localVarReturnType = new ParameterizedTypeReference<ChatThreadGroup>() {};
+        return getGroupedThreadsRequestCreation().toEntityList(localVarReturnType);
+    }
+
+    /**
+     * List chat threads grouped by time buckets
+     * 
+     * <p><b>200</b> - Grouped chat threads
+     * @return ResponseSpec
+     * @throws WebClientResponseException if an error occurs while attempting to invoke the API
+     */
+    public ResponseSpec getGroupedThreadsWithResponseSpec() throws WebClientResponseException {
+        return getGroupedThreadsRequestCreation();
+    }
     /**
      * Handle mentor chat
      * 

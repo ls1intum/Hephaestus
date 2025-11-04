@@ -12,9 +12,9 @@ interface MentorSidebarProps {
 
 export function MentorSidebar({ className }: MentorSidebarProps) {
 	const { threadId } = useParams({ strict: false });
-	const { data: groupedThreads, isLoading } = useQuery(
-		getGroupedThreadsOptions(),
-	);
+       const { data: groupedThreads, isLoading } = useQuery(
+	       getGroupedThreadsOptions(),
+       );
 
 	const formatDate = (dateString: string) => {
 		const date = new Date(dateString);
@@ -91,7 +91,7 @@ export function MentorSidebar({ className }: MentorSidebarProps) {
 															{thread.title}
 														</div>
 														<div className="text-xs text-muted-foreground">
-															{formatDate(thread.createdAt.toString())}
+															{thread.createdAt ? formatDate(thread.createdAt.toString()) : ""}
 														</div>
 													</div>
 												</Button>

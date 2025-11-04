@@ -3,7 +3,7 @@ import type {
 	CreateDocumentOutput,
 	UpdateDocumentInput,
 	UpdateDocumentOutput,
-} from "@/api/types.gen";
+} from "@/lib/types";
 import { DocumentTool } from "../DocumentTool";
 import type { PartRendererProps } from "./types";
 
@@ -17,6 +17,7 @@ export const DocumentToolRenderer = ({
 	part,
 	onDocumentClick,
 }: DocumentToolRendererProps) => {
+
 	if (part.state === "input-available") {
 		if (part.type === "tool-createDocument") {
 			const input = (part.input ?? {}) as Partial<CreateDocumentInput>;

@@ -1,4 +1,5 @@
 import type { Meta, StoryObj } from "@storybook/react";
+import type { GetWeatherOutput } from "@/lib/types";
 import { WeatherTool } from "./WeatherTool";
 
 /**
@@ -81,7 +82,7 @@ export const NightTime: Story = {
 				sunrise: ["2024-10-07T07:15", "2024-10-08T07:16"],
 				sunset: ["2024-10-07T19:00", "2024-10-08T18:58"],
 			},
-		},
+		} as GetWeatherOutput,
 	},
 };
 
@@ -136,7 +137,7 @@ export const HotDay: Story = {
 				sunrise: ["2024-07-15T05:25", "2024-07-16T05:26"],
 				sunset: ["2024-07-15T19:45", "2024-07-16T19:44"],
 			},
-		},
+		} as GetWeatherOutput,
 	},
 };
 
@@ -191,7 +192,7 @@ export const ColdWinter: Story = {
 				sunrise: ["2024-01-15T11:20", "2024-01-16T11:18"],
 				sunset: ["2024-01-15T15:45", "2024-01-16T15:47"],
 			},
-		},
+		} as GetWeatherOutput,
 	},
 };
 
@@ -246,7 +247,7 @@ export const SunriseTransition: Story = {
 				sunrise: ["2024-10-07T07:15", "2024-10-08T07:16"],
 				sunset: ["2024-10-07T19:00", "2024-10-08T18:58"],
 			},
-		},
+		} as GetWeatherOutput,
 	},
 };
 
@@ -312,6 +313,6 @@ export const FahrenheitUnits: Story = {
 				sunrise: ["2024-08-15T06:35", "2024-08-16T06:36"],
 				sunset: ["2024-08-15T20:05", "2024-08-16T20:04"],
 			},
-		},
+		} as GetWeatherOutput,
 	},
 };

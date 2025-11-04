@@ -1,6 +1,6 @@
 import { format, isWithinInterval } from "date-fns";
 import { useEffect, useState } from "react";
-import type { GetWeatherOutput } from "@/api/types.gen";
+import type { GetWeatherOutput } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
 const SAMPLE = {
@@ -207,7 +207,7 @@ export function WeatherTool({
 	const currentTimeIndex = (
 		weatherAtLocation?.hourly?.time ?? SAMPLE.hourly.time
 	).findIndex(
-		(time) =>
+		(time: string) =>
 			new Date(time) >=
 			new Date(weatherAtLocation?.current?.time ?? SAMPLE.current.time),
 	);
@@ -259,7 +259,7 @@ export function WeatherTool({
 			</div>
 
 			<div className="flex flex-row justify-between">
-				{displayTimes.map((time, index) => (
+				{displayTimes.map((time: string, index: number) => (
 					<div key={time} className="flex flex-col items-center gap-1">
 						<div className="text-blue-100 text-xs">
 							{format(new Date(time), "ha")}

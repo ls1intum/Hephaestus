@@ -116,6 +116,7 @@ if (parsedMaybe) {
 		MODEL_NAME: "openai:gpt-5-mini",
 		DETECTION_MODEL_NAME: "openai:gpt-5-mini",
 		OPENAI_API_KEY: "test",
+			ENABLE_CORS: false,
 	};
 } else {
 	// Will exit below due to error
@@ -130,6 +131,8 @@ if (error && !isTestEnv) {
 // In tests, fall back to stub models to avoid external calls
 const defaultModel: LanguageModel = isTestEnv
 	? ({
+			// Attempt to satisfy AI SDK v5 LanguageModel V2 shape
+			spec: { version: "v2", providerId: "test", modelId: "test" },
 			doStream: async function* () {
 				yield { type: "text-delta", textDelta: "test " } as unknown;
 				yield { type: "text-delta", textDelta: "response" } as unknown;

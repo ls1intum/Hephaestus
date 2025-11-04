@@ -125,17 +125,6 @@ P.S. Don't forget to make a special wish when you blow out your candles! 🎂✨
 	},
 ];
 
-const CONVERSATION_VOTES: ChatMessageVote[] = [
-	{
-		messageId: "msg-2",
-		isUpvoted: true,
-	},
-	{
-		messageId: "msg-4",
-		isUpvoted: true,
-	},
-];
-
 /**
  * Empty Copilot widget ready for new conversations.
  * Click the chat icon in the bottom-right corner to open a fresh chat interface.
@@ -238,7 +227,10 @@ export const WithConversation: Story = {
 				<Chat
 					id="copilot-conversation"
 					messages={CONVERSATION_MESSAGES}
-					votes={CONVERSATION_VOTES}
+				       votes={[
+					       { messageId: "msg-2", isUpvoted: true, createdAt: new Date(), updatedAt: new Date() },
+					       { messageId: "msg-4", isUpvoted: true, createdAt: new Date(), updatedAt: new Date() },
+				       ] satisfies ChatMessageVote[]}
 					status="ready"
 					attachments={[]}
 					onMessageSubmit={fn()}
