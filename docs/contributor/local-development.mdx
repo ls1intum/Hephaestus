@@ -63,6 +63,49 @@ Never commit `application-local.yml`. It may contain secrets and machine-specifi
 
 3. Access the API at `http://localhost:8080` or explore `http://localhost:8080/swagger-ui/index.html`.
 
+### GitHub configuration
+
+Hephaestus can connect to GitHub using either a **Personal Access Token (PAT)** or a **GitHub App**. For local development, using a PAT is simpler and recommended.
+
+#### Using a Personal Access Token (recommended for development)
+
+1. [Create a Personal Access Token](https://github.com/settings/tokens) with the following scopes:
+   - `repo` (full control of private repositories)
+   - `read:org` (read organization membership)
+   - `read:user` (read user profile data)
+
+2. Configure your workspace through the UI after signing in, or set up a default workspace in `application-local.yml`:
+
+   ```yaml
+   hephaestus:
+     workspace:
+       init-default: true
+       default:
+         login: your-github-org
+         token: ghp_your_personal_access_token
+   ```
+
+:::tip
+The GitHub App configuration (`github.app.id`, `github.app.privateKey`) is optional and defaults to disabled. The application will work perfectly with just a Personal Access Token for local development.
+:::
+
+#### Using a GitHub App (optional)
+
+If you need to test GitHub App functionality:
+
+1. [Create a GitHub App](https://docs.github.com/en/apps/creating-github-apps/registering-a-github-app/registering-a-github-app) with appropriate permissions.
+2. Set the following in `application-local.yml`:
+
+   ```yaml
+   github:
+     app:
+       id: your-app-id
+       privateKey: |
+         -----BEGIN RSA PRIVATE KEY-----
+         your-private-key-content
+         -----END RSA PRIVATE KEY-----
+   ```
+
 ### Keycloak integration
 
 Keycloak runs in Docker as part of the development compose stack. The bundled realm import no longer ships test users—authentication always flows through GitHub and mirrors production.

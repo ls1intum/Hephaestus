@@ -35,6 +35,18 @@ Set the following secrets before starting the stack:
 | `POSTFIX_USERNAME` / `POSTFIX_PASSWORD` | Credentials for production SMTP relay |
 | `SLACK_WEBHOOK_URL` | Optional: webhook for weekly leaderboard posts |
 
+### GitHub integration
+
+Hephaestus can connect to GitHub using either a **Personal Access Token (PAT)** or a **GitHub App**:
+
+- **Personal Access Token**: Simpler to set up. Configure tokens through the workspace UI after deployment. No additional environment variables required.
+- **GitHub App** (optional): Provides more granular permissions and better rate limits. If using a GitHub App, set:
+  - `GH_APP_ID`: Your GitHub App ID
+  - `GH_APP_PRIVATE_KEY`: Your GitHub App private key (PEM format)
+  - `GH_APP_PRIVATE_KEY_LOCATION`: Alternative path to private key file (optional)
+
+The application works with either approach. If GitHub App credentials are not provided (defaults to `GH_APP_ID=0`), workspaces will use Personal Access Tokens instead.
+
 ## Deployment steps
 
 1. **Provision infrastructure:** Ensure PostgreSQL, Redis (if used), and storage volumes are ready.
