@@ -134,9 +134,9 @@ monitoring:
 # Can be any OAuth token, such as the PAT
 github:
     app:
-        id: ${GH_APP_ID}
-        privateKeyLocation: ${GH_APP_PRIVATE_KEY_LOCATION}
-        privateKey: ${GH_APP_PRIVATE_KEY}
+        id: ${GH_APP_ID:0}
+        privateKeyLocation: ${GH_APP_PRIVATE_KEY_LOCATION:}
+        privateKey: ${GH_APP_PRIVATE_KEY:}
     meta:
         auth-token: ${GH_AUTH_TOKEN:}
 
