@@ -72,7 +72,7 @@ public class OrganizationService {
         Organization organization = upsertIdentity(githubId, login);
         Long current = organization.getInstallationId();
 
-        if (!Long.valueOf(installationId).equals(current)) {
+        if (current == null || current != installationId) {
             organization.setInstallationId(installationId);
             organization = organizations.save(organization);
         }
