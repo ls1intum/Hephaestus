@@ -9,6 +9,7 @@ import de.tum.in.www1.hephaestus.gitprovider.pullrequest.PullRequestRepository;
 import de.tum.in.www1.hephaestus.gitprovider.pullrequest.github.GitHubPullRequestConverter;
 import de.tum.in.www1.hephaestus.gitprovider.pullrequestreview.PullRequestReview;
 import de.tum.in.www1.hephaestus.gitprovider.pullrequestreview.PullRequestReviewRepository;
+import de.tum.in.www1.hephaestus.gitprovider.pullrequestreviewcomment.PullRequestReviewComment;
 import de.tum.in.www1.hephaestus.gitprovider.pullrequestreviewcomment.PullRequestReviewCommentRepository;
 import de.tum.in.www1.hephaestus.gitprovider.pullrequestreviewthread.PullRequestReviewThread;
 import de.tum.in.www1.hephaestus.gitprovider.pullrequestreviewthread.PullRequestReviewThreadRepository;
@@ -21,13 +22,15 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.kohsuke.github.GHEventPayloadPullRequestReviewThread;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.transaction.annotation.Transactional;
 
 @DisplayName("GitHub Pull Request Review Thread Message Handler")
 @ExtendWith(GitHubPayloadExtension.class)
+@Transactional
 class GitHubPullRequestReviewThreadMessageHandlerIntegrationTest extends BaseIntegrationTest {
 
-    private static final long ROOT_COMMENT_ID = 2471131704L;
-    private static final Instant RESOLVED_TIMESTAMP = Instant.parse("2025-10-28T21:40:57Z");
+    private static final long ROOT_COMMENT_ID = 2494208170L;
+    private static final Instant RESOLVED_TIMESTAMP = Instant.parse("2025-11-05T12:14:01Z");
 
     @Autowired
     private GitHubPullRequestReviewThreadMessageHandler handler;
@@ -64,12 +67,22 @@ class GitHubPullRequestReviewThreadMessageHandlerIntegrationTest extends BaseInt
         handler.handleEvent(payload);
 
         // Assert
-        var thread = threadRepository.findById(ROOT_COMMENT_ID).orElseThrow();
+        var thread = threadRepository.findWithCommentsById(ROOT_COMMENT_ID).orElseThrow();
         assertThat(thread.getState()).isEqualTo(PullRequestReviewThread.State.RESOLVED);
         assertThat(thread.getResolvedAt()).isEqualTo(RESOLVED_TIMESTAMP);
         assertThat(thread.getUpdatedAt()).isEqualTo(RESOLVED_TIMESTAMP);
         assertThat(thread.getRootComment()).isNotNull();
         assertThat(thread.getComments()).hasSize(2);
+        assertThat(thread.getProviderThreadId()).isEqualTo(ROOT_COMMENT_ID);
+        assertThat(thread.getNodeId()).isEqualTo("PRRT_kwDOQNibEc5gpi6h");
+        assertThat(thread.getPath()).isEqualTo("README.md");
+        assertThat(thread.getLine()).isEqualTo(5);
+        assertThat(thread.getStartLine()).isNull();
+        assertThat(thread.getSide()).isEqualTo(PullRequestReviewComment.Side.RIGHT);
+        assertThat(thread.getStartSide()).isEqualTo(PullRequestReviewComment.Side.UNKNOWN);
+        assertThat(thread.getOutdated()).isNull();
+        assertThat(thread.getCollapsed()).isNull();
+        assertThat(thread.getResolvedBy()).isNull();
 
         var comments = commentRepository.findAll();
         assertThat(comments).hasSize(2);
@@ -90,11 +103,15 @@ class GitHubPullRequestReviewThreadMessageHandlerIntegrationTest extends BaseInt
         handler.handleEvent(unresolved);
 
         // Assert
-        var thread = threadRepository.findById(ROOT_COMMENT_ID).orElseThrow();
+        var thread = threadRepository.findWithCommentsById(ROOT_COMMENT_ID).orElseThrow();
         assertThat(thread.getState()).isEqualTo(PullRequestReviewThread.State.UNRESOLVED);
         assertThat(thread.getResolvedAt()).isNull();
         assertThat(thread.getUpdatedAt()).isEqualTo(RESOLVED_TIMESTAMP);
         assertThat(thread.getComments()).hasSize(2);
+        assertThat(thread.getResolvedBy()).isNull();
+        assertThat(thread.getOutdated()).isNull();
+        assertThat(thread.getCollapsed()).isNull();
+        assertThat(thread.getStartSide()).isEqualTo(PullRequestReviewComment.Side.UNKNOWN);
 
         assertThat(commentRepository.count()).isEqualTo(2);
         assertThat(threadRepository.count()).isEqualTo(1);
@@ -121,8 +138,10 @@ class GitHubPullRequestReviewThreadMessageHandlerIntegrationTest extends BaseInt
             review.setId(id);
             review.setState(PullRequestReview.State.COMMENTED);
             review.setDismissed(false);
-            review.setHtmlUrl("https://github.com/HephaestusTest/TestRepository/pull/1#pullrequestreview-" + id);
-            review.setSubmittedAt(Instant.parse("2025-10-28T21:37:58Z"));
+            review.setHtmlUrl(
+                "https://github.com/HephaestusTest/payload-fixture-repo-renamed/pull/3#pullrequestreview-" + id
+            );
+            review.setSubmittedAt(Instant.parse("2025-11-05T12:13:46Z"));
             review.setPullRequest(pullRequest);
             reviewRepository.save(review);
         });

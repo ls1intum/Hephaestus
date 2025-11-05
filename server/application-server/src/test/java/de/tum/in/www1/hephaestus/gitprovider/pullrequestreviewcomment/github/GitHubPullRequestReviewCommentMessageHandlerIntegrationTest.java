@@ -9,7 +9,6 @@ import de.tum.in.www1.hephaestus.gitprovider.pullrequest.github.GitHubPullReques
 import de.tum.in.www1.hephaestus.gitprovider.pullrequestreview.PullRequestReview;
 import de.tum.in.www1.hephaestus.gitprovider.pullrequestreview.PullRequestReviewRepository;
 import de.tum.in.www1.hephaestus.gitprovider.pullrequestreview.github.GitHubPullRequestReviewSyncService;
-import de.tum.in.www1.hephaestus.gitprovider.pullrequestreviewcomment.PullRequestReviewComment;
 import de.tum.in.www1.hephaestus.gitprovider.pullrequestreviewcomment.PullRequestReviewCommentRepository;
 import de.tum.in.www1.hephaestus.gitprovider.pullrequestreviewthread.PullRequestReviewThreadRepository;
 import de.tum.in.www1.hephaestus.testconfig.BaseIntegrationTest;
@@ -20,9 +19,11 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.kohsuke.github.GHEventPayload;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.transaction.annotation.Transactional;
 
 @DisplayName("GitHub Pull Request Review Comment Message Handler")
 @ExtendWith(GitHubPayloadExtension.class)
+@Transactional
 class GitHubPullRequestReviewCommentMessageHandlerIntegrationTest extends BaseIntegrationTest {
 
     @Autowired
@@ -76,12 +77,19 @@ class GitHubPullRequestReviewCommentMessageHandlerIntegrationTest extends BaseIn
                 assertThat(comment.getSide().name()).isEqualTo(commentPayload.getComment().getSide().name());
                 assertThat(comment.getThread()).isNotNull();
                 assertThat(comment.getThread().getId()).isEqualTo(comment.getId());
+                assertThat(comment.getThread().getProviderThreadId()).isEqualTo(comment.getId());
+                assertThat(comment.getThread().getPath()).isEqualTo(comment.getPath());
+                assertThat(comment.getThread().getLine()).isEqualTo(comment.getLine());
+                assertThat(comment.getThread().getSide()).isEqualTo(comment.getSide());
                 assertThat(comment.getThread().getState()).isEqualTo(
                     de.tum.in.www1.hephaestus.gitprovider.pullrequestreviewthread.PullRequestReviewThread.State.UNRESOLVED
                 );
             });
 
-        assertThat(threadRepository.findById(commentPayload.getComment().getId())).isPresent();
+        assertThat(threadRepository.findById(commentPayload.getComment().getId()))
+            .isPresent()
+            .get()
+            .satisfies(thread -> assertThat(thread.getProviderThreadId()).isEqualTo(thread.getId()));
     }
 
     @Test
@@ -104,7 +112,8 @@ class GitHubPullRequestReviewCommentMessageHandlerIntegrationTest extends BaseIn
         assertThat(threadRepository.count()).isEqualTo(1);
         var replayed = commentRepository.findById(commentPayload.getComment().getId()).orElseThrow();
         assertThat(replayed.getUpdatedAt()).isEqualTo(originalUpdatedAt);
-        assertThat(replayed.getThread().getComments()).hasSize(1);
+        var persistedThread = threadRepository.findWithCommentsById(replayed.getThread().getId()).orElseThrow();
+        assertThat(persistedThread.getComments()).hasSize(1);
     }
 
     @Test
@@ -200,15 +209,13 @@ class GitHubPullRequestReviewCommentMessageHandlerIntegrationTest extends BaseIn
         ensureReviewExists(replyPayload);
         handler.handleEvent(replyPayload);
         var threadId = rootPayload.getComment().getId();
-        assertThat(threadRepository.findById(threadId)).isPresent();
-        assertThat(commentRepository.findById(replyPayload.getComment().getId())).isPresent();
 
         // Act
         handler.handleEvent(deletedReplyPayload);
 
         // Assert
-        assertThat(commentRepository.findById(replyPayload.getComment().getId())).isEmpty();
-        var thread = threadRepository.findById(threadId).orElseThrow();
+        assertThat(commentRepository.existsById(replyPayload.getComment().getId())).isFalse();
+        var thread = threadRepository.findWithCommentsById(threadId).orElseThrow();
         assertThat(commentRepository.countByThreadId(threadId)).isEqualTo(1);
         assertThat(thread.getRootComment()).isNotNull();
         assertThat(thread.getRootComment().getId()).isEqualTo(threadId);

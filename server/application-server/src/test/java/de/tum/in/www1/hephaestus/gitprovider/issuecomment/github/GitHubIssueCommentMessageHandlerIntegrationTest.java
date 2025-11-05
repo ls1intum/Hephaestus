@@ -38,9 +38,8 @@ class GitHubIssueCommentMessageHandlerIntegrationTest extends BaseIntegrationTes
 
     @Test
     @DisplayName("should persist created issue comments with author and issue links")
-    void createdEventPersistsComment(
-        @GitHubPayload("issue_comment.created") GHEventPayload.IssueComment payload
-    ) throws Exception {
+    void createdEventPersistsComment(@GitHubPayload("issue_comment.created") GHEventPayload.IssueComment payload)
+        throws Exception {
         // Act
         handler.handleEvent(payload);
 
@@ -64,9 +63,8 @@ class GitHubIssueCommentMessageHandlerIntegrationTest extends BaseIntegrationTes
 
     @Test
     @DisplayName("should ignore duplicate create events")
-    void createdEventIsIdempotent(
-        @GitHubPayload("issue_comment.created") GHEventPayload.IssueComment payload
-    ) throws Exception {
+    void createdEventIsIdempotent(@GitHubPayload("issue_comment.created") GHEventPayload.IssueComment payload)
+        throws Exception {
         // Arrange
         handler.handleEvent(payload);
         var original = issueCommentRepository.findById(ISSUE_COMMENT_ID).orElseThrow();

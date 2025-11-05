@@ -6,11 +6,11 @@ import de.tum.in.www1.hephaestus.gitprovider.pullrequest.PullRequest;
 import de.tum.in.www1.hephaestus.gitprovider.pullrequestreview.PullRequestReview;
 import de.tum.in.www1.hephaestus.gitprovider.pullrequestreviewthread.PullRequestReviewThread;
 import de.tum.in.www1.hephaestus.gitprovider.user.User;
+import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
 import jakarta.persistence.JoinColumn;
-import jakarta.persistence.Lob;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.OneToMany;
 import jakarta.persistence.Table;
@@ -31,7 +31,7 @@ import org.springframework.lang.NonNull;
 public class PullRequestReviewComment extends BaseGitServiceEntity {
 
     // The diff of the line that the comment refers to.
-    @Lob
+    @Column(columnDefinition = "TEXT")
     @NonNull
     private String diffHunk;
 
@@ -47,7 +47,7 @@ public class PullRequestReviewComment extends BaseGitServiceEntity {
     @NonNull
     private String originalCommitId;
 
-    @Lob
+    @Column(columnDefinition = "TEXT")
     @NonNull
     private String body;
 
