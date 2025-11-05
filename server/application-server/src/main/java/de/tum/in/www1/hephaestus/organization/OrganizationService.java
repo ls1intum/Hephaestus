@@ -1,11 +1,15 @@
 package de.tum.in.www1.hephaestus.organization;
 
 import java.util.Optional;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 @Service
 public class OrganizationService {
+
+    private static final Logger logger = LoggerFactory.getLogger(OrganizationService.class);
 
     private final OrganizationRepository organizations;
 
@@ -15,6 +19,10 @@ public class OrganizationService {
 
     /**
      * Ensure an organization row exists (by stable GitHub org id) and keep its login up to date (rename-safe).
+     * 
+     * This method uses the GitHub organization ID as both the primary key (id) and the githubId field.
+     * The fallback check by ID is defensive programming to handle edge cases where the database
+     * might be in an inconsistent state.
      */
     @Transactional
     public Organization upsertIdentity(long githubId, String login) {
@@ -22,15 +30,22 @@ public class OrganizationService {
             throw new IllegalArgumentException("login required");
         }
 
-        // First try to find by githubId
+        // First try to find by githubId (the standard lookup)
         Organization organization = organizations.findByGithubId(githubId).orElse(null);
         
-        // If not found by githubId, check if an organization with this ID already exists
-        // This handles edge cases where the database may have an entry with matching id
+        // If not found by githubId, check if an organization with this ID already exists.
+        // This is a defensive check to prevent duplicate key violations if the database
+        // is in an inconsistent state (e.g., id exists but githubId doesn't match).
         if (organization == null) {
             organization = organizations.findById(githubId).orElse(null);
             if (organization != null) {
-                // Update the githubId to ensure consistency
+                // Found by ID but not by githubId - this indicates an inconsistency
+                logger.warn(
+                    "Organization with id={} found but githubId was {}. Updating githubId to {}.",
+                    githubId,
+                    organization.getGithubId(),
+                    githubId
+                );
                 organization.setGithubId(githubId);
             }
         }
