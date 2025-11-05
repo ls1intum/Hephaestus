@@ -603,6 +603,8 @@ class Milestone(Base):
     )
     id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
     number: Mapped[int] = mapped_column(Integer)
+    closed_issues_count: Mapped[int] = mapped_column(Integer, server_default=text("0"))
+    open_issues_count: Mapped[int] = mapped_column(Integer, server_default=text("0"))
     created_at: Mapped[Optional[datetime.datetime]] = mapped_column(DateTime(True))
     updated_at: Mapped[Optional[datetime.datetime]] = mapped_column(DateTime(True))
     closed_at: Mapped[Optional[datetime.datetime]] = mapped_column(DateTime(True))
