@@ -22,15 +22,25 @@ public class OrganizationService {
             throw new IllegalArgumentException("login required");
         }
 
-        Organization organization = organizations
-            .findByGithubId(githubId)
-            .orElseGet(() -> {
-                Organization o = new Organization();
-                o.setId(githubId);
-                o.setGithubId(githubId);
-
-                return o;
-            });
+        // First try to find by githubId
+        Organization organization = organizations.findByGithubId(githubId).orElse(null);
+        
+        // If not found by githubId, check if an organization with this ID already exists
+        // This handles edge cases where the database may have an entry with matching id
+        if (organization == null) {
+            organization = organizations.findById(githubId).orElse(null);
+            if (organization != null) {
+                // Update the githubId to ensure consistency
+                organization.setGithubId(githubId);
+            }
+        }
+        
+        // If still not found, create a new organization
+        if (organization == null) {
+            organization = new Organization();
+            organization.setId(githubId);
+            organization.setGithubId(githubId);
+        }
 
         if (!login.equals(organization.getLogin())) {
             organization.setLogin(login);
