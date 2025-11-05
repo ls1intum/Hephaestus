@@ -107,17 +107,29 @@
             SET body_text = CASE
                     WHEN body IS NOT NULL
                         AND EXISTS (SELECT 1 FROM pg_largeobject_metadata lom WHERE lom.oid = body)
-                        THEN convert_from(pg_catalog.lo_get(body), 'UTF8')
+                        THEN convert_from(
+                            pg_catalog.decode(
+                                replace(pg_catalog.encode(pg_catalog.lo_get(body), 'escape'), E'\\000', ''),
+                                'escape'
+                            ),
+                            'UTF8'
+                        )
                     ELSE NULL
                 END,
                 bad_practice_summary_text = CASE
                     WHEN bad_practice_summary IS NOT NULL
                         AND EXISTS (SELECT 1 FROM pg_largeobject_metadata lom WHERE lom.oid = bad_practice_summary)
-                        THEN convert_from(pg_catalog.lo_get(bad_practice_summary), 'UTF8')
+                        THEN convert_from(
+                            pg_catalog.decode(
+                                replace(pg_catalog.encode(pg_catalog.lo_get(bad_practice_summary), 'escape'), E'\\000', ''),
+                                'escape'
+                            ),
+                            'UTF8'
+                        )
                     ELSE NULL
                 END;
         </sql>
-        <sql>
+        <sql splitStatements="false">
             DO $$
             DECLARE
                 rec RECORD;
@@ -144,7 +156,8 @@
                         PERFORM pg_catalog.lo_unlink(rec.bad_practice_summary);
                     END IF;
                 END LOOP;
-            END$$;
+            END;
+            $$;
         </sql>
         <sql>
             ALTER TABLE issue DROP COLUMN body;
@@ -167,11 +180,17 @@
             UPDATE issue_comment
             SET body_text = CASE
                 WHEN body IS NOT NULL AND EXISTS (SELECT 1 FROM pg_largeobject_metadata lom WHERE lom.oid = body)
-                    THEN convert_from(pg_catalog.lo_get(body), 'UTF8')
+                    THEN convert_from(
+                        pg_catalog.decode(
+                            replace(pg_catalog.encode(pg_catalog.lo_get(body), 'escape'), E'\\000', ''),
+                            'escape'
+                        ),
+                        'UTF8'
+                    )
                 ELSE NULL
             END;
         </sql>
-        <sql>
+        <sql splitStatements="false">
             DO $$
             DECLARE
                 rec RECORD;
@@ -194,7 +213,8 @@
                         PERFORM pg_catalog.lo_unlink(rec.body);
                     END IF;
                 END LOOP;
-            END$$;
+            END;
+            $$;
         </sql>
         <sql>
             ALTER TABLE issue_comment DROP COLUMN body;
@@ -211,11 +231,17 @@
             UPDATE pull_request_review
             SET body_text = CASE
                 WHEN body IS NOT NULL AND EXISTS (SELECT 1 FROM pg_largeobject_metadata lom WHERE lom.oid = body)
-                    THEN convert_from(pg_catalog.lo_get(body), 'UTF8')
+                    THEN convert_from(
+                        pg_catalog.decode(
+                            replace(pg_catalog.encode(pg_catalog.lo_get(body), 'escape'), E'\\000', ''),
+                            'escape'
+                        ),
+                        'UTF8'
+                    )
                 ELSE NULL
             END;
         </sql>
-        <sql>
+        <sql splitStatements="false">
             DO $$
             DECLARE
                 rec RECORD;
@@ -238,7 +264,8 @@
                         PERFORM pg_catalog.lo_unlink(rec.body);
                     END IF;
                 END LOOP;
-            END$$;
+            END;
+            $$;
         </sql>
         <sql>
             ALTER TABLE pull_request_review DROP COLUMN body;
@@ -257,17 +284,29 @@
             UPDATE pull_request_review_comment
             SET body_text = CASE
                     WHEN body IS NOT NULL AND EXISTS (SELECT 1 FROM pg_largeobject_metadata lom WHERE lom.oid = body)
-                        THEN convert_from(pg_catalog.lo_get(body), 'UTF8')
+                        THEN convert_from(
+                            pg_catalog.decode(
+                                replace(pg_catalog.encode(pg_catalog.lo_get(body), 'escape'), E'\\000', ''),
+                                'escape'
+                            ),
+                            'UTF8'
+                        )
                     ELSE NULL
                 END,
                 diff_hunk_text = CASE
                     WHEN diff_hunk IS NOT NULL
                         AND EXISTS (SELECT 1 FROM pg_largeobject_metadata lom WHERE lom.oid = diff_hunk)
-                        THEN convert_from(pg_catalog.lo_get(diff_hunk), 'UTF8')
+                        THEN convert_from(
+                            pg_catalog.decode(
+                                replace(pg_catalog.encode(pg_catalog.lo_get(diff_hunk), 'escape'), E'\\000', ''),
+                                'escape'
+                            ),
+                            'UTF8'
+                        )
                     ELSE NULL
                 END;
         </sql>
-        <sql>
+        <sql splitStatements="false">
             DO $$
             DECLARE
                 rec RECORD;
@@ -294,7 +333,8 @@
                         PERFORM pg_catalog.lo_unlink(rec.diff_hunk);
                     END IF;
                 END LOOP;
-            END$$;
+            END;
+            $$;
         </sql>
         <sql>
             ALTER TABLE pull_request_review_comment DROP COLUMN body;
@@ -317,11 +357,17 @@
             UPDATE milestone
             SET description_text = CASE
                 WHEN description IS NOT NULL AND EXISTS (SELECT 1 FROM pg_largeobject_metadata lom WHERE lom.oid = description)
-                    THEN convert_from(pg_catalog.lo_get(description), 'UTF8')
+                    THEN convert_from(
+                        pg_catalog.decode(
+                            replace(pg_catalog.encode(pg_catalog.lo_get(description), 'escape'), E'\\000', ''),
+                            'escape'
+                        ),
+                        'UTF8'
+                    )
                 ELSE NULL
             END;
         </sql>
-        <sql>
+        <sql splitStatements="false">
             DO $$
             DECLARE
                 rec RECORD;
@@ -344,7 +390,8 @@
                         PERFORM pg_catalog.lo_unlink(rec.description);
                     END IF;
                 END LOOP;
-            END$$;
+            END;
+            $$;
         </sql>
         <sql>
             ALTER TABLE milestone DROP COLUMN description;
@@ -361,11 +408,17 @@
             UPDATE pullrequestbadpractice
             SET description_text = CASE
                 WHEN description IS NOT NULL AND EXISTS (SELECT 1 FROM pg_largeobject_metadata lom WHERE lom.oid = description)
-                    THEN convert_from(pg_catalog.lo_get(description), 'UTF8')
+                    THEN convert_from(
+                        pg_catalog.decode(
+                            replace(pg_catalog.encode(pg_catalog.lo_get(description), 'escape'), E'\\000', ''),
+                            'escape'
+                        ),
+                        'UTF8'
+                    )
                 ELSE NULL
             END;
         </sql>
-        <sql>
+        <sql splitStatements="false">
             DO $$
             DECLARE
                 rec RECORD;
@@ -388,7 +441,8 @@
                         PERFORM pg_catalog.lo_unlink(rec.description);
                     END IF;
                 END LOOP;
-            END$$;
+            END;
+            $$;
         </sql>
         <sql>
             ALTER TABLE pullrequestbadpractice DROP COLUMN description;
@@ -406,11 +460,17 @@
             SET explanation_text = CASE
                 WHEN explanation IS NOT NULL
                     AND EXISTS (SELECT 1 FROM pg_largeobject_metadata lom WHERE lom.oid = explanation)
-                    THEN convert_from(pg_catalog.lo_get(explanation), 'UTF8')
+                    THEN convert_from(
+                        pg_catalog.decode(
+                            replace(pg_catalog.encode(pg_catalog.lo_get(explanation), 'escape'), E'\\000', ''),
+                            'escape'
+                        ),
+                        'UTF8'
+                    )
                 ELSE NULL
             END;
         </sql>
-        <sql>
+        <sql splitStatements="false">
             DO $$
             DECLARE
                 rec RECORD;
@@ -433,7 +493,8 @@
                         PERFORM pg_catalog.lo_unlink(rec.explanation);
                     END IF;
                 END LOOP;
-            END$$;
+            END;
+            $$;
         </sql>
         <sql>
             ALTER TABLE bad_practice_feedback DROP COLUMN explanation;
@@ -450,11 +511,17 @@
             UPDATE bad_practice_detection
             SET summary_text = CASE
                 WHEN summary IS NOT NULL AND EXISTS (SELECT 1 FROM pg_largeobject_metadata lom WHERE lom.oid = summary)
-                    THEN convert_from(pg_catalog.lo_get(summary), 'UTF8')
+                    THEN convert_from(
+                        pg_catalog.decode(
+                            replace(pg_catalog.encode(pg_catalog.lo_get(summary), 'escape'), E'\\000', ''),
+                            'escape'
+                        ),
+                        'UTF8'
+                    )
                 ELSE NULL
             END;
         </sql>
-        <sql>
+        <sql splitStatements="false">
             DO $$
             DECLARE
                 rec RECORD;
@@ -477,7 +544,8 @@
                         PERFORM pg_catalog.lo_unlink(rec.summary);
                     END IF;
                 END LOOP;
-            END$$;
+            END;
+            $$;
         </sql>
         <sql>
             ALTER TABLE bad_practice_detection DROP COLUMN summary;
