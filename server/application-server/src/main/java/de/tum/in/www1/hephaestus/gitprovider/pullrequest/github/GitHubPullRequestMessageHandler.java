@@ -41,7 +41,12 @@ public class GitHubPullRequestMessageHandler extends GitHubMessageHandler<GHEven
         );
         repositorySyncService.processRepository(eventPayload.getRepository());
         // We don't need to handle the deleted action here, as pull requests are not deleted
-        PullRequest pullRequest = pullRequestSyncService.processPullRequest(eventPayload.getPullRequest());
+        PullRequest pullRequest =
+            switch (eventPayload.getAction()) {
+                case "labeled" -> handleLabelEvent(eventPayload, true);
+                case "unlabeled" -> handleLabelEvent(eventPayload, false);
+                default -> pullRequestSyncService.processPullRequest(eventPayload.getPullRequest());
+            };
 
         scheduleBadPracticeDetectionOnEvent(eventPayload, pullRequest);
     }
@@ -60,5 +65,10 @@ public class GitHubPullRequestMessageHandler extends GitHubMessageHandler<GHEven
             );
             case "closed" -> badPracticeDetectorScheduler.detectBadPracticeForPrIfClosedEvent(pullRequest);
         }
+    }
+
+    private PullRequest handleLabelEvent(GHEventPayload.PullRequest eventPayload, boolean added) {
+        var label = eventPayload.getLabel();
+        return pullRequestSyncService.processPullRequest(eventPayload.getPullRequest(), label, added);
     }
 }
