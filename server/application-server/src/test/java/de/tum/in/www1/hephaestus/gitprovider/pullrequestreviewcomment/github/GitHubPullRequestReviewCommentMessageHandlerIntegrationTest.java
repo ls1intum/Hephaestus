@@ -85,6 +85,29 @@ class GitHubPullRequestReviewCommentMessageHandlerIntegrationTest extends BaseIn
     }
 
     @Test
+    @DisplayName("should ignore duplicate create events for the same review comment")
+    void createdEventIsIdempotent(
+        @GitHubPayload("pull_request_review_comment.created") GHEventPayload.PullRequestReviewComment commentPayload,
+        @GitHubPayload("pull_request_review.submitted") GHEventPayload.PullRequestReview reviewPayload
+    ) throws Exception {
+        // Arrange
+        reviewSyncService.processPullRequestReview(reviewPayload.getReview());
+        handler.handleEvent(commentPayload);
+        var existing = commentRepository.findById(commentPayload.getComment().getId()).orElseThrow();
+        var originalUpdatedAt = existing.getUpdatedAt();
+
+        // Act
+        handler.handleEvent(commentPayload);
+
+        // Assert
+        assertThat(commentRepository.count()).isEqualTo(1);
+        assertThat(threadRepository.count()).isEqualTo(1);
+        var replayed = commentRepository.findById(commentPayload.getComment().getId()).orElseThrow();
+        assertThat(replayed.getUpdatedAt()).isEqualTo(originalUpdatedAt);
+        assertThat(replayed.getThread().getComments()).hasSize(1);
+    }
+
+    @Test
     @DisplayName("should update existing comments on edit events")
     void editedEventUpdatesComment(
         @GitHubPayload("pull_request_review_comment.created") GHEventPayload.PullRequestReviewComment createdPayload,

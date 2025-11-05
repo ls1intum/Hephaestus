@@ -4,20 +4,21 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import de.tum.in.www1.hephaestus.gitprovider.common.GitHubPayload;
 import de.tum.in.www1.hephaestus.gitprovider.common.GitHubPayloadExtension;
+import de.tum.in.www1.hephaestus.gitprovider.pullrequest.PullRequest;
 import de.tum.in.www1.hephaestus.gitprovider.pullrequest.PullRequestRepository;
 import de.tum.in.www1.hephaestus.gitprovider.pullrequest.github.GitHubPullRequestConverter;
 import de.tum.in.www1.hephaestus.gitprovider.pullrequestreview.PullRequestReview;
 import de.tum.in.www1.hephaestus.gitprovider.pullrequestreview.PullRequestReviewRepository;
-import de.tum.in.www1.hephaestus.gitprovider.pullrequestreviewcomment.github.GitHubPullRequestReviewCommentSyncService;
+import de.tum.in.www1.hephaestus.gitprovider.pullrequestreviewcomment.PullRequestReviewCommentRepository;
 import de.tum.in.www1.hephaestus.gitprovider.pullrequestreviewthread.PullRequestReviewThread;
 import de.tum.in.www1.hephaestus.gitprovider.pullrequestreviewthread.PullRequestReviewThreadRepository;
 import de.tum.in.www1.hephaestus.testconfig.BaseIntegrationTest;
 import java.time.Instant;
+import java.util.Set;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.kohsuke.github.GHEventPayload;
 import org.kohsuke.github.GHEventPayloadPullRequestReviewThread;
 import org.springframework.beans.factory.annotation.Autowired;
 
@@ -25,14 +26,17 @@ import org.springframework.beans.factory.annotation.Autowired;
 @ExtendWith(GitHubPayloadExtension.class)
 class GitHubPullRequestReviewThreadMessageHandlerIntegrationTest extends BaseIntegrationTest {
 
+    private static final long ROOT_COMMENT_ID = 2471131704L;
+    private static final Instant RESOLVED_TIMESTAMP = Instant.parse("2025-10-28T21:40:57Z");
+
     @Autowired
     private GitHubPullRequestReviewThreadMessageHandler handler;
 
     @Autowired
-    private GitHubPullRequestReviewCommentSyncService commentSyncService;
+    private PullRequestReviewThreadRepository threadRepository;
 
     @Autowired
-    private PullRequestReviewThreadRepository threadRepository;
+    private PullRequestReviewCommentRepository commentRepository;
 
     @Autowired
     private PullRequestReviewRepository reviewRepository;
@@ -49,62 +53,78 @@ class GitHubPullRequestReviewThreadMessageHandlerIntegrationTest extends BaseInt
     }
 
     @Test
-    @DisplayName("should update thread state on resolve and unresolve events")
-    void threadEventsUpdateState(
-        @GitHubPayload(
-            "pull_request_review_comment.created.thread-1"
-        ) GHEventPayload.PullRequestReviewComment rootComment,
-        @GitHubPayload(
-            "pull_request_review_comment.created.thread-2"
-        ) GHEventPayload.PullRequestReviewComment replyComment,
-        @GitHubPayload("pull_request_review_thread.resolved") GHEventPayloadPullRequestReviewThread resolvedPayload,
-        @GitHubPayload("pull_request_review_thread.unresolved") GHEventPayloadPullRequestReviewThread unresolvedPayload
+    @DisplayName("resolved events mark threads as resolved and stamp timestamps")
+    void resolvedEventUpdatesThread(
+        @GitHubPayload("pull_request_review_thread.resolved") GHEventPayloadPullRequestReviewThread payload
     ) throws Exception {
-        // Arrange - ensure prerequisite review data and comments are stored
-        ensureReviewExists(rootComment);
-        commentSyncService.processPullRequestReviewComment(rootComment.getComment(), rootComment.getPullRequest());
-        ensureReviewExists(replyComment);
-        commentSyncService.processPullRequestReviewComment(replyComment.getComment(), replyComment.getPullRequest());
+        // Arrange
+        seedPullRequestAndReviews(payload);
 
-        var threadId = rootComment.getComment().getId();
-        var initialThread = threadRepository.findById(threadId).orElseThrow();
-        assertThat(initialThread.getState()).isEqualTo(PullRequestReviewThread.State.UNRESOLVED);
+        // Act
+        handler.handleEvent(payload);
 
-        // Act - resolve event
-        handler.handleEvent(resolvedPayload);
+        // Assert
+        var thread = threadRepository.findById(ROOT_COMMENT_ID).orElseThrow();
+        assertThat(thread.getState()).isEqualTo(PullRequestReviewThread.State.RESOLVED);
+        assertThat(thread.getResolvedAt()).isEqualTo(RESOLVED_TIMESTAMP);
+        assertThat(thread.getUpdatedAt()).isEqualTo(RESOLVED_TIMESTAMP);
+        assertThat(thread.getRootComment()).isNotNull();
+        assertThat(thread.getComments()).hasSize(2);
 
-        // Assert resolved state
-        var resolvedThread = threadRepository.findById(threadId).orElseThrow();
-        assertThat(resolvedThread.getState()).isEqualTo(PullRequestReviewThread.State.RESOLVED);
-        assertThat(resolvedThread.getResolvedAt()).isNotNull();
-
-        // Act - unresolved event
-        handler.handleEvent(unresolvedPayload);
-
-        // Assert unresolved state
-        var unresolvedThread = threadRepository.findById(threadId).orElseThrow();
-        assertThat(unresolvedThread.getState()).isEqualTo(PullRequestReviewThread.State.UNRESOLVED);
-        assertThat(unresolvedThread.getResolvedAt()).isNull();
+        var comments = commentRepository.findAll();
+        assertThat(comments).hasSize(2);
+        assertThat(comments).allMatch(comment -> comment.getThread().getId().equals(ROOT_COMMENT_ID));
     }
 
-    private void ensureReviewExists(GHEventPayload.PullRequestReviewComment payload) {
-        var reviewId = payload.getComment().getPullRequestReviewId();
-        if (reviewId == null || reviewRepository.findById(reviewId).isPresent()) {
-            return;
-        }
+    @Test
+    @DisplayName("unresolved events reopen threads without duplicating comments")
+    void unresolvedEventReopensThread(
+        @GitHubPayload("pull_request_review_thread.resolved") GHEventPayloadPullRequestReviewThread resolved,
+        @GitHubPayload("pull_request_review_thread.unresolved") GHEventPayloadPullRequestReviewThread unresolved
+    ) throws Exception {
+        // Arrange
+        seedPullRequestAndReviews(resolved);
+        handler.handleEvent(resolved);
 
-        var review = new PullRequestReview();
-        review.setId(reviewId);
-        review.setState(PullRequestReview.State.COMMENTED);
-        review.setHtmlUrl(payload.getComment().getHtmlUrl().toString());
-        review.setSubmittedAt(Instant.now());
-        var pullRequest = payload.getPullRequest();
-        if (pullRequest != null) {
-            var pullRequestEntity = pullRequestRepository
-                .findById(pullRequest.getId())
-                .orElseGet(() -> pullRequestRepository.save(pullRequestConverter.convert(pullRequest)));
-            review.setPullRequest(pullRequestEntity);
-        }
-        reviewRepository.save(review);
+        // Act
+        handler.handleEvent(unresolved);
+
+        // Assert
+        var thread = threadRepository.findById(ROOT_COMMENT_ID).orElseThrow();
+        assertThat(thread.getState()).isEqualTo(PullRequestReviewThread.State.UNRESOLVED);
+        assertThat(thread.getResolvedAt()).isNull();
+        assertThat(thread.getUpdatedAt()).isEqualTo(RESOLVED_TIMESTAMP);
+        assertThat(thread.getComments()).hasSize(2);
+
+        assertThat(commentRepository.count()).isEqualTo(2);
+        assertThat(threadRepository.count()).isEqualTo(1);
+    }
+
+    private void seedPullRequestAndReviews(GHEventPayloadPullRequestReviewThread payload) {
+        PullRequest pullRequest = pullRequestRepository
+            .findById(payload.getPullRequest().getId())
+            .orElseGet(() -> pullRequestRepository.save(pullRequestConverter.convert(payload.getPullRequest())));
+
+        Set<Long> reviewIds = payload
+            .getThread()
+            .getComments()
+            .stream()
+            .map(org.kohsuke.github.GHPullRequestReviewComment::getPullRequestReviewId)
+            .filter(id -> id != null && id > 0)
+            .collect(java.util.stream.Collectors.toSet());
+
+        reviewIds.forEach(id -> {
+            if (reviewRepository.existsById(id)) {
+                return;
+            }
+            PullRequestReview review = new PullRequestReview();
+            review.setId(id);
+            review.setState(PullRequestReview.State.COMMENTED);
+            review.setDismissed(false);
+            review.setHtmlUrl("https://github.com/HephaestusTest/TestRepository/pull/1#pullrequestreview-" + id);
+            review.setSubmittedAt(Instant.parse("2025-10-28T21:37:58Z"));
+            review.setPullRequest(pullRequest);
+            reviewRepository.save(review);
+        });
     }
 }
