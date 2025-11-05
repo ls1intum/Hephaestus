@@ -714,6 +714,7 @@ class Issue(Base):
     last_detection_time: Mapped[Optional[datetime.datetime]] = mapped_column(
         TIMESTAMP(True, 6)
     )
+    state_reason: Mapped[Optional[str]] = mapped_column(String(32))
     pull_request_review_comment: Mapped[List["PullRequestReviewComment"]] = (
         relationship("PullRequestReviewComment", back_populates="pull_request")
     )
