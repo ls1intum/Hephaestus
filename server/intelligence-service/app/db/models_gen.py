@@ -143,6 +143,38 @@ class Databasechangeloglock(Base):
     lockedby: Mapped[Optional[str]] = mapped_column(String(255))
 
 
+class InstallationTarget(Base):
+    __tablename__ = "installation_target"
+    __table_args__ = (
+        PrimaryKeyConstraint("id", name="pk_installation_target"),
+        Index("idx_installation_target_login", "login", unique=True),
+    )
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
+    login: Mapped[str] = mapped_column(String(255))
+    created_at: Mapped[Optional[datetime.datetime]] = mapped_column(DateTime(True))
+    updated_at: Mapped[Optional[datetime.datetime]] = mapped_column(DateTime(True))
+    node_id: Mapped[Optional[str]] = mapped_column(String(255))
+    html_url: Mapped[Optional[str]] = mapped_column(String(512))
+    avatar_url: Mapped[Optional[str]] = mapped_column(String(512))
+    target_type: Mapped[Optional[str]] = mapped_column(String(32))
+    site_admin: Mapped[Optional[bool]] = mapped_column(Boolean)
+    is_verified: Mapped[Optional[bool]] = mapped_column(Boolean)
+    has_organization_projects: Mapped[Optional[bool]] = mapped_column(Boolean)
+    has_repository_projects: Mapped[Optional[bool]] = mapped_column(Boolean)
+    public_repos: Mapped[Optional[int]] = mapped_column(Integer)
+    public_gists: Mapped[Optional[int]] = mapped_column(Integer)
+    followers: Mapped[Optional[int]] = mapped_column(Integer)
+    following: Mapped[Optional[int]] = mapped_column(Integer)
+    description: Mapped[Optional[str]] = mapped_column(String(512))
+    archived_at: Mapped[Optional[datetime.datetime]] = mapped_column(DateTime(True))
+    last_renamed_at: Mapped[Optional[datetime.datetime]] = mapped_column(DateTime(True))
+    last_renamed_from: Mapped[Optional[str]] = mapped_column(String(255))
+    last_synced_at: Mapped[Optional[datetime.datetime]] = mapped_column(DateTime(True))
+    installation: Mapped[List["Installation"]] = relationship(
+        "Installation", back_populates="target"
+    )
+
+
 class Organization(Base):
     __tablename__ = "organization"
     __table_args__ = (
@@ -401,6 +433,9 @@ class User(Base):
         "PullRequestReviewThread", back_populates="resolved_by"
     )
     document: Mapped[List["Document"]] = relationship("Document", back_populates="user")
+    installation: Mapped[List["Installation"]] = relationship(
+        "Installation", back_populates="suspended_by"
+    )
     team_membership: Mapped[List["TeamMembership"]] = relationship(
         "TeamMembership", back_populates="user"
     )
@@ -466,6 +501,68 @@ class Document(Base):
     user: Mapped["User"] = relationship("User", back_populates="document")
 
 
+class Installation(Base):
+    __tablename__ = "installation"
+    __table_args__ = (
+        ForeignKeyConstraint(
+            ["suspended_by_id"],
+            ["user.id"],
+            ondelete="SET NULL",
+            name="fk_installation_suspended_by",
+        ),
+        ForeignKeyConstraint(
+            ["target_id"],
+            ["installation_target.id"],
+            ondelete="SET NULL",
+            name="fk_installation_target",
+        ),
+        PrimaryKeyConstraint("id", name="pk_installation"),
+        Index("idx_installation_suspended_by", "suspended_by_id"),
+        Index("idx_installation_target", "target_id"),
+    )
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
+    repository_selection: Mapped[str] = mapped_column(
+        String(32), server_default=text("'UNKNOWN'::character varying")
+    )
+    lifecycle_state: Mapped[str] = mapped_column(
+        String(32), server_default=text("'ACTIVE'::character varying")
+    )
+    created_at: Mapped[Optional[datetime.datetime]] = mapped_column(DateTime(True))
+    updated_at: Mapped[Optional[datetime.datetime]] = mapped_column(DateTime(True))
+    target_id: Mapped[Optional[int]] = mapped_column(BigInteger)
+    target_github_id: Mapped[Optional[int]] = mapped_column(BigInteger)
+    target_type: Mapped[Optional[str]] = mapped_column(String(32))
+    app_id: Mapped[Optional[int]] = mapped_column(BigInteger)
+    access_tokens_url: Mapped[Optional[str]] = mapped_column(String(512))
+    repositories_url: Mapped[Optional[str]] = mapped_column(String(512))
+    html_url: Mapped[Optional[str]] = mapped_column(String(512))
+    single_file_name: Mapped[Optional[str]] = mapped_column(String(512))
+    suspended_at: Mapped[Optional[datetime.datetime]] = mapped_column(DateTime(True))
+    suspended_by_id: Mapped[Optional[int]] = mapped_column(BigInteger)
+    deleted_at: Mapped[Optional[datetime.datetime]] = mapped_column(DateTime(True))
+    last_webhook_received_at: Mapped[Optional[datetime.datetime]] = mapped_column(
+        DateTime(True)
+    )
+    last_repositories_sync_at: Mapped[Optional[datetime.datetime]] = mapped_column(
+        DateTime(True)
+    )
+    last_permissions_accepted_at: Mapped[Optional[datetime.datetime]] = mapped_column(
+        DateTime(True)
+    )
+    suspended_by: Mapped[Optional["User"]] = relationship(
+        "User", back_populates="installation"
+    )
+    target: Mapped[Optional["InstallationTarget"]] = relationship(
+        "InstallationTarget", back_populates="installation"
+    )
+    installation_permission: Mapped[List["InstallationPermission"]] = relationship(
+        "InstallationPermission", back_populates="installation"
+    )
+    installation_repository: Mapped[List["InstallationRepository"]] = relationship(
+        "InstallationRepository", back_populates="installation"
+    )
+
+
 class Repository(Base):
     __tablename__ = "repository"
     __table_args__ = (
@@ -497,9 +594,15 @@ class Repository(Base):
     organization: Mapped[Optional["Organization"]] = relationship(
         "Organization", back_populates="repository"
     )
+    installation_repository: Mapped[List["InstallationRepository"]] = relationship(
+        "InstallationRepository", back_populates="repository"
+    )
     label: Mapped[List["Label"]] = relationship("Label", back_populates="repository")
     milestone: Mapped[List["Milestone"]] = relationship(
         "Milestone", back_populates="repository"
+    )
+    repository_to_monitor: Mapped[List["RepositoryToMonitor"]] = relationship(
+        "RepositoryToMonitor", back_populates="repository"
     )
     team_repository_permission: Mapped[List["TeamRepositoryPermission"]] = relationship(
         "TeamRepositoryPermission", back_populates="repository"
@@ -532,6 +635,7 @@ class Workspace(Base):
             ["organization_id"], ["organization.id"], name="fk_workspace_organization"
         ),
         PrimaryKeyConstraint("id", name="workspacePK"),
+        UniqueConstraint("installation_id", name="uk_workspace_installation"),
         UniqueConstraint("organization_id", name="uc_workspaceorganization_id_col"),
     )
     id: Mapped[int] = mapped_column(
@@ -563,6 +667,75 @@ class Workspace(Base):
     )
     repository_to_monitor: Mapped[List["RepositoryToMonitor"]] = relationship(
         "RepositoryToMonitor", back_populates="workspace"
+    )
+
+
+t_installation_event = Table(
+    "installation_event",
+    Base.metadata,
+    Column("installation_id", BigInteger, nullable=False),
+    Column("event_name", String(128), nullable=False),
+    ForeignKeyConstraint(
+        ["installation_id"],
+        ["installation.id"],
+        ondelete="CASCADE",
+        name="fk_installation_event_installation",
+    ),
+)
+
+
+class InstallationPermission(Base):
+    __tablename__ = "installation_permission"
+    __table_args__ = (
+        ForeignKeyConstraint(
+            ["installation_id"],
+            ["installation.id"],
+            ondelete="CASCADE",
+            name="fk_installation_permission_installation",
+        ),
+        PrimaryKeyConstraint(
+            "installation_id", "permission_name", name="pk_installation_permission"
+        ),
+    )
+    installation_id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
+    permission_name: Mapped[str] = mapped_column(String(128), primary_key=True)
+    permission_level: Mapped[str] = mapped_column(String(32))
+    installation: Mapped["Installation"] = relationship(
+        "Installation", back_populates="installation_permission"
+    )
+
+
+class InstallationRepository(Base):
+    __tablename__ = "installation_repository"
+    __table_args__ = (
+        ForeignKeyConstraint(
+            ["installation_id"],
+            ["installation.id"],
+            ondelete="CASCADE",
+            name="fk_installation_repository_installation",
+        ),
+        ForeignKeyConstraint(
+            ["repository_id"],
+            ["repository.id"],
+            ondelete="CASCADE",
+            name="fk_installation_repository_repository",
+        ),
+        PrimaryKeyConstraint(
+            "installation_id", "repository_id", name="pk_installation_repository"
+        ),
+        Index("idx_installation_repository_repository", "repository_id"),
+    )
+    installation_id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
+    repository_id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
+    is_active: Mapped[bool] = mapped_column(Boolean, server_default=text("true"))
+    linked_at: Mapped[Optional[datetime.datetime]] = mapped_column(DateTime(True))
+    removed_at: Mapped[Optional[datetime.datetime]] = mapped_column(DateTime(True))
+    last_synced_at: Mapped[Optional[datetime.datetime]] = mapped_column(DateTime(True))
+    installation: Mapped["Installation"] = relationship(
+        "Installation", back_populates="installation_repository"
+    )
+    repository: Mapped["Repository"] = relationship(
+        "Repository", back_populates="installation_repository"
     )
 
 
@@ -626,6 +799,11 @@ class RepositoryToMonitor(Base):
     __tablename__ = "repository_to_monitor"
     __table_args__ = (
         ForeignKeyConstraint(
+            ["repository_id"],
+            ["repository.id"],
+            name="fk_repository_to_monitor_repository",
+        ),
+        ForeignKeyConstraint(
             ["workspace_id"], ["workspace.id"], name="FKdkxnkm4a2wyw0d5k63gh2st64"
         ),
         PrimaryKeyConstraint("id", name="repository_to_monitorPK"),
@@ -642,6 +820,10 @@ class RepositoryToMonitor(Base):
         ),
         primary_key=True,
     )
+    source: Mapped[str] = mapped_column(
+        String(32), server_default=text("'PAT'::character varying")
+    )
+    is_active: Mapped[bool] = mapped_column(Boolean, server_default=text("true"))
     issues_and_pull_requests_synced_at: Mapped[Optional[datetime.datetime]] = (
         mapped_column(TIMESTAMP(precision=6))
     )
@@ -656,6 +838,13 @@ class RepositoryToMonitor(Base):
         TIMESTAMP(precision=6)
     )
     workspace_id: Mapped[Optional[int]] = mapped_column(BigInteger)
+    repository_id: Mapped[Optional[int]] = mapped_column(BigInteger)
+    installation_id: Mapped[Optional[int]] = mapped_column(BigInteger)
+    linked_at: Mapped[Optional[datetime.datetime]] = mapped_column(DateTime)
+    unlinked_at: Mapped[Optional[datetime.datetime]] = mapped_column(DateTime)
+    repository: Mapped[Optional["Repository"]] = relationship(
+        "Repository", back_populates="repository_to_monitor"
+    )
     workspace: Mapped[Optional["Workspace"]] = relationship(
         "Workspace", back_populates="repository_to_monitor"
     )

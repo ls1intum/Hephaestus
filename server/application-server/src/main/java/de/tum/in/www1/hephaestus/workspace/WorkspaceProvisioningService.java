@@ -1,9 +1,16 @@
 package de.tum.in.www1.hephaestus.workspace;
 
 import de.tum.in.www1.hephaestus.gitprovider.common.github.app.GitHubAppTokenService;
+import de.tum.in.www1.hephaestus.gitprovider.installation.Installation;
+import de.tum.in.www1.hephaestus.gitprovider.installation.InstallationRepository;
+import de.tum.in.www1.hephaestus.gitprovider.installation.github.GitHubInstallationSyncService;
 import de.tum.in.www1.hephaestus.organization.OrganizationSyncService;
 import java.io.IOException;
+import java.time.Instant;
+import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Optional;
+import java.util.Set;
 import org.kohsuke.github.GHApp;
 import org.kohsuke.github.GHAppInstallation;
 import org.kohsuke.github.GHRepository;
@@ -40,6 +47,8 @@ public class WorkspaceProvisioningService {
     private final GitHubAppTokenService gitHubAppTokenService;
     private final OrganizationSyncService organizationSyncService;
     private final WorkspaceGitHubAccess workspaceGitHubAccess;
+    private final InstallationRepository installationRepository;
+    private final GitHubInstallationSyncService installationSyncService;
     private final boolean natsEnabled;
 
     public WorkspaceProvisioningService(
@@ -49,6 +58,8 @@ public class WorkspaceProvisioningService {
         GitHubAppTokenService gitHubAppTokenService,
         OrganizationSyncService organizationSyncService,
         WorkspaceGitHubAccess workspaceGitHubAccess,
+        InstallationRepository installationRepository,
+        GitHubInstallationSyncService installationSyncService,
         @Value("${nats.enabled}") boolean natsEnabled
     ) {
         this.workspaceProperties = workspaceProperties;
@@ -57,6 +68,8 @@ public class WorkspaceProvisioningService {
         this.gitHubAppTokenService = gitHubAppTokenService;
         this.organizationSyncService = organizationSyncService;
         this.workspaceGitHubAccess = workspaceGitHubAccess;
+        this.installationRepository = installationRepository;
+        this.installationSyncService = installationSyncService;
         this.natsEnabled = natsEnabled;
     }
 
@@ -103,6 +116,9 @@ public class WorkspaceProvisioningService {
                 RepositoryToMonitor monitor = new RepositoryToMonitor();
                 monitor.setNameWithOwner(nameWithOwner);
                 monitor.setWorkspace(workspace);
+                monitor.setSource(RepositoryToMonitor.Source.PAT);
+                monitor.setActive(true);
+                monitor.setLinkedAt(Instant.now());
                 workspace.getRepositoriesToMonitor().add(monitor);
             });
 
@@ -218,59 +234,108 @@ public class WorkspaceProvisioningService {
         Workspace workspace = workspaceService.ensureForInstallation(installationId, login, selection);
         workspace = workspaceService.updateAccountLogin(workspace.getId(), login);
 
+        Installation persistedInstallation = installationSyncService.synchronizeInstallationSnapshot(installation);
+
         organizationSyncService.syncOrganization(workspace);
         organizationSyncService.syncMembers(workspace);
 
-        if (natsEnabled && workspace.getGithubRepositorySelection() == GHRepositorySelection.SELECTED) {
-            seedRepositoriesForWorkspace(workspace);
+        if (!natsEnabled) {
+            logger.info(
+                "NATS is disabled; seeding installation repositories without starting asynchronous consumers."
+            );
+        }
+
+        if (workspace.getGithubRepositorySelection() == GHRepositorySelection.SELECTED) {
+            seedRepositoriesForWorkspace(workspace)
+                .ifPresent(activeRepositoryIds ->
+                    workspaceService.syncInstallationRepositoryLinks(installationId, activeRepositoryIds)
+                );
+        }
+
+        if (persistedInstallation != null) {
+            workspaceService.reconcileRepositoriesForInstallation(persistedInstallation);
+        } else {
+            installationRepository
+                .findById(installationId)
+                .ifPresent(workspaceService::reconcileRepositoriesForInstallation);
         }
     }
 
     /**
      * Seed repository monitors for an installation workspace when we manage selected repositories.
      */
-    private void seedRepositoriesForWorkspace(Workspace workspace) {
+    private Optional<Set<Long>> seedRepositoriesForWorkspace(Workspace workspace) {
         if (workspace.getGitProviderMode() != Workspace.GitProviderMode.GITHUB_APP_INSTALLATION) {
-            return;
+            return Optional.empty();
         }
 
-        workspaceGitHubAccess
-            .resolve(workspace)
-            .ifPresentOrElse(
-                context -> {
-                    logger.info(
-                        "Seeding repositories for org={} workspaceId={}.",
-                        context.ghOrganization().getLogin(),
-                        workspace.getId()
-                    );
-
-                    int repositoriesAdded = 0;
-                    for (GHRepository repo : context.ghOrganization().listRepositories().withPageSize(100)) {
-                        try {
-                            workspaceService.addRepositoryToMonitor(repo.getFullName());
-                            repositoriesAdded++;
-                        } catch (RepositoryAlreadyMonitoredException ignore) {
-                            // already present
-                        } catch (RepositoryNotFoundException rnfe) {
-                            logger.warn("Repository not found while seeding: {}", repo.getFullName());
-                        } catch (Exception ex) {
-                            logger.warn("Failed to add repository {}: {}", repo.getFullName(), ex.getMessage());
-                        }
-                    }
-
-                    logger.info(
-                        "Seeding complete for org={} workspaceId={} — added {} repositories.",
-                        context.ghOrganization().getLogin(),
-                        workspace.getId(),
-                        repositoriesAdded
-                    );
-                },
-                () ->
-                    logger.warn(
-                        "Unable to resolve GitHub context for workspace {}; skipping repository seeding.",
-                        workspace.getId()
-                    )
+        var contextOptional = workspaceGitHubAccess.resolve(workspace);
+        if (contextOptional.isEmpty()) {
+            logger.warn(
+                "Unable to resolve GitHub context for workspace {}; skipping repository seeding.",
+                workspace.getId()
             );
+            return Optional.empty();
+        }
+
+        var context = contextOptional.get();
+        logger.info(
+            "Seeding repositories for org={} workspaceId={}.",
+            context.ghOrganization().getLogin(),
+            workspace.getId()
+        );
+
+        Long installationId = workspace.getInstallationId();
+        if (installationId == null) {
+            logger.warn(
+                "Workspace {} is missing installation id despite GitHub App mode; skipping repository seeding.",
+                workspace.getId()
+            );
+            return Optional.empty();
+        }
+
+        int repositoriesAdded = 0;
+        Set<Long> repositoryIds = new LinkedHashSet<>();
+        try {
+            for (GHRepository repo : context.ghOrganization().listRepositories().withPageSize(100)) {
+                try {
+                    boolean activated = workspaceService.registerInstallationRepositorySnapshot(
+                        workspace,
+                        repo.getId(),
+                        repo.getFullName(),
+                        repo.getName(),
+                        repo.isPrivate()
+                    );
+                    repositoryIds.add(repo.getId());
+                    if (activated) {
+                        repositoriesAdded++;
+                    }
+                } catch (Exception ex) {
+                    logger.warn(
+                        "Failed to register installation repository snapshot {}: {}",
+                        repo.getFullName(),
+                        ex.getMessage()
+                    );
+                }
+            }
+        } catch (RuntimeException ex) {
+            logger.warn(
+                "Failed to enumerate repositories for org={} workspaceId={}: {}",
+                context.ghOrganization().getLogin(),
+                workspace.getId(),
+                ex.getMessage()
+            );
+            return Optional.empty();
+        }
+
+        logger.info(
+            "Seeding complete for org={} workspaceId={} — added {} repositories.",
+            context.ghOrganization().getLogin(),
+            workspace.getId(),
+            repositoriesAdded
+        );
+
+        return Optional.of(repositoryIds);
     }
 
     private boolean isBlank(String value) {

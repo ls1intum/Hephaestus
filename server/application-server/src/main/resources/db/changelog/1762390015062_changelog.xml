@@ -1,0 +1,247 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+        http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-3.8.xsd">
+
+    <changeSet author="FelixTJDietrich" id="1762390015062-1">
+        <createTable tableName="installation_target">
+            <column name="id" type="BIGINT">
+                <constraints nullable="false" primaryKey="true" primaryKeyName="pk_installation_target"/>
+            </column>
+            <column name="created_at" type="TIMESTAMP WITH TIME ZONE"/>
+            <column name="updated_at" type="TIMESTAMP WITH TIME ZONE"/>
+            <column name="login" type="VARCHAR(255)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="node_id" type="VARCHAR(255)"/>
+            <column name="html_url" type="VARCHAR(512)"/>
+            <column name="avatar_url" type="VARCHAR(512)"/>
+            <column name="target_type" type="VARCHAR(32)"/>
+            <column name="site_admin" type="BOOLEAN"/>
+            <column name="is_verified" type="BOOLEAN"/>
+            <column name="has_organization_projects" type="BOOLEAN"/>
+            <column name="has_repository_projects" type="BOOLEAN"/>
+            <column name="public_repos" type="INT"/>
+            <column name="public_gists" type="INT"/>
+            <column name="followers" type="INT"/>
+            <column name="following" type="INT"/>
+            <column name="description" type="VARCHAR(512)"/>
+            <column name="archived_at" type="TIMESTAMP WITH TIME ZONE"/>
+            <column name="last_renamed_at" type="TIMESTAMP WITH TIME ZONE"/>
+            <column name="last_renamed_from" type="VARCHAR(255)"/>
+            <column name="last_synced_at" type="TIMESTAMP WITH TIME ZONE"/>
+        </createTable>
+        <createIndex indexName="idx_installation_target_login" tableName="installation_target" unique="true">
+            <column name="login"/>
+        </createIndex>
+    </changeSet>
+
+    <changeSet author="FelixTJDietrich" id="1762390015062-2">
+        <createTable tableName="installation">
+            <column name="id" type="BIGINT">
+                <constraints nullable="false" primaryKey="true" primaryKeyName="pk_installation"/>
+            </column>
+            <column name="created_at" type="TIMESTAMP WITH TIME ZONE"/>
+            <column name="updated_at" type="TIMESTAMP WITH TIME ZONE"/>
+            <column name="target_id" type="BIGINT"/>
+            <column name="target_github_id" type="BIGINT"/>
+            <column name="target_type" type="VARCHAR(32)"/>
+            <column name="app_id" type="BIGINT"/>
+            <column name="access_tokens_url" type="VARCHAR(512)"/>
+            <column name="repositories_url" type="VARCHAR(512)"/>
+            <column name="html_url" type="VARCHAR(512)"/>
+            <column name="repository_selection" type="VARCHAR(32)" defaultValue="UNKNOWN">
+                <constraints nullable="false"/>
+            </column>
+            <column name="lifecycle_state" type="VARCHAR(32)" defaultValue="ACTIVE">
+                <constraints nullable="false"/>
+            </column>
+            <column name="single_file_name" type="VARCHAR(512)"/>
+            <column name="suspended_at" type="TIMESTAMP WITH TIME ZONE"/>
+            <column name="suspended_by_id" type="BIGINT"/>
+            <column name="deleted_at" type="TIMESTAMP WITH TIME ZONE"/>
+            <column name="last_webhook_received_at" type="TIMESTAMP WITH TIME ZONE"/>
+            <column name="last_repositories_sync_at" type="TIMESTAMP WITH TIME ZONE"/>
+            <column name="last_permissions_accepted_at" type="TIMESTAMP WITH TIME ZONE"/>
+        </createTable>
+        <createIndex indexName="idx_installation_target" tableName="installation">
+            <column name="target_id"/>
+        </createIndex>
+        <createIndex indexName="idx_installation_suspended_by" tableName="installation">
+            <column name="suspended_by_id"/>
+        </createIndex>
+    </changeSet>
+
+    <changeSet author="FelixTJDietrich" id="1762390015062-3">
+        <createTable tableName="installation_event">
+            <column name="installation_id" type="BIGINT">
+                <constraints nullable="false"/>
+            </column>
+            <column name="event_name" type="VARCHAR(128)">
+                <constraints nullable="false"/>
+            </column>
+        </createTable>
+        <addPrimaryKey
+            tableName="installation_event"
+            columnNames="installation_id, event_name"
+            constraintName="pk_installation_event"/>
+    </changeSet>
+
+    <changeSet author="FelixTJDietrich" id="1762390015062-4">
+        <createTable tableName="installation_permission">
+            <column name="installation_id" type="BIGINT">
+                <constraints nullable="false"/>
+            </column>
+            <column name="permission_name" type="VARCHAR(128)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="permission_level" type="VARCHAR(32)">
+                <constraints nullable="false"/>
+            </column>
+        </createTable>
+        <addPrimaryKey
+            tableName="installation_permission"
+            columnNames="installation_id, permission_name"
+            constraintName="pk_installation_permission"/>
+    </changeSet>
+
+    <changeSet author="FelixTJDietrich" id="1762390015062-5">
+        <createTable tableName="installation_repository">
+            <column name="installation_id" type="BIGINT">
+                <constraints nullable="false"/>
+            </column>
+            <column name="repository_id" type="BIGINT">
+                <constraints nullable="false"/>
+            </column>
+            <column name="is_active" type="BOOLEAN" defaultValueBoolean="true">
+                <constraints nullable="false"/>
+            </column>
+            <column name="linked_at" type="TIMESTAMP WITH TIME ZONE"/>
+            <column name="removed_at" type="TIMESTAMP WITH TIME ZONE"/>
+            <column name="last_synced_at" type="TIMESTAMP WITH TIME ZONE"/>
+        </createTable>
+        <addPrimaryKey
+            tableName="installation_repository"
+            columnNames="installation_id, repository_id"
+            constraintName="pk_installation_repository"/>
+        <createIndex indexName="idx_installation_repository_repository" tableName="installation_repository">
+            <column name="repository_id"/>
+        </createIndex>
+    </changeSet>
+
+    <changeSet author="FelixTJDietrich" id="1762390015062-6">
+        <addForeignKeyConstraint
+            baseTableName="installation"
+            baseColumnNames="target_id"
+            constraintName="fk_installation_target"
+            referencedTableName="installation_target"
+            referencedColumnNames="id"
+            onDelete="SET NULL"/>
+    </changeSet>
+
+    <changeSet author="FelixTJDietrich" id="1762390015062-7">
+        <addForeignKeyConstraint
+            baseTableName="installation"
+            baseColumnNames="suspended_by_id"
+            constraintName="fk_installation_suspended_by"
+            referencedTableName="user"
+            referencedColumnNames="id"
+            onDelete="SET NULL"/>
+    </changeSet>
+
+    <changeSet author="FelixTJDietrich" id="1762390015062-8">
+        <addForeignKeyConstraint
+            baseTableName="installation_event"
+            baseColumnNames="installation_id"
+            constraintName="fk_installation_event_installation"
+            referencedTableName="installation"
+            referencedColumnNames="id"
+            onDelete="CASCADE"/>
+    </changeSet>
+
+    <changeSet author="FelixTJDietrich" id="1762390015062-9">
+        <addForeignKeyConstraint
+            baseTableName="installation_permission"
+            baseColumnNames="installation_id"
+            constraintName="fk_installation_permission_installation"
+            referencedTableName="installation"
+            referencedColumnNames="id"
+            onDelete="CASCADE"/>
+    </changeSet>
+
+    <changeSet author="FelixTJDietrich" id="1762390015062-10">
+        <addForeignKeyConstraint
+            baseTableName="installation_repository"
+            baseColumnNames="installation_id"
+            constraintName="fk_installation_repository_installation"
+            referencedTableName="installation"
+            referencedColumnNames="id"
+            onDelete="CASCADE"/>
+    </changeSet>
+
+    <changeSet author="FelixTJDietrich" id="1762390015062-11">
+        <addForeignKeyConstraint
+            baseTableName="installation_repository"
+            baseColumnNames="repository_id"
+            constraintName="fk_installation_repository_repository"
+            referencedTableName="repository"
+            referencedColumnNames="id"
+            onDelete="CASCADE"/>
+    </changeSet>
+    <changeSet id="1762405123456-1" author="FelixTJDietrich">
+        <addColumn tableName="repository_to_monitor">
+            <column name="source" type="varchar(32)" defaultValue="PAT">
+                <constraints nullable="false"/>
+            </column>
+            <column name="is_active" type="boolean" defaultValueBoolean="true">
+                <constraints nullable="false"/>
+            </column>
+            <column name="repository_id" type="bigint"/>
+            <column name="installation_id" type="bigint"/>
+            <column name="linked_at" type="timestamp without time zone"/>
+            <column name="unlinked_at" type="timestamp without time zone"/>
+        </addColumn>
+    </changeSet>
+
+    <changeSet id="1762405123456-2" author="FelixTJDietrich">
+        <addForeignKeyConstraint
+            baseTableName="repository_to_monitor"
+            baseColumnNames="repository_id"
+            constraintName="fk_repository_to_monitor_repository"
+            referencedTableName="repository"
+            referencedColumnNames="id"/>
+    </changeSet>
+
+    <changeSet id="1762405123456-3" author="FelixTJDietrich">
+        <update tableName="repository_to_monitor">
+            <column name="linked_at" valueComputed="NOW()"/>
+            <where>linked_at IS NULL</where>
+        </update>
+    </changeSet>
+
+    <changeSet id="1762405123456-4" author="FelixTJDietrich">
+        <addUniqueConstraint
+            tableName="workspace"
+            columnNames="installation_id"
+            constraintName="uk_workspace_installation"/>
+    </changeSet>
+
+    <changeSet id="1762432764685-1" author="FelixTJDietrich">
+        <dropPrimaryKey
+            tableName="installation_event"
+            constraintName="pk_installation_event"/>
+    </changeSet>
+
+    <changeSet id="1762432764685-2" author="FelixTJDietrich">
+        <sql>
+            UPDATE repository_to_monitor rtm
+            SET source = 'INSTALLATION',
+                installation_id = w.installation_id
+            FROM workspace w
+            WHERE rtm.workspace_id = w.id
+              AND w.git_provider_mode = 'GITHUB_APP_INSTALLATION';
+        </sql>
+    </changeSet>
+</databaseChangeLog>

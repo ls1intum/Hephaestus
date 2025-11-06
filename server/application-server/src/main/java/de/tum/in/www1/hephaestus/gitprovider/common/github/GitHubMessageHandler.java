@@ -26,10 +26,14 @@ public abstract class GitHubMessageHandler<T extends GHEventPayload> implements 
 
     @Override
     public void onMessage(Message msg) {
-        String eventType = getHandlerEvent().name().toLowerCase();
         String subject = msg.getSubject();
-        if (!subject.endsWith(eventType)) {
-            logger.error("Received message on unexpected subject: {}, expected to end with {}", subject, eventType);
+        String expectedSuffix = getSubjectSuffix();
+        if (!subject.endsWith(expectedSuffix)) {
+            logger.error(
+                "Received message on unexpected subject: {}, expected to end with {}",
+                subject,
+                expectedSuffix
+            );
             return;
         }
 
@@ -43,6 +47,14 @@ public abstract class GitHubMessageHandler<T extends GHEventPayload> implements 
         } catch (Exception e) {
             logger.error("Unexpected error while handling message for subject {}: {}", subject, e.getMessage(), e);
         }
+    }
+
+    /**
+     * Returns the expected subject suffix for this handler. Defaults to the lower-case GHEvent name.
+     * Subclasses can override to support webhook subjects that are not yet represented in hub4j.
+     */
+    public String getSubjectSuffix() {
+        return getHandlerEvent().name().toLowerCase();
     }
 
     /**

@@ -50,6 +50,7 @@ public class Workspace {
     @Enumerated(EnumType.STRING)
     private GitProviderMode gitProviderMode = GitProviderMode.PAT_ORG;
 
+    @Column(name = "installation_id", unique = true)
     private Long installationId;
 
     private String accountLogin;

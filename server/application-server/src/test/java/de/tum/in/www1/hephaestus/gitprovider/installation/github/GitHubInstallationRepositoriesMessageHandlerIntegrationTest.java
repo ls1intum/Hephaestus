@@ -4,9 +4,18 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import de.tum.in.www1.hephaestus.gitprovider.common.GitHubPayload;
 import de.tum.in.www1.hephaestus.gitprovider.common.GitHubPayloadExtension;
+import de.tum.in.www1.hephaestus.gitprovider.installation.Installation;
+import de.tum.in.www1.hephaestus.gitprovider.installation.InstallationRepository;
+import de.tum.in.www1.hephaestus.gitprovider.installation.InstallationRepositoryLink;
+import de.tum.in.www1.hephaestus.gitprovider.installation.InstallationRepositoryLinkRepository;
 import de.tum.in.www1.hephaestus.gitprovider.repository.RepositoryRepository;
 import de.tum.in.www1.hephaestus.gitprovider.repository.github.GitHubRepositorySyncService;
 import de.tum.in.www1.hephaestus.testconfig.BaseIntegrationTest;
+import de.tum.in.www1.hephaestus.workspace.RepositoryToMonitor;
+import de.tum.in.www1.hephaestus.workspace.RepositoryToMonitorRepository;
+import de.tum.in.www1.hephaestus.workspace.Workspace;
+import de.tum.in.www1.hephaestus.workspace.WorkspaceRepository;
+import java.time.Instant;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -25,7 +34,19 @@ class GitHubInstallationRepositoriesMessageHandlerIntegrationTest extends BaseIn
     private RepositoryRepository repositoryRepository;
 
     @Autowired
+    private InstallationRepository installationRepository;
+
+    @Autowired
+    private InstallationRepositoryLinkRepository linkRepository;
+
+    @Autowired
     private GitHubRepositorySyncService repositorySyncService;
+
+    @Autowired
+    private WorkspaceRepository workspaceRepository;
+
+    @Autowired
+    private RepositoryToMonitorRepository repositoryToMonitorRepository;
 
     @BeforeEach
     void setUp() {
@@ -33,54 +54,139 @@ class GitHubInstallationRepositoriesMessageHandlerIntegrationTest extends BaseIn
     }
 
     @Test
-    @DisplayName("installation_repositories.added upserts repos")
-    void shouldUpsertOnRepositoriesAdded(
+    @DisplayName("Should link repositories on installation_repositories.added")
+    void shouldLinkRepositoriesOnAdded(
         @GitHubPayload("installation_repositories.added") GHEventPayload.InstallationRepositories payload
     ) {
-        assertThat(payload.getAction()).isEqualTo("added");
-        assertThat(payload.getRepositoriesAdded()).isNotEmpty();
+        Workspace workspace = new Workspace();
+        workspace.setGitProviderMode(Workspace.GitProviderMode.GITHUB_APP_INSTALLATION);
+        workspace.setInstallationId(payload.getInstallation().getId());
+        workspace.setAccountLogin(payload.getInstallation().getAccount().getLogin());
+        workspaceRepository.save(workspace);
 
-        var added = payload.getRepositoriesAdded();
-        var names = added.stream().map(r -> r.getFullName()).toList();
-        names.forEach(n -> assertThat(repositoryRepository.findByNameWithOwner(n)).isEmpty());
-
-        // When
         handler.handleEvent(payload);
 
-        // Then
-        names.forEach(n -> assertThat(repositoryRepository.findByNameWithOwner(n)).isPresent());
+        var installation = installationRepository
+            .findById(payload.getInstallation().getId())
+            .orElseThrow(() -> new AssertionError("Installation not persisted"));
+
+        assertThat(installation.getRepositorySelection()).isEqualTo(Installation.RepositorySelection.ALL);
+
+        var addedRepo = payload.getRepositoriesAdded().getFirst();
+        assertThat(repositoryRepository.findByNameWithOwner(addedRepo.getFullName())).isPresent();
+
+        var links = linkRepository.findAllByIdInstallationId(installation.getId());
+        assertThat(links)
+            .hasSize(1)
+            .first()
+            .satisfies(link -> {
+                assertThat(link.isActive()).isTrue();
+                assertThat(link.getRepository().getId()).isEqualTo(addedRepo.getId());
+            });
+
+        var refreshedWorkspace = workspaceRepository
+            .findByInstallationId(installation.getId())
+            .orElseThrow(() -> new AssertionError("Workspace missing"));
+        var activeMonitors = refreshedWorkspace
+            .getRepositoriesToMonitor()
+            .stream()
+            .filter(RepositoryToMonitor::isActive)
+            .map(RepositoryToMonitor::getNameWithOwner)
+            .toList();
+        assertThat(activeMonitors).containsExactly(addedRepo.getFullName());
     }
 
     @Test
-    @DisplayName("installation_repositories.removed deletes repos")
-    void shouldDeleteOnRepositoriesRemoved(
-        @GitHubPayload("installation_repositories.removed") GHEventPayload.InstallationRepositories payload
+    @DisplayName("Should deactivate repositories on installation_repositories.removed")
+    void shouldDeactivateRepositoriesOnRemoved(
+        @GitHubPayload("installation_repositories.added") GHEventPayload.InstallationRepositories addedPayload,
+        @GitHubPayload("installation_repositories.removed") GHEventPayload.InstallationRepositories removedPayload
     ) {
-        assertThat(payload.getAction()).isEqualTo("removed");
-        assertThat(payload.getRepositoriesRemoved()).isNotEmpty();
+        handler.handleEvent(addedPayload);
+        var installation = installationRepository
+            .findById(addedPayload.getInstallation().getId())
+            .orElseThrow(() -> new AssertionError("Installation not persisted"));
 
-        // Seed repos first
-        payload
+        Workspace workspace = new Workspace();
+        workspace.setGitProviderMode(Workspace.GitProviderMode.GITHUB_APP_INSTALLATION);
+        workspace.setInstallationId(installation.getId());
+        workspace.setAccountLogin(addedPayload.getInstallation().getAccount().getLogin());
+        workspaceRepository.save(workspace);
+
+        removedPayload
             .getRepositoriesRemoved()
-            .forEach(r ->
-                repositorySyncService.upsertFromInstallationPayload(
-                    r.getId(),
-                    r.getFullName(),
-                    r.getName(),
-                    r.isPrivate()
-                )
-            );
+            .forEach(repoPayload -> {
+                var repository = repositorySyncService.upsertFromInstallationPayload(
+                    repoPayload.getId(),
+                    repoPayload.getFullName(),
+                    repoPayload.getName(),
+                    repoPayload.isPrivate()
+                );
+                var link = new InstallationRepositoryLink();
+                link.setId(new InstallationRepositoryLink.Id(installation.getId(), repository.getId()));
+                link.setInstallation(installation);
+                link.setRepository(repository);
+                link.setActive(true);
+                link.setLinkedAt(Instant.now());
+                link.setLastSyncedAt(Instant.now());
+                linkRepository.save(link);
 
-        payload
+                RepositoryToMonitor repoToMonitor = new RepositoryToMonitor();
+                repoToMonitor.setNameWithOwner(repoPayload.getFullName());
+                repoToMonitor.setWorkspace(workspace);
+                repoToMonitor.setSource(RepositoryToMonitor.Source.INSTALLATION);
+                repoToMonitor.setRepository(repository);
+                repoToMonitor.setLinkedAt(Instant.now());
+                repoToMonitor.setActive(true);
+                repoToMonitor.setInstallationId(installation.getId());
+                repositoryToMonitorRepository.save(repoToMonitor);
+                workspace.getRepositoriesToMonitor().add(repoToMonitor);
+            });
+        workspaceRepository.save(workspace);
+
+        handler.handleEvent(removedPayload);
+
+        var removedIds = removedPayload
             .getRepositoriesRemoved()
-            .forEach(r -> assertThat(repositoryRepository.findByNameWithOwner(r.getFullName())).isPresent());
+            .stream()
+            .map(repo -> repo.getId())
+            .collect(java.util.stream.Collectors.toSet());
 
-        // When
-        handler.handleEvent(payload);
+        linkRepository
+            .findAllByIdInstallationId(installation.getId())
+            .stream()
+            .filter(link -> removedIds.contains(link.getRepository().getId()))
+            .forEach(link -> {
+                assertThat(link.isActive()).isFalse();
+                assertThat(link.getRemovedAt()).isNotNull();
+            });
+        var refreshedInstallation = installationRepository
+            .findById(installation.getId())
+            .orElseThrow(() -> new AssertionError("Installation missing after repositories removal"));
 
-        // Then
-        payload
-            .getRepositoriesRemoved()
-            .forEach(r -> assertThat(repositoryRepository.findByNameWithOwner(r.getFullName())).isEmpty());
+        assertThat(refreshedInstallation.getRepositorySelection()).isEqualTo(Installation.RepositorySelection.SELECTED);
+
+        var refreshedWorkspace = workspaceRepository
+            .findByInstallationId(installation.getId())
+            .orElseThrow(() -> new AssertionError("Workspace missing"));
+        var expectedRepositories = linkRepository
+            .findAllByIdInstallationId(installation.getId())
+            .stream()
+            .filter(InstallationRepositoryLink::isActive)
+            .map(link -> link.getId().getRepositoryId())
+            .map(repoId ->
+                repositoryRepository
+                    .findById(repoId)
+                    .orElseThrow(() -> new AssertionError("Repository missing: " + repoId))
+                    .getNameWithOwner()
+            )
+            .toList();
+        var activeWorkspaceRepositories = refreshedWorkspace
+            .getRepositoriesToMonitor()
+            .stream()
+            .filter(RepositoryToMonitor::isActive)
+            .map(RepositoryToMonitor::getNameWithOwner)
+            .toList();
+        assertThat(activeWorkspaceRepositories).containsExactlyInAnyOrderElementsOf(expectedRepositories);
     }
 }

@@ -1,7 +1,7 @@
 package de.tum.in.www1.hephaestus.gitprovider.installation.github;
 
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubMessageHandler;
-import de.tum.in.www1.hephaestus.gitprovider.repository.github.GitHubRepositorySyncService;
+import de.tum.in.www1.hephaestus.gitprovider.installation.Installation;
 import org.kohsuke.github.GHEvent;
 import org.kohsuke.github.GHEventPayload;
 import org.slf4j.Logger;
@@ -16,52 +16,43 @@ public class GitHubInstallationMessageHandler extends GitHubMessageHandler<GHEve
 
     private static final Logger logger = LoggerFactory.getLogger(GitHubInstallationMessageHandler.class);
 
-    private final GitHubRepositorySyncService repositorySyncService;
+    private final GitHubInstallationSyncService installationSyncService;
 
-    public GitHubInstallationMessageHandler(GitHubRepositorySyncService repositorySyncService) {
+    public GitHubInstallationMessageHandler(GitHubInstallationSyncService installationSyncService) {
         super(GHEventPayload.Installation.class);
-        this.repositorySyncService = repositorySyncService;
+        this.installationSyncService = installationSyncService;
     }
 
     @Override
     protected void handleEvent(GHEventPayload.Installation payload) {
         var action = payload.getAction();
         var installation = payload.getInstallation();
-        var rawRepositories = payload.getRawRepositories();
-        logger.info(
-            "Received installation event: action={}, appId={}, repositories={}",
-            action,
-            installation != null ? installation.getAppId() : null,
-            rawRepositories != null ? rawRepositories.size() : 0
-        );
-
-        // TODO: Persist/update the organization (installation.getAccount()) once an Organization table exists.
-
-        // Deleted: remove repositories and exit early
-        if ("deleted".equalsIgnoreCase(action)) {
-            if (rawRepositories != null && !rawRepositories.isEmpty()) {
-                var ids = rawRepositories.stream().map(GHEventPayload.Installation.Repository::getId).toList();
-                repositorySyncService.deleteRepositoriesByIds(ids);
-            }
+        if (installation == null) {
+            logger.warn("Skipping installation event {} because payload did not contain installation", action);
             return;
         }
 
-        // Other actions: upsert any provided repositories
-        if (rawRepositories != null && !rawRepositories.isEmpty()) {
-            rawRepositories.forEach(r -> {
-                if (r.getFullName() != null && !r.getFullName().isBlank()) {
-                    repositorySyncService.upsertFromInstallationPayload(
-                        r.getId(),
-                        r.getFullName(),
-                        r.getName(),
-                        r.isPrivate()
-                    );
-                }
-            });
+        int repositoryCount = safeRepositoryCount(payload);
+
+        logger.info(
+            "Received installation event: action={}, appId={}, repositories={}",
+            action,
+            installation.getAppId(),
+            repositoryCount
+        );
+        Installation entity = installationSyncService.handleInstallationEvent(payload);
+        if (entity != null) {
+            logger.debug("Installation {} processed; lifecycle state {}", entity.getId(), entity.getLifecycleState());
         }
-        // TODO: Consider removing/marking other installation-scoped data as inactive on "deleted".
-        // TODO: For action "suspend", consider pausing scheduled syncs and writes for this installation.
-        // TODO: For action "unsuspend", resume the paused activities and optionally re-sync repository metadata.
+    }
+
+    private int safeRepositoryCount(GHEventPayload.Installation payload) {
+        try {
+            var repositories = payload.getRawRepositories();
+            return repositories != null ? repositories.size() : 0;
+        } catch (NullPointerException ex) {
+            return 0;
+        }
     }
 
     @Override

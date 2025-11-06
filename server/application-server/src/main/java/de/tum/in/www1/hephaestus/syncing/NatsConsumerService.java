@@ -19,6 +19,7 @@ import java.util.Arrays;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map;
+import java.util.stream.Stream;
 import org.kohsuke.github.GHEvent;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -292,20 +293,16 @@ public class NatsConsumerService {
         try {
             String subject = msg.getSubject();
             String lastPart = subject.substring(subject.lastIndexOf(".") + 1);
-            GHEvent eventType = GHEvent.valueOf(lastPart.toUpperCase());
-            GitHubMessageHandler<?> eventHandler = handlerRegistry.getHandler(eventType);
+            GitHubMessageHandler<?> eventHandler = handlerRegistry.getHandlerBySubject(lastPart);
 
             if (eventHandler == null) {
-                logger.warn("No handler found for event type: {}", eventType);
+                logger.warn("No handler found for subject suffix: {}", lastPart);
                 msg.ack();
                 return;
             }
 
             eventHandler.onMessage(msg);
             msg.ack();
-        } catch (IllegalArgumentException e) {
-            logger.error("Invalid event type in subject '{}': {}", msg.getSubject(), e.getMessage());
-            msg.nak();
         } catch (Exception e) {
             logger.error("Error processing message: {}", e.getMessage(), e);
             msg.nak();
@@ -313,32 +310,35 @@ public class NatsConsumerService {
     }
 
     private String[] getOrganizationSubjects(String owner) {
-        return handlerRegistry
-            .getSupportedOrganizationEvents()
-            .stream()
-            .map(GHEvent::name)
-            .map(String::toLowerCase)
-            .map(event -> getSubjectPrefix(owner + "/?") + "." + event)
+        String prefix = getSubjectPrefix(owner + "/?");
+        return Stream.concat(
+            handlerRegistry.getSupportedOrganizationEvents().stream().map(GHEvent::name).map(String::toLowerCase),
+            handlerRegistry.getCustomOrganizationSubjects().stream()
+        )
+            .distinct()
+            .map(subject -> prefix + "." + subject)
             .toArray(String[]::new);
     }
 
     private String[] getRepositorySubjects(String nameWithOwner) {
-        return handlerRegistry
-            .getSupportedRepositoryEvents()
-            .stream()
-            .map(GHEvent::name)
-            .map(String::toLowerCase)
-            .map(event -> getSubjectPrefix(nameWithOwner) + "." + event)
+        String prefix = getSubjectPrefix(nameWithOwner);
+        return Stream.concat(
+            handlerRegistry.getSupportedRepositoryEvents().stream().map(GHEvent::name).map(String::toLowerCase),
+            handlerRegistry.getCustomRepositorySubjects().stream()
+        )
+            .distinct()
+            .map(subject -> prefix + "." + subject)
             .toArray(String[]::new);
     }
 
     private String[] getInstallationSubjects() {
-        return handlerRegistry
-            .getSupportedInstallationEvents()
-            .stream()
-            .map(GHEvent::name)
-            .map(String::toLowerCase)
-            .map(event -> getSubjectPrefix("?/?") + "." + event)
+        String prefix = getSubjectPrefix("?/?");
+        return Stream.concat(
+            handlerRegistry.getSupportedInstallationEvents().stream().map(GHEvent::name).map(String::toLowerCase),
+            handlerRegistry.getCustomInstallationSubjects().stream()
+        )
+            .distinct()
+            .map(subject -> prefix + "." + subject)
             .toArray(String[]::new);
     }
 

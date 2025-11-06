@@ -4,6 +4,7 @@ import de.tum.in.www1.hephaestus.gitprovider.team.TeamInfoDTO;
 import de.tum.in.www1.hephaestus.gitprovider.user.UserTeamsDTO;
 import java.util.List;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -35,6 +36,8 @@ public class WorkspaceController {
             return ResponseEntity.notFound().build();
         } catch (RepositoryAlreadyMonitoredException e) {
             return ResponseEntity.badRequest().build();
+        } catch (WorkspaceRepositoryMutationNotAllowedException e) {
+            return ResponseEntity.status(HttpStatus.CONFLICT).build();
         }
     }
 
@@ -45,6 +48,8 @@ public class WorkspaceController {
             return ResponseEntity.ok().build();
         } catch (RepositoryNotFoundException e) {
             return ResponseEntity.notFound().build();
+        } catch (WorkspaceRepositoryMutationNotAllowedException e) {
+            return ResponseEntity.status(HttpStatus.CONFLICT).build();
         }
     }
 

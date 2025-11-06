@@ -67,6 +67,72 @@ erDiagram
         BIGINT user_id FK "NOT NULL"
     }
 
+    Installation {
+        BIGINT id PK
+        TIMESTAMPTZ created_at
+        TIMESTAMPTZ updated_at
+        BIGINT target_id FK
+        BIGINT target_github_id
+        VARCHAR(32) target_type
+        BIGINT app_id
+        VARCHAR(512) access_tokens_url
+        VARCHAR(512) repositories_url
+        VARCHAR(512) html_url
+        VARCHAR(32) repository_selection "NOT NULL"
+        VARCHAR(32) lifecycle_state "NOT NULL"
+        VARCHAR(512) single_file_name
+        TIMESTAMPTZ suspended_at
+        BIGINT suspended_by_id FK
+        TIMESTAMPTZ deleted_at
+        TIMESTAMPTZ last_webhook_received_at
+        TIMESTAMPTZ last_repositories_sync_at
+        TIMESTAMPTZ last_permissions_accepted_at
+    }
+
+    InstallationEvent {
+        BIGINT installation_id FK "NOT NULL"
+        VARCHAR(128) event_name "NOT NULL"
+    }
+
+    InstallationPermission {
+        BIGINT installation_id PK,FK
+        VARCHAR(128) permission_name PK
+        VARCHAR(32) permission_level "NOT NULL"
+    }
+
+    InstallationRepository {
+        BIGINT installation_id PK,FK
+        BIGINT repository_id PK,FK
+        BOOLEAN is_active "NOT NULL"
+        TIMESTAMPTZ linked_at
+        TIMESTAMPTZ removed_at
+        TIMESTAMPTZ last_synced_at
+    }
+
+    InstallationTarget {
+        BIGINT id PK
+        TIMESTAMPTZ created_at
+        TIMESTAMPTZ updated_at
+        VARCHAR(255) login "NOT NULL"
+        VARCHAR(255) node_id
+        VARCHAR(512) html_url
+        VARCHAR(512) avatar_url
+        VARCHAR(32) target_type
+        BOOLEAN site_admin
+        BOOLEAN is_verified
+        BOOLEAN has_organization_projects
+        BOOLEAN has_repository_projects
+        INTEGER public_repos
+        INTEGER public_gists
+        INTEGER followers
+        INTEGER following
+        VARCHAR(512) description
+        TIMESTAMPTZ archived_at
+        TIMESTAMPTZ last_renamed_at
+        VARCHAR(255) last_renamed_from
+        TIMESTAMPTZ last_synced_at
+    }
+
     Issue {
         VARCHAR(31) issue_type "NOT NULL"
         BIGINT id PK
@@ -275,6 +341,12 @@ erDiagram
         VARCHAR(255) name_with_owner
         TIMESTAMP repository_synced_at
         BIGINT workspace_id FK
+        VARCHAR(32) source "NOT NULL"
+        BOOLEAN is_active "NOT NULL"
+        BIGINT repository_id FK
+        BIGINT installation_id
+        TIMESTAMP linked_at
+        TIMESTAMP unlinked_at
     }
 
     Team {
@@ -336,7 +408,7 @@ erDiagram
         VARCHAR(255) account_login
         VARCHAR(255) git_provider_mode
         VARCHAR(255) github_repository_selection
-        BIGINT installation_id
+        BIGINT installation_id UK
         TIMESTAMPTZ installation_linked_at
         BIGINT organization_id FK,UK
         TEXT personal_access_token
@@ -346,6 +418,9 @@ erDiagram
     %% One-to-One relationships
     ChatMessage ||--|| ChatMessagePart : has
     ChatMessage ||--|| ChatThread : references
+    Installation ||--|| InstallationPermission : has
+    Installation ||--|| InstallationRepository : has
+    Repository ||--|| InstallationRepository : has
     PullRequestReviewComment ||--|| PullRequestReviewThread : reviewed
     Organization ||--|| Workspace : has
 
@@ -356,6 +431,9 @@ erDiagram
     ChatThread ||--o{ ChatMessage : has
     User ||--o{ ChatThread : has
     User ||--o{ Document : has
+    User ||--o{ Installation : references
+    InstallationTarget ||--o{ Installation : has
+    Installation ||--o{ InstallationEvent : has
     User ||--o{ Issue : authored_by
     User ||--o{ Issue : merged_by
     Milestone ||--o{ Issue : has
@@ -377,6 +455,7 @@ erDiagram
     BadPracticeDetection ||--o{ PullRequestBadPractice : has
     Issue ||--o{ PullRequestBadPractice : references
     Organization ||--o{ Repository : has
+    Repository ||--o{ RepositoryToMonitor : monitors
     Workspace ||--o{ RepositoryToMonitor : monitors
 
     %% Many-to-Many relationships

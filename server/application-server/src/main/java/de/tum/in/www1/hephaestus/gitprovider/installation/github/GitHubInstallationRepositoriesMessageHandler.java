@@ -1,7 +1,7 @@
 package de.tum.in.www1.hephaestus.gitprovider.installation.github;
 
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubMessageHandler;
-import de.tum.in.www1.hephaestus.gitprovider.repository.github.GitHubRepositorySyncService;
+import de.tum.in.www1.hephaestus.gitprovider.installation.Installation;
 import org.kohsuke.github.GHEvent;
 import org.kohsuke.github.GHEventPayload;
 import org.slf4j.Logger;
@@ -17,11 +17,11 @@ public class GitHubInstallationRepositoriesMessageHandler
 
     private static final Logger logger = LoggerFactory.getLogger(GitHubInstallationRepositoriesMessageHandler.class);
 
-    private final GitHubRepositorySyncService repositorySyncService;
+    private final GitHubInstallationSyncService installationSyncService;
 
-    public GitHubInstallationRepositoriesMessageHandler(GitHubRepositorySyncService repositorySyncService) {
+    public GitHubInstallationRepositoriesMessageHandler(GitHubInstallationSyncService installationSyncService) {
         super(GHEventPayload.InstallationRepositories.class);
-        this.repositorySyncService = repositorySyncService;
+        this.installationSyncService = installationSyncService;
     }
 
     @Override
@@ -38,25 +38,9 @@ public class GitHubInstallationRepositoriesMessageHandler
             added != null ? added.size() : 0,
             removed != null ? removed.size() : 0
         );
-
-        // Upsert any added repositories
-        if (added != null && !added.isEmpty()) {
-            added.forEach(r -> {
-                if (r.getFullName() != null && !r.getFullName().isBlank()) {
-                    repositorySyncService.upsertFromInstallationPayload(
-                        r.getId(),
-                        r.getFullName(),
-                        r.getName(),
-                        r.isPrivate()
-                    );
-                }
-            });
-        }
-
-        // Delete any removed repositories
-        if (removed != null && !removed.isEmpty()) {
-            var ids = removed.stream().map(r -> r.getId()).toList();
-            repositorySyncService.deleteRepositoriesByIds(ids);
+        Installation installationEntity = installationSyncService.handleInstallationRepositoriesEvent(payload);
+        if (installationEntity == null) {
+            logger.warn("installation_repositories webhook {} skipped because installation payload was empty", action);
         }
     }
 
