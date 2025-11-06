@@ -6,6 +6,7 @@ import de.tum.in.www1.hephaestus.gitprovider.issuecomment.IssueComment;
 import de.tum.in.www1.hephaestus.gitprovider.pullrequest.PullRequest;
 import de.tum.in.www1.hephaestus.gitprovider.pullrequestreview.PullRequestReview;
 import de.tum.in.www1.hephaestus.gitprovider.pullrequestreviewcomment.PullRequestReviewComment;
+import de.tum.in.www1.hephaestus.gitprovider.repository.collaborator.RepositoryCollaborator;
 import de.tum.in.www1.hephaestus.gitprovider.team.Team;
 import de.tum.in.www1.hephaestus.gitprovider.team.membership.TeamMembership;
 import jakarta.persistence.Entity;
@@ -66,6 +67,10 @@ public class User extends BaseGitServiceEntity {
     @OneToMany(mappedBy = "user")
     @ToString.Exclude
     private Set<TeamMembership> teamMemberships = new HashSet<>();
+
+    @OneToMany(mappedBy = "user")
+    @ToString.Exclude
+    private Set<RepositoryCollaborator> repositoryCollaborations = new HashSet<>();
 
     @OneToMany(mappedBy = "author")
     @ToString.Exclude

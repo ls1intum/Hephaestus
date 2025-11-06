@@ -177,7 +177,7 @@ class OrganizationMembership(Base):
     organization_id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
     user_id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
     joined_at: Mapped[Optional[datetime.datetime]] = mapped_column(TIMESTAMP(True, 6))
-    role: Mapped[Optional[str]] = mapped_column(String(255))
+    role: Mapped[Optional[str]] = mapped_column(String(32))
 
 
 class PullRequestReviewComment(Base):
@@ -407,6 +407,9 @@ class User(Base):
     milestone: Mapped[List["Milestone"]] = relationship(
         "Milestone", back_populates="creator"
     )
+    repository_collaborator: Mapped[List["RepositoryCollaborator"]] = relationship(
+        "RepositoryCollaborator", back_populates="user"
+    )
     issue: Mapped[List["Issue"]] = relationship(
         "Issue", foreign_keys="[Issue.author_id]", back_populates="author"
     )
@@ -500,6 +503,9 @@ class Repository(Base):
     label: Mapped[List["Label"]] = relationship("Label", back_populates="repository")
     milestone: Mapped[List["Milestone"]] = relationship(
         "Milestone", back_populates="repository"
+    )
+    repository_collaborator: Mapped[List["RepositoryCollaborator"]] = relationship(
+        "RepositoryCollaborator", back_populates="repository"
     )
     team_repository_permission: Mapped[List["TeamRepositoryPermission"]] = relationship(
         "TeamRepositoryPermission", back_populates="repository"
@@ -620,6 +626,32 @@ class Milestone(Base):
         "Repository", back_populates="milestone"
     )
     issue: Mapped[List["Issue"]] = relationship("Issue", back_populates="milestone")
+
+
+class RepositoryCollaborator(Base):
+    __tablename__ = "repository_collaborator"
+    __table_args__ = (
+        ForeignKeyConstraint(
+            ["repository_id"],
+            ["repository.id"],
+            name="fk_repository_collaborator_repository",
+        ),
+        ForeignKeyConstraint(
+            ["user_id"], ["user.id"], name="fk_repository_collaborator_user"
+        ),
+        PrimaryKeyConstraint(
+            "repository_id", "user_id", name="pk_repository_collaborator"
+        ),
+    )
+    repository_id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
+    user_id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
+    permission: Mapped[str] = mapped_column(String(32))
+    repository: Mapped["Repository"] = relationship(
+        "Repository", back_populates="repository_collaborator"
+    )
+    user: Mapped["User"] = relationship(
+        "User", back_populates="repository_collaborator"
+    )
 
 
 class RepositoryToMonitor(Base):

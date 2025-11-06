@@ -164,7 +164,7 @@ erDiagram
         BIGINT organization_id PK
         BIGINT user_id PK
         TIMESTAMPTZ joined_at
-        VARCHAR(255) role
+        VARCHAR(32) role
     }
 
     PullRequestRequestedReviewer {
@@ -265,6 +265,12 @@ erDiagram
         VARCHAR(255) visibility
         INTEGER watchers_count "NOT NULL"
         BIGINT organization_id FK
+    }
+
+    RepositoryCollaborator {
+        BIGINT repository_id PK,FK
+        BIGINT user_id PK,FK
+        VARCHAR(32) permission "NOT NULL"
     }
 
     RepositoryToMonitor {
@@ -386,6 +392,8 @@ erDiagram
     Label }o--o{ IssueLabel : labeled
     Issue }o--o{ PullRequestRequestedReviewer : reviewed
     User }o--o{ PullRequestRequestedReviewer : reviewed
+    Repository }o--o{ RepositoryCollaborator : has
+    User }o--o{ RepositoryCollaborator : has
     Label }o--o{ TeamLabel : labeled
     Team }o--o{ TeamLabel : labeled
     Team }o--o{ TeamMembership : belongs_to

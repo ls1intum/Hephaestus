@@ -1,4 +1,4 @@
-package de.tum.in.www1.hephaestus.syncing;
+package de.tum.in.www1.hephaestus.gitprovider.sync;
 
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubMessageHandler;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubMessageHandlerRegistry;
