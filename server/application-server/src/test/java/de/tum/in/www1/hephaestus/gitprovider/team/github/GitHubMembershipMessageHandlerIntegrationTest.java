@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import de.tum.in.www1.hephaestus.gitprovider.common.GitHubPayload;
 import de.tum.in.www1.hephaestus.gitprovider.common.GitHubPayloadExtension;
 import de.tum.in.www1.hephaestus.gitprovider.team.TeamRepository;
+import de.tum.in.www1.hephaestus.gitprovider.team.membership.TeamMembership;
 import de.tum.in.www1.hephaestus.gitprovider.user.UserRepository;
 import de.tum.in.www1.hephaestus.testconfig.BaseIntegrationTest;
 import org.junit.jupiter.api.BeforeEach;
@@ -46,6 +47,7 @@ class GitHubMembershipMessageHandlerIntegrationTest extends BaseIntegrationTest 
         var user = userRepository.findById(userId).orElseThrow();
         assertThat(team.getMemberships()).anySatisfy(m -> {
             assertThat(m.getUser().getId()).isEqualTo(user.getId());
+            assertThat(m.getRole()).isEqualTo(TeamMembership.Role.MEMBER);
         });
     }
 

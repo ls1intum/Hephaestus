@@ -1,4 +1,4 @@
-package de.tum.in.www1.hephaestus.organization;
+package de.tum.in.www1.hephaestus.gitprovider.organization;
 
 import java.util.Optional;
 import org.springframework.data.jpa.repository.JpaRepository;

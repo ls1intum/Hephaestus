@@ -1,4 +1,4 @@
-package de.tum.in.www1.hephaestus.syncing;
+package de.tum.in.www1.hephaestus.gitprovider.sync;
 
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubClientProvider;
 import de.tum.in.www1.hephaestus.gitprovider.issue.Issue;
@@ -12,6 +12,7 @@ import de.tum.in.www1.hephaestus.gitprovider.pullrequest.github.GitHubPullReques
 import de.tum.in.www1.hephaestus.gitprovider.pullrequestreview.github.GitHubPullRequestReviewSyncService;
 import de.tum.in.www1.hephaestus.gitprovider.pullrequestreviewcomment.github.GitHubPullRequestReviewCommentSyncService;
 import de.tum.in.www1.hephaestus.gitprovider.repository.RepositoryRepository;
+import de.tum.in.www1.hephaestus.gitprovider.repository.github.GitHubRepositoryCollaboratorSyncService;
 import de.tum.in.www1.hephaestus.gitprovider.repository.github.GitHubRepositorySyncService;
 import de.tum.in.www1.hephaestus.gitprovider.team.github.GitHubTeamSyncService;
 import de.tum.in.www1.hephaestus.gitprovider.user.github.GitHubUserSyncService;
@@ -68,6 +69,9 @@ public class GitHubDataSyncService {
 
     @Autowired
     private GitHubRepositorySyncService repositorySyncService;
+
+    @Autowired
+    private GitHubRepositoryCollaboratorSyncService collaboratorSyncService;
 
     @Autowired
     private GitHubLabelSyncService labelSyncService;
@@ -207,6 +211,8 @@ public class GitHubDataSyncService {
         var repository = repositorySyncService.syncRepository(workSpaceId, nameWithOwner);
         repositoryToMonitor.setRepositorySyncedAt(currentTime);
         repositoryToMonitorRepository.save(repositoryToMonitor);
+
+        repository.ifPresent(collaboratorSyncService::syncCollaborators);
         return repository;
     }
 

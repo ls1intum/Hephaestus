@@ -1,4 +1,4 @@
-package de.tum.in.www1.hephaestus.organization;
+package de.tum.in.www1.hephaestus.gitprovider.organization;
 
 import java.io.Serializable;
 import java.util.Objects;
