@@ -3,6 +3,9 @@ spring:
         name: Hephaestus
         version: "0.10.0-rc.16"
 
+    config:
+        import: optional:file:.env[.properties]
+
     datasource:
         url: jdbc:postgresql://localhost:5432/hephaestus
         username: root
