@@ -1,9 +1,8 @@
 package de.tum.in.www1.hephaestus.config;
 
 import jakarta.annotation.PostConstruct;
-import net.bytebuddy.ByteBuddy;
 import net.bytebuddy.agent.ByteBuddyAgent;
-import net.bytebuddy.dynamic.loading.ClassReloadingStrategy;
+import net.bytebuddy.agent.builder.AgentBuilder;
 import net.bytebuddy.implementation.MethodDelegation;
 import net.bytebuddy.implementation.bind.annotation.RuntimeType;
 import net.bytebuddy.implementation.bind.annotation.This;
@@ -33,13 +32,16 @@ public class GitHubApiPatches {
     }
 
     private void patchGetUser(String className) throws Exception {
-        Class<?> target = Class.forName(className);
-        new ByteBuddy()
-            .redefine(target)
-            .method(ElementMatchers.named("getUser"))
-            .intercept(MethodDelegation.to(GetUserInterceptor.class))
-            .make()
-            .load(target.getClassLoader(), ClassReloadingStrategy.fromInstalledAgent());
+        new AgentBuilder.Default()
+            .with(AgentBuilder.RedefinitionStrategy.RETRANSFORMATION)
+            .ignore(ElementMatchers.none())
+            .type(ElementMatchers.named(className))
+            .transform((builder, typeDescription, classLoader, module, protectionDomain) ->
+                builder
+                    .method(ElementMatchers.named("getUser"))
+                    .intercept(MethodDelegation.to(GetUserInterceptor.class))
+            )
+            .installOnByteBuddyAgent();
 
         logger.info("Patched {}#getUser via Byte Buddy", className);
     }

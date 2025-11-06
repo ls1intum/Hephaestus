@@ -52,7 +52,7 @@ public class GitHubPullRequestReviewCommentConverter
     }
 
     private Integer nullIfZero(int value) {
-        return value == 0 ? null : value;
+        return value <= 0 ? null : value;
     }
 
     private PullRequestReviewComment.Side convertNullableSide(Side side) {

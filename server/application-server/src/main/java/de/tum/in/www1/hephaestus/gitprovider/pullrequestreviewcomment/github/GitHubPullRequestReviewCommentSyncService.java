@@ -211,6 +211,7 @@ public class GitHubPullRequestReviewCommentSyncService {
             .orElseGet(() -> {
                 PullRequestReviewThread newThread = new PullRequestReviewThread();
                 newThread.setId(rootCommentId);
+                newThread.setProviderThreadId(rootCommentId);
                 newThread.setState(PullRequestReviewThread.State.UNRESOLVED);
                 newThread.setPullRequest(pullRequest);
                 return pullRequestReviewThreadRepository.save(newThread);
@@ -231,6 +232,16 @@ public class GitHubPullRequestReviewCommentSyncService {
 
         if (ghPullRequestReviewComment.getInReplyToId() <= 0L) {
             thread.setRootComment(comment);
+            thread.setProviderThreadId(comment.getId());
+            thread.setPath(comment.getPath());
+            thread.setLine(comment.getLine());
+            thread.setStartLine(comment.getStartLine());
+            thread.setSide(comment.getSide());
+            thread.setStartSide(comment.getStartSide());
+        }
+
+        if (thread.getPath() == null) {
+            thread.setPath(comment.getPath());
         }
 
         if (
@@ -261,10 +272,17 @@ public class GitHubPullRequestReviewCommentSyncService {
 
                 if (isRootComment) {
                     pullRequestReviewThreadRepository.delete(thread);
+                    pullRequestReviewThreadRepository.flush();
                 } else {
+                    if (thread != null) {
+                        thread.getComments().remove(comment);
+                    }
+                    comment.setThread(null);
                     pullRequestReviewCommentRepository.delete(comment);
+                    pullRequestReviewCommentRepository.flush();
                     if (thread != null && pullRequestReviewCommentRepository.countByThreadId(thread.getId()) == 0) {
                         pullRequestReviewThreadRepository.delete(thread);
+                        pullRequestReviewThreadRepository.flush();
                     }
                 }
             });
