@@ -91,10 +91,14 @@ public class GitHubMilestoneSyncService {
 
         // Link creator
         var creator = ghMilestone.getCreator();
-        var resultCreator = userRepository
-            .findById(creator.getId())
-            .orElseGet(() -> userRepository.save(userConverter.convert(creator)));
-        result.setCreator(resultCreator);
+        if (creator != null) {
+            var resultCreator = userRepository
+                .findById(creator.getId())
+                .orElseGet(() -> userRepository.save(userConverter.convert(creator)));
+            result.setCreator(resultCreator);
+        } else {
+            result.setCreator(null);
+        }
 
         return milestoneRepository.save(result);
     }

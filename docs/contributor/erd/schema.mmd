@@ -144,6 +144,8 @@ erDiagram
         BIGINT creator_id FK
         BIGINT repository_id FK
         TEXT description
+        INTEGER closed_issues_count "NOT NULL"
+        INTEGER open_issues_count "NOT NULL"
     }
 
     Organization {
