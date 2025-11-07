@@ -36,6 +36,7 @@
         <maven.test.failure.ignore>false</maven.test.failure.ignore>
         <maven.test.skip>false</maven.test.skip>
         <hephaestus.surefire.timeout>180</hephaestus.surefire.timeout>
+        <hephaestus.githubIntegrationExcludedGroups>github-integration</hephaestus.githubIntegrationExcludedGroups>
 
         <!-- Coverage Configuration (disabled by default) -->
         <skipCoverage>true</skipCoverage>
@@ -434,6 +435,7 @@
                     <!-- Forked JVM timeout settings to prevent hanging -->
                     <forkedProcessTimeoutInSeconds>${hephaestus.surefire.timeout}</forkedProcessTimeoutInSeconds>
                     <forkedProcessExitTimeoutInSeconds>60</forkedProcessExitTimeoutInSeconds>
+                    <excludedGroups>${hephaestus.githubIntegrationExcludedGroups}</excludedGroups>
                 </configuration>
             </plugin>
 
@@ -555,6 +557,12 @@
             </activation>
             <properties>
                 <hephaestus.surefire.timeout>180</hephaestus.surefire.timeout>
+            </properties>
+        </profile>
+        <profile>
+            <id>github-integration-tests</id>
+            <properties>
+                <hephaestus.githubIntegrationExcludedGroups></hephaestus.githubIntegrationExcludedGroups>
             </properties>
         </profile>
     </profiles>

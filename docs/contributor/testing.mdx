@@ -133,8 +133,10 @@ Some regression scenarios can only be validated against GitHub itself. We ship a
 From `server/application-server/` run:
 
 ```bash
-./mvnw test -Dgroups=github-integration
+./mvnw test -Pgithub-integration-tests -Dgroups=github-integration
 ```
+
+The `github-integration-tests` profile clears the default exclusion so the live suite can execute; the `-Dgroups` flag narrows execution to just those classes. Run the regular unit/integration suites separately via `./mvnw test`.
 
 The run takes roughly two minutes and prints the GitHub artefacts it provisions. Clean-up is handled automatically, but if a failure interrupts execution you can safely delete any `hephaestus-it-*` repositories, milestones, or teams that remain in the sandbox.
 
