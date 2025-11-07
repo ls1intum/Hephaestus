@@ -89,6 +89,13 @@ public final class PostgreSQLTestContainer {
 
         newContainer.start();
 
+        LOGGER.info(
+            "Started PostgreSQL Testcontainer via Docker: jdbcUrl={}, username={}, database={}",
+            newContainer.getJdbcUrl(),
+            newContainer.getUsername(),
+            newContainer.getDatabaseName()
+        );
+
         Runtime.getRuntime()
             .addShutdownHook(
                 new Thread(() -> {
@@ -134,6 +141,12 @@ public final class PostgreSQLTestContainer {
         public void start() {
             try (Connection connection = DriverManager.getConnection(jdbcUrl, username, password)) {
                 connection.createStatement().execute("SELECT 1");
+                LOGGER.info(
+                    "Using locally managed PostgreSQL instance: jdbcUrl={}, username={}, database={}",
+                    jdbcUrl,
+                    username,
+                    databaseName
+                );
             } catch (SQLException exception) {
                 throw new IllegalStateException(
                     "Failed to connect to local PostgreSQL instance at " +

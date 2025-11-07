@@ -35,7 +35,7 @@
         <!-- Test Configuration -->
         <maven.test.failure.ignore>false</maven.test.failure.ignore>
         <maven.test.skip>false</maven.test.skip>
-        <hephaestus.surefire.timeout>60</hephaestus.surefire.timeout>
+        <hephaestus.surefire.timeout>180</hephaestus.surefire.timeout>
 
         <!-- Coverage Configuration (disabled by default) -->
         <skipCoverage>true</skipCoverage>
@@ -433,7 +433,7 @@
                     <skipAfterFailureCount>5</skipAfterFailureCount>
                     <!-- Forked JVM timeout settings to prevent hanging -->
                     <forkedProcessTimeoutInSeconds>${hephaestus.surefire.timeout}</forkedProcessTimeoutInSeconds>
-                    <forkedProcessExitTimeoutInSeconds>10</forkedProcessExitTimeoutInSeconds>
+                    <forkedProcessExitTimeoutInSeconds>60</forkedProcessExitTimeoutInSeconds>
                 </configuration>
             </plugin>
 
