@@ -102,22 +102,20 @@ public class Workspace {
     @Column(name = "updated_at")
     private Instant updatedAt;
 
-    // Leaderboard schedule configuration (nullable = use global default)
     @Column(name = "leaderboard_schedule_day")
     private Integer leaderboardScheduleDay; // 1=Monday, 7=Sunday
 
     @Column(name = "leaderboard_schedule_time", length = 10)
     private String leaderboardScheduleTime; // Format: "HH:mm"
 
-    // Leaderboard notification configuration (nullable = use global default)
     @Column(name = "leaderboard_notification_enabled")
     private Boolean leaderboardNotificationEnabled;
 
     @Column(name = "leaderboard_notification_team", length = 100)
-    private String leaderboardNotificationTeam; // Team name or "all"
+    private String leaderboardNotificationTeam;
 
     @Column(name = "leaderboard_notification_channel_id", length = 100)
-    private String leaderboardNotificationChannelId; // Slack channel ID
+    private String leaderboardNotificationChannelId;
 
     @PrePersist
     public void prePersist() {

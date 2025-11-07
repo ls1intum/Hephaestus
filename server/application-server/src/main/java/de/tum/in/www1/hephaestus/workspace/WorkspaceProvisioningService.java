@@ -105,7 +105,6 @@ public class WorkspaceProvisioningService {
             );
         }
 
-        // Sync the GitHub user to get proper ownership
         Long ownerUserId = syncGitHubUserForPAT(config.getToken(), accountLogin);
 
         String rawSlug = accountLogin;
@@ -304,12 +303,10 @@ public class WorkspaceProvisioningService {
      */
     private Long syncGitHubUserForPAT(String patToken, String accountLogin) {
         try {
-            // Create GitHub client with PAT
             GitHub github = new org.kohsuke.github.GitHubBuilder()
                 .withOAuthToken(patToken)
                 .build();
             
-            // Sync the user from GitHub
             User user = gitHubUserSyncService.syncUser(github, accountLogin);
             
             if (user != null && user.getId() != null) {
@@ -320,7 +317,6 @@ public class WorkspaceProvisioningService {
             logger.warn("Failed to sync GitHub user '{}' for PAT workspace: {}", accountLogin, e.getMessage());
         }
 
-        // Fallback: check if user already exists locally
         return userRepository.findByLogin(accountLogin)
             .map(User::getId)
             .orElseThrow(() -> new IllegalStateException(
