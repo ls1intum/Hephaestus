@@ -718,7 +718,38 @@ paths:
           description: OK
       tags:
       - user
-  /workspace/league/reset:
+  /workspaces:
+    get:
+      operationId: listWorkspaces
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/WorkspaceListItem"
+          description: OK
+      tags:
+      - workspace
+    post:
+      operationId: createWorkspace
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateWorkspaceRequest"
+        required: true
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                type: object
+          description: OK
+      tags:
+      - workspace
+  /workspaces/league/reset:
     put:
       operationId: resetAndRecalculateLeagues
       responses:
@@ -726,7 +757,7 @@ paths:
           description: OK
       tags:
       - workspace
-  /workspace/repositories:
+  /workspaces/repositories:
     get:
       operationId: getRepositoriesToMonitor
       responses:
@@ -740,7 +771,7 @@ paths:
           description: OK
       tags:
       - workspace
-  /workspace/repositories/{owner}/{name}:
+  /workspaces/repositories/{owner}/{name}:
     delete:
       operationId: removeRepositoryToMonitor
       parameters:
@@ -777,7 +808,7 @@ paths:
           description: OK
       tags:
       - workspace
-  /workspace/team/{teamId}/label/{labelId}:
+  /workspaces/team/{teamId}/label/{labelId}:
     delete:
       operationId: removeLabelFromTeam
       parameters:
@@ -802,7 +833,7 @@ paths:
           description: OK
       tags:
       - workspace
-  /workspace/team/{teamId}/label/{repositoryId}/{label}:
+  /workspaces/team/{teamId}/label/{repositoryId}/{label}:
     post:
       operationId: addLabelToTeam
       parameters:
@@ -832,7 +863,7 @@ paths:
           description: OK
       tags:
       - workspace
-  /workspace/users:
+  /workspaces/users:
     get:
       operationId: getUsersWithTeams
       responses:
@@ -843,6 +874,149 @@ paths:
                 type: array
                 items:
                   $ref: "#/components/schemas/UserTeams"
+          description: OK
+      tags:
+      - workspace
+  /workspaces/{slug}:
+    delete:
+      operationId: purgeWorkspace
+      parameters:
+      - in: path
+        name: slug
+        required: true
+        schema:
+          type: string
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                type: object
+          description: OK
+      tags:
+      - workspace
+    get:
+      operationId: getWorkspace
+      parameters:
+      - in: path
+        name: slug
+        required: true
+        schema:
+          type: string
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                type: object
+          description: OK
+      tags:
+      - workspace
+  /workspaces/{slug}/notifications:
+    patch:
+      operationId: updateNotifications
+      parameters:
+      - in: path
+        name: slug
+        required: true
+        schema:
+          type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateWorkspaceNotificationsRequest"
+        required: true
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                type: object
+          description: OK
+      tags:
+      - workspace
+  /workspaces/{slug}/resume:
+    post:
+      operationId: resumeWorkspace
+      parameters:
+      - in: path
+        name: slug
+        required: true
+        schema:
+          type: string
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                type: object
+          description: OK
+      tags:
+      - workspace
+  /workspaces/{slug}/schedule:
+    patch:
+      operationId: updateSchedule
+      parameters:
+      - in: path
+        name: slug
+        required: true
+        schema:
+          type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateWorkspaceScheduleRequest"
+        required: true
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                type: object
+          description: OK
+      tags:
+      - workspace
+  /workspaces/{slug}/suspend:
+    post:
+      operationId: suspendWorkspace
+      parameters:
+      - in: path
+        name: slug
+        required: true
+        schema:
+          type: string
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                type: object
+          description: OK
+      tags:
+      - workspace
+  /workspaces/{slug}/token:
+    patch:
+      operationId: updateToken
+      parameters:
+      - in: path
+        name: slug
+        required: true
+        schema:
+          type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateWorkspaceTokenRequest"
+        required: true
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                type: object
           description: OK
       tags:
       - workspace
@@ -1046,6 +1220,30 @@ components:
       - content
       - kind
       - title
+    CreateWorkspaceRequest:
+      type: object
+      description: DTO for creating a new workspace.
+      properties:
+        accountLogin:
+          type: string
+        accountType:
+          type: string
+          enum:
+          - ORG
+          - USER
+        displayName:
+          type: string
+        ownerUserId:
+          type: integer
+          format: int64
+        slug:
+          type: string
+      required:
+      - accountLogin
+      - accountType
+      - displayName
+      - ownerUserId
+      - slug
     DataUIPart:
       type: object
       description: |-
@@ -2697,6 +2895,39 @@ components:
       - content
       - kind
       - title
+    UpdateWorkspaceNotificationsRequest:
+      type: object
+      description: DTO for updating workspace leaderboard notification preferences.
+      properties:
+        channelId:
+          type: string
+        enabled:
+          type: boolean
+        team:
+          type: string
+    UpdateWorkspaceScheduleRequest:
+      type: object
+      description: |-
+        DTO for updating workspace leaderboard schedule configuration.
+         Day: 1=Monday, 2=Tuesday, ..., 7=Sunday
+         Time: Format "HH:mm" (24-hour format)
+      properties:
+        day:
+          type: integer
+          format: int32
+          maximum: 7
+          minimum: 1
+        time:
+          type: string
+          pattern: "^\\d{2}:\\d{2}$"
+    UpdateWorkspaceTokenRequest:
+      type: object
+      description: DTO for updating workspace Personal Access Token (PAT).
+      properties:
+        personalAccessToken:
+          type: string
+      required:
+      - personalAccessToken
     UserInfo:
       type: object
       properties:
@@ -2791,16 +3022,19 @@ components:
           anyOf:
           - type: integer
           - type: "null"
+          default: null
           title: Interval
         temperature_2m:
           anyOf:
           - type: number
           - type: "null"
+          default: null
           title: Temperature 2M
         time:
           anyOf:
           - type: string
           - type: "null"
+          default: null
           title: Time
       title: WeatherCurrent
     WeatherCurrentUnits:
@@ -2810,11 +3044,13 @@ components:
           anyOf:
           - type: string
           - type: "null"
+          default: null
           title: Interval
         temperature_2m:
           anyOf:
           - type: string
           - type: "null"
+          default: null
           title: Temperature 2M
         time:
           anyOf:
@@ -2851,11 +3087,13 @@ components:
           anyOf:
           - type: string
           - type: "null"
+          default: null
           title: Sunrise
         sunset:
           anyOf:
           - type: string
           - type: "null"
+          default: null
           title: Sunset
         time:
           anyOf:
@@ -2893,3 +3131,20 @@ components:
           - type: "null"
           title: Time
       title: WeatherHourlyUnits
+    WorkspaceListItem:
+      type: object
+      properties:
+        accountLogin:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+        displayName:
+          type: string
+        id:
+          type: integer
+          format: int64
+        slug:
+          type: string
+        status:
+          type: string

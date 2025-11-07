@@ -2,6 +2,7 @@ package de.tum.in.www1.hephaestus.workspace;
 
 import de.tum.in.www1.hephaestus.gitprovider.label.Label;
 import de.tum.in.www1.hephaestus.gitprovider.label.LabelRepository;
+import de.tum.in.www1.hephaestus.gitprovider.common.github.app.GitHubAppTokenService;
 import de.tum.in.www1.hephaestus.gitprovider.repository.RepositoryRepository;
 import de.tum.in.www1.hephaestus.gitprovider.repository.github.GitHubRepositorySyncService;
 import de.tum.in.www1.hephaestus.gitprovider.team.Team;
@@ -9,8 +10,10 @@ import de.tum.in.www1.hephaestus.gitprovider.team.TeamInfoDTO;
 import de.tum.in.www1.hephaestus.gitprovider.team.TeamInfoDTOConverter;
 import de.tum.in.www1.hephaestus.gitprovider.team.TeamRepository;
 import de.tum.in.www1.hephaestus.gitprovider.team.membership.TeamMembership;
+import de.tum.in.www1.hephaestus.gitprovider.user.User;
 import de.tum.in.www1.hephaestus.gitprovider.user.UserRepository;
 import de.tum.in.www1.hephaestus.gitprovider.user.UserTeamsDTO;
+import de.tum.in.www1.hephaestus.gitprovider.user.github.GitHubUserSyncService;
 import de.tum.in.www1.hephaestus.leaderboard.LeaderboardMode;
 import de.tum.in.www1.hephaestus.leaderboard.LeaderboardService;
 import de.tum.in.www1.hephaestus.leaderboard.LeaderboardSortType;
@@ -19,6 +22,7 @@ import de.tum.in.www1.hephaestus.organization.Organization;
 import de.tum.in.www1.hephaestus.organization.OrganizationService;
 import de.tum.in.www1.hephaestus.syncing.GitHubDataSyncService;
 import de.tum.in.www1.hephaestus.syncing.NatsConsumerService;
+import de.tum.in.www1.hephaestus.workspace.exception.*;
 import jakarta.transaction.Transactional;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
@@ -29,6 +33,7 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
+import java.util.regex.Pattern;
 import org.kohsuke.github.GHRepositorySelection;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -40,6 +45,17 @@ import org.springframework.stereotype.Service;
 public class WorkspaceService {
 
     private static final Logger logger = LoggerFactory.getLogger(WorkspaceService.class);
+
+    private static final Set<String> RESERVED_WORKSPACE_SLUGS = Set.of(
+        "admin",
+        "api",
+        "w",
+        "workspaces",
+        "system",
+        "metrics"
+    );
+
+    private static final Pattern SLACK_CHANNEL_ID_PATTERN = Pattern.compile("^[CG][A-Z0-9]{8,}$");
 
     @Autowired
     private NatsConsumerService natsConsumerService;
@@ -79,6 +95,15 @@ public class WorkspaceService {
 
     @Autowired
     private OrganizationService organizationService;
+
+    @Autowired
+    private WorkspaceRoleAssignmentRepository workspaceRoleAssignmentRepository;
+
+    @Autowired
+    private GitHubUserSyncService gitHubUserSyncService;
+
+    @Autowired
+    private GitHubAppTokenService gitHubAppTokenService;
 
     @Value("${nats.enabled}")
     private boolean isNatsEnabled;
@@ -407,7 +432,16 @@ public class WorkspaceService {
         }
 
         if (workspace == null) {
-            workspace = new Workspace();
+            if (isBlank(accountLogin)) {
+                throw new IllegalArgumentException(
+                    "Cannot create workspace from installation " + installationId + " without accountLogin."
+                );
+            }
+
+            Long ownerUserId = syncGitHubUserForOwnership(installationId, accountLogin);
+
+            workspace = createWorkspace(accountLogin, accountLogin, accountLogin, AccountType.ORG, ownerUserId);
+            logger.info("Created new workspace '{}' for installation {} with owner userId={}.", workspace.getSlug(), installationId, ownerUserId);
         }
 
         workspace.setGitProviderMode(Workspace.GitProviderMode.GITHUB_APP_INSTALLATION);
@@ -507,8 +541,8 @@ public class WorkspaceService {
     private Optional<Workspace> resolveFallbackWorkspace(String context) {
         List<Workspace> all = workspaceRepository.findAll();
         if (all.size() == 1) {
-            logger.info("Falling back to the only configured workspace id={} for {}.", all.get(0).getId(), context);
-            return Optional.of(all.get(0));
+            logger.info("Falling back to the only configured workspace id={} for {}.", all.getFirst().getId(), context);
+            return Optional.of(all.getFirst());
         }
         logger.warn("Unable to resolve workspace for {}. Available workspace count={}", context, all.size());
         return Optional.empty();
@@ -549,5 +583,157 @@ public class WorkspaceService {
                     "Ensure a PAT workspace exists or the GitHub App installation was reconciled."
                 )
             );
+    }
+
+    @Transactional
+    public Workspace createWorkspace(String rawSlug, String displayName, String accountLogin, AccountType accountType, Long ownerUserId) {
+        String slug = normalizeSlug(rawSlug);
+        validateSlug(slug);
+
+        if (workspaceRepository.existsBySlug(slug)) {
+            throw new WorkspaceSlugConflictException(slug);
+        }
+
+        Workspace workspace = new Workspace();
+        workspace.setSlug(slug);
+        workspace.setDisplayName(displayName);
+        workspace.setAccountLogin(accountLogin);
+        workspace.setAccountType(accountType);
+        workspace.setStatus(Workspace.WorkspaceStatus.ACTIVE);
+        Workspace saved = workspaceRepository.save(workspace);
+        createOwnerRole(saved, ownerUserId);
+
+        return saved;
+    }
+
+    public Optional<Workspace> getWorkspaceBySlug(String slug) {
+        return workspaceRepository.findBySlug(slug);
+    }
+
+    @Transactional
+    public Workspace updateSchedule(String slug, Integer day, String time) {
+        Workspace workspace = workspaceRepository
+            .findBySlug(slug)
+            .orElseThrow(() -> new WorkspaceNotFoundException(slug));
+
+        if (day != null) {
+            if (day < 1 || day > 7) {
+                throw new IllegalArgumentException("Day must be between 1 (Monday) and 7 (Sunday), got: " + day);
+            }
+            workspace.setLeaderboardScheduleDay(day);
+        }
+
+        if (time != null) {
+            if (!time.matches("^\\d{2}:\\d{2}$")) {
+                throw new IllegalArgumentException("Time must be in HH:mm format, got: " + time);
+            }
+            workspace.setLeaderboardScheduleTime(time);
+        }
+
+        return workspaceRepository.save(workspace);
+    }
+
+    @Transactional
+    public Workspace updateNotifications(String slug, Boolean enabled, String team, String channelId) {
+        Workspace workspace = workspaceRepository
+            .findBySlug(slug)
+            .orElseThrow(() -> new WorkspaceNotFoundException(slug));
+
+        if (enabled != null) {
+            workspace.setLeaderboardNotificationEnabled(enabled);
+        }
+
+        if (team != null) {
+            workspace.setLeaderboardNotificationTeam(team);
+        }
+
+        if (channelId != null) {
+            String trimmedChannelId = channelId.trim();
+            if (!SLACK_CHANNEL_ID_PATTERN.matcher(trimmedChannelId).matches()) {
+                throw new IllegalArgumentException(
+                    "Slack channel ID must start with C/G followed by at least 8 alphanumerics, got: " + channelId
+                );
+            }
+            workspace.setLeaderboardNotificationChannelId(trimmedChannelId);
+        }
+
+        return workspaceRepository.save(workspace);
+    }
+
+    @Transactional
+    public Workspace updateToken(String slug, String personalAccessToken) {
+        Workspace workspace = workspaceRepository
+            .findBySlug(slug)
+            .orElseThrow(() -> new WorkspaceNotFoundException(slug));
+
+        // TODO: Validate token with GitHub API before storing
+        // TODO: Consider encrypting the token at rest
+        // TODO: Add audit log entry for security tracking
+        workspace.setPersonalAccessToken(personalAccessToken);
+
+        return workspaceRepository.save(workspace);
+    }
+
+    private void createOwnerRole(Workspace workspace, Long ownerUserId) {
+        if (ownerUserId == null) {
+            throw new IllegalArgumentException("Owner user id must not be null when creating a workspace.");
+        }
+        WorkspaceRoleAssignment role = new WorkspaceRoleAssignment();
+        role.setWorkspace(workspace);
+        role.setUserId(ownerUserId);
+        role.setRole(WorkspaceRoleAssignment.WorkspaceRole.OWNER);
+        workspaceRoleAssignmentRepository.save(role);
+    }
+
+    private String normalizeSlug(String slug) {
+        if (slug == null) {
+            return null;
+        }
+        String normalized = slug.trim().toLowerCase();
+        normalized = normalized
+            .replace('_', '-')
+            .replaceAll("\\s+", "-")
+            .replaceAll("-{2,}", "-")
+            .replaceAll("^-|-$", "");
+        return normalized;
+    }
+
+    private void validateSlug(String slug) {
+        if (slug == null) {
+            throw new InvalidWorkspaceSlugException("null");
+        }
+        if (!slug.matches("^[a-z0-9][a-z0-9-]{2,50}$")) {
+            throw new InvalidWorkspaceSlugException(slug);
+        }
+        if (RESERVED_WORKSPACE_SLUGS.contains(slug)) {
+            throw new InvalidWorkspaceSlugException(slug);
+        }
+    }
+
+    /**
+     * Syncs a GitHub user from an installation and returns their user ID for ownership assignment.
+     * Falls back to checking existing users if GitHub sync fails.
+     */
+    private Long syncGitHubUserForOwnership(long installationId, String accountLogin) {
+        try {
+            org.kohsuke.github.GitHub github = gitHubAppTokenService.clientForInstallation(installationId);
+            
+            User user = gitHubUserSyncService.syncUser(github, accountLogin);
+            
+            if (user != null && user.getId() != null) {
+                logger.info("Synced GitHub user '{}' (id={}) as workspace owner.", accountLogin, user.getId());
+                return user.getId();
+            }
+        } catch (Exception e) {
+            logger.warn("Failed to sync GitHub user '{}' for installation {}: {}", accountLogin, installationId, e.getMessage());
+        }
+
+        return userRepository.findByLogin(accountLogin)
+            .map(User::getId)
+            .orElseThrow(() -> new IllegalStateException(
+                "Cannot assign owner for workspace: GitHub user '" + accountLogin + 
+                "' could not be synced and does not exist locally. " +
+                "Ensure the user exists in the system before creating the workspace."
+            ));
     }
 }

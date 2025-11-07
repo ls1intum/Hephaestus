@@ -15,9 +15,16 @@ import jakarta.persistence.JoinColumn;
 import jakarta.persistence.OneToMany;
 import jakarta.persistence.OneToOne;
 import jakarta.persistence.Table;
+import jakarta.persistence.PreUpdate;
+import jakarta.persistence.PrePersist;
+
 import java.time.Instant;
 import java.util.HashSet;
 import java.util.Set;
+
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Pattern;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
@@ -38,6 +45,20 @@ public class Workspace {
 
     private Instant usersSyncedAt;
 
+    @Column(name = "slug", unique = true, nullable = false, length = 64)
+    @NotBlank(message = "Slug is required")
+    @Pattern(regexp = "^[a-z0-9][a-z0-9-]{2,50}$")
+    private String slug;
+
+    @Column(name = "display_name", nullable = false, length = 120)
+    @NotBlank(message = "Display name is required")
+    private String displayName;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "status", nullable = false, length = 20)
+    @NotNull(message = "Status is required")
+    private WorkspaceStatus status = WorkspaceStatus.ACTIVE;
+
     @OneToMany(
         mappedBy = "workspace",
         fetch = FetchType.EAGER,
@@ -52,7 +73,14 @@ public class Workspace {
 
     private Long installationId;
 
+    @Column(name = "account_login", nullable = false, length = 120)
+    @NotBlank(message = "Account login is required")
     private String accountLogin;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "account_type", nullable = false, length = 10)
+    @NotNull(message = "Account type is required")
+    private AccountType accountType;
 
     @Column(name = "personal_access_token", columnDefinition = "TEXT")
     @ToString.Exclude
@@ -68,9 +96,58 @@ public class Workspace {
     @ToString.Exclude
     private Organization organization;
 
+    @Column(name = "created_at", nullable = false, updatable = false)
+    private Instant createdAt;
+
+    @Column(name = "updated_at")
+    private Instant updatedAt;
+
+    // Leaderboard schedule configuration (nullable = use global default)
+    @Column(name = "leaderboard_schedule_day")
+    private Integer leaderboardScheduleDay; // 1=Monday, 7=Sunday
+
+    @Column(name = "leaderboard_schedule_time", length = 10)
+    private String leaderboardScheduleTime; // Format: "HH:mm"
+
+    // Leaderboard notification configuration (nullable = use global default)
+    @Column(name = "leaderboard_notification_enabled")
+    private Boolean leaderboardNotificationEnabled;
+
+    @Column(name = "leaderboard_notification_team", length = 100)
+    private String leaderboardNotificationTeam; // Team name or "all"
+
+    @Column(name = "leaderboard_notification_channel_id", length = 100)
+    private String leaderboardNotificationChannelId; // Slack channel ID
+
+    @PrePersist
+    public void prePersist() {
+        this.createdAt = Instant.now();
+        this.updatedAt = this.createdAt;
+        if (this.slug != null) this.slug = normalizeSlug(this.slug);
+    }
+
+    @PreUpdate
+    public void preUpdate() {
+        this.updatedAt = Instant.now();
+        if (this.slug != null) this.slug = normalizeSlug(this.slug);
+    }
+
+    private static String normalizeSlug(String s) {
+        String x = s.trim().toLowerCase();
+        x = x.replace('_', '-').replaceAll("\\s+", "-").replaceAll("-{2,}", "-");
+        x = x.replaceAll("^-|-$", "");
+        return x;
+    }
+
     //TODO: Only temporary to differentiate between ls1intum <-> orgs installed via GHApp. To be deleted in the future
     public enum GitProviderMode {
         PAT_ORG,
         GITHUB_APP_INSTALLATION,
+    }
+
+    public enum WorkspaceStatus {
+        ACTIVE,
+        SUSPENDED,
+        PURGED
     }
 }

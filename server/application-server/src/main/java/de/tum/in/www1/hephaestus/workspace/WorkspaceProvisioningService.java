@@ -1,9 +1,15 @@
 package de.tum.in.www1.hephaestus.workspace;
 
 import de.tum.in.www1.hephaestus.gitprovider.common.github.app.GitHubAppTokenService;
+import de.tum.in.www1.hephaestus.gitprovider.user.User;
+import de.tum.in.www1.hephaestus.gitprovider.user.UserRepository;
+import de.tum.in.www1.hephaestus.gitprovider.user.github.GitHubUserSyncService;
 import de.tum.in.www1.hephaestus.organization.OrganizationSyncService;
 import java.io.IOException;
 import java.util.List;
+
+import de.tum.in.www1.hephaestus.workspace.exception.RepositoryAlreadyMonitoredException;
+import de.tum.in.www1.hephaestus.workspace.exception.RepositoryNotFoundException;
 import org.kohsuke.github.GHApp;
 import org.kohsuke.github.GHAppInstallation;
 import org.kohsuke.github.GHRepository;
@@ -38,6 +44,8 @@ public class WorkspaceProvisioningService {
     private final WorkspaceRepository workspaceRepository;
     private final WorkspaceService workspaceService;
     private final GitHubAppTokenService gitHubAppTokenService;
+    private final GitHubUserSyncService gitHubUserSyncService;
+    private final UserRepository userRepository;
     private final OrganizationSyncService organizationSyncService;
     private final WorkspaceGitHubAccess workspaceGitHubAccess;
     private final boolean natsEnabled;
@@ -47,6 +55,8 @@ public class WorkspaceProvisioningService {
         WorkspaceRepository workspaceRepository,
         WorkspaceService workspaceService,
         GitHubAppTokenService gitHubAppTokenService,
+        GitHubUserSyncService gitHubUserSyncService,
+        UserRepository userRepository,
         OrganizationSyncService organizationSyncService,
         WorkspaceGitHubAccess workspaceGitHubAccess,
         @Value("${nats.enabled}") boolean natsEnabled
@@ -55,6 +65,8 @@ public class WorkspaceProvisioningService {
         this.workspaceRepository = workspaceRepository;
         this.workspaceService = workspaceService;
         this.gitHubAppTokenService = gitHubAppTokenService;
+        this.gitHubUserSyncService = gitHubUserSyncService;
+        this.userRepository = userRepository;
         this.organizationSyncService = organizationSyncService;
         this.workspaceGitHubAccess = workspaceGitHubAccess;
         this.natsEnabled = natsEnabled;
@@ -77,11 +89,14 @@ public class WorkspaceProvisioningService {
 
         WorkspaceProperties.DefaultWorkspace config = workspaceProperties.getDefaultWorkspace();
 
-        Workspace workspace = new Workspace();
-        workspace.setGitProviderMode(Workspace.GitProviderMode.PAT_ORG);
-
+        String accountLogin = null;
         if (!isBlank(config.getLogin())) {
-            workspace.setAccountLogin(config.getLogin());
+            accountLogin = config.getLogin().trim();
+        }
+        if (isBlank(accountLogin)) {
+            throw new IllegalStateException(
+                "Failed to derive account login for default workspace bootstrap. Set hephaestus.workspace.default.login."
+            );
         }
 
         if (isBlank(config.getToken())) {
@@ -89,6 +104,22 @@ public class WorkspaceProvisioningService {
                 "Missing PAT for default workspace bootstrap. Configure hephaestus.workspace.default.token or set GITHUB_PAT."
             );
         }
+
+        // Sync the GitHub user to get proper ownership
+        Long ownerUserId = syncGitHubUserForPAT(config.getToken(), accountLogin);
+
+        String rawSlug = accountLogin;
+        String displayName = accountLogin;
+
+        Workspace workspace = workspaceService.createWorkspace(
+            rawSlug, 
+            displayName, 
+            accountLogin, 
+            AccountType.ORG, 
+            ownerUserId
+        );
+
+        workspace.setGitProviderMode(Workspace.GitProviderMode.PAT_ORG);
         workspace.setPersonalAccessToken(config.getToken());
         workspace.setGithubRepositorySelection(
             config.getRepositorySelection() != null ? config.getRepositorySelection() : GHRepositorySelection.SELECTED
@@ -105,16 +136,6 @@ public class WorkspaceProvisioningService {
                 monitor.setWorkspace(workspace);
                 workspace.getRepositoriesToMonitor().add(monitor);
             });
-
-        if (isBlank(workspace.getAccountLogin())) {
-            workspace.setAccountLogin(workspaceService.deriveAccountLogin(workspace));
-        }
-
-        if (isBlank(workspace.getAccountLogin())) {
-            throw new IllegalStateException(
-                "Failed to derive account login for default workspace bootstrap. Set hephaestus.workspace.default.login or provide repositories."
-            );
-        }
 
         Workspace savedWorkspace = workspaceRepository.save(workspace);
         logger.info(
@@ -275,5 +296,37 @@ public class WorkspaceProvisioningService {
 
     private boolean isBlank(String value) {
         return value == null || value.isBlank();
+    }
+
+    /**
+     * Syncs a GitHub user using PAT and returns their user ID for ownership assignment.
+     * Falls back to checking existing users if GitHub sync fails.
+     */
+    private Long syncGitHubUserForPAT(String patToken, String accountLogin) {
+        try {
+            // Create GitHub client with PAT
+            GitHub github = new org.kohsuke.github.GitHubBuilder()
+                .withOAuthToken(patToken)
+                .build();
+            
+            // Sync the user from GitHub
+            User user = gitHubUserSyncService.syncUser(github, accountLogin);
+            
+            if (user != null && user.getId() != null) {
+                logger.info("Synced GitHub user '{}' (id={}) as PAT workspace owner.", accountLogin, user.getId());
+                return user.getId();
+            }
+        } catch (Exception e) {
+            logger.warn("Failed to sync GitHub user '{}' for PAT workspace: {}", accountLogin, e.getMessage());
+        }
+
+        // Fallback: check if user already exists locally
+        return userRepository.findByLogin(accountLogin)
+            .map(User::getId)
+            .orElseThrow(() -> new IllegalStateException(
+                "Cannot assign owner for PAT workspace: GitHub user '" + accountLogin + 
+                "' could not be synced and does not exist locally. " +
+                "Ensure the user exists in the system before creating the workspace."
+            ));
     }
 }

@@ -1,4 +1,4 @@
-package de.tum.in.www1.hephaestus.workspace;
+package de.tum.in.www1.hephaestus.workspace.exception;
 
 public class RepositoryNotFoundException extends RuntimeException {
 

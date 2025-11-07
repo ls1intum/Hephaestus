@@ -3,22 +3,142 @@ package de.tum.in.www1.hephaestus.workspace;
 import de.tum.in.www1.hephaestus.gitprovider.team.TeamInfoDTO;
 import de.tum.in.www1.hephaestus.gitprovider.user.UserTeamsDTO;
 import java.util.List;
+
+import de.tum.in.www1.hephaestus.workspace.dto.*;
+import de.tum.in.www1.hephaestus.workspace.exception.*;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.DeleteMapping;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PathVariable;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.PutMapping;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
 
 @RestController
-@RequestMapping("/workspace")
+@RequestMapping("/workspaces")
 public class WorkspaceController {
 
     @Autowired
     private WorkspaceService workspaceService;
+
+    @Autowired
+    private WorkspaceLifecycleService workspaceLifecycleService;
+
+    @PostMapping
+    public ResponseEntity<?> createWorkspace(@RequestBody CreateWorkspaceRequestDTO createWorkspaceRequest) {
+        try {
+            Workspace workspace = workspaceService.createWorkspace(
+                createWorkspaceRequest.slug(),
+                createWorkspaceRequest.displayName(),
+                createWorkspaceRequest.accountLogin(),
+                createWorkspaceRequest.accountType(),
+                createWorkspaceRequest.ownerUserId()
+            );
+            return ResponseEntity.status(HttpStatus.CREATED).body(WorkspaceDTO.from(workspace));
+        } catch (InvalidWorkspaceSlugException e) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(e.getMessage());
+        } catch (WorkspaceSlugConflictException e) {
+            return ResponseEntity.status(HttpStatus.CONFLICT).body(e.getMessage());
+        }
+    }
+
+    @GetMapping
+    public ResponseEntity<List<WorkspaceListItemDTO>> listWorkspaces() {
+        List<WorkspaceListItemDTO> workspaces = workspaceService
+            .listAllWorkspaces()
+            .stream()
+            .map(WorkspaceListItemDTO::from)
+            .toList();
+        return ResponseEntity.ok(workspaces);
+    }
+
+    @GetMapping("/{slug}")
+    public ResponseEntity<?> getWorkspace(@PathVariable String slug) {
+        return workspaceService
+            .getWorkspaceBySlug(slug)
+            .map(WorkspaceDTO::from)
+            .map(ResponseEntity::ok)
+            .orElseGet(() -> ResponseEntity.notFound().build());
+    }
+
+    @PostMapping("/{slug}/suspend")
+    public ResponseEntity<?> suspendWorkspace(@PathVariable String slug) {
+        try {
+            Workspace workspace = workspaceLifecycleService.suspendWorkspace(slug);
+            return ResponseEntity.ok(WorkspaceDTO.from(workspace));
+        } catch (WorkspaceNotFoundException e) {
+            return ResponseEntity.notFound().build();
+        } catch (IllegalStateException e) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(e.getMessage());
+        }
+    }
+
+    @PostMapping("/{slug}/resume")
+    public ResponseEntity<?> resumeWorkspace(@PathVariable String slug) {
+        try {
+            Workspace workspace = workspaceLifecycleService.resumeWorkspace(slug);
+            return ResponseEntity.ok(WorkspaceDTO.from(workspace));
+        } catch (WorkspaceNotFoundException e) {
+            return ResponseEntity.notFound().build();
+        } catch (IllegalStateException e) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(e.getMessage());
+        }
+    }
+
+    @DeleteMapping("/{slug}")
+    public ResponseEntity<?> purgeWorkspace(@PathVariable String slug) {
+        try {
+            workspaceLifecycleService.purgeWorkspace(slug);
+            return ResponseEntity.noContent().build();
+        } catch (WorkspaceNotFoundException e) {
+            return ResponseEntity.notFound().build();
+        }
+    }
+
+    @PatchMapping("/{slug}/schedule")
+    public ResponseEntity<?> updateSchedule(
+        @PathVariable String slug,
+        @RequestBody UpdateWorkspaceScheduleRequestDTO request
+    ) {
+        try {
+            Workspace workspace = workspaceService.updateSchedule(
+                slug,
+                request.day(),
+                request.time()
+            );
+            return ResponseEntity.ok(WorkspaceDTO.from(workspace));
+        } catch (WorkspaceNotFoundException e) {
+            return ResponseEntity.notFound().build();
+        }
+    }
+
+    @PatchMapping("/{slug}/notifications")
+    public ResponseEntity<?> updateNotifications(
+        @PathVariable String slug,
+        @RequestBody UpdateWorkspaceNotificationsRequestDTO request
+    ) {
+        try {
+            Workspace workspace = workspaceService.updateNotifications(
+                slug,
+                request.enabled(),
+                request.team(),
+                request.channelId()
+            );
+            return ResponseEntity.ok(WorkspaceDTO.from(workspace));
+        } catch (WorkspaceNotFoundException e) {
+            return ResponseEntity.notFound().build();
+        }
+    }
+
+    @PatchMapping("/{slug}/token")
+    public ResponseEntity<?> updateToken(
+        @PathVariable String slug,
+        @RequestBody UpdateWorkspaceTokenRequestDTO request
+    ) {
+        try {
+            Workspace workspace = workspaceService.updateToken(slug, request.personalAccessToken());
+            return ResponseEntity.ok(WorkspaceDTO.from(workspace));
+        } catch (WorkspaceNotFoundException e) {
+            return ResponseEntity.notFound().build();
+        }
+    }
 
     @GetMapping("/repositories")
     public ResponseEntity<List<String>> getRepositoriesToMonitor() {
