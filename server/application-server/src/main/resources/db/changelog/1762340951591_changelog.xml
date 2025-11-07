@@ -132,7 +132,6 @@
         <sql splitStatements="false">
             DO $$
             DECLARE
-                rec RECORD;
                 mismatch_count integer;
             BEGIN
                 SELECT COUNT(*)
@@ -144,20 +143,29 @@
                 IF mismatch_count > 0 THEN
                     RAISE EXCEPTION 'Failed to migrate issue large objects: % rows missing', mismatch_count;
                 END IF;
-
-                FOR rec IN
-                    SELECT body, bad_practice_summary FROM issue
-                    WHERE body IS NOT NULL OR bad_practice_summary IS NOT NULL
-                LOOP
-                    IF rec.body IS NOT NULL AND EXISTS (SELECT 1 FROM pg_largeobject_metadata lom WHERE lom.oid = rec.body) THEN
-                        PERFORM pg_catalog.lo_unlink(rec.body);
-                    END IF;
-                    IF rec.bad_practice_summary IS NOT NULL AND EXISTS (SELECT 1 FROM pg_largeobject_metadata lom WHERE lom.oid = rec.bad_practice_summary) THEN
-                        PERFORM pg_catalog.lo_unlink(rec.bad_practice_summary);
-                    END IF;
-                END LOOP;
             END;
             $$;
+        </sql>
+        <!-- Clean up migrated large objects without lo_unlink to avoid exhausting large-object locks -->
+        <sql>
+            CREATE TEMP TABLE tmp_issue_lobs AS
+            SELECT DISTINCT oid
+            FROM (
+                SELECT body AS oid FROM issue WHERE body IS NOT NULL
+                UNION ALL
+                SELECT bad_practice_summary AS oid FROM issue WHERE bad_practice_summary IS NOT NULL
+            ) AS oids;
+        </sql>
+        <sql>
+            DELETE FROM pg_largeobject
+            WHERE loid IN (SELECT oid FROM tmp_issue_lobs);
+        </sql>
+        <sql>
+            DELETE FROM pg_largeobject_metadata
+            WHERE oid IN (SELECT oid FROM tmp_issue_lobs);
+        </sql>
+        <sql>
+            DROP TABLE tmp_issue_lobs;
         </sql>
         <sql>
             ALTER TABLE issue DROP COLUMN body;
@@ -193,7 +201,6 @@
         <sql splitStatements="false">
             DO $$
             DECLARE
-                rec RECORD;
                 mismatch_count integer;
             BEGIN
                 SELECT COUNT(*)
@@ -204,17 +211,25 @@
                 IF mismatch_count > 0 THEN
                     RAISE EXCEPTION 'Failed to migrate issue_comment large objects: % rows missing', mismatch_count;
                 END IF;
-
-                FOR rec IN
-                    SELECT body FROM issue_comment
-                    WHERE body IS NOT NULL
-                LOOP
-                    IF EXISTS (SELECT 1 FROM pg_largeobject_metadata lom WHERE lom.oid = rec.body) THEN
-                        PERFORM pg_catalog.lo_unlink(rec.body);
-                    END IF;
-                END LOOP;
             END;
             $$;
+        </sql>
+        <sql>
+            CREATE TEMP TABLE tmp_issue_comment_lobs AS
+            SELECT DISTINCT body AS oid
+            FROM issue_comment
+            WHERE body IS NOT NULL;
+        </sql>
+        <sql>
+            DELETE FROM pg_largeobject
+            WHERE loid IN (SELECT oid FROM tmp_issue_comment_lobs);
+        </sql>
+        <sql>
+            DELETE FROM pg_largeobject_metadata
+            WHERE oid IN (SELECT oid FROM tmp_issue_comment_lobs);
+        </sql>
+        <sql>
+            DROP TABLE tmp_issue_comment_lobs;
         </sql>
         <sql>
             ALTER TABLE issue_comment DROP COLUMN body;
@@ -244,7 +259,6 @@
         <sql splitStatements="false">
             DO $$
             DECLARE
-                rec RECORD;
                 mismatch_count integer;
             BEGIN
                 SELECT COUNT(*)
@@ -255,17 +269,25 @@
                 IF mismatch_count > 0 THEN
                     RAISE EXCEPTION 'Failed to migrate pull_request_review large objects: % rows missing', mismatch_count;
                 END IF;
-
-                FOR rec IN
-                    SELECT body FROM pull_request_review
-                    WHERE body IS NOT NULL
-                LOOP
-                    IF EXISTS (SELECT 1 FROM pg_largeobject_metadata lom WHERE lom.oid = rec.body) THEN
-                        PERFORM pg_catalog.lo_unlink(rec.body);
-                    END IF;
-                END LOOP;
             END;
             $$;
+        </sql>
+        <sql>
+            CREATE TEMP TABLE tmp_pr_review_lobs AS
+            SELECT DISTINCT body AS oid
+            FROM pull_request_review
+            WHERE body IS NOT NULL;
+        </sql>
+        <sql>
+            DELETE FROM pg_largeobject
+            WHERE loid IN (SELECT oid FROM tmp_pr_review_lobs);
+        </sql>
+        <sql>
+            DELETE FROM pg_largeobject_metadata
+            WHERE oid IN (SELECT oid FROM tmp_pr_review_lobs);
+        </sql>
+        <sql>
+            DROP TABLE tmp_pr_review_lobs;
         </sql>
         <sql>
             ALTER TABLE pull_request_review DROP COLUMN body;
@@ -309,7 +331,6 @@
         <sql splitStatements="false">
             DO $$
             DECLARE
-                rec RECORD;
                 mismatch_count integer;
             BEGIN
                 SELECT COUNT(*)
@@ -321,20 +342,28 @@
                 IF mismatch_count > 0 THEN
                     RAISE EXCEPTION 'Failed to migrate pull_request_review_comment large objects: % rows missing', mismatch_count;
                 END IF;
-
-                FOR rec IN
-                    SELECT body, diff_hunk FROM pull_request_review_comment
-                    WHERE body IS NOT NULL OR diff_hunk IS NOT NULL
-                LOOP
-                    IF rec.body IS NOT NULL AND EXISTS (SELECT 1 FROM pg_largeobject_metadata lom WHERE lom.oid = rec.body) THEN
-                        PERFORM pg_catalog.lo_unlink(rec.body);
-                    END IF;
-                    IF rec.diff_hunk IS NOT NULL AND EXISTS (SELECT 1 FROM pg_largeobject_metadata lom WHERE lom.oid = rec.diff_hunk) THEN
-                        PERFORM pg_catalog.lo_unlink(rec.diff_hunk);
-                    END IF;
-                END LOOP;
             END;
             $$;
+        </sql>
+        <sql>
+            CREATE TEMP TABLE tmp_pr_comment_lobs AS
+            SELECT DISTINCT oid
+            FROM (
+                SELECT body AS oid FROM pull_request_review_comment WHERE body IS NOT NULL
+                UNION ALL
+                SELECT diff_hunk AS oid FROM pull_request_review_comment WHERE diff_hunk IS NOT NULL
+            ) AS oids;
+        </sql>
+        <sql>
+            DELETE FROM pg_largeobject
+            WHERE loid IN (SELECT oid FROM tmp_pr_comment_lobs);
+        </sql>
+        <sql>
+            DELETE FROM pg_largeobject_metadata
+            WHERE oid IN (SELECT oid FROM tmp_pr_comment_lobs);
+        </sql>
+        <sql>
+            DROP TABLE tmp_pr_comment_lobs;
         </sql>
         <sql>
             ALTER TABLE pull_request_review_comment DROP COLUMN body;
@@ -370,7 +399,6 @@
         <sql splitStatements="false">
             DO $$
             DECLARE
-                rec RECORD;
                 mismatch_count integer;
             BEGIN
                 SELECT COUNT(*)
@@ -381,17 +409,25 @@
                 IF mismatch_count > 0 THEN
                     RAISE EXCEPTION 'Failed to migrate milestone descriptions: % rows missing', mismatch_count;
                 END IF;
-
-                FOR rec IN
-                    SELECT description FROM milestone
-                    WHERE description IS NOT NULL
-                LOOP
-                    IF EXISTS (SELECT 1 FROM pg_largeobject_metadata lom WHERE lom.oid = rec.description) THEN
-                        PERFORM pg_catalog.lo_unlink(rec.description);
-                    END IF;
-                END LOOP;
             END;
             $$;
+        </sql>
+        <sql>
+            CREATE TEMP TABLE tmp_milestone_lobs AS
+            SELECT DISTINCT description AS oid
+            FROM milestone
+            WHERE description IS NOT NULL;
+        </sql>
+        <sql>
+            DELETE FROM pg_largeobject
+            WHERE loid IN (SELECT oid FROM tmp_milestone_lobs);
+        </sql>
+        <sql>
+            DELETE FROM pg_largeobject_metadata
+            WHERE oid IN (SELECT oid FROM tmp_milestone_lobs);
+        </sql>
+        <sql>
+            DROP TABLE tmp_milestone_lobs;
         </sql>
         <sql>
             ALTER TABLE milestone DROP COLUMN description;
@@ -421,7 +457,6 @@
         <sql splitStatements="false">
             DO $$
             DECLARE
-                rec RECORD;
                 mismatch_count integer;
             BEGIN
                 SELECT COUNT(*)
@@ -432,17 +467,25 @@
                 IF mismatch_count > 0 THEN
                     RAISE EXCEPTION 'Failed to migrate pullrequestbadpractice descriptions: % rows missing', mismatch_count;
                 END IF;
-
-                FOR rec IN
-                    SELECT description FROM pullrequestbadpractice
-                    WHERE description IS NOT NULL
-                LOOP
-                    IF EXISTS (SELECT 1 FROM pg_largeobject_metadata lom WHERE lom.oid = rec.description) THEN
-                        PERFORM pg_catalog.lo_unlink(rec.description);
-                    END IF;
-                END LOOP;
             END;
             $$;
+        </sql>
+        <sql>
+            CREATE TEMP TABLE tmp_pr_bad_practice_lobs AS
+            SELECT DISTINCT description AS oid
+            FROM pullrequestbadpractice
+            WHERE description IS NOT NULL;
+        </sql>
+        <sql>
+            DELETE FROM pg_largeobject
+            WHERE loid IN (SELECT oid FROM tmp_pr_bad_practice_lobs);
+        </sql>
+        <sql>
+            DELETE FROM pg_largeobject_metadata
+            WHERE oid IN (SELECT oid FROM tmp_pr_bad_practice_lobs);
+        </sql>
+        <sql>
+            DROP TABLE tmp_pr_bad_practice_lobs;
         </sql>
         <sql>
             ALTER TABLE pullrequestbadpractice DROP COLUMN description;
@@ -473,7 +516,6 @@
         <sql splitStatements="false">
             DO $$
             DECLARE
-                rec RECORD;
                 mismatch_count integer;
             BEGIN
                 SELECT COUNT(*)
@@ -484,17 +526,25 @@
                 IF mismatch_count > 0 THEN
                     RAISE EXCEPTION 'Failed to migrate bad_practice_feedback explanations: % rows missing', mismatch_count;
                 END IF;
-
-                FOR rec IN
-                    SELECT explanation FROM bad_practice_feedback
-                    WHERE explanation IS NOT NULL
-                LOOP
-                    IF EXISTS (SELECT 1 FROM pg_largeobject_metadata lom WHERE lom.oid = rec.explanation) THEN
-                        PERFORM pg_catalog.lo_unlink(rec.explanation);
-                    END IF;
-                END LOOP;
             END;
             $$;
+        </sql>
+        <sql>
+            CREATE TEMP TABLE tmp_bad_practice_feedback_lobs AS
+            SELECT DISTINCT explanation AS oid
+            FROM bad_practice_feedback
+            WHERE explanation IS NOT NULL;
+        </sql>
+        <sql>
+            DELETE FROM pg_largeobject
+            WHERE loid IN (SELECT oid FROM tmp_bad_practice_feedback_lobs);
+        </sql>
+        <sql>
+            DELETE FROM pg_largeobject_metadata
+            WHERE oid IN (SELECT oid FROM tmp_bad_practice_feedback_lobs);
+        </sql>
+        <sql>
+            DROP TABLE tmp_bad_practice_feedback_lobs;
         </sql>
         <sql>
             ALTER TABLE bad_practice_feedback DROP COLUMN explanation;
@@ -524,7 +574,6 @@
         <sql splitStatements="false">
             DO $$
             DECLARE
-                rec RECORD;
                 mismatch_count integer;
             BEGIN
                 SELECT COUNT(*)
@@ -535,17 +584,25 @@
                 IF mismatch_count > 0 THEN
                     RAISE EXCEPTION 'Failed to migrate bad_practice_detection summaries: % rows missing', mismatch_count;
                 END IF;
-
-                FOR rec IN
-                    SELECT summary FROM bad_practice_detection
-                    WHERE summary IS NOT NULL
-                LOOP
-                    IF EXISTS (SELECT 1 FROM pg_largeobject_metadata lom WHERE lom.oid = rec.summary) THEN
-                        PERFORM pg_catalog.lo_unlink(rec.summary);
-                    END IF;
-                END LOOP;
             END;
             $$;
+        </sql>
+        <sql>
+            CREATE TEMP TABLE tmp_bad_practice_detection_lobs AS
+            SELECT DISTINCT summary AS oid
+            FROM bad_practice_detection
+            WHERE summary IS NOT NULL;
+        </sql>
+        <sql>
+            DELETE FROM pg_largeobject
+            WHERE loid IN (SELECT oid FROM tmp_bad_practice_detection_lobs);
+        </sql>
+        <sql>
+            DELETE FROM pg_largeobject_metadata
+            WHERE oid IN (SELECT oid FROM tmp_bad_practice_detection_lobs);
+        </sql>
+        <sql>
+            DROP TABLE tmp_bad_practice_detection_lobs;
         </sql>
         <sql>
             ALTER TABLE bad_practice_detection DROP COLUMN summary;
