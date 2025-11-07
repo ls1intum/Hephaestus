@@ -96,3 +96,51 @@ Available examples include `label.created`, `repository.created`, `create`, `pus
 
 Use the optional `-Dgroups=unit` or `-Dgroups=integration` flags once category support lands.
 
+## GitHub live sync integration tests
+
+Some regression scenarios can only be validated against GitHub itself. We ship a focused suite that exercises the live GitHub App installation and verifies end-to-end sync behaviour (repository metadata, labels, milestones, and teams).
+
+### Prerequisites
+
+1. **Sandbox installation** – the `Hephaestus IntegrationTests` GitHub App must be installed in a sandbox organisation you control. The tests create and delete repositories, milestones, labels, and teams on each run.
+2. **Credentials** – provide both a GitHub App private key and a Personal Access Token with the following scopes:
+    - `repo` (full)
+    - `admin:org`
+    - `read:packages`
+3. **Local config file** – copy the template that lives alongside the tests:
+
+    ```bash
+    cd server/application-server/src/test/resources
+    cp application-github-integration-local.example.yml application-github-integration-local.yml
+    ```
+
+    Fill in the placeholders with the sandbox organisation slug, the installation id, and either an inline PEM key (`github.app.privateKey`) or a readable `privateKeyLocation`. Keep this file out of version control—it is already listed in `.gitignore`.
+
+    Alternatively, export the matching environment variables:
+
+    ```bash
+    export GH_IT_APP_ID=2250297
+    export GH_IT_APP_PAT=ghp_xxx...      # PAT with the scopes above
+    export GH_IT_INSTALLATION_ID=93512943
+    export GH_IT_ORGANIZATION=HephaestusTest
+    export GH_IT_APP_PRIVATE_KEY_PATH=/absolute/path/to/private-key.pem
+    ```
+
+    Use either the file _or_ the environment variables; the suite checks both and aborts if key material is missing.
+
+### Running the suite
+
+From `server/application-server/` run:
+
+```bash
+./mvnw test -Dgroups=github-integration
+```
+
+The run takes roughly two minutes and prints the GitHub artefacts it provisions. Clean-up is handled automatically, but if a failure interrupts execution you can safely delete any `hephaestus-it-*` repositories, milestones, or teams that remain in the sandbox.
+
+### Troubleshooting
+
+- **Skipping because of missing credentials** – check the console output; the base test class verifies that the App id, private key, PAT, and installation id are all present before executing.
+- **Hub4j rate-limit failures** – the suite creates several entities per run. Prefer a dedicated sandbox organisation so you do not clash with production automation limits.
+- **Longer runtimes** – each suite bootstraps a Testcontainers PostgreSQL instance and provisions GitHub resources. Expect higher runtimes than the pure Testcontainers integration tests; avoid running them on every PR and instead use them before releases or when touching the GitHub sync layer.
+
