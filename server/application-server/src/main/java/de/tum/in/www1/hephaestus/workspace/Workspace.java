@@ -117,24 +117,25 @@ public class Workspace {
     @Column(name = "leaderboard_notification_channel_id", length = 100)
     private String leaderboardNotificationChannelId;
 
+    // TODO: Encrypt at rest using JPA AttributeConverter with AES-256-GCM
+    @Column(name = "slack_token", columnDefinition = "TEXT")
+    @ToString.Exclude
+    private String slackToken;
+
+    // TODO: Encrypt at rest using JPA AttributeConverter with AES-256-GCM
+    @Column(name = "slack_signing_secret", columnDefinition = "TEXT")
+    @ToString.Exclude
+    private String slackSigningSecret;
+
     @PrePersist
     public void prePersist() {
         this.createdAt = Instant.now();
         this.updatedAt = this.createdAt;
-        if (this.slug != null) this.slug = normalizeSlug(this.slug);
     }
 
     @PreUpdate
     public void preUpdate() {
         this.updatedAt = Instant.now();
-        if (this.slug != null) this.slug = normalizeSlug(this.slug);
-    }
-
-    private static String normalizeSlug(String s) {
-        String x = s.trim().toLowerCase();
-        x = x.replace('_', '-').replaceAll("\\s+", "-").replaceAll("-{2,}", "-");
-        x = x.replaceAll("^-|-$", "");
-        return x;
     }
 
     //TODO: Only temporary to differentiate between ls1intum <-> orgs installed via GHApp. To be deleted in the future

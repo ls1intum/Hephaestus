@@ -19,7 +19,9 @@ public record WorkspaceDTO(
     String leaderboardScheduleTime,
     Boolean leaderboardNotificationEnabled,
     String leaderboardNotificationTeam,
-    String leaderboardNotificationChannelId
+    String leaderboardNotificationChannelId,
+    Boolean hasSlackToken,
+    Boolean hasSlackSigningSecret
 ) {
     public static WorkspaceDTO from(Workspace workspace) {
         return new WorkspaceDTO(
@@ -37,7 +39,9 @@ public record WorkspaceDTO(
             workspace.getLeaderboardScheduleTime(),
             workspace.getLeaderboardNotificationEnabled(),
             workspace.getLeaderboardNotificationTeam(),
-            workspace.getLeaderboardNotificationChannelId()
+            workspace.getLeaderboardNotificationChannelId(),
+            workspace.getSlackToken() != null && !workspace.getSlackToken().isEmpty(),
+            workspace.getSlackSigningSecret() != null && !workspace.getSlackSigningSecret().isEmpty()
         );
     }
 }

@@ -3,12 +3,14 @@ package de.tum.in.www1.hephaestus.workspace.dto;
 import de.tum.in.www1.hephaestus.workspace.AccountType;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Pattern;
 
 /**
  * DTO for creating a new workspace.
  */
 public record CreateWorkspaceRequestDTO(
     @NotBlank(message = "Slug is required")
+    @Pattern(regexp = "^[a-zA-Z0-9][a-zA-Z0-9_\\s-]{2,50}$", message = "Slug must be 3-51 characters, start with alphanumeric, and contain only letters, numbers, spaces, hyphens, or underscores")
     String slug,
     
     @NotBlank(message = "Display name is required")

@@ -114,4 +114,16 @@
             </column>
         </addColumn>
     </changeSet>
+    
+    <!-- Add Slack credentials columns -->
+    <changeSet author="ddmukh" id="1762272537437-20">
+        <addColumn tableName="workspace">
+            <column name="slack_bot_token" type="VARCHAR(255)">
+                <constraints nullable="true"/>
+            </column>
+            <column name="slack_webhook_url" type="VARCHAR(255)">
+                <constraints nullable="true"/>
+            </column>
+        </addColumn>
+    </changeSet>
 </databaseChangeLog>

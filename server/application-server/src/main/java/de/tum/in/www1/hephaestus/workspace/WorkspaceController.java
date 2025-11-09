@@ -3,9 +3,11 @@ package de.tum.in.www1.hephaestus.workspace;
 import de.tum.in.www1.hephaestus.gitprovider.team.TeamInfoDTO;
 import de.tum.in.www1.hephaestus.gitprovider.user.UserTeamsDTO;
 import java.util.List;
+import java.util.Map;
 
 import de.tum.in.www1.hephaestus.workspace.dto.*;
 import de.tum.in.www1.hephaestus.workspace.exception.*;
+import jakarta.validation.Valid;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -22,7 +24,7 @@ public class WorkspaceController {
     private WorkspaceLifecycleService workspaceLifecycleService;
 
     @PostMapping
-    public ResponseEntity<?> createWorkspace(@RequestBody CreateWorkspaceRequestDTO createWorkspaceRequest) {
+    public ResponseEntity<?> createWorkspace(@Valid @RequestBody CreateWorkspaceRequestDTO createWorkspaceRequest) {
         try {
             Workspace workspace = workspaceService.createWorkspace(
                 createWorkspaceRequest.slug(),
@@ -33,9 +35,9 @@ public class WorkspaceController {
             );
             return ResponseEntity.status(HttpStatus.CREATED).body(WorkspaceDTO.from(workspace));
         } catch (InvalidWorkspaceSlugException e) {
-            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(e.getMessage());
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(Map.of("error", e.getMessage()));
         } catch (WorkspaceSlugConflictException e) {
-            return ResponseEntity.status(HttpStatus.CONFLICT).body(e.getMessage());
+            return ResponseEntity.status(HttpStatus.CONFLICT).body(Map.of("error", e.getMessage()));
         }
     }
 
@@ -66,7 +68,7 @@ public class WorkspaceController {
         } catch (WorkspaceNotFoundException e) {
             return ResponseEntity.notFound().build();
         } catch (IllegalStateException e) {
-            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(e.getMessage());
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(Map.of("error", e.getMessage()));
         }
     }
 
@@ -78,7 +80,7 @@ public class WorkspaceController {
         } catch (WorkspaceNotFoundException e) {
             return ResponseEntity.notFound().build();
         } catch (IllegalStateException e) {
-            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(e.getMessage());
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(Map.of("error", e.getMessage()));
         }
     }
 
@@ -95,7 +97,7 @@ public class WorkspaceController {
     @PatchMapping("/{slug}/schedule")
     public ResponseEntity<?> updateSchedule(
         @PathVariable String slug,
-        @RequestBody UpdateWorkspaceScheduleRequestDTO request
+        @Valid @RequestBody UpdateWorkspaceScheduleRequestDTO request
     ) {
         try {
             Workspace workspace = workspaceService.updateSchedule(
@@ -112,7 +114,7 @@ public class WorkspaceController {
     @PatchMapping("/{slug}/notifications")
     public ResponseEntity<?> updateNotifications(
         @PathVariable String slug,
-        @RequestBody UpdateWorkspaceNotificationsRequestDTO request
+        @Valid @RequestBody UpdateWorkspaceNotificationsRequestDTO request
     ) {
         try {
             Workspace workspace = workspaceService.updateNotifications(
@@ -130,10 +132,27 @@ public class WorkspaceController {
     @PatchMapping("/{slug}/token")
     public ResponseEntity<?> updateToken(
         @PathVariable String slug,
-        @RequestBody UpdateWorkspaceTokenRequestDTO request
+        @Valid @RequestBody UpdateWorkspaceTokenRequestDTO request
     ) {
         try {
             Workspace workspace = workspaceService.updateToken(slug, request.personalAccessToken());
+            return ResponseEntity.ok(WorkspaceDTO.from(workspace));
+        } catch (WorkspaceNotFoundException e) {
+            return ResponseEntity.notFound().build();
+        }
+    }
+
+    @PatchMapping("/{slug}/slack-credentials")
+    public ResponseEntity<?> updateSlackCredentials(
+        @PathVariable String slug,
+        @Valid @RequestBody UpdateWorkspaceSlackCredentialsRequestDTO request
+    ) {
+        try {
+            Workspace workspace = workspaceService.updateSlackCredentials(
+                slug,
+                request.slackToken(),
+                request.slackSigningSecret()
+            );
             return ResponseEntity.ok(WorkspaceDTO.from(workspace));
         } catch (WorkspaceNotFoundException e) {
             return ResponseEntity.notFound().build();

@@ -55,7 +55,7 @@ public class WorkspaceService {
         "metrics"
     );
 
-    private static final Pattern SLACK_CHANNEL_ID_PATTERN = Pattern.compile("^[CG][A-Z0-9]{8,}$");
+    private static final Pattern SLACK_CHANNEL_ID_PATTERN = Pattern.compile("^[CGD][A-Z0-9]{8,}$");
 
     @Autowired
     private NatsConsumerService natsConsumerService;
@@ -651,7 +651,7 @@ public class WorkspaceService {
             String trimmedChannelId = channelId.trim();
             if (!SLACK_CHANNEL_ID_PATTERN.matcher(trimmedChannelId).matches()) {
                 throw new IllegalArgumentException(
-                    "Slack channel ID must start with C/G followed by at least 8 alphanumerics, got: " + channelId
+                    "Slack channel ID must start with 'C' (public), 'G' (private), or 'D' (DM) followed by at least 8 alphanumerics, got: " + channelId
                 );
             }
             workspace.setLeaderboardNotificationChannelId(trimmedChannelId);
@@ -670,6 +670,18 @@ public class WorkspaceService {
         // TODO: Consider encrypting the token at rest
         // TODO: Add audit log entry for security tracking
         workspace.setPersonalAccessToken(personalAccessToken);
+
+        return workspaceRepository.save(workspace);
+    }
+
+    public Workspace updateSlackCredentials(String slug, String slackToken, String slackSigningSecret) {
+        Workspace workspace = workspaceRepository
+            .findBySlug(slug)
+            .orElseThrow(() -> new WorkspaceNotFoundException(slug));
+
+        // TODO: Validate Slack token by calling Slack API (auth.test)
+        workspace.setSlackToken(slackToken);
+        workspace.setSlackSigningSecret(slackSigningSecret);
 
         return workspaceRepository.save(workspace);
     }
