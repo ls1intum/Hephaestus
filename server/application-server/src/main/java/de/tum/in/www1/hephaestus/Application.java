@@ -11,7 +11,6 @@ import org.springframework.scheduling.annotation.EnableScheduling;
 @EnableCaching
 @EnableScheduling
 public class Application {
-
     static {
         GitHubApiPatches.ensureApplied();
     }

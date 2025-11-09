@@ -78,7 +78,11 @@ public abstract class BaseGitHubIntegrationTest extends BaseIntegrationTest {
         if (raw == null || raw.isBlank()) {
             throw new IllegalStateException("GitHub installation id not configured for integration tests.");
         }
-        return Long.parseLong(raw);
+        try {
+            return Long.parseLong(raw);
+        } catch (NumberFormatException ex) {
+            throw new IllegalStateException("GitHub installation id is not a valid number: '" + raw + "'", ex);
+        }
     }
 
     protected String sandboxRepository() {
@@ -86,7 +90,7 @@ public abstract class BaseGitHubIntegrationTest extends BaseIntegrationTest {
     }
 
     protected String nextEphemeralSlug(String suffix) {
-        var prefix = environment.getProperty("integration-tests.github.ephemeral-prefix", "hephaestus-it");
+        var prefix = environment.getProperty("integration-tests.ephemeral-prefix", "hephaestus-it");
         var timestamp = SUFFIX_FORMATTER.format(Instant.now());
         return (prefix + "-" + timestamp + (suffix == null || suffix.isBlank() ? "" : "-" + suffix)).toLowerCase();
     }

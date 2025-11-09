@@ -1,5 +1,6 @@
 package de.tum.in.www1.hephaestus.gitprovider.common;
 
+import de.tum.in.www1.hephaestus.config.GitHubApiPatches;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.StringReader;
@@ -10,7 +11,6 @@ import org.junit.jupiter.api.extension.ParameterResolutionException;
 import org.junit.jupiter.api.extension.ParameterResolver;
 import org.kohsuke.github.GHEventPayload;
 import org.kohsuke.github.GitHub;
-import de.tum.in.www1.hephaestus.config.GitHubApiPatches;
 
 /**
  * JUnit 5 extension that loads real GitHub webhook JSON files into test methods.

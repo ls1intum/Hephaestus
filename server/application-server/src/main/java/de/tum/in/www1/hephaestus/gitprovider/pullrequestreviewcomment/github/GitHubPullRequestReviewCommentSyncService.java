@@ -138,7 +138,7 @@ public class GitHubPullRequestReviewCommentSyncService {
                 )
             );
 
-    attachAuthor(ghPullRequestReviewComment, result, fallbackUser);
+        attachAuthor(ghPullRequestReviewComment, result, fallbackUser);
 
         attachInReplyTo(ghPullRequestReviewComment, result);
 
@@ -332,4 +332,4 @@ public class GitHubPullRequestReviewCommentSyncService {
         }
         return inReplyToId;
     }
-    }
+}

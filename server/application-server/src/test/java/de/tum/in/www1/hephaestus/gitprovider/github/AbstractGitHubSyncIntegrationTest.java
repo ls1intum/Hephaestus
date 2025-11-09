@@ -261,7 +261,7 @@ abstract class AbstractGitHubSyncIntegrationTest extends BaseGitHubIntegrationTe
             .create();
         awaitCondition("review comment present", () -> !pullRequest.listReviewComments().toList().isEmpty());
         List<GHPullRequestReviewComment> reviewComments = pullRequest.listReviewComments().toList();
-        GHPullRequestReviewComment reviewComment = reviewComments.getFirst();
+        GHPullRequestReviewComment reviewComment = reviewComments.get(0);
         awaitCondition("pull request review present", () ->
             pullRequest.listReviews().toList().stream().anyMatch(r -> r.getId() == commentReview.getId())
         );
