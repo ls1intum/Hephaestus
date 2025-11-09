@@ -2919,7 +2919,7 @@ components:
           minimum: 1
         time:
           type: string
-          pattern: "^\\d{2}:\\d{2}$"
+          pattern: "^([01]\\d|2[0-3]):[0-5]\\d$"
     UpdateWorkspaceTokenRequest:
       type: object
       description: DTO for updating workspace Personal Access Token (PAT).

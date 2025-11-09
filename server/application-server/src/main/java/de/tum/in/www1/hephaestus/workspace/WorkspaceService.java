@@ -679,6 +679,7 @@ public class WorkspaceService {
         return workspaceRepository.save(workspace);
     }
 
+    @Transactional
     public Workspace updateSlackCredentials(String slug, String slackToken, String slackSigningSecret) {
         Workspace workspace = workspaceRepository
             .findBySlug(slug)
