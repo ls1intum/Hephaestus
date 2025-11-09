@@ -10,19 +10,17 @@ import jakarta.validation.constraints.Pattern;
  */
 public record CreateWorkspaceRequestDTO(
     @NotBlank(message = "Slug is required")
-    @Pattern(regexp = "^[a-z0-9][a-z0-9-]{2,50}$", message = "Slug must be 3-51 characters, start with a lowercase letter or digit, and contain only lowercase letters, digits, or hyphens")  
+    @Pattern(
+        regexp = "^[a-z0-9][a-z0-9-]{2,50}$",
+        message = "Slug must be 3-51 characters, start with a lowercase letter or digit, and contain only lowercase letters, digits, or hyphens"
+    )
     String slug,
-    
-    @NotBlank(message = "Display name is required")
-    String displayName,
-    
-    @NotBlank(message = "Account login is required")
-    String accountLogin,
-    
-    @NotNull(message = "Account type is required")
-    AccountType accountType,
-    
-    @NotNull(message = "Owner user ID is required")
-    Long ownerUserId
-) {
-}
+
+    @NotBlank(message = "Display name is required") String displayName,
+
+    @NotBlank(message = "Account login is required") String accountLogin,
+
+    @NotNull(message = "Account type is required") AccountType accountType,
+
+    @NotNull(message = "Owner user ID is required") Long ownerUserId
+) {}

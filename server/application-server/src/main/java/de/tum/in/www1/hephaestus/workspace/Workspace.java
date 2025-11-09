@@ -14,17 +14,15 @@ import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.OneToMany;
 import jakarta.persistence.OneToOne;
-import jakarta.persistence.Table;
-import jakarta.persistence.PreUpdate;
 import jakarta.persistence.PrePersist;
-
-import java.time.Instant;
-import java.util.HashSet;
-import java.util.Set;
-
+import jakarta.persistence.PreUpdate;
+import jakarta.persistence.Table;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Pattern;
+import java.time.Instant;
+import java.util.HashSet;
+import java.util.Set;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
@@ -147,6 +145,6 @@ public class Workspace {
     public enum WorkspaceStatus {
         ACTIVE,
         SUSPENDED,
-        PURGED
+        PURGED,
     }
 }

@@ -7,11 +7,7 @@ import jakarta.validation.constraints.NotBlank;
  * These credentials are used for Slack API integration and webhook signature verification.
  */
 public record UpdateWorkspaceSlackCredentialsRequestDTO(
-    @NotBlank(message = "Slack token is required")
-    String slackToken,
+    @NotBlank(message = "Slack token is required") String slackToken,
 
-    @NotBlank(message = "Slack signing secret is required")
-    String slackSigningSecret
-) {
-    
-}
+    @NotBlank(message = "Slack signing secret is required") String slackSigningSecret
+) {}

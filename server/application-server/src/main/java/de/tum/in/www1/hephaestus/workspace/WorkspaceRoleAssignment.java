@@ -1,17 +1,17 @@
 package de.tum.in.www1.hephaestus.workspace;
 
 import jakarta.persistence.*;
+import java.time.Instant;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 
-import java.time.Instant;
-
 @Entity
-@Table(name = "workspace_role_assignment",
-    uniqueConstraints = @UniqueConstraint(name = "ux_wra_workspace_user",
-        columnNames = {"workspace_id", "user_id"}),
-    indexes = {@Index(name = "idx_wra_user_id", columnList = "user_id")})
+@Table(
+    name = "workspace_role_assignment",
+    uniqueConstraints = @UniqueConstraint(name = "ux_wra_workspace_user", columnNames = { "workspace_id", "user_id" }),
+    indexes = { @Index(name = "idx_wra_user_id", columnList = "user_id") }
+)
 @Getter
 @Setter
 @NoArgsConstructor
@@ -22,8 +22,7 @@ public class WorkspaceRoleAssignment {
     private Long id;
 
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
-    @JoinColumn(name = "workspace_id", nullable = false,
-        foreignKey = @ForeignKey(name = "fk_wra_workspace"))
+    @JoinColumn(name = "workspace_id", nullable = false, foreignKey = @ForeignKey(name = "fk_wra_workspace"))
     private Workspace workspace;
 
     @Column(name = "user_id", nullable = false)
@@ -40,6 +39,6 @@ public class WorkspaceRoleAssignment {
         OWNER,
         ADMIN,
         MEMBER,
-        VIEWER
+        VIEWER,
     }
 }

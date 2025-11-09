@@ -1,9 +1,8 @@
 package de.tum.in.www1.hephaestus.workspace;
 
+import jakarta.validation.constraints.NotNull;
 import java.util.List;
 import java.util.Optional;
-
-import jakarta.validation.constraints.NotNull;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
 

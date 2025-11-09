@@ -1,7 +1,6 @@
 package de.tum.in.www1.hephaestus.workspace.dto;
 
 import de.tum.in.www1.hephaestus.workspace.Workspace;
-
 import java.time.Instant;
 
 public record WorkspaceDTO(

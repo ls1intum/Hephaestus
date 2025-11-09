@@ -1,15 +1,14 @@
 package de.tum.in.www1.hephaestus.workspace;
 
+import de.tum.in.www1.hephaestus.core.exception.EntityNotFoundException;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.app.GitHubAppTokenService;
 import de.tum.in.www1.hephaestus.gitprovider.organization.OrganizationSyncService;
 import de.tum.in.www1.hephaestus.gitprovider.user.User;
 import de.tum.in.www1.hephaestus.gitprovider.user.UserRepository;
 import de.tum.in.www1.hephaestus.gitprovider.user.github.GitHubUserSyncService;
+import de.tum.in.www1.hephaestus.workspace.exception.RepositoryAlreadyMonitoredException;
 import java.io.IOException;
 import java.util.List;
-
-import de.tum.in.www1.hephaestus.workspace.exception.RepositoryAlreadyMonitoredException;
-import de.tum.in.www1.hephaestus.workspace.exception.RepositoryNotFoundException;
 import org.kohsuke.github.GHApp;
 import org.kohsuke.github.GHAppInstallation;
 import org.kohsuke.github.GHRepository;
@@ -111,10 +110,10 @@ public class WorkspaceProvisioningService {
         String displayName = accountLogin;
 
         Workspace workspace = workspaceService.createWorkspace(
-            rawSlug, 
-            displayName, 
-            accountLogin, 
-            AccountType.ORG, 
+            rawSlug,
+            displayName,
+            accountLogin,
+            AccountType.ORG,
             ownerUserId
         );
 
@@ -271,10 +270,10 @@ public class WorkspaceProvisioningService {
                             repositoriesAdded++;
                         } catch (RepositoryAlreadyMonitoredException ignore) {
                             // already present
-                        } catch (RepositoryNotFoundException rnfe) {
+                        } catch (EntityNotFoundException e) {
                             logger.warn("Repository not found while seeding: {}", repo.getFullName());
-                        } catch (Exception ex) {
-                            logger.warn("Failed to add repository {}: {}", repo.getFullName(), ex.getMessage());
+                        } catch (Exception e) {
+                            logger.warn("Failed to add repository {}: {}", repo.getFullName(), e.getMessage());
                         }
                     }
 
@@ -303,12 +302,10 @@ public class WorkspaceProvisioningService {
      */
     private Long syncGitHubUserForPAT(String patToken, String accountLogin) {
         try {
-            GitHub github = new org.kohsuke.github.GitHubBuilder()
-                .withOAuthToken(patToken)
-                .build();
-            
+            GitHub github = new org.kohsuke.github.GitHubBuilder().withOAuthToken(patToken).build();
+
             User user = gitHubUserSyncService.syncUser(github, accountLogin);
-            
+
             if (user != null && user.getId() != null) {
                 logger.info("Synced GitHub user '{}' (id={}) as PAT workspace owner.", accountLogin, user.getId());
                 return user.getId();
@@ -317,12 +314,16 @@ public class WorkspaceProvisioningService {
             logger.warn("Failed to sync GitHub user '{}' for PAT workspace: {}", accountLogin, e.getMessage());
         }
 
-        return userRepository.findByLogin(accountLogin)
+        return userRepository
+            .findByLogin(accountLogin)
             .map(User::getId)
-            .orElseThrow(() -> new IllegalStateException(
-                "Cannot assign owner for PAT workspace: GitHub user '" + accountLogin + 
-                "' could not be synced and does not exist locally. " +
-                "Ensure the user exists in the system before creating the workspace."
-            ));
+            .orElseThrow(() ->
+                new IllegalStateException(
+                    "Cannot assign owner for PAT workspace: GitHub user '" +
+                    accountLogin +
+                    "' could not be synced and does not exist locally. " +
+                    "Ensure the user exists in the system before creating the workspace."
+                )
+            );
     }
 }

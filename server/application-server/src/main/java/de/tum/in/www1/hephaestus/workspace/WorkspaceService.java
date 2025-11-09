@@ -1,5 +1,6 @@
 package de.tum.in.www1.hephaestus.workspace;
 
+import de.tum.in.www1.hephaestus.core.exception.EntityNotFoundException;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.app.GitHubAppTokenService;
 import de.tum.in.www1.hephaestus.gitprovider.label.Label;
 import de.tum.in.www1.hephaestus.gitprovider.label.LabelRepository;
@@ -229,7 +230,7 @@ public class WorkspaceService {
     }
 
     public void addRepositoryToMonitor(String nameWithOwner)
-        throws RepositoryAlreadyMonitoredException, RepositoryNotFoundException {
+        throws RepositoryAlreadyMonitoredException, EntityNotFoundException {
         logger.info("Adding repository to monitor: " + nameWithOwner);
         Workspace workspace = resolveWorkspaceForRepo(nameWithOwner);
 
@@ -244,7 +245,7 @@ public class WorkspaceService {
         var repository = repositorySyncService.syncRepository(workspaceId, nameWithOwner);
         if (repository.isEmpty()) {
             logger.info("Repository does not exist");
-            throw new RepositoryNotFoundException(nameWithOwner);
+            throw new EntityNotFoundException("Repository", nameWithOwner);
         }
 
         RepositoryToMonitor repositoryToMonitor = new RepositoryToMonitor();
@@ -261,7 +262,7 @@ public class WorkspaceService {
         gitHubDataSyncService.syncRepositoryToMonitorAsync(repositoryToMonitor);
     }
 
-    public void removeRepositoryToMonitor(String nameWithOwner) throws RepositoryNotFoundException {
+    public void removeRepositoryToMonitor(String nameWithOwner) throws EntityNotFoundException {
         logger.info("Removing repository from monitor: " + nameWithOwner);
         Workspace workspace = getWorkspaceByRepositoryOwner(nameWithOwner);
 
@@ -274,7 +275,7 @@ public class WorkspaceService {
 
         if (repositoryToMonitor == null) {
             logger.info("Repository is not being monitored");
-            throw new RepositoryNotFoundException(nameWithOwner);
+            throw new EntityNotFoundException("Repository", nameWithOwner);
         }
 
         repositoryToMonitorRepository.delete(repositoryToMonitor);
@@ -444,7 +445,12 @@ public class WorkspaceService {
             Long ownerUserId = syncGitHubUserForOwnership(installationId, accountLogin);
 
             workspace = createWorkspace(accountLogin, accountLogin, accountLogin, AccountType.ORG, ownerUserId);
-            logger.info("Created new workspace '{}' for installation {} with owner userId={}.", workspace.getSlug(), installationId, ownerUserId);
+            logger.info(
+                "Created new workspace '{}' for installation {} with owner userId={}.",
+                workspace.getSlug(),
+                installationId,
+                ownerUserId
+            );
         }
 
         workspace.setGitProviderMode(Workspace.GitProviderMode.GITHUB_APP_INSTALLATION);
@@ -589,7 +595,13 @@ public class WorkspaceService {
     }
 
     @Transactional
-    public Workspace createWorkspace(String rawSlug, String displayName, String accountLogin, AccountType accountType, Long ownerUserId) {
+    public Workspace createWorkspace(
+        String rawSlug,
+        String displayName,
+        String accountLogin,
+        AccountType accountType,
+        Long ownerUserId
+    ) {
         String slug = normalizeSlug(rawSlug);
         validateSlug(slug);
 
@@ -617,7 +629,7 @@ public class WorkspaceService {
     public Workspace updateSchedule(String slug, Integer day, String time) {
         Workspace workspace = workspaceRepository
             .findBySlug(slug)
-            .orElseThrow(() -> new WorkspaceNotFoundException(slug));
+            .orElseThrow(() -> new EntityNotFoundException("Workspace", slug));
 
         if (day != null) {
             if (day < 1 || day > 7) {
@@ -642,7 +654,7 @@ public class WorkspaceService {
     public Workspace updateNotifications(String slug, Boolean enabled, String team, String channelId) {
         Workspace workspace = workspaceRepository
             .findBySlug(slug)
-            .orElseThrow(() -> new WorkspaceNotFoundException(slug));
+            .orElseThrow(() -> new EntityNotFoundException("Workspace", slug));
 
         if (enabled != null) {
             workspace.setLeaderboardNotificationEnabled(enabled);
@@ -656,7 +668,8 @@ public class WorkspaceService {
             String trimmedChannelId = channelId.trim();
             if (!SLACK_CHANNEL_ID_PATTERN.matcher(trimmedChannelId).matches()) {
                 throw new IllegalArgumentException(
-                    "Slack channel ID must start with 'C' (public), 'G' (private), or 'D' (DM) followed by at least 8 alphanumerics, got: " + channelId
+                    "Slack channel ID must start with 'C' (public), 'G' (private), or 'D' (DM) followed by at least 8 alphanumerics, got: " +
+                    channelId
                 );
             }
             workspace.setLeaderboardNotificationChannelId(trimmedChannelId);
@@ -669,7 +682,7 @@ public class WorkspaceService {
     public Workspace updateToken(String slug, String personalAccessToken) {
         Workspace workspace = workspaceRepository
             .findBySlug(slug)
-            .orElseThrow(() -> new WorkspaceNotFoundException(slug));
+            .orElseThrow(() -> new EntityNotFoundException("Workspace", slug));
 
         // TODO: Validate token with GitHub API before storing
         // TODO: Consider encrypting the token at rest
@@ -683,7 +696,7 @@ public class WorkspaceService {
     public Workspace updateSlackCredentials(String slug, String slackToken, String slackSigningSecret) {
         Workspace workspace = workspaceRepository
             .findBySlug(slug)
-            .orElseThrow(() -> new WorkspaceNotFoundException(slug));
+            .orElseThrow(() -> new EntityNotFoundException("Workspace", slug));
 
         // TODO: Validate Slack token by calling Slack API (auth.test)
         workspace.setSlackToken(slackToken);
@@ -735,23 +748,32 @@ public class WorkspaceService {
     private Long syncGitHubUserForOwnership(long installationId, String accountLogin) {
         try {
             org.kohsuke.github.GitHub github = gitHubAppTokenService.clientForInstallation(installationId);
-            
+
             User user = gitHubUserSyncService.syncUser(github, accountLogin);
-            
+
             if (user != null && user.getId() != null) {
                 logger.info("Synced GitHub user '{}' (id={}) as workspace owner.", accountLogin, user.getId());
                 return user.getId();
             }
         } catch (Exception e) {
-            logger.warn("Failed to sync GitHub user '{}' for installation {}: {}", accountLogin, installationId, e.getMessage());
+            logger.warn(
+                "Failed to sync GitHub user '{}' for installation {}: {}",
+                accountLogin,
+                installationId,
+                e.getMessage()
+            );
         }
 
-        return userRepository.findByLogin(accountLogin)
+        return userRepository
+            .findByLogin(accountLogin)
             .map(User::getId)
-            .orElseThrow(() -> new IllegalStateException(
-                "Cannot assign owner for workspace: GitHub user '" + accountLogin + 
-                "' could not be synced and does not exist locally. " +
-                "Ensure the user exists in the system before creating the workspace."
-            ));
+            .orElseThrow(() ->
+                new IllegalStateException(
+                    "Cannot assign owner for workspace: GitHub user '" +
+                    accountLogin +
+                    "' could not be synced and does not exist locally. " +
+                    "Ensure the user exists in the system before creating the workspace."
+                )
+            );
     }
 }

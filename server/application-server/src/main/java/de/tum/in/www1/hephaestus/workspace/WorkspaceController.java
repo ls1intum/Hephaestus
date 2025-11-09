@@ -1,13 +1,13 @@
 package de.tum.in.www1.hephaestus.workspace;
 
+import de.tum.in.www1.hephaestus.core.exception.EntityNotFoundException;
 import de.tum.in.www1.hephaestus.gitprovider.team.TeamInfoDTO;
 import de.tum.in.www1.hephaestus.gitprovider.user.UserTeamsDTO;
-import java.util.List;
-import java.util.Map;
-
 import de.tum.in.www1.hephaestus.workspace.dto.*;
 import de.tum.in.www1.hephaestus.workspace.exception.*;
 import jakarta.validation.Valid;
+import java.util.List;
+import java.util.Map;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -65,7 +65,7 @@ public class WorkspaceController {
         try {
             Workspace workspace = workspaceLifecycleService.suspendWorkspace(slug);
             return ResponseEntity.ok(WorkspaceDTO.from(workspace));
-        } catch (WorkspaceNotFoundException e) {
+        } catch (EntityNotFoundException e) {
             return ResponseEntity.notFound().build();
         } catch (IllegalStateException e) {
             return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(Map.of("error", e.getMessage()));
@@ -77,7 +77,7 @@ public class WorkspaceController {
         try {
             Workspace workspace = workspaceLifecycleService.resumeWorkspace(slug);
             return ResponseEntity.ok(WorkspaceDTO.from(workspace));
-        } catch (WorkspaceNotFoundException e) {
+        } catch (EntityNotFoundException e) {
             return ResponseEntity.notFound().build();
         } catch (IllegalStateException e) {
             return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(Map.of("error", e.getMessage()));
@@ -89,7 +89,7 @@ public class WorkspaceController {
         try {
             workspaceLifecycleService.purgeWorkspace(slug);
             return ResponseEntity.noContent().build();
-        } catch (WorkspaceNotFoundException e) {
+        } catch (EntityNotFoundException e) {
             return ResponseEntity.notFound().build();
         }
     }
@@ -100,13 +100,9 @@ public class WorkspaceController {
         @Valid @RequestBody UpdateWorkspaceScheduleRequestDTO request
     ) {
         try {
-            Workspace workspace = workspaceService.updateSchedule(
-                slug,
-                request.day(),
-                request.time()
-            );
+            Workspace workspace = workspaceService.updateSchedule(slug, request.day(), request.time());
             return ResponseEntity.ok(WorkspaceDTO.from(workspace));
-        } catch (WorkspaceNotFoundException e) {
+        } catch (EntityNotFoundException e) {
             return ResponseEntity.notFound().build();
         } catch (IllegalArgumentException e) {
             return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(Map.of("error", e.getMessage()));
@@ -126,7 +122,7 @@ public class WorkspaceController {
                 request.channelId()
             );
             return ResponseEntity.ok(WorkspaceDTO.from(workspace));
-        } catch (WorkspaceNotFoundException e) {
+        } catch (EntityNotFoundException e) {
             return ResponseEntity.notFound().build();
         } catch (IllegalArgumentException e) {
             return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(Map.of("error", e.getMessage()));
@@ -141,7 +137,7 @@ public class WorkspaceController {
         try {
             Workspace workspace = workspaceService.updateToken(slug, request.personalAccessToken());
             return ResponseEntity.ok(WorkspaceDTO.from(workspace));
-        } catch (WorkspaceNotFoundException e) {
+        } catch (EntityNotFoundException e) {
             return ResponseEntity.notFound().build();
         }
     }
@@ -158,7 +154,7 @@ public class WorkspaceController {
                 request.slackSigningSecret()
             );
             return ResponseEntity.ok(WorkspaceDTO.from(workspace));
-        } catch (WorkspaceNotFoundException e) {
+        } catch (EntityNotFoundException e) {
             return ResponseEntity.notFound().build();
         }
     }
@@ -174,7 +170,7 @@ public class WorkspaceController {
         try {
             workspaceService.addRepositoryToMonitor(owner + '/' + name);
             return ResponseEntity.ok().build();
-        } catch (RepositoryNotFoundException e) {
+        } catch (EntityNotFoundException e) {
             return ResponseEntity.notFound().build();
         } catch (RepositoryAlreadyMonitoredException e) {
             return ResponseEntity.badRequest().build();
@@ -186,7 +182,7 @@ public class WorkspaceController {
         try {
             workspaceService.removeRepositoryToMonitor(owner + '/' + name);
             return ResponseEntity.ok().build();
-        } catch (RepositoryNotFoundException e) {
+        } catch (EntityNotFoundException e) {
             return ResponseEntity.notFound().build();
         }
     }

@@ -15,9 +15,8 @@ public record UpdateWorkspaceScheduleRequestDTO(
     @Min(value = 1, message = "Day must be between 1 (Monday) and 7 (Sunday)")
     @Max(value = 7, message = "Day must be between 1 (Monday) and 7 (Sunday)")
     Integer day,
-    
+
     @NotNull(message = "Time cannot be null")
     @Pattern(regexp = "^([01]\\d|2[0-3]):[0-5]\\d$", message = "Time must be in HH:mm format (00:00-23:59)")
     String time
-) {
-}
+) {}

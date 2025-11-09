@@ -1,6 +1,6 @@
 package de.tum.in.www1.hephaestus.workspace;
 
-import de.tum.in.www1.hephaestus.workspace.exception.WorkspaceNotFoundException;
+import de.tum.in.www1.hephaestus.core.exception.EntityNotFoundException;
 import jakarta.transaction.Transactional;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -22,17 +22,17 @@ public class WorkspaceLifecycleService {
     /**
      * Suspend a workspace, preventing new sync cycles and making it read-only.
      * Idempotent: calling suspend on an already suspended workspace is a no-op.
-     * 
+     *
      * @param slug the workspace slug
      * @return the suspended workspace
-     * @throws WorkspaceNotFoundException if workspace does not exist
+     * @throws EntityNotFoundException if workspace does not exist
      * @throws IllegalStateException if workspace is already purged
      */
     @Transactional
     public Workspace suspendWorkspace(String slug) {
         Workspace workspace = workspaceRepository
             .findBySlug(slug)
-            .orElseThrow(() -> new WorkspaceNotFoundException(slug));
+            .orElseThrow(() -> new EntityNotFoundException("Workspace", slug));
 
         if (workspace.getStatus() == Workspace.WorkspaceStatus.PURGED) {
             throw new IllegalStateException("Cannot suspend a purged workspace: " + slug);
@@ -42,7 +42,6 @@ public class WorkspaceLifecycleService {
             workspace.setStatus(Workspace.WorkspaceStatus.SUSPENDED);
             workspace = workspaceRepository.save(workspace);
             logger.info("Workspace '{}' has been suspended.", slug);
-
             // TODO: Stop NATS consumers and signal schedulers
         }
 
@@ -52,17 +51,17 @@ public class WorkspaceLifecycleService {
     /**
      * Resume a suspended workspace, making it active again.
      * Idempotent: calling resume on an already active workspace is a no-op.
-     * 
+     *
      * @param slug the workspace slug
      * @return the resumed workspace
-     * @throws WorkspaceNotFoundException if workspace does not exist
+     * @throws EntityNotFoundException if workspace does not exist
      * @throws IllegalStateException if workspace is purged (cannot resume purged)
      */
     @Transactional
     public Workspace resumeWorkspace(String slug) {
         Workspace workspace = workspaceRepository
             .findBySlug(slug)
-            .orElseThrow(() -> new WorkspaceNotFoundException(slug));
+            .orElseThrow(() -> new EntityNotFoundException("Workspace", slug));
 
         if (workspace.getStatus() == Workspace.WorkspaceStatus.PURGED) {
             throw new IllegalStateException("Cannot resume a purged workspace: " + slug);
@@ -72,7 +71,6 @@ public class WorkspaceLifecycleService {
             workspace.setStatus(Workspace.WorkspaceStatus.ACTIVE);
             workspace = workspaceRepository.save(workspace);
             logger.info("Workspace '{}' has been resumed.", slug);
-
             // TODO: Restart NATS consumers and re-enable schedulers
         }
 
@@ -82,15 +80,15 @@ public class WorkspaceLifecycleService {
     /**
      * Purge (soft delete) a workspace immediately.
      * Idempotent: calling purge on an already purged workspace is a no-op.
-     * 
+     *
      * @param slug the workspace slug
-     * @throws WorkspaceNotFoundException if workspace does not exist
+     * @throws EntityNotFoundException if workspace does not exist
      */
     @Transactional
     public void purgeWorkspace(String slug) {
         Workspace workspace = workspaceRepository
             .findBySlug(slug)
-            .orElseThrow(() -> new WorkspaceNotFoundException(slug));
+            .orElseThrow(() -> new EntityNotFoundException("Workspace", slug));
 
         if (workspace.getStatus() == Workspace.WorkspaceStatus.PURGED) {
             logger.info("Workspace '{}' is already purged. Skipping.", slug);
@@ -106,7 +104,7 @@ public class WorkspaceLifecycleService {
 
     /**
      * Check if a workspace is active (not suspended or purged).
-     * 
+     *
      * @param workspace the workspace to check
      * @return true if workspace is ACTIVE, false otherwise
      */
@@ -116,7 +114,7 @@ public class WorkspaceLifecycleService {
 
     /**
      * Check if a workspace is suspended.
-     * 
+     *
      * @param workspace the workspace to check
      * @return true if workspace is SUSPENDED, false otherwise
      */
@@ -126,7 +124,7 @@ public class WorkspaceLifecycleService {
 
     /**
      * Check if a workspace is purged (soft deleted).
-     * 
+     *
      * @param workspace the workspace to check
      * @return true if workspace is PURGED, false otherwise
      */

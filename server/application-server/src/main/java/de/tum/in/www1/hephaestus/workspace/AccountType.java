@@ -8,9 +8,9 @@ public enum AccountType {
      * GitHub organization account
      */
     ORG,
-    
+
     /**
      * GitHub user account
      */
-    USER
+    USER,
 }
