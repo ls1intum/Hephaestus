@@ -159,6 +159,19 @@ public class WorkspaceController {
         }
     }
 
+    @PatchMapping("/{slug}/public-visibility")
+    public ResponseEntity<?> updatePublicVisibility(
+        @PathVariable String slug,
+        @Valid @RequestBody UpdateWorkspacePublicVisibilityRequestDTO request
+    ) {
+        try {
+            Workspace workspace = workspaceService.updatePublicVisibility(slug, request.isPubliclyViewable());
+            return ResponseEntity.ok(WorkspaceDTO.from(workspace));
+        } catch (EntityNotFoundException e) {
+            return ResponseEntity.notFound().build();
+        }
+    }
+
     @GetMapping("/repositories")
     public ResponseEntity<List<String>> getRepositoriesToMonitor() {
         var repositories = workspaceService.getRepositoriesToMonitor().stream().sorted().toList();

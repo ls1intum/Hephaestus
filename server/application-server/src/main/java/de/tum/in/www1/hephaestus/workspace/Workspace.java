@@ -52,6 +52,10 @@ public class Workspace {
     @NotBlank(message = "Display name is required")
     private String displayName;
 
+    @Column(name = "is_publicly_viewable", nullable = false)
+    @NotNull(message = "Public viewable flag is required")
+    private Boolean isPubliclyViewable = false;
+
     @Enumerated(EnumType.STRING)
     @Column(name = "status", nullable = false, length = 20)
     @NotNull(message = "Status is required")

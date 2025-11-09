@@ -1,5 +1,6 @@
 package de.tum.in.www1.hephaestus.workspace;
 
+import de.tum.in.www1.hephaestus.core.LoggingUtils;
 import de.tum.in.www1.hephaestus.core.exception.EntityNotFoundException;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.app.GitHubAppTokenService;
 import de.tum.in.www1.hephaestus.gitprovider.label.Label;
@@ -50,14 +51,7 @@ public class WorkspaceService {
 
     private static final Logger logger = LoggerFactory.getLogger(WorkspaceService.class);
 
-    private static final Set<String> RESERVED_WORKSPACE_SLUGS = Set.of(
-        "admin",
-        "api",
-        "w",
-        "workspaces",
-        "system",
-        "metrics"
-    );
+    private static final boolean DEFAULT_PUBLIC_VISIBILITY = false;
 
     private static final Pattern SLACK_CHANNEL_ID_PATTERN = Pattern.compile("^[CGD][A-Z0-9]{8,}$");
 
@@ -188,17 +182,17 @@ public class WorkspaceService {
                 gitHubDataSyncService.syncUsers(workspace);
             })
             .exceptionally(ex -> {
-                logger.error("Error during syncUsers: {}", ex.getMessage(), ex);
+                logger.error("Error during syncUsers: {}", LoggingUtils.sanitizeForLog(ex.getMessage()), ex);
                 return null;
             });
 
         CompletableFuture<Void> teamsFuture = usersFuture
             .thenRunAsync(() -> {
-                logger.info("Syncing teams for workspace id={}", workspace.getId());
+                logger.info("Users synced, now syncing teams for workspace id={}", workspace.getId());
                 gitHubDataSyncService.syncTeams(workspace);
             })
             .exceptionally(ex -> {
-                logger.error("Error during syncTeams: {}", ex.getMessage(), ex);
+                logger.error("Error during syncTeams: {}", LoggingUtils.sanitizeForLog(ex.getMessage()), ex);
                 return null;
             });
 
@@ -231,7 +225,7 @@ public class WorkspaceService {
 
     public void addRepositoryToMonitor(String nameWithOwner)
         throws RepositoryAlreadyMonitoredException, EntityNotFoundException {
-        logger.info("Adding repository to monitor: " + nameWithOwner);
+        logger.info("Adding repository to monitor: {}", LoggingUtils.sanitizeForLog(nameWithOwner));
         Workspace workspace = resolveWorkspaceForRepo(nameWithOwner);
 
         if (workspace.getRepositoriesToMonitor().stream().anyMatch(r -> r.getNameWithOwner().equals(nameWithOwner))) {
@@ -263,7 +257,7 @@ public class WorkspaceService {
     }
 
     public void removeRepositoryToMonitor(String nameWithOwner) throws EntityNotFoundException {
-        logger.info("Removing repository from monitor: " + nameWithOwner);
+        logger.info("Removing repository from monitor: {}", LoggingUtils.sanitizeForLog(nameWithOwner));
         Workspace workspace = getWorkspaceByRepositoryOwner(nameWithOwner);
 
         RepositoryToMonitor repositoryToMonitor = workspace
@@ -303,7 +297,10 @@ public class WorkspaceService {
 
     public Optional<TeamInfoDTO> addLabelToTeam(Long teamId, Long repositoryId, String label) {
         logger.info(
-            "Adding label '" + label + "' of repository with ID: " + repositoryId + " to team with ID: " + teamId
+            "Adding label '{}' of repository with ID: {} to team with ID: {}",
+            LoggingUtils.sanitizeForLog(label),
+            repositoryId,
+            teamId
         );
         Optional<Team> optionalTeam = teamRepository.findById(teamId);
         if (optionalTeam.isEmpty()) {
@@ -320,7 +317,7 @@ public class WorkspaceService {
     }
 
     public Optional<TeamInfoDTO> removeLabelFromTeam(Long teamId, Long labelId) {
-        logger.info("Removing label with ID: " + labelId + " from team with ID: " + teamId);
+        logger.info("Removing label with ID: {} from team with ID: {}", labelId, teamId);
         Optional<Team> optionalTeam = teamRepository.findById(teamId);
         if (optionalTeam.isEmpty()) {
             return Optional.empty();
@@ -337,7 +334,7 @@ public class WorkspaceService {
 
     //TODO: Method never used
     public Optional<TeamInfoDTO> deleteTeam(Long teamId) {
-        logger.info("Deleting team with ID: " + teamId);
+        logger.info("Deleting team with ID: {}", teamId);
         Optional<Team> optionalTeam = teamRepository.findById(teamId);
         if (optionalTeam.isEmpty()) {
             return Optional.empty();
@@ -429,7 +426,7 @@ public class WorkspaceService {
                 logger.info(
                     "Linking existing workspace id={} login={} to installation {}.",
                     workspace.getId(),
-                    accountLogin,
+                    LoggingUtils.sanitizeForLog(accountLogin),
                     installationId
                 );
             }
@@ -447,7 +444,7 @@ public class WorkspaceService {
             workspace = createWorkspace(accountLogin, accountLogin, accountLogin, AccountType.ORG, ownerUserId);
             logger.info(
                 "Created new workspace '{}' for installation {} with owner userId={}.",
-                workspace.getSlug(),
+                LoggingUtils.sanitizeForLog(workspace.getSlug()),
                 installationId,
                 ownerUserId
             );
@@ -550,10 +547,18 @@ public class WorkspaceService {
     private Optional<Workspace> resolveFallbackWorkspace(String context) {
         List<Workspace> all = workspaceRepository.findAll();
         if (all.size() == 1) {
-            logger.info("Falling back to the only configured workspace id={} for {}.", all.getFirst().getId(), context);
+            logger.info(
+                "Falling back to the only configured workspace id={} for {}.",
+                all.getFirst().getId(),
+                LoggingUtils.sanitizeForLog(context)
+            );
             return Optional.of(all.getFirst());
         }
-        logger.warn("Unable to resolve workspace for {}. Available workspace count={}", context, all.size());
+        logger.warn(
+            "Unable to resolve workspace for {}. Available workspace count={}",
+            LoggingUtils.sanitizeForLog(context),
+            all.size()
+        );
         return Optional.empty();
     }
 
@@ -612,6 +617,7 @@ public class WorkspaceService {
         Workspace workspace = new Workspace();
         workspace.setSlug(slug);
         workspace.setDisplayName(displayName);
+        workspace.setIsPubliclyViewable(DEFAULT_PUBLIC_VISIBILITY);
         workspace.setAccountLogin(accountLogin);
         workspace.setAccountType(accountType);
         workspace.setStatus(Workspace.WorkspaceStatus.ACTIVE);
@@ -705,6 +711,17 @@ public class WorkspaceService {
         return workspaceRepository.save(workspace);
     }
 
+    @Transactional
+    public Workspace updatePublicVisibility(String slug, Boolean isPubliclyViewable) {
+        Workspace workspace = workspaceRepository
+            .findBySlug(slug)
+            .orElseThrow(() -> new EntityNotFoundException("Workspace", slug));
+
+        workspace.setIsPubliclyViewable(isPubliclyViewable);
+
+        return workspaceRepository.save(workspace);
+    }
+
     private void createOwnerRole(Workspace workspace, Long ownerUserId) {
         if (ownerUserId == null) {
             throw new IllegalArgumentException("Owner user id must not be null when creating a workspace.");
@@ -736,9 +753,6 @@ public class WorkspaceService {
         if (!slug.matches("^[a-z0-9][a-z0-9-]{2,50}$")) {
             throw new InvalidWorkspaceSlugException(slug);
         }
-        if (RESERVED_WORKSPACE_SLUGS.contains(slug)) {
-            throw new InvalidWorkspaceSlugException(slug);
-        }
     }
 
     /**
@@ -752,15 +766,19 @@ public class WorkspaceService {
             User user = gitHubUserSyncService.syncUser(github, accountLogin);
 
             if (user != null && user.getId() != null) {
-                logger.info("Synced GitHub user '{}' (id={}) as workspace owner.", accountLogin, user.getId());
+                logger.info(
+                    "Synced GitHub user '{}' (id={}) as workspace owner.",
+                    LoggingUtils.sanitizeForLog(accountLogin),
+                    user.getId()
+                );
                 return user.getId();
             }
         } catch (Exception e) {
             logger.warn(
                 "Failed to sync GitHub user '{}' for installation {}: {}",
-                accountLogin,
+                LoggingUtils.sanitizeForLog(accountLogin),
                 installationId,
-                e.getMessage()
+                LoggingUtils.sanitizeForLog(e.getMessage())
             );
         }
 

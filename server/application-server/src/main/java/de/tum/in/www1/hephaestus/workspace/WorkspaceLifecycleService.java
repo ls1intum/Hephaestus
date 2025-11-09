@@ -1,5 +1,8 @@
 package de.tum.in.www1.hephaestus.workspace;
 
+import static de.tum.in.www1.hephaestus.workspace.Workspace.WorkspaceStatus;
+
+import de.tum.in.www1.hephaestus.core.LoggingUtils;
 import de.tum.in.www1.hephaestus.core.exception.EntityNotFoundException;
 import jakarta.transaction.Transactional;
 import org.slf4j.Logger;
@@ -34,14 +37,14 @@ public class WorkspaceLifecycleService {
             .findBySlug(slug)
             .orElseThrow(() -> new EntityNotFoundException("Workspace", slug));
 
-        if (workspace.getStatus() == Workspace.WorkspaceStatus.PURGED) {
+        if (workspace.getStatus() == WorkspaceStatus.PURGED) {
             throw new IllegalStateException("Cannot suspend a purged workspace: " + slug);
         }
 
-        if (workspace.getStatus() != Workspace.WorkspaceStatus.SUSPENDED) {
-            workspace.setStatus(Workspace.WorkspaceStatus.SUSPENDED);
+        if (workspace.getStatus() != WorkspaceStatus.SUSPENDED) {
+            workspace.setStatus(WorkspaceStatus.SUSPENDED);
             workspace = workspaceRepository.save(workspace);
-            logger.info("Workspace '{}' has been suspended.", slug);
+            logger.info("Workspace '{}' has been suspended.", LoggingUtils.sanitizeForLog(slug));
             // TODO: Stop NATS consumers and signal schedulers
         }
 
@@ -63,14 +66,14 @@ public class WorkspaceLifecycleService {
             .findBySlug(slug)
             .orElseThrow(() -> new EntityNotFoundException("Workspace", slug));
 
-        if (workspace.getStatus() == Workspace.WorkspaceStatus.PURGED) {
+        if (workspace.getStatus() == WorkspaceStatus.PURGED) {
             throw new IllegalStateException("Cannot resume a purged workspace: " + slug);
         }
 
-        if (workspace.getStatus() != Workspace.WorkspaceStatus.ACTIVE) {
-            workspace.setStatus(Workspace.WorkspaceStatus.ACTIVE);
+        if (workspace.getStatus() != WorkspaceStatus.ACTIVE) {
+            workspace.setStatus(WorkspaceStatus.ACTIVE);
             workspace = workspaceRepository.save(workspace);
-            logger.info("Workspace '{}' has been resumed.", slug);
+            logger.info("Workspace '{}' has been resumed.", LoggingUtils.sanitizeForLog(slug));
             // TODO: Restart NATS consumers and re-enable schedulers
         }
 
@@ -90,45 +93,29 @@ public class WorkspaceLifecycleService {
             .findBySlug(slug)
             .orElseThrow(() -> new EntityNotFoundException("Workspace", slug));
 
-        if (workspace.getStatus() == Workspace.WorkspaceStatus.PURGED) {
-            logger.info("Workspace '{}' is already purged. Skipping.", slug);
+        if (workspace.getStatus() == WorkspaceStatus.PURGED) {
+            logger.info("Workspace '{}' is already purged. Skipping.", LoggingUtils.sanitizeForLog(slug));
             return;
         }
 
         // TODO: Implement hard delete with batch cascade strategy
 
-        workspace.setStatus(Workspace.WorkspaceStatus.PURGED);
+        workspace.setStatus(WorkspaceStatus.PURGED);
         workspaceRepository.save(workspace);
-        logger.info("Workspace '{}' has been purged (soft deleted).", slug);
+        logger.info("Workspace '{}' has been purged (soft deleted).", LoggingUtils.sanitizeForLog(slug));
     }
 
     /**
-     * Check if a workspace is active (not suspended or purged).
+     * Get the current status of a workspace.
      *
-     * @param workspace the workspace to check
-     * @return true if workspace is ACTIVE, false otherwise
+     * @param slug the workspace slug
+     * @return the workspace status
+     * @throws EntityNotFoundException if workspace does not exist
      */
-    public boolean isWorkspaceActive(Workspace workspace) {
-        return workspace != null && workspace.getStatus() == Workspace.WorkspaceStatus.ACTIVE;
-    }
-
-    /**
-     * Check if a workspace is suspended.
-     *
-     * @param workspace the workspace to check
-     * @return true if workspace is SUSPENDED, false otherwise
-     */
-    public boolean isWorkspaceSuspended(Workspace workspace) {
-        return workspace != null && workspace.getStatus() == Workspace.WorkspaceStatus.SUSPENDED;
-    }
-
-    /**
-     * Check if a workspace is purged (soft deleted).
-     *
-     * @param workspace the workspace to check
-     * @return true if workspace is PURGED, false otherwise
-     */
-    public boolean isWorkspacePurged(Workspace workspace) {
-        return workspace != null && workspace.getStatus() == Workspace.WorkspaceStatus.PURGED;
+    public WorkspaceStatus getWorkspaceStatus(String slug) {
+        Workspace workspace = workspaceRepository
+            .findBySlug(slug)
+            .orElseThrow(() -> new EntityNotFoundException("Workspace", slug));
+        return workspace.getStatus();
     }
 }

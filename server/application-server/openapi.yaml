@@ -3153,10 +3153,10 @@ components:
           type: string
         status:
           type: string
-        required:
-        - accountLogin  
-        - createdAt  
-        - displayName  
-        - id  
-        - slug  
+      required:
+        - accountLogin
+        - createdAt
+        - displayName
+        - id
+        - slug
         - status  
