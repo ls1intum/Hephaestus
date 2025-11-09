@@ -561,6 +561,11 @@
         </profile>
         <profile>
             <id>github-integration-tests</id>
+            <activation>
+                <property>
+                    <name>groups</name>
+                </property>
+            </activation>
             <properties>
                 <hephaestus.githubIntegrationExcludedGroups></hephaestus.githubIntegrationExcludedGroups>
             </properties>

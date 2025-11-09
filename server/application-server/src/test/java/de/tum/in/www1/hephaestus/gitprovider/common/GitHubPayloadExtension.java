@@ -10,6 +10,7 @@ import org.junit.jupiter.api.extension.ParameterResolutionException;
 import org.junit.jupiter.api.extension.ParameterResolver;
 import org.kohsuke.github.GHEventPayload;
 import org.kohsuke.github.GitHub;
+import de.tum.in.www1.hephaestus.config.GitHubApiPatches;
 
 /**
  * JUnit 5 extension that loads real GitHub webhook JSON files into test methods.
@@ -43,6 +44,7 @@ public class GitHubPayloadExtension implements ParameterResolver {
                 throw new IOException("GitHub payload not found on classpath: " + resourcePath);
             }
             String jsonPayload = new String(inputStream.readAllBytes(), StandardCharsets.UTF_8);
+            GitHubApiPatches.ensureApplied();
             try (StringReader reader = new StringReader(jsonPayload)) {
                 return GitHub.offline().parseEventPayload(reader, payloadType);
             }

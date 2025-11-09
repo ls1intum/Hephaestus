@@ -1,12 +1,12 @@
 package de.tum.in.www1.hephaestus.config;
 
 import jakarta.annotation.PostConstruct;
+import java.lang.instrument.Instrumentation;
 import net.bytebuddy.agent.ByteBuddyAgent;
 import net.bytebuddy.agent.builder.AgentBuilder;
-import net.bytebuddy.implementation.MethodDelegation;
-import net.bytebuddy.implementation.bind.annotation.RuntimeType;
-import net.bytebuddy.implementation.bind.annotation.This;
+import net.bytebuddy.asm.Advice;
 import net.bytebuddy.matcher.ElementMatchers;
+import org.kohsuke.github.GHUser;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.context.annotation.Configuration;
@@ -18,105 +18,120 @@ import org.springframework.context.annotation.Configuration;
 public class GitHubApiPatches {
 
     private static final Logger logger = LoggerFactory.getLogger(GitHubApiPatches.class);
+    private static volatile boolean patchApplied;
 
     @PostConstruct
     public void applyPatches() {
-        try {
-            ByteBuddyAgent.install();
+        ensureApplied();
+    }
 
-            patchGetUser("org.kohsuke.github.GHPullRequestReview");
-            patchGetUser("org.kohsuke.github.GHPullRequestReviewComment");
-        } catch (Throwable t) {
-            logger.warn("Failed to apply Byte Buddy patches for github-api. Proceeding without patches.", t);
+    public static void ensureApplied() {
+        if (patchApplied) {
+            return;
+        }
+        synchronized (GitHubApiPatches.class) {
+            if (patchApplied) {
+                return;
+            }
+            try {
+                installPatches();
+                patchApplied = true;
+            } catch (Throwable t) {
+                logger.warn("Failed to apply Byte Buddy patches for github-api. Proceeding without patches.", t);
+            }
         }
     }
 
-    private void patchGetUser(String className) throws Exception {
+    private static void installPatches() {
+        Instrumentation instrumentation = ByteBuddyAgent.install();
+        logger.info(
+            "ByteBuddy instrumentation supports retransformation: {}",
+            instrumentation.isRetransformClassesSupported()
+        );
+
+        patchGetUser(instrumentation, "org.kohsuke.github.GHPullRequestReview");
+        patchGetUser(instrumentation, "org.kohsuke.github.GHPullRequestReviewComment");
+    }
+
+    private static void patchGetUser(Instrumentation instrumentation, String className) {
         new AgentBuilder.Default()
+            .disableClassFormatChanges()
             .with(AgentBuilder.RedefinitionStrategy.RETRANSFORMATION)
             .ignore(ElementMatchers.none())
             .type(ElementMatchers.named(className))
             .transform((builder, typeDescription, classLoader, module, protectionDomain) ->
-                builder
-                    .method(ElementMatchers.named("getUser"))
-                    .intercept(MethodDelegation.to(GetUserInterceptor.class))
+                builder.visit(Advice.to(GetUserAdvice.class).on(ElementMatchers.named("getUser")))
             )
-            .installOnByteBuddyAgent();
+            .installOn(instrumentation);
+
+        if (instrumentation.isRetransformClassesSupported()) {
+            try {
+                Class<?> targetClass = Class.forName(className, false, GitHubApiPatches.class.getClassLoader());
+                if (instrumentation.isModifiableClass(targetClass)) {
+                    instrumentation.retransformClasses(targetClass);
+                }
+            } catch (ClassNotFoundException ignored) {
+                // Class will be transformed on first load.
+            } catch (UnsupportedOperationException | java.lang.instrument.UnmodifiableClassException ex) {
+                logger.warn("Instrumentation cannot retransform {}: {}", className, ex.getMessage());
+            }
+        }
 
         logger.info("Patched {}#getUser via Byte Buddy", className);
     }
 
     /**
-     * Interceptor implementing: return owner == null || owner.isOffline() ? user : owner.root().getUser(user.login)
+     * Advice returning the embedded user whenever possible to avoid remote API calls.
      */
-    public static class GetUserInterceptor {
+    public static class GetUserAdvice {
 
-        @RuntimeType
-        public static Object intercept(@This Object self) throws Exception {
+        @Advice.OnMethodEnter(skipOn = Advice.OnNonDefaultValue.class)
+        public static GHUser enter(@Advice.This Object self) {
             try {
-                // Reflectively access fields: owner, user
                 var clazz = self.getClass();
-                var ownerField = clazz.getDeclaredField("owner");
-                ownerField.setAccessible(true);
-                Object owner = ownerField.get(self);
 
                 var userField = clazz.getDeclaredField("user");
                 userField.setAccessible(true);
-                Object user = userField.get(self);
+                GHUser user = (GHUser) userField.get(self);
+
+                var ownerField = clazz.getDeclaredField("owner");
+                ownerField.setAccessible(true);
+                Object owner = ownerField.get(self);
 
                 if (owner == null) {
                     return user;
                 }
 
-                // owner has isOffline()
-                var isOfflineMethod = owner.getClass().getMethod("isOffline");
-                boolean isOffline = (Boolean) isOfflineMethod.invoke(owner);
-                if (isOffline) {
+                Object offline = owner.getClass().getMethod("isOffline").invoke(owner);
+                if (Boolean.TRUE.equals(offline)) {
                     return user;
                 }
 
-                if (user == null) {
-                    return null;
-                }
-
-                // user has login field (package-private), fallback to getLogin()
-                String login = null;
-                try {
-                    var loginField = user.getClass().getDeclaredField("login");
-                    loginField.setAccessible(true);
-                    Object v = loginField.get(user);
-                    login = v != null ? v.toString() : null;
-                } catch (NoSuchFieldException ignore) {
-                    try {
-                        var getLogin = user.getClass().getMethod("getLogin");
-                        Object v = getLogin.invoke(user);
-                        login = v != null ? v.toString() : null;
-                    } catch (ReflectiveOperationException ex) {
-                        // ignore
-                    }
-                }
-
-                if (login == null) {
+                if (user != null) {
                     return user;
                 }
-
-                // owner.root().getUser(login)
-                var rootMethod = owner.getClass().getMethod("root");
-                Object root = rootMethod.invoke(owner);
-                if (root == null) {
-                    return user;
-                }
-                var getUserMethod = root.getClass().getMethod("getUser", String.class);
-                return getUserMethod.invoke(root, login);
             } catch (Throwable t) {
-                // On any unexpected error, return the embedded user to be safe
                 try {
-                    var userField = self.getClass().getDeclaredField("user");
-                    userField.setAccessible(true);
-                    return userField.get(self);
-                } catch (Throwable inner) {
+                    var field = self.getClass().getDeclaredField("user");
+                    field.setAccessible(true);
+                    return (GHUser) field.get(self);
+                } catch (Throwable ignored) {
                     return null;
                 }
+            }
+
+            return null;
+        }
+
+        @Advice.OnMethodExit(onThrowable = Throwable.class)
+        public static void exit(
+            @Advice.Enter GHUser resolved,
+            @Advice.Return(readOnly = false) GHUser returnValue,
+            @Advice.Thrown(readOnly = false) Throwable throwable
+        ) {
+            if (resolved != null) {
+                returnValue = resolved;
+                throwable = null;
             }
         }
     }

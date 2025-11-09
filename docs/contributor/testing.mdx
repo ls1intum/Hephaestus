@@ -133,12 +133,19 @@ Some regression scenarios can only be validated against GitHub itself. We ship a
 From `server/application-server/` run:
 
 ```bash
-./mvnw test -Pgithub-integration-tests -Dgroups=github-integration
+./mvnw test -Dgroups=github-integration
 ```
 
-The `github-integration-tests` profile clears the default exclusion so the live suite can execute; the `-Dgroups` flag narrows execution to just those classes. Run the regular unit/integration suites separately via `./mvnw test`.
+Passing the `groups` system property automatically activates the `github-integration-tests` Maven profile, which clears the default exclusion and runs only the live GitHub scenarios. The regular CI pipeline never sets this flag, so these tests remain skipped unless you opt in locally.
 
 The run takes roughly two minutes and prints the GitHub artefacts it provisions. Clean-up is handled automatically, but if a failure interrupts execution you can safely delete any `hephaestus-it-*` repositories, milestones, or teams that remain in the sandbox.
+
+### Authoring new GitHub sync tests
+
+1. Extend `AbstractGitHubSyncIntegrationTest` (or fall back to `BaseGitHubIntegrationTest` when repositories are not needed). These bases set up credential checks, provide the `workspaceRepository`, and expose helpers such as `createEphemeralRepository`, `registerRepositoryToMonitor`, `createEphemeralTeam`, and `seedOrganizationMembers`.
+2. Use the supplied helpers to create and track temporary GitHub artefacts. They automatically register clean-up handlers via `@AfterEach`, so add new resources to the provided lists instead of implementing manual deletion logic.
+3. Keep tests deterministic: rely on `databaseTestUtils.cleanDatabase()` in `@BeforeEach` (already invoked by the base), and generate unique slugs via `nextEphemeralSlug("suffix")` when naming repositories, branches, or teams.
+4. If a scenario needs extra Spring configuration, extend `application-github-integration-local.yml` in `server/application-server/src/test/resources/`. The checked-in `.example` file documents every property; copy it on demand and keep secrets out of version control.
 
 ### Troubleshooting
 
