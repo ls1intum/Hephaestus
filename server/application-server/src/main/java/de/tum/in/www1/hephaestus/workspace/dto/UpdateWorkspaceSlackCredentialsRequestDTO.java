@@ -12,4 +12,6 @@ public record UpdateWorkspaceSlackCredentialsRequestDTO(
 
     @NotBlank(message = "Slack signing secret is required")
     String slackSigningSecret
-) {}
+) {
+    
+}

@@ -25,6 +25,9 @@ import de.tum.in.www1.hephaestus.leaderboard.LeaguePointsCalculationService;
 import de.tum.in.www1.hephaestus.workspace.exception.*;
 import jakarta.transaction.Transactional;
 import java.time.Instant;
+import java.time.LocalTime;
+import java.time.format.DateTimeFormatter;
+import java.time.format.DateTimeParseException;
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.HashSet;
@@ -624,10 +627,12 @@ public class WorkspaceService {
         }
 
         if (time != null) {
-            if (!time.matches("^\\d{2}:\\d{2}$")) {
-                throw new IllegalArgumentException("Time must be in HH:mm format, got: " + time);
+            try {
+                LocalTime parsed = LocalTime.parse(time, DateTimeFormatter.ofPattern("HH:mm"));
+                workspace.setLeaderboardScheduleTime(parsed.toString());
+            } catch (DateTimeParseException ex) {
+                throw new IllegalArgumentException("Time must be in HH:mm format (00:00 to 23:59), got: " + time);
             }
-            workspace.setLeaderboardScheduleTime(time);
         }
 
         return workspaceRepository.save(workspace);
