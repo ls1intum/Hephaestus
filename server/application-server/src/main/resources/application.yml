@@ -1,7 +1,7 @@
 spring:
     application:
         name: Hephaestus
-        version: "0.10.0-rc.5"
+        version: "0.10.0-rc.20"
 
     datasource:
         url: jdbc:postgresql://localhost:5432/hephaestus
@@ -101,6 +101,12 @@ hephaestus:
             # The secret key of the langfuse server
             secret-key: ${LANGFUSE_SECRET_KEY:}
 
+    posthog:
+        enabled: ${POSTHOG_ENABLED:false}
+        api-host: ${POSTHOG_API_HOST:https://app.posthog.com}
+        project-id: ${POSTHOG_PROJECT_ID:}
+        personal-api-key: ${POSTHOG_PERSONAL_API_KEY:}
+
 
 
 keycloak:
@@ -128,9 +134,10 @@ monitoring:
 # Can be any OAuth token, such as the PAT
 github:
     app:
-        id: ${GH_APP_ID}
-        privateKeyLocation: ${GH_APP_PRIVATE_KEY_LOCATION}
-        privateKey: ${GH_APP_PRIVATE_KEY}
+        # Set to 0 to disable GitHub App mode and use Personal Access Tokens instead
+        id: ${GH_APP_ID:0}
+        privateKeyLocation: ${GH_APP_PRIVATE_KEY_LOCATION:}
+        privateKey: ${GH_APP_PRIVATE_KEY:}
     meta:
         auth-token: ${GH_AUTH_TOKEN:}
 

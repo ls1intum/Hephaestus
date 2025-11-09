@@ -1,5 +1,55 @@
 # Changelog
 
+## [0.10.0-rc.20](https://github.com/ls1intum/Hephaestus/compare/v0.10.0-rc.19...v0.10.0-rc.20) (2025-11-07)
+
+## [0.10.0-rc.19](https://github.com/ls1intum/Hephaestus/compare/v0.10.0-rc.18...v0.10.0-rc.19) (2025-11-06)
+
+## [0.10.0-rc.18](https://github.com/ls1intum/Hephaestus/compare/v0.10.0-rc.17...v0.10.0-rc.18) (2025-11-06)
+
+## [0.10.0-rc.17](https://github.com/ls1intum/Hephaestus/compare/v0.10.0-rc.16...v0.10.0-rc.17) (2025-11-06)
+
+## [0.10.0-rc.16](https://github.com/ls1intum/Hephaestus/compare/v0.10.0-rc.15...v0.10.0-rc.16) (2025-11-05)
+
+## [0.10.0-rc.15](https://github.com/ls1intum/Hephaestus/compare/v0.10.0-rc.14...v0.10.0-rc.15) (2025-11-05)
+
+## [0.10.0-rc.14](https://github.com/ls1intum/Hephaestus/compare/v0.10.0-rc.13...v0.10.0-rc.14) (2025-11-03)
+
+## [0.10.0-rc.13](https://github.com/ls1intum/Hephaestus/compare/v0.10.0-rc.12...v0.10.0-rc.13) (2025-11-02)
+
+## [0.10.0-rc.12](https://github.com/ls1intum/Hephaestus/compare/v0.10.0-rc.11...v0.10.0-rc.12) (2025-11-02)
+
+## [0.10.0-rc.11](https://github.com/ls1intum/Hephaestus/compare/v0.10.0-rc.10...v0.10.0-rc.11) (2025-11-01)
+
+### 🚀 Features
+
+* skip Keycloak login page and directly login with Github ([#526](https://github.com/ls1intum/Hephaestus/issues/526)) ([cc83957](https://github.com/ls1intum/Hephaestus/commit/cc83957dfe89cfa55fce3271e617e1fe0c712657))
+
+## [0.10.0-rc.10](https://github.com/ls1intum/Hephaestus/compare/v0.10.0-rc.9...v0.10.0-rc.10) (2025-10-31)
+
+### 🚀 Features
+
+* enforce research participation consent ([#524](https://github.com/ls1intum/Hephaestus/issues/524)) ([6531868](https://github.com/ls1intum/Hephaestus/commit/65318683a7a8182c13fe13f2cd32817925d4fcaa))
+
+## [0.10.0-rc.9](https://github.com/ls1intum/Hephaestus/compare/v0.10.0-rc.8...v0.10.0-rc.9) (2025-10-30)
+
+### 🚀 Features
+
+* **application-server:** sync pull request review threads ([#522](https://github.com/ls1intum/Hephaestus/issues/522)) ([e5f00d0](https://github.com/ls1intum/Hephaestus/commit/e5f00d057ab74930b2bcd8c97fb870c66592dd97))
+
+## [0.10.0-rc.8](https://github.com/ls1intum/Hephaestus/compare/v0.10.0-rc.7...v0.10.0-rc.8) (2025-10-29)
+
+### 🚀 Features
+
+* add PostHog survey ([#515](https://github.com/ls1intum/Hephaestus/issues/515)) ([a9ee3b2](https://github.com/ls1intum/Hephaestus/commit/a9ee3b26ba9294b97237e0903dc4f5de49228462))
+
+## [0.10.0-rc.7](https://github.com/ls1intum/Hephaestus/compare/v0.10.0-rc.6...v0.10.0-rc.7) (2025-10-28)
+
+## [0.10.0-rc.6](https://github.com/ls1intum/Hephaestus/compare/v0.10.0-rc.5...v0.10.0-rc.6) (2025-10-28)
+
+### 🚀 Features
+
+* support dockerless postgres workflow ([#517](https://github.com/ls1intum/Hephaestus/issues/517)) ([15acfe2](https://github.com/ls1intum/Hephaestus/commit/15acfe2626dbb28745ff5cb7884dfd270772e374))
+
 ## [0.10.0-rc.5](https://github.com/ls1intum/Hephaestus/compare/v0.10.0-rc.4...v0.10.0-rc.5) (2025-10-24)
 
 ## [0.10.0-rc.4](https://github.com/ls1intum/Hephaestus/compare/v0.10.0-rc.3...v0.10.0-rc.4) (2025-10-24)

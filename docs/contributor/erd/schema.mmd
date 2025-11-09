@@ -12,17 +12,17 @@ erDiagram
     BadPracticeDetection {
         BIGINT id PK
         TIMESTAMPTZ detection_time
-        OID summary
         VARCHAR(255) trace_id
         BIGINT pullrequest_id FK
+        TEXT summary
     }
 
     BadPracticeFeedback {
         BIGINT id PK
-        OID explanation
         VARCHAR(255) type
         BIGINT pull_request_bad_practice_id FK
         TIMESTAMPTZ creation_time
+        TEXT explanation
     }
 
     ChatMessage {
@@ -72,7 +72,6 @@ erDiagram
         BIGINT id PK
         TIMESTAMPTZ created_at
         TIMESTAMPTZ updated_at
-        OID body
         TIMESTAMPTZ closed_at
         INTEGER comments_count "NOT NULL"
         VARCHAR(255) html_url
@@ -97,8 +96,10 @@ erDiagram
         BIGINT merged_by_id FK
         BOOLEAN has_pull_request "NOT NULL"
         TIMESTAMP last_sync_at
-        OID bad_practice_summary
         TIMESTAMPTZ last_detection_time
+        VARCHAR(32) state_reason
+        TEXT body
+        TEXT bad_practice_summary
     }
 
     IssueAssignee {
@@ -111,10 +112,10 @@ erDiagram
         TIMESTAMPTZ created_at
         TIMESTAMPTZ updated_at
         VARCHAR(255) author_association
-        OID body
         VARCHAR(255) html_url
         BIGINT author_id FK
         BIGINT issue_id FK
+        TEXT body
     }
 
     IssueLabel {
@@ -135,7 +136,6 @@ erDiagram
         TIMESTAMPTZ created_at
         TIMESTAMPTZ updated_at
         TIMESTAMPTZ closed_at
-        OID description
         TIMESTAMPTZ due_on
         VARCHAR(255) html_url
         INTEGER number "NOT NULL"
@@ -143,6 +143,9 @@ erDiagram
         VARCHAR(255) title
         BIGINT creator_id FK
         BIGINT repository_id FK
+        TEXT description
+        INTEGER closed_issues_count "NOT NULL"
+        INTEGER open_issues_count "NOT NULL"
     }
 
     Organization {
@@ -161,7 +164,7 @@ erDiagram
         BIGINT organization_id PK
         BIGINT user_id PK
         TIMESTAMPTZ joined_at
-        VARCHAR(255) role
+        VARCHAR(32) role
     }
 
     PullRequestRequestedReviewer {
@@ -171,7 +174,6 @@ erDiagram
 
     PullRequestReview {
         BIGINT id PK
-        OID body
         VARCHAR(255) commit_id
         VARCHAR(255) html_url
         BOOLEAN is_dismissed "NOT NULL"
@@ -179,6 +181,7 @@ erDiagram
         TIMESTAMPTZ submitted_at
         BIGINT author_id FK
         BIGINT pull_request_id FK
+        TEXT body
     }
 
     PullRequestReviewComment {
@@ -186,9 +189,7 @@ erDiagram
         TIMESTAMPTZ created_at
         TIMESTAMPTZ updated_at
         VARCHAR(255) author_association
-        OID body
         VARCHAR(255) commit_id
-        OID diff_hunk
         VARCHAR(255) html_url
         INTEGER line "NOT NULL"
         VARCHAR(255) original_commit_id
@@ -203,11 +204,34 @@ erDiagram
         BIGINT author_id FK
         BIGINT pull_request_id FK
         BIGINT review_id FK
+        BIGINT thread_id FK "NOT NULL"
+        BIGINT in_reply_to_id FK
+        TEXT body
+        TEXT diff_hunk
+    }
+
+    PullRequestReviewThread {
+        BIGINT id PK
+        TIMESTAMPTZ created_at
+        TIMESTAMPTZ updated_at
+        VARCHAR(20) state "NOT NULL"
+        TIMESTAMPTZ resolved_at
+        BIGINT pull_request_id FK "NOT NULL"
+        BIGINT root_comment_id FK,UK
+        BIGINT provider_thread_id
+        VARCHAR(64) node_id
+        TEXT path
+        INTEGER line
+        INTEGER start_line
+        VARCHAR(16) side
+        VARCHAR(16) start_side
+        BOOLEAN outdated
+        BOOLEAN collapsed
+        BIGINT resolved_by_id FK
     }
 
     PullRequestBadPractice {
         BIGINT id PK
-        OID description
         VARCHAR(255) title
         BIGINT pullrequest_id FK
         SMALLINT state
@@ -217,6 +241,7 @@ erDiagram
         SMALLINT detection_pullrequest_lifecycle_state
         VARCHAR(255) detection_trace_id
         BIGINT bad_practice_detection_id FK
+        TEXT description
     }
 
     Repository {
@@ -240,6 +265,12 @@ erDiagram
         VARCHAR(255) visibility
         INTEGER watchers_count "NOT NULL"
         BIGINT organization_id FK
+    }
+
+    RepositoryCollaborator {
+        BIGINT repository_id PK,FK
+        BIGINT user_id PK,FK
+        VARCHAR(32) permission "NOT NULL"
     }
 
     RepositoryToMonitor {
@@ -302,6 +333,7 @@ erDiagram
         VARCHAR(255) type
         INTEGER league_points "NOT NULL"
         BOOLEAN notifications_enabled "NOT NULL"
+        BOOLEAN participate_in_research "NOT NULL"
     }
 
     Workspace {
@@ -320,6 +352,7 @@ erDiagram
     %% One-to-One relationships
     ChatMessage ||--|| ChatMessagePart : has
     ChatMessage ||--|| ChatThread : references
+    PullRequestReviewComment ||--|| PullRequestReviewThread : reviewed
     Organization ||--|| Workspace : has
 
     %% One-to-Many relationships
@@ -341,8 +374,12 @@ erDiagram
     User ||--o{ PullRequestReview : reviewed
     Issue ||--o{ PullRequestReview : reviewed
     User ||--o{ PullRequestReviewComment : commented_on
+    PullRequestReviewComment ||--o{ PullRequestReviewComment : commented_on
     Issue ||--o{ PullRequestReviewComment : commented_on
     PullRequestReview ||--o{ PullRequestReviewComment : commented_on
+    PullRequestReviewThread ||--o{ PullRequestReviewComment : commented_on
+    Issue ||--o{ PullRequestReviewThread : reviewed
+    User ||--o{ PullRequestReviewThread : reviewed
     BadPracticeDetection ||--o{ PullRequestBadPractice : has
     Issue ||--o{ PullRequestBadPractice : references
     Organization ||--o{ Repository : has
@@ -355,6 +392,8 @@ erDiagram
     Label }o--o{ IssueLabel : labeled
     Issue }o--o{ PullRequestRequestedReviewer : reviewed
     User }o--o{ PullRequestRequestedReviewer : reviewed
+    Repository }o--o{ RepositoryCollaborator : has
+    User }o--o{ RepositoryCollaborator : has
     Label }o--o{ TeamLabel : labeled
     Team }o--o{ TeamLabel : labeled
     Team }o--o{ TeamMembership : belongs_to

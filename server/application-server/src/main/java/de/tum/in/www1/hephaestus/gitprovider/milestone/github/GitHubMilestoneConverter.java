@@ -28,6 +28,8 @@ public class GitHubMilestoneConverter extends BaseGitServiceEntityConverter<GHMi
         milestone.setTitle(source.getTitle());
         milestone.setDescription(source.getDescription());
         milestone.setDueOn(source.getDueOn());
+        milestone.setOpenIssuesCount(source.getOpenIssues());
+        milestone.setClosedIssuesCount(source.getClosedIssues());
         try {
             milestone.setClosedAt(source.getClosedAt());
         } catch (Exception e) {

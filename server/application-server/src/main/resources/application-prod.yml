@@ -63,6 +63,12 @@ hephaestus:
         # The secret key of the langfuse server
         secret-key: ${LANGFUSE_SECRET_KEY}
 
+    posthog:
+      enabled: ${POSTHOG_ENABLED:false}
+      api-host: ${POSTHOG_API_HOST:https://app.posthog.com}
+      project-id: ${POSTHOG_PROJECT_ID:}
+      personal-api-key: ${POSTHOG_PERSONAL_API_KEY:}
+
 keycloak:
     url: ${KEYCLOAK_URL}
     realm: ${KEYCLOAK_REALM}
@@ -85,7 +91,8 @@ monitoring:
 
 github:
     app:
-        id: ${GH_APP_ID}
+        # Set to 0 to disable GitHub App mode and use Personal Access Tokens instead
+        id: ${GH_APP_ID:0}
         privateKeyLocation: ${GH_APP_PRIVATE_KEY_LOCATION:}
         privateKey: ${GH_APP_PRIVATE_KEY:}
     meta:

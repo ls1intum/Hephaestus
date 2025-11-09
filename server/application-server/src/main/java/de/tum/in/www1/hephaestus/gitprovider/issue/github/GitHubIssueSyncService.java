@@ -17,6 +17,7 @@ import java.time.Instant;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Objects;
 import java.util.Optional;
 import org.kohsuke.github.GHDirection;
 import org.kohsuke.github.GHIssue;
@@ -159,7 +160,17 @@ public class GitHubIssueSyncService {
             .findById(ghIssue.getId())
             .map(issue -> {
                 try {
-                    if (issue.getUpdatedAt() == null || issue.getUpdatedAt().isBefore(ghIssue.getUpdatedAt())) {
+                    boolean needsUpdate =
+                        issue.getUpdatedAt() == null || issue.getUpdatedAt().isBefore(ghIssue.getUpdatedAt());
+
+                    if (!needsUpdate) {
+                        var incomingStateReason = issueConverter.convertStateReason(ghIssue.getStateReason());
+                        if (!Objects.equals(issue.getStateReason(), incomingStateReason)) {
+                            needsUpdate = true;
+                        }
+                    }
+
+                    if (needsUpdate) {
                         return issueConverter.update(ghIssue, issue);
                     }
                     return issue;

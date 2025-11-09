@@ -1,0 +1,1 @@
+export { PostHogIdentity } from "./PostHogIdentity";

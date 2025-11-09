@@ -3,6 +3,7 @@ import type { LeaderboardEntry, PullRequestInfo } from "@/api/types.gen";
 import aliceAvatar from "@/assets/alice_developer.jpg";
 import bobAvatar from "@/assets/bob_builder.jpg";
 import charlieAvatar from "@/assets/charlie_coder.jpg";
+import { GitHubSignInButton } from "@/components/auth/GitHubSignInButton";
 import { LeaderboardTable } from "@/components/leaderboard/LeaderboardTable";
 import { MentorIcon } from "@/components/mentor/MentorIcon";
 import { Button } from "@/components/ui/button";
@@ -121,11 +122,18 @@ export function LandingHeroSection({
 							rituals.
 						</p>
 					</div>
-					<div className="flex gap-4 sm:gap-6">
-						<Button onClick={onSignIn} size="lg" className="gap-2">
-							{isSignedIn ? "Go to Dashboard" : "Get Started"}{" "}
-							<ArrowRight className="h-4 w-4" />
-						</Button>
+					<div className="flex flex-col items-center gap-4 sm:flex-row sm:gap-6">
+						{isSignedIn ? (
+							<Button onClick={onSignIn} size="lg" className="gap-2">
+								Go to Dashboard <ArrowRight className="h-4 w-4" />
+							</Button>
+						) : (
+							<GitHubSignInButton
+								onClick={onSignIn}
+								size="lg"
+								className="w-full justify-center sm:w-auto"
+							/>
+						)}
 						<Button
 							variant="outline"
 							size="lg"

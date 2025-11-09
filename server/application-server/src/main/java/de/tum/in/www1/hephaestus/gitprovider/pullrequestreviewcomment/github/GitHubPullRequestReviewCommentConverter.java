@@ -40,15 +40,26 @@ public class GitHubPullRequestReviewCommentConverter
         comment.setBody(source.getBody());
         comment.setHtmlUrl(source.getHtmlUrl().toString());
         comment.setAuthorAssociation(authorAssociationConverter.convert(source.getAuthorAssociation()));
-        comment.setStartLine(source.getPosition());
-        comment.setOriginalStartLine(source.getOriginalPosition());
-        comment.setLine(source.getPosition());
-        comment.setOriginalLine(source.getOriginalPosition());
-        comment.setStartSide(convertSide(source.getStartSide()));
+        comment.setStartLine(nullIfZero(source.getStartLine()));
+        comment.setOriginalStartLine(nullIfZero(source.getOriginalStartLine()));
+        comment.setLine(source.getLine());
+        comment.setOriginalLine(source.getOriginalLine());
+        comment.setStartSide(convertNullableSide(source.getStartSide()));
         comment.setSide(convertSide(source.getSide()));
         comment.setPosition(source.getPosition());
         comment.setOriginalPosition(source.getOriginalPosition());
         return comment;
+    }
+
+    private Integer nullIfZero(int value) {
+        return value <= 0 ? null : value;
+    }
+
+    private PullRequestReviewComment.Side convertNullableSide(Side side) {
+        if (side == null) {
+            return null;
+        }
+        return convertSide(side);
     }
 
     private PullRequestReviewComment.Side convertSide(Side side) {

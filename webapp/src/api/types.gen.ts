@@ -1403,7 +1403,8 @@ export type UserProfile = {
 };
 
 export type UserSettings = {
-    receiveNotifications?: boolean;
+    participateInResearch: boolean;
+    receiveNotifications: boolean;
 };
 
 export type UserTeams = {

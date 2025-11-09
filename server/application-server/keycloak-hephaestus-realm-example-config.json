@@ -107,7 +107,12 @@
               "composites": {
                 "realm": [
                   "mentor_access"
-                ]
+                ],
+                "client": {
+                  "realm-management": [
+                    "realm-admin"
+                  ]
+                }
               },
               "clientRole": false,
               "containerId": "69732d45-1431-4909-9335-9f39e304f823",
@@ -486,58 +491,6 @@
                     "manage-users"
                 ]
             },
-            "notBefore": 0,
-            "groups": []
-        },
-        {
-            "id": "9d394368-150d-4559-b005-758a50cbb353",
-            "username": "admin",
-            "firstName": "Admin",
-            "lastName": "Heph",
-            "email": "admin@test.de",
-            "emailVerified": true,
-            "createdTimestamp": 1728164083186,
-            "enabled": true,
-            "totp": false,
-            "credentials": [
-                {
-                    "id": "3da23015-0fac-48c2-a8e3-eeb716b61191",
-                    "type": "password",
-                    "userLabel": "My password",
-                    "createdDate": 1728164095322,
-                    "secretData": "{\"value\":\"BTbtjHu/bRIKqfSJhKGphtBmss3tMTulJbyEliEtauA=\",\"salt\":\"T5PabTudL9XbW/hfyARmSw==\",\"additionalParameters\":{}}",
-                    "credentialData": "{\"hashIterations\":5,\"algorithm\":\"argon2\",\"additionalParameters\":{\"hashLength\":[\"32\"],\"memory\":[\"7168\"],\"type\":[\"id\"],\"version\":[\"1.3\"],\"parallelism\":[\"1\"]}}"
-                }
-            ],
-            "disableableCredentialTypes": [],
-            "requiredActions": [],
-            "realmRoles": ["default-roles-hephaestus", "admin"],
-            "notBefore": 0,
-            "groups": []
-        },
-        {
-            "id": "6089efcd-06c1-4688-b23f-992871bfc299",
-            "username": "testuser",
-            "firstName": "Test",
-            "lastName": "User",
-            "email": "testuser@test.de",
-            "emailVerified": false,
-            "createdTimestamp": 1728164130587,
-            "enabled": true,
-            "totp": false,
-            "credentials": [
-                {
-                    "id": "d29517ce-b1cf-4058-b851-33c5364fff21",
-                    "type": "password",
-                    "userLabel": "My password",
-                    "createdDate": 1728164143708,
-                    "secretData": "{\"value\":\"CaelkV+Qy8IH8fV6kG97jePGwsnUpTNzRkxdfKb+IuY=\",\"salt\":\"4UtFbmsnpzl+YS7CwCuZDA==\",\"additionalParameters\":{}}",
-                    "credentialData": "{\"hashIterations\":5,\"algorithm\":\"argon2\",\"additionalParameters\":{\"hashLength\":[\"32\"],\"memory\":[\"7168\"],\"type\":[\"id\"],\"version\":[\"1.3\"],\"parallelism\":[\"1\"]}}"
-                }
-            ],
-            "disableableCredentialTypes": [],
-            "requiredActions": [],
-            "realmRoles": ["default-roles-hephaestus"],
             "notBefore": 0,
             "groups": []
         }
@@ -1499,14 +1452,48 @@
         "strictTransportSecurity": "max-age=31536000; includeSubDomains"
     },
     "smtpServer": {},
-    "loginTheme": "hephaestus",
+    "loginTheme": "keycloak.v2",
     "eventsEnabled": false,
     "eventsListeners": ["jboss-logging"],
     "enabledEventTypes": [],
     "adminEventsEnabled": false,
     "adminEventsDetailsEnabled": false,
-    "identityProviders": [],
-    "identityProviderMappers": [],
+    "identityProviders": [
+        {
+            "alias": "github",
+            "displayName": "GitHub",
+            "providerId": "github",
+            "enabled": true,
+            "updateProfileFirstLoginMode": "on",
+            "trustEmail": true,
+            "storeToken": false,
+            "addReadTokenRoleOnCreate": false,
+            "authenticateByDefault": false,
+            "linkOnly": false,
+            "hideOnLogin": false,
+            "firstBrokerLoginFlowAlias": "first broker login",
+            "config": {
+                "syncMode": "FORCE",
+                "clientId": "${KEYCLOAK_GITHUB_CLIENT_ID}",
+                "clientSecret": "${KEYCLOAK_GITHUB_CLIENT_SECRET}",
+                "guiOrder": "1"
+            }
+        }
+    ],
+    "identityProviderMappers": [
+        {
+            "id": "5f4b9f8f-9506-4917-9ab7-3d9a523e3490",
+            "name": "github-admin-realm-role",
+            "identityProviderAlias": "github",
+            "identityProviderMapper": "oidc-advanced-role-idp-mapper",
+            "config": {
+                "syncMode": "FORCE",
+                "claims": "[{\"key\":\"login\",\"value\":\"(?i)^${KEYCLOAK_GITHUB_ADMIN_USERNAME}$\"}]",
+                "are.claim.values.regex": "true",
+                "role": "admin"
+            }
+        }
+    ],
     "components": {
         "org.keycloak.services.clientregistration.policy.ClientRegistrationPolicy": [
             {

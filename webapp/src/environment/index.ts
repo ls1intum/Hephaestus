@@ -10,9 +10,9 @@ export default {
 		url: "http://localhost:8081",
 		realm: "hephaestus",
 		clientId: "hephaestus",
-		skipLoginPage: true, // If true, it will directly use github IDP for login
 	},
 	posthog: {
+		enabled: false,
 		projectApiKey: "",
 		apiHost: "",
 	},

@@ -19,6 +19,9 @@ const meta = {
 		accountProps: {
 			description: "Props for the AccountSection component",
 		},
+		researchProps: {
+			description: "Props for the ResearchParticipationSection component",
+		},
 		isLoading: {
 			control: "boolean",
 			description: "Whether the settings are still loading",
@@ -38,6 +41,10 @@ export const Default: Story = {
 			receiveNotifications: true,
 			onToggleNotifications: fn(),
 		},
+		researchProps: {
+			participateInResearch: true,
+			onToggleResearch: fn(),
+		},
 		accountProps: {
 			onDeleteAccount: fn(),
 		},
@@ -54,6 +61,10 @@ export const NotificationsDisabled: Story = {
 			receiveNotifications: false,
 			onToggleNotifications: fn(),
 		},
+		researchProps: {
+			participateInResearch: false,
+			onToggleResearch: fn(),
+		},
 		accountProps: {
 			onDeleteAccount: fn(),
 		},
@@ -69,6 +80,10 @@ export const Loading: Story = {
 		notificationsProps: {
 			receiveNotifications: false,
 			onToggleNotifications: fn(),
+		},
+		researchProps: {
+			participateInResearch: true,
+			onToggleResearch: fn(),
 		},
 		accountProps: {
 			onDeleteAccount: fn(),

@@ -23,7 +23,7 @@ public class BadPracticeFeedback {
     String type;
 
     @NonNull
-    @Lob
+    @Column(columnDefinition = "TEXT")
     private String explanation;
 
     private Instant creationTime;

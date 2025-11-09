@@ -5,11 +5,14 @@ import de.tum.in.www1.hephaestus.gitprovider.pullrequest.github.GitHubPullReques
 import de.tum.in.www1.hephaestus.gitprovider.pullrequestreview.PullRequestReviewRepository;
 import de.tum.in.www1.hephaestus.gitprovider.pullrequestreviewcomment.PullRequestReviewComment;
 import de.tum.in.www1.hephaestus.gitprovider.pullrequestreviewcomment.PullRequestReviewCommentRepository;
+import de.tum.in.www1.hephaestus.gitprovider.pullrequestreviewthread.PullRequestReviewThread;
+import de.tum.in.www1.hephaestus.gitprovider.pullrequestreviewthread.PullRequestReviewThreadRepository;
 import de.tum.in.www1.hephaestus.gitprovider.user.UserRepository;
 import de.tum.in.www1.hephaestus.gitprovider.user.github.GitHubUserConverter;
 import jakarta.transaction.Transactional;
 import java.io.IOException;
 import java.util.List;
+import java.util.Optional;
 import org.kohsuke.github.GHPullRequest;
 import org.kohsuke.github.GHPullRequestReviewComment;
 import org.kohsuke.github.GHUser;
@@ -25,6 +28,7 @@ public class GitHubPullRequestReviewCommentSyncService {
     private final PullRequestReviewCommentRepository pullRequestReviewCommentRepository;
     private final PullRequestReviewRepository pullRequestReviewRepository;
     private final PullRequestRepository pullRequestRepository;
+    private final PullRequestReviewThreadRepository pullRequestReviewThreadRepository;
     private final UserRepository userRepository;
     private final GitHubPullRequestReviewCommentConverter pullRequestReviewCommentConverter;
     private final GitHubPullRequestConverter pullRequestConverter;
@@ -34,6 +38,7 @@ public class GitHubPullRequestReviewCommentSyncService {
         PullRequestReviewCommentRepository pullRequestReviewCommentRepository,
         PullRequestReviewRepository pullRequestReviewRepository,
         PullRequestRepository pullRequestRepository,
+        PullRequestReviewThreadRepository pullRequestReviewThreadRepository,
         UserRepository userRepository,
         GitHubPullRequestReviewCommentConverter pullRequestReviewCommentConverter,
         GitHubPullRequestConverter pullRequestConverter,
@@ -42,6 +47,7 @@ public class GitHubPullRequestReviewCommentSyncService {
         this.pullRequestReviewCommentRepository = pullRequestReviewCommentRepository;
         this.pullRequestReviewRepository = pullRequestReviewRepository;
         this.pullRequestRepository = pullRequestRepository;
+        this.pullRequestReviewThreadRepository = pullRequestReviewThreadRepository;
         this.userRepository = userRepository;
         this.pullRequestReviewCommentConverter = pullRequestReviewCommentConverter;
         this.pullRequestConverter = pullRequestConverter;
@@ -64,7 +70,10 @@ public class GitHubPullRequestReviewCommentSyncService {
      * @param pullRequest the GitHub pull request to sync review comments for
      */
     public void syncReviewCommentsOfPullRequest(GHPullRequest pullRequest) {
-        pullRequest.listReviewComments().withPageSize(100).forEach(this::processPullRequestReviewComment);
+        pullRequest
+            .listReviewComments()
+            .withPageSize(100)
+            .forEach(comment -> processPullRequestReviewComment(comment, pullRequest));
     }
 
     /**
@@ -82,71 +91,226 @@ public class GitHubPullRequestReviewCommentSyncService {
     public PullRequestReviewComment processPullRequestReviewComment(
         GHPullRequestReviewComment ghPullRequestReviewComment
     ) {
-        var result = pullRequestReviewCommentRepository
-            .findById(ghPullRequestReviewComment.getId())
-            .map(pullRequestReviewComment -> {
-                try {
-                    if (
-                        pullRequestReviewComment.getUpdatedAt() == null ||
-                        pullRequestReviewComment.getUpdatedAt().isBefore(ghPullRequestReviewComment.getUpdatedAt())
-                    ) {
-                        return pullRequestReviewCommentConverter.update(
-                            ghPullRequestReviewComment,
-                            pullRequestReviewComment
-                        );
-                    }
-                    return pullRequestReviewComment;
-                } catch (IOException e) {
-                    logger.error(
-                        "Failed to update pull request review comment {}: {}",
-                        ghPullRequestReviewComment.getId(),
-                        e.getMessage()
-                    );
-                    return null;
-                }
-            })
-            .orElseGet(() -> pullRequestReviewCommentConverter.convert(ghPullRequestReviewComment));
+        return processPullRequestReviewComment(ghPullRequestReviewComment, null);
+    }
+
+    @Transactional
+    public PullRequestReviewComment processPullRequestReviewComment(
+        GHPullRequestReviewComment ghPullRequestReviewComment,
+        GHPullRequest providedPullRequest
+    ) {
+        var existing = pullRequestReviewCommentRepository.findById(ghPullRequestReviewComment.getId()).orElse(null);
+        var result = existing != null
+            ? updateIfNewer(ghPullRequestReviewComment, existing)
+            : pullRequestReviewCommentConverter.convert(ghPullRequestReviewComment);
 
         if (result == null) {
             return null;
         }
 
-        // Link pull request
-        var pullRequest = ghPullRequestReviewComment.getParent();
+        var pullRequest = resolvePullRequest(ghPullRequestReviewComment, providedPullRequest);
+        if (pullRequest == null) {
+            logger.warn(
+                "Unable to determine pull request for review comment {}. Skipping.",
+                ghPullRequestReviewComment.getId()
+            );
+            return null;
+        }
         var resultPullRequest = pullRequestRepository
             .findById(pullRequest.getId())
             .orElseGet(() -> pullRequestRepository.save(pullRequestConverter.convert(pullRequest)));
         result.setPullRequest(resultPullRequest);
 
-        // Link review
-        var review = pullRequestReviewRepository.findById(ghPullRequestReviewComment.getPullRequestReviewId());
-        if (review.isPresent()) {
-            result.setReview(review.get());
-        } else {
-            // If review is not found, we cannot link the review comment and would need to
-            // fetch the associated review
-            logger.error(
-                "Failed to link review for pull request review comment {}: {}",
-                ghPullRequestReviewComment.getId(),
-                "Review not found"
+        pullRequestReviewRepository
+            .findById(ghPullRequestReviewComment.getPullRequestReviewId())
+            .ifPresentOrElse(result::setReview, () ->
+                logger.error(
+                    "Failed to link review for pull request review comment {}: {}",
+                    ghPullRequestReviewComment.getId(),
+                    "Review not found"
+                )
             );
-        }
 
-        // Link author
+        attachAuthor(ghPullRequestReviewComment, result);
+
+        attachInReplyTo(ghPullRequestReviewComment, result);
+
+        PullRequestReviewThread thread = ensureThread(ghPullRequestReviewComment, resultPullRequest);
+        result.setThread(thread);
+
+        var persisted = pullRequestReviewCommentRepository.save(result);
+
+        updateThreadMetadata(thread, persisted, ghPullRequestReviewComment);
+
+        return persisted;
+    }
+
+    private PullRequestReviewComment updateIfNewer(GHPullRequestReviewComment source, PullRequestReviewComment target) {
+        try {
+            if (target.getUpdatedAt() == null || target.getUpdatedAt().isBefore(source.getUpdatedAt())) {
+                return pullRequestReviewCommentConverter.update(source, target);
+            }
+            return target;
+        } catch (IOException e) {
+            logger.error("Failed to update pull request review comment {}: {}", source.getId(), e.getMessage());
+            return null;
+        }
+    }
+
+    private void attachAuthor(GHPullRequestReviewComment ghPullRequestReviewComment, PullRequestReviewComment comment) {
         try {
             GHUser user = ghPullRequestReviewComment.getUser();
+            if (user == null) {
+                comment.setAuthor(null);
+                return;
+            }
             var resultAuthor = userRepository
                 .findById(user.getId())
                 .orElseGet(() -> userRepository.save(userConverter.convert(user)));
-            result.setAuthor(resultAuthor);
-        } catch (IOException e) {
+            comment.setAuthor(resultAuthor);
+        } catch (IOException | NullPointerException e) {
             logger.error(
                 "Failed to link author for pull request review comment {}: {}",
                 ghPullRequestReviewComment.getId(),
                 e.getMessage()
             );
         }
+    }
 
-        return pullRequestReviewCommentRepository.save(result);
+    private void attachInReplyTo(
+        GHPullRequestReviewComment ghPullRequestReviewComment,
+        PullRequestReviewComment comment
+    ) {
+        long inReplyToId = ghPullRequestReviewComment.getInReplyToId();
+        if (inReplyToId <= 0L) {
+            comment.setInReplyTo(null);
+            return;
+        }
+
+        Optional<PullRequestReviewComment> parent = pullRequestReviewCommentRepository.findById(inReplyToId);
+        if (parent.isPresent()) {
+            comment.setInReplyTo(parent.get());
+        } else {
+            logger.warn(
+                "Parent review comment {} not found for reply {}",
+                inReplyToId,
+                ghPullRequestReviewComment.getId()
+            );
+            comment.setInReplyTo(null);
+        }
+    }
+
+    private PullRequestReviewThread ensureThread(
+        GHPullRequestReviewComment ghPullRequestReviewComment,
+        de.tum.in.www1.hephaestus.gitprovider.pullrequest.PullRequest pullRequest
+    ) {
+        long rootCommentId = extractRootCommentId(ghPullRequestReviewComment);
+
+        PullRequestReviewThread thread = pullRequestReviewThreadRepository
+            .findById(rootCommentId)
+            .orElseGet(() -> {
+                PullRequestReviewThread newThread = new PullRequestReviewThread();
+                newThread.setId(rootCommentId);
+                newThread.setProviderThreadId(rootCommentId);
+                newThread.setState(PullRequestReviewThread.State.UNRESOLVED);
+                newThread.setPullRequest(pullRequest);
+                return pullRequestReviewThreadRepository.save(newThread);
+            });
+
+        thread.setPullRequest(pullRequest);
+        return thread;
+    }
+
+    private void updateThreadMetadata(
+        PullRequestReviewThread thread,
+        PullRequestReviewComment comment,
+        GHPullRequestReviewComment ghPullRequestReviewComment
+    ) {
+        if (!thread.getComments().contains(comment)) {
+            thread.getComments().add(comment);
+        }
+
+        if (ghPullRequestReviewComment.getInReplyToId() <= 0L) {
+            thread.setRootComment(comment);
+            thread.setProviderThreadId(comment.getId());
+            thread.setPath(comment.getPath());
+            thread.setLine(comment.getLine());
+            thread.setStartLine(comment.getStartLine());
+            thread.setSide(comment.getSide());
+            thread.setStartSide(comment.getStartSide());
+        }
+
+        if (thread.getPath() == null) {
+            thread.setPath(comment.getPath());
+        }
+
+        if (
+            thread.getCreatedAt() == null ||
+            (comment.getCreatedAt() != null && comment.getCreatedAt().isBefore(thread.getCreatedAt()))
+        ) {
+            thread.setCreatedAt(comment.getCreatedAt());
+        }
+
+        var updatedTimestamp = comment.getUpdatedAt() != null ? comment.getUpdatedAt() : comment.getCreatedAt();
+        if (updatedTimestamp != null) {
+            thread.setUpdatedAt(updatedTimestamp);
+        }
+
+        pullRequestReviewThreadRepository.save(thread);
+    }
+
+    @Transactional
+    public void deletePullRequestReviewComment(long commentId) {
+        pullRequestReviewCommentRepository
+            .findById(commentId)
+            .ifPresent(comment -> {
+                var thread = comment.getThread();
+                boolean isRootComment =
+                    thread != null &&
+                    thread.getRootComment() != null &&
+                    thread.getRootComment().getId().equals(commentId);
+
+                if (isRootComment) {
+                    pullRequestReviewThreadRepository.delete(thread);
+                    pullRequestReviewThreadRepository.flush();
+                } else {
+                    if (thread != null) {
+                        thread.getComments().remove(comment);
+                    }
+                    comment.setThread(null);
+                    pullRequestReviewCommentRepository.delete(comment);
+                    pullRequestReviewCommentRepository.flush();
+                    if (thread != null && pullRequestReviewCommentRepository.countByThreadId(thread.getId()) == 0) {
+                        pullRequestReviewThreadRepository.delete(thread);
+                        pullRequestReviewThreadRepository.flush();
+                    }
+                }
+            });
+    }
+
+    private GHPullRequest resolvePullRequest(
+        GHPullRequestReviewComment ghPullRequestReviewComment,
+        GHPullRequest providedPullRequest
+    ) {
+        if (providedPullRequest != null) {
+            return providedPullRequest;
+        }
+
+        var parent = ghPullRequestReviewComment.getParent();
+        if (parent == null) {
+            logger.warn(
+                "GitHub did not include pull request details for review comment {}",
+                ghPullRequestReviewComment.getId()
+            );
+        }
+        return parent;
+    }
+
+    private long extractRootCommentId(GHPullRequestReviewComment ghPullRequestReviewComment) {
+        long inReplyToId = ghPullRequestReviewComment.getInReplyToId();
+        if (inReplyToId <= 0L) {
+            return ghPullRequestReviewComment.getId();
+        }
+        return inReplyToId;
     }
 }

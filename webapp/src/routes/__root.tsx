@@ -9,7 +9,10 @@ import {
 } from "@tanstack/react-router";
 import { TanStackRouterDevtools } from "@tanstack/react-router-devtools";
 import { Toaster } from "sonner";
-import { getGroupedThreadsOptions } from "@/api/@tanstack/react-query.gen";
+import {
+	getGroupedThreadsOptions,
+	getUserSettingsOptions,
+} from "@/api/@tanstack/react-query.gen";
 import Footer from "@/components/core/Footer";
 import Header from "@/components/core/Header";
 import {
@@ -20,6 +23,7 @@ import { ArtifactOverlayContainer } from "@/components/mentor/ArtifactOverlayCon
 import { Chat } from "@/components/mentor/Chat";
 import { Copilot } from "@/components/mentor/Copilot";
 import { defaultPartRenderers } from "@/components/mentor/renderers";
+import { PostHogSurveyWidget } from "@/components/surveys/posthog-survey-widget";
 import {
 	SidebarInset,
 	SidebarProvider,
@@ -28,6 +32,7 @@ import {
 import environment from "@/environment";
 import { useMentorChat } from "@/hooks/useMentorChat";
 import { type AuthContextType, useAuth } from "@/integrations/auth/AuthContext";
+import { isPosthogEnabled } from "@/integrations/posthog/config";
 import { useTheme } from "@/integrations/theme";
 import type { ChatMessage } from "@/lib/types";
 import TanstackQueryLayout from "../integrations/tanstack-query/layout";
@@ -42,6 +47,15 @@ export const Route = createRootRouteWithContext<MyRouterContext>()({
 		const { theme } = useTheme();
 		const { pathname } = useLocation();
 		const { isAuthenticated, hasRole, isLoading } = useAuth();
+		const { data: userSettings, isError: userSettingsError } = useQuery({
+			...getUserSettingsOptions({}),
+			enabled: isAuthenticated && isPosthogEnabled,
+			retry: 1,
+		});
+		const allowSurveys =
+			isPosthogEnabled &&
+			!userSettingsError &&
+			(userSettings?.participateInResearch ?? true);
 		const isMentorRoute = pathname.startsWith("/mentor");
 
 		// Exclude routes where Copilot should not appear
@@ -82,6 +96,9 @@ export const Route = createRootRouteWithContext<MyRouterContext>()({
 				<TanstackQueryLayout />
 
 				{showCopilot && <GlobalCopilot />}
+				{!isLoading && isAuthenticated && allowSurveys && (
+					<PostHogSurveyWidget />
+				)}
 			</>
 		);
 	},
