@@ -39,6 +39,5 @@ public class WorkspaceRoleAssignment {
         OWNER,
         ADMIN,
         MEMBER,
-        VIEWER,
     }
 }
