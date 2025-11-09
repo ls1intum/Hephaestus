@@ -88,16 +88,23 @@ public class GitHubPullRequestReviewCommentSyncService {
      *         {@code null} if an error occurred
      */
     @Transactional
+    public PullRequestReviewComment processPullRequestReviewComment(GHPullRequestReviewComment ghComment) {
+        return processPullRequestReviewComment(ghComment, null, null);
+    }
+
+    @Transactional
     public PullRequestReviewComment processPullRequestReviewComment(
-        GHPullRequestReviewComment ghPullRequestReviewComment
+        GHPullRequestReviewComment ghComment,
+        GHPullRequest providedPullRequest
     ) {
-        return processPullRequestReviewComment(ghPullRequestReviewComment, null);
+        return processPullRequestReviewComment(ghComment, providedPullRequest, null);
     }
 
     @Transactional
     public PullRequestReviewComment processPullRequestReviewComment(
         GHPullRequestReviewComment ghPullRequestReviewComment,
-        GHPullRequest providedPullRequest
+        GHPullRequest providedPullRequest,
+        GHUser fallbackUser
     ) {
         var existing = pullRequestReviewCommentRepository.findById(ghPullRequestReviewComment.getId()).orElse(null);
         var result = existing != null
@@ -131,7 +138,7 @@ public class GitHubPullRequestReviewCommentSyncService {
                 )
             );
 
-        attachAuthor(ghPullRequestReviewComment, result);
+        attachAuthor(ghPullRequestReviewComment, result, fallbackUser);
 
         attachInReplyTo(ghPullRequestReviewComment, result);
 
@@ -157,24 +164,36 @@ public class GitHubPullRequestReviewCommentSyncService {
         }
     }
 
-    private void attachAuthor(GHPullRequestReviewComment ghPullRequestReviewComment, PullRequestReviewComment comment) {
+    private void attachAuthor(
+        GHPullRequestReviewComment ghPullRequestReviewComment,
+        PullRequestReviewComment comment,
+        GHUser fallbackUser
+    ) {
+        GHUser user = null;
         try {
-            GHUser user = ghPullRequestReviewComment.getUser();
-            if (user == null) {
-                comment.setAuthor(null);
-                return;
-            }
-            var resultAuthor = userRepository
-                .findById(user.getId())
-                .orElseGet(() -> userRepository.save(userConverter.convert(user)));
-            comment.setAuthor(resultAuthor);
+            user = ghPullRequestReviewComment.getUser();
         } catch (IOException | NullPointerException e) {
             logger.error(
-                "Failed to link author for pull request review comment {}: {}",
+                "Failed to fetch author via API for pull request review comment {}: {}",
                 ghPullRequestReviewComment.getId(),
                 e.getMessage()
             );
         }
+
+        if (user == null) {
+            user = fallbackUser;
+        }
+
+        if (user == null) {
+            comment.setAuthor(null);
+            return;
+        }
+
+        var resultAuthor = userRepository.findById(user.getId()).orElse(null);
+        if (resultAuthor == null) {
+            resultAuthor = userRepository.save(userConverter.convert(user));
+        }
+        comment.setAuthor(resultAuthor);
     }
 
     private void attachInReplyTo(
