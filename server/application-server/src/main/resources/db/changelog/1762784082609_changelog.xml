@@ -21,28 +21,28 @@
     </changeSet>
     <changeSet author="ddmukh" id="1762784082609-3">
         <addColumn tableName="workspace">
-            <column name="account_type" type="VARCHAR(10)">
+            <column name="account_type" type="VARCHAR(10)" defaultValue="USER">
                 <constraints nullable="false"/>
             </column>
         </addColumn>
     </changeSet>
     <changeSet author="ddmukh" id="1762784082609-4">
         <addColumn tableName="workspace">
-            <column name="created_at" type="TIMESTAMP(6) WITH TIME ZONE">
+            <column name="created_at" type="TIMESTAMP(6) WITH TIME ZONE" defaultValueComputed="CURRENT_TIMESTAMP">
                 <constraints nullable="false"/>
             </column>
         </addColumn>
     </changeSet>
     <changeSet author="ddmukh" id="1762784082609-5">
         <addColumn tableName="workspace">
-            <column name="display_name" type="VARCHAR(120)">
+            <column name="display_name" type="VARCHAR(120)" defaultValue="">
                 <constraints nullable="false"/>
             </column>
         </addColumn>
     </changeSet>
     <changeSet author="ddmukh" id="1762784082609-6">
         <addColumn tableName="workspace">
-            <column name="is_publicly_viewable" type="BOOLEAN">
+            <column name="is_publicly_viewable" type="BOOLEAN" defaultValueBoolean="false">
                 <constraints nullable="false"/>
             </column>
         </addColumn>
@@ -85,13 +85,21 @@
     <changeSet author="ddmukh" id="1762784082609-14">
         <addColumn tableName="workspace">
             <column name="slug" type="VARCHAR(64)">
-                <constraints nullable="false"/>
+                <constraints nullable="true"/>
             </column>
         </addColumn>
     </changeSet>
+    <changeSet author="ddmukh" id="1762784082609-14-backfill">
+        <sql>
+            UPDATE workspace SET slug = LOWER(REGEXP_REPLACE(account_login, '[^a-zA-Z0-9-]', '-', 'g')) WHERE slug IS NULL
+        </sql>
+    </changeSet>
+    <changeSet author="ddmukh" id="1762784082609-14-constraint">
+        <addNotNullConstraint tableName="workspace" columnName="slug" columnDataType="VARCHAR(64)"/>
+    </changeSet>
     <changeSet author="ddmukh" id="1762784082609-15">
         <addColumn tableName="workspace">
-            <column name="status" type="VARCHAR(20)">
+            <column name="status" type="VARCHAR(20)" defaultValue="ACTIVE">
                 <constraints nullable="false"/>
             </column>
         </addColumn>
