@@ -1,7 +1,7 @@
-package de.tum.in.www1.hephaestus.organization.github;
+package de.tum.in.www1.hephaestus.gitprovider.organization.github;
 
 import de.tum.in.www1.hephaestus.gitprovider.common.BaseGitServiceEntityConverter;
-import de.tum.in.www1.hephaestus.organization.Organization;
+import de.tum.in.www1.hephaestus.gitprovider.organization.Organization;
 import java.io.IOException;
 import org.kohsuke.github.GHOrganization;
 import org.slf4j.Logger;

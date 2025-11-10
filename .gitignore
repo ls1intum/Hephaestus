@@ -132,6 +132,7 @@ venv/
 ENV/
 env.bak/
 venv.bak/
+/server/application-server/src/test/resources/application-github-integration-local.yml
 
 # Spyder project settings
 .spyderproject

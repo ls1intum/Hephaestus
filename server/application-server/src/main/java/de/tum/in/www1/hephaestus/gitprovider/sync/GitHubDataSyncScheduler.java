@@ -1,4 +1,4 @@
-package de.tum.in.www1.hephaestus.syncing;
+package de.tum.in.www1.hephaestus.gitprovider.sync;
 
 import de.tum.in.www1.hephaestus.workspace.Workspace;
 import de.tum.in.www1.hephaestus.workspace.WorkspaceService;

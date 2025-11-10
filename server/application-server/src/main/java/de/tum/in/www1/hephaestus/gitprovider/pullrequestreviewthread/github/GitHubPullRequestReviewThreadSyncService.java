@@ -13,9 +13,11 @@ import java.io.IOException;
 import java.time.Instant;
 import java.util.Comparator;
 import java.util.List;
+import java.util.Locale;
 import java.util.Optional;
 import org.kohsuke.github.GHEventPayloadPullRequestReviewThread;
 import org.kohsuke.github.GHPullRequestReviewComment;
+import org.kohsuke.github.GHUser;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
@@ -84,14 +86,17 @@ public class GitHubPullRequestReviewThreadSyncService {
         }
 
         thread.setPullRequest(pullRequest);
+        updateThreadMetadata(thread, threadPayload);
         thread.setUpdatedAt(determineTimestamp(threadPayload.getComments()));
 
         if ("resolved".equalsIgnoreCase(payload.getAction())) {
             thread.setState(PullRequestReviewThread.State.RESOLVED);
             thread.setResolvedAt(thread.getUpdatedAt());
+            attachResolvedBy(thread, threadPayload.getResolvedBy());
         } else if ("unresolved".equalsIgnoreCase(payload.getAction())) {
             thread.setState(PullRequestReviewThread.State.UNRESOLVED);
             thread.setResolvedAt(null);
+            thread.setResolvedBy(null);
         }
 
         return pullRequestReviewThreadRepository.save(thread);
@@ -111,5 +116,91 @@ public class GitHubPullRequestReviewThreadSyncService {
             .filter(java.util.Objects::nonNull)
             .max(Comparator.naturalOrder())
             .orElse(Instant.now());
+    }
+
+    private void updateThreadMetadata(
+        PullRequestReviewThread thread,
+        GHEventPayloadPullRequestReviewThread.Thread data
+    ) {
+        if (data.getId() != null) {
+            thread.setProviderThreadId(data.getId());
+        }
+        if (data.getNodeId() != null) {
+            thread.setNodeId(data.getNodeId());
+        }
+
+        if (data.getPath() != null) {
+            thread.setPath(data.getPath());
+        }
+
+        if (data.getLine() != null) {
+            thread.setLine(data.getLine());
+        }
+
+        if (data.getStartLine() != null) {
+            thread.setStartLine(data.getStartLine());
+        }
+
+        if (data.getSide() != null) {
+            thread.setSide(resolveSide(data.getSide()));
+        }
+
+        if (data.getStartSide() != null) {
+            thread.setStartSide(resolveSide(data.getStartSide()));
+        }
+
+        if (data.getOutdated() != null) {
+            thread.setOutdated(data.getOutdated());
+        }
+
+        if (data.getCollapsed() != null) {
+            thread.setCollapsed(data.getCollapsed());
+        }
+
+        if (thread.getPath() == null && thread.getRootComment() != null) {
+            thread.setPath(thread.getRootComment().getPath());
+        }
+        if (thread.getLine() == null && thread.getRootComment() != null) {
+            thread.setLine(thread.getRootComment().getLine());
+        }
+        if (thread.getStartLine() == null && thread.getRootComment() != null) {
+            thread.setStartLine(thread.getRootComment().getStartLine());
+        }
+        if (thread.getSide() == null && thread.getRootComment() != null) {
+            thread.setSide(thread.getRootComment().getSide());
+        }
+        if (thread.getStartSide() == null && thread.getRootComment() != null) {
+            thread.setStartSide(thread.getRootComment().getStartSide());
+        }
+        if (thread.getProviderThreadId() == null && thread.getRootComment() != null) {
+            thread.setProviderThreadId(thread.getRootComment().getId());
+        }
+    }
+
+    private PullRequestReviewComment.Side resolveSide(String value) {
+        if (value == null) {
+            return null;
+        }
+        try {
+            return PullRequestReviewComment.Side.valueOf(value.toUpperCase(Locale.ROOT));
+        } catch (IllegalArgumentException ex) {
+            return PullRequestReviewComment.Side.UNKNOWN;
+        }
+    }
+
+    private void attachResolvedBy(PullRequestReviewThread thread, GHUser resolver) {
+        if (resolver == null) {
+            thread.setResolvedBy(null);
+            return;
+        }
+
+        var existing = userRepository.findById(resolver.getId());
+        if (existing.isPresent()) {
+            thread.setResolvedBy(existing.get());
+            return;
+        }
+
+        var converted = userConverter.convert(resolver);
+        thread.setResolvedBy(userRepository.save(converted));
     }
 }

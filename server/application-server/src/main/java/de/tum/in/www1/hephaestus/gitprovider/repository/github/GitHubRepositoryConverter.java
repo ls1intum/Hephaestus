@@ -1,10 +1,11 @@
 package de.tum.in.www1.hephaestus.gitprovider.repository.github;
 
 import de.tum.in.www1.hephaestus.gitprovider.common.BaseGitServiceEntityConverter;
+import de.tum.in.www1.hephaestus.gitprovider.organization.Organization;
+import de.tum.in.www1.hephaestus.gitprovider.organization.OrganizationService;
 import de.tum.in.www1.hephaestus.gitprovider.repository.Repository;
-import de.tum.in.www1.hephaestus.organization.Organization;
-import de.tum.in.www1.hephaestus.organization.OrganizationService;
 import java.io.IOException;
+import java.time.Instant;
 import org.kohsuke.github.GHRepository;
 import org.kohsuke.github.GHRepository.Visibility;
 import org.slf4j.Logger;
@@ -32,16 +33,28 @@ public class GitHubRepositoryConverter extends BaseGitServiceEntityConverter<GHR
         repository.setName(source.getName());
         repository.setNameWithOwner(source.getFullName());
         repository.setPrivate(source.isPrivate());
-        repository.setHtmlUrl(source.getHtmlUrl().toString());
+        if (source.getHtmlUrl() != null) {
+            repository.setHtmlUrl(source.getHtmlUrl().toString());
+        } else if (repository.getHtmlUrl() == null && repository.getNameWithOwner() != null) {
+            repository.setHtmlUrl("https://github.com/" + repository.getNameWithOwner());
+        }
         repository.setDescription(source.getDescription());
         repository.setHomepage(source.getHomepage());
-        repository.setPushedAt(source.getPushedAt());
+        Instant pushedAt = source.getPushedAt();
+        if (pushedAt != null) {
+            repository.setPushedAt(pushedAt);
+        } else if (repository.getPushedAt() == null) {
+            repository.setPushedAt(repository.getUpdatedAt() != null ? repository.getUpdatedAt() : Instant.now());
+        }
         repository.setArchived(source.isArchived());
         repository.setDisabled(source.isDisabled());
         repository.setVisibility(convertVisibility(source.getVisibility()));
         repository.setStargazersCount(source.getStargazersCount());
         repository.setWatchersCount(source.getWatchersCount());
-        repository.setDefaultBranch(source.getDefaultBranch());
+        var defaultBranch = source.getDefaultBranch();
+        if (defaultBranch != null && !defaultBranch.isBlank()) {
+            repository.setDefaultBranch(defaultBranch);
+        }
         repository.setHasIssues(source.hasIssues());
         repository.setHasProjects(source.hasProjects());
         repository.setHasWiki(source.hasWiki());
@@ -63,6 +76,9 @@ public class GitHubRepositoryConverter extends BaseGitServiceEntityConverter<GHR
     }
 
     private Repository.Visibility convertVisibility(Visibility visibility) {
+        if (visibility == null) {
+            return Repository.Visibility.UNKNOWN;
+        }
         switch (visibility) {
             case PRIVATE:
                 return Repository.Visibility.PRIVATE;

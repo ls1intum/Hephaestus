@@ -60,6 +60,50 @@ class GitHubPullRequestReviewMessageHandlerIntegrationTest extends BaseIntegrati
     }
 
     @Test
+    @DisplayName("should link submitted reviews to pull requests and authors")
+    void submittedEventLinksReviewAndAuthor(
+        @GitHubPayload("pull_request_review.submitted") GHEventPayload.PullRequestReview payload
+    ) throws Exception {
+        // Act
+        handler.handleEvent(payload);
+
+        // Assert
+        var review = reviewRepository.findById(payload.getReview().getId()).orElseThrow();
+        assertThat(review.getPullRequest()).isNotNull();
+        assertThat(review.getPullRequest().getId()).isEqualTo(payload.getPullRequest().getId());
+        assertThat(review.getAuthor()).isNotNull();
+        assertThat(review.getAuthor().getId()).isEqualTo(payload.getReview().getUser().getId());
+        assertThat(review.getAuthor().getLogin()).isEqualTo(payload.getReview().getUser().getLogin());
+        assertThat(review.getCommitId()).isEqualTo(payload.getReview().getCommitId());
+
+        assertThat(reviewRepository.count()).isEqualTo(1);
+        assertThat(pullRequestRepository.count()).isEqualTo(1);
+    }
+
+    @Test
+    @DisplayName("should ignore duplicate submitted events")
+    void replayedSubmittedEventIsIdempotent(
+        @GitHubPayload("pull_request_review.submitted") GHEventPayload.PullRequestReview payload
+    ) throws Exception {
+        // Arrange
+        handler.handleEvent(payload);
+        var original = reviewRepository.findById(payload.getReview().getId()).orElseThrow();
+        var originalSubmittedAt = original.getSubmittedAt();
+
+        // Act
+        handler.handleEvent(payload);
+
+        // Assert
+        assertThat(reviewRepository.count()).isEqualTo(1);
+        assertThat(pullRequestRepository.count()).isEqualTo(1);
+
+        var review = reviewRepository.findById(payload.getReview().getId()).orElseThrow();
+        assertThat(review.getSubmittedAt()).isEqualTo(originalSubmittedAt);
+        assertThat(review.getBody()).isEqualTo(payload.getReview().getBody());
+        assertThat(review.isDismissed()).isFalse();
+    }
+
+    @Test
     @DisplayName("should retain review state when dismissed")
     void dismissedEventMarksReview(
         @GitHubPayload("pull_request_review.dismissed") GHEventPayload.PullRequestReview dismissed
@@ -104,5 +148,27 @@ class GitHubPullRequestReviewMessageHandlerIntegrationTest extends BaseIntegrati
         var review = reviewRepository.findById(submitted.getReview().getId()).orElseThrow();
         assertThat(review.getBody()).isEqualTo(edited.getReview().getBody());
         assertThat(review.getSubmittedAt()).isEqualTo(edited.getReview().getSubmittedAt());
+    }
+
+    @Test
+    @DisplayName("should keep dismissal flag when edits arrive")
+    void editedEventKeepsDismissedState(
+        @GitHubPayload("pull_request_review.submitted") GHEventPayload.PullRequestReview submitted,
+        @GitHubPayload("pull_request_review.edited") GHEventPayload.PullRequestReview edited
+    ) throws Exception {
+        // Arrange
+        handler.handleEvent(submitted);
+        var review = reviewRepository.findById(submitted.getReview().getId()).orElseThrow();
+        review.setDismissed(true);
+        reviewRepository.save(review);
+
+        // Act
+        handler.handleEvent(edited);
+
+        // Assert
+        var updated = reviewRepository.findById(submitted.getReview().getId()).orElseThrow();
+        assertThat(updated.isDismissed()).isTrue();
+        assertThat(updated.getState()).isEqualTo(PullRequestReview.State.APPROVED);
+        assertThat(updated.getBody()).isEqualTo(edited.getReview().getBody());
     }
 }

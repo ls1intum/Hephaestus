@@ -1,9 +1,10 @@
-package de.tum.in.www1.hephaestus.organization;
+package de.tum.in.www1.hephaestus.gitprovider.organization;
 
+import de.tum.in.www1.hephaestus.gitprovider.organization.github.GitHubOrganizationConverter;
 import de.tum.in.www1.hephaestus.gitprovider.user.User;
 import de.tum.in.www1.hephaestus.gitprovider.user.UserRepository;
+import de.tum.in.www1.hephaestus.gitprovider.user.github.GitHubUserConverter;
 import de.tum.in.www1.hephaestus.gitprovider.user.github.GitHubUserSyncService;
-import de.tum.in.www1.hephaestus.organization.github.GitHubOrganizationConverter;
 import de.tum.in.www1.hephaestus.workspace.Workspace;
 import de.tum.in.www1.hephaestus.workspace.WorkspaceGitHubAccess;
 import de.tum.in.www1.hephaestus.workspace.WorkspaceGitHubAccess.Context;
@@ -38,6 +39,7 @@ public class OrganizationSyncService {
     private final WorkspaceRepository workspaceRepository;
     private final GitHubUserSyncService userSyncService;
     private final WorkspaceGitHubAccess workspaceGitHubAccess;
+    private final GitHubUserConverter userConverter;
 
     public OrganizationSyncService(
         OrganizationRepository organizationRepository,
@@ -46,7 +48,8 @@ public class OrganizationSyncService {
         UserRepository userRepository,
         WorkspaceRepository workspaceRepository,
         GitHubUserSyncService userSyncService,
-        WorkspaceGitHubAccess workspaceGitHubAccess
+        WorkspaceGitHubAccess workspaceGitHubAccess,
+        GitHubUserConverter userConverter
     ) {
         this.organizationRepository = organizationRepository;
         this.organizationConverter = organizationConverter;
@@ -55,6 +58,7 @@ public class OrganizationSyncService {
         this.workspaceRepository = workspaceRepository;
         this.userSyncService = userSyncService;
         this.workspaceGitHubAccess = workspaceGitHubAccess;
+        this.userConverter = userConverter;
     }
 
     private static final Logger logger = LoggerFactory.getLogger(OrganizationSyncService.class);
@@ -67,6 +71,19 @@ public class OrganizationSyncService {
     @Transactional
     public void syncMembers(Workspace workspace) {
         workspaceGitHubAccess.resolve(workspace).ifPresent(context -> synchronizeMembers(context));
+    }
+
+    @Transactional
+    public String upsertMemberFromEvent(long organizationId, GHUser ghUser, String rawRole) {
+        User user = upsertUserFromPayload(ghUser);
+        String role = normalizeRole(rawRole);
+        membershipRepository.upsertMembership(organizationId, user.getId(), role);
+        return role;
+    }
+
+    @Transactional
+    public void removeMember(long organizationId, long userId) {
+        membershipRepository.deleteByOrganizationIdAndUserIdIn(organizationId, List.of(userId));
     }
 
     private Organization upsertOrganization(Context context) {
@@ -177,5 +194,22 @@ public class OrganizationSyncService {
             toCreate.size(),
             toRemove.size()
         );
+    }
+
+    private User upsertUserFromPayload(GHUser ghUser) {
+        if (ghUser == null) {
+            throw new IllegalArgumentException("GHUser required for membership upsert");
+        }
+        User user = userRepository.findById(ghUser.getId()).orElseGet(User::new);
+        user.setId(ghUser.getId());
+        userConverter.update(ghUser, user);
+        return userRepository.save(user);
+    }
+
+    private String normalizeRole(String role) {
+        if (role == null || role.isBlank()) {
+            return "MEMBER";
+        }
+        return role.toUpperCase(Locale.ROOT);
     }
 }

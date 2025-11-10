@@ -12,7 +12,7 @@
     </parent>
     <groupId>de.tum.in.www1</groupId>
     <artifactId>hephaestus</artifactId>
-    <version>0.10.0-rc.16-SNAPSHOT</version>
+    <version>0.10.0-rc.21-SNAPSHOT</version>
     <name>Hephaestus</name>
     <description>AI-driven learning for better software development</description>
     <url/>
@@ -35,7 +35,8 @@
         <!-- Test Configuration -->
         <maven.test.failure.ignore>false</maven.test.failure.ignore>
         <maven.test.skip>false</maven.test.skip>
-        <hephaestus.surefire.timeout>60</hephaestus.surefire.timeout>
+        <hephaestus.surefire.timeout>180</hephaestus.surefire.timeout>
+        <hephaestus.githubIntegrationExcludedGroups>github-integration</hephaestus.githubIntegrationExcludedGroups>
 
         <!-- Coverage Configuration (disabled by default) -->
         <skipCoverage>true</skipCoverage>
@@ -433,7 +434,8 @@
                     <skipAfterFailureCount>5</skipAfterFailureCount>
                     <!-- Forked JVM timeout settings to prevent hanging -->
                     <forkedProcessTimeoutInSeconds>${hephaestus.surefire.timeout}</forkedProcessTimeoutInSeconds>
-                    <forkedProcessExitTimeoutInSeconds>10</forkedProcessExitTimeoutInSeconds>
+                    <forkedProcessExitTimeoutInSeconds>60</forkedProcessExitTimeoutInSeconds>
+                    <excludedGroups>${hephaestus.githubIntegrationExcludedGroups}</excludedGroups>
                 </configuration>
             </plugin>
 
@@ -555,6 +557,17 @@
             </activation>
             <properties>
                 <hephaestus.surefire.timeout>180</hephaestus.surefire.timeout>
+            </properties>
+        </profile>
+        <profile>
+            <id>github-integration-tests</id>
+            <activation>
+                <property>
+                    <name>groups</name>
+                </property>
+            </activation>
+            <properties>
+                <hephaestus.githubIntegrationExcludedGroups></hephaestus.githubIntegrationExcludedGroups>
             </properties>
         </profile>
     </profiles>

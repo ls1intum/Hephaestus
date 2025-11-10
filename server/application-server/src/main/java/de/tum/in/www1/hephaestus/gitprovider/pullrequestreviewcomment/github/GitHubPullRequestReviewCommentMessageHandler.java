@@ -53,7 +53,11 @@ public class GitHubPullRequestReviewCommentMessageHandler
         if (action.equals("deleted")) {
             pullRequestReviewCommentSyncService.deletePullRequestReviewComment(comment.getId());
         } else {
-            pullRequestReviewCommentSyncService.processPullRequestReviewComment(comment, pullRequest);
+            pullRequestReviewCommentSyncService.processPullRequestReviewComment(
+                comment,
+                pullRequest,
+                eventPayload.getSender()
+            );
         }
     }
 

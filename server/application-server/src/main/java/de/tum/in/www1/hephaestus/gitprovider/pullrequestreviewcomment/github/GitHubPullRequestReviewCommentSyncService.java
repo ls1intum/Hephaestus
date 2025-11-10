@@ -88,16 +88,23 @@ public class GitHubPullRequestReviewCommentSyncService {
      *         {@code null} if an error occurred
      */
     @Transactional
+    public PullRequestReviewComment processPullRequestReviewComment(GHPullRequestReviewComment ghComment) {
+        return processPullRequestReviewComment(ghComment, null, null);
+    }
+
+    @Transactional
     public PullRequestReviewComment processPullRequestReviewComment(
-        GHPullRequestReviewComment ghPullRequestReviewComment
+        GHPullRequestReviewComment ghComment,
+        GHPullRequest providedPullRequest
     ) {
-        return processPullRequestReviewComment(ghPullRequestReviewComment, null);
+        return processPullRequestReviewComment(ghComment, providedPullRequest, null);
     }
 
     @Transactional
     public PullRequestReviewComment processPullRequestReviewComment(
         GHPullRequestReviewComment ghPullRequestReviewComment,
-        GHPullRequest providedPullRequest
+        GHPullRequest providedPullRequest,
+        GHUser fallbackUser
     ) {
         var existing = pullRequestReviewCommentRepository.findById(ghPullRequestReviewComment.getId()).orElse(null);
         var result = existing != null
@@ -131,7 +138,7 @@ public class GitHubPullRequestReviewCommentSyncService {
                 )
             );
 
-        attachAuthor(ghPullRequestReviewComment, result);
+        attachAuthor(ghPullRequestReviewComment, result, fallbackUser);
 
         attachInReplyTo(ghPullRequestReviewComment, result);
 
@@ -157,24 +164,36 @@ public class GitHubPullRequestReviewCommentSyncService {
         }
     }
 
-    private void attachAuthor(GHPullRequestReviewComment ghPullRequestReviewComment, PullRequestReviewComment comment) {
+    private void attachAuthor(
+        GHPullRequestReviewComment ghPullRequestReviewComment,
+        PullRequestReviewComment comment,
+        GHUser fallbackUser
+    ) {
+        GHUser user = null;
         try {
-            GHUser user = ghPullRequestReviewComment.getUser();
-            if (user == null) {
-                comment.setAuthor(null);
-                return;
-            }
-            var resultAuthor = userRepository
-                .findById(user.getId())
-                .orElseGet(() -> userRepository.save(userConverter.convert(user)));
-            comment.setAuthor(resultAuthor);
+            user = ghPullRequestReviewComment.getUser();
         } catch (IOException | NullPointerException e) {
             logger.error(
-                "Failed to link author for pull request review comment {}: {}",
+                "Failed to fetch author via API for pull request review comment {}: {}",
                 ghPullRequestReviewComment.getId(),
                 e.getMessage()
             );
         }
+
+        if (user == null) {
+            user = fallbackUser;
+        }
+
+        if (user == null) {
+            comment.setAuthor(null);
+            return;
+        }
+
+        var resultAuthor = userRepository.findById(user.getId()).orElse(null);
+        if (resultAuthor == null) {
+            resultAuthor = userRepository.save(userConverter.convert(user));
+        }
+        comment.setAuthor(resultAuthor);
     }
 
     private void attachInReplyTo(
@@ -211,6 +230,7 @@ public class GitHubPullRequestReviewCommentSyncService {
             .orElseGet(() -> {
                 PullRequestReviewThread newThread = new PullRequestReviewThread();
                 newThread.setId(rootCommentId);
+                newThread.setProviderThreadId(rootCommentId);
                 newThread.setState(PullRequestReviewThread.State.UNRESOLVED);
                 newThread.setPullRequest(pullRequest);
                 return pullRequestReviewThreadRepository.save(newThread);
@@ -231,6 +251,16 @@ public class GitHubPullRequestReviewCommentSyncService {
 
         if (ghPullRequestReviewComment.getInReplyToId() <= 0L) {
             thread.setRootComment(comment);
+            thread.setProviderThreadId(comment.getId());
+            thread.setPath(comment.getPath());
+            thread.setLine(comment.getLine());
+            thread.setStartLine(comment.getStartLine());
+            thread.setSide(comment.getSide());
+            thread.setStartSide(comment.getStartSide());
+        }
+
+        if (thread.getPath() == null) {
+            thread.setPath(comment.getPath());
         }
 
         if (
@@ -261,10 +291,17 @@ public class GitHubPullRequestReviewCommentSyncService {
 
                 if (isRootComment) {
                     pullRequestReviewThreadRepository.delete(thread);
+                    pullRequestReviewThreadRepository.flush();
                 } else {
+                    if (thread != null) {
+                        thread.getComments().remove(comment);
+                    }
+                    comment.setThread(null);
                     pullRequestReviewCommentRepository.delete(comment);
+                    pullRequestReviewCommentRepository.flush();
                     if (thread != null && pullRequestReviewCommentRepository.countByThreadId(thread.getId()) == 0) {
                         pullRequestReviewThreadRepository.delete(thread);
+                        pullRequestReviewThreadRepository.flush();
                     }
                 }
             });

@@ -1,5 +1,6 @@
 package de.tum.in.www1.hephaestus.gitprovider.label;
 
+import java.util.List;
 import java.util.Optional;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
@@ -17,4 +18,6 @@ public interface LabelRepository extends JpaRepository<Label, Long> {
         """
     )
     Optional<Label> findByRepositoryIdAndName(@Param("repositoryId") Long repositoryId, @Param("name") String name);
+
+    List<Label> findAllByRepository_Id(Long repositoryId);
 }

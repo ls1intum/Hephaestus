@@ -4,7 +4,12 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import de.tum.in.www1.hephaestus.gitprovider.common.GitHubPayload;
 import de.tum.in.www1.hephaestus.gitprovider.common.GitHubPayloadExtension;
+import de.tum.in.www1.hephaestus.gitprovider.organization.Organization;
+import de.tum.in.www1.hephaestus.gitprovider.organization.OrganizationMembershipRepository;
+import de.tum.in.www1.hephaestus.gitprovider.organization.OrganizationRepository;
+import de.tum.in.www1.hephaestus.gitprovider.organization.OrganizationService;
 import de.tum.in.www1.hephaestus.testconfig.BaseIntegrationTest;
+import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -19,59 +24,74 @@ class GitHubOrganizationMessageHandlerIntegrationTest extends BaseIntegrationTes
     @Autowired
     private GitHubOrganizationMessageHandler handler;
 
+    @Autowired
+    private OrganizationRepository organizationRepository;
+
+    @Autowired
+    private OrganizationMembershipRepository membershipRepository;
+
+    @Autowired
+    private OrganizationService organizationService;
+
     @BeforeEach
     void setUp() {
         databaseTestUtils.cleanDatabase();
     }
 
     @Test
-    @DisplayName("organization.member_added is handled")
-    void handlesMemberAdded(@GitHubPayload("organization.member_added") GHEventPayloadOrganization payload) {
-        assertThat(payload.getAction()).isEqualTo("member_added");
-        assertThat(payload.getMembership()).isNotNull();
-        assertThat(payload.getMembership().getUser().getLogin()).isEqualTo("hephaestususer");
-
-        // When
+    @DisplayName("organization.member_added persists membership and user")
+    void memberAddedCreatesMembership(@GitHubPayload("organization.member_added") GHEventPayloadOrganization payload) {
         handler.handleEvent(payload);
-        // Then: no exception and core fields present (behavior currently logs only)
-        assertThat(payload.getOrganization()).isNotNull();
-        assertThat(payload.getSender()).isNotNull();
+
+        var organization = organizationRepository.findByGithubId(payload.getOrganization().getId()).orElseThrow();
+        assertThat(organization.getLogin()).isEqualTo(payload.getOrganization().getLogin());
+        assertThat(organization.getAvatarUrl()).isNotBlank();
+
+        var memberships = membershipRepository.findAll();
+        assertThat(memberships)
+            .singleElement()
+            .satisfies(m -> {
+                assertThat(m.getOrganizationId()).isEqualTo(payload.getOrganization().getId());
+                assertThat(m.getUserId()).isEqualTo(payload.getMembership().getUser().getId());
+                assertThat(m.getRole()).isEqualTo("MEMBER");
+            });
     }
 
     @Test
-    @DisplayName("organization.member_removed is handled")
-    void handlesMemberRemoved(@GitHubPayload("organization.member_removed") GHEventPayloadOrganization payload) {
-        assertThat(payload.getAction()).isEqualTo("member_removed");
-        assertThat(payload.getMembership()).isNotNull();
-        assertThat(payload.getMembership().getUser().getLogin()).isEqualTo("hephaestususer");
+    @DisplayName("organization.member_removed deletes membership")
+    void memberRemovedDeletesMembership(
+        @GitHubPayload("organization.member_added") GHEventPayloadOrganization added,
+        @GitHubPayload("organization.member_removed") GHEventPayloadOrganization removed
+    ) {
+        handler.handleEvent(added);
+        assertThat(membershipRepository.findAll()).isNotEmpty();
 
-        handler.handleEvent(payload);
-        assertThat(payload.getOrganization()).isNotNull();
-        assertThat(payload.getSender()).isNotNull();
+        handler.handleEvent(removed);
+
+        assertThat(membershipRepository.findAll()).isEmpty();
     }
 
     @Test
-    @DisplayName("organization.member_invited is handled")
-    void handlesMemberInvited(@GitHubPayload("organization.member_invited") GHEventPayloadOrganization payload) {
-        assertThat(payload.getAction()).isEqualTo("member_invited");
-        assertThat(payload.getInvitation()).isNotNull();
-        assertThat(payload.getInvitation().getLogin()).isEqualTo("hephaestususer");
-        assertThat(payload.getUser()).isNotNull();
-
+    @DisplayName("organization.member_invited is ignored for ETL")
+    void memberInvitedIsIgnored(@GitHubPayload("organization.member_invited") GHEventPayloadOrganization payload) {
         handler.handleEvent(payload);
-        assertThat(payload.getOrganization()).isNotNull();
-        assertThat(payload.getSender()).isNotNull();
+
+        Optional<Organization> organization = organizationRepository.findByGithubId(payload.getOrganization().getId());
+        assertThat(organization).isPresent();
+        assertThat(membershipRepository.findAll()).isEmpty();
     }
 
     @Test
-    @DisplayName("organization.renamed is handled")
-    void handlesRenamed(@GitHubPayload("organization.renamed") GHEventPayloadOrganization payload) {
-        assertThat(payload.getAction()).isEqualTo("renamed");
-        assertThat(payload.getChanges()).isNotNull();
-        assertThat(payload.getChanges().getLogin()).isNotNull();
-        assertThat(payload.getChanges().getLogin().getFrom()).isEqualTo("HephaestusTest2");
+    @DisplayName("organization.renamed updates stored login")
+    void renamedUpdatesLogin(@GitHubPayload("organization.renamed") GHEventPayloadOrganization payload) {
+        organizationService.upsertIdentity(
+            payload.getOrganization().getId(),
+            payload.getChanges().getLogin().getFrom()
+        );
 
         handler.handleEvent(payload);
-        assertThat(payload.getOrganization()).isNotNull();
+
+        var organization = organizationRepository.findByGithubId(payload.getOrganization().getId()).orElseThrow();
+        assertThat(organization.getLogin()).isEqualTo(payload.getOrganization().getLogin());
     }
 }

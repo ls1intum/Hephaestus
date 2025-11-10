@@ -1,5 +1,6 @@
 package de.tum.in.www1.hephaestus.gitprovider.common;
 
+import de.tum.in.www1.hephaestus.config.GitHubApiPatches;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.StringReader;
@@ -43,6 +44,7 @@ public class GitHubPayloadExtension implements ParameterResolver {
                 throw new IOException("GitHub payload not found on classpath: " + resourcePath);
             }
             String jsonPayload = new String(inputStream.readAllBytes(), StandardCharsets.UTF_8);
+            GitHubApiPatches.ensureApplied();
             try (StringReader reader = new StringReader(jsonPayload)) {
                 return GitHub.offline().parseEventPayload(reader, payloadType);
             }

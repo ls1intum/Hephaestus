@@ -19,7 +19,6 @@ import jakarta.persistence.Inheritance;
 import jakarta.persistence.InheritanceType;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.JoinTable;
-import jakarta.persistence.Lob;
 import jakarta.persistence.ManyToMany;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.OneToMany;
@@ -58,7 +57,7 @@ public class Issue extends BaseGitServiceEntity {
     @NonNull
     private String title;
 
-    @Lob
+    @Column(columnDefinition = "TEXT")
     @ToString.Exclude
     private String body;
 
