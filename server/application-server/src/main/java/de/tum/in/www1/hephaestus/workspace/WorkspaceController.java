@@ -141,6 +141,8 @@ public class WorkspaceController {
             return ResponseEntity.ok(WorkspaceDTO.from(workspace));
         } catch (EntityNotFoundException e) {
             return ResponseEntity.notFound().build();
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(Map.of("error", e.getMessage()));
         }
     }
 
@@ -158,6 +160,8 @@ public class WorkspaceController {
             return ResponseEntity.ok(WorkspaceDTO.from(workspace));
         } catch (EntityNotFoundException e) {
             return ResponseEntity.notFound().build();
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(Map.of("error", e.getMessage()));
         }
     }
 
@@ -171,6 +175,8 @@ public class WorkspaceController {
             return ResponseEntity.ok(WorkspaceDTO.from(workspace));
         } catch (EntityNotFoundException e) {
             return ResponseEntity.notFound().build();
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(Map.of("error", e.getMessage()));
         }
     }
 
