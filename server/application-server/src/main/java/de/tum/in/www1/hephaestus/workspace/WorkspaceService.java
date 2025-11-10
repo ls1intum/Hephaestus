@@ -44,6 +44,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 
 @Service
@@ -610,10 +611,6 @@ public class WorkspaceService {
         String slug = normalizeSlug(rawSlug);
         validateSlug(slug);
 
-        if (workspaceRepository.existsBySlug(slug)) {
-            throw new WorkspaceSlugConflictException(slug);
-        }
-
         Workspace workspace = new Workspace();
         workspace.setSlug(slug);
         workspace.setDisplayName(displayName);
@@ -621,10 +618,15 @@ public class WorkspaceService {
         workspace.setAccountLogin(accountLogin);
         workspace.setAccountType(accountType);
         workspace.setStatus(Workspace.WorkspaceStatus.ACTIVE);
-        Workspace saved = workspaceRepository.save(workspace);
-        createOwnerRole(saved, ownerUserId);
 
-        return saved;
+        try {
+            Workspace saved = workspaceRepository.save(workspace);
+            createOwnerRole(saved, ownerUserId);
+            return saved;
+        } catch (DataIntegrityViolationException e) {
+            // Unique constraint violation on slug
+            throw new WorkspaceSlugConflictException(slug);
+        }
     }
 
     public Optional<Workspace> getWorkspaceBySlug(String slug) {
