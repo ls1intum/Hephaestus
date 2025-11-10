@@ -36,7 +36,11 @@ public class WorkspaceMembershipService {
             throw new IllegalArgumentException("User ID must not be null");
         }
 
-        User userReference = entityManager.getReference(User.class, userId);
+        User userReference = entityManager.find(User.class, userId);
+        if (userReference == null) {
+            throw new IllegalArgumentException("User not found with ID: " + userId);
+        }
+
         WorkspaceMembership membership = new WorkspaceMembership();
         membership.setWorkspace(workspace);
         membership.setUser(userReference);
