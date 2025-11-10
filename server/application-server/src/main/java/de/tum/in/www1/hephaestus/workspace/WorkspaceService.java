@@ -95,7 +95,7 @@ public class WorkspaceService {
     private OrganizationService organizationService;
 
     @Autowired
-    private WorkspaceRoleAssignmentRepository workspaceRoleAssignmentRepository;
+    private WorkspaceMembershipService workspaceMembershipService;
 
     @Autowired
     private GitHubUserSyncService gitHubUserSyncService;
@@ -726,11 +726,7 @@ public class WorkspaceService {
         if (ownerUserId == null) {
             throw new IllegalArgumentException("Owner user id must not be null when creating a workspace.");
         }
-        WorkspaceRoleAssignment role = new WorkspaceRoleAssignment();
-        role.setWorkspace(workspace);
-        role.setUserId(ownerUserId);
-        role.setRole(WorkspaceRoleAssignment.WorkspaceRole.OWNER);
-        workspaceRoleAssignmentRepository.save(role);
+        workspaceMembershipService.createMembership(workspace, ownerUserId, WorkspaceMembership.WorkspaceRole.OWNER);
     }
 
     private String normalizeSlug(String slug) {
