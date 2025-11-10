@@ -936,6 +936,30 @@ paths:
           description: OK
       tags:
       - workspace
+  /workspaces/{slug}/public-visibility:
+    patch:
+      operationId: updatePublicVisibility
+      parameters:
+      - in: path
+        name: slug
+        required: true
+        schema:
+          type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateWorkspacePublicVisibilityRequest"
+        required: true
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                type: object
+          description: OK
+      tags:
+      - workspace
   /workspaces/{slug}/resume:
     post:
       operationId: resumeWorkspace
@@ -968,6 +992,30 @@ paths:
           application/json:
             schema:
               $ref: "#/components/schemas/UpdateWorkspaceScheduleRequest"
+        required: true
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                type: object
+          description: OK
+      tags:
+      - workspace
+  /workspaces/{slug}/slack-credentials:
+    patch:
+      operationId: updateSlackCredentials
+      parameters:
+      - in: path
+        name: slug
+        required: true
+        schema:
+          type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateWorkspaceSlackCredentialsRequest"
         required: true
       responses:
         "200":
@@ -1238,6 +1286,7 @@ components:
           format: int64
         slug:
           type: string
+          pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
       required:
       - accountLogin
       - accountType
@@ -2901,10 +2950,19 @@ components:
       properties:
         channelId:
           type: string
+          pattern: "^[CGD][A-Z0-9]{8,}$"
         enabled:
           type: boolean
         team:
           type: string
+    UpdateWorkspacePublicVisibilityRequest:
+      type: object
+      description: DTO for updating workspace public visibility.
+      properties:
+        isPubliclyViewable:
+          type: boolean
+      required:
+      - isPubliclyViewable
     UpdateWorkspaceScheduleRequest:
       type: object
       description: |-
@@ -2920,6 +2978,22 @@ components:
         time:
           type: string
           pattern: "^([01]\\d|2[0-3]):[0-5]\\d$"
+      required:
+      - day
+      - time
+    UpdateWorkspaceSlackCredentialsRequest:
+      type: object
+      description: |-
+        Request DTO for updating Slack credentials (token and signing secret) for a workspace.
+         These credentials are used for Slack API integration and webhook signature verification.
+      properties:
+        slackSigningSecret:
+          type: string
+        slackToken:
+          type: string
+      required:
+      - slackSigningSecret
+      - slackToken
     UpdateWorkspaceTokenRequest:
       type: object
       description: DTO for updating workspace Personal Access Token (PAT).
@@ -3153,10 +3227,3 @@ components:
           type: string
         status:
           type: string
-      required:
-        - accountLogin
-        - createdAt
-        - displayName
-        - id
-        - slug
-        - status  
