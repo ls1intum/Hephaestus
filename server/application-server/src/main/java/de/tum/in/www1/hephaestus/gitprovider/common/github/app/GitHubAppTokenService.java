@@ -239,7 +239,14 @@ public class GitHubAppTokenService {
         if (privateKeyPem != null && !privateKeyPem.isBlank()) {
             return true;
         }
-        return privateKeyRes != null && privateKeyRes.exists();
+        if (privateKeyRes == null) {
+            return false;
+        }
+        try {
+            return privateKeyRes.exists() && privateKeyRes.contentLength() > 0;
+        } catch (IOException ignored) {
+            return false;
+        }
     }
 
     private static PrivateKey generateEphemeralRsaKey() {

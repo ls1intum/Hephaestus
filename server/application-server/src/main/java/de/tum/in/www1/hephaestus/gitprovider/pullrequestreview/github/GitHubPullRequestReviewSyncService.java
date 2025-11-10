@@ -73,6 +73,15 @@ public class GitHubPullRequestReviewSyncService {
      */
     @Transactional
     public PullRequestReview processPullRequestReview(GHPullRequestReview ghPullRequestReview) {
+        return processPullRequestReview(ghPullRequestReview, null, null);
+    }
+
+    @Transactional
+    public PullRequestReview processPullRequestReview(
+        GHPullRequestReview ghPullRequestReview,
+        GHPullRequest fallbackPullRequest,
+        GHUser fallbackUser
+    ) {
         var result = pullRequestReviewRepository
             .findById(ghPullRequestReview.getId())
             .map(pullRequestReview -> {
@@ -85,25 +94,58 @@ public class GitHubPullRequestReviewSyncService {
         }
 
         // Link pull request
-        var pullRequest = ghPullRequestReview.getParent();
-        var resultPullRequest = pullRequestRepository
-            .findById(pullRequest.getId())
-            .orElseGet(() -> pullRequestRepository.save(pullRequestConverter.convert(pullRequest)));
+        GHPullRequest pullRequest = null;
+        try {
+            pullRequest = ghPullRequestReview.getParent();
+        } catch (NullPointerException ignored) {
+            logger.warn(
+                "Hub4j pull request review {} missing parent reference; falling back to event payload.",
+                ghPullRequestReview.getId()
+            );
+        }
+        if (pullRequest == null) {
+            pullRequest = fallbackPullRequest;
+        }
+        if (pullRequest == null) {
+            logger.error(
+                "Failed to link pull request for pull request review {}: {}",
+                ghPullRequestReview.getId(),
+                "Parent pull request not available"
+            );
+            return null;
+        }
+        var resultPullRequest = pullRequestRepository.findById(pullRequest.getId()).orElse(null);
+        if (resultPullRequest == null) {
+            resultPullRequest = pullRequestRepository.save(pullRequestConverter.convert(pullRequest));
+        }
         result.setPullRequest(resultPullRequest);
 
         // Link author
+        GHUser user = null;
         try {
-            GHUser user = ghPullRequestReview.getUser();
-            var resultAuthor = userRepository
-                .findById(user.getId())
-                .orElseGet(() -> userRepository.save(userConverter.convert(user)));
-            result.setAuthor(resultAuthor);
+            user = ghPullRequestReview.getUser();
         } catch (IOException | NullPointerException e) {
             logger.error(
                 "Failed to link author for pull request review {}: {}",
                 ghPullRequestReview.getId(),
                 e.getMessage()
             );
+        }
+        if (user == null) {
+            user = fallbackUser;
+        }
+        if (user != null) {
+            var resultAuthor = userRepository.findById(user.getId()).orElse(null);
+            if (resultAuthor == null) {
+                resultAuthor = userRepository.save(userConverter.convert(user));
+            }
+            result.setAuthor(resultAuthor);
+        } else {
+            logger.warn(
+                "No author information available for pull request review {}; leaving review without author.",
+                ghPullRequestReview.getId()
+            );
+            result.setAuthor(null);
         }
 
         return pullRequestReviewRepository.save(result);

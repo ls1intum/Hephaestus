@@ -59,7 +59,11 @@ class GitHubPullRequestReviewCommentMessageHandlerIntegrationTest extends BaseIn
         @GitHubPayload("pull_request_review.submitted") GHEventPayload.PullRequestReview reviewPayload
     ) throws Exception {
         // Arrange
-        reviewSyncService.processPullRequestReview(reviewPayload.getReview());
+        reviewSyncService.processPullRequestReview(
+            reviewPayload.getReview(),
+            reviewPayload.getPullRequest(),
+            reviewPayload.getSender()
+        );
         assertThat(commentRepository.findById(commentPayload.getComment().getId())).isEmpty();
 
         // Act
@@ -99,7 +103,11 @@ class GitHubPullRequestReviewCommentMessageHandlerIntegrationTest extends BaseIn
         @GitHubPayload("pull_request_review.submitted") GHEventPayload.PullRequestReview reviewPayload
     ) throws Exception {
         // Arrange
-        reviewSyncService.processPullRequestReview(reviewPayload.getReview());
+        reviewSyncService.processPullRequestReview(
+            reviewPayload.getReview(),
+            reviewPayload.getPullRequest(),
+            reviewPayload.getSender()
+        );
         handler.handleEvent(commentPayload);
         var existing = commentRepository.findById(commentPayload.getComment().getId()).orElseThrow();
         var originalUpdatedAt = existing.getUpdatedAt();
@@ -124,7 +132,11 @@ class GitHubPullRequestReviewCommentMessageHandlerIntegrationTest extends BaseIn
         @GitHubPayload("pull_request_review.submitted") GHEventPayload.PullRequestReview reviewPayload
     ) throws Exception {
         // Arrange
-        reviewSyncService.processPullRequestReview(reviewPayload.getReview());
+        reviewSyncService.processPullRequestReview(
+            reviewPayload.getReview(),
+            reviewPayload.getPullRequest(),
+            reviewPayload.getSender()
+        );
         handler.handleEvent(createdPayload);
         var original = commentRepository.findById(createdPayload.getComment().getId()).orElseThrow();
         assertThat(original.getBody()).isEqualTo(createdPayload.getComment().getBody());
@@ -146,7 +158,11 @@ class GitHubPullRequestReviewCommentMessageHandlerIntegrationTest extends BaseIn
         @GitHubPayload("pull_request_review.submitted") GHEventPayload.PullRequestReview reviewPayload
     ) throws Exception {
         // Arrange
-        reviewSyncService.processPullRequestReview(reviewPayload.getReview());
+        reviewSyncService.processPullRequestReview(
+            reviewPayload.getReview(),
+            reviewPayload.getPullRequest(),
+            reviewPayload.getSender()
+        );
         handler.handleEvent(createdPayload);
         assertThat(commentRepository.findById(createdPayload.getComment().getId())).isPresent();
         assertThat(threadRepository.findById(createdPayload.getComment().getId())).isPresent();
