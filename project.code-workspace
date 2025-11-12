@@ -35,6 +35,7 @@
 			"#"
 		],
 		"java.debug.settings.onBuildFailureProceed": true,
+		"graphql-config.load.filepath": "./.graphqlrc.yml"
 	},
 	"extensions": {
 		"recommendations": [
@@ -48,7 +49,8 @@
 			"davidanson.vscode-markdownlint",
 			"streetsidesoftware.code-spell-checker",
 			"njpwerner.autodocstring",
-			"formulahendry.auto-rename-tag"
+			"formulahendry.auto-rename-tag",
+			"GraphQL.vscode-graphql"
 		]
 	},
 }

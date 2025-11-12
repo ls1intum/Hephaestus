@@ -26,6 +26,7 @@ Open the repository using the `project.code-workspace` file in VS Code and insta
 - Python and Poetry support
 - ESLint + Prettier
 - Tailwind CSS IntelliSense
+- GraphQL: Language Feature Support (GraphQL.vscode-graphql)
 
 JetBrains alternatives such as IntelliJ (Java), WebStorm (React), and PyCharm (Python) work equally well.
 
@@ -92,6 +93,19 @@ Never commit actual tokens to version control. Use `application-local.yml` (whic
 :::tip
 The GitHub App configuration (`github.app.id`, `github.app.privateKey`) is optional and defaults to disabled. The application will work perfectly with just a Personal Access Token for local development.
 :::
+
+### GitHub GraphQL workflow
+
+The application server checks GraphQL queries into source control for deterministic builds. Operations are validated against a pinned GitHub public schema; code generation happens during the Maven build.
+
+**Schema maintenance**
+
+- Validate operations: `npm run gql:validate`
+- Refresh schema: `GITHUB_TOKEN=<token> npm run gql:schema:update`
+
+**Editor support**
+
+The GraphQL VS Code extension ([`GraphQL.vscode-graphql`](https://marketplace.visualstudio.com/items?itemName=GraphQL.vscode-graphql)) activates automatically. Look for the `🔌 graphql` status-bar item to confirm it loaded `.graphqlrc.yml`, which surfaces completions and diagnostics for all `.graphql` files under `server/application-server/src/main/resources/github/graphql`.
 
 #### Using a GitHub App (optional)
 

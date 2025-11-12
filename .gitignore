@@ -175,3 +175,6 @@ server/application-server/postgres-data-local/
 
 # Java-Client creation temporary
 tmp
+
+# Accidentally generated GraphQL introspection files
+graphql.schema.json

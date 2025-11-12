@@ -19,5 +19,6 @@
 		"editor.defaultFormatter": "ms-python.autopep8"
 	},
 	"python.testing.pytestArgs": ["."],
-	"python.testing.pytestEnabled": true
+	"python.testing.pytestEnabled": true,
+	"graphql-config.load.filepath": "./.graphqlrc.yml"
 }

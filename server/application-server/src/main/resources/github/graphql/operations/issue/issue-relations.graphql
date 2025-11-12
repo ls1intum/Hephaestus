@@ -1,0 +1,97 @@
+# Query issue relations for parent/sub-issue/dependency edges.
+# Generated types will power the GitHub GraphQL sync service.
+query IssueRelations(
+  $owner: String!
+  $name: String!
+  $number: Int!
+  $subIssuesPageSize: Int = 50
+  $subIssuesCursor: String
+  $trackedPageSize: Int = 50
+  $trackedCursor: String
+  $trackedInPageSize: Int = 50
+  $trackedInCursor: String
+) {
+  repository(owner: $owner, name: $name) {
+    name
+    owner {
+      login
+    }
+    issue(number: $number) {
+      id
+      databaseId
+      number
+      title
+      state
+      stateReason
+      url
+      parent {
+        ...IssueReference
+      }
+      subIssues(first: $subIssuesPageSize, after: $subIssuesCursor) {
+        totalCount
+        pageInfo {
+          hasNextPage
+          endCursor
+        }
+        nodes {
+          ...IssueReference
+        }
+      }
+      subIssuesSummary {
+        completed
+        percentCompleted
+        total
+      }
+      trackedIssues(first: $trackedPageSize, after: $trackedCursor) {
+        totalCount
+        pageInfo {
+          hasNextPage
+          endCursor
+        }
+        nodes {
+          ...IssueReference
+        }
+      }
+      trackedIssuesOpen: trackedIssuesCount(states: OPEN)
+      trackedIssuesClosed: trackedIssuesCount(states: CLOSED)
+      trackedIssuesTotal: trackedIssuesCount
+      trackedInIssues(first: $trackedInPageSize, after: $trackedInCursor) {
+        totalCount
+        pageInfo {
+          hasNextPage
+          endCursor
+        }
+        nodes {
+          ...IssueReference
+        }
+      }
+    }
+  }
+  ...RateLimitFooter
+}
+
+fragment IssueReference on Issue {
+  id
+  databaseId
+  number
+  title
+  state
+  url
+  repository {
+    name
+    owner {
+      login
+    }
+  }
+}
+
+fragment RateLimitFooter on Query {
+  rateLimit {
+    limit
+    remaining
+    used
+    cost
+    nodeCount
+    resetAt
+  }
+}

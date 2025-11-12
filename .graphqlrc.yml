@@ -1,0 +1,7 @@
+projects:
+  github:
+    schema:
+      - ./server/application-server/src/main/resources/github/graphql/schema/github-public-schema.graphql
+    documents:
+      - ./server/application-server/src/main/resources/github/graphql/operations/**/*.graphql
+      - ./server/application-server/src/main/resources/github/graphql/operations/**/*.gql

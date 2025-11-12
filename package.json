@@ -14,6 +14,8 @@
     "generate:api:intelligence-service:client": "npx openapi-generator-cli generate -i server/intelligence-service/openapi.yaml -g java --library resttemplate --api-package de.tum.in.www1.hephaestus.intelligenceservice.api --model-package de.tum.in.www1.hephaestus.intelligenceservice.model --invoker-package de.tum.in.www1.hephaestus.intelligenceservice --additional-properties useJakartaEe=true,performBeanValidation=true,hideGenerationTimestamp=true,openApiNullable=true,serializationLibrary=jackson --package-name de.tum.in.www1.hephaestus.intelligenceservice -o tmp/java-client && shx mkdir -p server/application-server/src/main/java/de/tum/in/www1/hephaestus && shx cp -r tmp/java-client/src/main/java/de/tum/in/www1/hephaestus/intelligenceservice server/application-server/src/main/java/de/tum/in/www1/hephaestus/ && shx rm -rf tmp && node scripts/postprocess-openapi-java.mjs",
     "generate:api:intelligence-service": "npm run generate:api:intelligence-service:clean && npm run generate:api:intelligence-service:specs && npm run generate:api:intelligence-service:client",
     "generate:api": "npm run generate:api:intelligence-service && npm run generate:api:application-server",
+    "gql:schema:update": "scripts/refresh-github-schema.sh",
+    "gql:validate": "graphql-inspector validate 'server/application-server/src/main/resources/github/graphql/operations/**/*.graphql' server/application-server/src/main/resources/github/graphql/schema/github-public-schema.graphql",
     "format:java": "prettier --write server/application-server/src/**/*.java --config-precedence prefer-file --config server/application-server/.prettierrc.yaml --ignore-path server/application-server/.prettierignore",
     "lint:java": "prettier --check server/application-server/src/**/*.java --config-precedence prefer-file --config server/application-server/.prettierrc.yaml --ignore-path server/application-server/.prettierignore",
     "format:py:intelligence-service": "cd server/intelligence-service/ && poetry run black .",
@@ -35,7 +37,9 @@
     "db:generate-models:intelligence-service": "scripts/db-utils.sh generate-models-intelligence-service"
   },
   "devDependencies": {
+    "@graphql-inspector/cli": "^5.0.8",
     "@openapitools/openapi-generator-cli": "2.16.3",
+    "graphql": "^16.9.0",
     "npm-run-all": "^4.1.5",
     "patch-package": "^8.0.1",
     "prettier": "3.5.1",
