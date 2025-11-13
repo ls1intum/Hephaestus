@@ -30,4 +30,5 @@
     <include file="./changelog/1762340951591_changelog.xml" relativeToChangelogFile="true"/>
     <include file="./changelog/1762377811570_changelog.xml" relativeToChangelogFile="true"/>
     <include file="./changelog/1762441036158_changelog.xml" relativeToChangelogFile="true"/>
+    <include file="./changelog/1762800000000_changelog.xml" relativeToChangelogFile="true"/>
 </databaseChangeLog>

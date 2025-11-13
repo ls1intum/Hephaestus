@@ -7,6 +7,8 @@ import de.tum.in.www1.hephaestus.gitprovider.issue.github.GitHubIssueSyncService
 import de.tum.in.www1.hephaestus.gitprovider.issuecomment.github.GitHubIssueCommentSyncService;
 import de.tum.in.www1.hephaestus.gitprovider.label.github.GitHubLabelSyncService;
 import de.tum.in.www1.hephaestus.gitprovider.milestone.github.GitHubMilestoneSyncService;
+import de.tum.in.www1.hephaestus.gitprovider.issue.github.graphql.GitHubIssueRelationsGraphQLService;
+import de.tum.in.www1.hephaestus.gitprovider.issue.github.graphql.IssueRelationsPageRequest;
 import de.tum.in.www1.hephaestus.gitprovider.pullrequest.PullRequestRepository;
 import de.tum.in.www1.hephaestus.gitprovider.pullrequest.github.GitHubPullRequestSyncService;
 import de.tum.in.www1.hephaestus.gitprovider.pullrequestreview.github.GitHubPullRequestReviewSyncService;
@@ -84,6 +86,9 @@ public class GitHubDataSyncService {
 
     @Autowired
     private GitHubIssueCommentSyncService issueCommentSyncService;
+
+    @Autowired
+    private GitHubIssueRelationsGraphQLService issueRelationsGraphQLService;
 
     @Autowired
     private GitHubPullRequestSyncService pullRequestSyncService;
@@ -282,7 +287,11 @@ public class GitHubDataSyncService {
 
         PagedIterator<GHIssue> issuesIterator = issueSyncService.getIssuesIterator(repository, cutoffDate);
         while (issuesIterator.hasNext()) {
-            var syncedUpToTime = syncRepositoryRecentIssuesAndPullRequestsNextPage(repository, issuesIterator);
+            var syncedUpToTime = syncRepositoryRecentIssuesAndPullRequestsNextPage(
+                repositoryToMonitor.getWorkspace().getId(),
+                repository,
+                issuesIterator
+            );
             repositoryToMonitor.setIssuesAndPullRequestsSyncedAt(syncedUpToTime);
             repositoryToMonitorRepository.save(repositoryToMonitor);
         }
@@ -296,6 +305,7 @@ public class GitHubDataSyncService {
      * @return the last updated time of the last issue or the current time if no issues were fetched
      */
     private Instant syncRepositoryRecentIssuesAndPullRequestsNextPage(
+        Long workspaceId,
         GHRepository repository,
         PagedIterator<GHIssue> issuesIterator
     ) {
@@ -304,6 +314,11 @@ public class GitHubDataSyncService {
         var issues = ghIssues.stream().map(issueSyncService::processIssue).toList();
         issueCommentSyncService.syncIssueCommentsOfAllIssues(ghIssues);
         issues.forEach(issue -> issue.setLastSyncAt(currentTime));
+
+        ghIssues
+            .stream()
+            .filter(ghIssue -> !ghIssue.isPullRequest())
+            .forEach(ghIssue -> refreshIssueRelations(workspaceId, repository, ghIssue));
 
         var pullRequestNumbers = issues.stream().filter(Issue::isHasPullRequest).map(Issue::getNumber).toList();
 
@@ -317,6 +332,25 @@ public class GitHubDataSyncService {
             return issues.getLast().getUpdatedAt();
         } catch (NoSuchElementException e) {
             return currentTime;
+        }
+    }
+
+    private void refreshIssueRelations(Long workspaceId, GHRepository repository, GHIssue ghIssue) {
+        try {
+            issueRelationsGraphQLService.synchronizeForWorkspace(
+                workspaceId,
+                repository.getOwnerName(),
+                repository.getName(),
+                ghIssue.getNumber(),
+                IssueRelationsPageRequest.defaults()
+            );
+        } catch (Exception ex) {
+            logger.warn(
+                "Failed to refresh relations for {}#{}: {}",
+                repository.getFullName(),
+                ghIssue.getNumber(),
+                ex.getMessage()
+            );
         }
     }
 

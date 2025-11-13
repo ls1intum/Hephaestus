@@ -46,6 +46,8 @@
         <!-- Encoding -->
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
+    <dgs.version>10.4.0</dgs.version>
+        <jakarta-validation.version>3.1.0-M2</jakarta-validation.version>
     </properties>
     <dependencies>
         <dependency>
@@ -80,6 +82,10 @@
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-webflux</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.graphql</groupId>
+            <artifactId>spring-graphql</artifactId>
         </dependency>
         <dependency>
             <groupId>org.springdoc</groupId>
@@ -288,6 +294,12 @@
             <version>5.0.0-alpha.14</version>
         </dependency>
         <dependency>
+            <groupId>com.squareup.okhttp3</groupId>
+            <artifactId>mockwebserver</artifactId>
+            <version>4.12.0</version>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
             <groupId>com.google.code.gson</groupId>
             <artifactId>gson</artifactId>
         </dependency>
@@ -336,6 +348,13 @@
     <dependencyManagement>
         <dependencies>
             <dependency>
+                <groupId>com.netflix.graphql.dgs</groupId>
+                <artifactId>graphql-dgs-platform-dependencies</artifactId>
+                <version>${dgs.version}</version>
+                <type>pom</type>
+                <scope>import</scope>
+            </dependency>
+            <dependency>
                 <groupId>org.springframework.modulith</groupId>
                 <artifactId>spring-modulith-bom</artifactId>
                 <version>1.2.2</version>
@@ -347,6 +366,56 @@
     </dependencyManagement>
     <build>
         <plugins>
+            <plugin>
+                <groupId>io.github.deweyjose</groupId>
+                <artifactId>graphqlcodegen-maven-plugin</artifactId>
+                <version>3.5.1</version>
+                <executions>
+                    <execution>
+                        <id>generate-github-graphql-types</id>
+                        <phase>generate-sources</phase>
+                        <goals>
+                            <goal>generate</goal>
+                        </goals>
+                    </execution>
+                </executions>
+                <configuration>
+                    <schemaPaths>
+                        <schemaPath>src/main/resources/github/graphql/schema/issue-relations-schema.graphqls</schemaPath>
+                    </schemaPaths>
+                    <documents>
+                        <document>src/main/resources/github/graphql/operations/issue/issue-relations.graphql</document>
+                    </documents>
+                    <packageName>de.tum.in.www1.hephaestus.gitprovider.github.graphql.generated</packageName>
+                    <generateClient>false</generateClient>
+                    <generateDataTypes>true</generateDataTypes>
+                    <onlyGenerateChanged>false</onlyGenerateChanged>
+                    <addGeneratedAnnotation>false</addGeneratedAnnotation>
+                    <typeMapping>
+                        <DateTime>java.time.OffsetDateTime</DateTime>
+                        <URI>java.net.URI</URI>
+                    </typeMapping>
+                </configuration>
+            </plugin>
+            <plugin>
+                <groupId>org.codehaus.mojo</groupId>
+                <artifactId>build-helper-maven-plugin</artifactId>
+                <version>3.5.0</version>
+                <executions>
+                    <execution>
+                        <id>add-graphql-generated-sources</id>
+                        <phase>generate-sources</phase>
+                        <goals>
+                            <goal>add-source</goal>
+                        </goals>
+                        <configuration>
+                            <sources>
+                                <source>${project.build.directory}/generated-sources</source>
+                            </sources>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-compiler-plugin</artifactId>

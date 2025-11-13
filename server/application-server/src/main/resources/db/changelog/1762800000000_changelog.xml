@@ -1,0 +1,57 @@
+<?xml version="1.1" encoding="UTF-8" standalone="no"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd"
+>
+    <changeSet id="1762800000000-create-issue-link" author="copilot">
+        <createTable tableName="issue_link">
+            <column name="id" type="BIGINT" autoIncrement="true">
+                <constraints primaryKey="true" primaryKeyName="pk_issue_link"/>
+            </column>
+            <column name="source_issue_id" type="BIGINT">
+                <constraints nullable="false"/>
+            </column>
+            <column name="target_issue_id" type="BIGINT">
+                <constraints nullable="false"/>
+            </column>
+            <column name="type" type="VARCHAR(32)">
+                <constraints nullable="false"/>
+            </column>
+        </createTable>
+        <addUniqueConstraint
+            tableName="issue_link"
+            columnNames="source_issue_id, target_issue_id, type"
+            constraintName="uk_issue_link_source_target_type"
+        />
+        <addForeignKeyConstraint
+            baseTableName="issue_link"
+            baseColumnNames="source_issue_id"
+            referencedTableName="issue"
+            referencedColumnNames="id"
+            constraintName="fk_issue_link_source"
+        />
+        <addForeignKeyConstraint
+            baseTableName="issue_link"
+            baseColumnNames="target_issue_id"
+            referencedTableName="issue"
+            referencedColumnNames="id"
+            constraintName="fk_issue_link_target"
+        />
+    </changeSet>
+
+    <changeSet id="1762800000000-augment-issue-summary" author="copilot">
+        <addColumn tableName="issue">
+            <column name="sub_issues_total" type="INT"/>
+            <column name="sub_issues_completed" type="INT"/>
+            <column name="sub_issues_percent_completed" type="NUMERIC(5,2)"/>
+            <column name="dependencies_blocked_by" type="INT"/>
+            <column name="dependencies_total_blocked_by" type="INT"/>
+            <column name="dependencies_blocking" type="INT"/>
+            <column name="dependencies_total_blocking" type="INT"/>
+            <column name="tracked_issues_open" type="INT"/>
+            <column name="tracked_issues_closed" type="INT"/>
+            <column name="tracked_issues_total" type="INT"/>
+        </addColumn>
+    </changeSet>
+</databaseChangeLog>

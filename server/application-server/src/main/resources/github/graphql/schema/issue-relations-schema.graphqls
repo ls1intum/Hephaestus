@@ -1,0 +1,80 @@
+schema {
+  query: Query
+}
+
+scalar DateTime
+scalar URI
+
+enum IssueState {
+  OPEN
+  CLOSED
+}
+
+enum IssueStateReason {
+  COMPLETED
+  NOT_PLANNED
+  REOPENED
+}
+
+enum TrackedIssueStates {
+  OPEN
+  CLOSED
+}
+
+type Query {
+  repository(owner: String!, name: String!): Repository
+  rateLimit: RateLimit!
+}
+
+type Repository {
+  name: String!
+  owner: RepositoryOwner!
+  issue(number: Int!): Issue
+}
+
+type RepositoryOwner {
+  login: String!
+}
+
+type Issue {
+  id: ID!
+  databaseId: Int
+  number: Int!
+  title: String!
+  state: IssueState!
+  stateReason: IssueStateReason
+  url: URI!
+  repository: Repository
+  parent: Issue
+  subIssues(first: Int, after: String): IssueConnection!
+  subIssuesSummary: SubIssuesSummary
+  trackedIssues(first: Int, after: String): IssueConnection!
+  trackedInIssues(first: Int, after: String): IssueConnection!
+  trackedIssuesCount(states: [TrackedIssueStates!]): Int!
+}
+
+type IssueConnection {
+  nodes: [Issue!]!
+  pageInfo: PageInfo!
+  totalCount: Int!
+}
+
+type PageInfo {
+  hasNextPage: Boolean!
+  endCursor: String
+}
+
+type SubIssuesSummary {
+  total: Int!
+  completed: Int!
+  percentCompleted: Float!
+}
+
+type RateLimit {
+  cost: Int!
+  limit: Int!
+  nodeCount: Int!
+  remaining: Int!
+  used: Int!
+  resetAt: DateTime!
+}

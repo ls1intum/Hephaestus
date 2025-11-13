@@ -18,7 +18,9 @@ import java.time.ZonedDateTime;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.Locale;
 import java.util.Map;
+import java.util.stream.Stream;
 import org.kohsuke.github.GHEvent;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -291,21 +293,27 @@ public class NatsConsumerService {
     private void handleMessage(Message msg) {
         try {
             String subject = msg.getSubject();
-            String lastPart = subject.substring(subject.lastIndexOf(".") + 1);
-            GHEvent eventType = GHEvent.valueOf(lastPart.toUpperCase());
-            GitHubMessageHandler<?> eventHandler = handlerRegistry.getHandler(eventType);
+            String lastPart = subject.substring(subject.lastIndexOf('.') + 1);
+            GitHubMessageHandler<?> eventHandler = null;
+            try {
+                GHEvent eventType = GHEvent.valueOf(lastPart.toUpperCase(Locale.ROOT));
+                eventHandler = handlerRegistry.getHandler(eventType);
+            } catch (IllegalArgumentException ignored) {
+                // Fall through to custom handler resolution
+            }
 
             if (eventHandler == null) {
-                logger.warn("No handler found for event type: {}", eventType);
+                eventHandler = handlerRegistry.getCustomHandler(lastPart);
+            }
+
+            if (eventHandler == null) {
+                logger.warn("No handler found for event '{}'", lastPart);
                 msg.ack();
                 return;
             }
 
             eventHandler.onMessage(msg);
             msg.ack();
-        } catch (IllegalArgumentException e) {
-            logger.error("Invalid event type in subject '{}': {}", msg.getSubject(), e.getMessage());
-            msg.nak();
         } catch (Exception e) {
             logger.error("Error processing message: {}", e.getMessage(), e);
             msg.nak();
@@ -323,11 +331,15 @@ public class NatsConsumerService {
     }
 
     private String[] getRepositorySubjects(String nameWithOwner) {
-        return handlerRegistry
-            .getSupportedRepositoryEvents()
-            .stream()
-            .map(GHEvent::name)
-            .map(String::toLowerCase)
+        return Stream
+            .concat(
+                handlerRegistry
+                    .getSupportedRepositoryEvents()
+                    .stream()
+                    .map(GHEvent::name)
+                    .map(name -> name.toLowerCase(Locale.ROOT)),
+                handlerRegistry.getSupportedCustomRepositoryEvents().stream()
+            )
             .map(event -> getSubjectPrefix(nameWithOwner) + "." + event)
             .toArray(String[]::new);
     }

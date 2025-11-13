@@ -74,6 +74,15 @@ public abstract class GitHubMessageHandler<T extends GHEventPayload> implements 
         return List.of();
     }
 
+    /**
+     * Custom event name for payloads not covered by {@link GHEvent}.
+     * <p>
+     * Return {@code null} to rely on the enum-based routing.
+     */
+    public String getCustomEventName() {
+        return null;
+    }
+
     public enum GitHubMessageDomain {
         REPOSITORY,
         ORGANIZATION,

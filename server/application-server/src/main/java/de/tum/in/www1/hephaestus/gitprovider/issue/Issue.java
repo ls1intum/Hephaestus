@@ -112,6 +112,26 @@ public class Issue extends BaseGitServiceEntity {
     @ToString.Exclude
     private Set<IssueComment> comments = new HashSet<>();
 
+    private Integer subIssuesTotal;
+
+    private Integer subIssuesCompleted;
+
+    private Double subIssuesPercentCompleted;
+
+    private Integer dependenciesBlockedBy;
+
+    private Integer dependenciesTotalBlockedBy;
+
+    private Integer dependenciesBlocking;
+
+    private Integer dependenciesTotalBlocking;
+
+    private Integer trackedIssuesOpen;
+
+    private Integer trackedIssuesClosed;
+
+    private Integer trackedIssuesTotal;
+
     public enum State {
         OPEN,
         CLOSED,
@@ -143,13 +163,9 @@ public class Issue extends BaseGitServiceEntity {
      * - issue.author_association (github/issues.closed.json).
      * - issue.active_lock_reason (github/issues.locked.json).
      * - issue.type (github/issues.typed.json).
-     * - issue.issue_dependencies_summary (github/issues.transferred.json).
-     * - issue.sub_issues_summary (github/issues.closed.json).
      * - issue.reactions total counters (github/issues.closed.json).
      * - issue.formProgress (GraphQL Issue.formProgress.nodes).
      * Relationships:
-     * - Parent/child linkage (sub_issues.* payloads: parent_issue_url, sub_issue objects).
-     * - Dependency edges (GraphQL Issue.trackedIn / Issue.tracks).
      * - Issue.projectItems (GraphQL Issue.projectItems / ProjectV2ItemConnection).
      * - Timeline discussion + commit events (GraphQL Issue.timelineItems variants not bound in hub4j).
      *
