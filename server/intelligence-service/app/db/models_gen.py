@@ -143,6 +143,135 @@ class Databasechangeloglock(Base):
     lockedby: Mapped[Optional[str]] = mapped_column(String(255))
 
 
+class Discussion(Base):
+    __tablename__ = "discussion"
+    __table_args__ = (
+        ForeignKeyConstraint(
+            ["answer_author_id"], ["user.id"], name="fk_discussion_answer_selector"
+        ),
+        ForeignKeyConstraint(
+            ["answer_comment_id"],
+            ["discussion_comment.id"],
+            name="fk_discussion_answer_comment",
+        ),
+        ForeignKeyConstraint(["author_id"], ["user.id"], name="fk_discussion_author"),
+        ForeignKeyConstraint(
+            ["category_id"], ["discussion_category.id"], name="fk_discussion_category"
+        ),
+        ForeignKeyConstraint(
+            ["repository_id"], ["repository.id"], name="fk_discussion_repository"
+        ),
+        PrimaryKeyConstraint("id", name="discussionPK"),
+        UniqueConstraint("answer_comment_id", name="uk_discussion_answer_comment"),
+        UniqueConstraint("repository_id", "number", name="uk_discussion_repo_number"),
+        Index("idx_discussion_answer_author", "answer_author_id"),
+        Index("idx_discussion_repo_last_sync", "repository_id", "last_sync_at"),
+        Index("idx_discussion_repository", "repository_id"),
+    )
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
+    locked: Mapped[bool] = mapped_column(Boolean, server_default=text("false"))
+    number: Mapped[int] = mapped_column(Integer)
+    state: Mapped[str] = mapped_column(String(32))
+    title: Mapped[str] = mapped_column(String(256))
+    repository_id: Mapped[int] = mapped_column(BigInteger)
+    created_at: Mapped[Optional[datetime.datetime]] = mapped_column(TIMESTAMP(True, 6))
+    updated_at: Mapped[Optional[datetime.datetime]] = mapped_column(TIMESTAMP(True, 6))
+    active_lock_reason: Mapped[Optional[str]] = mapped_column(String(64))
+    answer_chosen_at: Mapped[Optional[datetime.datetime]] = mapped_column(
+        TIMESTAMP(True, 6)
+    )
+    author_association: Mapped[Optional[str]] = mapped_column(String(32))
+    body: Mapped[Optional[str]] = mapped_column(Text)
+    html_url: Mapped[Optional[str]] = mapped_column(Text)
+    comment_count: Mapped[Optional[int]] = mapped_column(Integer)
+    last_sync_at: Mapped[Optional[datetime.datetime]] = mapped_column(
+        TIMESTAMP(True, 6)
+    )
+    answer_author_id: Mapped[Optional[int]] = mapped_column(BigInteger)
+    answer_comment_id: Mapped[Optional[int]] = mapped_column(BigInteger)
+    author_id: Mapped[Optional[int]] = mapped_column(BigInteger)
+    category_id: Mapped[Optional[int]] = mapped_column(BigInteger)
+    answer_author: Mapped[Optional["User"]] = relationship(
+        "User", foreign_keys=[answer_author_id], back_populates="discussion"
+    )
+    answer_comment: Mapped[Optional["DiscussionComment"]] = relationship(
+        "DiscussionComment",
+        foreign_keys=[answer_comment_id],
+        back_populates="discussion",
+    )
+    author: Mapped[Optional["User"]] = relationship(
+        "User", foreign_keys=[author_id], back_populates="discussion_"
+    )
+    category: Mapped[Optional["DiscussionCategory"]] = relationship(
+        "DiscussionCategory", back_populates="discussion"
+    )
+    repository: Mapped["Repository"] = relationship(
+        "Repository", back_populates="discussion"
+    )
+    discussion_comment: Mapped[List["DiscussionComment"]] = relationship(
+        "DiscussionComment",
+        foreign_keys="[DiscussionComment.discussion_id]",
+        back_populates="discussion_",
+    )
+
+
+class DiscussionComment(Base):
+    __tablename__ = "discussion_comment"
+    __table_args__ = (
+        ForeignKeyConstraint(
+            ["author_id"], ["user.id"], name="fk_discussion_comment_author"
+        ),
+        ForeignKeyConstraint(
+            ["discussion_id"],
+            ["discussion.id"],
+            name="fk_discussion_comment_discussion",
+        ),
+        ForeignKeyConstraint(
+            ["parent_comment_id"],
+            ["discussion_comment.id"],
+            name="fk_discussion_comment_parent",
+        ),
+        PrimaryKeyConstraint("id", name="discussion_commentPK"),
+        Index("idx_discussion_comment_author", "author_id"),
+        Index("idx_discussion_comment_discussion", "discussion_id"),
+        Index(
+            "idx_discussion_comment_discussion_created", "discussion_id", "created_at"
+        ),
+        Index("idx_discussion_comment_parent", "parent_comment_id"),
+    )
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
+    author_association: Mapped[str] = mapped_column(String(32))
+    body: Mapped[str] = mapped_column(Text)
+    discussion_id: Mapped[int] = mapped_column(BigInteger)
+    created_at: Mapped[Optional[datetime.datetime]] = mapped_column(TIMESTAMP(True, 6))
+    updated_at: Mapped[Optional[datetime.datetime]] = mapped_column(TIMESTAMP(True, 6))
+    last_sync_at: Mapped[Optional[datetime.datetime]] = mapped_column(
+        TIMESTAMP(True, 6)
+    )
+    parent_comment_id: Mapped[Optional[int]] = mapped_column(BigInteger)
+    author_id: Mapped[Optional[int]] = mapped_column(BigInteger)
+    discussion: Mapped[Optional["Discussion"]] = relationship(
+        "Discussion",
+        uselist=False,
+        foreign_keys="[Discussion.answer_comment_id]",
+        back_populates="answer_comment",
+    )
+    author: Mapped[Optional["User"]] = relationship(
+        "User", back_populates="discussion_comment"
+    )
+    discussion_: Mapped["Discussion"] = relationship(
+        "Discussion", foreign_keys=[discussion_id], back_populates="discussion_comment"
+    )
+    parent_comment: Mapped[Optional["DiscussionComment"]] = relationship(
+        "DiscussionComment", remote_side=[id], back_populates="parent_comment_reverse"
+    )
+    parent_comment_reverse: Mapped[List["DiscussionComment"]] = relationship(
+        "DiscussionComment",
+        remote_side=[parent_comment_id],
+        back_populates="parent_comment",
+    )
+
+
 class Organization(Base):
     __tablename__ = "organization"
     __table_args__ = (
@@ -394,6 +523,17 @@ class User(Base):
     chat_thread: Mapped[List["ChatThread"]] = relationship(
         "ChatThread", back_populates="user"
     )
+    discussion: Mapped[List["Discussion"]] = relationship(
+        "Discussion",
+        foreign_keys="[Discussion.answer_author_id]",
+        back_populates="answer_author",
+    )
+    discussion_: Mapped[List["Discussion"]] = relationship(
+        "Discussion", foreign_keys="[Discussion.author_id]", back_populates="author"
+    )
+    discussion_comment: Mapped[List["DiscussionComment"]] = relationship(
+        "DiscussionComment", back_populates="author"
+    )
     pull_request_review_comment: Mapped[List["PullRequestReviewComment"]] = (
         relationship("PullRequestReviewComment", back_populates="author")
     )
@@ -403,6 +543,12 @@ class User(Base):
     document: Mapped[List["Document"]] = relationship("Document", back_populates="user")
     team_membership: Mapped[List["TeamMembership"]] = relationship(
         "TeamMembership", back_populates="user"
+    )
+    git_commit: Mapped[List["GitCommit"]] = relationship(
+        "GitCommit", foreign_keys="[GitCommit.author_id]", back_populates="author"
+    )
+    git_commit_: Mapped[List["GitCommit"]] = relationship(
+        "GitCommit", foreign_keys="[GitCommit.committer_id]", back_populates="committer"
     )
     milestone: Mapped[List["Milestone"]] = relationship(
         "Milestone", back_populates="creator"
@@ -497,8 +643,17 @@ class Repository(Base):
     pushed_at: Mapped[Optional[datetime.datetime]] = mapped_column(DateTime(True))
     visibility: Mapped[Optional[str]] = mapped_column(String(255))
     organization_id: Mapped[Optional[int]] = mapped_column(BigInteger)
+    discussion: Mapped[List["Discussion"]] = relationship(
+        "Discussion", back_populates="repository"
+    )
     organization: Mapped[Optional["Organization"]] = relationship(
         "Organization", back_populates="repository"
+    )
+    discussion_category: Mapped[List["DiscussionCategory"]] = relationship(
+        "DiscussionCategory", back_populates="repository"
+    )
+    git_commit: Mapped[List["GitCommit"]] = relationship(
+        "GitCommit", back_populates="repository"
     )
     label: Mapped[List["Label"]] = relationship("Label", back_populates="repository")
     milestone: Mapped[List["Milestone"]] = relationship(
@@ -569,6 +724,95 @@ class Workspace(Base):
     )
     repository_to_monitor: Mapped[List["RepositoryToMonitor"]] = relationship(
         "RepositoryToMonitor", back_populates="workspace"
+    )
+
+
+class DiscussionCategory(Base):
+    __tablename__ = "discussion_category"
+    __table_args__ = (
+        ForeignKeyConstraint(
+            ["repository_id"],
+            ["repository.id"],
+            name="fk_discussion_category_repository",
+        ),
+        PrimaryKeyConstraint("id", name="discussion_categoryPK"),
+        UniqueConstraint(
+            "repository_id", "slug", name="uk_discussion_category_repo_slug"
+        ),
+    )
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
+    name: Mapped[str] = mapped_column(String(128))
+    slug: Mapped[str] = mapped_column(String(128))
+    answerable: Mapped[bool] = mapped_column(Boolean, server_default=text("false"))
+    repository_id: Mapped[int] = mapped_column(BigInteger)
+    emoji: Mapped[Optional[str]] = mapped_column(String(64))
+    description: Mapped[Optional[str]] = mapped_column(Text)
+    discussion: Mapped[List["Discussion"]] = relationship(
+        "Discussion", back_populates="category"
+    )
+    repository: Mapped["Repository"] = relationship(
+        "Repository", back_populates="discussion_category"
+    )
+
+
+class GitCommit(Base):
+    __tablename__ = "git_commit"
+    __table_args__ = (
+        ForeignKeyConstraint(
+            ["author_id"], ["user.id"], ondelete="SET NULL", name="fk_git_commit_author"
+        ),
+        ForeignKeyConstraint(
+            ["committer_id"],
+            ["user.id"],
+            ondelete="SET NULL",
+            name="fk_git_commit_committer",
+        ),
+        ForeignKeyConstraint(
+            ["repository_id"], ["repository.id"], name="fk_git_commit_repository"
+        ),
+        PrimaryKeyConstraint("sha", name="git_commitPK"),
+        Index("idx_git_commit_author_id", "author_id"),
+        Index("idx_git_commit_committed_at", "repository_id", "committed_at"),
+        Index("idx_git_commit_committer_id", "committer_id"),
+        Index("idx_git_commit_repository", "repository_id"),
+    )
+    sha: Mapped[str] = mapped_column(String(40), primary_key=True)
+    is_distinct: Mapped[bool] = mapped_column(Boolean, server_default=text("false"))
+    head_commit: Mapped[bool] = mapped_column(Boolean, server_default=text("false"))
+    repository_id: Mapped[int] = mapped_column(BigInteger)
+    message: Mapped[Optional[str]] = mapped_column(Text)
+    authored_at: Mapped[Optional[datetime.datetime]] = mapped_column(TIMESTAMP(True, 6))
+    committed_at: Mapped[Optional[datetime.datetime]] = mapped_column(
+        TIMESTAMP(True, 6)
+    )
+    ref_name: Mapped[Optional[str]] = mapped_column(String(512))
+    pusher_name: Mapped[Optional[str]] = mapped_column(String(255))
+    pusher_email: Mapped[Optional[str]] = mapped_column(String(320))
+    author_name: Mapped[Optional[str]] = mapped_column(String(255))
+    author_email: Mapped[Optional[str]] = mapped_column(String(320))
+    author_login: Mapped[Optional[str]] = mapped_column(String(64))
+    committer_name: Mapped[Optional[str]] = mapped_column(String(255))
+    committer_email: Mapped[Optional[str]] = mapped_column(String(320))
+    committer_login: Mapped[Optional[str]] = mapped_column(String(64))
+    author_id: Mapped[Optional[int]] = mapped_column(BigInteger)
+    committer_id: Mapped[Optional[int]] = mapped_column(BigInteger)
+    additions: Mapped[Optional[int]] = mapped_column(Integer)
+    deletions: Mapped[Optional[int]] = mapped_column(Integer)
+    total_changes: Mapped[Optional[int]] = mapped_column(Integer)
+    last_synced_at: Mapped[Optional[datetime.datetime]] = mapped_column(
+        TIMESTAMP(True, 6)
+    )
+    author: Mapped[Optional["User"]] = relationship(
+        "User", foreign_keys=[author_id], back_populates="git_commit"
+    )
+    committer: Mapped[Optional["User"]] = relationship(
+        "User", foreign_keys=[committer_id], back_populates="git_commit_"
+    )
+    repository: Mapped["Repository"] = relationship(
+        "Repository", back_populates="git_commit"
+    )
+    git_commit_file_change: Mapped[List["GitCommitFileChange"]] = relationship(
+        "GitCommitFileChange", back_populates="git_commit"
     )
 
 
@@ -688,6 +932,12 @@ class RepositoryToMonitor(Base):
         TIMESTAMP(precision=6)
     )
     workspace_id: Mapped[Optional[int]] = mapped_column(BigInteger)
+    commits_synced_at: Mapped[Optional[datetime.datetime]] = mapped_column(
+        TIMESTAMP(True, 6)
+    )
+    discussions_synced_at: Mapped[Optional[datetime.datetime]] = mapped_column(
+        TIMESTAMP(True, 6)
+    )
     workspace: Mapped[Optional["Workspace"]] = relationship(
         "Workspace", back_populates="repository_to_monitor"
     )
@@ -717,6 +967,35 @@ class TeamRepositoryPermission(Base):
     )
     team: Mapped["Team"] = relationship(
         "Team", back_populates="team_repository_permission"
+    )
+
+
+class GitCommitFileChange(Base):
+    __tablename__ = "git_commit_file_change"
+    __table_args__ = (
+        ForeignKeyConstraint(
+            ["commit_sha"], ["git_commit.sha"], name="fk_commit_file_change_commit"
+        ),
+        PrimaryKeyConstraint("id", name="git_commit_file_changePK"),
+        Index("idx_git_commit_file_change_commit", "commit_sha"),
+    )
+    id: Mapped[int] = mapped_column(
+        BigInteger,
+        Identity(
+            start=1,
+            increment=1,
+            minvalue=1,
+            maxvalue=9223372036854775807,
+            cycle=False,
+            cache=1,
+        ),
+        primary_key=True,
+    )
+    change_type: Mapped[str] = mapped_column(String(16))
+    path: Mapped[str] = mapped_column(String(4096))
+    commit_sha: Mapped[str] = mapped_column(String(40))
+    git_commit: Mapped["GitCommit"] = relationship(
+        "GitCommit", back_populates="git_commit_file_change"
     )
 
 

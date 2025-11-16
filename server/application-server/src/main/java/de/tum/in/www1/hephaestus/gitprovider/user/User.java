@@ -1,6 +1,8 @@
 package de.tum.in.www1.hephaestus.gitprovider.user;
 
 import de.tum.in.www1.hephaestus.gitprovider.common.BaseGitServiceEntity;
+import de.tum.in.www1.hephaestus.gitprovider.discussion.Discussion;
+import de.tum.in.www1.hephaestus.gitprovider.discussioncomment.DiscussionComment;
 import de.tum.in.www1.hephaestus.gitprovider.issue.Issue;
 import de.tum.in.www1.hephaestus.gitprovider.issuecomment.IssueComment;
 import de.tum.in.www1.hephaestus.gitprovider.pullrequest.PullRequest;
@@ -83,6 +85,18 @@ public class User extends BaseGitServiceEntity {
     @OneToMany(mappedBy = "author")
     @ToString.Exclude
     private Set<IssueComment> issueComments = new HashSet<>();
+
+    @OneToMany(mappedBy = "author")
+    @ToString.Exclude
+    private Set<Discussion> createdDiscussions = new HashSet<>();
+
+    @OneToMany(mappedBy = "answerChosenBy")
+    @ToString.Exclude
+    private Set<Discussion> acceptedDiscussionAnswers = new HashSet<>();
+
+    @OneToMany(mappedBy = "author")
+    @ToString.Exclude
+    private Set<DiscussionComment> discussionComments = new HashSet<>();
 
     @OneToMany(mappedBy = "mergedBy")
     @ToString.Exclude

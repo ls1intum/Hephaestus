@@ -57,6 +57,50 @@ erDiagram
         BIGINT user_id FK
     }
 
+    Discussion {
+        BIGINT id PK
+        TIMESTAMPTZ created_at
+        TIMESTAMPTZ updated_at
+        VARCHAR(64) active_lock_reason
+        TIMESTAMPTZ answer_chosen_at
+        VARCHAR(32) author_association
+        TEXT body
+        TEXT html_url
+        INTEGER comment_count
+        TIMESTAMPTZ last_sync_at
+        BOOLEAN locked "NOT NULL"
+        INTEGER number UK "NOT NULL"
+        VARCHAR(32) state "NOT NULL"
+        VARCHAR(256) title "NOT NULL"
+        BIGINT answer_author_id FK
+        BIGINT answer_comment_id FK,UK
+        BIGINT author_id FK
+        BIGINT category_id FK
+        BIGINT repository_id FK,UK "NOT NULL"
+    }
+
+    DiscussionCategory {
+        BIGINT id PK
+        VARCHAR(128) name "NOT NULL"
+        VARCHAR(128) slug UK "NOT NULL"
+        VARCHAR(64) emoji
+        TEXT description
+        BOOLEAN answerable "NOT NULL"
+        BIGINT repository_id FK,UK "NOT NULL"
+    }
+
+    DiscussionComment {
+        BIGINT id PK
+        TIMESTAMPTZ created_at
+        TIMESTAMPTZ updated_at
+        VARCHAR(32) author_association "NOT NULL"
+        TEXT body "NOT NULL"
+        TIMESTAMPTZ last_sync_at
+        BIGINT parent_comment_id FK
+        BIGINT author_id FK
+        BIGINT discussion_id FK "NOT NULL"
+    }
+
     Document {
         UUID id PK
         INTEGER version_number PK
@@ -65,6 +109,38 @@ erDiagram
         VARCHAR(255) kind "NOT NULL"
         VARCHAR(255) title "NOT NULL"
         BIGINT user_id FK "NOT NULL"
+    }
+
+    GitCommit {
+        VARCHAR(40) sha PK
+        TEXT message
+        TIMESTAMPTZ authored_at
+        TIMESTAMPTZ committed_at
+        BOOLEAN is_distinct "NOT NULL"
+        BOOLEAN head_commit "NOT NULL"
+        VARCHAR(512) ref_name
+        VARCHAR(255) pusher_name
+        VARCHAR(320) pusher_email
+        VARCHAR(255) author_name
+        VARCHAR(320) author_email
+        VARCHAR(64) author_login
+        VARCHAR(255) committer_name
+        VARCHAR(320) committer_email
+        VARCHAR(64) committer_login
+        BIGINT author_id FK
+        BIGINT committer_id FK
+        INTEGER additions
+        INTEGER deletions
+        INTEGER total_changes
+        TIMESTAMPTZ last_synced_at
+        BIGINT repository_id FK "NOT NULL"
+    }
+
+    GitCommitFileChange {
+        BIGINT id PK
+        VARCHAR(16) change_type "NOT NULL"
+        VARCHAR(4096) path "NOT NULL"
+        VARCHAR(40) commit_sha FK "NOT NULL"
     }
 
     Issue {
@@ -281,6 +357,8 @@ erDiagram
         VARCHAR(255) name_with_owner
         TIMESTAMP repository_synced_at
         BIGINT workspace_id FK
+        TIMESTAMPTZ commits_synced_at
+        TIMESTAMPTZ discussions_synced_at
     }
 
     Team {
@@ -352,6 +430,9 @@ erDiagram
     %% One-to-One relationships
     ChatMessage ||--|| ChatMessagePart : has
     ChatMessage ||--|| ChatThread : references
+    DiscussionComment ||--|| Discussion : references
+    Repository ||--|| Discussion : has
+    Repository ||--|| DiscussionCategory : has
     PullRequestReviewComment ||--|| PullRequestReviewThread : reviewed
     Organization ||--|| Workspace : has
 
@@ -361,7 +442,17 @@ erDiagram
     ChatMessage ||--o{ ChatMessage : references
     ChatThread ||--o{ ChatMessage : has
     User ||--o{ ChatThread : has
+    User ||--o{ Discussion : authored_by
+    User ||--o{ Discussion : authored_by
+    DiscussionCategory ||--o{ Discussion : has
+    User ||--o{ DiscussionComment : commented_on
+    Discussion ||--o{ DiscussionComment : commented_on
+    DiscussionComment ||--o{ DiscussionComment : commented_on
     User ||--o{ Document : has
+    User ||--o{ GitCommit : authored_by
+    User ||--o{ GitCommit : references
+    Repository ||--o{ GitCommit : has
+    GitCommit ||--o{ GitCommitFileChange : references
     User ||--o{ Issue : authored_by
     User ||--o{ Issue : merged_by
     Milestone ||--o{ Issue : has

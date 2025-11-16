@@ -1,6 +1,9 @@
 package de.tum.in.www1.hephaestus.gitprovider.repository;
 
+import de.tum.in.www1.hephaestus.gitprovider.commit.GitCommit;
 import de.tum.in.www1.hephaestus.gitprovider.common.BaseGitServiceEntity;
+import de.tum.in.www1.hephaestus.gitprovider.discussion.Discussion;
+import de.tum.in.www1.hephaestus.gitprovider.discussion.DiscussionCategory;
 import de.tum.in.www1.hephaestus.gitprovider.issue.Issue;
 import de.tum.in.www1.hephaestus.gitprovider.label.Label;
 import de.tum.in.www1.hephaestus.gitprovider.milestone.Milestone;
@@ -85,6 +88,18 @@ public class Repository extends BaseGitServiceEntity {
 
     @OneToMany(mappedBy = "repository", cascade = CascadeType.REMOVE, orphanRemoval = true)
     @ToString.Exclude
+    private Set<Discussion> discussions = new HashSet<>();
+
+    @OneToMany(mappedBy = "repository", cascade = CascadeType.REMOVE, orphanRemoval = true)
+    @ToString.Exclude
+    private Set<DiscussionCategory> discussionCategories = new HashSet<>();
+
+    @OneToMany(mappedBy = "repository", cascade = CascadeType.REMOVE, orphanRemoval = true)
+    @ToString.Exclude
+    private Set<GitCommit> commits = new HashSet<>();
+
+    @OneToMany(mappedBy = "repository", cascade = CascadeType.REMOVE, orphanRemoval = true)
+    @ToString.Exclude
     private Set<Label> labels = new HashSet<>();
 
     @OneToMany(mappedBy = "repository", cascade = CascadeType.REMOVE, orphanRemoval = true)
@@ -106,12 +121,12 @@ public class Repository extends BaseGitServiceEntity {
         UNKNOWN,
     }
     /*
-     * Webhook coverage (repository & member events → repository):
+     * Webhook coverage (repository & member events -> repository):
      * Supported (webhook, no extra fetch):
      * - repository.id/full_name/name/html_url/private/visibility/description/homepage.
      * - repository.pushed_at/default_branch/stargazers_count/watchers_count.
      * - repository.archived/disabled/has_issues/has_projects/has_wiki.
-     * - repository.owner (type=Organization) → linked via organization relation when payload.owner.type == "Organization".
+     * - repository.owner (type=Organization) -> linked via organization relation when payload.owner.type == "Organization".
      * - Relationships populated by dedicated handlers: collaborators (RepositoryCollaborator) and teamRepoPermissions.
      * Ignored although hub4j exposes them from payloads:
      * - repository.has_discussions/has_downloads/has_pages/topics/size/fork/forks_count/open_issues_count/subscribers_count/network_count.
@@ -119,7 +134,7 @@ public class Repository extends BaseGitServiceEntity {
      * - repository.allow_* merge toggles, template_repository, parent/source fork lineage (handled separately if required).
      * - repository.owner when type == "User" (we scope ETL to organization-owned workspaces).
      * Desired but missing in hub4j/github-api 2.0-rc.5 (available via REST/GraphQL):
-     * - REST GET /repos/{owner}/{repo} → security_and_analysis, custom_properties, rulesets[].
+     * - REST GET /repos/{owner}/{repo} -> security_and_analysis, custom_properties, rulesets[].
      * - GraphQL Repository.rulesets, Repository.codeScanningAlerts, Repository.latestRelease, Repository.branchProtectionRules.
      * Requires extra fetch (out-of-scope for now):
      * - GET /repos/{owner}/{repo}/topics, /languages, /collaborators/{username}/permission for fine-grained permissions.

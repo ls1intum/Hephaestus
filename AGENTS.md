@@ -10,6 +10,14 @@ This file governs the entire repository. Combine these guardrails with the scope
 - `server/webhook-ingest/`: FastAPI webhook intake that forwards events into NATS JetStream.
 - `docs/`: Contributor docs (including the ERD that `db:generate-erd-docs` regenerates).
 
+### GitHub API extensions
+
+- When hub4j (`org.kohsuke:github-api`) is missing an endpoint, extend it locally under
+  `server/application-server/src/main/java/org/kohsuke/github/**`. These classes sit in the
+  same package as the dependency, so they can reuse package-private helpers like
+  `GHRepository#getApiTailUrl`. Reach for the dedicated `github-api/` workspace when the change
+  is generic enough to upstream, otherwise keep the shim local and document the behavior here.
+
 ## 2. Toolchain & environment prerequisites
 
 - **Node.js**: Use the exact version from `.node-version` (currently 22.10.0). Stick with npm—the repo maintains `package-lock.json` and uses npm workspaces.
@@ -54,10 +62,12 @@ Regeneration is destructive; stash local edits before running these commands. Ch
 ## 5. Database workflow (Liquibase)
 
 - Liquibase changelog files live under `server/application-server/src/main/resources/db/changelog/` and are included via `master.xml`.
-- Use `npm run db:draft-changelog` after changing JPA entities. The script will:
-  1. Spin up PostgreSQL through Docker (ensure Docker is running or set `CI=true` with a ready Postgres).
-  2. Snapshot the schema, run Liquibase diff, and create a timestamped changelog file.
-  3. Tear down the temporary container.
+- **Always** generate migrations via `npm run db:draft-changelog` (wrapper around `scripts/db-utils.sh draft-changelog`). Do **not** copy/paste or handwrite XML. The expected loop is:
+  1. Apply your entity changes (JPA annotations, repositories, etc.) and ensure they compile.
+  2. From the repo root, run `npm run db:draft-changelog`. The helper spins up Dockerized Postgres, snapshots the schema, performs a Liquibase diff, emits a timestamped changelog file, then tears the container down.
+  3. Open the generated changelog, delete any noise, and retain only the statements that reflect your actual entity changes.
+  4. Rename/keep the timestamped filename, then add a corresponding `<include>` entry in `db/master.xml` so Liquibase picks the file up in order.
+  5. Execute `npm run db:generate-erd-docs` and `npm run db:generate-models:intelligence-service` if the schema change affects documentation or the intelligence-service ORM models.
 - Trim the generated changelog to only the real schema deltas (e.g., new columns). Never commit the raw diff wholesale—prune back to the minimal change set before renaming it into `db/changelog/`.
 - After drafting a changelog, run `npm run db:generate-erd-docs` and `npm run db:generate-models:intelligence-service` to keep ERD docs and SQLAlchemy models in sync.
 - Never manually edit generated Liquibase diff sections unless you fully understand the implications. Prefer creating a follow-up changelog to fix mistakes.

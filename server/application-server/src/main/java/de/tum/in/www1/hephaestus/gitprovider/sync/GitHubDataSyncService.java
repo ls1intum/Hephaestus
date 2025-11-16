@@ -1,6 +1,8 @@
 package de.tum.in.www1.hephaestus.gitprovider.sync;
 
+import de.tum.in.www1.hephaestus.gitprovider.commit.github.GitHubCommitSyncService;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubClientProvider;
+import de.tum.in.www1.hephaestus.gitprovider.discussion.github.GitHubDiscussionSyncService;
 import de.tum.in.www1.hephaestus.gitprovider.issue.Issue;
 import de.tum.in.www1.hephaestus.gitprovider.issue.IssueRepository;
 import de.tum.in.www1.hephaestus.gitprovider.issue.github.GitHubIssueSyncService;
@@ -103,6 +105,12 @@ public class GitHubDataSyncService {
     @Autowired
     private PullRequestRepository pullRequestRepository;
 
+    @Autowired
+    private GitHubCommitSyncService commitSyncService;
+
+    @Autowired
+    private GitHubDiscussionSyncService discussionSyncService;
+
     /**
      * Syncs all existing users in the database with their GitHub data
      */
@@ -159,9 +167,21 @@ public class GitHubDataSyncService {
         boolean shouldSyncIssuesAndPullRequests =
             repositoryToMonitor.getIssuesAndPullRequestsSyncedAt() == null ||
             repositoryToMonitor.getIssuesAndPullRequestsSyncedAt().isBefore(cooldownTime);
+        boolean shouldSyncCommits =
+            repositoryToMonitor.getCommitsSyncedAt() == null ||
+            repositoryToMonitor.getCommitsSyncedAt().isBefore(cooldownTime);
+        boolean shouldSyncDiscussions =
+            repositoryToMonitor.getDiscussionsSyncedAt() == null ||
+            repositoryToMonitor.getDiscussionsSyncedAt().isBefore(cooldownTime);
 
         // Sync repository is required if any of the following is true
-        if (shouldSyncLabels || shouldSyncMilestones || shouldSyncIssuesAndPullRequests) {
+        if (
+            shouldSyncLabels ||
+            shouldSyncMilestones ||
+            shouldSyncIssuesAndPullRequests ||
+            shouldSyncCommits ||
+            shouldSyncDiscussions
+        ) {
             shouldSyncRepository = true;
         }
 
@@ -194,6 +214,14 @@ public class GitHubDataSyncService {
             logger.info(repositoryToMonitor.getNameWithOwner() + " - Syncing recent issues and pull requests...");
             syncRepositoryRecentIssuesAndPullRequests(ghRepository, repositoryToMonitor);
         }
+        if (shouldSyncCommits) {
+            logger.info(repositoryToMonitor.getNameWithOwner() + " - Syncing recent commits...");
+            syncRepositoryCommits(ghRepository, repositoryToMonitor);
+        }
+        if (shouldSyncDiscussions) {
+            logger.info(repositoryToMonitor.getNameWithOwner() + " - Syncing recent discussions...");
+            syncRepositoryDiscussions(ghRepository, repositoryToMonitor);
+        }
 
         // TODO: Re-enable once it works without exceptions
         //
@@ -202,6 +230,34 @@ public class GitHubDataSyncService {
         //     syncAllPastIssuesAndPullRequests(ghRepository, repositoryToMonitor);
         // }
         logger.info(repositoryToMonitor.getNameWithOwner() + " - Data sync completed.");
+    }
+
+    private void syncRepositoryCommits(GHRepository repository, RepositoryToMonitor repositoryToMonitor) {
+        var cutoffDate = Instant.now().minusSeconds(timeframe * 24L * 60L * 60L);
+        var commitsSyncedAt = repositoryToMonitor.getCommitsSyncedAt();
+        if (commitsSyncedAt != null && commitsSyncedAt.isAfter(cutoffDate)) {
+            cutoffDate = commitsSyncedAt;
+        }
+
+        commitSyncService.syncRecentCommits(repository, cutoffDate);
+        repositoryToMonitor.setCommitsSyncedAt(Instant.now());
+        repositoryToMonitorRepository.save(repositoryToMonitor);
+    }
+
+    private void syncRepositoryDiscussions(GHRepository repository, RepositoryToMonitor repositoryToMonitor) {
+        if (repository == null) {
+            return;
+        }
+
+        var cutoffDate = Instant.now().minusSeconds(timeframe * 24L * 60L * 60L);
+        var discussionsSyncedAt = repositoryToMonitor.getDiscussionsSyncedAt();
+        if (discussionsSyncedAt != null && discussionsSyncedAt.isAfter(cutoffDate)) {
+            cutoffDate = discussionsSyncedAt;
+        }
+
+        var syncedUpTo = discussionSyncService.syncRecentDiscussions(repository, cutoffDate);
+        repositoryToMonitor.setDiscussionsSyncedAt(syncedUpTo);
+        repositoryToMonitorRepository.save(repositoryToMonitor);
     }
 
     private Optional<GHRepository> syncRepository(RepositoryToMonitor repositoryToMonitor) {
@@ -366,6 +422,7 @@ public class GitHubDataSyncService {
      * @param repository the GitHub repository to sync
      */
     //TODO: Method never used
+    @SuppressWarnings("unused")
     private void syncAllPastIssuesAndPullRequests(GHRepository repository) {
         int lastIssueNumber = issueRepository.findLastIssueNumber(repository.getId()).orElse(0);
         if (lastIssueNumber == 0) {
