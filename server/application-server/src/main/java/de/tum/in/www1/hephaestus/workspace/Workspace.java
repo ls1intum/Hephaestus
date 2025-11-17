@@ -111,7 +111,7 @@ public class Workspace {
     private String leaderboardScheduleTime; // Format: "HH:mm"
 
     @Column(name = "leaderboard_notification_enabled")
-    private Boolean leaderboardNotificationEnabled;
+    private Boolean leaderboardNotificationEnabled = false;
 
     @Column(name = "leaderboard_notification_team", length = 100)
     private String leaderboardNotificationTeam;

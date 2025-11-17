@@ -749,134 +749,6 @@ paths:
           description: OK
       tags:
       - workspace
-  /workspaces/league/reset:
-    put:
-      operationId: resetAndRecalculateLeagues
-      responses:
-        "200":
-          description: OK
-      tags:
-      - workspace
-  /workspaces/repositories:
-    get:
-      operationId: getRepositoriesToMonitor
-      responses:
-        "200":
-          content:
-            application/json:
-              schema:
-                type: array
-                items:
-                  type: string
-          description: OK
-      tags:
-      - workspace
-  /workspaces/repositories/{owner}/{name}:
-    delete:
-      operationId: removeRepositoryToMonitor
-      parameters:
-      - in: path
-        name: owner
-        required: true
-        schema:
-          type: string
-      - in: path
-        name: name
-        required: true
-        schema:
-          type: string
-      responses:
-        "200":
-          description: OK
-      tags:
-      - workspace
-    post:
-      operationId: addRepositoryToMonitor
-      parameters:
-      - in: path
-        name: owner
-        required: true
-        schema:
-          type: string
-      - in: path
-        name: name
-        required: true
-        schema:
-          type: string
-      responses:
-        "200":
-          description: OK
-      tags:
-      - workspace
-  /workspaces/team/{teamId}/label/{labelId}:
-    delete:
-      operationId: removeLabelFromTeam
-      parameters:
-      - in: path
-        name: teamId
-        required: true
-        schema:
-          type: integer
-          format: int64
-      - in: path
-        name: labelId
-        required: true
-        schema:
-          type: integer
-          format: int64
-      responses:
-        "200":
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/TeamInfo"
-          description: OK
-      tags:
-      - workspace
-  /workspaces/team/{teamId}/label/{repositoryId}/{label}:
-    post:
-      operationId: addLabelToTeam
-      parameters:
-      - in: path
-        name: teamId
-        required: true
-        schema:
-          type: integer
-          format: int64
-      - in: path
-        name: repositoryId
-        required: true
-        schema:
-          type: integer
-          format: int64
-      - in: path
-        name: label
-        required: true
-        schema:
-          type: string
-      responses:
-        "200":
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/TeamInfo"
-          description: OK
-      tags:
-      - workspace
-  /workspaces/users:
-    get:
-      operationId: getUsersWithTeams
-      responses:
-        "200":
-          content:
-            application/json:
-              schema:
-                type: array
-                items:
-                  $ref: "#/components/schemas/UserTeams"
-          description: OK
-      tags:
-      - workspace
   /workspaces/{slug}:
     delete:
       operationId: purgeWorkspace
@@ -897,6 +769,24 @@ paths:
       - workspace
     get:
       operationId: getWorkspace
+      parameters:
+      - in: path
+        name: slug
+        required: true
+        schema:
+          type: string
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                type: object
+          description: OK
+      tags:
+      - workspace
+  /workspaces/{slug}/league/reset:
+    put:
+      operationId: resetLeague
       parameters:
       - in: path
         name: slug
@@ -951,6 +841,81 @@ paths:
             schema:
               $ref: "#/components/schemas/UpdateWorkspacePublicVisibilityRequest"
         required: true
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                type: object
+          description: OK
+      tags:
+      - workspace
+  /workspaces/{slug}/repositories:
+    get:
+      operationId: getRepositories
+      parameters:
+      - in: path
+        name: slug
+        required: true
+        schema:
+          type: string
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: string
+          description: OK
+      tags:
+      - workspace
+  /workspaces/{slug}/repositories/{owner}/{name}:
+    delete:
+      operationId: removeRepository
+      parameters:
+      - in: path
+        name: slug
+        required: true
+        schema:
+          type: string
+      - in: path
+        name: owner
+        required: true
+        schema:
+          type: string
+      - in: path
+        name: name
+        required: true
+        schema:
+          type: string
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                type: object
+          description: OK
+      tags:
+      - workspace
+    post:
+      operationId: addRepository
+      parameters:
+      - in: path
+        name: slug
+        required: true
+        schema:
+          type: string
+      - in: path
+        name: owner
+        required: true
+        schema:
+          type: string
+      - in: path
+        name: name
+        required: true
+        schema:
+          type: string
       responses:
         "200":
           content:
@@ -1044,6 +1009,71 @@ paths:
           description: OK
       tags:
       - workspace
+  /workspaces/{slug}/teams/{teamId}/labels/{labelId}:
+    delete:
+      operationId: removeLabelFromTeam
+      parameters:
+      - in: path
+        name: slug
+        required: true
+        schema:
+          type: string
+      - in: path
+        name: teamId
+        required: true
+        schema:
+          type: integer
+          format: int64
+      - in: path
+        name: labelId
+        required: true
+        schema:
+          type: integer
+          format: int64
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                type: object
+          description: OK
+      tags:
+      - workspace
+  /workspaces/{slug}/teams/{teamId}/labels/{repositoryId}/{label}:
+    post:
+      operationId: addLabelToTeam
+      parameters:
+      - in: path
+        name: slug
+        required: true
+        schema:
+          type: string
+      - in: path
+        name: teamId
+        required: true
+        schema:
+          type: integer
+          format: int64
+      - in: path
+        name: repositoryId
+        required: true
+        schema:
+          type: integer
+          format: int64
+      - in: path
+        name: label
+        required: true
+        schema:
+          type: string
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                type: object
+          description: OK
+      tags:
+      - workspace
   /workspaces/{slug}/token:
     patch:
       operationId: updateToken
@@ -1065,6 +1095,26 @@ paths:
             application/json:
               schema:
                 type: object
+          description: OK
+      tags:
+      - workspace
+  /workspaces/{slug}/users:
+    get:
+      operationId: getUsers
+      parameters:
+      - in: path
+        name: slug
+        required: true
+        schema:
+          type: string
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/UserTeams"
           description: OK
       tags:
       - workspace
@@ -3101,16 +3151,19 @@ components:
           anyOf:
           - type: integer
           - type: "null"
+          default: null
           title: Interval
         temperature_2m:
           anyOf:
           - type: number
           - type: "null"
+          default: null
           title: Temperature 2M
         time:
           anyOf:
           - type: string
           - type: "null"
+          default: null
           title: Time
       title: WeatherCurrent
     WeatherCurrentUnits:
@@ -3120,11 +3173,13 @@ components:
           anyOf:
           - type: string
           - type: "null"
+          default: null
           title: Interval
         temperature_2m:
           anyOf:
           - type: string
           - type: "null"
+          default: null
           title: Temperature 2M
         time:
           anyOf:
@@ -3161,11 +3216,13 @@ components:
           anyOf:
           - type: string
           - type: "null"
+          default: null
           title: Sunrise
         sunset:
           anyOf:
           - type: string
           - type: "null"
+          default: null
           title: Sunset
         time:
           anyOf:
