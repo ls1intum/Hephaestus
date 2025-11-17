@@ -2,6 +2,7 @@ package de.tum.in.www1.hephaestus.config;
 
 import jakarta.annotation.PostConstruct;
 import java.lang.instrument.Instrumentation;
+import java.time.Instant;
 import net.bytebuddy.agent.ByteBuddyAgent;
 import net.bytebuddy.agent.builder.AgentBuilder;
 import net.bytebuddy.asm.Advice;
@@ -51,6 +52,7 @@ public class GitHubApiPatches {
 
         patchGetUser(instrumentation, "org.kohsuke.github.GHPullRequestReview");
         patchGetUser(instrumentation, "org.kohsuke.github.GHPullRequestReviewComment");
+        patchParseInstant(instrumentation);
     }
 
     private static void patchGetUser(Instrumentation instrumentation, String className) {
@@ -64,6 +66,32 @@ public class GitHubApiPatches {
             )
             .installOn(instrumentation);
 
+        retransformClass(instrumentation, className);
+        logger.info("Patched {}#getUser via Byte Buddy", className);
+    }
+
+    private static void patchParseInstant(Instrumentation instrumentation) {
+        new AgentBuilder.Default()
+            .disableClassFormatChanges()
+            .with(AgentBuilder.RedefinitionStrategy.RETRANSFORMATION)
+            .ignore(ElementMatchers.none())
+            .type(ElementMatchers.named("org.kohsuke.github.GitHubClient"))
+            .transform((builder, typeDescription, classLoader, module, protectionDomain) ->
+                builder.visit(
+                    Advice.to(ParseInstantAdvice.class).on(
+                        ElementMatchers.named("parseInstant")
+                            .and(ElementMatchers.takesArguments(String.class))
+                            .and(ElementMatchers.isStatic())
+                    )
+                )
+            )
+            .installOn(instrumentation);
+
+        retransformClass(instrumentation, "org.kohsuke.github.GitHubClient");
+        logger.info("Patched org.kohsuke.github.GitHubClient#parseInstant via Byte Buddy");
+    }
+
+    private static void retransformClass(Instrumentation instrumentation, String className) {
         if (instrumentation.isRetransformClassesSupported()) {
             try {
                 Class<?> targetClass = Class.forName(className, false, GitHubApiPatches.class.getClassLoader());
@@ -76,8 +104,6 @@ public class GitHubApiPatches {
                 logger.warn("Instrumentation cannot retransform {}: {}", className, ex.getMessage());
             }
         }
-
-        logger.info("Patched {}#getUser via Byte Buddy", className);
     }
 
     /**
@@ -132,6 +158,54 @@ public class GitHubApiPatches {
             if (resolved != null) {
                 returnValue = resolved;
                 throwable = null;
+            }
+        }
+    }
+
+    /**
+     * Advice to normalize GitHub timestamps that occasionally arrive as epoch integers instead of ISO strings.
+     */
+    public static class ParseInstantAdvice {
+
+        @Advice.OnMethodEnter(skipOn = Advice.OnNonDefaultValue.class)
+        public static Instant enter(@Advice.Argument(0) String timestamp) {
+            return tryParseEpochTimestamp(timestamp);
+        }
+
+        @Advice.OnMethodExit(onThrowable = Throwable.class)
+        public static void exit(
+            @Advice.Enter Instant parsed,
+            @Advice.Return(readOnly = false) Instant returnValue,
+            @Advice.Thrown(readOnly = false) Throwable throwable
+        ) {
+            if (parsed != null) {
+                returnValue = parsed;
+                throwable = null;
+            }
+        }
+
+        public static Instant tryParseEpochTimestamp(String timestamp) {
+            if (timestamp == null) {
+                return null;
+            }
+            String trimmed = timestamp.trim();
+            if (trimmed.isEmpty()) {
+                return null;
+            }
+            int start = trimmed.startsWith("-") || trimmed.startsWith("+") ? 1 : 0;
+            for (int i = start; i < trimmed.length(); i++) {
+                if (!Character.isDigit(trimmed.charAt(i))) {
+                    return null;
+                }
+            }
+            try {
+                long epochValue = Long.parseLong(trimmed);
+                if (Math.abs(epochValue) >= 1_000_000_000_000L) {
+                    return Instant.ofEpochMilli(epochValue);
+                }
+                return Instant.ofEpochSecond(epochValue);
+            } catch (NumberFormatException ignored) {
+                return null;
             }
         }
     }

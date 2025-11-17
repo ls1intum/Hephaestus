@@ -32,6 +32,8 @@ public class RepositoryToMonitor {
     private Instant repositorySyncedAt;
     private Instant labelsSyncedAt;
     private Instant milestonesSyncedAt;
+    private Instant commitsSyncedAt;
+    private Instant discussionsSyncedAt;
 
     // The time up to which issues and pull requests have been synced in the recent sync
     private Instant issuesAndPullRequestsSyncedAt;

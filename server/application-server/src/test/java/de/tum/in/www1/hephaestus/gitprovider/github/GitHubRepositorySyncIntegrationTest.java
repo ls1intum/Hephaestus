@@ -2,6 +2,10 @@ package de.tum.in.www1.hephaestus.gitprovider.github;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import de.tum.in.www1.hephaestus.gitprovider.commit.GitCommitFileChange;
+import de.tum.in.www1.hephaestus.gitprovider.commit.GitCommitRepository;
+import de.tum.in.www1.hephaestus.gitprovider.discussion.DiscussionRepository;
+import de.tum.in.www1.hephaestus.gitprovider.discussioncomment.DiscussionCommentRepository;
 import de.tum.in.www1.hephaestus.gitprovider.issue.IssueRepository;
 import de.tum.in.www1.hephaestus.gitprovider.issuecomment.IssueCommentRepository;
 import de.tum.in.www1.hephaestus.gitprovider.label.LabelRepository;
@@ -22,9 +26,13 @@ import java.util.stream.Collectors;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.Test;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 
 class GitHubRepositorySyncIntegrationTest extends AbstractGitHubSyncIntegrationTest {
+
+    private static final Logger logger = LoggerFactory.getLogger(GitHubRepositorySyncIntegrationTest.class);
 
     @Autowired
     private GitHubDataSyncService dataSyncService;
@@ -61,6 +69,15 @@ class GitHubRepositorySyncIntegrationTest extends AbstractGitHubSyncIntegrationT
 
     @Autowired
     private TeamRepositoryPermissionRepository teamRepositoryPermissionRepository;
+
+    @Autowired
+    private GitCommitRepository gitCommitRepository;
+
+    @Autowired
+    private DiscussionRepository discussionRepository;
+
+    @Autowired
+    private DiscussionCommentRepository discussionCommentRepository;
 
     private CreatedTeam createdTeam;
     private String integrationLabelName;
@@ -108,6 +125,8 @@ class GitHubRepositorySyncIntegrationTest extends AbstractGitHubSyncIntegrationT
 
         var createdIssue = createIssueWithComment(ghRepository);
         var pullRequestArtifacts = createPullRequestWithReview(ghRepository);
+        var createdCommit = createDefaultBranchCommit(ghRepository);
+        var discussionArtifacts = createRepositoryDiscussionWithComment(ghRepository);
 
         var repositoryToMonitor = registerRepositoryToMonitor(ghRepository);
         dataSyncService.syncRepositoryToMonitor(repositoryToMonitor);
@@ -119,6 +138,8 @@ class GitHubRepositorySyncIntegrationTest extends AbstractGitHubSyncIntegrationT
         assertThat(refreshedMonitor.getLabelsSyncedAt()).as("label sync timestamp").isNotNull();
         assertThat(refreshedMonitor.getMilestonesSyncedAt()).as("milestone sync timestamp").isNotNull();
         assertThat(refreshedMonitor.getIssuesAndPullRequestsSyncedAt()).as("issue sync timestamp").isNotNull();
+        assertThat(refreshedMonitor.getCommitsSyncedAt()).as("commit sync timestamp").isNotNull();
+        assertThat(refreshedMonitor.getDiscussionsSyncedAt()).as("discussion sync timestamp").isNotNull();
 
         var storedRepository = repositoryRepository.findById(ghRepository.getId()).orElseThrow();
         assertThat(storedRepository.getNameWithOwner()).isEqualTo(ghRepository.getFullName());
@@ -163,6 +184,33 @@ class GitHubRepositorySyncIntegrationTest extends AbstractGitHubSyncIntegrationT
             .orElseThrow();
         assertThat(storedMilestone.getTitle()).isEqualTo(integrationMilestoneTitle);
         assertThat(storedMilestone.getState()).isEqualTo(Milestone.State.OPEN);
+
+        var storedCommit = gitCommitRepository.findWithFileChangesBySha(createdCommit.sha()).orElseThrow();
+        assertThat(storedCommit.getRepository()).isNotNull();
+        assertThat(storedCommit.getRepository().getId()).isEqualTo(ghRepository.getId());
+        assertThat(storedCommit.getMessage()).isEqualTo(createdCommit.message());
+        assertThat(storedCommit.getFileChanges())
+            .extracting(GitCommitFileChange::getPath)
+            .contains(createdCommit.path());
+
+        discussionArtifacts.ifPresentOrElse(
+            artifacts -> {
+                var storedDiscussion = discussionRepository.findById(artifacts.discussionId()).orElseThrow();
+                assertThat(storedDiscussion.getTitle()).isEqualTo(artifacts.discussionTitle());
+                assertThat(storedDiscussion.getBody()).contains(artifacts.discussionBody());
+                assertThat(storedDiscussion.getRepository()).isNotNull();
+                assertThat(storedDiscussion.getRepository().getId()).isEqualTo(ghRepository.getId());
+
+                var storedDiscussionComment = discussionCommentRepository.findById(artifacts.commentId()).orElseThrow();
+                assertThat(storedDiscussionComment.getBody()).isEqualTo(artifacts.commentBody());
+                assertThat(storedDiscussionComment.getDiscussion().getId()).isEqualTo(artifacts.discussionId());
+            },
+            () ->
+                logger.warn(
+                    "Repository {} cannot create discussions with the current GitHub App permissions; skipping discussion assertions.",
+                    ghRepository.getFullName()
+                )
+        );
 
         var storedCollaborator = repositoryCollaboratorRepository
             .findByRepositoryIdAndUserId(ghRepository.getId(), collaboratorUserId)

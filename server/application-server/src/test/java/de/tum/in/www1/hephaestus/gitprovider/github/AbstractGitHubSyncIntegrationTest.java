@@ -11,6 +11,7 @@ import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
@@ -23,6 +24,7 @@ import org.kohsuke.github.GHPullRequestReview;
 import org.kohsuke.github.GHPullRequestReviewComment;
 import org.kohsuke.github.GHPullRequestReviewEvent;
 import org.kohsuke.github.GHRepository;
+import org.kohsuke.github.GHRepositoryDiscussionsSupport;
 import org.kohsuke.github.GHTeam;
 import org.kohsuke.github.GHUser;
 import org.kohsuke.github.GitHub;
@@ -280,6 +282,78 @@ abstract class AbstractGitHubSyncIntegrationTest extends BaseGitHubIntegrationTe
         );
     }
 
+    protected CreatedCommit createDefaultBranchCommit(GHRepository repository)
+        throws IOException, InterruptedException {
+        String filePath = "integration/commit-" + nextEphemeralSlug("commit") + ".txt";
+        String commitMessage = "Add default branch seed " + filePath;
+        var response = repository
+            .createContent()
+            .path(filePath)
+            .message(commitMessage)
+            .content("integration-default-branch " + Instant.now())
+            .branch(repository.getDefaultBranch())
+            .commit();
+        String commitSha = response.getCommit().getSHA1();
+        awaitCondition("default branch commit availability", () -> {
+            try {
+                repository.getCommit(commitSha);
+                return true;
+            } catch (IOException ex) {
+                return false;
+            }
+        });
+        return new CreatedCommit(commitSha, filePath, commitMessage);
+    }
+
+    protected Optional<DiscussionArtifacts> createRepositoryDiscussionWithComment(GHRepository repository)
+        throws IOException, InterruptedException {
+        try {
+            GHRepositoryDiscussionsSupport.enableDiscussions(repository);
+        } catch (IOException enableError) {
+            logger.warn(
+                "Repository {} does not expose discussion APIs with the current credentials: {}",
+                repository.getFullName(),
+                enableError.getMessage()
+            );
+            return Optional.empty();
+        }
+
+        awaitCondition("repository discussions enabled", () -> {
+            try {
+                return !GHRepositoryDiscussionsSupport.listDiscussionCategories(repository).isEmpty();
+            } catch (IOException fetchError) {
+                return false;
+            }
+        });
+        var categories = GHRepositoryDiscussionsSupport.listDiscussionCategories(repository);
+        if (categories.isEmpty()) {
+            logger.warn("Repository {} does not report discussion categories", repository.getFullName());
+            return Optional.empty();
+        }
+
+        var category = categories.getFirst();
+        String title = "IT discussion " + nextEphemeralSlug("discussion");
+        String body = "Integration discussion body " + Instant.now();
+        var discussion = GHRepositoryDiscussionsSupport.createDiscussion(repository, title, body, category.getId());
+
+        String commentBody = "Discussion comment seed " + Instant.now();
+        var comment = GHRepositoryDiscussionsSupport.createDiscussionComment(
+            repository,
+            discussion.getNumber(),
+            commentBody
+        );
+        return Optional.of(
+            new DiscussionArtifacts(
+                discussion.getId(),
+                discussion.getNumber(),
+                title,
+                body,
+                comment.getId(),
+                commentBody
+            )
+        );
+    }
+
     protected void awaitCondition(String description, CheckedCondition condition) throws InterruptedException {
         Instant deadline = Instant.now().plus(Duration.ofSeconds(45));
         while (Instant.now().isBefore(deadline)) {
@@ -427,6 +501,17 @@ abstract class AbstractGitHubSyncIntegrationTest extends BaseGitHubIntegrationTe
         String reviewCommentPath,
         int reviewCommentLine,
         String commitSha
+    ) {}
+
+    protected record CreatedCommit(String sha, String path, String message) {}
+
+    protected record DiscussionArtifacts(
+        long discussionId,
+        int discussionNumber,
+        String discussionTitle,
+        String discussionBody,
+        long commentId,
+        String commentBody
     ) {}
 
     @FunctionalInterface
