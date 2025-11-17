@@ -183,9 +183,6 @@
             <column name="is_distinct" type="BOOLEAN" defaultValueBoolean="false">
                 <constraints nullable="false"/>
             </column>
-            <column name="head_commit" type="BOOLEAN" defaultValueBoolean="false">
-                <constraints nullable="false"/>
-            </column>
             <column name="ref_name" type="VARCHAR(512)"/>
             <column name="pusher_name" type="VARCHAR(255)"/>
             <column name="pusher_email" type="VARCHAR(320)"/>
@@ -200,7 +197,7 @@
             <column name="additions" type="INTEGER"/>
             <column name="deletions" type="INTEGER"/>
             <column name="total_changes" type="INTEGER"/>
-            <column name="last_synced_at" type="TIMESTAMP(6) WITH TIME ZONE"/>
+            <column name="last_sync_at" type="TIMESTAMP(6) WITH TIME ZONE"/>
             <column name="repository_id" type="BIGINT">
                 <constraints nullable="false"/>
             </column>
@@ -309,4 +306,51 @@
             <column name="created_at"/>
         </createIndex>
     </changeSet>
+
+    <changeSet author="github-copilot" id="1763350000000-enhance-git-commit">
+        <addColumn tableName="git_commit">
+            <column name="commit_url" type="TEXT"/>
+            <column name="compare_url" type="TEXT"/>
+            <column name="before_sha" type="VARCHAR(40)"/>
+            <column name="merge_commit" type="BOOLEAN" defaultValueBoolean="false">
+                <constraints nullable="false"/>
+            </column>
+        </addColumn>
+        <createIndex indexName="idx_git_commit_repo_committed" tableName="git_commit">
+            <column name="repository_id"/>
+            <column name="committed_at"/>
+        </createIndex>
+        <createIndex indexName="idx_git_commit_author_committed" tableName="git_commit">
+            <column name="author_id"/>
+            <column name="committed_at"/>
+        </createIndex>
+        <createIndex indexName="idx_git_commit_committer_committed" tableName="git_commit">
+            <column name="committer_id"/>
+            <column name="committed_at"/>
+        </createIndex>
+    </changeSet>
+
+    <changeSet author="github-copilot" id="1763350000000-enhance-git-commit-file-change">
+        <addColumn tableName="git_commit_file_change">
+            <column name="previous_path" type="VARCHAR(4096)"/>
+            <column name="additions" type="INTEGER"/>
+            <column name="deletions" type="INTEGER"/>
+            <column name="is_binary" type="BOOLEAN" defaultValueBoolean="false">
+                <constraints nullable="false"/>
+            </column>
+        </addColumn>
+        <createIndex indexName="idx_git_commit_file_change_path" tableName="git_commit_file_change">
+            <column name="path"/>
+        </createIndex>
+    </changeSet>
+
+    <changeSet author="github-copilot" id="1763350000000-git-commit-file-change-path-text">
+        <modifyDataType tableName="git_commit_file_change" columnName="path" newDataType="TEXT"/>
+        <modifyDataType tableName="git_commit_file_change" columnName="previous_path" newDataType="TEXT"/>
+    </changeSet>
+
+    <changeSet author="github-copilot" id="1763350000000-git-commit-file-change-path-not-null">
+        <addNotNullConstraint tableName="git_commit_file_change" columnName="path" columnDataType="TEXT"/>
+    </changeSet>
+
 </databaseChangeLog>

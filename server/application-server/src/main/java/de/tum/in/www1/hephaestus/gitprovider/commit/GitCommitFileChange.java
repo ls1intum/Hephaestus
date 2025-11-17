@@ -32,8 +32,18 @@ public class GitCommitFileChange {
     @Enumerated(EnumType.STRING)
     private ChangeType changeType;
 
-    @Column(length = 4096)
+    @Column(columnDefinition = "TEXT", nullable = false)
     private String path;
+
+    @Column(columnDefinition = "TEXT")
+    private String previousPath;
+
+    private Integer additions;
+
+    private Integer deletions;
+
+    @Column(name = "is_binary", nullable = false)
+    private boolean binary;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "commit_sha", nullable = false)
@@ -44,6 +54,8 @@ public class GitCommitFileChange {
         ADDED,
         MODIFIED,
         REMOVED,
+        RENAMED,
+        COPIED,
     }
     /*
      * Stored per-commit file deltas sourced from push payload arrays and GHCommit file stats.

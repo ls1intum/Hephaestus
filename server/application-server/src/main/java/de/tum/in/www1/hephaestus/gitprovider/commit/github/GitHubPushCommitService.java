@@ -6,6 +6,8 @@ import de.tum.in.www1.hephaestus.gitprovider.commit.GitCommitFileChange.ChangeTy
 import de.tum.in.www1.hephaestus.gitprovider.commit.GitCommitRepository;
 import de.tum.in.www1.hephaestus.gitprovider.repository.Repository;
 import de.tum.in.www1.hephaestus.gitprovider.repository.RepositoryRepository;
+import de.tum.in.www1.hephaestus.gitprovider.user.User;
+import de.tum.in.www1.hephaestus.gitprovider.user.UserRepository;
 import jakarta.transaction.Transactional;
 import java.time.Instant;
 import java.util.LinkedHashMap;
@@ -27,10 +29,16 @@ public class GitHubPushCommitService {
 
     private final GitCommitRepository commitRepository;
     private final RepositoryRepository repositoryRepository;
+    private final UserRepository userRepository;
 
-    public GitHubPushCommitService(GitCommitRepository commitRepository, RepositoryRepository repositoryRepository) {
+    public GitHubPushCommitService(
+        GitCommitRepository commitRepository,
+        RepositoryRepository repositoryRepository,
+        UserRepository userRepository
+    ) {
         this.commitRepository = commitRepository;
         this.repositoryRepository = repositoryRepository;
+        this.userRepository = userRepository;
     }
 
     @Transactional
@@ -66,7 +74,9 @@ public class GitHubPushCommitService {
         commit.setCommittedAt(pushCommit.getTimestamp());
         commit.setAuthoredAt(readGitUserDate(pushCommit.getAuthor()));
         commit.setDistinct(pushCommit.isDistinct());
-        commit.setHeadCommit(isHeadCommit(payload, pushCommit));
+        commit.setCommitUrl(pushCommit.getUrl());
+        commit.setCompareUrl(payload.getCompare());
+        commit.setBeforeSha(payload.getBefore());
         commit.setRefName(payload.getRef());
         commit.setPusherName(payload.getPusher() != null ? payload.getPusher().getName() : null);
         commit.setPusherEmail(payload.getPusher() != null ? payload.getPusher().getEmail() : null);
@@ -74,15 +84,8 @@ public class GitHubPushCommitService {
         applyGitUser(commit, pushCommit.getCommitter(), false);
         commit.setRepository(repository);
         commit.replaceFileChanges(buildFileChanges(pushCommit));
-        commit.setLastSyncedAt(Instant.now());
+        commit.setLastSyncAt(Instant.now());
         commitRepository.save(commit);
-    }
-
-    private boolean isHeadCommit(GHEventPayload.Push payload, GHEventPayload.Push.PushCommit pushCommit) {
-        if (payload.getHeadCommit() == null || payload.getHeadCommit().getSha() == null) {
-            return false;
-        }
-        return payload.getHeadCommit().getSha().equals(pushCommit.getSha());
     }
 
     private void applyGitUser(GitCommit commit, GitUser gitUser, boolean isAuthor) {
@@ -91,10 +94,12 @@ public class GitHubPushCommitService {
                 commit.setAuthorName(null);
                 commit.setAuthorEmail(null);
                 commit.setAuthorLogin(null);
+                commit.setAuthor(null);
             } else {
                 commit.setCommitterName(null);
                 commit.setCommitterEmail(null);
                 commit.setCommitterLogin(null);
+                commit.setCommitter(null);
             }
             return;
         }
@@ -103,6 +108,10 @@ public class GitHubPushCommitService {
             commit.setAuthorName(gitUser.getName());
             commit.setAuthorEmail(gitUser.getEmail());
             commit.setAuthorLogin(gitUser.getUsername());
+            commit.setAuthor(findExistingUser(gitUser));
+            if ((commit.getAuthorLogin() == null || commit.getAuthorLogin().isBlank()) && commit.getAuthor() != null) {
+                commit.setAuthorLogin(commit.getAuthor().getLogin());
+            }
             if (commit.getAuthoredAt() == null) {
                 commit.setAuthoredAt(readGitUserDate(gitUser));
             }
@@ -110,7 +119,24 @@ public class GitHubPushCommitService {
             commit.setCommitterName(gitUser.getName());
             commit.setCommitterEmail(gitUser.getEmail());
             commit.setCommitterLogin(gitUser.getUsername());
+            commit.setCommitter(findExistingUser(gitUser));
+            if (
+                (commit.getCommitterLogin() == null || commit.getCommitterLogin().isBlank()) && commit.getCommitter() != null
+            ) {
+                commit.setCommitterLogin(commit.getCommitter().getLogin());
+            }
         }
+    }
+
+    private User findExistingUser(GitUser gitUser) {
+        if (gitUser == null) {
+            return null;
+        }
+        var login = gitUser.getUsername();
+        if (login == null || login.isBlank()) {
+            return null;
+        }
+        return userRepository.findByLogin(login).orElse(null);
     }
 
     private Instant readGitUserDate(GitUser gitUser) {
@@ -140,6 +166,7 @@ public class GitHubPushCommitService {
                         var change = new GitCommitFileChange();
                         change.setChangeType(type);
                         change.setPath(path);
+                        change.setBinary(false);
                         return change;
                     }
                     if (shouldOverride(existing.getChangeType(), type)) {
@@ -159,8 +186,9 @@ public class GitHubPushCommitService {
     private int priority(ChangeType type) {
         return switch (type) {
             case REMOVED -> 3;
-            case MODIFIED -> 2;
+            case MODIFIED, RENAMED, COPIED -> 2;
             case ADDED -> 1;
+            default -> 0;
         };
     }
 }

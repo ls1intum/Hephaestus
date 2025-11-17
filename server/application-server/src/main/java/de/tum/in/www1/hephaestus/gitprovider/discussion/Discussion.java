@@ -45,13 +45,15 @@ import org.springframework.lang.NonNull;
 @ToString(callSuper = true)
 public class Discussion extends BaseGitServiceEntity {
 
+    @Column(nullable = false)
     private int number;
 
     @NonNull
-    @Column(length = 256)
+    @Column(length = 256, nullable = false)
     private String title;
 
     @Column(columnDefinition = "TEXT")
+    @ToString.Exclude
     private String body;
 
     @Column(columnDefinition = "TEXT")
@@ -60,7 +62,7 @@ public class Discussion extends BaseGitServiceEntity {
     private Integer commentCount;
 
     @NonNull
-    @Column(length = 32)
+    @Column(length = 32, nullable = false)
     @Enumerated(EnumType.STRING)
     private State state;
 
@@ -68,6 +70,7 @@ public class Discussion extends BaseGitServiceEntity {
     @Enumerated(EnumType.STRING)
     private AuthorAssociation authorAssociation;
 
+    @Column(nullable = false)
     private boolean locked;
 
     @Column(length = 64)
@@ -89,7 +92,7 @@ public class Discussion extends BaseGitServiceEntity {
     private DiscussionComment answerComment;
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "repository_id")
+    @JoinColumn(name = "repository_id", nullable = false)
     @ToString.Exclude
     private Repository repository;
 

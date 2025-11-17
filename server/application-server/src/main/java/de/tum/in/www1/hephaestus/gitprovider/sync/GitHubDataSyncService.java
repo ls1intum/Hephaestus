@@ -240,6 +240,7 @@ public class GitHubDataSyncService {
         }
 
         commitSyncService.syncRecentCommits(repository, cutoffDate);
+        commitSyncService.enrichIncompleteCommits(repository);
         repositoryToMonitor.setCommitsSyncedAt(Instant.now());
         repositoryToMonitorRepository.save(repositoryToMonitor);
     }

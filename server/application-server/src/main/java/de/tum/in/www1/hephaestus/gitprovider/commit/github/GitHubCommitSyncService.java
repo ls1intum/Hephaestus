@@ -12,7 +12,9 @@ import de.tum.in.www1.hephaestus.gitprovider.user.github.GitHubUserConverter;
 import jakarta.transaction.Transactional;
 import java.io.IOException;
 import java.time.Instant;
+import java.util.Collection;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Optional;
 import java.util.Set;
 import org.kohsuke.github.GHCommit;
@@ -25,11 +27,13 @@ import org.kohsuke.github.PagedIterable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
+import org.springframework.data.domain.PageRequest;
 
 @Service
 public class GitHubCommitSyncService {
 
     private static final Logger logger = LoggerFactory.getLogger(GitHubCommitSyncService.class);
+    private static final int MAX_COMMITS_TO_ENRICH_PER_RUN = 50;
 
     private final GitCommitRepository commitRepository;
     private final RepositoryRepository repositoryRepository;
@@ -56,6 +60,58 @@ public class GitHubCommitSyncService {
         builder.list().forEach(ghCommit -> processCommit(ghCommit, ghRepository));
     }
 
+    public void enrichIncompleteCommits(GHRepository ghRepository) {
+        if (ghRepository == null) {
+            return;
+        }
+        var repository = resolveRepository(ghRepository);
+        if (repository == null) {
+            return;
+        }
+        List<String> incompleteShas = commitRepository.findIncompleteCommitShas(
+            repository.getId(),
+            PageRequest.of(0, MAX_COMMITS_TO_ENRICH_PER_RUN)
+        );
+        if (incompleteShas.isEmpty()) {
+            return;
+        }
+        incompleteShas.forEach(sha -> enrichCommit(ghRepository, sha));
+    }
+
+    public void syncCommits(GHRepository ghRepository, Collection<String> shas) {
+        if (ghRepository == null || shas == null || shas.isEmpty()) {
+            return;
+        }
+        var repository = resolveRepository(ghRepository);
+        if (repository == null) {
+            return;
+        }
+        var normalizedShas = shas.stream().filter(sha -> sha != null && !sha.isBlank()).toList();
+        if (normalizedShas.isEmpty()) {
+            return;
+        }
+        List<String> incomplete = commitRepository.findIncompleteCommitShas(repository.getId(), normalizedShas);
+        if (incomplete.isEmpty()) {
+            logger.debug(
+                "All {} commits already enriched for repository {}",
+                normalizedShas.size(),
+                repository.getNameWithOwner()
+            );
+            return;
+        }
+        incomplete.forEach(sha -> enrichCommit(ghRepository, sha));
+    }
+
+    // Visible for tests
+    void enrichCommit(GHRepository ghRepository, String sha) {
+        try {
+            var ghCommit = ghRepository.getCommit(sha);
+            processCommit(ghCommit, ghRepository);
+        } catch (IOException e) {
+            logger.debug("Failed to enrich commit {}: {}", sha, e.getMessage());
+        }
+    }
+
     @Transactional
     public void processCommit(GHCommit ghCommit, GHRepository ghRepository) {
         try {
@@ -79,10 +135,12 @@ public class GitHubCommitSyncService {
             commit.setAdditions(safeStatCall(() -> ghCommit.getLinesAdded()));
             commit.setDeletions(safeStatCall(() -> ghCommit.getLinesDeleted()));
             commit.setTotalChanges(safeStatCall(() -> ghCommit.getLinesChanged()));
+            commit.setCommitUrl(ghCommit.getHtmlUrl() != null ? ghCommit.getHtmlUrl().toString() : commit.getCommitUrl());
+            commit.setMergeCommit(!ghCommit.getParentSHA1s().isEmpty() && ghCommit.getParentSHA1s().size() > 1);
             applyGitIdentities(commit, shortInfo);
             commit.setRepository(repository);
             linkCommitUsers(commit, ghCommit, shortInfo);
-            commit.setLastSyncedAt(Instant.now());
+            commit.setLastSyncAt(Instant.now());
             commit.replaceFileChanges(readFileChanges(ghCommit));
             commitRepository.save(commit);
         } catch (IOException e) {
@@ -121,6 +179,10 @@ public class GitHubCommitSyncService {
         var change = new GitCommitFileChange();
         change.setChangeType(mapStatus(file.getStatus()));
         change.setPath(file.getFileName());
+        change.setPreviousPath(file.getPreviousFilename());
+        change.setAdditions(file.getLinesAdded());
+        change.setDeletions(file.getLinesDeleted());
+        change.setBinary(file.getPatch() == null);
         return change;
     }
 
@@ -131,6 +193,8 @@ public class GitHubCommitSyncService {
         return switch (status.toLowerCase()) {
             case "added" -> ChangeType.ADDED;
             case "removed" -> ChangeType.REMOVED;
+            case "renamed" -> ChangeType.RENAMED;
+            case "copied" -> ChangeType.COPIED;
             default -> ChangeType.MODIFIED;
         };
     }
@@ -166,7 +230,13 @@ public class GitHubCommitSyncService {
             "committer"
         );
         commit.setAuthor(authorUser);
+        if ((commit.getAuthorLogin() == null || commit.getAuthorLogin().isBlank()) && authorUser != null) {
+            commit.setAuthorLogin(authorUser.getLogin());
+        }
         commit.setCommitter(committerUser);
+        if ((commit.getCommitterLogin() == null || commit.getCommitterLogin().isBlank()) && committerUser != null) {
+            commit.setCommitterLogin(committerUser.getLogin());
+        }
     }
 
     private User resolveCommitUser(GitUser gitUser, GHUserSupplier ghUserSupplier, String commitSha, String role) {

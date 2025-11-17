@@ -21,27 +21,15 @@ import lombok.ToString;
 
 /**
  * Supported via webhook push payloads (GHEventPayload.Push) and REST {@code GHCommit} fetches.
- * Fields:
- * - commit.sha -> primary key.
- * - commit.message/timestamp/distinct -> mapped to message/committedAt/distinct.
- * - push.ref/head/before -> stored as refName/headCommit (compare URLs can be recomputed when needed).
- * - push.pusher plus commit author/committer git identities captured via the author_* and committer_* columns.
- * - GHCommit stats/files populate additions/deletions/totalChanges & GitCommitFileChange rows.
+ * Data sources:
+ * - Webhooks persist message/timestamps/distinct flags plus push pusher + git identities.
+ * - REST sync augments additions/deletions/totalChanges and enriches {@link GitCommitFileChange} rows with stats/patches.
  * - Relationships: push.repository -> repository, fileChanges cascade via GitCommitFileChange.
  *
- * Ignored even though available without extra fetch:
- * - push.before, created/deleted/forced booleans (derivable from commit graph, not persisted yet).
- * - commit.parent SHA list ({@code GHCommit#getParents()}).
- * - head_commit.tree_id (not required for ETL consumers today).
- *
- * Desired but missing from hub4j/github-api 2.0-rc.5 (needs GraphQL or manual REST parsing):
- * - push.distinct_commits count, repository.full_push payload metadata (deployment contexts, branch protections).
- * - GraphQL Commit.checkSuites, status contexts, signature verification blocks, reaction summaries.
- * - REST push_id / installation delivery id (not surfaced by hub4j {@code GHEventPayload}).
- *
- * Requires additional fetch (out-of-scope for this iteration):
- * - GET /repos/{owner}/{repo}/commits/{sha} to capture files/stats when webhook omitted them (for example >300 files).
- * - Compare API to reconstruct pushes spanning >20 commits when webhook truncates the commits list.
+ * Still intentionally omitted:
+ * - Commit parent SHA list ({@code GHCommit#getParents()}) and head tree IDs (no downstream consumer today).
+ * - Push delivery IDs (not surfaced via hub4j yet) and status/signature metadata (requires GraphQL batching).
+ * - Compare API hydration for >20 commit pushes (tracked separately via backfill jobs).
  */
 @Entity
 @Table(name = "git_commit")
@@ -56,25 +44,26 @@ public class GitCommit {
     private String sha;
 
     @Column(columnDefinition = "TEXT")
+    @ToString.Exclude
     private String message;
 
     private Instant authoredAt;
 
     private Instant committedAt;
 
-    @Column(name = "is_distinct")
+    @Column(name = "is_distinct", nullable = false)
     private boolean distinct;
-
-    private boolean headCommit;
 
     @Column(length = 512)
     private String refName;
 
+    @Column(length = 255)
     private String pusherName;
 
     @Column(length = 320)
     private String pusherEmail;
 
+    @Column(length = 255)
     private String authorName;
 
     @Column(length = 320)
@@ -83,6 +72,7 @@ public class GitCommit {
     @Column(length = 64)
     private String authorLogin;
 
+    @Column(length = 255)
     private String committerName;
 
     @Column(length = 320)
@@ -97,7 +87,20 @@ public class GitCommit {
 
     private Integer totalChanges;
 
-    private Instant lastSyncedAt;
+    @Column(columnDefinition = "TEXT")
+    private String commitUrl;
+
+    @Column(columnDefinition = "TEXT")
+    private String compareUrl;
+
+    @Column(name = "before_sha", length = 40)
+    private String beforeSha;
+
+    @Column(name = "merge_commit", nullable = false)
+    private boolean mergeCommit = false;
+
+    @Column(name = "last_sync_at")
+    private Instant lastSyncAt;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "repository_id", nullable = false)

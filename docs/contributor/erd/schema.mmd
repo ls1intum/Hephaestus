@@ -117,7 +117,6 @@ erDiagram
         TIMESTAMPTZ authored_at
         TIMESTAMPTZ committed_at
         BOOLEAN is_distinct "NOT NULL"
-        BOOLEAN head_commit "NOT NULL"
         VARCHAR(512) ref_name
         VARCHAR(255) pusher_name
         VARCHAR(320) pusher_email
@@ -132,15 +131,23 @@ erDiagram
         INTEGER additions
         INTEGER deletions
         INTEGER total_changes
-        TIMESTAMPTZ last_synced_at
+        TIMESTAMPTZ last_sync_at
         BIGINT repository_id FK "NOT NULL"
+        TEXT commit_url
+        TEXT compare_url
+        VARCHAR(40) before_sha
+        BOOLEAN merge_commit "NOT NULL"
     }
 
     GitCommitFileChange {
         BIGINT id PK
         VARCHAR(16) change_type "NOT NULL"
-        VARCHAR(4096) path "NOT NULL"
+        TEXT path "NOT NULL"
         VARCHAR(40) commit_sha FK "NOT NULL"
+        TEXT previous_path
+        INTEGER additions
+        INTEGER deletions
+        BOOLEAN is_binary "NOT NULL"
     }
 
     Issue {

@@ -771,15 +771,18 @@ class GitCommit(Base):
             ["repository_id"], ["repository.id"], name="fk_git_commit_repository"
         ),
         PrimaryKeyConstraint("sha", name="git_commitPK"),
+        Index("idx_git_commit_author_committed", "author_id", "committed_at"),
         Index("idx_git_commit_author_id", "author_id"),
         Index("idx_git_commit_committed_at", "repository_id", "committed_at"),
+        Index("idx_git_commit_committer_committed", "committer_id", "committed_at"),
         Index("idx_git_commit_committer_id", "committer_id"),
+        Index("idx_git_commit_repo_committed", "repository_id", "committed_at"),
         Index("idx_git_commit_repository", "repository_id"),
     )
     sha: Mapped[str] = mapped_column(String(40), primary_key=True)
     is_distinct: Mapped[bool] = mapped_column(Boolean, server_default=text("false"))
-    head_commit: Mapped[bool] = mapped_column(Boolean, server_default=text("false"))
     repository_id: Mapped[int] = mapped_column(BigInteger)
+    merge_commit: Mapped[bool] = mapped_column(Boolean, server_default=text("false"))
     message: Mapped[Optional[str]] = mapped_column(Text)
     authored_at: Mapped[Optional[datetime.datetime]] = mapped_column(TIMESTAMP(True, 6))
     committed_at: Mapped[Optional[datetime.datetime]] = mapped_column(
@@ -799,9 +802,12 @@ class GitCommit(Base):
     additions: Mapped[Optional[int]] = mapped_column(Integer)
     deletions: Mapped[Optional[int]] = mapped_column(Integer)
     total_changes: Mapped[Optional[int]] = mapped_column(Integer)
-    last_synced_at: Mapped[Optional[datetime.datetime]] = mapped_column(
+    last_sync_at: Mapped[Optional[datetime.datetime]] = mapped_column(
         TIMESTAMP(True, 6)
     )
+    commit_url: Mapped[Optional[str]] = mapped_column(Text)
+    compare_url: Mapped[Optional[str]] = mapped_column(Text)
+    before_sha: Mapped[Optional[str]] = mapped_column(String(40))
     author: Mapped[Optional["User"]] = relationship(
         "User", foreign_keys=[author_id], back_populates="git_commit"
     )
@@ -978,6 +984,7 @@ class GitCommitFileChange(Base):
         ),
         PrimaryKeyConstraint("id", name="git_commit_file_changePK"),
         Index("idx_git_commit_file_change_commit", "commit_sha"),
+        Index("idx_git_commit_file_change_path", "path"),
     )
     id: Mapped[int] = mapped_column(
         BigInteger,
@@ -992,8 +999,12 @@ class GitCommitFileChange(Base):
         primary_key=True,
     )
     change_type: Mapped[str] = mapped_column(String(16))
-    path: Mapped[str] = mapped_column(String(4096))
+    path: Mapped[str] = mapped_column(Text)
     commit_sha: Mapped[str] = mapped_column(String(40))
+    is_binary: Mapped[bool] = mapped_column(Boolean, server_default=text("false"))
+    previous_path: Mapped[Optional[str]] = mapped_column(Text)
+    additions: Mapped[Optional[int]] = mapped_column(Integer)
+    deletions: Mapped[Optional[int]] = mapped_column(Integer)
     git_commit: Mapped["GitCommit"] = relationship(
         "GitCommit", back_populates="git_commit_file_change"
     )

@@ -7,6 +7,8 @@ import de.tum.in.www1.hephaestus.gitprovider.commit.GitCommitFileChange;
 import de.tum.in.www1.hephaestus.gitprovider.commit.GitCommitRepository;
 import de.tum.in.www1.hephaestus.gitprovider.common.GitHubPayload;
 import de.tum.in.www1.hephaestus.gitprovider.common.GitHubPayloadExtension;
+import de.tum.in.www1.hephaestus.gitprovider.user.User;
+import de.tum.in.www1.hephaestus.gitprovider.user.UserRepository;
 import de.tum.in.www1.hephaestus.testconfig.BaseIntegrationTest;
 import jakarta.transaction.Transactional;
 import java.time.Instant;
@@ -29,6 +31,9 @@ class GitHubPushMessageHandlerIntegrationTest extends BaseIntegrationTest {
     @Autowired
     private GitCommitRepository commitRepository;
 
+    @Autowired
+    private UserRepository userRepository;
+
     @BeforeEach
     void cleanDatabase() {
         databaseTestUtils.cleanDatabase();
@@ -50,8 +55,9 @@ class GitHubPushMessageHandlerIntegrationTest extends BaseIntegrationTest {
 
         assertThat(commit.getRepository()).isNotNull();
         assertThat(commit.getRefName()).isEqualTo(payload.getRef());
-        assertThat(commit.isHeadCommit()).isTrue();
         assertThat(commit.getMessage()).isEqualTo(pushCommit.getMessage());
+        assertThat(commit.getCompareUrl()).isEqualTo(payload.getCompare());
+        assertThat(commit.getBeforeSha()).isEqualTo(payload.getBefore());
         var expectedPaths = allPaths(pushCommit);
         assertThat(commit.getFileChanges()).hasSize(expectedPaths.size());
         assertThat(commit.getAuthorName()).isEqualTo(pushCommit.getAuthor().getName());
@@ -81,7 +87,55 @@ class GitHubPushMessageHandlerIntegrationTest extends BaseIntegrationTest {
         assertThat(reloaded.getFileChanges())
             .extracting(GitCommitFileChange::getPath)
             .containsExactlyInAnyOrderElementsOf(expectedPaths);
-        assertThat(reloaded.getLastSyncedAt()).isAfter(Instant.now().minusSeconds(60));
+        assertThat(reloaded.getLastSyncAt()).isAfter(Instant.now().minusSeconds(60));
+    }
+
+    @Test
+    void shouldCaptureMetadataForNewBranchCommits(
+        @GitHubPayload("push.branch-rename-binary") GHEventPayload.Push payload
+    ) throws Exception {
+        handler.handleEvent(payload);
+
+        var pushCommit = payload.getCommits().get(payload.getCommits().size() - 1);
+        var commit = commitRepository
+            .findById(pushCommit.getSha())
+            .orElseThrow(() -> new AssertionError("Commit not persisted"));
+
+        assertThat(commit.getCommitUrl()).isEqualTo(pushCommit.getUrl());
+        assertThat(commit.getCompareUrl()).isEqualTo(payload.getCompare());
+        assertThat(commit.getFileChanges())
+            .extracting(GitCommitFileChange::getPath)
+            .contains("assets/snapshot.bin");
+    }
+
+    @Test
+    void shouldMarkForcePushCommits(@GitHubPayload("push.force-branch-rewrite") GHEventPayload.Push payload)
+        throws Exception {
+        handler.handleEvent(payload);
+
+        var pushCommit = payload.getCommits().get(0);
+        var commit = commitRepository
+            .findById(pushCommit.getSha())
+            .orElseThrow(() -> new AssertionError("Commit not persisted"));
+
+        assertThat(commit.getBeforeSha()).isEqualTo(payload.getBefore());
+    }
+
+    @Test
+    void shouldLinkExistingAuthorAndCommitter(@GitHubPayload("push") GHEventPayload.Push payload) throws Exception {
+        var login = payload.getCommits().get(0).getAuthor().getUsername();
+        userRepository.save(sampleUser(5898705L, login));
+
+        handler.handleEvent(payload);
+
+        var commit = commitRepository
+            .findById(payload.getCommits().get(0).getSha())
+            .orElseThrow(() -> new AssertionError("Commit not persisted"));
+
+        assertThat(commit.getAuthor()).isNotNull();
+        assertThat(commit.getAuthor().getLogin()).isEqualTo(login);
+        assertThat(commit.getCommitter()).isNotNull();
+        assertThat(commit.getCommitter().getLogin()).isEqualTo(login);
     }
 
     private java.util.List<String> allPaths(GHEventPayload.Push.PushCommit commit) {
@@ -96,5 +150,18 @@ class GitHubPushMessageHandlerIntegrationTest extends BaseIntegrationTest {
             paths.addAll(commit.getModified());
         }
         return paths;
+    }
+
+    private User sampleUser(long id, String login) {
+        var user = new User();
+        user.setId(id);
+        user.setLogin(login);
+        user.setAvatarUrl("https://example.com/avatar.png");
+        user.setName(login);
+        user.setHtmlUrl("https://github.com/" + login);
+        user.setType(User.Type.USER);
+        user.setNotificationsEnabled(true);
+        user.setParticipateInResearch(true);
+        return user;
     }
 }
