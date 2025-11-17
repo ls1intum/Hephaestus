@@ -96,7 +96,11 @@ public class GitHubPushMessageHandler extends GitHubMessageHandler<GHEventPayloa
         try {
             var hydrated = repositorySyncService.syncRepository(workspace.getId(), nameWithOwner);
             if (hydrated.isEmpty()) {
-                logger.warn("Unable to hydrate repository {} for workspace {}; skipping commit enrichment", nameWithOwner, workspace.getId());
+                logger.warn(
+                    "Unable to hydrate repository {} for workspace {}; skipping commit enrichment",
+                    nameWithOwner,
+                    workspace.getId()
+                );
             }
             return hydrated.orElse(null);
         } catch (Exception e) {

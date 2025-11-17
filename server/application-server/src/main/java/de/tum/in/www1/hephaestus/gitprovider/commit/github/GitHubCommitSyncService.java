@@ -26,8 +26,8 @@ import org.kohsuke.github.GitUser;
 import org.kohsuke.github.PagedIterable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.stereotype.Service;
 import org.springframework.data.domain.PageRequest;
+import org.springframework.stereotype.Service;
 
 @Service
 public class GitHubCommitSyncService {
@@ -135,7 +135,9 @@ public class GitHubCommitSyncService {
             commit.setAdditions(safeStatCall(() -> ghCommit.getLinesAdded()));
             commit.setDeletions(safeStatCall(() -> ghCommit.getLinesDeleted()));
             commit.setTotalChanges(safeStatCall(() -> ghCommit.getLinesChanged()));
-            commit.setCommitUrl(ghCommit.getHtmlUrl() != null ? ghCommit.getHtmlUrl().toString() : commit.getCommitUrl());
+            commit.setCommitUrl(
+                ghCommit.getHtmlUrl() != null ? ghCommit.getHtmlUrl().toString() : commit.getCommitUrl()
+            );
             commit.setMergeCommit(!ghCommit.getParentSHA1s().isEmpty() && ghCommit.getParentSHA1s().size() > 1);
             applyGitIdentities(commit, shortInfo);
             commit.setRepository(repository);

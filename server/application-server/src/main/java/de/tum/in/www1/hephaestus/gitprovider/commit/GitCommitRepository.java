@@ -43,5 +43,4 @@ public interface GitCommitRepository extends JpaRepository<GitCommit, String> {
         @Param("repositoryId") Long repositoryId,
         @Param("shas") Collection<String> shas
     );
-
 }

@@ -45,7 +45,9 @@ class GitHubCommitSyncServiceTest {
 
     @BeforeEach
     void setUp() {
-        service = spy(new GitHubCommitSyncService(commitRepository, repositoryRepository, userRepository, userConverter));
+        service = spy(
+            new GitHubCommitSyncService(commitRepository, repositoryRepository, userRepository, userConverter)
+        );
     }
 
     @Test

@@ -121,7 +121,8 @@ public class GitHubPushCommitService {
             commit.setCommitterLogin(gitUser.getUsername());
             commit.setCommitter(findExistingUser(gitUser));
             if (
-                (commit.getCommitterLogin() == null || commit.getCommitterLogin().isBlank()) && commit.getCommitter() != null
+                (commit.getCommitterLogin() == null || commit.getCommitterLogin().isBlank()) &&
+                commit.getCommitter() != null
             ) {
                 commit.setCommitterLogin(commit.getCommitter().getLogin());
             }

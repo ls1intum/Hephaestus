@@ -61,10 +61,12 @@ class GitHubPushMessageHandlerTest {
         var repository = payload.getRepository();
         var workspace = workspace();
 
-        when(workspaceRepository.findByRepositoriesToMonitor_NameWithOwner(repository.getFullName()))
-            .thenReturn(Optional.of(workspace));
-        when(repositorySyncService.syncRepository(WORKSPACE_ID, repository.getFullName()))
-            .thenReturn(Optional.of(repository));
+        when(workspaceRepository.findByRepositoriesToMonitor_NameWithOwner(repository.getFullName())).thenReturn(
+            Optional.of(workspace)
+        );
+        when(repositorySyncService.syncRepository(WORKSPACE_ID, repository.getFullName())).thenReturn(
+            Optional.of(repository)
+        );
 
         handler.handleEvent(payload);
 
@@ -91,8 +93,9 @@ class GitHubPushMessageHandlerTest {
 
     @Test
     void handleEventSkipsCommitSyncWhenWorkspaceMissing(@GitHubPayload("push") GHEventPayload.Push payload) {
-        when(workspaceRepository.findByRepositoriesToMonitor_NameWithOwner(payload.getRepository().getFullName()))
-            .thenReturn(Optional.empty());
+        when(
+            workspaceRepository.findByRepositoriesToMonitor_NameWithOwner(payload.getRepository().getFullName())
+        ).thenReturn(Optional.empty());
 
         handler.handleEvent(payload);
 
@@ -104,10 +107,12 @@ class GitHubPushMessageHandlerTest {
     @Test
     void handleEventSkipsCommitSyncWhenHydrationFails(@GitHubPayload("push") GHEventPayload.Push payload) {
         var workspace = workspace();
-        when(workspaceRepository.findByRepositoriesToMonitor_NameWithOwner(payload.getRepository().getFullName()))
-            .thenReturn(Optional.of(workspace));
-        when(repositorySyncService.syncRepository(WORKSPACE_ID, payload.getRepository().getFullName()))
-            .thenReturn(Optional.empty());
+        when(
+            workspaceRepository.findByRepositoriesToMonitor_NameWithOwner(payload.getRepository().getFullName())
+        ).thenReturn(Optional.of(workspace));
+        when(repositorySyncService.syncRepository(WORKSPACE_ID, payload.getRepository().getFullName())).thenReturn(
+            Optional.empty()
+        );
 
         handler.handleEvent(payload);
 

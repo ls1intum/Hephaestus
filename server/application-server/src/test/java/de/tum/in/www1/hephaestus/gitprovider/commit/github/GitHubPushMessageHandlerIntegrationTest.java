@@ -103,9 +103,7 @@ class GitHubPushMessageHandlerIntegrationTest extends BaseIntegrationTest {
 
         assertThat(commit.getCommitUrl()).isEqualTo(pushCommit.getUrl());
         assertThat(commit.getCompareUrl()).isEqualTo(payload.getCompare());
-        assertThat(commit.getFileChanges())
-            .extracting(GitCommitFileChange::getPath)
-            .contains("assets/snapshot.bin");
+        assertThat(commit.getFileChanges()).extracting(GitCommitFileChange::getPath).contains("assets/snapshot.bin");
     }
 
     @Test
