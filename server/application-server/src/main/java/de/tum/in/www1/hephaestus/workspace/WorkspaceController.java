@@ -213,7 +213,7 @@ public class WorkspaceController {
     ) {
         try {
             workspaceService.removeRepositoryToMonitor(owner + '/' + name);
-            return ResponseEntity.ok().build();
+            return ResponseEntity.noContent().build();
         } catch (EntityNotFoundException e) {
             return ResponseEntity.notFound().build();
         } catch (IllegalArgumentException e) {
@@ -248,7 +248,7 @@ public class WorkspaceController {
     ) {
         return workspaceService
             .removeLabelFromTeam(teamId, labelId)
-            .map(ResponseEntity::ok)
+            .map(team -> ResponseEntity.noContent().build())
             .orElseGet(() -> ResponseEntity.notFound().build());
     }
 

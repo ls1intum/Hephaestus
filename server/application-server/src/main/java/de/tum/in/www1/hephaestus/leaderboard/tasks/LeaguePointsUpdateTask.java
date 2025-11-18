@@ -4,7 +4,7 @@ import de.tum.in.www1.hephaestus.gitprovider.user.UserInfoDTO;
 import de.tum.in.www1.hephaestus.gitprovider.user.UserRepository;
 import de.tum.in.www1.hephaestus.leaderboard.*;
 import de.tum.in.www1.hephaestus.workspace.Workspace;
-import de.tum.in.www1.hephaestus.workspace.member.WorkspaceMemberService;
+import de.tum.in.www1.hephaestus.workspace.WorkspaceMembershipService;
 import jakarta.transaction.Transactional;
 import java.time.DayOfWeek;
 import java.time.Instant;
@@ -14,12 +14,16 @@ import java.time.temporal.TemporalAdjusters;
 import java.util.List;
 import java.util.Optional;
 import java.util.function.Consumer;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
 @Component
 public class LeaguePointsUpdateTask implements Runnable {
+
+    private static final Logger logger = LoggerFactory.getLogger(LeaguePointsUpdateTask.class);
 
     @Value("${hephaestus.leaderboard.schedule.day}")
     private String scheduledDay;
@@ -37,12 +41,12 @@ public class LeaguePointsUpdateTask implements Runnable {
     private LeaguePointsCalculationService leaguePointsCalculationService;
 
     @Autowired
-    private WorkspaceMemberService workspaceMemberService;
+    private WorkspaceMembershipService workspaceMembershipService;
 
     @Override
     @Transactional
     public void run() {
-        Optional<Workspace> workspaceOptional = workspaceMemberService.resolveSingleWorkspace(
+        Optional<Workspace> workspaceOptional = workspaceMembershipService.resolveSingleWorkspace(
             "scheduled league points update"
         );
         if (workspaceOptional.isEmpty()) {
@@ -66,9 +70,9 @@ public class LeaguePointsUpdateTask implements Runnable {
                 return;
             }
             var user = userRepository.findByLoginWithEagerMergedPullRequests(leaderboardUser.login()).orElseThrow();
-            int currentPoints = workspaceMemberService.getCurrentLeaguePoints(workspaceOptional, user);
+            int currentPoints = workspaceMembershipService.getCurrentLeaguePoints(workspaceOptional, user);
             int newPoints = leaguePointsCalculationService.calculateNewPoints(user, currentPoints, entry);
-            workspaceMemberService.updateLeaguePoints(workspaceOptional, user, newPoints);
+            workspaceMembershipService.updateLeaguePoints(workspaceOptional, user, newPoints);
         };
     }
 
