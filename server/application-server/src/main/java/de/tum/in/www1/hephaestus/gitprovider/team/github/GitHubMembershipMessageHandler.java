@@ -88,6 +88,7 @@ public class GitHubMembershipMessageHandler extends GitHubMessageHandler<GHEvent
 
         if ("added".equals(action)) {
             // ensure membership exists (default role MEMBER for team membership events)
+            var targetRole = TeamMembership.Role.MEMBER;
             var existing = team
                 .getMemberships()
                 .stream()
@@ -95,7 +96,10 @@ public class GitHubMembershipMessageHandler extends GitHubMessageHandler<GHEvent
                 .findFirst()
                 .orElse(null);
             if (existing == null) {
-                team.addMembership(new TeamMembership(team, user, TeamMembership.Role.MEMBER));
+                team.addMembership(new TeamMembership(team, user, targetRole));
+                teamRepository.save(team);
+            } else if (existing.getRole() != targetRole) {
+                existing.setRole(targetRole);
                 teamRepository.save(team);
             }
         }

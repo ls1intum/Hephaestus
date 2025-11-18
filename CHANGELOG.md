@@ -1,5 +1,37 @@
 # Changelog
 
+## [0.10.0-rc.21](https://github.com/ls1intum/Hephaestus/compare/v0.10.0-rc.20...v0.10.0-rc.21) (2025-11-09)
+
+## [0.10.0-rc.20](https://github.com/ls1intum/Hephaestus/compare/v0.10.0-rc.19...v0.10.0-rc.20) (2025-11-07)
+
+## [0.10.0-rc.19](https://github.com/ls1intum/Hephaestus/compare/v0.10.0-rc.18...v0.10.0-rc.19) (2025-11-06)
+
+## [0.10.0-rc.18](https://github.com/ls1intum/Hephaestus/compare/v0.10.0-rc.17...v0.10.0-rc.18) (2025-11-06)
+
+## [0.10.0-rc.17](https://github.com/ls1intum/Hephaestus/compare/v0.10.0-rc.16...v0.10.0-rc.17) (2025-11-06)
+
+## [0.10.0-rc.16](https://github.com/ls1intum/Hephaestus/compare/v0.10.0-rc.15...v0.10.0-rc.16) (2025-11-05)
+
+## [0.10.0-rc.15](https://github.com/ls1intum/Hephaestus/compare/v0.10.0-rc.14...v0.10.0-rc.15) (2025-11-05)
+
+## [0.10.0-rc.14](https://github.com/ls1intum/Hephaestus/compare/v0.10.0-rc.13...v0.10.0-rc.14) (2025-11-03)
+
+## [0.10.0-rc.13](https://github.com/ls1intum/Hephaestus/compare/v0.10.0-rc.12...v0.10.0-rc.13) (2025-11-02)
+
+## [0.10.0-rc.12](https://github.com/ls1intum/Hephaestus/compare/v0.10.0-rc.11...v0.10.0-rc.12) (2025-11-02)
+
+## [0.10.0-rc.11](https://github.com/ls1intum/Hephaestus/compare/v0.10.0-rc.10...v0.10.0-rc.11) (2025-11-01)
+
+### 🚀 Features
+
+* skip Keycloak login page and directly login with Github ([#526](https://github.com/ls1intum/Hephaestus/issues/526)) ([cc83957](https://github.com/ls1intum/Hephaestus/commit/cc83957dfe89cfa55fce3271e617e1fe0c712657))
+
+## [0.10.0-rc.10](https://github.com/ls1intum/Hephaestus/compare/v0.10.0-rc.9...v0.10.0-rc.10) (2025-10-31)
+
+### 🚀 Features
+
+* enforce research participation consent ([#524](https://github.com/ls1intum/Hephaestus/issues/524)) ([6531868](https://github.com/ls1intum/Hephaestus/commit/65318683a7a8182c13fe13f2cd32817925d4fcaa))
+
 ## [0.10.0-rc.9](https://github.com/ls1intum/Hephaestus/compare/v0.10.0-rc.8...v0.10.0-rc.9) (2025-10-30)
 
 ### 🚀 Features

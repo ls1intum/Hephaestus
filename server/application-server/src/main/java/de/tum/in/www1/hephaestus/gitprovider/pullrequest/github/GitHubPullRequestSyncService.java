@@ -18,9 +18,11 @@ import java.time.Instant;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Objects;
 import java.util.Optional;
 import org.kohsuke.github.GHDirection;
 import org.kohsuke.github.GHIssueState;
+import org.kohsuke.github.GHLabel;
 import org.kohsuke.github.GHPullRequest;
 import org.kohsuke.github.GHPullRequestQueryBuilder.Sort;
 import org.kohsuke.github.GHRepository;
@@ -188,6 +190,33 @@ public class GitHubPullRequestSyncService {
      */
     @Transactional
     public PullRequest processPullRequest(GHPullRequest ghPullRequest) {
+        return processPullRequestInternal(ghPullRequest, collectLabels(ghPullRequest));
+    }
+
+    @Transactional
+    public PullRequest processPullRequest(GHPullRequest ghPullRequest, GHLabel changedLabel, boolean added) {
+        var effectiveLabels = adjustLabels(collectLabels(ghPullRequest), changedLabel, added);
+        return processPullRequestInternal(ghPullRequest, effectiveLabels);
+    }
+
+    private List<GHLabel> collectLabels(GHPullRequest ghPullRequest) {
+        return new ArrayList<>(ghPullRequest.getLabels());
+    }
+
+    private List<GHLabel> adjustLabels(List<GHLabel> labels, GHLabel changedLabel, boolean added) {
+        if (changedLabel == null) {
+            return labels;
+        }
+
+        var adjusted = new ArrayList<>(labels);
+        adjusted.removeIf(label -> Objects.equals(label.getId(), changedLabel.getId()));
+        if (added) {
+            adjusted.add(changedLabel);
+        }
+        return adjusted;
+    }
+
+    private PullRequest processPullRequestInternal(GHPullRequest ghPullRequest, List<GHLabel> effectiveLabels) {
         var result = pullRequestRepository
             .findById(ghPullRequest.getId())
             .map(pullRequest -> {
@@ -219,9 +248,9 @@ public class GitHubPullRequestSyncService {
         }
 
         // Link new labels and remove labels that are not present anymore
-        var ghLabels = ghPullRequest.getLabels();
+        var previousLabels = new HashSet<>(result.getLabels());
         var resultLabels = new HashSet<Label>();
-        ghLabels.forEach(ghLabel -> {
+        effectiveLabels.forEach(ghLabel -> {
             var resultLabel = labelRepository
                 .findById(ghLabel.getId())
                 .orElseGet(() -> {
@@ -231,8 +260,10 @@ public class GitHubPullRequestSyncService {
                 });
             resultLabels.add(resultLabel);
         });
-        badPracticeDetectorScheduler.detectBadPracticeForPrIfReadyLabels(result, result.getLabels(), resultLabels);
+        badPracticeDetectorScheduler.detectBadPracticeForPrIfReadyLabels(result, previousLabels, resultLabels);
+        previousLabels.forEach(label -> label.getIssues().remove(result));
         result.getLabels().clear();
+        resultLabels.forEach(label -> label.getIssues().add(result));
         result.getLabels().addAll(resultLabels);
 
         // Link milestone

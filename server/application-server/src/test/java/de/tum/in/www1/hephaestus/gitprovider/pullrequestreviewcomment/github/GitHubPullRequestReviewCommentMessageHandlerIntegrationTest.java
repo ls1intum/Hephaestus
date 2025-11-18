@@ -9,7 +9,6 @@ import de.tum.in.www1.hephaestus.gitprovider.pullrequest.github.GitHubPullReques
 import de.tum.in.www1.hephaestus.gitprovider.pullrequestreview.PullRequestReview;
 import de.tum.in.www1.hephaestus.gitprovider.pullrequestreview.PullRequestReviewRepository;
 import de.tum.in.www1.hephaestus.gitprovider.pullrequestreview.github.GitHubPullRequestReviewSyncService;
-import de.tum.in.www1.hephaestus.gitprovider.pullrequestreviewcomment.PullRequestReviewComment;
 import de.tum.in.www1.hephaestus.gitprovider.pullrequestreviewcomment.PullRequestReviewCommentRepository;
 import de.tum.in.www1.hephaestus.gitprovider.pullrequestreviewthread.PullRequestReviewThreadRepository;
 import de.tum.in.www1.hephaestus.testconfig.BaseIntegrationTest;
@@ -20,9 +19,11 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.kohsuke.github.GHEventPayload;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.transaction.annotation.Transactional;
 
 @DisplayName("GitHub Pull Request Review Comment Message Handler")
 @ExtendWith(GitHubPayloadExtension.class)
+@Transactional
 class GitHubPullRequestReviewCommentMessageHandlerIntegrationTest extends BaseIntegrationTest {
 
     @Autowired
@@ -58,7 +59,11 @@ class GitHubPullRequestReviewCommentMessageHandlerIntegrationTest extends BaseIn
         @GitHubPayload("pull_request_review.submitted") GHEventPayload.PullRequestReview reviewPayload
     ) throws Exception {
         // Arrange
-        reviewSyncService.processPullRequestReview(reviewPayload.getReview());
+        reviewSyncService.processPullRequestReview(
+            reviewPayload.getReview(),
+            reviewPayload.getPullRequest(),
+            reviewPayload.getSender()
+        );
         assertThat(commentRepository.findById(commentPayload.getComment().getId())).isEmpty();
 
         // Act
@@ -76,10 +81,47 @@ class GitHubPullRequestReviewCommentMessageHandlerIntegrationTest extends BaseIn
                 assertThat(comment.getSide().name()).isEqualTo(commentPayload.getComment().getSide().name());
                 assertThat(comment.getThread()).isNotNull();
                 assertThat(comment.getThread().getId()).isEqualTo(comment.getId());
-                assertThat(comment.getThread().getState()).isEqualTo(de.tum.in.www1.hephaestus.gitprovider.pullrequestreviewthread.PullRequestReviewThread.State.UNRESOLVED);
+                assertThat(comment.getThread().getProviderThreadId()).isEqualTo(comment.getId());
+                assertThat(comment.getThread().getPath()).isEqualTo(comment.getPath());
+                assertThat(comment.getThread().getLine()).isEqualTo(comment.getLine());
+                assertThat(comment.getThread().getSide()).isEqualTo(comment.getSide());
+                assertThat(comment.getThread().getState()).isEqualTo(
+                    de.tum.in.www1.hephaestus.gitprovider.pullrequestreviewthread.PullRequestReviewThread.State.UNRESOLVED
+                );
             });
 
-        assertThat(threadRepository.findById(commentPayload.getComment().getId())).isPresent();
+        assertThat(threadRepository.findById(commentPayload.getComment().getId()))
+            .isPresent()
+            .get()
+            .satisfies(thread -> assertThat(thread.getProviderThreadId()).isEqualTo(thread.getId()));
+    }
+
+    @Test
+    @DisplayName("should ignore duplicate create events for the same review comment")
+    void createdEventIsIdempotent(
+        @GitHubPayload("pull_request_review_comment.created") GHEventPayload.PullRequestReviewComment commentPayload,
+        @GitHubPayload("pull_request_review.submitted") GHEventPayload.PullRequestReview reviewPayload
+    ) throws Exception {
+        // Arrange
+        reviewSyncService.processPullRequestReview(
+            reviewPayload.getReview(),
+            reviewPayload.getPullRequest(),
+            reviewPayload.getSender()
+        );
+        handler.handleEvent(commentPayload);
+        var existing = commentRepository.findById(commentPayload.getComment().getId()).orElseThrow();
+        var originalUpdatedAt = existing.getUpdatedAt();
+
+        // Act
+        handler.handleEvent(commentPayload);
+
+        // Assert
+        assertThat(commentRepository.count()).isEqualTo(1);
+        assertThat(threadRepository.count()).isEqualTo(1);
+        var replayed = commentRepository.findById(commentPayload.getComment().getId()).orElseThrow();
+        assertThat(replayed.getUpdatedAt()).isEqualTo(originalUpdatedAt);
+        var persistedThread = threadRepository.findWithCommentsById(replayed.getThread().getId()).orElseThrow();
+        assertThat(persistedThread.getComments()).hasSize(1);
     }
 
     @Test
@@ -90,7 +132,11 @@ class GitHubPullRequestReviewCommentMessageHandlerIntegrationTest extends BaseIn
         @GitHubPayload("pull_request_review.submitted") GHEventPayload.PullRequestReview reviewPayload
     ) throws Exception {
         // Arrange
-        reviewSyncService.processPullRequestReview(reviewPayload.getReview());
+        reviewSyncService.processPullRequestReview(
+            reviewPayload.getReview(),
+            reviewPayload.getPullRequest(),
+            reviewPayload.getSender()
+        );
         handler.handleEvent(createdPayload);
         var original = commentRepository.findById(createdPayload.getComment().getId()).orElseThrow();
         assertThat(original.getBody()).isEqualTo(createdPayload.getComment().getBody());
@@ -112,7 +158,11 @@ class GitHubPullRequestReviewCommentMessageHandlerIntegrationTest extends BaseIn
         @GitHubPayload("pull_request_review.submitted") GHEventPayload.PullRequestReview reviewPayload
     ) throws Exception {
         // Arrange
-        reviewSyncService.processPullRequestReview(reviewPayload.getReview());
+        reviewSyncService.processPullRequestReview(
+            reviewPayload.getReview(),
+            reviewPayload.getPullRequest(),
+            reviewPayload.getSender()
+        );
         handler.handleEvent(createdPayload);
         assertThat(commentRepository.findById(createdPayload.getComment().getId())).isPresent();
         assertThat(threadRepository.findById(createdPayload.getComment().getId())).isPresent();
@@ -128,8 +178,12 @@ class GitHubPullRequestReviewCommentMessageHandlerIntegrationTest extends BaseIn
     @Test
     @DisplayName("should persist replies and link them to the root thread")
     void createdReplyLinksToThread(
-        @GitHubPayload("pull_request_review_comment.created.thread-1") GHEventPayload.PullRequestReviewComment rootPayload,
-        @GitHubPayload("pull_request_review_comment.created.thread-2") GHEventPayload.PullRequestReviewComment replyPayload
+        @GitHubPayload(
+            "pull_request_review_comment.created.thread-1"
+        ) GHEventPayload.PullRequestReviewComment rootPayload,
+        @GitHubPayload(
+            "pull_request_review_comment.created.thread-2"
+        ) GHEventPayload.PullRequestReviewComment replyPayload
     ) throws Exception {
         // Arrange root review
         ensureReviewExists(rootPayload);
@@ -155,9 +209,15 @@ class GitHubPullRequestReviewCommentMessageHandlerIntegrationTest extends BaseIn
     @Test
     @DisplayName("should retain threads when a reply is deleted")
     void deletedReplyKeepsThread(
-        @GitHubPayload("pull_request_review_comment.created.thread-1") GHEventPayload.PullRequestReviewComment rootPayload,
-        @GitHubPayload("pull_request_review_comment.created.thread-2") GHEventPayload.PullRequestReviewComment replyPayload,
-        @GitHubPayload("pull_request_review_comment.deleted.thread-2") GHEventPayload.PullRequestReviewComment deletedReplyPayload
+        @GitHubPayload(
+            "pull_request_review_comment.created.thread-1"
+        ) GHEventPayload.PullRequestReviewComment rootPayload,
+        @GitHubPayload(
+            "pull_request_review_comment.created.thread-2"
+        ) GHEventPayload.PullRequestReviewComment replyPayload,
+        @GitHubPayload(
+            "pull_request_review_comment.deleted.thread-2"
+        ) GHEventPayload.PullRequestReviewComment deletedReplyPayload
     ) throws Exception {
         // Arrange
         ensureReviewExists(rootPayload);
@@ -165,15 +225,13 @@ class GitHubPullRequestReviewCommentMessageHandlerIntegrationTest extends BaseIn
         ensureReviewExists(replyPayload);
         handler.handleEvent(replyPayload);
         var threadId = rootPayload.getComment().getId();
-        assertThat(threadRepository.findById(threadId)).isPresent();
-        assertThat(commentRepository.findById(replyPayload.getComment().getId())).isPresent();
 
         // Act
         handler.handleEvent(deletedReplyPayload);
 
         // Assert
-        assertThat(commentRepository.findById(replyPayload.getComment().getId())).isEmpty();
-        var thread = threadRepository.findById(threadId).orElseThrow();
+        assertThat(commentRepository.existsById(replyPayload.getComment().getId())).isFalse();
+        var thread = threadRepository.findWithCommentsById(threadId).orElseThrow();
         assertThat(commentRepository.countByThreadId(threadId)).isEqualTo(1);
         assertThat(thread.getRootComment()).isNotNull();
         assertThat(thread.getRootComment().getId()).isEqualTo(threadId);

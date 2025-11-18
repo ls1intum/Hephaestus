@@ -5,7 +5,9 @@ import de.tum.in.www1.hephaestus.gitprovider.label.LabelRepository;
 import de.tum.in.www1.hephaestus.gitprovider.repository.RepositoryRepository;
 import jakarta.transaction.Transactional;
 import java.io.IOException;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 import org.kohsuke.github.GHLabel;
 import org.kohsuke.github.GHRepository;
 import org.slf4j.Logger;
@@ -48,8 +50,42 @@ public class GitHubLabelSyncService {
      *
      * @param repository the GitHub repository whose labels are to be synchronized
      */
+    @Transactional
     public void syncLabelsOfRepository(GHRepository repository) {
-        repository.listLabels().withPageSize(100).forEach(this::processLabel);
+        if (repository == null) {
+            return;
+        }
+
+        List<GHLabel> remoteLabels;
+        try {
+            remoteLabels = repository.listLabels().withPageSize(100).toList();
+        } catch (IOException listingError) {
+            logger.error(
+                "Failed to list labels for repositoryId={}: {}",
+                repository.getId(),
+                listingError.getMessage()
+            );
+            return;
+        }
+        Set<Long> seenLabelIds = new HashSet<>(remoteLabels.size());
+        remoteLabels.forEach(ghLabel -> {
+            seenLabelIds.add(ghLabel.getId());
+            processLabel(ghLabel);
+        });
+
+        var repositoryId = repository.getId();
+        List<Label> existingLabels = labelRepository.findAllByRepository_Id(repositoryId);
+        int removed = 0;
+        for (Label label : existingLabels) {
+            if (!seenLabelIds.contains(label.getId())) {
+                labelRepository.delete(label);
+                removed++;
+            }
+        }
+
+        if (removed > 0) {
+            logger.info("Deleted {} stale labels for repositoryId={}", removed, repositoryId);
+        }
     }
 
     /**

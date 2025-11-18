@@ -15,7 +15,7 @@ import de.tum.in.www1.hephaestus.gitprovider.user.User;
 import de.tum.in.www1.hephaestus.gitprovider.user.UserInfoDTO;
 import de.tum.in.www1.hephaestus.gitprovider.user.UserRepository;
 import de.tum.in.www1.hephaestus.workspace.Workspace;
-import de.tum.in.www1.hephaestus.workspace.member.WorkspaceMemberService;
+import de.tum.in.www1.hephaestus.workspace.WorkspaceMembershipService;
 import jakarta.annotation.Nonnull;
 import jakarta.transaction.Transactional;
 import java.time.Instant;
@@ -36,7 +36,7 @@ public class LeaderboardService {
     private final ScoringService scoringService;
     private final TeamRepository teamRepository;
     private final LeaguePointsCalculationService leaguePointsCalculationService;
-    private final WorkspaceMemberService workspaceMemberService;
+    private final WorkspaceMembershipService workspaceMembershipService;
 
     public LeaderboardService(
         UserRepository userRepository,
@@ -45,7 +45,7 @@ public class LeaderboardService {
         ScoringService scoringService,
         TeamRepository teamRepository,
         LeaguePointsCalculationService leaguePointsCalculationService,
-        WorkspaceMemberService workspaceMemberService
+        WorkspaceMembershipService workspaceMembershipService
     ) {
         this.userRepository = userRepository;
         this.pullRequestReviewRepository = pullRequestReviewRepository;
@@ -53,7 +53,7 @@ public class LeaderboardService {
         this.scoringService = scoringService;
         this.teamRepository = teamRepository;
         this.leaguePointsCalculationService = leaguePointsCalculationService;
-        this.workspaceMemberService = workspaceMemberService;
+        this.workspaceMembershipService = workspaceMembershipService;
     }
 
     @Transactional
@@ -147,7 +147,7 @@ public class LeaderboardService {
                 });
         }
 
-        Map<Long, Integer> leaguePointsByUserId = workspaceMemberService.getLeaguePointsSnapshot(
+        Map<Long, Integer> leaguePointsByUserId = workspaceMembershipService.getLeaguePointsSnapshot(
             usersById.values(),
             "leaderboard dataset"
         );
@@ -427,10 +427,10 @@ public class LeaderboardService {
         User user = userRepository
             .findByLogin(login)
             .orElseThrow(() -> new IllegalArgumentException("User not found with login: " + login));
-        Optional<Workspace> workspaceOptional = workspaceMemberService.resolveSingleWorkspace(
+        Optional<Workspace> workspaceOptional = workspaceMembershipService.resolveSingleWorkspace(
             "league stats for user '" + login + "'"
         );
-        int currentLeaguePoints = workspaceMemberService.getCurrentLeaguePoints(workspaceOptional, user);
+        int currentLeaguePoints = workspaceMembershipService.getCurrentLeaguePoints(workspaceOptional, user);
         int projectedNewPoints = leaguePointsCalculationService.calculateNewPoints(
             user,
             currentLeaguePoints,

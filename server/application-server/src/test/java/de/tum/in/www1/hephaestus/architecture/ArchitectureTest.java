@@ -97,4 +97,25 @@ class ArchitectureTest {
             .because("Test classes should be accessible for testing")
             .check(applicationClasses);
     }
+
+    @Test
+    @DisplayName("Controllers and services should not directly access WorkspaceRepository")
+    void shouldNotDirectlyAccessWorkspaceRepository() {
+        noClasses()
+            .that()
+            .resideInAnyPackage("..controller..", "..service..")
+            .and()
+            .resideOutsideOfPackage("..workspace.context..")
+            .and()
+            .resideOutsideOfPackage("..workspace.")
+            .should()
+            .dependOnClassesThat()
+            .haveSimpleName("WorkspaceRepository")
+            .because(
+                "Use WorkspaceContextHolder.getContext() instead of direct workspace repository access. " +
+                "Only workspace context resolver and workspace service packages may access WorkspaceRepository directly."
+            )
+            .allowEmptyShould(true)
+            .check(applicationClasses);
+    }
 }

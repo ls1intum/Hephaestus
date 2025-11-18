@@ -8,7 +8,7 @@ info:
     name: MIT License
     url: https://github.com/ls1intum/Hephaestus/blob/develop/LICENSE
   title: Hephaestus API
-  version: 0.10.0-rc.9
+  version: 0.10.0-rc.21
 servers:
 - description: Default Server URL
   url: /
@@ -718,17 +718,147 @@ paths:
           description: OK
       tags:
       - user
-  /workspace/league/reset:
-    put:
-      operationId: resetAndRecalculateLeagues
+  /workspaces:
+    get:
+      operationId: listWorkspaces
       responses:
         "200":
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/WorkspaceListItem"
           description: OK
       tags:
       - workspace
-  /workspace/repositories:
+    post:
+      operationId: createWorkspace
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateWorkspaceRequest"
+        required: true
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                type: object
+          description: OK
+      tags:
+      - workspace
+  /workspaces/{slug}:
+    delete:
+      operationId: purgeWorkspace
+      parameters:
+      - in: path
+        name: slug
+        required: true
+        schema:
+          type: string
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                type: object
+          description: OK
+      tags:
+      - workspace
     get:
-      operationId: getRepositoriesToMonitor
+      operationId: getWorkspace
+      parameters:
+      - in: path
+        name: slug
+        required: true
+        schema:
+          type: string
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                type: object
+          description: OK
+      tags:
+      - workspace
+  /workspaces/{slug}/league/reset:
+    put:
+      operationId: resetLeague
+      parameters:
+      - in: path
+        name: slug
+        required: true
+        schema:
+          type: string
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                type: object
+          description: OK
+      tags:
+      - workspace
+  /workspaces/{slug}/notifications:
+    patch:
+      operationId: updateNotifications
+      parameters:
+      - in: path
+        name: slug
+        required: true
+        schema:
+          type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateWorkspaceNotificationsRequest"
+        required: true
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                type: object
+          description: OK
+      tags:
+      - workspace
+  /workspaces/{slug}/public-visibility:
+    patch:
+      operationId: updatePublicVisibility
+      parameters:
+      - in: path
+        name: slug
+        required: true
+        schema:
+          type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateWorkspacePublicVisibilityRequest"
+        required: true
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                type: object
+          description: OK
+      tags:
+      - workspace
+  /workspaces/{slug}/repositories:
+    get:
+      operationId: getRepositories
+      parameters:
+      - in: path
+        name: slug
+        required: true
+        schema:
+          type: string
       responses:
         "200":
           content:
@@ -740,10 +870,15 @@ paths:
           description: OK
       tags:
       - workspace
-  /workspace/repositories/{owner}/{name}:
+  /workspaces/{slug}/repositories/{owner}/{name}:
     delete:
-      operationId: removeRepositoryToMonitor
+      operationId: removeRepository
       parameters:
+      - in: path
+        name: slug
+        required: true
+        schema:
+          type: string
       - in: path
         name: owner
         required: true
@@ -756,12 +891,21 @@ paths:
           type: string
       responses:
         "200":
+          content:
+            application/json:
+              schema:
+                type: object
           description: OK
       tags:
       - workspace
     post:
-      operationId: addRepositoryToMonitor
+      operationId: addRepository
       parameters:
+      - in: path
+        name: slug
+        required: true
+        schema:
+          type: string
       - in: path
         name: owner
         required: true
@@ -774,13 +918,106 @@ paths:
           type: string
       responses:
         "200":
+          content:
+            application/json:
+              schema:
+                type: object
           description: OK
       tags:
       - workspace
-  /workspace/team/{teamId}/label/{labelId}:
+  /workspaces/{slug}/resume:
+    post:
+      operationId: resumeWorkspace
+      parameters:
+      - in: path
+        name: slug
+        required: true
+        schema:
+          type: string
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                type: object
+          description: OK
+      tags:
+      - workspace
+  /workspaces/{slug}/schedule:
+    patch:
+      operationId: updateSchedule
+      parameters:
+      - in: path
+        name: slug
+        required: true
+        schema:
+          type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateWorkspaceScheduleRequest"
+        required: true
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                type: object
+          description: OK
+      tags:
+      - workspace
+  /workspaces/{slug}/slack-credentials:
+    patch:
+      operationId: updateSlackCredentials
+      parameters:
+      - in: path
+        name: slug
+        required: true
+        schema:
+          type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateWorkspaceSlackCredentialsRequest"
+        required: true
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                type: object
+          description: OK
+      tags:
+      - workspace
+  /workspaces/{slug}/suspend:
+    post:
+      operationId: suspendWorkspace
+      parameters:
+      - in: path
+        name: slug
+        required: true
+        schema:
+          type: string
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                type: object
+          description: OK
+      tags:
+      - workspace
+  /workspaces/{slug}/teams/{teamId}/labels/{labelId}:
     delete:
       operationId: removeLabelFromTeam
       parameters:
+      - in: path
+        name: slug
+        required: true
+        schema:
+          type: string
       - in: path
         name: teamId
         required: true
@@ -798,14 +1035,19 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/TeamInfo"
+                type: object
           description: OK
       tags:
       - workspace
-  /workspace/team/{teamId}/label/{repositoryId}/{label}:
+  /workspaces/{slug}/teams/{teamId}/labels/{repositoryId}/{label}:
     post:
       operationId: addLabelToTeam
       parameters:
+      - in: path
+        name: slug
+        required: true
+        schema:
+          type: string
       - in: path
         name: teamId
         required: true
@@ -828,13 +1070,43 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/TeamInfo"
+                type: object
           description: OK
       tags:
       - workspace
-  /workspace/users:
+  /workspaces/{slug}/token:
+    patch:
+      operationId: updateToken
+      parameters:
+      - in: path
+        name: slug
+        required: true
+        schema:
+          type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateWorkspaceTokenRequest"
+        required: true
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                type: object
+          description: OK
+      tags:
+      - workspace
+  /workspaces/{slug}/users:
     get:
-      operationId: getUsersWithTeams
+      operationId: getUsers
+      parameters:
+      - in: path
+        name: slug
+        required: true
+        schema:
+          type: string
       responses:
         "200":
           content:
@@ -1046,6 +1318,31 @@ components:
       - content
       - kind
       - title
+    CreateWorkspaceRequest:
+      type: object
+      description: DTO for creating a new workspace.
+      properties:
+        accountLogin:
+          type: string
+        accountType:
+          type: string
+          enum:
+          - ORG
+          - USER
+        displayName:
+          type: string
+        ownerUserId:
+          type: integer
+          format: int64
+        slug:
+          type: string
+          pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
+      required:
+      - accountLogin
+      - accountType
+      - displayName
+      - ownerUserId
+      - slug
     DataUIPart:
       type: object
       description: |-
@@ -2697,6 +2994,64 @@ components:
       - content
       - kind
       - title
+    UpdateWorkspaceNotificationsRequest:
+      type: object
+      description: DTO for updating workspace leaderboard notification preferences.
+      properties:
+        channelId:
+          type: string
+          pattern: "^[CGD][A-Z0-9]{8,}$"
+        enabled:
+          type: boolean
+        team:
+          type: string
+    UpdateWorkspacePublicVisibilityRequest:
+      type: object
+      description: DTO for updating workspace public visibility.
+      properties:
+        isPubliclyViewable:
+          type: boolean
+      required:
+      - isPubliclyViewable
+    UpdateWorkspaceScheduleRequest:
+      type: object
+      description: |-
+        DTO for updating workspace leaderboard schedule configuration.
+         Day: 1=Monday, 2=Tuesday, ..., 7=Sunday
+         Time: Format "HH:mm" (24-hour format)
+      properties:
+        day:
+          type: integer
+          format: int32
+          maximum: 7
+          minimum: 1
+        time:
+          type: string
+          pattern: "^([01]\\d|2[0-3]):[0-5]\\d$"
+      required:
+      - day
+      - time
+    UpdateWorkspaceSlackCredentialsRequest:
+      type: object
+      description: |-
+        Request DTO for updating Slack credentials (token and signing secret) for a workspace.
+         These credentials are used for Slack API integration and webhook signature verification.
+      properties:
+        slackSigningSecret:
+          type: string
+        slackToken:
+          type: string
+      required:
+      - slackSigningSecret
+      - slackToken
+    UpdateWorkspaceTokenRequest:
+      type: object
+      description: DTO for updating workspace Personal Access Token (PAT).
+      properties:
+        personalAccessToken:
+          type: string
+      required:
+      - personalAccessToken
     UserInfo:
       type: object
       properties:
@@ -2749,8 +3104,13 @@ components:
     UserSettings:
       type: object
       properties:
+        participateInResearch:
+          type: boolean
         receiveNotifications:
           type: boolean
+      required:
+      - participateInResearch
+      - receiveNotifications
     UserTeams:
       type: object
       properties:
@@ -2791,16 +3151,19 @@ components:
           anyOf:
           - type: integer
           - type: "null"
+          default: null
           title: Interval
         temperature_2m:
           anyOf:
           - type: number
           - type: "null"
+          default: null
           title: Temperature 2M
         time:
           anyOf:
           - type: string
           - type: "null"
+          default: null
           title: Time
       title: WeatherCurrent
     WeatherCurrentUnits:
@@ -2810,11 +3173,13 @@ components:
           anyOf:
           - type: string
           - type: "null"
+          default: null
           title: Interval
         temperature_2m:
           anyOf:
           - type: string
           - type: "null"
+          default: null
           title: Temperature 2M
         time:
           anyOf:
@@ -2851,11 +3216,13 @@ components:
           anyOf:
           - type: string
           - type: "null"
+          default: null
           title: Sunrise
         sunset:
           anyOf:
           - type: string
           - type: "null"
+          default: null
           title: Sunset
         time:
           anyOf:
@@ -2893,3 +3260,20 @@ components:
           - type: "null"
           title: Time
       title: WeatherHourlyUnits
+    WorkspaceListItem:
+      type: object
+      properties:
+        accountLogin:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+        displayName:
+          type: string
+        id:
+          type: integer
+          format: int64
+        slug:
+          type: string
+        status:
+          type: string

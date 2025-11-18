@@ -1,5 +1,6 @@
 import { Link } from "@tanstack/react-router";
 import { Hammer, LogOut, Settings, User } from "lucide-react";
+import { GitHubSignInButton } from "@/components/auth/GitHubSignInButton";
 import { ModeToggle } from "@/components/core/ModeToggle";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
@@ -64,9 +65,9 @@ export default function Header({
 
 				<div className="flex items-center gap-2">
 					{!isAuthenticated ? (
-						<Button onClick={onLogin} disabled={isLoading}>
-							{isLoading ? "Loading..." : "Sign In"}
-						</Button>
+						<GitHubSignInButton onClick={onLogin} disabled={isLoading}>
+							{isLoading ? "Signing in..." : "Sign in"}
+						</GitHubSignInButton>
 					) : (
 						<div className="flex items-center gap-2">
 							<DropdownMenu>

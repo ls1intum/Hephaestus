@@ -1,0 +1,129 @@
+<?xml version="1.1" encoding="UTF-8" standalone="no"?>
+<databaseChangeLog xmlns="http://www.liquibase.org/xml/ns/dbchangelog" xmlns:ext="http://www.liquibase.org/xml/ns/dbchangelog-ext" xmlns:pro="http://www.liquibase.org/xml/ns/pro" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog-ext http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-ext.xsd http://www.liquibase.org/xml/ns/pro http://www.liquibase.org/xml/ns/pro/liquibase-pro-latest.xsd http://www.liquibase.org/xml/ns/dbchangelog http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+    <changeSet author="ddmukh" id="1762272537437-1">
+        <createTable tableName="workspace_role_assignment">
+            <column autoIncrement="true" name="id" type="BIGINT">
+                <constraints nullable="false" primaryKey="true" primaryKeyName="workspace_role_assignmentPK"/>
+            </column>
+            <column name="created_at" type="TIMESTAMP(6) WITH TIME ZONE">
+                <constraints nullable="false"/>
+            </column>
+            <column name="role" type="VARCHAR(16)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="user_id" type="BIGINT">
+                <constraints nullable="false"/>
+            </column>
+            <column name="workspace_id" type="BIGINT">
+                <constraints nullable="false"/>
+            </column>
+        </createTable>
+    </changeSet>
+    <changeSet author="ddmukh" id="1762272537437-2">
+        <addColumn tableName="workspace">
+            <column name="created_at" type="TIMESTAMP(6) WITH TIME ZONE">
+                <constraints nullable="false"/>
+            </column>
+        </addColumn>
+    </changeSet>
+    <changeSet author="ddmukh" id="1762272537437-3">
+        <addColumn tableName="workspace">
+            <column name="display_name" type="VARCHAR(120)">
+                <constraints nullable="false"/>
+            </column>
+        </addColumn>
+    </changeSet>
+    <changeSet author="ddmukh" id="1762272537437-4">
+        <addColumn tableName="workspace">
+            <column name="slug" type="VARCHAR(64)">
+                <constraints nullable="false"/>
+            </column>
+        </addColumn>
+    </changeSet>
+    <changeSet author="ddmukh" id="1762272537437-5">
+        <addColumn tableName="workspace">
+            <column name="status" type="VARCHAR(20)">
+                <constraints nullable="false"/>
+            </column>
+        </addColumn>
+    </changeSet>
+    <changeSet author="ddmukh" id="1762272537437-6">
+        <addColumn tableName="workspace">
+            <column name="updated_at" type="TIMESTAMP(6) WITH TIME ZONE"/>
+        </addColumn>
+    </changeSet>
+    <changeSet author="ddmukh" id="1762272537437-7">
+        <addUniqueConstraint columnNames="slug" constraintName="UC_WORKSPACESLUG_COL" tableName="workspace"/>
+    </changeSet>
+    <changeSet author="ddmukh" id="1762272537437-8">
+        <addUniqueConstraint columnNames="workspace_id, user_id" constraintName="ux_wra_workspace_user" tableName="workspace_role_assignment"/>
+    </changeSet>
+    <changeSet author="ddmukh" id="1762272537437-9">
+        <createIndex indexName="idx_wra_user_id" tableName="workspace_role_assignment">
+            <column name="user_id"/>
+        </createIndex>
+    </changeSet>
+    <changeSet author="ddmukh" id="1762272537437-10">
+        <addForeignKeyConstraint baseColumnNames="workspace_id" baseTableName="workspace_role_assignment" constraintName="fk_wra_workspace" deferrable="false" initiallyDeferred="false" referencedColumnNames="id" referencedTableName="workspace" validate="true"/>
+    </changeSet>
+    
+    <!-- Add account_type column -->
+    <changeSet author="ddmukh" id="1762272537437-14">
+        <addColumn tableName="workspace">
+            <column name="account_type" type="VARCHAR(10)">
+                <constraints nullable="false"/>
+            </column>
+        </addColumn>
+    </changeSet>
+    
+    <!-- Make account_login NOT NULL -->
+    <changeSet author="ddmukh" id="1762272537437-16">
+        <addNotNullConstraint tableName="workspace" columnName="account_login" columnDataType="VARCHAR(120)"/>
+    </changeSet>
+    
+    <!-- Add index on installation_id -->
+    <changeSet author="ddmukh" id="1762272537437-17">
+        <createIndex indexName="idx_workspace_installation_id" tableName="workspace">
+            <column name="installation_id"/>
+        </createIndex>
+    </changeSet>
+    
+    <!-- Add leaderboard schedule configuration -->
+    <changeSet author="ddmukh" id="1762272537437-18">
+        <addColumn tableName="workspace">
+            <column name="leaderboard_schedule_day" type="INTEGER">
+                <constraints nullable="true"/>
+            </column>
+            <column name="leaderboard_schedule_time" type="VARCHAR(10)">
+                <constraints nullable="true"/>
+            </column>
+        </addColumn>
+    </changeSet>
+    
+    <!-- Add leaderboard notification configuration -->
+    <changeSet author="ddmukh" id="1762272537437-19">
+        <addColumn tableName="workspace">
+            <column name="leaderboard_notification_enabled" type="BOOLEAN">
+                <constraints nullable="true"/>
+            </column>
+            <column name="leaderboard_notification_team" type="VARCHAR(100)">
+                <constraints nullable="true"/>
+            </column>
+            <column name="leaderboard_notification_channel_id" type="VARCHAR(100)">
+                <constraints nullable="true"/>
+            </column>
+        </addColumn>
+    </changeSet>
+    
+    <!-- Add Slack credentials columns -->
+    <changeSet author="ddmukh" id="1762272537437-20">
+        <addColumn tableName="workspace">
+            <column name="slack_token" type="TEXT">
+                <constraints nullable="true"/>
+            </column>
+            <column name="slack_signing_secret" type="TEXT">
+                <constraints nullable="true"/>
+            </column>
+        </addColumn>
+    </changeSet>
+</databaseChangeLog>

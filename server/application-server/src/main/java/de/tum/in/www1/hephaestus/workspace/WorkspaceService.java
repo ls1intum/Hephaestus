@@ -1,27 +1,38 @@
 package de.tum.in.www1.hephaestus.workspace;
 
+import de.tum.in.www1.hephaestus.core.LoggingUtils;
+import de.tum.in.www1.hephaestus.core.exception.EntityNotFoundException;
+import de.tum.in.www1.hephaestus.gitprovider.common.github.app.GitHubAppTokenService;
 import de.tum.in.www1.hephaestus.gitprovider.label.Label;
 import de.tum.in.www1.hephaestus.gitprovider.label.LabelRepository;
+import de.tum.in.www1.hephaestus.gitprovider.organization.Organization;
+import de.tum.in.www1.hephaestus.gitprovider.organization.OrganizationService;
 import de.tum.in.www1.hephaestus.gitprovider.repository.RepositoryRepository;
 import de.tum.in.www1.hephaestus.gitprovider.repository.github.GitHubRepositorySyncService;
+import de.tum.in.www1.hephaestus.gitprovider.sync.GitHubDataSyncService;
+import de.tum.in.www1.hephaestus.gitprovider.sync.NatsConsumerService;
 import de.tum.in.www1.hephaestus.gitprovider.team.Team;
 import de.tum.in.www1.hephaestus.gitprovider.team.TeamInfoDTO;
 import de.tum.in.www1.hephaestus.gitprovider.team.TeamInfoDTOConverter;
 import de.tum.in.www1.hephaestus.gitprovider.team.TeamRepository;
 import de.tum.in.www1.hephaestus.gitprovider.team.membership.TeamMembership;
+import de.tum.in.www1.hephaestus.gitprovider.user.User;
 import de.tum.in.www1.hephaestus.gitprovider.user.UserRepository;
 import de.tum.in.www1.hephaestus.gitprovider.user.UserTeamsDTO;
+import de.tum.in.www1.hephaestus.gitprovider.user.github.GitHubUserSyncService;
 import de.tum.in.www1.hephaestus.leaderboard.LeaderboardMode;
 import de.tum.in.www1.hephaestus.leaderboard.LeaderboardService;
 import de.tum.in.www1.hephaestus.leaderboard.LeaderboardSortType;
 import de.tum.in.www1.hephaestus.leaderboard.LeaguePointsCalculationService;
-import de.tum.in.www1.hephaestus.organization.Organization;
-import de.tum.in.www1.hephaestus.organization.OrganizationService;
-import de.tum.in.www1.hephaestus.syncing.GitHubDataSyncService;
-import de.tum.in.www1.hephaestus.syncing.NatsConsumerService;
-import de.tum.in.www1.hephaestus.workspace.member.WorkspaceMemberService;
+import de.tum.in.www1.hephaestus.workspace.context.WorkspaceContext;
+import de.tum.in.www1.hephaestus.workspace.context.WorkspaceContextExecutor;
+import de.tum.in.www1.hephaestus.workspace.context.WorkspaceContextHolder;
+import de.tum.in.www1.hephaestus.workspace.exception.*;
 import jakarta.transaction.Transactional;
 import java.time.Instant;
+import java.time.LocalTime;
+import java.time.format.DateTimeFormatter;
+import java.time.format.DateTimeParseException;
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.HashSet;
@@ -30,17 +41,21 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
+import java.util.regex.Pattern;
 import org.kohsuke.github.GHRepositorySelection;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 
 @Service
 public class WorkspaceService {
 
     private static final Logger logger = LoggerFactory.getLogger(WorkspaceService.class);
+
+    private static final Pattern SLACK_CHANNEL_ID_PATTERN = Pattern.compile("^[CGD][A-Z0-9]{8,}$");
 
     @Autowired
     private NatsConsumerService natsConsumerService;
@@ -79,10 +94,16 @@ public class WorkspaceService {
     private LeaguePointsCalculationService leaguePointsCalculationService;
 
     @Autowired
-    private WorkspaceMemberService workspaceMemberService;
+    private OrganizationService organizationService;
 
     @Autowired
-    private OrganizationService organizationService;
+    private WorkspaceMembershipService workspaceMembershipService;
+
+    @Autowired
+    private GitHubUserSyncService gitHubUserSyncService;
+
+    @Autowired
+    private GitHubAppTokenService gitHubAppTokenService;
 
     @Value("${nats.enabled}")
     private boolean isNatsEnabled;
@@ -151,35 +172,54 @@ public class WorkspaceService {
 
         logger.info("Running monitoring on startup for workspace id={}", workspace.getId());
 
-        CompletableFuture<?>[] repoFutures = repositoriesToMonitor
-            .stream()
-            .map(repo -> CompletableFuture.runAsync(() -> gitHubDataSyncService.syncRepositoryToMonitor(repo)))
-            .toArray(CompletableFuture[]::new);
-        CompletableFuture<Void> reposDone = CompletableFuture.allOf(repoFutures);
+        // Temporarily set workspace context for async operations to capture
+        WorkspaceContext workspaceContext = WorkspaceContext.fromWorkspace(workspace, Set.of());
+        WorkspaceContextHolder.setContext(workspaceContext);
+        try {
+            CompletableFuture<?>[] repoFutures = repositoriesToMonitor
+                .stream()
+                .map(repo ->
+                    CompletableFuture.runAsync(
+                        WorkspaceContextExecutor.wrap(() -> gitHubDataSyncService.syncRepositoryToMonitor(repo))
+                    )
+                )
+                .toArray(CompletableFuture[]::new);
+            CompletableFuture<Void> reposDone = CompletableFuture.allOf(repoFutures);
 
-        CompletableFuture<Void> usersFuture = reposDone
-            .thenRunAsync(() -> {
-                logger.info("All repositories synced, now syncing users for workspace id={}", workspace.getId());
-                gitHubDataSyncService.syncUsers(workspace);
-            })
-            .exceptionally(ex -> {
-                logger.error("Error during syncUsers: {}", ex.getMessage(), ex);
-                return null;
-            });
+            CompletableFuture<Void> usersFuture = reposDone
+                .thenRunAsync(
+                    WorkspaceContextExecutor.wrap(() -> {
+                        logger.info(
+                            "All repositories synced, now syncing users for workspace id={}",
+                            workspace.getId()
+                        );
+                        gitHubDataSyncService.syncUsers(workspace);
+                    })
+                )
+                .exceptionally(ex -> {
+                    logger.error("Error during syncUsers: {}", LoggingUtils.sanitizeForLog(ex.getMessage()), ex);
+                    return null;
+                });
 
-        CompletableFuture<Void> teamsFuture = usersFuture
-            .thenRunAsync(() -> {
-                logger.info("Syncing teams for workspace id={}", workspace.getId());
-                gitHubDataSyncService.syncTeams(workspace);
-            })
-            .exceptionally(ex -> {
-                logger.error("Error during syncTeams: {}", ex.getMessage(), ex);
-                return null;
-            });
+            CompletableFuture<Void> teamsFuture = usersFuture
+                .thenRunAsync(
+                    WorkspaceContextExecutor.wrap(() -> {
+                        logger.info("Users synced, now syncing teams for workspace id={}", workspace.getId());
+                        gitHubDataSyncService.syncTeams(workspace);
+                    })
+                )
+                .exceptionally(ex -> {
+                    logger.error("Error during syncTeams: {}", LoggingUtils.sanitizeForLog(ex.getMessage()), ex);
+                    return null;
+                });
 
-        CompletableFuture.allOf(teamsFuture).thenRun(() ->
-            logger.info("Finished running monitoring on startup for workspace id={}", workspace.getId())
-        );
+            CompletableFuture.allOf(teamsFuture).thenRun(() ->
+                logger.info("Finished running monitoring on startup for workspace id={}", workspace.getId())
+            );
+        } finally {
+            // Clear context after spawning async tasks
+            WorkspaceContextHolder.clearContext();
+        }
     }
 
     public Workspace getWorkspaceByRepositoryOwner(String nameWithOwner) {
@@ -194,21 +234,50 @@ public class WorkspaceService {
     }
 
     public List<String> getRepositoriesToMonitor() {
-        logger.info("Getting repositories to monitor from all workspaces");
-        return workspaceRepository
-            .findAll()
-            .stream()
-            .flatMap(ws -> ws.getRepositoriesToMonitor().stream())
-            .map(RepositoryToMonitor::getNameWithOwner)
-            .distinct()
-            .toList();
+        WorkspaceContext workspaceContext = WorkspaceContextHolder.getContext();
+
+        if (workspaceContext != null) {
+            logger.info("Getting repositories for workspace: {}", workspaceContext.slug());
+            Workspace workspace = workspaceRepository
+                .findById(workspaceContext.id())
+                .orElseThrow(() -> new EntityNotFoundException("Workspace", workspaceContext.slug()));
+
+            return workspace
+                .getRepositoriesToMonitor()
+                .stream()
+                .map(RepositoryToMonitor::getNameWithOwner)
+                .sorted()
+                .toList();
+        } else {
+            logger.info("Getting repositories from all workspaces (no workspace context)");
+            return workspaceRepository
+                .findAll()
+                .stream()
+                .flatMap(ws -> ws.getRepositoriesToMonitor().stream())
+                .map(RepositoryToMonitor::getNameWithOwner)
+                .distinct()
+                .toList();
+        }
     }
 
     public void addRepositoryToMonitor(String nameWithOwner)
-        throws RepositoryAlreadyMonitoredException, RepositoryNotFoundException {
-        logger.info("Adding repository to monitor: " + nameWithOwner);
-        Workspace workspace = resolveWorkspaceForRepo(nameWithOwner);
+        throws RepositoryAlreadyMonitoredException, EntityNotFoundException {
+        WorkspaceContext workspaceContext = WorkspaceContextHolder.getContext();
 
+        Workspace workspace;
+        if (workspaceContext != null) {
+            logger.info(
+                "Adding repository {} to workspace: {}",
+                LoggingUtils.sanitizeForLog(nameWithOwner),
+                workspaceContext.slug()
+            );
+            workspace = workspaceRepository
+                .findById(workspaceContext.id())
+                .orElseThrow(() -> new EntityNotFoundException("Workspace", workspaceContext.slug()));
+        } else {
+            logger.info("Adding repository {} (no workspace context)", LoggingUtils.sanitizeForLog(nameWithOwner));
+            workspace = resolveWorkspaceForRepo(nameWithOwner);
+        }
         if (workspace.getRepositoriesToMonitor().stream().anyMatch(r -> r.getNameWithOwner().equals(nameWithOwner))) {
             logger.info("Repository is already being monitored");
             throw new RepositoryAlreadyMonitoredException(nameWithOwner);
@@ -220,7 +289,7 @@ public class WorkspaceService {
         var repository = repositorySyncService.syncRepository(workspaceId, nameWithOwner);
         if (repository.isEmpty()) {
             logger.info("Repository does not exist");
-            throw new RepositoryNotFoundException(nameWithOwner);
+            throw new EntityNotFoundException("Repository", nameWithOwner);
         }
 
         RepositoryToMonitor repositoryToMonitor = new RepositoryToMonitor();
@@ -237,10 +306,23 @@ public class WorkspaceService {
         gitHubDataSyncService.syncRepositoryToMonitorAsync(repositoryToMonitor);
     }
 
-    public void removeRepositoryToMonitor(String nameWithOwner) throws RepositoryNotFoundException {
-        logger.info("Removing repository from monitor: " + nameWithOwner);
-        Workspace workspace = getWorkspaceByRepositoryOwner(nameWithOwner);
+    public void removeRepositoryToMonitor(String nameWithOwner) throws EntityNotFoundException {
+        WorkspaceContext workspaceContext = WorkspaceContextHolder.getContext();
 
+        Workspace workspace;
+        if (workspaceContext != null) {
+            logger.info(
+                "Removing repository {} from workspace: {}",
+                LoggingUtils.sanitizeForLog(nameWithOwner),
+                workspaceContext.slug()
+            );
+            workspace = workspaceRepository
+                .findById(workspaceContext.id())
+                .orElseThrow(() -> new EntityNotFoundException("Workspace", workspaceContext.slug()));
+        } else {
+            logger.info("Removing repository {} (no workspace context)", LoggingUtils.sanitizeForLog(nameWithOwner));
+            workspace = getWorkspaceByRepositoryOwner(nameWithOwner);
+        }
         RepositoryToMonitor repositoryToMonitor = workspace
             .getRepositoriesToMonitor()
             .stream()
@@ -250,7 +332,7 @@ public class WorkspaceService {
 
         if (repositoryToMonitor == null) {
             logger.info("Repository is not being monitored");
-            throw new RepositoryNotFoundException(nameWithOwner);
+            throw new EntityNotFoundException("Repository", nameWithOwner);
         }
 
         repositoryToMonitorRepository.delete(repositoryToMonitor);
@@ -272,14 +354,41 @@ public class WorkspaceService {
     }
 
     public List<UserTeamsDTO> getUsersWithTeams() {
-        logger.info("Getting all users with their teams");
-        return userRepository.findAllHuman().stream().map(UserTeamsDTO::fromUser).toList();
+        WorkspaceContext workspaceContext = WorkspaceContextHolder.getContext();
+
+        if (workspaceContext != null) {
+            logger.info("Getting users for workspace: {}", workspaceContext.slug());
+            workspaceRepository
+                .findById(workspaceContext.id())
+                .orElseThrow(() -> new EntityNotFoundException("Workspace", workspaceContext.slug()));
+
+            return userRepository.findAllHuman().stream().map(UserTeamsDTO::fromUser).toList();
+        } else {
+            logger.info("Getting all users (no workspace context)");
+            return userRepository.findAllHuman().stream().map(UserTeamsDTO::fromUser).toList();
+        }
     }
 
     public Optional<TeamInfoDTO> addLabelToTeam(Long teamId, Long repositoryId, String label) {
-        logger.info(
-            "Adding label '" + label + "' of repository with ID: " + repositoryId + " to team with ID: " + teamId
-        );
+        WorkspaceContext workspaceContext = WorkspaceContextHolder.getContext();
+
+        if (workspaceContext != null) {
+            logger.info(
+                "Adding label '{}' of repository {} to team {} in workspace: {}",
+                LoggingUtils.sanitizeForLog(label),
+                repositoryId,
+                teamId,
+                workspaceContext.slug()
+            );
+        } else {
+            logger.info(
+                "Adding label '{}' of repository {} to team {}",
+                LoggingUtils.sanitizeForLog(label),
+                repositoryId,
+                teamId
+            );
+        }
+
         Optional<Team> optionalTeam = teamRepository.findById(teamId);
         if (optionalTeam.isEmpty()) {
             return Optional.empty();
@@ -295,7 +404,14 @@ public class WorkspaceService {
     }
 
     public Optional<TeamInfoDTO> removeLabelFromTeam(Long teamId, Long labelId) {
-        logger.info("Removing label with ID: " + labelId + " from team with ID: " + teamId);
+        WorkspaceContext workspaceContext = WorkspaceContextHolder.getContext();
+
+        if (workspaceContext != null) {
+            logger.info("Removing label {} from team {} in workspace: {}", labelId, teamId, workspaceContext.slug());
+        } else {
+            logger.info("Removing label {} from team {}", labelId, teamId);
+        }
+
         Optional<Team> optionalTeam = teamRepository.findById(teamId);
         if (optionalTeam.isEmpty()) {
             return Optional.empty();
@@ -312,7 +428,7 @@ public class WorkspaceService {
 
     //TODO: Method never used
     public Optional<TeamInfoDTO> deleteTeam(Long teamId) {
-        logger.info("Deleting team with ID: " + teamId);
+        logger.info("Deleting team with ID: {}", teamId);
         Optional<Team> optionalTeam = teamRepository.findById(teamId);
         if (optionalTeam.isEmpty()) {
             return Optional.empty();
@@ -338,13 +454,23 @@ public class WorkspaceService {
     }
 
     /**
-     * Reset and recalculate league points for all users until 01/01/2024
+     * Reset and recalculate league points for all users until 01/01/2024.
+     * If workspace context is available, only processes users in that workspace.
      */
     @Transactional
     public void resetAndRecalculateLeagues() {
-        logger.info("Resetting and recalculating league points for all users");
+        WorkspaceContext workspaceContext = WorkspaceContextHolder.getContext();
 
-        Optional<Workspace> workspaceOptional = workspaceMemberService.resolveSingleWorkspace(
+        if (workspaceContext != null) {
+            logger.info("Resetting league points for workspace: {}", workspaceContext.slug());
+            workspaceRepository
+                .findById(workspaceContext.id())
+                .orElseThrow(() -> new EntityNotFoundException("Workspace", workspaceContext.slug()));
+        } else {
+            logger.info("Resetting league points for all users (no workspace context)");
+        }
+
+        Optional<Workspace> workspaceOptional = workspaceMembershipService.resolveSingleWorkspace(
             "league recalculation"
         );
         if (workspaceOptional.isEmpty()) {
@@ -352,7 +478,7 @@ public class WorkspaceService {
             return;
         }
 
-        workspaceMemberService.resetLeaguePoints(workspaceOptional, LeaguePointsCalculationService.POINTS_DEFAULT);
+        workspaceMembershipService.resetLeaguePoints(workspaceOptional, LeaguePointsCalculationService.POINTS_DEFAULT);
 
         // Get all pull request reviews and issue comments to calculate past leaderboards
         var now = Instant.now();
@@ -378,9 +504,9 @@ public class WorkspaceService {
                     return;
                 }
                 var user = userRepository.findByLoginWithEagerMergedPullRequests(leaderboardUser.login()).orElseThrow();
-                int currentPoints = workspaceMemberService.getCurrentLeaguePoints(workspaceOptional, user);
+                int currentPoints = workspaceMembershipService.getCurrentLeaguePoints(workspaceOptional, user);
                 int newPoints = leaguePointsCalculationService.calculateNewPoints(user, currentPoints, entry);
-                workspaceMemberService.updateLeaguePoints(workspaceOptional, user, newPoints);
+                workspaceMembershipService.updateLeaguePoints(workspaceOptional, user, newPoints);
             });
 
             // Move time window back one week
@@ -406,14 +532,28 @@ public class WorkspaceService {
                 logger.info(
                     "Linking existing workspace id={} login={} to installation {}.",
                     workspace.getId(),
-                    accountLogin,
+                    LoggingUtils.sanitizeForLog(accountLogin),
                     installationId
                 );
             }
         }
 
         if (workspace == null) {
-            workspace = new Workspace();
+            if (isBlank(accountLogin)) {
+                throw new IllegalArgumentException(
+                    "Cannot create workspace from installation " + installationId + " without accountLogin."
+                );
+            }
+
+            Long ownerUserId = syncGitHubUserForOwnership(installationId, accountLogin);
+
+            workspace = createWorkspace(accountLogin, accountLogin, accountLogin, AccountType.ORG, ownerUserId);
+            logger.info(
+                "Created new workspace '{}' for installation {} with owner userId={}.",
+                LoggingUtils.sanitizeForLog(workspace.getSlug()),
+                installationId,
+                ownerUserId
+            );
         }
 
         workspace.setGitProviderMode(Workspace.GitProviderMode.GITHUB_APP_INSTALLATION);
@@ -513,10 +653,18 @@ public class WorkspaceService {
     private Optional<Workspace> resolveFallbackWorkspace(String context) {
         List<Workspace> all = workspaceRepository.findAll();
         if (all.size() == 1) {
-            logger.info("Falling back to the only configured workspace id={} for {}.", all.get(0).getId(), context);
-            return Optional.of(all.get(0));
+            logger.info(
+                "Falling back to the only configured workspace id={} for {}.",
+                all.getFirst().getId(),
+                LoggingUtils.sanitizeForLog(context)
+            );
+            return Optional.of(all.getFirst());
         }
-        logger.warn("Unable to resolve workspace for {}. Available workspace count={}", context, all.size());
+        logger.warn(
+            "Unable to resolve workspace for {}. Available workspace count={}",
+            LoggingUtils.sanitizeForLog(context),
+            all.size()
+        );
         return Optional.empty();
     }
 
@@ -553,6 +701,197 @@ public class WorkspaceService {
                     owner +
                     "'. " +
                     "Ensure a PAT workspace exists or the GitHub App installation was reconciled."
+                )
+            );
+    }
+
+    @Transactional
+    public Workspace createWorkspace(
+        String rawSlug,
+        String displayName,
+        String accountLogin,
+        AccountType accountType,
+        Long ownerUserId
+    ) {
+        String slug = normalizeSlug(rawSlug);
+        validateSlug(slug);
+
+        Workspace workspace = new Workspace();
+        workspace.setSlug(slug);
+        workspace.setDisplayName(displayName);
+        workspace.setAccountLogin(accountLogin);
+        workspace.setAccountType(accountType);
+
+        try {
+            Workspace saved = workspaceRepository.save(workspace);
+            createOwnerRole(saved, ownerUserId);
+            return saved;
+        } catch (DataIntegrityViolationException e) {
+            // Unique constraint violation on slug
+            throw new WorkspaceSlugConflictException(slug);
+        }
+    }
+
+    public Optional<Workspace> getWorkspaceBySlug(String slug) {
+        return workspaceRepository.findBySlug(slug);
+    }
+
+    @Transactional
+    public Workspace updateSchedule(String slug, Integer day, String time) {
+        Workspace workspace = workspaceRepository
+            .findBySlug(slug)
+            .orElseThrow(() -> new EntityNotFoundException("Workspace", slug));
+
+        if (day != null) {
+            if (day < 1 || day > 7) {
+                throw new IllegalArgumentException("Day must be between 1 (Monday) and 7 (Sunday), got: " + day);
+            }
+            workspace.setLeaderboardScheduleDay(day);
+        }
+
+        if (time != null) {
+            try {
+                LocalTime parsed = LocalTime.parse(time, DateTimeFormatter.ofPattern("HH:mm"));
+                workspace.setLeaderboardScheduleTime(parsed.toString());
+            } catch (DateTimeParseException ex) {
+                throw new IllegalArgumentException("Time must be in HH:mm format (00:00 to 23:59), got: " + time);
+            }
+        }
+
+        return workspaceRepository.save(workspace);
+    }
+
+    @Transactional
+    public Workspace updateNotifications(String slug, Boolean enabled, String team, String channelId) {
+        Workspace workspace = workspaceRepository
+            .findBySlug(slug)
+            .orElseThrow(() -> new EntityNotFoundException("Workspace", slug));
+
+        if (enabled != null) {
+            workspace.setLeaderboardNotificationEnabled(enabled);
+        }
+
+        if (team != null) {
+            workspace.setLeaderboardNotificationTeam(team);
+        }
+
+        if (channelId != null) {
+            String trimmedChannelId = channelId.trim();
+            if (!SLACK_CHANNEL_ID_PATTERN.matcher(trimmedChannelId).matches()) {
+                throw new IllegalArgumentException(
+                    "Slack channel ID must start with 'C' (public), 'G' (private), or 'D' (DM) followed by at least 8 alphanumerics, got: " +
+                    trimmedChannelId
+                );
+            }
+            workspace.setLeaderboardNotificationChannelId(trimmedChannelId);
+        }
+
+        return workspaceRepository.save(workspace);
+    }
+
+    @Transactional
+    public Workspace updateToken(String slug, String personalAccessToken) {
+        Workspace workspace = workspaceRepository
+            .findBySlug(slug)
+            .orElseThrow(() -> new EntityNotFoundException("Workspace", slug));
+
+        // TODO: Validate token with GitHub API before storing
+        // TODO: Consider encrypting the token at rest
+        // TODO: Add audit log entry for security tracking
+        workspace.setPersonalAccessToken(personalAccessToken);
+
+        return workspaceRepository.save(workspace);
+    }
+
+    @Transactional
+    public Workspace updateSlackCredentials(String slug, String slackToken, String slackSigningSecret) {
+        Workspace workspace = workspaceRepository
+            .findBySlug(slug)
+            .orElseThrow(() -> new EntityNotFoundException("Workspace", slug));
+
+        // TODO: Validate Slack token by calling Slack API (auth.test)
+        workspace.setSlackToken(slackToken);
+        workspace.setSlackSigningSecret(slackSigningSecret);
+
+        return workspaceRepository.save(workspace);
+    }
+
+    @Transactional
+    public Workspace updatePublicVisibility(String slug, Boolean isPubliclyViewable) {
+        Workspace workspace = workspaceRepository
+            .findBySlug(slug)
+            .orElseThrow(() -> new EntityNotFoundException("Workspace", slug));
+
+        workspace.setIsPubliclyViewable(isPubliclyViewable);
+
+        return workspaceRepository.save(workspace);
+    }
+
+    private void createOwnerRole(Workspace workspace, Long ownerUserId) {
+        if (ownerUserId == null) {
+            throw new IllegalArgumentException("Owner user id must not be null when creating a workspace.");
+        }
+        workspaceMembershipService.createMembership(workspace, ownerUserId, WorkspaceMembership.WorkspaceRole.OWNER);
+    }
+
+    private String normalizeSlug(String slug) {
+        if (slug == null) {
+            return null;
+        }
+        String normalized = slug.trim().toLowerCase();
+        normalized = normalized
+            .replace('_', '-')
+            .replaceAll("\\s+", "-")
+            .replaceAll("-{2,}", "-")
+            .replaceAll("^-|-$", "");
+        return normalized;
+    }
+
+    private void validateSlug(String slug) {
+        if (slug == null) {
+            throw new InvalidWorkspaceSlugException("null");
+        }
+        if (!slug.matches("^[a-z0-9][a-z0-9-]{2,50}$")) {
+            throw new InvalidWorkspaceSlugException(slug);
+        }
+    }
+
+    /**
+     * Syncs a GitHub user from an installation and returns their user ID for ownership assignment.
+     * Falls back to checking existing users if GitHub sync fails.
+     */
+    private Long syncGitHubUserForOwnership(long installationId, String accountLogin) {
+        try {
+            org.kohsuke.github.GitHub github = gitHubAppTokenService.clientForInstallation(installationId);
+
+            User user = gitHubUserSyncService.syncUser(github, accountLogin);
+
+            if (user != null && user.getId() != null) {
+                logger.info(
+                    "Synced GitHub user '{}' (id={}) as workspace owner.",
+                    LoggingUtils.sanitizeForLog(accountLogin),
+                    user.getId()
+                );
+                return user.getId();
+            }
+        } catch (Exception e) {
+            logger.warn(
+                "Failed to sync GitHub user '{}' for installation {}: {}",
+                LoggingUtils.sanitizeForLog(accountLogin),
+                installationId,
+                LoggingUtils.sanitizeForLog(e.getMessage())
+            );
+        }
+
+        return userRepository
+            .findByLogin(accountLogin)
+            .map(User::getId)
+            .orElseThrow(() ->
+                new IllegalStateException(
+                    "Cannot assign owner for workspace: GitHub user '" +
+                    accountLogin +
+                    "' could not be synced and does not exist locally. " +
+                    "Ensure the user exists in the system before creating the workspace."
                 )
             );
     }

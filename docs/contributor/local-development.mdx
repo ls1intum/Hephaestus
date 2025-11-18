@@ -63,9 +63,72 @@ Never commit `application-local.yml`. It may contain secrets and machine-specifi
 
 3. Access the API at `http://localhost:8080` or explore `http://localhost:8080/swagger-ui/index.html`.
 
+### GitHub configuration
+
+Hephaestus can connect to GitHub using either a **Personal Access Token (PAT)** or a **GitHub App**. For local development, using a PAT is simpler and recommended.
+
+#### Using a Personal Access Token (recommended for development)
+
+1. [Create a Personal Access Token](https://github.com/settings/tokens) with the following scopes:
+   - `repo` (full control of private repositories)
+   - `read:org` (read organization membership)
+   - `read:user` (read user profile data)
+
+2. Configure your workspace through the UI after signing in, or set up a default workspace in `application-local.yml`:
+
+   ```yaml
+   hephaestus:
+     workspace:
+       init-default: true
+       default:
+         login: your-github-org
+         token: ghp_your_personal_access_token
+   ```
+
+:::caution Security
+Never commit actual tokens to version control. Use `application-local.yml` (which is in `.gitignore`) or environment variables to store tokens securely. The example above shows placeholder values only.
+:::
+
+:::tip
+The GitHub App configuration (`github.app.id`, `github.app.privateKey`) is optional and defaults to disabled. The application will work perfectly with just a Personal Access Token for local development.
+:::
+
+#### Using a GitHub App (optional)
+
+If you need to test GitHub App functionality:
+
+1. [Create a GitHub App](https://docs.github.com/en/apps/creating-github-apps/registering-a-github-app/registering-a-github-app) with appropriate permissions.
+2. Set the following in `application-local.yml`:
+
+   ```yaml
+   github:
+     app:
+       id: your-app-id
+       privateKey: |
+         -----BEGIN RSA PRIVATE KEY-----
+         your-private-key-content
+         -----END RSA PRIVATE KEY-----
+   ```
+
 ### Keycloak integration
 
-Keycloak runs in Docker as part of the development compose stack. Configure GitHub as an identity provider before inviting external testers.
+Keycloak runs in Docker as part of the development compose stack. The bundled realm import no longer ships test users—authentication always flows through GitHub and mirrors production.
+
+#### Configure the GitHub identity provider
+
+1. [Create a new GitHub OAuth application](https://github.com/settings/developers) with the callback URL `http://localhost:8081/realms/hephaestus/broker/github/endpoint`.
+2. Export the generated **Client ID** and **Client secret**, then copy `server/application-server/.env.example` to `server/application-server/.env` and update the placeholders:
+
+   ```bash
+   cp server/application-server/.env.example server/application-server/.env
+   KEYCLOAK_GITHUB_CLIENT_ID=<github-client-id>
+   KEYCLOAK_GITHUB_CLIENT_SECRET=<github-client-secret>
+   KEYCLOAK_GITHUB_ADMIN_USERNAME=<github-handle-with-admin-access>
+   ```
+
+   The Keycloak container resolves these placeholders during realm import, as documented in the [Keycloak import guide](https://www.keycloak.org/server/importExport#_using_environment_variables_within_the_realm_configuration_files).
+3. (Re)start the local stack: `docker compose up keycloak postgres`. On first boot Keycloak imports `keycloak-hephaestus-realm-example-config.json` and wires the GitHub provider automatically.
+4. Sign in via GitHub using the account referenced by `KEYCLOAK_GITHUB_ADMIN_USERNAME`. During the first brokered login Keycloak automatically grants that account the `admin` realm role and the `realm-management` → `realm-admin` client role, unlocking the administrative views in the application server and Keycloak console.
 
 ## Web client (`webapp`)
 

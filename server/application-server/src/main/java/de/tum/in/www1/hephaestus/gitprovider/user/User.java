@@ -6,9 +6,10 @@ import de.tum.in.www1.hephaestus.gitprovider.issuecomment.IssueComment;
 import de.tum.in.www1.hephaestus.gitprovider.pullrequest.PullRequest;
 import de.tum.in.www1.hephaestus.gitprovider.pullrequestreview.PullRequestReview;
 import de.tum.in.www1.hephaestus.gitprovider.pullrequestreviewcomment.PullRequestReviewComment;
+import de.tum.in.www1.hephaestus.gitprovider.repository.collaborator.RepositoryCollaborator;
 import de.tum.in.www1.hephaestus.gitprovider.team.Team;
 import de.tum.in.www1.hephaestus.gitprovider.team.membership.TeamMembership;
-import de.tum.in.www1.hephaestus.workspace.member.WorkspaceMember;
+import de.tum.in.www1.hephaestus.workspace.WorkspaceMembership;
 import jakarta.persistence.CascadeType;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
@@ -69,6 +70,10 @@ public class User extends BaseGitServiceEntity {
     @ToString.Exclude
     private Set<TeamMembership> teamMemberships = new HashSet<>();
 
+    @OneToMany(mappedBy = "user")
+    @ToString.Exclude
+    private Set<RepositoryCollaborator> repositoryCollaborations = new HashSet<>();
+
     @OneToMany(mappedBy = "author")
     @ToString.Exclude
     private Set<Issue> createdIssues = new HashSet<>();
@@ -97,12 +102,18 @@ public class User extends BaseGitServiceEntity {
     @ToString.Exclude
     private Set<PullRequestReviewComment> reviewComments = new HashSet<>();
 
+    @OneToMany(mappedBy = "user", cascade = CascadeType.ALL, orphanRemoval = true)
+    @ToString.Exclude
+    private Set<WorkspaceMembership> workspaceMemberships = new HashSet<>();
+
     @NonNull
     private boolean notificationsEnabled = true;
 
-    @OneToMany(mappedBy = "user", cascade = CascadeType.ALL, orphanRemoval = true)
-    @ToString.Exclude
-    private Set<WorkspaceMember> workspaceMemberships = new HashSet<>();
+    @NonNull
+    private boolean participateInResearch = true;
+
+    // Current ranking points for the leaderboard leagues
+    private int leaguePoints;
 
     public enum Type {
         USER,
