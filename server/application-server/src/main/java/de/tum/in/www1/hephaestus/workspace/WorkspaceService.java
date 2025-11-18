@@ -779,7 +779,7 @@ public class WorkspaceService {
             if (!SLACK_CHANNEL_ID_PATTERN.matcher(trimmedChannelId).matches()) {
                 throw new IllegalArgumentException(
                     "Slack channel ID must start with 'C' (public), 'G' (private), or 'D' (DM) followed by at least 8 alphanumerics, got: " +
-                    channelId
+                    trimmedChannelId
                 );
             }
             workspace.setLeaderboardNotificationChannelId(trimmedChannelId);

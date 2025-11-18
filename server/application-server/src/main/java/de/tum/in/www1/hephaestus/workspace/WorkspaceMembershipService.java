@@ -2,15 +2,12 @@ package de.tum.in.www1.hephaestus.workspace;
 
 import de.tum.in.www1.hephaestus.gitprovider.user.User;
 import jakarta.persistence.EntityManager;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import java.util.Optional;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 @Service
 public class WorkspaceMembershipService {
-
-    private static final Logger logger = LoggerFactory.getLogger(WorkspaceMembershipService.class);
 
     private final WorkspaceMembershipRepository workspaceMembershipRepository;
     private final EntityManager entityManager;
@@ -39,6 +36,15 @@ public class WorkspaceMembershipService {
         User userReference = entityManager.find(User.class, userId);
         if (userReference == null) {
             throw new IllegalArgumentException("User not found with ID: " + userId);
+        }
+
+        // Check if membership already exists
+        Optional<WorkspaceMembership> existing = workspaceMembershipRepository
+            .findByWorkspace_IdAndUser_Id(workspace.getId(), userId);
+        if (existing.isPresent()) {
+            throw new IllegalArgumentException(
+                "Membership already exists for workspace " + workspace.getId() + " and user " + userId
+            );
         }
 
         WorkspaceMembership membership = new WorkspaceMembership();
