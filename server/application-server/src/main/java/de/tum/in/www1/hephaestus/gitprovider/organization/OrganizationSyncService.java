@@ -187,7 +187,10 @@ public class OrganizationSyncService {
             }
             membershipRepository.upsertMembership(organization.getGithubId(), user.getId(), entry.getValue());
             seen.add(user.getId());
-            desiredWorkspaceRoles.put(user.getId(), WorkspaceMembership.WorkspaceRole.fromOrganizationRole(entry.getValue()));
+            desiredWorkspaceRoles.put(
+                user.getId(),
+                WorkspaceMembership.WorkspaceRole.fromOrganizationRole(entry.getValue())
+            );
         }
 
         List<Long> current = membershipRepository.findUserIdsByOrganizationId(organization.getGithubId());

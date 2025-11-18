@@ -188,12 +188,13 @@ public class LeaderboardService {
         for (int index = 0; index < ranking.size(); index++) {
             Long userId = ranking.get(index);
             int score = scoresByUserId.getOrDefault(userId, 0);
-            UserInfoDTO userDto = Optional
-                .ofNullable(usersById.get(userId))
-                .map(user -> UserInfoDTO.fromUser(
+            UserInfoDTO userDto = Optional.ofNullable(usersById.get(userId))
+                .map(user ->
+                    UserInfoDTO.fromUser(
                         user,
                         leaguePointsByUserId.getOrDefault(userId, LeaguePointsCalculationService.POINTS_DEFAULT)
-                    ))
+                    )
+                )
                 .orElse(null);
             List<PullRequestReview> userReviews = reviewsByUserId.getOrDefault(userId, Collections.emptyList());
             List<IssueComment> userIssueComments = issueCommentsByUserId.getOrDefault(userId, Collections.emptyList());
@@ -431,11 +432,7 @@ public class LeaderboardService {
             "league stats for user '" + login + "'"
         );
         int currentLeaguePoints = workspaceMembershipService.getCurrentLeaguePoints(workspaceOptional, user);
-        int projectedNewPoints = leaguePointsCalculationService.calculateNewPoints(
-            user,
-            currentLeaguePoints,
-            entry
-        );
+        int projectedNewPoints = leaguePointsCalculationService.calculateNewPoints(user, currentLeaguePoints, entry);
         return new LeagueChangeDTO(user.getLogin(), projectedNewPoints - currentLeaguePoints);
     }
 

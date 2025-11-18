@@ -40,7 +40,8 @@ class WorkspaceContextExecutorTest {
         AtomicReference<WorkspaceContext> capturedContext = new AtomicReference<>();
 
         // Act
-        Runnable wrapped = WorkspaceContextExecutor.wrap(() -> capturedContext.set(WorkspaceContextHolder.getContext()));
+        Runnable wrapped = WorkspaceContextExecutor.wrap(() -> capturedContext.set(WorkspaceContextHolder.getContext())
+        );
 
         // Clear context in main thread to simulate async boundary
         WorkspaceContextHolder.clearContext();
@@ -62,7 +63,14 @@ class WorkspaceContextExecutorTest {
     @DisplayName("Should propagate context to wrapped Callable")
     void shouldPropagateContextToCallable() throws Exception {
         // Arrange
-        WorkspaceContext workspaceContext = new WorkspaceContext(42L, "callable-test", "Test", AccountType.USER, null, Set.of());
+        WorkspaceContext workspaceContext = new WorkspaceContext(
+            42L,
+            "callable-test",
+            "Test",
+            AccountType.USER,
+            null,
+            Set.of()
+        );
         WorkspaceContextHolder.setContext(workspaceContext);
 
         // Act

@@ -59,11 +59,7 @@ public class WorkspaceMembershipService {
             return Collections.emptyMap();
         }
 
-        Set<Long> userIds = users
-            .stream()
-            .map(User::getId)
-            .filter(Objects::nonNull)
-            .collect(Collectors.toSet());
+        Set<Long> userIds = users.stream().map(User::getId).filter(Objects::nonNull).collect(Collectors.toSet());
 
         if (userIds.isEmpty()) {
             return Collections.emptyMap();
@@ -71,7 +67,9 @@ public class WorkspaceMembershipService {
 
         Optional<Workspace> workspaceOptional = resolveSingleWorkspace(context);
         if (workspaceOptional.isEmpty()) {
-            return userIds.stream().collect(Collectors.toMap(id -> id, id -> LeaguePointsCalculationService.POINTS_DEFAULT));
+            return userIds
+                .stream()
+                .collect(Collectors.toMap(id -> id, id -> LeaguePointsCalculationService.POINTS_DEFAULT));
         }
 
         Workspace workspace = workspaceOptional.get();
@@ -125,7 +123,10 @@ public class WorkspaceMembershipService {
             return;
         }
         if (workspaceOptional.isEmpty()) {
-            logger.debug("Skipping league point update for user {} because no workspace is configured.", user.getLogin());
+            logger.debug(
+                "Skipping league point update for user {} because no workspace is configured.",
+                user.getLogin()
+            );
             return;
         }
         Workspace workspace = workspaceOptional.get();
@@ -157,8 +158,9 @@ public class WorkspaceMembershipService {
             return;
         }
 
-        Map<Long, WorkspaceMembership.WorkspaceRole> normalizedRoles =
-            desiredRoles == null ? Collections.<Long, WorkspaceMembership.WorkspaceRole>emptyMap() : desiredRoles;
+        Map<Long, WorkspaceMembership.WorkspaceRole> normalizedRoles = desiredRoles == null
+            ? Collections.<Long, WorkspaceMembership.WorkspaceRole>emptyMap()
+            : desiredRoles;
 
         List<WorkspaceMembership> existingMembers = workspaceMembershipRepository.findByWorkspace_Id(workspace.getId());
         Map<Long, WorkspaceMembership> existingByUserId = existingMembers
@@ -177,9 +179,9 @@ public class WorkspaceMembershipService {
             if (userId == null) {
                 continue;
             }
-            WorkspaceMembership.WorkspaceRole desiredRole = Optional
-                .ofNullable(entry.getValue())
-                .orElse(WorkspaceMembership.WorkspaceRole.MEMBER);
+            WorkspaceMembership.WorkspaceRole desiredRole = Optional.ofNullable(entry.getValue()).orElse(
+                WorkspaceMembership.WorkspaceRole.MEMBER
+            );
             WorkspaceMembership existing = existingByUserId.get(userId);
             if (existing == null) {
                 User userReference = entityManager.getReference(User.class, userId);
@@ -229,8 +231,10 @@ public class WorkspaceMembershipService {
         }
 
         // Check if membership already exists
-        Optional<WorkspaceMembership> existing = workspaceMembershipRepository
-            .findByWorkspace_IdAndUser_Id(workspace.getId(), userId);
+        Optional<WorkspaceMembership> existing = workspaceMembershipRepository.findByWorkspace_IdAndUser_Id(
+            workspace.getId(),
+            userId
+        );
         if (existing.isPresent()) {
             throw new IllegalArgumentException(
                 "Membership already exists for workspace " + workspace.getId() + " and user " + userId
@@ -250,7 +254,11 @@ public class WorkspaceMembershipService {
         return createMembershipInternal(workspace, user, WorkspaceMembership.WorkspaceRole.MEMBER);
     }
 
-    private WorkspaceMembership createMembershipInternal(Workspace workspace, User user, WorkspaceMembership.WorkspaceRole role) {
+    private WorkspaceMembership createMembershipInternal(
+        Workspace workspace,
+        User user,
+        WorkspaceMembership.WorkspaceRole role
+    ) {
         WorkspaceMembership member = new WorkspaceMembership();
         member.setWorkspace(workspace);
         member.setUser(user);
