@@ -52,6 +52,7 @@ public class WorkspaceMembership {
     @NoArgsConstructor
     @AllArgsConstructor
     @EqualsAndHashCode
+    @ToString
     public static class Id implements Serializable {
 
         private Long workspaceId;
