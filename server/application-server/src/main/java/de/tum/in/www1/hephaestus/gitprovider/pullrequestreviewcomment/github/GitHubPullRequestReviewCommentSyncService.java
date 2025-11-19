@@ -245,9 +245,7 @@ public class GitHubPullRequestReviewCommentSyncService {
         PullRequestReviewComment comment,
         GHPullRequestReviewComment ghPullRequestReviewComment
     ) {
-        if (!thread.getComments().contains(comment)) {
-            thread.getComments().add(comment);
-        }
+        comment.setThread(thread);
 
         if (ghPullRequestReviewComment.getInReplyToId() <= 0L) {
             thread.setRootComment(comment);
