@@ -12,6 +12,7 @@ public class WorkspaceProperties {
 
     private boolean initDefault = true;
     private final DefaultWorkspace defaultWorkspace = new DefaultWorkspace();
+    private final Dev dev = new Dev();
 
     public boolean isInitDefault() {
         return initDefault;
@@ -30,6 +31,23 @@ public class WorkspaceProperties {
      */
     public DefaultWorkspace getDefault() {
         return defaultWorkspace;
+    }
+
+    public Dev getDev() {
+        return dev;
+    }
+
+    public static class Dev {
+
+        private boolean autoBootstrapFirstWorkspace = false;
+
+        public boolean isAutoBootstrapFirstWorkspace() {
+            return autoBootstrapFirstWorkspace;
+        }
+
+        public void setAutoBootstrapFirstWorkspace(boolean autoBootstrapFirstWorkspace) {
+            this.autoBootstrapFirstWorkspace = autoBootstrapFirstWorkspace;
+        }
     }
 
     public static class DefaultWorkspace {

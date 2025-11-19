@@ -85,6 +85,9 @@ hephaestus:
             repositories-to-monitor:
                 - ls1intum/Hephaestus
                 - ls1intum/Artemis
+        dev:
+            # Auto-create a dev workspace on fresh database (dev/local profiles only)
+            auto-bootstrap-first-workspace: false
     
     intelligence-service:
         url: http://localhost:8000
