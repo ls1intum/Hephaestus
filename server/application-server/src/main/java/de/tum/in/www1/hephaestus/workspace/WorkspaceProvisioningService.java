@@ -41,6 +41,7 @@ public class WorkspaceProvisioningService {
 
     private final WorkspaceProperties workspaceProperties;
     private final WorkspaceRepository workspaceRepository;
+    private final RepositoryToMonitorRepository repositoryToMonitorRepository;
     private final WorkspaceService workspaceService;
     private final GitHubAppTokenService gitHubAppTokenService;
     private final GitHubUserSyncService gitHubUserSyncService;
@@ -52,6 +53,7 @@ public class WorkspaceProvisioningService {
     public WorkspaceProvisioningService(
         WorkspaceProperties workspaceProperties,
         WorkspaceRepository workspaceRepository,
+        RepositoryToMonitorRepository repositoryToMonitorRepository,
         WorkspaceService workspaceService,
         GitHubAppTokenService gitHubAppTokenService,
         GitHubUserSyncService gitHubUserSyncService,
@@ -62,6 +64,7 @@ public class WorkspaceProvisioningService {
     ) {
         this.workspaceProperties = workspaceProperties;
         this.workspaceRepository = workspaceRepository;
+        this.repositoryToMonitorRepository = repositoryToMonitorRepository;
         this.workspaceService = workspaceService;
         this.gitHubAppTokenService = gitHubAppTokenService;
         this.gitHubUserSyncService = gitHubUserSyncService;
@@ -123,6 +126,13 @@ public class WorkspaceProvisioningService {
             config.getRepositorySelection() != null ? config.getRepositorySelection() : GHRepositorySelection.SELECTED
         );
 
+        Workspace savedWorkspace = workspaceRepository.save(workspace);
+        logger.info(
+            "Created default PAT workspace '{}' (id={}) for development convenience.",
+            savedWorkspace.getAccountLogin(),
+            savedWorkspace.getId()
+        );
+
         config
             .getRepositoriesToMonitor()
             .stream()
@@ -131,16 +141,14 @@ public class WorkspaceProvisioningService {
             .forEach(nameWithOwner -> {
                 RepositoryToMonitor monitor = new RepositoryToMonitor();
                 monitor.setNameWithOwner(nameWithOwner);
-                monitor.setWorkspace(workspace);
-                workspace.getRepositoriesToMonitor().add(monitor);
+                monitor.setWorkspace(savedWorkspace);
+                repositoryToMonitorRepository.save(monitor);
+                savedWorkspace.getRepositoriesToMonitor().add(monitor);
+                logger.info("Queued repository for monitoring: {}", nameWithOwner);
             });
 
-        Workspace savedWorkspace = workspaceRepository.save(workspace);
-        logger.info(
-            "Created default PAT workspace '{}' (id={}) for development convenience.",
-            savedWorkspace.getAccountLogin(),
-            savedWorkspace.getId()
-        );
+        workspaceRepository.save(savedWorkspace);
+        logger.info("PAT workspace provisioning complete. Repositories will be synced by startup monitoring.");
     }
 
     /**
@@ -240,6 +248,9 @@ public class WorkspaceProvisioningService {
         organizationSyncService.syncOrganization(workspace);
         organizationSyncService.syncMembers(workspace);
 
+        if (natsEnabled && workspace.getGithubRepositorySelection() == GHRepositorySelection.SELECTED) {
+            seedRepositoriesForWorkspace(workspace);
+        }
         if (natsEnabled && workspace.getGithubRepositorySelection() == GHRepositorySelection.SELECTED) {
             seedRepositoriesForWorkspace(workspace);
         }

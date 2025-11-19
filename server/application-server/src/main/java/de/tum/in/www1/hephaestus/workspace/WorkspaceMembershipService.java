@@ -39,8 +39,10 @@ public class WorkspaceMembershipService {
         }
 
         // Check if membership already exists
-        Optional<WorkspaceMembership> existing = workspaceMembershipRepository
-            .findByWorkspace_IdAndUser_Id(workspace.getId(), userId);
+        Optional<WorkspaceMembership> existing = workspaceMembershipRepository.findByWorkspace_IdAndUser_Id(
+            workspace.getId(),
+            userId
+        );
         if (existing.isPresent()) {
             throw new IllegalArgumentException(
                 "Membership already exists for workspace " + workspace.getId() + " and user " + userId
